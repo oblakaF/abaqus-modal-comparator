@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pyuff
+from scipy.signal import find_peaks, savgol_filter
 
 from modal_core import ModalDataset, ModeShape
 
@@ -36,12 +37,12 @@ def _read_geometry(datasets: Iterable[Dict[str, Any]]) -> Tuple[Dict[int, np.nda
 
     for dataset in datasets:
         dataset_type = _dataset_type(dataset)
-        if dataset_type in (151,):
-            for key in ("model_name", "description", "program", "db_app"):
+        if dataset_type == 151:
+            for key in ("model_name", "description", "program", "db_app", "id1", "id2", "id3", "id4", "id5"):
                 if dataset.get(key) not in (None, ""):
                     metadata[key] = dataset.get(key)
 
-        if dataset_type in (164,):
+        if dataset_type == 164:
             metadata["units_code"] = dataset.get("units_code")
             metadata["units_description"] = dataset.get("units_description")
             metadata["length_scale"] = dataset.get("length")
@@ -67,9 +68,9 @@ def _coordinates_for_nodes(node_numbers: np.ndarray, geometry: Dict[int, np.ndar
     if missing:
         sample = ", ".join(str(value) for value in missing[:8])
         raise ValueError(
-            "The UNV/UFF file contains modal vectors but no coordinates for "
+            "The UNV/UFF file contains vectors but no coordinates for "
             f"{len(missing)} nodes (for example: {sample}). "
-            "Export geometry together with modal data from Simcenter Testlab."
+            "Export geometry together with the measurement data from Simcenter Testlab."
         )
     return np.vstack([geometry[int(node)] for node in node_numbers])
 
@@ -115,6 +116,7 @@ def _mode_from_dataset_55(dataset: Dict[str, Any], geometry: Dict[int, np.ndarra
             "data_characteristic": dataset.get("data_ch"),
             "id1": dataset.get("id1"),
             "id2": dataset.get("id2"),
+            "mode_source": "curve-fitted modal dataset",
         },
     )
 
@@ -164,11 +166,374 @@ def _mode_from_dataset_2414(dataset: Dict[str, Any], geometry: Dict[int, np.ndar
             "data_characteristic": dataset.get("data_characteristic"),
             "result_type": dataset.get("result_type"),
             "analysis_dataset_name": dataset.get("analysis_dataset_name"),
+            "mode_source": "curve-fitted modal dataset",
         },
     )
 
 
-def load_universal_modal_file(file_path: Path) -> ModalDataset:
+def _axis_signature(dataset: Dict[str, Any]) -> Optional[Tuple[int, float, float, float]]:
+    x = _as_array(dataset.get("x"), dtype=float)
+    if len(x) < 3 or not np.all(np.isfinite(x)):
+        return None
+    step = float(np.median(np.diff(x)))
+    return len(x), round(float(x[0]), 10), round(float(x[-1]), 10), round(step, 10)
+
+
+def _frf_label(dataset: Dict[str, Any]) -> str:
+    return " ".join(
+        str(dataset.get(key, ""))
+        for key in (
+            "id1",
+            "id2",
+            "ordinate_axis_lab",
+            "ordinate_axis_units_lab",
+            "orddenom_axis_lab",
+            "orddenom_axis_units_lab",
+        )
+    ).lower()
+
+
+def _select_frf_group(
+    datasets: Sequence[Dict[str, Any]],
+    geometry: Dict[int, np.ndarray],
+) -> List[Dict[str, Any]]:
+    groups: Dict[Tuple[Any, ...], List[Dict[str, Any]]] = {}
+
+    for dataset in datasets:
+        if _dataset_type(dataset) != 58:
+            continue
+        if int(dataset.get("func_type", -1)) != 4:
+            continue
+        response_node = dataset.get("rsp_node")
+        response_direction = dataset.get("rsp_dir")
+        if response_node is None or int(response_node) not in geometry:
+            continue
+        if response_direction is None or abs(int(response_direction)) not in (1, 2, 3):
+            continue
+        data = _as_array(dataset.get("data"), dtype=complex)
+        signature = _axis_signature(dataset)
+        if signature is None or len(data) != signature[0]:
+            continue
+
+        label = _frf_label(dataset)
+        if "displacement" in label:
+            quantity_priority = 3
+        elif "velocity" in label:
+            quantity_priority = 2
+        elif "acceleration" in label or "accelerance" in label:
+            quantity_priority = 1
+        else:
+            quantity_priority = 0
+
+        key = (
+            signature,
+            int(dataset.get("ref_node", 0) or 0),
+            int(dataset.get("ref_dir", 0) or 0),
+            quantity_priority,
+            str(dataset.get("id2", "")),
+        )
+        groups.setdefault(key, []).append(dataset)
+
+    if not groups:
+        return []
+
+    def group_score(item: Tuple[Tuple[Any, ...], List[Dict[str, Any]]]) -> Tuple[int, int, int]:
+        key, group = item
+        unique_dofs = {
+            (int(dataset.get("rsp_node")), int(dataset.get("rsp_dir")))
+            for dataset in group
+        }
+        quantity_priority = int(key[3])
+        return quantity_priority, len(unique_dofs), len(group)
+
+    return max(groups.items(), key=group_score)[1]
+
+
+def _coherence_by_dof(
+    datasets: Sequence[Dict[str, Any]],
+    x_reference: np.ndarray,
+    reference_node: int,
+    reference_direction: int,
+) -> Dict[Tuple[int, int], np.ndarray]:
+    output: Dict[Tuple[int, int], np.ndarray] = {}
+    for dataset in datasets:
+        if _dataset_type(dataset) != 58 or int(dataset.get("func_type", -1)) != 6:
+            continue
+        if int(dataset.get("ref_node", 0) or 0) != reference_node:
+            continue
+        if int(dataset.get("ref_dir", 0) or 0) != reference_direction:
+            continue
+        x = _as_array(dataset.get("x"), dtype=float)
+        data = _as_array(dataset.get("data"), dtype=float)
+        if len(x) != len(x_reference) or len(data) != len(x_reference):
+            continue
+        if not np.allclose(x, x_reference, rtol=1e-8, atol=1e-10):
+            continue
+        node = int(dataset.get("rsp_node", 0) or 0)
+        direction = int(dataset.get("rsp_dir", 0) or 0)
+        output[(node, direction)] = np.clip(np.real(data), 0.0, 1.0)
+    return output
+
+
+def _estimate_half_power_damping(
+    frequency: np.ndarray,
+    indicator: np.ndarray,
+    peak_index: int,
+) -> Optional[float]:
+    peak_value = float(indicator[peak_index])
+    peak_frequency = float(frequency[peak_index])
+    if peak_value <= 0.0 or peak_frequency <= 0.0:
+        return None
+
+    threshold = peak_value / np.sqrt(2.0)
+    left = peak_index
+    while left > 0 and indicator[left] > threshold:
+        left -= 1
+    right = peak_index
+    while right < len(indicator) - 1 and indicator[right] > threshold:
+        right += 1
+    if left == 0 or right == len(indicator) - 1:
+        return None
+
+    def interpolate(first: int, second: int) -> float:
+        first_value = float(indicator[first])
+        second_value = float(indicator[second])
+        if abs(second_value - first_value) <= 1e-30:
+            return float(frequency[second])
+        return float(
+            frequency[first]
+            + (threshold - first_value)
+            * (frequency[second] - frequency[first])
+            / (second_value - first_value)
+        )
+
+    lower_frequency = interpolate(left, left + 1)
+    upper_frequency = interpolate(right - 1, right)
+    damping = (upper_frequency - lower_frequency) / (2.0 * peak_frequency)
+    if not np.isfinite(damping) or damping <= 0.0 or damping >= 0.50:
+        return None
+    return float(damping)
+
+
+def _phase_complexity(vector: np.ndarray) -> float:
+    flattened = np.asarray(vector, dtype=complex).reshape(-1)
+    if not len(flattened) or np.max(np.abs(flattened)) <= 1e-30:
+        return 1.0
+    reference = flattened[int(np.argmax(np.abs(flattened)))]
+    aligned = flattened * np.exp(-1j * np.angle(reference))
+    real_norm = float(np.linalg.norm(np.real(aligned)))
+    imaginary_norm = float(np.linalg.norm(np.imag(aligned)))
+    return imaginary_norm / max(real_norm, 1e-30)
+
+
+def _detect_frf_peak_indices(
+    frequency: np.ndarray,
+    indicator: np.ndarray,
+    mean_coherence: np.ndarray,
+    target_frequencies: Optional[Sequence[float]],
+    target_count: int,
+) -> np.ndarray:
+    safe_indicator = np.maximum(indicator, max(float(np.max(indicator)), 1e-30) * 1e-14)
+    logarithmic = np.log10(safe_indicator)
+    frequency_step = float(np.median(np.diff(frequency)))
+
+    window = max(5, int(round(2.0 / max(frequency_step, 1e-12))))
+    if window % 2 == 0:
+        window += 1
+    maximum_window = len(frequency) - 1 if (len(frequency) - 1) % 2 == 1 else len(frequency) - 2
+    window = min(window, maximum_window)
+    smoothed = savgol_filter(logarithmic, window, 2) if window >= 5 else logarithmic
+
+    minimum_distance = max(2, int(round(1.25 / max(frequency_step, 1e-12))))
+    peaks, properties = find_peaks(smoothed, distance=minimum_distance, prominence=0.02)
+
+    targets = np.asarray(
+        [value for value in (target_frequencies or []) if np.isfinite(value) and value > 0.0],
+        dtype=float,
+    )
+    if len(targets):
+        lower_frequency = max(float(frequency[0]), 5.0, float(np.min(targets)) * 0.35)
+        upper_frequency = min(float(frequency[-1]), float(np.max(targets)) * 1.80)
+    else:
+        lower_frequency = max(float(frequency[0]), 5.0)
+        upper_frequency = float(frequency[-1])
+
+    in_band = (frequency[peaks] >= lower_frequency) & (frequency[peaks] <= upper_frequency)
+    peaks = peaks[in_band]
+    prominences = properties["prominences"][in_band]
+    if not len(peaks):
+        raise ValueError(
+            f"No FRF resonance peaks were detected between {lower_frequency:.3f} and {upper_frequency:.3f} Hz."
+        )
+
+    amplitude_range = float(np.ptp(smoothed[peaks]))
+    normalized_amplitude = (
+        (smoothed[peaks] - float(np.min(smoothed[peaks]))) / max(amplitude_range, 1e-12)
+    )
+    scores = (
+        prominences
+        + 0.25 * np.clip(mean_coherence[peaks], 0.0, 1.0)
+        + 0.15 * normalized_amplitude
+    )
+
+    if len(targets):
+        relative_distance = np.min(
+            np.abs(frequency[peaks, None] - targets[None, :])
+            / np.maximum(targets[None, :], 1.0),
+            axis=1,
+        )
+        scores += 0.25 * np.exp(-((relative_distance / 0.15) ** 2))
+
+    damping_values = [
+        _estimate_half_power_damping(frequency, indicator, int(index)) for index in peaks
+    ]
+    physically_plausible = np.array(
+        [value is None or value <= 0.15 for value in damping_values], dtype=bool
+    )
+    if np.count_nonzero(physically_plausible) >= max(1, target_count):
+        peaks = peaks[physically_plausible]
+        scores = scores[physically_plausible]
+
+    maximum_candidates = min(40, max(target_count + 6, target_count * 3))
+    if len(peaks) > maximum_candidates:
+        selected = np.argsort(scores)[::-1][:maximum_candidates]
+        peaks = peaks[selected]
+
+    return np.sort(peaks.astype(int))
+
+
+def _modes_from_frf_datasets(
+    datasets: Sequence[Dict[str, Any]],
+    geometry: Dict[int, np.ndarray],
+    target_frequencies: Optional[Sequence[float]],
+    target_count: int,
+) -> Tuple[List[ModeShape], Dict[str, Any]]:
+    target_count = max(12, int(target_count))
+    frf_group = _select_frf_group(datasets, geometry)
+    if not frf_group:
+        raise ValueError(
+            "No usable frequency-response functions were found in dataset 58."
+        )
+
+    x_reference = _as_array(frf_group[0].get("x"), dtype=float)
+    if len(x_reference) < 5:
+        raise ValueError("The selected FRF group contains too few frequency lines.")
+
+    reference_node = int(frf_group[0].get("ref_node", 0) or 0)
+    reference_direction = int(frf_group[0].get("ref_dir", 0) or 0)
+    coherence_lookup = _coherence_by_dof(
+        datasets,
+        x_reference,
+        reference_node,
+        reference_direction,
+    )
+
+    dof_data: Dict[Tuple[int, int], np.ndarray] = {}
+    for dataset in frf_group:
+        x = _as_array(dataset.get("x"), dtype=float)
+        data = _as_array(dataset.get("data"), dtype=complex)
+        if len(x) != len(x_reference) or len(data) != len(x_reference):
+            continue
+        if not np.allclose(x, x_reference, rtol=1e-8, atol=1e-10):
+            continue
+        node = int(dataset.get("rsp_node"))
+        direction = int(dataset.get("rsp_dir"))
+        dof_data[(node, direction)] = data
+
+    if not dof_data:
+        raise ValueError("No compatible nodal FRF channels were found.")
+
+    row_keys = sorted(dof_data)
+    frf_matrix = np.vstack([dof_data[key] for key in row_keys])
+    indicator = np.linalg.norm(frf_matrix, axis=0)
+
+    coherence_rows = [
+        coherence_lookup[key]
+        for key in row_keys
+        if key in coherence_lookup
+    ]
+    if coherence_rows:
+        mean_coherence = np.mean(np.vstack(coherence_rows), axis=0)
+    else:
+        mean_coherence = np.ones_like(x_reference, dtype=float)
+
+    peak_indices = _detect_frf_peak_indices(
+        x_reference,
+        indicator,
+        mean_coherence,
+        target_frequencies,
+        max(1, target_count),
+    )
+
+    node_numbers = np.asarray(sorted({node for node, _ in row_keys}), dtype=int)
+    node_index = {int(node): index for index, node in enumerate(node_numbers)}
+    coordinates = _coordinates_for_nodes(node_numbers, geometry)
+    modes: List[ModeShape] = []
+
+    for mode_number, peak_index in enumerate(peak_indices, start=1):
+        vectors = np.zeros((len(node_numbers), 3), dtype=complex)
+        for node, signed_direction in row_keys:
+            direction = abs(int(signed_direction))
+            sign = -1.0 if int(signed_direction) < 0 else 1.0
+            if direction not in (1, 2, 3):
+                continue
+            vectors[node_index[int(node)], direction - 1] = (
+                sign * dof_data[(node, signed_direction)][peak_index]
+            )
+
+        damping = _estimate_half_power_damping(x_reference, indicator, int(peak_index))
+        modes.append(
+            ModeShape(
+                number=mode_number,
+                frequency_hz=float(x_reference[peak_index]),
+                node_ids=node_numbers.astype(object),
+                coordinates=coordinates,
+                vectors=vectors,
+                damping_ratio=damping,
+                metadata={
+                    "dataset_type": 58,
+                    "mode_source": "FRF peak-derived experimental shape",
+                    "frequency_line_index": int(peak_index),
+                    "mean_coherence": float(mean_coherence[peak_index]),
+                    "frf_indicator": float(indicator[peak_index]),
+                    "phase_complexity_ratio": float(_phase_complexity(vectors)),
+                    "response_quantity": str(frf_group[0].get("id2", "")),
+                    "reference_node": reference_node,
+                    "reference_direction": reference_direction,
+                },
+            )
+        )
+
+    metadata = {
+        "mode_source": "dataset 58 FRF peak extraction",
+        "frf_channel_count": len(dof_data),
+        "frf_response_node_count": len(node_numbers),
+        "frf_reference_node": reference_node,
+        "frf_reference_direction": reference_direction,
+        "frf_frequency_start_hz": float(x_reference[0]),
+        "frf_frequency_end_hz": float(x_reference[-1]),
+        "frf_frequency_lines": len(x_reference),
+        "frf_frequency_increment_hz": float(np.median(np.diff(x_reference))),
+        "detected_peak_frequencies_hz": [mode.frequency_hz for mode in modes],
+        "frf_quantity": str(frf_group[0].get("id2", "")),
+        "coherence_channel_count": len(coherence_rows),
+        "frf_mode_warning": (
+            "Experimental shapes were derived directly from complex FRFs at detected resonance peaks. "
+            "They are suitable for automatic screening and MAC comparison, but they are not a substitute "
+            "for a fully curve-fitted Simcenter modal model when modes are strongly overlapping."
+        ),
+        "_frf_frequency_hz": x_reference.tolist(),
+        "_frf_indicator": indicator.tolist(),
+        "_frf_mean_coherence": mean_coherence.tolist(),
+    }
+    return modes, metadata
+
+
+def load_universal_modal_file(
+    file_path: Path,
+    target_frequencies: Optional[Sequence[float]] = None,
+    target_count: Optional[int] = None,
+) -> ModalDataset:
     file_path = Path(file_path)
     if not file_path.exists():
         raise FileNotFoundError(file_path)
@@ -200,23 +565,30 @@ def load_universal_modal_file(file_path: Path) -> ModalDataset:
         except ValueError as error:
             errors.append(str(error))
 
+    source_name = "Simcenter Testlab UNV/UFF"
     if not modes:
-        found = ", ".join(str(value) for value in sorted(set(metadata["dataset_types"])))
-        detail = f" Detected dataset types: {found}." if found else ""
-        if errors:
-            detail += " " + " | ".join(errors[:3])
-        raise ValueError(
-            "No experimental mode shapes were found in the UNV/UFF file. "
-            "The file must include geometry (dataset 15 or 2411) and modal data "
-            f"(dataset 55 or modal dataset 2414).{detail}"
+        if 58 not in metadata["dataset_types"]:
+            found = ", ".join(str(value) for value in sorted(set(metadata["dataset_types"])))
+            raise ValueError(
+                "No experimental modal vectors or FRFs were found in the UNV/UFF file. "
+                f"Detected dataset types: {found}."
+            )
+        frf_modes, frf_metadata = _modes_from_frf_datasets(
+            dataset_list,
+            geometry,
+            target_frequencies,
+            target_count or 12,
         )
+        modes.extend(frf_modes)
+        metadata.update(frf_metadata)
+        source_name = "Simcenter Testlab UNV/UFF — FRF-derived modes"
 
     modes.sort(key=lambda mode: mode.number)
     metadata["mode_count"] = len(modes)
     metadata["import_warnings"] = errors
 
     return ModalDataset(
-        source_name="Simcenter Testlab UNV/UFF",
+        source_name=source_name,
         source_path=file_path,
         modes=modes,
         metadata=metadata,
