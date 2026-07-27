@@ -5,10 +5,13 @@ install_universal_hardening()
 install_reporting_hardening()
 
 from enhanced_reporting import install_reporting_enhancements
+from advanced_reporting import install_advanced_reporting
 
 install_reporting_enhancements()
+install_advanced_reporting()
 
 import app
+from advanced_ui import install_advanced_ui
 from quality_control import compare_modal_datasets_with_quality_control
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
@@ -17,6 +20,7 @@ from ui_enhancements import install_app_enhancements
 app.compare_modal_datasets = compare_modal_datasets_with_quality_control
 install_app_enhancements(app)
 install_runtime_hardening(app)
+install_advanced_ui(app)
 
 
 if __name__ == "__main__":
