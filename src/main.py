@@ -1,6 +1,8 @@
 from universal_hardening import install_universal_hardening
+from reporting_hardening import install_reporting_hardening
 
 install_universal_hardening()
+install_reporting_hardening()
 
 from enhanced_reporting import install_reporting_enhancements
 
