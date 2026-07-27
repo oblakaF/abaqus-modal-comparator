@@ -1,30 +1,34 @@
 # Abaqus–Simcenter Modal Comparator
 
-A Windows desktop application that compares numerical modal results from an Abaqus output database with experimental modal results from Siemens LMS / Simcenter Testlab.
+A Windows desktop application for comparing Abaqus modal results with Siemens LMS / Simcenter Testlab measurements.
 
-The normal workflow requires only two result files:
+The normal workflow requires only:
 
-- Abaqus: `*.odb`
-- Simcenter Testlab: `*.unv` or `*.uff`
+- Abaqus `*.odb`;
+- Simcenter Testlab `*.unv` or `*.uff`.
 
-No manual frequency entry and no manual Abaqus screenshots are required.
+No manual frequency entry or Abaqus screenshots are required.
 
 ## Main functions
 
-- Runs an Abaqus Python extraction script against the selected ODB.
-- Extracts Abaqus mode numbers, natural frequencies, FE-node coordinates, and complex `U1/U2/U3` mode-shape vectors.
-- Preserves useful modal history outputs when they are present in the ODB.
-- Reads Testlab Universal File Format geometry and modal datasets.
-- Supports UNV/UFF geometry datasets 15 and 2411.
-- Supports modal datasets 55 and 2414.
-- Reads experimental mode number, frequency, damping, modal mass, node coordinates, and complex modal vectors when available.
-- Automatically detects coordinate-unit scale and signed axis permutations.
-- Maps experimental measurement points to Abaqus FE nodes.
-- Calculates the full MAC matrix.
-- Performs one-to-one mode assignment using MAC and frequency error.
-- Detects mode-order changes.
-- Displays Abaqus, experimental, and overlaid mode-shape plots.
-- Exports an Excel workbook and a multipage PDF report.
+- Opens the ODB through the Python interpreter supplied with Abaqus.
+- Extracts mode numbers, frequencies, FE coordinates, and complex `U1/U2/U3` vectors.
+- Reuses a valid ODB extraction cache when the ODB, mode range, and Abaqus command have not changed.
+- Reads UNV/UFF geometry datasets 15/2411.
+- Reads curve-fitted modal datasets 55 and 2414 with tolerant key/scalar handling for pyuff variants.
+- Reads raw complex FRFs from dataset 58 and derives resonance-peak shapes when a curve-fitted modal dataset is absent.
+- Reads coherence, estimates peak damping, and reports the limitations of peak-derived shapes.
+- Detects measured experimental degrees of freedom and calculates MAC only on those DOFs.
+- Aligns coordinate scale, axis order, and axis signs; a manual scale override is available.
+- Reports duplicate nearest-node mappings and reflected coordinate transformations.
+- Applies frequency/MAC admissibility limits before one-to-one assignment, so a bad pair cannot consume a good partner.
+- Retains the sign of frequency error:
+  - positive: Abaqus frequency is higher than experiment;
+  - negative: Abaqus frequency is lower than experiment.
+- Detects mode-order changes only within accepted matched pairs.
+- Calculates full MAC, verified-pair MAC, AutoMAC, and COMAC.
+- Displays mode-shape fields, a shared-scale correlation plot, FRF/coherence diagnostics, and frequency regression.
+- Exports Excel and PDF reports.
 
 ## First launch on Windows
 
@@ -34,77 +38,93 @@ Double-click:
 RUN_PROGRAM.cmd
 ```
 
-The launcher creates a private `.venv` folder and installs the required Python packages. This can take several minutes on the first run.
+The launcher creates a local `.venv` environment and installs the required packages. The first launch can take several minutes.
 
 ## Input procedure
 
 1. Select the Abaqus `*.odb` file.
 2. Select the Simcenter Testlab `*.unv` or `*.uff` file.
-3. Keep the default Abaqus command as `abaqus`, or enter the command used by the installed version, for example:
+3. Keep the Abaqus command as `abaqus`, or enter the command used by the installed release, for example `abq2024`.
+4. Choose the Abaqus mode range.
+5. Leave coordinate scale as `auto`. When the experimental grid covers only part of the specimen and automatic scale is unreliable, enter a known scale such as `0.001` for mm→m.
+6. Press **Extract, compare, and build report data**.
+
+## LMS projects
+
+A native `*.lms` database depends on installed/licensed Testlab Automation components and project-version details. The application can use an LMS file as a pointer when a companion UNV/UFF file is beside it. Selecting the supplied UNV/UFF directly remains the most portable workflow.
+
+## Experimental data paths
+
+### Curve-fitted modes
+
+Preferred input contains:
+
+- geometry dataset 15 or 2411;
+- modal dataset 55 or 2414.
+
+These modes are the most rigorous input for MAC.
+
+### Raw FRFs
+
+A dataset-58-only file is supported. The program combines the complex FRFs, detects resonance peaks, estimates coherence/damping, and constructs experimental shapes at the selected frequency lines.
+
+Peak-derived shapes are useful for automatic screening and correlation, but they are less rigorous than a full multi-mode curve fit when modes overlap strongly. This distinction is shown in the interface and reports.
+
+## Quality control
+
+Near-zero rigid modes are detected by a relative frequency-gap criterion rather than a fixed 1 Hz limit.
+
+Default admissibility limits are applied **before** the Hungarian assignment:
 
 ```text
-abq2024
+|frequency error| <= 15%
+MAC >= 0.50
 ```
 
-A full path to an Abaqus batch command can also be entered.
-
-4. Keep Abaqus modes `6` to `14`, or change the range.
-5. Press **Extract, compare, and build report data**.
-
-The experimental modes are detected automatically.
-
-## Selecting an LMS project
-
-The native `*.lms` database requires installed and licensed Simcenter Testlab Automation libraries and its internal database layout varies by Testlab version and project template.
-
-The application therefore accepts the `*.lms` file only as a project pointer and automatically looks for a companion `*.unv` or `*.uff` file in the same folder. Since the supplied test data include both LMS and UNV files, select the UNV file directly for the most reliable import.
-
-## Required Testlab UNV/UFF contents
-
-For numerical MAC, the universal file must contain:
-
-- geometry: dataset 15 or 2411;
-- experimental modal vectors: dataset 55 or modal dataset 2414.
-
-A file containing only FRFs in dataset 58 is not yet sufficient for MAC because modal parameter identification and curve fitting would still be required.
-
-## Abaqus extraction
-
-The ODB is proprietary and is read by the Python interpreter installed with Abaqus. The desktop application calls:
+A pair without calculable MAC can be accepted by frequency only when:
 
 ```text
-abaqus python abaqus_scripts\extract_odb.py ...
+|frequency error| <= 10%
 ```
 
-The extractor writes a reusable local package containing `manifest.json` and one CSV file per mode. A previously extracted `manifest.json` can be selected instead of rerunning Abaqus.
+Modes that do not satisfy these limits are left unmatched. The FRF & quality tab lists:
+
+- excluded near-zero modes;
+- unmatched Abaqus modes;
+- unmatched experimental peak candidates;
+- closely spaced mode groups;
+- selected coordinate scale and transformation warnings.
+
+## Local coordinate systems
+
+The importer detects dataset 2420 and non-default `def_cs`/`disp_cs` identifiers. It currently warns rather than silently assuming these vectors are global. When such a warning appears, confirm that Testlab exported response directions in the global system before interpreting MAC.
 
 ## Reports
 
-The Excel report contains:
+Excel includes:
 
 - summary and source files;
+- signed and absolute frequency errors;
 - mode-pair table;
-- frequency errors;
-- MAC values;
-- mode-order changes;
-- MAC matrix;
+- full and verified MAC matrices;
+- FRF/coherence diagnostics;
 - geometry mapping distances;
-- Abaqus modal history output;
-- frequency and MAC figures.
+- quality-control decisions;
+- AutoMAC and COMAC;
+- Abaqus modal history output.
 
-The PDF report contains the summary, frequency comparison, MAC matrix, and one page for every matched Abaqus–experimental mode pair.
+PDF includes summary pages, frequency regression, MAC, FRF diagnostics, quality-control decisions, AutoMAC/COMAC, and a page for every accepted mode pair.
 
-## Current engineering assumptions
+## Engineering interpretation
 
-- The experimental geometry and Abaqus geometry describe the same physical panel.
-- Their coordinate systems may differ by unit scale, axis order, and axis signs.
-- Experimental points are mapped to nearest Abaqus nodes after automatic alignment.
-- Mode-shape comparison uses available translational components.
-- For the best result, export the experimental mode-shape vectors and geometry together from Testlab.
+- High MAC confirms similarity only over measured DOFs.
+- High off-diagonal AutoMAC indicates that the measurement grid cannot distinguish some shapes reliably.
+- Low COMAC identifies local regions where Abaqus and experiment disagree repeatedly.
+- A frequency-regression slope above 1 means Abaqus is generally higher/stiffer; below 1 means generally lower/softer.
 
-## Repository data policy
+## Data policy
 
-Large or confidential project files are intentionally ignored by Git:
+Large or confidential files are ignored by Git:
 
 ```text
 *.odb
@@ -113,4 +133,4 @@ Large or confidential project files are intentionally ignored by Git:
 *.uff
 ```
 
-Keep these files on the laboratory computer and select them through the program interface.
+Keep laboratory files local and select them through the desktop interface.
