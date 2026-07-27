@@ -8,12 +8,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from modal_core import ModalDataset, ModeShape
-from reviewed_core import (
-    _admissible_assignment,
+from modal_correlation import (
     compare_modal_datasets,
     frequency_error_percent,
     geometry_alignment_candidates,
 )
+from reviewed_core import _admissible_assignment
 
 
 class ReviewedCoreTests(unittest.TestCase):
