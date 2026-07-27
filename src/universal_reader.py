@@ -345,7 +345,7 @@ def _detect_frf_peak_indices(
     smoothed = savgol_filter(logarithmic, window, 2) if window >= 5 else logarithmic
 
     minimum_distance = max(2, int(round(1.25 / max(frequency_step, 1e-12))))
-    peaks, properties = find_peaks(smoothed, distance=minimum_distance, prominence=0.04)
+    peaks, properties = find_peaks(smoothed, distance=minimum_distance, prominence=0.02)
 
     targets = np.asarray(
         [value for value in (target_frequencies or []) if np.isfinite(value) and value > 0.0],
@@ -408,6 +408,7 @@ def _modes_from_frf_datasets(
     target_frequencies: Optional[Sequence[float]],
     target_count: int,
 ) -> Tuple[List[ModeShape], Dict[str, Any]]:
+    target_count = max(12, int(target_count))
     frf_group = _select_frf_group(datasets, geometry)
     if not frf_group:
         raise ValueError(
@@ -576,7 +577,7 @@ def load_universal_modal_file(
             dataset_list,
             geometry,
             target_frequencies,
-            target_count or max(1, len(target_frequencies or [])),
+            target_count or 12,
         )
         modes.extend(frf_modes)
         metadata.update(frf_metadata)
