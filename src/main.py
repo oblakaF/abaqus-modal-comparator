@@ -8,9 +8,11 @@ install_reporting_hardening()
 
 from enhanced_reporting import install_reporting_enhancements
 from advanced_reporting import install_advanced_reporting
+from final_reporting_review import install_final_reporting_review
 
 install_reporting_enhancements()
 install_advanced_reporting()
+install_final_reporting_review()
 
 import app
 from advanced_ui import install_advanced_ui
