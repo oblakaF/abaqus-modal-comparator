@@ -7,7 +7,10 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from universal_reader import _modes_from_frf_datasets
+from universal_frf_review import modes_from_frf_datasets
+from universal_hardening import install_universal_hardening
+
+install_universal_hardening()
 
 
 class FrfModeImportTests(unittest.TestCase):
@@ -70,7 +73,7 @@ class FrfModeImportTests(unittest.TestCase):
                 }
             )
 
-        modes, metadata = _modes_from_frf_datasets(
+        modes, metadata = modes_from_frf_datasets(
             datasets,
             geometry,
             target_frequencies=natural_frequencies,
@@ -81,10 +84,13 @@ class FrfModeImportTests(unittest.TestCase):
         for expected in natural_frequencies:
             self.assertLess(float(np.min(np.abs(detected - expected))), 0.8)
 
+        self.assertEqual(metadata["requested_peak_count"], 3)
         self.assertEqual(metadata["frf_response_node_count"], 25)
         self.assertEqual(metadata["coherence_channel_count"], 25)
         self.assertTrue(all(mode.metadata["dataset_type"] == 58 for mode in modes))
         self.assertTrue(all(mode.vectors.shape == (25, 3) for mode in modes))
+        self.assertTrue(all(np.all(mode.measured_dofs[:, 2]) for mode in modes))
+        self.assertTrue(all(not np.any(mode.measured_dofs[:, :2]) for mode in modes))
 
 
 if __name__ == "__main__":
