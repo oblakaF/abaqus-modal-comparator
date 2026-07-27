@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from modal_core import ModalDataset, ModeShape
-from quality_control import compare_modal_datasets_with_quality_control
+from quality_control_reviewed import compare_modal_datasets_with_quality_control
 
 
 class QualityControlTests(unittest.TestCase):
@@ -57,7 +57,7 @@ class QualityControlTests(unittest.TestCase):
         close_groups = result.abaqus.metadata["close_abaqus_mode_groups"]
         self.assertTrue(any({8, 9}.issubset({item["mode"] for item in group}) for group in close_groups))
         self.assertTrue(any("rigid-body" in warning for warning in result.warnings))
-        self.assertTrue(any("left unmatched" in warning for warning in result.warnings))
+        self.assertTrue(any("No admissible" in warning for warning in result.warnings))
         self.assertTrue(any("Closely spaced" in warning for warning in result.warnings))
 
 
