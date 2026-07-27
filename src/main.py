@@ -1,13 +1,30 @@
-from quality_control import install_quality_control
-from enhanced_reporting import install_reporting_enhancements
+from universal_hardening import install_universal_hardening
+from universal_frf_review import install_frf_review
+from reporting_hardening import install_reporting_hardening
 
-install_quality_control()
+install_universal_hardening()
+install_frf_review()
+install_reporting_hardening()
+
+from enhanced_reporting import install_reporting_enhancements
+from advanced_reporting import install_advanced_reporting
+from final_reporting_review import install_final_reporting_review
+
 install_reporting_enhancements()
+install_advanced_reporting()
+install_final_reporting_review()
 
 import app
+from advanced_ui import install_advanced_ui
+from quality_control_reviewed import compare_modal_datasets_with_quality_control
+from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
 
+# Bind the reviewed comparison path explicitly. No import-order monkey patch is required.
+app.compare_modal_datasets = compare_modal_datasets_with_quality_control
 install_app_enhancements(app)
+install_runtime_hardening(app)
+install_advanced_ui(app)
 
 
 if __name__ == "__main__":
