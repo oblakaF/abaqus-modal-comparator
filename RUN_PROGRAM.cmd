@@ -2,46 +2,46 @@
 setlocal
 cd /d "%~dp0"
 
-set "PYTHON_CMD="
+title Abaqus-Simcenter Modal Comparator
 
-where python >nul 2>nul
-if not errorlevel 1 set "PYTHON_CMD=python"
+set "BASE_PYTHON="
+where py >nul 2>nul
+if not errorlevel 1 set "BASE_PYTHON=py -3"
 
-if not defined PYTHON_CMD (
-    where py >nul 2>nul
-    if not errorlevel 1 set "PYTHON_CMD=py -3"
+if not defined BASE_PYTHON (
+    where python >nul 2>nul
+    if not errorlevel 1 set "BASE_PYTHON=python"
 )
 
-if not defined PYTHON_CMD (
-    echo Python was not found.
+if not defined BASE_PYTHON (
+    echo Python 3 was not found.
     echo Install Python 3 and enable the "Add Python to PATH" option.
     echo.
     pause
     exit /b 1
 )
 
-%PYTHON_CMD% -c "import PIL" >nul 2>nul
-if errorlevel 1 (
-    echo Installing the image-preview dependency...
-    %PYTHON_CMD% -m pip install -r requirements.txt
-    if errorlevel 1 (
-        echo.
-        echo The required package could not be installed.
-        echo Run this command manually:
-        echo %PYTHON_CMD% -m pip install -r requirements.txt
-        echo.
-        pause
-        exit /b 1
-    )
+if not exist ".venv\Scripts\python.exe" (
+    echo Creating the local Python environment...
+    %BASE_PYTHON% -m venv .venv
+    if errorlevel 1 goto :error
 )
 
-echo Starting Abaqus Modal Comparator...
-%PYTHON_CMD% src\main.py
+echo Checking program dependencies...
+".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements.txt
+if errorlevel 1 goto :error
 
-if errorlevel 1 (
-    echo.
-    echo The program finished with an error.
-    pause
-)
+echo Starting Abaqus-Simcenter Modal Comparator...
+".venv\Scripts\python.exe" src\main.py
+if errorlevel 1 goto :error
 
 endlocal
+exit /b 0
+
+:error
+echo.
+echo The program could not start or finished with an error.
+echo Review the messages above, then press any key.
+pause >nul
+endlocal
+exit /b 1
