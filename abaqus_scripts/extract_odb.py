@@ -90,19 +90,37 @@ def node_coordinates(odb):
     return coordinates
 
 
+def sequence_values(raw_value):
+    """Convert Abaqus scalar/list/tuple/numpy-like data to a normal list.
+
+    Abaqus may expose FieldValue.data and conjugateData as numpy arrays. Their
+    truth value is ambiguous, so they must never be used in expressions such as
+    ``raw_value or ()`` or ``if raw_value``.
+    """
+    if raw_value is None:
+        return []
+    try:
+        return list(raw_value)
+    except TypeError:
+        return [raw_value]
+
+
 def vector_parts(value):
-    real_data = list(getattr(value, "data", ()) or ())
+    real_data = sequence_values(getattr(value, "data", None))
     while len(real_data) < 3:
         real_data.append(0.0)
+
     imaginary_data = [0.0, 0.0, 0.0]
     try:
         conjugate = getattr(value, "conjugateData", None)
-        if conjugate:
-            imaginary_data = list(conjugate)
+        conjugate_values = sequence_values(conjugate)
+        if len(conjugate_values) > 0:
+            imaginary_data = conjugate_values
             while len(imaginary_data) < 3:
                 imaginary_data.append(0.0)
     except Exception:
         pass
+
     return real_data[:3], imaginary_data[:3]
 
 
