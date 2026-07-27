@@ -1,0 +1,1 @@
+﻿# Abaqus ODB extraction scripts
