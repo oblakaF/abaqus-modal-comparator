@@ -50,12 +50,12 @@ def run_abaqus_extraction(
         "--end-mode",
         str(end_mode),
     ]
-
     executable = abaqus_command.strip() or "abaqus"
-    if os.name == "nt":
-        command = _windows_command(executable, arguments)
-    else:
-        command = shlex.split(executable) + arguments
+    command = (
+        _windows_command(executable, arguments)
+        if os.name == "nt"
+        else shlex.split(executable) + arguments
+    )
 
     try:
         completed = subprocess.run(
@@ -95,11 +95,15 @@ def run_abaqus_extraction(
             + tail
             + f"\n\nFull log: {log_path}"
         )
-
     return manifest_path
 
 
-def _load_mode_csv(file_path: Path, mode_number: int, frequency_hz: float, metadata: Dict[str, Any]) -> ModeShape:
+def _load_mode_csv(
+    file_path: Path,
+    mode_number: int,
+    frequency_hz: float,
+    metadata: Dict[str, Any],
+) -> ModeShape:
     node_ids: List[str] = []
     coordinates: List[List[float]] = []
     vectors: List[List[complex]] = []
@@ -136,7 +140,7 @@ def _load_mode_csv(file_path: Path, mode_number: int, frequency_hz: float, metad
     if not node_ids:
         raise ValueError(f"No displacement values were found in {file_path.name}.")
 
-    return ModeShape(
+    mode = ModeShape(
         number=mode_number,
         frequency_hz=frequency_hz,
         node_ids=np.asarray(node_ids, dtype=object),
@@ -144,6 +148,8 @@ def _load_mode_csv(file_path: Path, mode_number: int, frequency_hz: float, metad
         vectors=np.asarray(vectors, dtype=complex),
         metadata=metadata,
     )
+    mode.measured_dofs = np.ones(mode.vectors.shape, dtype=bool)
+    return mode
 
 
 def load_extracted_odb(manifest_path: Path) -> ModalDataset:
@@ -154,6 +160,8 @@ def load_extracted_odb(manifest_path: Path) -> ModalDataset:
     modes: List[ModeShape] = []
     for mode_entry in manifest.get("modes", []):
         file_path = manifest_path.parent / mode_entry["file"]
+        if not file_path.exists():
+            raise FileNotFoundError(f"Extracted mode file is missing: {file_path}")
         modes.append(
             _load_mode_csv(
                 file_path=file_path,
@@ -169,7 +177,6 @@ def load_extracted_odb(manifest_path: Path) -> ModalDataset:
 
     if not modes:
         raise ValueError("The extracted Abaqus package contains no modes.")
-
     return ModalDataset(
         source_name="Abaqus ODB",
         source_path=Path(manifest.get("odb_path", manifest_path)),
@@ -177,6 +184,44 @@ def load_extracted_odb(manifest_path: Path) -> ModalDataset:
         metadata=manifest,
         history=list(manifest.get("history", [])),
     )
+
+
+def _source_signature(
+    odb_path: Path,
+    abaqus_command: str,
+    start_mode: int,
+    end_mode: int,
+) -> Dict[str, Any]:
+    stat = odb_path.stat()
+    return {
+        "odb_path": str(odb_path.resolve()),
+        "odb_size": int(stat.st_size),
+        "odb_mtime_ns": int(stat.st_mtime_ns),
+        "abaqus_command": abaqus_command.strip() or "abaqus",
+        "start_mode": int(start_mode),
+        "end_mode": int(end_mode),
+    }
+
+
+def _cache_is_valid(
+    cache_directory: Path,
+    signature: Dict[str, Any],
+) -> bool:
+    manifest_path = cache_directory / "manifest.json"
+    signature_path = cache_directory / "extraction_signature.json"
+    if not manifest_path.exists() or not signature_path.exists():
+        return False
+    try:
+        cached_signature = json.loads(signature_path.read_text(encoding="utf-8"))
+        if cached_signature != signature:
+            return False
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return bool(manifest.get("modes")) and all(
+            (cache_directory / item["file"]).exists()
+            for item in manifest.get("modes", [])
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
 
 
 def load_or_extract_odb(
@@ -189,9 +234,21 @@ def load_or_extract_odb(
     selected = Path(odb_or_manifest_path)
     if selected.name.lower() == "manifest.json":
         return load_extracted_odb(selected)
-
     if selected.suffix.lower() != ".odb":
-        raise ValueError("Select an Abaqus .odb file or a previously extracted manifest.json file.")
+        raise ValueError(
+            "Select an Abaqus .odb file or a previously extracted manifest.json file."
+        )
+
+    cache_directory = Path(cache_directory)
+    cache_directory.mkdir(parents=True, exist_ok=True)
+    signature = _source_signature(
+        selected, abaqus_command, start_mode, end_mode
+    )
+    manifest_path = cache_directory / "manifest.json"
+    if _cache_is_valid(cache_directory, signature):
+        dataset = load_extracted_odb(manifest_path)
+        dataset.metadata["extraction_cache_reused"] = True
+        return dataset
 
     manifest_path = run_abaqus_extraction(
         odb_path=selected,
@@ -200,4 +257,9 @@ def load_or_extract_odb(
         start_mode=start_mode,
         end_mode=end_mode,
     )
-    return load_extracted_odb(manifest_path)
+    (cache_directory / "extraction_signature.json").write_text(
+        json.dumps(signature, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    dataset = load_extracted_odb(manifest_path)
+    dataset.metadata["extraction_cache_reused"] = False
+    return dataset
