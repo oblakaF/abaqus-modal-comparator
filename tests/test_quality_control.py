@@ -50,9 +50,15 @@ class QualityControlTests(unittest.TestCase):
         self.assertEqual([pair.experimental_mode for pair in result.pairs], [1, 2])
         self.assertTrue(all(not pair.order_changed for pair in result.pairs))
         self.assertIn(6, result.abaqus.metadata["quality_control"]["excluded_abaqus_modes"])
-        self.assertIn(9, result.abaqus.metadata["unmatched_abaqus_modes"])
+        unmatched_numbers = [
+            item["mode"] for item in result.abaqus.metadata["unmatched_abaqus_modes"]
+        ]
+        self.assertIn(9, unmatched_numbers)
+        close_groups = result.abaqus.metadata["close_abaqus_mode_groups"]
+        self.assertTrue(any({8, 9}.issubset({item["mode"] for item in group}) for group in close_groups))
         self.assertTrue(any("rigid-body" in warning for warning in result.warnings))
         self.assertTrue(any("left unmatched" in warning for warning in result.warnings))
+        self.assertTrue(any("Closely spaced" in warning for warning in result.warnings))
 
 
 if __name__ == "__main__":
