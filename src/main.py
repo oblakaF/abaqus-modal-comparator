@@ -12,7 +12,7 @@ install_advanced_reporting()
 
 import app
 from advanced_ui import install_advanced_ui
-from quality_control import compare_modal_datasets_with_quality_control
+from quality_control_reviewed import compare_modal_datasets_with_quality_control
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
 
