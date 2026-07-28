@@ -37,13 +37,11 @@ from final_ui_polish import install_final_ui_polish
 from pair_plot_cache_ui import install_pair_plot_cache_ui
 from project_review import install_project_review
 from project_review_polish import install_project_review_polish
-from quality_control_reviewed import compare_modal_datasets_with_quality_control
 from responsive_images import install_responsive_images
+from runtime_contracts import verify_runtime_contracts
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
 
-# Bind the reviewed comparison path explicitly. No import-order monkey patch is required.
-app.compare_modal_datasets = compare_modal_datasets_with_quality_control
 install_app_enhancements(app)
 install_runtime_hardening(app)
 install_advanced_ui(app)
@@ -56,6 +54,7 @@ install_final_ui_polish(app)
 install_responsive_images(app)
 install_project_review(app)
 install_project_review_polish(app)
+verify_runtime_contracts(app)
 
 
 if __name__ == "__main__":
