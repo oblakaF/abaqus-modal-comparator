@@ -39,6 +39,7 @@ from pair_plot_cache_ui import install_pair_plot_cache_ui
 from project_review import install_project_review
 from project_review_polish import install_project_review_polish
 from responsive_images import install_responsive_images
+from responsive_status_bar import install_responsive_status_bar
 from runtime_contracts import verify_runtime_contracts
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
@@ -56,6 +57,7 @@ install_responsive_images(app)
 install_project_review(app)
 install_project_review_polish(app)
 install_idle_ui_state(app)
+install_responsive_status_bar(app)
 verify_runtime_contracts(app)
 
 
