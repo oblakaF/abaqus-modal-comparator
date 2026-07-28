@@ -22,7 +22,6 @@ class ModeShape:
         self.node_ids = np.asarray(self.node_ids, dtype=object)
         self.coordinates = np.asarray(self.coordinates, dtype=float)
         self.vectors = np.asarray(self.vectors)
-
         if self.coordinates.ndim != 2 or self.coordinates.shape[1] != 3:
             raise ValueError("Mode coordinates must have shape (N, 3).")
         if self.vectors.ndim != 2 or self.vectors.shape[1] != 3:
@@ -47,11 +46,10 @@ class ModalDataset:
 
 @dataclass(eq=False)
 class GeometryMatch:
-    """One geometry transform candidate.
+    """One geometry transform candidate with identity equality.
 
-    Equality is deliberately identity-based because NumPy array value equality is not
-    a scalar truth value. The transformed full FE coordinate array is populated only
-    for the selected candidate to avoid retaining one large array per candidate.
+    The full transformed FE coordinates are populated only for the selected
+    candidate, preventing one large coordinate copy per trial orientation.
     """
 
     experimental_to_abaqus: np.ndarray
@@ -97,25 +95,20 @@ class ComparisonResult:
 def modal_assurance_criterion(vector_a: np.ndarray, vector_b: np.ndarray) -> Optional[float]:
     a = np.asarray(vector_a).reshape(-1)
     b = np.asarray(vector_b).reshape(-1)
-
     valid = np.isfinite(a.real) & np.isfinite(a.imag) & np.isfinite(b.real) & np.isfinite(b.imag)
     a = a[valid]
     b = b[valid]
-
     if a.size == 0 or b.size == 0:
         return None
-
     norm_a = np.vdot(a, a).real
     norm_b = np.vdot(b, b).real
     if norm_a <= 1e-30 or norm_b <= 1e-30:
         return None
-
     value = abs(np.vdot(a, b)) ** 2 / (norm_a * norm_b)
     return float(np.clip(value.real, 0.0, 1.0))
 
 
 def phase_align(reference: np.ndarray, candidate: np.ndarray) -> np.ndarray:
-    """Return candidate with its global complex phase aligned to reference."""
     ref = np.asarray(reference).reshape(-1)
     cand = np.asarray(candidate).reshape(-1)
     denominator = np.vdot(cand, cand)
@@ -124,5 +117,18 @@ def phase_align(reference: np.ndarray, candidate: np.ndarray) -> np.ndarray:
     coefficient = np.vdot(cand, ref) / denominator
     if abs(coefficient) <= 1e-30:
         return np.asarray(candidate)
-    phase = coefficient / abs(coefficient)
-    return np.asarray(candidate) * phase
+    return np.asarray(candidate) * (coefficient / abs(coefficient))
+
+
+def frequency_error_percent(calculated: float, experimental: float) -> float:
+    """Compatibility facade for the single reviewed signed-error implementation."""
+    from reviewed_core import frequency_error_percent as reviewed_frequency_error
+
+    return reviewed_frequency_error(calculated, experimental)
+
+
+def compare_modal_datasets(*args, **kwargs):
+    """Compatibility facade; no legacy correlation algorithm remains here."""
+    from quality_control_reviewed import compare_modal_datasets_with_quality_control
+
+    return compare_modal_datasets_with_quality_control(*args, **kwargs)
