@@ -36,6 +36,7 @@ from figure_export_ui import install_figure_export_ui
 from final_ui_polish import install_final_ui_polish
 from pair_plot_cache_ui import install_pair_plot_cache_ui
 from quality_control_reviewed import compare_modal_datasets_with_quality_control
+from responsive_images import install_responsive_images
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
 
@@ -50,6 +51,7 @@ install_cmif_ui(app)
 install_cmif_validation_ui(cmif_ui, app)
 install_pair_plot_cache_ui(app)
 install_final_ui_polish(app)
+install_responsive_images(app)
 
 
 if __name__ == "__main__":
