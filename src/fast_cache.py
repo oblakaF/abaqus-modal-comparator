@@ -7,16 +7,55 @@ import os
 import pickle
 import tempfile
 import time
+from copy import deepcopy
+from dataclasses import MISSING, fields
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
 import abaqus_bridge
 import universal_reader
+from modal_core import ModalDataset, ModeShape
 
 
 _INSTALLED = False
-_CACHE_VERSION = "modal-cache-v4-conservative-svd-validation"
-_MEMORY_UNV: Dict[str, Any] = {}
+_MEMORY_UNV: Dict[str, ModalDataset] = {}
+_RUNTIME_METADATA_KEYS = {
+    "unv_cache_reused",
+    "unv_load_seconds",
+    "unv_cache_write_failed",
+    "binary_odb_cache_reused",
+    "odb_dataset_load_seconds",
+    "binary_odb_cache_write_failed",
+}
+
+
+def _schema_fingerprint() -> str:
+    """Fingerprint cached dataclasses so field changes invalidate old files."""
+    payload = []
+    for data_class in (ModeShape, ModalDataset):
+        class_fields = []
+        for item in fields(data_class):
+            default = "<missing>" if item.default is MISSING else repr(item.default)
+            factory = (
+                "<missing>"
+                if item.default_factory is MISSING
+                else repr(item.default_factory)
+            )
+            class_fields.append(
+                {
+                    "name": item.name,
+                    "type": str(item.type),
+                    "default": default,
+                    "factory": factory,
+                }
+            )
+        payload.append({"class": data_class.__name__, "fields": class_fields})
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
+
+
+_CACHE_VERSION = "modal-cache-v5-" + _schema_fingerprint()
 
 
 def _atomic_pickle_dump(value: Any, destination: Path, compressed: bool) -> None:
@@ -52,7 +91,56 @@ def _user_cache_root() -> Path:
     else:
         root = Path(tempfile.gettempdir()) / "AbaqusModalComparator" / "cache"
     root.mkdir(parents=True, exist_ok=True)
-    return root
+    try:
+        os.chmod(root, 0o700)
+    except OSError:
+        pass
+    return root.resolve()
+
+
+def _user_cache_path(file_name: str) -> Path:
+    root = _user_cache_root()
+    candidate = (root / file_name).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as error:
+        raise ValueError("Cache path escaped the current-user cache directory.") from error
+    return candidate
+
+
+def _clean_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    copied = deepcopy(dict(metadata))
+    for key in _RUNTIME_METADATA_KEYS:
+        copied.pop(key, None)
+    return copied
+
+
+def _clone_mode(mode: ModeShape) -> ModeShape:
+    clone = ModeShape(
+        number=mode.number,
+        frequency_hz=mode.frequency_hz,
+        node_ids=mode.node_ids,
+        coordinates=mode.coordinates,
+        vectors=mode.vectors,
+        damping_ratio=mode.damping_ratio,
+        modal_mass=mode.modal_mass,
+        metadata=deepcopy(dict(mode.metadata)),
+    )
+    measured_dofs = getattr(mode, "measured_dofs", None)
+    if measured_dofs is not None:
+        clone.measured_dofs = measured_dofs
+    return clone
+
+
+def _clone_dataset(dataset: ModalDataset) -> ModalDataset:
+    """Clone mutable containers while sharing the large numerical arrays."""
+    return ModalDataset(
+        source_name=dataset.source_name,
+        source_path=dataset.source_path,
+        modes=[_clone_mode(mode) for mode in dataset.modes],
+        metadata=_clean_metadata(dataset.metadata),
+        history=deepcopy(list(dataset.history)),
+    )
 
 
 def _unv_cache_key(
@@ -75,6 +163,21 @@ def _unv_cache_key(
     ).hexdigest()
 
 
+def _returned_dataset(
+    canonical: ModalDataset,
+    cache_source,
+    started: float,
+    load_key: str,
+) -> ModalDataset:
+    dataset = _clone_dataset(canonical)
+    dataset.metadata[load_key] = cache_source
+    if load_key == "unv_cache_reused":
+        dataset.metadata["unv_load_seconds"] = time.perf_counter() - started
+    else:
+        dataset.metadata["odb_dataset_load_seconds"] = time.perf_counter() - started
+    return dataset
+
+
 def _cached_universal_loader(
     file_path: Path,
     target_frequencies: Optional[Sequence[float]] = None,
@@ -84,45 +187,44 @@ def _cached_universal_loader(
     key = _unv_cache_key(source, target_frequencies, target_count)
     started = time.perf_counter()
 
-    if key in _MEMORY_UNV:
-        dataset = _MEMORY_UNV[key]
-        dataset.metadata["unv_cache_reused"] = "memory"
-        dataset.metadata["unv_load_seconds"] = time.perf_counter() - started
-        return dataset
+    canonical = _MEMORY_UNV.get(key)
+    if canonical is not None:
+        return _returned_dataset(canonical, "memory", started, "unv_cache_reused")
 
-    cache_path = _user_cache_root() / f"unv_{key}.pkl.gz"
+    cache_path = _user_cache_path(f"unv_{key}.pkl.gz")
     if cache_path.exists():
         try:
             payload = _pickle_load(cache_path, compressed=True)
             if payload.get("version") == _CACHE_VERSION:
-                dataset = payload["dataset"]
-                dataset.metadata["unv_cache_reused"] = "disk"
-                dataset.metadata["unv_load_seconds"] = time.perf_counter() - started
-                _MEMORY_UNV[key] = dataset
-                return dataset
+                canonical = _clone_dataset(payload["dataset"])
+                _MEMORY_UNV[key] = canonical
+                return _returned_dataset(canonical, "disk", started, "unv_cache_reused")
         except Exception:
             try:
                 cache_path.unlink()
             except OSError:
                 pass
 
-    dataset = _ORIGINAL_UNIVERSAL_LOADER(
+    loaded = _ORIGINAL_UNIVERSAL_LOADER(
         source,
         target_frequencies=target_frequencies,
         target_count=target_count,
     )
-    dataset.metadata["unv_cache_reused"] = False
-    dataset.metadata["unv_load_seconds"] = time.perf_counter() - started
+    canonical = _clone_dataset(loaded)
     try:
         _atomic_pickle_dump(
-            {"version": _CACHE_VERSION, "dataset": dataset},
+            {"version": _CACHE_VERSION, "dataset": canonical},
             cache_path,
             compressed=True,
         )
     except OSError:
-        dataset.metadata["unv_cache_write_failed"] = True
-    _MEMORY_UNV[key] = dataset
-    return dataset
+        returned = _returned_dataset(canonical, False, started, "unv_cache_reused")
+        returned.metadata["unv_cache_write_failed"] = True
+        _MEMORY_UNV[key] = canonical
+        return returned
+
+    _MEMORY_UNV[key] = canonical
+    return _returned_dataset(canonical, False, started, "unv_cache_reused")
 
 
 def _manifest_signature(manifest_path: Path) -> Dict[str, Any]:
@@ -144,42 +246,51 @@ def _cached_extracted_odb_loader(manifest_path: Path):
     signature = _manifest_signature(manifest_path)
     signature_text = json.dumps(signature, sort_keys=True)
     key = hashlib.sha256(signature_text.encode("utf-8")).hexdigest()
-    cache_path = manifest_path.parent / f"modal_dataset_{key[:16]}.pickle"
+    cache_path = _user_cache_path(f"odb_{key}.pkl.gz")
     started = time.perf_counter()
 
     if cache_path.exists():
         try:
-            payload = _pickle_load(cache_path, compressed=False)
+            payload = _pickle_load(cache_path, compressed=True)
             if payload.get("signature") == signature:
-                dataset = payload["dataset"]
-                dataset.metadata["binary_odb_cache_reused"] = True
-                dataset.metadata["odb_dataset_load_seconds"] = time.perf_counter() - started
-                return dataset
+                canonical = _clone_dataset(payload["dataset"])
+                return _returned_dataset(
+                    canonical,
+                    True,
+                    started,
+                    "binary_odb_cache_reused",
+                )
         except Exception:
             try:
                 cache_path.unlink()
             except OSError:
                 pass
 
-    dataset = _ORIGINAL_EXTRACTED_ODB_LOADER(manifest_path)
-    dataset.metadata["binary_odb_cache_reused"] = False
-    dataset.metadata["odb_dataset_load_seconds"] = time.perf_counter() - started
+    loaded = _ORIGINAL_EXTRACTED_ODB_LOADER(manifest_path)
+    canonical = _clone_dataset(loaded)
     try:
         _atomic_pickle_dump(
-            {"signature": signature, "dataset": dataset},
+            {"signature": signature, "dataset": canonical},
             cache_path,
-            compressed=False,
+            compressed=True,
         )
-        # Remove stale binary caches from earlier extractions in the same directory.
-        for stale in manifest_path.parent.glob("modal_dataset_*.pickle"):
+        for stale in _user_cache_root().glob("odb_*.pkl.gz"):
             if stale != cache_path:
                 try:
                     stale.unlink()
                 except OSError:
                     pass
     except OSError:
-        dataset.metadata["binary_odb_cache_write_failed"] = True
-    return dataset
+        returned = _returned_dataset(
+            canonical,
+            False,
+            started,
+            "binary_odb_cache_reused",
+        )
+        returned.metadata["binary_odb_cache_write_failed"] = True
+        return returned
+
+    return _returned_dataset(canonical, False, started, "binary_odb_cache_reused")
 
 
 def install_fast_cache() -> None:
