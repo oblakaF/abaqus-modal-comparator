@@ -32,9 +32,11 @@ class ModalCoreTests(unittest.TestCase):
 
         abaqus_modes = []
         experimental_modes = []
-        frequencies = [105.0, 148.0, 221.0]
+        # Modes 2 and 3 are deliberately close and reverse their frequency order,
+        # but every physical pair remains inside the reviewed admissibility gates.
+        frequencies = [105.0, 148.0, 154.0]
         experimental_order = [1, 2, 3]
-        experimental_frequencies = [106.5, 224.0, 150.0]
+        experimental_frequencies = [106.5, 155.0, 150.0]
 
         for index, frequency in enumerate(frequencies, start=1):
             vectors = np.zeros_like(abaqus_coordinates)
