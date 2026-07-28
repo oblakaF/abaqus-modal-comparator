@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from cmif_separation import render_cmif_svd_diagnostics
@@ -9,6 +10,21 @@ from figure_export_ui import FullSizeImageViewer
 
 
 _INSTALLED = False
+COMPACT_SUMMARY_LINES = 6
+EXPANDED_SUMMARY_LINES = 18
+
+
+def summary_height(expanded: bool) -> int:
+    """Return the fixed text height used by the close-mode summary panel."""
+    return EXPANDED_SUMMARY_LINES if expanded else COMPACT_SUMMARY_LINES
+
+
+def _replace_readonly_text(widget: tk.Text, value: str) -> None:
+    widget.configure(state="normal")
+    widget.delete("1.0", "end")
+    widget.insert("1.0", value)
+    widget.configure(state="disabled")
+    widget.yview_moveto(0.0)
 
 
 def _summary_text(result) -> str:
@@ -141,17 +157,59 @@ def install_cmif_ui(app_module) -> None:
         summary_frame = ttk.LabelFrame(
             self.cmif_tab,
             text="Close-mode decision and performance",
-            padding=8,
+            padding=6,
         )
         summary_frame.pack(fill="x", pady=(8, 0))
-        self.cmif_summary = ttk.Label(
-            summary_frame,
-            text="No analysis results yet.",
-            justify="left",
-            anchor="w",
-            font=("Consolas", 9),
+        summary_frame.columnconfigure(0, weight=1)
+
+        summary_toolbar = ttk.Frame(summary_frame)
+        summary_toolbar.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        ttk.Label(
+            summary_toolbar,
+            text="Detailed diagnostics are scrollable; keep this panel compact to enlarge the plot.",
+        ).pack(side="left", fill="x", expand=True)
+
+        self.cmif_summary_expanded = False
+
+        def toggle_summary() -> None:
+            self.cmif_summary_expanded = not self.cmif_summary_expanded
+            self.cmif_summary.configure(
+                height=summary_height(self.cmif_summary_expanded)
+            )
+            self.cmif_summary_toggle.configure(
+                text="Collapse details" if self.cmif_summary_expanded else "Expand details"
+            )
+            refresh = getattr(self, "_refresh_responsive_images", None)
+            if callable(refresh):
+                self.root.after_idle(refresh)
+
+        self.cmif_summary_toggle = ttk.Button(
+            summary_toolbar,
+            text="Expand details",
+            command=toggle_summary,
         )
-        self.cmif_summary.pack(fill="x")
+        self.cmif_summary_toggle.pack(side="right", padx=(8, 0))
+
+        self.cmif_summary = tk.Text(
+            summary_frame,
+            height=summary_height(False),
+            wrap="word",
+            font=("Consolas", 9),
+            state="disabled",
+            relief="flat",
+            borderwidth=0,
+            padx=3,
+            pady=2,
+        )
+        summary_scroll = ttk.Scrollbar(
+            summary_frame,
+            orient="vertical",
+            command=self.cmif_summary.yview,
+        )
+        self.cmif_summary.configure(yscrollcommand=summary_scroll.set)
+        self.cmif_summary.grid(row=1, column=0, sticky="ew")
+        summary_scroll.grid(row=1, column=1, sticky="ns", padx=(4, 0))
+        _replace_readonly_text(self.cmif_summary, "No analysis results yet.")
 
     def cmif_populate(self, result) -> None:
         original_populate(self, result)
@@ -161,7 +219,7 @@ def install_cmif_ui(app_module) -> None:
         if not plot_path.exists():
             render_cmif_svd_diagnostics(result.experimental, plot_path)
         self._image(self.cmif_label, plot_path, "cmif_svd_diagnostics")
-        self.cmif_summary.configure(text=_summary_text(result))
+        _replace_readonly_text(self.cmif_summary, _summary_text(result))
 
     application_class._build = cmif_build
     application_class._populate = cmif_populate
