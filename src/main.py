@@ -33,6 +33,7 @@ from amplitude_correlation import install_correlation_ui
 from cmif_ui import install_cmif_ui
 from cmif_validation_ui import install_cmif_validation_ui
 from figure_export_ui import install_figure_export_ui
+from pair_plot_cache_ui import install_pair_plot_cache_ui
 from quality_control_reviewed import compare_modal_datasets_with_quality_control
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
@@ -46,6 +47,7 @@ install_correlation_ui(app)
 install_figure_export_ui(app)
 install_cmif_ui(app)
 install_cmif_validation_ui(cmif_ui, app)
+install_pair_plot_cache_ui(app)
 
 
 if __name__ == "__main__":
