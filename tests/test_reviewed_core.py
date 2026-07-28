@@ -7,9 +7,11 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from modal_core import ModalDataset, ModeShape
+from modal_core import GeometryMatch, ModalDataset, ModeShape
 from reviewed_core import (
     _admissible_assignment,
+    _frequency_error_matrices,
+    _geometry_warnings_and_transform,
     compare_modal_datasets,
     experimental_measurement_mask,
     frequency_error_percent,
@@ -187,6 +189,60 @@ class ReviewedCoreTests(unittest.TestCase):
         )
         self.assertEqual(len(result.pairs), 2)
         self.assertTrue(all(pair.mapped_points >= 4 for pair in result.pairs))
+
+    def test_frequency_error_matrix_is_signed_abaqus_rows_by_experimental_columns(self):
+        node_ids = np.arange(4)
+        coordinates = np.zeros((4, 3))
+        vectors = np.zeros((4, 3))
+        abaqus_modes = [
+            ModeShape(1, 110.0, node_ids, coordinates, vectors),
+            ModeShape(2, 90.0, node_ids, coordinates, vectors),
+        ]
+        experimental_modes = [ModeShape(1, 100.0, node_ids, coordinates, vectors)]
+
+        signed, absolute = _frequency_error_matrices(abaqus_modes, experimental_modes)
+
+        self.assertEqual(signed.shape, (2, 1))
+        self.assertAlmostEqual(signed[0, 0], 10.0)
+        self.assertAlmostEqual(signed[1, 0], -10.0)
+        np.testing.assert_allclose(absolute, np.abs(signed))
+
+    def test_geometry_warnings_flag_reflection_and_sparse_matched_fraction(self):
+        reflection = np.diag([1.0, 1.0, -1.0])
+        geometry = GeometryMatch(
+            experimental_to_abaqus=np.array([0, 1, 2], dtype=int),
+            distances=np.zeros(3),
+            rotation=reflection,
+            coordinate_scale=1.0,
+            translation=np.zeros(3),
+            normalized_rms_distance=0.10,
+            matched_fraction=0.50,
+        )
+
+        warnings, selected_transform = _geometry_warnings_and_transform(geometry)
+
+        self.assertTrue(any("50.0%" in warning for warning in warnings))
+        self.assertTrue(any("reflection" in warning for warning in warnings))
+        self.assertTrue(any("alignment RMS" in warning for warning in warnings))
+        self.assertTrue(selected_transform["mirrored"])
+        self.assertAlmostEqual(selected_transform["determinant"], -1.0)
+        self.assertEqual(selected_transform["unique_mapped_abaqus_nodes"], 3)
+
+    def test_geometry_warnings_are_empty_for_a_clean_non_reflected_match(self):
+        geometry = GeometryMatch(
+            experimental_to_abaqus=np.array([0, 1, 2], dtype=int),
+            distances=np.zeros(3),
+            rotation=np.eye(3),
+            coordinate_scale=1.0,
+            translation=np.zeros(3),
+            normalized_rms_distance=0.001,
+            matched_fraction=1.0,
+        )
+
+        warnings, selected_transform = _geometry_warnings_and_transform(geometry)
+
+        self.assertEqual(warnings, [])
+        self.assertFalse(selected_transform["mirrored"])
 
     def test_comparison_does_not_mutate_input_metadata(self):
         coordinates = np.array(

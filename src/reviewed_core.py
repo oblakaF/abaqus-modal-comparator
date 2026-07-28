@@ -396,40 +396,27 @@ def _copy_dataset(dataset: ModalDataset) -> ModalDataset:
     )
 
 
-def compare_modal_datasets(
-    abaqus: ModalDataset,
-    experimental: ModalDataset,
-    mac_weight: float = 0.75,
-    frequency_weight: float = 0.25,
-    maximum_frequency_error_percent: float = 15.0,
-    minimum_mac: float = 0.50,
-    maximum_frequency_only_error_percent: float = 10.0,
-    coordinate_scale_override: Optional[float] = None,
-) -> ComparisonResult:
-    abaqus_modes = abaqus.sorted_modes()
-    experimental_modes = experimental.sorted_modes()
-    if not abaqus_modes:
-        raise ValueError("No Abaqus modes are available.")
-    if not experimental_modes:
-        raise ValueError("No experimental modes are available.")
-
-    abaqus_reference = abaqus_modes[0]
-    experimental_reference = experimental_modes[0]
-    experimental_node_ids = experimental_reference.node_ids
-    experimental_coordinates = experimental_reference.coordinates
-
-    signed_frequency_matrix = np.zeros(
-        (len(abaqus_modes), len(experimental_modes)),
-        dtype=float,
-    )
+def _frequency_error_matrices(
+    abaqus_modes: Sequence[ModeShape],
+    experimental_modes: Sequence[ModeShape],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Return (signed, absolute) Abaqus-rows x experimental-columns error matrices."""
+    signed = np.zeros((len(abaqus_modes), len(experimental_modes)), dtype=float)
     for row, abaqus_mode in enumerate(abaqus_modes):
         for column, experimental_mode in enumerate(experimental_modes):
-            signed_frequency_matrix[row, column] = frequency_error_percent(
+            signed[row, column] = frequency_error_percent(
                 abaqus_mode.frequency_hz,
                 experimental_mode.frequency_hz,
             )
-    absolute_frequency_matrix = np.abs(signed_frequency_matrix)
+    return signed, np.abs(signed)
 
+
+def _experimental_vectors_and_mask(
+    experimental_modes: Sequence[ModeShape],
+    experimental_node_ids: np.ndarray,
+) -> Tuple[List[np.ndarray], np.ndarray]:
+    """Return per-mode vectors mapped onto the reference node order, plus the
+    union of measured DOFs across all experimental modes."""
     experimental_vectors = [
         _vectors_on_nodes(mode, experimental_node_ids)
         for mode in experimental_modes
@@ -440,14 +427,30 @@ def compare_modal_datasets(
     )
     if not np.any(measurement_mask):
         raise ValueError("No measured experimental degrees of freedom were detected.")
+    return experimental_vectors, measurement_mask
 
-    candidates = geometry_alignment_candidates(
-        abaqus_reference.coordinates,
-        experimental_coordinates,
-        coordinate_scale_override=coordinate_scale_override,
-    )
+
+def _best_geometry_evaluation(
+    candidates: Sequence[GeometryMatch],
+    abaqus_modes: Sequence[ModeShape],
+    abaqus_reference: ModeShape,
+    experimental_vectors: Sequence[np.ndarray],
+    measurement_mask: np.ndarray,
+    absolute_frequency_matrix: np.ndarray,
+    mac_weight: float,
+    frequency_weight: float,
+    maximum_frequency_error_percent: float,
+    minimum_mac: float,
+    maximum_frequency_only_error_percent: float,
+) -> Tuple[GeometryMatch, np.ndarray, np.ndarray, np.ndarray]:
+    """Evaluate every geometry candidate and return the best-scoring one.
+
+    The score first maximizes the number of admissible one-to-one pairs, then
+    minimizes assignment cost plus a geometry-fit penalty; see the module-level
+    comment on UNMATCHED_COST for why admissibility, not this score, is the
+    acceptance gate.
+    """
     best_evaluation = None
-
     for geometry in candidates:
         mapped_abaqus_ids = abaqus_reference.node_ids[
             geometry.experimental_to_abaqus
@@ -491,44 +494,31 @@ def compare_modal_datasets(
             -len(rows),
             assignment_cost + geometry_penalty,
         )
-        evaluation = (
-            score,
-            geometry,
-            mac_matrix,
-            rows,
-            columns,
-        )
         if best_evaluation is None or score < best_evaluation[0]:
-            best_evaluation = evaluation
+            best_evaluation = (score, geometry, mac_matrix, rows, columns)
 
     if best_evaluation is None:
         raise RuntimeError(
             "No valid geometry and modal alignment could be calculated."
         )
+    _, geometry, mac_matrix, abaqus_indices, experimental_indices = best_evaluation
+    return geometry, mac_matrix, abaqus_indices, experimental_indices
 
-    (
-        _,
-        geometry,
-        mac_matrix,
-        abaqus_indices,
-        experimental_indices,
-    ) = best_evaluation
 
-    geometry.transformed_abaqus_coordinates = (
-        abaqus_reference.coordinates
-        @ geometry.rotation
-        * geometry.coordinate_scale
-        + geometry.translation
-    )
-    mapped_abaqus_ids = abaqus_reference.node_ids[
-        geometry.experimental_to_abaqus
-    ]
-    winning_abaqus_vectors = _rotated_abaqus_modes(
-        abaqus_modes,
-        mapped_abaqus_ids,
-        geometry.rotation,
-    )
-
+def _build_mode_pairs(
+    abaqus_modes: Sequence[ModeShape],
+    experimental_modes: Sequence[ModeShape],
+    winning_abaqus_vectors: Sequence[np.ndarray],
+    experimental_vectors: Sequence[np.ndarray],
+    experimental_coordinates: np.ndarray,
+    measurement_mask: np.ndarray,
+    mac_matrix: np.ndarray,
+    signed_frequency_matrix: np.ndarray,
+    abaqus_indices: np.ndarray,
+    experimental_indices: np.ndarray,
+) -> List[ModePairResult]:
+    """Build one ModePairResult per accepted (Abaqus, experimental) index pair,
+    ordered by Abaqus frequency, with order-change flags applied afterward."""
     pairs: List[ModePairResult] = []
     for row, column in sorted(
         zip(abaqus_indices, experimental_indices),
@@ -581,7 +571,14 @@ def compare_modal_datasets(
         pairs.append(pair)
 
     _recalculate_order_changed(pairs)
+    return pairs
 
+
+def _geometry_warnings_and_transform(
+    geometry: GeometryMatch,
+) -> Tuple[List[str], Dict[str, object]]:
+    """Return user-facing geometry warnings plus the selected-transform metadata
+    that quality_control/reporting attach to the Abaqus dataset."""
     warnings: List[str] = []
     if geometry.matched_fraction < 0.90:
         warnings.append(
@@ -603,6 +600,11 @@ def compare_modal_datasets(
         )
 
     determinant = float(np.linalg.det(geometry.rotation))
+    if determinant < 0.0:
+        warnings.append(
+            "The selected coordinate transformation includes a reflection "
+            "(determinant -1). Verify axis signs and specimen orientation."
+        )
     selected_transform = {
         "coordinate_scale": geometry.coordinate_scale,
         "rotation": geometry.rotation.tolist(),
@@ -614,14 +616,89 @@ def compare_modal_datasets(
             geometry.experimental_to_abaqus
         ),
     }
+    return warnings, selected_transform
+
+
+def compare_modal_datasets(
+    abaqus: ModalDataset,
+    experimental: ModalDataset,
+    mac_weight: float = 0.75,
+    frequency_weight: float = 0.25,
+    maximum_frequency_error_percent: float = 15.0,
+    minimum_mac: float = 0.50,
+    maximum_frequency_only_error_percent: float = 10.0,
+    coordinate_scale_override: Optional[float] = None,
+) -> ComparisonResult:
+    abaqus_modes = abaqus.sorted_modes()
+    experimental_modes = experimental.sorted_modes()
+    if not abaqus_modes:
+        raise ValueError("No Abaqus modes are available.")
+    if not experimental_modes:
+        raise ValueError("No experimental modes are available.")
+
+    abaqus_reference = abaqus_modes[0]
+    experimental_reference = experimental_modes[0]
+    experimental_node_ids = experimental_reference.node_ids
+    experimental_coordinates = experimental_reference.coordinates
+
+    signed_frequency_matrix, absolute_frequency_matrix = _frequency_error_matrices(
+        abaqus_modes, experimental_modes
+    )
+    experimental_vectors, measurement_mask = _experimental_vectors_and_mask(
+        experimental_modes, experimental_node_ids
+    )
+
+    candidates = geometry_alignment_candidates(
+        abaqus_reference.coordinates,
+        experimental_coordinates,
+        coordinate_scale_override=coordinate_scale_override,
+    )
+    geometry, mac_matrix, abaqus_indices, experimental_indices = _best_geometry_evaluation(
+        candidates,
+        abaqus_modes,
+        abaqus_reference,
+        experimental_vectors,
+        measurement_mask,
+        absolute_frequency_matrix,
+        mac_weight,
+        frequency_weight,
+        maximum_frequency_error_percent,
+        minimum_mac,
+        maximum_frequency_only_error_percent,
+    )
+
+    geometry.transformed_abaqus_coordinates = (
+        abaqus_reference.coordinates
+        @ geometry.rotation
+        * geometry.coordinate_scale
+        + geometry.translation
+    )
+    mapped_abaqus_ids = abaqus_reference.node_ids[
+        geometry.experimental_to_abaqus
+    ]
+    winning_abaqus_vectors = _rotated_abaqus_modes(
+        abaqus_modes,
+        mapped_abaqus_ids,
+        geometry.rotation,
+    )
+
+    pairs = _build_mode_pairs(
+        abaqus_modes,
+        experimental_modes,
+        winning_abaqus_vectors,
+        experimental_vectors,
+        experimental_coordinates,
+        measurement_mask,
+        mac_matrix,
+        signed_frequency_matrix,
+        abaqus_indices,
+        experimental_indices,
+    )
+
+    warnings, selected_transform = _geometry_warnings_and_transform(geometry)
     result_abaqus = _copy_dataset(abaqus)
     result_abaqus.metadata["selected_geometry_transform"] = selected_transform
 
-    if determinant < 0.0:
-        warnings.append(
-            "The selected coordinate transformation includes a reflection "
-            "(determinant -1). Verify axis signs and specimen orientation."
-        )
     if not pairs:
         raise ValueError(
             "No admissible one-to-one mode pairs satisfy the frequency and MAC limits."

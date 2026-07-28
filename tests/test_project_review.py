@@ -2,12 +2,14 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+import project_review
 from modal_core import ComparisonResult, GeometryMatch, ModalDataset, ModeShape
 from project_review import (
     build_manual_pair,
@@ -108,6 +110,38 @@ class ProjectReviewTests(unittest.TestCase):
         self.assertAlmostEqual(pair.frequency_error_percent, (20.0 - 19.8) / 19.8 * 100.0)
         self.assertEqual(pair.mapped_points, 4)
         self.assertEqual(getattr(pair, "measured_dof_count"), 4)
+
+    def test_all_elastic_abaqus_modes_propagates_rigid_mode_detection_failures(self):
+        abaqus = self._dataset("Abaqus", "a.odb", [10.0, 20.0], scale=1.0e5)
+        experimental = self._dataset("Experiment", "e.unv", [10.2, 19.8], scale=1.0e-5)
+        geometry = GeometryMatch(
+            experimental_to_abaqus=np.asarray([0, 1, 2, 3], dtype=int),
+            distances=np.zeros(4),
+            transformed_abaqus_coordinates=abaqus.modes[0].coordinates.copy(),
+            rotation=np.eye(3),
+            coordinate_scale=1.0,
+            translation=np.zeros(3),
+            normalized_rms_distance=0.0,
+            matched_fraction=1.0,
+        )
+        result = ComparisonResult(
+            abaqus=abaqus,
+            experimental=experimental,
+            geometry=geometry,
+            pairs=[],
+            mac_matrix=np.zeros((2, 2)),
+            frequency_error_matrix=np.zeros((2, 2)),
+            abaqus_mode_numbers=[1, 2],
+            experimental_mode_numbers=[1, 2],
+        )
+
+        with patch.object(
+            project_review,
+            "_detect_rigid_modes",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                project_review._all_elastic_abaqus_modes(result)
 
 
 if __name__ == "__main__":

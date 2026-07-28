@@ -197,11 +197,16 @@ def build_manual_pair(
 
 
 def _all_elastic_abaqus_modes(result: ComparisonResult):
-    try:
-        _, retained, _, _ = _detect_rigid_modes(result.abaqus)
-        return retained
-    except Exception:
-        return result.abaqus.sorted_modes()
+    """Return the Abaqus modes retained after rigid-body filtering.
+
+    Mirrors quality_control.compare_modal_datasets_with_quality_control, which
+    already ran this same filter on this dataset to build *result*: a failure
+    here indicates a real bug, not an expected input shape, so it is left to
+    propagate rather than silently substituting unfiltered (possibly rigid)
+    modes into the manual-review candidate list.
+    """
+    _, retained, _, _ = _detect_rigid_modes(result.abaqus)
+    return retained
 
 
 def install_project_review(app_module) -> None:
