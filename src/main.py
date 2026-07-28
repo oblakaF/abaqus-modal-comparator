@@ -21,6 +21,7 @@ install_final_reporting_review()
 import app
 from advanced_ui import install_advanced_ui
 from amplitude_correlation import install_correlation_ui
+from figure_export_ui import install_figure_export_ui
 from quality_control_reviewed import compare_modal_datasets_with_quality_control
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
@@ -31,6 +32,7 @@ install_app_enhancements(app)
 install_runtime_hardening(app)
 install_advanced_ui(app)
 install_correlation_ui(app)
+install_figure_export_ui(app)
 
 
 if __name__ == "__main__":
