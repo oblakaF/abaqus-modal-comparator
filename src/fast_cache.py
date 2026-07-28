@@ -15,7 +15,7 @@ import universal_reader
 
 
 _INSTALLED = False
-_CACHE_VERSION = "modal-cache-v3-cmif-svd"
+_CACHE_VERSION = "modal-cache-v4-conservative-svd-validation"
 _MEMORY_UNV: Dict[str, Any] = {}
 
 
