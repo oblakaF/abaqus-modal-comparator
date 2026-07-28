@@ -36,6 +36,7 @@ from figure_export_ui import install_figure_export_ui
 from final_ui_polish import install_final_ui_polish
 from pair_plot_cache_ui import install_pair_plot_cache_ui
 from project_review import install_project_review
+from project_review_polish import install_project_review_polish
 from quality_control_reviewed import compare_modal_datasets_with_quality_control
 from responsive_images import install_responsive_images
 from runtime_hardening import install_runtime_hardening
@@ -54,6 +55,7 @@ install_pair_plot_cache_ui(app)
 install_final_ui_polish(app)
 install_responsive_images(app)
 install_project_review(app)
+install_project_review_polish(app)
 
 
 if __name__ == "__main__":
