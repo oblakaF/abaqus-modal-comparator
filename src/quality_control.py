@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
-from modal_core import ComparisonResult, ModalDataset
-from reviewed_core import compare_modal_datasets
+import numpy as np
 
+from modal_core import ComparisonResult, ModalDataset, ModeShape
+from reviewed_core import compare_modal_datasets
 
 MAX_ACCEPTED_FREQUENCY_ERROR_PERCENT = 15.0
 MIN_ACCEPTED_MAC = 0.50
 MAX_FREQUENCY_ONLY_ERROR_PERCENT = 10.0
-RIGID_MODE_RELATIVE_THRESHOLD = 0.01
-RIGID_MODE_GAP_RATIO = 20.0
+RIGID_SHAPE_RESIDUAL_THRESHOLD = 0.02
 MIN_POSITIVE_FREQUENCY_HZ = 1.0e-8
 CLOSE_MODE_ABSOLUTE_GAP_HZ = 3.0
 CLOSE_MODE_RELATIVE_GAP = 0.03
@@ -26,34 +26,66 @@ def _copy_dataset_with_modes(dataset: ModalDataset, modes) -> ModalDataset:
     )
 
 
-def _detect_rigid_modes(dataset: ModalDataset) -> Tuple[List, List, float, Optional[float]]:
-    """Detect a near-zero cluster from a large relative gap, not a fixed 1 Hz cut-off."""
+def _rigid_body_residual_fraction(mode: ModeShape) -> float:
+    coordinates = np.asarray(mode.coordinates, dtype=float)
+    vectors = np.asarray(mode.vectors, dtype=complex)
+    finite_rows = (
+        np.all(np.isfinite(coordinates), axis=1)
+        & np.all(np.isfinite(vectors.real), axis=1)
+        & np.all(np.isfinite(vectors.imag), axis=1)
+    )
+    coordinates = coordinates[finite_rows]
+    vectors = vectors[finite_rows]
+    if len(coordinates) < 2:
+        return 1.0
+    vector = vectors.reshape(-1)
+    vector_norm = float(np.linalg.norm(vector))
+    if vector_norm <= 1.0e-30:
+        return 1.0
+
+    centered = coordinates - np.mean(coordinates, axis=0)
+    x, y, z = centered[:, 0], centered[:, 1], centered[:, 2]
+    basis = np.zeros((3 * len(centered), 6), dtype=float)
+    basis[0::3, 0] = 1.0
+    basis[1::3, 1] = 1.0
+    basis[2::3, 2] = 1.0
+    basis[1::3, 3] = -z
+    basis[2::3, 3] = y
+    basis[0::3, 4] = z
+    basis[2::3, 4] = -x
+    basis[0::3, 5] = -y
+    basis[1::3, 5] = x
+
+    coefficients, _, _, _ = np.linalg.lstsq(basis, vector, rcond=None)
+    residual = vector - basis @ coefficients
+    return float(np.linalg.norm(residual) / vector_norm)
+
+
+def _detect_rigid_modes(
+    dataset: ModalDataset,
+) -> Tuple[List[ModeShape], List[ModeShape], float, Optional[float]]:
     modes = sorted(dataset.modes, key=lambda mode: mode.frequency_hz)
-    positive = [mode for mode in modes if mode.frequency_hz > MIN_POSITIVE_FREQUENCY_HZ]
-    if len(positive) < 2:
-        return [], modes, 0.0, positive[0].frequency_hz if positive else None
-
-    ratios = [
-        right.frequency_hz / max(left.frequency_hz, MIN_POSITIVE_FREQUENCY_HZ)
-        for left, right in zip(positive, positive[1:])
+    residuals = {
+        int(mode.number): _rigid_body_residual_fraction(mode)
+        for mode in modes
+    }
+    excluded = [
+        mode
+        for mode in modes
+        if residuals[int(mode.number)] <= RIGID_SHAPE_RESIDUAL_THRESHOLD
     ]
-    largest_index = max(range(len(ratios)), key=ratios.__getitem__)
-    largest_ratio = ratios[largest_index]
-    if largest_ratio < RIGID_MODE_GAP_RATIO:
-        return [], modes, 0.0, positive[0].frequency_hz
-
-    first_elastic_frequency = positive[largest_index + 1].frequency_hz
-    threshold = first_elastic_frequency * RIGID_MODE_RELATIVE_THRESHOLD
-    excluded = [mode for mode in modes if mode.frequency_hz < threshold]
-    retained = [mode for mode in modes if mode.frequency_hz >= threshold]
-    return excluded, retained, threshold, first_elastic_frequency
+    excluded_ids = {id(mode) for mode in excluded}
+    retained = [mode for mode in modes if id(mode) not in excluded_ids]
+    highest_excluded = max((mode.frequency_hz for mode in excluded), default=0.0)
+    first_elastic = min((mode.frequency_hz for mode in retained), default=None)
+    dataset.metadata["_rigid_body_residuals"] = residuals
+    return excluded, retained, highest_excluded, first_elastic
 
 
 def _close_mode_groups(dataset: ModalDataset) -> List[List[Dict[str, float]]]:
     modes = sorted(dataset.modes, key=lambda mode: mode.frequency_hz)
     groups: List[List[Dict[str, float]]] = []
     current = []
-
     for left, right in zip(modes, modes[1:]):
         average = 0.5 * (left.frequency_hz + right.frequency_hz)
         threshold = max(
@@ -66,21 +98,16 @@ def _close_mode_groups(dataset: ModalDataset) -> List[List[Dict[str, float]]]:
             if current[-1].number != right.number:
                 current.append(right)
         elif current:
-            groups.append(
-                [
-                    {"mode": int(mode.number), "frequency_hz": float(mode.frequency_hz)}
-                    for mode in current
-                ]
-            )
-            current = []
-
-    if current:
-        groups.append(
-            [
+            groups.append([
                 {"mode": int(mode.number), "frequency_hz": float(mode.frequency_hz)}
                 for mode in current
-            ]
-        )
+            ])
+            current = []
+    if current:
+        groups.append([
+            {"mode": int(mode.number), "frequency_hz": float(mode.frequency_hz)}
+            for mode in current
+        ])
     return groups
 
 
@@ -103,14 +130,15 @@ def compare_modal_datasets_with_quality_control(
 ) -> ComparisonResult:
     excluded_modes, retained_modes, rigid_threshold, first_elastic = _detect_rigid_modes(abaqus)
     if not retained_modes:
-        raise ValueError("No elastic Abaqus modes remain after near-zero mode detection.")
+        raise ValueError("No elastic Abaqus modes remain after rigid-body shape projection.")
 
     filtered_abaqus = _copy_dataset_with_modes(abaqus, retained_modes)
+    rigid_residuals = dict(abaqus.metadata.get("_rigid_body_residuals", {}))
     filtered_abaqus.metadata["quality_control"] = {
-        "rigid_mode_method": "relative gap detection",
-        "rigid_mode_relative_threshold": RIGID_MODE_RELATIVE_THRESHOLD,
-        "rigid_mode_gap_ratio": RIGID_MODE_GAP_RATIO,
-        "rigid_mode_threshold_hz": rigid_threshold,
+        "rigid_mode_method": "six-vector rigid-body subspace projection",
+        "rigid_shape_residual_threshold": RIGID_SHAPE_RESIDUAL_THRESHOLD,
+        "rigid_body_residual_fraction_by_mode": rigid_residuals,
+        "highest_excluded_rigid_frequency_hz": rigid_threshold,
         "first_elastic_frequency_hz": first_elastic,
         "maximum_accepted_frequency_error_percent": MAX_ACCEPTED_FREQUENCY_ERROR_PERCENT,
         "minimum_accepted_mac": MIN_ACCEPTED_MAC,
@@ -138,13 +166,14 @@ def compare_modal_datasets_with_quality_control(
 
     if excluded_modes:
         details = ", ".join(
-            f"mode {mode.number} ({mode.frequency_hz:.6g} Hz)"
+            f"mode {mode.number} ({mode.frequency_hz:.6g} Hz, residual "
+            f"{rigid_residuals.get(int(mode.number), float('nan')):.3g})"
             for mode in excluded_modes
         )
         result.warnings.append(
-            "Automatically excluded near-zero rigid-body mode(s): "
+            "Automatically excluded rigid-body mode(s) by shape projection: "
             + details
-            + f". Relative threshold: {rigid_threshold:.6g} Hz."
+            + f". Residual limit: {RIGID_SHAPE_RESIDUAL_THRESHOLD:.3g}."
         )
 
     paired_abaqus_modes = {pair.abaqus_mode for pair in result.pairs}
@@ -172,6 +201,18 @@ def compare_modal_datasets_with_quality_control(
         if mode.number not in paired_experimental_modes
         and minimum_frequency <= mode.frequency_hz <= maximum_frequency
     ]
+    if unmatched_experimental_modes:
+        details = ", ".join(
+            f"mode {mode.number} ({mode.frequency_hz:.6g} Hz)"
+            for mode in unmatched_experimental_modes
+        )
+        result.warnings.append(
+            "Experimental mode candidate(s) inside the Abaqus comparison band have no "
+            "admissible numerical counterpart: "
+            + details
+            + ". Check omitted components, joints, boundary conditions, local coordinate "
+            "systems, or other missing model physics."
+        )
 
     close_abaqus_groups = _close_mode_groups(filtered_abaqus)
     close_experimental_groups = _close_mode_groups(experimental)
@@ -197,5 +238,4 @@ def compare_modal_datasets_with_quality_control(
 
 
 def install_quality_control() -> None:
-    """Backward-compatible no-op; callers should import the wrapper directly."""
     return None
