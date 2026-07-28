@@ -27,8 +27,7 @@ if not exist ".venv\Scripts\python.exe" (
     if errorlevel 1 goto :error
 )
 
-echo Checking program dependencies...
-".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements.txt
+".venv\Scripts\python.exe" src\ensure_dependencies.py
 if errorlevel 1 goto :error
 
 echo Starting Abaqus-Simcenter Modal Comparator...
