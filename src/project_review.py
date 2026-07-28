@@ -234,19 +234,11 @@ def install_project_review(app_module) -> None:
         self.root.protocol("WM_DELETE_WINDOW", self._close_with_session_save)
 
     def install_project_controls(self) -> None:
-        project_frame = ttk.LabelFrame(self.input_tab, text="Project", padding=10)
-        children = self.input_tab.winfo_children()
-        before = children[0] if children else None
-        pack_options = {"fill": "x", "pady": (0, 10)}
-        if before is not None:
-            pack_options["before"] = before
-        project_frame.pack(**pack_options)
-        ttk.Button(project_frame, text="New project", command=self._new_project).pack(side="left")
-        ttk.Button(project_frame, text="Open project…", command=self._open_project).pack(side="left", padx=6)
-        ttk.Button(project_frame, text="Save project", command=self._save_project).pack(side="left")
-        ttk.Button(project_frame, text="Save project as…", command=self._save_project_as).pack(side="left", padx=6)
-        self.project_name_label = ttk.Label(project_frame, text="Unsaved project")
-        self.project_name_label.pack(side="left", padx=14)
+        # New/Open/Save/Save as live in the File menu (menu_ui.install_menu_ui) so
+        # they are reachable from every tab; this only keeps the current-project
+        # indicator visible in the header, next to the window title.
+        self.project_name_label = ttk.Label(self.header, text="Project: Unsaved project")
+        self.project_name_label.pack(side="right", anchor="e", padx=(0, 4))
 
     def install_manual_columns(self) -> None:
         columns = list(self.table["columns"])
@@ -342,7 +334,8 @@ def install_project_review(app_module) -> None:
         self.manual_reviews = normalize_manual_reviews(payload.get("manual_reviews", {}))
         self.project_path = None if project_path is None else Path(project_path)
         self.project_name_label.configure(
-            text="Recovered last session" if self.project_path is None else self.project_path.name
+            text="Project: "
+            + ("Recovered last session" if self.project_path is None else self.project_path.name)
         )
         self._refresh_review_table()
 
@@ -379,7 +372,7 @@ def install_project_review(app_module) -> None:
         self.end_mode.set(15)
         if hasattr(self, "coordinate_scale_text"):
             self.coordinate_scale_text.set("auto")
-        self.project_name_label.configure(text="Unsaved project")
+        self.project_name_label.configure(text="Project: Unsaved project")
         self.table.delete(*self.table.get_children())
         self._refresh_review_table()
         self.status.set("New project created.")
@@ -406,7 +399,7 @@ def install_project_review(app_module) -> None:
         try:
             write_project(self.project_path, self._project_payload_for_self())
             self._save_last_session()
-            self.project_name_label.configure(text=self.project_path.name)
+            self.project_name_label.configure(text=f"Project: {self.project_path.name}")
             self.status.set(f"Project saved: {self.project_path}")
         except Exception as error:
             messagebox.showerror("Could not save project", str(error))

@@ -66,6 +66,7 @@ class ModalComparatorApp:
     def _build(self) -> None:
         header = ttk.Frame(self.root, padding=(18, 14, 18, 8))
         header.pack(fill="x")
+        self.header = header
         ttk.Label(header, text=APP_TITLE, style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             header,
