@@ -34,6 +34,7 @@ from cmif_ui import install_cmif_ui
 from cmif_validation_ui import install_cmif_validation_ui
 from figure_export_ui import install_figure_export_ui
 from final_ui_polish import install_final_ui_polish
+from idle_ui_state import install_idle_ui_state
 from pair_plot_cache_ui import install_pair_plot_cache_ui
 from project_review import install_project_review
 from project_review_polish import install_project_review_polish
@@ -54,6 +55,7 @@ install_final_ui_polish(app)
 install_responsive_images(app)
 install_project_review(app)
 install_project_review_polish(app)
+install_idle_ui_state(app)
 verify_runtime_contracts(app)
 
 
