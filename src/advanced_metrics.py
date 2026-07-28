@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -90,7 +90,85 @@ def _project_coordinates(coordinates: np.ndarray) -> Tuple[np.ndarray, np.ndarra
     return projected[:, 0], projected[:, 1]
 
 
+def _draw_matrix(axis, figure, matrix, labels, title: str) -> None:
+    image = axis.imshow(matrix, vmin=0.0, vmax=1.0, aspect="equal")
+    axis.set_xticks(range(len(labels)))
+    axis.set_xticklabels(labels, rotation=45, ha="right")
+    axis.set_yticks(range(len(labels)))
+    axis.set_yticklabels(labels)
+    axis.set_title(title)
+    axis.set_xlabel("Mode")
+    axis.set_ylabel("Mode")
+    if matrix.size <= 400:
+        for row in range(matrix.shape[0]):
+            for column in range(matrix.shape[1]):
+                value = matrix[row, column]
+                text_color = "black" if value >= 0.55 else "white"
+                axis.text(
+                    column,
+                    row,
+                    f"{value:.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=9,
+                    color=text_color,
+                )
+    figure.colorbar(image, ax=axis, fraction=0.046, label="MAC")
+
+
+def render_abaqus_automac(result: ComparisonResult, output_path: Path) -> Path:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    abaqus_automac, _ = automac_matrices(result)
+    labels = [f"A{pair.abaqus_mode}" for pair in result.pairs]
+    figure = _new_figure((8.4, 7.2))
+    axis = figure.add_subplot(111)
+    _draw_matrix(axis, figure, abaqus_automac, labels, "Abaqus AutoMAC")
+    figure.savefig(output_path, dpi=190)
+    return output_path
+
+
+def render_experimental_automac(result: ComparisonResult, output_path: Path) -> Path:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _, experimental_automac = automac_matrices(result)
+    labels = [f"E{pair.experimental_mode}" for pair in result.pairs]
+    figure = _new_figure((8.4, 7.2))
+    axis = figure.add_subplot(111)
+    _draw_matrix(axis, figure, experimental_automac, labels, "Experimental AutoMAC")
+    figure.savefig(output_path, dpi=190)
+    return output_path
+
+
+def render_comac_map(result: ComparisonResult, output_path: Path) -> Path:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    coordinates, comac = comac_by_node(result)
+    x, y = _project_coordinates(coordinates)
+    figure = _new_figure((8.8, 7.0))
+    axis = figure.add_subplot(111)
+    scatter = axis.scatter(
+        x,
+        y,
+        c=comac,
+        vmin=0.0,
+        vmax=1.0,
+        s=105,
+        edgecolors="black",
+        linewidths=0.25,
+    )
+    axis.set_title("COMAC by measurement point")
+    axis.set_xlabel("Principal coordinate 1")
+    axis.set_ylabel("Principal coordinate 2")
+    axis.set_aspect("equal", adjustable="box")
+    axis.grid(True, alpha=0.2)
+    figure.colorbar(scatter, ax=axis, fraction=0.046, label="COMAC")
+    figure.savefig(output_path, dpi=190)
+    return output_path
+
+
 def render_automac_comac(result: ComparisonResult, output_path: Path) -> Path:
+    """Keep the combined figure for reports while the GUI uses separate large panels."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     abaqus_automac, experimental_automac = automac_matrices(result)
@@ -98,13 +176,13 @@ def render_automac_comac(result: ComparisonResult, output_path: Path) -> Path:
     labels = [f"A{pair.abaqus_mode}" for pair in result.pairs]
     experimental_labels = [f"E{pair.experimental_mode}" for pair in result.pairs]
 
-    figure = _new_figure((12.0, 4.3))
+    figure = _new_figure((13.5, 4.8))
     axes = [figure.add_subplot(1, 3, index) for index in (1, 2, 3)]
     for axis, matrix, xlabels, title in (
         (axes[0], abaqus_automac, labels, "Abaqus AutoMAC"),
         (axes[1], experimental_automac, experimental_labels, "Experimental AutoMAC"),
     ):
-        image = axis.imshow(matrix, vmin=0.0, vmax=1.0, aspect="auto")
+        image = axis.imshow(matrix, vmin=0.0, vmax=1.0, aspect="equal")
         axis.set_xticks(range(len(xlabels)))
         axis.set_xticklabels(xlabels, rotation=45, ha="right")
         axis.set_yticks(range(len(xlabels)))
@@ -117,14 +195,14 @@ def render_automac_comac(result: ComparisonResult, output_path: Path) -> Path:
         figure.colorbar(image, ax=axis, fraction=0.046)
 
     x, y = _project_coordinates(coordinates)
-    scatter = axes[2].scatter(x, y, c=comac, vmin=0.0, vmax=1.0, s=42)
+    scatter = axes[2].scatter(x, y, c=comac, vmin=0.0, vmax=1.0, s=52)
     axes[2].set_title("COMAC by measurement point")
     axes[2].set_xlabel("Principal coordinate 1")
     axes[2].set_ylabel("Principal coordinate 2")
     axes[2].set_aspect("equal", adjustable="box")
     axes[2].grid(True, alpha=0.2)
     figure.colorbar(scatter, ax=axes[2], fraction=0.046, label="COMAC")
-    figure.savefig(output_path, dpi=170)
+    figure.savefig(output_path, dpi=180)
     return output_path
 
 
