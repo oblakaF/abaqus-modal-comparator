@@ -31,14 +31,23 @@ def install_final_reporting_review() -> None:
         summary = workbook["Summary"]
         errors = [pair.frequency_error_percent for pair in result.pairs]
         if errors:
+            # A10/A11 used to be overwritten here with "Mean absolute/signed
+            # frequency error" without preserving the "Mean MAC" row the base
+            # reporting.export_excel had already written to A11, silently
+            # dropping it from the Summary sheet. Mean MAC now gets its own
+            # row instead of being clobbered.
             summary["A10"] = "Mean absolute frequency error"
             summary["B10"] = float(np.mean(np.abs(errors))) / 100.0
             summary["B10"].number_format = "0.00%"
             summary["A11"] = "Mean signed frequency error"
             summary["B11"] = float(np.mean(errors)) / 100.0
             summary["B11"].number_format = "+0.00%;-0.00%;0.00%"
-            summary["A12"] = "Frequency-error sign"
-            summary["B12"] = "positive = Abaqus higher; negative = Abaqus lower"
+            mac_values = [pair.mac for pair in result.pairs if pair.mac is not None]
+            if mac_values:
+                summary["A12"] = "Mean MAC"
+                summary["B12"] = float(np.mean(mac_values))
+            summary["A13"] = "Frequency-error sign"
+            summary["B13"] = "positive = Abaqus higher; negative = Abaqus lower"
 
         comparison = workbook["Mode Comparison"]
         comparison.cell(row=1, column=5, value="Signed frequency error, %")

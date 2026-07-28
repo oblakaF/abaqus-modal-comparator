@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 import cmif_separation
+import universal_reader
 from modal_core import ModeShape, modal_assurance_criterion
 
 
@@ -138,19 +139,21 @@ class CloseModeSvdTests(unittest.TestCase):
                     "data": response,
                 }
             )
-        # A coherence channel is present (func_type 6) but carries a malformed,
-        # multi-element "ref_node" that pyuff sometimes emits, which raises when
-        # coerced to a scalar rather than simply being absent.
+        # A normal coherence channel; the failure this test targets is injected
+        # below via a patched universal_reader._coherence_by_dof instead of a
+        # specific malformed shape, so the fallback stays covered as
+        # defense-in-depth even now that universal_hardening.install_universal_hardening
+        # hardens _coherence_by_dof itself against malformed pyuff scalars.
         datasets.append(
             {
                 "type": 58,
                 "func_type": 6,
                 "rsp_node": 1,
                 "rsp_dir": 3,
-                "ref_node": np.array([1, 2]),
+                "ref_node": 1,
                 "ref_dir": 3,
                 "x": frequency,
-                "data": np.ones_like(frequency),
+                "data": np.full_like(frequency, 0.9),
             }
         )
 
@@ -180,6 +183,10 @@ class CloseModeSvdTests(unittest.TestCase):
             "_ORIGINAL_MODES_FROM_FRF",
             fake_base_reader,
             create=True,
+        ), patch.object(
+            universal_reader,
+            "_coherence_by_dof",
+            side_effect=ValueError("boom"),
         ):
             _modes, metadata = cmif_separation._reviewed_modes_from_frf(
                 datasets,

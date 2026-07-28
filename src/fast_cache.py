@@ -55,7 +55,17 @@ def _schema_fingerprint() -> str:
     ).hexdigest()[:16]
 
 
-_CACHE_VERSION = "modal-cache-v5-" + _schema_fingerprint()
+# _schema_fingerprint() only catches ModeShape/ModalDataset FIELD-shape changes.
+# A semantic change to the derivation algorithm (peak detection, coherence
+# handling, CMIF/SVD separation, quality-control thresholds, coordinate-system
+# handling, and so on) does not change those dataclasses' fields, so without
+# this separate marker an on-disk cache from before the change would keep
+# being served after an update. Bump this by hand whenever such logic changes.
+_ANALYSIS_PIPELINE_VERSION = "2026.07.28.1"
+
+_CACHE_VERSION = (
+    f"modal-cache-v5-{_ANALYSIS_PIPELINE_VERSION}-" + _schema_fingerprint()
+)
 
 
 def _atomic_pickle_dump(value: Any, destination: Path, compressed: bool) -> None:

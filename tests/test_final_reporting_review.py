@@ -46,6 +46,8 @@ class FinalReportingReviewTests(unittest.TestCase):
     def test_export_excel_final_writes_signed_and_absolute_frequency_summary(self):
         result = self.make_result()
         errors = [pair.frequency_error_percent for pair in result.pairs]
+        mac_values = [pair.mac for pair in result.pairs if pair.mac is not None]
+        self.assertTrue(mac_values, "fixture must include at least one calculable MAC")
 
         install_final_reporting_review()
         export_excel_final = target.reporting.export_excel
@@ -67,6 +69,11 @@ class FinalReportingReviewTests(unittest.TestCase):
                 self.assertAlmostEqual(
                     summary["B11"].value, float(np.mean(errors)) / 100.0
                 )
+                # Mean MAC must survive this layer rather than being clobbered
+                # by the frequency-error rows that used to reuse the same cells.
+                self.assertEqual(summary["A12"].value, "Mean MAC")
+                self.assertAlmostEqual(summary["B12"].value, float(np.mean(mac_values)))
+                self.assertEqual(summary["A13"].value, "Frequency-error sign")
                 self.assertEqual(
                     workbook["Mode Comparison"].cell(row=1, column=5).value,
                     "Signed frequency error, %",

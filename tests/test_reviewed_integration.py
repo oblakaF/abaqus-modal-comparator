@@ -75,6 +75,16 @@ class ReviewedIntegrationTests(unittest.TestCase):
                     workbook["Mode Comparison"].cell(row=1, column=5).value,
                     "Signed frequency error, %",
                 )
+                summary = workbook["Summary"]
+                # Mean MAC (written by the base reporting.export_excel) must not be
+                # clobbered by the frequency-error summary rows the reporting
+                # extension layers add afterward.
+                self.assertEqual(summary.cell(row=12, column=1).value, "Mean MAC")
+                self.assertAlmostEqual(
+                    summary.cell(row=12, column=2).value,
+                    float(np.mean([pair.mac for pair in result.pairs])),
+                    places=6,
+                )
             finally:
                 workbook.close()
 

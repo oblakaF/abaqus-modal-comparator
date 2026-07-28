@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from fast_cache import (
+    _ANALYSIS_PIPELINE_VERSION,
     _CACHE_VERSION,
     _clone_dataset,
     _user_cache_path,
@@ -19,6 +20,14 @@ class FastCacheSafetyTests(unittest.TestCase):
     def test_cache_version_contains_schema_fingerprint(self):
         self.assertTrue(_CACHE_VERSION.startswith("modal-cache-v5-"))
         self.assertGreater(len(_CACHE_VERSION.split("-")[-1]), 8)
+
+    def test_cache_version_embeds_the_analysis_pipeline_version(self):
+        # A hand-bumped marker independent of the dataclass schema fingerprint,
+        # so an algorithm-only change (peak detection, coherence handling,
+        # CMIF/SVD, quality control, ...) still invalidates old cache files
+        # even though ModeShape/ModalDataset's fields did not change.
+        self.assertIn(_ANALYSIS_PIPELINE_VERSION, _CACHE_VERSION)
+        self.assertGreater(len(_ANALYSIS_PIPELINE_VERSION), 0)
 
     def test_clone_does_not_share_mutable_metadata(self):
         coordinates = np.array(
