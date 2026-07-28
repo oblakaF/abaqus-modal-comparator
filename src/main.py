@@ -22,6 +22,11 @@ from enhanced_reporting import install_reporting_enhancements
 from advanced_reporting import install_advanced_reporting
 from final_reporting_review import install_final_reporting_review
 
+# Each install_* below wraps reporting.export_excel/export_pdf around whatever the
+# previous call left in place, so this order is load-bearing: reordering silently
+# changes what ends up in the generated report. verify_runtime_contracts() (below)
+# checks the final owner of export_excel/export_pdf and fails startup if this order
+# is ever changed without updating that contract.
 install_reporting_enhancements()
 install_advanced_reporting()
 install_final_reporting_review()

@@ -25,6 +25,7 @@ class _FrfBlock:
     coordinates: np.ndarray
     measured_mask: np.ndarray
     mean_coherence: np.ndarray
+    coherence_status: str
     reference_count: int
 
 
@@ -99,19 +100,27 @@ def _build_frf_block(
     for node, signed_direction in row_keys:
         measured_mask[node_index[int(node)], abs(int(signed_direction)) - 1] = True
 
+    reference_node, reference_direction = next(iter(references))
     try:
-        reference_node, reference_direction = next(iter(references))
         coherence_lookup = universal_reader._coherence_by_dof(
             datasets, frequency, reference_node, reference_direction
         )
         coherence_rows = [coherence_lookup[key] for key in row_keys if key in coherence_lookup]
-        mean_coherence = (
-            np.mean(np.vstack(coherence_rows), axis=0)
-            if coherence_rows
-            else np.ones_like(frequency, dtype=float)
-        )
-    except Exception:
-        mean_coherence = np.ones_like(frequency, dtype=float)
+        if coherence_rows:
+            mean_coherence = np.mean(np.vstack(coherence_rows), axis=0)
+            coherence_status = "computed"
+        else:
+            # No dataset-58 coherence channel was exported for this reference: there is
+            # no basis to distrust the FRF data, so it is weighted at full confidence.
+            mean_coherence = np.ones_like(frequency, dtype=float)
+            coherence_status = "unavailable"
+    except (TypeError, ValueError, IndexError, KeyError) as error:
+        # The coherence channel exists but could not be parsed (malformed pyuff scalar
+        # data). Unlike the "unavailable" case above, real data was withheld here, so
+        # default to the least-trusting weight rather than silently assuming perfect
+        # coherence, and surface the failure to the user via close_mode_separation.
+        mean_coherence = np.zeros_like(frequency, dtype=float)
+        coherence_status = f"error: {error}"
 
     return _FrfBlock(
         frequency=frequency,
@@ -121,6 +130,7 @@ def _build_frf_block(
         coordinates=coordinates,
         measured_mask=measured_mask,
         mean_coherence=mean_coherence,
+        coherence_status=coherence_status,
         reference_count=max(1, len(references)),
     )
 
@@ -318,6 +328,20 @@ def _reviewed_modes_from_frf(
         mode.metadata.setdefault("original_experimental_mode_number", mode.number)
         mode.number = new_number
 
+    scientific_warning = (
+        "With one excitation reference, local SVD identifies additional spatial "
+        "components inside an overlapping resonance band, but it is not a fully "
+        "independent multi-reference modal curve fit. Confirm split modes by MAC, "
+        "AutoMAC, coherence, and visual inspection."
+    )
+    if block.coherence_status.startswith("error"):
+        scientific_warning += (
+            " Coherence-based weighting could not be computed for this dataset "
+            f"({block.coherence_status}); the local SVD residual was weighted as if "
+            "coherence were poor across the band, so split components may be "
+            "under-detected rather than falsely confirmed."
+        )
+
     metadata.update(
         {
             "mode_count": len(all_modes),
@@ -331,13 +355,9 @@ def _reviewed_modes_from_frf(
                 ),
                 "reference_count": block.reference_count,
                 "added_mode_count": len(added_modes),
+                "coherence_status": block.coherence_status,
                 "clusters": cluster_diagnostics,
-                "scientific_warning": (
-                    "With one excitation reference, local SVD identifies additional spatial "
-                    "components inside an overlapping resonance band, but it is not a fully "
-                    "independent multi-reference modal curve fit. Confirm split modes by MAC, "
-                    "AutoMAC, coherence, and visual inspection."
-                ),
+                "scientific_warning": scientific_warning,
             },
         }
     )

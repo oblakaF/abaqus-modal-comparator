@@ -68,12 +68,15 @@ class ReviewedIntegrationTests(unittest.TestCase):
             self.assertGreater(pdf.stat().st_size, 1000)
 
             workbook = load_workbook(excel, read_only=True)
-            self.assertIn("AutoMAC COMAC", workbook.sheetnames)
-            self.assertIn("FRF Diagnostics", workbook.sheetnames)
-            self.assertEqual(
-                workbook["Mode Comparison"].cell(row=1, column=5).value,
-                "Signed frequency error, %",
-            )
+            try:
+                self.assertIn("AutoMAC COMAC", workbook.sheetnames)
+                self.assertIn("FRF Diagnostics", workbook.sheetnames)
+                self.assertEqual(
+                    workbook["Mode Comparison"].cell(row=1, column=5).value,
+                    "Signed frequency error, %",
+                )
+            finally:
+                workbook.close()
 
 
 if __name__ == "__main__":

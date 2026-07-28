@@ -101,6 +101,97 @@ class CloseModeSvdTests(unittest.TestCase):
             0.98,
         )
 
+    def test_malformed_coherence_dataset_falls_back_conservatively_and_warns(self):
+        x, y = np.meshgrid(np.linspace(-1.0, 1.0, 7), np.linspace(-1.0, 1.0, 7))
+        coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        node_numbers = np.arange(1, len(coordinates) + 1)
+        geometry = {int(node): coordinate for node, coordinate in zip(node_numbers, coordinates)}
+
+        shape_1 = np.sin(np.pi * (x.ravel() + 1.0) / 2.0) * np.sin(
+            np.pi * (y.ravel() + 1.0) / 2.0
+        )
+        shape_2 = np.sin(2.0 * np.pi * (x.ravel() + 1.0) / 2.0) * np.sin(
+            np.pi * (y.ravel() + 1.0) / 2.0
+        )
+        shape_1 /= np.linalg.norm(shape_1)
+        shape_2 /= np.linalg.norm(shape_2)
+
+        frequency = np.linspace(86.0, 97.0, 353)
+        f1, f2 = 91.35, 92.10
+        zeta_1, zeta_2 = 0.010, 0.012
+        datasets = []
+        for index, node in enumerate(node_numbers):
+            denominator_1 = f1**2 - frequency**2 + 2j * zeta_1 * f1 * frequency
+            denominator_2 = f2**2 - frequency**2 + 2j * zeta_2 * f2 * frequency
+            response = shape_1[index] / denominator_1 + 0.75 * shape_2[index] / denominator_2
+            datasets.append(
+                {
+                    "type": 58,
+                    "func_type": 4,
+                    "id1": "Transfer Function H1",
+                    "id2": "H1 Displacement / Force",
+                    "rsp_node": int(node),
+                    "rsp_dir": 3,
+                    "ref_node": 1,
+                    "ref_dir": 3,
+                    "x": frequency,
+                    "data": response,
+                }
+            )
+        # A coherence channel is present (func_type 6) but carries a malformed,
+        # multi-element "ref_node" that pyuff sometimes emits, which raises when
+        # coerced to a scalar rather than simply being absent.
+        datasets.append(
+            {
+                "type": 58,
+                "func_type": 6,
+                "rsp_node": 1,
+                "rsp_dir": 3,
+                "ref_node": np.array([1, 2]),
+                "ref_dir": 3,
+                "x": frequency,
+                "data": np.ones_like(frequency),
+            }
+        )
+
+        base_vectors = np.zeros((len(node_numbers), 3), dtype=complex)
+        base_vectors[:, 2] = shape_1
+        base_mode = ModeShape(
+            number=1,
+            frequency_hz=91.72,
+            node_ids=node_numbers.astype(object),
+            coordinates=coordinates,
+            vectors=base_vectors,
+            metadata={"mode_source": "single detected peak"},
+        )
+        base_mode.measured_dofs = np.column_stack(
+            (
+                np.zeros(len(node_numbers), dtype=bool),
+                np.zeros(len(node_numbers), dtype=bool),
+                np.ones(len(node_numbers), dtype=bool),
+            )
+        )
+
+        def fake_base_reader(*_args, **_kwargs):
+            return [base_mode], {"mode_source": "test peak extraction"}
+
+        with patch.object(
+            cmif_separation,
+            "_ORIGINAL_MODES_FROM_FRF",
+            fake_base_reader,
+            create=True,
+        ):
+            _modes, metadata = cmif_separation._reviewed_modes_from_frf(
+                datasets,
+                geometry,
+                target_frequencies=[f1, f2],
+                target_count=2,
+            )
+
+        separation = metadata["close_mode_separation"]
+        self.assertTrue(separation["coherence_status"].startswith("error"))
+        self.assertIn("Coherence-based weighting could not be computed", separation["scientific_warning"])
+
 
 if __name__ == "__main__":
     unittest.main()

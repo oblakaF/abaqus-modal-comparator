@@ -11,7 +11,7 @@ from modal_core import ModeShape
 
 
 _INSTALLED = False
-_ORIGINAL_LOAD = universal_reader.load_universal_modal_file
+_ORIGINAL_LOAD = None
 
 
 def _scalar(value: Any, default: Optional[float] = None) -> Optional[float]:
@@ -333,9 +333,10 @@ def load_universal_modal_file(*args, **kwargs):
 
 
 def install_universal_hardening() -> None:
-    global _INSTALLED
+    global _INSTALLED, _ORIGINAL_LOAD
     if _INSTALLED:
         return
+    _ORIGINAL_LOAD = universal_reader.load_universal_modal_file
     universal_reader._dataset_type = _dataset_type
     universal_reader._mode_from_dataset_55 = _safe_mode_55
     universal_reader._mode_from_dataset_2414 = _safe_mode_2414

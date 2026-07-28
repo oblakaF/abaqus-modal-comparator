@@ -46,6 +46,16 @@ def verify_runtime_contracts(app_module) -> None:
             reporting.render_pair_images,
             "amplitude_correlation",
         ),
+        (
+            "reporting.export_excel",
+            reporting.export_excel,
+            "final_reporting_review",
+        ),
+        (
+            "reporting.export_pdf",
+            reporting.export_pdf,
+            "advanced_reporting",
+        ),
     )
     failures = [
         f"{name}: expected {module_name}, got {_owner(value)}"

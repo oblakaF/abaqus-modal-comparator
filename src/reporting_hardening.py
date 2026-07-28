@@ -6,15 +6,12 @@ from typing import Dict, Tuple
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
-from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
 
 import reporting
 from modal_core import ComparisonResult, ModePairResult
 
 
 _INSTALLED = False
-_ORIGINAL_EXPORT_EXCEL = reporting.export_excel
 
 
 def _new_figure(figsize) -> Figure:
@@ -254,32 +251,6 @@ def render_frequency_comparison(result: ComparisonResult, output_path: Path) -> 
     return output_path
 
 
-def export_excel_reviewed(result: ComparisonResult, output_path: Path, image_directory: Path) -> Path:
-    output_path = _ORIGINAL_EXPORT_EXCEL(result, output_path, image_directory)
-    workbook = load_workbook(output_path)
-    summary = workbook["Summary"]
-    errors = [pair.frequency_error_percent for pair in result.pairs]
-    if errors:
-        summary["A10"] = "Mean absolute frequency error"
-        summary["B10"] = float(np.mean(np.abs(errors))) / 100.0
-        summary["B10"].number_format = "0.00%"
-        summary["A11"] = "Mean signed frequency error"
-        summary["B11"] = float(np.mean(errors)) / 100.0
-        summary["B11"].number_format = "+0.00%;-0.00%;0.00%"
-        summary["A12"] = "Frequency-error sign"
-        summary["B12"] = "positive = Abaqus higher; negative = Abaqus lower"
-
-    comparison = workbook["Mode Comparison"]
-    comparison.cell(row=1, column=5, value="Signed frequency error, %")
-    for column in range(1, comparison.max_column + 1):
-        comparison.column_dimensions[get_column_letter(column)].width = max(
-            comparison.column_dimensions[get_column_letter(column)].width or 0,
-            20,
-        )
-    workbook.save(output_path)
-    return output_path
-
-
 def install_reporting_hardening() -> None:
     global _INSTALLED
     if _INSTALLED:
@@ -289,5 +260,7 @@ def install_reporting_hardening() -> None:
     reporting.render_pair_images = render_pair_images
     reporting.render_mac_matrix = render_mac_matrix
     reporting.render_frequency_comparison = render_frequency_comparison
-    reporting.export_excel = export_excel_reviewed
+    # The signed-frequency-error summary rows and "Mode Comparison" column widths
+    # are written once, last, by final_reporting_review.install_final_reporting_review
+    # after every other report extension has run.
     _INSTALLED = True

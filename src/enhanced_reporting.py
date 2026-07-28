@@ -19,8 +19,8 @@ import reporting
 from modal_core import ComparisonResult
 
 
-_ORIGINAL_EXPORT_EXCEL = reporting.export_excel
-_ORIGINAL_EXPORT_PDF = reporting.export_pdf
+_ORIGINAL_EXPORT_EXCEL = None
+_ORIGINAL_EXPORT_PDF = None
 _INSTALLED = False
 
 
@@ -306,9 +306,11 @@ def export_pdf_enhanced(
 
 
 def install_reporting_enhancements() -> None:
-    global _INSTALLED
+    global _INSTALLED, _ORIGINAL_EXPORT_EXCEL, _ORIGINAL_EXPORT_PDF
     if _INSTALLED:
         return
+    _ORIGINAL_EXPORT_EXCEL = reporting.export_excel
+    _ORIGINAL_EXPORT_PDF = reporting.export_pdf
     reporting.export_excel = export_excel_enhanced
     reporting.export_pdf = export_pdf_enhanced
     _INSTALLED = True
