@@ -1,10 +1,14 @@
 from universal_hardening import install_universal_hardening
 from universal_frf_review import install_frf_review
 from reporting_hardening import install_reporting_hardening
+from amplitude_correlation import install_amplitude_correlation
+from metrics_normalization import install_metrics_normalization
 
 install_universal_hardening()
 install_frf_review()
 install_reporting_hardening()
+install_amplitude_correlation()
+install_metrics_normalization()
 
 from enhanced_reporting import install_reporting_enhancements
 from advanced_reporting import install_advanced_reporting
@@ -16,6 +20,7 @@ install_final_reporting_review()
 
 import app
 from advanced_ui import install_advanced_ui
+from amplitude_correlation import install_correlation_ui
 from quality_control_reviewed import compare_modal_datasets_with_quality_control
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
@@ -25,6 +30,7 @@ app.compare_modal_datasets = compare_modal_datasets_with_quality_control
 install_app_enhancements(app)
 install_runtime_hardening(app)
 install_advanced_ui(app)
+install_correlation_ui(app)
 
 
 if __name__ == "__main__":
