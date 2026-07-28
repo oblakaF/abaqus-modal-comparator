@@ -61,14 +61,18 @@ def _rigid_body_residual_fraction(mode: ModeShape) -> float:
     return float(np.linalg.norm(residual) / vector_norm)
 
 
+def _rigid_residuals(dataset: ModalDataset) -> Dict[int, float]:
+    return {
+        int(mode.number): _rigid_body_residual_fraction(mode)
+        for mode in dataset.modes
+    }
+
+
 def _detect_rigid_modes(
     dataset: ModalDataset,
 ) -> Tuple[List[ModeShape], List[ModeShape], float, Optional[float]]:
     modes = sorted(dataset.modes, key=lambda mode: mode.frequency_hz)
-    residuals = {
-        int(mode.number): _rigid_body_residual_fraction(mode)
-        for mode in modes
-    }
+    residuals = _rigid_residuals(dataset)
     excluded = [
         mode
         for mode in modes
@@ -78,7 +82,6 @@ def _detect_rigid_modes(
     retained = [mode for mode in modes if id(mode) not in excluded_ids]
     highest_excluded = max((mode.frequency_hz for mode in excluded), default=0.0)
     first_elastic = min((mode.frequency_hz for mode in retained), default=None)
-    dataset.metadata["_rigid_body_residuals"] = residuals
     return excluded, retained, highest_excluded, first_elastic
 
 
@@ -128,12 +131,12 @@ def compare_modal_datasets_with_quality_control(
     frequency_weight: float = 0.25,
     coordinate_scale_override: Optional[float] = None,
 ) -> ComparisonResult:
+    rigid_residuals = _rigid_residuals(abaqus)
     excluded_modes, retained_modes, rigid_threshold, first_elastic = _detect_rigid_modes(abaqus)
     if not retained_modes:
         raise ValueError("No elastic Abaqus modes remain after rigid-body shape projection.")
 
     filtered_abaqus = _copy_dataset_with_modes(abaqus, retained_modes)
-    rigid_residuals = dict(abaqus.metadata.get("_rigid_body_residuals", {}))
     filtered_abaqus.metadata["quality_control"] = {
         "rigid_mode_method": "six-vector rigid-body subspace projection",
         "rigid_shape_residual_threshold": RIGID_SHAPE_RESIDUAL_THRESHOLD,
