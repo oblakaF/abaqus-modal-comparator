@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Dict, Tuple
 
@@ -78,7 +79,11 @@ def comac_by_node(result: ComparisonResult) -> Tuple[np.ndarray, np.ndarray]:
             )
             row += 1
 
-    node_scores = np.nanmean(dof_scores, axis=1)
+    with warnings.catch_warnings():
+        # A node with no measured DOF at all yields an all-NaN row here; the
+        # resulting NaN node score is correct, only numpy's warning is unwanted.
+        warnings.filterwarnings("ignore", message="Mean of empty slice", category=RuntimeWarning)
+        node_scores = np.nanmean(dof_scores, axis=1)
     coordinates = np.asarray(result.pairs[0].coordinates, dtype=float)
     return coordinates, np.clip(node_scores, 0.0, 1.0)
 

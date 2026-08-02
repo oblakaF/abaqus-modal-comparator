@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import traceback
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,11 +27,31 @@ PROJECT_SCHEMA_VERSION = 1
 PROJECT_EXTENSION = ".amcp.json"
 CONFIG_DIRECTORY = Path.home() / ".abaqus_simcenter_modal_comparator"
 LAST_SESSION_PATH = CONFIG_DIRECTORY / "last_session.json"
+ERROR_LOG_PATH = CONFIG_DIRECTORY / "project_review_errors.log"
 _INSTALLED = False
 
 
 def utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _log_recoverable_error(context: str, error: BaseException) -> None:
+    """Record an error that is deliberately not raised further.
+
+    Session persistence and plot-cache refresh are allowed to fail without
+    interrupting the user's session, but staying completely silent about it
+    (the previous ``except Exception: pass``) meant a persistent failure
+    could go unnoticed indefinitely. Logging here is itself best-effort: if
+    the filesystem is unwritable there is nowhere left to report that either.
+    """
+    try:
+        CONFIG_DIRECTORY.mkdir(parents=True, exist_ok=True)
+        with ERROR_LOG_PATH.open("a", encoding="utf-8") as stream:
+            stream.write(f"{utc_timestamp()} [{context}] {error!r}\n")
+            stream.write(traceback.format_exc())
+            stream.write("\n")
+    except Exception:
+        pass
 
 
 def normalize_manual_reviews(value) -> Dict[str, dict]:
@@ -307,7 +328,7 @@ def install_project_review(app_module) -> None:
         try:
             start_mode = int(self.start_mode.get())
             end_mode = int(self.end_mode.get())
-        except Exception:
+        except (TypeError, ValueError, tk.TclError):
             start_mode, end_mode = 6, 15
         return project_payload(
             abaqus_path=self.abaqus_path.get(),
@@ -343,8 +364,8 @@ def install_project_review(app_module) -> None:
         try:
             CONFIG_DIRECTORY.mkdir(parents=True, exist_ok=True)
             write_project(LAST_SESSION_PATH, self._project_payload_for_self())
-        except Exception:
-            pass
+        except Exception as error:
+            _log_recoverable_error("save_last_session", error)
 
     def restore_last_session(self) -> None:
         if not LAST_SESSION_PATH.exists():
@@ -352,8 +373,12 @@ def install_project_review(app_module) -> None:
         try:
             self._apply_project_payload(read_project(LAST_SESSION_PATH), None)
             self.status.set("Last project settings restored. Run the analysis to restore results.")
-        except Exception:
-            pass
+        except Exception as error:
+            _log_recoverable_error("restore_last_session", error)
+            self.status.set(
+                "Could not restore the last session; starting from defaults. "
+                f"See {ERROR_LOG_PATH}."
+            )
 
     def new_project(self) -> None:
         if not messagebox.askyesno("New project", "Clear the current project settings and manual decisions?"):
@@ -566,7 +591,11 @@ def install_project_review(app_module) -> None:
         for experimental_mode in self.result.experimental.sorted_modes():
             try:
                 pair = build_manual_pair(self.result, abaqus_mode, experimental_mode.number)
-            except Exception:
+            except ValueError:
+                # build_manual_pair raises ValueError for a candidate with no
+                # common measured DOF, or a mode number that no longer exists;
+                # that mode is simply not a viable candidate for this list.
+                # Anything else is a real bug and must not be hidden here.
                 continue
             metadata = experimental_mode.metadata
             source = metadata.get("source_label") or metadata.get("mode_source") or "Unknown"
@@ -636,7 +665,16 @@ def install_project_review(app_module) -> None:
                     try:
                         pair = build_manual_pair(self.result, int(abaqus_mode), int(selected_experimental))
                         self._manual_candidate_pairs[int(abaqus_mode)] = pair
-                    except Exception:
+                    except ValueError as error:
+                        # A manually requested pair with no common measured DOF
+                        # (or a stale mode number) is dropped from the effective
+                        # set below rather than crashing the review. Any other
+                        # exception is a real bug in the reviewed pair and must
+                        # propagate instead of silently vanishing from the report.
+                        _log_recoverable_error(
+                            f"apply_manual_reviews: A{abaqus_mode}/E{selected_experimental}",
+                            error,
+                        )
                         pair = None
             if decision in {"rejected", "unresolved"}:
                 continue
@@ -680,16 +718,24 @@ def install_project_review(app_module) -> None:
         ):
             try:
                 (plot_directory / name).unlink(missing_ok=True)
-            except Exception:
-                pass
+            except OSError as error:
+                _log_recoverable_error(f"invalidate_review_plots: unlink {name}", error)
         try:
             app_module.render_frequency_comparison(
                 self.result, plot_directory / "frequency_comparison.png"
             )
             from enhanced_reporting import render_verified_mac_matrix
             render_verified_mac_matrix(self.result, plot_directory / "verified_mac_matrix.png")
-        except Exception:
-            pass
+        except Exception as error:
+            # The stale plots were already removed above, so a failed
+            # re-render leaves the images missing rather than silently wrong;
+            # still surface it, since a plot that should reflect the current
+            # manual-review pair set failing to regenerate is worth knowing.
+            _log_recoverable_error("invalidate_review_plots: re-render", error)
+            self.result.warnings.append(
+                "Frequency/verified-MAC plots could not be refreshed after the "
+                f"manual review change; see {ERROR_LOG_PATH}."
+            )
 
     def refresh_review_table(self) -> None:
         if not hasattr(self, "review_table"):

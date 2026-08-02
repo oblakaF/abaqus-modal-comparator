@@ -4,6 +4,8 @@ import tempfile
 import unittest
 
 import numpy as np
+from openpyxl import load_workbook
+from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -91,6 +93,87 @@ class ModalCoreTests(unittest.TestCase):
             pdf_path = export_pdf(result, directory_path / "report.pdf", directory_path / "report_images")
             self.assertGreater(excel_path.stat().st_size, 1000)
             self.assertGreater(pdf_path.stat().st_size, 1000)
+
+    def test_export_excel_base_writes_the_documented_sheets_and_values(self):
+        """Characterization test for the un-patched reporting.export_excel.
+
+        Locks in the sheet list, headers, and summary values so a future
+        refactor of the install_* patch chain (see ROADMAP.md Stage 4) can be
+        checked against this instead of just "did it crash".
+        """
+        result = self.synthetic_result()
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            excel_path = export_excel(
+                result, directory_path / "report.xlsx", directory_path / "report_images"
+            )
+            workbook = load_workbook(excel_path)
+            try:
+                self.assertEqual(
+                    workbook.sheetnames,
+                    [
+                        "Summary",
+                        "Mode Comparison",
+                        "MAC Matrix",
+                        "Geometry Match",
+                        "Abaqus History",
+                    ],
+                )
+
+                summary = workbook["Summary"]
+                self.assertEqual(summary["A1"].value, "Abaqus Modal Comparator")
+                self.assertEqual(summary["A5"].value, "Matched mode pairs")
+                self.assertEqual(summary["B5"].value, len(result.pairs))
+                self.assertEqual(summary["A10"].value, "Mean frequency error")
+                self.assertAlmostEqual(
+                    summary["B10"].value,
+                    float(np.mean([pair.frequency_error_percent for pair in result.pairs])) / 100.0,
+                    places=8,
+                )
+                mac_values = [pair.mac for pair in result.pairs if pair.mac is not None]
+                self.assertTrue(mac_values, "fixture must include at least one calculable MAC")
+                self.assertEqual(summary["A11"].value, "Mean MAC")
+                self.assertAlmostEqual(
+                    summary["B11"].value, float(np.mean(mac_values)), places=8
+                )
+
+                comparison = workbook["Mode Comparison"]
+                self.assertEqual(
+                    [cell.value for cell in comparison[1]],
+                    [
+                        "Abaqus mode",
+                        "Experimental mode",
+                        "Abaqus frequency, Hz",
+                        "Experimental frequency, Hz",
+                        "Frequency error, %",
+                        "MAC",
+                        "Order changed",
+                        "Mapped points",
+                        "Status",
+                    ],
+                )
+                self.assertEqual(comparison.max_row, len(result.pairs) + 1)
+
+                mac_sheet = workbook["MAC Matrix"]
+                self.assertEqual(
+                    [cell.value for cell in mac_sheet[1]],
+                    ["Abaqus / Experiment", *result.experimental_mode_numbers],
+                )
+            finally:
+                workbook.close()
+
+    def test_export_pdf_base_produces_one_page_per_summary_item_and_pair(self):
+        """Characterization test for the un-patched reporting.export_pdf page count:
+        1 title page + 2 diagnostic pages (frequency, MAC) + 1 page per matched pair.
+        """
+        result = self.synthetic_result()
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            pdf_path = export_pdf(
+                result, directory_path / "report.pdf", directory_path / "report_images"
+            )
+            reader = PdfReader(str(pdf_path))
+            self.assertEqual(len(reader.pages), 3 + len(result.pairs))
 
 
 if __name__ == "__main__":
