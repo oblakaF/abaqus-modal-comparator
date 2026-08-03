@@ -27,7 +27,8 @@ Remaining baseline gaps:
 The order below is mandatory for an implementation agent:
 
 1. complete scientific hardening;
-2. add Polytec and expand the comparison workflow/windows for three sources;
+2. add explicit Polytec/Testlab data lineage and the optional future
+   three-source comparison workflow;
 3. implement the current user-requested UI refinements;
 4. consolidate the architecture and reproducibility tooling.
 
@@ -211,18 +212,77 @@ Required tests:
 
 ---
 
-## Stage 3 — add Polytec as a third modal-data source
+## Stage 3 — explicit Polytec/Testlab lineage and optional three-source analysis
 
-Goal:
+### Current real workflow
 
-Support one project containing:
+The current laboratory data represent one physical experiment:
+
+```text
+Measurement system: Polytec scanning laser vibrometer
+Processing/database software: Simcenter Testlab
+Imported container: LMS / UNV / UFF
+Comparison: Abaqus FEM ↔ Polytec experiment processed in Simcenter Testlab
+```
+
+Simcenter Testlab is not a second independent experiment in this workflow. It is
+software used to store/process the Polytec measurements. Therefore the current
+project must not calculate a meaningless `Simcenter ↔ Polytec` comparison from
+two exports of the same physical dataset.
+
+The default UI label should be explicit, for example:
+
+```text
+Abaqus FEM ↔ Polytec experiment (processed in Simcenter Testlab)
+```
+
+Do not label the same dataset once as `Simcenter` and once as `Polytec` merely
+because it was imported from a Testlab UNV/UFF file.
+
+### 0. Separate physical source, processing software, and file container
+
+The data model must store these as different concepts:
+
+- `experiment_id` — stable identity of the physical measurement campaign;
+- `measurement_system` — e.g. Polytec PSV/laser vibrometer, accelerometers,
+  impact hammer, shaker, SCADAS;
+- `processing_software` — e.g. Simcenter Testlab;
+- `import_format` / `import_adapter` — LMS pointer, UNV/UFF 55/2414, dataset 58,
+  future native Polytec API;
+- `source_display_name` — human-readable experiment label;
+- `parent/raw-data lineage` — enough metadata to identify two exports from the
+  same experiment.
+
+Two datasets with the same `experiment_id` or declared common lineage are not
+independent sources. The program may compare processing variants diagnostically,
+but must label them as reprocessed versions of one experiment rather than as
+independent experimental validation.
+
+Existing projects must migrate to the default lineage:
+
+```text
+measurement_system = Polytec
+processing_software = Simcenter Testlab
+experiment_id = existing imported experimental file/campaign
+```
+
+unless the user explicitly identifies a different physical measurement system.
+
+### Goal for the future optional mode
+
+Support a project that can later contain two genuinely independent experimental
+datasets, for example:
 
 - Abaqus numerical modes;
-- Simcenter/Testlab experimental modes or FRFs;
-- Polytec laser-vibrometer modes or FRFs.
+- a contact/SCADAS/accelerometer experiment processed in Simcenter Testlab;
+- a separate Polytec laser-vibrometer experiment, possibly also processed in
+  Simcenter Testlab.
+
+Only in that situation should the application enable all three independent
+pairwise comparisons.
 
 This stage includes both the data/algorithm work and the minimum comparison UI
-needed to use all three sources. The Polytec comparison windows must not be
+needed to use all available sources. The comparison windows must not be
 postponed to Stage 4.
 
 ### 1. Initial Polytec import path
@@ -231,8 +291,8 @@ First implementation phase:
 
 - accept Polytec data exported as ASCII UFF/UNV;
 - reuse the hardened universal-file importer;
-- identify `Polytec` explicitly in metadata, caches, UI, tables, projects, and
-  reports;
+- record Polytec as the measurement system and Testlab as processing software;
+- preserve this lineage in metadata, caches, UI, tables, projects, and reports;
 - prefer geometry plus curve-fitted modal datasets 55/2414;
 - permit dataset-58 FRFs under the Stage-2 confidence and scientific limits.
 
@@ -244,33 +304,50 @@ stable supported access method are available.
 Replace the fixed conceptual structure:
 
 ```text
-Abaqus + one Experimental dataset
+Abaqus + one generic Experimental dataset
 ```
 
-with named modal sources:
+with named numerical and physical experimental datasets, while keeping
+processing software separate:
 
 ```text
 Numerical:
   Abaqus
-Experimental:
-  Simcenter
-  Polytec
+
+Physical experiment A:
+  Polytec measurement
+  processed in Simcenter Testlab
+
+Optional independent physical experiment B:
+  accelerometer/SCADAS measurement
+  processed in Simcenter Testlab
 ```
 
-Each dataset must have a stable source ID, display name, source type, import
-method, file path/hash, geometry, modes, measured directions, and confidence
-metadata. Store results per source pair and migrate existing two-source project
-files without changing their results.
+Each dataset must have a stable source ID, experiment ID, display name,
+measurement-system type, processing software, import method, file path/hash,
+geometry, modes, measured directions, and confidence metadata. Store results
+per independent source pair and migrate existing two-source project files
+without changing their numerical results.
 
-### 3. Calculate all three pairwise comparisons
+### 3. Calculate available pairwise comparisons conditionally
 
-Required pairs:
+#### Current project with one physical experiment
 
-- Abaqus ↔ Simcenter;
-- Abaqus ↔ Polytec;
-- Simcenter ↔ Polytec.
+Calculate only:
 
-For every pair provide:
+- Abaqus FEM ↔ Polytec experiment processed in Simcenter Testlab.
+
+Do not create a separate Simcenter–Polytec pair from the same data lineage.
+
+#### Future project with two independent physical experiments
+
+Enable:
+
+- Abaqus ↔ independent Simcenter/contact experiment;
+- Abaqus ↔ independent Polytec experiment;
+- independent Simcenter/contact experiment ↔ Polytec experiment.
+
+For every valid pair provide:
 
 - signed and absolute frequency differences;
 - MAC on valid common measured directions/DOFs;
@@ -280,33 +357,42 @@ For every pair provide:
 - damping comparison where available;
 - unmatched and reordered modes.
 
-The Simcenter–Polytec pair is essential for separating numerical-model error
-from disagreement between the two experimental systems.
+The experimental–experimental comparison is useful only when the two datasets
+represent genuinely independent measurements. It then separates numerical-model
+error from disagreement between measurement systems.
 
-### 4. Expand the comparison windows for Polytec
+### 4. Expand the comparison windows for current and future modes
 
 This is a required part of Stage 3.
 
-#### Source-pair selector
+#### Conditional source-pair selector
 
-Add a persistent selector available from all comparison/diagnostic tabs:
+The selector must reflect actual independent data, not software names.
 
-- `Abaqus ↔ Simcenter`;
-- `Abaqus ↔ Polytec`;
-- `Simcenter ↔ Polytec`;
-- optional `Three-source summary`.
+For the current project show:
+
+- `Abaqus ↔ Polytec (processed in Testlab)`.
+
+When an independent contact/Simcenter experiment is also loaded, enable:
+
+- `Abaqus ↔ Simcenter contact experiment`;
+- `Abaqus ↔ Polytec experiment`;
+- `Simcenter contact experiment ↔ Polytec experiment`;
+- `Three-source comparison`.
+
+Disable or hide unavailable pairs. Never create a pair merely because one file
+was exported by Testlab.
 
 The selected source pair must be one shared state used by the table, mode-shape
 view, frequency/MAC plots, FRF/quality diagnostics, AutoMAC/COMAC, manual
-review, and exports. Do not maintain separate unsynchronized source selections
-in each tab.
+review, and exports.
 
 #### Comparison table window
 
-The table must switch between the selected pair and show source-specific
-columns, including:
+The table must switch between the selected valid pair and show:
 
-- left/right source and mode numbers;
+- left/right physical source and mode numbers;
+- measurement system and processing software;
 - left/right frequencies;
 - signed and absolute error;
 - MAC;
@@ -316,71 +402,129 @@ columns, including:
 - damping values where available;
 - automatic/manual decision.
 
-Add a separate three-source summary table with one row per consolidated mode and
-columns for all three frequencies and all three pairwise MAC values.
+For the future independent three-source case, add a summary table with one row
+per consolidated mode and columns for all three frequencies and all three
+pairwise MAC values.
 
-#### Mode-shape comparison window
+#### Mode-shape comparison window — same top-level tab 3
 
-For each selected source pair show:
+Keep all mode-shape work on the existing top-level tab:
 
-- left source shape;
-- right source shape;
-- overlay/correlation view;
-- explicit source names in titles;
-- actual measured direction (Polytec line-of-sight or 3D);
-- confidence and coverage information.
+```text
+3. Mode shapes
+```
 
-For `Simcenter ↔ Polytec`, both sides are experimental and the UI must not label
-one side as Abaqus. For the three-source summary, provide either a three-panel
-shape view or a clear source-pair switch without losing the consolidated mode
-selection.
+Inside that tab provide two view modes:
+
+1. `Pair comparison` — the existing detailed left/right/overlay view for one
+   selected source pair;
+2. `Three-source comparison` — a dedicated view enabled only when Abaqus and
+   two independent experimental datasets are loaded.
+
+The `Three-source comparison` view must keep one consolidated physical mode
+selected and show all three comparisons simultaneously on the same tab:
+
+- Abaqus ↔ Simcenter/contact experiment;
+- Abaqus ↔ Polytec experiment;
+- Simcenter/contact experiment ↔ Polytec experiment.
+
+Recommended wide-window layout:
+
+- top row: the three source mode shapes — Abaqus, Simcenter/contact experiment,
+  Polytec;
+- bottom row: three pairwise overlay/correlation cards — A–S, A–P, S–P.
+
+Each pairwise card must show at least:
+
+- source names;
+- frequencies and signed/absolute error;
+- MAC;
+- common point/DOF coverage;
+- confidence/measurement direction;
+- compact overlay or amplitude-correlation figure.
+
+Clicking or double-clicking a pairwise card must open/select that pair in the
+full `Pair comparison` view without losing the consolidated mode selection.
+At narrow window widths, reflow the six panels vertically or as `2 + 1` rows;
+do not reduce plots to unreadable thumbnails.
+
+The existing/future **Previous mode** and **Next mode** controls must navigate
+the consolidated mode in both view modes, so all three pairwise cards update
+together.
+
+For the current one-experiment project, hide or disable `Three-source
+comparison`; retain the normal pair view labeled
+`Abaqus ↔ Polytec (processed in Simcenter Testlab)`.
 
 #### Frequency and MAC windows
 
 Every frequency-regression, MAC matrix, amplitude-correlation, and accepted-pair
-plot must identify the selected source pair. The user must be able to compare
-all three source pairs without reloading the files or rerunning extraction.
+plot must identify the selected physical source pair. In the independent
+three-source case, the user must be able to inspect all three pairs without
+reloading files or rerunning extraction.
 
 #### AutoMAC/COMAC windows
 
-AutoMAC belongs to an individual source and COMAC/cross-correlation belongs to a
-source pair. Therefore the UI must provide:
+AutoMAC belongs to one physical dataset; COMAC/cross-correlation belongs to one
+independent source pair.
+
+Current project:
 
 - Abaqus AutoMAC;
-- Simcenter AutoMAC;
-- Polytec AutoMAC;
-- Abaqus–Simcenter COMAC;
-- Abaqus–Polytec COMAC;
-- Simcenter–Polytec COMAC, when common spatial coverage is sufficient.
+- Polytec-experiment AutoMAC;
+- Abaqus–Polytec COMAC.
 
-The selected source/pair and valid common grid must be explicit in every title,
-legend, interpretation block, and export file name.
+Future independent three-source project:
+
+- Abaqus AutoMAC;
+- Simcenter/contact-experiment AutoMAC;
+- Polytec-experiment AutoMAC;
+- Abaqus–Simcenter/contact COMAC;
+- Abaqus–Polytec COMAC;
+- Simcenter/contact–Polytec COMAC, when common coverage is sufficient.
+
+The selected source/pair and valid common grid must be explicit in titles,
+legends, interpretation blocks, and export file names.
 
 #### FRF and quality windows
 
-Show Simcenter and Polytec FRF/coherence/peak diagnostics separately, plus
-pair-specific warnings. Do not merge two experimental datasets into one
-unlabeled FRF plot.
+Show diagnostics per physical experiment. The current Polytec FRFs may be
+processed/imported through Testlab but remain labeled as Polytec experimental
+data. In the future independent case, show contact/Simcenter and Polytec
+FRF/coherence/peak diagnostics separately, plus pair-specific warnings.
 
 #### Manual-review window
 
-Manual decisions must be stored per source pair and mode pair. Changing an
-Abaqus–Simcenter decision must not overwrite an Abaqus–Polytec or
-Simcenter–Polytec decision.
+Manual decisions must be stored per independent source pair and mode pair.
+Reprocessed exports of the same physical experiment must retain lineage and must
+not masquerade as independent validation decisions.
 
 #### Reports and project persistence
 
 Excel, PDF, project files, cached figures, and exported PNG/data files must
-record the selected source pair and include all available pairwise results.
+record:
+
+- physical measurement system;
+- processing software;
+- experiment ID/lineage;
+- selected valid source pair;
+- all available independent pairwise results.
+
 File names must not collide between source pairs.
 
 Required UI regression tests:
 
-- switching among all three source pairs updates every linked tab;
-- no stale figures or table rows remain from the previous pair;
+- current lineage is displayed as Polytec processed in Testlab;
+- no false Simcenter–Polytec pair appears for the same experiment;
+- loading a second independent experiment enables all three pair choices and
+  the `Three-source comparison` view;
+- switching among independent pairs updates every linked tab;
+- all three cards on tab 3 update for the same consolidated mode;
+- no stale figures or rows remain from the previous pair/mode;
 - source labels are correct for experimental–experimental comparison;
-- decisions and selected modes remain independent per source pair;
-- reopening a project restores all sources and comparison-window state.
+- decisions remain independent per valid source pair;
+- reopening a project restores lineage, sources, selected view, and current
+  consolidated mode.
 
 ### 5. Respect Polytec measurement directions
 
@@ -396,72 +540,86 @@ Requirements:
 - report whether each comparison uses line-of-sight scalar data or full 3D
   vectors.
 
-### 6. Add three-source tables, plots, and transparent conclusions
+### 6. Add conditional three-source tables, plots, and transparent conclusions
 
-The consolidated table must include, where available:
+When two independent experiments are available, the consolidated table must
+include:
 
-- Abaqus, Simcenter, and Polytec frequencies;
-- all three pairwise MAC values;
+- Abaqus, Simcenter/contact, and Polytec frequencies;
+- all three valid pairwise MAC values;
 - damping values;
 - coverage/confidence;
 - final review state.
 
 Add transparent diagnostic conclusions such as:
 
-- both experiments agree and Abaqus differs;
-- Abaqus agrees with Polytec but Simcenter requires review;
+- both independent experiments agree and Abaqus differs;
+- Abaqus agrees with Polytec but the contact experiment requires review;
 - all three agree;
-- the experiments disagree, so model calibration should pause.
+- the independent experiments disagree, so model calibration should pause.
+
+For the current single Polytec experiment, do not generate three-source
+conclusions. Report only the Abaqus–Polytec comparison and its Testlab
+processing lineage.
 
 Do not hide these rules inside one opaque score.
 
-### 7. Polytec validation and regression tests
+### 7. Polytec and lineage validation tests
 
 Before completion:
 
+- test the current real workflow: Polytec measurement processed in Testlab;
+- verify that it remains one physical experiment in the data model and UI;
 - test at least one real anonymized Polytec-exported UFF/UNV file;
 - test 1D line-of-sight and, when available, 3D data;
-- test a Polytec grid different from the Simcenter grid;
+- test a future independent contact/Simcenter dataset together with Polytec;
+- test a Polytec grid different from the contact-experiment grid;
 - test source-to-source geometry mapping and pairwise MAC;
-- verify all expanded comparison windows;
+- verify the pair view and the dedicated three-source view on tab 3;
 - verify Excel/PDF/project persistence and cache invalidation;
-- document exact Polytec export settings.
+- document exact Polytec/Testlab export settings and lineage fields.
 
 ### Stage 3 completion criteria
 
-- existing Abaqus–Simcenter projects reproduce their results;
-- Simcenter and Polytec can coexist in one project;
-- all three pairwise comparisons are calculated and visible in the expanded
-  comparison windows;
-- source-pair switching updates all tabs through one shared state;
-- measurement directions and confidence are explicit;
+- existing Abaqus–experimental projects reproduce their results;
+- the current dataset is labeled as a Polytec experiment processed in Simcenter
+  Testlab, not as two independent experiments;
+- no false Simcenter–Polytec comparison is created from one experiment;
+- an optional second independent experiment can coexist with Polytec;
+- all valid independent pairwise comparisons are calculated and visible;
+- the same tab `3. Mode shapes` contains both detailed pair comparison and the
+  dedicated three-source comparison view;
+- source-pair and consolidated-mode switching updates all linked views through
+  shared state;
+- measurement directions, processing lineage, and confidence are explicit;
 - no Polytec-specific logic is embedded in the MAC core.
 
 ---
 
 ## Stage 4 — UI/UX backlog from the 2026-08-03 user review
 
-These refinements follow Stage 3 and must work with all source pairs introduced
-there. They must not alter numerical values, pairing, confidence, or review
-states.
+These refinements follow Stage 3 and must work with all valid source pairs and
+both tab-3 view modes introduced there. They must not alter numerical values,
+pairing, confidence, lineage, or review states.
 
 ### 1. Previous/next matched-pair navigation on Mode shapes
 
 - add visible **Previous mode** and **Next mode** buttons;
-- show position, for example `Pair 2 of 7`;
-- use the visible table order;
-- update table selection, title, figures, and manual-review selection through
-  one shared current-pair state;
-- disable the unavailable direction at the first/last pair;
-- synchronize after reanalysis, restore, source-pair change, and manual edits;
-- test first/middle/last and empty/single-pair cases.
+- show position, for example `Pair 2 of 7` or `Consolidated mode 2 of 7`;
+- use the visible table/consolidated-mode order;
+- update table selection, title, pair figures, all three comparison cards, and
+  manual-review selection through one shared current-mode state;
+- disable the unavailable direction at the first/last mode;
+- synchronize after reanalysis, restore, source-pair change, view-mode change,
+  and manual edits;
+- test first/middle/last and empty/single-mode cases.
 
 ### 2. Restore table headings and make the table responsive
 
 - restore all captions after final runtime assembly, session restore, and
   reanalysis;
 - include mode, frequency, signed/absolute error, MAC, coverage, geometry,
-  source, confidence, and decision columns;
+  measurement system, processing software, confidence, and decision columns;
 - test the final assembled `Treeview.heading(..., "text")` values;
 - distribute width responsively while preserving numeric minimum widths;
 - retain horizontal and vertical scrollbars;
@@ -471,10 +629,10 @@ states.
 
 ### 3. Combine AutoMAC/COMAC views into one responsive dashboard
 
-- show the selected sources' AutoMAC matrices and selected pair's COMAC in one
-  dashboard;
-- for a three-source project, clearly select which two source AutoMAC matrices
-  and which pair COMAC are displayed;
+- show the selected physical datasets' AutoMAC matrices and selected valid
+  pair's COMAC in one dashboard;
+- for an independent three-source project, clearly select which two AutoMAC
+  matrices and which pair COMAC are displayed;
 - use three panels on wide windows and `2 + 1` or vertical reflow on narrow
   windows;
 - preserve aspect ratios and full-size/export actions;
@@ -482,8 +640,8 @@ states.
 
 ### 4. Add linked previous/next controls to the diagnostics dashboard
 
-- use the same current source-pair/current mode-pair controller as the table,
-  mode shapes, and manual review;
+- use the same current source-pair/current consolidated-mode controller as the
+  table, tab-3 pair view, tab-3 three-source view, and manual review;
 - use pair selection for titles, highlighting, and follow-on views without
   changing global metric values;
 - do not add another order-dependent monkey-patch layer solely for navigation.
@@ -492,7 +650,8 @@ states.
 
 - no blank headings after startup, restore, or reanalysis;
 - all columns remain accessible at supported sizes/scales;
-- previous/next navigation is synchronized across tabs and source pairs;
+- previous/next navigation is synchronized across tabs, valid source pairs,
+  and both mode-shape views;
 - the combined AutoMAC/COMAC dashboard remains readable and correctly labeled;
 - Windows checks pass at 100%, 125%, and 150% display scaling.
 
@@ -511,8 +670,8 @@ Current debt:
 Planned approach:
 
 - fold one vertical slice at a time into explicit components;
-- introduce explicit source registry, comparison service, and navigation
-  controller rather than new hidden patches;
+- introduce explicit experiment/source registry, lineage model, comparison
+  service, and navigation controller rather than new hidden patches;
 - keep runtime-contract tests until each corresponding patch chain is removed.
 
 ## Release and reproducibility work
@@ -526,14 +685,15 @@ Planned approach:
 - CLI/batch processing;
 - compatibility matrix for Abaqus, Testlab, and Polytec exports;
 - complete run fingerprint: file hashes, versions, thresholds, masks,
-  transformations, source pair, and manual-review state.
+  transformations, experiment lineage, source pair, and manual-review state.
 
 ## Staged plan summary
 
 - **Stage 1:** current behavior locked in — done.
 - **Stage 2:** seven scientific hardening items — test-first.
-- **Stage 3:** Polytec, named sources, all three pairwise calculations, and
-  fully expanded comparison windows.
+- **Stage 3:** explicit Polytec/Testlab lineage, current Abaqus–Polytec mode,
+  optional independent three-source mode, expanded comparison windows, and the
+  dedicated three-comparison view on tab 3.
 - **Stage 4:** user-requested navigation and responsive-layout refinements.
 - **Stage 5:** remove patch-chain architecture and split responsibilities.
 - **Reproducibility work:** proceed alongside the stages without bypassing
