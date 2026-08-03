@@ -47,6 +47,89 @@ Remaining, not yet done:
   it no longer needs "reproduction," only a fix decision. No behavior was
   changed.
 
+## UI/UX backlog from the 2026-08-03 application review
+
+These items were observed in the current Windows interface while reviewing a
+seven-pair result (`Mean |frequency error| = 1.27%`, `Mean MAC = 0.930`, full
+121-point geometry match). They are presentation/navigation changes only and
+must not alter MAC values, frequency pairing, quality-control thresholds, or
+manual-review decisions.
+
+### 1. Previous/next matched-pair navigation on Mode shapes
+
+- Add clearly visible **Previous mode** and **Next mode** buttons directly on
+  the `Mode shapes` tab so the user does not have to return to the comparison
+  table for every pair.
+- Show the current position, for example `Pair 2 of 7: Abaqus 9 ↔ Experiment
+  5`, beside the navigation controls.
+- Navigation order must be exactly the current visible order of accepted
+  matched pairs in the comparison table.
+- Changing the pair from the `Mode shapes` tab must update the table selection,
+  the mode title, all three figures, and the active manual-review pair through
+  one shared selection state; do not implement an independent second index.
+- Disable `Previous` on the first pair and `Next` on the last pair. Reanalysis,
+  project restore, and manual pair changes must reset/synchronize this state
+  without stale plots.
+- Add regression tests for first/middle/last navigation, table synchronization,
+  and empty/single-pair results.
+
+### 2. Restore comparison-table headings and make the table responsive
+
+- The current result table can display values while all column captions are
+  blank. Restore the headings after the complete `install_*()` UI patch stack,
+  session restore, and reanalysis. The final runtime headings must include the
+  existing mode, frequency, signed error, MAC, order-change, mapped-point,
+  status, source, confidence, and manual-decision columns.
+- Add a runtime/GUI regression test that inspects the final assembled
+  `Treeview.heading(..., "text")` values rather than testing only an earlier
+  pre-patched widget constructor.
+- Make the table respond to window width. Distribute extra width among useful
+  text columns, preserve sensible minimum widths for numeric columns, and
+  prevent the rightmost source/confidence/manual-decision columns from being
+  silently clipped.
+- Provide a horizontal scrollbar when the window is too narrow instead of
+  compressing headings to zero width. The table must remain usable at the
+  minimum application size, the default `1500x900` size, and a maximized
+  desktop window.
+- Keep heading text, rows, and both scrollbars visible when the main window or
+  notebook tab is resized. Add layout tests for shrink and grow events.
+
+### 3. Combine the three AutoMAC/COMAC views into one responsive tab
+
+- Replace the nested `Abaqus AutoMAC`, `Experimental AutoMAC`, and `COMAC map`
+  sub-tabs with one `AutoMAC & COMAC` dashboard that shows all three figures at
+  the same time.
+- On a wide window, use a three-panel layout. On a narrower window, reflow to a
+  readable `2 + 1` or vertical layout instead of shrinking the figures to
+  illegibility. Preserve each figure's aspect ratio and existing full-size and
+  export actions.
+- Show the interpretation summary (`Abaqus AutoMAC max off-diagonal`,
+  `Experimental AutoMAC max off-diagonal`, mean/minimum COMAC) in a compact
+  area that remains visible without consuming most of the plotting space.
+- Add the same **Previous mode** / **Next mode** matched-pair controls to this
+  dashboard and synchronize them with the comparison table and `Mode shapes`
+  tab. AutoMAC and COMAC remain global diagnostics; the active-pair controls
+  select the linked pair used by any pair-specific title, interpretation,
+  highlighting, or follow-on view rather than recomputing a different global
+  matrix.
+- Where practical, highlight the active matched pair's diagonal cells in both
+  AutoMAC matrices and the corresponding measured points/summary context
+  without changing the underlying metric values.
+- Add tests for the combined dashboard's three figure widgets, responsive
+  reflow, linked pair selection, and image refresh after a manual-review
+  change.
+
+### 4. Shared implementation requirement
+
+- Introduce one explicit current-pair navigation/controller API used by the
+  comparison table, `Mode shapes`, `AutoMAC & COMAC`, and manual review. Avoid
+  adding another order-dependent monkey-patch layer solely for navigation.
+- Implement these changes as one reviewable UI slice with before/after layout
+  screenshots and tests against the final assembled runtime.
+- Do not mark this UI stage complete until it is checked manually on Windows
+  at 100%, 125%, and 150% display scaling, because Tk font scaling can reproduce
+  blank/clipped headings even when fixed pixel-size tests pass.
+
 ## Scientific risks requiring reproduction
 
 Raised by review but **not yet confirmed** against this codebase's actual
@@ -133,6 +216,11 @@ corresponding patch chain is actually gone. See Stage 4 below.
   chain; fix the empty-slice warning; replace silent excepts in
   `project_review.py` with typed/logged handling. No numerical behavior
   changes.
+- **Stage 1B — implement the 2026-08-03 UI/UX review backlog.** Add shared
+  previous/next pair navigation, restore final-runtime table headings, make
+  the table responsive, and combine all AutoMAC/COMAC views into one linked,
+  responsive dashboard. Keep numerical results unchanged and verify the final
+  assembled UI on Windows and multiple display scales.
 - **Stage 2 — reproduce scientific risks.** For each item above, write a
   reproducing test first. Report which are confirmed, which don't reproduce,
   and only then fix confirmed ones — each fix ships with its test and a
