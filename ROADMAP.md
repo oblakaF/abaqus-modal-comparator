@@ -125,9 +125,38 @@ Required tests:
 - UI/report labels;
 - cache invalidation after this semantic change.
 
-### 2. Implement a real multi-reference FRF/CMIF path
+### 2. Implement a real multi-reference FRF/CMIF path — landed, one piece deferred
 
-Current risk:
+Implemented in `cmif_separation.py`: `_build_multi_reference_frf_block` groups
+FRF response channels by the full (response node/direction, reference
+node/direction, physical quantity, frequency-axis signature) key instead of
+`universal_hardening._safe_select_frf_group`'s single best-scoring group, so
+independent references are no longer discarded. It builds a genuine complex
+response x reference x frequency matrix, deduplicates a repeated channel
+deterministically (keeping the first occurrence, not averaging or picking at
+random), excludes a response DOF not covered by every included reference
+instead of fabricating it, and rejects a reference on an incompatible
+frequency axis or physical quantity rather than misaligning it. `reference_count`
+now genuinely exceeds 1 when independent references are present (previously
+always 1, so `cmif_validation.validate_close_mode_candidates`'s multi-reference
+promotion path was dead code). `_cmif_singular_values` computes the
+conventional per-frequency-line CMIF SVD and reports matrix rank capacity and
+singular-value ratios per cluster; `_local_svd_components` (the close-mode
+candidate shape extractor) now stacks every included reference's band
+snapshots as additional columns, which is mathematically identical to the
+prior single-reference computation when only one reference is present
+(verified by the pre-existing `test_close_mode_svd.py` cases, unchanged).
+
+Deferred: candidate mode *shapes* are still extracted by this local
+snapshot-SVD method, not by a full per-frequency-line CMIF curve fit (deriving
+shapes directly from the H(f) singular vectors across frequency, with proper
+residue-based curve fitting). The snapshot-SVD approach is a legitimate,
+already-validated diagnostic technique and now genuinely benefits from
+multiple references' data; replacing it with textbook CMIF shape extraction
+is a separate, larger numerical project and is not required for this item's
+completion criteria below.
+
+Original current risk (now addressed above):
 
 - grouping by `ref_node`/`ref_dir` can separate every reference;
 - close-mode data can be keyed only by response DOF;

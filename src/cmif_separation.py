@@ -10,23 +10,35 @@ import numpy as np
 
 import universal_reader
 from modal_core import ModeShape, modal_assurance_criterion
+from universal_hardening import _scalar_int
 
 
 _INSTALLED = False
-_ALGORITHM_VERSION = "local-svd-v1"
+_ALGORITHM_VERSION = "local-svd-v2-multi-reference"
 
 
 @dataclass
-class _FrfBlock:
+class _MultiReferenceFrfBlock:
+    """A genuine response x reference x frequency FRF matrix, built from every
+    compatible reference present in the file (ROADMAP Stage 2 #2), instead of
+    universal_hardening._safe_select_frf_group's single best-scoring group.
+
+    matrix has shape (len(row_keys), len(reference_keys), len(frequency)).
+    """
+
     frequency: np.ndarray
     matrix: np.ndarray
     row_keys: List[Tuple[int, int]]
+    reference_keys: List[Tuple[int, int]]
     node_numbers: np.ndarray
     coordinates: np.ndarray
     measured_mask: np.ndarray
     mean_coherence: np.ndarray
     coherence_status: str
     reference_count: int
+    duplicate_channels_dropped: List[Dict[str, Any]]
+    excluded_response_dofs: List[Dict[str, Any]]
+    dropped_references: List[Dict[str, Any]]
 
 
 def _close_target_clusters(
@@ -55,44 +67,133 @@ def _close_target_clusters(
     return [cluster for cluster in clusters if len(cluster) > 1]
 
 
-def _build_frf_block(
+def _channel_quantity_priority(dataset: Dict[str, Any]) -> int:
+    label = universal_reader._frf_label(dataset)
+    if "displacement" in label:
+        return 3
+    if "velocity" in label:
+        return 2
+    if "acceleration" in label or "accelerance" in label:
+        return 1
+    return 0
+
+
+def _build_multi_reference_frf_block(
     datasets: Sequence[Dict[str, Any]],
     geometry: Dict[int, np.ndarray],
-) -> _FrfBlock:
-    frf_group = universal_reader._select_frf_group(datasets, geometry)
-    if not frf_group:
+) -> _MultiReferenceFrfBlock:
+    """Build a genuine response x reference x frequency FRF matrix from every
+    compatible reference in the file (ROADMAP Stage 2 #2).
+
+    Each channel is identified by its full (response node, response direction,
+    reference node, reference direction) key. References sharing a common
+    frequency-axis signature and physical quantity are combined into one
+    matrix; a reference on an incompatible axis/quantity is excluded rather
+    than misaligned against the rest. A response DOF not covered by every
+    included reference is excluded from the matrix rather than fabricated
+    (for example zero-filled). A duplicate channel (the same response and
+    reference key appearing more than once) keeps its first occurrence
+    deterministically instead of averaging or silently overwriting it.
+    """
+    # group[(signature, quantity_priority)][(ref_node, ref_dir)][(rsp_node, rsp_dir)] -> dataset
+    groups: Dict[Tuple[Any, int], Dict[Tuple[int, int], Dict[Tuple[int, int], Dict[str, Any]]]] = {}
+    duplicate_channels_dropped: List[Dict[str, Any]] = []
+
+    for dataset in datasets:
+        if universal_reader._dataset_type(dataset) != 58:
+            continue
+        if _scalar_int(dataset.get("func_type"), -1) != 4:
+            continue
+        response_node = _scalar_int(dataset.get("rsp_node"), -1)
+        if response_node not in geometry:
+            continue
+        response_direction = _scalar_int(dataset.get("rsp_dir"), 0)
+        if abs(response_direction) not in (1, 2, 3):
+            continue
+        signature = universal_reader._axis_signature(dataset)
+        if signature is None:
+            continue
+        data = universal_reader._as_array(dataset.get("data"), dtype=complex)
+        if len(data) != signature[0]:
+            continue
+        reference_node = _scalar_int(dataset.get("ref_node"), 0)
+        reference_direction = _scalar_int(dataset.get("ref_dir"), 0)
+
+        group_key = (signature, _channel_quantity_priority(dataset))
+        reference_key = (reference_node, reference_direction)
+        response_key = (response_node, response_direction)
+        reference_channels = groups.setdefault(group_key, {}).setdefault(reference_key, {})
+        if response_key in reference_channels:
+            duplicate_channels_dropped.append(
+                {
+                    "response": response_key,
+                    "reference": reference_key,
+                    "signature": group_key[0],
+                }
+            )
+            continue
+        reference_channels[response_key] = dataset
+
+    if not groups:
         raise ValueError("No usable transfer-function group is available for close-mode separation.")
 
-    frequency = universal_reader._as_array(frf_group[0].get("x"), dtype=float)
-    if len(frequency) < 5:
-        raise ValueError("The selected FRF group contains too few frequency lines.")
+    def group_score(item) -> Tuple[int, int, int]:
+        (_, quantity_priority), references_in_group = item
+        unique_channels = sum(len(channels) for channels in references_in_group.values())
+        return quantity_priority, len(references_in_group), unique_channels
 
-    dof_data: Dict[Tuple[int, int], np.ndarray] = {}
-    references = set()
-    for dataset in frf_group:
-        x = universal_reader._as_array(dataset.get("x"), dtype=float)
-        data = universal_reader._as_array(dataset.get("data"), dtype=complex)
-        if len(x) != len(frequency) or len(data) != len(frequency):
-            continue
-        if not np.allclose(x, frequency, rtol=1.0e-8, atol=1.0e-10):
-            continue
-        try:
-            node = int(np.asarray(dataset.get("rsp_node")).reshape(-1)[0])
-            direction = int(np.asarray(dataset.get("rsp_dir")).reshape(-1)[0])
-            reference_node = int(np.asarray(dataset.get("ref_node", 0)).reshape(-1)[0])
-            reference_direction = int(np.asarray(dataset.get("ref_dir", 0)).reshape(-1)[0])
-        except (TypeError, ValueError, IndexError):
-            continue
-        if node not in geometry or abs(direction) not in (1, 2, 3):
-            continue
-        dof_data[(node, direction)] = data
-        references.add((reference_node, reference_direction))
+    winning_group_key, winning_group = max(groups.items(), key=group_score)
 
-    if not dof_data:
-        raise ValueError("No compatible complex FRF channels are available for SVD.")
+    dropped_references: List[Dict[str, Any]] = []
+    for (signature, quantity_priority), references_in_group in groups.items():
+        if (signature, quantity_priority) == winning_group_key:
+            continue
+        for reference_key in references_in_group:
+            if reference_key in winning_group:
+                continue
+            reason = (
+                "incompatible frequency axis"
+                if signature != winning_group_key[0]
+                else "incompatible physical quantity"
+            )
+            dropped_references.append({"reference": reference_key, "reason": reason})
 
-    row_keys = sorted(dof_data)
-    matrix = np.vstack([dof_data[key] for key in row_keys])
+    reference_keys = sorted(winning_group)
+    response_key_sets = [set(winning_group[reference_key]) for reference_key in reference_keys]
+    common_response_keys = set.intersection(*response_key_sets) if response_key_sets else set()
+    all_response_keys = set.union(*response_key_sets) if response_key_sets else set()
+
+    excluded_response_dofs = [
+        {
+            "node": response_key[0],
+            "direction": response_key[1],
+            "present_for_references": sorted(
+                reference_key
+                for reference_key, channels in winning_group.items()
+                if response_key in channels
+            ),
+        }
+        for response_key in sorted(all_response_keys - common_response_keys)
+    ]
+
+    if not common_response_keys:
+        raise ValueError(
+            "No response DOF is covered by every compatible reference for close-mode separation."
+        )
+
+    row_keys = sorted(common_response_keys)
+    frequency = universal_reader._as_array(
+        next(iter(winning_group[reference_keys[0]].values())).get("x"), dtype=float
+    )
+
+    matrix = np.zeros((len(row_keys), len(reference_keys), len(frequency)), dtype=complex)
+    for reference_index, reference_key in enumerate(reference_keys):
+        channels = winning_group[reference_key]
+        for response_index, response_key in enumerate(row_keys):
+            matrix[response_index, reference_index, :] = universal_reader._as_array(
+                channels[response_key].get("data"), dtype=complex
+            )
+
     node_numbers = np.asarray(sorted({node for node, _ in row_keys}), dtype=int)
     node_index = {int(node): index for index, node in enumerate(node_numbers)}
     coordinates = universal_reader._coordinates_for_nodes(node_numbers, geometry)
@@ -100,42 +201,54 @@ def _build_frf_block(
     for node, signed_direction in row_keys:
         measured_mask[node_index[int(node)], abs(int(signed_direction)) - 1] = True
 
-    reference_node, reference_direction = next(iter(references))
+    primary_reference_node, primary_reference_direction = reference_keys[0]
     try:
         coherence_lookup = universal_reader._coherence_by_dof(
-            datasets, frequency, reference_node, reference_direction
+            datasets, frequency, primary_reference_node, primary_reference_direction
         )
         coherence_rows = [coherence_lookup[key] for key in row_keys if key in coherence_lookup]
         if coherence_rows:
             mean_coherence = np.mean(np.vstack(coherence_rows), axis=0)
             coherence_status = "computed"
         else:
-            # No dataset-58 coherence channel was exported for this reference: there is
-            # no basis to distrust the FRF data, so it is weighted at full confidence.
             mean_coherence = np.ones_like(frequency, dtype=float)
             coherence_status = "unavailable"
     except (TypeError, ValueError, IndexError, KeyError) as error:
-        # The coherence channel exists but could not be parsed (malformed pyuff scalar
-        # data). Unlike the "unavailable" case above, real data was withheld here, so
-        # default to the least-trusting weight rather than silently assuming perfect
-        # coherence, and surface the failure to the user via close_mode_separation.
         mean_coherence = np.zeros_like(frequency, dtype=float)
         coherence_status = f"error: {error}"
 
-    return _FrfBlock(
+    return _MultiReferenceFrfBlock(
         frequency=frequency,
         matrix=matrix,
         row_keys=row_keys,
+        reference_keys=reference_keys,
         node_numbers=node_numbers,
         coordinates=coordinates,
         measured_mask=measured_mask,
         mean_coherence=mean_coherence,
         coherence_status=coherence_status,
-        reference_count=max(1, len(references)),
+        reference_count=len(reference_keys),
+        duplicate_channels_dropped=duplicate_channels_dropped,
+        excluded_response_dofs=excluded_response_dofs,
+        dropped_references=dropped_references,
     )
 
 
-def _vectors_from_spatial_component(block: _FrfBlock, component: np.ndarray) -> np.ndarray:
+def _cmif_singular_values(block: _MultiReferenceFrfBlock) -> np.ndarray:
+    """Conventional multi-reference CMIF: the singular values of the complex
+    response x reference matrix H(f), computed independently at every
+    frequency line. Returns an array of shape
+    (len(block.frequency), min(len(block.row_keys), block.reference_count)),
+    descending within each row. A peak in the second column near an existing
+    peak in the first indicates a mode that a single reference cannot resolve
+    on its own.
+    """
+    # np.linalg.svd batches over leading dimensions, so move frequency first.
+    stacked = np.moveaxis(block.matrix, 2, 0)
+    return np.linalg.svd(stacked, compute_uv=False)
+
+
+def _vectors_from_spatial_component(block: _MultiReferenceFrfBlock, component: np.ndarray) -> np.ndarray:
     vectors = np.zeros((len(block.node_numbers), 3), dtype=complex)
     node_index = {int(node): index for index, node in enumerate(block.node_numbers)}
     for value, (node, signed_direction) in zip(component, block.row_keys):
@@ -146,7 +259,7 @@ def _vectors_from_spatial_component(block: _FrfBlock, component: np.ndarray) -> 
 
 
 def _local_svd_components(
-    block: _FrfBlock,
+    block: _MultiReferenceFrfBlock,
     cluster: Sequence[float],
 ) -> Tuple[List[Tuple[np.ndarray, float, float, np.ndarray]], Dict[str, Any]]:
     center = float(np.mean(cluster))
@@ -163,17 +276,27 @@ def _local_svd_components(
             "reason": "too few frequency lines",
         }
 
-    raw = np.asarray(block.matrix[:, band_mask], dtype=complex)
-    t = np.linspace(0.0, 1.0, raw.shape[1])
-    baseline = raw[:, [0]] * (1.0 - t)[None, :] + raw[:, [-1]] * t[None, :]
+    # block.matrix is (Nresponse, Nreference, Nfrequency). Each reference's band is
+    # detrended against its own band edges, then references are concatenated as
+    # additional snapshot columns: extra independent references give the SVD more
+    # independent excitation patterns to separate close modes with, exactly the
+    # benefit multi-reference testing provides over a single reference (ROADMAP
+    # Stage 2 #2). With one reference this reduces exactly to the prior single-
+    # reference snapshot-POD computation.
+    raw = np.asarray(block.matrix[:, :, band_mask], dtype=complex)
+    band_size = raw.shape[2]
+    t = np.linspace(0.0, 1.0, band_size)
+    baseline = raw[:, :, [0]] * (1.0 - t)[None, None, :] + raw[:, :, [-1]] * t[None, None, :]
     residual = raw - baseline
-    residual *= np.sqrt(np.clip(block.mean_coherence[band_mask], 0.05, 1.0))[None, :]
+    coherence_weight = np.sqrt(np.clip(block.mean_coherence[band_mask], 0.05, 1.0))
+    residual *= coherence_weight[None, None, :]
+    snapshots_raw = residual.reshape(residual.shape[0], -1)
 
-    column_norm = np.linalg.norm(residual, axis=0)
+    column_norm = np.linalg.norm(snapshots_raw, axis=0)
     floor = max(float(np.max(column_norm)) * 1.0e-12, 1.0e-30)
     # Square-root normalization prevents one strong line from hiding a nearby weaker mode
     # while retaining more physical amplitude information than unit-column normalization.
-    snapshots = residual / np.sqrt(np.maximum(column_norm, floor))[None, :]
+    snapshots = snapshots_raw / np.sqrt(np.maximum(column_norm, floor))[None, :]
     u, singular_values, vh = np.linalg.svd(snapshots, full_matrices=False)
     if not len(singular_values) or singular_values[0] <= 1.0e-30:
         return [], {
@@ -189,7 +312,14 @@ def _local_svd_components(
         singular_ratio = float(singular_values[component_index] / singular_values[0])
         if component_index > 0 and singular_ratio < 0.015:
             continue
-        spectral_energy = np.abs(singular_values[component_index] * vh[component_index]) ** 2
+        # Sum energy across references at each frequency line: multiple references
+        # share the same band frequency samples, so this collapses the
+        # (Nreference, Nband) snapshot energy back to one per-frequency profile.
+        spectral_energy = (
+            (np.abs(singular_values[component_index] * vh[component_index]) ** 2)
+            .reshape(raw.shape[1], band_size)
+            .sum(axis=0)
+        )
         if float(np.sum(spectral_energy)) <= 1.0e-30:
             continue
         peak_frequency = float(local_frequency[int(np.argmax(spectral_energy))])
@@ -253,7 +383,7 @@ def _reviewed_modes_from_frf(
         return base_modes, metadata
 
     try:
-        block = _build_frf_block(datasets, geometry)
+        block = _build_multi_reference_frf_block(datasets, geometry)
     except Exception as error:
         metadata["close_mode_separation"] = {
             "algorithm_version": _ALGORITHM_VERSION,
@@ -262,6 +392,12 @@ def _reviewed_modes_from_frf(
             "clusters": [list(cluster) for cluster in clusters],
         }
         return base_modes, metadata
+
+    # Conventional CMIF: singular values of H(f) at every frequency line, computed
+    # once and sliced per cluster band below (ROADMAP Stage 2 #2 "report ... matrix
+    # rank, singular-value ratios").
+    cmif_singular_values = _cmif_singular_values(block)
+    matrix_rank_capacity = int(cmif_singular_values.shape[1])
 
     added_modes: List[ModeShape] = []
     cluster_diagnostics: List[Dict[str, Any]] = []
@@ -281,6 +417,17 @@ def _reviewed_modes_from_frf(
             mode.frequency_hz for mode in nearby_existing
         ]
         diagnostic["requested_additional_shapes"] = missing_count
+        diagnostic["cmif_matrix_rank_capacity"] = matrix_rank_capacity
+        band_hz = diagnostic.get("band_hz")
+        if band_hz is not None:
+            band_mask = (block.frequency >= band_hz[0]) & (block.frequency <= band_hz[1])
+            if matrix_rank_capacity > 1 and np.any(band_mask):
+                ratios = cmif_singular_values[band_mask, 1] / np.maximum(
+                    cmif_singular_values[band_mask, 0], 1.0e-30
+                )
+                diagnostic["cmif_max_second_to_first_singular_ratio"] = float(np.max(ratios))
+            else:
+                diagnostic["cmif_max_second_to_first_singular_ratio"] = None
 
         if missing_count > 0 and components:
             ranked = sorted(
@@ -328,12 +475,20 @@ def _reviewed_modes_from_frf(
         mode.metadata.setdefault("original_experimental_mode_number", mode.number)
         mode.number = new_number
 
-    scientific_warning = (
-        "With one excitation reference, local SVD identifies additional spatial "
-        "components inside an overlapping resonance band, but it is not a fully "
-        "independent multi-reference modal curve fit. Confirm split modes by MAC, "
-        "AutoMAC, coherence, and visual inspection."
-    )
+    if block.reference_count > 1:
+        scientific_warning = (
+            f"{block.reference_count} independent excitation references were combined "
+            "into one response x reference matrix and locally decomposed by SVD; this is "
+            "not yet a full per-frequency-line conventional CMIF modal curve fit. Confirm "
+            "split modes by MAC, AutoMAC, coherence, and visual inspection."
+        )
+    else:
+        scientific_warning = (
+            "With one excitation reference, local SVD identifies additional spatial "
+            "components inside an overlapping resonance band, but it is not a fully "
+            "independent multi-reference modal curve fit. Confirm split modes by MAC, "
+            "AutoMAC, coherence, and visual inspection."
+        )
     if block.coherence_status.startswith("error"):
         scientific_warning += (
             " Coherence-based weighting could not be computed for this dataset "
@@ -354,8 +509,13 @@ def _reviewed_modes_from_frf(
                     else "single-reference local response-matrix SVD"
                 ),
                 "reference_count": block.reference_count,
+                "reference_keys": [list(key) for key in block.reference_keys],
+                "matrix_rank_capacity": matrix_rank_capacity,
                 "added_mode_count": len(added_modes),
                 "coherence_status": block.coherence_status,
+                "duplicate_channels_dropped": block.duplicate_channels_dropped,
+                "excluded_response_dofs": block.excluded_response_dofs,
+                "rejected_references": block.dropped_references,
                 "clusters": cluster_diagnostics,
                 "scientific_warning": scientific_warning,
             },
