@@ -20,19 +20,23 @@ Remaining baseline gaps:
 
 - dependencies have lower bounds only; there is no lock file;
 - CI runs only on Ubuntu although the application targets Windows and Abaqus;
-- real vendor ODB/UNV regression fixtures are not stored in the repository;
-- there is no machine-readable baseline snapshot (accepted pairs, signed and
-  absolute frequency errors, MAC/AutoMAC/COMAC matrices, geometry-mapping
-  distances, warning list, manual-review decisions, input-file SHA-256
-  hashes, and pinned Python/NumPy/SciPy/pyuff/openpyxl/matplotlib/Abaqus
-  versions) captured before Stage 2 numerical changes begin.
+- real vendor ODB/UNV regression fixtures are not stored in the repository.
+
+The machine-readable baseline snapshot (accepted pairs, signed and absolute
+frequency errors, AutoMAC/COMAC matrices, geometry-mapping distances, warning
+list, manual-review decisions, input-file SHA-256 hashes, and pinned
+Python/NumPy/SciPy/pyuff/openpyxl/matplotlib versions) is captured in
+`docs/baseline/stage0_baseline.json`, frozen at commit `997e707` (the last
+commit before Stage 2 numerical work began). Regenerate it with
+`tools/generate_baseline_snapshot.py` whenever the accepted reference result
+is intentionally allowed to change.
 
 ## Required implementation order
 
 The order below is mandatory for an implementation agent:
 
-0. capture the baseline snapshot above as a committed JSON artifact, so that
-   every later numerical change can be diffed against it;
+0. diff every numerical change against `docs/baseline/stage0_baseline.json`
+   before treating it as accepted;
 1. complete scientific hardening;
 2. add explicit Polytec/Testlab data lineage and the optional future
    three-source comparison workflow;
@@ -42,8 +46,15 @@ The order below is mandatory for an implementation agent:
    tool for a new Abaqus version, UNV/UFF variant, or measurement setup.
 
 Every numerical change must include a reproducing test and a before/after
-comparison on the current full 121-point, seven-pair, single-reference result.
-Do not silently change MAC/frequency thresholds or the accepted reference
+comparison on the current full 121-point, eight-pair, single-reference result
+frozen in `docs/baseline/stage0_baseline.json` (Job-1.odb + the Auxetic
+Polytec scan, modes 6-17; regenerate with
+`tools/generate_baseline_snapshot.py`). This updates the older "seven-pair"
+figure used earlier in this document: the real current run of this exact
+dataset accepts eight pairs, most likely because the rigid-body detection
+method changed from a near-zero frequency threshold to shape-projection
+residual filtering before this figure was first written. Do not silently
+change MAC/frequency thresholds or the accepted reference
 assignment. Do not change a numerical algorithm, its acceptance thresholds,
 and its display/reporting together in one step. Every warning that affects
 scientific interpretation must surface in the GUI, Excel export, PDF export,
@@ -257,7 +268,8 @@ Required tests:
 
 - every item has a reproducing test;
 - confirmed defects are fixed without unrelated numerical changes;
-- the seven-pair reference result is compared before and after every change;
+- the `docs/baseline/stage0_baseline.json` eight-pair reference result is
+  compared before and after every change;
 - reports record actual masks, coverage, coherence state, geometry filtering,
   and coordinate transformations;
 - semantic changes bump the analysis-pipeline cache version.
@@ -785,15 +797,16 @@ Required artifacts:
 - a regression report;
 - a list of the version/format combinations actually verified.
 
-## Release and reproducibility work
+## Reproducibility, dependencies, and platform verification
+
+This program is built for personal research use, not public distribution —
+there is no packaging, installer, license, or changelog work on this list.
 
 - Windows CI;
 - `pyproject.toml`, `requirements.in`, and a lock/constraints file that pins
   compatible ranges, not just lower bounds; check the Python version at
   startup;
 - application version in UI/projects/reports;
-- changelog, license, and packaging;
-- offline installer;
 - cancellation of Abaqus extraction;
 - CLI/batch processing;
 - a separate `Validate inputs` action that runs before a full analysis;
