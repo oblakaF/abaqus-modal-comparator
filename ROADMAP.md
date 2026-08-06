@@ -20,22 +20,36 @@ Remaining baseline gaps:
 
 - dependencies have lower bounds only; there is no lock file;
 - CI runs only on Ubuntu although the application targets Windows and Abaqus;
-- real vendor ODB/UNV regression fixtures are not stored in the repository.
+- real vendor ODB/UNV regression fixtures are not stored in the repository;
+- there is no machine-readable baseline snapshot (accepted pairs, signed and
+  absolute frequency errors, MAC/AutoMAC/COMAC matrices, geometry-mapping
+  distances, warning list, manual-review decisions, input-file SHA-256
+  hashes, and pinned Python/NumPy/SciPy/pyuff/openpyxl/matplotlib/Abaqus
+  versions) captured before Stage 2 numerical changes begin.
 
 ## Required implementation order
 
 The order below is mandatory for an implementation agent:
 
+0. capture the baseline snapshot above as a committed JSON artifact, so that
+   every later numerical change can be diffed against it;
 1. complete scientific hardening;
 2. add explicit Polytec/Testlab data lineage and the optional future
    three-source comparison workflow;
 3. implement the current user-requested UI refinements;
-4. consolidate the architecture and reproducibility tooling.
+4. consolidate the architecture and reproducibility tooling;
+5. validate against the real-data test matrix (Stage 6) before relying on the
+   tool for a new Abaqus version, UNV/UFF variant, or measurement setup.
 
 Every numerical change must include a reproducing test and a before/after
 comparison on the current full 121-point, seven-pair, single-reference result.
 Do not silently change MAC/frequency thresholds or the accepted reference
-assignment.
+assignment. Do not change a numerical algorithm, its acceptance thresholds,
+and its display/reporting together in one step. Every warning that affects
+scientific interpretation must surface in the GUI, Excel export, PDF export,
+and run metadata alike — not just one of them. Until Stage 2 is complete,
+results must be presented with the explicit caveats of the current analysis
+scenario rather than as unqualified numbers.
 
 ---
 
@@ -44,6 +58,29 @@ assignment.
 These seven items affect the meaning and reliability of MAC, FRF confidence,
 geometry mapping, and coordinate handling. They must be completed before
 Polytec support.
+
+### 0. Data model additions required by this stage
+
+Add explicit fields instead of relying on dynamic attributes:
+
+`ModeShape`:
+
+- `measured_dofs` — this mode's own measured-DOF mask (see item 3);
+- `measurement_directions`;
+- `coordinate_system_id`;
+- `source_confidence`;
+- `source_lineage`.
+
+`ModePairResult`:
+
+- `common_dof_mask`, `geometry_valid_mask`;
+- `common_dof_count`, `unique_point_count`;
+- `dof_coverage_fraction`, `point_coverage_fraction`, `spatial_coverage`;
+- `acceptance_reasons`, `rejection_reasons`;
+- `automatic_decision`, `manual_decision`.
+
+Remove the critical dynamic `setattr` calls these fields currently replace.
+This item lands first because items 1–7 below populate these fields.
 
 ### 1. Treat missing coherence as unavailable, not perfect
 
@@ -127,7 +164,12 @@ Required change:
 - minimum unique point count;
 - minimum measured-DOF coverage fraction;
 - minimum measurement-point coverage fraction;
-- pairs below the limits must be unmatched or marked `insufficient coverage`;
+- pairs below the limits must be unmatched or marked with one of the explicit
+  statuses `accepted`, `insufficient DOF coverage`,
+  `insufficient point coverage`, `insufficient spatial coverage`, or
+  `MAC unavailable` — never silently dropped;
+- a pair carrying any non-`accepted` status must not participate in automatic
+  Hungarian assignment as a valid candidate;
 - expose counts, fractions, thresholds, and decisions in UI, projects, Excel,
   PDF, and reproducibility metadata.
 
@@ -145,8 +187,8 @@ Required change:
 
 - create an explicit geometry-validity mask;
 - exclude out-of-tolerance points from accepted MAC;
-- resolve duplicate mappings by one-to-one assignment or documented
-  aggregation;
+- resolve duplicate mappings by one of: one-to-one assignment, documented
+  aggregation, or selection of the nearest experimental point;
 - retain complete audit diagnostics for rejected points;
 - keep any unfiltered MAC only as a diagnostic, not the acceptance value.
 
@@ -169,9 +211,11 @@ Required change:
 - retain the fast complete-grid path;
 - add reliable support using anchors, a supplied transform, constrained ICP,
   or stable point identifiers;
-- report transform source, residuals, inlier fraction, reflections, and
-  ambiguity;
-- never silently accept a poorly constrained solution.
+- for every solution, record transform source, scale, rotation, translation,
+  determinant/reflection, RMS residual, inlier fraction, an ambiguity score,
+  and the number of alternative transforms considered;
+- never silently accept a poorly constrained or symmetrically ambiguous
+  solution — block automatic acceptance instead.
 
 Required tests:
 
@@ -667,34 +711,119 @@ Current debt:
 - project persistence, domain logic, GUI code, and report audit behavior remain
   mixed in large modules.
 
+Target component layout:
+
+- `domain/` — modal models, masks, coverage, lineage;
+- `importers/` — Abaqus ODB, UNV/UFF, Polytec;
+- `services/` — geometry alignment, MAC, assignment, FRF/CMIF, quality control;
+- `reporting/` — Excel, PDF, figures;
+- `persistence/` — projects, cache, migrations;
+- `ui/` — controllers, views, navigation.
+
+Mandatory removal order for the `install_*` chain, one vertical slice at a
+time:
+
+1. reporting;
+2. universal reader;
+3. comparison core;
+4. project/manual review;
+5. UI extensions;
+6. cache/runtime hardening.
+
+For each slice: keep a temporary facade at the old call site, move the real
+implementation into the explicit component, confirm characterization tests
+still pass, remove the corresponding `install_*`, and only then remove its
+runtime contract.
+
 Planned approach:
 
-- fold one vertical slice at a time into explicit components;
+- fold one vertical slice at a time into explicit components, in the order
+  above;
 - introduce explicit experiment/source registry, lineage model, comparison
   service, and navigation controller rather than new hidden patches;
+- inject services into the GUI through the constructor instead of having it
+  import globally patched functions;
 - keep runtime-contract tests until each corresponding patch chain is removed.
+
+### Stage 5 completion criteria
+
+`main.py` only constructs dependencies and starts the application; no
+numerical function's behavior depends on import order.
+
+## Stage 6 — real-data test matrix
+
+**Priority:** P0 before relying on the tool for any new Abaqus version,
+UNV/UFF variant, or measurement setup not already covered.
+**Goal:** prove portability beyond the single file/version combination the
+tool has been validated against so far.
+
+Minimum matrix:
+
+- **Abaqus:** at least two Abaqus versions; real eigenvalue modes; complex
+  modes; multiple instances; shell and solid models; different mode ranges.
+- **UNV/UFF:** dataset 55; dataset 2414; dataset 58 single-reference; dataset
+  58 multi-reference; dataset 2420; incomplete grids; different pyuff
+  variants.
+- **Geometry:** full grid; half-panel; corner grid; mirrored axes; mm↔m
+  scale; duplicate points; outliers.
+- **Experiment:** Polytec line-of-sight; Polytec 3D; contact accelerometers;
+  two independent experiments.
+
+Required artifacts:
+
+- anonymized fixtures or a fixture generator;
+- expected-result JSON per fixture;
+- a tolerance specification;
+- a regression report;
+- a list of the version/format combinations actually verified.
 
 ## Release and reproducibility work
 
 - Windows CI;
-- dependency lock or bounded compatibility set;
+- `pyproject.toml`, `requirements.in`, and a lock/constraints file that pins
+  compatible ranges, not just lower bounds; check the Python version at
+  startup;
 - application version in UI/projects/reports;
-- changelog, license, `pyproject.toml`, and packaging;
+- changelog, license, and packaging;
 - offline installer;
 - cancellation of Abaqus extraction;
 - CLI/batch processing;
+- a separate `Validate inputs` action that runs before a full analysis;
+- an `Export reproducibility package` action that bundles the full run
+  fingerprint below with the inputs needed to reproduce it;
+- a `Clear analysis cache` action;
+- safe project-file migration across analysis-pipeline versions;
+- a compatibility diagnostic for the installed Abaqus, Python, and pyuff
+  versions against the supported matrix;
 - compatibility matrix for Abaqus, Testlab, and Polytec exports;
-- complete run fingerprint: file hashes, versions, thresholds, masks,
-  transformations, experiment lineage, source pair, and manual-review state.
+- complete run fingerprint: application version, Git commit SHA, analysis
+  pipeline version, Python/library/Abaqus versions, input file paths, SHA-256
+  hashes, sizes and timestamps, MAC/frequency/coverage thresholds, actual
+  masks, geometry transform, coherence status, source lineage, selected
+  source pair, manual-review state, and cache-reuse status.
+
+### Cache management
+
+- include the application version and Git commit SHA in the cache key, and
+  invalidate automatically after a numerical-pipeline change;
+- keep raw-parsed-data, derived-mode, comparison-result, and rendered-figure
+  caches separate;
+- never unpickle a cache file written by an unknown or incompatible
+  application version.
 
 ## Staged plan summary
 
 - **Stage 1:** current behavior locked in — done.
-- **Stage 2:** seven scientific hardening items — test-first.
+- **Stage 2:** data-model additions plus seven scientific hardening items —
+  test-first.
 - **Stage 3:** explicit Polytec/Testlab lineage, current Abaqus–Polytec mode,
   optional independent three-source mode, expanded comparison windows, and the
   dedicated three-comparison view on tab 3.
 - **Stage 4:** user-requested navigation and responsive-layout refinements.
-- **Stage 5:** remove patch-chain architecture and split responsibilities.
+- **Stage 5:** remove patch-chain architecture and split responsibilities
+  along explicit `domain/importers/services/reporting/persistence/ui`
+  boundaries.
+- **Stage 6:** validate against a real-data matrix of Abaqus versions,
+  UNV/UFF variants, geometries, and experiment types.
 - **Reproducibility work:** proceed alongside the stages without bypassing
   numerical regression requirements.
