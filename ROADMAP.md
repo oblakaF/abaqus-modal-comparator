@@ -132,29 +132,40 @@ FRF response channels by the full (response node/direction, reference
 node/direction, physical quantity, frequency-axis signature) key instead of
 `universal_hardening._safe_select_frf_group`'s single best-scoring group, so
 independent references are no longer discarded. It builds a genuine complex
-response x reference x frequency matrix, deduplicates a repeated channel
-deterministically (keeping the first occurrence, not averaging or picking at
-random), excludes a response DOF not covered by every included reference
-instead of fabricating it, and rejects a reference on an incompatible
-frequency axis or physical quantity rather than misaligning it. `reference_count`
-now genuinely exceeds 1 when independent references are present (previously
-always 1, so `cmif_validation.validate_close_mode_candidates`'s multi-reference
-promotion path was dead code). `_cmif_singular_values` computes the
-conventional per-frequency-line CMIF SVD and reports matrix rank capacity and
-singular-value ratios per cluster; `_local_svd_components` (the close-mode
-candidate shape extractor) now stacks every included reference's band
-snapshots as additional columns, which is mathematically identical to the
-prior single-reference computation when only one reference is present
-(verified by the pre-existing `test_close_mode_svd.py` cases, unchanged).
+response x reference x frequency matrix. A channel signature match (length,
+first/last value, median step) is only the coarse candidate filter; every
+individual channel's frequency samples are additionally verified against the
+canonical axis with `np.allclose`, since two axes can share that coarse
+signature while differing sample-for-sample. A duplicate channel (the same
+response/reference key seen twice) is kept once and recorded with status
+`"equivalent"` when the two occurrences are numerically identical, or has
+every occurrence excluded and recorded with status `"conflicting"` when they
+disagree — never silently resolved by picking the first one. A response DOF
+not covered by every included reference is excluded rather than fabricated.
+`reference_count` now genuinely exceeds 1 when independent references are
+present (previously always 1, so
+`cmif_validation.validate_close_mode_candidates`'s multi-reference promotion
+path was dead code). `_cmif_singular_values` computes the conventional
+**per-frequency multi-reference CMIF singular values**, and
+`close_mode_separation` metadata reports, per cluster, the matrix rank
+capacity and the actual `cmif_max_second_to_first_singular_ratio`, plus
+initial/common response-DOF counts, coverage fraction, duplicate-channel
+status, and dropped-reference reasons. `validate_close_mode_candidates` now
+decides acceptance from that real CMIF ratio, not from the local candidate
+shape extractor's own component-energy ratios.
 
-Deferred: candidate mode *shapes* are still extracted by this local
-snapshot-SVD method, not by a full per-frequency-line CMIF curve fit (deriving
-shapes directly from the H(f) singular vectors across frequency, with proper
-residue-based curve fitting). The snapshot-SVD approach is a legitimate,
-already-validated diagnostic technique and now genuinely benefits from
-multiple references' data; replacing it with textbook CMIF shape extraction
-is a separate, larger numerical project and is not required for this item's
-completion criteria below.
+Terminology is kept distinct on purpose: **per-frequency multi-reference CMIF
+singular values** are the real evidence of an independent second mode; a
+**local snapshot-SVD candidate shape** is what `_local_svd_components` still
+extracts (now stacking every included reference's band snapshots as extra
+columns, mathematically identical to the prior single-reference computation
+when only one reference is present — verified by the pre-existing
+`test_close_mode_svd.py` cases, unchanged). A full per-frequency-line CMIF
+modal curve fit — deriving shapes directly from the H(f) singular vectors
+across frequency with proper residue-based curve fitting, rather than the
+local snapshot-SVD method — is **not implemented** and remains a separate,
+larger future task; it is not required for this item's completion criteria
+below.
 
 Original current risk (now addressed above):
 

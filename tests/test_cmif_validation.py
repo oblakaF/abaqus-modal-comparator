@@ -49,7 +49,7 @@ class ConservativeSvdValidationTests(unittest.TestCase):
                 "clusters": [
                     {
                         "cluster": [91.4, 92.2],
-                        "singular_value_ratios": [1.0, second_ratio],
+                        "cmif_max_second_to_first_singular_ratio": second_ratio,
                         "added_candidate_frequencies_hz": [91.8],
                     }
                 ],

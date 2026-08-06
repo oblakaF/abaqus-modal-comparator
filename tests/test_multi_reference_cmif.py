@@ -107,25 +107,51 @@ class TwoReferenceMatrixConstructionTests(unittest.TestCase):
         self.assertEqual(block.reference_keys, [(1, 3)])
         self.assertEqual(block.matrix.shape, (self.node_count, 1, len(self.axis)))
 
-    def test_duplicate_reference_channel_is_deduplicated_deterministically(self):
+    def test_equivalent_duplicate_channel_is_kept_once_and_recorded(self):
+        datasets = self._two_reference_datasets()
+        # A channel exported twice with numerically identical data (for example
+        # re-exported without change) is not a corruption; keep one copy and
+        # record the duplicate, but do not warn or exclude it.
+        duplicate = dict(datasets[0])
+        duplicate["data"] = np.array(datasets[0]["data"])
+        datasets.append(duplicate)
+
+        block = cmif_separation._build_multi_reference_frf_block(datasets, self.geometry)
+
+        self.assertEqual(block.reference_count, 2)
+        self.assertEqual(
+            block.duplicate_channels,
+            [{"response": (1, 3), "reference": (1, 3), "status": "equivalent"}],
+        )
+        reference_a_index = block.reference_keys.index((1, 3))
+        response_index = block.row_keys.index((1, 3))
+        np.testing.assert_allclose(
+            block.matrix[response_index, reference_a_index, :],
+            datasets[0]["data"],
+        )
+
+    def test_conflicting_duplicate_channel_is_excluded_not_silently_chosen(self):
         datasets = self._two_reference_datasets()
         # A corrupted duplicate export of the same (response, reference) channel
-        # with different data must not be averaged in or picked at random.
+        # with genuinely different data must not be averaged in, picked at
+        # random, or silently kept as "the first one" -- it must be excluded
+        # and recorded so the conflict is visible.
         duplicate = dict(datasets[0])
         duplicate["data"] = _synthetic_frf(self.axis, 80.0, 0.01, 999.0)
         datasets.append(duplicate)
 
         block = cmif_separation._build_multi_reference_frf_block(datasets, self.geometry)
 
-        self.assertEqual(block.reference_count, 2)
-        self.assertEqual(len(block.duplicate_channels_dropped), 1)
-        reference_a_index = block.reference_keys.index((1, 3))
-        response_index = block.row_keys.index((1, 3))
-        # The retained value must be the first (legitimate) channel, not the
-        # corrupted duplicate appended afterward.
-        np.testing.assert_allclose(
-            block.matrix[response_index, reference_a_index, :],
-            datasets[0]["data"],
+        self.assertEqual(
+            block.duplicate_channels,
+            [{"response": (1, 3), "reference": (1, 3), "status": "conflicting"}],
+        )
+        # Both the legitimate and the corrupted channel are excluded, so node 1
+        # is missing under reference (1, 3) and can no longer be a common
+        # response DOF across every reference.
+        self.assertNotIn((1, 3), block.row_keys)
+        self.assertTrue(
+            any(entry["node"] == 1 for entry in block.excluded_response_dofs)
         )
 
     def test_response_dof_missing_for_one_reference_is_excluded_not_fabricated(self):
@@ -146,6 +172,11 @@ class TwoReferenceMatrixConstructionTests(unittest.TestCase):
         self.assertEqual(len(block.excluded_response_dofs), 1)
         self.assertEqual(block.excluded_response_dofs[0]["node"], 1)
         self.assertEqual(block.matrix.shape[0], self.node_count - 1)
+        self.assertEqual(block.initial_response_dof_count, self.node_count)
+        self.assertAlmostEqual(
+            block.response_dof_coverage_fraction,
+            (self.node_count - 1) / self.node_count,
+        )
 
     def test_incompatible_frequency_axis_reference_is_rejected_not_merged(self):
         datasets = self._two_reference_datasets()
@@ -167,6 +198,40 @@ class TwoReferenceMatrixConstructionTests(unittest.TestCase):
         self.assertEqual(len(block.dropped_references), 1)
         self.assertEqual(block.dropped_references[0]["reference"], (5, 3))
         self.assertIn("axis", block.dropped_references[0]["reason"])
+
+    def test_axis_matching_coarse_signature_but_not_samples_is_rejected(self):
+        """Two axes can share length, first value, last value, and median step
+        while differing at an interior sample -- the coarse (signature-based)
+        grouping alone must not be trusted as proof of alignment; every
+        channel's actual samples must be compared with np.allclose against the
+        canonical reference axis."""
+        distorted_axis = self.axis.copy()
+        # A single interior perturbation leaves length/start/end/median-step
+        # identical (median is robust to one changed sample among 400), but
+        # the array is no longer sample-for-sample identical.
+        distorted_axis[200] += 0.5
+        step = float(np.median(np.diff(self.axis)))
+        distorted_step = float(np.median(np.diff(distorted_axis)))
+        self.assertEqual(len(distorted_axis), len(self.axis))
+        self.assertEqual(distorted_axis[0], self.axis[0])
+        self.assertEqual(distorted_axis[-1], self.axis[-1])
+        self.assertAlmostEqual(distorted_step, step, places=8)
+        self.assertFalse(np.allclose(distorted_axis, self.axis, rtol=1.0e-8, atol=1.0e-10))
+
+        rebuilt = [item for item in self._two_reference_datasets() if item["ref_node"] == 1]
+        for node_index in range(self.node_count):
+            node = node_index + 1
+            shape_b = np.cos(0.4 * node)
+            data_b = _synthetic_frf(distorted_axis, 80.0, 0.01, shape_b)
+            rebuilt.append(_response_channel(node, 3, 5, 3, distorted_axis, data_b))
+
+        block = cmif_separation._build_multi_reference_frf_block(rebuilt, self.geometry)
+
+        self.assertEqual(block.reference_count, 1)
+        self.assertEqual(block.reference_keys, [(1, 3)])
+        self.assertEqual(len(block.dropped_references), 1)
+        self.assertEqual(block.dropped_references[0]["reference"], (5, 3))
+        self.assertIn("sample-for-sample", block.dropped_references[0]["reason"])
 
 
 class CmifSingularValueTests(unittest.TestCase):
@@ -299,23 +364,60 @@ class EndToEndPromotionTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].metadata["reference_count"], 2)
 
-        # With a genuine second independent reference, validate_close_mode_candidates
-        # (cmif_validation.py) must be able to promote the candidate -- unlike the
-        # single-reference case, which test_cmif_validation.py already confirms stays
-        # diagnostic-only.
-        validation_metadata = {
-            "close_mode_separation": {
-                "reference_count": 2,
-                "clusters": [
-                    {
-                        "cluster": [self.f1, self.f2],
-                        "singular_value_ratios": [1.0, 0.4],
-                    }
-                ],
-            }
-        }
-        final_modes, _ = validate_close_mode_candidates(modes, validation_metadata)
+        # The two independent references must produce a genuine, non-negligible
+        # per-frequency CMIF second singular value near this cluster -- this is
+        # the actual evidence validate_close_mode_candidates now decides on.
+        cluster_diagnostic = separation["clusters"][0]
+        cmif_ratio = cluster_diagnostic["cmif_max_second_to_first_singular_ratio"]
+        self.assertIsNotNone(cmif_ratio)
+        self.assertGreater(cmif_ratio, 0.05)
+
+        # Full chain: FRF datasets -> response x reference matrix H(f) ->
+        # per-frequency CMIF -> computed ratio -> automatic acceptance. The
+        # real metadata produced above is passed through unmodified -- unlike
+        # a single reference (test_cmif_validation.py's
+        # test_single_reference_candidate_is_diagnostic_only), a genuinely
+        # independent second reference lets the candidate be promoted.
+        final_modes, _ = validate_close_mode_candidates(modes, metadata)
         self.assertEqual(len(final_modes), 2)
+        promoted = [
+            mode
+            for mode in final_modes
+            if "SVD/CMIF" in mode.metadata.get("source_label", "")
+        ]
+        self.assertEqual(len(promoted), 1)
+
+    def test_single_reference_candidate_is_not_promoted_through_the_full_chain(self):
+        """Same chain, but with only one reference: the candidate must stay
+        diagnostic-only, confirming the real (not hand-built) CMIF ratio
+        correctly reports no second-reference evidence when there is none."""
+        base_mode = self._base_mode()
+        single_reference_datasets = [
+            item for item in self._datasets() if item["ref_node"] == 1
+        ]
+
+        def fake_base_reader(*_args, **_kwargs):
+            return [base_mode], {"mode_source": "test peak extraction"}
+
+        with patch.object(
+            cmif_separation, "_ORIGINAL_MODES_FROM_FRF", fake_base_reader, create=True
+        ):
+            modes, metadata = cmif_separation._reviewed_modes_from_frf(
+                single_reference_datasets,
+                self.geometry,
+                target_frequencies=[self.f1, self.f2],
+                target_count=2,
+            )
+
+        separation = metadata["close_mode_separation"]
+        self.assertEqual(separation["reference_count"], 1)
+        self.assertEqual(separation["matrix_rank_capacity"], 1)
+        self.assertIsNone(
+            separation["clusters"][0]["cmif_max_second_to_first_singular_ratio"]
+        )
+
+        final_modes, _ = validate_close_mode_candidates(modes, metadata)
+        self.assertEqual(len(final_modes), 1)
 
 
 if __name__ == "__main__":

@@ -165,12 +165,15 @@ def validate_close_mode_candidates(
             <= max(cluster) + association_window
         ]
         target_shape_count = max(1, len(cluster))
-        singular_ratios = [
-            float(value)
-            for value in diagnostic.get("singular_value_ratios", [])
-            if value is not None and np.isfinite(value)
-        ]
-        second_ratio = singular_ratios[1] if len(singular_ratios) > 1 else 0.0
+        # Acceptance is driven by the actual per-frequency multi-reference CMIF
+        # singular-value ratio (evidence that a second reference resolves an
+        # independent mode), not by the local snapshot-SVD candidate shape's own
+        # component energy ratios, which reflect the extraction method rather than
+        # independent-reference evidence.
+        cmif_ratio = diagnostic.get("cmif_max_second_to_first_singular_ratio")
+        second_ratio = (
+            float(cmif_ratio) if cmif_ratio is not None and np.isfinite(cmif_ratio) else 0.0
+        )
         duplicate_mac = _max_mac(candidate, base_modes + accepted)
         confidence_score = _candidate_confidence(
             reference_count, second_ratio, duplicate_mac
