@@ -197,6 +197,7 @@ def build_manual_pair(
     e = np.asarray(experimental_values[valid_rows])
     local_mask = np.asarray(dof_mask[valid_rows], dtype=bool)
     coordinates = np.asarray(experimental_reference.coordinates[valid_rows])
+    node_ids = np.asarray(reference_node_ids)[valid_rows]
     mac_value = modal_assurance_criterion(a[local_mask], e[local_mask])
     signed_error = frequency_error_percent(
         abaqus_mode.frequency_hz, experimental_mode.frequency_hz
@@ -215,6 +216,7 @@ def build_manual_pair(
         abaqus_vector=aligned_a,
         experimental_vector=e,
         coordinates=coordinates,
+        node_ids=node_ids,
     )
     setattr(pair, "measured_dof_mask", local_mask)
     setattr(pair, "measured_dof_count", int(np.count_nonzero(local_mask)))

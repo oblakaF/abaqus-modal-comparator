@@ -231,19 +231,37 @@ implicitly assuming every pair kept the *same* rows in the *same* order. That
 assumption holds for every current importer (every mode in one loaded dataset
 still gets an identical or coincidentally-aligned mask in practice today), so
 this is not reachable with current real data, but it is not actually
-guaranteed once masks can genuinely differ per mode. A correct fix needs
-`ModePairResult` to carry enough node identity to realign pairs with
-different retained rows (or to keep the full reference grid with a mask
-rather than pre-filtering it), which touches `reporting.py`,
-`reporting_hardening.py`, `amplitude_correlation.py`, `modal_scaling.py`, and
-`metrics_normalization.py` as well as `advanced_metrics.py` — out of scope
-for this item and left as a follow-up.
+guaranteed once masks can genuinely differ per mode.
+
+Follow-up landed (minimal guard, not the full realignment): `ModePairResult`
+gained a `node_ids` field (set by both `reviewed_core._build_mode_pairs` and
+`project_review.build_manual_pair`, sliced by that pair's own `valid_rows`
+alongside `coordinates`). Before combining any pairs,
+`advanced_metrics._verified_pairs_share_one_measurement_grid` now checks
+every accepted pair has the same `node_ids` in the same order, the same
+vector shapes, and an explicit `measured_dof_mask` before allowing
+`_common_pair_data` to AND them together; a mismatch raises `"AutoMAC/COMAC
+unavailable: verified pairs use different measurement grids."` instead of
+silently correlating the wrong physical points. `metrics_normalization.py`'s
+duplicate `_normalized_common_pair_data` — the function actually installed
+in production, found only while wiring this in — now calls the same guard
+rather than skip it. A genuine *realignment* of pairs that keep different
+node subsets (rather than refusing them) is still the deferred, larger task
+described above, touching `reporting.py`, `reporting_hardening.py`,
+`amplitude_correlation.py`, and `modal_scaling.py`.
+
+Also fixed in the same pass: `_inferred_measurement_mask` no longer treats an
+all-zero mode with no explicit mask as "every finite DOF is measured" — it
+now returns an all-False mask, since zero energy and no explicit mask leaves
+no reliable basis to claim anything was measured.
 
 Required tests:
 
 - different missing channels/components by mode — done;
-- inferred-mask fallback — done, now per-mode;
-- AutoMAC and COMAC consistency — done, within the row-alignment gap above.
+- inferred-mask fallback — done, now per-mode, and an all-zero mode no longer
+  defaults to fully measured;
+- AutoMAC and COMAC consistency — done: different node IDs are rejected with
+  a clear error, and the same node IDs/order still compute as before.
 
 ### 4. Add minimum common-DOF and spatial-coverage gates
 

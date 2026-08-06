@@ -108,10 +108,14 @@ def _inferred_measurement_mask(vectors: np.ndarray) -> np.ndarray:
     component_norms = np.sqrt(np.sum(amplitudes**2, axis=0))
     mode_norm = float(np.linalg.norm(component_norms))
     if mode_norm <= 1.0e-30:
-        return finite
+        # No explicit mask and no measurable energy anywhere in this mode's
+        # own vector: there is no reliable basis to say anything was
+        # measured. Falling back to "everything finite counts as measured"
+        # would silently trust every DOF of a mode that is entirely zero
+        # (ROADMAP Stage 2 #3).
+        return np.zeros_like(finite)
     active_components = component_norms > mode_norm * INFERRED_DOF_RELATIVE_NORM
-    inferred = finite & active_components[np.newaxis, :]
-    return inferred if np.any(inferred) else finite
+    return finite & active_components[np.newaxis, :]
 
 
 def experimental_measurement_masks(
@@ -512,6 +516,7 @@ def _build_mode_pairs(
     winning_abaqus_vectors: Sequence[np.ndarray],
     experimental_vectors: Sequence[np.ndarray],
     experimental_coordinates: np.ndarray,
+    experimental_node_ids: np.ndarray,
     measurement_masks: Sequence[np.ndarray],
     mac_matrix: np.ndarray,
     signed_frequency_matrix: np.ndarray,
@@ -542,6 +547,7 @@ def _build_mode_pairs(
         e = experimental_values[valid_rows]
         local_mask = dof_mask[valid_rows]
         coordinates = experimental_coordinates[valid_rows]
+        node_ids = np.asarray(experimental_node_ids)[valid_rows]
 
         mac_value = (
             None
@@ -563,6 +569,7 @@ def _build_mode_pairs(
             abaqus_vector=np.asarray(aligned_a),
             experimental_vector=np.asarray(e),
             coordinates=np.asarray(coordinates),
+            node_ids=node_ids,
         )
         setattr(pair, "measured_dof_mask", np.asarray(local_mask, dtype=bool))
         setattr(
@@ -690,6 +697,7 @@ def compare_modal_datasets(
         winning_abaqus_vectors,
         experimental_vectors,
         experimental_coordinates,
+        experimental_node_ids,
         measurement_masks,
         mac_matrix,
         signed_frequency_matrix,

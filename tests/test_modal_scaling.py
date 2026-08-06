@@ -17,7 +17,7 @@ from modal_scaling import correlation_plot_values
 
 class ModalScalingTests(unittest.TestCase):
     @staticmethod
-    def _pair(abaqus_values, experimental_values, abaqus_mode, experimental_mode):
+    def _pair(abaqus_values, experimental_values, abaqus_mode, experimental_mode, node_ids=None):
         coordinates = np.column_stack(
             (np.arange(len(abaqus_values), dtype=float), np.zeros(len(abaqus_values)), np.zeros(len(abaqus_values)))
         )
@@ -40,6 +40,7 @@ class ModalScalingTests(unittest.TestCase):
             abaqus_vector=abaqus,
             experimental_vector=experiment,
             coordinates=coordinates,
+            node_ids=np.arange(len(abaqus_values)) if node_ids is None else np.asarray(node_ids),
         )
         setattr(pair, "measured_dof_mask", mask)
         return pair
@@ -89,6 +90,30 @@ class ModalScalingTests(unittest.TestCase):
         self.assertTrue(common_mask[0, 2])
         self.assertEqual(abaqus_columns.shape[0], int(np.count_nonzero(common_mask)))
         self.assertEqual(experimental_columns.shape[0], int(np.count_nonzero(common_mask)))
+
+    def test_different_node_ids_are_rejected_not_combined_positionally(self):
+        """Same row count, different physical node IDs: AutoMAC/COMAC must
+        refuse rather than silently correlate the wrong points row-by-row."""
+        shape = np.array([1.0, 2.0, -1.0, -2.0])
+        pair_a = self._pair(shape, shape, 1, 1, node_ids=[1, 2, 3, 4])
+        pair_b = self._pair(shape, shape, 2, 2, node_ids=[5, 6, 7, 8])
+
+        with self.assertRaisesRegex(ValueError, "different measurement grids"):
+            advanced_metrics._common_pair_data(SimpleNamespace(pairs=[pair_a, pair_b]))
+        with self.assertRaisesRegex(ValueError, "different measurement grids"):
+            comac_by_node(SimpleNamespace(pairs=[pair_a, pair_b]))
+
+    def test_same_node_ids_and_order_are_accepted_as_before(self):
+        """Same physical grid in the same order: AutoMAC/COMAC compute
+        exactly as before this guard was added."""
+        shape_1 = np.array([1.0, 2.0, -1.0, -2.0])
+        shape_2 = np.array([-2.0, 0.5, 1.5, -0.25])
+        pair_a = self._pair(shape_1, shape_1, 1, 1, node_ids=[1, 2, 3, 4])
+        pair_b = self._pair(shape_2, shape_2, 2, 2, node_ids=[1, 2, 3, 4])
+
+        install_metrics_normalization()
+        _, comac = comac_by_node(SimpleNamespace(pairs=[pair_a, pair_b]))
+        np.testing.assert_allclose(comac, np.ones_like(comac), atol=1.0e-12)
 
 
 if __name__ == "__main__":

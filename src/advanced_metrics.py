@@ -17,22 +17,62 @@ def _new_figure(figsize) -> Figure:
     return figure
 
 
+_GRID_MISMATCH_MESSAGE = (
+    "AutoMAC/COMAC unavailable: verified pairs use different measurement grids."
+)
+
+
+def _verified_pairs_share_one_measurement_grid(result: ComparisonResult) -> None:
+    """Raise if any two accepted pairs cannot be combined by row position.
+
+    advanced_metrics.py combines every accepted pair's already row-filtered
+    abaqus_vector/experimental_vector/measured_dof_mask into one AutoMAC/COMAC
+    Gram-matrix computation purely by array position. That is only valid when
+    every pair kept the exact same node IDs in the exact same order -- which
+    is not guaranteed now that each pair uses its own experimental mode's own
+    measured-DOF mask (ROADMAP Stage 2 #3) and can therefore keep a different
+    subset of rows. Positionally combining mismatched grids would silently
+    correlate the wrong physical points, so this refuses instead of guessing;
+    genuinely realigning differently ordered/subsetted grids is left as a
+    documented future task rather than attempted here.
+    """
+    reference_pair = result.pairs[0]
+    reference_node_ids = getattr(reference_pair, "node_ids", None)
+    shape = reference_pair.abaqus_vector.shape
+    if reference_node_ids is None or np.asarray(reference_node_ids).shape[:1] != shape[:1]:
+        raise ValueError(_GRID_MISMATCH_MESSAGE)
+    reference_node_ids = np.asarray(reference_node_ids)
+
+    for pair in result.pairs:
+        pair_node_ids = getattr(pair, "node_ids", None)
+        pair_mask = getattr(pair, "measured_dof_mask", None)
+        if (
+            pair.abaqus_vector.shape != shape
+            or pair.experimental_vector.shape != shape
+            or pair_mask is None
+            or np.asarray(pair_mask, dtype=bool).shape != shape
+            or pair_node_ids is None
+            or np.asarray(pair_node_ids).shape != reference_node_ids.shape
+            or not np.array_equal(np.asarray(pair_node_ids), reference_node_ids)
+        ):
+            raise ValueError(_GRID_MISMATCH_MESSAGE)
+
+
 def _common_pair_data(result: ComparisonResult):
     if not result.pairs:
         raise ValueError("No verified pairs are available for AutoMAC or COMAC.")
+    _verified_pairs_share_one_measurement_grid(result)
+
     shape = result.pairs[0].abaqus_vector.shape
     common_mask = np.ones(shape, dtype=bool)
     for pair in result.pairs:
-        if pair.abaqus_vector.shape != shape or pair.experimental_vector.shape != shape:
-            raise ValueError("Verified pair vectors do not share a common measurement grid.")
-        pair_mask = getattr(pair, "measured_dof_mask", np.ones(shape, dtype=bool))
         finite = (
             np.isfinite(pair.abaqus_vector.real)
             & np.isfinite(pair.abaqus_vector.imag)
             & np.isfinite(pair.experimental_vector.real)
             & np.isfinite(pair.experimental_vector.imag)
         )
-        common_mask &= np.asarray(pair_mask, dtype=bool) & finite
+        common_mask &= np.asarray(pair.measured_dof_mask, dtype=bool) & finite
     if not np.any(common_mask):
         raise ValueError("No common measured degrees of freedom exist across verified pairs.")
     abaqus = np.column_stack(

@@ -76,6 +76,7 @@ class ModePairResult:
     abaqus_vector: np.ndarray
     experimental_vector: np.ndarray
     coordinates: np.ndarray
+    node_ids: Optional[np.ndarray] = None
 
 
 @dataclass

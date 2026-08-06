@@ -80,6 +80,18 @@ class ReviewedCoreTests(unittest.TestCase):
         self.assertFalse(np.any(mask[:, 0]))
         self.assertTrue(np.all(mask[:, 2]))
 
+    def test_all_zero_mode_without_explicit_mask_is_not_treated_as_fully_measured(self):
+        """A mode with zero energy everywhere and no explicit measured_dofs
+        has no reliable basis for saying anything was measured; it must not
+        default to 'every finite DOF counts as measured' (ROADMAP Stage 2
+        #3 legacy-fallback fix)."""
+        coordinates = np.column_stack((np.arange(5.0), np.zeros(5), np.zeros(5)))
+        node_ids = np.arange(5)
+        vectors = np.zeros((5, 3), dtype=float)  # all zero, finite everywhere
+        mode = ModeShape(1, 10.0, node_ids, coordinates, vectors)
+        masks = experimental_measurement_masks([mode], node_ids)
+        self.assertFalse(np.any(masks[0]))
+
     def test_inferred_mask_is_computed_per_mode_not_from_other_modes_energy(self):
         """ROADMAP Stage 2 #3 inferred-mask fallback: a component active in one
         mode's own vector must not make another, genuinely-inactive mode's
