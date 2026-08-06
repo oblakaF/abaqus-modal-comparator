@@ -82,9 +82,17 @@ Add explicit fields instead of relying on dynamic attributes:
 Remove the critical dynamic `setattr` calls these fields currently replace.
 This item lands first because items 1–7 below populate these fields.
 
-### 1. Treat missing coherence as unavailable, not perfect
+### 1. Treat missing coherence as unavailable, not perfect — done
 
-Current confirmed behavior:
+Fixed in `universal_frf_review.py`, `cmif_validation.py`, `enhanced_reporting.py`,
+`ui_enhancements.py`, `quality_control.py`, and `fast_cache.py` (analysis
+pipeline version bumped to invalidate stale caches). The single-reference
+local-SVD path in `cmif_separation.py` keeps its own, separately-reasoned
+`unavailable → full weight` choice for now — that weighting feeds the SVD
+residual itself rather than a displayed confidence label, so it is left for
+item 2 (multi-reference FRF/CMIF) rather than folded into this fix.
+
+Previously confirmed behavior:
 
 - when no dataset-58 coherence channels exist,
   `mean_coherence = np.ones_like(...)`;

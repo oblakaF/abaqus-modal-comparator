@@ -228,6 +228,29 @@ def compare_modal_datasets_with_quality_control(
             + "."
         )
 
+    uncomputed_coherence_modes = [
+        mode
+        for mode in experimental.sorted_modes()
+        if mode.metadata.get("dataset_type") == 58
+        and mode.metadata.get("coherence_status") in ("unavailable", "parse_error")
+    ]
+    if uncomputed_coherence_modes:
+        parse_error_count = sum(
+            1
+            for mode in uncomputed_coherence_modes
+            if mode.metadata.get("coherence_status") == "parse_error"
+        )
+        detail = (
+            f"{parse_error_count} could not be parsed"
+            if parse_error_count
+            else "no dataset-58 coherence channels were present"
+        )
+        result.warnings.append(
+            f"{len(uncomputed_coherence_modes)} FRF-derived experimental mode(s) have no "
+            f"measured coherence ({detail}); their confidence is reported as "
+            "peak-derived only and was not allowed to read as high-confidence."
+        )
+
     result.abaqus.metadata["matched_pair_count_after_quality_control"] = len(result.pairs)
     result.abaqus.metadata["unmatched_abaqus_modes"] = [
         {"mode": mode.number, "frequency_hz": mode.frequency_hz}

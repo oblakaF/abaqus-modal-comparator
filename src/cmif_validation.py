@@ -75,20 +75,33 @@ def _annotate_standard_mode(mode: ModeShape) -> None:
         return
 
     if dataset_type == 58 or "frf" in source.lower() or "peak" in source.lower():
-        coherence = metadata.get("mean_coherence")
-        try:
-            coherence_value = float(coherence)
-        except (TypeError, ValueError):
-            coherence_value = 0.0
-        if coherence_value >= 0.90:
+        # Only a genuinely computed coherence value may raise confidence above the
+        # peak-derived baseline (ROADMAP Stage 2 #1). A missing or unparsable
+        # coherence channel must not be able to score as "High peak confidence".
+        coherence_status = str(metadata.get("coherence_status", ""))
+        coherence_value: Optional[float] = None
+        if coherence_status == "computed":
+            try:
+                coherence_value = float(metadata.get("mean_coherence"))
+            except (TypeError, ValueError):
+                coherence_value = None
+
+        if coherence_value is None:
+            reason = "parse error" if coherence_status == "parse_error" else "unavailable"
+            confidence = f"Peak-derived (coherence {reason})"
+            confidence_score = 0.0
+        elif coherence_value >= 0.90:
             confidence = "High peak confidence"
+            confidence_score = coherence_value
         elif coherence_value >= 0.70:
             confidence = "Medium peak confidence"
+            confidence_score = coherence_value
         else:
             confidence = "Peak-derived"
+            confidence_score = coherence_value
         metadata["source_label"] = "FRF resonance peak"
         metadata["confidence_label"] = confidence
-        metadata["confidence_score"] = float(np.clip(coherence_value, 0.0, 1.0))
+        metadata["confidence_score"] = float(np.clip(confidence_score, 0.0, 1.0))
         return
 
     metadata.setdefault("source_label", "Imported modal vector")

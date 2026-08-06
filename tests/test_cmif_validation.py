@@ -7,7 +7,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from cmif_validation import validate_close_mode_candidates
+from cmif_validation import _annotate_standard_mode, validate_close_mode_candidates
 from modal_core import ModeShape
 
 
@@ -105,6 +105,75 @@ class ConservativeSvdValidationTests(unittest.TestCase):
         accepted = [mode for mode in modes if "SVD/CMIF" in mode.metadata.get("source_label", "")]
         self.assertEqual(len(accepted), 1)
         self.assertIn(accepted[0].metadata["confidence_label"], ("Medium", "High"))
+
+
+class StandardModeConfidenceTests(unittest.TestCase):
+    """ROADMAP Stage 2 #1: only genuinely computed coherence may raise an FRF
+    peak's confidence; missing/unparsable coherence must not read as perfect."""
+
+    def _mode(self, metadata):
+        return ModeShape(
+            number=1,
+            frequency_hz=91.7,
+            node_ids=np.array([1], dtype=object),
+            coordinates=np.zeros((1, 3)),
+            vectors=np.zeros((1, 3), dtype=complex),
+            metadata=metadata,
+        )
+
+    def test_computed_high_coherence_yields_high_confidence(self):
+        mode = self._mode(
+            {
+                "dataset_type": 58,
+                "mode_source": "FRF peak-derived experimental shape",
+                "mean_coherence": 0.98,
+                "coherence_status": "computed",
+            }
+        )
+        _annotate_standard_mode(mode)
+        self.assertEqual(mode.metadata["confidence_label"], "High peak confidence")
+        self.assertAlmostEqual(mode.metadata["confidence_score"], 0.98)
+
+    def test_unavailable_coherence_does_not_yield_high_confidence(self):
+        mode = self._mode(
+            {
+                "dataset_type": 58,
+                "mode_source": "FRF peak-derived experimental shape",
+                "mean_coherence": None,
+                "coherence_status": "unavailable",
+            }
+        )
+        _annotate_standard_mode(mode)
+        self.assertNotIn("High", mode.metadata["confidence_label"])
+        self.assertNotIn("Medium", mode.metadata["confidence_label"])
+        self.assertEqual(mode.metadata["confidence_score"], 0.0)
+
+    def test_parse_error_coherence_does_not_yield_high_confidence(self):
+        mode = self._mode(
+            {
+                "dataset_type": 58,
+                "mode_source": "FRF peak-derived experimental shape",
+                "mean_coherence": None,
+                "coherence_status": "parse_error",
+            }
+        )
+        _annotate_standard_mode(mode)
+        self.assertIn("parse error", mode.metadata["confidence_label"])
+        self.assertEqual(mode.metadata["confidence_score"], 0.0)
+
+    def test_missing_coherence_status_defaults_to_unavailable_not_perfect(self):
+        """A mode built before this field existed (legacy cache/project data)
+        must not be reinterpreted as computed coherence."""
+        mode = self._mode(
+            {
+                "dataset_type": 58,
+                "mode_source": "FRF peak-derived experimental shape",
+                "mean_coherence": 1.0,
+            }
+        )
+        _annotate_standard_mode(mode)
+        self.assertNotEqual(mode.metadata["confidence_label"], "High peak confidence")
+        self.assertEqual(mode.metadata["confidence_score"], 0.0)
 
 
 if __name__ == "__main__":

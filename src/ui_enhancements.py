@@ -201,9 +201,14 @@ def install_app_enhancements(app_module) -> None:
         lines.extend(["", "SIMCENTER PEAK CANDIDATES", "-" * 88])
         for mode in result.experimental.sorted_modes():
             damping = "—" if mode.damping_ratio is None else f"{mode.damping_ratio:.6g}"
-            coherence = mode.metadata.get("mean_coherence", "—")
+            coherence = mode.metadata.get("mean_coherence")
+            coherence_status = mode.metadata.get("coherence_status")
             if isinstance(coherence, float):
                 coherence = f"{coherence:.4f}"
+            elif coherence_status in ("unavailable", "parse_error"):
+                coherence = f"not measured ({coherence_status})"
+            else:
+                coherence = "—"
             lines.append(
                 f"E{mode.number:>3}: {mode.frequency_hz:>11.5f} Hz | "
                 f"damping {damping} | mean coherence {coherence} | points {len(mode.node_ids)}"

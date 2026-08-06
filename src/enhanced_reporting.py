@@ -79,11 +79,23 @@ def render_frf_diagnostics(result: ComparisonResult, output_path: Path) -> Path:
             )
             primary.axvline(pair.abaqus_frequency_hz, linestyle="--", linewidth=1.0, alpha=0.7)
 
-    if len(coherence) == len(frequency):
+    coherence_status = str(metadata.get("coherence_status", ""))
+    if len(coherence) == len(frequency) and coherence_status == "computed":
         secondary = primary.twinx()
         secondary.plot(frequency, np.clip(coherence, 0.0, 1.0), alpha=0.45, label="Mean coherence")
         secondary.set_ylim(0.0, 1.05)
         secondary.set_ylabel("Mean coherence")
+    elif coherence_status in ("unavailable", "parse_error"):
+        primary.text(
+            0.02,
+            0.02,
+            "Coherence: "
+            + ("not available (no dataset-58 coherence channels)" if coherence_status == "unavailable"
+               else "could not be parsed — see warnings"),
+            transform=primary.transAxes,
+            fontsize=8,
+            color="firebrick",
+        )
 
     primary.set_title(
         "Experimental FRF diagnostics\n"

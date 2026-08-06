@@ -150,6 +150,48 @@ class QualityControlTests(unittest.TestCase):
             any("Closely spaced" in warning for warning in result.warnings)
         )
 
+    def test_frf_modes_without_computed_coherence_raise_a_visible_warning(self):
+        """ROADMAP Stage 2 #1: missing coherence must be visible in the
+        aggregated ComparisonResult.warnings list, which reaches the GUI,
+        Excel export, and PDF export alike."""
+        x, y = np.meshgrid(np.linspace(0.0, 1.0, 5), np.linspace(0.0, 1.0, 5))
+        coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        node_ids = np.arange(1, len(coordinates) + 1)
+        shape = np.zeros_like(coordinates)
+        shape[:, 2] = np.sin(np.pi * coordinates[:, 0]) * np.sin(np.pi * coordinates[:, 1])
+
+        abaqus = ModalDataset(
+            "Abaqus", Path("model.odb"), [ModeShape(1, 25.0, node_ids, coordinates, shape)]
+        )
+        experiment = ModalDataset(
+            "Experiment",
+            Path("scan.unv"),
+            [
+                ModeShape(
+                    1,
+                    25.2,
+                    node_ids,
+                    coordinates,
+                    shape,
+                    metadata={
+                        "dataset_type": 58,
+                        "mode_source": "FRF peak-derived experimental shape",
+                        "mean_coherence": None,
+                        "coherence_status": "unavailable",
+                    },
+                )
+            ],
+        )
+
+        result = compare_modal_datasets_with_quality_control(abaqus, experiment)
+
+        self.assertTrue(
+            any(
+                "no measured coherence" in warning
+                for warning in result.warnings
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

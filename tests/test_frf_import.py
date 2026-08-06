@@ -205,6 +205,100 @@ class FrfModeImportTests(unittest.TestCase):
         self.assertEqual(metadata["frf_response_node_count"], 25)
         self.assertEqual(metadata["coherence_channel_count"], 25)
 
+    def _response_only_datasets(self):
+        """FRF response channels with no dataset-58 coherence (func_type 6) at all."""
+        axis = np.linspace(1.0, 160.0, 1273)
+        natural_frequencies = [24.0, 71.0, 118.0]
+        damping = [0.012, 0.009, 0.015]
+
+        x, y = np.meshgrid(np.linspace(-0.2, 0.2, 5), np.linspace(-0.2, 0.2, 5))
+        coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        geometry = {index + 1: coordinate for index, coordinate in enumerate(coordinates)}
+
+        shapes = [
+            np.sin(np.pi * (coordinates[:, 0] + 0.2) / 0.4)
+            * np.sin(np.pi * (coordinates[:, 1] + 0.2) / 0.4),
+            np.sin(2.0 * np.pi * (coordinates[:, 0] + 0.2) / 0.4)
+            * np.sin(np.pi * (coordinates[:, 1] + 0.2) / 0.4),
+            np.sin(np.pi * (coordinates[:, 0] + 0.2) / 0.4)
+            * np.sin(2.0 * np.pi * (coordinates[:, 1] + 0.2) / 0.4),
+        ]
+
+        datasets = []
+        for node_index in range(len(coordinates)):
+            response = np.zeros_like(axis, dtype=complex)
+            for mode_frequency, mode_damping, shape in zip(
+                natural_frequencies, damping, shapes
+            ):
+                denominator = (
+                    mode_frequency**2
+                    - axis**2
+                    + 2j * mode_damping * mode_frequency * axis
+                )
+                response += shape[node_index] / denominator
+
+            datasets.append(
+                {
+                    "type": 58,
+                    "func_type": 4,
+                    "id1": "Transfer Function H1",
+                    "id2": "H1 Displacement / Force",
+                    "rsp_node": node_index + 1,
+                    "rsp_dir": 3,
+                    "ref_node": 1,
+                    "ref_dir": 3,
+                    "x": axis,
+                    "data": response,
+                }
+            )
+        return datasets, geometry, natural_frequencies
+
+    def test_absent_coherence_channels_are_reported_as_unavailable_not_perfect(self):
+        """ROADMAP Stage 2 #1: no coherence channels must not read as perfect
+        coherence (mean_coherence == 1.0) downstream."""
+        datasets, geometry, natural_frequencies = self._response_only_datasets()
+
+        modes, metadata = modes_from_frf_datasets(
+            datasets,
+            geometry,
+            target_frequencies=natural_frequencies,
+            target_count=3,
+        )
+
+        self.assertEqual(metadata["coherence_channel_count"], 0)
+        self.assertEqual(metadata["coherence_status"], "unavailable")
+        self.assertIsNone(metadata["coherence_parse_error"])
+        self.assertTrue(all(np.isnan(metadata["_frf_mean_coherence"])))
+        for mode in modes:
+            self.assertIsNone(mode.metadata["mean_coherence"])
+            self.assertEqual(mode.metadata["coherence_status"], "unavailable")
+
+    def test_malformed_coherence_dataset_is_reported_as_parse_error(self):
+        """A coherence channel that exists but cannot be parsed must not be
+        silently treated the same as "no channel was ever exported"."""
+        import universal_reader
+
+        datasets, geometry, natural_frequencies = self._response_only_datasets()
+        original = universal_reader._coherence_by_dof
+        universal_reader._coherence_by_dof = lambda *args, **kwargs: (_ for _ in ()).throw(
+            ValueError("malformed coherence dataset")
+        )
+        try:
+            modes, metadata = modes_from_frf_datasets(
+                datasets,
+                geometry,
+                target_frequencies=natural_frequencies,
+                target_count=3,
+            )
+        finally:
+            universal_reader._coherence_by_dof = original
+
+        self.assertEqual(metadata["coherence_status"], "parse_error")
+        self.assertIn("malformed coherence dataset", metadata["coherence_parse_error"])
+        for mode in modes:
+            self.assertIsNone(mode.metadata["mean_coherence"])
+            self.assertEqual(mode.metadata["coherence_status"], "parse_error")
+
 
 if __name__ == "__main__":
     unittest.main()

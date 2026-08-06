@@ -29,12 +29,17 @@ def modes_from_frf_datasets(
 
     reference_node = _scalar_int(frf_group[0].get("ref_node"), 0)
     reference_direction = _scalar_int(frf_group[0].get("ref_dir"), 0)
-    coherence_lookup = universal_reader._coherence_by_dof(
-        datasets,
-        x_reference,
-        reference_node,
-        reference_direction,
-    )
+    try:
+        coherence_lookup = universal_reader._coherence_by_dof(
+            datasets,
+            x_reference,
+            reference_node,
+            reference_direction,
+        )
+        coherence_parse_error: Optional[str] = None
+    except (TypeError, ValueError, IndexError, KeyError) as error:
+        coherence_lookup = {}
+        coherence_parse_error = str(error)
 
     dof_data: Dict[Tuple[int, int], np.ndarray] = {}
     for dataset in frf_group:
@@ -60,16 +65,28 @@ def modes_from_frf_datasets(
         for key in row_keys
         if key in coherence_lookup
     ]
-    mean_coherence = (
-        np.mean(np.vstack(coherence_rows), axis=0)
-        if coherence_rows
-        else np.ones_like(x_reference, dtype=float)
-    )
+    if coherence_parse_error is not None:
+        coherence_status = "parse_error"
+    elif coherence_rows:
+        coherence_status = "computed"
+    else:
+        coherence_status = "unavailable"
+
+    if coherence_status == "computed":
+        mean_coherence = np.mean(np.vstack(coherence_rows), axis=0)
+    else:
+        # No fabricated 1.0 fallback: a mode without measured coherence must not
+        # be able to read as "perfect coherence" downstream (ROADMAP Stage 2 #1).
+        mean_coherence = np.full_like(x_reference, np.nan, dtype=float)
+
+    # Peak ranking gets a neutral (no bonus, no penalty) coherence term when
+    # coherence was not actually measured, instead of NaN or a fabricated 1.0.
+    ranking_coherence = np.nan_to_num(mean_coherence, nan=0.0)
 
     peak_indices = universal_reader._detect_frf_peak_indices(
         x_reference,
         indicator,
-        mean_coherence,
+        ranking_coherence,
         target_frequencies,
         requested_count,
     )
@@ -109,7 +126,12 @@ def modes_from_frf_datasets(
                 "dataset_type": 58,
                 "mode_source": "FRF peak-derived experimental shape",
                 "frequency_line_index": int(peak_index),
-                "mean_coherence": float(mean_coherence[peak_index]),
+                "mean_coherence": (
+                    float(mean_coherence[peak_index])
+                    if coherence_status == "computed"
+                    else None
+                ),
+                "coherence_status": coherence_status,
                 "frf_indicator": float(indicator[peak_index]),
                 "phase_complexity_ratio": float(
                     universal_reader._phase_complexity(vectors)
@@ -137,6 +159,8 @@ def modes_from_frf_datasets(
         "detected_peak_frequencies_hz": [mode.frequency_hz for mode in modes],
         "frf_quantity": str(frf_group[0].get("id2", "")),
         "coherence_channel_count": len(coherence_rows),
+        "coherence_status": coherence_status,
+        "coherence_parse_error": coherence_parse_error,
         "frf_mode_warning": (
             "Experimental shapes were derived directly from complex FRFs at detected resonance peaks. "
             "They are suitable for screening and MAC comparison, but are not a substitute for a "
