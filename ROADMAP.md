@@ -191,25 +191,59 @@ Required tests:
 - incompatible axes;
 - confirmation that single-reference candidates are not automatically promoted.
 
-### 3. Use a separate measured-DOF mask for every experimental mode
+### 3. Use a separate measured-DOF mask for every experimental mode — landed, one gap documented
 
-Current risk:
+Fixed in `reviewed_core.py`: `experimental_measurement_mask` (one array,
+unioned across every experimental mode) is replaced by
+`experimental_measurement_masks` (one array per mode). An explicit Testlab
+mask still takes precedence per mode; a mode without one now infers its own
+mask from its own vector energy only, via the extracted
+`_inferred_measurement_mask` helper — never from another mode's energy, which
+would have reintroduced the same leak for the "no explicit mask" case.
+`_mac_matrix_for_geometry` and `_build_mode_pairs` index into that per-mode
+list by experimental column instead of applying one shared mask to every
+column, so a channel measured only in mode A can no longer be scored as
+measured for mode B (confirmed by a reproducing test that fails without the
+fix: two experimental modes with disjoint measured components and
+deliberately anti-correlated "phantom" data in each other's unmeasured
+direction — MAC collapses if the leak is present, stays ~1.0 once fixed).
+`project_review.build_manual_pair` had the identical leak (it called the same
+all-modes union for a single manually chosen pair) and is fixed the same way.
+Persistence was already fine: `fast_cache._clone_mode` round-trips the
+per-mode `measured_dofs` attribute correctly, and `.amcp.json` project files
+never serialize `ModeShape` objects at all — they store scalars and re-import
+from the original files on load, so masks are always regenerated fresh.
+`advanced_metrics.py` (AutoMAC/COMAC) needed no code change: it already
+consumed `pair.measured_dof_mask`, which is now genuinely per-pair-correct,
+so ANDing every accepted pair's mask together to get one common AutoMAC/COMAC
+grid is now a legitimate reduction over correct inputs rather than
+compounding an already-leaked one — confirmed by a test showing two pairs
+with genuinely disjoint per-mode masks now correctly make AutoMAC/COMAC raise
+instead of silently computing over falsely-shared DOFs, and a second test
+showing a genuinely shared mask still produces a valid AutoMAC/COMAC result.
 
-- a union of measured DOFs can be reused for all experimental modes;
-- a channel present in one mode can be treated as measured in another mode.
-
-Required change:
-
-- carry mode-specific masks through import, geometry mapping, MAC, pair
-  construction, AutoMAC, COMAC, manual review, persistence, and reports;
-- calculate each pair from that mode's own valid finite measured DOFs;
-- do not use a global union as the acceptance mask.
+Documented gap, not fixed here: `ModePairResult.abaqus_vector` /
+`experimental_vector` / `coordinates` are stored already row-filtered to that
+pair's own `valid_rows` (only the measured rows are kept), and
+`advanced_metrics._common_pair_data` (plus a duplicated equivalent in
+`metrics_normalization.py`) then ANDs masks positionally across pairs,
+implicitly assuming every pair kept the *same* rows in the *same* order. That
+assumption holds for every current importer (every mode in one loaded dataset
+still gets an identical or coincidentally-aligned mask in practice today), so
+this is not reachable with current real data, but it is not actually
+guaranteed once masks can genuinely differ per mode. A correct fix needs
+`ModePairResult` to carry enough node identity to realign pairs with
+different retained rows (or to keep the full reference grid with a mask
+rather than pre-filtering it), which touches `reporting.py`,
+`reporting_hardening.py`, `amplitude_correlation.py`, `modal_scaling.py`, and
+`metrics_normalization.py` as well as `advanced_metrics.py` — out of scope
+for this item and left as a follow-up.
 
 Required tests:
 
-- different missing channels/components by mode;
-- inferred-mask fallback;
-- AutoMAC and COMAC consistency.
+- different missing channels/components by mode — done;
+- inferred-mask fallback — done, now per-mode;
+- AutoMAC and COMAC consistency — done, within the row-alignment gap above.
 
 ### 4. Add minimum common-DOF and spatial-coverage gates
 

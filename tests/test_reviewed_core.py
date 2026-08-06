@@ -13,7 +13,7 @@ from reviewed_core import (
     _frequency_error_matrices,
     _geometry_warnings_and_transform,
     compare_modal_datasets,
-    experimental_measurement_mask,
+    experimental_measurement_masks,
     frequency_error_percent,
     geometry_alignment_candidates,
 )
@@ -74,9 +74,106 @@ class ReviewedCoreTests(unittest.TestCase):
         vectors[:, 0] = 1.0e-9 * np.arange(1.0, 6.0)
         vectors[:, 2] = np.arange(1.0, 6.0)
         mode = ModeShape(1, 10.0, node_ids, coordinates, vectors)
-        mask = experimental_measurement_mask([mode], node_ids)
+        masks = experimental_measurement_masks([mode], node_ids)
+        self.assertEqual(len(masks), 1)
+        mask = masks[0]
         self.assertFalse(np.any(mask[:, 0]))
         self.assertTrue(np.all(mask[:, 2]))
+
+    def test_inferred_mask_is_computed_per_mode_not_from_other_modes_energy(self):
+        """ROADMAP Stage 2 #3 inferred-mask fallback: a component active in one
+        mode's own vector must not make another, genuinely-inactive mode's
+        same component read as measured."""
+        coordinates = np.column_stack((np.arange(5.0), np.zeros(5), np.zeros(5)))
+        node_ids = np.arange(5)
+        active_in_x = np.zeros((5, 3), dtype=float)
+        active_in_x[:, 0] = np.arange(1.0, 6.0)
+        inactive_in_x = np.zeros((5, 3), dtype=float)
+        inactive_in_x[:, 2] = np.arange(1.0, 6.0)
+
+        mode_with_x = ModeShape(1, 10.0, node_ids, coordinates, active_in_x)
+        mode_without_x = ModeShape(2, 20.0, node_ids, coordinates, inactive_in_x)
+        masks = experimental_measurement_masks([mode_with_x, mode_without_x], node_ids)
+
+        self.assertTrue(np.all(masks[0][:, 0]))
+        # mode_without_x has zero energy in X; inferring from its own vector
+        # alone must leave X unmeasured, even though mode_with_x measured X.
+        self.assertFalse(np.any(masks[1][:, 0]))
+
+    def test_pair_uses_only_its_own_experimental_modes_measured_dofs(self):
+        """ROADMAP Stage 2 #3: a channel measured only in one experimental mode
+        must not be treated as measured for a different experimental mode's
+        pair. Reproduces the confirmed union-mask risk described in
+        ROADMAP.md Stage 2 #3."""
+        coordinates = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [1.0, 1.0, 0.0],
+            ]
+        )
+        node_ids = np.arange(1, 5)
+        shape_z = np.array([1.0, -1.0, 0.5, -0.5])
+        abaqus_x = np.array([1.0, -1.0, 1.0, -1.0])
+        # Deliberately near-zero correlation with abaqus_x, so if X ever leaks
+        # into experimental mode 1's pair (which never measured X), the MAC
+        # visibly collapses instead of coincidentally staying high.
+        phantom_x = np.array([1.0, 1.0, -1.0, -1.0])
+
+        abaqus_vector_1 = np.zeros((4, 3))
+        abaqus_vector_1[:, 2] = shape_z
+        abaqus_vector_1[:, 0] = abaqus_x
+        abaqus_vector_2 = np.zeros((4, 3))
+        abaqus_vector_2[:, 0] = abaqus_x
+
+        experimental_vector_1 = np.zeros((4, 3))
+        experimental_vector_1[:, 2] = shape_z
+        experimental_vector_1[:, 0] = phantom_x
+        experimental_mode_1 = ModeShape(
+            1, 100.5, node_ids, coordinates, experimental_vector_1
+        )
+        experimental_mode_1.measured_dofs = np.zeros((4, 3), dtype=bool)
+        experimental_mode_1.measured_dofs[:, 2] = True
+
+        experimental_vector_2 = np.zeros((4, 3))
+        experimental_vector_2[:, 0] = abaqus_x
+        experimental_mode_2 = ModeShape(
+            2, 200.5, node_ids, coordinates, experimental_vector_2
+        )
+        experimental_mode_2.measured_dofs = np.zeros((4, 3), dtype=bool)
+        experimental_mode_2.measured_dofs[:, 0] = True
+
+        abaqus = ModalDataset(
+            "Abaqus",
+            Path("model.odb"),
+            [
+                ModeShape(1, 100.0, node_ids, coordinates, abaqus_vector_1),
+                ModeShape(2, 200.0, node_ids, coordinates, abaqus_vector_2),
+            ],
+        )
+        experiment = ModalDataset(
+            "Experiment",
+            Path("scan.unv"),
+            [experimental_mode_1, experimental_mode_2],
+        )
+
+        result = compare_modal_datasets(
+            abaqus, experiment, coordinate_scale_override=1.0
+        )
+        self.assertEqual(len(result.pairs), 2)
+        pair_1 = next(p for p in result.pairs if p.experimental_mode == 1)
+        pair_2 = next(p for p in result.pairs if p.experimental_mode == 2)
+
+        # Pair 1 must be scored only on Z (experimental mode 1's own measured
+        # DOF), not on X, even though experimental mode 2 measured X.
+        self.assertGreater(pair_1.mac, 0.999)
+        self.assertFalse(np.any(pair_1.measured_dof_mask[:, 0]))
+
+        # Pair 2 must be scored only on X (measured only in experimental mode
+        # 2), not on Z.
+        self.assertGreater(pair_2.mac, 0.999)
+        self.assertFalse(np.any(pair_2.measured_dof_mask[:, 2]))
 
     def test_assignment_allows_unmatched_without_stealing_valid_partner(self):
         cost = np.array([[0.40, 0.95], [0.39, 0.50]])

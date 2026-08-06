@@ -95,46 +95,45 @@ def _measurement_mask_on_nodes(
     return _map_rows(explicit, mode, reference_node_ids, False, bool)
 
 
-def experimental_measurement_mask(
+def _inferred_measurement_mask(vectors: np.ndarray) -> np.ndarray:
+    """Infer one mode's own measured DOFs from its own vector energy alone.
+
+    A component is considered measured only when its norm exceeds 1e-6 of the
+    complete modal-vector norm, in this mode's own vector only -- never
+    borrowed from another mode's energy, which would reintroduce the same
+    cross-mode leak this function exists to avoid (ROADMAP Stage 2 #3).
+    """
+    finite = np.isfinite(vectors.real) & np.isfinite(vectors.imag)
+    amplitudes = np.where(finite, np.abs(vectors), 0.0)
+    component_norms = np.sqrt(np.sum(amplitudes**2, axis=0))
+    mode_norm = float(np.linalg.norm(component_norms))
+    if mode_norm <= 1.0e-30:
+        return finite
+    active_components = component_norms > mode_norm * INFERRED_DOF_RELATIVE_NORM
+    inferred = finite & active_components[np.newaxis, :]
+    return inferred if np.any(inferred) else finite
+
+
+def experimental_measurement_masks(
     experimental_modes: Sequence[ModeShape],
     reference_node_ids: np.ndarray,
-) -> np.ndarray:
-    """Return the union of genuinely measured experimental DOFs.
+) -> List[np.ndarray]:
+    """Return each experimental mode's own measured-DOF mask, mapped onto the
+    reference node order -- never a mask shared or unioned across modes.
 
-    Explicit Testlab masks take precedence. When no explicit mask exists, a
-    component is considered measured only when its norm exceeds 1e-6 of the
-    complete modal-vector norm in at least one mode. This rejects curve-fitting
-    round-off in nominally unmeasured directions.
+    An explicit Testlab mask takes precedence for a mode that has one. A mode
+    without an explicit mask falls back to _inferred_measurement_mask using
+    only that mode's own vector (ROADMAP Stage 2 #3: "a channel present in
+    one mode" must not be "treated as measured in another mode").
     """
-    union = np.zeros((len(reference_node_ids), 3), dtype=bool)
-    inferred_vectors: List[np.ndarray] = []
-    explicit_found = False
-
+    masks: List[np.ndarray] = []
     for mode in experimental_modes:
-        mapped_mask = _measurement_mask_on_nodes(mode, reference_node_ids)
-        if mapped_mask is not None:
-            union |= mapped_mask
-            explicit_found = True
-        inferred_vectors.append(_vectors_on_nodes(mode, reference_node_ids))
-
-    if explicit_found:
-        return union
-
-    finite_any = np.zeros_like(union)
-    for vectors in inferred_vectors:
-        finite = np.isfinite(vectors.real) & np.isfinite(vectors.imag)
-        finite_any |= finite
-        amplitudes = np.where(finite, np.abs(vectors), 0.0)
-        component_norms = np.sqrt(np.sum(amplitudes**2, axis=0))
-        mode_norm = float(np.linalg.norm(component_norms))
-        if mode_norm <= 1.0e-30:
+        explicit = _measurement_mask_on_nodes(mode, reference_node_ids)
+        if explicit is not None:
+            masks.append(explicit)
             continue
-        active_components = component_norms > mode_norm * INFERRED_DOF_RELATIVE_NORM
-        union |= finite & active_components[np.newaxis, :]
-
-    if not np.any(union):
-        union = finite_any
-    return union
+        masks.append(_inferred_measurement_mask(_vectors_on_nodes(mode, reference_node_ids)))
+    return masks
 
 
 def _geometry_center_radius(points: np.ndarray) -> Tuple[np.ndarray, float]:
@@ -359,7 +358,7 @@ def _rotated_abaqus_modes(
 def _mac_matrix_for_geometry(
     abaqus_rotated_modes: Sequence[np.ndarray],
     experimental_vectors: Sequence[np.ndarray],
-    measurement_mask: np.ndarray,
+    measurement_masks: Sequence[np.ndarray],
 ) -> np.ndarray:
     matrix = np.full(
         (len(abaqus_rotated_modes), len(experimental_vectors)),
@@ -374,7 +373,9 @@ def _mac_matrix_for_geometry(
                 & np.isfinite(experimental_values.real)
                 & np.isfinite(experimental_values.imag)
             )
-            dof_mask = measurement_mask & finite
+            # This experimental mode's own mask only -- never another
+            # column's (ROADMAP Stage 2 #3).
+            dof_mask = measurement_masks[column] & finite
             if np.any(dof_mask):
                 value = modal_assurance_criterion(
                     abaqus_rotated[dof_mask],
@@ -414,20 +415,20 @@ def _frequency_error_matrices(
 def _experimental_vectors_and_mask(
     experimental_modes: Sequence[ModeShape],
     experimental_node_ids: np.ndarray,
-) -> Tuple[List[np.ndarray], np.ndarray]:
-    """Return per-mode vectors mapped onto the reference node order, plus the
-    union of measured DOFs across all experimental modes."""
+) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    """Return per-mode vectors mapped onto the reference node order, plus each
+    mode's own measured-DOF mask (never unioned across modes)."""
     experimental_vectors = [
         _vectors_on_nodes(mode, experimental_node_ids)
         for mode in experimental_modes
     ]
-    measurement_mask = experimental_measurement_mask(
+    measurement_masks = experimental_measurement_masks(
         experimental_modes,
         experimental_node_ids,
     )
-    if not np.any(measurement_mask):
+    if not any(np.any(mask) for mask in measurement_masks):
         raise ValueError("No measured experimental degrees of freedom were detected.")
-    return experimental_vectors, measurement_mask
+    return experimental_vectors, measurement_masks
 
 
 def _best_geometry_evaluation(
@@ -435,7 +436,7 @@ def _best_geometry_evaluation(
     abaqus_modes: Sequence[ModeShape],
     abaqus_reference: ModeShape,
     experimental_vectors: Sequence[np.ndarray],
-    measurement_mask: np.ndarray,
+    measurement_masks: Sequence[np.ndarray],
     absolute_frequency_matrix: np.ndarray,
     mac_weight: float,
     frequency_weight: float,
@@ -463,7 +464,7 @@ def _best_geometry_evaluation(
         mac_matrix = _mac_matrix_for_geometry(
             abaqus_rotated_modes,
             experimental_vectors,
-            measurement_mask,
+            measurement_masks,
         )
 
         mac_available = np.isfinite(mac_matrix)
@@ -511,7 +512,7 @@ def _build_mode_pairs(
     winning_abaqus_vectors: Sequence[np.ndarray],
     experimental_vectors: Sequence[np.ndarray],
     experimental_coordinates: np.ndarray,
-    measurement_mask: np.ndarray,
+    measurement_masks: Sequence[np.ndarray],
     mac_matrix: np.ndarray,
     signed_frequency_matrix: np.ndarray,
     abaqus_indices: np.ndarray,
@@ -534,7 +535,8 @@ def _build_mode_pairs(
             & np.isfinite(experimental_values.real)
             & np.isfinite(experimental_values.imag)
         )
-        dof_mask = measurement_mask & finite
+        # This pair's own experimental mode mask only (ROADMAP Stage 2 #3).
+        dof_mask = measurement_masks[column] & finite
         valid_rows = np.any(dof_mask, axis=1)
         a = abaqus_rotated[valid_rows]
         e = experimental_values[valid_rows]
@@ -644,7 +646,7 @@ def compare_modal_datasets(
     signed_frequency_matrix, absolute_frequency_matrix = _frequency_error_matrices(
         abaqus_modes, experimental_modes
     )
-    experimental_vectors, measurement_mask = _experimental_vectors_and_mask(
+    experimental_vectors, measurement_masks = _experimental_vectors_and_mask(
         experimental_modes, experimental_node_ids
     )
 
@@ -658,7 +660,7 @@ def compare_modal_datasets(
         abaqus_modes,
         abaqus_reference,
         experimental_vectors,
-        measurement_mask,
+        measurement_masks,
         absolute_frequency_matrix,
         mac_weight,
         frequency_weight,
@@ -688,7 +690,7 @@ def compare_modal_datasets(
         winning_abaqus_vectors,
         experimental_vectors,
         experimental_coordinates,
-        measurement_mask,
+        measurement_masks,
         mac_matrix,
         signed_frequency_matrix,
         abaqus_indices,

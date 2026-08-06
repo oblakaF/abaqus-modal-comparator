@@ -17,7 +17,7 @@ from reviewed_core import (
     _recalculate_order_changed,
     _status,
     _vectors_on_nodes,
-    experimental_measurement_mask,
+    experimental_measurement_masks,
     frequency_error_percent,
 )
 from quality_control import _detect_rigid_modes
@@ -177,7 +177,11 @@ def build_manual_pair(
     abaqus_values = _vectors_on_nodes(abaqus_mode, mapped_abaqus_ids)
     abaqus_rotated = abaqus_values @ result.geometry.rotation
     experimental_values = _vectors_on_nodes(experimental_mode, reference_node_ids)
-    measurement_mask = experimental_measurement_mask(experimental_modes, reference_node_ids)
+    # This pair's own experimental mode only -- never the whole dataset's
+    # modes unioned together (ROADMAP Stage 2 #3).
+    measurement_mask = experimental_measurement_masks(
+        [experimental_mode], reference_node_ids
+    )[0]
     finite = (
         np.isfinite(abaqus_rotated.real)
         & np.isfinite(abaqus_rotated.imag)

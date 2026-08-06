@@ -111,6 +111,70 @@ class ProjectReviewTests(unittest.TestCase):
         self.assertEqual(pair.mapped_points, 4)
         self.assertEqual(getattr(pair, "measured_dof_count"), 4)
 
+    def test_build_manual_pair_uses_only_its_own_experimental_mode_mask(self):
+        """ROADMAP Stage 2 #3: a manually selected pair must be scored on the
+        chosen experimental mode's own measured DOFs, not on a mask leaked in
+        from another experimental mode in the same dataset."""
+        node_ids = np.asarray([1, 2, 3, 4], dtype=object)
+        coordinates = np.asarray(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]],
+            dtype=float,
+        )
+        shape_z = np.asarray([1.0, -1.0, -1.0, 1.0])
+        shape_x = np.asarray([1.0, 1.0, -1.0, -1.0])
+        phantom_x = np.asarray([1.0, -1.0, 1.0, -1.0])  # near-zero correlation with shape_x
+
+        abaqus_vector_1 = np.zeros((4, 3), dtype=complex)
+        abaqus_vector_1[:, 2] = shape_z
+        abaqus_vector_1[:, 0] = shape_x
+        abaqus = ModalDataset(
+            "Abaqus",
+            Path("a.odb"),
+            [ModeShape(1, 10.0, node_ids, coordinates, abaqus_vector_1)],
+        )
+
+        experimental_vector_1 = np.zeros((4, 3), dtype=complex)
+        experimental_vector_1[:, 2] = shape_z
+        experimental_vector_1[:, 0] = phantom_x
+        experimental_mode_1 = ModeShape(
+            1, 10.2, node_ids, coordinates, experimental_vector_1,
+            metadata={"measured_dofs": [False, False, True]},  # Z only
+        )
+        experimental_vector_2 = np.zeros((4, 3), dtype=complex)
+        experimental_vector_2[:, 0] = shape_x
+        experimental_mode_2 = ModeShape(
+            2, 20.0, node_ids, coordinates, experimental_vector_2,
+            metadata={"measured_dofs": [True, False, False]},  # X only
+        )
+        experimental = ModalDataset(
+            "Experiment", Path("e.unv"), [experimental_mode_1, experimental_mode_2]
+        )
+
+        geometry = GeometryMatch(
+            experimental_to_abaqus=np.asarray([0, 1, 2, 3], dtype=int),
+            distances=np.zeros(4),
+            transformed_abaqus_coordinates=coordinates.copy(),
+            rotation=np.eye(3),
+            coordinate_scale=1.0,
+            translation=np.zeros(3),
+            normalized_rms_distance=0.0,
+            matched_fraction=1.0,
+        )
+        result = ComparisonResult(
+            abaqus=abaqus,
+            experimental=experimental,
+            geometry=geometry,
+            pairs=[],
+            mac_matrix=np.zeros((1, 2)),
+            frequency_error_matrix=np.zeros((1, 2)),
+            abaqus_mode_numbers=[1],
+            experimental_mode_numbers=[1, 2],
+        )
+
+        pair = build_manual_pair(result, 1, 1)
+        self.assertAlmostEqual(pair.mac, 1.0, places=9)
+        self.assertFalse(np.any(pair.measured_dof_mask[:, 0]))
+
     def test_all_elastic_abaqus_modes_propagates_rigid_mode_detection_failures(self):
         abaqus = self._dataset("Abaqus", "a.odb", [10.0, 20.0], scale=1.0e5)
         experimental = self._dataset("Experiment", "e.unv", [10.2, 19.8], scale=1.0e-5)
