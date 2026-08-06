@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from itertools import permutations, product
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -26,6 +26,23 @@ GEOMETRY_CANDIDATE_LIMIT = 16
 GEOMETRY_RMS_FACTOR = 1.5
 GEOMETRY_RMS_ABSOLUTE_WINDOW = 1.0e-8
 INFERRED_DOF_RELATIVE_NORM = 1.0e-6
+
+# ROADMAP Stage 2 #4: minimum common-DOF and spatial-coverage gates.
+#
+# These are deliberately a sanity floor, not a calibrated acceptance boundary.
+# The only real dataset available to calibrate against (docs/baseline/stage0_baseline.json,
+# a full 121-point single-LOS-direction Polytec scan) is fully degenerate for this
+# purpose: every one of its 8 accepted pairs retains 100% of common DOF, points,
+# and spatial extent, so there is no marginal example to learn a real threshold
+# from. Until partial/sparse-grid fixtures exist (ROADMAP Stage 6), these values
+# are set low enough to act as diagnostics that flag only near-total coverage
+# failure (near-empty overlap, a handful of points, or points clustered in one
+# corner) rather than to reject anything resembling normal modal-test coverage.
+MINIMUM_COMMON_DOF_COUNT = 3
+MINIMUM_UNIQUE_POINT_COUNT = 3
+MINIMUM_MEASURED_DOF_COVERAGE_FRACTION = 0.05
+MINIMUM_POINT_COVERAGE_FRACTION = 0.02
+MINIMUM_SPATIAL_EXTENT_FRACTION = 0.02
 
 
 def frequency_error_percent(calculated: float, experimental: float) -> float:
@@ -359,16 +376,85 @@ def _rotated_abaqus_modes(
     ]
 
 
+class _CoverageReport(NamedTuple):
+    common_dof_count: int
+    unique_point_count: int
+    dof_coverage_fraction: float
+    point_coverage_fraction: float
+    spatial_coverage_fraction: float
+    status: str
+
+
+def _coverage_report(
+    dof_mask: np.ndarray,
+    own_measured_dof_count: int,
+    coordinates: np.ndarray,
+    full_grid_point_count: int,
+    full_grid_extent: float,
+) -> _CoverageReport:
+    """ROADMAP Stage 2 #4 coverage gate/diagnostics (see the module-level
+    threshold comment for why these are a soft sanity floor, not a
+    calibrated cutoff). Status values match ROADMAP.md: "accepted",
+    "insufficient DOF coverage", "insufficient point coverage",
+    "insufficient spatial coverage"."""
+    common_dof_count = int(np.count_nonzero(dof_mask))
+    valid_rows = np.any(dof_mask, axis=1)
+    unique_point_count = int(np.count_nonzero(valid_rows))
+    dof_coverage_fraction = (
+        common_dof_count / own_measured_dof_count if own_measured_dof_count else 0.0
+    )
+    point_coverage_fraction = (
+        unique_point_count / full_grid_point_count if full_grid_point_count else 0.0
+    )
+    if full_grid_extent > 0.0 and unique_point_count >= 2:
+        spatial_coverage_fraction = float(
+            np.linalg.norm(
+                coordinates[valid_rows].max(axis=0) - coordinates[valid_rows].min(axis=0)
+            )
+        ) / full_grid_extent
+    else:
+        spatial_coverage_fraction = 0.0
+
+    if common_dof_count < MINIMUM_COMMON_DOF_COUNT or (
+        own_measured_dof_count and dof_coverage_fraction < MINIMUM_MEASURED_DOF_COVERAGE_FRACTION
+    ):
+        status = "insufficient DOF coverage"
+    elif unique_point_count < MINIMUM_UNIQUE_POINT_COUNT or (
+        full_grid_point_count and point_coverage_fraction < MINIMUM_POINT_COVERAGE_FRACTION
+    ):
+        status = "insufficient point coverage"
+    elif full_grid_extent > 0.0 and spatial_coverage_fraction < MINIMUM_SPATIAL_EXTENT_FRACTION:
+        status = "insufficient spatial coverage"
+    else:
+        status = "accepted"
+
+    return _CoverageReport(
+        common_dof_count,
+        unique_point_count,
+        dof_coverage_fraction,
+        point_coverage_fraction,
+        spatial_coverage_fraction,
+        status,
+    )
+
+
 def _mac_matrix_for_geometry(
     abaqus_rotated_modes: Sequence[np.ndarray],
     experimental_vectors: Sequence[np.ndarray],
     measurement_masks: Sequence[np.ndarray],
-) -> np.ndarray:
-    matrix = np.full(
-        (len(abaqus_rotated_modes), len(experimental_vectors)),
-        np.nan,
-        dtype=float,
-    )
+    experimental_coordinates: np.ndarray,
+    full_grid_point_count: int,
+    full_grid_extent: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Return (mac_matrix, coverage_admissible_matrix). coverage_admissible_matrix
+    is a boolean gate: a cell below the Stage 2 #4 coverage floor must not
+    participate in Hungarian assignment as a valid candidate, independent of
+    its MAC/frequency admissibility."""
+    shape = (len(abaqus_rotated_modes), len(experimental_vectors))
+    mac_matrix = np.full(shape, np.nan, dtype=float)
+    coverage_admissible = np.zeros(shape, dtype=bool)
+    own_measured_dof_counts = [int(np.count_nonzero(mask)) for mask in measurement_masks]
+
     for row, abaqus_rotated in enumerate(abaqus_rotated_modes):
         for column, experimental_values in enumerate(experimental_vectors):
             finite = (
@@ -380,6 +466,16 @@ def _mac_matrix_for_geometry(
             # This experimental mode's own mask only -- never another
             # column's (ROADMAP Stage 2 #3).
             dof_mask = measurement_masks[column] & finite
+            coverage_admissible[row, column] = (
+                _coverage_report(
+                    dof_mask,
+                    own_measured_dof_counts[column],
+                    experimental_coordinates,
+                    full_grid_point_count,
+                    full_grid_extent,
+                ).status
+                == "accepted"
+            )
             if np.any(dof_mask):
                 value = modal_assurance_criterion(
                     abaqus_rotated[dof_mask],
@@ -387,8 +483,8 @@ def _mac_matrix_for_geometry(
                 )
             else:
                 value = None
-            matrix[row, column] = np.nan if value is None else value
-    return matrix
+            mac_matrix[row, column] = np.nan if value is None else value
+    return mac_matrix, coverage_admissible
 
 
 def _copy_dataset(dataset: ModalDataset) -> ModalDataset:
@@ -441,6 +537,9 @@ def _best_geometry_evaluation(
     abaqus_reference: ModeShape,
     experimental_vectors: Sequence[np.ndarray],
     measurement_masks: Sequence[np.ndarray],
+    experimental_coordinates: np.ndarray,
+    full_grid_point_count: int,
+    full_grid_extent: float,
     absolute_frequency_matrix: np.ndarray,
     mac_weight: float,
     frequency_weight: float,
@@ -465,10 +564,13 @@ def _best_geometry_evaluation(
             mapped_abaqus_ids,
             geometry.rotation,
         )
-        mac_matrix = _mac_matrix_for_geometry(
+        mac_matrix, coverage_admissible = _mac_matrix_for_geometry(
             abaqus_rotated_modes,
             experimental_vectors,
             measurement_masks,
+            experimental_coordinates,
+            full_grid_point_count,
+            full_grid_extent,
         )
 
         mac_available = np.isfinite(mac_matrix)
@@ -480,6 +582,9 @@ def _best_geometry_evaluation(
             mac_matrix >= minimum_mac,
             absolute_frequency_matrix <= maximum_frequency_only_error_percent,
         )
+        # ROADMAP Stage 2 #4: a pair below the coverage floor must not
+        # participate in Hungarian assignment as an admissible candidate.
+        admissible &= coverage_admissible
 
         mac_cost = 1.0 - np.nan_to_num(mac_matrix, nan=0.0)
         frequency_cost = np.minimum(
@@ -518,6 +623,8 @@ def _build_mode_pairs(
     experimental_coordinates: np.ndarray,
     experimental_node_ids: np.ndarray,
     measurement_masks: Sequence[np.ndarray],
+    full_grid_point_count: int,
+    full_grid_extent: float,
     mac_matrix: np.ndarray,
     signed_frequency_matrix: np.ndarray,
     abaqus_indices: np.ndarray,
@@ -577,6 +684,18 @@ def _build_mode_pairs(
             "measured_dof_count",
             int(np.count_nonzero(local_mask)),
         )
+        # ROADMAP Stage 2 #4 coverage diagnostics for this accepted pair.
+        coverage = _coverage_report(
+            dof_mask,
+            int(np.count_nonzero(measurement_masks[column])),
+            experimental_coordinates,
+            full_grid_point_count,
+            full_grid_extent,
+        )
+        setattr(pair, "coverage_status", coverage.status)
+        setattr(pair, "dof_coverage_fraction", coverage.dof_coverage_fraction)
+        setattr(pair, "point_coverage_fraction", coverage.point_coverage_fraction)
+        setattr(pair, "spatial_coverage_fraction", coverage.spatial_coverage_fraction)
         pairs.append(pair)
 
     _recalculate_order_changed(pairs)
@@ -649,6 +768,12 @@ def compare_modal_datasets(
     experimental_reference = experimental_modes[0]
     experimental_node_ids = experimental_reference.node_ids
     experimental_coordinates = experimental_reference.coordinates
+    full_grid_point_count = len(experimental_node_ids)
+    full_grid_extent = float(
+        np.linalg.norm(
+            experimental_coordinates.max(axis=0) - experimental_coordinates.min(axis=0)
+        )
+    ) if full_grid_point_count >= 2 else 0.0
 
     signed_frequency_matrix, absolute_frequency_matrix = _frequency_error_matrices(
         abaqus_modes, experimental_modes
@@ -668,6 +793,9 @@ def compare_modal_datasets(
         abaqus_reference,
         experimental_vectors,
         measurement_masks,
+        experimental_coordinates,
+        full_grid_point_count,
+        full_grid_extent,
         absolute_frequency_matrix,
         mac_weight,
         frequency_weight,
@@ -699,6 +827,8 @@ def compare_modal_datasets(
         experimental_coordinates,
         experimental_node_ids,
         measurement_masks,
+        full_grid_point_count,
+        full_grid_extent,
         mac_matrix,
         signed_frequency_matrix,
         abaqus_indices,

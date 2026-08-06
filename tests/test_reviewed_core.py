@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from modal_core import GeometryMatch, ModalDataset, ModeShape
 from reviewed_core import (
     _admissible_assignment,
+    _coverage_report,
     _frequency_error_matrices,
     _geometry_warnings_and_transform,
     compare_modal_datasets,
@@ -384,6 +385,131 @@ class ReviewedCoreTests(unittest.TestCase):
         self.assertEqual(abaqus.metadata, {"source_marker": "unchanged"})
         self.assertIn("selected_geometry_transform", result.abaqus.metadata)
         self.assertIsNotNone(result.geometry.transformed_abaqus_coordinates)
+
+    def test_coverage_report_status_thresholds(self):
+        """ROADMAP Stage 2 #4: unit-level check of the soft coverage-gate
+        status transitions (see reviewed_core.py's module-level comment on
+        why these thresholds are a sanity floor, not a calibrated cutoff)."""
+        coordinates = np.column_stack((np.arange(10.0), np.zeros(10), np.zeros(10)))
+        full_grid_point_count = 10
+        full_grid_extent = float(
+            np.linalg.norm(coordinates.max(axis=0) - coordinates.min(axis=0))
+        )
+
+        # Plenty of DOF, points, and spread: accepted.
+        mask = np.zeros((10, 3), dtype=bool)
+        mask[:, 2] = True
+        report = _coverage_report(mask, 10, coordinates, full_grid_point_count, full_grid_extent)
+        self.assertEqual(report.status, "accepted")
+
+        # Only 2 DOF true: below MINIMUM_COMMON_DOF_COUNT.
+        mask_low_dof = np.zeros((10, 3), dtype=bool)
+        mask_low_dof[0:2, 2] = True
+        report = _coverage_report(
+            mask_low_dof, 10, coordinates, full_grid_point_count, full_grid_extent
+        )
+        self.assertEqual(report.status, "insufficient DOF coverage")
+
+        # Enough DOF (all 3 components at 2 points = 6), but only 2 unique
+        # points: below MINIMUM_UNIQUE_POINT_COUNT.
+        mask_low_points = np.zeros((10, 3), dtype=bool)
+        mask_low_points[0:2, :] = True
+        report = _coverage_report(
+            mask_low_points, 10, coordinates, full_grid_point_count, full_grid_extent
+        )
+        self.assertEqual(report.status, "insufficient point coverage")
+
+        # Enough DOF and points, but all measured points sit at the same
+        # location: zero spatial extent.
+        clustered_coordinates = coordinates.copy()
+        clustered_coordinates[0:3] = coordinates[0]
+        mask_clustered = np.zeros((10, 3), dtype=bool)
+        mask_clustered[0:3, :] = True
+        report = _coverage_report(
+            mask_clustered, 10, clustered_coordinates, full_grid_point_count, full_grid_extent
+        )
+        self.assertEqual(report.status, "insufficient spatial coverage")
+
+    def test_insufficient_coverage_pair_is_not_assigned(self):
+        """A candidate pair with genuinely insufficient coverage must not be
+        admitted into Hungarian assignment, even if its MAC/frequency would
+        otherwise be admissible (ROADMAP Stage 2 #4)."""
+        x, y = np.meshgrid(np.linspace(0.0, 2.0, 3), np.linspace(0.0, 2.0, 3))
+        coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        node_ids = np.arange(1, 10)
+
+        shape_1 = np.sin(np.pi * coordinates[:, 0] / 2.0)
+        shape_2 = np.cos(np.pi * coordinates[:, 1] / 2.0)
+
+        abaqus_vector_1 = np.zeros((9, 3))
+        abaqus_vector_1[:, 2] = shape_1
+        abaqus_vector_2 = np.zeros((9, 3))
+        abaqus_vector_2[:, 2] = shape_2
+        abaqus = ModalDataset(
+            "Abaqus",
+            Path("model.odb"),
+            [
+                ModeShape(1, 100.0, node_ids, coordinates, abaqus_vector_1),
+                ModeShape(2, 200.0, node_ids, coordinates, abaqus_vector_2),
+            ],
+        )
+
+        experimental_vector_1 = np.zeros((9, 3))
+        experimental_vector_1[:, 2] = shape_1
+        experimental_mode_1 = ModeShape(
+            1, 100.2, node_ids, coordinates, experimental_vector_1
+        )
+        experimental_mode_1.measured_dofs = np.zeros((9, 3), dtype=bool)
+        experimental_mode_1.measured_dofs[:, 2] = True  # full coverage
+
+        experimental_vector_2 = np.zeros((9, 3))
+        experimental_vector_2[:, 2] = shape_2
+        experimental_mode_2 = ModeShape(
+            2, 200.2, node_ids, coordinates, experimental_vector_2
+        )
+        experimental_mode_2.measured_dofs = np.zeros((9, 3), dtype=bool)
+        # Only 2 of 9 points measured: below MINIMUM_UNIQUE_POINT_COUNT (3),
+        # even though its shape would otherwise match abaqus mode 2 well.
+        experimental_mode_2.measured_dofs[0:2, 2] = True
+
+        experiment = ModalDataset(
+            "Experiment",
+            Path("scan.unv"),
+            [experimental_mode_1, experimental_mode_2],
+        )
+
+        result = compare_modal_datasets(
+            abaqus, experiment, coordinate_scale_override=1.0
+        )
+
+        self.assertEqual(len(result.pairs), 1)
+        self.assertEqual(result.pairs[0].experimental_mode, 1)
+        self.assertEqual(result.pairs[0].abaqus_mode, 1)
+        self.assertEqual(getattr(result.pairs[0], "coverage_status"), "accepted")
+
+    def test_sufficient_coverage_pair_reports_accepted_status(self):
+        result = compare_modal_datasets(
+            ModalDataset(
+                "Abaqus",
+                Path("model.odb"),
+                [ModeShape(1, 100.0, np.arange(4), np.array(
+                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
+                ), np.column_stack([np.zeros(4), np.zeros(4), [1.0, -1.0, -1.0, 1.0]]))],
+            ),
+            ModalDataset(
+                "Experiment",
+                Path("scan.unv"),
+                [ModeShape(1, 100.2, np.arange(4), np.array(
+                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
+                ), np.column_stack([np.zeros(4), np.zeros(4), [1.0, -1.0, -1.0, 1.0]]))],
+            ),
+            coordinate_scale_override=1.0,
+        )
+        self.assertEqual(len(result.pairs), 1)
+        self.assertEqual(getattr(result.pairs[0], "coverage_status"), "accepted")
+        self.assertAlmostEqual(getattr(result.pairs[0], "dof_coverage_fraction"), 1.0)
+        self.assertAlmostEqual(getattr(result.pairs[0], "point_coverage_fraction"), 1.0)
+        self.assertAlmostEqual(getattr(result.pairs[0], "spatial_coverage_fraction"), 1.0)
 
 
 if __name__ == "__main__":

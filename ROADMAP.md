@@ -263,29 +263,74 @@ Required tests:
 - AutoMAC and COMAC consistency — done: different node IDs are rejected with
   a clear error, and the same node IDs/order still compute as before.
 
-### 4. Add minimum common-DOF and spatial-coverage gates
+### 4. Add minimum common-DOF and spatial-coverage gates — landed as a soft diagnostic gate
 
-Current weakness:
+Implemented in `reviewed_core.py`. `_coverage_report` computes, for every
+(Abaqus, experimental) cell, `common_dof_count`, `unique_point_count`,
+`dof_coverage_fraction` (relative to that experimental mode's own measured
+DOF count, not the theoretical full 3-component grid — see below),
+`point_coverage_fraction` (relative to the full reference grid's point
+count), `spatial_coverage_fraction` (bounding-box diagonal of the mapped
+points over the full reference grid's diagonal), and one of the four
+explicit statuses `accepted`, `insufficient DOF coverage`,
+`insufficient point coverage`, `insufficient spatial coverage` (a
+`MAC unavailable` cell is a pre-existing, separate frequency-only
+admissibility path, not folded into this status). `_mac_matrix_for_geometry`
+computes this per cell for every geometry candidate and ANDs
+`status == "accepted"` into the existing `admissible` matrix *before*
+`_admissible_assignment` runs — a non-`accepted` cell cannot be selected by
+Hungarian assignment, matching "pairs below the limits must not participate
+... as a valid candidate." `_build_mode_pairs` recomputes the same report for
+each *accepted* pair and attaches `coverage_status`,
+`dof_coverage_fraction`, `point_coverage_fraction`, and
+`spatial_coverage_fraction` to it (same dynamic-attribute style as the
+pre-existing `measured_dof_mask`/`measured_dof_count`).
 
-- `np.any(dof_mask)` allows MAC to be calculated from one common scalar DOF.
+Thresholds are a deliberate sanity floor, not a calibrated cutoff:
+`MINIMUM_COMMON_DOF_COUNT = 3`, `MINIMUM_UNIQUE_POINT_COUNT = 3`,
+`MINIMUM_MEASURED_DOF_COVERAGE_FRACTION = 0.05`,
+`MINIMUM_POINT_COVERAGE_FRACTION = 0.02`,
+`MINIMUM_SPATIAL_EXTENT_FRACTION = 0.02`. The only real dataset available to
+calibrate against — `docs/baseline/stage0_baseline.json`, a full 121-point
+single-LOS-direction Polytec scan — is completely degenerate for calibration
+purposes: every one of its 8 accepted pairs retains exactly 100% of its own
+DOF, points, and spatial extent (checked directly, not assumed; see the
+distribution table in this stage's commit message). There is no marginal
+example in that data to learn a real boundary from, so these values are set
+low enough to flag only near-total coverage failure (a handful of DOF, a
+couple of points, or points clustered in one spot) rather than to reject
+anything resembling normal modal-test coverage; calibrating a tighter,
+evidence-based boundary needs the partial/sparse-grid fixtures from Stage 6
+(half-panel, corner-only grids), which do not exist yet.
 
-Required change:
+Also note: `dof_coverage_fraction`'s denominator is deliberately each mode's
+*own* measured-DOF count (mapped onto the reference grid), not
+`full_grid_point_count * 3`. A single-line-of-sight Polytec scan measures one
+direction per point by design — comparing against the theoretical 3-component
+maximum would give every ordinary LOS pair a permanent ~33% "DOF coverage"
+number that looks deficient but is not; the fraction that actually matters is
+how much of what the mode itself measured survived geometry mapping and
+pairing.
 
-- configurable minimum common DOF count;
-- minimum unique point count;
-- minimum measured-DOF coverage fraction;
-- minimum measurement-point coverage fraction;
-- pairs below the limits must be unmatched or marked with one of the explicit
-  statuses `accepted`, `insufficient DOF coverage`,
-  `insufficient point coverage`, `insufficient spatial coverage`, or
-  `MAC unavailable` — never silently dropped;
-- a pair carrying any non-`accepted` status must not participate in automatic
-  Hungarian assignment as a valid candidate;
-- expose counts, fractions, thresholds, and decisions in UI, projects, Excel,
-  PDF, and reproducibility metadata.
+Deferred, not part of this item's completion: exposing these
+counts/fractions/thresholds/decisions in the GUI comparison table, Excel/PDF
+exports, and project persistence (they exist in `ModePairResult` today and
+are available to any consumer, but nothing renders them yet) — a UI/reporting
+task, tracked under Stage 4/5 rather than duplicated here. Also deferred:
+making the five threshold constants configurable via project settings rather
+than module constants, which needs a settings UI this stage does not add.
 
-Default thresholds must be chosen only after checking the current seven accepted
-pairs.
+Required tests:
+
+- unit coverage of all four status transitions (`_coverage_report`);
+- an end-to-end case proving a genuinely insufficient-coverage candidate is
+  excluded from Hungarian assignment even when its MAC/frequency would
+  otherwise admit it;
+- a sufficient-coverage case reporting `accepted` with the expected
+  fractions;
+- the full test suite and the Stage 0 baseline re-run unchanged (all 8 real
+  pairs stay `accepted`, confirming these thresholds do not reject normal
+  coverage).
 
 ### 5. Exclude geometry outliers and duplicate FE-node mappings from MAC
 
