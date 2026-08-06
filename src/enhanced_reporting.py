@@ -79,13 +79,15 @@ def render_frf_diagnostics(result: ComparisonResult, output_path: Path) -> Path:
             )
             primary.axvline(pair.abaqus_frequency_hz, linestyle="--", linewidth=1.0, alpha=0.7)
 
-    coherence_status = str(metadata.get("coherence_status", ""))
+    # Legacy metadata (saved before coherence_status existed) is normalized to
+    # "unavailable" instead of silently skipping the warning below.
+    coherence_status = str(metadata.get("coherence_status") or "unavailable")
     if len(coherence) == len(frequency) and coherence_status == "computed":
         secondary = primary.twinx()
         secondary.plot(frequency, np.clip(coherence, 0.0, 1.0), alpha=0.45, label="Mean coherence")
         secondary.set_ylim(0.0, 1.05)
         secondary.set_ylabel("Mean coherence")
-    elif coherence_status in ("unavailable", "parse_error"):
+    else:
         primary.text(
             0.02,
             0.02,

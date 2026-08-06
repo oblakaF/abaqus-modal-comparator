@@ -192,6 +192,44 @@ class QualityControlTests(unittest.TestCase):
             )
         )
 
+    def test_legacy_frf_modes_with_no_coherence_status_field_still_warn(self):
+        """A project/cache saved before coherence_status existed has an FRF
+        mode with a bare fabricated mean_coherence and no status key at all;
+        it must be normalized to "unavailable", not silently trusted."""
+        x, y = np.meshgrid(np.linspace(0.0, 1.0, 5), np.linspace(0.0, 1.0, 5))
+        coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        node_ids = np.arange(1, len(coordinates) + 1)
+        shape = np.zeros_like(coordinates)
+        shape[:, 2] = np.sin(np.pi * coordinates[:, 0]) * np.sin(np.pi * coordinates[:, 1])
+
+        abaqus = ModalDataset(
+            "Abaqus", Path("model.odb"), [ModeShape(1, 25.0, node_ids, coordinates, shape)]
+        )
+        experiment = ModalDataset(
+            "Experiment",
+            Path("scan.unv"),
+            [
+                ModeShape(
+                    1,
+                    25.2,
+                    node_ids,
+                    coordinates,
+                    shape,
+                    metadata={
+                        "dataset_type": 58,
+                        "mode_source": "FRF peak-derived experimental shape",
+                        "mean_coherence": 1.0,
+                    },
+                )
+            ],
+        )
+
+        result = compare_modal_datasets_with_quality_control(abaqus, experiment)
+
+        self.assertTrue(
+            any("no measured coherence" in warning for warning in result.warnings)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

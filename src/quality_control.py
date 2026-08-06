@@ -228,11 +228,14 @@ def compare_modal_datasets_with_quality_control(
             + "."
         )
 
+    # A missing coherence_status (legacy cache/project data saved before this
+    # field existed) is normalized to "unavailable" rather than silently
+    # skipped, so old projects surface this warning too.
     uncomputed_coherence_modes = [
         mode
         for mode in experimental.sorted_modes()
         if mode.metadata.get("dataset_type") == 58
-        and mode.metadata.get("coherence_status") in ("unavailable", "parse_error")
+        and mode.metadata.get("coherence_status") != "computed"
     ]
     if uncomputed_coherence_modes:
         parse_error_count = sum(

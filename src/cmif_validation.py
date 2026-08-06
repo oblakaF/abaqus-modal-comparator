@@ -78,7 +78,10 @@ def _annotate_standard_mode(mode: ModeShape) -> None:
         # Only a genuinely computed coherence value may raise confidence above the
         # peak-derived baseline (ROADMAP Stage 2 #1). A missing or unparsable
         # coherence channel must not be able to score as "High peak confidence".
-        coherence_status = str(metadata.get("coherence_status", ""))
+        # Legacy modes (cache/project data saved before this field existed) have
+        # no coherence_status at all and are normalized to "unavailable" rather
+        # than trusting whatever mean_coherence they happened to store.
+        coherence_status = str(metadata.get("coherence_status") or "unavailable")
         coherence_value: Optional[float] = None
         if coherence_status == "computed":
             try:

@@ -201,12 +201,16 @@ def install_app_enhancements(app_module) -> None:
         lines.extend(["", "SIMCENTER PEAK CANDIDATES", "-" * 88])
         for mode in result.experimental.sorted_modes():
             damping = "—" if mode.damping_ratio is None else f"{mode.damping_ratio:.6g}"
-            coherence = mode.metadata.get("mean_coherence")
-            coherence_status = mode.metadata.get("coherence_status")
-            if isinstance(coherence, float):
-                coherence = f"{coherence:.4f}"
-            elif coherence_status in ("unavailable", "parse_error"):
-                coherence = f"not measured ({coherence_status})"
+            if mode.metadata.get("dataset_type") == 58:
+                # Legacy FRF-derived modes (saved before coherence_status existed)
+                # are normalized to "unavailable" rather than trusting whatever
+                # mean_coherence value they happened to have stored.
+                coherence_status = str(mode.metadata.get("coherence_status") or "unavailable")
+                coherence_value = mode.metadata.get("mean_coherence")
+                if coherence_status == "computed" and isinstance(coherence_value, float):
+                    coherence = f"{coherence_value:.4f}"
+                else:
+                    coherence = f"not measured ({coherence_status})"
             else:
                 coherence = "—"
             lines.append(
