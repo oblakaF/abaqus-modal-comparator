@@ -29,7 +29,11 @@ class ModalClusterAnalysis:
     @property
     def effective_observation_count(self) -> int:
         clustered = sum(cluster.cluster_size for cluster in self.clusters)
-        return len(self.observations) - clustered + len(self.clusters)
+        return (
+            len(self.observations)
+            - clustered
+            + sum(cluster.effective_observation_count for cluster in self.clusters)
+        )
 
 
 def _orthonormal_basis(matrix: np.ndarray, relative_tolerance: Optional[float]) -> np.ndarray:
@@ -249,11 +253,21 @@ def _validate_observation_pair(
 def _cluster_inclusion(
     observations: Sequence[ModalObservation],
     subspace_value: Optional[float],
+    fe_rank: int,
+    experimental_rank: int,
     unavailable_reason: str = "",
 ) -> Tuple[InclusionStatus, str]:
     if subspace_value is None:
         detail = unavailable_reason or "unknown numerical reason"
         return InclusionStatus.EXCLUDED, f"Subspace MAC unavailable: {detail}"
+    member_count = len(observations)
+    if fe_rank != member_count or experimental_rank != member_count:
+        return (
+            InclusionStatus.EXCLUDED,
+            "Incomplete or rank-deficient modal subspace requires manual review: "
+            f"{member_count} cluster members, FE rank {fe_rank}, "
+            f"experimental rank {experimental_rank}.",
+        )
     excluded = [
         item.observation_id
         for item in observations
@@ -334,7 +348,11 @@ def detect_modal_clusters(
             experimental_rank = 0
             unavailable_reason = str(error)
         inclusion_status, reason = _cluster_inclusion(
-            member_observations, mac_value, unavailable_reason
+            member_observations,
+            mac_value,
+            fe_rank,
+            experimental_rank,
+            unavailable_reason,
         )
         fe_mode_ids = tuple(int(pair.abaqus_mode) for pair in pairs)
         experimental_mode_ids = tuple(int(pair.experimental_mode) for pair in pairs)

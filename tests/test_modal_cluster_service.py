@@ -199,6 +199,31 @@ class ModalClusterServiceTests(unittest.TestCase):
         self.assertEqual(cluster.inclusion_status, InclusionStatus.INCLUDED)
         self.assertTrue(cluster.reason)
 
+    def test_rank_deficient_subspace_is_diagnostic_only_and_requires_review(self):
+        pairs = self.close_pairs()
+        pairs[1].abaqus_vector = pairs[0].abaqus_vector.copy()
+
+        result = self.analyze(pairs)
+        cluster = result.clusters[0]
+
+        self.assertAlmostEqual(cluster.subspace_mac, 1.0)
+        self.assertEqual(cluster.metadata["fe_subspace_rank"], 1)
+        self.assertEqual(cluster.metadata["experimental_subspace_rank"], 2)
+        self.assertEqual(cluster.inclusion_status, InclusionStatus.EXCLUDED)
+        self.assertIn("rank-deficient modal subspace", cluster.reason)
+        self.assertIn("manual review", cluster.reason)
+
+    def test_excluded_cluster_contributes_zero_effective_observations(self):
+        pairs = self.close_pairs()
+        pairs[0].status = "Review"
+
+        result = self.analyze(pairs)
+        cluster = result.clusters[0]
+
+        self.assertEqual(cluster.inclusion_status, InclusionStatus.EXCLUDED)
+        self.assertEqual(cluster.effective_observation_count, 0)
+        self.assertEqual(result.effective_observation_count, 0)
+
     def test_two_distant_modes_do_not_form_a_cluster(self):
         pairs = self.close_pairs()
         pairs[1].abaqus_frequency_hz = 110.0

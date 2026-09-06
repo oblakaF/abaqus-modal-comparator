@@ -178,4 +178,6 @@ class ModalCluster:
 
     @property
     def effective_observation_count(self) -> int:
+        if self.inclusion_status == InclusionStatus.EXCLUDED:
+            return 0
         return 1
