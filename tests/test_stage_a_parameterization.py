@@ -104,15 +104,19 @@ class AbaqusStageAShellSectionTests(unittest.TestCase):
     def test_packed_general_section_order_and_explicit_shear(self):
         section = build_stage_a_shell_section(self.parameters, self.config)
         self.assertEqual(section.section_stiffness_values[:6], self.A.abaqus_values)
-        self.assertEqual(section.section_stiffness_values[6:12], (0.0,) * 6)
         self.assertEqual(
-            section.section_stiffness_values[12:],
-            (11.0, 2.75, 11.0, 0.0, 0.0, 6.0),
+            section.section_stiffness_values,
+            (
+                101.0, 12.0, 103.0, 14.0, 15.0, 106.0,
+                0.0, 0.0,
+                0.0, 11.0, 0.0, 0.0, 0.0, 2.75, 11.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 6.0,
+            ),
         )
 
         text = generate_stage_a_shell_general_section(self.parameters, self.config)
         self.assertIn("*SHELL GENERAL SECTION, ELSET=FACE\n", text)
-        self.assertIn("*TRANSVERSE SHEAR STIFFNESS\n71, 7.2000000000000002, 73\n", text)
+        self.assertIn("*TRANSVERSE SHEAR STIFFNESS\n71, 73, 7.2000000000000002\n", text)
 
     def test_changing_d_changes_only_the_d_entries(self):
         first = build_stage_a_shell_section(self.parameters, self.config)
@@ -126,7 +130,7 @@ class AbaqusStageAShellSectionTests(unittest.TestCase):
             )
             if left != right
         }
-        self.assertEqual(differing_indexes, {12, 13, 14, 17})
+        self.assertEqual(differing_indexes, {9, 13, 14, 20})
         self.assertEqual(first.A, changed.A)
         self.assertEqual(first.B, changed.B)
         self.assertEqual(first.transverse_shear, changed.transverse_shear)
@@ -148,6 +152,15 @@ class AbaqusStageAShellSectionTests(unittest.TestCase):
                 self.shear,
                 B=SectionStiffnessBlock(1.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             )
+
+    def test_optional_density_is_rendered_and_validated(self):
+        config = StageAShellSectionConfiguration(
+            "FACE", self.A, self.shear, density=2.75
+        )
+        text = generate_stage_a_shell_general_section(self.parameters, config)
+        self.assertIn("*SHELL GENERAL SECTION, ELSET=FACE, DENSITY=2.75\n", text)
+        with self.assertRaisesRegex(ValueError, "density must be positive"):
+            StageAShellSectionConfiguration("FACE", self.A, self.shear, density=0.0)
 
 
 if __name__ == "__main__":

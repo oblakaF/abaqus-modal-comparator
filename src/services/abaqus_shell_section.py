@@ -62,7 +62,9 @@ class TransverseShearStiffness:
 
     @property
     def abaqus_values(self) -> Tuple[float, float, float]:
-        return self.k11, self.k12, self.k22
+        """Abaqus data-line order: K11, K22, K12."""
+
+        return self.k11, self.k22, self.k12
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,7 @@ class StageAShellSectionConfiguration:
     A: SectionStiffnessBlock
     transverse_shear: TransverseShearStiffness
     B: SectionStiffnessBlock = field(default_factory=SectionStiffnessBlock.zero)
+    density: float | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.elset, str) or not self.elset.strip():
@@ -82,6 +85,11 @@ class StageAShellSectionConfiguration:
         object.__setattr__(self, "elset", self.elset.strip())
         if self.B != SectionStiffnessBlock.zero():
             raise ValueError("Stage A requires the complete B block to be zero.")
+        if self.density is not None:
+            density = _finite(self.density, "density")
+            if density <= 0.0:
+                raise ValueError("density must be positive when supplied.")
+            object.__setattr__(self, "density", density)
 
 
 @dataclass(frozen=True)
@@ -93,10 +101,18 @@ class AbaqusShellGeneralSection:
     B: SectionStiffnessBlock
     D: SectionStiffnessBlock
     transverse_shear: TransverseShearStiffness
+    density: float | None = None
 
     @property
     def section_stiffness_values(self) -> Tuple[float, ...]:
-        """Abaqus packed symmetric 6x6 order, split 8/8/2 when rendered."""
+        """Abaqus packed symmetric 6x6 order, split 8/8/5 when rendered.
+
+        Abaqus packs the upper triangle by successive generalized-strain
+        columns.  The membrane-bending block is therefore interleaved with
+        the D block; it is not an ``A + B + D`` concatenation.  Stage A uses a
+        symmetric B block, so its three off-diagonal values appear twice in
+        the general 21-value representation.
+        """
 
         a = self.A
         b = self.B
@@ -110,13 +126,16 @@ class AbaqusShellGeneralSection:
             a.c66,
             b.c11,
             b.c12,
+            b.c16,
+            d.c11,
+            b.c12,
             b.c22,
+            b.c26,
+            d.c12,
+            d.c22,
             b.c16,
             b.c26,
             b.c66,
-            d.c11,
-            d.c12,
-            d.c22,
             d.c16,
             d.c26,
             d.c66,
@@ -143,6 +162,7 @@ def build_stage_a_shell_section(
         B=configuration.B,
         D=d_block,
         transverse_shear=configuration.transverse_shear,
+        density=configuration.density,
     )
 
 
@@ -161,9 +181,12 @@ def render_abaqus_shell_general_section(
     stiffness_lines = (
         values[0:8],
         values[8:16],
-        values[16:18],
+        values[16:21],
     )
-    lines = [f"*SHELL GENERAL SECTION, ELSET={section.elset}"]
+    keyword = f"*SHELL GENERAL SECTION, ELSET={section.elset}"
+    if section.density is not None:
+        keyword += f", DENSITY={_format_number(section.density)}"
+    lines = [keyword]
     lines.extend(", ".join(_format_number(value) for value in row) for row in stiffness_lines)
     lines.append("*TRANSVERSE SHEAR STIFFNESS")
     lines.append(
