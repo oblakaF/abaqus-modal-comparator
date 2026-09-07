@@ -95,6 +95,18 @@ Modes that do not satisfy these limits are left unmatched. The FRF & quality tab
 - closely spaced mode groups;
 - selected coordinate scale and transformation warnings.
 
+When no candidate passes the unchanged frequency, MAC, and measured-coverage
+gates, the run completes as a **diagnostic result with zero admissible pairs**.
+The full MAC and signed frequency-error matrices, geometry transform, candidate
+coverage, gate decisions, rejection reasons, and nearest-frequency/best-MAC
+cross-checks remain available in the plots and Details view. The analysis cache
+also contains `no_pair_diagnostics.json` and `no_pair_candidates.csv`.
+
+This fallback does not accept a rejected candidate, relax a scientific gate, or
+constitute successful model validation. It only preserves the evidence needed
+to diagnose frequency mismatch, low or unavailable MAC, insufficient coverage,
+geometry mapping, or poor experimental mode-shape quality.
+
 ## Local coordinate systems
 
 The importer detects dataset 2420 and non-default `def_cs`/`disp_cs` identifiers. It currently warns rather than silently assuming these vectors are global. When such a warning appears, confirm that Testlab exported response directions in the global system before interpreting MAC.

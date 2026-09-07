@@ -130,6 +130,20 @@ def render_verified_mac_matrix(result: ComparisonResult, output_path: Path) -> P
             ]
 
     figure, axis = plt.subplots(figsize=(7.2, 5.8), constrained_layout=True)
+    if not result.pairs:
+        axis.text(
+            0.5,
+            0.5,
+            "No accepted mode pairs\nSee the full MAC matrix and candidate diagnostics",
+            ha="center",
+            va="center",
+            transform=axis.transAxes,
+        )
+        axis.set_axis_off()
+        axis.set_title("Verified-pair MAC submatrix")
+        figure.savefig(output_path, dpi=170)
+        plt.close(figure)
+        return output_path
     image = axis.imshow(matrix, vmin=0.0, vmax=1.0, aspect="auto")
     figure.colorbar(image, ax=axis, label="MAC")
     axis.set_xticks(range(len(column_labels)))

@@ -22,6 +22,16 @@ _ORIGINAL_EXPORT_PDF = None
 def export_excel_advanced(result, output_path: Path, image_directory: Path) -> Path:
     output_path = _ORIGINAL_EXPORT_EXCEL(result, output_path, image_directory)
     image_directory = Path(image_directory)
+    if not result.pairs:
+        workbook = load_workbook(output_path)
+        if "AutoMAC COMAC" in workbook.sheetnames:
+            del workbook["AutoMAC COMAC"]
+        sheet = workbook.create_sheet("AutoMAC COMAC")
+        sheet["A1"] = "AutoMAC and COMAC diagnostics"
+        sheet["A1"].font = Font(size=16, bold=True)
+        sheet["A3"] = "Unavailable: no accepted mode pairs."
+        workbook.save(output_path)
+        return output_path
     image_path = render_automac_comac(
         result, image_directory / "automac_comac.png"
     )
@@ -49,6 +59,8 @@ def export_pdf_advanced(result, output_path: Path, image_directory: Path) -> Pat
     output_path = Path(output_path)
     image_directory = Path(image_directory)
     image_directory.mkdir(parents=True, exist_ok=True)
+    if not result.pairs:
+        return _ORIGINAL_EXPORT_PDF(result, output_path, image_directory)
     with TemporaryDirectory() as temporary_directory:
         temporary = Path(temporary_directory)
         base_pdf = temporary / "base.pdf"

@@ -189,6 +189,9 @@ def install_app_enhancements(app_module) -> None:
             lines.extend("• " + warning for warning in result.warnings)
             lines.append("")
 
+        if not result.pairs:
+            lines.extend(app_module._no_pair_detail_lines(result))
+
         lines.extend(["MATCHED MODES", "-" * 88])
         for pair in result.pairs:
             mac = "—" if pair.mac is None else f"{pair.mac:.4f}"
