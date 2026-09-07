@@ -515,7 +515,7 @@ class ModalComparatorApp:
             text=(
                 f"Mean frequency error: {sum(errors) / len(errors):.2f}%"
                 if errors
-                else "Mean frequency error: â€”"
+                else "Mean frequency error: —"
             )
         )
         self.metric_mac.configure(text="Mean MAC: —" if not macs else f"Mean MAC: {sum(macs) / len(macs):.3f}")
