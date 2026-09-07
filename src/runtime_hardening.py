@@ -157,6 +157,8 @@ def install_runtime_hardening(app_module) -> None:
                 render_frf_diagnostics(result, plot_dir / "frf_diagnostics.png")
                 render_verified_mac_matrix(result, plot_dir / "verified_mac_matrix.png")
             self._write_summary(result, cache / "analysis_summary.json")
+            if not result.pairs:
+                app_module.write_no_pair_diagnostics(result, cache)
         except Exception as error:
             failure = error
             try:

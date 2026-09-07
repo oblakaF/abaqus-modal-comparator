@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import os
 import threading
 import traceback
+from dataclasses import asdict
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Dict, Optional
 
+import numpy as np
 from PIL import Image, ImageTk
 
 from abaqus_bridge import AbaqusExtractionError, load_or_extract_odb
@@ -26,6 +29,148 @@ from universal_reader import load_universal_modal_file, resolve_testlab_file
 APP_TITLE = "Abaqus–Simcenter Modal Comparator"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORKSPACE = PROJECT_ROOT / "modal_comparator_output"
+
+
+def _json_matrix(values) -> list[list[Optional[float]]]:
+    matrix = []
+    for row in values:
+        matrix.append(
+            [
+                float(value)
+                if np.isfinite(value)
+                else None
+                for value in row
+            ]
+        )
+    return matrix
+
+
+def write_no_pair_diagnostics(result: ComparisonResult, directory: Path) -> tuple[Path, Path]:
+    """Persist a deterministic diagnostic snapshot for a zero-pair result."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    def candidate_payload(candidate):
+        return None if candidate is None else asdict(candidate)
+
+    payload = {
+        "diagnostic_state": result.diagnostic_state,
+        "accepted_pair_count": len(result.pairs),
+        "abaqus_source": str(result.abaqus.source_path),
+        "experimental_source": str(result.experimental.source_path),
+        "abaqus_mode_numbers": result.abaqus_mode_numbers,
+        "experimental_mode_numbers": result.experimental_mode_numbers,
+        "admissibility_gates": result.metadata.get("admissibility_gates", {}),
+        "selected_geometry_transform": result.metadata.get(
+            "selected_geometry_transform", {}
+        ),
+        "geometry_match": {
+            "matched_fraction": result.geometry.matched_fraction,
+            "normalized_rms_distance": result.geometry.normalized_rms_distance,
+            "mean_mapping_distance": float(np.mean(result.geometry.distances)),
+            "maximum_mapping_distance": float(np.max(result.geometry.distances)),
+            "experimental_to_abaqus": [
+                int(value) for value in result.geometry.experimental_to_abaqus
+            ],
+            "mapping_distances": [
+                float(value) for value in result.geometry.distances
+            ],
+        },
+        "mac_matrix": _json_matrix(result.mac_matrix),
+        "signed_frequency_error_matrix": _json_matrix(
+            result.frequency_error_matrix
+        ),
+        "candidates": [
+            candidate_payload(candidate)
+            for candidate in result.candidate_diagnostics
+        ],
+        "summaries": {
+            key: [candidate_payload(candidate) for candidate in candidates]
+            for key, candidates in sorted(result.diagnostic_summaries.items())
+        },
+        "warnings": list(result.warnings),
+    }
+    json_path = directory / "no_pair_diagnostics.json"
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False),
+        encoding="utf-8",
+    )
+
+    csv_path = directory / "no_pair_candidates.csv"
+    rows = [asdict(candidate) for candidate in result.candidate_diagnostics]
+    fieldnames = list(rows[0]) if rows else []
+    with csv_path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fieldnames)
+        if fieldnames:
+            writer.writeheader()
+            for row in rows:
+                row["rejection_reasons"] = ";".join(row["rejection_reasons"])
+                writer.writerow(row)
+    return json_path, csv_path
+
+
+def _candidate_label(candidate) -> str:
+    if candidate is None:
+        return "unavailable (no calculable MAC)"
+    mac = "unavailable" if candidate.mac is None else f"{candidate.mac:.3f}"
+    reasons = ",".join(candidate.rejection_reasons) or "none"
+    return (
+        f"A{candidate.abaqus_mode}/E{candidate.experimental_mode} | "
+        f"fa={candidate.abaqus_frequency_hz:.5f} Hz | "
+        f"fe={candidate.experimental_frequency_hz:.5f} Hz | "
+        f"error={candidate.frequency_error_percent:+.2f}% | MAC={mac} | "
+        f"DOF={candidate.measured_dof_coverage:.1%} | "
+        f"points={candidate.point_coverage:.1%} | "
+        f"spatial={candidate.spatial_coverage:.1%} | reject={reasons}"
+    )
+
+
+def _no_pair_detail_lines(result: ComparisonResult, width: int = 88) -> list[str]:
+    lines = [
+        "NO-ACCEPTED-PAIRS DIAGNOSTICS",
+        "-" * width,
+        "Diagnostic result only; scientific admissibility gates are unchanged.",
+        "Rejected candidates below are not accepted mode pairs.",
+        "",
+    ]
+    headings = (
+        ("nearest_frequency_by_abaqus", "Nearest frequency for each Abaqus mode"),
+        ("best_mac_by_abaqus", "Best MAC for each Abaqus mode"),
+        (
+            "nearest_frequency_by_experimental",
+            "Nearest frequency for each experimental mode",
+        ),
+        ("best_mac_by_experimental", "Best MAC for each experimental mode"),
+    )
+    for key, heading in headings:
+        lines.append(heading + ":")
+        lines.extend(
+            "  " + _candidate_label(candidate)
+            for candidate in result.diagnostic_summaries.get(key, [])
+        )
+        lines.append("")
+
+    lines.extend(["All candidate gate results:", "-" * width])
+    for candidate in result.candidate_diagnostics:
+        mac_passed = (
+            "unavailable"
+            if candidate.mac_gate_passed is None
+            else str(candidate.mac_gate_passed)
+        )
+        lines.append(
+            _candidate_label(candidate)
+            + f" | gates frequency={candidate.frequency_gate_passed}, "
+            + f"MAC={mac_passed}, coverage={candidate.coverage_gate_passed}, "
+            + f"admissible={candidate.admissible} ({candidate.coverage_status})"
+        )
+    lines.append("")
+    return lines
+
+
+def analysis_completion_status(result: ComparisonResult) -> str:
+    if not result.pairs:
+        return "Diagnostic result: 0 admissible pairs"
+    return "Analysis completed. Select a row to inspect the matched mode shapes."
 
 
 class ModalComparatorApp:
@@ -294,6 +439,8 @@ class ModalComparatorApp:
             render_mac_matrix(result, plot_dir / "mac_matrix.png")
             render_frequency_comparison(result, plot_dir / "frequency_comparison.png")
             self._write_summary(result, cache / "analysis_summary.json")
+            if not result.pairs:
+                write_no_pair_diagnostics(result, cache)
             self.cache = cache
             self.root.after(0, lambda: self._complete(result))
         except Exception as error:
@@ -304,6 +451,7 @@ class ModalComparatorApp:
     @staticmethod
     def _write_summary(result: ComparisonResult, path: Path) -> None:
         payload = {
+            "diagnostic_state": result.diagnostic_state,
             "abaqus_source": str(result.abaqus.source_path),
             "experimental_source": str(result.experimental.source_path),
             "geometry_match_fraction": result.geometry.matched_fraction,
@@ -333,8 +481,11 @@ class ModalComparatorApp:
         self.pdf_button.configure(state="normal")
         self.result = result
         self._populate(result)
-        self.status.set("Analysis completed. Select a row to inspect the matched mode shapes.")
-        self.tabs.select(self.table_tab)
+        self.status.set(analysis_completion_status(result))
+        if result.pairs:
+            self.tabs.select(self.table_tab)
+        else:
+            self.tabs.select(self.plot_tab)
 
     def _failed(self, error: Exception) -> None:
         self.running = False
@@ -360,7 +511,13 @@ class ModalComparatorApp:
         errors = [p.frequency_error_percent for p in result.pairs]
         macs = [p.mac for p in result.pairs if p.mac is not None]
         self.metric_pairs.configure(text=f"Matched pairs: {len(result.pairs)}")
-        self.metric_error.configure(text=f"Mean frequency error: {sum(errors) / len(errors):.2f}%")
+        self.metric_error.configure(
+            text=(
+                f"Mean frequency error: {sum(errors) / len(errors):.2f}%"
+                if errors
+                else "Mean frequency error: —"
+            )
+        )
         self.metric_mac.configure(text="Mean MAC: —" if not macs else f"Mean MAC: {sum(macs) / len(macs):.3f}")
         self.metric_geometry.configure(text=f"Geometry match: {result.geometry.matched_fraction:.1%}")
 
@@ -390,6 +547,8 @@ class ModalComparatorApp:
         ]
         if result.warnings:
             lines.extend(["WARNINGS", "-" * 80] + ["• " + w for w in result.warnings] + [""])
+        if not result.pairs:
+            lines.extend(_no_pair_detail_lines(result, width=80))
         lines.extend(["SIMCENTER MODES", "-" * 80])
         for mode in result.experimental.sorted_modes():
             damping = "—" if mode.damping_ratio is None else f"{mode.damping_ratio:.6g}"

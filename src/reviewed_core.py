@@ -11,6 +11,7 @@ from modal_core import (
     ComparisonResult,
     GeometryMatch,
     ModalDataset,
+    ModeCandidateDiagnostic,
     ModePairResult,
     ModeShape,
     modal_assurance_criterion,
@@ -445,14 +446,19 @@ def _mac_matrix_for_geometry(
     experimental_coordinates: np.ndarray,
     full_grid_point_count: int,
     full_grid_extent: float,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Return (mac_matrix, coverage_admissible_matrix). coverage_admissible_matrix
+) -> Tuple[np.ndarray, np.ndarray, List[List[_CoverageReport]]]:
+    """Return MAC, coverage gate, and coverage-report matrices.
+
+    ``coverage_admissible_matrix``
     is a boolean gate: a cell below the Stage 2 #4 coverage floor must not
     participate in Hungarian assignment as a valid candidate, independent of
     its MAC/frequency admissibility."""
     shape = (len(abaqus_rotated_modes), len(experimental_vectors))
     mac_matrix = np.full(shape, np.nan, dtype=float)
     coverage_admissible = np.zeros(shape, dtype=bool)
+    coverage_reports: List[List[_CoverageReport]] = [
+        [None] * shape[1] for _ in range(shape[0])
+    ]  # type: ignore[list-item]
     own_measured_dof_counts = [int(np.count_nonzero(mask)) for mask in measurement_masks]
 
     for row, abaqus_rotated in enumerate(abaqus_rotated_modes):
@@ -466,16 +472,15 @@ def _mac_matrix_for_geometry(
             # This experimental mode's own mask only -- never another
             # column's (ROADMAP Stage 2 #3).
             dof_mask = measurement_masks[column] & finite
-            coverage_admissible[row, column] = (
-                _coverage_report(
-                    dof_mask,
-                    own_measured_dof_counts[column],
-                    experimental_coordinates,
-                    full_grid_point_count,
-                    full_grid_extent,
-                ).status
-                == "accepted"
+            coverage = _coverage_report(
+                dof_mask,
+                own_measured_dof_counts[column],
+                experimental_coordinates,
+                full_grid_point_count,
+                full_grid_extent,
             )
+            coverage_reports[row][column] = coverage
+            coverage_admissible[row, column] = coverage.status == "accepted"
             if np.any(dof_mask):
                 value = modal_assurance_criterion(
                     abaqus_rotated[dof_mask],
@@ -484,7 +489,7 @@ def _mac_matrix_for_geometry(
             else:
                 value = None
             mac_matrix[row, column] = np.nan if value is None else value
-    return mac_matrix, coverage_admissible
+    return mac_matrix, coverage_admissible, coverage_reports
 
 
 def _copy_dataset(dataset: ModalDataset) -> ModalDataset:
@@ -546,7 +551,13 @@ def _best_geometry_evaluation(
     maximum_frequency_error_percent: float,
     minimum_mac: float,
     maximum_frequency_only_error_percent: float,
-) -> Tuple[GeometryMatch, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[
+    GeometryMatch,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    List[List[_CoverageReport]],
+]:
     """Evaluate every geometry candidate and return the best-scoring one.
 
     The score first maximizes the number of admissible one-to-one pairs, then
@@ -564,7 +575,7 @@ def _best_geometry_evaluation(
             mapped_abaqus_ids,
             geometry.rotation,
         )
-        mac_matrix, coverage_admissible = _mac_matrix_for_geometry(
+        mac_matrix, coverage_admissible, coverage_reports = _mac_matrix_for_geometry(
             abaqus_rotated_modes,
             experimental_vectors,
             measurement_masks,
@@ -605,14 +616,152 @@ def _best_geometry_evaluation(
             assignment_cost + geometry_penalty,
         )
         if best_evaluation is None or score < best_evaluation[0]:
-            best_evaluation = (score, geometry, mac_matrix, rows, columns)
+            best_evaluation = (
+                score,
+                geometry,
+                mac_matrix,
+                rows,
+                columns,
+                coverage_reports,
+            )
 
     if best_evaluation is None:
         raise RuntimeError(
             "No valid geometry and modal alignment could be calculated."
         )
-    _, geometry, mac_matrix, abaqus_indices, experimental_indices = best_evaluation
-    return geometry, mac_matrix, abaqus_indices, experimental_indices
+    (
+        _,
+        geometry,
+        mac_matrix,
+        abaqus_indices,
+        experimental_indices,
+        coverage_reports,
+    ) = best_evaluation
+    return (
+        geometry,
+        mac_matrix,
+        abaqus_indices,
+        experimental_indices,
+        coverage_reports,
+    )
+
+
+def _build_candidate_diagnostics(
+    abaqus_modes: Sequence[ModeShape],
+    experimental_modes: Sequence[ModeShape],
+    mac_matrix: np.ndarray,
+    signed_frequency_matrix: np.ndarray,
+    coverage_reports: Sequence[Sequence[_CoverageReport]],
+    maximum_frequency_error_percent: float,
+    minimum_mac: float,
+    maximum_frequency_only_error_percent: float,
+) -> Tuple[
+    List[ModeCandidateDiagnostic],
+    Dict[str, List[Optional[ModeCandidateDiagnostic]]],
+]:
+    """Describe every cross-product candidate without changing assignment."""
+    candidates: List[ModeCandidateDiagnostic] = []
+    by_index: Dict[Tuple[int, int], ModeCandidateDiagnostic] = {}
+    for row, abaqus_mode in enumerate(abaqus_modes):
+        for column, experimental_mode in enumerate(experimental_modes):
+            signed_error = float(signed_frequency_matrix[row, column])
+            absolute_error = abs(signed_error)
+            mac_available = bool(np.isfinite(mac_matrix[row, column]))
+            mac_value = float(mac_matrix[row, column]) if mac_available else None
+            frequency_gate_passed = (
+                absolute_error <= maximum_frequency_error_percent
+            )
+            mac_gate_passed = (
+                mac_value >= minimum_mac if mac_value is not None else None
+            )
+            frequency_only_passed = (
+                mac_value is None
+                and absolute_error <= maximum_frequency_only_error_percent
+            )
+            coverage = coverage_reports[row][column]
+            coverage_gate_passed = coverage.status == "accepted"
+            admissible = coverage_gate_passed and (
+                (
+                    frequency_gate_passed
+                    and mac_gate_passed is True
+                )
+                or frequency_only_passed
+            )
+
+            reasons: List[str] = []
+            if not frequency_gate_passed:
+                reasons.append("frequency")
+            if mac_value is None:
+                if not frequency_only_passed:
+                    reasons.append("mac_unavailable")
+            elif mac_gate_passed is False:
+                reasons.append("mac")
+            if not coverage_gate_passed:
+                reasons.append("coverage")
+
+            candidate = ModeCandidateDiagnostic(
+                abaqus_mode=int(abaqus_mode.number),
+                experimental_mode=int(experimental_mode.number),
+                abaqus_frequency_hz=float(abaqus_mode.frequency_hz),
+                experimental_frequency_hz=float(experimental_mode.frequency_hz),
+                frequency_error_percent=signed_error,
+                absolute_frequency_error_percent=absolute_error,
+                mac=mac_value,
+                measured_dof_count=coverage.common_dof_count,
+                measured_dof_coverage=coverage.dof_coverage_fraction,
+                matched_point_count=coverage.unique_point_count,
+                point_coverage=coverage.point_coverage_fraction,
+                spatial_coverage=coverage.spatial_coverage_fraction,
+                coverage_status=coverage.status,
+                frequency_gate_passed=frequency_gate_passed,
+                mac_gate_passed=mac_gate_passed,
+                coverage_gate_passed=coverage_gate_passed,
+                admissible=admissible,
+                rejection_reasons=tuple(reasons),
+            )
+            candidates.append(candidate)
+            by_index[(row, column)] = candidate
+
+    nearest_by_abaqus = [
+        by_index[(row, int(np.argmin(np.abs(signed_frequency_matrix[row]))))]
+        for row in range(len(abaqus_modes))
+    ]
+    nearest_by_experiment = [
+        by_index[(int(np.argmin(np.abs(signed_frequency_matrix[:, column]))), column)]
+        for column in range(len(experimental_modes))
+    ]
+
+    def best_mac_for_row(row: int) -> Optional[ModeCandidateDiagnostic]:
+        finite = np.flatnonzero(np.isfinite(mac_matrix[row]))
+        if not len(finite):
+            return None
+        column = int(finite[np.argmax(mac_matrix[row, finite])])
+        return by_index[(row, column)]
+
+    def best_mac_for_column(column: int) -> Optional[ModeCandidateDiagnostic]:
+        finite = np.flatnonzero(np.isfinite(mac_matrix[:, column]))
+        if not len(finite):
+            return None
+        row = int(finite[np.argmax(mac_matrix[finite, column])])
+        return by_index[(row, column)]
+
+    summaries = {
+        "nearest_frequency_by_abaqus": [
+            nearest_by_abaqus[row] for row in range(len(abaqus_modes))
+        ],
+        "best_mac_by_abaqus": [
+            best_mac_for_row(row) for row in range(len(abaqus_modes))
+        ],
+        "nearest_frequency_by_experimental": [
+            nearest_by_experiment[column]
+            for column in range(len(experimental_modes))
+        ],
+        "best_mac_by_experimental": [
+            best_mac_for_column(column)
+            for column in range(len(experimental_modes))
+        ],
+    }
+    return candidates, summaries
 
 
 def _build_mode_pairs(
@@ -787,7 +936,13 @@ def compare_modal_datasets(
         experimental_coordinates,
         coordinate_scale_override=coordinate_scale_override,
     )
-    geometry, mac_matrix, abaqus_indices, experimental_indices = _best_geometry_evaluation(
+    (
+        geometry,
+        mac_matrix,
+        abaqus_indices,
+        experimental_indices,
+        coverage_reports,
+    ) = _best_geometry_evaluation(
         candidates,
         abaqus_modes,
         abaqus_reference,
@@ -838,10 +993,21 @@ def compare_modal_datasets(
     warnings, selected_transform = _geometry_warnings_and_transform(geometry)
     result_abaqus = _copy_dataset(abaqus)
     result_abaqus.metadata["selected_geometry_transform"] = selected_transform
-
+    candidate_diagnostics, diagnostic_summaries = _build_candidate_diagnostics(
+        abaqus_modes,
+        experimental_modes,
+        mac_matrix,
+        signed_frequency_matrix,
+        coverage_reports,
+        maximum_frequency_error_percent,
+        minimum_mac,
+        maximum_frequency_only_error_percent,
+    )
+    diagnostic_state = "comparison" if pairs else "no_accepted_pairs"
     if not pairs:
-        raise ValueError(
-            "No admissible one-to-one mode pairs satisfy the frequency and MAC limits."
+        warnings.append(
+            "Diagnostic result only: zero mode pairs passed the unchanged "
+            "frequency, MAC, and coverage admissibility gates."
         )
 
     return ComparisonResult(
@@ -859,8 +1025,29 @@ def compare_modal_datasets(
         metadata={
             "selected_geometry_transform": selected_transform,
             "evaluated_geometry_candidate_count": len(candidates),
+            "admissibility_gates": {
+                "maximum_frequency_error_percent": maximum_frequency_error_percent,
+                "minimum_mac": minimum_mac,
+                "maximum_frequency_only_error_percent": (
+                    maximum_frequency_only_error_percent
+                ),
+                "minimum_common_dof_count": MINIMUM_COMMON_DOF_COUNT,
+                "minimum_unique_point_count": MINIMUM_UNIQUE_POINT_COUNT,
+                "minimum_measured_dof_coverage_fraction": (
+                    MINIMUM_MEASURED_DOF_COVERAGE_FRACTION
+                ),
+                "minimum_point_coverage_fraction": (
+                    MINIMUM_POINT_COVERAGE_FRACTION
+                ),
+                "minimum_spatial_extent_fraction": (
+                    MINIMUM_SPATIAL_EXTENT_FRACTION
+                ),
+            },
             "measurement_mask_relative_norm_threshold": (
                 INFERRED_DOF_RELATIVE_NORM
             ),
         },
+        candidate_diagnostics=candidate_diagnostics,
+        diagnostic_summaries=diagnostic_summaries,
+        diagnostic_state=diagnostic_state,
     )

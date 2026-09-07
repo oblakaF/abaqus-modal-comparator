@@ -79,6 +79,35 @@ class ModePairResult:
     node_ids: Optional[np.ndarray] = None
 
 
+@dataclass(frozen=True)
+class ModeCandidateDiagnostic:
+    """Gate-by-gate evidence for one possible Abaqus/experiment pairing.
+
+    Candidates are diagnostic observations only.  ``admissible`` records the
+    scientific gates; membership in ``ComparisonResult.pairs`` remains the
+    sole indication that Hungarian assignment accepted a one-to-one pair.
+    """
+
+    abaqus_mode: int
+    experimental_mode: int
+    abaqus_frequency_hz: float
+    experimental_frequency_hz: float
+    frequency_error_percent: float
+    absolute_frequency_error_percent: float
+    mac: Optional[float]
+    measured_dof_count: int
+    measured_dof_coverage: float
+    matched_point_count: int
+    point_coverage: float
+    spatial_coverage: float
+    coverage_status: str
+    frequency_gate_passed: bool
+    mac_gate_passed: Optional[bool]
+    coverage_gate_passed: bool
+    admissible: bool
+    rejection_reasons: tuple[str, ...]
+
+
 @dataclass
 class ComparisonResult:
     abaqus: ModalDataset
@@ -91,6 +120,11 @@ class ComparisonResult:
     experimental_mode_numbers: List[int]
     warnings: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    candidate_diagnostics: List[ModeCandidateDiagnostic] = field(default_factory=list)
+    diagnostic_summaries: Dict[
+        str, List[Optional[ModeCandidateDiagnostic]]
+    ] = field(default_factory=dict)
+    diagnostic_state: str = "comparison"
 
 
 def modal_assurance_criterion(vector_a: np.ndarray, vector_b: np.ndarray) -> Optional[float]:

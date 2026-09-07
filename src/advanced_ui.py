@@ -78,6 +78,21 @@ def install_advanced_ui(app_module) -> None:
 
     def advanced_populate(self, result) -> None:
         original_populate(self, result)
+        if not result.pairs:
+            message = "Unavailable: no accepted mode pairs."
+            for label in (
+                self.abaqus_automac_label,
+                self.experimental_automac_label,
+                self.comac_label,
+            ):
+                label.configure(image="", text=message)
+            self.advanced_metrics_summary.configure(
+                text=(
+                    "AutoMAC and COMAC require accepted pairs. Review the full MAC "
+                    "matrix and no-pair candidate diagnostics instead."
+                )
+            )
+            return
         if self.cache is None:
             return
 

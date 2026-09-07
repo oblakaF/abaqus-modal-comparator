@@ -241,10 +241,62 @@ def render_frequency_comparison(result: ComparisonResult, output_path: Path) -> 
         axis.set_xlim(0.0, maximum)
         axis.set_ylim(0.0, maximum)
     else:
-        axis.text(0.5, 0.5, "No accepted mode pairs", ha="center", va="center", transform=axis.transAxes)
-    axis.set_xlabel("Experimental frequency, Hz")
-    axis.set_ylabel("Abaqus frequency, Hz")
-    axis.set_title("Natural-frequency regression")
+        abaqus_modes = result.abaqus.sorted_modes()
+        experimental_modes = result.experimental.sorted_modes()
+        abaqus_frequencies = [mode.frequency_hz for mode in abaqus_modes]
+        experimental_frequencies = [mode.frequency_hz for mode in experimental_modes]
+        axis.scatter(
+            abaqus_frequencies,
+            np.ones(len(abaqus_frequencies)),
+            marker="|",
+            s=260,
+            linewidths=2,
+            label="Abaqus candidates",
+        )
+        axis.scatter(
+            experimental_frequencies,
+            np.zeros(len(experimental_frequencies)),
+            marker="|",
+            s=260,
+            linewidths=2,
+            label="Experimental candidates",
+        )
+        for mode in abaqus_modes:
+            axis.annotate(
+                f"A{mode.number}",
+                (mode.frequency_hz, 1.0),
+                xytext=(0, 7),
+                textcoords="offset points",
+                ha="center",
+                fontsize=8,
+            )
+        for mode in experimental_modes:
+            axis.annotate(
+                f"E{mode.number}",
+                (mode.frequency_hz, 0.0),
+                xytext=(0, -12),
+                textcoords="offset points",
+                ha="center",
+                fontsize=8,
+            )
+        axis.set_yticks([0.0, 1.0])
+        axis.set_yticklabels(["Experiment", "Abaqus"])
+        axis.set_ylim(-0.5, 1.5)
+        axis.text(
+            0.5,
+            0.5,
+            "Diagnostic result: no accepted mode pairs",
+            ha="center",
+            va="center",
+            transform=axis.transAxes,
+        )
+        axis.set_xlabel("Frequency, Hz")
+        axis.set_ylabel("Modal dataset")
+        axis.set_title("Unpaired natural-frequency candidates")
+    if len(experimental):
+        axis.set_xlabel("Experimental frequency, Hz")
+        axis.set_ylabel("Abaqus frequency, Hz")
+        axis.set_title("Natural-frequency regression")
     axis.grid(True, alpha=0.25)
     axis.legend(loc="best")
     figure.savefig(output_path, dpi=170)

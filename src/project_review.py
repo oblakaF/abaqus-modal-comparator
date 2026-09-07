@@ -457,6 +457,8 @@ def install_project_review(app_module) -> None:
         setattr(result, "automatic_pairs", list(result.pairs))
         original_complete(self, result)
         self._apply_manual_reviews(refresh=True)
+        if not self.result.pairs:
+            self.status.set(app_module.analysis_completion_status(self.result))
         self._save_last_session()
 
     def reviewed_populate(self, result) -> None:
