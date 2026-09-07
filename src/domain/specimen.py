@@ -93,9 +93,11 @@ class PrimaryMeasurement:
             raise ValueError("Primary measurement value must be positive and finite.")
         if (
             not math.isfinite(float(self.standard_uncertainty))
-            or float(self.standard_uncertainty) <= 0.0
+            or float(self.standard_uncertainty) < 0.0
         ):
-            raise ValueError("Primary measurement uncertainty must be positive and finite.")
+            raise ValueError(
+                "Primary measurement uncertainty must be non-negative and finite."
+            )
 
 
 @dataclass(frozen=True)

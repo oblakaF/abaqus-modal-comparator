@@ -183,7 +183,7 @@ class InverseIdentificationDomainTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "derived"):
             PrimaryMeasurement("areal_mass", 6.5, 0.1, "kg/m2")
         with self.assertRaisesRegex(ValueError, "uncertainty"):
-            PrimaryMeasurement("m", 0.5, 0.0, "kg")
+            PrimaryMeasurement("m", 0.5, -0.01, "kg")
         with self.assertRaisesRegex(ValueError, "lower_bound"):
             IdentificationParameter(
                 "bad",
