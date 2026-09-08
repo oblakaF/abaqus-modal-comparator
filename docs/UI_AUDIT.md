@@ -95,7 +95,7 @@ The fix deliberately runs after the complete `__init__` wrapper chain. It enumer
 - Comparison and Manual Review had vertical scrollbars but no horizontal scrollbar. The experimental-candidate dialog originally had neither a complete two-axis scroll layout nor the final scientific headings.
 - Style definitions were split between base widgets and individual wrappers, with ad-hoc fonts and spacing.
 
-## Concrete defects and applied UI corrections
+## Implemented now: concrete defects and UI corrections
 
 - Minimum width blocked the requested 1024-class viewport: reduced the hard minimum and made the input page vertically scrollable.
 - Nine long tab labels could run past the right edge: compact labels activate below the Wide breakpoint.
@@ -105,7 +105,10 @@ The fix deliberately runs after the complete `__init__` wrapper chain. It enumer
 - Normal users had to type `auto`, `0.001` or `1000`: unit selection now computes the conversion, labels the Abaqus field exactly `Abaqus model length unit`, and exposes numeric input only for Custom scale.
 - The command field assumed an alias: detection only lists launchers found with `PATH`/`PATHEXT` or existing launcher files; zero/one/multiple discovery states are distinct.
 - Run had no real Stop: the worker now uses a cancellation event and the Abaqus bridge owns a `Popen` handle; Windows termination targets only that PID tree.
-- Close could orphan work: active analysis requires `Stop and close`; the app waits for the cancellation callback and remains open on timeout.
+- Cancellation had startup and timeout races: a pre-set cancellation request now prevents launch, and cancellation/timeout paths confirm process exit before releasing the owned handle.
+- Close could orphan work: active analysis requires `Stop and close`; the app waits for the cancellation callback, ignores callbacks after Tk shutdown begins, and remains open if owned-process termination is not confirmed.
+- A restored manual acceptance could visually promote a zero-automatic-pair result: completion state now uses the automatic scientific result and labels manual-only effective pairs explicitly.
+- Duplicate launcher labels could collapse same-version installations, and Browse accepted arbitrary files: selection labels are now unique and explicit paths must be executable launchers.
 - Text editing was inconsistent: Entry, Spinbox, Combobox and Text class bindings implement Ctrl+C/V/X/A, while context menus expose editable or read-only commands as appropriate.
 - Save behavior was unpredictable: persistent fields and manual decisions drive a snapshot-based dirty flag; Save/Save As reset it only after a successful write.
 - Recovery masqueraded as Save: recovery has separate preferences, a debounced file, explicit recovered-session text and a one-time controllable notice.
@@ -134,9 +137,9 @@ The visible states are NO DATA, READY, RUNNING, STOPPING, STOPPED, SUCCESS, DIAG
 5. Plot generation
 6. Report data generation
 
-Cancellation is checked between stages and between plot renders. An Abaqus launcher is started with `Popen`; only the stored application-owned process tree is terminated. A cancelled run cannot schedule successful completion, clears partial result presentation, leaves logs/cache files available for diagnosis, and returns Run to an idle state.
+Cancellation is checked before subprocess launch, during extraction, between stages and between plot renders. An Abaqus launcher is started with `Popen`; only the stored application-owned process tree is terminated. Cancellation and timeout paths wait for confirmed exit before releasing the handle. If termination cannot be confirmed, the handle remains tracked and window close is blocked. A cancelled run cannot schedule successful completion, clears partial result presentation, leaves logs/cache files available for diagnosis, and returns Run to an idle state.
 
-## Remaining technical debt and follow-up architecture PR
+## Future technical debt: follow-up architecture PR
 
 The wrapper stack remains order-sensitive by explicit scope decision. The next architecture PR should introduce composed owners without changing scientific services:
 
@@ -161,14 +164,17 @@ That PR should replace closure capture with explicit construction hooks, give ea
 
 ## Validation performed for this change
 
-- The full automated suite was run, including all scientific regression tests.
-- A native Tcl/Tk 8.6.15 runtime smoke test instantiated the exact `src/main.py` assembly outside the filesystem sandbox.
+- The final pre-PR full suite completed with `277 passed, 3 skipped, 1 warning, 37 subtests passed`, including all scientific regression tests.
+- A native Tcl/Tk 8.6.15 focused run completed with `21 passed, 4 subtests passed` and instantiated the exact `src/main.py` assembly outside the filesystem sandbox.
 - The assembled app exposed all nine tabs and all 13 final Comparison columns with non-empty headings.
 - Comparison and Manual Review both reported connected horizontal and vertical scroll commands.
 - The native root was repeatedly resized through 1920x1080, 1600x900, 1366x768, 1280x720, and 1024x700; every tab was selected at each pass without a Tk exception.
 - The compact policy activated at 1024x700, and all nine compact tab labels remained present.
 - A long path Entry and the disabled Details Text were exercised through Select All and Copy dispatch.
 - A zero-admissible-pair `ComparisonResult` was rendered through the assembled population chain and showed the explicit diagnostic metric state.
+- A manually restored effective pair on top of zero automatic admissible pairs remains visibly diagnostic and is labeled manual-only.
+- Cancellation tests cover pre-launch cancellation, PID-tree scoping, confirmed timeout cleanup, and retention of an unconfirmed live handle.
+- Same-version Abaqus launchers retain unique choices, and non-executable Browse targets are rejected.
 - Abaqus discovery found the existing `abq2024.bat` and `abaqus.bat` launchers rather than assuming either alias. The `Test Abaqus` implementation successfully ran `information=release` against Abaqus 2024 without starting an FE analysis.
 - DPI normalization is tested at 100%, 125%, and 150% scaling equivalents. A human visual pass on three separately configured Windows displays remains part of the checklist below; no screenshot pixel-comparison test was introduced.
 - Real ODB extraction was intentionally not launched for this UI PR. Owned-process-tree termination and cancellation callbacks are deterministic tests; the manual real-job Stop checks remain below.

@@ -56,6 +56,26 @@ def cancel_owned_process(process: Optional[subprocess.Popen]) -> bool:
             return False
 
 
+def stop_owned_process_and_wait(
+    process: Optional[subprocess.Popen],
+    first_timeout_seconds: float = 10.0,
+    retry_timeout_seconds: float = 5.0,
+) -> bool:
+    """Request scoped termination and confirm that the owned process exited."""
+    if process is None or process.poll() is not None:
+        return True
+    cancel_owned_process(process)
+    try:
+        process.wait(timeout=first_timeout_seconds)
+    except subprocess.TimeoutExpired:
+        cancel_owned_process(process)
+        try:
+            process.wait(timeout=retry_timeout_seconds)
+        except subprocess.TimeoutExpired:
+            return False
+    return process.poll() is not None
+
+
 def _windows_command(executable: str, arguments: List[str]) -> List[str]:
     command_line = subprocess.list2cmdline([executable] + arguments)
     return ["cmd.exe", "/d", "/s", "/c", command_line]
@@ -115,25 +135,23 @@ def run_abaqus_extraction(
                 popen_options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
             else:
                 popen_options["start_new_session"] = True
+            if cancel_event is not None and cancel_event.is_set():
+                raise AnalysisCancelled("Analysis stopped by user.")
             process = subprocess.Popen(command, **popen_options)
             if process_callback is not None:
                 process_callback(process)
             while process.poll() is None:
                 if cancel_event is not None and cancel_event.is_set():
-                    cancel_owned_process(process)
-                    try:
-                        process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        cancel_owned_process(process)
-                        try:
-                            process.wait(timeout=5)
-                        except subprocess.TimeoutExpired as error:
-                            raise AbaqusExtractionError(
-                                "The owned Abaqus process did not stop within the cancellation timeout."
-                            ) from error
+                    if not stop_owned_process_and_wait(process):
+                        raise AbaqusExtractionError(
+                            "The owned Abaqus process did not stop within the cancellation timeout."
+                        )
                     raise AnalysisCancelled("Analysis stopped by user.")
                 if time.monotonic() - started > timeout_seconds:
-                    cancel_owned_process(process)
+                    if not stop_owned_process_and_wait(process):
+                        raise AbaqusExtractionError(
+                            "Abaqus extraction timed out, but the owned process did not stop."
+                        )
                     raise AbaqusExtractionError(
                         f"Abaqus extraction exceeded {timeout_seconds // 60} minutes."
                     )
@@ -145,7 +163,9 @@ def run_abaqus_extraction(
             "Browse, or Advanced command."
         ) from error
     finally:
-        if process_callback is not None:
+        if process_callback is not None and (
+            process is None or process.poll() is not None
+        ):
             process_callback(None)
 
     manifest_path = output_directory / "manifest.json"

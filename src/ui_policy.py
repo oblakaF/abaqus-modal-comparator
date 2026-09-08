@@ -311,7 +311,20 @@ def discover_abaqus_installations(
             except OSError:
                 continue
 
-    return tuple(sorted(found.values(), key=lambda item: item.label.lower()))
+    installations = sorted(found.values(), key=lambda item: (item.label.lower(), item.command.lower()))
+    label_counts: dict[str, int] = {}
+    for installation in installations:
+        label_counts[installation.label] = label_counts.get(installation.label, 0) + 1
+    return tuple(
+        installation
+        if label_counts[installation.label] == 1
+        else AbaqusInstallation(
+            f"{installation.label} [{installation.command}]",
+            installation.command,
+            installation.detected,
+        )
+        for installation in installations
+    )
 
 
 def select_abaqus_installation(
@@ -332,6 +345,16 @@ def resolve_command(command: str) -> Optional[str]:
         return None
     path = Path(value)
     if path.is_file():
+        if os.name == "nt":
+            executable_suffixes = {
+                item.lower()
+                for item in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
+                if item
+            }
+            if path.suffix.lower() not in executable_suffixes:
+                return None
+        elif not os.access(path, os.X_OK):
+            return None
         return str(path.resolve())
     return shutil.which(value)
 
@@ -359,6 +382,11 @@ def transition_analysis_state(state: AnalysisState, event: str) -> AnalysisState
         return _TRANSITIONS[(AnalysisState(state), str(event))]
     except KeyError as error:
         raise ValueError(f"Invalid analysis transition: {state} + {event}") from error
+
+
+def completion_state(automatic_pair_count: int) -> AnalysisState:
+    """Classify completion from scientific automatic acceptance only."""
+    return AnalysisState.SUCCESS if int(automatic_pair_count) > 0 else AnalysisState.DIAGNOSTIC
 
 
 def status_text(state: AnalysisState, *, pair_count: Optional[int] = None) -> str:

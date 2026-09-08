@@ -19,6 +19,7 @@ from ui_policy import (
     REVIEW_COLUMNS,
     STYLE_TOKENS,
     button_grid_columns,
+    completion_state,
     coordinate_scale_from_units,
     discover_abaqus_installations,
     experimental_unit_from_metadata,
@@ -309,6 +310,8 @@ def install_responsive_workflow(app_module) -> None:
         self._owned_analysis_process = None
         self._analysis_thread = None
         self._close_after_cancel = False
+        self._ui_closing = False
+        self._automatic_admissible_pair_count = None
         self._autosave_job = None
         self._responsive_job = None
         self._layout_mode = None
@@ -629,12 +632,19 @@ def install_responsive_workflow(app_module) -> None:
             filetypes=[("Abaqus launchers", "*.bat *.cmd *.exe"), ("All files", "*.*")],
         )
         if filename:
+            resolved = resolve_command(filename)
+            if resolved is None:
+                messagebox.showwarning(
+                    "Abaqus launcher",
+                    "Choose an executable Abaqus launcher (.bat, .cmd, or .exe).",
+                )
+                return
             label = f"Abaqus \u2014 selected \u2713"
-            self._abaqus_installations[label] = filename
+            self._abaqus_installations[label] = resolved
             self.abaqus_installation_combo.configure(values=tuple(self._abaqus_installations))
             self.abaqus_installation_label.set(label)
-            self.abaqus_command.set(filename)
-            self.abaqus_detection_status.set(f"Selected launcher: {filename}")
+            self.abaqus_command.set(resolved)
+            self.abaqus_detection_status.set(f"Selected launcher: {resolved}")
 
     def toggle_abaqus_advanced(self) -> None:
         if self.show_abaqus_advanced.get():
@@ -655,7 +665,7 @@ def install_responsive_workflow(app_module) -> None:
                     messagebox.showinfo("Test Abaqus", detail or "Abaqus launcher is available.")
                 else:
                     messagebox.showwarning("Test Abaqus", detail)
-            self.root.after(0, finished)
+            self._post_to_ui(finished)
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -686,6 +696,7 @@ def install_responsive_workflow(app_module) -> None:
             return
         self._analysis_cancel_event = threading.Event()
         self._owned_analysis_process = None
+        self._automatic_admissible_pair_count = None
         self.result = None
         self.cache = None
         self._clear_result_presentation("Analysis is running; previous results are no longer active.")
@@ -721,9 +732,11 @@ def install_responsive_workflow(app_module) -> None:
         if self._analysis_cancel_event.is_set():
             self._cancelled()
             return
+        automatic_pair_count = len(result.pairs)
+        self._automatic_admissible_pair_count = automatic_pair_count
         original_complete(self, result)
-        state = AnalysisState.SUCCESS if result.pairs else AnalysisState.DIAGNOSTIC
-        self._set_analysis_state(state, status_text(state, pair_count=len(result.pairs)))
+        state = completion_state(automatic_pair_count)
+        self._set_analysis_state(state, status_text(state, pair_count=automatic_pair_count))
 
     def failed(self, error: Exception) -> None:
         original_failed(self, error)
@@ -735,16 +748,34 @@ def install_responsive_workflow(app_module) -> None:
             AnalysisState.ERROR,
             "Analysis could not be completed. See last_error.log in the output workspace.",
         )
+        if self._close_after_cancel:
+            self._close_after_cancel = False
+            process = self._owned_analysis_process
+            if process is not None and process.poll() is None:
+                messagebox.showwarning(
+                    "Close blocked",
+                    "The application is still tracking an Abaqus process that did not stop. "
+                    "The window will remain open so the process is not orphaned.",
+                )
+            else:
+                self._finish_close()
 
     def populate(self, result) -> None:
         original_populate(self, result)
         pairs = list(result.pairs)
+        automatic_pair_count = self._automatic_admissible_pair_count
+        automatic_diagnostic = automatic_pair_count == 0
         errors = [abs(float(pair.frequency_error_percent)) for pair in pairs]
         macs = [float(pair.mac) for pair in pairs if pair.mac is not None]
-        self.metric_pairs.configure(text=str(len(pairs)))
+        pair_text = f"{len(pairs)} manual" if automatic_diagnostic and pairs else str(len(pairs))
+        self.metric_pairs.configure(text=pair_text)
         self.metric_error.configure(text=EM_DASH if not errors else f"{sum(errors) / len(errors):.2f}%")
         self.metric_mac.configure(text=EM_DASH if not macs else f"{sum(macs) / len(macs):.3f}")
-        if pairs:
+        if automatic_diagnostic:
+            self.metric_geometry_caption.configure(text="STATE")
+            detail = "manual review only" if pairs else "gates not satisfied"
+            self.metric_geometry.configure(text=f"Diagnostic \u2014 {detail}")
+        elif pairs:
             self.metric_geometry_caption.configure(text="GEOMETRY MATCH")
             self.metric_geometry.configure(text=f"{result.geometry.matched_fraction:.1%}")
         else:
@@ -1256,7 +1287,24 @@ def install_responsive_workflow(app_module) -> None:
                 "The application will remain open so no analysis process is orphaned.",
             )
 
+    def post_to_ui(self, callback) -> bool:
+        if self._ui_closing:
+            return False
+        try:
+            self.root.after(0, lambda: callback() if not self._ui_closing else None)
+            return True
+        except (tk.TclError, RuntimeError):
+            return False
+
     def finish_close(self) -> None:
+        process = self._owned_analysis_process
+        if process is not None and process.poll() is None:
+            messagebox.showwarning(
+                "Close blocked",
+                "An Abaqus process launched by this application is still active. "
+                "Close is blocked until that owned process exits.",
+            )
+            return
         if self.dirty_tracker.dirty:
             project_name = self.project_path.name if self.project_path is not None else "this unsaved project"
             choice = _choice_dialog(
@@ -1271,6 +1319,7 @@ def install_responsive_workflow(app_module) -> None:
                 return
         if self._recovery_preferences["autosave_enabled"]:
             self._save_recovery_now()
+        self._ui_closing = True
         self.root.destroy()
 
     def set_manual_review(self, *args, **kwargs) -> None:
@@ -1348,6 +1397,7 @@ def install_responsive_workflow(app_module) -> None:
     application_class._apply_responsive_layout = apply_responsive_layout
     application_class._close_requested = close_requested
     application_class._close_stop_timeout = close_stop_timeout
+    application_class._post_to_ui = post_to_ui
     application_class._finish_close = finish_close
     application_class._set_manual_review = set_manual_review
     application_class._manual_reset = manual_reset

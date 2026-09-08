@@ -115,6 +115,16 @@ def install_runtime_hardening(app_module) -> None:
         result = None
         cache = None
 
+        def post_to_ui(callback) -> bool:
+            post = getattr(self, "_post_to_ui", None)
+            if callable(post):
+                return bool(post(callback))
+            try:
+                self.root.after(0, callback)
+                return True
+            except (tk.TclError, RuntimeError):
+                return False
+
         def check_cancelled() -> None:
             cancellation = getattr(self, "_analysis_cancel_event", None)
             if cancellation is not None and cancellation.is_set():
@@ -124,7 +134,7 @@ def install_runtime_hardening(app_module) -> None:
             check_cancelled()
             callback = getattr(self, "_set_analysis_stage", None)
             if callable(callback):
-                self.root.after(0, lambda: callback(number, text))
+                post_to_ui(lambda: callback(number, text))
 
         def remember_process(process) -> None:
             self._owned_analysis_process = process
@@ -213,19 +223,20 @@ def install_runtime_hardening(app_module) -> None:
             except Exception:
                 pass
         finally:
-            self._owned_analysis_process = None
+            owned_process = getattr(self, "_owned_analysis_process", None)
+            if owned_process is None or owned_process.poll() is not None:
+                self._owned_analysis_process = None
             if isinstance(failure, AnalysisCancelled):
                 callback = getattr(self, "_cancelled", None)
                 if callable(callback):
-                    self.root.after(0, callback)
+                    post_to_ui(callback)
                 else:
-                    self.root.after(0, lambda: self._failed(failure))
+                    post_to_ui(lambda: self._failed(failure))
             elif failure is None and result is not None and cache is not None:
                 self.cache = cache
-                self.root.after(0, lambda value=result: self._complete(value))
+                post_to_ui(lambda value=result: self._complete(value))
             else:
-                self.root.after(
-                    0,
+                post_to_ui(
                     lambda error=failure or RuntimeError("Unknown analysis failure"): self._failed(error),
                 )
 

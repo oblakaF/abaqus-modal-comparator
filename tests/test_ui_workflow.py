@@ -21,12 +21,14 @@ from ui_policy import (
     REVIEW_COLUMNS,
     button_grid_columns,
     close_decision,
+    completion_state,
     coordinate_scale_from_units,
     discover_abaqus_installations,
     metric_grid_columns,
     logical_window_width,
     non_empty_headings,
     normalize_recovery_preferences,
+    resolve_command,
     select_abaqus_installation,
     select_layout_mode,
     status_text,
@@ -123,6 +125,26 @@ class AbaqusSelectionTests(unittest.TestCase):
         self.assertEqual(len(installations), 2)
         self.assertIsNone(select_abaqus_installation(installations))
 
+    def test_same_version_launchers_keep_unique_selection_labels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            first_dir = Path(directory) / "one"
+            second_dir = Path(directory) / "two"
+            first_dir.mkdir()
+            second_dir.mkdir()
+            (first_dir / "abq2024.bat").write_text("", encoding="utf-8")
+            (second_dir / "abq2024.bat").write_text("", encoding="utf-8")
+            installations = discover_abaqus_installations(
+                path="", search_directories=(first_dir, second_dir)
+            )
+        self.assertEqual(len(installations), 2)
+        self.assertEqual(len({item.label for item in installations}), 2)
+
+    def test_explicit_launcher_path_must_be_executable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            invalid = Path(directory) / "not-a-launcher.txt"
+            invalid.write_text("not executable", encoding="utf-8")
+            self.assertIsNone(resolve_command(str(invalid)))
+
 
 class AnalysisAndProjectStateTests(unittest.TestCase):
     def test_run_stop_state_machine(self):
@@ -139,6 +161,10 @@ class AnalysisAndProjectStateTests(unittest.TestCase):
         self.assertIs(state, AnalysisState.DIAGNOSTIC)
         self.assertIn("0 admissible pairs", status_text(state))
         self.assertIn("gates were not satisfied", status_text(state))
+
+    def test_completion_uses_automatic_acceptance_not_manual_effective_pairs(self):
+        self.assertIs(completion_state(0), AnalysisState.DIAGNOSTIC)
+        self.assertIs(completion_state(1), AnalysisState.SUCCESS)
 
     def test_dirty_tracker_resets_only_to_an_explicit_baseline(self):
         tracker = DirtyTracker()
@@ -316,7 +342,13 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             application._sync_coordinate_mapping()
             self.assertEqual(application.computed_coordinate_scale.get(), "0.001")
 
-            from modal_core import ComparisonResult, GeometryMatch, ModalDataset, ModeShape
+            from modal_core import (
+                ComparisonResult,
+                GeometryMatch,
+                ModalDataset,
+                ModePairResult,
+                ModeShape,
+            )
 
             coordinates = np.asarray([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
             vectors = np.asarray([[0.0, 0.0, 1.0], [0.0, 0.0, -1.0]], dtype=complex)
@@ -350,11 +382,70 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             self.assertIn("Diagnostic", application.metric_geometry.cget("text"))
             self.assertTrue(application.table.get_children())
 
+            manual_pair = ModePairResult(
+                abaqus_mode=1,
+                experimental_mode=1,
+                abaqus_frequency_hz=10.0,
+                experimental_frequency_hz=10.0,
+                frequency_error_percent=0.0,
+                mac=1.0,
+                status="manual acceptance",
+                order_changed=False,
+                mapped_points=2,
+                abaqus_vector=vectors,
+                experimental_vector=vectors,
+                coordinates=coordinates,
+            )
+            manual_pair.manual_decision = "accepted"
+            result.pairs = [manual_pair]
+            application._automatic_admissible_pair_count = 0
+            with patch("project_review._all_elastic_abaqus_modes", return_value=[]):
+                application._populate(result)
+            self.assertEqual(application.metric_pairs.cget("text"), "1 manual")
+            self.assertIn("manual review only", application.metric_geometry.cget("text"))
+            self.assertEqual(result.pairs, [manual_pair])
+
+            posted = []
+            self.assertTrue(application._post_to_ui(lambda: posted.append("done")))
+            root.update()
+            self.assertEqual(posted, ["done"])
+            application._ui_closing = True
+            self.assertFalse(application._post_to_ui(lambda: posted.append("late")))
+            self.assertEqual(posted, ["done"])
+            application._ui_closing = False
+
             application.details.configure(state="normal")
             application.details.insert("end", "\nclipboard smoke")
             application.details.configure(state="disabled")
             self.assertTrue(dispatch_clipboard_action(application.details, "select_all"))
             self.assertTrue(dispatch_clipboard_action(application.details, "copy"))
+
+            close_calls = []
+            real_finish_close = application._finish_close
+            application._finish_close = lambda: close_calls.append("closed")
+            application._close_after_cancel = True
+            application.running = True
+            application._owned_analysis_process = None
+            with patch("tkinter.messagebox.showerror"), patch("tkinter.messagebox.showwarning"):
+                application._failed(RuntimeError("queued failure"))
+            self.assertEqual(close_calls, ["closed"])
+
+            class _StillRunning:
+                def poll(self):
+                    return None
+
+            close_calls.clear()
+            application._close_after_cancel = True
+            application.running = True
+            application._owned_analysis_process = _StillRunning()
+            with patch("tkinter.messagebox.showerror"), patch(
+                "tkinter.messagebox.showwarning"
+            ) as warning:
+                application._failed(RuntimeError("termination not confirmed"))
+            self.assertEqual(close_calls, [])
+            warning.assert_called_once()
+            application._finish_close = real_finish_close
+            application._owned_analysis_process = None
         finally:
             root.destroy()
 
