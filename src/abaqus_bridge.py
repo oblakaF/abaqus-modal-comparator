@@ -4,9 +4,11 @@ import csv
 import json
 import os
 import shlex
+import signal
 import subprocess
+import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -15,6 +17,43 @@ from modal_core import ModalDataset, ModeShape
 
 class AbaqusExtractionError(RuntimeError):
     pass
+
+
+class AnalysisCancelled(RuntimeError):
+    """Raised when the user cancels work owned by this application."""
+
+
+def cancel_owned_process(process: Optional[subprocess.Popen]) -> bool:
+    """Terminate exactly the process tree started by this application.
+
+    Abaqus launchers commonly create a ``cmd.exe`` and one or more Python/solver
+    children.  On Windows, terminating only the launcher can orphan those
+    children, so taskkill is scoped to the recorded PID and its descendants.
+    """
+    if process is None or process.poll() is not None:
+        return False
+    try:
+        if os.name == "nt":
+            completed = subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+            if completed.returncode != 0 and process.poll() is None:
+                process.terminate()
+        else:
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+            except (AttributeError, ProcessLookupError):
+                process.terminate()
+        return True
+    except (OSError, subprocess.SubprocessError):
+        try:
+            process.terminate()
+            return True
+        except OSError:
+            return False
 
 
 def _windows_command(executable: str, arguments: List[str]) -> List[str]:
@@ -29,6 +68,8 @@ def run_abaqus_extraction(
     start_mode: int = 6,
     end_mode: int = 14,
     timeout_seconds: int = 3600,
+    cancel_event=None,
+    process_callback: Optional[Callable[[Optional[subprocess.Popen]], None]] = None,
 ) -> Path:
     odb_path = Path(odb_path).resolve()
     output_directory = Path(output_directory).resolve()
@@ -57,39 +98,62 @@ def run_abaqus_extraction(
         else shlex.split(executable) + arguments
     )
 
+    log_path = output_directory / "abaqus_extraction.log"
+    process: Optional[subprocess.Popen] = None
+    started = time.monotonic()
     try:
-        completed = subprocess.run(
-            command,
-            cwd=str(script_path.parent),
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            check=False,
-        )
+        with log_path.open("w", encoding="utf-8") as log:
+            log.write("COMMAND\n" + " ".join(command) + "\n\nOUTPUT\n")
+            log.flush()
+            popen_options = {
+                "cwd": str(script_path.parent),
+                "stdout": log,
+                "stderr": subprocess.STDOUT,
+                "text": True,
+            }
+            if os.name == "nt":
+                popen_options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                popen_options["start_new_session"] = True
+            process = subprocess.Popen(command, **popen_options)
+            if process_callback is not None:
+                process_callback(process)
+            while process.poll() is None:
+                if cancel_event is not None and cancel_event.is_set():
+                    cancel_owned_process(process)
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        cancel_owned_process(process)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired as error:
+                            raise AbaqusExtractionError(
+                                "The owned Abaqus process did not stop within the cancellation timeout."
+                            ) from error
+                    raise AnalysisCancelled("Analysis stopped by user.")
+                if time.monotonic() - started > timeout_seconds:
+                    cancel_owned_process(process)
+                    raise AbaqusExtractionError(
+                        f"Abaqus extraction exceeded {timeout_seconds // 60} minutes."
+                    )
+                time.sleep(0.1)
+            return_code = int(process.returncode or 0)
     except FileNotFoundError as error:
         raise AbaqusExtractionError(
-            "The Abaqus command could not be started. Enter the command used on this "
-            "computer, for example 'abaqus', 'abq2024', or the full path to a .bat file."
+            "No valid Abaqus installation was found. Choose Detect again, "
+            "Browse, or Advanced command."
         ) from error
-    except subprocess.TimeoutExpired as error:
-        raise AbaqusExtractionError(
-            f"Abaqus extraction exceeded {timeout_seconds // 60} minutes."
-        ) from error
-
-    log_path = output_directory / "abaqus_extraction.log"
-    log_path.write_text(
-        "COMMAND\n"
-        + " ".join(command)
-        + "\n\nSTDOUT\n"
-        + completed.stdout
-        + "\n\nSTDERR\n"
-        + completed.stderr,
-        encoding="utf-8",
-    )
+    finally:
+        if process_callback is not None:
+            process_callback(None)
 
     manifest_path = output_directory / "manifest.json"
-    if completed.returncode != 0 or not manifest_path.exists():
-        tail = (completed.stderr or completed.stdout or "No output was produced.")[-4000:]
+    if return_code != 0 or not manifest_path.exists():
+        try:
+            tail = log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
+        except OSError:
+            tail = "No output was produced."
         raise AbaqusExtractionError(
             "Abaqus could not extract the ODB results.\n\n"
             + tail
@@ -230,6 +294,8 @@ def load_or_extract_odb(
     abaqus_command: str,
     start_mode: int,
     end_mode: int,
+    cancel_event=None,
+    process_callback: Optional[Callable[[Optional[subprocess.Popen]], None]] = None,
 ) -> ModalDataset:
     selected = Path(odb_or_manifest_path)
     if selected.name.lower() == "manifest.json":
@@ -256,6 +322,8 @@ def load_or_extract_odb(
         abaqus_command=abaqus_command,
         start_mode=start_mode,
         end_mode=end_mode,
+        cancel_event=cancel_event,
+        process_callback=process_callback,
     )
     (cache_directory / "extraction_signature.json").write_text(
         json.dumps(signature, indent=2, sort_keys=True), encoding="utf-8"

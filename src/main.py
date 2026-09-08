@@ -50,6 +50,7 @@ from responsive_status_bar import install_responsive_status_bar
 from runtime_contracts import verify_runtime_contracts
 from runtime_hardening import install_runtime_hardening
 from ui_enhancements import install_app_enhancements
+from ui_workflow import enable_windows_dpi_awareness, install_responsive_workflow
 
 install_app_enhancements(app)
 install_runtime_hardening(app)
@@ -67,8 +68,10 @@ install_help_ui(app)
 install_menu_ui(app)
 install_idle_ui_state(app)
 install_responsive_status_bar(app)
+install_responsive_workflow(app)
 verify_runtime_contracts(app)
 
 
 if __name__ == "__main__":
+    enable_windows_dpi_awareness()
     app.main()

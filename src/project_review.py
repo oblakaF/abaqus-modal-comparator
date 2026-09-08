@@ -579,17 +579,26 @@ def install_project_review(app_module) -> None:
         window.transient(self.root)
         window.grab_set()
         columns = ("em", "freq", "error", "mac", "source")
-        table = ttk.Treeview(window, columns=columns, show="headings", selectmode="browse")
+        table_frame = ttk.Frame(window)
+        table_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        table = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
         for key, title, width in (
             ("em", "Experimental mode", 125),
-            ("freq", "Frequency, Hz", 120),
-            ("error", "Signed error, %", 115),
+            ("freq", "Experimental frequency, Hz", 175),
+            ("error", "Frequency error, %", 135),
             ("mac", "MAC", 90),
-            ("source", "Source", 190),
+            ("source", "Experimental source", 190),
         ):
             table.heading(key, text=title)
-            table.column(key, width=width, anchor="center")
-        table.pack(fill="both", expand=True, padx=10, pady=10)
+            table.column(key, width=width, minwidth=min(width, 115), anchor="center")
+        y_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=table.yview)
+        x_scroll = ttk.Scrollbar(table_frame, orient="horizontal", command=table.xview)
+        table.configure(yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set)
+        table.grid(row=0, column=0, sticky="nsew")
+        y_scroll.grid(row=0, column=1, sticky="ns")
+        x_scroll.grid(row=1, column=0, sticky="ew")
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
         candidates: Dict[str, ModePairResult] = {}
         used_modes = {
             int(pair.experimental_mode): int(pair.abaqus_mode)
