@@ -46,6 +46,36 @@ DIAGNOSTIC_SHAPE_MESSAGE = (
     "No accepted mode pairs.\n"
     "See MAC and frequencies / Manual review for diagnostic candidates."
 )
+ANALYSIS_CONFIGURATION_CONTROL_NAMES = (
+    "abaqus_path",
+    "abaqus_path_browse",
+    "experimental_path",
+    "experimental_path_browse",
+    "start_mode",
+    "end_mode",
+    "abaqus_installation",
+    "detect_abaqus",
+    "browse_abaqus",
+    "test_abaqus",
+    "advanced_command_toggle",
+    "advanced_command",
+    "abaqus_model_unit",
+    "experimental_coordinate_unit",
+    "automatic_scale",
+    "custom_scale",
+    "custom_scale_input",
+    "workspace_path",
+    "workspace_path_browse",
+)
+
+
+def set_configuration_controls_locked(controls, locked: bool) -> None:
+    """Freeze or restore every widget that defines an active analysis run."""
+    for widget, idle_state in controls.values():
+        try:
+            widget.configure(state="disabled" if locked else idle_state)
+        except tk.TclError:
+            continue
 
 
 def enable_windows_dpi_awareness() -> bool:
@@ -324,6 +354,7 @@ def install_responsive_workflow(app_module) -> None:
         self._responsive_wrap_labels = []
         self._tooltips = []
         self._abaqus_installations = {}
+        self._analysis_configuration_controls = {}
         self.analysis_state = AnalysisState.NO_DATA
         self.dirty_tracker = DirtyTracker()
 
@@ -388,11 +419,11 @@ def install_responsive_workflow(app_module) -> None:
             return frame
 
         source = section("SOURCE FILES")
-        self.abaqus_path_entry, _ = self._responsive_file_row(
+        self.abaqus_path_entry, abaqus_path_browse = self._responsive_file_row(
             source, 0, "Abaqus results", self.abaqus_path, self._choose_abaqus,
             "Select an .odb file or an extracted manifest.json."
         )
-        self.experimental_path_entry, _ = self._responsive_file_row(
+        self.experimental_path_entry, experimental_path_browse = self._responsive_file_row(
             source, 2, "Experimental results", self.experimental_path, self._choose_experiment,
             "Select UNV/UFF data; an LMS file is accepted when its exported UNV/UFF is beside it."
         )
@@ -401,9 +432,15 @@ def install_responsive_workflow(app_module) -> None:
         ttk.Label(analysis, text="Abaqus mode range:").grid(row=0, column=0, sticky="w", pady=4)
         mode_box = ttk.Frame(analysis)
         mode_box.grid(row=0, column=1, sticky="w", padx=(10, 0), pady=4)
-        ttk.Spinbox(mode_box, from_=1, to=999, textvariable=self.start_mode, width=7).pack(side="left")
+        self.start_mode_spinbox = ttk.Spinbox(
+            mode_box, from_=1, to=999, textvariable=self.start_mode, width=7
+        )
+        self.start_mode_spinbox.pack(side="left")
         ttk.Label(mode_box, text="to").pack(side="left", padx=7)
-        ttk.Spinbox(mode_box, from_=1, to=999, textvariable=self.end_mode, width=7).pack(side="left")
+        self.end_mode_spinbox = ttk.Spinbox(
+            mode_box, from_=1, to=999, textvariable=self.end_mode, width=7
+        )
+        self.end_mode_spinbox.pack(side="left")
         mode_help = ttk.Label(
             analysis,
             text="Rigid and near-zero modes are excluded automatically; experimental modes are detected from the measurement file.",
@@ -423,17 +460,27 @@ def install_responsive_workflow(app_module) -> None:
         self.abaqus_installation_combo.bind("<<ComboboxSelected>>", self._select_abaqus_installation, add="+")
         detect_buttons = ttk.Frame(abaqus)
         detect_buttons.grid(row=0, column=2, sticky="e", padx=(10, 0))
-        ttk.Button(detect_buttons, text="Detect again", command=self._detect_abaqus_installations).pack(side="left")
-        ttk.Button(detect_buttons, text="Browse...", command=self._browse_abaqus_command).pack(side="left", padx=5)
-        ttk.Button(detect_buttons, text="Test Abaqus", command=self._test_abaqus).pack(side="left")
+        self.detect_abaqus_button = ttk.Button(
+            detect_buttons, text="Detect again", command=self._detect_abaqus_installations
+        )
+        self.detect_abaqus_button.pack(side="left")
+        self.browse_abaqus_button = ttk.Button(
+            detect_buttons, text="Browse...", command=self._browse_abaqus_command
+        )
+        self.browse_abaqus_button.pack(side="left", padx=5)
+        self.test_abaqus_button = ttk.Button(
+            detect_buttons, text="Test Abaqus", command=self._test_abaqus
+        )
+        self.test_abaqus_button.pack(side="left")
         self.abaqus_warning_label = ttk.Label(abaqus, textvariable=self.abaqus_detection_status, style="Secondary.TLabel")
         self.abaqus_warning_label.grid(row=1, column=1, columnspan=2, sticky="w", padx=(10, 0))
-        ttk.Checkbutton(
+        self.abaqus_advanced_checkbutton = ttk.Checkbutton(
             abaqus,
             text="Advanced command",
             variable=self.show_abaqus_advanced,
             command=self._toggle_abaqus_advanced,
-        ).grid(row=2, column=0, sticky="w", pady=(7, 2))
+        )
+        self.abaqus_advanced_checkbutton.grid(row=2, column=0, sticky="w", pady=(7, 2))
         self.abaqus_advanced_frame = ttk.Frame(abaqus)
         self.abaqus_advanced_frame.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(10, 0), pady=(7, 2))
         self.abaqus_advanced_frame.columnconfigure(0, weight=1)
@@ -460,8 +507,22 @@ def install_responsive_workflow(app_module) -> None:
         ttk.Label(geometry, text="Coordinate mapping:").grid(row=2, column=0, sticky="nw", pady=4)
         mapping = ttk.Frame(geometry)
         mapping.grid(row=2, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
-        ttk.Radiobutton(mapping, text="Automatic from units / alignment", variable=self.coordinate_mapping_mode, value="automatic", command=self._sync_coordinate_mapping).pack(anchor="w")
-        ttk.Radiobutton(mapping, text="Custom scale factor", variable=self.coordinate_mapping_mode, value="custom", command=self._sync_coordinate_mapping).pack(anchor="w")
+        self.automatic_scale_radio = ttk.Radiobutton(
+            mapping,
+            text="Automatic from units / alignment",
+            variable=self.coordinate_mapping_mode,
+            value="automatic",
+            command=self._sync_coordinate_mapping,
+        )
+        self.automatic_scale_radio.pack(anchor="w")
+        self.custom_scale_radio = ttk.Radiobutton(
+            mapping,
+            text="Custom scale factor",
+            variable=self.coordinate_mapping_mode,
+            value="custom",
+            command=self._sync_coordinate_mapping,
+        )
+        self.custom_scale_radio.pack(anchor="w")
         self.custom_scale_frame = ttk.Frame(geometry)
         self.custom_scale_frame.grid(row=3, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
         ttk.Label(self.custom_scale_frame, text="Custom scale:").pack(side="left")
@@ -483,10 +544,32 @@ def install_responsive_workflow(app_module) -> None:
         ))
 
         output = section("OUTPUT")
-        self.workspace_path_entry, _ = self._responsive_file_row(
+        self.workspace_path_entry, workspace_path_browse = self._responsive_file_row(
             output, 0, "Output workspace", self.workspace_path, self._choose_workspace,
             "Extraction cache, diagnostic logs, plots and report data are written here."
         )
+
+        self._analysis_configuration_controls = {
+            "abaqus_path": (self.abaqus_path_entry, "normal"),
+            "abaqus_path_browse": (abaqus_path_browse, "normal"),
+            "experimental_path": (self.experimental_path_entry, "normal"),
+            "experimental_path_browse": (experimental_path_browse, "normal"),
+            "start_mode": (self.start_mode_spinbox, "normal"),
+            "end_mode": (self.end_mode_spinbox, "normal"),
+            "abaqus_installation": (self.abaqus_installation_combo, "readonly"),
+            "detect_abaqus": (self.detect_abaqus_button, "normal"),
+            "browse_abaqus": (self.browse_abaqus_button, "normal"),
+            "test_abaqus": (self.test_abaqus_button, "normal"),
+            "advanced_command_toggle": (self.abaqus_advanced_checkbutton, "normal"),
+            "advanced_command": (self.abaqus_command_entry, "normal"),
+            "abaqus_model_unit": (self.abaqus_unit_combo, "readonly"),
+            "experimental_coordinate_unit": (self.experimental_unit_combo, "readonly"),
+            "automatic_scale": (self.automatic_scale_radio, "normal"),
+            "custom_scale": (self.custom_scale_radio, "normal"),
+            "custom_scale_input": (self.custom_scale_entry, "normal"),
+            "workspace_path": (self.workspace_path_entry, "normal"),
+            "workspace_path_browse": (workspace_path_browse, "normal"),
+        }
 
         actions = ttk.Frame(content)
         actions.pack(fill="x", pady=(2, 10))
@@ -678,6 +761,14 @@ def install_responsive_workflow(app_module) -> None:
         if message is None:
             message = status_text(self.analysis_state)
         self.status.set(message)
+        configuration_locked = self.analysis_state in {
+            AnalysisState.RUNNING,
+            AnalysisState.STOPPING,
+        }
+        set_configuration_controls_locked(
+            self._analysis_configuration_controls,
+            configuration_locked,
+        )
         if self.analysis_state in {AnalysisState.RUNNING}:
             self.run_button.configure(state="disabled")
             self.stop_button.configure(state="normal")

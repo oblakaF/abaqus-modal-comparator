@@ -38,7 +38,11 @@ from ui_policy import (
     transition_analysis_state,
     validate_custom_scale,
 )
-from ui_workflow import dispatch_clipboard_action
+from ui_workflow import (
+    ANALYSIS_CONFIGURATION_CONTROL_NAMES,
+    dispatch_clipboard_action,
+    set_configuration_controls_locked,
+)
 
 
 class ResponsivePolicyTests(unittest.TestCase):
@@ -91,6 +95,8 @@ class ResponsivePolicyTests(unittest.TestCase):
 class CoordinateUnitTests(unittest.TestCase):
     def test_named_units_convert_abaqus_coordinates_to_experimental_units(self):
         self.assertAlmostEqual(coordinate_scale_from_units("mm", "m"), 0.001)
+        self.assertAlmostEqual(coordinate_scale_from_units("mm", "mm"), 1.0)
+        self.assertAlmostEqual(coordinate_scale_from_units("m", "m"), 1.0)
         self.assertAlmostEqual(coordinate_scale_from_units("m", "mm"), 1000.0)
         self.assertAlmostEqual(coordinate_scale_from_units("cm", "mm"), 10.0)
 
@@ -138,6 +144,25 @@ class AbaqusSelectionTests(unittest.TestCase):
             )
         self.assertEqual(len(installations), 2)
         self.assertEqual(len({item.label for item in installations}), 2)
+
+    def test_generic_alias_is_deduplicated_by_resolved_launcher_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            explicit = root / "abq2027.bat"
+            alias = root / "abaqus.bat"
+            explicit.write_text("@echo off\n", encoding="utf-8")
+            alias.write_text(f'@echo off\n"{explicit}" %*\n', encoding="utf-8")
+            installations = discover_abaqus_installations(
+                path="", search_directories=(root,)
+            )
+        self.assertEqual(len(installations), 1)
+        self.assertIn("2027", installations[0].label)
+        self.assertEqual(installations[0].command, str(explicit.resolve()))
+        self.assertEqual(installations[0].fallback_commands, (str(alias.resolve()),))
+        self.assertEqual(
+            select_abaqus_installation(installations, str(alias.resolve())),
+            installations[0],
+        )
 
     def test_explicit_launcher_path_must_be_executable(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -216,6 +241,10 @@ class _FakeEntry:
     def cget(self, key):
         return self.state
 
+    def configure(self, **kwargs):
+        if "state" in kwargs:
+            self.state = kwargs["state"]
+
     def get(self):
         return self.value
 
@@ -278,6 +307,22 @@ class ClipboardDispatchTests(unittest.TestCase):
         self.assertEqual(entry.value, "alpha beta")
 
 
+class ConfigurationLockTests(unittest.TestCase):
+    def test_all_registered_controls_are_frozen_and_restore_their_idle_state(self):
+        normal = _FakeEntry()
+        readonly = _FakeEntry(state="readonly")
+        controls = {
+            "entry": (normal, "normal"),
+            "combobox": (readonly, "readonly"),
+        }
+        set_configuration_controls_locked(controls, True)
+        self.assertEqual(normal.state, "disabled")
+        self.assertEqual(readonly.state, "disabled")
+        set_configuration_controls_locked(controls, False)
+        self.assertEqual(normal.state, "normal")
+        self.assertEqual(readonly.state, "readonly")
+
+
 class TkRuntimeSmokeTests(unittest.TestCase):
     def test_runtime_builds_nine_resizable_tabs_with_complete_headings(self):
         try:
@@ -299,6 +344,52 @@ class TkRuntimeSmokeTests(unittest.TestCase):
                 ui_workflow, "discover_abaqus_installations", return_value=()
             ):
                 application = main.app.ModalComparatorApp(root)
+            self.assertEqual(
+                tuple(application._analysis_configuration_controls),
+                ANALYSIS_CONFIGURATION_CONTROL_NAMES,
+            )
+            application._set_analysis_state(AnalysisState.RUNNING)
+            running_control_states = {
+                name: str(widget.cget("state"))
+                for name, (widget, _idle_state) in application._analysis_configuration_controls.items()
+            }
+            self.assertEqual(
+                running_control_states,
+                {name: "disabled" for name in ANALYSIS_CONFIGURATION_CONTROL_NAMES},
+            )
+            self.assertEqual(str(application.run_button.cget("state")), "disabled")
+            self.assertEqual(str(application.stop_button.cget("state")), "normal")
+            self.assertEqual(str(application.folder_button.cget("state")), "normal")
+            original_path = application.abaqus_path.get()
+            application.abaqus_path_entry.insert("end", "cannot-change")
+            self.assertEqual(application.abaqus_path.get(), original_path)
+
+            application._set_analysis_state(AnalysisState.STOPPING)
+            self.assertTrue(
+                all(
+                    str(widget.cget("state")) == "disabled"
+                    for widget, _idle_state in application._analysis_configuration_controls.values()
+                )
+            )
+            self.assertEqual(str(application.run_button.cget("state")), "disabled")
+            self.assertEqual(str(application.stop_button.cget("state")), "disabled")
+
+            for terminal_state in (
+                AnalysisState.STOPPED,
+                AnalysisState.SUCCESS,
+                AnalysisState.DIAGNOSTIC,
+                AnalysisState.ERROR,
+            ):
+                application._set_analysis_state(terminal_state)
+                self.assertTrue(
+                    all(
+                        str(widget.cget("state")) == idle_state
+                        for widget, idle_state in application._analysis_configuration_controls.values()
+                    )
+                )
+                self.assertEqual(str(application.run_button.cget("state")), "normal")
+                self.assertEqual(str(application.stop_button.cget("state")), "disabled")
+                self.assertEqual(str(application.folder_button.cget("state")), "normal")
             root.geometry("1024x700")
             root.update_idletasks()
             application._apply_responsive_layout()

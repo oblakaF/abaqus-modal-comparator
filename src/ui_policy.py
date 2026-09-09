@@ -260,14 +260,84 @@ class AbaqusInstallation:
     label: str
     command: str
     detected: bool = True
+    fallback_commands: tuple[str, ...] = ()
 
 
-def _installation_label(command: str) -> str:
-    name = Path(command).stem
-    match = re.search(r"(?:abq|abaqus)[-_ ]?(20\d{2})", name, re.IGNORECASE)
-    if match:
-        return f"Abaqus {match.group(1)} \u2014 detected \u2713"
+def _launcher_version(paths: Sequence[Path]) -> Optional[str]:
+    for path in paths:
+        match = re.search(r"(?:abq|abaqus)[-_ ]?(20\d{2})", path.stem, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    for path in paths:
+        match = re.search(r"(?:^|[\\/])(20\d{2})(?:[\\/]|$)", str(path))
+        if match:
+            return match.group(1)
+    return None
+
+
+def _installation_label(command: str, version: Optional[str] = None) -> str:
+    version = version or _launcher_version((Path(command),))
+    if version:
+        return f"Abaqus {version} \u2014 detected \u2713"
     return "Abaqus \u2014 detected \u2713"
+
+
+def _referenced_launcher(path: Path) -> Optional[Path]:
+    """Return the next launcher referenced by a small batch wrapper, if any."""
+    if path.suffix.lower() not in {".bat", ".cmd"}:
+        return None
+    try:
+        contents = path.read_text(encoding="utf-8", errors="ignore")[:65_536]
+    except OSError:
+        return None
+
+    candidates = re.findall(r'"([^"\r\n]+\.(?:bat|cmd|exe))"', contents, re.IGNORECASE)
+    candidates.extend(
+        re.findall(
+            r"(?:^|\s)([^\s\"']+\.(?:bat|cmd|exe))(?=\s|$)",
+            contents,
+            re.IGNORECASE | re.MULTILINE,
+        )
+    )
+    for value in candidates:
+        expanded = value.replace("%~dp0", str(path.parent) + os.sep)
+        expanded = os.path.expandvars(expanded)
+        candidate = Path(expanded)
+        if not candidate.is_absolute():
+            local = path.parent / candidate
+            resolved = local if local.is_file() else Path(shutil.which(str(candidate)) or "")
+        else:
+            resolved = candidate
+        try:
+            if resolved.is_file() and resolved.resolve() != path.resolve():
+                return resolved.resolve()
+        except OSError:
+            continue
+    return None
+
+
+def _launcher_chain(command: str) -> tuple[Path, ...]:
+    current = Path(command).resolve()
+    chain = [current]
+    seen = {str(current).lower()}
+    for _ in range(8):
+        referenced = _referenced_launcher(current)
+        if referenced is None or str(referenced).lower() in seen:
+            break
+        chain.append(referenced)
+        seen.add(str(referenced).lower())
+        current = referenced
+    return tuple(chain)
+
+
+def _prefer_explicit_launcher(commands: Sequence[str]) -> str:
+    def score(command: str) -> tuple[int, int, str]:
+        path = Path(command)
+        explicit = _launcher_version((path,)) is not None
+        batch_wrapper = path.suffix.lower() in {".bat", ".cmd"}
+        return (int(explicit), int(batch_wrapper), command.lower())
+
+    return max(commands, key=score)
 
 
 def discover_abaqus_installations(
@@ -311,7 +381,33 @@ def discover_abaqus_installations(
             except OSError:
                 continue
 
-    installations = sorted(found.values(), key=lambda item: (item.label.lower(), item.command.lower()))
+    equivalent: dict[str, list[str]] = {}
+    chains: dict[str, tuple[Path, ...]] = {}
+    for installation in found.values():
+        chain = _launcher_chain(installation.command)
+        identity = str(chain[-1]).lower()
+        equivalent.setdefault(identity, []).append(installation.command)
+        chains[installation.command.lower()] = chain
+
+    deduplicated = []
+    for commands in equivalent.values():
+        preferred = _prefer_explicit_launcher(commands)
+        chain = chains[preferred.lower()]
+        version = _launcher_version(chain)
+        fallbacks = tuple(
+            command for command in sorted(commands, key=str.lower) if command != preferred
+        )
+        deduplicated.append(
+            AbaqusInstallation(
+                _installation_label(preferred, version),
+                preferred,
+                fallback_commands=fallbacks,
+            )
+        )
+
+    installations = sorted(
+        deduplicated, key=lambda item: (item.label.lower(), item.command.lower())
+    )
     label_counts: dict[str, int] = {}
     for installation in installations:
         label_counts[installation.label] = label_counts.get(installation.label, 0) + 1
@@ -322,6 +418,7 @@ def discover_abaqus_installations(
             f"{installation.label} [{installation.command}]",
             installation.command,
             installation.detected,
+            installation.fallback_commands,
         )
         for installation in installations
     )
@@ -334,7 +431,8 @@ def select_abaqus_installation(
     if current_command:
         current = str(Path(resolve_command(current_command) or current_command).expanduser()).lower()
         for installation in installations:
-            if installation.command.lower() == current:
+            commands = (installation.command, *installation.fallback_commands)
+            if any(command.lower() == current for command in commands):
                 return installation
     return installations[0] if len(installations) == 1 else None
 
