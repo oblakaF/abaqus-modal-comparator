@@ -42,6 +42,10 @@ RESIZE_DEBOUNCE_MS = 90
 AUTOSAVE_DEBOUNCE_MS = 650
 STOP_CLOSE_TIMEOUT_MS = 12_000
 RECOVERY_SETTINGS_NAME = "ui_preferences.json"
+DIAGNOSTIC_SHAPE_MESSAGE = (
+    "No accepted mode pairs.\n"
+    "See MAC and frequencies / Manual review for diagnostic candidates."
+)
 
 
 def enable_windows_dpi_awareness() -> bool:
@@ -735,6 +739,11 @@ def install_responsive_workflow(app_module) -> None:
         automatic_pair_count = len(result.pairs)
         self._automatic_admissible_pair_count = automatic_pair_count
         original_complete(self, result)
+        if not result.pairs:
+            self._set_mode_shape_placeholder(DIAGNOSTIC_SHAPE_MESSAGE)
+        range_notice = result.metadata.get("extraction_range_notice")
+        if range_notice:
+            self.abaqus_detection_status.set(str(range_notice))
         state = completion_state(automatic_pair_count)
         self._set_analysis_state(state, status_text(state, pair_count=automatic_pair_count))
 
@@ -781,14 +790,14 @@ def install_responsive_workflow(app_module) -> None:
         else:
             self.metric_geometry_caption.configure(text="STATE")
             self.metric_geometry.configure(text="Diagnostic \u2014 gates not satisfied")
-            if not self.table.get_children():
-                values = [""] * len(self.table["columns"])
-                columns = list(self.table["columns"])
-                if "status" in columns:
-                    values[columns.index("status")] = "Diagnostic \u2014 no admissible pairs"
-                if "comment" in columns:
-                    values[columns.index("comment")] = "Scientific acceptance gates were not satisfied."
-                self.table.insert("", "end", values=values, tags=("diagnostic",))
+        if not pairs and not self.table.get_children():
+            values = [""] * len(self.table["columns"])
+            columns = list(self.table["columns"])
+            if "status" in columns:
+                values[columns.index("status")] = "Diagnostic \u2014 no admissible pairs"
+            if "comment" in columns:
+                values[columns.index("comment")] = "Scientific acceptance gates were not satisfied."
+            self.table.insert("", "end", values=values, tags=("diagnostic",))
         if self.experimental_unit_source.get() != "manually selected":
             try:
                 unit, source = experimental_unit_from_metadata(result.experimental.metadata)
@@ -1171,10 +1180,9 @@ def install_responsive_workflow(app_module) -> None:
         ] + list(getattr(self, "shape_labels", ()))
         for label in labels:
             if label is not None:
-                try:
-                    label.configure(image="", text=message, anchor="center")
-                except tk.TclError:
-                    pass
+                self._set_visual_placeholder(label, message)
+        if hasattr(self, "pair_title"):
+            self.pair_title.configure(text=message)
         if hasattr(self, "details"):
             self.details.configure(state="normal")
             self.details.delete("1.0", "end")
@@ -1185,6 +1193,30 @@ def install_responsive_workflow(app_module) -> None:
             self.cmif_summary.delete("1.0", "end")
             self.cmif_summary.insert("1.0", message)
             self.cmif_summary.configure(state="disabled")
+
+    def set_visual_placeholder(self, label, message: str) -> None:
+        jobs = getattr(self, "_responsive_resize_jobs", {})
+        job = jobs.pop(label, None)
+        if job is not None:
+            try:
+                self.root.after_cancel(job)
+            except tk.TclError:
+                pass
+        key = getattr(self, "_responsive_label_keys", {}).pop(label, None)
+        if key is not None:
+            getattr(self, "_responsive_sources", {}).pop(key, None)
+            self.photos.pop(key, None)
+        getattr(self, "_responsive_last_render", {}).pop(label, None)
+        try:
+            label.configure(image="", text=message, anchor="center")
+        except tk.TclError:
+            pass
+
+    def set_mode_shape_placeholder(self, message: str) -> None:
+        for label in getattr(self, "shape_labels", ()):
+            self._set_visual_placeholder(label, message)
+        if hasattr(self, "pair_title"):
+            self.pair_title.configure(text=message)
 
     def collect_responsive_widgets(self) -> None:
         for widget in _walk(self.root):
@@ -1391,6 +1423,8 @@ def install_responsive_workflow(app_module) -> None:
     application_class._show_recovery_settings = show_recovery_settings
     application_class._refresh_readiness = refresh_readiness
     application_class._set_empty_states = set_empty_states
+    application_class._set_visual_placeholder = set_visual_placeholder
+    application_class._set_mode_shape_placeholder = set_mode_shape_placeholder
     application_class._clear_result_presentation = clear_result_presentation
     application_class._collect_responsive_widgets = collect_responsive_widgets
     application_class._schedule_responsive_layout = schedule_responsive_layout

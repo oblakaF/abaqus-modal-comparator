@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Optional
 
-from abaqus_bridge import AnalysisCancelled
+from abaqus_bridge import AnalysisCancelled, extraction_range_notice
 from quality_control import _detect_rigid_modes
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
@@ -160,6 +160,9 @@ def install_runtime_hardening(app_module) -> None:
                 cancel_event=getattr(self, "_analysis_cancel_event", None),
                 process_callback=remember_process,
             )
+            range_notice = extraction_range_notice(abaqus_data.metadata)
+            if range_notice is not None:
+                abaqus_data.metadata["extraction_range_notice"] = range_notice
             check_cancelled()
             _, retained_modes, _, _ = _detect_rigid_modes(abaqus_data)
             target_frequencies = [mode.frequency_hz for mode in retained_modes]
@@ -176,6 +179,10 @@ def install_runtime_hardening(app_module) -> None:
                 experiment_data,
                 coordinate_scale_override=scale_override,
             )
+            if range_notice is not None:
+                result.metadata["extraction_range_notice"] = range_notice
+                if range_notice not in result.warnings:
+                    result.warnings.insert(0, range_notice)
             stage(4, "Modal comparison")
             check_cancelled()
 

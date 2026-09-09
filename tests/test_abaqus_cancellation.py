@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -13,6 +14,8 @@ from abaqus_bridge import (
     AbaqusExtractionError,
     AnalysisCancelled,
     cancel_owned_process,
+    extraction_range_notice,
+    load_or_extract_odb,
     run_abaqus_extraction,
     stop_owned_process_and_wait,
 )
@@ -43,6 +46,53 @@ class _CancellationAfterLaunch:
 
 
 class AbaqusCancellationTests(unittest.TestCase):
+    def test_exact_available_range_needs_no_clipping_notice(self):
+        manifest = {
+            "start_mode": 7,
+            "end_mode": 16,
+            "modes": [{"mode": mode} for mode in range(7, 17)],
+        }
+        self.assertIsNone(extraction_range_notice(manifest))
+
+    def test_upper_request_beyond_available_range_is_reported(self):
+        manifest = {
+            "start_mode": 7,
+            "end_mode": 30,
+            "modes": [{"mode": mode} for mode in range(7, 17)],
+        }
+        notice = extraction_range_notice(manifest)
+        self.assertIn("Requested Abaqus modes 7-30", notice)
+        self.assertIn("Using modes 7-16", notice)
+
+    def test_repeated_load_reuses_extraction_instead_of_launching_twice(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            odb = root / "model.odb"
+            odb.write_bytes(b"odb")
+            cache = root / "cache"
+
+            def extract(**kwargs):
+                output = Path(kwargs["output_directory"])
+                mode_file = output / "mode_0007.csv"
+                mode_file.write_text("mode", encoding="utf-8")
+                manifest = output / "manifest.json"
+                manifest.write_text(
+                    '{"start_mode": 7, "end_mode": 7, "modes": '
+                    '[{"mode": 7, "file": "mode_0007.csv"}]}',
+                    encoding="utf-8",
+                )
+                return manifest
+
+            with patch("abaqus_bridge.run_abaqus_extraction", side_effect=extract) as run, patch(
+                "abaqus_bridge.load_extracted_odb",
+                side_effect=lambda _path: SimpleNamespace(metadata={}),
+            ):
+                first = load_or_extract_odb(odb, cache, "abaqus", 7, 7)
+                second = load_or_extract_odb(odb, cache, "abaqus", 7, 7)
+        run.assert_called_once()
+        self.assertFalse(first.metadata["extraction_cache_reused"])
+        self.assertTrue(second.metadata["extraction_cache_reused"])
+
     def test_windows_termination_is_scoped_to_owned_pid_tree(self):
         process = _OwnedProcess()
         with patch("abaqus_bridge.subprocess.run") as run:

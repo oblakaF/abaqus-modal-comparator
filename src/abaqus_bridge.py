@@ -8,7 +8,7 @@ import signal
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 import numpy as np
 
@@ -21,6 +21,35 @@ class AbaqusExtractionError(RuntimeError):
 
 class AnalysisCancelled(RuntimeError):
     """Raised when the user cancels work owned by this application."""
+
+
+def extraction_range_notice(manifest: Mapping[str, Any]) -> Optional[str]:
+    """Describe a requested modal range clipped by available extraction frames."""
+    try:
+        requested_start = int(manifest["start_mode"])
+        requested_end = int(manifest["end_mode"])
+        extracted = sorted({int(item["mode"]) for item in manifest.get("modes", ())})
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not extracted:
+        return None
+    effective_start, effective_end = extracted[0], extracted[-1]
+    contiguous = extracted == list(range(effective_start, effective_end + 1))
+    if (
+        contiguous
+        and effective_start == requested_start
+        and effective_end == requested_end
+    ):
+        return None
+    effective = (
+        f"{effective_start}-{effective_end}"
+        if contiguous
+        else ", ".join(str(mode) for mode in extracted)
+    )
+    return (
+        f"Requested Abaqus modes {requested_start}-{requested_end}; available extraction "
+        f"frames yielded modes {effective}. Using modes {effective}."
+    )
 
 
 def cancel_owned_process(process: Optional[subprocess.Popen]) -> bool:
@@ -261,6 +290,9 @@ def load_extracted_odb(manifest_path: Path) -> ModalDataset:
 
     if not modes:
         raise ValueError("The extracted Abaqus package contains no modes.")
+    notice = extraction_range_notice(manifest)
+    if notice is not None:
+        manifest["extraction_range_notice"] = notice
     return ModalDataset(
         source_name="Abaqus ODB",
         source_path=Path(manifest.get("odb_path", manifest_path)),

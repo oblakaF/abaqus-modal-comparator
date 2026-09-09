@@ -155,6 +155,8 @@ class AnalysisAndProjectStateTests(unittest.TestCase):
         state = transition_analysis_state(state, "stopped")
         self.assertIs(state, AnalysisState.STOPPED)
         self.assertEqual(status_text(state), "Analysis stopped by user.")
+        state = transition_analysis_state(state, "run")
+        self.assertIs(state, AnalysisState.RUNNING)
 
     def test_diagnostic_completion_is_not_an_error(self):
         state = transition_analysis_state(AnalysisState.RUNNING, "diagnostic")
@@ -376,8 +378,25 @@ class TkRuntimeSmokeTests(unittest.TestCase):
                 experimental_mode_numbers=[1],
                 diagnostic_state="no_admissible_pairs",
             )
+            running_placeholder = "Analysis is running; previous results are no longer active."
+            application._clear_result_presentation(running_placeholder)
+            self.assertTrue(
+                all(label.cget("text") == running_placeholder for label in application.shape_labels)
+            )
+            application.running = True
+            application.progress.start(12)
+            application._analysis_cancel_event.clear()
             with patch("project_review._all_elastic_abaqus_modes", return_value=[]):
-                application._populate(result)
+                application._complete(result)
+            self.assertIs(application.analysis_state, AnalysisState.DIAGNOSTIC)
+            self.assertEqual(float(application.progress.cget("value")), 0.0)
+            self.assertTrue(
+                all(
+                    "No accepted mode pairs" in label.cget("text")
+                    and "Analysis is running" not in label.cget("text")
+                    for label in application.shape_labels
+                )
+            )
             self.assertEqual(application.metric_pairs.cget("text"), "0")
             self.assertIn("Diagnostic", application.metric_geometry.cget("text"))
             self.assertTrue(application.table.get_children())
@@ -398,6 +417,13 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             )
             manual_pair.manual_decision = "accepted"
             result.pairs = [manual_pair]
+            application.running = True
+            application._analysis_cancel_event.clear()
+            with patch.object(application, "_show_pair") as render_pair:
+                application._complete(result)
+            self.assertIs(application.analysis_state, AnalysisState.SUCCESS)
+            render_pair.assert_called_with(manual_pair)
+
             application._automatic_admissible_pair_count = 0
             with patch("project_review._all_elastic_abaqus_modes", return_value=[]):
                 application._populate(result)
@@ -420,6 +446,14 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             self.assertTrue(dispatch_clipboard_action(application.details, "select_all"))
             self.assertTrue(dispatch_clipboard_action(application.details, "copy"))
 
+            application.running = True
+            application._close_after_cancel = False
+            application._cancelled()
+            self.assertIs(application.analysis_state, AnalysisState.STOPPED)
+            self.assertTrue(
+                all(label.cget("text") == "Analysis stopped by user." for label in application.shape_labels)
+            )
+
             close_calls = []
             real_finish_close = application._finish_close
             application._finish_close = lambda: close_calls.append("closed")
@@ -428,6 +462,13 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             application._owned_analysis_process = None
             with patch("tkinter.messagebox.showerror"), patch("tkinter.messagebox.showwarning"):
                 application._failed(RuntimeError("queued failure"))
+            self.assertIs(application.analysis_state, AnalysisState.ERROR)
+            self.assertTrue(
+                all(
+                    label.cget("text") == "Analysis could not be completed."
+                    for label in application.shape_labels
+                )
+            )
             self.assertEqual(close_calls, ["closed"])
 
             class _StillRunning:
