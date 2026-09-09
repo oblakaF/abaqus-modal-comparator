@@ -125,6 +125,8 @@ STYLE_TOKENS = {
     "table_row_height": 28,
 }
 
+UI_SCALE_PERCENT_VALUES = (80, 90, 100, 110, 125)
+
 
 UNIT_TO_METRES = {
     "mm": 1.0e-3,
@@ -141,6 +143,53 @@ def select_layout_mode(width: int) -> LayoutMode:
     if width >= 1120:
         return LayoutMode.MEDIUM
     return LayoutMode.COMPACT
+
+
+def normalize_ui_scale_percent(value: object) -> int:
+    try:
+        percent = int(value)
+    except (TypeError, ValueError):
+        return 100
+    return percent if percent in UI_SCALE_PERCENT_VALUES else 100
+
+
+class SettledCallback:
+    """One cancel-and-replace callback for the settled phase of a burst."""
+
+    def __init__(self, scheduler, delay_ms: int, callback) -> None:
+        self.scheduler = scheduler
+        self.delay_ms = int(delay_ms)
+        self.callback = callback
+        self.job = None
+        self.scheduled_count = 0
+        self.cancelled_count = 0
+        self.executed_count = 0
+
+    def schedule(self):
+        if self.job is not None:
+            try:
+                self.scheduler.after_cancel(self.job)
+                self.cancelled_count += 1
+            except Exception:
+                pass
+        self.scheduled_count += 1
+        self.job = self.scheduler.after(self.delay_ms, self._run)
+        return self.job
+
+    def _run(self) -> None:
+        self.job = None
+        self.executed_count += 1
+        self.callback()
+
+    def cancel(self) -> None:
+        if self.job is None:
+            return
+        try:
+            self.scheduler.after_cancel(self.job)
+            self.cancelled_count += 1
+        except Exception:
+            pass
+        self.job = None
 
 
 def logical_window_width(pixel_width: int, tk_scaling: float) -> int:
@@ -562,13 +611,17 @@ DEFAULT_RECOVERY_PREFERENCES = {
     "autosave_enabled": True,
     "restore_on_startup": True,
     "show_recovery_notice": True,
+    "ui_scale_percent": 100,
 }
 
 
-def normalize_recovery_preferences(value: object) -> dict[str, bool]:
+def normalize_recovery_preferences(value: object) -> dict[str, object]:
     output = dict(DEFAULT_RECOVERY_PREFERENCES)
     if isinstance(value, Mapping):
-        for key in output:
+        for key in ("autosave_enabled", "restore_on_startup", "show_recovery_notice"):
             if key in value:
                 output[key] = bool(value[key])
+        output["ui_scale_percent"] = normalize_ui_scale_percent(
+            value.get("ui_scale_percent", 100)
+        )
     return output

@@ -7,6 +7,7 @@ import subprocess
 import threading
 from pathlib import Path
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 from typing import Optional
 
@@ -26,6 +27,8 @@ from ui_policy import (
     LayoutMode,
     REVIEW_COLUMNS,
     STYLE_TOKENS,
+    UI_SCALE_PERCENT_VALUES,
+    SettledCallback,
     button_grid_columns,
     completion_state,
     coordinate_scale_from_units,
@@ -34,6 +37,7 @@ from ui_policy import (
     logical_window_width,
     metric_grid_columns,
     normalize_recovery_preferences,
+    normalize_ui_scale_percent,
     resolve_command,
     responsive_padding,
     select_abaqus_installation,
@@ -46,7 +50,7 @@ from ui_policy import (
 
 
 _INSTALLED = False
-RESIZE_DEBOUNCE_MS = 90
+SETTLED_RESIZE_MS = 210
 AUTOSAVE_DEBOUNCE_MS = 650
 STOP_CLOSE_TIMEOUT_MS = 12_000
 RECOVERY_SETTINGS_NAME = "ui_preferences.json"
@@ -114,7 +118,7 @@ def _preferences_path() -> Path:
     return CONFIG_DIRECTORY / RECOVERY_SETTINGS_NAME
 
 
-def load_recovery_preferences(path: Optional[Path] = None) -> dict[str, bool]:
+def load_recovery_preferences(path: Optional[Path] = None) -> dict[str, object]:
     path = path or _preferences_path()
     try:
         return normalize_recovery_preferences(json.loads(path.read_text(encoding="utf-8")))
@@ -254,19 +258,32 @@ def _walk(widget):
         yield from _walk(child)
 
 
-def _configure_styles(root) -> None:
+def _scaled_metric(value: int, percent: int) -> int:
+    return max(1, int(round(int(value) * int(percent) / 100.0)))
+
+
+def _configure_styles(root, ui_scale_percent: int = 100) -> None:
     style = ttk.Style(root)
     family = STYLE_TOKENS["font_family"]
-    root.option_add("*Font", (family, STYLE_TOKENS["body_size"]))
-    style.configure("Title.TLabel", font=(family, STYLE_TOKENS["application_title_size"], "bold"))
-    style.configure("Section.TLabel", font=(family, STYLE_TOKENS["section_title_size"], "bold"))
-    style.configure("MetricCaption.TLabel", font=(family, STYLE_TOKENS["metric_caption_size"], "bold"), foreground="#505A64")
-    style.configure("MetricValue.TLabel", font=(family, STYLE_TOKENS["metric_value_size"], "bold"), foreground="#17212B")
-    style.configure("Secondary.TLabel", font=(family, STYLE_TOKENS["secondary_size"]), foreground="#59636E")
-    style.configure("Status.TLabel", font=(family, STYLE_TOKENS["status_size"]))
-    style.configure("Tooltip.TLabel", font=(family, STYLE_TOKENS["secondary_size"]), background="#FFFBEA", relief="solid", borderwidth=1)
-    style.configure("Treeview", font=(family, STYLE_TOKENS["table_size"]), rowheight=STYLE_TOKENS["table_row_height"])
-    style.configure("Treeview.Heading", font=(family, STYLE_TOKENS["table_size"], "bold"))
+    percent = normalize_ui_scale_percent(ui_scale_percent)
+    body_size = _scaled_metric(STYLE_TOKENS["body_size"], percent)
+    for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkFixedFont"):
+        try:
+            tkfont.nametofont(name, root=root).configure(family=family, size=body_size)
+        except tk.TclError:
+            pass
+    root.option_add("*Font", (family, body_size))
+    style.configure("Title.TLabel", font=(family, _scaled_metric(STYLE_TOKENS["application_title_size"], percent), "bold"))
+    style.configure("Section.TLabel", font=(family, _scaled_metric(STYLE_TOKENS["section_title_size"], percent), "bold"))
+    style.configure("MetricCaption.TLabel", font=(family, _scaled_metric(STYLE_TOKENS["metric_caption_size"], percent), "bold"), foreground="#505A64")
+    style.configure("MetricValue.TLabel", font=(family, _scaled_metric(STYLE_TOKENS["metric_value_size"], percent), "bold"), foreground="#17212B")
+    style.configure("Secondary.TLabel", font=(family, _scaled_metric(STYLE_TOKENS["secondary_size"], percent)), foreground="#59636E")
+    style.configure("Status.TLabel", font=(family, _scaled_metric(STYLE_TOKENS["status_size"], percent)))
+    style.configure("Tooltip.TLabel", font=(family, _scaled_metric(STYLE_TOKENS["secondary_size"], percent)), background="#FFFBEA", relief="solid", borderwidth=1)
+    style.configure("Treeview", font=(family, _scaled_metric(STYLE_TOKENS["table_size"], percent)), rowheight=_scaled_metric(STYLE_TOKENS["table_row_height"], percent))
+    style.configure("Treeview.Heading", font=(family, _scaled_metric(STYLE_TOKENS["table_size"], percent), "bold"))
+    style.configure("TButton", padding=(_scaled_metric(6, percent), _scaled_metric(3, percent)))
+    style.configure("TNotebook.Tab", padding=(_scaled_metric(7, percent), _scaled_metric(3, percent)))
     style.configure("MetricCard.TFrame", relief="solid", borderwidth=1)
 
 
@@ -363,6 +380,8 @@ def install_responsive_workflow(app_module) -> None:
         self._automatic_admissible_pair_count = None
         self._autosave_job = None
         self._responsive_job = None
+        self._resize_settler = None
+        self._responsive_layout_signature = None
         self._layout_mode = None
         self._metric_cards = []
         self._button_frames = []
@@ -372,6 +391,12 @@ def install_responsive_workflow(app_module) -> None:
         self._analysis_configuration_controls = {}
         self.analysis_state = AnalysisState.NO_DATA
         self.dirty_tracker = DirtyTracker()
+        self.ui_scale_percent = tk.IntVar(
+            master=root,
+            value=normalize_ui_scale_percent(
+                self._recovery_preferences.get("ui_scale_percent", 100)
+            ),
+        )
 
         self.abaqus_model_unit = tk.StringVar(master=root, value="mm")
         self.experimental_coordinate_unit = tk.StringVar(master=root, value="m")
@@ -395,8 +420,8 @@ def install_responsive_workflow(app_module) -> None:
 
         original_init(self, root)
         root.geometry("1400x860")
-        root.minsize(900, 650)
-        _configure_styles(root)
+        root.minsize(760, 560)
+        _configure_styles(root, self.ui_scale_percent.get())
         self._rebuild_metric_cards()
         self._finalize_tables()
         self._install_text_editing()
@@ -407,6 +432,9 @@ def install_responsive_workflow(app_module) -> None:
         self._sync_coordinate_mapping()
         self._set_empty_states()
         self._refresh_readiness()
+        self._resize_settler = SettledCallback(
+            root, SETTLED_RESIZE_MS, self._apply_responsive_layout
+        )
         root.bind("<Configure>", self._schedule_responsive_layout, add="+")
         root.after_idle(self._apply_responsive_layout)
         root.protocol("WM_DELETE_WINDOW", self._close_requested)
@@ -423,16 +451,25 @@ def install_responsive_workflow(app_module) -> None:
         self.end_mode.set(15)
         canvas = tk.Canvas(self.input_tab, highlightthickness=0, borderwidth=0)
         scrollbar = ttk.Scrollbar(self.input_tab, orient="vertical", command=canvas.yview)
+        horizontal_scrollbar = ttk.Scrollbar(self.input_tab, orient="horizontal", command=canvas.xview)
         content = ttk.Frame(canvas, padding=4)
         window_id = canvas.create_window((0, 0), window=content, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.configure(yscrollcommand=scrollbar.set, xscrollcommand=horizontal_scrollbar.set)
+        horizontal_scrollbar.pack(side="bottom", fill="x")
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(window_id, width=event.width), add="+")
+        canvas.bind(
+            "<Configure>",
+            lambda event: canvas.itemconfigure(
+                window_id, width=max(event.width, content.winfo_reqwidth())
+            ),
+            add="+",
+        )
         content.bind("<Configure>", lambda _event: canvas.configure(scrollregion=canvas.bbox("all")), add="+")
         self.root.bind_all("<MouseWheel>", self._scroll_input_tab, add="+")
         self._input_canvas = canvas
         self._input_content = content
+        self._input_horizontal_scrollbar = horizontal_scrollbar
 
         def section(title: str):
             frame = ttk.LabelFrame(content, text=title, padding=STYLE_TOKENS["section_padding"])
@@ -568,24 +605,32 @@ def install_responsive_workflow(app_module) -> None:
         self.custom_scale_entry.pack(side="left", padx=(8, 0))
         self.camera_scale_frame = ttk.Frame(geometry)
         self.camera_scale_frame.grid(row=4, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
-        ttk.Label(self.camera_scale_frame, text="Scan coverage:").grid(row=0, column=0, sticky="w")
+        self.camera_scan_coverage_label = ttk.Label(self.camera_scale_frame, text="Scan coverage:")
+        self.camera_scan_coverage_label.grid(row=0, column=0, sticky="w")
         self.camera_scan_coverage_combo = ttk.Combobox(self.camera_scale_frame, textvariable=self.camera_scan_coverage, values=("full", "partial"), state="readonly", width=12)
         self.camera_scan_coverage_combo.grid(row=0, column=1, padx=(8, 14))
-        ttk.Label(self.camera_scale_frame, text="Physical scan width:").grid(row=0, column=2, sticky="w")
+        self.camera_physical_width_label = ttk.Label(self.camera_scale_frame, text="Physical scan width:")
+        self.camera_physical_width_label.grid(row=0, column=2, sticky="w")
         self.camera_physical_width_entry = ttk.Entry(self.camera_scale_frame, textvariable=self.camera_physical_width, width=12)
         self.camera_physical_width_entry.grid(row=0, column=3, padx=(8, 14))
-        ttk.Label(self.camera_scale_frame, text="height:").grid(row=0, column=4, sticky="w")
+        self.camera_physical_height_label = ttk.Label(self.camera_scale_frame, text="height:")
+        self.camera_physical_height_label.grid(row=0, column=4, sticky="w")
         self.camera_physical_height_entry = ttk.Entry(self.camera_scale_frame, textvariable=self.camera_physical_height, width=12)
         self.camera_physical_height_entry.grid(row=0, column=5, padx=(8, 14))
         self.camera_dimension_unit_combo = ttk.Combobox(self.camera_scale_frame, textvariable=self.camera_dimension_unit, values=("mm", "m", "cm", "µm"), state="readonly", width=7)
         self.camera_dimension_unit_combo.grid(row=0, column=6)
-        ttk.Label(self.camera_scale_frame, text="Calibration source:").grid(row=1, column=0, sticky="w", pady=(6, 0))
+        self.calibration_provenance_label = ttk.Label(self.camera_scale_frame, text="Calibration source:")
+        self.calibration_provenance_label.grid(row=1, column=0, sticky="w", pady=(6, 0))
         self.calibration_provenance_entry = ttk.Entry(self.camera_scale_frame, textvariable=self.calibration_provenance, width=70)
         self.calibration_provenance_entry.grid(row=1, column=1, columnspan=6, sticky="ew", padx=(8, 0), pady=(6, 0))
-        ttk.Label(self.camera_scale_frame, text="X calibration:").grid(row=2, column=0, sticky="w", pady=(6, 0))
-        ttk.Label(self.camera_scale_frame, textvariable=self.computed_camera_x).grid(row=2, column=1, sticky="w", padx=(8, 14), pady=(6, 0))
-        ttk.Label(self.camera_scale_frame, text="Y calibration:").grid(row=2, column=2, sticky="w", pady=(6, 0))
-        ttk.Label(self.camera_scale_frame, textvariable=self.computed_camera_y).grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(6, 0))
+        self.computed_camera_x_label = ttk.Label(self.camera_scale_frame, text="X calibration:")
+        self.computed_camera_x_label.grid(row=2, column=0, sticky="w", pady=(6, 0))
+        self.computed_camera_x_value = ttk.Label(self.camera_scale_frame, textvariable=self.computed_camera_x)
+        self.computed_camera_x_value.grid(row=2, column=1, sticky="w", padx=(8, 14), pady=(6, 0))
+        self.computed_camera_y_label = ttk.Label(self.camera_scale_frame, text="Y calibration:")
+        self.computed_camera_y_label.grid(row=2, column=2, sticky="w", pady=(6, 0))
+        self.computed_camera_y_value = ttk.Label(self.camera_scale_frame, textvariable=self.computed_camera_y)
+        self.computed_camera_y_value.grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(6, 0))
         ttk.Label(geometry, text="Unit/manual scale:").grid(row=5, column=0, sticky="w", pady=4)
         ttk.Entry(geometry, textvariable=self.computed_coordinate_scale, state="readonly", width=18).grid(row=5, column=1, sticky="w", padx=(10, 0), pady=4)
         mapping_help = ttk.Label(
@@ -1300,7 +1345,7 @@ def install_responsive_workflow(app_module) -> None:
         if self._autosave_job is not None:
             try:
                 self.root.after_cancel(self._autosave_job)
-            except tk.TclError:
+            except (tk.TclError, ValueError):
                 pass
         self._autosave_job = self.root.after(AUTOSAVE_DEBOUNCE_MS, self._save_recovery_now)
 
@@ -1357,6 +1402,16 @@ def install_responsive_workflow(app_module) -> None:
         if not hasattr(self, "menu_bar"):
             return
         settings = tk.Menu(self.menu_bar, tearoff=False)
+        scale_menu = tk.Menu(settings, tearoff=False)
+        for percent in UI_SCALE_PERCENT_VALUES:
+            scale_menu.add_radiobutton(
+                label=f"{percent}%",
+                variable=self.ui_scale_percent,
+                value=percent,
+                command=lambda value=percent: self._apply_ui_scale(value),
+            )
+        settings.add_cascade(label="Interface scale", menu=scale_menu)
+        settings.add_separator()
         settings.add_command(label="Session recovery...", command=self._show_recovery_settings)
         self.menu_bar.add_cascade(label="Settings", menu=settings)
         self.settings_menu = settings
@@ -1370,6 +1425,27 @@ def install_responsive_workflow(app_module) -> None:
                             file_menu.entryconfigure(item, accelerator="Ctrl+Shift+S")
         except (tk.TclError, TypeError):
             pass
+
+    def apply_ui_scale(self, percent: int, *, persist: bool = True) -> int:
+        value = normalize_ui_scale_percent(percent)
+        self.ui_scale_percent.set(value)
+        self._recovery_preferences["ui_scale_percent"] = value
+        _configure_styles(self.root, value)
+        frame_padding = _scaled_metric(STYLE_TOKENS["section_padding"], value)
+        for widget in _walk(self.root):
+            if isinstance(widget, ttk.LabelFrame):
+                try:
+                    widget.configure(padding=frame_padding)
+                except tk.TclError:
+                    pass
+        self._responsive_layout_signature = None
+        self._apply_responsive_layout()
+        if persist:
+            try:
+                save_recovery_preferences(self._recovery_preferences)
+            except OSError as error:
+                messagebox.showerror("Interface scale", str(error))
+        return value
 
     def show_recovery_settings(self) -> None:
         window = tk.Toplevel(self.root)
@@ -1453,18 +1529,15 @@ def install_responsive_workflow(app_module) -> None:
             self.cmif_summary.configure(state="disabled")
 
     def set_visual_placeholder(self, label, message: str) -> None:
-        jobs = getattr(self, "_responsive_resize_jobs", {})
-        job = jobs.pop(label, None)
-        if job is not None:
-            try:
-                self.root.after_cancel(job)
-            except tk.TclError:
-                pass
-        key = getattr(self, "_responsive_label_keys", {}).pop(label, None)
-        if key is not None:
-            getattr(self, "_responsive_sources", {}).pop(key, None)
-            self.photos.pop(key, None)
-        getattr(self, "_responsive_last_render", {}).pop(label, None)
+        discard = getattr(self, "_discard_responsive_image", None)
+        if callable(discard):
+            discard(label)
+        else:
+            key = getattr(self, "_responsive_label_keys", {}).pop(label, None)
+            if key is not None:
+                getattr(self, "_responsive_sources", {}).pop(key, None)
+                self.photos.pop(key, None)
+            getattr(self, "_responsive_last_render", {}).pop(label, None)
         try:
             label.configure(image="", text=message, anchor="center")
         except tk.TclError:
@@ -1497,12 +1570,9 @@ def install_responsive_workflow(app_module) -> None:
     def schedule_responsive_layout(self, event=None) -> None:
         if event is not None and event.widget is not self.root:
             return
-        if self._responsive_job is not None:
-            try:
-                self.root.after_cancel(self._responsive_job)
-            except tk.TclError:
-                pass
-        self._responsive_job = self.root.after(RESIZE_DEBOUNCE_MS, self._apply_responsive_layout)
+        if self._resize_settler is None:
+            return
+        self._responsive_job = self._resize_settler.schedule()
 
     def apply_responsive_layout(self) -> None:
         self._responsive_job = None
@@ -1510,47 +1580,79 @@ def install_responsive_workflow(app_module) -> None:
             pixel_width = int(self.root.winfo_width())
             tk_scaling = float(self.root.tk.call("tk", "scaling"))
             width = logical_window_width(pixel_width, tk_scaling)
+            width = max(
+                1,
+                int(round(width / (self.ui_scale_percent.get() / 100.0))),
+            )
         except tk.TclError:
             return
         mode = select_layout_mode(width)
         self._layout_mode = mode
-        labels = tab_labels_for(mode)
         ordered_tabs = (
             self.input_tab, self.table_tab, self.shape_tab, self.plot_tab,
             self.frf_tab, self.cmif_tab, self.advanced_tab, self.manual_review_tab, self.details_tab,
         )
-        for tab, label in zip(ordered_tabs, labels):
-            self.tabs.tab(tab, text=label)
-        columns = metric_grid_columns(mode, width)
-        for card in self._metric_cards:
-            card.grid_forget()
-        xpad, ypad = responsive_padding(mode)
-        for index, card in enumerate(self._metric_cards):
-            card.grid(row=index // columns, column=index % columns, sticky="nsew", padx=(0 if index % columns == 0 else xpad, 0), pady=(0, ypad))
-        for column in range(4):
-            self._metrics_frame.columnconfigure(column, weight=1 if column < columns else 0)
+        structural_signature = (mode, self.ui_scale_percent.get())
+        if structural_signature != self._responsive_layout_signature:
+            self._responsive_layout_signature = structural_signature
+            labels = tab_labels_for(mode)
+            for tab, label in zip(ordered_tabs, labels):
+                if self.tabs.tab(tab, "text") != label:
+                    self.tabs.tab(tab, text=label)
+            columns = metric_grid_columns(mode, width)
+            for card in self._metric_cards:
+                card.grid_forget()
+            xpad, ypad = responsive_padding(mode)
+            for index, card in enumerate(self._metric_cards):
+                card.grid(row=index // columns, column=index % columns, sticky="nsew", padx=(0 if index % columns == 0 else xpad, 0), pady=(0, ypad))
+            for column in range(4):
+                self._metrics_frame.columnconfigure(column, weight=1 if column < columns else 0)
+            for frame, buttons in self._button_frames:
+                count = button_grid_columns(mode, len(buttons))
+                for button in buttons:
+                    button.pack_forget()
+                    button.grid_forget()
+                for index, button in enumerate(buttons):
+                    button.grid(row=index // count, column=index % count, sticky="w", padx=(0, 5 if mode is LayoutMode.COMPACT else 7), pady=(0, 4 if mode is LayoutMode.COMPACT else 5))
+            padding = responsive_padding(mode)[0]
+            for tab in ordered_tabs:
+                try:
+                    tab.configure(padding=padding)
+                except tk.TclError:
+                    pass
+            compact = mode is LayoutMode.COMPACT
+            self.camera_scan_coverage_combo.configure(width=10 if compact else 12)
+            self.camera_physical_width_entry.configure(width=10 if compact else 12)
+            self.camera_physical_height_entry.configure(width=10 if compact else 12)
+            self.camera_dimension_unit_combo.configure(width=6 if compact else 7)
+            self.calibration_provenance_entry.configure(width=42 if compact else 70)
+            camera_layout = (
+                (self.camera_scan_coverage_label, 0, 0, 1),
+                (self.camera_scan_coverage_combo, 0, 1, 1),
+                (self.camera_physical_width_label, 1 if compact else 0, 0 if compact else 2, 1),
+                (self.camera_physical_width_entry, 1 if compact else 0, 1 if compact else 3, 1),
+                (self.camera_physical_height_label, 1 if compact else 0, 2 if compact else 4, 1),
+                (self.camera_physical_height_entry, 1 if compact else 0, 3 if compact else 5, 1),
+                (self.camera_dimension_unit_combo, 1 if compact else 0, 4 if compact else 6, 1),
+                (self.calibration_provenance_label, 2 if compact else 1, 0, 1),
+                (self.calibration_provenance_entry, 2 if compact else 1, 1, 4 if compact else 6),
+                (self.computed_camera_x_label, 3 if compact else 2, 0, 1),
+                (self.computed_camera_x_value, 3 if compact else 2, 1, 1),
+                (self.computed_camera_y_label, 3 if compact else 2, 2, 1),
+                (self.computed_camera_y_value, 3 if compact else 2, 3, 1),
+            )
+            for widget, row, column, columnspan in camera_layout:
+                widget.grid_configure(row=row, column=column, columnspan=columnspan)
         wrap = text_wrap_width(width, mode)
         for label in self._responsive_wrap_labels:
             try:
-                label.configure(wraplength=wrap)
-            except tk.TclError:
-                pass
-        for frame, buttons in self._button_frames:
-            count = button_grid_columns(mode, len(buttons))
-            for button in buttons:
-                button.pack_forget()
-                button.grid_forget()
-            for index, button in enumerate(buttons):
-                button.grid(row=index // count, column=index % count, sticky="w", padx=(0, 7), pady=(0, 5))
-        padding = responsive_padding(mode)[0]
-        for tab in ordered_tabs:
-            try:
-                tab.configure(padding=padding)
-            except tk.TclError:
+                if int(label.cget("wraplength")) != wrap:
+                    label.configure(wraplength=wrap)
+            except (tk.TclError, ValueError):
                 pass
         refresh = getattr(self, "_refresh_responsive_images", None)
         if callable(refresh):
-            self.root.after_idle(refresh)
+            refresh(immediate=True)
 
     def close_requested(self) -> None:
         if self.running:
@@ -1678,6 +1780,7 @@ def install_responsive_workflow(app_module) -> None:
     application_class._restore_last_session = restore_last_session
     application_class._show_recovery_notice = show_recovery_notice
     application_class._install_settings_menu = install_settings_menu
+    application_class._apply_ui_scale = apply_ui_scale
     application_class._show_recovery_settings = show_recovery_settings
     application_class._refresh_readiness = refresh_readiness
     application_class._set_empty_states = set_empty_states

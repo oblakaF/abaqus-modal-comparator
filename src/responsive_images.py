@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 
 
 MIN_RENDER_DIMENSION = 48
-RESIZE_DEBOUNCE_MS = 90
+SETTLED_RESIZE_MS = 210
 IMAGE_PADDING = 12
 _INSTALLED = False
 
@@ -44,18 +44,18 @@ def install_responsive_images(app_module) -> None:
     def responsive_init(self, *args, **kwargs) -> None:
         self._responsive_sources: Dict[str, Image.Image] = {}
         self._responsive_label_keys = {}
-        self._responsive_resize_jobs = {}
+        self._responsive_resize_job = None
+        self._responsive_pending_labels = set()
         self._responsive_last_render = {}
         self._responsive_bound_labels = set()
         original_init(self, *args, **kwargs)
         self.tabs.bind(
             "<<NotebookTabChanged>>",
-            lambda _event: self.root.after_idle(self._refresh_responsive_images),
+            lambda _event: self._refresh_responsive_images(immediate=True),
             add="+",
         )
 
     def _render_responsive_image(self, label) -> None:
-        self._responsive_resize_jobs.pop(label, None)
         key = self._responsive_label_keys.get(label)
         source = self._responsive_sources.get(key)
         if key is None or source is None:
@@ -96,23 +96,50 @@ def install_responsive_images(app_module) -> None:
             except tk.TclError:
                 pass
 
-    def _schedule_responsive_image(self, label, *, immediate: bool = False) -> None:
-        previous = self._responsive_resize_jobs.pop(label, None)
-        if previous is not None:
+    def _render_pending_responsive_images(self) -> None:
+        self._responsive_resize_job = None
+        labels = tuple(self._responsive_pending_labels)
+        self._responsive_pending_labels.clear()
+        for label in labels:
             try:
-                self.root.after_cancel(previous)
+                visible = bool(label.winfo_ismapped())
+            except tk.TclError:
+                visible = False
+            if visible:
+                self._render_responsive_image(label)
+
+    def _schedule_responsive_image(self, label, *, immediate: bool = False) -> None:
+        self._responsive_pending_labels.add(label)
+        if self._responsive_resize_job is not None:
+            try:
+                self.root.after_cancel(self._responsive_resize_job)
             except tk.TclError:
                 pass
-        delay = 0 if immediate else RESIZE_DEBOUNCE_MS
+        delay = 0 if immediate else SETTLED_RESIZE_MS
         try:
-            job = self.root.after(delay, lambda: self._render_responsive_image(label))
+            self._responsive_resize_job = self.root.after(
+                delay, self._render_pending_responsive_images
+            )
         except tk.TclError:
             return
-        self._responsive_resize_jobs[label] = job
 
-    def _refresh_responsive_images(self) -> None:
+    def _refresh_responsive_images(self, *, immediate: bool = False) -> None:
         for label in tuple(self._responsive_label_keys):
-            self._schedule_responsive_image(label, immediate=True)
+            self._responsive_pending_labels.add(label)
+        if self._responsive_label_keys:
+            # Scheduling one representative label coalesces the entire visible
+            # image set into a single callback.
+            self._schedule_responsive_image(
+                next(iter(self._responsive_label_keys)), immediate=immediate
+            )
+
+    def _discard_responsive_image(self, label) -> None:
+        self._responsive_pending_labels.discard(label)
+        key = self._responsive_label_keys.pop(label, None)
+        if key is not None:
+            self._responsive_sources.pop(key, None)
+            self._responsive_last_render.pop(label, None)
+            self.photos.pop(key, None)
 
     def responsive_image(self, label, path: Path, key: str) -> None:
         try:
@@ -145,7 +172,9 @@ def install_responsive_images(app_module) -> None:
 
     application_class.__init__ = responsive_init
     application_class._render_responsive_image = _render_responsive_image
+    application_class._render_pending_responsive_images = _render_pending_responsive_images
     application_class._schedule_responsive_image = _schedule_responsive_image
     application_class._refresh_responsive_images = _refresh_responsive_images
+    application_class._discard_responsive_image = _discard_responsive_image
     application_class._image = responsive_image
     _INSTALLED = True

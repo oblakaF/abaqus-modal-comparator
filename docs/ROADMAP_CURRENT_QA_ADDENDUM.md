@@ -589,3 +589,93 @@ four cancellation points plus two independent unrelated-process survival
 checks. The fix no longer depends on process-tree position at all, so it
 should remain correct even if a future Abaqus version changes the
 launcher/reparenting behavior that caused the original report.
+
+## Part 3 — VERIFIED responsive HUD and interface scale (2026-09-09)
+
+### Resize bottleneck and fix
+
+Native-Tk profiling with eleven cached 2200x1400 plot images showed that the
+old resize path did not recreate Matplotlib figures or repopulate Treeviews.
+The bottleneck was the interaction of two 90 ms callback systems: each plot
+label independently scheduled PIL LANCZOS resampling/`PhotoImage` creation,
+while the root responsive callback repeatedly relabelled all nine Notebook
+tabs, regridded metric cards/buttons, rewrote every wrap length, and requested
+another immediate refresh of every cached image.
+
+One 1600x900 -> 1024x700 -> 1600x900 sweep produced 98 root Configure events,
+50 full responsive-policy executions, 450 Notebook tab updates, 646 image
+render callbacks, 0 Treeview mutations, 0 Matplotlib draws/figure creations,
+and 0 scientific callbacks. Responsive-policy work took 0.301 s and image
+work 2.426 s on Tk's UI thread.
+
+The production path now has two phases:
+
+- active drag: native Tk/container geometry and the bounded status-bar length
+  track the Windows frame; expensive application reflow is not performed;
+- settled resize: a single cancel-and-replace 210 ms callback applies the final
+  layout mode, changed wrapping, compact control layout, and one coalesced
+  visible-image batch. No queue of per-label jobs remains.
+
+For the same sweep after the fix, all 98 Configure events were retained, 97
+stale settled jobs were cancelled, and exactly 1 responsive-policy execution
+ran. It caused 0 Notebook relabels, 4 visible-image render checks, 0 Treeview
+mutations, 0 Matplotlib draws/figure creations, and 0 scientific callbacks.
+Responsive-policy time was 0.000089 s and image work 0.099 s, with no pending
+layout/image jobs afterward.
+
+All scientific plots in the current HUD are generated once into PNG assets.
+Resize retains their decoded PIL sources and only creates a final presentation
+`PhotoImage` after settlement; the underlying scientific arrays and Matplotlib
+rendering pipeline are never invoked by Configure events.
+
+### Sizes, density, and navigation
+
+The input tab now has both vertical and horizontal scrolling, the minimum
+window was reduced from 900x650 to 760x560, and camera-calibration controls
+stack into a compact grid with shorter presentation widths. Native checks at
+1920x1080, 1600x900, 1366x768, 1280x720, and 1024x700 confirmed all required
+configuration controls plus Run/Stop are managed and reachable, all nine tabs
+can be selected, and the 1024x700 compact content fits horizontally (954 px
+requested in a 955 px canvas; scrolling remains available for larger UI scale
+or OS-DPI combinations).
+
+### Interface scale and DPI
+
+Settings -> Interface scale provides 80%, 90%, 100%, 110%, and 125%, defaulting
+to 100%. It updates named Tk fonts, ttk styles, table row height, common padding,
+and responsive density without rebuilding the application or rerunning analysis.
+It is stored only in the application `ui_preferences.json`, is absent from the
+scientific project schema/dirty snapshot, and cannot change coordinate units,
+camera factors, geometry, MAC, frequencies, or cached results.
+
+Windows DPI awareness remains enabled. Tk's OS-DPI scaling is not modified by
+the Interface scale control; font point sizes are multiplied only by the user
+factor. Logical-width tests cover 100%, 125%, and 150% Windows scaling and the
+native test confirms changing Interface scale leaves `tk scaling` unchanged,
+preventing double multiplication.
+
+### State and stress verification
+
+RUNNING and STOPPING keep every scientific configuration control locked during
+responsive/UI-scale updates; Run/Stop state and progress text are not derived
+from layout. The completed zero-pair path remains DIAGNOSTIC and replaces all
+three Mode Shapes panels' transient running text with `No accepted mode pairs`
+guidance to MAC/frequencies and Manual Review.
+
+A six-cycle native Windows/Tk stress harness exercised continuous
+1600x900 <-> 1024x700 geometry changes while visiting Input, MAC, FRF, Close
+Modes, Mode Shapes, and Manual Review, followed by two maximize/restore cycles.
+It processed 592 Configure events, cancelled 586 stale final-layout callbacks,
+performed only 6 settled policy executions (0.00154 s total), 8 visible image
+renders (0.222 s), no Treeview/scientific/Matplotlib work, no stale jobs, and no
+TclErrors. Mean/max event-loop update time was 13.4/81.6 ms. Native mouse-drag
+visual observation could not be automated because the available computer-use
+surface exposed no native applications; final human visual QA on the target
+Windows display remains required before PR preparation.
+
+### Remaining HUD release blockers
+
+No automated Part-3 code/test blocker remains. Final human mouse-drag visual QA
+at the intended Windows DPI settings is still required. The separately recorded
+PolyMAX dataset-55 modal-set importer remains post-HUD work; SCI-S0 was not
+started and neither item is part of this change.

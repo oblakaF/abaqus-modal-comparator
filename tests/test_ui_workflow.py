@@ -360,6 +360,39 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             self.assertEqual(str(application.run_button.cget("state")), "disabled")
             self.assertEqual(str(application.stop_button.cget("state")), "normal")
             self.assertEqual(str(application.folder_button.cget("state")), "normal")
+            tk_scaling_before = float(root.tk.call("tk", "scaling"))
+            scientific_before = (
+                application.abaqus_model_unit.get(),
+                application.experimental_coordinate_unit.get(),
+                application.coordinate_mapping_mode.get(),
+                application.custom_coordinate_scale.get(),
+                application.camera_physical_width.get(),
+                application.camera_physical_height.get(),
+            )
+            dirty_before = application.dirty_tracker.dirty
+            application._apply_ui_scale(125, persist=False)
+            self.assertEqual(application.ui_scale_percent.get(), 125)
+            self.assertEqual(float(root.tk.call("tk", "scaling")), tk_scaling_before)
+            self.assertEqual(
+                scientific_before,
+                (
+                    application.abaqus_model_unit.get(),
+                    application.experimental_coordinate_unit.get(),
+                    application.coordinate_mapping_mode.get(),
+                    application.custom_coordinate_scale.get(),
+                    application.camera_physical_width.get(),
+                    application.camera_physical_height.get(),
+                ),
+            )
+            self.assertEqual(application.dirty_tracker.dirty, dirty_before)
+            self.assertTrue(
+                all(
+                    str(widget.cget("state")) == "disabled"
+                    for widget, _idle_state in application._analysis_configuration_controls.values()
+                )
+            )
+            self.assertEqual(str(application.stop_button.cget("state")), "normal")
+            application._apply_ui_scale(100, persist=False)
             original_path = application.abaqus_path.get()
             application.abaqus_path_entry.insert("end", "cannot-change")
             self.assertEqual(application.abaqus_path.get(), original_path)
