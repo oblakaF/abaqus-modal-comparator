@@ -60,6 +60,22 @@ class GeometryMatch:
     normalized_rms_distance: float
     matched_fraction: float
     transformed_abaqus_coordinates: Optional[np.ndarray] = None
+    coordinate_scales: Optional[np.ndarray] = None
+    calibration_details: Dict[str, Any] = field(default_factory=dict)
+    physical_distances: Optional[np.ndarray] = None
+
+    def __post_init__(self) -> None:
+        if self.coordinate_scales is None:
+            self.coordinate_scales = np.full(3, float(self.coordinate_scale))
+        else:
+            values = np.asarray(self.coordinate_scales, dtype=float)
+            if values.shape != (3,) or not np.all(np.isfinite(values)) or np.any(values <= 0.0):
+                raise ValueError("Coordinate scales must contain three positive finite values.")
+            self.coordinate_scales = values
+        if self.physical_distances is None:
+            self.physical_distances = np.asarray(self.distances, dtype=float) / float(self.coordinate_scale)
+        else:
+            self.physical_distances = np.asarray(self.physical_distances, dtype=float)
 
 
 @dataclass

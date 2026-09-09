@@ -9,6 +9,7 @@ from tkinter import messagebox, ttk
 from typing import Optional
 
 from abaqus_bridge import AnalysisCancelled, extraction_range_notice
+from coordinate_calibration import CoordinateCalibration
 from quality_control import _detect_rigid_modes
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
@@ -109,7 +110,7 @@ def install_runtime_hardening(app_module) -> None:
         start: int,
         end: int,
         command: str,
-        scale_override: Optional[float],
+        calibration: CoordinateCalibration | float | None,
     ) -> None:
         failure = None
         result = None
@@ -144,7 +145,7 @@ def install_runtime_hardening(app_module) -> None:
             signature = (
                 f"{abaqus.resolve()}|{abaqus.stat().st_size}|{abaqus.stat().st_mtime_ns}|"
                 f"{experiment.resolve()}|{experiment.stat().st_size}|{experiment.stat().st_mtime_ns}|"
-                f"{start}|{end}|{scale_override}"
+                f"{start}|{end}|{calibration}"
             )
             key = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:16]
             cache = workspace / f"analysis_{key}"
@@ -181,10 +182,15 @@ def install_runtime_hardening(app_module) -> None:
                 target_count=max(len(target_frequencies), 1),
             )
             stage(3, "Geometry alignment")
+            comparison_kwargs = (
+                {"geometry_calibration": calibration}
+                if isinstance(calibration, CoordinateCalibration)
+                else {"coordinate_scale_override": calibration}
+            )
             result = app_module.compare_modal_datasets(
                 abaqus_data,
                 experiment_data,
-                coordinate_scale_override=scale_override,
+                **comparison_kwargs,
             )
             if range_notice is not None:
                 result.metadata["extraction_range_notice"] = range_notice

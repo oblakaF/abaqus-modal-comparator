@@ -7,6 +7,12 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial import cKDTree
 
+from coordinate_calibration import (
+    LEGACY_GEOMETRIC_FIT,
+    CoordinateCalibration,
+    scale_candidates as calibration_scale_candidates,
+)
+
 from modal_core import (
     ComparisonResult,
     GeometryMatch,
@@ -204,6 +210,7 @@ def geometry_alignment_candidates(
     experimental_coordinates: np.ndarray,
     tolerance_fraction: float = 0.03,
     coordinate_scale_override: Optional[float] = None,
+    geometry_calibration: Optional[CoordinateCalibration] = None,
 ) -> List[GeometryMatch]:
     """Return geometrically plausible signed-axis candidates.
 
@@ -227,26 +234,69 @@ def geometry_alignment_candidates(
     )
     tolerance = max(experimental_span * tolerance_fraction, 1.0e-12)
 
+    if geometry_calibration is not None and coordinate_scale_override is not None:
+        raise ValueError("Use geometry_calibration or coordinate_scale_override, not both.")
+    if geometry_calibration is None:
+        scalar_candidates = _candidate_scales(abaqus, experimental, coordinate_scale_override)
+        configured_scales = [
+            (
+                np.full(3, coordinate_scale, dtype=float),
+                {
+                    "mode": "manual" if coordinate_scale_override is not None else LEGACY_GEOMETRIC_FIT,
+                    "scale_x": coordinate_scale,
+                    "scale_y": coordinate_scale,
+                    "axes_swapped": False,
+                },
+            )
+            for coordinate_scale in scalar_candidates
+        ]
+    else:
+        configured_scales = calibration_scale_candidates(geometry_calibration, experimental)
+        if not configured_scales:  # explicitly retained legacy extent-fit mode
+            configured_scales = [
+                (
+                    np.full(3, coordinate_scale, dtype=float),
+                    {
+                        **geometry_calibration.to_dict(),
+                        "scale_x": coordinate_scale,
+                        "scale_y": coordinate_scale,
+                        "axes_swapped": False,
+                    },
+                )
+                for coordinate_scale in _candidate_scales(abaqus, experimental, None)
+            ]
+
     candidates: List[GeometryMatch] = []
-    for coordinate_scale in _candidate_scales(
-        abaqus,
-        experimental,
-        coordinate_scale_override,
-    ):
+    for coordinate_scales, calibration_details in configured_scales:
+        coordinate_scale = float(np.sqrt(coordinate_scales[0] * coordinate_scales[1]))
         for permutation in permutations(range(3)):
             permutation_matrix = np.eye(3)[:, permutation]
             for signs in product((-1.0, 1.0), repeat=3):
                 rotation = permutation_matrix @ np.diag(signs)
-                query_points = (centered_experimental / coordinate_scale) @ rotation.T
-                distances_local, indices = tree.query(query_points, k=1)
-                distances = np.asarray(distances_local, dtype=float) * coordinate_scale
+                query_points = (centered_experimental / coordinate_scales) @ rotation.T
+                # The reusable tree is in FE coordinates. With anisotropic
+                # camera calibration, refine several nearby FE candidates in
+                # the exact raw-coordinate metric before selecting a node.
+                neighbor_count = min(8, len(centered_abaqus))
+                _, nearby_indices = tree.query(query_points, k=neighbor_count)
+                nearby_indices = np.asarray(nearby_indices, dtype=int)
+                if nearby_indices.ndim == 1:
+                    nearby_indices = nearby_indices[:, np.newaxis]
+                nearby_local = centered_abaqus[nearby_indices] @ rotation
+                nearby_residuals = nearby_local * coordinate_scales - centered_experimental[:, np.newaxis, :]
+                nearby_distances = np.linalg.norm(nearby_residuals, axis=2)
+                choices = np.argmin(nearby_distances, axis=1)
+                indices = nearby_indices[np.arange(len(nearby_indices)), choices]
+                mapped_local = centered_abaqus[indices] @ rotation
+                residuals = mapped_local * coordinate_scales - centered_experimental
+                distances = np.linalg.norm(residuals, axis=1)
                 normalized_rms = float(
                     np.sqrt(np.mean(distances**2)) / experimental_span
                 )
                 matched_fraction = float(np.mean(distances <= tolerance))
                 translation = (
                     experimental_center
-                    - abaqus_center @ rotation * coordinate_scale
+                    - (abaqus_center @ rotation) * coordinate_scales
                 )
                 candidates.append(
                     GeometryMatch(
@@ -257,11 +307,18 @@ def geometry_alignment_candidates(
                         translation=translation,
                         normalized_rms_distance=normalized_rms,
                         matched_fraction=matched_fraction,
+                        coordinate_scales=coordinate_scales,
+                        calibration_details=dict(calibration_details),
+                        physical_distances=np.linalg.norm(residuals / coordinate_scales, axis=1),
                     )
                 )
 
     candidates.sort(
-        key=lambda item: (item.normalized_rms_distance, -item.matched_fraction)
+        key=lambda item: (
+            item.normalized_rms_distance,
+            -item.matched_fraction,
+            float(np.linalg.det(item.rotation)) < 0.0,
+        )
     )
     if not candidates:
         raise RuntimeError("No geometry-alignment candidates were generated.")
@@ -613,6 +670,7 @@ def _best_geometry_evaluation(
         )
         score = (
             -len(rows),
+            float(np.linalg.det(geometry.rotation)) < 0.0,
             assignment_cost + geometry_penalty,
         )
         if best_evaluation is None or score < best_evaluation[0]:
@@ -857,6 +915,17 @@ def _geometry_warnings_and_transform(
     """Return user-facing geometry warnings plus the selected-transform metadata
     that quality_control/reporting attach to the Abaqus dataset."""
     warnings: List[str] = []
+    calibration_mode = geometry.calibration_details.get("mode")
+    if calibration_mode == LEGACY_GEOMETRIC_FIT:
+        warnings.append(
+            "Legacy extent-based geometric scale is active. It preserves historical 'auto' semantics and is not evidence of physical calibration."
+        )
+    if calibration_mode == "camera_grid" and not str(
+        geometry.calibration_details.get("provenance", "")
+    ).strip():
+        warnings.append(
+            "Camera-grid calibration has no recorded provenance source; document how the physical scan dimensions were obtained."
+        )
     if geometry.matched_fraction < 0.90:
         warnings.append(
             f"Only {geometry.matched_fraction:.1%} of experimental points are "
@@ -877,6 +946,7 @@ def _geometry_warnings_and_transform(
         )
 
     determinant = float(np.linalg.det(geometry.rotation))
+    axis_permutation = np.argmax(np.abs(geometry.rotation), axis=0).astype(int).tolist()
     if determinant < 0.0:
         warnings.append(
             "The selected coordinate transformation includes a reflection "
@@ -884,14 +954,18 @@ def _geometry_warnings_and_transform(
         )
     selected_transform = {
         "coordinate_scale": geometry.coordinate_scale,
+        "coordinate_scales": geometry.coordinate_scales.tolist(),
         "rotation": geometry.rotation.tolist(),
         "translation": geometry.translation.tolist(),
         "determinant": determinant,
         "mirrored": determinant < 0.0,
+        "axis_permutation": axis_permutation,
+        "planar_axes_swapped": axis_permutation[:2] == [1, 0],
         "unique_mapped_abaqus_nodes": unique_nodes,
         "experimental_point_count": len(
             geometry.experimental_to_abaqus
         ),
+        "calibration": dict(geometry.calibration_details),
     }
     return warnings, selected_transform
 
@@ -905,6 +979,7 @@ def compare_modal_datasets(
     minimum_mac: float = 0.50,
     maximum_frequency_only_error_percent: float = 10.0,
     coordinate_scale_override: Optional[float] = None,
+    geometry_calibration: Optional[CoordinateCalibration] = None,
 ) -> ComparisonResult:
     abaqus_modes = abaqus.sorted_modes()
     experimental_modes = experimental.sorted_modes()
@@ -935,6 +1010,7 @@ def compare_modal_datasets(
         abaqus_reference.coordinates,
         experimental_coordinates,
         coordinate_scale_override=coordinate_scale_override,
+        geometry_calibration=geometry_calibration,
     )
     (
         geometry,
@@ -962,7 +1038,7 @@ def compare_modal_datasets(
     geometry.transformed_abaqus_coordinates = (
         abaqus_reference.coordinates
         @ geometry.rotation
-        * geometry.coordinate_scale
+        * geometry.coordinate_scales
         + geometry.translation
     )
     mapped_abaqus_ids = abaqus_reference.node_ids[
@@ -993,6 +1069,29 @@ def compare_modal_datasets(
     warnings, selected_transform = _geometry_warnings_and_transform(geometry)
     result_abaqus = _copy_dataset(abaqus)
     result_abaqus.metadata["selected_geometry_transform"] = selected_transform
+    mapped_fe_coordinates = abaqus_reference.coordinates[geometry.experimental_to_abaqus]
+    mapped_bbox = {
+        "minimum": mapped_fe_coordinates.min(axis=0).tolist(),
+        "maximum": mapped_fe_coordinates.max(axis=0).tolist(),
+        "span": np.ptp(mapped_fe_coordinates, axis=0).tolist(),
+    }
+    result_metadata = {
+        "geometry_calibration": dict(geometry.calibration_details),
+        "raw_experimental_bbox": {
+            "minimum": experimental_coordinates.min(axis=0).tolist(),
+            "maximum": experimental_coordinates.max(axis=0).tolist(),
+            "span": np.ptp(experimental_coordinates, axis=0).tolist(),
+        },
+        "mapped_fe_bbox": mapped_bbox,
+        "transformed_full_fe_bbox_in_experimental_coordinates": {
+            "minimum": geometry.transformed_abaqus_coordinates.min(axis=0).tolist(),
+            "maximum": geometry.transformed_abaqus_coordinates.max(axis=0).tolist(),
+        },
+        "mapping_rms": float(np.sqrt(np.mean(geometry.distances ** 2))),
+        "mapping_max_residual": float(np.max(geometry.distances)),
+        "mapping_rms_in_abaqus_units": float(np.sqrt(np.mean(geometry.physical_distances ** 2))),
+        "mapping_max_residual_in_abaqus_units": float(np.max(geometry.physical_distances)),
+    }
     candidate_diagnostics, diagnostic_summaries = _build_candidate_diagnostics(
         abaqus_modes,
         experimental_modes,
@@ -1023,6 +1122,7 @@ def compare_modal_datasets(
         ],
         warnings=warnings,
         metadata={
+            **result_metadata,
             "selected_geometry_transform": selected_transform,
             "evaluated_geometry_candidate_count": len(candidates),
             "admissibility_gates": {

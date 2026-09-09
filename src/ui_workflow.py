@@ -10,6 +10,14 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Optional
 
+from coordinate_calibration import (
+    CALIBRATED_PHYSICAL,
+    CAMERA_GRID,
+    LEGACY_GEOMETRIC_FIT,
+    MANUAL,
+    CoordinateCalibration,
+)
+
 from ui_policy import (
     AnalysisState,
     COMPARISON_COLUMNS,
@@ -62,8 +70,15 @@ ANALYSIS_CONFIGURATION_CONTROL_NAMES = (
     "abaqus_model_unit",
     "experimental_coordinate_unit",
     "automatic_scale",
+    "camera_scale",
     "custom_scale",
+    "legacy_scale",
     "custom_scale_input",
+    "camera_scan_coverage",
+    "camera_physical_width",
+    "camera_physical_height",
+    "camera_dimension_unit",
+    "calibration_provenance",
     "workspace_path",
     "workspace_path_browse",
 )
@@ -361,9 +376,16 @@ def install_responsive_workflow(app_module) -> None:
         self.abaqus_model_unit = tk.StringVar(master=root, value="mm")
         self.experimental_coordinate_unit = tk.StringVar(master=root, value="m")
         self.experimental_unit_source = tk.StringVar(master=root, value="inferred; verify for this test setup")
-        self.coordinate_mapping_mode = tk.StringVar(master=root, value="automatic")
+        self.coordinate_mapping_mode = tk.StringVar(master=root, value=CALIBRATED_PHYSICAL)
         self.custom_coordinate_scale = tk.StringVar(master=root, value="1.0")
         self.computed_coordinate_scale = tk.StringVar(master=root, value="0.001")
+        self.camera_scan_coverage = tk.StringVar(master=root, value="full")
+        self.camera_physical_width = tk.StringVar(master=root, value="")
+        self.camera_physical_height = tk.StringVar(master=root, value="")
+        self.camera_dimension_unit = tk.StringVar(master=root, value="mm")
+        self.calibration_provenance = tk.StringVar(master=root, value="")
+        self.computed_camera_x = tk.StringVar(master=root, value=EM_DASH)
+        self.computed_camera_y = tk.StringVar(master=root, value=EM_DASH)
         # Kept as a compatibility bridge for the existing project payload and
         # runtime worker; normal users never edit or see the word "auto".
         self.coordinate_scale_text = tk.StringVar(master=root, value="auto")
@@ -509,33 +531,70 @@ def install_responsive_workflow(app_module) -> None:
         mapping.grid(row=2, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
         self.automatic_scale_radio = ttk.Radiobutton(
             mapping,
-            text="Automatic from units / alignment",
+            text="Calibrated physical geometry (trust documented units)",
             variable=self.coordinate_mapping_mode,
-            value="automatic",
+            value=CALIBRATED_PHYSICAL,
             command=self._sync_coordinate_mapping,
         )
         self.automatic_scale_radio.pack(anchor="w")
+        self.camera_scale_radio = ttk.Radiobutton(
+            mapping,
+            text="Uncalibrated camera grid (require physical dimensions)",
+            variable=self.coordinate_mapping_mode,
+            value=CAMERA_GRID,
+            command=self._sync_coordinate_mapping,
+        )
+        self.camera_scale_radio.pack(anchor="w")
         self.custom_scale_radio = ttk.Radiobutton(
             mapping,
-            text="Custom scale factor",
+            text="Manual / legacy advanced",
             variable=self.coordinate_mapping_mode,
-            value="custom",
+            value=MANUAL,
             command=self._sync_coordinate_mapping,
         )
         self.custom_scale_radio.pack(anchor="w")
+        self.legacy_scale_radio = ttk.Radiobutton(
+            mapping,
+            text="Legacy extent-based geometric fit (historical projects only)",
+            variable=self.coordinate_mapping_mode,
+            value=LEGACY_GEOMETRIC_FIT,
+            command=self._sync_coordinate_mapping,
+        )
+        self.legacy_scale_radio.pack(anchor="w")
         self.custom_scale_frame = ttk.Frame(geometry)
         self.custom_scale_frame.grid(row=3, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
         ttk.Label(self.custom_scale_frame, text="Custom scale:").pack(side="left")
         self.custom_scale_entry = ttk.Entry(self.custom_scale_frame, textvariable=self.custom_coordinate_scale, width=16)
         self.custom_scale_entry.pack(side="left", padx=(8, 0))
-        ttk.Label(geometry, text="Computed scale:").grid(row=4, column=0, sticky="w", pady=4)
-        ttk.Entry(geometry, textvariable=self.computed_coordinate_scale, state="readonly", width=18).grid(row=4, column=1, sticky="w", padx=(10, 0), pady=4)
+        self.camera_scale_frame = ttk.Frame(geometry)
+        self.camera_scale_frame.grid(row=4, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
+        ttk.Label(self.camera_scale_frame, text="Scan coverage:").grid(row=0, column=0, sticky="w")
+        self.camera_scan_coverage_combo = ttk.Combobox(self.camera_scale_frame, textvariable=self.camera_scan_coverage, values=("full", "partial"), state="readonly", width=12)
+        self.camera_scan_coverage_combo.grid(row=0, column=1, padx=(8, 14))
+        ttk.Label(self.camera_scale_frame, text="Physical scan width:").grid(row=0, column=2, sticky="w")
+        self.camera_physical_width_entry = ttk.Entry(self.camera_scale_frame, textvariable=self.camera_physical_width, width=12)
+        self.camera_physical_width_entry.grid(row=0, column=3, padx=(8, 14))
+        ttk.Label(self.camera_scale_frame, text="height:").grid(row=0, column=4, sticky="w")
+        self.camera_physical_height_entry = ttk.Entry(self.camera_scale_frame, textvariable=self.camera_physical_height, width=12)
+        self.camera_physical_height_entry.grid(row=0, column=5, padx=(8, 14))
+        self.camera_dimension_unit_combo = ttk.Combobox(self.camera_scale_frame, textvariable=self.camera_dimension_unit, values=("mm", "m", "cm", "µm"), state="readonly", width=7)
+        self.camera_dimension_unit_combo.grid(row=0, column=6)
+        ttk.Label(self.camera_scale_frame, text="Calibration source:").grid(row=1, column=0, sticky="w", pady=(6, 0))
+        self.calibration_provenance_entry = ttk.Entry(self.camera_scale_frame, textvariable=self.calibration_provenance, width=70)
+        self.calibration_provenance_entry.grid(row=1, column=1, columnspan=6, sticky="ew", padx=(8, 0), pady=(6, 0))
+        ttk.Label(self.camera_scale_frame, text="X calibration:").grid(row=2, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(self.camera_scale_frame, textvariable=self.computed_camera_x).grid(row=2, column=1, sticky="w", padx=(8, 14), pady=(6, 0))
+        ttk.Label(self.camera_scale_frame, text="Y calibration:").grid(row=2, column=2, sticky="w", pady=(6, 0))
+        ttk.Label(self.camera_scale_frame, textvariable=self.computed_camera_y).grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(6, 0))
+        ttk.Label(geometry, text="Unit/manual scale:").grid(row=5, column=0, sticky="w", pady=4)
+        ttk.Entry(geometry, textvariable=self.computed_coordinate_scale, state="readonly", width=18).grid(row=5, column=1, sticky="w", padx=(10, 0), pady=4)
         mapping_help = ttk.Label(
             geometry,
             text="The scale converts Abaqus model coordinates into the experimental coordinate unit before alignment. Automatic mapping remains subject to the existing scientific geometry checks.",
             style="Secondary.TLabel", justify="left"
         )
-        mapping_help.grid(row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        mapping_help.configure(text="Calibration establishes physical coordinate scale first. Registration may then permute axes, translate, or reflect; it does not fit scale to improve MAC.")
+        mapping_help.grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self._responsive_wrap_labels.append(mapping_help)
         self._tooltips.extend((
             Tooltip(self.abaqus_unit_combo, "Abaqus ODB files do not contain an intrinsic physical length unit. Choose the unit used when the model geometry was created."),
@@ -565,8 +624,15 @@ def install_responsive_workflow(app_module) -> None:
             "abaqus_model_unit": (self.abaqus_unit_combo, "readonly"),
             "experimental_coordinate_unit": (self.experimental_unit_combo, "readonly"),
             "automatic_scale": (self.automatic_scale_radio, "normal"),
+            "camera_scale": (self.camera_scale_radio, "normal"),
             "custom_scale": (self.custom_scale_radio, "normal"),
+            "legacy_scale": (self.legacy_scale_radio, "normal"),
             "custom_scale_input": (self.custom_scale_entry, "normal"),
+            "camera_scan_coverage": (self.camera_scan_coverage_combo, "readonly"),
+            "camera_physical_width": (self.camera_physical_width_entry, "normal"),
+            "camera_physical_height": (self.camera_physical_height_entry, "normal"),
+            "camera_dimension_unit": (self.camera_dimension_unit_combo, "readonly"),
+            "calibration_provenance": (self.calibration_provenance_entry, "normal"),
             "workspace_path": (self.workspace_path_entry, "normal"),
             "workspace_path_browse": (workspace_path_browse, "normal"),
         }
@@ -603,8 +669,14 @@ def install_responsive_workflow(app_module) -> None:
         return entry, button
 
     def sync_coordinate_mapping(self, *_args) -> Optional[float]:
-        custom = self.coordinate_mapping_mode.get() == "custom"
-        if custom:
+        mode = self.coordinate_mapping_mode.get()
+        self.custom_scale_frame.grid_remove()
+        self.camera_scale_frame.grid_remove()
+        if mode == LEGACY_GEOMETRIC_FIT:
+            self.computed_coordinate_scale.set("legacy extent fit")
+            self.coordinate_scale_text.set("auto")
+            return None
+        if mode == MANUAL:
             self.custom_scale_frame.grid()
             try:
                 value = validate_custom_scale(self.custom_coordinate_scale.get())
@@ -615,7 +687,13 @@ def install_responsive_workflow(app_module) -> None:
             self.computed_coordinate_scale.set(f"{value:.9g}")
             self.coordinate_scale_text.set(f"{value:.17g}")
             return value
-        self.custom_scale_frame.grid_remove()
+        if mode == CAMERA_GRID:
+            self.camera_scale_frame.grid()
+            self.computed_coordinate_scale.set(EM_DASH)
+            self.coordinate_scale_text.set("camera_grid")
+            self.computed_camera_x.set("computed from imported raw X span")
+            self.computed_camera_y.set("computed from imported raw Y span")
+            return None
         try:
             value = coordinate_scale_from_units(
                 self.abaqus_model_unit.get(), self.experimental_coordinate_unit.get()
@@ -625,7 +703,7 @@ def install_responsive_workflow(app_module) -> None:
             self.coordinate_scale_text.set("auto")
             return None
         self.computed_coordinate_scale.set(f"{value:.9g}")
-        self.coordinate_scale_text.set("auto")
+        self.coordinate_scale_text.set(f"{value:.17g}")
         return value
 
     def scroll_input_tab(self, event) -> None:
@@ -662,11 +740,39 @@ def install_responsive_workflow(app_module) -> None:
         if start < 1 or end < start:
             messagebox.showwarning("Abaqus mode range", "The final mode must be greater than or equal to the first mode.")
             return None
-        if self.coordinate_mapping_mode.get() == "custom":
+        mode = self.coordinate_mapping_mode.get()
+        if mode == LEGACY_GEOMETRIC_FIT:
+            calibration = CoordinateCalibration(
+                mode=LEGACY_GEOMETRIC_FIT,
+                abaqus_unit=self.abaqus_model_unit.get(),
+                provenance=self.calibration_provenance.get().strip() or "Legacy extent-based geometric fit",
+            )
+        elif mode == MANUAL:
             try:
                 scale = validate_custom_scale(self.custom_coordinate_scale.get())
             except ValueError as error:
                 messagebox.showwarning("Custom coordinate scale", str(error))
+                return None
+            calibration = CoordinateCalibration(
+                mode=MANUAL,
+                abaqus_unit=self.abaqus_model_unit.get(),
+                manual_scale=scale,
+                provenance=self.calibration_provenance.get().strip() or "Manual advanced override",
+            )
+        elif mode == CAMERA_GRID:
+            try:
+                calibration = CoordinateCalibration(
+                    mode=CAMERA_GRID,
+                    abaqus_unit=self.abaqus_model_unit.get(),
+                    scan_coverage=self.camera_scan_coverage.get(),
+                    physical_width=float(self.camera_physical_width.get().strip().replace(",", ".")) if self.camera_physical_width.get().strip() else None,
+                    physical_height=float(self.camera_physical_height.get().strip().replace(",", ".")) if self.camera_physical_height.get().strip() else None,
+                    dimension_unit=self.camera_dimension_unit.get(),
+                    provenance=self.calibration_provenance.get().strip(),
+                )
+                calibration.validate()
+            except ValueError as error:
+                messagebox.showwarning("Camera-grid calibration", str(error))
                 return None
         else:
             try:
@@ -679,6 +785,12 @@ def install_responsive_workflow(app_module) -> None:
                     "Choose Automatic mapping with named units, or enter a positive Custom scale factor.",
                 )
                 return None
+            calibration = CoordinateCalibration(
+                mode=CALIBRATED_PHYSICAL,
+                abaqus_unit=self.abaqus_model_unit.get(),
+                experimental_unit=self.experimental_coordinate_unit.get(),
+                provenance=self.experimental_unit_source.get(),
+            )
         command = self.abaqus_command.get().strip()
         if abaqus.suffix.lower() == ".odb" and resolve_command(command) is None:
             messagebox.showwarning(
@@ -686,7 +798,7 @@ def install_responsive_workflow(app_module) -> None:
                 "No valid Abaqus installation was found. Choose Detect again, Browse, or Advanced command.",
             )
             return None
-        return abaqus, experiment, workspace, start, end, command or "abaqus", scale
+        return abaqus, experiment, workspace, start, end, command or "abaqus", calibration
 
     def detect_abaqus(self) -> None:
         installations = discover_abaqus_installations()
@@ -897,6 +1009,14 @@ def install_responsive_workflow(app_module) -> None:
                 self._sync_coordinate_mapping()
             except Exception:
                 pass
+        if result.geometry.calibration_details.get("mode") == CAMERA_GRID:
+            details = result.geometry.calibration_details
+            self.computed_camera_x.set(
+                f"raw X / {details.get('physical_height') if details.get('axes_swapped') else details.get('physical_width')} {details.get('dimension_unit')} = {details.get('scale_x'):.9g}"
+            )
+            self.computed_camera_y.set(
+                f"raw Y / {details.get('physical_width') if details.get('axes_swapped') else details.get('physical_height')} {details.get('dimension_unit')} = {details.get('scale_y'):.9g}"
+            )
 
     def rebuild_metric_cards(self) -> None:
         frame = self.metric_pairs.master
@@ -998,6 +1118,11 @@ def install_responsive_workflow(app_module) -> None:
             "experimental_unit_source": self.experimental_unit_source.get(),
             "coordinate_mapping_mode": self.coordinate_mapping_mode.get(),
             "custom_coordinate_scale": self.custom_coordinate_scale.get(),
+            "camera_scan_coverage": self.camera_scan_coverage.get(),
+            "camera_physical_width": self.camera_physical_width.get(),
+            "camera_physical_height": self.camera_physical_height.get(),
+            "camera_dimension_unit": self.camera_dimension_unit.get(),
+            "calibration_provenance": self.calibration_provenance.get(),
             "manual_reviews": self.manual_reviews,
         }
 
@@ -1035,6 +1160,11 @@ def install_responsive_workflow(app_module) -> None:
             self.experimental_coordinate_unit,
             self.coordinate_mapping_mode,
             self.custom_coordinate_scale,
+            self.camera_scan_coverage,
+            self.camera_physical_width,
+            self.camera_physical_height,
+            self.camera_dimension_unit,
+            self.calibration_provenance,
         )
         self._persistent_traces = [variable.trace_add("write", self._on_persistent_change) for variable in variables]
         self.root.bind_all("<Control-s>", lambda _event: (self._save_project(), "break")[1])
@@ -1044,6 +1174,23 @@ def install_responsive_workflow(app_module) -> None:
     def project_payload_for_self(self) -> dict:
         from project_review import project_payload
 
+        mode = self.coordinate_mapping_mode.get()
+        if mode == CAMERA_GRID:
+            calibration = CoordinateCalibration(
+                mode=CAMERA_GRID,
+                abaqus_unit=self.abaqus_model_unit.get(),
+                scan_coverage=self.camera_scan_coverage.get(),
+                physical_width=float(self.camera_physical_width.get().replace(",", ".")) if self.camera_physical_width.get().strip() else None,
+                physical_height=float(self.camera_physical_height.get().replace(",", ".")) if self.camera_physical_height.get().strip() else None,
+                dimension_unit=self.camera_dimension_unit.get(),
+                provenance=self.calibration_provenance.get(),
+            )
+        elif mode == LEGACY_GEOMETRIC_FIT:
+            calibration = CoordinateCalibration(mode=LEGACY_GEOMETRIC_FIT, abaqus_unit=self.abaqus_model_unit.get(), provenance=self.calibration_provenance.get() or "Legacy extent-based geometric fit")
+        elif mode == MANUAL:
+            calibration = CoordinateCalibration(mode=MANUAL, abaqus_unit=self.abaqus_model_unit.get(), manual_scale=validate_custom_scale(self.custom_coordinate_scale.get()), provenance=self.calibration_provenance.get())
+        else:
+            calibration = CoordinateCalibration(mode=CALIBRATED_PHYSICAL, abaqus_unit=self.abaqus_model_unit.get(), experimental_unit=self.experimental_coordinate_unit.get(), provenance=self.experimental_unit_source.get())
         payload = project_payload(
             abaqus_path=self.abaqus_path.get(),
             experimental_path=self.experimental_path.get(),
@@ -1051,9 +1198,10 @@ def install_responsive_workflow(app_module) -> None:
             abaqus_command=self.abaqus_command.get(),
             start_mode=int(self.start_mode.get()),
             end_mode=int(self.end_mode.get()),
-            coordinate_scale="auto" if self.coordinate_mapping_mode.get() == "automatic" else self.custom_coordinate_scale.get(),
+            coordinate_scale=self.coordinate_scale_text.get(),
             manual_reviews=self.manual_reviews,
             result=self.result,
+            geometry_calibration=calibration.to_dict(),
         )
         payload["inputs"].update(
             {
@@ -1062,6 +1210,11 @@ def install_responsive_workflow(app_module) -> None:
                 "experimental_unit_source": self.experimental_unit_source.get(),
                 "coordinate_mapping_mode": self.coordinate_mapping_mode.get(),
                 "custom_coordinate_scale": self.custom_coordinate_scale.get(),
+                "camera_scan_coverage": self.camera_scan_coverage.get(),
+                "camera_physical_width": self.camera_physical_width.get(),
+                "camera_physical_height": self.camera_physical_height.get(),
+                "camera_dimension_unit": self.camera_dimension_unit.get(),
+                "calibration_provenance": self.calibration_provenance.get(),
             }
         )
         return payload
@@ -1073,10 +1226,19 @@ def install_responsive_workflow(app_module) -> None:
         self.abaqus_model_unit.set(str(inputs.get("abaqus_model_length_unit", "mm")))
         self.experimental_coordinate_unit.set(str(inputs.get("experimental_coordinate_unit", "m")))
         self.experimental_unit_source.set(str(inputs.get("experimental_unit_source", "inferred; verify for this test setup")))
-        mode = str(inputs.get("coordinate_mapping_mode", "automatic" if legacy_scale.lower() in {"", "auto", "automatic"} else "custom"))
+        calibration_data = inputs.get("geometry_calibration") or {}
+        mode = str(calibration_data.get("mode", inputs.get("coordinate_mapping_mode", LEGACY_GEOMETRIC_FIT if legacy_scale.lower() in {"", "auto", "automatic"} else MANUAL)))
         self.coordinate_mapping_mode.set(mode)
-        self.custom_coordinate_scale.set(str(inputs.get("custom_coordinate_scale", "1.0" if mode == "automatic" else legacy_scale)))
+        self.custom_coordinate_scale.set(str(calibration_data.get("manual_scale", inputs.get("custom_coordinate_scale", "1.0" if mode == CALIBRATED_PHYSICAL else legacy_scale))))
+        self.camera_scan_coverage.set(str(calibration_data.get("scan_coverage", inputs.get("camera_scan_coverage", "full"))))
+        self.camera_physical_width.set("" if calibration_data.get("physical_width") is None else str(calibration_data.get("physical_width")))
+        self.camera_physical_height.set("" if calibration_data.get("physical_height") is None else str(calibration_data.get("physical_height")))
+        self.camera_dimension_unit.set(str(calibration_data.get("dimension_unit") or inputs.get("camera_dimension_unit", "mm")))
+        self.calibration_provenance.set(str(calibration_data.get("provenance", inputs.get("calibration_provenance", ""))))
         self._sync_coordinate_mapping()
+        warnings = payload.get("load_warnings", [])
+        if warnings:
+            messagebox.showwarning("Legacy coordinate calibration", "\n\n".join(map(str, warnings)))
         if project_path is None:
             self._session_recovered = True
         if hasattr(self, "dirty_tracker") and project_path is not None:
@@ -1091,8 +1253,13 @@ def install_responsive_workflow(app_module) -> None:
             self.abaqus_model_unit.set("mm")
             self.experimental_coordinate_unit.set("m")
             self.experimental_unit_source.set("inferred; verify for this test setup")
-            self.coordinate_mapping_mode.set("automatic")
+            self.coordinate_mapping_mode.set(CALIBRATED_PHYSICAL)
             self.custom_coordinate_scale.set("1.0")
+            self.camera_scan_coverage.set("full")
+            self.camera_physical_width.set("")
+            self.camera_physical_height.set("")
+            self.camera_dimension_unit.set("mm")
+            self.calibration_provenance.set("")
             self._reset_dirty()
             self._set_empty_states()
             self._refresh_readiness()

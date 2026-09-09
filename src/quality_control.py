@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from coordinate_calibration import CoordinateCalibration
 from modal_core import ComparisonResult, ModalDataset, ModeShape
 from reviewed_core import compare_modal_datasets
 
@@ -130,6 +131,7 @@ def compare_modal_datasets_with_quality_control(
     mac_weight: float = 0.75,
     frequency_weight: float = 0.25,
     coordinate_scale_override: Optional[float] = None,
+    geometry_calibration: Optional[CoordinateCalibration] = None,
 ) -> ComparisonResult:
     rigid_residuals = _rigid_residuals(abaqus)
     excluded_modes, retained_modes, rigid_threshold, first_elastic = _detect_rigid_modes(abaqus)
@@ -165,6 +167,7 @@ def compare_modal_datasets_with_quality_control(
         minimum_mac=MIN_ACCEPTED_MAC,
         maximum_frequency_only_error_percent=MAX_FREQUENCY_ONLY_ERROR_PERCENT,
         coordinate_scale_override=coordinate_scale_override,
+        geometry_calibration=geometry_calibration,
     )
 
     if excluded_modes:

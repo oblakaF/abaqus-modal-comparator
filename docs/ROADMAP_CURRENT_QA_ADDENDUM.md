@@ -98,6 +98,58 @@ The historical saved project independently confirms that the 8-pair run used `co
 
 ## 4. Resolved: physical coordinate-scale audit
 
+### 4.0 Coordinate-provenance correction (2026-09-09; supersedes 4.2–4.5)
+
+The operator has since confirmed that no specimen dimensions, reference length,
+distance calibration, or CAD geometry were supplied when the 11x11 Polytec
+camera-view grid was drawn. The scan covered the full specimen. Consequently,
+dataset 164's SI declaration does **not** establish metric calibration of these
+camera-grid coordinates. The statements below that interpret the raw spans as
+metres, call this a partial scan, or conclude that `coordinate_scale=0.001` is
+physically correct are obsolete for this acquisition and retained only as audit
+history. `docs/COORDINATE_CALIBRATION_DECISION.md` is the authoritative decision
+record.
+
+Production now separates calibrated physical geometry, uncalibrated camera-grid
+geometry, manual overrides, and explicitly warned legacy extent fitting. A full
+camera-grid scan requires recorded physical width/height; a partial scan requires
+physical scan-window width/height and is never stretched from specimen dimensions.
+
+No independent measurement record for the exact
+`Job-1.odb` / `500by500_Glue420_Auxetic_full_scan_260624.unv` specimen was found in
+the available local records. The validation therefore uses nominal 500 x 500 mm
+as a clearly labelled fallback. Raw spans 0.3329370319843292 x
+0.3286576420068741 produce independent comparator-convention factors
+`scale_x=0.0006658740639686585` and
+`scale_y=0.0006573152840137482`.
+
+The real format-v2 extraction diagnostic (modes 7–16, unchanged gates) gave:
+
+- fixed `0.001`: 3 accepted pairs;
+- retained legacy extent fit `0.000660345670989`: 9 accepted pairs in the current
+  7–16 diagnostic (the frozen historical project records 8 under its earlier
+  run context);
+- explicit nominal 500 x 500 camera calibration: 9 accepted pairs, independently
+  reproducing the full-panel geometric behavior without optimizing scale for MAC.
+
+The explicit camera result used planar axis permutation `[1, 0]`, determinant
+`+1`, 100% tolerance match, normalized RMS `0.00145978`, raw-coordinate RMS/max
+residual `0.000682926 / 0.00136569`, and Abaqus-unit RMS/max residual
+`1.03267 / 2.06677 mm`. The matched FE-node bounding box is
+`X 5.45904..505.56833`, `Y -2.88000..496.42496`, `Z 0.45..2.45 mm`
+(spans `500.10929 x 499.30496 x 2.00000 mm`). The complete diagnostic,
+including all MAC matrices, is reproducible with
+`tools/validate_coordinate_calibration.py`. No affine/projective fit was
+introduced.
+
+The requested real SP15 rerun used
+`CFRP_PLAIN_520_STAGEA_baseline.odb` and
+`SP15_500by500_bigSP14_with_geometry.unv`: fresh extraction format 2, modes
+1–20, explicit nominal 500 x 500 calibration, X/Y factors `0.001 / 0.001`,
+100% geometry match, normalized RMS `1.95e-17`, determinant `+1`, no planar
+axis swap, and 0 accepted pairs. This is a real SP15 diagnostic result, not a
+proxy, and does not promote zero pairs to a scientific pass.
+
 ### 4.1 FE geometry
 
 `Job-1.odb` contains a ~500 mm sandwich model:
