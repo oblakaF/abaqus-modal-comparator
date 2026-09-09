@@ -188,25 +188,151 @@ For this specimen:
 - useful benchmark range: `7 -> 15` or `7 -> 16`
 - mode 16 does not pair in the historical comparison
 
-Preliminary profiling indicates the dominant cost is the very large full-field export/read path:
+Confirmed dominant cost is the very large full-field export/read path:
 
 - ~977,270 FE nodes
-- ~9-10 requested elastic modes
-- roughly ~150 MB CSV per mode
+- 10 usable elastic modes present in the ODB (range clips to 1-16; requests above 16 are clipped, not fabricated)
+- old per-mode CSV ~150 MB (geometry embedded redundantly in every mode file)
 
-A prior controlled parse/hash pass took ~99 s in-process, while real Abaqus CSV export consumed much longer wall-clock time. This is the likely performance target, not geometry/MAC/Hungarian math.
+### 5.1 VERIFIED performance measurements (this session)
 
-Required next performance work:
+Real files: `.sandwich_postfix_benchmark\Job-1.odb` (977,270-node sandwich model), same UNV as section 2, range 7->16, `coordinate_scale=0.001`.
 
-- measure main vs feature extraction time using the same real files and effective range
-- prove whether HUD process-management adds any material overhead
-- preserve correct clipping to available modes
-- surface the range notice clearly (`requested 7-30; available through 16; using 7-16`)
-- do not leave the user staring at a generic apparently frozen `1/6 Abaqus extraction...`
-- add meaningful extraction/export/read progress if technically feasible
-- investigate reducing unnecessary repeated full-field CSV I/O without changing scientific results
+**Before optimization** (`format_version=1`, geometry duplicated per mode CSV):
+
+- cold extraction wall-clock: 285 s (12:35:55 -> 12:40:40, ~26-28 s/mode)
+- total CSV bytes written: 1,503,342,861 (10 files, ~150.3 MB each, no shared geometry file)
+
+**After optimization** (`format_version=2`, geometry.csv written once, per-mode CSVs carry displacement values only):
+
+- cold extraction wall-clock: 196.13 s (measured directly via `run_abaqus_extraction`)
+  - geometry exported once: 10.8 s (977,270 nodes)
+  - 10 modes at ~17-18 s each
+- in-process parse (`load_extracted_odb`) of the extracted CSVs: 39.41 s
+- total CSV bytes written: 1,070,706,233 (geometry.csv 87,429,012 bytes + 10 per-mode files ~98.3 MB each)
+- byte reduction vs before: 432,636,628 bytes (28.8%)
+- wall-clock speedup: 285 s -> 196.13 s (1.45x on extraction alone)
+
+**Main vs feature branch control** (`control_pipeline.py`, same old-format manifest, `coordinate_scale=0.001`, both against `main`@`cc31b41` in a worktree and this feature branch): `odb_load` 98.78 s (main) vs 99.07 s (feature) — statistically indistinguishable; HUD process-management/progress-callback wiring adds no material overhead.
+
+**Scientific before/after equality** (`format_version=1` extraction vs `format_version=2` extraction of the same ODB/UNV, same code, `coordinate_scale=0.001`): `abaqus_frequencies`, `abaqus_vector_stats` (coord/vector hashes), `experimental_frequencies`/`experimental_vector_stats`, `geometry` transform, `mac_matrix`, `frequency_error_matrix`, `pairs` (3 accepted: A7->E1 MAC 0.977, A8->E2 MAC 0.932, A15->E8 MAC 0.761), and `warnings` were byte-for-byte identical between old- and new-format extraction outputs. **PASS, no scientific regression.**
+
+**SP15 small-case regression** (`CFRP_PLAIN_520_STAGEA_baseline.odb`, range 1-20): extraction 1.82 s, full pipeline 4.43 s total, `format_version=2`, 0 accepted pairs — unchanged from the documented zero-pair diagnostic baseline (section 6.2). Stays fast.
+
+### 5.2 Cancellation regression: NOT CLEAN — orphaned Abaqus worker process found
+
+A live cancel-mid-extraction smoke test (cancel raised during per-mode export, mode 7 in flight) confirmed:
+
+- `AnalysisCancelled` is raised correctly and `manifest.json` is never written, so partial output is correctly never treated as valid cache (existing contract in `fast_cache.py`, unchanged by this work).
+- `stop_owned_process_and_wait` / `cancel_owned_process` (`src/abaqus_bridge.py`) reported the owned `cmd.exe` launcher as terminated (`taskkill /PID <pid> /T /F` succeeded, `process.poll()` non-`None`).
+- **However the real Abaqus worker (`SMAPython.exe`) kept running after cancellation was reported complete**, and continued writing `mode_0007.csv` to disk for tens of seconds afterward. `taskkill` later reported this survivor's actual parent as a *different*, untracked PID — i.e. the Abaqus launch chain (`abq2024.bat`) re-parents the real worker under a process outside the tree rooted at the PID this code records, so `/T` (tree-kill) does not reach it.
+
+This is a **pre-existing bug**, not introduced by the format-version-2 optimization (`cancel_owned_process`/`stop_owned_process_and_wait` are untouched by this change; `runtime_hardening.py`'s diff only adds a best-effort progress-text callback inside the existing poll loop). It was found while re-verifying the cancellation contract as part of this performance task's release gate. It fails release-gate item 8 in section 7 ("Stop still terminates owned Abaqus work cleanly") and must be fixed (e.g. by recording the real worker PID via a job object / `CREATE_NEW_PROCESS_GROUP` + `taskkill /T` from the true root, or by having `extract_odb.py` write its own PID to a sentinel file the launcher can taskkill directly) before this is considered release-ready. Only the per-mode-export scenario was reproduced live this session; ODB-inspection, geometry-export, and Python-parse cancellation points were not independently re-verified live and should not be assumed clean.
 
 Any `.sandwich_postfix_benchmark` / `_sandwich_postfix_benchmark.py` artifact remains diagnostic scratch unless explicitly promoted with justification.
+
+### 5.1 Resolved: extraction I/O optimization (geometry-once format)
+
+Real-run measurements against `Job-1.odb` (977,270 nodes), range 7-16, using
+local read-only copies under `.sandwich_postfix_benchmark/`:
+
+**Bottleneck breakdown (before):** dominant cost is per-mode full-field CSV
+export, not ODB open or geometry indexing. Process launch -> ODB
+open+node-coordinate indexing ~11s; each of the 10 mode exports ~27-29s
+(~274s, 96% of the 285s extraction wall time). Every per-mode CSV repeated
+`instance,node_label,x,y,z` for all 977,270 nodes -- static geometry was
+~61% of each row's bytes, duplicated across 10 files (1 needed write + 9
+redundant writes). Total format-1 CSV output: 1,503,342,861 bytes (10 files,
+~150MB each).
+
+**Optimization implemented:** `abaqus_scripts/extract_odb.py` now writes
+static node geometry once to `geometry.csv` (`instance,node_label,x,y,z`)
+and per-mode CSVs (`mode_%04d.csv`) contain only
+`instance,node_label,u1_real,u2_real,u3_real,u1_imag,u2_imag,u3_imag`, joined
+back to geometry by `(instance, node_label)` at parse time (not by row
+order, so exact identity is preserved independent of any Abaqus field-value
+ordering assumption). Manifest gained `format_version: 2` and
+`geometry_file`; `src/abaqus_bridge.py::load_extracted_odb` dispatches on
+`format_version` and still reads `format_version` 1 (or missing, which
+defaults to 1) read-only. `src/fast_cache.py`'s binary-cache signature now
+includes the geometry file so a geometry change alone still invalidates that
+cache layer.
+
+**Real measured result (same ODB, same range, local copy):**
+
+| Metric | Before (format 1) | After (format 2) | Change |
+|---|---|---|---|
+| Abaqus extraction wall time | 285.0s (from timestamps) / 216.2s (main-branch control, warm cache) | 196.1s | ~1.1-1.45x faster (see caveat below) |
+| Python parse time | 51.5s | 39.4s | 1.31x faster |
+| Total CSV bytes written | 1,503,342,861 | 1,070,706,233 (incl. geometry.csv once) | -432.6 MB (-28.8%) |
+| Per-mode export time | ~27-29s | ~17.1-18.3s | ~35% faster per mode |
+
+Scientific output was verified bit-for-bit equivalent before vs after
+(identical frequencies, identical 3 accepted pairs, identical MAC/frequency
+errors to the digits printed -- see section 3's reference numbers).
+
+**Main vs feature control (section B):** main (`subprocess.run`,
+blocking, pipe-captured output) produced byte-identical CSV output
+(1,503,342,861 bytes) to the feature branch's pre-optimization script, and a
+comparable Python parse time (52.4s vs 51.5s). Its measured extraction wall
+time (216.2s) was faster than the feature branch's own earlier same-morning
+cold run (285.0s), but that comparison spans two different sessions hours
+apart on a 291MB ODB, so OS file-cache warmth is a real confound, not a
+controlled variable. Architecturally, the only process-management difference
+between branches is a `Popen` + 0.1s poll loop with a cancellation check
+versus a single blocking `subprocess.run` call -- overhead on that order
+(microseconds per iteration, ~2000 iterations over a 200s run) cannot
+plausibly explain a two-minute-scale gap. Conclusion: **no evidence that HUD
+process-management/cancellation plumbing adds material extraction
+overhead**; the observed session-to-session variance is attributed to
+disk/OS-cache state, and no UI-plumbing "optimization" was made on that
+basis.
+
+**Progress reporting (section H):** `extract_odb.py` now emits
+`PROGRESS: ...` lines (ODB opened, available vs requested vs effective mode
+range, geometry export start/done with node count and elapsed time, and
+per-mode "exporting mode i/N (mode k)..." / "mode i/N done in Xs").
+`run_abaqus_extraction` tails the log file for these lines and forwards them
+through a new `progress_callback` parameter; `runtime_hardening.py`'s
+`hardened_worker` (confirmed the final `_worker` owner in the patch chain)
+relays them into the existing `stage(1, ...)` status text, so the GUI shows
+real phase text instead of a static "1/6 Abaqus extraction..." for the
+entire multi-minute extraction.
+
+**Cancellation (section I):** a real cancellation fired ~20s into a live
+`Job-1.odb` extraction (mid-write of the first mode file) via
+`load_or_extract_odb`'s `cancel_event`. Result: `AnalysisCancelled` raised
+cleanly, `cache/manifest.json` never written (so `_cache_is_valid` correctly
+treats the partial cache directory as invalid on any later run), and a
+process check by command line (`Get-CimInstance Win32_Process`) found zero
+remaining processes referencing the cancelled run's output directory --- the
+owned `cmd.exe`/`SMAPython.exe`/`ABQcaeK.exe` tree was fully torn down by the
+existing `taskkill /PID <pid> /T /F` scoping. Two unrelated, long-running
+Abaqus sessions already present on the machine (an interactive CAE session
+from 9/7, and a separate live extraction against `SP-01.odb` from another
+session) were correctly left untouched.
+
+**SP15 regression (section K):** re-run against
+`C:\temp\12 sampls\results\SP15\test\CFRP_PLAIN_520_STAGEA_baseline.odb`
+with the new format-2 extractor: total pipeline 2.15s (extraction 1.51s),
+`format_version: 2`, 20 modes extracted, 0 accepted pairs (unchanged
+diagnostic result). Still fast, still correct.
+
+**Node-subset extraction (section F):** not implemented. The comparison
+pipeline currently builds `mode.measured_dofs` as all-True over the full
+field and geometry mapping in `reviewed_core.py` operates over the complete
+FE point cloud before any subsetting to the 121 experimental points; Mode
+Shapes visualization also renders the full FE field. A two-stage
+(geometry-then-selective-displacement) extraction would require either a
+second Abaqus invocation (extra process/license startup cost per run, likely
+comparable to or exceeding today's ~11s ODB-open/geometry-index overhead) or
+a first-stage geometry pass followed by node-filtered field export in the
+same session -- a real architecture change to `extract_odb.py`'s frame/field
+API usage, `abaqus_bridge.py`'s manifest schema, and the comparison/report
+code that currently assumes full-field mode vectors are available for
+visualization. Left as a documented future optimization; not attempted in
+this pass given the smaller geometry-dedup change in this section already
+captured most of the confirmed redundant I/O.
 
 ## 6. Remaining HUD state/UI blockers
 

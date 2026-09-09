@@ -16,8 +16,29 @@ import json
 import os
 import re
 import sys
+import time
 
 from odbAccess import openOdb
+
+
+# Bumped whenever the on-disk extraction layout changes in a way that a
+# consumer must branch on. Format 1 wrote node coordinates redundantly into
+# every per-mode CSV. Format 2 writes static node geometry once (geometry.csv)
+# and per-mode CSV files carry only the dynamic displacement values, joined
+# back to geometry by (instance, node_label). abaqus_bridge.load_extracted_odb
+# dispatches on manifest["format_version"] and still reads format 1 read-only.
+FORMAT_VERSION = 2
+
+
+def _log(message):
+    """Emit a single-line, timestamped progress marker to stdout.
+
+    Abaqus's subprocess stdout is captured to a log file by abaqus_bridge and
+    tailed for new lines, so each call here becomes one GUI-visible progress
+    update. Keep messages short and free of embedded newlines.
+    """
+    print("PROGRESS: %s" % message)
+    sys.stdout.flush()
 
 
 def safe_float(value, default=0.0):
@@ -77,6 +98,27 @@ def select_modal_step(odb, start_mode, end_mode):
             "for modes %d-%d." % (start_mode, end_mode)
         )
     return best
+
+
+def describe_available_modes(odb, start_mode, end_mode):
+    """Scan every step's frames once to report the full modal range present.
+
+    This is a diagnostic pass only (no field data is read) so it stays cheap
+    even for a large ODB, and lets the caller surface an accurate range-clip
+    message such as "requested 7-30; ODB contains modes through 16".
+    """
+    all_modes = []
+    for step in odb.steps.values():
+        for frame_index, frame in enumerate(step.frames):
+            if "U" not in frame.fieldOutputs:
+                continue
+            frequency = frame_frequency(frame)
+            if frequency <= 0:
+                continue
+            all_modes.append(frame_mode_number(frame, frame_index))
+    if not all_modes:
+        return None
+    return min(all_modes), max(all_modes)
 
 
 def node_coordinates(odb):
@@ -162,14 +204,48 @@ def main():
     if not os.path.isdir(output_directory):
         os.makedirs(output_directory)
 
+    _log("opening ODB %s" % os.path.basename(odb_path))
+    open_started = time.time()
     odb = openOdb(path=odb_path, readOnly=True)
+    _log("ODB opened in %.1fs" % (time.time() - open_started))
     try:
+        available = describe_available_modes(odb, args.start_mode, args.end_mode)
+        if available is not None:
+            _log(
+                "modes available %d-%d; requested %d-%d"
+                % (available[0], available[1], args.start_mode, args.end_mode)
+            )
         step_name, frames = select_modal_step(odb, args.start_mode, args.end_mode)
         step = odb.steps[step_name]
-        coordinates = node_coordinates(odb)
-        mode_entries = []
+        effective_modes = sorted(item[2] for item in frames)
+        if effective_modes:
+            _log(
+                "using modes %d-%d (%d frames)"
+                % (effective_modes[0], effective_modes[-1], len(effective_modes))
+            )
 
-        for frame_index, frame, mode_number, frequency in frames:
+        geometry_started = time.time()
+        _log("exporting geometry...")
+        coordinates = node_coordinates(odb)
+        geometry_file_name = "geometry.csv"
+        geometry_path = os.path.join(output_directory, geometry_file_name)
+        with open(geometry_path, "w") as stream:
+            writer = csv.writer(stream, lineterminator="\n")
+            writer.writerow(["instance", "node_label", "x", "y", "z"])
+            for (instance_name, node_label), xyz in coordinates.items():
+                writer.writerow(
+                    [instance_name, node_label] + ["%.16g" % item for item in xyz]
+                )
+        _log(
+            "geometry exported: %d nodes in %.1fs"
+            % (len(coordinates), time.time() - geometry_started)
+        )
+
+        mode_entries = []
+        total_modes = len(frames)
+        for mode_index, (frame_index, frame, mode_number, frequency) in enumerate(frames, start=1):
+            mode_started = time.time()
+            _log("exporting mode %d/%d (mode %d)..." % (mode_index, total_modes, mode_number))
             file_name = "mode_%04d.csv" % mode_number
             file_path = os.path.join(output_directory, file_name)
             field = frame.fieldOutputs["U"]
@@ -180,9 +256,6 @@ def main():
                     [
                         "instance",
                         "node_label",
-                        "x",
-                        "y",
-                        "z",
                         "u1_real",
                         "u2_real",
                         "u3_real",
@@ -196,11 +269,9 @@ def main():
                     instance = getattr(value, "instance", None)
                     instance_name = getattr(instance, "name", "ASSEMBLY")
                     node_label = int(getattr(value, "nodeLabel", 0))
-                    xyz = coordinates.get((instance_name, node_label), [0.0, 0.0, 0.0])
                     real_data, imaginary_data = vector_parts(value)
                     writer.writerow(
                         [instance_name, node_label]
-                        + ["%.16g" % item for item in xyz]
                         + ["%.16g" % item for item in real_data]
                         + ["%.16g" % item for item in imaginary_data]
                     )
@@ -217,9 +288,15 @@ def main():
                 }
             )
             print("Extracted mode %d at %.8g Hz (%d nodes)" % (mode_number, frequency, row_count))
+            _log(
+                "mode %d/%d done in %.1fs"
+                % (mode_index, total_modes, time.time() - mode_started)
+            )
 
         manifest = {
-            "format_version": 1,
+            "format_version": FORMAT_VERSION,
+            "geometry_file": geometry_file_name,
+            "geometry_node_count": len(coordinates),
             "odb_path": odb_path,
             "odb_name": getattr(odb, "name", os.path.basename(odb_path)),
             "analysis_title": getattr(odb, "analysisTitle", ""),
@@ -234,6 +311,7 @@ def main():
         manifest_path = os.path.join(output_directory, "manifest.json")
         with open(manifest_path, "w") as stream:
             json.dump(manifest, stream, indent=2, sort_keys=True)
+        _log("wrote manifest %s" % manifest_path)
         print("Wrote %s" % manifest_path)
     finally:
         odb.close()

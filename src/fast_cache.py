@@ -244,10 +244,17 @@ def _manifest_signature(manifest_path: Path) -> Dict[str, Any]:
     for item in manifest.get("modes", []):
         path = manifest_path.parent / item["file"]
         files.append(_file_signature(path))
+    geometry_file = manifest.get("geometry_file")
+    geometry_signature = (
+        _file_signature(manifest_path.parent / geometry_file)
+        if geometry_file
+        else None
+    )
     return {
         "version": _CACHE_VERSION,
         "manifest": _file_signature(manifest_path),
         "mode_files": files,
+        "geometry_file": geometry_signature,
     }
 
 

@@ -119,6 +119,7 @@ def run_abaqus_extraction(
     timeout_seconds: int = 3600,
     cancel_event=None,
     process_callback: Optional[Callable[[Optional[subprocess.Popen]], None]] = None,
+    progress_callback: Optional[Callable[[str], None]] = None,
 ) -> Path:
     odb_path = Path(odb_path).resolve()
     output_directory = Path(output_directory).resolve()
@@ -169,6 +170,36 @@ def run_abaqus_extraction(
             process = subprocess.Popen(command, **popen_options)
             if process_callback is not None:
                 process_callback(process)
+            log_tail_position = 0
+            log_tail_partial = ""
+
+            def _drain_progress() -> None:
+                # Best-effort: the extraction script's stdout is captured to
+                # log_path, so new "PROGRESS: ..." lines are surfaced to the
+                # GUI as they appear instead of only after the whole process
+                # exits. Any read failure (e.g. transient sharing violation
+                # while the child is flushing) is silently skipped and
+                # retried on the next poll tick.
+                nonlocal log_tail_position, log_tail_partial
+                if progress_callback is None:
+                    return
+                try:
+                    with log_path.open("r", encoding="utf-8", errors="replace") as tail:
+                        tail.seek(log_tail_position)
+                        chunk = tail.read()
+                        log_tail_position = tail.tell()
+                except OSError:
+                    return
+                if not chunk:
+                    return
+                text = log_tail_partial + chunk
+                lines = text.split("\n")
+                log_tail_partial = lines.pop()
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith("PROGRESS:"):
+                        progress_callback(line[len("PROGRESS:"):].strip())
+
             while process.poll() is None:
                 if cancel_event is not None and cancel_event.is_set():
                     if not stop_owned_process_and_wait(process):
@@ -184,7 +215,9 @@ def run_abaqus_extraction(
                     raise AbaqusExtractionError(
                         f"Abaqus extraction exceeded {timeout_seconds // 60} minutes."
                     )
+                _drain_progress()
                 time.sleep(0.1)
+            _drain_progress()
             return_code = int(process.returncode or 0)
     except FileNotFoundError as error:
         raise AbaqusExtractionError(
@@ -211,37 +244,67 @@ def run_abaqus_extraction(
     return manifest_path
 
 
+def _load_geometry_csv(file_path: Path) -> Dict[tuple, List[float]]:
+    """Load the format-2 shared node-geometry file (written once per extraction)."""
+    coordinates: Dict[tuple, List[float]] = {}
+    with file_path.open("r", encoding="utf-8-sig", newline="") as stream:
+        reader = csv.DictReader(stream)
+        required = {"instance", "node_label", "x", "y", "z"}
+        if reader.fieldnames is None or not required.issubset(reader.fieldnames):
+            raise ValueError(f"Invalid Abaqus geometry file: {file_path.name}")
+        for row in reader:
+            key = (row["instance"], int(row["node_label"]))
+            coordinates[key] = [float(row["x"]), float(row["y"]), float(row["z"])]
+    return coordinates
+
+
 def _load_mode_csv(
     file_path: Path,
     mode_number: int,
     frequency_hz: float,
     metadata: Dict[str, Any],
+    geometry: Optional[Dict[tuple, List[float]]] = None,
 ) -> ModeShape:
+    """Parse one per-mode CSV.
+
+    ``geometry`` is None for format-1 files (legacy layout, each row also
+    carries its own x/y/z) and a shared coordinate lookup for format-2 files
+    (coordinates were written once to geometry.csv). Missing keys fall back to
+    [0, 0, 0], mirroring the format-1 script's historical fallback so parsing
+    behavior does not silently change if a node is ever absent from a frame.
+    """
     node_ids: List[str] = []
     coordinates: List[List[float]] = []
     vectors: List[List[complex]] = []
 
+    legacy = geometry is None
+    required = {
+        "instance",
+        "node_label",
+        "u1_real",
+        "u2_real",
+        "u3_real",
+        "u1_imag",
+        "u2_imag",
+        "u3_imag",
+    }
+    if legacy:
+        required = required | {"x", "y", "z"}
+
     with file_path.open("r", encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
-        required = {
-            "instance",
-            "node_label",
-            "x",
-            "y",
-            "z",
-            "u1_real",
-            "u2_real",
-            "u3_real",
-            "u1_imag",
-            "u2_imag",
-            "u3_imag",
-        }
         if reader.fieldnames is None or not required.issubset(reader.fieldnames):
             raise ValueError(f"Invalid Abaqus mode file: {file_path.name}")
 
         for row in reader:
-            node_ids.append(f"{row['instance']}:{row['node_label']}")
-            coordinates.append([float(row["x"]), float(row["y"]), float(row["z"])])
+            instance_name = row["instance"]
+            node_label = int(row["node_label"])
+            node_ids.append(f"{instance_name}:{node_label}")
+            if legacy:
+                xyz = [float(row["x"]), float(row["y"]), float(row["z"])]
+            else:
+                xyz = geometry.get((instance_name, node_label), [0.0, 0.0, 0.0])
+            coordinates.append(xyz)
             vectors.append(
                 [
                     complex(float(row["u1_real"]), float(row["u1_imag"])),
@@ -270,6 +333,20 @@ def load_extracted_odb(manifest_path: Path) -> ModalDataset:
     with manifest_path.open("r", encoding="utf-8") as stream:
         manifest = json.load(stream)
 
+    format_version = int(manifest.get("format_version", 1))
+    geometry: Optional[Dict[tuple, List[float]]] = None
+    if format_version >= 2:
+        geometry_file = manifest.get("geometry_file")
+        if not geometry_file:
+            raise ValueError(
+                "Extraction manifest declares format_version "
+                f"{format_version} but has no geometry_file entry."
+            )
+        geometry_path = manifest_path.parent / geometry_file
+        if not geometry_path.exists():
+            raise FileNotFoundError(f"Extracted geometry file is missing: {geometry_path}")
+        geometry = _load_geometry_csv(geometry_path)
+
     modes: List[ModeShape] = []
     for mode_entry in manifest.get("modes", []):
         file_path = manifest_path.parent / mode_entry["file"]
@@ -285,6 +362,7 @@ def load_extracted_odb(manifest_path: Path) -> ModalDataset:
                     "frame_description": mode_entry.get("description"),
                     "step_name": manifest.get("step_name"),
                 },
+                geometry=geometry,
             )
         )
 
@@ -348,6 +426,7 @@ def load_or_extract_odb(
     end_mode: int,
     cancel_event=None,
     process_callback: Optional[Callable[[Optional[subprocess.Popen]], None]] = None,
+    progress_callback: Optional[Callable[[str], None]] = None,
 ) -> ModalDataset:
     selected = Path(odb_or_manifest_path)
     if selected.name.lower() == "manifest.json":
@@ -376,6 +455,7 @@ def load_or_extract_odb(
         end_mode=end_mode,
         cancel_event=cancel_event,
         process_callback=process_callback,
+        progress_callback=progress_callback,
     )
     (cache_directory / "extraction_signature.json").write_text(
         json.dumps(signature, indent=2, sort_keys=True), encoding="utf-8"

@@ -151,6 +151,12 @@ def install_runtime_hardening(app_module) -> None:
             cache.mkdir(parents=True, exist_ok=True)
 
             stage(1, "Abaqus extraction")
+
+            def report_extraction_progress(text: str) -> None:
+                # Best-effort live phase text from the Abaqus subprocess (see
+                # extract_odb.py's "PROGRESS:" markers). Never fails the run.
+                stage(1, f"Abaqus extraction: {text}")
+
             abaqus_data = app_module.load_or_extract_odb(
                 abaqus,
                 cache / "abaqus",
@@ -159,6 +165,7 @@ def install_runtime_hardening(app_module) -> None:
                 end,
                 cancel_event=getattr(self, "_analysis_cancel_event", None),
                 process_callback=remember_process,
+                progress_callback=report_extraction_progress,
             )
             range_notice = extraction_range_notice(abaqus_data.metadata)
             if range_notice is not None:
