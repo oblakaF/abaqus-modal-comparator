@@ -258,7 +258,13 @@ def _manifest_signature(manifest_path: Path) -> Dict[str, Any]:
     }
 
 
-def _cached_extracted_odb_loader(manifest_path: Path):
+def _raise_if_cancelled(cancel_event) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise abaqus_bridge.AnalysisCancelled("Analysis stopped by user.")
+
+
+def _cached_extracted_odb_loader(manifest_path: Path, cancel_event=None):
+    _raise_if_cancelled(cancel_event)
     manifest_path = Path(manifest_path).resolve()
     signature = _manifest_signature(manifest_path)
     signature_text = json.dumps(signature, sort_keys=True)
@@ -269,21 +275,25 @@ def _cached_extracted_odb_loader(manifest_path: Path):
     if cache_path.exists():
         try:
             payload = _pickle_load(cache_path, compressed=True)
-            if payload.get("signature") == signature:
-                canonical = _clone_dataset(payload["dataset"])
-                return _returned_dataset(
-                    canonical,
-                    True,
-                    started,
-                    "binary_odb_cache_reused",
-                )
         except Exception:
             try:
                 cache_path.unlink()
             except OSError:
                 pass
+        else:
+            _raise_if_cancelled(cancel_event)
+            if payload.get("signature") == signature:
+                canonical = _clone_dataset(payload["dataset"])
+                returned = _returned_dataset(
+                    canonical, True, started, "binary_odb_cache_reused"
+                )
+                _raise_if_cancelled(cancel_event)
+                return returned
 
-    loaded = _ORIGINAL_EXTRACTED_ODB_LOADER(manifest_path)
+    loaded = _ORIGINAL_EXTRACTED_ODB_LOADER(
+        manifest_path,
+        cancel_event=cancel_event,
+    )
     canonical = _clone_dataset(loaded)
     try:
         _atomic_pickle_dump(
@@ -305,9 +315,12 @@ def _cached_extracted_odb_loader(manifest_path: Path):
             "binary_odb_cache_reused",
         )
         returned.metadata["binary_odb_cache_write_failed"] = True
+        _raise_if_cancelled(cancel_event)
         return returned
 
-    return _returned_dataset(canonical, False, started, "binary_odb_cache_reused")
+    returned = _returned_dataset(canonical, False, started, "binary_odb_cache_reused")
+    _raise_if_cancelled(cancel_event)
+    return returned
 
 
 def install_fast_cache() -> None:

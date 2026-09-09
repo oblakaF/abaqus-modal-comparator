@@ -679,3 +679,36 @@ No automated Part-3 code/test blocker remains. Final human mouse-drag visual QA
 at the intended Windows DPI settings is still required. The separately recorded
 PolyMAX dataset-55 modal-set importer remains post-HUD work; SCI-S0 was not
 started and neither item is part of this change.
+
+## Final manual-QA cached ODB loader regression - VERIFIED (2026-09-09)
+
+A real GUI run exposed a contract mismatch introduced when
+`abaqus_bridge.load_extracted_odb` gained cooperative `cancel_event` support:
+`fast_cache._cached_extracted_odb_loader` still accepted only `manifest_path`,
+although the installed wrapper replaced the public loader and
+`load_or_extract_odb` called it with `cancel_event=...`. The valid extraction-
+cache path therefore failed before loading data with an unexpected-keyword
+`TypeError`.
+
+The fast-cache wrapper now accepts the same optional argument. Cache misses
+pass that exact event to the original CSV loader, preserving cancellation
+during Python-side parsing. Cache hits check the event before signature/cache
+work, immediately after the potentially expensive pickle read, and again
+after cloning just before return. All cancellation exits use the existing
+`abaqus_bridge.AnalysisCancelled("Analysis stopped by user.")` exception.
+Manifest, mode-file, and format-2 geometry signatures, format-1/format-2
+compatibility, stale-cache invalidation, and binary-cache reuse metadata are
+unchanged.
+
+Focused fast-cache/cancellation/format tests passed (28). Native Tk tests
+passed (35). Full pytest passed (320 passed, 3 skipped, 37 subtests; one
+pre-existing collection warning).
+
+A real production-installed-loader smoke used the existing sandwich
+format-2 extraction for modes 7-16. The first load populated an isolated
+binary cache, the second load reported `binary_odb_cache_reused=True`, and all
+10 cached modes matched the original loader exactly for mode number,
+frequency, node IDs, coordinates, and vectors. A pre-set Stop event through
+the same `load_or_extract_odb` path raised `AnalysisCancelled`; no unexpected-
+keyword failure occurred. This closes the reported final-manual-QA loader
+regression without changing scientific results.
