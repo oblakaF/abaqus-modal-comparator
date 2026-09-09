@@ -41,6 +41,116 @@ def _log(message):
     sys.stdout.flush()
 
 
+def _process_creation_time(pid):
+    """Best-effort Windows process creation timestamp (FILETIME halves).
+
+    Used only as an additional PID-reuse safety check by the controller; the
+    process that actually runs this script reports its own creation time so
+    the controller never has to guess or race a query after the fact. Returns
+    None off Windows or if the query fails for any reason (never fatal).
+    """
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return None
+        try:
+            creation = wintypes.FILETIME()
+            exit_t = wintypes.FILETIME()
+            kernel_t = wintypes.FILETIME()
+            user_t = wintypes.FILETIME()
+            ok = kernel32.GetProcessTimes(
+                handle,
+                ctypes.byref(creation),
+                ctypes.byref(exit_t),
+                ctypes.byref(kernel_t),
+                ctypes.byref(user_t),
+            )
+            if not ok:
+                return None
+            return [int(creation.dwLowDateTime), int(creation.dwHighDateTime)]
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:
+        return None
+
+
+def _atomic_replace(tmp_path, final_path):
+    """Publish tmp_path as final_path so a reader never observes a partial file.
+
+    Plain os.rename fails on Windows if final_path already exists (and
+    os.replace is Python-3-only, while this script also runs under Abaqus's
+    Python 2.7). MoveFileExW with MOVEFILE_REPLACE_EXISTING is atomic on a
+    single volume on Windows; elsewhere fall back to remove-then-rename.
+    """
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            MOVEFILE_REPLACE_EXISTING = 0x1
+            MOVEFILE_WRITE_THROUGH = 0x8
+            ok = ctypes.windll.kernel32.MoveFileExW(
+                unicode(tmp_path) if str is bytes else tmp_path,  # noqa: F821
+                unicode(final_path) if str is bytes else final_path,  # noqa: F821
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+            if ok:
+                return
+        except Exception:
+            pass
+    try:
+        if os.path.exists(final_path):
+            os.remove(final_path)
+    except OSError:
+        pass
+    os.rename(tmp_path, final_path)
+
+
+def _write_registration(registration_file, owner_token):
+    """Self-register this process as the owner of the current extraction run.
+
+    Written as early as possible (before openOdb) and atomically, so the
+    controller can positively identify the real worker PID for cancellation
+    even if Abaqus's launcher chain later reparents/detaches it away from the
+    originally-spawned launcher process.
+    """
+    if not registration_file or not owner_token:
+        return
+    pid = os.getpid()
+    record = {
+        "token": owner_token,
+        "pid": pid,
+        "timestamp": time.time(),
+        "format_version": FORMAT_VERSION,
+    }
+    creation_time = _process_creation_time(pid)
+    if creation_time is not None:
+        record["creation_time"] = creation_time
+    tmp_path = "%s.tmp-%d" % (registration_file, pid)
+    try:
+        with open(tmp_path, "w") as stream:
+            json.dump(record, stream)
+            stream.flush()
+            try:
+                os.fsync(stream.fileno())
+            except Exception:
+                pass
+        _atomic_replace(tmp_path, registration_file)
+        _log("registered worker pid %d" % pid)
+    except Exception as error:
+        # Registration is best-effort from the extractor's point of view: if
+        # it fails, the controller simply has no positive worker identity and
+        # falls back to launcher-tree-only cancellation (documented gap), but
+        # extraction itself must not be blocked by a registration failure.
+        _log("worker registration failed: %s" % error)
+
+
 def safe_float(value, default=0.0):
     try:
         return float(value)
@@ -197,12 +307,16 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--start-mode", type=int, default=6)
     parser.add_argument("--end-mode", type=int, default=14)
+    parser.add_argument("--owner-token", default=None)
+    parser.add_argument("--registration-file", default=None)
     args = parser.parse_args()
 
     odb_path = os.path.abspath(args.odb)
     output_directory = os.path.abspath(args.output)
     if not os.path.isdir(output_directory):
         os.makedirs(output_directory)
+
+    _write_registration(args.registration_file, args.owner_token)
 
     _log("opening ODB %s" % os.path.basename(odb_path))
     open_started = time.time()
@@ -309,8 +423,15 @@ def main():
         }
 
         manifest_path = os.path.join(output_directory, "manifest.json")
-        with open(manifest_path, "w") as stream:
+        manifest_tmp_path = "%s.tmp-%d" % (manifest_path, os.getpid())
+        with open(manifest_tmp_path, "w") as stream:
             json.dump(manifest, stream, indent=2, sort_keys=True)
+            stream.flush()
+            try:
+                os.fsync(stream.fileno())
+            except Exception:
+                pass
+        _atomic_replace(manifest_tmp_path, manifest_path)
         _log("wrote manifest %s" % manifest_path)
         print("Wrote %s" % manifest_path)
     finally:

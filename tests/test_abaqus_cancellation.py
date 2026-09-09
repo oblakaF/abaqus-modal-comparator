@@ -17,6 +17,7 @@ from abaqus_bridge import (
     extraction_range_notice,
     load_or_extract_odb,
     run_abaqus_extraction,
+    stop_owned_extraction,
     stop_owned_process_and_wait,
 )
 
@@ -85,7 +86,7 @@ class AbaqusCancellationTests(unittest.TestCase):
 
             with patch("abaqus_bridge.run_abaqus_extraction", side_effect=extract) as run, patch(
                 "abaqus_bridge.load_extracted_odb",
-                side_effect=lambda _path: SimpleNamespace(metadata={}),
+                side_effect=lambda _path, **kwargs: SimpleNamespace(metadata={}),
             ):
                 first = load_or_extract_odb(odb, cache, "abaqus", 7, 7)
                 second = load_or_extract_odb(odb, cache, "abaqus", 7, 7)
@@ -137,8 +138,8 @@ class AbaqusCancellationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch(
             "abaqus_bridge.subprocess.Popen", return_value=process
         ), patch(
-            "abaqus_bridge.stop_owned_process_and_wait",
-            side_effect=lambda owned: (owned.terminate(), True)[1],
+            "abaqus_bridge.stop_owned_extraction",
+            side_effect=lambda owned, *args, **kwargs: (owned.terminate(), True)[1],
         ):
             with self.assertRaises(AnalysisCancelled):
                 run_abaqus_extraction(
@@ -193,8 +194,8 @@ class AbaqusCancellationTests(unittest.TestCase):
         ), patch(
             "abaqus_bridge.time.monotonic", side_effect=[0.0, 1.0]
         ), patch(
-            "abaqus_bridge.stop_owned_process_and_wait",
-            side_effect=lambda owned: (owned.terminate(), True)[1],
+            "abaqus_bridge.stop_owned_extraction",
+            side_effect=lambda owned, *args, **kwargs: (owned.terminate(), True)[1],
         ) as stop:
             with self.assertRaisesRegex(AbaqusExtractionError, "exceeded"):
                 run_abaqus_extraction(
@@ -204,7 +205,8 @@ class AbaqusCancellationTests(unittest.TestCase):
                     timeout_seconds=0,
                     process_callback=callbacks.append,
                 )
-        stop.assert_called_once_with(process)
+        stop.assert_called_once()
+        self.assertIs(stop.call_args.args[0], process)
         self.assertIs(callbacks[0], process)
         self.assertIsNone(callbacks[-1])
 
@@ -215,7 +217,7 @@ class AbaqusCancellationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch(
             "abaqus_bridge.subprocess.Popen", return_value=process
         ), patch(
-            "abaqus_bridge.stop_owned_process_and_wait", return_value=False
+            "abaqus_bridge.stop_owned_extraction", return_value=False
         ):
             with self.assertRaisesRegex(AbaqusExtractionError, "did not stop"):
                 run_abaqus_extraction(

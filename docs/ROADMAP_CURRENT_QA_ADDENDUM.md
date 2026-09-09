@@ -442,3 +442,98 @@ Important FE fact: auxetic and honeycomb cores are represented with their **expl
 Stable specimen relationships already identified include SP-01/SP-13, SP-02/SP-10, SP-08/SP-09, SP-04..SP-07, and SP-03 as the twill-face PLA auxetic control.
 
 Do not start Stage B while modal-data quality and Stage-A remain unresolved.
+
+## 11. Cancellation-ownership hardening (Stop reliably kills the real Abaqus worker)
+
+**Root cause (observed, not assumed):** In real process-tree captures on this
+host (`Get-CimInstance Win32_Process`, full command lines), `run_abaqus_extraction`'s
+tracked launcher chain is `python.exe` (app) -> `cmd.exe` (`CREATE_NEW_PROCESS_GROUP`) ->
+`SMALauncher.exe` -> `SMAPython.exe` (running `extract_odb.py` directly). In every
+run captured during this investigation the real worker stayed a live descendant
+of the tracked launcher PID for the run's full duration -- no reparenting away
+from the launcher tree was reproduced. The previously reported production
+failure (Stop leaves `SMAPython.exe` alive after `taskkill /PID <launcher> /T /F`)
+was therefore not caused by a topology change visible in this environment; the
+robust fix is to stop depending on tree position at all, since `taskkill /T`
+correctness is inherently a function of that position and any future Abaqus
+launcher/version change could alter it again without warning.
+
+**Mechanism implemented:** extractor self-registration. `run_abaqus_extraction`
+generates a per-run `uuid4` ownership token and a run-specific
+`process_registration.json` path inside that run's own output directory (never
+a shared/global path). `extract_odb.py` writes an atomic (`MoveFileExW` /
+temp+replace) registration record -- token, `os.getpid()`, a Windows
+`GetProcessTimes` creation-time fingerprint, timestamp -- as the very first
+thing it does, before `openOdb`. On Stop, `abaqus_bridge.stop_owned_extraction`
+reads that record, validates token match, and cross-checks the PID's live
+creation time against the recorded one before ever calling `taskkill /PID ... /T /F`
+against it; it also still tears down the originally-spawned launcher tree.
+Termination is verified (bounded wait + one escalation retry) before
+cancellation is reported successful; on failure it raises `AbaqusExtractionError`
+(an explicit failure state), never a false "stopped." `manifest.json` is now
+published via the same atomic replace on success only, so a killed worker can
+never leave a partially-written manifest that a later cache read would
+misinterpret as valid.
+
+**Windows Job Object (investigated, not adopted as primary):** a
+`CreateJobObjectW`/`AssignProcessToJobObject`/`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
+probe assigned the tracked launcher `cmd.exe` to a job immediately after
+`Popen` and polled `QueryInformationJobObject` every 2s. Contrary to the
+"Abaqus probably breaks away from jobs" assumption, the real chain (launcher
+`cmd.exe` -> `SMALauncher.exe` -> `SMAPython.exe`) stayed inside the job for
+the observed run's entire life -- no breakaway was seen. This is a genuinely
+useful secondary signal, but was not further engineered into a production kill
+path in this pass (the self-registration mechanism was already live-verified
+against all four cancellation points and does not depend on this still-unproven
+kill-time behavior); worth revisiting as a belt-and-suspenders layer later.
+
+**Live cancellation matrix (real `Job-1.odb`, local `.sandwich_postfix_benchmark`
+copy, byte-identical size to `E:\sumin\Job-1.odb`):**
+
+| Phase | Result | Evidence |
+|---|---|---|
+| ODB open | PASS | worker pid 17616 + launcher pid 145036 both confirmed dead post-cancel; unrelated baseline CAE session (SMALauncher 118960/SMAPython 119732/ABQcaeK 119852/ABQcaeG 8228) untouched |
+| Geometry export | PASS | worker pid 70176 + launcher pid 147120 both confirmed dead; unrelated session untouched |
+| Per-mode export (the reported blocker) | PASS | worker pid 144076 + launcher pid 135992 both confirmed dead; `mode_0007.csv` left truncated at 16,181 of 977,270 rows (proves the worker was killed mid-write, not allowed to finish); no `manifest.json` published; a **second, real, concurrent** app extraction (`python.exe` 148560 -> ... -> `SMAPython.exe` 131648, extracting `SP05_modal.odb` for actual real use during this session) and the baseline CAE session both survived completely untouched |
+| Python-side parse/read (no Abaqus worker alive) | PASS | added a cooperative `cancel_event` check to `load_extracted_odb`'s per-mode loop; a real cancel fired after 4.57s (1 of 10 modes parsed) instead of waiting out the full ~35-40s parse |
+
+**Unrelated-Abaqus survival:** confirmed live, twice, opportunistically -- a
+long-running unrelated Abaqus CAE session already open on this machine, and a
+second real concurrent extraction the application itself launched during this
+investigation. Neither was touched by any cancellation in the matrix above.
+
+**Partial-cache validity:** no cancelled run ever produced a `manifest.json`
+in this session (verified by directory listing after each test); the one
+directory with a partially-written mode CSV (`live_cancel_out_mode`) has no
+manifest, so `_cache_is_valid` correctly refuses to treat it as usable, and the
+next Run into that same directory naturally overwrites the stale partial file.
+
+**Format-v2 regression after the fix:** full uncancelled rerun, real
+`Job-1.odb`, modes 7-16, scale 0.001: `format_version=2`, `geometry.csv`
+written once (977,270 nodes), frequencies exactly match the previously
+verified extraction (24.147, 76.735, 79.619, 91.425, 92.18, 147.52, 212.13,
+214.51, 221.13, 227.9 Hz -- byte-identical to the pre-cancellation-fix
+baseline), extraction wall time 185.45s (within the ~196s ballpark, no
+regression). PROGRESS messages continued to work throughout.
+
+**SP15:** not independently rerun in this session -- no dedicated SP15 `.odb`
+file exists on this machine (only its `.svd`/`.unv` experimental files); the
+prior agent's SP15 result was not reproducible without that file. As a proxy,
+the previously cached format-2 extraction sharing `Job-1.odb`'s content
+(`analysis_58959f0d7fa5a73b`, `C:\temp\SP-01.odb`, same size as `Job-1.odb`)
+was reloaded end-to-end under the modified parse code and still parsed
+correctly (9 modes, 35.67s, `format_version=2`). None of this change's code
+paths execute differently on a normal (non-cancelled) run -- the only
+functional additions are a small registration-file write/delete and an
+atomic-rename manifest publish (both no-ops on the final parsed content) plus
+a `cancel_event` check that is inert when no cancellation is requested -- so
+there is no plausible mechanism by which SP15's numeric result would change,
+but this was not independently re-observed end-to-end.
+
+**Release-blocker status:** the reported failure mode (Stop leaves
+`SMAPython.exe` running after `taskkill /T`) is closed for every process shape
+observed in this session's real reproductions and live-verified across all
+four cancellation points plus two independent unrelated-process survival
+checks. The fix no longer depends on process-tree position at all, so it
+should remain correct even if a future Abaqus version changes the
+launcher/reparenting behavior that caused the original report.
