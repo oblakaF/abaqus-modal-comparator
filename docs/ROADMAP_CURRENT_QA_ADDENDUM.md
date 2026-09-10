@@ -139,7 +139,8 @@ residual `0.000682926 / 0.00136569`, and Abaqus-unit RMS/max residual
 `X 5.45904..505.56833`, `Y -2.88000..496.42496`, `Z 0.45..2.45 mm`
 (spans `500.10929 x 499.30496 x 2.00000 mm`). The complete diagnostic,
 including all MAC matrices, is reproducible with
-`tools/validate_coordinate_calibration.py`. No affine/projective fit was
+`tools/validate_coordinate_calibration.py` when its `--manifest` and
+`--experiment` inputs are supplied explicitly. No affine/projective fit was
 introduced.
 
 The requested real SP15 rerun used
@@ -160,7 +161,7 @@ proxy, and does not promote zero pairs to a scientific pass.
 
 This independently supports **Abaqus native model units = mm**.
 
-### 4.2 Experimental UNV geometry and units
+### 4.2 Historical dataset-164 interpretation (obsolete)
 
 The UNV contains:
 
@@ -171,21 +172,25 @@ The UNV contains:
 - raw Z constant at -1.0 (not real surface flatness/elevation)
 - dataset 164 declares `METRIC_ABS_(SI)` with length conversion factor 1.0
 
-Therefore the experimental coordinates are explicitly declared in **metres**.
+The earlier audit therefore concluded that the experimental coordinates were
+physical **metres**. That conclusion is superseded: dataset-level SI metadata
+does not prove that this camera-drawn grid was geometrically calibrated.
 
-Physical unit conversion is consequently exact:
+Under that now-obsolete interpretation, the audit treated this unit conversion
+as exact:
 
 `m -> mm = x1000`, equivalent to the application's `coordinate_scale = 0.001` convention.
 
-### 4.3 Partial scan is the decisive point
+### 4.3 Historical partial-scan inference (obsolete)
 
-With fixed physical conversion 0.001:
+Under the superseded fixed-0.001 assumption:
 
 - experimental scan span becomes ~332.9 x 328.7 mm in FE space
 - it maps to an interior ~333 x 329 mm region of the ~502 x 500 mm panel
 - margins are roughly 80-90 mm from panel edges
 
-This is physically consistent with a **partial scan**.
+The earlier audit interpreted this as a **partial scan**; operator provenance
+later established that the camera grid covered the full specimen.
 
 With historical geometric `auto` (~0.0006603457):
 
@@ -202,17 +207,21 @@ With historical geometric `auto` (~0.0006603457):
 
 For a partial scan this is **not a valid physical unit-identification method**.
 
-### 4.4 Final scale decision
+### 4.4 Superseded scale decision
 
-**SCALE-A: fixed 0.001 is physically justified.**
+**SUPERSEDED SCALE-A:** the earlier audit treated fixed 0.001 as physically
+justified. The authoritative calibration decision above replaces this claim.
 
-The old ~0.000660 value was a registration artifact that stretched a partial ~330 mm scan to fill a ~500 mm FE panel. The historical 8-pair result therefore should not be treated as the physically correct reference merely because its MACs are higher.
+The earlier audit described the old ~0.000660 value as stretching a partial
+~330 mm scan to fill a ~500 mm FE panel. That partial-scan premise is obsolete;
+the current decision instead treats the value as an opaque legacy extent fit
+unless the same scale is derived explicitly from known full-scan dimensions.
 
 Both fixed and stretched mappings achieve similar ~1 mm nearest-node residuals because 121 scan points are being mapped onto a very dense ~977k-node FE mesh; residual magnitude alone cannot determine the physical scale.
 
-### 4.5 Required coordinate-mapping UX cleanup before PR
+### 4.5 Historical coordinate-mapping UX plan (superseded)
 
-The current HUD wording/implementation must make two concepts explicit and separate:
+The earlier UX plan required the HUD to make two concepts explicit and separate:
 
 1. **Unit conversion (physical, deterministic)**
    - based on Abaqus model unit + experimental declared/selected unit
@@ -225,9 +234,13 @@ The current HUD wording/implementation must make two concepts explicit and separ
    - should warn when it differs substantially from the physical unit conversion
    - should warn that partial-coverage scans invalidate full-extent scale fitting
 
-The current label `Automatic from units / alignment` conflates these concepts.
+The earlier label `Automatic from units / alignment` conflated these concepts;
+the final HUD now exposes distinct calibrated-physical, camera-grid, manual,
+and legacy modes.
 
-There is also a latent internal inconsistency: the UI display sync still stores literal `"auto"` in one state path while the currently active validator recomputes and passes the numeric unit-derived value. Reconcile this to one source of truth so a future patch-chain change cannot silently restore old geometric-auto semantics.
+The earlier audit also identified a literal `"auto"` display/persistence path.
+Schema-v2 calibration provenance and explicit legacy migration now prevent that
+compatibility value from silently redefining current calibration semantics.
 
 Recommended diagnostic result display: mapped scan-region bounding box vs full FE panel bounding box.
 
@@ -428,8 +441,9 @@ This must be verified fixed before PR. Correct completed zero-pair text should i
 
 Do not create the HUD PR until all of the following pass manually:
 
-1. sandwich unit conversion uses physical 0.001 by default
-2. geometric best-fit is clearly separated/labelled if retained
+1. calibrated geometry trusts deterministic physical units; uncalibrated
+   camera-grid geometry requires known physical scan/specimen dimensions
+2. legacy geometric extent-fit is clearly separated, explicit, and warned
 3. sandwich extraction no longer looks indefinitely stuck and range clipping is surfaced
 4. resize is smooth and usable below fullscreen
 5. configuration remains locked during RUNNING/STOPPING
@@ -712,3 +726,18 @@ frequency, node IDs, coordinates, and vectors. A pre-set Stop event through
 the same `load_or_extract_odb` path raised `AnalysisCancelled`; no unexpected-
 keyword failure occurred. This closes the reported final-manual-QA loader
 regression without changing scientific results.
+
+### Final SP05 GUI smoke (HUD evidence only)
+
+Final human QA reran SP05 through the real GUI after the cached-loader fix. The
+run completed without the former unexpected-`cancel_event` keyword error and
+populated the Comparison table, Mode Shapes, MAC and frequencies, FRF and
+quality, Close Modes, and Manual Review tabs. The observed run reported 6
+admissible pairs, mean absolute frequency error of approximately 4.79%, mean
+MAC of approximately 0.873, and 100% geometry match.
+
+This is an end-to-end HUD/extraction/cache/calibration smoke result only. It is
+not final SP05 scientific validation because the current dataset-55 importer
+still mixes PolyMAX modal sets. Explicit modal-set discovery and selection
+remain post-HUD work in `docs/POLYMAX_MODAL_SET_DECISION.md`; no SP05 pairing
+interpretation or importer change belongs in this PR.

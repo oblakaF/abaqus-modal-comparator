@@ -124,7 +124,12 @@ The fix deliberately runs after the complete `__init__` wrapper chain. It enumer
 - MEDIUM: 1120–1499; compact tab labels; two metric columns; action rows wrap to at most three columns.
 - COMPACT: below 1120; compact tab labels; two metric columns (one only below 720); actions wrap to two columns.
 
-Resize handling is debounced at 90 ms. It does not resize the root, call `update()` recursively or perform rendering inline. Plot refresh is queued after idle, preserving aspect ratio and avoiding hidden-tab 1-by-1 geometry.
+Resize handling uses one cancel-and-replace 210 ms settled callback. Active
+drag events leave ordinary Tk container geometry to track the frame; after the
+event burst settles, one responsive-policy update applies the final layout and
+one coalesced batch refreshes only visible cached plot images. It does not call
+`update()` recursively, recreate scientific figures, recompute scientific data,
+repopulate Treeviews, or accumulate stale per-label callbacks.
 
 ## Analysis states and progress
 
@@ -164,8 +169,8 @@ That PR should replace closure capture with explicit construction hooks, give ea
 
 ## Validation performed for this change
 
-- The final pre-PR full suite completed with `277 passed, 3 skipped, 1 warning, 37 subtests passed`, including all scientific regression tests.
-- A native Tcl/Tk 8.6.15 focused run completed with `21 passed, 4 subtests passed` and instantiated the exact `src/main.py` assembly outside the filesystem sandbox.
+- The final pre-PR full suite completed with `320 passed, 3 skipped, 1 warning, 37 subtests passed`, including all scientific regression tests.
+- A native Tcl/Tk focused run completed with `35 passed` and instantiated the exact `src/main.py` assembly outside the filesystem sandbox.
 - The assembled app exposed all nine tabs and all 13 final Comparison columns with non-empty headings.
 - Comparison and Manual Review both reported connected horizontal and vertical scroll commands.
 - The native root was repeatedly resized through 1920x1080, 1600x900, 1366x768, 1280x720, and 1024x700; every tab was selected at each pass without a Tk exception.
@@ -177,7 +182,11 @@ That PR should replace closure capture with explicit construction hooks, give ea
 - Same-version Abaqus launchers retain unique choices, and non-executable Browse targets are rejected.
 - Abaqus discovery found the existing `abq2024.bat` and `abaqus.bat` launchers rather than assuming either alias. The `Test Abaqus` implementation successfully ran `information=release` against Abaqus 2024 without starting an FE analysis.
 - DPI normalization is tested at 100%, 125%, and 150% scaling equivalents. A human visual pass on three separately configured Windows displays remains part of the checklist below; no screenshot pixel-comparison test was introduced.
-- Real ODB extraction was intentionally not launched for this UI PR. Owned-process-tree termination and cancellation callbacks are deterministic tests; the manual real-job Stop checks remain below.
+- Real ODB extraction, cached loading, and cancellation were exercised with the
+  sandwich and SP15 inputs recorded in
+  `docs/ROADMAP_CURRENT_QA_ADDENDUM.md`. The final real SP05 GUI smoke also
+  completed after the cached-loader contract fix. SP05's mixed dataset-55
+  modal-set interpretation remains explicitly post-HUD work.
 
 ## Manual acceptance checklist
 

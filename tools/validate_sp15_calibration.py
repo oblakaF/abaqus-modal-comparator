@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import tempfile
@@ -16,18 +17,27 @@ from universal_reader import load_universal_modal_file
 
 
 def main() -> None:
-    test_root = Path(r"C:\temp\12 sampls\results\SP15\test")
-    odb = test_root / "CFRP_PLAIN_520_STAGEA_baseline.odb"
-    unv = test_root / "SP15_500by500_bigSP14_with_geometry.unv"
+    parser = argparse.ArgumentParser(
+        description="Run the SP15 coordinate-calibration validation against supplied real inputs."
+    )
+    parser.add_argument("--odb", type=Path, required=True)
+    parser.add_argument("--experiment", type=Path, required=True)
+    parser.add_argument("--abaqus-command", default="abaqus")
+    parser.add_argument("--start-mode", type=int, default=1)
+    parser.add_argument("--end-mode", type=int, default=20)
+    args = parser.parse_args()
+
+    odb = args.odb
+    unv = args.experiment
     if not odb.is_file() or not unv.is_file():
         raise FileNotFoundError(f"Real SP15 input unavailable: ODB={odb.is_file()}, UNV={unv.is_file()}")
     with tempfile.TemporaryDirectory(prefix="sp15_calibration_") as directory:
         manifest = run_abaqus_extraction(
             odb,
             Path(directory),
-            r"C:\SIMULIA\Commands\abaqus.bat",
-            1,
-            20,
+            args.abaqus_command,
+            args.start_mode,
+            args.end_mode,
         )
         abaqus = load_extracted_odb(manifest)
         _, retained, _, _ = _detect_rigid_modes(abaqus)

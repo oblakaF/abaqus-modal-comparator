@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -51,11 +52,20 @@ def summarize(result, include_matrix: bool = True) -> dict:
 
 
 def main() -> None:
-    root = ROOT / ".sandwich_postfix_benchmark"
-    abaqus = load_extracted_odb(root / "after_7_16" / "manifest.json")
+    parser = argparse.ArgumentParser(
+        description="Compare explicit coordinate-calibration modes for an extracted ODB package."
+    )
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--experiment", type=Path, required=True)
+    parser.add_argument(
+        "--summary", action="store_true", help="Omit the full MAC matrices."
+    )
+    args = parser.parse_args()
+
+    abaqus = load_extracted_odb(args.manifest)
     _, retained, _, _ = _detect_rigid_modes(abaqus)
     experimental = load_universal_modal_file(
-        root / "500by500_Glue420_Auxetic_full_scan_260624.unv",
+        args.experiment,
         target_frequencies=[mode.frequency_hz for mode in retained],
         target_count=max(len(retained), 1),
     )
@@ -78,7 +88,7 @@ def main() -> None:
             ),
         ),
     )
-    include_matrix = "--summary" not in sys.argv[1:]
+    include_matrix = not args.summary
     print(json.dumps({"fixed_0.001": summarize(fixed, include_matrix), "legacy_auto": summarize(legacy, include_matrix), "camera_nominal_500x500": summarize(camera, include_matrix)}, indent=2))
 
 
