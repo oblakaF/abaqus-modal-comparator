@@ -96,13 +96,17 @@ class AbaqusCancellationTests(unittest.TestCase):
 
     def test_windows_termination_is_scoped_to_owned_pid_tree(self):
         process = _OwnedProcess()
-        with patch("abaqus_bridge.subprocess.run") as run:
+        with patch("abaqus_bridge.os.name", "nt"), patch(
+            "abaqus_bridge.subprocess.run"
+        ) as run:
+            run.return_value.returncode = 0
             self.assertTrue(cancel_owned_process(process))
-        command = run.call_args.args[0]
-        self.assertEqual(command[:2], ["taskkill", "/PID"])
-        self.assertEqual(command[2], str(process.pid))
-        self.assertIn("/T", command)
-        self.assertIn("/F", command)
+        run.assert_called_once_with(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
 
     def test_preexisting_cancellation_does_not_launch_abaqus(self):
         process = _OwnedProcess()
