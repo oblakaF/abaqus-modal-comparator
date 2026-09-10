@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -8,6 +11,31 @@ import pyuff
 from scipy.signal import find_peaks, savgol_filter
 
 from modal_core import ModalDataset, ModeShape
+
+
+@dataclass
+class ExperimentalModalSet:
+    """One fitted dataset-55 result set, detached from pyuff records."""
+
+    key: str
+    display_name: str
+    modes: List[ModeShape]
+    source_dataset: int = 55
+    processing_name: str = ""
+    record_indices: List[int] = field(default_factory=list)
+    residual_record_indices: List[int] = field(default_factory=list)
+    residual_labels: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def excluded_residual_count(self) -> int:
+        return len(self.residual_record_indices)
+
+
+_RESIDUAL_ID1 = re.compile(
+    r"^(?P<processing>.*?)\s+residuals?\s+(?P<side>below|above)\b(?P<limit>.*)$",
+    re.IGNORECASE,
+)
 
 
 def _as_array(value: Any, length: Optional[int] = None, dtype: Any = float) -> np.ndarray:
@@ -75,6 +103,35 @@ def _coordinates_for_nodes(node_numbers: np.ndarray, geometry: Dict[int, np.ndar
     return np.vstack([geometry[int(node)] for node in node_numbers])
 
 
+def _text(value: Any) -> str:
+    if value is None:
+        return ""
+    return " ".join(str(value).strip().split())
+
+
+def _modal_set_identity(name: str) -> str:
+    return _text(name).casefold()
+
+
+def _modal_set_key(name: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", _text(name).casefold()).strip("-")
+    return normalized or "dataset-55"
+
+
+def _residual_identity(dataset: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    """Return the parent processing name and label for a semantic residual record.
+
+    In Test.Lab's dataset-55 export the processing identity and the residual
+    designation share ``id1``. The anchored marker avoids classifying a
+    structural mode by its numerical frequency.
+    """
+    label = _text(dataset.get("id1"))
+    match = _RESIDUAL_ID1.match(label)
+    if match is None:
+        return None
+    return _text(match.group("processing")), label
+
+
 def _mode_from_dataset_55(dataset: Dict[str, Any], geometry: Dict[int, np.ndarray], index: int) -> ModeShape:
     node_numbers = _as_array(dataset.get("node_nums"), dtype=int)
     if len(node_numbers) == 0:
@@ -119,6 +176,136 @@ def _mode_from_dataset_55(dataset: Dict[str, Any], geometry: Dict[int, np.ndarra
             "mode_source": "curve-fitted modal dataset",
         },
     )
+
+
+def _discover_dataset_55_modal_sets(
+    datasets: Sequence[Dict[str, Any]],
+    geometry: Dict[int, np.ndarray],
+) -> List[ExperimentalModalSet]:
+    groups: Dict[str, Dict[str, Any]] = {}
+
+    def group_for(processing_name: str) -> Dict[str, Any]:
+        identity = _modal_set_identity(processing_name)
+        group = groups.get(identity)
+        if group is None:
+            display_name = _text(processing_name) or "Dataset 55 modal set"
+            group = {
+                "processing_name": _text(processing_name),
+                "display_name": display_name,
+                "modes": [],
+                "record_indices": [],
+                "residual_record_indices": [],
+                "residual_labels": [],
+                "errors": [],
+                "id2": [],
+                "id3": [],
+                "id5": [],
+                "analysis_types": [],
+            }
+            groups[identity] = group
+        return group
+
+    for record_index, dataset in enumerate(datasets):
+        if _dataset_type(dataset) != 55:
+            continue
+
+        residual = _residual_identity(dataset)
+        if residual is not None:
+            processing_name, label = residual
+            group = group_for(processing_name)
+            group["residual_record_indices"].append(record_index)
+            group["residual_labels"].append(label)
+            continue
+
+        processing_name = _text(dataset.get("id1"))
+        group = group_for(processing_name)
+        try:
+            mode = _mode_from_dataset_55(dataset, geometry, record_index + 1)
+        except ValueError as error:
+            group["errors"].append(str(error))
+            continue
+
+        mode.metadata.update(
+            {
+                "source": "curve-fitted dataset 55",
+                "modal_set_name": group["display_name"],
+                "processing_name": processing_name,
+                "dataset_55_record_index": record_index,
+                "dataset_55_record_id": f"dataset55:{record_index}",
+                "source_frequency_hz": mode.frequency_hz,
+            }
+        )
+        group["modes"].append(mode)
+        group["record_indices"].append(record_index)
+        for field_name in ("id2", "id3", "id5"):
+            value = _text(dataset.get(field_name))
+            if value and value not in group[field_name]:
+                group[field_name].append(value)
+        analysis_type = dataset.get("analysis_type")
+        try:
+            analysis_type = int(np.asarray(analysis_type).reshape(-1)[0])
+        except (TypeError, ValueError, IndexError):
+            analysis_type = None
+        if analysis_type is not None and analysis_type not in group["analysis_types"]:
+            group["analysis_types"].append(analysis_type)
+
+    results: List[ExperimentalModalSet] = []
+    used_keys: Dict[str, str] = {}
+    for identity, group in groups.items():
+        if not group["modes"]:
+            continue
+        key = _modal_set_key(group["processing_name"])
+        if key in used_keys and used_keys[key] != identity:
+            suffix = hashlib.sha1(identity.encode("utf-8")).hexdigest()[:8]
+            key = f"{key}-{suffix}"
+        used_keys[key] = identity
+        for mode in group["modes"]:
+            mode.metadata["modal_set_key"] = key
+        results.append(
+            ExperimentalModalSet(
+                key=key,
+                display_name=group["display_name"],
+                processing_name=group["processing_name"],
+                modes=sorted(group["modes"], key=lambda item: item.number),
+                record_indices=list(group["record_indices"]),
+                residual_record_indices=list(group["residual_record_indices"]),
+                residual_labels=list(group["residual_labels"]),
+                metadata={
+                    "source": "dataset_55",
+                    "record_indices": list(group["record_indices"]),
+                    "residual_record_indices": list(group["residual_record_indices"]),
+                    "excluded_residual_count": len(group["residual_record_indices"]),
+                    "excluded_residual_labels": list(group["residual_labels"]),
+                    "analysis_types": list(group["analysis_types"]),
+                    "id2": list(group["id2"]),
+                    "id3": list(group["id3"]),
+                    "id5": list(group["id5"]),
+                    "import_warnings": list(group["errors"]),
+                    "residual_classification": (
+                        "dataset 55 id1 anchored 'Residuals below/above' marker"
+                    ),
+                },
+            )
+        )
+    return results
+
+
+def _read_universal_datasets(file_path: Path) -> List[Dict[str, Any]]:
+    uff = pyuff.UFF(str(file_path))
+    datasets = uff.read_sets()
+    if isinstance(datasets, dict):
+        datasets = [datasets]
+    return [item for item in datasets if isinstance(item, dict)]
+
+
+def discover_experimental_modal_sets(file_path: Path) -> List[ExperimentalModalSet]:
+    """Discover fitted dataset-55 groups without choosing or merging them."""
+    file_path = Path(file_path)
+    if not file_path.exists():
+        raise FileNotFoundError(file_path)
+    datasets = _read_universal_datasets(file_path)
+    geometry, _ = _read_geometry(datasets)
+    return _discover_dataset_55_modal_sets(datasets, geometry)
 
 
 def _mode_from_dataset_2414(dataset: Dict[str, Any], geometry: Dict[int, np.ndarray], index: int) -> ModeShape:
@@ -529,21 +716,91 @@ def _modes_from_frf_datasets(
     return modes, metadata
 
 
+def _frf_diagnostic_metadata(
+    datasets: Sequence[Dict[str, Any]],
+    geometry: Dict[int, np.ndarray],
+) -> Dict[str, Any]:
+    """Parse dataset-58 FRF/coherence arrays without deriving modal candidates."""
+    frf_group = _select_frf_group(datasets, geometry)
+    if not frf_group:
+        raise ValueError("No usable frequency-response functions were found in dataset 58.")
+
+    x_reference = _as_array(frf_group[0].get("x"), dtype=float)
+    if len(x_reference) < 5:
+        raise ValueError("The selected FRF group contains too few frequency lines.")
+    reference_node = int(np.asarray(frf_group[0].get("ref_node", 0)).reshape(-1)[0])
+    reference_direction = int(np.asarray(frf_group[0].get("ref_dir", 0)).reshape(-1)[0])
+
+    dof_data: Dict[Tuple[int, int], np.ndarray] = {}
+    for dataset in frf_group:
+        x = _as_array(dataset.get("x"), dtype=float)
+        data = _as_array(dataset.get("data"), dtype=complex)
+        if len(x) != len(x_reference) or len(data) != len(x_reference):
+            continue
+        if not np.allclose(x, x_reference, rtol=1e-8, atol=1e-10):
+            continue
+        node = int(np.asarray(dataset.get("rsp_node", 0)).reshape(-1)[0])
+        direction = int(np.asarray(dataset.get("rsp_dir", 0)).reshape(-1)[0])
+        if node in geometry and abs(direction) in (1, 2, 3):
+            dof_data[(node, direction)] = data
+    if not dof_data:
+        raise ValueError("No compatible nodal FRF channels were found.")
+
+    indicator = np.linalg.norm(np.vstack(list(dof_data.values())), axis=0)
+    try:
+        coherence_lookup = _coherence_by_dof(
+            datasets, x_reference, reference_node, reference_direction
+        )
+        coherence_parse_error: Optional[str] = None
+    except (TypeError, ValueError, IndexError, KeyError) as error:
+        coherence_lookup = {}
+        coherence_parse_error = str(error)
+    coherence_rows = [
+        coherence_lookup[key] for key in dof_data if key in coherence_lookup
+    ]
+    if coherence_parse_error is not None:
+        coherence_status = "parse_error"
+        mean_coherence = np.full_like(x_reference, np.nan, dtype=float)
+    elif coherence_rows:
+        coherence_status = "computed"
+        mean_coherence = np.mean(np.vstack(coherence_rows), axis=0)
+    else:
+        coherence_status = "unavailable"
+        mean_coherence = np.full_like(x_reference, np.nan, dtype=float)
+
+    return {
+        "dataset_58_role": "diagnostic_only",
+        "dataset_58_diagnostic_available": True,
+        "dataset_58_derived_mode_count": 0,
+        "frf_channel_count": len(dof_data),
+        "frf_response_node_count": len({node for node, _ in dof_data}),
+        "frf_reference_node": reference_node,
+        "frf_reference_direction": reference_direction,
+        "frf_frequency_start_hz": float(x_reference[0]),
+        "frf_frequency_end_hz": float(x_reference[-1]),
+        "frf_frequency_lines": len(x_reference),
+        "frf_frequency_increment_hz": float(np.median(np.diff(x_reference))),
+        "frf_quantity": str(frf_group[0].get("id2", "")),
+        "coherence_channel_count": len(coherence_rows),
+        "coherence_status": coherence_status,
+        "coherence_parse_error": coherence_parse_error,
+        "_frf_frequency_hz": x_reference.tolist(),
+        "_frf_indicator": indicator.tolist(),
+        "_frf_mean_coherence": mean_coherence.tolist(),
+    }
+
+
 def load_universal_modal_file(
     file_path: Path,
     target_frequencies: Optional[Sequence[float]] = None,
     target_count: Optional[int] = None,
+    modal_set: Optional[str] = None,
 ) -> ModalDataset:
     file_path = Path(file_path)
     if not file_path.exists():
         raise FileNotFoundError(file_path)
 
-    uff = pyuff.UFF(str(file_path))
-    datasets = uff.read_sets()
-    if isinstance(datasets, dict):
-        datasets = [datasets]
-
-    dataset_list: List[Dict[str, Any]] = [item for item in datasets if isinstance(item, dict)]
+    dataset_list = _read_universal_datasets(file_path)
     geometry, metadata = _read_geometry(dataset_list)
     set_types = [_dataset_type(item) for item in dataset_list]
     metadata["dataset_types"] = [value for value in set_types if value is not None]
@@ -552,18 +809,86 @@ def load_universal_modal_file(
     modes: List[ModeShape] = []
     errors: List[str] = []
 
-    for index, dataset in enumerate(dataset_list, start=1):
-        dataset_type = _dataset_type(dataset)
-        try:
-            if dataset_type == 55:
-                modes.append(_mode_from_dataset_55(dataset, geometry, index))
-            elif dataset_type == 2414:
+    modal_sets = _discover_dataset_55_modal_sets(dataset_list, geometry)
+    metadata["available_modal_sets"] = [
+        {
+            "key": item.key,
+            "display_name": item.display_name,
+            "processing_name": item.processing_name,
+            "mode_count": len(item.modes),
+            "excluded_residual_count": item.excluded_residual_count,
+        }
+        for item in modal_sets
+    ]
+
+    selected_set: Optional[ExperimentalModalSet] = None
+    if modal_sets:
+        if modal_set is None:
+            if len(modal_sets) > 1:
+                available = ", ".join(
+                    f"{item.display_name} ({item.key})" for item in modal_sets
+                )
+                raise ValueError(
+                    "Multiple dataset-55 modal sets are available; select one explicitly "
+                    f"with modal_set=. Available sets: {available}."
+                )
+            selected_set = modal_sets[0]
+            selection_policy = "implicit_single_set"
+        else:
+            requested = _text(modal_set)
+            matches = [
+                item
+                for item in modal_sets
+                if requested.casefold()
+                in {
+                    item.key.casefold(),
+                    item.display_name.casefold(),
+                    item.processing_name.casefold(),
+                }
+            ]
+            if not matches:
+                available = ", ".join(
+                    f"{item.display_name} ({item.key})" for item in modal_sets
+                )
+                raise ValueError(
+                    f"Dataset-55 modal set {modal_set!r} was not found. Available sets: {available}."
+                )
+            selected_set = matches[0]
+            selection_policy = "explicit"
+
+        modes.extend(selected_set.modes)
+        metadata.update(
+            {
+                "mode_source": "curve-fitted dataset 55",
+                "modal_set_key": selected_set.key,
+                "modal_set_name": selected_set.display_name,
+                "processing_name": selected_set.processing_name,
+                "modal_set_selection_policy": selection_policy,
+                "modal_set_record_indices": list(selected_set.record_indices),
+                "excluded_residual_count": selected_set.excluded_residual_count,
+                "excluded_residual_labels": list(selected_set.residual_labels),
+                "excluded_residual_record_indices": list(
+                    selected_set.residual_record_indices
+                ),
+            }
+        )
+        errors.extend(selected_set.metadata.get("import_warnings", []))
+    else:
+        if modal_set is not None:
+            raise ValueError(
+                f"Dataset-55 modal set {modal_set!r} was requested, but the file "
+                "contains no valid dataset-55 modal sets."
+            )
+        for index, dataset in enumerate(dataset_list, start=1):
+            if _dataset_type(dataset) != 2414:
+                continue
+            try:
                 analysis_type = dataset.get("analysis_type")
                 mode_number = dataset.get("mode_number")
                 if mode_number not in (None, 0) or analysis_type in (2, 3, 7):
                     modes.append(_mode_from_dataset_2414(dataset, geometry, index))
-        except ValueError as error:
-            errors.append(str(error))
+            except ValueError as error:
+                errors.append(str(error))
 
     source_name = "Simcenter Testlab UNV/UFF"
     if not modes:
@@ -582,6 +907,21 @@ def load_universal_modal_file(
         modes.extend(frf_modes)
         metadata.update(frf_metadata)
         source_name = "Simcenter Testlab UNV/UFF — FRF-derived modes"
+
+    elif selected_set is not None and 58 in metadata["dataset_types"]:
+        try:
+            frf_metadata = _frf_diagnostic_metadata(dataset_list, geometry)
+        except ValueError as error:
+            metadata.update(
+                {
+                    "dataset_58_role": "diagnostic_only",
+                    "dataset_58_diagnostic_available": False,
+                    "dataset_58_diagnostic_error": str(error),
+                }
+            )
+            errors.append(f"Dataset 58 diagnostics: {error}")
+        else:
+            metadata.update(frf_metadata)
 
     modes.sort(key=lambda mode: mode.number)
     metadata["mode_count"] = len(modes)

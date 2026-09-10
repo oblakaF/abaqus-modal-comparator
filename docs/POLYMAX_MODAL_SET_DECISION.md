@@ -106,6 +106,55 @@ Do **not** broaden the current HUD/responsive release task with this importer ch
 
 This change should precede any attempt to judge SP05 mode-pair completeness or to implement a new FRF curve fitter for SP05. Proper imported PolyMAX modes are preferred over raw FRF peak snapshots when available and internally consistent.
 
+## Part 1 backend implementation — VERIFIED (2026-09-10)
+
+The raw `SP05_polymax.unv` audit found 28 consecutive dataset-55 records at
+zero-based pyuff indices 15–42. Physical fitted records use `id1` as the
+processing-set identity (`Processing_nice` or `Processing`), `analysis_type=3`,
+`mode_n`, and `eig`. Residual records retain the parent processing name in
+`id1` and append the semantic marker `Residuals below ...` or
+`Residuals above ...`; they use `analysis_type=5`, `freq_step_n`, and `freq`.
+Every record contains 121 nodes and three 121-value response components.
+
+The importer now exposes `ExperimentalModalSet` and
+`discover_experimental_modal_sets(path)`. Stable keys are derived
+deterministically from the normalized processing name, with
+`Dataset 55 modal set` / `dataset-55` used for a single unnamed group. No
+pyuff record object escapes the importer. Each fitted mode records its modal-set
+key/name, processing name, zero-based pyuff record index, stable record ID, and
+source frequency.
+
+Residual filtering is semantic, not frequency-based. The classifier applies an
+anchored, case-insensitive `id1` pattern whose form is
+`<processing name> Residuals <below|above> ...`. The processing-name prefix
+associates each excluded residual with its fitted set. Labels, record indices,
+and excluded counts remain in modal-set and returned-dataset metadata.
+
+`load_universal_modal_file(..., modal_set=...)` accepts either the stable key or
+literal processing/display name. One valid set remains an auditable implicit
+single-set compatibility case. Multiple valid sets without selection raise a
+validation error listing the available sets; they are never concatenated. A
+missing requested set also raises a validation error.
+
+When dataset 55 is selected, only its physical modes populate
+`ModalDataset.modes`. Dataset-58 response and coherence arrays are still parsed
+into diagnostic metadata (`dataset_58_role=diagnostic_only`) without running
+peak-derived-mode or CMIF candidate selection and without changing fitted
+frequencies/shapes. Files with no valid dataset 55 retain the existing
+dataset-2414/dataset-58 fallback path. The fast-cache key includes the selected
+modal-set value, preventing cross-set cache reuse.
+
+Real-file validation discovered:
+
+- `Processing_nice` (`processing-nice`): 7 physical modes; 2 residuals excluded;
+- `Processing` (`processing`): 17 physical modes; 2 residuals excluded.
+
+Both selections loaded explicitly through the installed hardening and cache
+stack. Dataset 58 remained diagnostic-only with 121 parsed FRF channels and no
+coherence channels present in the selected group. This completes backend Part 1
+only. A GUI modal-set selector and persistence wiring remain Part 2 and are not
+claimed here.
+
 ## Relationship to SCI-S0 / EMA roadmap
 
 The new SP05 file changes priority, not the general architecture:
