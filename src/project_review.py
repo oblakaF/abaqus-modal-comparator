@@ -22,6 +22,7 @@ from reviewed_core import (
 )
 from quality_control import _detect_rigid_modes
 from coordinate_calibration import legacy_project_calibration
+from polymax_ui import experimental_mode_source_label
 
 
 PROJECT_SCHEMA_VERSION = 2
@@ -642,7 +643,7 @@ def install_project_review(app_module) -> None:
                 # Anything else is a real bug and must not be hidden here.
                 continue
             metadata = experimental_mode.metadata
-            source = metadata.get("source_label") or metadata.get("mode_source") or "Unknown"
+            source = experimental_mode_source_label(metadata)
             item = table.insert(
                 "",
                 "end",

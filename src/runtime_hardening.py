@@ -111,6 +111,7 @@ def install_runtime_hardening(app_module) -> None:
         end: int,
         command: str,
         calibration: CoordinateCalibration | float | None,
+        modal_set: Optional[str] = None,
     ) -> None:
         failure = None
         result = None
@@ -145,7 +146,7 @@ def install_runtime_hardening(app_module) -> None:
             signature = (
                 f"{abaqus.resolve()}|{abaqus.stat().st_size}|{abaqus.stat().st_mtime_ns}|"
                 f"{experiment.resolve()}|{experiment.stat().st_size}|{experiment.stat().st_mtime_ns}|"
-                f"{start}|{end}|{calibration}"
+                f"{start}|{end}|{calibration}|{modal_set or ''}"
             )
             key = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:16]
             cache = workspace / f"analysis_{key}"
@@ -180,6 +181,7 @@ def install_runtime_hardening(app_module) -> None:
                 resolved_experiment,
                 target_frequencies=target_frequencies,
                 target_count=max(len(target_frequencies), 1),
+                modal_set=modal_set,
             )
             stage(3, "Geometry alignment")
             comparison_kwargs = (

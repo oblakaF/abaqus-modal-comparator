@@ -43,6 +43,7 @@ from help_ui import install_help_ui
 from idle_ui_state import install_idle_ui_state
 from menu_ui import install_menu_ui
 from pair_plot_cache_ui import install_pair_plot_cache_ui
+from polymax_ui import install_polymax_ui
 from project_review import install_project_review
 from project_review_polish import install_project_review_polish
 from responsive_images import install_responsive_images
@@ -69,6 +70,7 @@ install_menu_ui(app)
 install_idle_ui_state(app)
 install_responsive_status_bar(app)
 install_responsive_workflow(app)
+install_polymax_ui(app)
 verify_runtime_contracts(app)
 
 
