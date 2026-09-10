@@ -49,7 +49,10 @@ def ensure_status_bar_visible(application) -> bool:
             return
         try:
             width = int(root.winfo_width())
-            progress.configure(length=progress_length_for_width(width))
+            length = progress_length_for_width(width)
+            if getattr(application, "_last_progress_length", None) != length:
+                progress.configure(length=length)
+                application._last_progress_length = length
             footer.lift()
         except Exception:
             return

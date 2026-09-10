@@ -8,6 +8,8 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Optional
 
+from abaqus_bridge import AnalysisCancelled, extraction_range_notice
+from coordinate_calibration import CoordinateCalibration
 from quality_control import _detect_rigid_modes
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
@@ -108,45 +110,104 @@ def install_runtime_hardening(app_module) -> None:
         start: int,
         end: int,
         command: str,
-        scale_override: Optional[float],
+        calibration: CoordinateCalibration | float | None,
     ) -> None:
         failure = None
         result = None
         cache = None
+
+        def post_to_ui(callback) -> bool:
+            post = getattr(self, "_post_to_ui", None)
+            if callable(post):
+                return bool(post(callback))
+            try:
+                self.root.after(0, callback)
+                return True
+            except (tk.TclError, RuntimeError):
+                return False
+
+        def check_cancelled() -> None:
+            cancellation = getattr(self, "_analysis_cancel_event", None)
+            if cancellation is not None and cancellation.is_set():
+                raise AnalysisCancelled("Analysis stopped by user.")
+
+        def stage(number: int, text: str) -> None:
+            check_cancelled()
+            callback = getattr(self, "_set_analysis_stage", None)
+            if callable(callback):
+                post_to_ui(lambda: callback(number, text))
+
+        def remember_process(process) -> None:
+            self._owned_analysis_process = process
+
         try:
             workspace.mkdir(parents=True, exist_ok=True)
             signature = (
                 f"{abaqus.resolve()}|{abaqus.stat().st_size}|{abaqus.stat().st_mtime_ns}|"
                 f"{experiment.resolve()}|{experiment.stat().st_size}|{experiment.stat().st_mtime_ns}|"
-                f"{start}|{end}|{scale_override}"
+                f"{start}|{end}|{calibration}"
             )
             key = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:16]
             cache = workspace / f"analysis_{key}"
             cache.mkdir(parents=True, exist_ok=True)
 
+            stage(1, "Abaqus extraction")
+
+            def report_extraction_progress(text: str) -> None:
+                # Best-effort live phase text from the Abaqus subprocess (see
+                # extract_odb.py's "PROGRESS:" markers). Never fails the run.
+                stage(1, f"Abaqus extraction: {text}")
+
             abaqus_data = app_module.load_or_extract_odb(
-                abaqus, cache / "abaqus", command, start, end
+                abaqus,
+                cache / "abaqus",
+                command,
+                start,
+                end,
+                cancel_event=getattr(self, "_analysis_cancel_event", None),
+                process_callback=remember_process,
+                progress_callback=report_extraction_progress,
             )
+            range_notice = extraction_range_notice(abaqus_data.metadata)
+            if range_notice is not None:
+                abaqus_data.metadata["extraction_range_notice"] = range_notice
+            check_cancelled()
             _, retained_modes, _, _ = _detect_rigid_modes(abaqus_data)
             target_frequencies = [mode.frequency_hz for mode in retained_modes]
+            stage(2, "Experimental import")
             resolved_experiment = resolve_testlab_file(experiment)
             experiment_data = load_universal_modal_file(
                 resolved_experiment,
                 target_frequencies=target_frequencies,
                 target_count=max(len(target_frequencies), 1),
             )
+            stage(3, "Geometry alignment")
+            comparison_kwargs = (
+                {"geometry_calibration": calibration}
+                if isinstance(calibration, CoordinateCalibration)
+                else {"coordinate_scale_override": calibration}
+            )
             result = app_module.compare_modal_datasets(
                 abaqus_data,
                 experiment_data,
-                coordinate_scale_override=scale_override,
+                **comparison_kwargs,
             )
+            if range_notice is not None:
+                result.metadata["extraction_range_notice"] = range_notice
+                if range_notice not in result.warnings:
+                    result.warnings.insert(0, range_notice)
+            stage(4, "Modal comparison")
+            check_cancelled()
 
             plot_dir = cache / "plots"
+            stage(5, "Plot generation")
             with _MATPLOTLIB_LOCK:
                 app_module.render_mac_matrix(result, plot_dir / "mac_matrix.png")
+                check_cancelled()
                 app_module.render_frequency_comparison(
                     result, plot_dir / "frequency_comparison.png"
                 )
+                check_cancelled()
                 # Functions installed by ui_enhancements are imported lazily to avoid
                 # a circular import during startup.
                 from enhanced_reporting import (
@@ -155,10 +216,23 @@ def install_runtime_hardening(app_module) -> None:
                 )
 
                 render_frf_diagnostics(result, plot_dir / "frf_diagnostics.png")
+                check_cancelled()
                 render_verified_mac_matrix(result, plot_dir / "verified_mac_matrix.png")
+            stage(6, "Report data generation")
             self._write_summary(result, cache / "analysis_summary.json")
             if not result.pairs:
                 app_module.write_no_pair_diagnostics(result, cache)
+            check_cancelled()
+        except AnalysisCancelled as error:
+            failure = error
+            try:
+                workspace.mkdir(parents=True, exist_ok=True)
+                (workspace / "last_cancellation.log").write_text(
+                    "Analysis stopped by user. Partial files, if any, are diagnostic only.\n",
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
         except Exception as error:
             failure = error
             try:
@@ -169,12 +243,20 @@ def install_runtime_hardening(app_module) -> None:
             except Exception:
                 pass
         finally:
-            if failure is None and result is not None and cache is not None:
+            owned_process = getattr(self, "_owned_analysis_process", None)
+            if owned_process is None or owned_process.poll() is not None:
+                self._owned_analysis_process = None
+            if isinstance(failure, AnalysisCancelled):
+                callback = getattr(self, "_cancelled", None)
+                if callable(callback):
+                    post_to_ui(callback)
+                else:
+                    post_to_ui(lambda: self._failed(failure))
+            elif failure is None and result is not None and cache is not None:
                 self.cache = cache
-                self.root.after(0, lambda value=result: self._complete(value))
+                post_to_ui(lambda value=result: self._complete(value))
             else:
-                self.root.after(
-                    0,
+                post_to_ui(
                     lambda error=failure or RuntimeError("Unknown analysis failure"): self._failed(error),
                 )
 

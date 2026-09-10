@@ -65,6 +65,8 @@ def write_no_pair_diagnostics(result: ComparisonResult, directory: Path) -> tupl
             "selected_geometry_transform", {}
         ),
         "geometry_match": {
+            "calibration": dict(result.geometry.calibration_details),
+            "coordinate_scales": result.geometry.coordinate_scales.tolist(),
             "matched_fraction": result.geometry.matched_fraction,
             "normalized_rms_distance": result.geometry.normalized_rms_distance,
             "mean_mapping_distance": float(np.mean(result.geometry.distances)),
@@ -75,6 +77,17 @@ def write_no_pair_diagnostics(result: ComparisonResult, directory: Path) -> tupl
             "mapping_distances": [
                 float(value) for value in result.geometry.distances
             ],
+            "diagnostics": {
+                key: result.metadata.get(key)
+                for key in (
+                    "raw_experimental_bbox",
+                    "mapped_fe_bbox",
+                    "mapping_rms",
+                    "mapping_max_residual",
+                    "mapping_rms_in_abaqus_units",
+                    "mapping_max_residual_in_abaqus_units",
+                )
+            },
         },
         "mac_matrix": _json_matrix(result.mac_matrix),
         "signed_frequency_error_matrix": _json_matrix(
@@ -456,6 +469,20 @@ class ModalComparatorApp:
             "experimental_source": str(result.experimental.source_path),
             "geometry_match_fraction": result.geometry.matched_fraction,
             "geometry_normalized_rms": result.geometry.normalized_rms_distance,
+            "geometry_calibration": dict(result.geometry.calibration_details),
+            "coordinate_scales": result.geometry.coordinate_scales.tolist(),
+            "selected_geometry_transform": result.metadata.get("selected_geometry_transform", {}),
+            "geometry_diagnostics": {
+                key: result.metadata.get(key)
+                for key in (
+                    "raw_experimental_bbox",
+                    "mapped_fe_bbox",
+                    "mapping_rms",
+                    "mapping_max_residual",
+                    "mapping_rms_in_abaqus_units",
+                    "mapping_max_residual_in_abaqus_units",
+                )
+            },
             "warnings": result.warnings,
             "pairs": [
                 {
@@ -540,10 +567,18 @@ class ModalComparatorApp:
             f"Experimental modes: {result.experimental_mode_numbers}", "",
             "GEOMETRY ALIGNMENT", "-" * 80,
             f"Coordinate scale: {result.geometry.coordinate_scale:.8g}",
+            f"Coordinate X/Y scales: {result.geometry.coordinate_scales[0]:.9g} / {result.geometry.coordinate_scales[1]:.9g}",
+            f"Calibration mode: {result.geometry.calibration_details.get('mode', 'unspecified')}",
+            f"Calibration axes swapped: {result.geometry.calibration_details.get('axes_swapped', False)}",
+            f"Registration planar axes swapped: {result.metadata.get('selected_geometry_transform', {}).get('planar_axes_swapped', False)}",
+            f"Transform determinant: {float(np.linalg.det(result.geometry.rotation)):.0f}",
             f"Matched points: {result.geometry.matched_fraction:.2%}",
             f"RMS / diagonal: {result.geometry.normalized_rms_distance:.3%}",
             f"Mean mapping distance: {result.geometry.distances.mean():.8g}",
-            f"Maximum mapping distance: {result.geometry.distances.max():.8g}", "",
+            f"Maximum mapping distance: {result.geometry.distances.max():.8g}",
+            f"Mapping RMS / max in Abaqus units: {result.metadata.get('mapping_rms_in_abaqus_units'):.8g} / {result.metadata.get('mapping_max_residual_in_abaqus_units'):.8g}",
+            f"Raw experimental bbox: {result.metadata.get('raw_experimental_bbox')}",
+            f"Mapped FE bbox: {result.metadata.get('mapped_fe_bbox')}", "",
         ]
         if result.warnings:
             lines.extend(["WARNINGS", "-" * 80] + ["• " + w for w in result.warnings] + [""])

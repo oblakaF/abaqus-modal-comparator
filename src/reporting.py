@@ -223,9 +223,8 @@ def export_excel(result: ComparisonResult, output_path: Path, image_directory: P
     summary["A7"] = "Geometry normalized RMS distance"
     summary["B7"] = result.geometry.normalized_rms_distance
     summary["B7"].number_format = "0.00%"
-    summary["A8"] = "Detected coordinate scale"
+    summary["A8"] = "Coordinate scale (compatibility scalar)"
     summary["B8"] = result.geometry.coordinate_scale
-
     if result.pairs:
         summary["A10"] = "Mean frequency error"
         summary["B10"] = float(np.mean([pair.frequency_error_percent for pair in result.pairs])) / 100.0
@@ -235,7 +234,12 @@ def export_excel(result: ComparisonResult, output_path: Path, image_directory: P
             summary["A11"] = "Mean MAC"
             summary["B11"] = float(np.mean(mac_values))
 
-    row = 13
+    summary["A12"] = "Coordinate calibration X / Y"
+    summary["B12"] = f"{result.geometry.coordinate_scales[0]:.12g} / {result.geometry.coordinate_scales[1]:.12g}"
+    summary["A13"] = "Calibration mode"
+    summary["B13"] = result.geometry.calibration_details.get("mode", "unspecified")
+
+    row = 14
     if result.warnings:
         summary.cell(row=row, column=1, value="Warnings").font = Font(bold=True)
         for warning in result.warnings:

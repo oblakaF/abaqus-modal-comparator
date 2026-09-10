@@ -125,11 +125,11 @@ HELP_TOPICS: List[HelpTopic] = [
     ),
     (
         "Coordinate scale and geometry alignment",
-        "The importer detects coordinate scale, axis order, and axis signs "
-        "automatically by testing candidate rotations/scales and keeping the one with "
-        "the best geometry fit. Leave the scale as 'auto' unless the experimental grid "
-        "only covers part of the specimen, in which case automatic detection can be "
-        "unreliable; enter a known scale such as 0.001 for millimeters-to-meters. "
+        "Automatic mapping derives coordinate scale from the selected Abaqus model "
+        "and experimental coordinate units (for example, mm to m is 0.001, while "
+        "mm to mm is 1). It then tests axis order and signs while keeping that physical "
+        "unit conversion. Use Custom scale factor only when the named units do not "
+        "describe the data or an explicit override is required. "
         "Warnings about reflected transformations (mirrored geometry) or experimental "
         "points that map to an already-used Abaqus node appear in the FRF & quality tab "
         "and the Details tab, and mean the alignment should be checked before trusting "
@@ -162,8 +162,8 @@ HELP_TOPICS: List[HelpTopic] = [
         "Troubleshooting: analysis failed",
         "If the analysis fails, the status bar points to last_error.log in the output "
         "workspace, which has the full error. A common cause is the Abaqus command not "
-        "matching the installed release (try the exact command you would type to start "
-        "Abaqus, such as abq2024, instead of the generic 'abaqus'). For the "
+        "matching the installed release (select the detected version-labelled launcher "
+        "or browse to the command you use to start Abaqus). For the "
         "experimental file, confirm the .unv/.uff actually contains geometry (dataset "
         "15 or 2411) and either curve-fitted modes (dataset 55/2414) or raw FRFs "
         "(dataset 58); an .lms file only works when its companion UNV/UFF sits beside "

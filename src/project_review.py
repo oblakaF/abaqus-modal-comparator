@@ -21,9 +21,10 @@ from reviewed_core import (
     frequency_error_percent,
 )
 from quality_control import _detect_rigid_modes
+from coordinate_calibration import legacy_project_calibration
 
 
-PROJECT_SCHEMA_VERSION = 1
+PROJECT_SCHEMA_VERSION = 2
 PROJECT_EXTENSION = ".amcp.json"
 CONFIG_DIRECTORY = Path.home() / ".abaqus_simcenter_modal_comparator"
 LAST_SESSION_PATH = CONFIG_DIRECTORY / "last_session.json"
@@ -93,7 +94,12 @@ def project_payload(
     coordinate_scale: str,
     manual_reviews: Dict[str, dict],
     result: Optional[ComparisonResult] = None,
+    geometry_calibration: Optional[dict] = None,
 ) -> dict:
+    if geometry_calibration is None:
+        geometry_calibration = legacy_project_calibration(
+            {"coordinate_scale": coordinate_scale}
+        ).to_dict()
     payload = {
         "schema_version": PROJECT_SCHEMA_VERSION,
         "application": "Abaqus–Simcenter Modal Comparator",
@@ -106,6 +112,7 @@ def project_payload(
             "start_mode": int(start_mode),
             "end_mode": int(end_mode),
             "coordinate_scale": str(coordinate_scale or "auto"),
+            "geometry_calibration": geometry_calibration,
         },
         "manual_reviews": normalize_manual_reviews(manual_reviews),
     }
@@ -113,6 +120,18 @@ def project_payload(
         payload["last_result"] = {
             "matched_pairs": len(result.pairs),
             "geometry_match_fraction": float(result.geometry.matched_fraction),
+            "geometry_calibration": dict(result.geometry.calibration_details),
+            "geometry_diagnostics": {
+                key: result.metadata.get(key)
+                for key in (
+                    "raw_experimental_bbox",
+                    "mapped_fe_bbox",
+                    "mapping_rms",
+                    "mapping_max_residual",
+                    "mapping_rms_in_abaqus_units",
+                    "mapping_max_residual_in_abaqus_units",
+                )
+            },
             "pairs": [
                 {
                     "abaqus_mode": int(pair.abaqus_mode),
@@ -143,12 +162,20 @@ def read_project(path: Path) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("Project file must contain a JSON object.")
     version = int(payload.get("schema_version", 0))
-    if version != PROJECT_SCHEMA_VERSION:
+    if version not in {1, PROJECT_SCHEMA_VERSION}:
         raise ValueError(
-            f"Unsupported project schema version {version}; expected {PROJECT_SCHEMA_VERSION}."
+            f"Unsupported project schema version {version}; expected 1 or {PROJECT_SCHEMA_VERSION}."
         )
     if not isinstance(payload.get("inputs"), dict):
         raise ValueError("Project file does not contain an inputs section.")
+    if version == 1:
+        inputs = payload["inputs"]
+        calibration = legacy_project_calibration(inputs)
+        inputs["geometry_calibration"] = calibration.to_dict()
+        payload.setdefault("load_warnings", []).append(
+            "Legacy project coordinate_scale semantics were retained explicitly; 'auto' remains legacy extent-based geometric fit and was not reinterpreted as calibrated units."
+        )
+        payload["schema_version"] = PROJECT_SCHEMA_VERSION
     payload["manual_reviews"] = normalize_manual_reviews(payload.get("manual_reviews", {}))
     return payload
 
@@ -579,17 +606,26 @@ def install_project_review(app_module) -> None:
         window.transient(self.root)
         window.grab_set()
         columns = ("em", "freq", "error", "mac", "source")
-        table = ttk.Treeview(window, columns=columns, show="headings", selectmode="browse")
+        table_frame = ttk.Frame(window)
+        table_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        table = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
         for key, title, width in (
             ("em", "Experimental mode", 125),
-            ("freq", "Frequency, Hz", 120),
-            ("error", "Signed error, %", 115),
+            ("freq", "Experimental frequency, Hz", 175),
+            ("error", "Frequency error, %", 135),
             ("mac", "MAC", 90),
-            ("source", "Source", 190),
+            ("source", "Experimental source", 190),
         ):
             table.heading(key, text=title)
-            table.column(key, width=width, anchor="center")
-        table.pack(fill="both", expand=True, padx=10, pady=10)
+            table.column(key, width=width, minwidth=min(width, 115), anchor="center")
+        y_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=table.yview)
+        x_scroll = ttk.Scrollbar(table_frame, orient="horizontal", command=table.xview)
+        table.configure(yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set)
+        table.grid(row=0, column=0, sticky="nsew")
+        y_scroll.grid(row=0, column=1, sticky="ns")
+        x_scroll.grid(row=1, column=0, sticky="ew")
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
         candidates: Dict[str, ModePairResult] = {}
         used_modes = {
             int(pair.experimental_mode): int(pair.abaqus_mode)
