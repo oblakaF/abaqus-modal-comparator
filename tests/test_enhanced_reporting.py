@@ -75,6 +75,24 @@ class EnhancedReportingTests(unittest.TestCase):
         self.assertIn("Unmatched Abaqus modes: none", text)
         self.assertIn("Accepted-pair limits", text)
 
+    def test_quality_summary_records_selected_modal_set_provenance(self):
+        result = self.make_result()
+        result.experimental.metadata.update(
+            {
+                "mode_source": "curve-fitted dataset 55",
+                "modal_set_key": "processing-nice",
+                "modal_set_name": "Processing_nice",
+                "excluded_residual_count": 2,
+                "dataset_58_role": "diagnostic_only",
+            }
+        )
+        text = quality_control_text(result)
+        self.assertIn("Experimental source: curve-fitted dataset 55", text)
+        self.assertIn("Experimental modal set: Processing_nice", text)
+        self.assertIn("Experimental modal-set key: processing-nice", text)
+        self.assertIn("Dataset-55 residual records excluded: 2", text)
+        self.assertIn("Dataset-58 role: diagnostic_only", text)
+
 
 if __name__ == "__main__":
     unittest.main()

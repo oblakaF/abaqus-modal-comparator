@@ -85,6 +85,7 @@ ANALYSIS_CONFIGURATION_CONTROL_NAMES = (
     "calibration_provenance",
     "workspace_path",
     "workspace_path_browse",
+    "experimental_modal_set",
 )
 
 

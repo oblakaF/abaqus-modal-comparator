@@ -106,6 +106,126 @@ Do **not** broaden the current HUD/responsive release task with this importer ch
 
 This change should precede any attempt to judge SP05 mode-pair completeness or to implement a new FRF curve fitter for SP05. Proper imported PolyMAX modes are preferred over raw FRF peak snapshots when available and internally consistent.
 
+## Part 1 backend implementation — VERIFIED (2026-09-10)
+
+The raw `SP05_polymax.unv` audit found 28 consecutive dataset-55 records at
+zero-based pyuff indices 15–42. Physical fitted records use `id1` as the
+processing-set identity (`Processing_nice` or `Processing`), `analysis_type=3`,
+`mode_n`, and `eig`. Residual records retain the parent processing name in
+`id1` and append the semantic marker `Residuals below ...` or
+`Residuals above ...`; they use `analysis_type=5`, `freq_step_n`, and `freq`.
+Every record contains 121 nodes and three 121-value response components.
+
+The importer now exposes `ExperimentalModalSet` and
+`discover_experimental_modal_sets(path)`. Stable keys are derived
+deterministically from the normalized processing name, with
+`Dataset 55 modal set` / `dataset-55` used for a single unnamed group. No
+pyuff record object escapes the importer. Each fitted mode records its modal-set
+key/name, processing name, zero-based pyuff record index, stable record ID, and
+source frequency.
+
+Residual filtering is semantic, not frequency-based. The classifier applies an
+anchored, case-insensitive `id1` pattern whose form is
+`<processing name> Residuals <below|above> ...`. The processing-name prefix
+associates each excluded residual with its fitted set. Labels, record indices,
+and excluded counts remain in modal-set and returned-dataset metadata.
+
+`load_universal_modal_file(..., modal_set=...)` accepts either the stable key or
+literal processing/display name. One valid set remains an auditable implicit
+single-set compatibility case. Multiple valid sets without selection raise a
+validation error listing the available sets; they are never concatenated. A
+missing requested set also raises a validation error.
+
+When dataset 55 is selected, only its physical modes populate
+`ModalDataset.modes`. Dataset-58 response and coherence arrays are still parsed
+into diagnostic metadata (`dataset_58_role=diagnostic_only`) without running
+peak-derived-mode or CMIF candidate selection and without changing fitted
+frequencies/shapes. Files with no valid dataset 55 retain the existing
+dataset-2414/dataset-58 fallback path. The fast-cache key includes the selected
+modal-set value, preventing cross-set cache reuse.
+
+Real-file validation discovered:
+
+- `Processing_nice` (`processing-nice`): 7 physical modes; 2 residuals excluded;
+- `Processing` (`processing`): 17 physical modes; 2 residuals excluded.
+
+Both selections loaded explicitly through the installed hardening and cache
+stack. Dataset 58 remained diagnostic-only with 121 parsed FRF channels and no
+coherence channels present in the selected group. That checkpoint completed
+backend Part 1 only; the subsequent Part 2 work is recorded below.
+
+## Part 2 GUI selection and SP05 validation — VERIFIED (2026-09-10)
+
+The Files page now discovers dataset-55 sets asynchronously when the
+experimental path changes. A generation token binds each completion to the
+exact resolved file, so a stale worker cannot repopulate the selector after a
+later path change. Discovery is not connected to Configure/resize events.
+
+The `Experimental modal set` selector shows processing names and physical-mode
+counts, plus a compact summary of dataset source, selected set, physical modes,
+and excluded residual count. Zero sets visibly retain the dataset-2414/58
+fallback; one set is selected visibly and automatically; multiple sets require
+an explicit selection before Run. Changing the experimental path clears the
+old choice before rediscovery. The control is frozen with the other scientific
+configuration controls during RUNNING/STOPPING.
+
+Project schema version 2 remains backward compatible and now carries optional
+`inputs.experimental_modal_set` (authoritative stable key) and
+`inputs.experimental_modal_set_name` (display provenance). A valid saved key is
+restored after rediscovery. A missing saved key produces a warning and requires
+reselection. Old projects follow the same zero/one/multiple policy. Modal-set
+changes participate in the persistent dirty snapshot; Interface Scale remains
+presentation-only.
+
+The selected key is included in both the runtime analysis-directory signature
+and the Part-1 UNV binary-cache key, and is passed unchanged to
+`load_universal_modal_file`. Comparison-table source cells, Details, quality
+summary, Excel quality sheet, and PDF quality page identify dataset 55 and the
+selected modal-set name/key. Details and reports also expose excluded residuals
+and dataset-58 diagnostic-only provenance. The FRF plot remains populated from
+121 dataset-58 channels and labels dataset 55 / the selected set as the fitted
+modal source; absent coherence remains `unavailable`, never perfect.
+
+### Real SP05 run — unchanged gates and explicit camera calibration
+
+Inputs were the existing format-2 extraction of `SP05_modal.odb`, Abaqus modes
+7–15, and `SP05_polymax.unv`. Geometry used `camera_grid`, full scan, 301 ×
+302 mm, never legacy extent-auto. Both runs mapped all 121 points (100%), with
+normalized RMS 0.00174931, Abaqus-unit RMS/max residual 0.74555/2.11099 mm,
+and independent X/Y comparator-convention factors
+0.0007769505/0.0007804594 (planar axes swapped).
+
+`Processing_nice` loaded exactly 7 physical modes and excluded 2 residuals.
+Unchanged gates accepted 6 pairs:
+
+- A7 47.747 Hz → E1 50.966983 Hz: −6.3178%, MAC 0.91493;
+- A8 148.570 Hz → E2 134.241465 Hz: +10.6737%, MAC 0.95779;
+- A9 152.870 Hz → E3 149.172904 Hz: +2.4784%, MAC 0.82977;
+- A10 172.400 Hz → E5 166.901014 Hz: +3.2948%, MAC 0.96358;
+- A11 172.500 Hz → E4 163.476000 Hz: +5.5201%, MAC 0.83440;
+- A12 260.590 Hz → E6 259.455980 Hz: +0.4371%, MAC 0.73289.
+
+The 163.476 and 166.901 Hz fitted records remain two distinct mode shapes and
+pair independently to A11 and A10 respectively. E7 at 350.914368 Hz remains
+unmatched. Its A15 candidate has +0.22958% signed frequency error but raw MAC
+0.31334, so it is rejected by the unchanged MAC gate. A13, A14, and A15 are
+unmatched.
+
+`Processing` loaded exactly 17 physical modes and excluded 2 residuals. It also
+accepted 6 pairs with the same identities; corresponding MAC values were
+0.91481, 0.95819, 0.82912, 0.96615, 0.83435, and 0.70308. The additional
+Processing-only in-band unmatched candidates were 295.031884, 364.986848,
+380.270497, 386.203793, 400.542062, and 425.545304 Hz. Higher physical modes
+443.281531, 461.667110, 468.135167, and 486.312253 Hz remained loaded but lay
+outside the FE comparison band. No extra pair was inferred merely from the
+larger set.
+
+A native-Tk single-session `Processing_nice → Processing → Processing_nice`
+run changed MAC dimensions 9×7 → 9×17 → 9×7, refreshed table source labels and
+both MAC/FRF plot files, and returned the first and third runs to identical
+pairs and MAC data. The third load reused the `processing-nice` memory-cache
+entry. No residual appeared in any physical-mode list, matrix, or table.
+
 ## Relationship to SCI-S0 / EMA roadmap
 
 The new SP05 file changes priority, not the general architecture:

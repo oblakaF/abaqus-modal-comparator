@@ -57,6 +57,12 @@ def render_frf_diagnostics(result: ComparisonResult, output_path: Path) -> Path:
     primary.semilogy(frequency, np.maximum(normalized, 1e-12), label="Combined FRF indicator")
     primary.set_xlabel("Frequency, Hz")
     primary.set_ylabel("Normalized FRF indicator")
+    modal_set_name = metadata.get("modal_set_name")
+    if metadata.get("dataset_58_role") == "diagnostic_only" and modal_set_name:
+        primary.set_title(
+            "Dataset 58 FRF diagnostics; fitted modes from dataset 55 / "
+            f"{modal_set_name}"
+        )
     primary.grid(True, alpha=0.25)
 
     all_peaks = [mode.frequency_hz for mode in result.experimental.sorted_modes()]
@@ -177,6 +183,18 @@ def quality_control_text(result: ComparisonResult) -> str:
         f"Reliable matched pairs: {len(result.pairs)}",
         f"Rigid / near-zero Abaqus modes excluded: {excluded or 'none'}",
     ]
+    experimental_metadata = result.experimental.metadata
+    if experimental_metadata.get("modal_set_key"):
+        lines.extend(
+            [
+                "Experimental source: curve-fitted dataset 55",
+                f"Experimental modal set: {experimental_metadata.get('modal_set_name')}",
+                f"Experimental modal-set key: {experimental_metadata.get('modal_set_key')}",
+                "Dataset-55 residual records excluded: "
+                f"{experimental_metadata.get('excluded_residual_count', 0)}",
+                f"Dataset-58 role: {experimental_metadata.get('dataset_58_role', 'unavailable')}",
+            ]
+        )
     if unmatched:
         lines.append(
             "Unmatched Abaqus modes: "

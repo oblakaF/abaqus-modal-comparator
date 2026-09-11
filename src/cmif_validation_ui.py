@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from polymax_ui import experimental_mode_source_label
+
 
 _INSTALLED = False
 
@@ -12,7 +14,7 @@ def _source_and_confidence(result, experimental_mode_number: int):
     if mode is None:
         return "Unknown", "—"
     metadata = mode.metadata
-    source = metadata.get("source_label") or metadata.get("mode_source") or "Unknown"
+    source = experimental_mode_source_label(metadata)
     confidence = metadata.get("confidence_label") or "—"
     return str(source), str(confidence)
 
