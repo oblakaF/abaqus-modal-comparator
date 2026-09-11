@@ -222,6 +222,8 @@ def install_polymax_ui(app_module) -> None:
         self._set_modal_set_key("")
         selected_path = self.experimental_path.get().strip()
         if not selected_path:
+            self._pending_project_modal_set = None
+            self._modal_set_restore_baseline = False
             self._modal_set_discovery_path = None
             self._modal_set_discovery_state = "idle"
             self.experimental_modal_set_combo.configure(values=())

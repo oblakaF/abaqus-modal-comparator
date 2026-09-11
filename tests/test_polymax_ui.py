@@ -51,6 +51,63 @@ def _set(key: str, name: str, frequencies, residuals: int = 0):
 
 
 class PolymaxUiPolicyTests(unittest.TestCase):
+    def test_empty_path_clears_restore_before_later_discovery(self):
+        import main
+
+        class Variable:
+            def __init__(self, value=""):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+            def set(self, value):
+                self.value = value
+
+        class Combo:
+            def configure(self, **_kwargs):
+                pass
+
+        application = SimpleNamespace(
+            _modal_set_discovery_generation=0,
+            available_experimental_modal_sets=[object()],
+            _modal_set_choices={"stale": "processing"},
+            _pending_project_modal_set="processing",
+            _modal_set_restore_baseline=True,
+            _suppress_modal_set_dirty=False,
+            experimental_path=Variable(""),
+            experimental_modal_set_key=Variable("processing"),
+            experimental_modal_set_combo=Combo(),
+            experimental_modal_set_display=Variable(),
+            experimental_modal_set_summary=Variable(),
+        )
+        application._set_modal_set_key = application.experimental_modal_set_key.set
+
+        main.app.ModalComparatorApp._schedule_modal_set_discovery(application)
+
+        self.assertIsNone(application._pending_project_modal_set)
+        self.assertFalse(application._modal_set_restore_baseline)
+
+        later_path = Path("later.unv")
+        shown = []
+        dirty_resets = []
+        application._modal_set_discovery_path = later_path
+        application._show_experimental_modal_set = shown.append
+        application._reset_dirty = lambda: dirty_resets.append(True)
+        application._refresh_readiness = lambda: None
+        only = _set("only", "Only set", [30.0])
+
+        main.app.ModalComparatorApp._apply_discovered_modal_sets(
+            application,
+            application._modal_set_discovery_generation,
+            later_path,
+            [only],
+            None,
+        )
+
+        self.assertEqual(shown, ["only"])
+        self.assertEqual(dirty_resets, [])
+
     def test_zero_one_and_multiple_set_defaults(self):
         one = _set("only", "Only", [10.0])
         two = _set("second", "Second", [20.0])
@@ -135,6 +192,80 @@ class PolymaxUiPolicyTests(unittest.TestCase):
 
 
 class PolymaxNativeTkTests(unittest.TestCase):
+    def test_empty_path_project_does_not_leak_restore_state(self):
+        try:
+            import tkinter as tk
+
+            root = tk.Tk()
+        except tk.TclError as error:
+            self.skipTest(f"Tk is unavailable: {error}")
+        root.withdraw()
+        try:
+            import main
+            import polymax_ui
+            import ui_workflow
+
+            disabled = {
+                "autosave_enabled": False,
+                "restore_on_startup": False,
+                "show_recovery_notice": False,
+            }
+            nice = _set("processing-nice", "Processing_nice", [10.0] * 7)
+            full = _set("processing", "Processing", [10.0] * 17)
+            only = _set("only", "Only set", [30.0])
+            with patch.object(
+                ui_workflow, "load_recovery_preferences", return_value=disabled
+            ), patch.object(
+                ui_workflow, "discover_abaqus_installations", return_value=()
+            ), patch.object(
+                polymax_ui,
+                "discover_experimental_modal_sets",
+                side_effect=lambda path: (
+                    [only] if Path(path).name == "other.unv" else [nice, full]
+                ),
+            ):
+                application = main.app.ModalComparatorApp(root)
+                with tempfile.TemporaryDirectory() as directory:
+                    directory = Path(directory)
+                    first = directory / "first.unv"
+                    other = directory / "other.unv"
+                    first.write_text("fixture", encoding="utf-8")
+                    other.write_text("fixture", encoding="utf-8")
+
+                    empty_payload = application._project_payload_for_self()
+                    empty_payload["inputs"]["simcenter_results"] = ""
+                    empty_payload["inputs"]["experimental_modal_set"] = "processing"
+                    application._apply_project_payload(
+                        empty_payload, directory / "empty.amcp.json"
+                    )
+                    self.assertIsNone(application._pending_project_modal_set)
+                    self.assertFalse(application._modal_set_restore_baseline)
+
+                    with patch("polymax_ui.messagebox.showwarning") as warning:
+                        application.experimental_path.set(str(first))
+                        self._wait_for_discovery(root, application)
+                    self.assertFalse(warning.called)
+                    self.assertEqual(application.experimental_modal_set_key.get(), "")
+                    self.assertTrue(application.dirty_tracker.dirty)
+
+                    application.experimental_modal_set_display.set(
+                        modal_set_choice_text(full)
+                    )
+                    application._experimental_modal_set_selected()
+                    saved_payload = application._project_payload_for_self()
+                    saved_project = directory / "saved.amcp.json"
+
+                    application.experimental_path.set(str(other))
+                    self._wait_for_discovery(root, application)
+                    application._apply_project_payload(saved_payload, saved_project)
+                    self._wait_for_discovery(root, application)
+                    self.assertEqual(
+                        application.experimental_modal_set_key.get(), "processing"
+                    )
+                    self.assertFalse(application.dirty_tracker.dirty)
+        finally:
+            root.destroy()
+
     def test_discovery_selection_dirty_persistence_and_path_invalidation(self):
         try:
             import tkinter as tk
