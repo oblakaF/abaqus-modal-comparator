@@ -43,6 +43,12 @@ class SyntheticProductionFixture:
         self.coordinates = np.column_stack(
             (grid_x.ravel(), 1.3 * grid_y.ravel(), np.zeros(grid_x.size))
         )
+        # A complete, evenly-spaced rectangular grid is invariant under a
+        # 180-degree rotation and both axis mirrors regardless of aspect
+        # ratio; nudge one point off that exact symmetry so the point set
+        # has exactly one geometrically admissible registration, for a
+        # reason unrelated to what these tests verify.
+        self.coordinates[-1] += np.array([0.05, -0.03, 0.0])
         self.node_ids = np.arange(1, len(self.coordinates) + 1)
         centered = self.coordinates - np.mean(self.coordinates, axis=0)
         rigid_z = np.column_stack(

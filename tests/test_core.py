@@ -18,6 +18,12 @@ class ModalCoreTests(unittest.TestCase):
     def synthetic_result(self):
         x, y = np.meshgrid(np.linspace(0.0, 500.0, 13), np.linspace(0.0, 510.0, 11))
         abaqus_coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        # A complete, evenly-spaced rectangular grid is invariant under a
+        # 180-degree rotation and both axis mirrors regardless of aspect
+        # ratio; nudge one point off that exact symmetry so the point set
+        # has exactly one geometrically admissible registration, for a
+        # reason unrelated to what these tests verify.
+        abaqus_coordinates[0] += np.array([0.37, -0.21, 0.0])
         abaqus_ids = np.arange(len(abaqus_coordinates))
 
         experimental_indices = np.arange(0, len(abaqus_coordinates), 4)

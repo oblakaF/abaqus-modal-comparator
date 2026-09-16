@@ -639,7 +639,7 @@ def install_responsive_workflow(app_module) -> None:
             text="The scale converts Abaqus model coordinates into the experimental coordinate unit before alignment. Automatic mapping remains subject to the existing scientific geometry checks.",
             style="Secondary.TLabel", justify="left"
         )
-        mapping_help.configure(text="Calibration establishes physical coordinate scale first. Registration may then permute axes, translate, or reflect; it does not fit scale to improve MAC.")
+        mapping_help.configure(text="Calibration establishes physical coordinate scale first. Registration then selects axis permutation, translation, and reflection using geometric fit alone (residual and matched fraction); MAC is evaluated only after geometry is fixed and never influences which orientation is chosen. If geometry cannot resolve a single orientation, the comparison is refused rather than guessed.")
         mapping_help.grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self._responsive_wrap_labels.append(mapping_help)
         self._tooltips.extend((

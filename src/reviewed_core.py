@@ -52,6 +52,28 @@ MINIMUM_POINT_COVERAGE_FRACTION = 0.02
 MINIMUM_SPATIAL_EXTENT_FRACTION = 0.02
 
 
+class GeometryOrientationAmbiguousError(RuntimeError):
+    """Raised when physical geometry/orientation cannot be determined from
+    geometric evidence alone.
+
+    Multiple axis-permutation/reflection/scale candidates remain equally
+    plausible using ONLY geometric evidence (normalized RMS residual and
+    matched fraction). Per project scientific policy (see
+    docs/literature/SCIENTIFIC_RULES.md rule 5 and
+    analysis/campaign_experiment_audit/SP13_EXP_FE_READINESS.md), MAC,
+    frequency, or any modal-correlation quantity must never be used to break
+    this tie -- doing so would let the same MAC that is later reported as
+    comparison evidence silently decide the physical orientation first.
+    Resolving this requires independent physical provenance (e.g. a
+    confirmed scan-corner/edge-to-specimen correspondence), not more
+    computation on the existing geometry/modal data.
+    """
+
+    def __init__(self, message: str, ambiguous_candidates: Sequence[Dict[str, object]]) -> None:
+        super().__init__(message)
+        self.ambiguous_candidates = list(ambiguous_candidates)
+
+
 def frequency_error_percent(calculated: float, experimental: float) -> float:
     """Signed frequency error: positive means the numerical model is stiffer/higher."""
     experimental_value = float(experimental)
@@ -336,6 +358,87 @@ def geometry_alignment_candidates(
     return plausible[:GEOMETRY_CANDIDATE_LIMIT]
 
 
+def _geometry_equivalence_key(
+    candidate: GeometryMatch,
+) -> Tuple[Tuple[int, ...], Tuple[float, ...]]:
+    """Identify candidates that are the SAME physical registration.
+
+    Two candidates that map every experimental point onto the same Abaqus
+    node at the same physical scale are mathematically/geometrically
+    equivalent -- for example the identical transform re-derived from two
+    near-duplicate calibration scale candidates. They are not competing
+    physical orientations and must be collapsed to one representative
+    before an ambiguity decision is made, never treated as separate ties.
+    """
+    return (
+        tuple(int(value) for value in candidate.experimental_to_abaqus),
+        tuple(round(float(value), 9) for value in candidate.coordinate_scales),
+    )
+
+
+def _candidate_summary(candidate: GeometryMatch) -> Dict[str, object]:
+    """Geometry-only description of one orientation candidate, for the
+    ambiguity diagnostic. Contains no MAC/frequency/modal information."""
+    determinant = float(np.linalg.det(candidate.rotation))
+    axis_permutation = np.argmax(np.abs(candidate.rotation), axis=0).astype(int).tolist()
+    return {
+        "rotation": candidate.rotation.tolist(),
+        "coordinate_scales": candidate.coordinate_scales.tolist(),
+        "normalized_rms_distance": candidate.normalized_rms_distance,
+        "matched_fraction": candidate.matched_fraction,
+        "determinant": determinant,
+        "mirrored": determinant < 0.0,
+        "axis_permutation": axis_permutation,
+        "calibration": dict(candidate.calibration_details),
+    }
+
+
+def _select_unambiguous_geometry(
+    candidates: Sequence[GeometryMatch],
+) -> GeometryMatch:
+    """Select the single physical geometry/orientation using ONLY geometric
+    evidence -- never MAC, frequency, or any modal-correlation quantity.
+
+    ``candidates`` is already ranked and filtered by
+    ``geometry_alignment_candidates`` using purely geometric criteria
+    (normalized RMS residual, matched fraction; deterministically ordered by
+    that same criteria, with a non-reflected transform preferred on exact
+    ties -- see that function's sort key). This function only needs to
+    (a) collapse candidates that are mathematically/geometrically
+    equivalent (identical experimental-to-Abaqus node correspondence at the
+    same physical scale, per ``_geometry_equivalence_key``), keeping the
+    first (best-ranked) representative of each equivalence group, and
+    (b) refuse to guess between candidates that remain physically distinct
+    after that collapse -- raising ``GeometryOrientationAmbiguousError``
+    rather than silently picking one by list order or by any modal quantity.
+    """
+    if not candidates:
+        raise RuntimeError("No geometry-alignment candidates were generated.")
+
+    distinct: List[GeometryMatch] = []
+    seen_keys: set = set()
+    for candidate in candidates:
+        key = _geometry_equivalence_key(candidate)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        distinct.append(candidate)
+
+    if len(distinct) == 1:
+        return distinct[0]
+
+    raise GeometryOrientationAmbiguousError(
+        f"{len(distinct)} physically distinct orientation/registration "
+        "candidates are equally plausible using geometric evidence alone "
+        "(normalized RMS residual and matched fraction). Physical "
+        "orientation cannot be determined by modal correlation (MAC) or "
+        "frequency; independent physical provenance (e.g. a confirmed "
+        "scan-corner/edge-to-specimen correspondence) is required before a "
+        "unique EXP-vs-FE comparison can be claimed.",
+        [_candidate_summary(candidate) for candidate in distinct],
+    )
+
+
 def _phase_align_masked(
     reference: np.ndarray,
     candidate: np.ndarray,
@@ -593,8 +696,8 @@ def _experimental_vectors_and_mask(
     return experimental_vectors, measurement_masks
 
 
-def _best_geometry_evaluation(
-    candidates: Sequence[GeometryMatch],
+def _evaluate_geometry_pairing(
+    geometry: GeometryMatch,
     abaqus_modes: Sequence[ModeShape],
     abaqus_reference: ModeShape,
     experimental_vectors: Sequence[np.ndarray],
@@ -609,99 +712,54 @@ def _best_geometry_evaluation(
     minimum_mac: float,
     maximum_frequency_only_error_percent: float,
 ) -> Tuple[
-    GeometryMatch,
     np.ndarray,
     np.ndarray,
     np.ndarray,
     List[List[_CoverageReport]],
 ]:
-    """Evaluate every geometry candidate and return the best-scoring one.
+    """Compute the MAC matrix and Hungarian mode pairing for ONE, already
+    independently fixed, geometry candidate.
 
-    The score first maximizes the number of admissible one-to-one pairs, then
-    minimizes assignment cost plus a geometry-fit penalty; see the module-level
-    comment on UNMATCHED_COST for why admissibility, not this score, is the
-    acceptance gate.
+    Geometry/orientation selection happens entirely before this function is
+    called (see ``_select_unambiguous_geometry``): MAC and frequency here
+    only ever influence which experimental/FE MODES are paired within this
+    single fixed geometry, never which geometry was chosen. This preserves
+    the unchanged admissibility gates and Hungarian assignment behavior (see
+    the module-level comment on UNMATCHED_COST for why admissibility, not
+    assignment cost, is the acceptance gate).
     """
-    best_evaluation = None
-    for geometry in candidates:
-        mapped_abaqus_ids = abaqus_reference.node_ids[
-            geometry.experimental_to_abaqus
-        ]
-        abaqus_rotated_modes = _rotated_abaqus_modes(
-            abaqus_modes,
-            mapped_abaqus_ids,
-            geometry.rotation,
-        )
-        mac_matrix, coverage_admissible, coverage_reports = _mac_matrix_for_geometry(
-            abaqus_rotated_modes,
-            experimental_vectors,
-            measurement_masks,
-            experimental_coordinates,
-            full_grid_point_count,
-            full_grid_extent,
-        )
-
-        mac_available = np.isfinite(mac_matrix)
-        admissible = (
-            absolute_frequency_matrix <= maximum_frequency_error_percent
-        )
-        admissible &= np.where(
-            mac_available,
-            mac_matrix >= minimum_mac,
-            absolute_frequency_matrix <= maximum_frequency_only_error_percent,
-        )
-        # ROADMAP Stage 2 #4: a pair below the coverage floor must not
-        # participate in Hungarian assignment as an admissible candidate.
-        admissible &= coverage_admissible
-
-        mac_cost = 1.0 - np.nan_to_num(mac_matrix, nan=0.0)
-        frequency_cost = np.minimum(
-            absolute_frequency_matrix / 20.0,
-            5.0,
-        )
-        cost = mac_weight * mac_cost + frequency_weight * frequency_cost
-        rows, columns, assignment_cost = _admissible_assignment(
-            cost,
-            admissible,
-        )
-        geometry_penalty = (
-            3.0 * geometry.normalized_rms_distance
-            + 0.5 * (1.0 - geometry.matched_fraction)
-        )
-        score = (
-            -len(rows),
-            float(np.linalg.det(geometry.rotation)) < 0.0,
-            assignment_cost + geometry_penalty,
-        )
-        if best_evaluation is None or score < best_evaluation[0]:
-            best_evaluation = (
-                score,
-                geometry,
-                mac_matrix,
-                rows,
-                columns,
-                coverage_reports,
-            )
-
-    if best_evaluation is None:
-        raise RuntimeError(
-            "No valid geometry and modal alignment could be calculated."
-        )
-    (
-        _,
-        geometry,
-        mac_matrix,
-        abaqus_indices,
-        experimental_indices,
-        coverage_reports,
-    ) = best_evaluation
-    return (
-        geometry,
-        mac_matrix,
-        abaqus_indices,
-        experimental_indices,
-        coverage_reports,
+    mapped_abaqus_ids = abaqus_reference.node_ids[geometry.experimental_to_abaqus]
+    abaqus_rotated_modes = _rotated_abaqus_modes(
+        abaqus_modes,
+        mapped_abaqus_ids,
+        geometry.rotation,
     )
+    mac_matrix, coverage_admissible, coverage_reports = _mac_matrix_for_geometry(
+        abaqus_rotated_modes,
+        experimental_vectors,
+        measurement_masks,
+        experimental_coordinates,
+        full_grid_point_count,
+        full_grid_extent,
+    )
+
+    mac_available = np.isfinite(mac_matrix)
+    admissible = absolute_frequency_matrix <= maximum_frequency_error_percent
+    admissible &= np.where(
+        mac_available,
+        mac_matrix >= minimum_mac,
+        absolute_frequency_matrix <= maximum_frequency_only_error_percent,
+    )
+    # ROADMAP Stage 2 #4: a pair below the coverage floor must not
+    # participate in Hungarian assignment as an admissible candidate.
+    admissible &= coverage_admissible
+
+    mac_cost = 1.0 - np.nan_to_num(mac_matrix, nan=0.0)
+    frequency_cost = np.minimum(absolute_frequency_matrix / 20.0, 5.0)
+    cost = mac_weight * mac_cost + frequency_weight * frequency_cost
+    rows, columns, _ = _admissible_assignment(cost, admissible)
+
+    return mac_matrix, rows, columns, coverage_reports
 
 
 def _build_candidate_diagnostics(
@@ -1012,14 +1070,17 @@ def compare_modal_datasets(
         coordinate_scale_override=coordinate_scale_override,
         geometry_calibration=geometry_calibration,
     )
+    # Geometry/orientation is selected using ONLY geometric evidence, before
+    # any MAC/frequency/modal quantity is computed -- see
+    # _select_unambiguous_geometry and GeometryOrientationAmbiguousError.
+    geometry = _select_unambiguous_geometry(candidates)
     (
-        geometry,
         mac_matrix,
         abaqus_indices,
         experimental_indices,
         coverage_reports,
-    ) = _best_geometry_evaluation(
-        candidates,
+    ) = _evaluate_geometry_pairing(
+        geometry,
         abaqus_modes,
         abaqus_reference,
         experimental_vectors,

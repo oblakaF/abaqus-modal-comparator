@@ -9,10 +9,12 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from modal_core import GeometryMatch, ModalDataset, ModeShape
 from reviewed_core import (
+    GeometryOrientationAmbiguousError,
     _admissible_assignment,
     _coverage_report,
     _frequency_error_matrices,
     _geometry_warnings_and_transform,
+    _select_unambiguous_geometry,
     compare_modal_datasets,
     experimental_measurement_masks,
     frequency_error_percent,
@@ -118,12 +120,17 @@ class ReviewedCoreTests(unittest.TestCase):
         must not be treated as measured for a different experimental mode's
         pair. Reproduces the confirmed union-mask risk described in
         ROADMAP.md Stage 2 #3."""
+        # The fourth corner is nudged off the exact unit square so the point
+        # set has exactly one geometrically admissible registration; an
+        # exact square is invariant under all 8 axis-permutation/reflection
+        # operations, which would make this fixture geometrically ambiguous
+        # for a reason unrelated to what this test verifies.
         coordinates = np.array(
             [
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
-                [1.0, 1.0, 0.0],
+                [1.15, 0.95, 0.0],
             ]
         )
         node_ids = np.arange(1, 5)
@@ -254,13 +261,19 @@ class ReviewedCoreTests(unittest.TestCase):
         self.assertLess(candidates[0].normalized_rms_distance, 1.0e-10)
 
     def test_different_node_sets_between_modes_are_supported(self):
+        # The interior points are deliberately off the unit square's
+        # symmetry lines (not exactly x=0.5 or y=0.5) so the point set has
+        # exactly one geometrically admissible registration; a coordinate
+        # sitting exactly on a mirror line would make an incorrect
+        # reflection candidate register with zero residual too, which is a
+        # fixture-symmetry artifact unrelated to what this test verifies.
         coordinates = np.array(
             [
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
                 [1.0, 1.0, 0.0],
-                [0.5, 0.3, 0.0],
+                [0.55, 0.3, 0.0],
                 [0.2, 0.8, 0.0],
             ]
         )
@@ -355,12 +368,15 @@ class ReviewedCoreTests(unittest.TestCase):
         self.assertFalse(selected_transform["mirrored"])
 
     def test_comparison_does_not_mutate_input_metadata(self):
+        # Fourth corner nudged off the exact unit square -- see the
+        # comment in test_pair_uses_only_its_own_experimental_modes_measured_dofs
+        # for why an exact square is geometrically ambiguous here.
         coordinates = np.array(
             [
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
-                [1.0, 1.0, 0.0],
+                [1.15, 0.95, 0.0],
             ]
         )
         ids = np.arange(4)
@@ -436,6 +452,14 @@ class ReviewedCoreTests(unittest.TestCase):
         otherwise be admissible (ROADMAP Stage 2 #4)."""
         x, y = np.meshgrid(np.linspace(0.0, 2.0, 3), np.linspace(0.0, 2.0, 3))
         coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        # A complete, evenly-spaced rectangular grid is invariant under a
+        # 180-degree rotation and both axis mirrors regardless of aspect
+        # ratio; nudge the far corner off that exact symmetry so the point
+        # set has exactly one geometrically admissible registration, for a
+        # reason unrelated to what this test verifies. Only unmeasured
+        # DOFs of the far corner (never part of either mask below) are
+        # affected.
+        coordinates[-1] = [2.1, 2.05, 0.0]
         node_ids = np.arange(1, 10)
 
         shape_1 = np.sin(np.pi * coordinates[:, 0] / 2.0)
@@ -488,19 +512,24 @@ class ReviewedCoreTests(unittest.TestCase):
         self.assertEqual(getattr(result.pairs[0], "coverage_status"), "accepted")
 
     def test_sufficient_coverage_pair_reports_accepted_status(self):
+        # Fourth corner nudged off the exact unit square -- an exact square
+        # is invariant under all 8 axis-permutation/reflection operations,
+        # which would make this fixture geometrically ambiguous for a
+        # reason unrelated to what this test verifies (see the comment in
+        # test_pair_uses_only_its_own_experimental_modes_measured_dofs).
         result = compare_modal_datasets(
             ModalDataset(
                 "Abaqus",
                 Path("model.odb"),
                 [ModeShape(1, 100.0, np.arange(4), np.array(
-                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
+                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.15, 0.95, 0.0]]
                 ), np.column_stack([np.zeros(4), np.zeros(4), [1.0, -1.0, -1.0, 1.0]]))],
             ),
             ModalDataset(
                 "Experiment",
                 Path("scan.unv"),
                 [ModeShape(1, 100.2, np.arange(4), np.array(
-                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
+                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.15, 0.95, 0.0]]
                 ), np.column_stack([np.zeros(4), np.zeros(4), [1.0, -1.0, -1.0, 1.0]]))],
             ),
             coordinate_scale_override=1.0,
@@ -510,6 +539,189 @@ class ReviewedCoreTests(unittest.TestCase):
         self.assertAlmostEqual(getattr(result.pairs[0], "dof_coverage_fraction"), 1.0)
         self.assertAlmostEqual(getattr(result.pairs[0], "point_coverage_fraction"), 1.0)
         self.assertAlmostEqual(getattr(result.pairs[0], "spatial_coverage_fraction"), 1.0)
+
+
+class GeometryOrientationSelectionTests(unittest.TestCase):
+    """Scientific-audit regression tests for finding P0-1: geometry/orientation
+    selection must use ONLY geometric evidence and must never be resolved by
+    MAC/frequency/modal correlation. See docs/scientific_audit/
+    SCIENTIFIC_RISK_REGISTER.md (P0-1) and docs/literature/SCIENTIFIC_RULES.md
+    (rule 5)."""
+
+    _SQUARE = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+        ]
+    )
+
+    def test_ambiguous_orientation_is_not_resolved_by_a_large_mac_difference(self):
+        """An exact unit square is geometrically invariant under all eight
+        axis-permutation/reflection candidates (identity, three more
+        rotations/reflections, and their four Z-flip duplicates that are
+        already collapsed as equivalent). One candidate ('identity') is
+        constructed to give a near-perfect MAC and another (a 180-degree,
+        point-swap candidate) is constructed to give a much lower MAC. The
+        comparator must refuse to pick either -- proving the huge MAC gap
+        between orientation candidates was NOT used to break the tie. This
+        test fails on the pre-fix implementation (which silently selects
+        the high-MAC orientation) and passes after the fix."""
+        node_ids = np.arange(1, 5)
+        # A strictly increasing shape: identical at every point on both
+        # sides gives MAC = 1 for the identity correspondence, but a very
+        # different value for the point-swapped (180-degree) correspondence
+        # (comparing [1,2,3,4] against [4,3,2,1] is far from collinear).
+        shape = np.array([1.0, 2.0, 3.0, 4.0])
+        abaqus_vector = np.zeros((4, 3))
+        abaqus_vector[:, 2] = shape
+        experimental_vector = np.zeros((4, 3))
+        experimental_vector[:, 2] = shape
+
+        abaqus = ModalDataset(
+            "Abaqus",
+            Path("model.odb"),
+            [ModeShape(1, 100.0, node_ids, self._SQUARE, abaqus_vector)],
+        )
+        experiment = ModalDataset(
+            "Experiment",
+            Path("scan.unv"),
+            [ModeShape(1, 100.1, node_ids, self._SQUARE, experimental_vector)],
+        )
+
+        # Sanity check: the identity correspondence really does give a much
+        # higher MAC than the 180-degree point-swap correspondence, so a
+        # MAC-driven selection (the pre-fix bug) would have a strong signal
+        # to (wrongly) act on.
+        from modal_core import modal_assurance_criterion
+
+        identity_mac = modal_assurance_criterion(shape, shape)
+        swapped_mac = modal_assurance_criterion(shape, shape[::-1])
+        self.assertGreater(identity_mac, 0.999)
+        self.assertLess(swapped_mac, 0.7)
+
+        with self.assertRaises(GeometryOrientationAmbiguousError) as raised:
+            compare_modal_datasets(abaqus, experiment, coordinate_scale_override=1.0)
+        self.assertGreaterEqual(len(raised.exception.ambiguous_candidates), 2)
+
+    def test_asymmetric_geometry_with_unique_orientation_proceeds_normally(self):
+        """A genuinely asymmetric point set (no axis-permutation/reflection
+        maps it onto itself) must resolve to a single geometry and proceed
+        through the normal pairing pipeline without raising."""
+        coordinates = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [2.3, 1.4, 0.0],
+                [0.6, 0.2, 0.0],
+            ]
+        )
+        node_ids = np.arange(1, 6)
+        shape = np.array([1.0, -0.5, 0.3, -0.8, 0.2])
+        vectors = np.zeros((5, 3))
+        vectors[:, 2] = shape
+
+        abaqus = ModalDataset(
+            "Abaqus", Path("model.odb"), [ModeShape(1, 50.0, node_ids, coordinates, vectors)]
+        )
+        experiment = ModalDataset(
+            "Experiment", Path("scan.unv"), [ModeShape(1, 50.1, node_ids, coordinates, vectors)]
+        )
+
+        result = compare_modal_datasets(abaqus, experiment, coordinate_scale_override=1.0)
+        self.assertEqual(len(result.pairs), 1)
+        self.assertGreater(result.pairs[0].mac, 0.999)
+
+    def test_geometry_selection_is_independent_of_modal_vectors(self):
+        """Changing the modal vectors while keeping geometry identical must
+        not change which geometry is selected -- geometry selection depends
+        only on coordinates, never on mode shapes."""
+        coordinates = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [2.3, 1.4, 0.0],
+                [0.6, 0.2, 0.0],
+            ]
+        )
+        candidates = geometry_alignment_candidates(
+            coordinates, coordinates, coordinate_scale_override=1.0
+        )
+        geometry_a = _select_unambiguous_geometry(candidates)
+
+        # Re-running geometry selection against the very same coordinate
+        # candidates (mode-shape data never enters geometry_alignment_candidates
+        # or _select_unambiguous_geometry at all) must reproduce the identical
+        # transform -- this is the structural guarantee that no modal
+        # quantity could have influenced the outcome.
+        candidates_again = geometry_alignment_candidates(
+            coordinates, coordinates, coordinate_scale_override=1.0
+        )
+        geometry_b = _select_unambiguous_geometry(candidates_again)
+
+        np.testing.assert_array_equal(
+            geometry_a.experimental_to_abaqus, geometry_b.experimental_to_abaqus
+        )
+        np.testing.assert_array_equal(geometry_a.rotation, geometry_b.rotation)
+
+        # And end-to-end: two comparisons over the same geometry with
+        # completely different, unrelated mode shapes must select the same
+        # geometry transform.
+        node_ids = np.arange(1, 6)
+        vectors_1 = np.zeros((5, 3))
+        vectors_1[:, 2] = np.array([1.0, -0.5, 0.3, -0.8, 0.2])
+        vectors_2 = np.zeros((5, 3))
+        vectors_2[:, 0] = np.array([-2.0, 4.0, 0.1, -3.0, 5.0])
+
+        result_1 = compare_modal_datasets(
+            ModalDataset("Abaqus", Path("model.odb"), [ModeShape(1, 50.0, node_ids, coordinates, vectors_1)]),
+            ModalDataset("Experiment", Path("scan.unv"), [ModeShape(1, 50.1, node_ids, coordinates, vectors_1)]),
+            coordinate_scale_override=1.0,
+        )
+        result_2 = compare_modal_datasets(
+            ModalDataset("Abaqus", Path("model.odb"), [ModeShape(1, 50.0, node_ids, coordinates, vectors_2)]),
+            ModalDataset("Experiment", Path("scan.unv"), [ModeShape(1, 50.1, node_ids, coordinates, vectors_2)]),
+            coordinate_scale_override=1.0,
+        )
+        np.testing.assert_array_equal(
+            result_1.geometry.experimental_to_abaqus,
+            result_2.geometry.experimental_to_abaqus,
+        )
+        np.testing.assert_array_equal(result_1.geometry.rotation, result_2.geometry.rotation)
+
+    def test_unresolved_orientation_raises_instead_of_an_arbitrary_mapping(self):
+        """When geometry alone cannot determine orientation, the comparator
+        must raise an explicit diagnostic (never silently return a
+        ComparisonResult built on an arbitrarily chosen candidate)."""
+        node_ids = np.arange(1, 5)
+        vectors = np.zeros((4, 3))
+        vectors[:, 2] = [1.0, -1.0, 0.5, -0.5]
+
+        abaqus = ModalDataset(
+            "Abaqus", Path("model.odb"), [ModeShape(1, 100.0, node_ids, self._SQUARE, vectors)]
+        )
+        experiment = ModalDataset(
+            "Experiment", Path("scan.unv"), [ModeShape(1, 100.1, node_ids, self._SQUARE, vectors)]
+        )
+
+        with self.assertRaises(GeometryOrientationAmbiguousError):
+            compare_modal_datasets(abaqus, experiment, coordinate_scale_override=1.0)
+
+        # The exception must carry enough geometry-only detail (no MAC or
+        # frequency information) for a caller to present the ambiguity.
+        try:
+            compare_modal_datasets(abaqus, experiment, coordinate_scale_override=1.0)
+            self.fail("Expected GeometryOrientationAmbiguousError")
+        except GeometryOrientationAmbiguousError as error:
+            self.assertGreaterEqual(len(error.ambiguous_candidates), 2)
+            for candidate in error.ambiguous_candidates:
+                self.assertIn("rotation", candidate)
+                self.assertIn("normalized_rms_distance", candidate)
+                self.assertIn("matched_fraction", candidate)
+                self.assertNotIn("mac", candidate)
 
 
 if __name__ == "__main__":

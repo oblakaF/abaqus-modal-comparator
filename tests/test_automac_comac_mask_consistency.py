@@ -31,12 +31,15 @@ from reviewed_core import compare_modal_datasets
 
 class AutomacComacMaskConsistencyTests(unittest.TestCase):
     def _disjoint_mask_result(self):
+        # The fourth corner is nudged off the exact unit square (see
+        # tests/test_reviewed_core.py's comment on the same pattern) so the
+        # point set has exactly one geometrically admissible registration.
         coordinates = np.array(
             [
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
-                [1.0, 1.0, 0.0],
+                [1.15, 0.95, 0.0],
             ]
         )
         node_ids = np.arange(1, 5)
@@ -99,12 +102,15 @@ class AutomacComacMaskConsistencyTests(unittest.TestCase):
         """Same geometry, but both experimental modes measure the same
         component (Z only): AutoMAC/COMAC must succeed and use exactly that
         shared, genuine per-pair mask -- not a coincidentally wider one."""
+        # The fourth corner is nudged off the exact unit square (see
+        # tests/test_reviewed_core.py's comment on the same pattern) so the
+        # point set has exactly one geometrically admissible registration.
         coordinates = np.array(
             [
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
-                [1.0, 1.0, 0.0],
+                [1.15, 0.95, 0.0],
             ]
         )
         node_ids = np.arange(1, 5)

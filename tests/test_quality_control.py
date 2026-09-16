@@ -23,6 +23,12 @@ class QualityControlTests(unittest.TestCase):
         coordinates = np.column_stack(
             (x.ravel(), y.ravel(), np.zeros(x.size))
         )
+        # A complete, evenly-spaced square grid is invariant under all 8
+        # axis-permutation/reflection operations; nudge the far corner off
+        # that exact symmetry so the point set has exactly one geometrically
+        # admissible registration, for a reason unrelated to what this test
+        # verifies.
+        coordinates[-1] += np.array([0.02, -0.015, 0.0])
         node_ids = np.arange(1, len(coordinates) + 1)
 
         rigid_translation = np.zeros_like(coordinates)
@@ -156,6 +162,9 @@ class QualityControlTests(unittest.TestCase):
         Excel export, and PDF export alike."""
         x, y = np.meshgrid(np.linspace(0.0, 1.0, 5), np.linspace(0.0, 1.0, 5))
         coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        # See the comment on the same pattern in
+        # test_rigid_shape_and_forced_remote_pair_are_removed above.
+        coordinates[-1] += np.array([0.02, -0.015, 0.0])
         node_ids = np.arange(1, len(coordinates) + 1)
         shape = np.zeros_like(coordinates)
         shape[:, 2] = np.sin(np.pi * coordinates[:, 0]) * np.sin(np.pi * coordinates[:, 1])
@@ -198,6 +207,9 @@ class QualityControlTests(unittest.TestCase):
         it must be normalized to "unavailable", not silently trusted."""
         x, y = np.meshgrid(np.linspace(0.0, 1.0, 5), np.linspace(0.0, 1.0, 5))
         coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        # See the comment on the same pattern in
+        # test_rigid_shape_and_forced_remote_pair_are_removed above.
+        coordinates[-1] += np.array([0.02, -0.015, 0.0])
         node_ids = np.arange(1, len(coordinates) + 1)
         shape = np.zeros_like(coordinates)
         shape[:, 2] = np.sin(np.pi * coordinates[:, 0]) * np.sin(np.pi * coordinates[:, 1])

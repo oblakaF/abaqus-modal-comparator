@@ -17,13 +17,20 @@ from reporting import export_excel, export_pdf
 
 class ReviewedIntegrationTests(unittest.TestCase):
     def test_reviewed_stack_imports_and_exports_reports(self):
+        # The interior points are deliberately not a point-reflection of one
+        # another (0.65 rather than 0.6) so the point set has exactly one
+        # geometrically admissible registration; the original (0.6,0.3) is
+        # the exact 180-degree point-reflection of (1.4,0.7) about the
+        # rectangle's center, which makes that reflection candidate register
+        # with zero residual too -- a fixture-symmetry artifact unrelated to
+        # what this test verifies.
         coordinates = np.array(
             [
                 [0.0, 0.0, 0.0],
                 [2.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
                 [2.0, 1.0, 0.0],
-                [0.6, 0.3, 0.0],
+                [0.65, 0.3, 0.0],
                 [1.4, 0.7, 0.0],
             ]
         )

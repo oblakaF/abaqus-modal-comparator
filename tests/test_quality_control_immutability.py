@@ -13,12 +13,15 @@ from quality_control_reviewed import compare_modal_datasets_with_quality_control
 
 class QualityControlImmutabilityTests(unittest.TestCase):
     def test_input_datasets_are_not_mutated(self):
+        # Fourth corner nudged off the exact unit square -- see the comment
+        # in tests/test_reviewed_core.py on the same pattern -- so the point
+        # set has exactly one geometrically admissible registration.
         coordinates = np.array(
             [
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
-                [1.0, 1.0, 0.0],
+                [1.15, 0.95, 0.0],
             ]
         )
         vectors = np.zeros((4, 3))

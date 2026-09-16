@@ -21,6 +21,12 @@ class EnhancedReportingTests(unittest.TestCase):
     def make_result(self):
         x, y = np.meshgrid(np.linspace(0.0, 1.0, 6), np.linspace(0.0, 1.0, 6))
         coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
+        # A complete, evenly-spaced square grid is invariant under all 8
+        # axis-permutation/reflection operations; nudge the far corner off
+        # that exact symmetry so the point set has exactly one geometrically
+        # admissible registration, for a reason unrelated to what these
+        # tests verify.
+        coordinates[-1] += np.array([0.02, -0.015, 0.0])
         node_ids = np.arange(1, len(coordinates) + 1)
 
         shapes = []
