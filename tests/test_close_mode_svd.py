@@ -10,11 +10,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import cmif_separation
 import universal_reader
-from modal_core import ModeShape, modal_assurance_criterion
+from modal_core import ModeShape
 
 
 class CloseModeSvdTests(unittest.TestCase):
-    def test_single_reference_local_svd_adds_missing_close_mode_candidate(self):
+    def test_fe_close_cluster_cannot_create_single_reference_candidate(self):
         x, y = np.meshgrid(np.linspace(-1.0, 1.0, 7), np.linspace(-1.0, 1.0, 7))
         coordinates = np.column_stack((x.ravel(), y.ravel(), np.zeros(x.size)))
         node_numbers = np.arange(1, len(coordinates) + 1)
@@ -79,28 +79,26 @@ class CloseModeSvdTests(unittest.TestCase):
             fake_base_reader,
             create=True,
         ):
-            modes, metadata = cmif_separation._reviewed_modes_from_frf(
+            first_modes, first_metadata = cmif_separation._reviewed_modes_from_frf(
                 datasets,
                 geometry,
                 target_frequencies=[f1, f2],
                 target_count=2,
             )
+            second_modes, second_metadata = cmif_separation._reviewed_modes_from_frf(
+                datasets,
+                geometry,
+                target_frequencies=[20.0, 200.0, 400.0],
+                target_count=200,
+            )
 
-        self.assertGreaterEqual(len(modes), 2)
-        separation = metadata["close_mode_separation"]
-        self.assertEqual(separation["added_mode_count"], 1)
-        self.assertEqual(separation["reference_count"], 1)
-        candidate = [
-            mode
-            for mode in modes
-            if mode.metadata.get("mode_source")
-            == "local response-matrix SVD close-mode candidate"
-        ][0]
-        self.assertTrue(np.any(np.abs(candidate.vectors[:, 2]) > 0.0))
-        self.assertLess(
-            modal_assurance_criterion(base_mode.vectors, candidate.vectors),
-            0.98,
+        self.assertEqual([mode.frequency_hz for mode in first_modes], [base_mode.frequency_hz])
+        self.assertEqual(
+            [mode.frequency_hz for mode in first_modes],
+            [mode.frequency_hz for mode in second_modes],
         )
+        self.assertEqual(first_metadata["close_mode_separation"]["method"], "not required")
+        self.assertEqual(first_metadata["close_mode_separation"], second_metadata["close_mode_separation"])
 
     def test_malformed_coherence_dataset_falls_back_conservatively_and_warns(self):
         x, y = np.meshgrid(np.linspace(-1.0, 1.0, 7), np.linspace(-1.0, 1.0, 7))
@@ -175,8 +173,20 @@ class CloseModeSvdTests(unittest.TestCase):
             )
         )
 
+        second_vectors = np.zeros((len(node_numbers), 3), dtype=complex)
+        second_vectors[:, 2] = shape_2
+        second_mode = ModeShape(
+            number=2,
+            frequency_hz=f2,
+            node_ids=node_numbers.astype(object),
+            coordinates=coordinates,
+            vectors=second_vectors,
+            metadata={"mode_source": "second detected experimental peak"},
+        )
+        second_mode.measured_dofs = base_mode.measured_dofs.copy()
+
         def fake_base_reader(*_args, **_kwargs):
-            return [base_mode], {"mode_source": "test peak extraction"}
+            return [base_mode, second_mode], {"mode_source": "test peak extraction"}
 
         with patch.object(
             cmif_separation,

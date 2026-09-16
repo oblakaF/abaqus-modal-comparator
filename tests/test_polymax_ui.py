@@ -171,8 +171,6 @@ class PolymaxUiPolicyTests(unittest.TestCase):
             with patch.object(
                 main.app, "load_or_extract_odb", return_value=abaqus_data
             ), patch.object(
-                runtime_hardening, "_detect_rigid_modes", return_value=([], [mode], 0.0, None)
-            ), patch.object(
                 runtime_hardening,
                 "load_universal_modal_file",
                 side_effect=RuntimeError("stop after import call"),
@@ -189,6 +187,8 @@ class PolymaxUiPolicyTests(unittest.TestCase):
                     "processing-nice",
                 )
         self.assertEqual(loader.call_args.kwargs["modal_set"], "processing-nice")
+        self.assertNotIn("target_frequencies", loader.call_args.kwargs)
+        self.assertNotIn("target_count", loader.call_args.kwargs)
 
 
 class PolymaxNativeTkTests(unittest.TestCase):

@@ -61,7 +61,7 @@ def _schema_fingerprint() -> str:
 # handling, and so on) does not change those dataclasses' fields, so without
 # this separate marker an on-disk cache from before the change would keep
 # being served after an update. Bump this by hand whenever such logic changes.
-_ANALYSIS_PIPELINE_VERSION = "2026.09.10.1"
+_ANALYSIS_PIPELINE_VERSION = "2026.09.16.2-exp-only-dataset58"
 
 _CACHE_VERSION = (
     f"modal-cache-v5-{_ANALYSIS_PIPELINE_VERSION}-" + _schema_fingerprint()
@@ -159,15 +159,12 @@ def _unv_cache_key(
     target_count: Optional[int],
     modal_set: Optional[str],
 ) -> str:
+    # target_frequencies/target_count are legacy compatibility inputs. They no
+    # longer affect UNV import, so they must not fragment cache identity.
+    del target_frequencies, target_count
     payload = {
         "version": _CACHE_VERSION,
         "source": _file_signature(file_path),
-        "target_frequencies": [
-            round(float(value), 8)
-            for value in (target_frequencies or [])
-            if value is not None
-        ],
-        "target_count": None if target_count is None else int(target_count),
         "modal_set": None if modal_set is None else str(modal_set),
     }
     return hashlib.sha256(
@@ -220,8 +217,6 @@ def _cached_universal_loader(
 
     loaded = _ORIGINAL_UNIVERSAL_LOADER(
         source,
-        target_frequencies=target_frequencies,
-        target_count=target_count,
         modal_set=modal_set,
     )
     canonical = _clone_dataset(loaded)

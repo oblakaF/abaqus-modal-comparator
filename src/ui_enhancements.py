@@ -105,17 +105,8 @@ def install_app_enhancements(app_module) -> None:
             abaqus_data = app_module.load_or_extract_odb(
                 abaqus, cache / "abaqus", command, start, end
             )
-            target_frequencies = [
-                mode.frequency_hz
-                for mode in abaqus_data.sorted_modes()
-                if mode.frequency_hz >= 1.0
-            ]
             resolved_experiment = resolve_testlab_file(experiment)
-            experiment_data = load_universal_modal_file(
-                resolved_experiment,
-                target_frequencies=target_frequencies,
-                target_count=max(len(target_frequencies), 12),
-            )
+            experiment_data = load_universal_modal_file(resolved_experiment)
             result = app_module.compare_modal_datasets(abaqus_data, experiment_data)
 
             plot_dir = cache / "plots"

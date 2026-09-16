@@ -15,10 +15,12 @@ _INSTALLED = False
 def modes_from_frf_datasets(
     datasets: Sequence[Dict[str, Any]],
     geometry: Dict[int, np.ndarray],
-    target_frequencies: Optional[Sequence[float]],
-    target_count: int,
+    target_frequencies: Optional[Sequence[float]] = None,
+    target_count: Optional[int] = None,
 ) -> Tuple[List[ModeShape], Dict[str, Any]]:
-    requested_count = max(1, int(target_count))
+    # Legacy compatibility inputs stop here. Candidate existence is determined
+    # exclusively from the experimental FRF/coherence data below.
+    del target_frequencies, target_count
     frf_group = universal_reader._select_frf_group(datasets, geometry)
     if not frf_group:
         raise ValueError("No usable frequency-response functions were found in dataset 58.")
@@ -87,8 +89,6 @@ def modes_from_frf_datasets(
         x_reference,
         indicator,
         ranking_coherence,
-        target_frequencies,
-        requested_count,
     )
 
     node_numbers = np.asarray(sorted({node for node, _ in row_keys}), dtype=int)
@@ -146,7 +146,8 @@ def modes_from_frf_datasets(
 
     metadata = {
         "mode_source": "dataset 58 FRF peak extraction",
-        "requested_peak_count": requested_count,
+        "candidate_policy": "experimental_only",
+        "peak_candidate_safety_cap": universal_reader.MAX_EXPERIMENTAL_PEAK_CANDIDATES,
         "returned_peak_count": len(modes),
         "frf_channel_count": len(dof_data),
         "frf_response_node_count": len(node_numbers),

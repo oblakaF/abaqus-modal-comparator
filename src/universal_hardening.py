@@ -282,9 +282,14 @@ def _relative_peak_detector(
     frequency: np.ndarray,
     indicator: np.ndarray,
     mean_coherence: np.ndarray,
-    target_frequencies: Optional[Sequence[float]],
-    target_count: int,
+    target_frequencies: Optional[Sequence[float]] = None,
+    target_count: Optional[int] = None,
 ) -> np.ndarray:
+    """Relative FRF peak detector driven only by experimental data.
+
+    The two legacy target arguments are compatibility-only and ignored.
+    """
+    del target_frequencies, target_count
     frequency = np.asarray(frequency, dtype=float)
     indicator = np.asarray(indicator, dtype=float)
     safe = np.maximum(indicator, max(float(np.max(indicator)), 1.0e-30) * 1.0e-14)
@@ -305,16 +310,9 @@ def _relative_peak_detector(
         prominence=max(0.01, 0.02 * float(np.ptp(smoothed))),
     )
 
-    targets = np.asarray(
-        [value for value in (target_frequencies or []) if np.isfinite(value) and value > 0.0],
-        dtype=float,
-    )
     positive_frequency = frequency[frequency > 0.0]
     lower_bound = float(positive_frequency[0]) if len(positive_frequency) else float(frequency[0])
     upper_bound = float(frequency[-1])
-    if len(targets):
-        lower_bound = max(lower_bound, float(np.min(targets)) * 0.30)
-        upper_bound = min(upper_bound, float(np.max(targets)) * 1.80)
 
     in_band = (frequency[peaks] >= lower_bound) & (frequency[peaks] <= upper_bound)
     peaks = peaks[in_band]
@@ -329,18 +327,12 @@ def _relative_peak_detector(
         smoothed[peaks] - float(np.min(smoothed[peaks]))
     ) / max(amplitude_range, 1.0e-12)
     scores = prominences + 0.25 * np.clip(mean_coherence[peaks], 0.0, 1.0) + 0.15 * normalized_amplitude
-    if len(targets):
-        relative_distance = np.min(
-            np.abs(frequency[peaks, None] - targets[None, :])
-            / np.maximum(targets[None, :], 1.0e-12),
-            axis=1,
-        )
-        scores += 0.25 * np.exp(-((relative_distance / 0.15) ** 2))
-
-    requested = max(1, int(target_count))
-    maximum_candidates = min(40, max(requested + 6, requested * 3))
-    if len(peaks) > maximum_candidates:
-        peaks = peaks[np.argsort(scores)[::-1][:maximum_candidates]]
+    if len(peaks) > universal_reader.MAX_EXPERIMENTAL_PEAK_CANDIDATES:
+        peaks = peaks[
+            np.argsort(scores)[::-1][
+                : universal_reader.MAX_EXPERIMENTAL_PEAK_CANDIDATES
+            ]
+        ]
     return np.sort(peaks.astype(int))
 
 

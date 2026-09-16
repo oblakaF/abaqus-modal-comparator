@@ -164,7 +164,10 @@ def validate_close_mode_candidates(
             <= mode.frequency_hz
             <= max(cluster) + association_window
         ]
-        target_shape_count = max(1, len(cluster))
+        target_shape_count = max(
+            1,
+            int(candidate.metadata.get("experimental_shape_count", len(cluster))),
+        )
         # Acceptance is driven by the actual per-frequency multi-reference CMIF
         # singular-value ratio (evidence that a second reference resolves an
         # independent mode), not by the local snapshot-SVD candidate shape's own
@@ -294,12 +297,11 @@ def validate_close_mode_candidates(
 def _validated_modes_from_frf(
     datasets,
     geometry,
-    target_frequencies,
-    target_count,
+    target_frequencies=None,
+    target_count=None,
 ):
-    modes, metadata = _ORIGINAL_MODES_FROM_FRF(
-        datasets, geometry, target_frequencies, target_count
-    )
+    del target_frequencies, target_count
+    modes, metadata = _ORIGINAL_MODES_FROM_FRF(datasets, geometry)
     return validate_close_mode_candidates(modes, metadata)
 
 

@@ -10,7 +10,6 @@ from typing import Optional
 
 from abaqus_bridge import AnalysisCancelled, extraction_range_notice
 from coordinate_calibration import CoordinateCalibration
-from quality_control import _detect_rigid_modes
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
 
@@ -173,14 +172,10 @@ def install_runtime_hardening(app_module) -> None:
             if range_notice is not None:
                 abaqus_data.metadata["extraction_range_notice"] = range_notice
             check_cancelled()
-            _, retained_modes, _, _ = _detect_rigid_modes(abaqus_data)
-            target_frequencies = [mode.frequency_hz for mode in retained_modes]
             stage(2, "Experimental import")
             resolved_experiment = resolve_testlab_file(experiment)
             experiment_data = load_universal_modal_file(
                 resolved_experiment,
-                target_frequencies=target_frequencies,
-                target_count=max(len(target_frequencies), 1),
                 modal_set=modal_set,
             )
             stage(3, "Geometry alignment")

@@ -37,6 +37,11 @@ _RESIDUAL_ID1 = re.compile(
     re.IGNORECASE,
 )
 
+# Dataset-58 peak discovery is intentionally independent of any FE model.
+# This is only a computational/sanity ceiling for pathological FRF exports;
+# it is not an expected physical mode count and is never derived from Abaqus.
+MAX_EXPERIMENTAL_PEAK_CANDIDATES = 40
+
 
 def _as_array(value: Any, length: Optional[int] = None, dtype: Any = float) -> np.ndarray:
     if value is None:
@@ -517,9 +522,16 @@ def _detect_frf_peak_indices(
     frequency: np.ndarray,
     indicator: np.ndarray,
     mean_coherence: np.ndarray,
-    target_frequencies: Optional[Sequence[float]],
-    target_count: int,
+    target_frequencies: Optional[Sequence[float]] = None,
+    target_count: Optional[int] = None,
 ) -> np.ndarray:
+    """Detect experimental FRF peaks using experimental evidence only.
+
+    ``target_frequencies`` and ``target_count`` are retained temporarily for
+    compatibility with older callers, but deliberately ignored. FE results
+    must not determine whether an experimental resonance/ODS candidate exists.
+    """
+    del target_frequencies, target_count
     safe_indicator = np.maximum(indicator, max(float(np.max(indicator)), 1e-30) * 1e-14)
     logarithmic = np.log10(safe_indicator)
     frequency_step = float(np.median(np.diff(frequency)))
@@ -534,16 +546,8 @@ def _detect_frf_peak_indices(
     minimum_distance = max(2, int(round(1.25 / max(frequency_step, 1e-12))))
     peaks, properties = find_peaks(smoothed, distance=minimum_distance, prominence=0.02)
 
-    targets = np.asarray(
-        [value for value in (target_frequencies or []) if np.isfinite(value) and value > 0.0],
-        dtype=float,
-    )
-    if len(targets):
-        lower_frequency = max(float(frequency[0]), 5.0, float(np.min(targets)) * 0.35)
-        upper_frequency = min(float(frequency[-1]), float(np.max(targets)) * 1.80)
-    else:
-        lower_frequency = max(float(frequency[0]), 5.0)
-        upper_frequency = float(frequency[-1])
+    lower_frequency = max(float(frequency[0]), 5.0)
+    upper_frequency = float(frequency[-1])
 
     in_band = (frequency[peaks] >= lower_frequency) & (frequency[peaks] <= upper_frequency)
     peaks = peaks[in_band]
@@ -563,27 +567,8 @@ def _detect_frf_peak_indices(
         + 0.15 * normalized_amplitude
     )
 
-    if len(targets):
-        relative_distance = np.min(
-            np.abs(frequency[peaks, None] - targets[None, :])
-            / np.maximum(targets[None, :], 1.0),
-            axis=1,
-        )
-        scores += 0.25 * np.exp(-((relative_distance / 0.15) ** 2))
-
-    damping_values = [
-        _estimate_half_power_damping(frequency, indicator, int(index)) for index in peaks
-    ]
-    physically_plausible = np.array(
-        [value is None or value <= 0.15 for value in damping_values], dtype=bool
-    )
-    if np.count_nonzero(physically_plausible) >= max(1, target_count):
-        peaks = peaks[physically_plausible]
-        scores = scores[physically_plausible]
-
-    maximum_candidates = min(40, max(target_count + 6, target_count * 3))
-    if len(peaks) > maximum_candidates:
-        selected = np.argsort(scores)[::-1][:maximum_candidates]
+    if len(peaks) > MAX_EXPERIMENTAL_PEAK_CANDIDATES:
+        selected = np.argsort(scores)[::-1][:MAX_EXPERIMENTAL_PEAK_CANDIDATES]
         peaks = peaks[selected]
 
     return np.sort(peaks.astype(int))
@@ -592,10 +577,10 @@ def _detect_frf_peak_indices(
 def _modes_from_frf_datasets(
     datasets: Sequence[Dict[str, Any]],
     geometry: Dict[int, np.ndarray],
-    target_frequencies: Optional[Sequence[float]],
-    target_count: int,
+    target_frequencies: Optional[Sequence[float]] = None,
+    target_count: Optional[int] = None,
 ) -> Tuple[List[ModeShape], Dict[str, Any]]:
-    target_count = max(12, int(target_count))
+    del target_frequencies, target_count
     frf_group = _select_frf_group(datasets, geometry)
     if not frf_group:
         raise ValueError(
@@ -648,8 +633,6 @@ def _modes_from_frf_datasets(
         x_reference,
         indicator,
         mean_coherence,
-        target_frequencies,
-        max(1, target_count),
     )
 
     node_numbers = np.asarray(sorted({node for node, _ in row_keys}), dtype=int)
@@ -901,8 +884,6 @@ def load_universal_modal_file(
         frf_modes, frf_metadata = _modes_from_frf_datasets(
             dataset_list,
             geometry,
-            target_frequencies,
-            target_count or 12,
         )
         modes.extend(frf_modes)
         metadata.update(frf_metadata)

@@ -351,6 +351,25 @@ class EndToEndPromotionTests(unittest.TestCase):
                 target_frequencies=[self.f1, self.f2],
                 target_count=2,
             )
+            modes_with_unrelated_fe, metadata_with_unrelated_fe = (
+                cmif_separation._reviewed_modes_from_frf(
+                    self._datasets(),
+                    self.geometry,
+                    target_frequencies=[10.0, 150.0, 300.0],
+                    target_count=300,
+                )
+            )
+
+        np.testing.assert_allclose(
+            [mode.frequency_hz for mode in modes],
+            [mode.frequency_hz for mode in modes_with_unrelated_fe],
+        )
+        for left, right in zip(modes, modes_with_unrelated_fe):
+            np.testing.assert_allclose(left.vectors, right.vectors)
+        self.assertEqual(
+            metadata["close_mode_separation"],
+            metadata_with_unrelated_fe["close_mode_separation"],
+        )
 
         separation = metadata["close_mode_separation"]
         self.assertEqual(separation["reference_count"], 2)
@@ -411,10 +430,8 @@ class EndToEndPromotionTests(unittest.TestCase):
 
         separation = metadata["close_mode_separation"]
         self.assertEqual(separation["reference_count"], 1)
-        self.assertEqual(separation["matrix_rank_capacity"], 1)
-        self.assertIsNone(
-            separation["clusters"][0]["cmif_max_second_to_first_singular_ratio"]
-        )
+        self.assertEqual(separation["method"], "not required")
+        self.assertEqual(separation["clusters"], [])
 
         final_modes, _ = validate_close_mode_candidates(modes, metadata)
         self.assertEqual(len(final_modes), 1)

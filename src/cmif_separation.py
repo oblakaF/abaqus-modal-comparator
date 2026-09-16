@@ -15,6 +15,7 @@ from universal_hardening import _scalar_int
 
 _INSTALLED = False
 _ALGORITHM_VERSION = "local-svd-v2-multi-reference"
+_MIN_MULTI_REFERENCE_SECOND_RATIO = 0.05
 
 
 @dataclass
@@ -43,19 +44,21 @@ class _MultiReferenceFrfBlock:
     response_dof_coverage_fraction: float
 
 
-def _close_target_clusters(
-    target_frequencies: Optional[Sequence[float]],
+def _experimental_peak_groups(
+    modes: Sequence[ModeShape],
+    include_singletons: bool = False,
     absolute_gap_hz: float = 3.5,
     relative_gap: float = 0.035,
 ) -> List[List[float]]:
+    """Group independently detected experimental peaks by proximity."""
     values = sorted(
         {
-            float(value)
-            for value in (target_frequencies or [])
-            if np.isfinite(value) and float(value) > 0.0
+            float(mode.frequency_hz)
+            for mode in modes
+            if np.isfinite(mode.frequency_hz) and float(mode.frequency_hz) > 0.0
         }
     )
-    if len(values) < 2:
+    if not values:
         return []
 
     clusters: List[List[float]] = [[values[0]]]
@@ -66,6 +69,8 @@ def _close_target_clusters(
             clusters[-1].append(value)
         else:
             clusters.append([value])
+    if include_singletons:
+        return clusters
     return [cluster for cluster in clusters if len(cluster) > 1]
 
 
@@ -330,6 +335,7 @@ def _vectors_from_spatial_component(block: _MultiReferenceFrfBlock, component: n
 def _local_svd_components(
     block: _MultiReferenceFrfBlock,
     cluster: Sequence[float],
+    maximum_components: Optional[int] = None,
 ) -> Tuple[List[Tuple[np.ndarray, float, float, np.ndarray]], Dict[str, Any]]:
     center = float(np.mean(cluster))
     frequency_step = float(np.median(np.diff(block.frequency)))
@@ -374,7 +380,8 @@ def _local_svd_components(
             "reason": "zero local SVD energy",
         }
 
-    maximum_components = min(len(cluster), len(singular_values), u.shape[1])
+    requested_components = len(cluster) if maximum_components is None else int(maximum_components)
+    maximum_components = min(requested_components, len(singular_values), u.shape[1])
     components: List[Tuple[np.ndarray, float, float, np.ndarray]] = []
     local_frequency = block.frequency[band_mask]
     for component_index in range(maximum_components):
@@ -436,20 +443,14 @@ def _max_mac_against_existing(candidate: np.ndarray, existing: Sequence[ModeShap
 def _reviewed_modes_from_frf(
     datasets: Sequence[Dict[str, Any]],
     geometry: Dict[int, np.ndarray],
-    target_frequencies: Optional[Sequence[float]],
-    target_count: int,
+    target_frequencies: Optional[Sequence[float]] = None,
+    target_count: Optional[int] = None,
 ):
-    base_modes, metadata = _ORIGINAL_MODES_FROM_FRF(
-        datasets, geometry, target_frequencies, target_count
-    )
-    clusters = _close_target_clusters(target_frequencies)
-    if not clusters:
-        metadata["close_mode_separation"] = {
-            "algorithm_version": _ALGORITHM_VERSION,
-            "method": "not required",
-            "clusters": [],
-        }
-        return base_modes, metadata
+    # Compatibility arguments are deliberately not propagated. FE information
+    # stops before experimental candidate generation.
+    del target_frequencies, target_count
+    base_modes, metadata = _ORIGINAL_MODES_FROM_FRF(datasets, geometry)
+    close_peak_groups = _experimental_peak_groups(base_modes)
 
     try:
         block = _build_multi_reference_frf_block(datasets, geometry)
@@ -458,7 +459,23 @@ def _reviewed_modes_from_frf(
             "algorithm_version": _ALGORITHM_VERSION,
             "method": "unavailable",
             "error": str(error),
-            "clusters": [list(cluster) for cluster in clusters],
+            "clusters": [list(cluster) for cluster in close_peak_groups],
+        }
+        return base_modes, metadata
+
+    # Close experimental peaks always justify a diagnostic window. Independent
+    # multi-reference data may additionally justify checking a singleton peak
+    # for an overlapping second singular direction. Neither path uses FE data.
+    clusters = _experimental_peak_groups(
+        base_modes,
+        include_singletons=block.reference_count > 1,
+    )
+    if not clusters:
+        metadata["close_mode_separation"] = {
+            "algorithm_version": _ALGORITHM_VERSION,
+            "method": "not required",
+            "reference_count": block.reference_count,
+            "clusters": [],
         }
         return base_modes, metadata
 
@@ -480,12 +497,18 @@ def _reviewed_modes_from_frf(
             <= mode.frequency_hz
             <= max(cluster) + association_window
         ]
-        missing_count = max(0, len(cluster) - len(nearby_existing))
-        components, diagnostic = _local_svd_components(block, cluster)
+        component_limit = max(
+            len(cluster),
+            2 if block.reference_count > 1 else len(cluster),
+        )
+        components, diagnostic = _local_svd_components(
+            block,
+            cluster,
+            maximum_components=component_limit,
+        )
         diagnostic["existing_peak_frequencies_hz"] = [
             mode.frequency_hz for mode in nearby_existing
         ]
-        diagnostic["requested_additional_shapes"] = missing_count
         diagnostic["cmif_matrix_rank_capacity"] = matrix_rank_capacity
         band_hz = diagnostic.get("band_hz")
         if band_hz is not None:
@@ -497,6 +520,22 @@ def _reviewed_modes_from_frf(
                 diagnostic["cmif_max_second_to_first_singular_ratio"] = float(np.max(ratios))
             else:
                 diagnostic["cmif_max_second_to_first_singular_ratio"] = None
+
+        cmif_ratio = diagnostic.get("cmif_max_second_to_first_singular_ratio")
+        experimentally_supported_count = len(cluster)
+        if (
+            block.reference_count > 1
+            and cmif_ratio is not None
+            and np.isfinite(cmif_ratio)
+            and float(cmif_ratio) >= _MIN_MULTI_REFERENCE_SECOND_RATIO
+        ):
+            experimentally_supported_count = max(experimentally_supported_count, 2)
+        missing_count = max(
+            0,
+            experimentally_supported_count - len(nearby_existing),
+        )
+        diagnostic["experimental_shape_count"] = experimentally_supported_count
+        diagnostic["requested_additional_shapes"] = missing_count
 
         if missing_count > 0 and components:
             ranked = sorted(
@@ -517,6 +556,7 @@ def _reviewed_modes_from_frf(
                         "dataset_type": 58,
                         "mode_source": "local response-matrix SVD close-mode candidate",
                         "close_mode_cluster_hz": [float(value) for value in cluster],
+                        "experimental_shape_count": experimentally_supported_count,
                         "singular_value_ratio": float(singular_ratio),
                         "reference_count": block.reference_count,
                         "separation_method": (
@@ -544,7 +584,7 @@ def _reviewed_modes_from_frf(
         mode.metadata.setdefault("original_experimental_mode_number", mode.number)
         mode.number = new_number
 
-    if block.reference_count > 1:
+    if added_modes and block.reference_count > 1:
         scientific_warning = (
             f"Candidate shapes were extracted by a local snapshot-SVD candidate shape "
             f"method: {block.reference_count} independent excitation references' band "
@@ -555,12 +595,19 @@ def _reviewed_modes_from_frf(
             "separate future task. Confirm split modes by MAC, AutoMAC, coherence, and "
             "visual inspection."
         )
-    else:
+    elif added_modes:
         scientific_warning = (
             "With one excitation reference, the local snapshot-SVD candidate shape method "
             "identifies additional spatial components inside an overlapping resonance "
             "band, but it is not a fully independent multi-reference modal curve fit. "
             "Confirm split modes by MAC, AutoMAC, coherence, and visual inspection."
+        )
+    else:
+        scientific_warning = (
+            "CMIF/local-SVD diagnostics used only independently detected experimental "
+            "peak groups and measured multi-reference singular-value structure. No "
+            "additional experimental candidate was required or supported; FE "
+            "frequencies and expected FE multiplicity were not used."
         )
     if block.coherence_status.startswith("error"):
         scientific_warning += (

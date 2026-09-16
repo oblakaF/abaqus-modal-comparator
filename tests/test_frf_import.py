@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from universal_frf_review import modes_from_frf_datasets
-from universal_hardening import install_universal_hardening
+from universal_hardening import _relative_peak_detector, install_universal_hardening
 
 install_universal_hardening()
 
@@ -84,7 +84,8 @@ class FrfModeImportTests(unittest.TestCase):
         for expected in natural_frequencies:
             self.assertLess(float(np.min(np.abs(detected - expected))), 0.8)
 
-        self.assertEqual(metadata["requested_peak_count"], 3)
+        self.assertEqual(metadata["candidate_policy"], "experimental_only")
+        self.assertEqual(metadata["peak_candidate_safety_cap"], 40)
         self.assertEqual(metadata["frf_response_node_count"], 25)
         self.assertEqual(metadata["coherence_channel_count"], 25)
         self.assertTrue(all(mode.metadata["dataset_type"] == 58 for mode in modes))
@@ -252,6 +253,84 @@ class FrfModeImportTests(unittest.TestCase):
                 }
             )
         return datasets, geometry, natural_frequencies
+
+    @staticmethod
+    def _assert_same_candidates(first, second):
+        first_modes, first_metadata = first
+        second_modes, second_metadata = second
+        np.testing.assert_allclose(
+            [mode.frequency_hz for mode in first_modes],
+            [mode.frequency_hz for mode in second_modes],
+        )
+        self_vectors = [mode.vectors for mode in first_modes]
+        other_vectors = [mode.vectors for mode in second_modes]
+        self_count = len(self_vectors)
+        if self_count != len(other_vectors):
+            raise AssertionError(
+                f"Candidate count changed from {self_count} to {len(other_vectors)}"
+            )
+        for left, right in zip(self_vectors, other_vectors):
+            np.testing.assert_allclose(left, right)
+        assert first_metadata["detected_peak_frequencies_hz"] == second_metadata[
+            "detected_peak_frequencies_hz"
+        ]
+
+    def test_dataset_58_candidates_are_invariant_to_fe_targets_and_no_targets(self):
+        datasets, geometry, natural_frequencies = self._response_only_datasets()
+
+        baseline = modes_from_frf_datasets(
+            datasets,
+            geometry,
+            target_frequencies=None,
+            target_count=None,
+        )
+        radically_different_targets = modes_from_frf_datasets(
+            datasets,
+            geometry,
+            target_frequencies=[118.0],
+            target_count=1,
+        )
+        unrelated_targets = modes_from_frf_datasets(
+            datasets,
+            geometry,
+            target_frequencies=[140.0, 5000.0],
+            target_count=1000,
+        )
+
+        self._assert_same_candidates(baseline, radically_different_targets)
+        self._assert_same_candidates(baseline, unrelated_targets)
+
+        detected = np.asarray([mode.frequency_hz for mode in baseline[0]])
+        # The 24-Hz experimental peak is far below the 118-Hz FE target and
+        # was removed by the old FE-derived search band.
+        self.assertLess(float(np.min(np.abs(detected - natural_frequencies[0]))), 0.8)
+        # An FE target without an experimental local maximum cannot invent one.
+        self.assertGreater(float(np.min(np.abs(detected - 140.0))), 5.0)
+
+    def test_fe_count_cannot_change_the_experimental_peak_safety_cap(self):
+        frequency = np.linspace(1.0, 500.0, 20001)
+        indicator = np.full_like(frequency, 1.0e-6)
+        for center in np.linspace(10.0, 490.0, 50):
+            indicator += np.exp(-0.5 * ((frequency - center) / 0.18) ** 2)
+        coherence = np.full_like(frequency, 0.9)
+
+        few_fe_modes = _relative_peak_detector(
+            frequency,
+            indicator,
+            coherence,
+            target_frequencies=[100.0],
+            target_count=1,
+        )
+        many_fe_modes = _relative_peak_detector(
+            frequency,
+            indicator,
+            coherence,
+            target_frequencies=[100.0],
+            target_count=1000,
+        )
+
+        np.testing.assert_array_equal(few_fe_modes, many_fe_modes)
+        self.assertEqual(len(few_fe_modes), 40)
 
     def test_absent_coherence_channels_are_reported_as_unavailable_not_perfect(self):
         """ROADMAP Stage 2 #1: no coherence channels must not read as perfect
