@@ -80,6 +80,44 @@ class ModalCoreTests(unittest.TestCase):
         vector = np.array([1.0, -2.0, 3.0, 0.5])
         self.assertAlmostEqual(modal_assurance_criterion(vector, -4.0 * vector), 1.0)
 
+    def test_complex_mac_is_invariant_to_global_phase(self):
+        phi = np.array([1.0 + 2.0j, -3.0 + 0.5j, 2.0 - 4.0j])
+        theta = 0.73
+        psi = np.exp(1.0j * theta) * phi
+
+        self.assertAlmostEqual(modal_assurance_criterion(phi, psi), 1.0)
+
+    def test_complex_mac_uses_hermitian_inner_product(self):
+        phi = np.array([1.0 + 1.0j, 2.0 - 1.0j, -0.5 + 2.0j])
+        psi = np.array([2.0 - 1.0j, -1.0 + 0.5j, 1.0 + 3.0j])
+        denominator = np.vdot(phi, phi).real * np.vdot(psi, psi).real
+        hermitian_expected = abs(np.vdot(phi, psi)) ** 2 / denominator
+        plain_transpose_result = abs(np.dot(phi, psi)) ** 2 / denominator
+
+        self.assertAlmostEqual(
+            modal_assurance_criterion(phi, psi), hermitian_expected
+        )
+        self.assertGreater(
+            abs(hermitian_expected - plain_transpose_result),
+            0.1,
+        )
+
+    def test_complex_mac_is_invariant_to_nonzero_complex_scaling(self):
+        phi = np.array([1.0 + 1.0j, 2.0 - 1.0j, -0.5 + 2.0j])
+        psi = np.array([2.0 - 1.0j, -1.0 + 0.5j, 1.0 + 3.0j])
+        baseline = modal_assurance_criterion(phi, psi)
+
+        scaled = modal_assurance_criterion((2.0 - 3.0j) * phi, (-0.5 + 1.25j) * psi)
+
+        self.assertAlmostEqual(scaled, baseline)
+
+    def test_complex_mac_zero_norm_returns_none(self):
+        zero = np.zeros(3, dtype=complex)
+        nonzero = np.array([1.0 + 2.0j, -3.0j, 0.5 - 0.25j])
+
+        self.assertIsNone(modal_assurance_criterion(zero, nonzero))
+        self.assertIsNone(modal_assurance_criterion(nonzero, zero))
+
     def test_geometry_alignment_and_mode_matching(self):
         result = self.synthetic_result()
         self.assertGreaterEqual(result.geometry.matched_fraction, 0.95)
