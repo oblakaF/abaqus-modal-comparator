@@ -17,6 +17,13 @@ from modal_core import ModalDataset, ModeShape
 
 
 class FastCacheSafetyTests(unittest.TestCase):
+    def test_residual_classifier_pipeline_version_invalidates_older_unv_entries(self):
+        self.assertEqual(
+            _ANALYSIS_PIPELINE_VERSION,
+            "2026.09.16.3-residual-record-classification",
+        )
+        self.assertNotIn("2026.09.16.2-exp-only-dataset58", _CACHE_VERSION)
+
     def test_cache_version_contains_schema_fingerprint(self):
         self.assertTrue(_CACHE_VERSION.startswith("modal-cache-v5-"))
         self.assertGreater(len(_CACHE_VERSION.split("-")[-1]), 8)

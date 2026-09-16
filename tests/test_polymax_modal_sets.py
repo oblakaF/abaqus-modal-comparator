@@ -55,6 +55,23 @@ def _residual(processing_name, side, frequency):
     }
 
 
+def _mode_2414(number, frequency, analysis_type=3, name="Modal result"):
+    return {
+        "type": 2414,
+        "analysis_dataset_name": name,
+        "dataset_location": 1,
+        "analysis_type": analysis_type,
+        "data_characteristic": 2,
+        "result_type": 8,
+        "mode_number": number,
+        "frequency": frequency,
+        "node_nums": np.array([1, 2]),
+        "x": np.zeros(2),
+        "y": np.zeros(2),
+        "z": np.array([1.0, -1.0]),
+    }
+
+
 class PolymaxModalSetTests(unittest.TestCase):
     def _load(self, datasets, **kwargs):
         with tempfile.TemporaryDirectory() as directory:
@@ -111,6 +128,113 @@ class PolymaxModalSetTests(unittest.TestCase):
         self.assertEqual(result.metadata["excluded_residual_count"], 2)
         self.assertEqual(result.metadata["excluded_residual_record_indices"], [2, 3])
         self.assertTrue(all("Residuals" in value for value in result.metadata["excluded_residual_labels"]))
+
+        audits = result.metadata["modal_record_classifications"]
+        self.assertEqual(
+            [item["classification"] for item in audits],
+            ["physical", "residual", "residual"],
+        )
+        self.assertEqual(audits[0]["evidence"]["analysis_type"], 3)
+        self.assertEqual(audits[1]["evidence"]["analysis_type"], 5)
+        self.assertTrue(audits[1]["evidence"]["id1_residual_marker"])
+
+    def test_all_verified_modal_analysis_types_are_physical(self):
+        datasets = [_geometry()]
+        for number, analysis_type in enumerate((2, 3, 7), start=1):
+            mode = _mode("Processing", number, 10.0 * number)
+            mode["analysis_type"] = analysis_type
+            datasets.append(mode)
+
+        result = self._load(datasets, modal_set="processing")
+
+        self.assertEqual([mode.frequency_hz for mode in result.modes], [10.0, 20.0, 30.0])
+        self.assertEqual(
+            [mode.metadata["record_classification"] for mode in result.modes],
+            ["physical", "physical", "physical"],
+        )
+
+    def test_dataset_55_structure_handles_label_variants_and_disagreement(self):
+        lower = _residual("Processing", "below", 12.0)
+        lower["id1"] = "  Processing    ReSiDuAlS    BeLoW   12.0 Hz  "
+        mislabeled_physical = _mode(
+            "Processing Residuals above 999.0 Hz", 2, 20.0
+        )
+        datasets = [
+            _geometry(),
+            _mode("Processing", 1, 12.0),
+            lower,
+        ]
+
+        result = self._load(datasets, modal_set="processing")
+
+        self.assertEqual([mode.frequency_hz for mode in result.modes], [12.0])
+        self.assertEqual(result.metadata["excluded_residual_record_indices"], [2])
+
+        disagreement_sets = universal_reader._discover_dataset_55_modal_sets(
+            [_geometry(), mislabeled_physical],
+            universal_reader._read_geometry([_geometry()])[0],
+        )
+        self.assertEqual(len(disagreement_sets), 1)
+        disagreement = disagreement_sets[0]
+        self.assertEqual(
+            disagreement.processing_name,
+            "Processing Residuals above 999.0 Hz",
+        )
+        self.assertEqual(disagreement.metadata["ambiguous_record_indices"], [1])
+        self.assertEqual(
+            disagreement.modes[0].metadata["record_classification"], "ambiguous"
+        )
+        self.assertTrue(
+            any(
+                "preserved as ambiguous" in warning
+                for warning in disagreement.metadata["import_warnings"]
+            )
+        )
+
+    def test_physical_processing_name_containing_residual_is_not_dropped(self):
+        result = self._load(
+            [_geometry(), _mode("Residual review set", 1, 42.0)],
+            modal_set="residual-review-set",
+        )
+        self.assertEqual([mode.frequency_hz for mode in result.modes], [42.0])
+        self.assertEqual(result.metadata["excluded_residual_count"], 0)
+        self.assertEqual(result.modes[0].metadata["record_classification"], "physical")
+
+    def test_unlabeled_frequency_response_record_is_structurally_non_modal(self):
+        non_modal = _residual("Processing", "below", 30.0)
+        non_modal["id1"] = "Processing"
+        result = self._load(
+            [_geometry(), _mode("Processing", 1, 30.0), non_modal],
+            modal_set="processing",
+        )
+        self.assertEqual([mode.frequency_hz for mode in result.modes], [30.0])
+        self.assertEqual(result.metadata["excluded_residual_record_indices"], [])
+        self.assertEqual(result.metadata["excluded_non_modal_record_indices"], [2])
+        audit = result.metadata["modal_record_classifications"][1]
+        self.assertEqual(audit["classification"], "non_modal")
+        self.assertFalse(audit["evidence"]["id1_residual_marker"])
+
+    def test_dataset_2414_uses_structure_and_preserves_unknown_records(self):
+        physical = _mode_2414(1, 25.0, analysis_type=3)
+        non_modal = _mode_2414(2, 25.0, analysis_type=5, name="Frequency response")
+        ambiguous = _mode_2414(3, 35.0, analysis_type=None, name="Legacy modal result")
+        result = self._load([_geometry(), physical, non_modal, ambiguous])
+
+        self.assertEqual([mode.frequency_hz for mode in result.modes], [25.0, 35.0])
+        self.assertEqual(
+            [mode.metadata["record_classification"] for mode in result.modes],
+            ["physical", "ambiguous"],
+        )
+        self.assertEqual(result.metadata["excluded_dataset_2414_record_indices"], [2])
+        self.assertEqual(result.metadata["ambiguous_dataset_2414_record_indices"], [3])
+        audits = result.metadata["dataset_2414_record_classifications"]
+        self.assertEqual(
+            [item["classification"] for item in audits],
+            ["physical", "non_modal", "ambiguous"],
+        )
+        self.assertTrue(
+            any("preserved as ambiguous" in warning for warning in result.metadata["import_warnings"])
+        )
 
     def test_explicit_selection_accepts_key_or_processing_name(self):
         datasets = [

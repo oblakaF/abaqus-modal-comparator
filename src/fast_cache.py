@@ -61,7 +61,7 @@ def _schema_fingerprint() -> str:
 # handling, and so on) does not change those dataclasses' fields, so without
 # this separate marker an on-disk cache from before the change would keep
 # being served after an update. Bump this by hand whenever such logic changes.
-_ANALYSIS_PIPELINE_VERSION = "2026.09.16.2-exp-only-dataset58"
+_ANALYSIS_PIPELINE_VERSION = "2026.09.16.3-residual-record-classification"
 
 _CACHE_VERSION = (
     f"modal-cache-v5-{_ANALYSIS_PIPELINE_VERSION}-" + _schema_fingerprint()

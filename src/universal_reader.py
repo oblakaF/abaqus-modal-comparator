@@ -25,17 +25,27 @@ class ExperimentalModalSet:
     record_indices: List[int] = field(default_factory=list)
     residual_record_indices: List[int] = field(default_factory=list)
     residual_labels: List[str] = field(default_factory=list)
+    non_modal_record_indices: List[int] = field(default_factory=list)
+    non_modal_labels: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def excluded_residual_count(self) -> int:
         return len(self.residual_record_indices)
 
+    @property
+    def excluded_non_modal_count(self) -> int:
+        return len(self.non_modal_record_indices)
+
 
 _RESIDUAL_ID1 = re.compile(
     r"^(?P<processing>.*?)\s+residuals?\s+(?P<side>below|above)\b(?P<limit>.*)$",
     re.IGNORECASE,
 )
+
+_MODAL_ANALYSIS_TYPES = {2, 3, 7}
+_DATASET_55_NON_MODAL_ANALYSIS_TYPES = {1, 4, 5, 6}
+_DATASET_2414_NON_MODAL_ANALYSIS_TYPES = {1, 4, 5, 6, 9}
 
 # Dataset-58 peak discovery is intentionally independent of any FE model.
 # This is only a computational/sanity ceiling for pathological FRF exports;
@@ -123,18 +133,126 @@ def _modal_set_key(name: str) -> str:
     return normalized or "dataset-55"
 
 
-def _residual_identity(dataset: Dict[str, Any]) -> Optional[Tuple[str, str]]:
-    """Return the parent processing name and label for a semantic residual record.
+def _integer_value(value: Any) -> Optional[int]:
+    try:
+        values = np.asarray(value).reshape(-1)
+        return None if len(values) == 0 else int(values[0])
+    except (TypeError, ValueError, IndexError):
+        return None
 
-    In Test.Lab's dataset-55 export the processing identity and the residual
-    designation share ``id1``. The anchored marker avoids classifying a
-    structural mode by its numerical frequency.
-    """
+
+def _residual_identity(dataset: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    """Return Test.Lab's parent processing name and residual label, if present."""
     label = _text(dataset.get("id1"))
     match = _RESIDUAL_ID1.match(label)
     if match is None:
         return None
     return _text(match.group("processing")), label
+
+
+def _classify_dataset_55_record(dataset: Dict[str, Any]) -> Dict[str, Any]:
+    """Classify one dataset-55 record using UNV structure plus Test.Lab text.
+
+    UNV defines analysis types 2, 3, and 7 as modal/eigenvalue records and
+    analysis type 5 as frequency response. Real SP10/SP13 Test.Lab exports use
+    type 3 for fitted poles and type 5 for below/above residual shapes. Text is
+    therefore supporting identity evidence, never sufficient to discard a
+    structurally modal record.
+    """
+    label = _text(dataset.get("id1"))
+    residual_identity = _residual_identity(dataset)
+    analysis_type = _integer_value(dataset.get("analysis_type"))
+    processing_name = (
+        label
+        if analysis_type in _MODAL_ANALYSIS_TYPES
+        else residual_identity[0] if residual_identity else label
+    )
+    evidence = {
+        "analysis_type": analysis_type,
+        "id1_residual_marker": residual_identity is not None,
+    }
+
+    if analysis_type in _MODAL_ANALYSIS_TYPES:
+        if residual_identity is not None:
+            return {
+                "classification": "ambiguous",
+                "include": True,
+                "processing_name": processing_name,
+                "label": label,
+                "reason": (
+                    "id1 resembles a Test.Lab residual label, but UNV analysis_type "
+                    f"{analysis_type} is modal; preserved conservatively"
+                ),
+                "evidence": evidence,
+            }
+        return {
+            "classification": "physical",
+            "include": True,
+            "processing_name": processing_name,
+            "label": label,
+            "reason": f"UNV analysis_type {analysis_type} is modal/eigenvalue data",
+            "evidence": evidence,
+        }
+
+    if analysis_type in _DATASET_55_NON_MODAL_ANALYSIS_TYPES:
+        description = (
+            "frequency-response data" if analysis_type == 5 else "non-modal analysis data"
+        )
+        marker = (
+            " with a corroborating Test.Lab residual below/above label"
+            if residual_identity is not None
+            else ""
+        )
+        return {
+            "classification": "residual" if residual_identity is not None else "non_modal",
+            "include": False,
+            "processing_name": processing_name,
+            "label": label,
+            "reason": f"UNV analysis_type {analysis_type} is {description}{marker}",
+            "evidence": evidence,
+        }
+
+    return {
+        "classification": "ambiguous",
+        "include": True,
+        "processing_name": processing_name,
+        "label": label,
+        "reason": "analysis_type is missing, unknown, or not portable; preserved conservatively",
+        "evidence": evidence,
+    }
+
+
+def _classify_dataset_2414_record(dataset: Dict[str, Any]) -> Dict[str, Any]:
+    """Classify dataset 2414 without borrowing Test.Lab dataset-55 labels."""
+    analysis_type = _integer_value(dataset.get("analysis_type"))
+    evidence = {
+        "analysis_type": analysis_type,
+        "dataset_location": _integer_value(dataset.get("dataset_location")),
+        "result_type": _integer_value(dataset.get("result_type")),
+    }
+    if analysis_type in _MODAL_ANALYSIS_TYPES:
+        return {
+            "classification": "physical",
+            "include": True,
+            "reason": f"UNV analysis_type {analysis_type} is modal/eigenvalue data",
+            "evidence": evidence,
+        }
+    if analysis_type in _DATASET_2414_NON_MODAL_ANALYSIS_TYPES:
+        description = (
+            "frequency-response data" if analysis_type == 5 else "non-modal analysis data"
+        )
+        return {
+            "classification": "non_modal",
+            "include": False,
+            "reason": f"UNV analysis_type {analysis_type} is {description}",
+            "evidence": evidence,
+        }
+    return {
+        "classification": "ambiguous",
+        "include": True,
+        "reason": "analysis_type is missing, unknown, or not portable; preserved conservatively",
+        "evidence": evidence,
+    }
 
 
 def _mode_from_dataset_55(dataset: Dict[str, Any], geometry: Dict[int, np.ndarray], index: int) -> ModeShape:
@@ -201,11 +319,15 @@ def _discover_dataset_55_modal_sets(
                 "record_indices": [],
                 "residual_record_indices": [],
                 "residual_labels": [],
+                "non_modal_record_indices": [],
+                "non_modal_labels": [],
                 "errors": [],
                 "id2": [],
                 "id3": [],
                 "id5": [],
                 "analysis_types": [],
+                "record_classifications": [],
+                "ambiguous_record_indices": [],
             }
             groups[identity] = group
         return group
@@ -214,16 +336,28 @@ def _discover_dataset_55_modal_sets(
         if _dataset_type(dataset) != 55:
             continue
 
-        residual = _residual_identity(dataset)
-        if residual is not None:
-            processing_name, label = residual
-            group = group_for(processing_name)
-            group["residual_record_indices"].append(record_index)
-            group["residual_labels"].append(label)
+        classification = _classify_dataset_55_record(dataset)
+        processing_name = classification["processing_name"]
+        group = group_for(processing_name)
+        record_audit = {
+            "record_index": record_index,
+            "record_id": f"dataset55:{record_index}",
+            "id1": classification["label"],
+            "classification": classification["classification"],
+            "included": classification["include"],
+            "reason": classification["reason"],
+            "evidence": classification["evidence"],
+        }
+        group["record_classifications"].append(record_audit)
+        if not classification["include"]:
+            if classification["classification"] == "residual":
+                group["residual_record_indices"].append(record_index)
+                group["residual_labels"].append(classification["label"])
+            else:
+                group["non_modal_record_indices"].append(record_index)
+                group["non_modal_labels"].append(classification["label"])
             continue
 
-        processing_name = _text(dataset.get("id1"))
-        group = group_for(processing_name)
         try:
             mode = _mode_from_dataset_55(dataset, geometry, record_index + 1)
         except ValueError as error:
@@ -238,8 +372,17 @@ def _discover_dataset_55_modal_sets(
                 "dataset_55_record_index": record_index,
                 "dataset_55_record_id": f"dataset55:{record_index}",
                 "source_frequency_hz": mode.frequency_hz,
+                "record_classification": classification["classification"],
+                "record_classification_reason": classification["reason"],
+                "record_classification_evidence": classification["evidence"],
             }
         )
+        if classification["classification"] == "ambiguous":
+            group["ambiguous_record_indices"].append(record_index)
+            group["errors"].append(
+                f"Dataset 55 record {record_index} was preserved as ambiguous: "
+                f"{classification['reason']}."
+            )
         group["modes"].append(mode)
         group["record_indices"].append(record_index)
         for field_name in ("id2", "id3", "id5"):
@@ -275,19 +418,27 @@ def _discover_dataset_55_modal_sets(
                 record_indices=list(group["record_indices"]),
                 residual_record_indices=list(group["residual_record_indices"]),
                 residual_labels=list(group["residual_labels"]),
+                non_modal_record_indices=list(group["non_modal_record_indices"]),
+                non_modal_labels=list(group["non_modal_labels"]),
                 metadata={
                     "source": "dataset_55",
                     "record_indices": list(group["record_indices"]),
                     "residual_record_indices": list(group["residual_record_indices"]),
                     "excluded_residual_count": len(group["residual_record_indices"]),
                     "excluded_residual_labels": list(group["residual_labels"]),
+                    "non_modal_record_indices": list(group["non_modal_record_indices"]),
+                    "excluded_non_modal_count": len(group["non_modal_record_indices"]),
+                    "excluded_non_modal_labels": list(group["non_modal_labels"]),
                     "analysis_types": list(group["analysis_types"]),
                     "id2": list(group["id2"]),
                     "id3": list(group["id3"]),
                     "id5": list(group["id5"]),
                     "import_warnings": list(group["errors"]),
+                    "record_classifications": list(group["record_classifications"]),
+                    "ambiguous_record_indices": list(group["ambiguous_record_indices"]),
                     "residual_classification": (
-                        "dataset 55 id1 anchored 'Residuals below/above' marker"
+                        "UNV modal/non-modal analysis_type semantics corroborated by "
+                        "Test.Lab id1 residual labels; ambiguous records are preserved"
                     ),
                 },
             )
@@ -800,6 +951,7 @@ def load_universal_modal_file(
             "processing_name": item.processing_name,
             "mode_count": len(item.modes),
             "excluded_residual_count": item.excluded_residual_count,
+            "excluded_non_modal_count": item.excluded_non_modal_count,
         }
         for item in modal_sets
     ]
@@ -853,6 +1005,17 @@ def load_universal_modal_file(
                 "excluded_residual_record_indices": list(
                     selected_set.residual_record_indices
                 ),
+                "excluded_non_modal_count": selected_set.excluded_non_modal_count,
+                "excluded_non_modal_labels": list(selected_set.non_modal_labels),
+                "excluded_non_modal_record_indices": list(
+                    selected_set.non_modal_record_indices
+                ),
+                "modal_record_classifications": list(
+                    selected_set.metadata.get("record_classifications", [])
+                ),
+                "ambiguous_modal_record_indices": list(
+                    selected_set.metadata.get("ambiguous_record_indices", [])
+                ),
             }
         )
         errors.extend(selected_set.metadata.get("import_warnings", []))
@@ -862,16 +1025,58 @@ def load_universal_modal_file(
                 f"Dataset-55 modal set {modal_set!r} was requested, but the file "
                 "contains no valid dataset-55 modal sets."
             )
+        dataset_2414_classifications: List[Dict[str, Any]] = []
         for index, dataset in enumerate(dataset_list, start=1):
             if _dataset_type(dataset) != 2414:
                 continue
+            record_index = index - 1
+            classification = _classify_dataset_2414_record(dataset)
+            record_audit = {
+                "record_index": record_index,
+                "record_id": f"dataset2414:{record_index}",
+                "identity": _text(dataset.get("analysis_dataset_name")),
+                "classification": classification["classification"],
+                "included": classification["include"],
+                "reason": classification["reason"],
+                "evidence": classification["evidence"],
+            }
+            dataset_2414_classifications.append(record_audit)
+            if not classification["include"]:
+                continue
             try:
-                analysis_type = dataset.get("analysis_type")
                 mode_number = dataset.get("mode_number")
-                if mode_number not in (None, 0) or analysis_type in (2, 3, 7):
-                    modes.append(_mode_from_dataset_2414(dataset, geometry, index))
+                analysis_type = _integer_value(dataset.get("analysis_type"))
+                if mode_number not in (None, 0) or analysis_type in _MODAL_ANALYSIS_TYPES:
+                    mode = _mode_from_dataset_2414(dataset, geometry, index)
+                    mode.metadata.update(
+                        {
+                            "dataset_2414_record_index": record_index,
+                            "dataset_2414_record_id": f"dataset2414:{record_index}",
+                            "record_classification": classification["classification"],
+                            "record_classification_reason": classification["reason"],
+                            "record_classification_evidence": classification["evidence"],
+                        }
+                    )
+                    modes.append(mode)
+                    if classification["classification"] == "ambiguous":
+                        errors.append(
+                            f"Dataset 2414 record {record_index} was preserved as ambiguous: "
+                            f"{classification['reason']}."
+                        )
             except ValueError as error:
                 errors.append(str(error))
+        if dataset_2414_classifications:
+            metadata["dataset_2414_record_classifications"] = dataset_2414_classifications
+            metadata["excluded_dataset_2414_record_indices"] = [
+                item["record_index"]
+                for item in dataset_2414_classifications
+                if not item["included"]
+            ]
+            metadata["ambiguous_dataset_2414_record_indices"] = [
+                item["record_index"]
+                for item in dataset_2414_classifications
+                if item["classification"] == "ambiguous"
+            ]
 
     source_name = "Simcenter Testlab UNV/UFF"
     if not modes:
