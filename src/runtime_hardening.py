@@ -10,6 +10,7 @@ from typing import Optional
 
 from abaqus_bridge import AnalysisCancelled, extraction_range_notice
 from coordinate_calibration import CoordinateCalibration
+from reviewed_core import GeometryOrientationAmbiguousError
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
 
@@ -142,10 +143,18 @@ def install_runtime_hardening(app_module) -> None:
 
         try:
             workspace.mkdir(parents=True, exist_ok=True)
+            orientation_selection = getattr(
+                self, "_active_orientation_selection", None
+            )
+            orientation_candidate_id = (
+                orientation_selection.get("candidate_id", "")
+                if isinstance(orientation_selection, dict)
+                else ""
+            )
             signature = (
                 f"{abaqus.resolve()}|{abaqus.stat().st_size}|{abaqus.stat().st_mtime_ns}|"
                 f"{experiment.resolve()}|{experiment.stat().st_size}|{experiment.stat().st_mtime_ns}|"
-                f"{start}|{end}|{calibration}|{modal_set or ''}"
+                f"{start}|{end}|{calibration}|{modal_set or ''}|{orientation_candidate_id}"
             )
             key = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:16]
             cache = workspace / f"analysis_{key}"
@@ -184,6 +193,8 @@ def install_runtime_hardening(app_module) -> None:
                 if isinstance(calibration, CoordinateCalibration)
                 else {"coordinate_scale_override": calibration}
             )
+            if orientation_selection is not None:
+                comparison_kwargs["orientation_selection"] = orientation_selection
             result = app_module.compare_modal_datasets(
                 abaqus_data,
                 experiment_data,
@@ -230,6 +241,15 @@ def install_runtime_hardening(app_module) -> None:
                 )
             except Exception:
                 pass
+        except GeometryOrientationAmbiguousError as error:
+            failure = error
+            try:
+                workspace.mkdir(parents=True, exist_ok=True)
+                (workspace / "last_orientation_ambiguity.log").write_text(
+                    traceback.format_exc(), encoding="utf-8"
+                )
+            except Exception:
+                pass
         except Exception as error:
             failure = error
             try:
@@ -249,6 +269,12 @@ def install_runtime_hardening(app_module) -> None:
                     post_to_ui(callback)
                 else:
                     post_to_ui(lambda: self._failed(failure))
+            elif isinstance(failure, GeometryOrientationAmbiguousError):
+                callback = getattr(self, "_orientation_ambiguous", None)
+                if callable(callback):
+                    post_to_ui(lambda error=failure: callback(error))
+                else:
+                    post_to_ui(lambda error=failure: self._failed(error))
             elif failure is None and result is not None and cache is not None:
                 self.cache = cache
                 post_to_ui(lambda value=result: self._complete(value))

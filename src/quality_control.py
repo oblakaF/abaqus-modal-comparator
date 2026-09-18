@@ -132,6 +132,7 @@ def compare_modal_datasets_with_quality_control(
     frequency_weight: float = 0.25,
     coordinate_scale_override: Optional[float] = None,
     geometry_calibration: Optional[CoordinateCalibration] = None,
+    orientation_selection: Optional[Dict[str, object]] = None,
 ) -> ComparisonResult:
     rigid_residuals = _rigid_residuals(abaqus)
     excluded_modes, retained_modes, rigid_threshold, first_elastic = _detect_rigid_modes(abaqus)
@@ -168,6 +169,7 @@ def compare_modal_datasets_with_quality_control(
         maximum_frequency_only_error_percent=MAX_FREQUENCY_ONLY_ERROR_PERCENT,
         coordinate_scale_override=coordinate_scale_override,
         geometry_calibration=geometry_calibration,
+        orientation_selection=orientation_selection,
     )
 
     if excluded_modes:

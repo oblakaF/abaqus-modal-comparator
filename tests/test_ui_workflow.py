@@ -41,8 +41,142 @@ from ui_policy import (
 from ui_workflow import (
     ANALYSIS_CONFIGURATION_CONTROL_NAMES,
     dispatch_clipboard_action,
+    orientation_candidate_rows,
     set_configuration_controls_locked,
 )
+from scientific_state import (
+    calibration_fingerprint,
+    experimental_source_identity,
+    orientation_registration_valid,
+    source_identity_matches,
+)
+
+
+class SourceBoundScientificStateTests(unittest.TestCase):
+    def test_source_identity_uses_path_size_and_mtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            first = Path(directory) / "SP05.unv"
+            second = Path(directory) / "SP13.unv"
+            first.write_text("SP05", encoding="utf-8")
+            second.write_text("SP13-different", encoding="utf-8")
+            first_identity = experimental_source_identity(first)
+            self.assertTrue(
+                source_identity_matches(first_identity, experimental_source_identity(first))
+            )
+            self.assertFalse(
+                source_identity_matches(first_identity, experimental_source_identity(second))
+            )
+
+    def test_orientation_registration_requires_same_source_and_calibration(self):
+        source = {"path": "sp13.unv", "size": 10, "mtime_ns": 20}
+        calibration = {"mode": "camera_grid", "physical_width": 500.0}
+        registration = {
+            "orientation_source": "user_confirmed",
+            "experimental_source_identity": dict(source),
+            "calibration_fingerprint": calibration_fingerprint(calibration),
+            "candidate": {"candidate_id": "geometry-1"},
+        }
+        self.assertTrue(
+            orientation_registration_valid(registration, source, calibration)
+        )
+        self.assertFalse(
+            orientation_registration_valid(
+                registration,
+                {**source, "path": "other.unv"},
+                calibration,
+            )
+        )
+        self.assertFalse(
+            orientation_registration_valid(
+                registration,
+                source,
+                {**calibration, "physical_width": 301.0},
+            )
+        )
+
+    def test_orientation_candidate_rows_contain_geometry_only_in_input_order(self):
+        candidates = [
+            {
+                "candidate_id": "geometry-b",
+                "axis_permutation": [1, 0, 2],
+                "mirrored": True,
+                "determinant": -1.0,
+                "coordinate_scales": [1.0, 2.0, 3.0],
+                "normalized_rms_distance": 0.02,
+                "matched_fraction": 0.9,
+                "calibration": {"provenance": "corner marks"},
+                "mac": 0.99,
+                "frequency": 100.0,
+            },
+            {
+                "candidate_id": "geometry-a",
+                "axis_permutation": [0, 1, 2],
+                "mirrored": False,
+                "determinant": 1.0,
+                "coordinate_scales": [1.0, 1.0, 1.0],
+                "normalized_rms_distance": 0.01,
+                "matched_fraction": 1.0,
+                "calibration": {"provenance": "edge marks"},
+            },
+        ]
+        rows = orientation_candidate_rows(candidates)
+        self.assertEqual([row["candidate_id"] for row in rows], ["geometry-b", "geometry-a"])
+        self.assertTrue(all("mac" not in row and "frequency" not in row for row in rows))
+
+    def test_production_source_change_handler_clears_specimen_state(self):
+        import main
+
+        class Variable:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+            def set(self, value):
+                self.value = value
+
+        with tempfile.TemporaryDirectory() as directory:
+            sp05 = Path(directory) / "SP05.unv"
+            sp13 = Path(directory) / "SP13.unv"
+            sp05.write_text("SP05", encoding="utf-8")
+            sp13.write_text("SP13", encoding="utf-8")
+            application = type("FakeApplication", (), {})()
+            application.experimental_path = Variable(str(sp13))
+            application.coordinate_mapping_mode = Variable("camera_grid")
+            application.experimental_coordinate_unit = Variable("mm")
+            application.experimental_unit_source = Variable("manually selected")
+            application.custom_coordinate_scale = Variable("0.001")
+            application.camera_scan_coverage = Variable("full")
+            application.camera_physical_width = Variable("301.0")
+            application.camera_physical_height = Variable("302.0")
+            application.camera_dimension_unit = Variable("mm")
+            application.calibration_provenance = Variable(
+                "SP05 measured specimen dimensions"
+            )
+            application._source_calibration_binding = {
+                "experimental_source_identity": experimental_source_identity(sp05),
+                "calibration_fingerprint": "old",
+            }
+            application._confirmed_orientation = {"orientation_source": "user_confirmed"}
+            application._active_orientation_selection = {"candidate_id": "geometry-old"}
+            application._suppress_source_state_tracking = False
+            application._on_persistent_change = lambda: None
+            application._invalidate_source_scientific_state = (
+                main.app.ModalComparatorApp._invalidate_source_scientific_state.__get__(application)
+            )
+
+            main.app.ModalComparatorApp._experimental_source_changed(application)
+
+            self.assertEqual(application.camera_physical_width.get(), "")
+            self.assertEqual(application.camera_physical_height.get(), "")
+            self.assertEqual(application.calibration_provenance.get(), "")
+            self.assertEqual(
+                application.experimental_unit_source.get(),
+                "confirmation required for selected experimental source",
+            )
+            self.assertIsNone(application._confirmed_orientation)
+            self.assertIsNone(application._source_calibration_binding)
 
 
 class ResponsivePolicyTests(unittest.TestCase):
@@ -577,6 +711,39 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             self.assertTrue(
                 all(label.cget("text") == "Analysis stopped by user." for label in application.shape_labels)
             )
+
+            from reviewed_core import GeometryOrientationAmbiguousError
+
+            ambiguity = GeometryOrientationAmbiguousError(
+                "two geometry candidates",
+                [
+                    {
+                        "candidate_id": "geometry-1",
+                        "rotation": np.eye(3).tolist(),
+                        "translation": [0.0, 0.0, 0.0],
+                        "coordinate_scales": [1.0, 1.0, 1.0],
+                        "normalized_rms_distance": 0.0,
+                        "matched_fraction": 1.0,
+                        "determinant": 1.0,
+                        "mirrored": False,
+                        "axis_permutation": [0, 1, 2],
+                        "calibration": {"provenance": "corner marks"},
+                    }
+                ],
+            )
+            application.running = True
+            application._close_after_cancel = False
+            with patch.object(
+                application, "_show_orientation_ambiguity_dialog"
+            ) as decision_dialog, patch(
+                "tkinter.messagebox.showerror"
+            ) as generic_error:
+                application._failed(ambiguity)
+            self.assertIs(application.analysis_state, AnalysisState.DIAGNOSTIC)
+            self.assertIsNone(application._confirmed_orientation)
+            decision_dialog.assert_called_once_with(ambiguity)
+            generic_error.assert_not_called()
+            self.assertIn("orientation ambiguous", application.status.get().lower())
 
             close_calls = []
             real_finish_close = application._finish_close

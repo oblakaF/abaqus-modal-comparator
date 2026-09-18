@@ -723,6 +723,59 @@ class GeometryOrientationSelectionTests(unittest.TestCase):
                 self.assertIn("matched_fraction", candidate)
                 self.assertNotIn("mac", candidate)
 
+    def test_user_confirmed_geometry_candidate_is_applied_without_modal_selection(self):
+        node_ids = np.arange(1, 5)
+        vectors = np.zeros((4, 3))
+        vectors[:, 2] = [1.0, -1.0, 0.5, -0.5]
+        abaqus = ModalDataset(
+            "Abaqus", Path("model.odb"),
+            [ModeShape(1, 100.0, node_ids, self._SQUARE, vectors)],
+        )
+        experiment = ModalDataset(
+            "Experiment", Path("scan.unv"),
+            [ModeShape(1, 100.1, node_ids, self._SQUARE, vectors)],
+        )
+
+        with self.assertRaises(GeometryOrientationAmbiguousError) as raised:
+            compare_modal_datasets(abaqus, experiment, coordinate_scale_override=1.0)
+        candidate = raised.exception.ambiguous_candidates[0]
+        self.assertIn("candidate_id", candidate)
+        self.assertIn("translation", candidate)
+
+        result = compare_modal_datasets(
+            abaqus,
+            experiment,
+            coordinate_scale_override=1.0,
+            orientation_selection=candidate,
+        )
+        self.assertEqual(result.metadata["orientation_source"], "user_confirmed")
+        self.assertEqual(
+            result.metadata["selected_geometry_transform"]["orientation_source"],
+            "user_confirmed",
+        )
+        np.testing.assert_allclose(result.geometry.rotation, candidate["rotation"])
+        np.testing.assert_allclose(result.geometry.translation, candidate["translation"])
+
+    def test_obsolete_manual_candidate_does_not_weaken_ambiguity_stop(self):
+        node_ids = np.arange(1, 5)
+        vectors = np.zeros((4, 3))
+        vectors[:, 2] = [1.0, -1.0, 0.5, -0.5]
+        abaqus = ModalDataset(
+            "Abaqus", Path("model.odb"),
+            [ModeShape(1, 100.0, node_ids, self._SQUARE, vectors)],
+        )
+        experiment = ModalDataset(
+            "Experiment", Path("scan.unv"),
+            [ModeShape(1, 100.1, node_ids, self._SQUARE, vectors)],
+        )
+        with self.assertRaises(GeometryOrientationAmbiguousError):
+            compare_modal_datasets(
+                abaqus,
+                experiment,
+                coordinate_scale_override=1.0,
+                orientation_selection={"candidate_id": "geometry-obsolete"},
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

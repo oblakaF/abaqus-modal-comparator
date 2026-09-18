@@ -5,11 +5,12 @@ import os
 import shlex
 import subprocess
 import threading
+from copy import deepcopy
 from pathlib import Path
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
-from typing import Optional
+from typing import Mapping, Optional
 
 from coordinate_calibration import (
     CALIBRATED_PHYSICAL,
@@ -17,6 +18,13 @@ from coordinate_calibration import (
     LEGACY_GEOMETRIC_FIT,
     MANUAL,
     CoordinateCalibration,
+)
+from reviewed_core import GeometryOrientationAmbiguousError
+from scientific_state import (
+    calibration_fingerprint,
+    experimental_source_identity,
+    orientation_registration_valid,
+    source_identity_matches,
 )
 
 from ui_policy import (
@@ -58,6 +66,33 @@ DIAGNOSTIC_SHAPE_MESSAGE = (
     "No accepted mode pairs.\n"
     "See MAC and frequencies / Manual review for diagnostic candidates."
 )
+
+
+def orientation_candidate_rows(candidates) -> list[dict[str, object]]:
+    """Return display-only geometry evidence in geometry-candidate order."""
+    rows = []
+    for index, candidate in enumerate(candidates, start=1):
+        calibration = candidate.get("calibration", {})
+        rows.append(
+            {
+                "candidate_id": candidate.get("candidate_id", f"candidate-{index}"),
+                "label": f"Candidate {index}",
+                "axis_permutation": candidate.get("axis_permutation"),
+                "mirrored": bool(candidate.get("mirrored", False)),
+                "determinant": candidate.get("determinant"),
+                "coordinate_scales": candidate.get("coordinate_scales"),
+                "normalized_rms_distance": candidate.get("normalized_rms_distance"),
+                "matched_fraction": candidate.get("matched_fraction"),
+                "calibration_provenance": (
+                    calibration.get("provenance", "")
+                    if isinstance(calibration, Mapping)
+                    else ""
+                ),
+            }
+        )
+    return rows
+
+
 ANALYSIS_CONFIGURATION_CONTROL_NAMES = (
     "abaqus_path",
     "abaqus_path_browse",
@@ -370,6 +405,123 @@ def install_responsive_workflow(app_module) -> None:
     original_manual_reset = application_class._manual_reset
     original_refresh_review = application_class._refresh_review_table
 
+    def source_calibration(self) -> Optional[CoordinateCalibration]:
+        mode = self.coordinate_mapping_mode.get()
+        provenance = self.calibration_provenance.get().strip()
+        try:
+            if mode == CAMERA_GRID:
+                if not provenance:
+                    return None
+                calibration = CoordinateCalibration(
+                    mode=CAMERA_GRID,
+                    abaqus_unit=self.abaqus_model_unit.get(),
+                    scan_coverage=self.camera_scan_coverage.get(),
+                    physical_width=(
+                        float(self.camera_physical_width.get().strip().replace(",", "."))
+                        if self.camera_physical_width.get().strip()
+                        else None
+                    ),
+                    physical_height=(
+                        float(self.camera_physical_height.get().strip().replace(",", "."))
+                        if self.camera_physical_height.get().strip()
+                        else None
+                    ),
+                    dimension_unit=self.camera_dimension_unit.get(),
+                    provenance=provenance,
+                )
+            elif mode == MANUAL:
+                if not provenance:
+                    return None
+                calibration = CoordinateCalibration(
+                    mode=MANUAL,
+                    abaqus_unit=self.abaqus_model_unit.get(),
+                    manual_scale=validate_custom_scale(self.custom_coordinate_scale.get()),
+                    provenance=provenance,
+                )
+            elif mode == LEGACY_GEOMETRIC_FIT:
+                if not provenance:
+                    return None
+                calibration = CoordinateCalibration(
+                    mode=LEGACY_GEOMETRIC_FIT,
+                    abaqus_unit=self.abaqus_model_unit.get(),
+                    provenance=provenance,
+                )
+            else:
+                if self.experimental_unit_source.get() != "manually selected":
+                    return None
+                calibration = CoordinateCalibration(
+                    mode=CALIBRATED_PHYSICAL,
+                    abaqus_unit=self.abaqus_model_unit.get(),
+                    experimental_unit=self.experimental_coordinate_unit.get(),
+                    provenance=self.experimental_unit_source.get(),
+                )
+            calibration.validate()
+            return calibration
+        except (TypeError, ValueError):
+            return None
+
+    def bind_source_calibration(self) -> bool:
+        identity = experimental_source_identity(self.experimental_path.get())
+        calibration = self._source_calibration()
+        if identity is None or calibration is None:
+            self._source_calibration_binding = None
+            return False
+        self._source_calibration_binding = {
+            "experimental_source_identity": identity,
+            "calibration_fingerprint": calibration_fingerprint(calibration.to_dict()),
+        }
+        return True
+
+    def invalidate_source_scientific_state(self) -> None:
+        self._source_calibration_binding = None
+        self._confirmed_orientation = None
+        self._active_orientation_selection = None
+        self.coordinate_mapping_mode.set(CALIBRATED_PHYSICAL)
+        self.experimental_coordinate_unit.set("m")
+        self.experimental_unit_source.set(
+            "confirmation required for selected experimental source"
+        )
+        self.custom_coordinate_scale.set("")
+        self.camera_scan_coverage.set("full")
+        self.camera_physical_width.set("")
+        self.camera_physical_height.set("")
+        self.camera_dimension_unit.set("mm")
+        self.calibration_provenance.set("")
+
+    def experimental_source_changed(self, *_args) -> None:
+        if self._suppress_source_state_tracking:
+            return
+        current = experimental_source_identity(self.experimental_path.get())
+        bound = (
+            self._source_calibration_binding.get("experimental_source_identity")
+            if isinstance(self._source_calibration_binding, Mapping)
+            else None
+        )
+        if not source_identity_matches(bound, current):
+            self._suppress_source_state_tracking = True
+            try:
+                self._invalidate_source_scientific_state()
+            finally:
+                self._suppress_source_state_tracking = False
+        self._on_persistent_change()
+
+    def source_calibration_changed(self, *_args) -> None:
+        if self._suppress_source_state_tracking:
+            return
+        self._confirmed_orientation = None
+        self._active_orientation_selection = None
+        self._bind_source_calibration()
+        self._on_persistent_change()
+
+    def valid_orientation_selection(self, calibration: CoordinateCalibration):
+        identity = experimental_source_identity(self.experimental_path.get())
+        if orientation_registration_valid(
+            self._confirmed_orientation, identity, calibration.to_dict()
+        ):
+            return dict(self._confirmed_orientation["candidate"])
+        self._confirmed_orientation = None
+        return None
+
     def workflow_init(self, root) -> None:
         self._recovery_preferences = load_recovery_preferences()
         self._session_recovered = False
@@ -390,6 +542,10 @@ def install_responsive_workflow(app_module) -> None:
         self._tooltips = []
         self._abaqus_installations = {}
         self._analysis_configuration_controls = {}
+        self._source_calibration_binding = None
+        self._confirmed_orientation = None
+        self._active_orientation_selection = None
+        self._suppress_source_state_tracking = False
         self.analysis_state = AnalysisState.NO_DATA
         self.dirty_tracker = DirtyTracker()
         self.ui_scale_percent = tk.IntVar(
@@ -765,7 +921,7 @@ def install_responsive_workflow(app_module) -> None:
 
     def experimental_unit_selected(self, _event=None) -> None:
         self.experimental_unit_source.set("manually selected")
-        self._on_persistent_change()
+        self._source_calibration_changed()
 
     def workflow_validate(self):
         abaqus = Path(self.abaqus_path.get().strip())
@@ -837,6 +993,28 @@ def install_responsive_workflow(app_module) -> None:
                 experimental_unit=self.experimental_coordinate_unit.get(),
                 provenance=self.experimental_unit_source.get(),
             )
+        source_identity = experimental_source_identity(experiment)
+        binding = self._source_calibration_binding
+        binding_valid = (
+            isinstance(binding, Mapping)
+            and source_identity_matches(
+                binding.get("experimental_source_identity"), source_identity
+            )
+            and binding.get("calibration_fingerprint")
+            == calibration_fingerprint(calibration.to_dict())
+        )
+        if not binding_valid:
+            self._active_orientation_selection = None
+            messagebox.showwarning(
+                "Confirm experimental calibration",
+                "The geometry/calibration values are not confirmed for the selected "
+                "experimental source. Re-enter or confirm its coordinate unit, mapping "
+                "mode, dimensions/scale, and provenance before analysis.",
+            )
+            return None
+        self._active_orientation_selection = self._valid_orientation_selection(
+            calibration
+        )
         command = self.abaqus_command.get().strip()
         if abaqus.suffix.lower() == ".odb" and resolve_command(command) is None:
             messagebox.showwarning(
@@ -994,9 +1172,15 @@ def install_responsive_workflow(app_module) -> None:
         if range_notice:
             self.abaqus_detection_status.set(str(range_notice))
         state = completion_state(automatic_pair_count)
-        self._set_analysis_state(state, status_text(state, pair_count=automatic_pair_count))
+        message = status_text(state, pair_count=automatic_pair_count)
+        if result.metadata.get("orientation_source") == "user_confirmed":
+            message += " Physical orientation: user-confirmed."
+        self._set_analysis_state(state, message)
 
     def failed(self, error: Exception) -> None:
+        if isinstance(error, GeometryOrientationAmbiguousError):
+            self._orientation_ambiguous(error)
+            return
         original_failed(self, error)
         self._clear_result_presentation("Analysis could not be completed.")
         self._set_empty_states()
@@ -1017,6 +1201,144 @@ def install_responsive_workflow(app_module) -> None:
                 )
             else:
                 self._finish_close()
+
+    def confirm_orientation_candidate(self, candidate: Mapping[str, object]) -> bool:
+        calibration = self._source_calibration()
+        identity = experimental_source_identity(self.experimental_path.get())
+        if calibration is None or identity is None:
+            messagebox.showwarning(
+                "Physical orientation",
+                "Confirm the experimental-source calibration before selecting an orientation.",
+            )
+            return False
+        self._confirmed_orientation = {
+            "orientation_source": "user_confirmed",
+            "candidate_identity": candidate.get("candidate_id"),
+            "candidate": deepcopy(dict(candidate)),
+            "experimental_source_identity": identity,
+            "calibration_state": calibration.to_dict(),
+            "calibration_fingerprint": calibration_fingerprint(
+                calibration.to_dict()
+            ),
+        }
+        self._active_orientation_selection = dict(candidate)
+        self._on_persistent_change()
+        self.status.set(
+            "Physical orientation: user-confirmed. Run analysis again to apply it."
+        )
+        return True
+
+    def show_orientation_ambiguity_dialog(self, error) -> None:
+        candidates = list(error.ambiguous_candidates)
+        rows = orientation_candidate_rows(candidates)
+        window = tk.Toplevel(self.root)
+        window.title("Physical orientation is ambiguous")
+        window.transient(self.root)
+        window.geometry("1180x520")
+        ttk.Label(
+            window,
+            text="Physical orientation is ambiguous",
+            style="Section.TLabel",
+            padding=(16, 16, 16, 6),
+        ).pack(anchor="w")
+        ttk.Label(
+            window,
+            text=(
+                "Multiple physical geometry mappings are equally plausible from "
+                "geometric evidence. MAC and modal frequency cannot be used to "
+                "choose the physical orientation. Select only when independent "
+                "experimental provenance identifies the setup orientation."
+            ),
+            justify="left",
+            wraplength=1120,
+            padding=(16, 0, 16, 10),
+        ).pack(fill="x")
+        columns = (
+            "label", "candidate_id", "axis", "mirrored", "determinant",
+            "scales", "rms", "matched", "provenance",
+        )
+        table = ttk.Treeview(window, columns=columns, show="headings", height=12)
+        headings = {
+            "label": "Candidate",
+            "candidate_id": "Candidate ID",
+            "axis": "Axis permutation",
+            "mirrored": "Mirrored",
+            "determinant": "Determinant",
+            "scales": "Coordinate scales",
+            "rms": "Normalized RMS",
+            "matched": "Matched fraction",
+            "provenance": "Calibration provenance",
+        }
+        for key in columns:
+            table.heading(key, text=headings[key])
+            table.column(key, width=120 if key != "provenance" else 220)
+        for index, row in enumerate(rows):
+            table.insert(
+                "", "end", iid=str(index),
+                values=(
+                    row["label"], row["candidate_id"], row["axis_permutation"],
+                    "yes" if row["mirrored"] else "no", row["determinant"],
+                    row["coordinate_scales"],
+                    f"{float(row['normalized_rms_distance']):.9g}",
+                    f"{float(row['matched_fraction']):.6g}",
+                    row["calibration_provenance"],
+                ),
+            )
+        table.pack(fill="both", expand=True, padx=16)
+        buttons = ttk.Frame(window, padding=16)
+        buttons.pack(fill="x")
+        select_button = ttk.Button(
+            buttons, text="Select known physical orientation", state="disabled"
+        )
+
+        def selected(*_args) -> None:
+            select_button.configure(
+                state="normal" if table.selection() else "disabled"
+            )
+
+        def confirm() -> None:
+            selection = table.selection()
+            if not selection:
+                return
+            if self._confirm_orientation_candidate(candidates[int(selection[0])]):
+                window.destroy()
+
+        def sensitivity() -> None:
+            self.status.set(
+                "Diagnostic / orientation ambiguous: no physical orientation selected."
+            )
+            messagebox.showinfo(
+                "Orientation sensitivity",
+                "All geometry candidates may be studied as a sensitivity set without "
+                "declaring any one physically correct. This research diagnostic is not "
+                "yet integrated as a production workflow; no research script was run.",
+                parent=window,
+            )
+
+        select_button.configure(command=confirm)
+        table.bind("<<TreeviewSelect>>", selected, add="+")
+        select_button.pack(side="left")
+        ttk.Button(
+            buttons, text="Orientation sensitivity", command=sensitivity
+        ).pack(side="left", padx=8)
+        ttk.Button(buttons, text="Cancel", command=window.destroy).pack(side="left")
+        window.protocol("WM_DELETE_WINDOW", window.destroy)
+
+    def orientation_ambiguous(self, error) -> None:
+        self.running = False
+        self.progress.stop()
+        self.result = None
+        self.cache = None
+        self._active_orientation_selection = None
+        self._clear_result_presentation("Physical orientation is ambiguous.")
+        self._set_empty_states()
+        self.metric_geometry_caption.configure(text="STATE")
+        self.metric_geometry.configure(text="Orientation ambiguous")
+        self._set_analysis_state(
+            AnalysisState.DIAGNOSTIC,
+            "Diagnostic / orientation ambiguous: physical provenance required.",
+        )
+        self._show_orientation_ambiguity_dialog(error)
 
     def populate(self, result) -> None:
         original_populate(self, result)
@@ -1169,6 +1491,8 @@ def install_responsive_workflow(app_module) -> None:
             "camera_physical_height": self.camera_physical_height.get(),
             "camera_dimension_unit": self.camera_dimension_unit.get(),
             "calibration_provenance": self.calibration_provenance.get(),
+            "source_calibration_binding": self._source_calibration_binding,
+            "orientation_registration": self._confirmed_orientation,
             "manual_reviews": self.manual_reviews,
         }
 
@@ -1195,13 +1519,14 @@ def install_responsive_workflow(app_module) -> None:
         self.project_name_label.configure(text=f"Project: {name}{' *' if self.dirty_tracker.dirty else ''}")
 
     def install_dirty_tracking(self) -> None:
-        variables = (
+        global_or_model_variables = (
             self.abaqus_path,
-            self.experimental_path,
             self.workspace_path,
             self.abaqus_command,
             self.start_mode,
             self.end_mode,
+        )
+        source_specific_variables = (
             self.abaqus_model_unit,
             self.experimental_coordinate_unit,
             self.coordinate_mapping_mode,
@@ -1212,7 +1537,19 @@ def install_responsive_workflow(app_module) -> None:
             self.camera_dimension_unit,
             self.calibration_provenance,
         )
-        self._persistent_traces = [variable.trace_add("write", self._on_persistent_change) for variable in variables]
+        self._persistent_traces = [
+            variable.trace_add("write", self._on_persistent_change)
+            for variable in global_or_model_variables
+        ]
+        self._persistent_traces.append(
+            self.experimental_path.trace_add(
+                "write", self._experimental_source_changed
+            )
+        )
+        self._persistent_traces.extend(
+            variable.trace_add("write", self._source_calibration_changed)
+            for variable in source_specific_variables
+        )
         self.root.bind_all("<Control-s>", lambda _event: (self._save_project(), "break")[1])
         self.root.bind_all("<Control-Shift-s>", lambda _event: (self._save_project_as(), "break")[1])
         self.root.bind_all("<Control-S>", lambda _event: (self._save_project_as(), "break")[1])
@@ -1261,27 +1598,72 @@ def install_responsive_workflow(app_module) -> None:
                 "camera_physical_height": self.camera_physical_height.get(),
                 "camera_dimension_unit": self.camera_dimension_unit.get(),
                 "calibration_provenance": self.calibration_provenance.get(),
+                "experimental_source_identity": experimental_source_identity(
+                    self.experimental_path.get()
+                ),
+                "source_calibration_binding": deepcopy(
+                    self._source_calibration_binding
+                ),
+                "orientation_registration": deepcopy(
+                    self._confirmed_orientation
+                ),
             }
         )
         return payload
 
     def apply_project(self, payload: dict, project_path: Optional[Path] = None) -> None:
-        original_apply_project(self, payload, project_path)
-        inputs = payload.get("inputs", {})
-        legacy_scale = str(inputs.get("coordinate_scale", "auto"))
-        self.abaqus_model_unit.set(str(inputs.get("abaqus_model_length_unit", "mm")))
-        self.experimental_coordinate_unit.set(str(inputs.get("experimental_coordinate_unit", "m")))
-        self.experimental_unit_source.set(str(inputs.get("experimental_unit_source", "inferred; verify for this test setup")))
-        calibration_data = inputs.get("geometry_calibration") or {}
-        mode = str(calibration_data.get("mode", inputs.get("coordinate_mapping_mode", LEGACY_GEOMETRIC_FIT if legacy_scale.lower() in {"", "auto", "automatic"} else MANUAL)))
-        self.coordinate_mapping_mode.set(mode)
-        self.custom_coordinate_scale.set(str(calibration_data.get("manual_scale", inputs.get("custom_coordinate_scale", "1.0" if mode == CALIBRATED_PHYSICAL else legacy_scale))))
-        self.camera_scan_coverage.set(str(calibration_data.get("scan_coverage", inputs.get("camera_scan_coverage", "full"))))
-        self.camera_physical_width.set("" if calibration_data.get("physical_width") is None else str(calibration_data.get("physical_width")))
-        self.camera_physical_height.set("" if calibration_data.get("physical_height") is None else str(calibration_data.get("physical_height")))
-        self.camera_dimension_unit.set(str(calibration_data.get("dimension_unit") or inputs.get("camera_dimension_unit", "mm")))
-        self.calibration_provenance.set(str(calibration_data.get("provenance", inputs.get("calibration_provenance", ""))))
-        self._sync_coordinate_mapping()
+        self._suppress_source_state_tracking = True
+        try:
+            original_apply_project(self, payload, project_path)
+            inputs = payload.get("inputs", {})
+            legacy_scale = str(inputs.get("coordinate_scale", "auto"))
+            self.abaqus_model_unit.set(str(inputs.get("abaqus_model_length_unit", "mm")))
+            self.experimental_coordinate_unit.set(str(inputs.get("experimental_coordinate_unit", "m")))
+            self.experimental_unit_source.set(str(inputs.get("experimental_unit_source", "inferred; verify for this test setup")))
+            calibration_data = inputs.get("geometry_calibration") or {}
+            mode = str(calibration_data.get("mode", inputs.get("coordinate_mapping_mode", LEGACY_GEOMETRIC_FIT if legacy_scale.lower() in {"", "auto", "automatic"} else MANUAL)))
+            self.coordinate_mapping_mode.set(mode)
+            self.custom_coordinate_scale.set(str(calibration_data.get("manual_scale", inputs.get("custom_coordinate_scale", "1.0" if mode == CALIBRATED_PHYSICAL else legacy_scale))))
+            self.camera_scan_coverage.set(str(calibration_data.get("scan_coverage", inputs.get("camera_scan_coverage", "full"))))
+            self.camera_physical_width.set("" if calibration_data.get("physical_width") is None else str(calibration_data.get("physical_width")))
+            self.camera_physical_height.set("" if calibration_data.get("physical_height") is None else str(calibration_data.get("physical_height")))
+            self.camera_dimension_unit.set(str(calibration_data.get("dimension_unit") or inputs.get("camera_dimension_unit", "mm")))
+            self.calibration_provenance.set(str(calibration_data.get("provenance", inputs.get("calibration_provenance", ""))))
+            self._source_calibration_binding = deepcopy(
+                inputs.get("source_calibration_binding")
+            )
+            self._confirmed_orientation = deepcopy(
+                inputs.get("orientation_registration")
+            )
+            current_identity = experimental_source_identity(
+                self.experimental_path.get()
+            )
+            calibration = self._source_calibration()
+            binding_valid = (
+                calibration is not None
+                and isinstance(self._source_calibration_binding, Mapping)
+                and source_identity_matches(
+                    self._source_calibration_binding.get(
+                        "experimental_source_identity"
+                    ),
+                    current_identity,
+                )
+                and self._source_calibration_binding.get(
+                    "calibration_fingerprint"
+                )
+                == calibration_fingerprint(calibration.to_dict())
+            )
+            if not binding_valid:
+                self._invalidate_source_scientific_state()
+            elif not orientation_registration_valid(
+                self._confirmed_orientation,
+                current_identity,
+                calibration.to_dict(),
+            ):
+                self._confirmed_orientation = None
+            self._sync_coordinate_mapping()
+        finally:
+            self._suppress_source_state_tracking = False
         warnings = payload.get("load_warnings", [])
         if warnings:
             messagebox.showwarning("Legacy coordinate calibration", "\n\n".join(map(str, warnings)))
@@ -1296,6 +1678,9 @@ def install_responsive_workflow(app_module) -> None:
         after = (self.project_path, self.abaqus_path.get(), self.experimental_path.get())
         if before != after:
             self._session_recovered = False
+            self._source_calibration_binding = None
+            self._confirmed_orientation = None
+            self._active_orientation_selection = None
             self.abaqus_model_unit.set("mm")
             self.experimental_coordinate_unit.set("m")
             self.experimental_unit_source.set("inferred; verify for this test setup")
@@ -1761,12 +2146,21 @@ def install_responsive_workflow(app_module) -> None:
     application_class._cancelled = cancelled
     application_class._complete = complete
     application_class._failed = failed
+    application_class._orientation_ambiguous = orientation_ambiguous
+    application_class._show_orientation_ambiguity_dialog = show_orientation_ambiguity_dialog
+    application_class._confirm_orientation_candidate = confirm_orientation_candidate
     application_class._populate = populate
     application_class._rebuild_metric_cards = rebuild_metric_cards
     application_class._finalize_tables = finalize_tables
     application_class._install_text_editing = install_text_editing
     application_class._show_text_context_menu = show_text_context_menu
     application_class._persistent_snapshot = persistent_snapshot
+    application_class._source_calibration = source_calibration
+    application_class._bind_source_calibration = bind_source_calibration
+    application_class._invalidate_source_scientific_state = invalidate_source_scientific_state
+    application_class._experimental_source_changed = experimental_source_changed
+    application_class._source_calibration_changed = source_calibration_changed
+    application_class._valid_orientation_selection = valid_orientation_selection
     application_class._reset_dirty = reset_dirty
     application_class._on_persistent_change = on_persistent_change
     application_class._update_project_indicator = update_project_indicator

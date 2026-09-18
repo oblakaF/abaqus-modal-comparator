@@ -12,6 +12,7 @@ from coordinate_calibration import (
     CoordinateCalibration,
     scale_candidates as calibration_scale_candidates,
 )
+from scientific_state import geometry_candidate_id
 
 from modal_core import (
     ComparisonResult,
@@ -381,8 +382,9 @@ def _candidate_summary(candidate: GeometryMatch) -> Dict[str, object]:
     ambiguity diagnostic. Contains no MAC/frequency/modal information."""
     determinant = float(np.linalg.det(candidate.rotation))
     axis_permutation = np.argmax(np.abs(candidate.rotation), axis=0).astype(int).tolist()
-    return {
+    summary = {
         "rotation": candidate.rotation.tolist(),
+        "translation": candidate.translation.tolist(),
         "coordinate_scales": candidate.coordinate_scales.tolist(),
         "normalized_rms_distance": candidate.normalized_rms_distance,
         "matched_fraction": candidate.matched_fraction,
@@ -391,6 +393,29 @@ def _candidate_summary(candidate: GeometryMatch) -> Dict[str, object]:
         "axis_permutation": axis_permutation,
         "calibration": dict(candidate.calibration_details),
     }
+    summary["candidate_id"] = geometry_candidate_id(summary)
+    return summary
+
+
+def _select_user_confirmed_geometry(
+    candidates: Sequence[GeometryMatch],
+    orientation_selection: Optional[Dict[str, object]],
+) -> GeometryMatch:
+    """Apply an independently user-confirmed candidate, or use P0 selection.
+
+    Candidate matching uses geometry-only identity.  It does not inspect MAC,
+    frequency, pair counts, or assignment cost.  An obsolete selection cannot
+    silently fall back to a different registration.
+    """
+    if orientation_selection is None:
+        return _select_unambiguous_geometry(candidates)
+    requested = str(orientation_selection.get("candidate_id", ""))
+    for candidate in candidates:
+        if _candidate_summary(candidate)["candidate_id"] == requested:
+            return candidate
+    # Preserve the scientific stop when the confirmed candidate is not valid
+    # for the current geometry/calibration context.
+    return _select_unambiguous_geometry(candidates)
 
 
 def _select_unambiguous_geometry(
@@ -1038,6 +1063,7 @@ def compare_modal_datasets(
     maximum_frequency_only_error_percent: float = 10.0,
     coordinate_scale_override: Optional[float] = None,
     geometry_calibration: Optional[CoordinateCalibration] = None,
+    orientation_selection: Optional[Dict[str, object]] = None,
 ) -> ComparisonResult:
     abaqus_modes = abaqus.sorted_modes()
     experimental_modes = experimental.sorted_modes()
@@ -1073,7 +1099,12 @@ def compare_modal_datasets(
     # Geometry/orientation is selected using ONLY geometric evidence, before
     # any MAC/frequency/modal quantity is computed -- see
     # _select_unambiguous_geometry and GeometryOrientationAmbiguousError.
-    geometry = _select_unambiguous_geometry(candidates)
+    geometry = _select_user_confirmed_geometry(candidates, orientation_selection)
+    orientation_was_user_confirmed = (
+        orientation_selection is not None
+        and _candidate_summary(geometry)["candidate_id"]
+        == orientation_selection.get("candidate_id")
+    )
     (
         mac_matrix,
         abaqus_indices,
@@ -1128,6 +1159,9 @@ def compare_modal_datasets(
     )
 
     warnings, selected_transform = _geometry_warnings_and_transform(geometry)
+    selected_transform["orientation_source"] = (
+        "user_confirmed" if orientation_was_user_confirmed else "geometry_unique"
+    )
     result_abaqus = _copy_dataset(abaqus)
     result_abaqus.metadata["selected_geometry_transform"] = selected_transform
     mapped_fe_coordinates = abaqus_reference.coordinates[geometry.experimental_to_abaqus]
@@ -1138,6 +1172,9 @@ def compare_modal_datasets(
     }
     result_metadata = {
         "geometry_calibration": dict(geometry.calibration_details),
+        "orientation_source": (
+            "user_confirmed" if orientation_was_user_confirmed else "geometry_unique"
+        ),
         "raw_experimental_bbox": {
             "minimum": experimental_coordinates.min(axis=0).tolist(),
             "maximum": experimental_coordinates.max(axis=0).tolist(),

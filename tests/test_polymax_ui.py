@@ -190,6 +190,61 @@ class PolymaxUiPolicyTests(unittest.TestCase):
         self.assertNotIn("target_frequencies", loader.call_args.kwargs)
         self.assertNotIn("target_count", loader.call_args.kwargs)
 
+    def test_runtime_routes_orientation_ambiguity_to_diagnostic_handler(self):
+        import main
+        import runtime_hardening
+        from reviewed_core import GeometryOrientationAmbiguousError
+
+        mode = ModeShape(
+            1,
+            10.0,
+            np.array([1], dtype=object),
+            np.array([[0.0, 0.0, 0.0]]),
+            np.array([[0.0, 0.0, 1.0]]),
+        )
+        dataset = ModalDataset("Abaqus", Path("model.odb"), [mode])
+        decisions = []
+        failures = []
+
+        class Root:
+            @staticmethod
+            def after(_delay, callback):
+                callback()
+
+        application = SimpleNamespace(
+            root=Root(),
+            _analysis_cancel_event=threading.Event(),
+            _owned_analysis_process=None,
+            _set_analysis_stage=lambda *_args: None,
+            _orientation_ambiguous=lambda error: decisions.append(error),
+            _failed=lambda error: failures.append(error),
+            _active_orientation_selection=None,
+        )
+        ambiguity = GeometryOrientationAmbiguousError(
+            "physical orientation is ambiguous", []
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            odb = root / "model.odb"
+            unv = root / "scan.unv"
+            output = root / "output"
+            odb.write_text("fixture", encoding="utf-8")
+            unv.write_text("fixture", encoding="utf-8")
+            with patch.object(
+                main.app, "load_or_extract_odb", return_value=dataset
+            ), patch.object(
+                runtime_hardening, "load_universal_modal_file", return_value=dataset
+            ), patch.object(
+                main.app, "compare_modal_datasets", side_effect=ambiguity
+            ):
+                main.app.ModalComparatorApp._worker(
+                    application, odb, unv, output, 7, 15, "abaqus", None, None
+                )
+            self.assertTrue((output / "last_orientation_ambiguity.log").exists())
+            self.assertFalse((output / "last_error.log").exists())
+        self.assertEqual(decisions, [ambiguity])
+        self.assertEqual(failures, [])
+
 
 class PolymaxNativeTkTests(unittest.TestCase):
     def test_empty_path_project_does_not_leak_restore_state(self):
@@ -328,6 +383,24 @@ class PolymaxNativeTkTests(unittest.TestCase):
                         modal_set_choice_text(full)
                     )
                     application._experimental_modal_set_selected()
+                    application.coordinate_mapping_mode.set("camera_grid")
+                    application.camera_scan_coverage.set("full")
+                    application.camera_physical_width.set("301.0")
+                    application.camera_physical_height.set("302.0")
+                    application.camera_dimension_unit.set("mm")
+                    application.calibration_provenance.set(
+                        "SP05 measured specimen dimensions"
+                    )
+                    self.assertIsNotNone(application._source_calibration_binding)
+                    orientation = {
+                        "candidate_id": "geometry-test-candidate",
+                        "rotation": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                        "translation": [0.0, 0.0, 0.0],
+                        "coordinate_scales": [1.0, 1.0, 1.0],
+                    }
+                    self.assertTrue(
+                        application._confirm_orientation_candidate(orientation)
+                    )
                     self.assertTrue(application.dirty_tracker.dirty)
                     payload = application._project_payload_for_self()
                     self.assertEqual(
@@ -340,10 +413,27 @@ class PolymaxNativeTkTests(unittest.TestCase):
 
                     application.experimental_path.set(str(other))
                     self._wait_for_discovery(root, application)
+                    self.assertEqual(application.camera_physical_width.get(), "")
+                    self.assertEqual(application.camera_physical_height.get(), "")
+                    self.assertEqual(application.calibration_provenance.get(), "")
+                    self.assertIsNone(application._confirmed_orientation)
+                    self.assertIsNone(application._source_calibration_binding)
                     self.assertEqual(application.experimental_modal_set_key.get(), "only")
                     self.assertEqual(
                         application.experimental_modal_set_display.get(),
                         modal_set_choice_text(only),
+                    )
+
+                    mismatched_recovery = deepcopy(payload)
+                    mismatched_recovery["inputs"]["simcenter_results"] = str(other)
+                    mismatched_recovery["inputs"]["experimental_modal_set"] = "only"
+                    application._apply_project_payload(mismatched_recovery, None)
+                    self._wait_for_discovery(root, application)
+                    self.assertEqual(application.camera_physical_width.get(), "")
+                    self.assertEqual(application.camera_physical_height.get(), "")
+                    self.assertNotEqual(
+                        application.calibration_provenance.get(),
+                        "SP05 measured specimen dimensions",
                     )
 
                     application._apply_project_payload(read_project(project_path), project_path)
@@ -351,7 +441,20 @@ class PolymaxNativeTkTests(unittest.TestCase):
                     self.assertEqual(
                         application.experimental_modal_set_key.get(), "processing"
                     )
+                    self.assertEqual(application.camera_physical_width.get(), "301.0")
+                    self.assertEqual(application.camera_physical_height.get(), "302.0")
+                    self.assertEqual(
+                        application.calibration_provenance.get(),
+                        "SP05 measured specimen dimensions",
+                    )
+                    self.assertEqual(
+                        application._confirmed_orientation["orientation_source"],
+                        "user_confirmed",
+                    )
                     self.assertFalse(application.dirty_tracker.dirty)
+
+                    application.camera_physical_width.set("303.0")
+                    self.assertIsNone(application._confirmed_orientation)
 
                     before_stale = [
                         item.key for item in application.available_experimental_modal_sets
