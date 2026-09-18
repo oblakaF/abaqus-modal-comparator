@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
+import hashlib
 import json
 import math
 import os
@@ -16,7 +17,8 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
-from typing import Callable, Iterable, Sequence, Tuple
+import tempfile
+from typing import Callable, Iterable, Mapping, Sequence, Tuple
 
 import numpy as np
 from scipy import linalg as dense_linalg
@@ -36,6 +38,9 @@ from .stage_a_parameterization import (
 STAGE_A_SECTION_MARKER = "** <STAGE_A_SHELL_GENERAL_SECTION>"
 STAGE_A_STEPS_MARKER = "** <STAGE_A_ANALYSIS_STEPS>"
 STAGE_A_PARAMETER_NAMES = ("D11", "D12", "D66")
+STAGE_A_POINT_EVALUATION_SCHEMA_VERSION = "stage-a-abaqus-point-v1"
+STAGE_A_MATRIX_DECK_RENDERER_VERSION = "stage-a-matrix-deck-v1"
+STAGE_A_FREQUENCY_EXTRACTION_SCHEMA_VERSION = "abaqus-frequency-json-v1"
 
 
 class AbaqusMatrixFormatError(ValueError):
@@ -48,6 +53,17 @@ class MatrixModelError(RuntimeError):
 
 class AbaqusMatrixGenerationError(MatrixModelError):
     """A real Abaqus matrix-generation or extraction process failed."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        returncode: int | None = None,
+        artifact_paths: Sequence[Path] = (),
+    ) -> None:
+        super().__init__(message)
+        self.returncode = returncode
+        self.artifact_paths = tuple(Path(path) for path in artifact_paths)
 
 
 def _finite(value: float, name: str) -> float:
@@ -662,6 +678,7 @@ def render_stage_a_matrix_deck(
     section_configuration: StageAShellSectionConfiguration,
     *,
     direct_frequency_modes: int = 0,
+    frequency_eigensolver: str = "LANCZOS",
 ) -> str:
     """Fill the two explicit Stage-A markers in an Abaqus input template."""
 
@@ -675,6 +692,9 @@ def render_stage_a_matrix_deck(
         or direct_frequency_modes < 0
     ):
         raise ValueError("direct_frequency_modes must be a non-negative integer.")
+    eigensolver = str(frequency_eigensolver).strip().upper()
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]*", eigensolver):
+        raise ValueError("frequency_eigensolver must be a valid Abaqus keyword value.")
 
     section_text = generate_stage_a_shell_general_section(
         parameters.as_parameterization(), section_configuration
@@ -689,7 +709,7 @@ def render_stage_a_matrix_deck(
         steps.extend(
             (
                 "*STEP, NAME=DIRECT_FREQUENCY",
-                "*FREQUENCY, EIGENSOLVER=LANCZOS",
+                f"*FREQUENCY, EIGENSOLVER={eigensolver}",
                 f"{int(direct_frequency_modes)},",
                 "*END STEP",
             )
@@ -792,7 +812,12 @@ def run_abaqus_matrix_job(
         if dat_tail:
             message += f"ABAQUS DAT TAIL\n{dat_tail}\n"
         message += f"Full launch log: {launch_log_path}"
-        raise AbaqusMatrixGenerationError(message)
+        raise AbaqusMatrixGenerationError(
+            message,
+            returncode=completed.returncode,
+            artifact_paths=tuple(path for path in required_outputs if path.exists())
+            + ((launch_log_path,) if launch_log_path.exists() else ()),
+        )
     return AbaqusMatrixJobResult(
         job_name=normalized_job_name,
         stiffness_path=None if datacheck else stiffness_path,
@@ -840,7 +865,9 @@ def extract_abaqus_frequencies(
     if completed.returncode != 0 or not output_path.is_file():
         tail = (completed.stderr or completed.stdout or "No output was produced.")[-4000:]
         raise AbaqusMatrixGenerationError(
-            f"Abaqus frequency extraction failed.\n{tail}"
+            f"Abaqus frequency extraction failed.\n{tail}",
+            returncode=completed.returncode,
+            artifact_paths=(output_path,) if output_path.exists() else (),
         )
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     frequencies = np.asarray(
@@ -852,6 +879,461 @@ def extract_abaqus_frequencies(
             "Abaqus frequency extraction produced no finite modal frequencies."
         )
     return frequencies
+
+
+@dataclass(frozen=True)
+class StageAAbaqusModalRequest:
+    """Modal settings that affect one direct Stage-A Abaqus evaluation."""
+
+    mode_count: int
+    eigensolver: str = "LANCZOS"
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.mode_count, bool)
+            or int(self.mode_count) != self.mode_count
+            or int(self.mode_count) <= 0
+        ):
+            raise ValueError("mode_count must be a positive integer.")
+        eigensolver = str(self.eigensolver).strip().upper()
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]*", eigensolver):
+            raise ValueError("eigensolver must be a valid Abaqus keyword value.")
+        object.__setattr__(self, "mode_count", int(self.mode_count))
+        object.__setattr__(self, "eigensolver", eigensolver)
+
+
+@dataclass(frozen=True)
+class StageAMatrixArtifactMetadata:
+    """Small immutable provenance record for one exported sparse matrix."""
+
+    path: Path
+    sha256: str
+    shape: Tuple[int, int]
+    nonzero_count: int
+    dof_count: int
+
+
+@dataclass(frozen=True)
+class StageAAbaqusPointEvaluation:
+    """Complete successful result for exactly one physical Stage-A point."""
+
+    parameters: StageAMatrixParameters
+    unconstrained_parameters: Tuple[float, float, float]
+    template_sha256: str
+    rendered_input_sha256: str
+    evaluation_key: str
+    job_name: str
+    work_directory: Path
+    input_path: Path
+    abaqus_command: str
+    abaqus_version: str | None
+    modal_request: StageAAbaqusModalRequest
+    matrix_job: AbaqusMatrixJobResult
+    matrices: AbaqusMatrixPair
+    stiffness_metadata: StageAMatrixArtifactMetadata
+    mass_metadata: StageAMatrixArtifactMetadata
+    direct_frequencies_hz: np.ndarray
+    frequency_output_path: Path
+    renderer_version: str
+    extraction_schema_version: str
+    success: bool = True
+    warnings: Tuple[str, ...] = ()
+    provenance: Tuple[Tuple[str, str], ...] = ()
+
+    def __post_init__(self) -> None:
+        frequencies = np.asarray(self.direct_frequencies_hz, dtype=float).copy()
+        if frequencies.shape != (self.modal_request.mode_count,):
+            raise ValueError("Direct frequencies must match the requested mode count.")
+        if not np.isfinite(frequencies).all() or np.any(frequencies < 0.0):
+            raise ValueError("Direct frequencies must be finite and non-negative.")
+        frequencies.setflags(write=False)
+        object.__setattr__(self, "direct_frequencies_hz", frequencies)
+        object.__setattr__(self, "work_directory", Path(self.work_directory))
+        object.__setattr__(self, "input_path", Path(self.input_path))
+        object.__setattr__(self, "frequency_output_path", Path(self.frequency_output_path))
+        object.__setattr__(self, "warnings", tuple(self.warnings))
+        object.__setattr__(self, "provenance", tuple(self.provenance))
+
+
+class StageAAbaqusPointEvaluationError(MatrixModelError):
+    """Structured failure for one isolated Stage-A Abaqus evaluation."""
+
+    success = False
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        evaluation_key: str,
+        parameters: StageAMatrixParameters,
+        job_name: str,
+        work_directory: Path,
+        stage: str,
+        process_return_code: int | None = None,
+        produced_paths: Sequence[Path] = (),
+    ) -> None:
+        super().__init__(message)
+        self.evaluation_key = evaluation_key
+        self.parameters = parameters
+        self.job_name = job_name
+        self.work_directory = Path(work_directory)
+        self.stage = str(stage)
+        self.process_return_code = process_return_code
+        self.produced_paths = tuple(Path(path) for path in produced_paths)
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _canonical_number(value: float) -> str:
+    return format(_finite(value, "evaluation identity value"), ".17g")
+
+
+def _section_identity(
+    configuration: StageAShellSectionConfiguration,
+) -> Mapping[str, object]:
+    return {
+        "elset": configuration.elset,
+        "A": [_canonical_number(item) for item in configuration.A.abaqus_values],
+        "B": [_canonical_number(item) for item in configuration.B.abaqus_values],
+        "transverse_shear": [
+            _canonical_number(item)
+            for item in configuration.transverse_shear.abaqus_values
+        ],
+        "density": (
+            None
+            if configuration.density is None
+            else _canonical_number(configuration.density)
+        ),
+    }
+
+
+def _evaluation_identity(
+    *,
+    parameters: StageAMatrixParameters,
+    section_configuration: StageAShellSectionConfiguration,
+    modal_request: StageAAbaqusModalRequest,
+    template_sha256: str,
+    rendered_input_sha256: str,
+    abaqus_command: str,
+    abaqus_version: str | None,
+) -> str:
+    runtime_identity = {
+        "command": str(abaqus_command).strip() or "abaqus",
+        "version": (
+            abaqus_version.strip()
+            if abaqus_version is not None and abaqus_version.strip()
+            else None
+        ),
+    }
+    payload = {
+        "schema_version": STAGE_A_POINT_EVALUATION_SCHEMA_VERSION,
+        "renderer_version": STAGE_A_MATRIX_DECK_RENDERER_VERSION,
+        "frequency_extraction_schema_version": (
+            STAGE_A_FREQUENCY_EXTRACTION_SCHEMA_VERSION
+        ),
+        "template_sha256": template_sha256,
+        "rendered_input_sha256": rendered_input_sha256,
+        "parameters": {
+            "D11": _canonical_number(parameters.D11),
+            "D12": _canonical_number(parameters.D12),
+            "D66": _canonical_number(parameters.D66),
+        },
+        "section": _section_identity(section_configuration),
+        "modal_request": {
+            "mode_count": modal_request.mode_count,
+            "eigensolver": modal_request.eigensolver,
+        },
+        "abaqus_runtime": runtime_identity,
+    }
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("ascii")
+    return _sha256_bytes(canonical)
+
+
+def _expected_point_paths(work_directory: Path, job_name: str) -> Tuple[Path, ...]:
+    return tuple(
+        work_directory / f"{job_name}{suffix}"
+        for suffix in (
+            ".inp",
+            ".launch.log",
+            ".dat",
+            ".odb",
+            "_STIF1.mtx",
+            "_MASS1.mtx",
+            "_frequencies.json",
+        )
+    )
+
+
+def _produced_point_paths(work_directory: Path, job_name: str) -> Tuple[Path, ...]:
+    return tuple(
+        path for path in _expected_point_paths(work_directory, job_name) if path.exists()
+    )
+
+
+def _point_failure(
+    error: Exception,
+    *,
+    evaluation_key: str,
+    parameters: StageAMatrixParameters,
+    job_name: str,
+    work_directory: Path,
+    stage: str,
+) -> StageAAbaqusPointEvaluationError:
+    produced = list(_produced_point_paths(work_directory, job_name))
+    for path in getattr(error, "artifact_paths", ()):
+        normalized = Path(path)
+        if normalized.exists() and normalized not in produced:
+            produced.append(normalized)
+    return StageAAbaqusPointEvaluationError(
+        f"Stage-A Abaqus point evaluation failed during {stage}: {error}",
+        evaluation_key=evaluation_key,
+        parameters=parameters,
+        job_name=job_name,
+        work_directory=work_directory,
+        stage=stage,
+        process_return_code=getattr(error, "returncode", None),
+        produced_paths=tuple(produced),
+    )
+
+
+def _validate_isolated_job_result(
+    job: AbaqusMatrixJobResult,
+    *,
+    work_directory: Path,
+    job_name: str,
+) -> None:
+    expected = {
+        "stiffness_path": work_directory / f"{job_name}_STIF1.mtx",
+        "mass_path": work_directory / f"{job_name}_MASS1.mtx",
+        "odb_path": work_directory / f"{job_name}.odb",
+        "dat_path": work_directory / f"{job_name}.dat",
+        "launch_log_path": work_directory / f"{job_name}.launch.log",
+    }
+    if job.job_name != job_name:
+        raise MatrixModelError("Abaqus returned a different job identity.")
+    for attribute, required_path in expected.items():
+        supplied = getattr(job, attribute)
+        if supplied is None or Path(supplied).resolve() != required_path.resolve():
+            raise MatrixModelError(
+                f"Abaqus {attribute} does not belong to the isolated evaluation."
+            )
+        if not required_path.is_file():
+            raise MatrixModelError(f"Expected Abaqus output is missing: {required_path}")
+
+
+def _matrix_artifact_metadata(
+    path: Path, matrix: sparse.csr_matrix, dof_count: int
+) -> StageAMatrixArtifactMetadata:
+    return StageAMatrixArtifactMetadata(
+        path=Path(path).resolve(),
+        sha256=_sha256_file(path),
+        shape=(int(matrix.shape[0]), int(matrix.shape[1])),
+        nonzero_count=int(matrix.nnz),
+        dof_count=int(dof_count),
+    )
+
+
+def evaluate_stage_a_abaqus_point(
+    template_text: str,
+    parameters: StageAMatrixParameters,
+    section_configuration: StageAShellSectionConfiguration,
+    work_root: Path,
+    *,
+    direct_frequency_modes: int,
+    frequency_eigensolver: str = "LANCZOS",
+    abaqus_command: str = "abaqus",
+    abaqus_version: str | None = None,
+    job_timeout_seconds: int = 3600,
+    extraction_timeout_seconds: int = 300,
+) -> StageAAbaqusPointEvaluation:
+    """Evaluate one Stage-A point in a fresh, content-identified work directory.
+
+    This function deliberately provides no persistent cache.  Its evaluation
+    key is suitable for a later cache layer, while every call remains isolated
+    from both earlier successful jobs and incomplete artifacts.
+    """
+
+    if not isinstance(template_text, str):
+        raise TypeError("template_text must be a string.")
+    if not isinstance(parameters, StageAMatrixParameters):
+        raise TypeError("parameters must be StageAMatrixParameters.")
+    if not isinstance(section_configuration, StageAShellSectionConfiguration):
+        raise TypeError(
+            "section_configuration must be StageAShellSectionConfiguration."
+        )
+    modal_request = StageAAbaqusModalRequest(
+        direct_frequency_modes, frequency_eigensolver
+    )
+    rendered = render_stage_a_matrix_deck(
+        template_text,
+        parameters,
+        section_configuration,
+        direct_frequency_modes=modal_request.mode_count,
+        frequency_eigensolver=modal_request.eigensolver,
+    )
+    template_sha256 = _sha256_bytes(template_text.encode("utf-8"))
+    rendered_sha256 = _sha256_bytes(rendered.encode("utf-8"))
+    normalized_version = (
+        str(abaqus_version).strip() if abaqus_version is not None else None
+    )
+    if normalized_version == "":
+        normalized_version = None
+    evaluation_key = _evaluation_identity(
+        parameters=parameters,
+        section_configuration=section_configuration,
+        modal_request=modal_request,
+        template_sha256=template_sha256,
+        rendered_input_sha256=rendered_sha256,
+        abaqus_command=abaqus_command,
+        abaqus_version=normalized_version,
+    )
+    job_name = f"stage_a_{evaluation_key[:20]}"
+    work_root = Path(work_root).resolve()
+    try:
+        work_root.mkdir(parents=True, exist_ok=True)
+        work_directory = Path(
+            tempfile.mkdtemp(prefix=f"{job_name}_", dir=str(work_root))
+        ).resolve()
+        input_path = work_directory / f"{job_name}.inp"
+        input_path.write_text(rendered, encoding="utf-8", newline="\n")
+    except Exception as exc:
+        fallback_directory = work_root / f"{job_name}_uncreated"
+        raise _point_failure(
+            exc,
+            evaluation_key=evaluation_key,
+            parameters=parameters,
+            job_name=job_name,
+            work_directory=fallback_directory,
+            stage="work_directory_preparation",
+        ) from exc
+
+    try:
+        matrix_job = run_abaqus_matrix_job(
+            input_path,
+            work_directory,
+            job_name=job_name,
+            abaqus_command=abaqus_command,
+            timeout_seconds=job_timeout_seconds,
+        )
+    except Exception as exc:
+        raise _point_failure(
+            exc,
+            evaluation_key=evaluation_key,
+            parameters=parameters,
+            job_name=job_name,
+            work_directory=work_directory,
+            stage="abaqus_job",
+        ) from exc
+
+    try:
+        _validate_isolated_job_result(
+            matrix_job, work_directory=work_directory, job_name=job_name
+        )
+    except Exception as exc:
+        raise _point_failure(
+            exc,
+            evaluation_key=evaluation_key,
+            parameters=parameters,
+            job_name=job_name,
+            work_directory=work_directory,
+            stage="job_output_validation",
+        ) from exc
+
+    assert matrix_job.stiffness_path is not None
+    assert matrix_job.mass_path is not None
+    try:
+        matrices = read_abaqus_matrix_pair(
+            matrix_job.stiffness_path, matrix_job.mass_path
+        )
+    except Exception as exc:
+        raise _point_failure(
+            exc,
+            evaluation_key=evaluation_key,
+            parameters=parameters,
+            job_name=job_name,
+            work_directory=work_directory,
+            stage="matrix_read",
+        ) from exc
+
+    frequency_output_path = work_directory / f"{job_name}_frequencies.json"
+    try:
+        frequencies = extract_abaqus_frequencies(
+            matrix_job.odb_path,
+            frequency_output_path,
+            abaqus_command=abaqus_command,
+            timeout_seconds=extraction_timeout_seconds,
+        )
+        frequencies = np.asarray(frequencies, dtype=float)
+        if not frequency_output_path.is_file():
+            raise MatrixModelError("Frequency extraction did not create its JSON output.")
+        if frequencies.shape != (modal_request.mode_count,):
+            raise MatrixModelError(
+                "Extracted frequency count does not match the requested modal count."
+            )
+        if not np.isfinite(frequencies).all() or np.any(frequencies < 0.0):
+            raise MatrixModelError(
+                "Extracted direct frequencies must be finite and non-negative."
+            )
+    except Exception as exc:
+        raise _point_failure(
+            exc,
+            evaluation_key=evaluation_key,
+            parameters=parameters,
+            job_name=job_name,
+            work_directory=work_directory,
+            stage="frequency_extraction",
+        ) from exc
+
+    point = parameters.as_parameterization()
+    warnings = (
+        (
+            "Abaqus version was not supplied; the evaluation key uses the "
+            "Abaqus command identity instead."
+        ),
+    ) if normalized_version is None else ()
+    return StageAAbaqusPointEvaluation(
+        parameters=parameters,
+        unconstrained_parameters=point.unconstrained,
+        template_sha256=template_sha256,
+        rendered_input_sha256=rendered_sha256,
+        evaluation_key=evaluation_key,
+        job_name=job_name,
+        work_directory=work_directory,
+        input_path=input_path,
+        abaqus_command=str(abaqus_command),
+        abaqus_version=normalized_version,
+        modal_request=modal_request,
+        matrix_job=matrix_job,
+        matrices=matrices,
+        stiffness_metadata=_matrix_artifact_metadata(
+            matrix_job.stiffness_path, matrices.stiffness, len(matrices.dofs)
+        ),
+        mass_metadata=_matrix_artifact_metadata(
+            matrix_job.mass_path, matrices.mass, len(matrices.dofs)
+        ),
+        direct_frequencies_hz=frequencies,
+        frequency_output_path=frequency_output_path,
+        renderer_version=STAGE_A_MATRIX_DECK_RENDERER_VERSION,
+        extraction_schema_version=STAGE_A_FREQUENCY_EXTRACTION_SCHEMA_VERSION,
+        warnings=warnings,
+        provenance=(
+            ("evaluation_schema", STAGE_A_POINT_EVALUATION_SCHEMA_VERSION),
+            ("template_sha256", template_sha256),
+            ("rendered_input_sha256", rendered_sha256),
+        ),
+    )
 
 
 @dataclass(frozen=True)

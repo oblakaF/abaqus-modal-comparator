@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 from scipy import sparse
@@ -19,11 +20,15 @@ from services.abaqus_shell_section import (
 from services.matrix_model_service import (
     AbaqusDof,
     AbaqusMatrixFormatError,
+    AbaqusMatrixGenerationError,
+    AbaqusMatrixJobResult,
     AbaqusMatrixPair,
     DirectAbaqusEvaluation,
     MatrixModelError,
+    StageAAbaqusPointEvaluationError,
     StageAMatrixParameters,
     build_stage_a_affine_basis,
+    evaluate_stage_a_abaqus_point,
     is_sparse_symmetric,
     read_abaqus_matrix_input,
     read_abaqus_matrix_pair,
@@ -281,6 +286,278 @@ class MatrixDeckAndProofTests(unittest.TestCase):
         )
         self.assertFalse(failed.passed)
         self.assertEqual(failed.offending_parameters, samples[0])
+
+
+class StageAAbaqusPointEvaluationTests(unittest.TestCase):
+    def setUp(self):
+        self.template = (
+            "*HEADING\n"
+            "** deterministic Stage-A fixture\n"
+            "** <STAGE_A_SHELL_GENERAL_SECTION>\n"
+            "** <STAGE_A_ANALYSIS_STEPS>\n"
+        )
+        self.parameters = StageAMatrixParameters(10.0, 2.0, 3.0)
+        self.configuration = StageAShellSectionConfiguration(
+            "PLATE",
+            SectionStiffnessBlock(100.0, 20.0, 100.0, 0.0, 0.0, 40.0),
+            TransverseShearStiffness(70.0, 7.0, 80.0),
+            density=2.5,
+        )
+        self.matrix_pair = diagonal_pair([4.0, 9.0, 16.0])
+
+    @staticmethod
+    def _successful_job(input_path, output_directory, *, job_name, **_kwargs):
+        output_directory = Path(output_directory)
+        paths = {
+            "launch": output_directory / f"{job_name}.launch.log",
+            "dat": output_directory / f"{job_name}.dat",
+            "odb": output_directory / f"{job_name}.odb",
+            "stiffness": output_directory / f"{job_name}_STIF1.mtx",
+            "mass": output_directory / f"{job_name}_MASS1.mtx",
+        }
+        for label, path in paths.items():
+            path.write_text(f"{label} for {job_name}\n", encoding="ascii")
+        return AbaqusMatrixJobResult(
+            job_name=job_name,
+            stiffness_path=paths["stiffness"],
+            mass_path=paths["mass"],
+            odb_path=paths["odb"],
+            dat_path=paths["dat"],
+            launch_log_path=paths["launch"],
+        )
+
+    @staticmethod
+    def _successful_frequency_extract(_odb_path, output_path, **_kwargs):
+        Path(output_path).write_text('{"format_version": 1}\n', encoding="ascii")
+        return np.array([0.0, 1.25, 2.5])
+
+    def _evaluate(self, work_root, **changes):
+        values = {
+            "template_text": self.template,
+            "parameters": self.parameters,
+            "section_configuration": self.configuration,
+            "work_root": work_root,
+            "direct_frequency_modes": 3,
+            "abaqus_version": "Abaqus 2024 test",
+        }
+        values.update(changes)
+        with (
+            mock.patch(
+                "services.matrix_model_service.run_abaqus_matrix_job",
+                side_effect=self._successful_job,
+            ) as runner,
+            mock.patch(
+                "services.matrix_model_service.read_abaqus_matrix_pair",
+                return_value=self.matrix_pair,
+            ) as reader,
+            mock.patch(
+                "services.matrix_model_service.extract_abaqus_frequencies",
+                side_effect=self._successful_frequency_extract,
+            ) as extractor,
+            mock.patch(
+                "services.matrix_model_service.subprocess.run",
+                side_effect=AssertionError("unit test attempted to launch Abaqus"),
+            ) as subprocess_run,
+        ):
+            result = evaluate_stage_a_abaqus_point(**values)
+        subprocess_run.assert_not_called()
+        return result, runner, reader, extractor
+
+    def test_same_complete_input_has_same_key_but_fresh_isolated_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            first, *_ = self._evaluate(directory)
+            second, *_ = self._evaluate(directory)
+        self.assertEqual(first.evaluation_key, second.evaluation_key)
+        self.assertEqual(first.job_name, second.job_name)
+        self.assertNotEqual(first.work_directory, second.work_directory)
+
+    def test_each_bending_parameter_changes_the_key(self):
+        changed_points = (
+            StageAMatrixParameters(11.0, 2.0, 3.0),
+            StageAMatrixParameters(10.0, 2.5, 3.0),
+            StageAMatrixParameters(10.0, 2.0, 3.5),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            baseline, *_ = self._evaluate(directory)
+            keys = [
+                self._evaluate(directory, parameters=point)[0].evaluation_key
+                for point in changed_points
+            ]
+        self.assertTrue(all(key != baseline.evaluation_key for key in keys))
+        self.assertEqual(len(set(keys)), len(changed_points))
+
+    def test_template_and_eigensolver_changes_each_change_the_key(self):
+        changed_template = self.template.replace(
+            "** deterministic", "** scientifically different"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            baseline, *_ = self._evaluate(directory)
+            template_result, *_ = self._evaluate(
+                directory, template_text=changed_template
+            )
+            solver_result, *_ = self._evaluate(
+                directory, frequency_eigensolver="SUBSPACE"
+            )
+            solver_input = solver_result.input_path.read_text(encoding="utf-8")
+        self.assertNotEqual(baseline.evaluation_key, template_result.evaluation_key)
+        self.assertNotEqual(baseline.evaluation_key, solver_result.evaluation_key)
+        self.assertIn("*FREQUENCY, EIGENSOLVER=SUBSPACE", solver_input)
+
+    def test_success_composes_existing_services_and_preserves_exact_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, runner, reader, extractor = self._evaluate(directory)
+            rendered = result.input_path.read_text(encoding="utf-8")
+        self.assertTrue(result.success)
+        self.assertEqual(result.parameters, self.parameters)
+        self.assertEqual(
+            result.unconstrained_parameters,
+            self.parameters.as_parameterization().unconstrained,
+        )
+        self.assertEqual(result.modal_request.mode_count, 3)
+        self.assertEqual(result.modal_request.eigensolver, "LANCZOS")
+        self.assertEqual(result.abaqus_version, "Abaqus 2024 test")
+        self.assertIs(result.matrices, self.matrix_pair)
+        np.testing.assert_array_equal(result.direct_frequencies_hz, [0.0, 1.25, 2.5])
+        self.assertIn("0, 10, 0, 0, 0, 2, 10, 0", rendered)
+        self.assertIn("*FREQUENCY, EIGENSOLVER=LANCZOS\n3,", rendered)
+        self.assertEqual(result.stiffness_metadata.shape, (3, 3))
+        self.assertEqual(result.mass_metadata.dof_count, 3)
+        self.assertEqual(len(result.template_sha256), 64)
+        self.assertEqual(len(result.rendered_input_sha256), 64)
+        self.assertEqual(len(result.evaluation_key), 64)
+        runner.assert_called_once()
+        reader.assert_called_once_with(
+            result.matrix_job.stiffness_path, result.matrix_job.mass_path
+        )
+        extractor.assert_called_once()
+
+    def test_failed_process_raises_structured_failure_with_no_success_result(self):
+        process_error = AbaqusMatrixGenerationError(
+            "solver returned an error", returncode=17
+        )
+        with tempfile.TemporaryDirectory() as directory, mock.patch(
+            "services.matrix_model_service.run_abaqus_matrix_job",
+            side_effect=process_error,
+        ), mock.patch(
+            "services.matrix_model_service.subprocess.run",
+            side_effect=AssertionError("unit test attempted to launch Abaqus"),
+        ) as subprocess_run:
+            with self.assertRaises(StageAAbaqusPointEvaluationError) as captured:
+                evaluate_stage_a_abaqus_point(
+                    self.template,
+                    self.parameters,
+                    self.configuration,
+                    directory,
+                    direct_frequency_modes=3,
+                    abaqus_version="Abaqus 2024 test",
+                )
+        subprocess_run.assert_not_called()
+        failure = captured.exception
+        self.assertFalse(failure.success)
+        self.assertEqual(failure.stage, "abaqus_job")
+        self.assertEqual(failure.process_return_code, 17)
+        self.assertEqual(failure.parameters, self.parameters)
+        self.assertEqual(len(failure.evaluation_key), 64)
+        self.assertTrue(failure.work_directory.name.startswith(failure.job_name))
+
+    def test_incomplete_current_outputs_are_rejected_before_read_or_extract(self):
+        def incomplete_job(input_path, output_directory, *, job_name, **_kwargs):
+            job = self._successful_job(
+                input_path, output_directory, job_name=job_name
+            )
+            job.mass_path.unlink()
+            return job
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            mock.patch(
+                "services.matrix_model_service.run_abaqus_matrix_job",
+                side_effect=incomplete_job,
+            ),
+            mock.patch(
+                "services.matrix_model_service.read_abaqus_matrix_pair"
+            ) as reader,
+            mock.patch(
+                "services.matrix_model_service.extract_abaqus_frequencies"
+            ) as extractor,
+        ):
+            with self.assertRaises(StageAAbaqusPointEvaluationError) as captured:
+                evaluate_stage_a_abaqus_point(
+                    self.template,
+                    self.parameters,
+                    self.configuration,
+                    directory,
+                    direct_frequency_modes=3,
+                    abaqus_version="Abaqus 2024 test",
+                )
+        self.assertEqual(captured.exception.stage, "job_output_validation")
+        reader.assert_not_called()
+        extractor.assert_not_called()
+
+    def test_missing_frequency_artifact_is_not_accepted_as_success(self):
+        def incomplete_extract(_odb_path, _output_path, **_kwargs):
+            return np.array([0.0, 1.25, 2.5])
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            mock.patch(
+                "services.matrix_model_service.run_abaqus_matrix_job",
+                side_effect=self._successful_job,
+            ),
+            mock.patch(
+                "services.matrix_model_service.read_abaqus_matrix_pair",
+                return_value=self.matrix_pair,
+            ),
+            mock.patch(
+                "services.matrix_model_service.extract_abaqus_frequencies",
+                side_effect=incomplete_extract,
+            ),
+        ):
+            with self.assertRaises(StageAAbaqusPointEvaluationError) as captured:
+                evaluate_stage_a_abaqus_point(
+                    self.template,
+                    self.parameters,
+                    self.configuration,
+                    directory,
+                    direct_frequency_modes=3,
+                    abaqus_version="Abaqus 2024 test",
+                )
+        self.assertEqual(captured.exception.stage, "frequency_extraction")
+
+    def test_stale_outputs_from_another_directory_cannot_satisfy_current_job(self):
+        with tempfile.TemporaryDirectory() as directory:
+            stale_directory = Path(directory) / "stale"
+            stale_directory.mkdir()
+
+            def stale_job(input_path, output_directory, *, job_name, **_kwargs):
+                return self._successful_job(
+                    input_path, stale_directory, job_name=job_name
+                )
+
+            with (
+                mock.patch(
+                    "services.matrix_model_service.run_abaqus_matrix_job",
+                    side_effect=stale_job,
+                ),
+                mock.patch(
+                    "services.matrix_model_service.read_abaqus_matrix_pair"
+                ) as reader,
+                mock.patch(
+                    "services.matrix_model_service.extract_abaqus_frequencies"
+                ) as extractor,
+            ):
+                with self.assertRaises(StageAAbaqusPointEvaluationError) as captured:
+                    evaluate_stage_a_abaqus_point(
+                        self.template,
+                        self.parameters,
+                        self.configuration,
+                        directory,
+                        direct_frequency_modes=3,
+                        abaqus_version="Abaqus 2024 test",
+                    )
+        self.assertEqual(captured.exception.stage, "job_output_validation")
+        reader.assert_not_called()
+        extractor.assert_not_called()
 
 
 if __name__ == "__main__":
