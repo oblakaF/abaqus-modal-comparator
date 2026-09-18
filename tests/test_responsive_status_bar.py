@@ -16,6 +16,7 @@ class FakeFooter:
         self.forgotten = False
         self.pack_options = None
         self.lift_count = 0
+        self.children = []
 
     def pack_forget(self):
         self.forgotten = True
@@ -25,6 +26,20 @@ class FakeFooter:
 
     def lift(self):
         self.lift_count += 1
+
+    def winfo_children(self):
+        return self.children
+
+
+class FakeStatusLabel:
+    def __init__(self):
+        self.wraplength = None
+
+    def winfo_class(self):
+        return "TLabel"
+
+    def configure(self, **kwargs):
+        self.wraplength = kwargs.get("wraplength", self.wraplength)
 
 
 class FakeProgress:
@@ -58,7 +73,9 @@ class FakeApplication:
         self.root = FakeRoot(width)
         self.tabs = object()
         self.footer = FakeFooter()
+        self.status_label = FakeStatusLabel()
         self.progress = FakeProgress(self.footer)
+        self.footer.children = [self.status_label, self.progress]
 
 
 class ResponsiveStatusBarTests(unittest.TestCase):
@@ -77,6 +94,7 @@ class ResponsiveStatusBarTests(unittest.TestCase):
         self.assertEqual(application.footer.pack_options["fill"], "x")
         self.assertIs(application.footer.pack_options["before"], application.tabs)
         self.assertEqual(application.progress.length, 264)
+        self.assertEqual(application.status_label.wraplength, 856)
         self.assertGreaterEqual(application.footer.lift_count, 2)
         self.assertEqual(application.root.bindings[0][0], "<Configure>")
         self.assertEqual(application.root.bindings[0][2], "+")

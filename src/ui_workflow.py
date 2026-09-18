@@ -42,12 +42,13 @@ from ui_policy import (
     coordinate_scale_from_units,
     discover_abaqus_installations,
     experimental_unit_from_metadata,
-    logical_window_width,
+    minimum_window_size,
     metric_grid_columns,
     normalize_recovery_preferences,
     normalize_ui_scale_percent,
     resolve_command,
     responsive_padding,
+    responsive_layout_width,
     select_abaqus_installation,
     select_layout_mode,
     status_text,
@@ -577,7 +578,17 @@ def install_responsive_workflow(app_module) -> None:
 
         original_init(self, root)
         root.geometry("1400x860")
-        root.minsize(760, 560)
+        root.minsize(*minimum_window_size())
+        footer = self.progress.master
+        for widget in (self.header, self.tabs, footer):
+            widget.pack_forget()
+        root.columnconfigure(0, weight=1)
+        root.rowconfigure(0, weight=0)
+        root.rowconfigure(1, weight=1)
+        root.rowconfigure(2, weight=0)
+        self.header.grid(row=0, column=0, sticky="ew")
+        self.tabs.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
+        footer.grid(row=2, column=0, sticky="ew")
         _configure_styles(root, self.ui_scale_percent.get())
         self._rebuild_metric_cards()
         self._finalize_tables()
@@ -606,27 +617,25 @@ def install_responsive_workflow(app_module) -> None:
 
     def build_input(self) -> None:
         self.end_mode.set(15)
+        self.input_tab.columnconfigure(0, weight=1)
+        self.input_tab.rowconfigure(0, weight=1)
         canvas = tk.Canvas(self.input_tab, highlightthickness=0, borderwidth=0)
         scrollbar = ttk.Scrollbar(self.input_tab, orient="vertical", command=canvas.yview)
-        horizontal_scrollbar = ttk.Scrollbar(self.input_tab, orient="horizontal", command=canvas.xview)
         content = ttk.Frame(canvas, padding=4)
         window_id = canvas.create_window((0, 0), window=content, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set, xscrollcommand=horizontal_scrollbar.set)
-        horizontal_scrollbar.pack(side="bottom", fill="x")
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
         canvas.bind(
             "<Configure>",
-            lambda event: canvas.itemconfigure(
-                window_id, width=max(event.width, content.winfo_reqwidth())
-            ),
+            lambda event: canvas.itemconfigure(window_id, width=max(1, event.width)),
             add="+",
         )
         content.bind("<Configure>", lambda _event: canvas.configure(scrollregion=canvas.bbox("all")), add="+")
         self.root.bind_all("<MouseWheel>", self._scroll_input_tab, add="+")
         self._input_canvas = canvas
         self._input_content = content
-        self._input_horizontal_scrollbar = horizontal_scrollbar
+        self._input_horizontal_scrollbar = None
 
         def section(title: str):
             frame = ttk.LabelFrame(content, text=title, padding=STYLE_TOKENS["section_padding"])
@@ -663,7 +672,7 @@ def install_responsive_workflow(app_module) -> None:
             style="Secondary.TLabel",
             justify="left",
         )
-        mode_help.grid(row=1, column=1, sticky="w", padx=(10, 0), pady=(0, 4))
+        mode_help.grid(row=1, column=1, sticky="ew", padx=(10, 0), pady=(0, 4))
         self._responsive_wrap_labels.append(mode_help)
         self._tooltips.append(Tooltip(mode_box, "Select the inclusive Abaqus eigenmode range to extract from the ODB."))
 
@@ -689,7 +698,8 @@ def install_responsive_workflow(app_module) -> None:
         )
         self.test_abaqus_button.pack(side="left")
         self.abaqus_warning_label = ttk.Label(abaqus, textvariable=self.abaqus_detection_status, style="Secondary.TLabel")
-        self.abaqus_warning_label.grid(row=1, column=1, columnspan=2, sticky="w", padx=(10, 0))
+        self.abaqus_warning_label.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(10, 0))
+        self._responsive_wrap_labels.append(self.abaqus_warning_label)
         self.abaqus_advanced_checkbutton = ttk.Checkbutton(
             abaqus,
             text="Advanced command",
@@ -705,12 +715,16 @@ def install_responsive_workflow(app_module) -> None:
         self.abaqus_advanced_frame.grid_remove()
 
         geometry = section("GEOMETRY / UNITS")
+        geometry.columnconfigure(1, weight=0)
+        geometry.columnconfigure(2, weight=1)
         ttk.Label(geometry, text="Abaqus model length unit:").grid(row=0, column=0, sticky="w", pady=4)
         self.abaqus_unit_combo = ttk.Combobox(
             geometry, textvariable=self.abaqus_model_unit, values=("mm", "m", "cm", "\u00b5m", "custom"), state="readonly", width=15
         )
         self.abaqus_unit_combo.grid(row=0, column=1, sticky="w", padx=(10, 0), pady=4)
-        ttk.Label(geometry, text="Abaqus is unitless; choose the length unit used to build the model.", style="Secondary.TLabel").grid(row=0, column=2, sticky="w", padx=(10, 0))
+        abaqus_unit_help = ttk.Label(geometry, text="Abaqus is unitless; choose the length unit used to build the model.", style="Secondary.TLabel", justify="left")
+        abaqus_unit_help.grid(row=0, column=2, sticky="ew", padx=(10, 0))
+        self._responsive_wrap_labels.append(abaqus_unit_help)
         ttk.Label(geometry, text="Experimental coordinate unit:").grid(row=1, column=0, sticky="w", pady=4)
         self.experimental_unit_combo = ttk.Combobox(
             geometry, textvariable=self.experimental_coordinate_unit, values=("mm", "m", "cm", "\u00b5m"), state="readonly", width=15
@@ -719,10 +733,12 @@ def install_responsive_workflow(app_module) -> None:
         self.experimental_unit_combo.bind(
             "<<ComboboxSelected>>", self._experimental_unit_selected, add="+"
         )
-        ttk.Label(geometry, textvariable=self.experimental_unit_source, style="Secondary.TLabel").grid(row=1, column=2, sticky="w", padx=(10, 0))
+        experimental_unit_help = ttk.Label(geometry, textvariable=self.experimental_unit_source, style="Secondary.TLabel", justify="left")
+        experimental_unit_help.grid(row=1, column=2, sticky="ew", padx=(10, 0))
+        self._responsive_wrap_labels.append(experimental_unit_help)
         ttk.Label(geometry, text="Coordinate mapping:").grid(row=2, column=0, sticky="nw", pady=4)
         mapping = ttk.Frame(geometry)
-        mapping.grid(row=2, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
+        mapping.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(10, 0), pady=4)
         self.automatic_scale_radio = ttk.Radiobutton(
             mapping,
             text="Calibrated physical geometry (trust documented units)",
@@ -756,12 +772,12 @@ def install_responsive_workflow(app_module) -> None:
         )
         self.legacy_scale_radio.pack(anchor="w")
         self.custom_scale_frame = ttk.Frame(geometry)
-        self.custom_scale_frame.grid(row=3, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
+        self.custom_scale_frame.grid(row=3, column=1, columnspan=2, sticky="ew", padx=(10, 0), pady=4)
         ttk.Label(self.custom_scale_frame, text="Custom scale:").pack(side="left")
         self.custom_scale_entry = ttk.Entry(self.custom_scale_frame, textvariable=self.custom_coordinate_scale, width=16)
         self.custom_scale_entry.pack(side="left", padx=(8, 0))
         self.camera_scale_frame = ttk.Frame(geometry)
-        self.camera_scale_frame.grid(row=4, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=4)
+        self.camera_scale_frame.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(10, 0), pady=4)
         self.camera_scan_coverage_label = ttk.Label(self.camera_scale_frame, text="Scan coverage:")
         self.camera_scan_coverage_label.grid(row=0, column=0, sticky="w")
         self.camera_scan_coverage_combo = ttk.Combobox(self.camera_scale_frame, textvariable=self.camera_scan_coverage, values=("full", "partial"), state="readonly", width=12)
@@ -796,7 +812,8 @@ def install_responsive_workflow(app_module) -> None:
             style="Secondary.TLabel", justify="left"
         )
         mapping_help.configure(text="Calibration establishes physical coordinate scale first. Registration then selects axis permutation, translation, and reflection using geometric fit alone (residual and matched fraction); MAC is evaluated only after geometry is fixed and never influences which orientation is chosen. If geometry cannot resolve a single orientation, the comparison is refused rather than guessed.")
-        mapping_help.grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        mapping_help.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(4, 0))
+        self.geometry_mapping_help_label = mapping_help
         self._responsive_wrap_labels.append(mapping_help)
         self._tooltips.extend((
             Tooltip(self.abaqus_unit_combo, "Abaqus ODB files do not contain an intrinsic physical length unit. Choose the unit used when the model geometry was created."),
@@ -866,7 +883,7 @@ def install_responsive_workflow(app_module) -> None:
         button = ttk.Button(parent, text="Browse...", command=command)
         button.grid(row=row, column=2, sticky="e", padx=(10, 0), pady=(5, 2))
         help_label = ttk.Label(parent, text=help_text, style="Secondary.TLabel", justify="left")
-        help_label.grid(row=row + 1, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=(0, 4))
+        help_label.grid(row=row + 1, column=1, columnspan=2, sticky="ew", padx=(10, 0), pady=(0, 4))
         self._responsive_wrap_labels.append(help_label)
         return entry, button
 
@@ -1965,10 +1982,8 @@ def install_responsive_workflow(app_module) -> None:
         try:
             pixel_width = int(self.root.winfo_width())
             tk_scaling = float(self.root.tk.call("tk", "scaling"))
-            width = logical_window_width(pixel_width, tk_scaling)
-            width = max(
-                1,
-                int(round(width / (self.ui_scale_percent.get() / 100.0))),
+            width = responsive_layout_width(
+                pixel_width, tk_scaling, self.ui_scale_percent.get()
             )
         except tk.TclError:
             return
@@ -2012,6 +2027,9 @@ def install_responsive_workflow(app_module) -> None:
             self.camera_physical_height_entry.configure(width=10 if compact else 12)
             self.camera_dimension_unit_combo.configure(width=6 if compact else 7)
             self.calibration_provenance_entry.configure(width=42 if compact else 70)
+            for column in range(7):
+                self.camera_scale_frame.columnconfigure(column, weight=0)
+            self.camera_scale_frame.columnconfigure(4 if compact else 6, weight=1)
             camera_layout = (
                 (self.camera_scan_coverage_label, 0, 0, 1),
                 (self.camera_scan_coverage_combo, 0, 1, 1),
@@ -2029,9 +2047,10 @@ def install_responsive_workflow(app_module) -> None:
             )
             for widget, row, column, columnspan in camera_layout:
                 widget.grid_configure(row=row, column=column, columnspan=columnspan)
-        wrap = text_wrap_width(width, mode)
         for label in self._responsive_wrap_labels:
             try:
+                container_width = int(label.master.winfo_width())
+                wrap = text_wrap_width(container_width, mode)
                 if int(label.cget("wraplength")) != wrap:
                     label.configure(wraplength=wrap)
             except (tk.TclError, ValueError):

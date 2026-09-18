@@ -127,6 +127,12 @@ STYLE_TOKENS = {
 
 UI_SCALE_PERCENT_VALUES = (80, 90, 100, 110, 125)
 
+# This is the smallest physical desktop window that keeps the nine-tab
+# notebook, primary file controls, and run/stop actions usable.  Interface
+# scale remains an independent presentation preference; the vertically
+# scrollable input page absorbs the additional height required at 125%.
+MINIMUM_WINDOW_SIZE = (1120, 700)
+
 
 UNIT_TO_METRES = {
     "mm": 1.0e-3,
@@ -201,6 +207,20 @@ def logical_window_width(pixel_width: int, tk_scaling: float) -> int:
         return max(1, int(pixel_width))
     baseline = 96.0 / 72.0
     return max(1, int(round(pixels / (scaling / baseline))))
+
+
+def responsive_layout_width(
+    pixel_width: int,
+    tk_scaling: float,
+    ui_scale_percent: object,
+) -> int:
+    """Return layout width without mutating the independent UI-scale setting."""
+    scale = normalize_ui_scale_percent(ui_scale_percent) / 100.0
+    return max(1, int(round(logical_window_width(pixel_width, tk_scaling) / scale)))
+
+
+def minimum_window_size() -> tuple[int, int]:
+    return MINIMUM_WINDOW_SIZE
 
 
 def metric_grid_columns(mode: LayoutMode, width: Optional[int] = None) -> int:

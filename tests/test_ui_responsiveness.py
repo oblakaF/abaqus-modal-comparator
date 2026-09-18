@@ -17,8 +17,10 @@ from project_review import project_payload
 from ui_policy import (
     UI_SCALE_PERCENT_VALUES,
     SettledCallback,
+    minimum_window_size,
     normalize_recovery_preferences,
     normalize_ui_scale_percent,
+    responsive_layout_width,
 )
 from ui_workflow import load_recovery_preferences, save_recovery_preferences
 
@@ -123,6 +125,14 @@ class InterfaceScaleTests(unittest.TestCase):
             normalize_ui_scale_percent(percent)
         after = scale_candidates(calibration, coordinates)[0][0]
         np.testing.assert_array_equal(before, after)
+
+    def test_window_resize_policy_is_separate_from_interface_scale(self):
+        selected = 80
+        width_at_80 = responsive_layout_width(1600, 96 / 72, selected)
+        width_at_125 = responsive_layout_width(1600, 96 / 72, 125)
+        self.assertGreater(width_at_80, width_at_125)
+        self.assertEqual(selected, 80)
+        self.assertEqual(minimum_window_size(), (1120, 700))
 
 
 if __name__ == "__main__":

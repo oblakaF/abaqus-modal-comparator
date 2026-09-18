@@ -38,6 +38,18 @@ def ensure_status_bar_visible(application) -> bool:
         return False
 
     try:
+        footer_children = footer.winfo_children()
+    except Exception:
+        footer_children = ()
+    status_labels = [
+        child
+        for child in footer_children
+        if child is not progress and child.winfo_class() == "TLabel"
+    ]
+    status_label = status_labels[0] if status_labels else None
+    application._status_label = status_label
+
+    try:
         footer.pack_forget()
         footer.pack(side="bottom", fill="x", before=tabs)
         footer.lift()
@@ -53,6 +65,11 @@ def ensure_status_bar_visible(application) -> bool:
             if getattr(application, "_last_progress_length", None) != length:
                 progress.configure(length=length)
                 application._last_progress_length = length
+            if status_label is not None:
+                status_wrap = max(260, width - length - 80)
+                if getattr(application, "_last_status_wrap", None) != status_wrap:
+                    status_label.configure(wraplength=status_wrap)
+                    application._last_status_wrap = status_wrap
             footer.lift()
         except Exception:
             return

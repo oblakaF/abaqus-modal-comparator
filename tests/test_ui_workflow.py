@@ -24,11 +24,13 @@ from ui_policy import (
     completion_state,
     coordinate_scale_from_units,
     discover_abaqus_installations,
+    minimum_window_size,
     metric_grid_columns,
     logical_window_width,
     non_empty_headings,
     normalize_recovery_preferences,
     resolve_command,
+    responsive_layout_width,
     select_abaqus_installation,
     select_layout_mode,
     status_text,
@@ -180,6 +182,12 @@ class SourceBoundScientificStateTests(unittest.TestCase):
 
 
 class ResponsivePolicyTests(unittest.TestCase):
+    def test_practical_minimum_window_size_is_stable(self):
+        width, height = minimum_window_size()
+        self.assertEqual((width, height), (1120, 700))
+        self.assertGreaterEqual(width, 1000)
+        self.assertGreaterEqual(height, 680)
+
     def test_breakpoint_selection_covers_target_window_classes(self):
         self.assertIs(select_layout_mode(1920), LayoutMode.WIDE)
         self.assertIs(select_layout_mode(1600), LayoutMode.WIDE)
@@ -191,6 +199,13 @@ class ResponsivePolicyTests(unittest.TestCase):
         self.assertEqual(logical_window_width(1024, 96 / 72), 1024)
         self.assertEqual(logical_window_width(1280, (96 / 72) * 1.25), 1024)
         self.assertEqual(logical_window_width(1536, (96 / 72) * 1.5), 1024)
+
+    def test_interface_scale_changes_layout_density_without_being_mutated(self):
+        selected_scale = 125
+        compact_width = responsive_layout_width(1280, 96 / 72, selected_scale)
+        self.assertEqual(compact_width, 1024)
+        self.assertEqual(selected_scale, 125)
+        self.assertIs(select_layout_mode(compact_width), LayoutMode.COMPACT)
 
     def test_metric_cards_and_buttons_wrap_deterministically(self):
         self.assertEqual(metric_grid_columns(LayoutMode.WIDE, 1920), 4)
@@ -478,6 +493,17 @@ class TkRuntimeSmokeTests(unittest.TestCase):
                 ui_workflow, "discover_abaqus_installations", return_value=()
             ):
                 application = main.app.ModalComparatorApp(root)
+            self.assertEqual(root.minsize(), minimum_window_size())
+            self.assertEqual(int(root.grid_rowconfigure(1)["weight"]), 1)
+            self.assertEqual(int(root.grid_columnconfigure(0)["weight"]), 1)
+            self.assertEqual(application.tabs.winfo_manager(), "grid")
+            self.assertEqual(set(application.tabs.grid_info()["sticky"]), set("nsew"))
+            self.assertEqual(int(application.input_tab.grid_rowconfigure(0)["weight"]), 1)
+            self.assertEqual(int(application.input_tab.grid_columnconfigure(0)["weight"]), 1)
+            self.assertIsNone(application._input_horizontal_scrollbar)
+            self.assertEqual(str(application._input_canvas.cget("xscrollcommand")), "")
+            self.assertIn("e", str(application.abaqus_path_entry.grid_info()["sticky"]))
+            self.assertIn("w", str(application.abaqus_path_entry.grid_info()["sticky"]))
             self.assertEqual(
                 tuple(application._analysis_configuration_controls),
                 ANALYSIS_CONFIGURATION_CONTROL_NAMES,
@@ -557,11 +583,16 @@ class TkRuntimeSmokeTests(unittest.TestCase):
                 self.assertEqual(str(application.run_button.cget("state")), "normal")
                 self.assertEqual(str(application.stop_button.cget("state")), "disabled")
                 self.assertEqual(str(application.folder_button.cget("state")), "normal")
-            root.geometry("1024x700")
+            application._apply_ui_scale(125, persist=False)
+            root.geometry("1120x700")
             root.update_idletasks()
             application._apply_responsive_layout()
             self.assertEqual(len(application.tabs.tabs()), 9)
             self.assertEqual(application._layout_mode, LayoutMode.COMPACT)
+            self.assertEqual(application.ui_scale_percent.get(), 125)
+            self.assertGreater(
+                int(application.geometry_mapping_help_label.cget("wraplength")), 0
+            )
             self.assertEqual(
                 tuple(application.tabs.tab(tab, "text") for tab in application.tabs.tabs()),
                 tab_labels_for(LayoutMode.COMPACT),
@@ -570,6 +601,8 @@ class TkRuntimeSmokeTests(unittest.TestCase):
                 headings = {column: table.heading(column, "text") for column in table["columns"]}
                 self.assertTrue(non_empty_headings(table["columns"], headings))
                 self.assertIsNotNone(getattr(table, "_horizontal_scrollbar", None))
+
+            application._apply_ui_scale(100, persist=False)
 
             for width, height in (
                 (1920, 1080),
@@ -582,8 +615,10 @@ class TkRuntimeSmokeTests(unittest.TestCase):
                 root.geometry(f"{width}x{height}")
                 root.update_idletasks()
                 application._apply_responsive_layout()
-                logical = logical_window_width(
-                    root.winfo_width(), float(root.tk.call("tk", "scaling"))
+                logical = responsive_layout_width(
+                    root.winfo_width(),
+                    float(root.tk.call("tk", "scaling")),
+                    application.ui_scale_percent.get(),
                 )
                 self.assertEqual(application._layout_mode, select_layout_mode(logical))
                 for tab in application.tabs.tabs():
