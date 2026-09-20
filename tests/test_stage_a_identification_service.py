@@ -38,7 +38,7 @@ from tests import test_core
 
 
 class SyntheticProductionFixture:
-    def __init__(self, *, rank_deficient=False):
+    def __init__(self, *, rank_deficient=False, mass_dependent=False):
         grid_x, grid_y = np.meshgrid(np.arange(4.0), np.arange(3.0))
         self.coordinates = np.column_stack(
             (grid_x.ravel(), 1.3 * grid_y.ravel(), np.zeros(grid_x.size))
@@ -78,16 +78,26 @@ class SyntheticProductionFixture:
         for value, contribution in zip(self.truth.values, basis_matrices):
             reference = reference + value * contribution
         self.dofs = tuple(AbaqusDof(int(node_id), 3) for node_id in self.node_ids)
+        mass_derivative_D11 = None
+        if mass_dependent:
+            # A small, deterministic D11 mass slope: still verified to be
+            # invariant to D12/D66 (only StageAMatrixParameters.D11 enters
+            # reconstruct_mass), harmless at the reference/truth point since
+            # its coefficient there is exactly zero.
+            mass_derivative_D11 = sparse.diags(
+                0.001 * np.arange(1, len(self.node_ids) + 1, dtype=float), format="csr"
+            )
         self.basis = StageAAffineBasis(
             reference_parameters=self.truth,
             reference_stiffness=reference,
             basis_matrices=basis_matrices,
             mass=sparse.eye(len(self.node_ids), format="csr"),
             dofs=self.dofs,
+            mass_derivative_D11=mass_derivative_D11,
         )
         truth_modes = solve_generalized_eigenproblem(
             reference,
-            self.basis.mass,
+            self.basis.reconstruct_mass(self.truth),
             8,
             expected_rigid_body_modes=3,
             dofs=self.dofs,
@@ -230,6 +240,23 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
         self.assertEqual(mode_one.inclusion_status.value, "excluded")
         self.assertEqual(mode_one.reason, "probable suspension influence")
         self.assertFalse(result.metadata["mac_used_in_objective"])
+        self.assertEqual(result.metadata["mass_model"], "constant reference mass")
+
+    def test_mass_dependent_basis_recovers_truth_and_reports_affine_mass_provenance(self):
+        fixture = SyntheticProductionFixture(mass_dependent=True)
+        self.assertIsNotNone(fixture.basis.mass_derivative_D11)
+        provider = create_production_pairing_provider(
+            fixture.comparison, fixture.basis, coordinate_scale_override=1.0
+        )
+        result = fixture.identify(pairing_provider=provider)
+        errors = {
+            name: abs(result.inverse_result.fitted_parameters[name] / truth - 1.0)
+            for name, truth in zip(("D11", "D12", "D66"), fixture.truth.values)
+        }
+        self.assertLess(max(errors.values()), 2.0e-6)
+        self.assertEqual(result.identifiability.rank, 3)
+        self.assertTrue(result.inverse_result.success)
+        self.assertIn("affine in D11", result.metadata["mass_model"])
 
     def test_manual_rejection_is_preserved_and_not_sent_to_pairing_provider(self):
         fixture = SyntheticProductionFixture()

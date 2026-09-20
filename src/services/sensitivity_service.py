@@ -274,9 +274,28 @@ def _stage_a_coordinates_and_derivatives(
     parameters: StageAMatrixParameters,
     coordinate_system: StageASensitivityCoordinate,
     ratio_characteristic_scale: float,
-) -> tuple[Tuple[ParameterSensitivityCoordinate, ...], Tuple[sparse.csr_matrix, ...]]:
+) -> tuple[
+    Tuple[ParameterSensitivityCoordinate, ...],
+    Tuple[sparse.csr_matrix, ...],
+    Tuple[sparse.csr_matrix | None, ...] | None,
+]:
+    """Return coordinates, ``dK/dq``, and ``dM/dq`` (``None`` entries mean 0).
+
+    ``D`` (physical ``D11``) is the only coordinate with a non-zero mass
+    derivative, and only when ``basis`` carries a recovered
+    ``mass_derivative_D11`` -- ``D12``/``D66``/``r`` were verified to leave
+    the mass matrix unchanged.  The overall mass-derivative tuple is
+    ``None`` for a legacy constant-``M`` basis, so callers can distinguish
+    "no D-dependence was ever evidenced" from "this coordinate's slope is
+    zero".
+    """
+
     affine = basis.basis_matrices
+    mass_slope = basis.mass_derivative_D11
     if coordinate_system == StageASensitivityCoordinate.AFFINE:
+        mass_derivatives = (
+            None if mass_slope is None else (mass_slope, None, None)
+        )
         return (
             (
                 ParameterSensitivityCoordinate(
@@ -296,6 +315,7 @@ def _stage_a_coordinates_and_derivatives(
                 ),
             ),
             affine,
+            mass_derivatives,
         )
     if coordinate_system == StageASensitivityCoordinate.BALANCED:
         point = parameters.as_parameterization()
@@ -304,6 +324,9 @@ def _stage_a_coordinates_and_derivatives(
             raise ValueError("ratio_characteristic_scale must be positive and finite.")
         d_derivative = sparse.csr_matrix(affine[0] + point.r * affine[1])
         ratio_derivative = sparse.csr_matrix(point.D * affine[1])
+        mass_derivatives = (
+            None if mass_slope is None else (mass_slope, None, None)
+        )
         return (
             (
                 ParameterSensitivityCoordinate(
@@ -320,6 +343,7 @@ def _stage_a_coordinates_and_derivatives(
                 ),
             ),
             (d_derivative, affine[2], ratio_derivative),
+            mass_derivatives,
         )
     raise ValueError(f"Unsupported Stage-A sensitivity coordinate: {coordinate_system!r}")
 
@@ -393,14 +417,14 @@ def _finite_difference_validation(
             step_sizes[relative_index, parameter_index] = step
             lower_result = solve_generalized_eigenproblem(
                 basis.reconstruct_stiffness(lower),
-                basis.mass,
+                basis.reconstruct_mass(lower),
                 mode_count,
                 expected_rigid_body_modes=expected_rigid_body_modes,
                 dofs=basis.dofs,
             )
             upper_result = solve_generalized_eigenproblem(
                 basis.reconstruct_stiffness(upper),
-                basis.mass,
+                basis.reconstruct_mass(upper),
                 mode_count,
                 expected_rigid_body_modes=expected_rigid_body_modes,
                 dofs=basis.dofs,
@@ -456,21 +480,23 @@ def compute_stage_a_sensitivity(
         raise ValueError("validation_relative_tolerance must be positive and finite.")
 
     stiffness = basis.reconstruct_stiffness(parameters)
+    mass = basis.reconstruct_mass(parameters)
     eigenpairs = solve_generalized_eigenproblem(
         stiffness,
-        basis.mass,
+        mass,
         mode_count,
         expected_rigid_body_modes=expected_rigid_body_modes,
         dofs=basis.dofs,
     )
-    coordinates, derivatives = _stage_a_coordinates_and_derivatives(
+    coordinates, derivatives, mass_derivatives = _stage_a_coordinates_and_derivatives(
         basis, parameters, coordinate_system, ratio_characteristic_scale
     )
     result = generalized_eigen_sensitivity(
         eigenpairs,
-        basis.mass,
+        mass,
         derivatives,
         coordinates,
+        mass_derivatives=mass_derivatives,
         observations=observations,
         coordinate_system=coordinate_system,
     )

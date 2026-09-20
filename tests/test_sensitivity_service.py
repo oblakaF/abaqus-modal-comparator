@@ -16,10 +16,12 @@ from services.matrix_model_service import (
     GeneralizedEigenResult,
     StageAAffineBasis,
     StageAMatrixParameters,
+    solve_generalized_eigenproblem,
 )
 from services.sensitivity_service import (
     ParameterSensitivityCoordinate,
     StageASensitivityCoordinate,
+    _stage_a_coordinates_and_derivatives,
     analytic_eigenvalue_derivative,
     compute_stage_a_sensitivity,
     eigenvalue_to_frequency_derivative,
@@ -148,6 +150,13 @@ class StageASensitivityTests(unittest.TestCase):
             "cluster_requires_subspace_sensitivity",
         )
 
+    def test_legacy_constant_mass_basis_has_no_mass_derivative_contribution(self):
+        self.assertIsNone(self.basis.mass_derivative_D11)
+        coordinates, derivatives, mass_derivatives = _stage_a_coordinates_and_derivatives(
+            self.basis, self.parameters, StageASensitivityCoordinate.AFFINE, 1.0
+        )
+        self.assertIsNone(mass_derivatives)
+
     def test_general_api_keeps_raw_and_scaled_derivatives_separate(self):
         eigenpairs = GeneralizedEigenResult(
             eigenvalues=np.array([4.0]),
@@ -171,6 +180,115 @@ class StageASensitivityTests(unittest.TestCase):
         self.assertAlmostEqual(
             result.scaled_sensitivity[0, 0],
             10.0 * expected_raw / result.frequencies_hz[0],
+        )
+
+
+class StageAMassDependentSensitivityTests(unittest.TestCase):
+    """Covers dM/dx wiring once a basis carries a recovered D11 mass slope."""
+
+    def setUp(self):
+        self.parameters = StageAMatrixParameters(10.0, 0.0, 5.0)
+        self.basis_matrices = (
+            sparse.diags([1.0, 0.2, 0.1], format="csr"),
+            sparse.diags([0.1, 0.3, 0.05], format="csr"),
+            sparse.diags([0.2, 0.1, 0.8], format="csr"),
+        )
+        constant = sparse.diags([5.0, 8.0, 12.0], format="csr")
+        stiffness = constant.copy()
+        for value, contribution in zip(self.parameters.values, self.basis_matrices):
+            stiffness = stiffness + value * contribution
+        self.mass = sparse.diags([2.0, 1.0, 3.0], format="csr")
+        self.mass_derivative_D11 = sparse.diags([0.03, -0.01, 0.02], format="csr")
+        self.dofs = tuple(AbaqusDof(index + 1, 1) for index in range(3))
+        self.basis = StageAAffineBasis(
+            reference_parameters=self.parameters,
+            reference_stiffness=stiffness,
+            basis_matrices=self.basis_matrices,
+            mass=self.mass,
+            dofs=self.dofs,
+            mass_derivative_D11=self.mass_derivative_D11,
+        )
+
+    def test_mass_derivative_is_wired_only_into_the_D11_D_coordinate(self):
+        for coordinate_system in (
+            StageASensitivityCoordinate.AFFINE,
+            StageASensitivityCoordinate.BALANCED,
+        ):
+            _, _, mass_derivatives = _stage_a_coordinates_and_derivatives(
+                self.basis, self.parameters, coordinate_system, 1.0
+            )
+            self.assertIsNotNone(mass_derivatives)
+            self.assertEqual(len(mass_derivatives), 3)
+            np.testing.assert_allclose(
+                mass_derivatives[0].toarray(), self.mass_derivative_D11.toarray()
+            )
+            self.assertIsNone(mass_derivatives[1])
+            self.assertIsNone(mass_derivatives[2])
+
+    def test_analytic_sensitivity_including_dM_dx_matches_central_finite_differences(self):
+        result = compute_stage_a_sensitivity(
+            self.basis,
+            self.parameters,
+            3,
+            expected_rigid_body_modes=0,
+        )
+        self.assertTrue(result.derivative_validation.consistent)
+        self.assertLess(result.derivative_validation.worst_relative_error, 1.0e-3)
+
+    def test_balanced_coordinate_analytic_sensitivity_matches_finite_differences(self):
+        result = compute_stage_a_sensitivity(
+            self.basis,
+            self.parameters,
+            3,
+            coordinate_system=StageASensitivityCoordinate.BALANCED,
+            expected_rigid_body_modes=0,
+        )
+        self.assertTrue(result.derivative_validation.consistent)
+        self.assertLess(result.derivative_validation.worst_relative_error, 1.0e-3)
+
+    def test_ignoring_the_mass_derivative_would_disagree_with_finite_differences(self):
+        # A regression guard: confirms the fixture's mass slope is large enough
+        # that omitting mass_derivatives from the analytic formula would fail
+        # finite-difference validation, so test_analytic_sensitivity_including_
+        # dM_dx_matches_central_finite_differences above is not passing
+        # vacuously.
+        eigenpairs = solve_generalized_eigenproblem(
+            self.basis.reconstruct_stiffness(self.parameters),
+            self.basis.reconstruct_mass(self.parameters),
+            3,
+            expected_rigid_body_modes=0,
+            dofs=self.basis.dofs,
+        )
+        without_mass_derivative = generalized_eigen_sensitivity(
+            eigenpairs,
+            self.mass,
+            self.basis_matrices,
+            (
+                ParameterSensitivityCoordinate("D11", "d11", self.parameters.D11, "relative"),
+                ParameterSensitivityCoordinate(
+                    "D12", "d12", self.parameters.D11, "characteristic_D11"
+                ),
+                ParameterSensitivityCoordinate("D66", "d66", self.parameters.D66, "relative"),
+            ),
+        )
+        with_mass_derivative = generalized_eigen_sensitivity(
+            eigenpairs,
+            self.mass,
+            self.basis_matrices,
+            (
+                ParameterSensitivityCoordinate("D11", "d11", self.parameters.D11, "relative"),
+                ParameterSensitivityCoordinate(
+                    "D12", "d12", self.parameters.D11, "characteristic_D11"
+                ),
+                ParameterSensitivityCoordinate("D66", "d66", self.parameters.D66, "relative"),
+            ),
+            mass_derivatives=(self.mass_derivative_D11, None, None),
+        )
+        self.assertFalse(
+            np.allclose(
+                without_mass_derivative.raw_derivatives[:, 0],
+                with_mass_derivative.raw_derivatives[:, 0],
+            )
         )
 
 

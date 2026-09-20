@@ -411,11 +411,27 @@ def stage_a_matrix_configurations(
 
 @dataclass(frozen=True)
 class StageAAffineBasis:
+    """A verified Stage-A reduced-order model.
+
+    ``K`` is reconstructed as a documented affine approximation in
+    ``(D11, D12, D66)`` -- validated against real Abaqus evaluations to be
+    frequency-accurate over the intended inverse domain, but it is not exact
+    at the matrix level (see ``docs/scientific_audit`` and the C0.1/C0.2/C0.3
+    diagnostic record).  ``M`` is affine in ``D11`` alone when
+    ``mass_derivative_D11`` was recovered from a real D11 perturbation
+    (verified to machine precision over the same domain); ``D12`` and
+    ``D66`` were verified to leave the mass matrix unchanged.  A basis built
+    without a mass slope (``mass_derivative_D11 is None``) uses the legacy
+    constant-``M`` behaviour explicitly, never a silently invented zero
+    slope.
+    """
+
     reference_parameters: StageAMatrixParameters
     reference_stiffness: sparse.csr_matrix
     basis_matrices: Tuple[sparse.csr_matrix, ...]
     mass: sparse.csr_matrix
     dofs: Tuple[AbaqusDof, ...]
+    mass_derivative_D11: sparse.csr_matrix | None = None
 
     def __post_init__(self) -> None:
         size = len(self.dofs)
@@ -432,10 +448,19 @@ class StageAAffineBasis:
         require_sparse_symmetric(mass, name="reference M")
         for name, item in zip(STAGE_A_PARAMETER_NAMES, basis):
             require_sparse_symmetric(item, name=f"K_{name}")
+        mass_slope = self.mass_derivative_D11
+        if mass_slope is not None:
+            mass_slope = sparse.csr_matrix(mass_slope, dtype=float)
+            if mass_slope.shape != (size, size):
+                raise ValueError("mass_derivative_D11 must have the reference M shape.")
+            if mass_slope.nnz and not np.isfinite(mass_slope.data).all():
+                raise ValueError("mass_derivative_D11 must be finite.")
+            require_sparse_symmetric(mass_slope, name="dM/dD11")
         object.__setattr__(self, "reference_stiffness", reference)
         object.__setattr__(self, "basis_matrices", basis)
         object.__setattr__(self, "mass", mass)
         object.__setattr__(self, "dofs", tuple(self.dofs))
+        object.__setattr__(self, "mass_derivative_D11", mass_slope)
 
     def reconstruct_stiffness(
         self, parameters: StageAMatrixParameters
@@ -450,6 +475,30 @@ class StageAAffineBasis:
         require_sparse_symmetric(reconstructed, name="reconstructed K")
         return reconstructed
 
+    def reconstruct_mass(
+        self, parameters: StageAMatrixParameters
+    ) -> sparse.csr_matrix:
+        """Return ``M`` at ``parameters``.
+
+        Uses the validated ``M = M_ref + (D11-D11_ref) * dM/dD11`` model when
+        a mass slope was recovered; otherwise returns the stored reference
+        mass unchanged (explicit legacy constant-``M`` behaviour -- this
+        basis was never built with D11-dependent mass evidence).  ``D12``
+        and ``D66`` never affect the returned mass, matching the verified
+        Abaqus behaviour.  The stored reference mass is never mutated.
+        """
+
+        if self.mass_derivative_D11 is None:
+            return self.mass
+        delta_d11 = parameters.D11 - self.reference_parameters.D11
+        if delta_d11 == 0.0:
+            return self.mass
+        reconstructed = self.mass + delta_d11 * self.mass_derivative_D11
+        reconstructed = sparse.csr_matrix(reconstructed)
+        reconstructed.eliminate_zeros()
+        require_sparse_symmetric(reconstructed, name="reconstructed M")
+        return reconstructed
+
 
 def build_stage_a_affine_basis(
     reference_parameters: StageAMatrixParameters,
@@ -459,17 +508,40 @@ def build_stage_a_affine_basis(
     mass_rtol: float = 1.0e-12,
     mass_atol: float = 1.0e-14,
 ) -> StageAAffineBasis:
-    """Recover three affine K contributions from four admissible Abaqus jobs."""
+    """Recover three affine K contributions from four admissible Abaqus jobs.
+
+    ``perturbations`` must be supplied in ``STAGE_A_PARAMETER_NAMES`` order
+    (D11, D12, D66).  The D11 perturbation's mass difference is used to
+    recover ``dM/dD11`` -- validated to be the only real mass dependency for
+    this specimen/mesh (see the C0.1/C0.2/C0.3 diagnostic record) -- instead
+    of being required to match the reference mass.  The D12 and D66
+    perturbations still must reproduce the reference mass within the
+    existing strict tolerance: that invariance is unchanged.
+    """
 
     if len(perturbations) != len(STAGE_A_PARAMETER_NAMES):
         raise ValueError("Stage A basis recovery requires exactly three perturbations.")
 
     delta_rows: list[np.ndarray] = []
     stiffness_differences: list[sparse.csr_matrix] = []
-    for parameters, matrices in perturbations:
+    mass_derivative_d11: sparse.csr_matrix | None = None
+    for parameter_name, (parameters, matrices) in zip(STAGE_A_PARAMETER_NAMES, perturbations):
         if matrices.dofs != reference_matrices.dofs:
             raise MatrixModelError("All basis jobs must have identical Abaqus DOF ordering.")
-        if not _sparse_allclose(
+        if parameter_name == "D11":
+            delta_d11 = parameters.D11 - reference_parameters.D11
+            if delta_d11 == 0.0:
+                raise MatrixModelError(
+                    "The D11 perturbation must change D11 to recover dM/dD11."
+                )
+            mass_difference = sparse.csr_matrix(matrices.mass - reference_matrices.mass)
+            slope = sparse.csr_matrix(mass_difference / delta_d11)
+            slope.eliminate_zeros()
+            if slope.nnz and not np.isfinite(slope.data).all():
+                raise MatrixModelError("The recovered dM/dD11 slope is not finite.")
+            require_sparse_symmetric(slope, name="dM/dD11")
+            mass_derivative_d11 = slope
+        elif not _sparse_allclose(
             matrices.mass,
             reference_matrices.mass,
             rtol=mass_rtol,
@@ -479,8 +551,9 @@ def build_stage_a_affine_basis(
                 reference_matrices.mass, matrices.mass
             )
             raise MatrixModelError(
-                "Stage-A mass matrix changed with D11/D12/D66; a single verified M "
-                f"cannot be used (relative Frobenius change {mass_error:.6g})."
+                f"Stage-A mass matrix changed with {parameter_name}; a single verified "
+                f"M cannot be used for this direction (relative Frobenius change "
+                f"{mass_error:.6g})."
             )
         delta_rows.append(parameters.values - reference_parameters.values)
         stiffness_differences.append(
@@ -509,6 +582,7 @@ def build_stage_a_affine_basis(
         basis_matrices=tuple(contributions),
         mass=reference_matrices.mass,
         dofs=reference_matrices.dofs,
+        mass_derivative_D11=mass_derivative_d11,
     )
 
 
@@ -1387,14 +1461,15 @@ def run_matrix_decomposition_proof_test(
             raise MatrixModelError(
                 "Proof-test Abaqus matrix has a different DOF ordering from the basis."
             )
+        predicted_mass = basis.reconstruct_mass(parameters)
         if not _sparse_allclose(
             direct.matrices.mass,
-            basis.mass,
+            predicted_mass,
             rtol=1.0e-12,
             atol=1.0e-14,
         ):
             raise MatrixModelError(
-                "Proof-test Abaqus mass matrix differs from the verified Stage-A M."
+                "Proof-test Abaqus mass matrix differs from the verified Stage-A M model."
             )
         reconstructed = basis.reconstruct_stiffness(parameters)
         matrix_error = relative_sparse_frobenius_error(
@@ -1404,7 +1479,7 @@ def run_matrix_decomposition_proof_test(
 
         fast = solve_generalized_eigenproblem(
             reconstructed,
-            basis.mass,
+            predicted_mass,
             mode_count,
             expected_rigid_body_modes=expected_rigid_body_modes,
             dofs=basis.dofs,

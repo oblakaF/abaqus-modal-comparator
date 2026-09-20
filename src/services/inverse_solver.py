@@ -645,19 +645,18 @@ def _prior_residuals(
     )
 
 
-def _reduced_mass_and_derivatives(
+def _reduce_to_eigen_dofs(
     basis: StageAAffineBasis,
     eigenpairs: GeneralizedEigenResult,
-    derivatives: Sequence[sparse.spmatrix],
-) -> tuple[sparse.csr_matrix, Tuple[sparse.csr_matrix, ...]]:
+    matrices: Sequence[sparse.spmatrix],
+) -> Tuple[sparse.csr_matrix, ...]:
+    """Restrict ``matrices`` (basis-DOF ordered) to the solved active DOFs."""
+
     if eigenpairs.dofs is None or eigenpairs.dofs == basis.dofs:
-        return basis.mass, tuple(sparse.csr_matrix(item) for item in derivatives)
+        return tuple(sparse.csr_matrix(item) for item in matrices)
     by_dof = {dof: index for index, dof in enumerate(basis.dofs)}
     indexes = [by_dof[dof] for dof in eigenpairs.dofs]
-    return (
-        basis.mass[indexes][:, indexes].tocsr(),
-        tuple(item[indexes][:, indexes].tocsr() for item in derivatives),
-    )
+    return tuple(sparse.csr_matrix(item)[indexes][:, indexes].tocsr() for item in matrices)
 
 
 def _analytic_local_jacobian(
@@ -684,12 +683,26 @@ def _analytic_local_jacobian(
         ParameterSensitivityCoordinate("D66", "physical D66 at fixed D,r", point.D66, "relative"),
         ParameterSensitivityCoordinate("r", "signed ratio at fixed D,D66", 1.0, "characteristic_ratio"),
     )
-    mass, derivatives = _reduced_mass_and_derivatives(basis, evaluation.eigenpairs, derivatives)
+    mass_point = basis.reconstruct_mass(parameters)
+    if basis.mass_derivative_D11 is None:
+        mass, *derivatives = _reduce_to_eigen_dofs(
+            basis, evaluation.eigenpairs, (mass_point, *derivatives)
+        )
+        mass_derivatives = None
+    else:
+        mass, *rest = _reduce_to_eigen_dofs(
+            basis,
+            evaluation.eigenpairs,
+            (mass_point, *derivatives, basis.mass_derivative_D11),
+        )
+        derivatives = rest[:-1]
+        mass_derivatives = (rest[-1], None, None)
     sensitivity = generalized_eigen_sensitivity(
         evaluation.eigenpairs,
         mass,
         derivatives,
         coordinates,
+        mass_derivatives=mass_derivatives,
         coordinate_system=StageASensitivityCoordinate.BALANCED,
     )
     paired_modes = {
@@ -855,7 +868,7 @@ def solve_stage_a_inverse(
         parameters = _parameters_from_vector(vector, subset, initial_parameters)
         eigenpairs = solve_generalized_eigenproblem(
             affine_model.reconstruct_stiffness(parameters),
-            affine_model.mass,
+            affine_model.reconstruct_mass(parameters),
             configuration.mode_count,
             expected_rigid_body_modes=configuration.expected_rigid_body_modes,
             dofs=affine_model.dofs,

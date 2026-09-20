@@ -26,6 +26,7 @@ from services.matrix_model_service import (
     DirectAbaqusEvaluation,
     MatrixModelError,
     StageAAbaqusPointEvaluationError,
+    StageAAffineBasis,
     StageAMatrixParameters,
     build_stage_a_affine_basis,
     evaluate_stage_a_abaqus_point,
@@ -175,6 +176,168 @@ class StageAAffineBasisTests(unittest.TestCase):
         with self.assertRaisesRegex(MatrixModelError, "mass matrix changed"):
             build_stage_a_affine_basis(
                 self.reference, self.matrices(self.reference), perturbations
+            )
+
+
+class StageAAffineBasisMassModelTests(unittest.TestCase):
+    """Covers the validated M = M_ref + (D11-D11_ref) * dM/dD11 architecture."""
+
+    def setUp(self):
+        self.reference = StageAMatrixParameters(10.0, 2.0, 3.0)
+        self.configurations = stage_a_matrix_configurations(
+            self.reference, relative_step=0.05
+        )
+        self.stiffness_constant = np.array([7.0, 11.0, 13.0])
+        self.stiffness_contributions = (
+            np.array([2.0, 3.0, 5.0]),
+            np.array([0.5, -0.25, 0.75]),
+            np.array([4.0, 1.0, 2.0]),
+        )
+        self.mass_constant = np.array([1.0, 2.0, 3.0])
+        self.mass_slope = np.array([0.02, -0.01, 0.03])
+
+    def stiffness(self, parameters):
+        diagonal = self.stiffness_constant.copy()
+        for value, contribution in zip(parameters.values, self.stiffness_contributions):
+            diagonal += value * contribution
+        return diagonal
+
+    def mass(self, parameters):
+        delta_d11 = parameters.D11 - self.reference.D11
+        return self.mass_constant + delta_d11 * self.mass_slope
+
+    def matrices(self, parameters):
+        return AbaqusMatrixPair(
+            stiffness=sparse.diags(self.stiffness(parameters), format="csr"),
+            mass=sparse.diags(self.mass(parameters), format="csr"),
+            dofs=DOFS,
+        )
+
+    def build_basis(self):
+        return build_stage_a_affine_basis(
+            self.reference,
+            self.matrices(self.reference),
+            [(p, self.matrices(p)) for p in self.configurations[1:]],
+        )
+
+    def test_build_accepts_D11_dependent_mass_and_recovers_the_slope(self):
+        basis = self.build_basis()
+        self.assertIsNotNone(basis.mass_derivative_D11)
+        np.testing.assert_allclose(
+            basis.mass_derivative_D11.toarray(), np.diag(self.mass_slope)
+        )
+
+    def test_reconstruct_mass_at_reference_returns_reference_mass(self):
+        basis = self.build_basis()
+        np.testing.assert_array_equal(
+            basis.reconstruct_mass(self.reference).toarray(),
+            self.matrices(self.reference).mass.toarray(),
+        )
+
+    def test_reconstruct_mass_at_D11_perturbation_reproduces_its_mass(self):
+        basis = self.build_basis()
+        d11_perturbation = self.configurations[1]
+        np.testing.assert_allclose(
+            basis.reconstruct_mass(d11_perturbation).toarray(),
+            self.matrices(d11_perturbation).mass.toarray(),
+        )
+
+    def test_changing_D_changes_mass_according_to_the_stored_slope(self):
+        basis = self.build_basis()
+        target = StageAMatrixParameters(13.5, self.reference.D12, self.reference.D66)
+        expected = self.mass_constant + (13.5 - self.reference.D11) * self.mass_slope
+        np.testing.assert_allclose(
+            basis.reconstruct_mass(target).toarray(), np.diag(expected)
+        )
+
+    def test_changing_only_D12_leaves_mass_unchanged(self):
+        basis = self.build_basis()
+        target = StageAMatrixParameters(self.reference.D11, -1.0, self.reference.D66)
+        np.testing.assert_array_equal(
+            basis.reconstruct_mass(target).toarray(),
+            self.matrices(self.reference).mass.toarray(),
+        )
+
+    def test_changing_only_D66_leaves_mass_unchanged(self):
+        basis = self.build_basis()
+        target = StageAMatrixParameters(self.reference.D11, self.reference.D12, 7.25)
+        np.testing.assert_array_equal(
+            basis.reconstruct_mass(target).toarray(),
+            self.matrices(self.reference).mass.toarray(),
+        )
+
+    def test_mass_reconstruction_preserves_symmetry_and_dimensions(self):
+        off_diagonal_slope = sparse.csr_matrix(
+            np.array([[0.0, 0.01, 0.0], [0.01, 0.0, -0.02], [0.0, -0.02, 0.0]])
+        )
+        basis = StageAAffineBasis(
+            reference_parameters=self.reference,
+            reference_stiffness=sparse.diags(self.stiffness(self.reference), format="csr"),
+            basis_matrices=tuple(
+                sparse.diags(item, format="csr") for item in self.stiffness_contributions
+            ),
+            mass=sparse.diags(self.mass_constant, format="csr"),
+            dofs=DOFS,
+            mass_derivative_D11=off_diagonal_slope,
+        )
+        target = StageAMatrixParameters(11.0, self.reference.D12, self.reference.D66)
+        reconstructed = basis.reconstruct_mass(target)
+        self.assertEqual(reconstructed.shape, (3, 3))
+        np.testing.assert_allclose(reconstructed.toarray(), reconstructed.toarray().T)
+
+    def test_build_rejects_D12_mass_mismatch(self):
+        perturbations = [
+            (parameters, self.matrices(parameters))
+            for parameters in self.configurations[1:]
+        ]
+        d12_parameters, _ = perturbations[1]
+        perturbations[1] = (
+            d12_parameters,
+            AbaqusMatrixPair(
+                stiffness=self.matrices(d12_parameters).stiffness,
+                mass=sparse.diags(self.mass_constant + np.array([0.0, 0.05, 0.0]), format="csr"),
+                dofs=DOFS,
+            ),
+        )
+        with self.assertRaisesRegex(MatrixModelError, "D12"):
+            build_stage_a_affine_basis(
+                self.reference, self.matrices(self.reference), perturbations
+            )
+
+    def test_build_rejects_D66_mass_mismatch(self):
+        perturbations = [
+            (parameters, self.matrices(parameters))
+            for parameters in self.configurations[1:]
+        ]
+        d66_parameters, _ = perturbations[2]
+        perturbations[2] = (
+            d66_parameters,
+            AbaqusMatrixPair(
+                stiffness=self.matrices(d66_parameters).stiffness,
+                mass=sparse.diags(self.mass_constant + np.array([0.0, 0.0, 0.07]), format="csr"),
+                dofs=DOFS,
+            ),
+        )
+        with self.assertRaisesRegex(MatrixModelError, "D66"):
+            build_stage_a_affine_basis(
+                self.reference, self.matrices(self.reference), perturbations
+            )
+
+    def test_legacy_basis_without_mass_slope_keeps_constant_mass(self):
+        legacy = StageAAffineBasis(
+            reference_parameters=self.reference,
+            reference_stiffness=sparse.diags(self.stiffness(self.reference), format="csr"),
+            basis_matrices=tuple(
+                sparse.diags(item, format="csr") for item in self.stiffness_contributions
+            ),
+            mass=sparse.diags(self.mass_constant, format="csr"),
+            dofs=DOFS,
+        )
+        self.assertIsNone(legacy.mass_derivative_D11)
+        for d11 in (5.0, 10.0, 22.0):
+            target = StageAMatrixParameters(d11, self.reference.D12, self.reference.D66)
+            np.testing.assert_array_equal(
+                legacy.reconstruct_mass(target).toarray(), np.diag(self.mass_constant)
             )
 
 

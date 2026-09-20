@@ -2,6 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import sys
 import unittest
+from unittest import mock
 
 import numpy as np
 
@@ -111,6 +112,45 @@ def _inverse(realisation, *, success=True):
         local_message="ok" if success else "failed",
         success=success,
     )
+
+
+class StageAPipelineRunnerTests(unittest.TestCase):
+    def test_pipeline_runner_forwards_the_factory_affine_basis_unmodified(self):
+        # create_stage_a_pipeline_runner has no mass/K logic of its own; it
+        # must hand the caller-supplied StageAAffineBasis (mass-dependent or
+        # not) straight through to identify_stage_a, which owns
+        # reconstruct_mass(). This proves the Monte Carlo/uncertainty fast
+        # path does not bypass the corrected mass reconstruction.
+        from services import uncertainty_service as uncertainty_module
+
+        sentinel_basis = object()
+        captured = {}
+
+        def fake_identify_stage_a(**kwargs):
+            captured.update(kwargs)
+            return "identification-result"
+
+        def input_factory(realisation):
+            return {
+                "affine_model": sentinel_basis,
+                "comparison": "comparison-object",
+                "initial_parameters": "initial-parameters",
+                "parameter_bounds": "bounds",
+                "requested_parameter_subset": ("D11",),
+                "solver_configuration": "solver-config",
+                "design_id": "design",
+                "physical_specimen_id": "specimen",
+                "test_run_id": "run",
+            }
+
+        runner = uncertainty_module.create_stage_a_pipeline_runner(input_factory)
+        with mock.patch.object(
+            uncertainty_module, "identify_stage_a", side_effect=fake_identify_stage_a
+        ):
+            result = runner(mock.Mock())
+
+        self.assertEqual(result, "identification-result")
+        self.assertIs(captured["affine_model"], sentinel_basis)
 
 
 class PrimarySamplingTests(unittest.TestCase):

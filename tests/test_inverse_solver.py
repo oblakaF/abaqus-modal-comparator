@@ -428,5 +428,130 @@ class StageAInverseSolverTests(unittest.TestCase):
         )
 
 
+class StageAInverseSolverMassDependentTests(unittest.TestCase):
+    """Every optimizer evaluation must reconstruct K(x) and M(x) together.
+
+    The basis reference point is deliberately NOT the truth point, so a
+    fixed-mass regression (using ``basis.mass`` instead of
+    ``basis.reconstruct_mass(parameters)``) would evaluate the truth
+    candidate with the wrong mass and leave a non-zero residual floor.
+    """
+
+    def setUp(self):
+        self.reference = StageAMatrixParameters(9.0, 1.8, 4.5)
+        self.truth = StageAMatrixParameters(12.0, 2.4, 5.0)
+        self.constant = np.array([20.0, 40.0, 65.0, 95.0, 130.0, 170.0, 215.0, 265.0])
+        self.contributions = (
+            np.array([1.2, 0.2, 0.9, 0.4, 1.5, 0.3, 1.1, 0.6]),
+            np.array([0.1, 1.0, -0.3, 0.7, 0.2, -0.4, 0.8, -0.1]),
+            np.array([0.2, 1.4, 0.3, 1.0, 0.5, 1.6, 0.4, 1.2]),
+        )
+        self.mass_constant = np.array([1.0, 1.2, 0.9, 1.4, 1.1, 1.5, 1.3, 1.6])
+        self.mass_slope = np.array(
+            [0.02, 0.03, -0.015, 0.025, 0.01, -0.03, 0.015, 0.005]
+        )
+        self.dofs = tuple(AbaqusDof(index + 1, 1) for index in range(8))
+        self.basis = StageAAffineBasis(
+            reference_parameters=self.reference,
+            reference_stiffness=self._stiffness(self.reference),
+            basis_matrices=tuple(
+                sparse.diags(item, format="csr") for item in self.contributions
+            ),
+            mass=sparse.diags(self.mass_constant, format="csr"),
+            dofs=self.dofs,
+            mass_derivative_D11=sparse.diags(self.mass_slope, format="csr"),
+        )
+        truth_result = solve_generalized_eigenproblem(
+            self._stiffness(self.truth),
+            self.basis.reconstruct_mass(self.truth),
+            8,
+            expected_rigid_body_modes=0,
+            dofs=self.dofs,
+        )
+        self.truth_frequencies = truth_result.frequencies_hz
+        self.bounds = StageAParameterBounds(
+            D11=(6.0, 18.0), D66=(2.0, 10.0), coupling_ratio=(-0.4, 0.5)
+        )
+
+    def _stiffness(self, parameters):
+        diagonal = self.constant.copy()
+        for value, contribution in zip(parameters.values, self.contributions):
+            diagonal += value * contribution
+        return sparse.diags(diagonal, format="csr")
+
+    def observations(self):
+        return tuple(
+            ModalObservation(
+                observation_id=f"obs_{index + 1}",
+                physical_specimen_id="SP_SYNTHETIC",
+                test_run_id="run_1",
+                fe_mode_id=index + 1,
+                experimental_mode_id=index + 1,
+                fe_frequency_hz=self.truth_frequencies[index],
+                experimental_frequency_hz=self.truth_frequencies[index],
+                mac=1.0,
+            )
+            for index in range(6)
+        )
+
+    def configuration(self):
+        return InverseSolverConfiguration(
+            mode_count=8,
+            expected_rigid_body_modes=0,
+            random_seed=7123,
+            global_max_iterations=100,
+            global_population_size=8,
+            global_tolerance=1.0e-7,
+            global_absolute_tolerance=1.0e-8,
+            local_max_evaluations=200,
+        )
+
+    def identifiability(self):
+        sensitivity = compute_stage_a_sensitivity(
+            self.basis,
+            self.truth,
+            8,
+            expected_rigid_body_modes=0,
+            finite_difference_relative_steps=(),
+        )
+        whitened = whiten_sensitivity(sensitivity, standard_deviations=np.full(8, 0.003))
+        return analyze_identifiability(whitened)
+
+    def test_recovery_uses_the_reconstructed_mass_at_every_candidate(self):
+        diagnostic = self.identifiability()
+        self.assertEqual(diagnostic.rank, 3)
+        result = solve_stage_a_inverse(
+            self.basis,
+            self.observations(),
+            ("D11", "D12", "D66"),
+            StageAMatrixParameters(8.0, -0.8, 8.5),
+            self.bounds,
+            self.configuration(),
+            observation_standard_deviations=np.full(6, 0.003),
+            identifiability=diagnostic,
+        )
+        for name, truth in zip(("D11", "D12", "D66"), self.truth.values):
+            self.assertLess(abs(result.fitted_parameters[name] / truth - 1.0), 1.0e-6)
+        self.assertLess(np.max(np.abs(result.residuals_final)), 1.0e-6)
+        self.assertLess(result.objective_final, result.objective_initial * 1.0e-8)
+        self.assertTrue(result.success)
+
+    def test_fixed_reference_mass_would_not_reach_the_same_truth_residual(self):
+        # Regression guard proving the fixture's mass slope is large enough
+        # to matter: evaluating the truth candidate with the OLD constant
+        # basis.mass (instead of the correct reconstructed mass) leaves a
+        # non-zero residual, so the recovery test above is not vacuous.
+        stale_mass_result = solve_generalized_eigenproblem(
+            self._stiffness(self.truth),
+            self.basis.mass,
+            8,
+            expected_rigid_body_modes=0,
+            dofs=self.dofs,
+        )
+        self.assertFalse(
+            np.allclose(stale_mass_result.frequencies_hz, self.truth_frequencies)
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

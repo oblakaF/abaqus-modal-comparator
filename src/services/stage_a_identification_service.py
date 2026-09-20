@@ -565,7 +565,7 @@ def identify_stage_a(
 
     initial_eigenpairs = solve_generalized_eigenproblem(
         affine_model.reconstruct_stiffness(initial_parameters),
-        affine_model.mass,
+        affine_model.reconstruct_mass(initial_parameters),
         solver_configuration.mode_count,
         expected_rigid_body_modes=solver_configuration.expected_rigid_body_modes,
         dofs=affine_model.dofs,
@@ -730,6 +730,22 @@ def identify_stage_a(
         "pairing_provider_calls": getattr(active_provider, "call_count", None),
         "pairing_provider_failures": getattr(active_provider, "failure_count", None),
         "pairing_fallback_reason": fallback_reason or None,
+        "stiffness_model": (
+            "documented affine approximation in (D11, D12, D66); not matrix-exact "
+            "over the full domain, validated by real Abaqus evaluations to keep "
+            "modal-frequency error below 1e-4 (worst observed 1.6394e-05) across "
+            "the SP15 CFRP inverse domain"
+        ),
+        "mass_model": (
+            "constant reference mass"
+            if affine_model.mass_derivative_D11 is None
+            else (
+                "affine in D11 (M = M_ref + (D11-D11_ref) * dM/dD11), validated to "
+                "machine precision over the SP15 CFRP inverse domain; invariant to "
+                "D12 and D66"
+            )
+        ),
+        "final_direct_abaqus_verification_required": True,
     }
     return StageAIdentificationResult(
         observations=observations,
