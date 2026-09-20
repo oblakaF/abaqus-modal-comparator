@@ -269,6 +269,7 @@ class InverseIdentificationResult:
     identifiability_metadata_reference: str | None
     weighting_mode: str
     global_success: bool
+    global_stage_acceptable: bool
     global_message: str
     local_success: bool
     local_message: str
@@ -908,11 +909,13 @@ def solve_stage_a_inverse(
     ]
     cache: dict[Tuple[float, ...], _CandidateEvaluation | str] = {}
     global_evaluation_count = 0
+    successful_global_evaluation_count = 0
     best_evaluation = initial_evaluation
     best_vector = initial_vector.copy()
 
     def global_objective(vector: np.ndarray) -> float:
-        nonlocal global_evaluation_count, best_evaluation, best_vector
+        nonlocal global_evaluation_count, successful_global_evaluation_count
+        nonlocal best_evaluation, best_vector
         key = tuple(round(float(item), configuration.cache_decimals) for item in vector)
         cached = cache.get(key)
         if isinstance(cached, _CandidateEvaluation):
@@ -939,6 +942,7 @@ def solve_stage_a_inverse(
             )
             return _FAILED_OBJECTIVE
         cache[key] = candidate
+        successful_global_evaluation_count += 1
         if candidate.objective < best_evaluation.objective:
             best_evaluation = candidate
             best_vector = np.asarray(vector, dtype=float).copy()
@@ -956,8 +960,43 @@ def solve_stage_a_inverse(
         return candidate.objective
 
     global_success = False
+    global_stage_acceptable = False
     global_message = ""
     global_optimizer_evaluations = 0
+    global_returned_normally = False
+    returned_candidate_valid = False
+
+    def admissible_candidate(
+        vector: Sequence[float], candidate: _CandidateEvaluation
+    ) -> bool:
+        transformed = np.asarray(vector, dtype=float)
+        if transformed.shape != (len(subset),) or not np.isfinite(transformed).all():
+            return False
+        for value, (lower_bound, upper_bound) in zip(
+            transformed, transformed_bounds
+        ):
+            if value < lower_bound or value > upper_bound:
+                return False
+        point = candidate.parameters.as_parameterization()
+        if not (
+            parameter_bounds.D11[0] <= point.D <= parameter_bounds.D11[1]
+            and parameter_bounds.D66[0] <= point.D66 <= parameter_bounds.D66[1]
+            and parameter_bounds.coupling_ratio[0]
+            <= point.r
+            <= parameter_bounds.coupling_ratio[1]
+        ):
+            return False
+        numerical_values = (
+            np.asarray(candidate.predicted_frequencies),
+            np.asarray(candidate.residuals),
+            np.asarray(candidate.least_squares_residuals),
+        )
+        return bool(
+            math.isfinite(candidate.objective)
+            and candidate.objective < _FAILED_OBJECTIVE
+            and all(np.isfinite(item).all() for item in numerical_values)
+        )
+
     try:
         global_result = optimize.differential_evolution(
             global_objective,
@@ -974,17 +1013,47 @@ def solve_stage_a_inverse(
         global_optimizer_evaluations = int(global_result.nfev)
         global_success = bool(global_result.success)
         global_message = str(global_result.message)
+        global_returned_normally = True
+        returned_vector = np.asarray(global_result.x, dtype=float)
+        returned_objective = float(global_result.fun)
         try:
-            result_evaluation = evaluate(global_result.x)
+            result_evaluation = evaluate(returned_vector)
         except (ValueError, MatrixModelError, np.linalg.LinAlgError):
             result_evaluation = best_evaluation
-        if result_evaluation.objective <= best_evaluation.objective:
+        else:
+            returned_candidate_valid = bool(
+                math.isfinite(returned_objective)
+                and returned_objective < _FAILED_OBJECTIVE
+                and admissible_candidate(returned_vector, result_evaluation)
+            )
+        if (
+            returned_candidate_valid
+            and result_evaluation.objective <= best_evaluation.objective
+        ):
             best_evaluation = result_evaluation
-            best_vector = np.asarray(global_result.x, dtype=float).copy()
-    except (RuntimeError, ValueError, FloatingPointError) as exc:
+            best_vector = returned_vector.copy()
+    except (RuntimeError, ValueError, FloatingPointError, OSError) as exc:
         global_message = f"differential_evolution failed: {exc}"
-    if not global_success:
+
+    global_stage_acceptable = bool(
+        global_returned_normally
+        and successful_global_evaluation_count > 0
+        and returned_candidate_valid
+        and admissible_candidate(best_vector, best_evaluation)
+    )
+    if not global_success and global_stage_acceptable:
+        warnings.append(
+            "differential_evolution convergence criterion was not reached, but "
+            "the returned candidate remained finite, in bounds, and valid; local "
+            f"refinement therefore proceeded. Raw SciPy message: {global_message}"
+        )
+    elif not global_success:
         warnings.append(global_message or "differential_evolution did not converge.")
+    elif not global_stage_acceptable:
+        warnings.append(
+            "differential_evolution reported convergence but did not provide an "
+            "acceptable finite global-stage candidate."
+        )
 
     global_evaluation = best_evaluation
     frozen_pairing = global_evaluation.pairing
@@ -1115,10 +1184,13 @@ def solve_stage_a_inverse(
         identifiability_metadata_reference=identifiability_metadata_reference,
         weighting_mode=weighting_mode,
         global_success=global_success,
+        global_stage_acceptable=global_stage_acceptable,
         global_message=global_message,
         local_success=local_success,
         local_message=local_message,
-        success=bool(global_success and local_success and not pairing_changed),
+        success=bool(
+            global_stage_acceptable and local_success and not pairing_changed
+        ),
     )
 
 

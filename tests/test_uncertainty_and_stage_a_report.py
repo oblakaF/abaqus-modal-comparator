@@ -107,6 +107,7 @@ def _inverse(realisation, *, success=True):
         identifiability_metadata_reference="synthetic",
         weighting_mode="diagonal_standard_deviations",
         global_success=success,
+        global_stage_acceptable=success,
         global_message="ok" if success else "failed",
         local_success=success,
         local_message="ok" if success else "failed",
@@ -353,6 +354,8 @@ class CoverageAndReportTests(unittest.TestCase):
         payload = report.to_json()
         restored = StageAReport.from_json(payload)
         self.assertEqual(restored.to_dict(), report.to_dict())
+        self.assertIn("global_success", report.inverse_fit_summary)
+        self.assertIn("global_stage_acceptable", report.inverse_fit_summary)
         self.assertEqual(report.to_markdown(), report.to_markdown())
         self.assertIn(APPARENT_FLEXURAL_LABEL, report.to_markdown())
         self.assertIn(APPARENT_FLEXURAL_NOTE, report.to_markdown())

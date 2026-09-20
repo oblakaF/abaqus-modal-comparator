@@ -37,6 +37,7 @@ from services.matrix_model_service import (
     solve_generalized_eigenproblem,
 )
 from services.sensitivity_service import compute_stage_a_sensitivity
+from services import inverse_solver as inverse_solver_module
 
 
 class StageAInverseSolverTests(unittest.TestCase):
@@ -302,8 +303,248 @@ class StageAInverseSolverTests(unittest.TestCase):
                 ("D11", "D66"),
             )
         self.assertFalse(result.global_success)
+        self.assertFalse(result.global_stage_acceptable)
+        self.assertFalse(result.success)
         self.assertIn("synthetic optimizer failure", result.global_message)
         self.assertTrue(any("synthetic optimizer failure" in item for item in result.warnings))
+
+    def test_de_maxiter_with_valid_candidate_is_acceptable_initializer(self):
+        candidate = np.log([self.truth.D11, self.truth.D66])
+
+        def exhausted_de(objective, bounds, **kwargs):
+            del bounds, kwargs
+            value = objective(candidate)
+            return mock.Mock(
+                x=candidate.copy(),
+                fun=value,
+                nfev=1,
+                success=False,
+                message="Maximum number of iterations has been exceeded.",
+            )
+
+        with mock.patch(
+            "services.inverse_solver.optimize.differential_evolution",
+            side_effect=exhausted_de,
+        ):
+            result = self.solve(
+                StageAMatrixParameters(8.0, self.truth.D12, 8.5),
+                ("D11", "D66"),
+            )
+
+        self.assertFalse(result.global_success)
+        self.assertTrue(result.global_stage_acceptable)
+        self.assertTrue(result.local_success)
+        self.assertTrue(result.success)
+        self.assertTrue(
+            any(
+                "convergence criterion was not reached" in item
+                and "Maximum number of iterations" in item
+                for item in result.warnings
+            )
+        )
+
+    def test_exact_acceptable_de_candidate_is_passed_to_trf(self):
+        candidate = np.log([self.truth.D11, self.truth.D66])
+        captured = {}
+
+        def converged_de(objective, bounds, **kwargs):
+            del bounds, kwargs
+            return mock.Mock(
+                x=candidate.copy(),
+                fun=objective(candidate),
+                nfev=1,
+                success=True,
+                message="Optimization terminated successfully.",
+            )
+
+        def successful_local(residual, x0, **kwargs):
+            captured["x0"] = np.asarray(x0).copy()
+            residual(x0)
+            return mock.Mock(
+                x=np.asarray(x0).copy(),
+                nfev=1,
+                status=3,
+                success=True,
+                message="`xtol` termination condition is satisfied.",
+            )
+
+        with (
+            mock.patch(
+                "services.inverse_solver.optimize.differential_evolution",
+                side_effect=converged_de,
+            ),
+            mock.patch(
+                "services.inverse_solver.optimize.least_squares",
+                side_effect=successful_local,
+            ),
+        ):
+            result = self.solve(
+                StageAMatrixParameters(8.0, self.truth.D12, 8.5),
+                ("D11", "D66"),
+            )
+
+        np.testing.assert_allclose(captured["x0"], candidate)
+        self.assertTrue(result.global_success)
+        self.assertTrue(result.global_stage_acceptable)
+        self.assertTrue(result.success)
+
+    def test_no_successful_de_objective_evaluation_is_unacceptable(self):
+        candidate = np.log([self.truth.D11, self.truth.D66])
+        result_without_evaluations = mock.Mock(
+            x=candidate,
+            fun=0.0,
+            nfev=0,
+            success=True,
+            message="synthetic result without evaluations",
+        )
+        with mock.patch(
+            "services.inverse_solver.optimize.differential_evolution",
+            return_value=result_without_evaluations,
+        ):
+            result = self.solve(
+                StageAMatrixParameters(8.0, self.truth.D12, 8.5),
+                ("D11", "D66"),
+            )
+        self.assertTrue(result.global_success)
+        self.assertFalse(result.global_stage_acceptable)
+        self.assertFalse(result.success)
+
+    def test_penalty_only_de_result_is_unacceptable(self):
+        candidate = np.log([self.truth.D11, self.truth.D66])
+        real_eigensolve = inverse_solver_module.solve_generalized_eigenproblem
+        eigensolve_calls = 0
+
+        def fail_only_global_candidate(*args, **kwargs):
+            nonlocal eigensolve_calls
+            eigensolve_calls += 1
+            if eigensolve_calls == 3:
+                raise inverse_solver_module.MatrixModelError(
+                    "synthetic global candidate failure"
+                )
+            return real_eigensolve(*args, **kwargs)
+
+        def penalty_de(objective, bounds, **kwargs):
+            del bounds, kwargs
+            penalty = objective(candidate)
+            self.assertEqual(penalty, inverse_solver_module._FAILED_OBJECTIVE)
+            return mock.Mock(
+                x=candidate,
+                fun=penalty,
+                nfev=1,
+                success=False,
+                message="Maximum number of iterations has been exceeded.",
+            )
+
+        with (
+            mock.patch.object(
+                inverse_solver_module,
+                "solve_generalized_eigenproblem",
+                side_effect=fail_only_global_candidate,
+            ),
+            mock.patch(
+                "services.inverse_solver.optimize.differential_evolution",
+                side_effect=penalty_de,
+            ),
+        ):
+            result = self.solve(
+                StageAMatrixParameters(8.0, self.truth.D12, 8.5),
+                ("D11", "D66"),
+            )
+        self.assertFalse(result.global_stage_acceptable)
+        self.assertFalse(result.success)
+        self.assertTrue(
+            any(not item.success and item.stage == "global" for item in result.convergence_history)
+        )
+
+    def test_nonfinite_de_result_is_unacceptable(self):
+        valid = np.log([self.truth.D11, self.truth.D66])
+        invalid = np.array([np.nan, valid[1]])
+
+        def nonfinite_de(objective, bounds, **kwargs):
+            del bounds, kwargs
+            objective(valid)
+            return mock.Mock(
+                x=invalid,
+                fun=0.0,
+                nfev=1,
+                success=True,
+                message="synthetic malformed convergence",
+            )
+
+        with mock.patch(
+            "services.inverse_solver.optimize.differential_evolution",
+            side_effect=nonfinite_de,
+        ):
+            result = self.solve(
+                StageAMatrixParameters(8.0, self.truth.D12, 8.5),
+                ("D11", "D66"),
+            )
+        self.assertFalse(result.global_stage_acceptable)
+        self.assertFalse(result.success)
+
+    def test_out_of_bounds_de_result_is_unacceptable(self):
+        valid = np.log([self.truth.D11, self.truth.D66])
+        out_of_bounds = np.array([math.log(self.bounds.D11[1]) + 0.1, valid[1]])
+
+        def invalid_de(objective, bounds, **kwargs):
+            del bounds, kwargs
+            objective(valid)
+            return mock.Mock(
+                x=out_of_bounds,
+                fun=0.0,
+                nfev=1,
+                success=True,
+                message="synthetic malformed convergence",
+            )
+
+        with mock.patch(
+            "services.inverse_solver.optimize.differential_evolution",
+            side_effect=invalid_de,
+        ):
+            result = self.solve(
+                StageAMatrixParameters(8.0, self.truth.D12, 8.5),
+                ("D11", "D66"),
+            )
+        self.assertFalse(result.global_stage_acceptable)
+        self.assertFalse(result.success)
+
+    def test_failed_trf_remains_fatal_with_acceptable_global_initializer(self):
+        candidate = np.log([self.truth.D11, self.truth.D66])
+
+        def converged_de(objective, bounds, **kwargs):
+            del bounds, kwargs
+            return mock.Mock(
+                x=candidate,
+                fun=objective(candidate),
+                nfev=1,
+                success=True,
+                message="Optimization terminated successfully.",
+            )
+
+        failed_local = mock.Mock(
+            x=candidate,
+            nfev=1,
+            status=0,
+            success=False,
+            message="The maximum number of function evaluations is exceeded.",
+        )
+        with (
+            mock.patch(
+                "services.inverse_solver.optimize.differential_evolution",
+                side_effect=converged_de,
+            ),
+            mock.patch(
+                "services.inverse_solver.optimize.least_squares",
+                return_value=failed_local,
+            ),
+        ):
+            result = self.solve(
+                StageAMatrixParameters(8.0, self.truth.D12, 8.5),
+                ("D11", "D66"),
+            )
+        self.assertTrue(result.global_stage_acceptable)
+        self.assertFalse(result.local_success)
+        self.assertFalse(result.success)
 
     def test_comparison_backed_pairing_is_explicit_and_mac_is_not_an_objective_term(self):
         calls = []
@@ -373,15 +614,21 @@ class StageAInverseSolverTests(unittest.TestCase):
                 method="stateful final-check adapter",
             )
 
-        fake_global_result = mock.Mock(
-            success=True,
-            message="synthetic global convergence",
-            nfev=0,
-            x=np.log([self.truth.D11, self.truth.D66]),
-        )
+        global_vector = np.log([self.truth.D11, self.truth.D66])
+
+        def fake_global(objective, bounds, **kwargs):
+            del bounds, kwargs
+            return mock.Mock(
+                success=True,
+                message="synthetic global convergence",
+                nfev=1,
+                x=global_vector,
+                fun=objective(global_vector),
+            )
+
         with mock.patch(
             "services.inverse_solver.optimize.differential_evolution",
-            return_value=fake_global_result,
+            side_effect=fake_global,
         ):
             result = solve_stage_a_inverse(
                 self.basis,
@@ -394,6 +641,7 @@ class StageAInverseSolverTests(unittest.TestCase):
                 comparison_pairing_provider=provider,
             )
         self.assertTrue(result.pairing_changed_at_optimum)
+        self.assertTrue(result.global_stage_acceptable)
         self.assertFalse(result.success)
         self.assertTrue(any("Pairing changed" in item for item in result.warnings))
 

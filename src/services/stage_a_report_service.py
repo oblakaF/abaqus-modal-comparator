@@ -261,6 +261,7 @@ def build_stage_a_report(
             "objective_final": inverse.objective_final,
             "success": inverse.success,
             "global_success": inverse.global_success,
+            "global_stage_acceptable": inverse.global_stage_acceptable,
             "local_success": inverse.local_success,
             "pairing_changed_at_optimum": inverse.pairing_changed_at_optimum,
             "residuals_final": inverse.residuals_final,

@@ -397,15 +397,21 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
                 method="stateful integration provider",
             )
 
-        fake_global_result = mock.Mock(
-            success=True,
-            message="synthetic global convergence",
-            nfev=0,
-            x=np.log([fixture.truth.D11, fixture.truth.D66]),
-        )
+        global_vector = np.log([fixture.truth.D11, fixture.truth.D66])
+
+        def fake_global(objective, bounds, **kwargs):
+            del bounds, kwargs
+            return mock.Mock(
+                success=True,
+                message="synthetic global convergence",
+                nfev=1,
+                x=global_vector,
+                fun=objective(global_vector),
+            )
+
         with mock.patch(
             "services.inverse_solver.optimize.differential_evolution",
-            return_value=fake_global_result,
+            side_effect=fake_global,
         ):
             result = fixture.identify(
                 pairing_provider=provider,
