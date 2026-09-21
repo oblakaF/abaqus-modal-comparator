@@ -109,8 +109,18 @@ class LocalCovarianceDiagnostic:
     parameter_ids: Tuple[str, ...]
     covariance: np.ndarray
     standard_deviations: np.ndarray
-    intervals_95: Mapping[str, Tuple[float, float]]
-    method: str = "diagnostic pseudoinverse of J.T @ W @ J; not final uncertainty"
+    intervals_95: Mapping[str, Tuple[float, float] | None]
+    rank: int
+    numerical_rank_tolerance: float
+    nullspace_basis: np.ndarray
+    observable_projector: np.ndarray
+    parameter_statuses: Mapping[str, str]
+    unobservable_parameter_ids: Tuple[str, ...]
+    partially_observable_parameter_ids: Tuple[str, ...]
+    method: str = (
+        "diagnostic pseudoinverse of J.T @ W @ J with explicit nullspace; "
+        "pseudoinverse zeros never imply zero physical uncertainty"
+    )
 
 
 @dataclass(frozen=True)
@@ -435,13 +445,46 @@ def local_linear_covariance(
             information = matrix.T @ supplied @ matrix
         else:
             raise UncertaintyValidationError("weights must be a row vector or square matrix.")
-    covariance = np.linalg.pinv(information)
-    standard_deviations = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+    # Rank and nullspace must correspond to the weighted information matrix,
+    # including semidefinite row weights.  Its eigenvectors provide the same
+    # observable/null decomposition without inventing an epsilon.
+    information_eigenvalues, information_vectors = np.linalg.eigh(information)
+    information_scale = float(np.max(np.abs(information_eigenvalues), initial=0.0))
+    information_tolerance = (
+        max(information.shape) * np.finfo(float).eps * information_scale
+    )
+    observable_mask = information_eigenvalues > information_tolerance
+    rank = int(np.count_nonzero(observable_mask))
+    observable_vectors = information_vectors[:, observable_mask]
+    nullspace_basis = information_vectors[:, ~observable_mask]
+    observable_projector = observable_vectors @ observable_vectors.T
+    covariance = np.linalg.pinv(information, rcond=(
+        information_tolerance / information_scale if information_scale > 0.0 else 0.0
+    ))
+    finite_sigmas = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+    fractions = np.clip(np.diag(observable_projector), 0.0, 1.0)
+    fraction_tolerance = 100.0 * np.finfo(float).eps * max(len(identifiers), 1)
+    statuses: dict[str, str] = {}
+    for identifier, fraction in zip(identifiers, fractions):
+        if fraction <= fraction_tolerance:
+            statuses[identifier] = "UNOBSERVABLE"
+        elif fraction >= 1.0 - fraction_tolerance:
+            statuses[identifier] = "OBSERVABLE"
+        else:
+            statuses[identifier] = "PARTIALLY_OBSERVABLE"
+    standard_deviations = finite_sigmas.copy()
+    for index, identifier in enumerate(identifiers):
+        if statuses[identifier] != "OBSERVABLE":
+            standard_deviations[index] = math.inf
     centres = np.zeros(len(identifiers)) if estimates is None else np.asarray(estimates, dtype=float)
     if centres.shape != (len(identifiers),) or not np.isfinite(centres).all():
         raise UncertaintyValidationError("estimates must match parameter_ids.")
     intervals = {
-        name: (float(value - 1.96 * sigma), float(value + 1.96 * sigma))
+        name: (
+            (float(value - 1.96 * sigma), float(value + 1.96 * sigma))
+            if statuses[name] == "OBSERVABLE"
+            else None
+        )
         for name, value, sigma in zip(identifiers, centres, standard_deviations)
     }
     return LocalCovarianceDiagnostic(
@@ -449,6 +492,17 @@ def local_linear_covariance(
         covariance=covariance,
         standard_deviations=standard_deviations,
         intervals_95=intervals,
+        rank=rank,
+        numerical_rank_tolerance=information_tolerance,
+        nullspace_basis=nullspace_basis,
+        observable_projector=observable_projector,
+        parameter_statuses=statuses,
+        unobservable_parameter_ids=tuple(
+            name for name in identifiers if statuses[name] == "UNOBSERVABLE"
+        ),
+        partially_observable_parameter_ids=tuple(
+            name for name in identifiers if statuses[name] == "PARTIALLY_OBSERVABLE"
+        ),
     )
 
 

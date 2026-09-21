@@ -64,8 +64,9 @@ class StageAReport:
     coverage_validation: Mapping[str, Any] | None
     assumptions: Tuple[str, ...]
     warnings: Tuple[str, ...]
+    scientific_status_summary: Mapping[str, Any] = field(default_factory=dict)
     local_covariance_comparison: Mapping[str, Any] | None = None
-    schema_version: str = "stage-a-report/1.0"
+    schema_version: str = "stage-a-report/1.1"
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Mapping[str, Any]:
@@ -185,7 +186,35 @@ def build_stage_a_report(
         "parameter_count": len(parameter_ids),
         "condition_number": identification.identifiability.condition_number,
         "gamma": identification.identifiability.collinearity.gamma,
+        "structurally_identifiable": identification.identifiability.structurally_identifiable,
+        "directionally_separable": identification.identifiability.directionally_separable,
+        "practically_precise_enough": identification.identifiability.practically_precise_enough,
+        "overall_practical_identifiability": (
+            identification.identifiability.overall_practical_identifiability
+        ),
         "practically_identifiable": identification.identifiability.practically_identifiable,
+        "precision_status": identification.identifiability.precision_status,
+        "precision_assessments": _primitive(
+            identification.identifiability.precision_assessments
+        ),
+        "scaled_standard_deviations": _primitive(
+            identification.identifiability.scaled_standard_deviations
+        ),
+        "transformed_coordinate_ids": (
+            identification.identifiability.transformed_coordinate_ids
+        ),
+        "transformed_standard_deviations": _primitive(
+            identification.identifiability.transformed_standard_deviations
+        ),
+        "physical_standard_deviations": _primitive(
+            identification.identifiability.physical_standard_deviations
+        ),
+        "parameter_observability": _primitive(
+            identification.identifiability.parameter_observability
+        ),
+        "nullspace_basis": _primitive(
+            identification.identifiability.nullspace_basis
+        ),
         "D12_D66_correlation": correlation,
         "weak_directions": weak_directions,
         "recommended_subset": identification.recommended_parameter_subset,
@@ -221,6 +250,10 @@ def build_stage_a_report(
         local_comparison = {
             "diagnostic_only": True,
             "method": local_covariance.method,
+            "rank": local_covariance.rank,
+            "parameter_statuses": _primitive(local_covariance.parameter_statuses),
+            "nullspace_basis": _primitive(local_covariance.nullspace_basis),
+            "standard_deviations": _primitive(local_covariance.standard_deviations),
             "local_intervals_95": _primitive(local_covariance.intervals_95),
             "monte_carlo_intervals_95": {
                 name: list(stats.interval_95)
@@ -282,12 +315,21 @@ def build_stage_a_report(
         coverage_validation=_primitive(coverage_validation) if coverage_validation else None,
         assumptions=assumptions,
         warnings=warnings,
+        scientific_status_summary=_primitive(
+            identification.metadata.get("scientific_statuses", {})
+        ),
         local_covariance_comparison=local_comparison,
         metadata={
             "stage": "A",
             "report_format": "structured scientific result",
             "pdf_exported": False,
             "excel_exported": False,
+            "model_validation_evidence": _primitive(
+                identification.metadata.get("model_validation_evidence")
+            ),
+            "mode_identity_caveat": _primitive(
+                identification.metadata.get("mode_identity_caveat")
+            ),
         },
     )
 
@@ -309,6 +351,10 @@ def render_stage_a_report(report: StageAReport) -> str:
             f"- Rank: {ident['rank']} / {ident['parameter_count']}",
             f"- Condition number: {_format_value(ident['condition_number'])}",
             f"- Collinearity gamma: {_format_value(ident['gamma'])}",
+            f"- Structural rank gate: {ident['structurally_identifiable']}",
+            f"- Directional separability gate: {ident['directionally_separable']}",
+            f"- Precision gate: {ident['precision_status']}",
+            f"- Overall practical identifiability: {ident['overall_practical_identifiability']}",
             f"- Fitted subset: {', '.join(report.fitted_subset)}",
             "",
             f"## DERIVED {APPARENT_FLEXURAL_LABEL}",
@@ -341,6 +387,11 @@ def render_stage_a_report(report: StageAReport) -> str:
             f"- Pairing changed at optimum: {report.inverse_fit_summary['pairing_changed_at_optimum']}",
         ]
     )
+    if report.scientific_status_summary:
+        lines.extend(["", "## INDEPENDENT SCIENTIFIC STATUSES"])
+        for name, status in report.scientific_status_summary.items():
+            value = status.get("status", "UNKNOWN") if isinstance(status, Mapping) else status
+            lines.append(f"- {name}: {value}")
     if report.coverage_validation is not None:
         lines.append(
             f"- Level-1 coverage validation passed: {report.coverage_validation['passed']}"

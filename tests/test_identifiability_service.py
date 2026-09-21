@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from domain.modal_observation import ObservationUncertainty
 from services.identifiability_service import (
+    ParameterPrecisionRequirement,
     analyze_identifiability,
     collinearity_index,
     combine_independent_uncertainties,
@@ -110,7 +111,13 @@ class IdentifiabilityTests(unittest.TestCase):
             standard_deviations=np.ones(len(sensitivity)),
             parameter_ids=parameter_ids,
         )
-        return analyze_identifiability(whitened)
+        return analyze_identifiability(
+            whitened,
+            precision_requirements={
+                name: ParameterPrecisionRequirement(10.0, coordinate="scaled")
+                for name in parameter_ids
+            },
+        )
 
     def test_orthogonal_columns_are_full_rank_and_well_conditioned(self):
         result = self.analyze(np.eye(2), ("p1", "p2"))

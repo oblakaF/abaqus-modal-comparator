@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from modal_core import ModalDataset, ModeShape, compare_modal_datasets
+from services.identifiability_service import ParameterPrecisionRequirement
 from services.inverse_solver import (
     InverseSolverConfiguration,
     ModeAssignment,
@@ -241,6 +242,27 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
         self.assertEqual(mode_one.reason, "probable suspension influence")
         self.assertFalse(result.metadata["mac_used_in_objective"])
         self.assertEqual(result.metadata["mass_model"], "constant reference mass")
+        self.assertEqual(
+            result.metadata["model_validation_evidence"]["status"],
+            "NOT_VALIDATED_FOR_THIS_MODEL",
+        )
+        statuses = result.metadata["scientific_statuses"]
+        self.assertEqual(statuses["optimizer_solver"]["status"], "PASS")
+        self.assertEqual(
+            statuses["fit_quality"]["status"],
+            "NOT_ASSESSED_NO_DECLARED_ACCEPTANCE_THRESHOLD",
+        )
+        self.assertEqual(statuses["direct_fe_validation"]["status"], "NOT_RUN")
+        self.assertEqual(statuses["hold_out_validation"]["status"], "NOT_RUN")
+        self.assertEqual(
+            statuses["material_identification_validation"]["status"],
+            "NOT_VALIDATED",
+        )
+        caveat = result.metadata["mode_identity_caveat"]
+        self.assertEqual(caveat["minimum_individual_mac"]["NB6"], 5.32e-4)
+        self.assertEqual(caveat["minimum_individual_mac"]["NB8"], 0.01495)
+        self.assertFalse(caveat["mac_thresholds_changed"])
+        self.assertFalse(caveat["cluster_subspace_residual_implemented"])
 
     def test_mass_dependent_basis_recovers_truth_and_reports_affine_mass_provenance(self):
         fixture = SyntheticProductionFixture(mass_dependent=True)
@@ -257,6 +279,26 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
         self.assertEqual(result.identifiability.rank, 3)
         self.assertTrue(result.inverse_result.success)
         self.assertIn("affine in D11", result.metadata["mass_model"])
+
+    def test_precision_is_re_evaluated_at_fitted_optimum_when_declared(self):
+        fixture = SyntheticProductionFixture()
+        result = fixture.identify(
+            campaign_policy=StageACampaignPolicy(
+                precision_requirements={
+                    name: ParameterPrecisionRequirement(
+                        1.0e12, coordinate="physical"
+                    )
+                    for name in ("D11", "D12", "D66")
+                }
+            )
+        )
+        self.assertEqual(result.metadata["identifiability_evaluated_at"], "fitted_optimum")
+        self.assertEqual(result.identifiability.precision_status, "PASS")
+        self.assertTrue(result.identifiability.practically_precise_enough)
+        self.assertEqual(
+            result.metadata["scientific_statuses"]["identifiability_at_optimum"]["status"],
+            "PASS",
+        )
 
     def test_manual_rejection_is_preserved_and_not_sent_to_pairing_provider(self):
         fixture = SyntheticProductionFixture()
@@ -309,7 +351,7 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
 
     def test_rank_deficient_full_request_requires_approval_or_override(self):
         fixture = SyntheticProductionFixture(rank_deficient=True)
-        with self.assertRaisesRegex(StageAIdentificationError, "not practically identifiable"):
+        with self.assertRaisesRegex(StageAIdentificationError, "not structurally identifiable"):
             fixture.identify()
 
         approved = fixture.identify(

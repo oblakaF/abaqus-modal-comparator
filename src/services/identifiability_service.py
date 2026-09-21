@@ -65,6 +65,56 @@ class SubsetIdentifiability:
 
 
 @dataclass(frozen=True)
+class ParameterPrecisionRequirement:
+    """Campaign-specific acceptable one-sigma uncertainty for one parameter.
+
+    ``coordinate`` deliberately names the quantity being gated.  In
+    particular, a signed parameter such as D12 can use an absolute physical
+    threshold or a scaled threshold based on a separately declared D scale;
+    its estimate is never used as a relative-uncertainty denominator.
+    """
+
+    maximum_standard_deviation: float
+    coordinate: str = "physical"
+    reference_scale: float | None = None
+    rationale: str = ""
+
+    def __post_init__(self) -> None:
+        maximum = float(self.maximum_standard_deviation)
+        if not math.isfinite(maximum) or maximum <= 0.0:
+            raise ValueError("maximum_standard_deviation must be positive and finite.")
+        coordinate = str(self.coordinate).strip().lower()
+        if coordinate not in {"scaled", "transformed", "physical"}:
+            raise ValueError("precision coordinate must be scaled, transformed, or physical.")
+        reference = self.reference_scale
+        if reference is not None:
+            reference = float(reference)
+            if not math.isfinite(reference) or reference <= 0.0:
+                raise ValueError("reference_scale must be positive and finite when supplied.")
+        object.__setattr__(self, "maximum_standard_deviation", maximum)
+        object.__setattr__(self, "coordinate", coordinate)
+        object.__setattr__(self, "reference_scale", reference)
+        object.__setattr__(self, "rationale", str(self.rationale))
+
+
+@dataclass(frozen=True)
+class ParameterPrecisionAssessment:
+    parameter_id: str
+    observability_status: str
+    observable_fraction: float
+    scaled_standard_deviation: float
+    transformed_coordinate: str
+    transformed_standard_deviation: float
+    physical_standard_deviation: float
+    requirement_coordinate: str | None
+    maximum_standard_deviation: float | None
+    reference_scale: float | None
+    achieved_fraction_of_reference: float | None
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class IdentifiabilityResult:
     parameter_ids: Tuple[str, ...]
     singular_values: np.ndarray
@@ -79,7 +129,20 @@ class IdentifiabilityResult:
     deficient_directions: Tuple[DeficientDirection, ...]
     best_identifiable_subset: SubsetIdentifiability | None
     subset_ranking: Tuple[SubsetIdentifiability, ...]
+    structurally_identifiable: bool
+    directionally_separable: bool
+    practically_precise_enough: bool | None
+    overall_practical_identifiability: bool
     practically_identifiable: bool
+    precision_status: str
+    precision_assessments: Tuple[ParameterPrecisionAssessment, ...]
+    scaled_standard_deviations: np.ndarray
+    transformed_coordinate_ids: Tuple[str, ...]
+    transformed_standard_deviations: np.ndarray
+    physical_standard_deviations: np.ndarray
+    observable_projector: np.ndarray
+    nullspace_basis: np.ndarray
+    parameter_observability: Mapping[str, str]
     warnings: Tuple[str, ...]
     weighting_mode: str
 
@@ -487,6 +550,63 @@ def _correlation_from_covariance(covariance: np.ndarray) -> np.ndarray:
     return correlation
 
 
+def _validated_scales(
+    parameter_ids: Tuple[str, ...],
+    supplied: Mapping[str, float] | None,
+) -> np.ndarray:
+    if supplied is None:
+        return np.ones(len(parameter_ids), dtype=float)
+    unknown = set(supplied) - set(parameter_ids)
+    if unknown:
+        raise ValueError(
+            "Physical parameter scales contain unknown IDs: "
+            + ", ".join(sorted(unknown))
+        )
+    missing = set(parameter_ids) - set(supplied)
+    if missing:
+        raise ValueError(
+            "A physical parameter scale is required for: "
+            + ", ".join(sorted(missing))
+        )
+    scales = np.asarray([float(supplied[item]) for item in parameter_ids], dtype=float)
+    if not np.isfinite(scales).all() or np.any(scales <= 0.0):
+        raise ValueError("Physical parameter scales must be positive and finite.")
+    return scales
+
+
+def _validated_transformation(
+    parameter_count: int,
+    supplied: np.ndarray | None,
+) -> np.ndarray:
+    if supplied is None:
+        return np.eye(parameter_count, dtype=float)
+    matrix = np.asarray(supplied, dtype=float)
+    if matrix.shape != (parameter_count, parameter_count):
+        raise ValueError(
+            "transformed_coordinate_jacobian must be square with one row per parameter."
+        )
+    if not np.isfinite(matrix).all():
+        raise ValueError("transformed_coordinate_jacobian must be finite.")
+    return matrix
+
+
+def _observability_statuses(
+    projector: np.ndarray,
+    parameter_ids: Tuple[str, ...],
+) -> tuple[Mapping[str, str], np.ndarray]:
+    fractions = np.clip(np.diag(projector), 0.0, 1.0)
+    tolerance = 100.0 * np.finfo(float).eps * max(projector.shape[0], 1)
+    statuses: dict[str, str] = {}
+    for identifier, fraction in zip(parameter_ids, fractions):
+        if fraction <= tolerance:
+            statuses[identifier] = "UNOBSERVABLE"
+        elif fraction >= 1.0 - tolerance:
+            statuses[identifier] = "OBSERVABLE"
+        else:
+            statuses[identifier] = "PARTIALLY_OBSERVABLE"
+    return statuses, fractions
+
+
 def analyze_identifiability(
     whitened_sensitivity: WhiteningResult | np.ndarray,
     parameter_ids: Sequence[str] | None = None,
@@ -495,6 +615,10 @@ def analyze_identifiability(
     rcond: float | None = None,
     condition_warning_threshold: float = 100.0,
     collinearity_warning_threshold: float = 20.0,
+    precision_requirements: Mapping[str, ParameterPrecisionRequirement] | None = None,
+    physical_parameter_scales: Mapping[str, float] | None = None,
+    transformed_coordinate_ids: Sequence[str] | None = None,
+    transformed_coordinate_jacobian: np.ndarray | None = None,
 ) -> IdentifiabilityResult:
     """Compute stable SVD/Fisher diagnostics and rank Stage-A subsets.
 
@@ -592,11 +716,113 @@ def analyze_identifiability(
         collinearity_warning_threshold=collinearity_warning_threshold,
     )
     best_subset = next((item for item in subset_ranking if item.admissible), None)
-    practically_identifiable = bool(
-        rank == parameter_count
-        and condition <= condition_warning_threshold
-        and not collinearity.warning
+    structurally_identifiable = bool(rank == parameter_count)
+    directionally_separable = bool(
+        condition <= condition_warning_threshold and not collinearity.warning
     )
+
+    retained_vectors = right_vectors[:, :rank]
+    observable_projector = retained_vectors @ retained_vectors.T
+    nullspace_basis = right_vectors[:, rank:].copy()
+    observability, observable_fractions = _observability_statuses(
+        observable_projector, identifiers
+    )
+    physical_scales = _validated_scales(identifiers, physical_parameter_scales)
+    transformed_jacobian = _validated_transformation(
+        parameter_count, transformed_coordinate_jacobian
+    )
+    if transformed_coordinate_ids is None:
+        transformed_ids = identifiers
+    else:
+        transformed_ids = _identifiers(
+            transformed_coordinate_ids, parameter_count, "transformed_coordinate"
+        )
+    physical_covariance = (
+        physical_scales[:, np.newaxis]
+        * covariance
+        * physical_scales[np.newaxis, :]
+    )
+    transformed_covariance = transformed_jacobian @ covariance @ transformed_jacobian.T
+    scaled_sigmas = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+    physical_sigmas = np.sqrt(np.maximum(np.diag(physical_covariance), 0.0))
+    transformed_sigmas = np.sqrt(np.maximum(np.diag(transformed_covariance), 0.0))
+    for index, identifier in enumerate(identifiers):
+        if observability[identifier] != "OBSERVABLE":
+            scaled_sigmas[index] = math.inf
+            physical_sigmas[index] = math.inf
+            transformed_sigmas[index] = math.inf
+
+    requirements = dict(precision_requirements or {})
+    unknown_requirements = set(requirements) - set(identifiers)
+    if unknown_requirements:
+        raise ValueError(
+            "Precision requirements contain unknown parameter IDs: "
+            + ", ".join(sorted(unknown_requirements))
+        )
+    assessments: list[ParameterPrecisionAssessment] = []
+    for index, identifier in enumerate(identifiers):
+        requirement = requirements.get(identifier)
+        observable_status = observability[identifier]
+        status = "NOT_ASSESSED"
+        reason = "No parameter-specific precision requirement was supplied."
+        coordinate = None
+        maximum = None
+        reference = None
+        achieved_fraction = None
+        if observable_status != "OBSERVABLE":
+            status = observable_status
+            reason = (
+                "The data do not constrain this individual parameter independently; "
+                "no finite ordinary confidence interval is valid."
+            )
+        elif requirement is not None:
+            coordinate = requirement.coordinate
+            maximum = requirement.maximum_standard_deviation
+            reference = requirement.reference_scale
+            achieved = {
+                "scaled": scaled_sigmas[index],
+                "transformed": transformed_sigmas[index],
+                "physical": physical_sigmas[index],
+            }[coordinate]
+            if reference is not None:
+                achieved_fraction = float(achieved / reference)
+            status = "PASS" if achieved <= maximum else "FAIL_IMPRECISE"
+            reason = (
+                f"One-sigma {coordinate} uncertainty {achieved:.6g} "
+                f"{'does not exceed' if status == 'PASS' else 'exceeds'} "
+                f"the declared parameter-specific maximum {maximum:.6g}."
+            )
+        assessments.append(
+            ParameterPrecisionAssessment(
+                parameter_id=identifier,
+                observability_status=observable_status,
+                observable_fraction=float(observable_fractions[index]),
+                scaled_standard_deviation=float(scaled_sigmas[index]),
+                transformed_coordinate=transformed_ids[index],
+                transformed_standard_deviation=float(transformed_sigmas[index]),
+                physical_standard_deviation=float(physical_sigmas[index]),
+                requirement_coordinate=coordinate,
+                maximum_standard_deviation=maximum,
+                reference_scale=reference,
+                achieved_fraction_of_reference=achieved_fraction,
+                status=status,
+                reason=reason,
+            )
+        )
+
+    requirements_complete = bool(requirements) and set(requirements) == set(identifiers)
+    if not requirements_complete:
+        practically_precise_enough: bool | None = None
+        precision_status = "NOT_ASSESSED_MISSING_PARAMETER_REQUIREMENTS"
+    else:
+        practically_precise_enough = all(item.status == "PASS" for item in assessments)
+        precision_status = "PASS" if practically_precise_enough else "FAIL_IMPRECISE_OR_UNOBSERVABLE"
+    overall_practical_identifiability = bool(
+        structurally_identifiable
+        and directionally_separable
+        and practically_precise_enough is True
+    )
+    practically_identifiable = overall_practical_identifiability
 
     warnings: list[str] = []
     if rank < parameter_count:
@@ -612,6 +838,19 @@ def analyze_identifiability(
         warnings.append(
             f"Collinearity gamma {collinearity.gamma:.6g} exceeds advisory threshold "
             f"{collinearity_warning_threshold:.6g}."
+        )
+    if precision_status == "NOT_ASSESSED_MISSING_PARAMETER_REQUIREMENTS":
+        warnings.append(
+            "Practical precision was not assessed because complete parameter-specific "
+            "uncertainty requirements were not supplied."
+        )
+    elif not practically_precise_enough:
+        failed = ", ".join(
+            item.parameter_id for item in assessments if item.status != "PASS"
+        )
+        warnings.append(
+            "The full-rank/conditioning result is insufficient for practical precision; "
+            f"failed or unobservable parameters: {failed}."
         )
     if weighting_mode == "unweighted":
         warnings.append("Observation uncertainty was unavailable; diagnostics are unweighted.")
@@ -630,7 +869,20 @@ def analyze_identifiability(
         deficient_directions=tuple(directions),
         best_identifiable_subset=best_subset,
         subset_ranking=subset_ranking,
+        structurally_identifiable=structurally_identifiable,
+        directionally_separable=directionally_separable,
+        practically_precise_enough=practically_precise_enough,
+        overall_practical_identifiability=overall_practical_identifiability,
         practically_identifiable=practically_identifiable,
+        precision_status=precision_status,
+        precision_assessments=tuple(assessments),
+        scaled_standard_deviations=scaled_sigmas,
+        transformed_coordinate_ids=transformed_ids,
+        transformed_standard_deviations=transformed_sigmas,
+        physical_standard_deviations=physical_sigmas,
+        observable_projector=observable_projector,
+        nullspace_basis=nullspace_basis,
+        parameter_observability=observability,
         warnings=tuple(warnings),
         weighting_mode=weighting_mode,
     )
@@ -640,6 +892,8 @@ __all__ = [
     "CollinearityResult",
     "DeficientDirection",
     "IdentifiabilityResult",
+    "ParameterPrecisionAssessment",
+    "ParameterPrecisionRequirement",
     "SubsetIdentifiability",
     "WhiteningResult",
     "analyze_identifiability",

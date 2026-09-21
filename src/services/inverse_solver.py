@@ -526,7 +526,13 @@ def _validate_identifiability(
         )
     subset_set = set(subset)
     if subset_set == set(identifiability.parameter_ids):
-        admissible = identifiability.practically_identifiable
+        # Solver admission is a structural/separability decision.  Practical
+        # precision is reported independently and may be NOT_ASSESSED until a
+        # campaign supplies parameter-specific acceptable uncertainty scales.
+        admissible = (
+            identifiability.structurally_identifiable
+            and identifiability.directionally_separable
+        )
     else:
         diagnostic = next(
             (
@@ -540,7 +546,8 @@ def _validate_identifiability(
     if admissible:
         return ()
     message = (
-        "The requested fitted parameter subset was not marked practically identifiable."
+        "The requested fitted parameter subset was not marked structurally identifiable "
+        "and directionally separable."
     )
     if not allow_override:
         raise InverseSolverValidationError(message + " Use an explicit override to proceed.")

@@ -166,7 +166,8 @@ class StageAInverseSolverTests(unittest.TestCase):
     def test_noiseless_full_rank_three_parameter_case_recovers_truth(self):
         diagnostic = self.identifiability()
         self.assertEqual(diagnostic.rank, 3)
-        self.assertTrue(diagnostic.practically_identifiable)
+        self.assertTrue(diagnostic.structurally_identifiable)
+        self.assertIsNone(diagnostic.practically_precise_enough)
         result = self.solve(
             StageAMatrixParameters(8.0, -0.8, 8.5),
             ("D11", "D12", "D66"),

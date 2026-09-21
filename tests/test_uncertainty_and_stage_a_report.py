@@ -269,6 +269,12 @@ class MonteCarloTests(unittest.TestCase):
             result.covariance, np.linalg.pinv(jacobian.T @ jacobian)
         )
         self.assertIn("pseudoinverse", result.method)
+        self.assertEqual(
+            result.parameter_statuses,
+            {"a": "PARTIALLY_OBSERVABLE", "b": "PARTIALLY_OBSERVABLE"},
+        )
+        self.assertTrue(np.isinf(result.standard_deviations).all())
+        self.assertIsNone(result.intervals_95["a"])
 
 
 class CoverageAndReportTests(unittest.TestCase):
@@ -344,13 +350,37 @@ class CoverageAndReportTests(unittest.TestCase):
                 rank=3,
                 condition_number=2.0,
                 collinearity=SimpleNamespace(gamma=1.2),
+                structurally_identifiable=True,
+                directionally_separable=True,
+                practically_precise_enough=True,
+                overall_practical_identifiability=True,
                 practically_identifiable=True,
+                precision_status="PASS",
+                precision_assessments=(),
+                scaled_standard_deviations=np.ones(3),
+                transformed_coordinate_ids=("x1", "x3", "x2"),
+                transformed_standard_deviations=np.ones(3),
+                physical_standard_deviations=np.ones(3),
+                parameter_observability={
+                    "D11": "OBSERVABLE",
+                    "D12": "OBSERVABLE",
+                    "D66": "OBSERVABLE",
+                },
+                nullspace_basis=np.empty((3, 0)),
                 correlation_matrix=np.eye(3),
                 deficient_directions=(),
                 weighting_mode="diagonal_standard_deviations",
             ),
         )
-        report = build_stage_a_report(identification, _specimen(uncertain=False), monte_carlo)
+        local = local_linear_covariance(
+            np.diag([1.0, 0.0, 1.0]), ("D11", "D12", "D66")
+        )
+        report = build_stage_a_report(
+            identification,
+            _specimen(uncertain=False),
+            monte_carlo,
+            local_covariance=local,
+        )
         payload = report.to_json()
         restored = StageAReport.from_json(payload)
         self.assertEqual(restored.to_dict(), report.to_dict())
@@ -359,6 +389,13 @@ class CoverageAndReportTests(unittest.TestCase):
         self.assertEqual(report.to_markdown(), report.to_markdown())
         self.assertIn(APPARENT_FLEXURAL_LABEL, report.to_markdown())
         self.assertIn(APPARENT_FLEXURAL_NOTE, report.to_markdown())
+        self.assertEqual(
+            report.local_covariance_comparison["parameter_statuses"]["D12"],
+            "UNOBSERVABLE",
+        )
+        self.assertIsNone(
+            report.local_covariance_comparison["local_intervals_95"]["D12"]
+        )
 
 
 if __name__ == "__main__":

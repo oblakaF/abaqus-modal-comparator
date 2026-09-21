@@ -374,6 +374,29 @@ class GeneralizedEigenproblemTests(unittest.TestCase):
                 expected_rigid_body_modes=0,
             )
 
+    def test_expected_rigid_count_does_not_hide_pathological_negative_modes(self):
+        diagonal = [-100.0, -90.0, -80.0, -70.0, -60.0, -50.0, 1.0, 4.0, 9.0, 16.0]
+        with self.assertRaisesRegex(MatrixModelError, "Rigid-spectrum safety FAIL"):
+            solve_generalized_eigenproblem(
+                sparse.diags(diagonal),
+                sparse.eye(len(diagonal), format="csr"),
+                4,
+                expected_rigid_body_modes=6,
+            )
+
+    def test_healthy_scale_aware_rigid_spectrum_passes(self):
+        diagonal = [1.0e-10, 2.0e-10, 3.0e-10, 4.0e-10, 5.0e-10, 6.0e-10,
+                    1.0, 4.0, 9.0, 16.0]
+        result = solve_generalized_eigenproblem(
+            sparse.diags(diagonal),
+            sparse.eye(len(diagonal), format="csr"),
+            4,
+            expected_rigid_body_modes=6,
+        )
+        self.assertEqual(result.rigid_spectrum_health.status, "PASS")
+        self.assertEqual(result.rigid_spectrum_health.detected_rigid_mode_count, 6)
+        self.assertLess(result.rigid_spectrum_health.rigid_to_first_elastic_ratio, 1.0e-2)
+
 
 class MatrixDeckAndProofTests(unittest.TestCase):
     def test_deck_renderer_emits_matrix_output_and_verified_shell_orders(self):

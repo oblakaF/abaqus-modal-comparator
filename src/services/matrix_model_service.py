@@ -587,12 +587,87 @@ def build_stage_a_affine_basis(
 
 
 @dataclass(frozen=True)
+class RigidSpectrumHealth:
+    status: str
+    expected_rigid_mode_count: int
+    detected_rigid_mode_count: int
+    largest_rigid_frequency_magnitude_hz: float
+    first_elastic_frequency_hz: float
+    rigid_to_first_elastic_ratio: float
+    significant_negative_rigid_eigenvalues: Tuple[float, ...]
+    absolute_frequency_cutoff_used: bool = False
+    pass_ratio_strictly_less_than: float = 1.0e-2
+    fail_ratio_greater_than_or_equal_to: float = 1.0e-1
+
+
+@dataclass(frozen=True)
 class GeneralizedEigenResult:
     eigenvalues: np.ndarray
     frequencies_hz: np.ndarray
     eigenvectors: np.ndarray
     dofs: Tuple[AbaqusDof, ...] | None
     rigid_body_eigenvalues: np.ndarray
+    rigid_spectrum_health: RigidSpectrumHealth | None = None
+
+
+def _classify_expected_rigid_spectrum(
+    eigenvalues: np.ndarray,
+    expected_rigid_body_modes: int,
+) -> RigidSpectrumHealth:
+    """Apply the project C2E0 scale-aware free-free spectrum criterion."""
+
+    rigid_count = int(expected_rigid_body_modes)
+    if eigenvalues.size <= rigid_count:
+        raise MatrixModelError(
+            f"Expected {rigid_count} rigid-body modes plus an elastic mode, but only "
+            f"{eigenvalues.size} eigenvalues were computed."
+        )
+    rigid = np.asarray(eigenvalues[:rigid_count], dtype=float)
+    first_elastic_value = float(eigenvalues[rigid_count])
+    if not np.isfinite(rigid).all() or not math.isfinite(first_elastic_value):
+        raise MatrixModelError("The rigid/first-elastic generalized spectrum is non-finite.")
+    if first_elastic_value <= 0.0:
+        raise MatrixModelError(
+            "The expected first elastic generalized eigenvalue is non-positive "
+            "(negative or zero); "
+            "the rigid-body mode count or model stability is invalid."
+        )
+    first_elastic_frequency = math.sqrt(first_elastic_value) / (2.0 * math.pi)
+    rigid_frequency_magnitudes = np.sqrt(np.abs(rigid)) / (2.0 * math.pi)
+    largest_rigid = (
+        float(np.max(rigid_frequency_magnitudes)) if rigid.size else 0.0
+    )
+    ratio = largest_rigid / first_elastic_frequency
+    individual_ratios = (
+        rigid_frequency_magnitudes / first_elastic_frequency
+        if rigid.size
+        else np.asarray([], dtype=float)
+    )
+    detected_count = int(np.count_nonzero(individual_ratios < 1.0e-1))
+    significant_negative = tuple(
+        float(value)
+        for value, value_ratio in zip(rigid, individual_ratios)
+        if value < 0.0 and value_ratio >= 1.0e-2
+    )
+    if (
+        detected_count != rigid_count
+        or ratio >= 1.0e-1
+        or significant_negative
+    ):
+        status = "FAIL"
+    elif ratio >= 1.0e-2:
+        status = "WARNING"
+    else:
+        status = "PASS"
+    return RigidSpectrumHealth(
+        status=status,
+        expected_rigid_mode_count=rigid_count,
+        detected_rigid_mode_count=detected_count,
+        largest_rigid_frequency_magnitude_hz=largest_rigid,
+        first_elastic_frequency_hz=first_elastic_frequency,
+        rigid_to_first_elastic_ratio=ratio,
+        significant_negative_rigid_eigenvalues=significant_negative,
+    )
 
 
 def _remove_fully_inactive_dofs(
@@ -707,6 +782,7 @@ def solve_generalized_eigenproblem(
     )
     eigenvalues[np.abs(eigenvalues) <= zero_tolerance] = 0.0
 
+    rigid_health = None
     if expected_rigid_body_modes is None:
         if np.any(eigenvalues < -zero_tolerance):
             most_negative = float(np.min(eigenvalues))
@@ -720,6 +796,19 @@ def solve_generalized_eigenproblem(
             raise MatrixModelError(
                 f"Expected {rigid_count} rigid-body modes, but only "
                 f"{eigenvalues.size} eigenvalues were computed."
+            )
+        rigid_health = _classify_expected_rigid_spectrum(
+            eigenvalues, expected_rigid_body_modes
+        )
+        if rigid_health.status == "FAIL":
+            raise MatrixModelError(
+                "Rigid-spectrum safety FAIL: expected "
+                f"{expected_rigid_body_modes} near-zero modes, detected "
+                f"{rigid_health.detected_rigid_mode_count}; "
+                "f_rigid,max/f_elastic,1="
+                f"{rigid_health.rigid_to_first_elastic_ratio:.6g}; "
+                "significant negative rigid eigenvalues="
+                f"{rigid_health.significant_negative_rigid_eigenvalues}."
             )
 
     elastic_values = eigenvalues[rigid_count : rigid_count + mode_count]
@@ -743,6 +832,7 @@ def solve_generalized_eigenproblem(
         eigenvectors=elastic_vectors,
         dofs=normalized_dofs,
         rigid_body_eigenvalues=eigenvalues[:rigid_count],
+        rigid_spectrum_health=rigid_health,
     )
 
 
