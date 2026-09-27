@@ -39,7 +39,8 @@ FULL_TAB_LABELS = (
     "6. Close modes \u2014 SVD",
     "7. AutoMAC and COMAC",
     "8. Manual review",
-    "9. Details",
+    "9. Effective Material Identification",
+    "10. Details",
 )
 
 COMPACT_TAB_LABELS = (
@@ -51,7 +52,18 @@ COMPACT_TAB_LABELS = (
     "6. Close modes",
     "7. AutoMAC",
     "8. Review",
-    "9. Details",
+    "9. Identification",
+    "10. Details",
+)
+
+MATERIAL_IDENTIFICATION_STEP_LABELS = (
+    "1. Project Evidence",
+    "2. Task Definition",
+    "3. Modal Correspondence",
+    "4. Sensitivity",
+    "5. Identification",
+    "6. Validation",
+    "7. Report",
 )
 
 
@@ -127,7 +139,7 @@ STYLE_TOKENS = {
 
 UI_SCALE_PERCENT_VALUES = (80, 90, 100, 110, 125)
 
-# This is the smallest physical desktop window that keeps the nine-tab
+# This is the smallest physical desktop window that keeps the ten-tab
 # notebook, primary file controls, and run/stop actions usable.  Interface
 # scale remains an independent presentation preference; the vertically
 # scrollable input page absorbs the additional height required at 125%.

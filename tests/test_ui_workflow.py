@@ -216,11 +216,12 @@ class ResponsivePolicyTests(unittest.TestCase):
         self.assertEqual(button_grid_columns(LayoutMode.MEDIUM, 6), 3)
         self.assertEqual(button_grid_columns(LayoutMode.COMPACT, 6), 2)
 
-    def test_compact_tab_labels_keep_all_nine_tabs(self):
+    def test_compact_tab_labels_keep_all_ten_tabs(self):
         labels = tab_labels_for(LayoutMode.COMPACT)
-        self.assertEqual(len(labels), 9)
+        self.assertEqual(len(labels), 10)
         self.assertEqual(labels[0], "1. Files")
-        self.assertEqual(labels[-1], "9. Details")
+        self.assertEqual(labels[-2], "9. Identification")
+        self.assertEqual(labels[-1], "10. Details")
 
     def test_dynamic_wrap_width_is_bounded_and_increases(self):
         compact = text_wrap_width(1024)
@@ -473,7 +474,7 @@ class ConfigurationLockTests(unittest.TestCase):
 
 
 class TkRuntimeSmokeTests(unittest.TestCase):
-    def test_runtime_builds_nine_resizable_tabs_with_complete_headings(self):
+    def test_runtime_builds_ten_resizable_tabs_with_complete_headings(self):
         try:
             import tkinter as tk
             root = tk.Tk()
@@ -587,7 +588,7 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             root.geometry("1120x700")
             root.update_idletasks()
             application._apply_responsive_layout()
-            self.assertEqual(len(application.tabs.tabs()), 9)
+            self.assertEqual(len(application.tabs.tabs()), 10)
             self.assertEqual(application._layout_mode, LayoutMode.COMPACT)
             self.assertEqual(application.ui_scale_percent.get(), 125)
             self.assertGreater(

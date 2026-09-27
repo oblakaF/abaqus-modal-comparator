@@ -1991,7 +1991,8 @@ def install_responsive_workflow(app_module) -> None:
         self._layout_mode = mode
         ordered_tabs = (
             self.input_tab, self.table_tab, self.shape_tab, self.plot_tab,
-            self.frf_tab, self.cmif_tab, self.advanced_tab, self.manual_review_tab, self.details_tab,
+            self.frf_tab, self.cmif_tab, self.advanced_tab, self.manual_review_tab,
+            self.material_identification_tab, self.details_tab,
         )
         structural_signature = (mode, self.ui_scale_percent.get())
         if structural_signature != self._responsive_layout_signature:

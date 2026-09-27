@@ -42,6 +42,7 @@ from final_ui_polish import install_final_ui_polish
 from help_ui import install_help_ui
 from idle_ui_state import install_idle_ui_state
 from menu_ui import install_menu_ui
+from material_identification_ui import install_material_identification_ui
 from pair_plot_cache_ui import install_pair_plot_cache_ui
 from polymax_ui import install_polymax_ui
 from project_review import install_project_review
@@ -64,6 +65,7 @@ install_pair_plot_cache_ui(app)
 install_final_ui_polish(app)
 install_responsive_images(app)
 install_project_review(app)
+install_material_identification_ui(app)
 install_project_review_polish(app)
 install_help_ui(app)
 install_menu_ui(app)
