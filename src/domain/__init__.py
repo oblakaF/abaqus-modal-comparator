@@ -26,6 +26,12 @@ from .parameter_model import (
     ParameterRole,
     ParameterScope,
 )
+from .registration import (
+    FROZEN_REGISTRATION_SCHEMA,
+    REGISTRATION_DOF_COMPONENTS,
+    FrozenRegistration,
+    RegistrationMismatchError,
+)
 from .specimen import (
     CoreFamily,
     Design,
@@ -43,6 +49,8 @@ __all__ = [
     "EvidenceRecord",
     "EvidenceSourceIdentity",
     "FaceSectionFamily",
+    "FROZEN_REGISTRATION_SCHEMA",
+    "FrozenRegistration",
     "IdentificationCampaign",
     "IdentificationEvidence",
     "IdentificationParameter",
@@ -58,6 +66,8 @@ __all__ = [
     "ParameterScope",
     "PhysicalSpecimen",
     "PrimaryMeasurement",
+    "REGISTRATION_DOF_COMPONENTS",
+    "RegistrationMismatchError",
     "SensitivityEvidence",
     "TestRun",
     "ValidationEvidence",
