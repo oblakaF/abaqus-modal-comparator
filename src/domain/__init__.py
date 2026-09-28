@@ -13,6 +13,15 @@ from .evidence import (
     evidence_from_json,
 )
 from .identification_campaign import IdentificationCampaign
+from .material_identification_session import (
+    MaterialIdentificationEvidenceReference,
+    MaterialIdentificationSession,
+    MaterialIdentificationSourceIdentities,
+    MaterialIdentificationTaskDefinition,
+    ParameterBounds,
+    SessionReadiness,
+    resolve_identification_model,
+)
 from .modal_observation import (
     InclusionStatus,
     ModalCluster,
@@ -69,10 +78,15 @@ __all__ = [
     "IdentifiabilityEvidence",
     "InclusionStatus",
     "InterfaceFamily",
+    "MaterialIdentificationEvidenceReference",
+    "MaterialIdentificationSession",
+    "MaterialIdentificationSourceIdentities",
+    "MaterialIdentificationTaskDefinition",
     "ModalCluster",
     "ModalObservation",
     "ObservationUncertainty",
     "ParameterPrior",
+    "ParameterBounds",
     "ParameterResultStatus",
     "ParameterRole",
     "ParameterScope",
@@ -81,9 +95,11 @@ __all__ = [
     "REGISTRATION_DOF_COMPONENTS",
     "RegistrationMismatchError",
     "SensitivityEvidence",
+    "SessionReadiness",
     "TestRun",
     "ValidationEvidence",
     "evidence_content_hash",
     "evidence_from_dict",
     "evidence_from_json",
+    "resolve_identification_model",
 ]
