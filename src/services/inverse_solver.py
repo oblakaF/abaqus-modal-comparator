@@ -188,6 +188,8 @@ class InverseSolverConfiguration:
     local_ftol: float = 1.0e-12
     local_gtol: float = 1.0e-12
     allow_unweighted: bool = False
+    # Allows a FULL-RANK subset that violates the condition-number or
+    # collinearity (gamma) limits.  It never allows a rank-deficient subset.
     allow_non_identifiable_subset: bool = False
     downweighted_observation_weights: Mapping[str, float] = field(
         default_factory=dict, compare=False
@@ -529,10 +531,9 @@ def _validate_identifiability(
         # Solver admission is a structural/separability decision.  Practical
         # precision is reported independently and may be NOT_ASSESSED until a
         # campaign supplies parameter-specific acceptable uncertainty scales.
-        admissible = (
-            identifiability.structurally_identifiable
-            and identifiability.directionally_separable
-        )
+        rank = identifiability.rank
+        full_rank = identifiability.structurally_identifiable
+        admissible = full_rank and identifiability.directionally_separable
     else:
         diagnostic = next(
             (
@@ -542,7 +543,18 @@ def _validate_identifiability(
             ),
             None,
         )
+        rank = None if diagnostic is None else diagnostic.rank
+        full_rank = rank is not None and rank == len(subset_set)
         admissible = diagnostic is not None and diagnostic.admissible
+    if not full_rank:
+        # Hard block: allow_override covers full-rank conditioning/collinearity
+        # limits only, never rank deficiency.
+        raise InverseSolverValidationError(
+            "The requested fitted parameter subset was not marked structurally "
+            f"identifiable: it is rank deficient (numerical rank {rank} for "
+            f"{len(subset_set)} fitted parameters). This is a hard block that "
+            "allow_non_identifiable_subset cannot override."
+        )
     if admissible:
         return ()
     message = (

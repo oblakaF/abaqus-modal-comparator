@@ -1,10 +1,12 @@
 import dataclasses
 from dataclasses import replace
 import hashlib
+import inspect
 import os
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -453,14 +455,14 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
         )
         self.assertTrue(approved.metadata["recommended_subset_approved"])
 
-        overridden = fixture.identify(
-            solver_configuration=fixture.configuration(
-                global_max_iterations=10,
-                allow_non_identifiable_subset=True,
+        # Rank deficiency is a hard block: the override no longer reaches it.
+        with self.assertRaisesRegex(StageAIdentificationError, "rank deficient.*hard block"):
+            fixture.identify(
+                solver_configuration=fixture.configuration(
+                    global_max_iterations=10,
+                    allow_non_identifiable_subset=True,
+                )
             )
-        )
-        self.assertEqual(overridden.fitted_parameter_subset, overridden.requested_parameter_subset)
-        self.assertTrue(overridden.metadata["non_identifiable_override"])
 
     def test_pairing_failure_requires_explicit_fallback_and_records_it(self):
         fixture = SyntheticProductionFixture()
@@ -1802,6 +1804,118 @@ class MacEvidencePairingTests(unittest.TestCase):
             )
         self.assertEqual(fixed.call_count, 1)
         self.assertEqual(result.pairing_provider_mode, PairingProviderMode.FIXED_PAIR_FALLBACK)
+
+
+class IdentifiabilityOverridePolicyTests(unittest.TestCase):
+    """Rank deficiency is a hard block; only full-rank conditioning may be overridden."""
+
+    # Test-only thresholds that a full-rank fixture exceeds; defaults stay unchanged.
+    TIGHT_CONDITION = dict(condition_warning_threshold=1.0 + 1e-9, collinearity_warning_threshold=1.0e6)
+    TIGHT_GAMMA = dict(condition_warning_threshold=1.0e12, collinearity_warning_threshold=1.0 + 1e-9)
+
+    def identify(self, fixture, *, allow_override=False, **changes):
+        values = dict(
+            solver_configuration=fixture.configuration(
+                global_max_iterations=5, allow_non_identifiable_subset=allow_override
+            ),
+        )
+        values.update(changes)
+        return fixture.identify(**values)
+
+    # A / B
+    def test_rank_deficiency_is_refused_with_or_without_override(self):
+        fixture = SyntheticProductionFixture(rank_deficient=True)
+        for allow_override in (False, True):
+            for policy in (
+                StageACampaignPolicy(),
+                StageACampaignPolicy(condition_warning_threshold=1.0e12, collinearity_warning_threshold=1.0e12),
+            ):
+                with self.subTest(allow_override=allow_override, policy=policy.condition_warning_threshold):
+                    with mock.patch.object(
+                        stage_a_service, "solve_stage_a_inverse", side_effect=AssertionError("fitted")
+                    ) as solver:
+                        with self.assertRaisesRegex(
+                            StageAIdentificationError, "rank deficient \\(numerical rank 2 < 3.*hard block"
+                        ):
+                            self.identify(fixture, allow_override=allow_override, campaign_policy=policy)
+                    solver.assert_not_called()
+
+    # C / K
+    def test_approved_recommended_subset_is_full_rank_even_when_request_is_deficient(self):
+        fixture = SyntheticProductionFixture(rank_deficient=True)
+        result = self.identify(
+            fixture,
+            allow_override=True,
+            campaign_policy=StageACampaignPolicy(approve_recommended_subset=True),
+        )
+        self.assertEqual(result.metadata["subset_selection"], "explicitly_approved_recommended_subset")
+        self.assertEqual(result.fitted_parameter_subset, result.recommended_parameter_subset)
+        self.assertFalse(result.metadata["non_identifiable_override"])
+        self.assertIsNone(result.metadata["identifiability_override"])
+        self.assertEqual(result.identifiability.rank, len(result.fitted_parameter_subset))
+
+    def test_rank_deficient_selected_subset_is_refused_by_the_final_guard(self):
+        deficient = SimpleNamespace(parameter_ids=("D11", "D66"), rank=1)
+        identifiability = SimpleNamespace(
+            parameter_ids=("D11", "D12", "D66"), rank=2, subset_ranking=(deficient,)
+        )
+        for subset in (("D11", "D12", "D66"), ("D11", "D66"), ("D12",)):
+            with self.subTest(subset=subset):
+                with self.assertRaisesRegex(StageAIdentificationError, "rank deficient.*hard block"):
+                    stage_a_service._require_full_rank_subset(identifiability, subset)
+
+    # D
+    def test_full_rank_well_conditioned_subset_passes_without_override(self):
+        fixture = SyntheticProductionFixture()
+        result = self.identify(fixture)
+        self.assertEqual(result.metadata["subset_selection"], "requested_subset_identifiable")
+        self.assertIsNone(result.metadata["identifiability_override"])
+        self.assertFalse(result.metadata["non_identifiable_override"])
+
+    # E / F / G / H / I
+    def test_full_rank_conditioning_limits_refuse_by_default_and_yield_to_override(self):
+        cases = (
+            ("condition_number", self.TIGHT_CONDITION, "condition_number", "condition_warning_threshold"),
+            ("collinearity_gamma", self.TIGHT_GAMMA, None, "collinearity_warning_threshold"),
+        )
+        for criterion, thresholds, metadata_key, threshold_name in cases:
+            with self.subTest(criterion):
+                fixture = SyntheticProductionFixture()
+                policy = StageACampaignPolicy(**thresholds)
+                with self.assertRaisesRegex(
+                    StageAIdentificationError, "not structurally identifiable or directionally separable"
+                ):
+                    self.identify(fixture, campaign_policy=policy)
+
+                result = self.identify(fixture, allow_override=True, campaign_policy=policy)
+                self.assertEqual(result.fitted_parameter_subset, ("D11", "D12", "D66"))
+                self.assertEqual(result.metadata["subset_selection"], "explicit_non_identifiable_override")
+                self.assertTrue(result.metadata["non_identifiable_override"])
+                provenance = result.metadata["identifiability_override"]
+                self.assertEqual(provenance["override"], "full_rank_conditioning")
+                self.assertEqual(provenance["numerical_rank"], 3)
+                self.assertEqual(provenance["fitted_parameter_subset"], ("D11", "D12", "D66"))
+                by_name = {item["criterion"]: item for item in provenance["overridden_criteria"]}
+                self.assertEqual(set(by_name), {criterion})
+                self.assertEqual(by_name[criterion]["threshold"], thresholds[threshold_name])
+                self.assertGreater(by_name[criterion]["value"], by_name[criterion]["threshold"])
+                if metadata_key is not None:
+                    self.assertEqual(
+                        by_name[criterion]["value"],
+                        result.metadata["initial_identifiability"][metadata_key],
+                    )
+
+    # J
+    def test_numerical_thresholds_are_unchanged(self):
+        policy = StageACampaignPolicy()
+        self.assertEqual(policy.condition_warning_threshold, 100.0)
+        self.assertEqual(policy.collinearity_warning_threshold, 20.0)
+        from services import identifiability_service
+
+        parameters = inspect.signature(identifiability_service.analyze_identifiability).parameters
+        self.assertEqual(parameters["condition_warning_threshold"].default, 100.0)
+        self.assertEqual(parameters["collinearity_warning_threshold"].default, 20.0)
+        self.assertIsNone(parameters["rcond"].default)
 
 
 if __name__ == "__main__":

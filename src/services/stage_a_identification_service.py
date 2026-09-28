@@ -1419,6 +1419,61 @@ def _resolved_uncertainty(
     return None, matrix[np.ix_(indexes, indexes)]
 
 
+def _require_full_rank_subset(
+    identifiability: IdentifiabilityResult, subset: Sequence[str]
+) -> None:
+    """Hard block: the fitted subset must have full numerical rank."""
+    subset_set = set(subset)
+    if subset_set == set(identifiability.parameter_ids):
+        rank = identifiability.rank
+    else:
+        diagnostic = next(
+            (
+                item
+                for item in identifiability.subset_ranking
+                if set(item.parameter_ids) == subset_set
+            ),
+            None,
+        )
+        rank = None if diagnostic is None else diagnostic.rank
+    if rank is None or rank < len(subset_set):
+        raise StageAIdentificationError(
+            f"The selected Stage-A subset {tuple(subset)} is rank deficient "
+            f"(numerical rank {rank}); this is a hard block that no override can bypass."
+        )
+
+
+def _conditioning_override_provenance(
+    identifiability: IdentifiabilityResult,
+    policy: StageACampaignPolicy,
+    subset: Sequence[str],
+) -> Mapping[str, object]:
+    """Record which full-rank conditioning criteria an explicit override bypassed."""
+    criteria = []
+    if identifiability.condition_number > policy.condition_warning_threshold:
+        criteria.append(
+            {
+                "criterion": "condition_number",
+                "value": float(identifiability.condition_number),
+                "threshold": policy.condition_warning_threshold,
+            }
+        )
+    if identifiability.collinearity.warning:
+        criteria.append(
+            {
+                "criterion": "collinearity_gamma",
+                "value": float(identifiability.collinearity.gamma),
+                "threshold": policy.collinearity_warning_threshold,
+            }
+        )
+    return {
+        "override": "full_rank_conditioning",
+        "overridden_criteria": tuple(criteria),
+        "numerical_rank": identifiability.rank,
+        "fitted_parameter_subset": tuple(subset),
+    }
+
+
 def _fixed_pairing(
     observations: Tuple[ModalObservation, ...], mode_count: int
 ) -> PairingResult:
@@ -1468,6 +1523,11 @@ def identify_stage_a(
     runs under ``registration`` (a FrozenRegistration), which is then required.
     ``StageAProductionPairingRefusal`` always propagates: a frozen-contract
     violation never becomes a fixed-pair fallback.
+
+    A rank-deficient fitted subset is a hard block.
+    ``solver_configuration.allow_non_identifiable_subset`` only overrides the
+    condition-number and collinearity (gamma) limits of a full-rank subset, and
+    the overridden criteria are recorded in ``metadata["identifiability_override"]``.
     """
 
     if not isinstance(comparison, ComparisonResult):
@@ -1620,19 +1680,37 @@ def identify_stage_a(
         else identifiability.best_identifiable_subset.parameter_ids
     )
     override_used = False
+    identifiability_override = None
     subset_selection = "requested_subset_identifiable"
     if (
         identifiability.structurally_identifiable
         and identifiability.directionally_separable
     ):
         fitted_subset = requested
-    elif solver_configuration.allow_non_identifiable_subset:
+    elif (
+        identifiability.structurally_identifiable
+        and solver_configuration.allow_non_identifiable_subset
+    ):
+        # The override covers full-rank conditioning/collinearity limits only;
+        # a rank-deficient subset can never be fitted through it.
         fitted_subset = requested
         override_used = True
         subset_selection = "explicit_non_identifiable_override"
+        identifiability_override = _conditioning_override_provenance(
+            identifiability, policy, requested
+        )
     elif policy.approve_recommended_subset and recommended is not None:
         fitted_subset = recommended
         subset_selection = "explicitly_approved_recommended_subset"
+    elif not identifiability.structurally_identifiable:
+        raise StageAIdentificationError(
+            "The requested Stage-A subset is not structurally identifiable: it is "
+            "rank deficient (numerical rank "
+            f"{identifiability.rank} < {len(requested)} fitted parameters, tolerance "
+            f"{identifiability.numerical_rank_tolerance:.6g}); this is a hard block that "
+            "no override can bypass. "
+            f"Recommended full-rank subset: {recommended}."
+        )
     else:
         raise StageAIdentificationError(
             "The requested Stage-A subset is not structurally identifiable or "
@@ -1640,6 +1718,7 @@ def identify_stage_a(
             f"recommended subset: {recommended}. Explicitly approve the recommendation "
             "or enable the non-identifiable override."
         )
+    _require_full_rank_subset(identifiability, fitted_subset)
 
     tracking_mode = (
         ModeTrackingMode.COMPARISON_BACKED
@@ -1826,6 +1905,7 @@ def identify_stage_a(
     metadata = {
         "identifiability_reference": reference,
         "non_identifiable_override": override_used,
+        "identifiability_override": identifiability_override,
         "recommended_subset_approved": bool(
             subset_selection == "explicitly_approved_recommended_subset"
         ),

@@ -802,5 +802,89 @@ class StageAInverseSolverMassDependentTests(unittest.TestCase):
         )
 
 
+class SolverIdentifiabilityGateTests(unittest.TestCase):
+    """Rank deficiency is a hard block; the override covers full-rank conditioning only."""
+
+    def setUp(self):
+        self.fixture = StageAInverseSolverTests()
+        self.fixture.setUp()
+
+    def solve(self, subset, identifiability, *, allow_override):
+        fixture = self.fixture
+        return solve_stage_a_inverse(
+            fixture.basis,
+            fixture.observations(),
+            subset,
+            StageAMatrixParameters(8.0, -0.8, 8.5),
+            fixture.bounds,
+            fixture.configuration(
+                global_max_iterations=5,
+                local_max_evaluations=20,
+                allow_non_identifiable_subset=allow_override,
+            ),
+            observation_standard_deviations=np.full(6, 0.003),
+            identifiability=identifiability,
+        )
+
+    # A / B
+    def test_rank_deficient_subset_is_refused_with_or_without_override(self):
+        full_set_deficient = analyze_identifiability(
+            np.array([[1.0, 1.0], [2.0, 2.0]]), ("D11", "D12"), dimensionless=True
+        )
+        # Full model rank 2 of 3; the (D11, D12) subset alone has rank 1.
+        subset_deficient = analyze_identifiability(
+            np.array([[1.0, 2.0, 0.0], [2.0, 4.0, 0.0], [0.0, 0.0, 1.0]]),
+            ("D11", "D12", "D66"),
+            dimensionless=True,
+        )
+        cases = (
+            ("full set", ("D11", "D12"), full_set_deficient, "rank 1 for 2"),
+            ("proper subset", ("D11", "D12"), subset_deficient, "rank 1 for 2"),
+            ("deficient full model", ("D11", "D12", "D66"), subset_deficient, "rank 2 for 3"),
+        )
+        for name, subset, identifiability, rank_text in cases:
+            for allow_override in (False, True):
+                with self.subTest(name, allow_override=allow_override), mock.patch(
+                    "services.inverse_solver.optimize.differential_evolution",
+                    side_effect=AssertionError("fitting started"),
+                ) as optimizer:
+                    with self.assertRaisesRegex(
+                        InverseSolverValidationError,
+                        f"not marked structurally identifiable.*{rank_text}.*hard block",
+                    ):
+                        self.solve(subset, identifiability, allow_override=allow_override)
+                optimizer.assert_not_called()
+
+    # C / D
+    def test_full_rank_poor_conditioning_keeps_the_explicit_override(self):
+        ill_conditioned = analyze_identifiability(
+            np.array([[1.0, 0.0], [0.0, 1.0e-3]]), ("D11", "D66"), dimensionless=True
+        )
+        self.assertTrue(ill_conditioned.structurally_identifiable)
+        self.assertFalse(ill_conditioned.collinearity.warning)
+        self.assertGreater(ill_conditioned.condition_number, 100.0)
+        with self.assertRaisesRegex(InverseSolverValidationError, "Use an explicit override"):
+            self.solve(("D11", "D66"), ill_conditioned, allow_override=False)
+        result = self.solve(("D11", "D66"), ill_conditioned, allow_override=True)
+        self.assertTrue(any("Explicit override accepted" in item for item in result.warnings))
+        self.assertEqual(set(result.fitted_parameters), {"D11", "D66"})
+
+    # E
+    def test_full_rank_gamma_violation_keeps_the_explicit_override(self):
+        collinear = analyze_identifiability(
+            np.array([[1.0, 1.0], [0.0, 0.01]]),
+            ("D11", "D66"),
+            dimensionless=True,
+            condition_warning_threshold=1.0e12,
+        )
+        self.assertTrue(collinear.structurally_identifiable)
+        self.assertTrue(collinear.collinearity.warning)
+        self.assertLessEqual(collinear.condition_number, 1.0e12)
+        with self.assertRaisesRegex(InverseSolverValidationError, "Use an explicit override"):
+            self.solve(("D11", "D66"), collinear, allow_override=False)
+        result = self.solve(("D11", "D66"), collinear, allow_override=True)
+        self.assertTrue(any("Explicit override accepted" in item for item in result.warnings))
+
+
 if __name__ == "__main__":
     unittest.main()
