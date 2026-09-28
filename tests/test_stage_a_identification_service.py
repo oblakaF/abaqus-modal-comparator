@@ -1,4 +1,5 @@
 import copy
+import dataclasses
 from dataclasses import replace
 import hashlib
 from pathlib import Path
@@ -13,7 +14,9 @@ from scipy import sparse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from domain.registration import FrozenRegistration
 from modal_core import ModalDataset, ModeShape, compare_modal_datasets
+from scientific_state import calibration_fingerprint
 from services.identifiability_service import ParameterPrecisionRequirement
 from services.inverse_solver import (
     InverseSolverConfiguration,
@@ -37,9 +40,15 @@ from services.stage_a_identification_service import (
     PairingProviderMode,
     ProductionComparisonPairingProvider,
     StageACampaignPolicy,
+    StageAFeAvailability,
+    StageAFeAvailabilityError,
     StageAIdentificationError,
+    build_stage_a_fe_availability,
+    check_required_fe_availability,
     create_production_pairing_provider,
     identify_stage_a,
+    precheck_required_fe_export,
+    required_fe_components,
     stage_a_basis_identity,
 )
 from tests import test_core
@@ -472,8 +481,8 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
         self.assertTrue(any("Pairing changed" in item for item in result.warnings))
 
 
-class MappedMatrixEigenmodeAdapterTests(unittest.TestCase):
-    """Explicit matrix-node -> INSTANCE:label mapping (multi-instance safe)."""
+class MappedAdapterFixture:
+    """Two instances with overlapping labels, mapped explicitly from matrix nodes."""
 
     REFERENCE_IDS = ("PART-B:1", "PART-A:1", "PART-A:2")
     REFERENCE_COORDINATES = ((10.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 5.0, 0.0))
@@ -513,6 +522,10 @@ class MappedMatrixEigenmodeAdapterTests(unittest.TestCase):
             self.DOFS,
             node_map=StageAMatrixNodeMap.from_mapping(mapping),
         )
+
+
+class MappedMatrixEigenmodeAdapterTests(MappedAdapterFixture, unittest.TestCase):
+    """Explicit matrix-node -> INSTANCE:label mapping (multi-instance safe)."""
 
     # A / B
     def test_overlapping_labels_map_to_distinct_instance_nodes(self):
@@ -621,6 +634,313 @@ class MappedMatrixEigenmodeAdapterTests(unittest.TestCase):
                 )
             )
         return ModalDataset(dataset.source_name, dataset.source_path, modes)
+
+
+def _registration(
+    rotation,
+    measured,
+    *,
+    experimental_node_ids=(1,),
+    mapped_fe_node_ids=("PART-A:1",),
+):
+    calibration = {"mode": "manual", "manual_scale": 1.0}
+    return FrozenRegistration.create(
+        experimental_source_identity={"path": "exp.unv", "size": 1, "mtime_ns": 1, "sha256": "a" * 64},
+        experimental_modal_set_identity=None,
+        fe_geometry_identity={"schema_version": "fe-geometry-identity/2", "sha256": "b" * 64},
+        calibration=calibration,
+        calibration_fingerprint=calibration_fingerprint(calibration),
+        orientation_candidate_id="geometry-0000000000000000",
+        rotation=rotation,
+        translation=[0.0, 0.0, 0.0],
+        coordinate_scales=[1.0, 1.0, 1.0],
+        experimental_node_ids=list(experimental_node_ids),
+        mapped_fe_node_ids=list(mapped_fe_node_ids),
+        measured_dof_contract=measured,
+        registration_metrics={},
+    )
+
+
+ONLY_U3 = [[False, False, True]]
+# exp = fe @ R ; this signed permutation sends FE U1 -> experimental U3.
+FE_U1_TO_EXP_U3 = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
+
+
+class StageAFeAvailabilityContractTests(unittest.TestCase):
+    IDS = ("PART-B:1", "PART-A:1", "PART-A:2")
+    MASK = [[False, False, True], [True, False, True], [False, False, False]]
+
+    def contract(self, ids=IDS, mask=MASK, node_map_hash="c" * 64):
+        return StageAFeAvailability(
+            fe_node_ids=ids, available=mask, node_map_hash=node_map_hash
+        )
+
+    # A
+    def test_contract_is_immutable_detached_and_hashed(self):
+        mask = np.asarray(self.MASK, dtype=bool)
+        ids = list(self.IDS)
+        contract = self.contract(ids=ids, mask=mask)
+        before = contract.content_hash
+        mask[0, 0] = True
+        ids[0] = "PART-Z:9"
+        self.assertEqual(contract.content_hash, before)
+        self.assertEqual(contract.fe_node_ids, self.IDS)
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            contract.node_map_hash = "d" * 64
+        self.assertEqual(contract.source, "stage_a_matrix_active_dofs")
+        self.assertRegex(before, r"^[0-9a-f]{64}$")
+        array = contract.mask_array()
+        array[:] = True
+        self.assertEqual(contract.content_hash, before)
+
+    def test_hash_is_stable_and_sensitive(self):
+        base = self.contract()
+        order = [2, 0, 1]
+        reordered = self.contract(
+            ids=tuple(self.IDS[i] for i in order), mask=[self.MASK[i] for i in order]
+        )
+        self.assertEqual(base.content_hash, reordered.content_hash)
+        changed_mask = [list(row) for row in self.MASK]
+        changed_mask[2][0] = True
+        self.assertNotEqual(base.content_hash, self.contract(mask=changed_mask).content_hash)
+        changed_ids = ("PART-B:1", "PART-A:1", "PART-A:3")
+        self.assertNotEqual(base.content_hash, self.contract(ids=changed_ids).content_hash)
+        self.assertNotEqual(
+            base.content_hash, self.contract(node_map_hash="d" * 64).content_hash
+        )
+
+    def test_malformed_contracts_are_refused(self):
+        invalid = {
+            "duplicate id": dict(ids=("PART-A:1", "PART-A:1", "PART-A:2")),
+            "unqualified id": dict(ids=(1, "PART-A:1", "PART-A:2")),
+            "no instance": dict(ids=("1", "PART-A:1", "PART-A:2")),
+            "mask shape": dict(mask=[[True, True]] * 3),
+            "mask rows": dict(mask=self.MASK[:2]),
+            "mask type": dict(mask=np.ones((3, 3), dtype=int)),
+            "node map hash": dict(node_map_hash="short"),
+        }
+        for name, change in invalid.items():
+            with self.subTest(name):
+                with self.assertRaises(StageAFeAvailabilityError):
+                    self.contract(**change)
+        with self.assertRaises(StageAFeAvailabilityError):
+            StageAFeAvailability(
+                fe_node_ids=self.IDS, available=self.MASK, node_map_hash="c" * 64, source="odb_all_true"
+            )
+
+
+class StageAFeAvailabilityDerivationTests(MappedAdapterFixture, unittest.TestCase):
+    # B
+    def test_availability_comes_from_active_dofs_not_values(self):
+        node_map = StageAMatrixNodeMap.from_mapping(self.MAPPING)
+        availability = build_stage_a_fe_availability(self.REFERENCE_IDS, node_map, self.DOFS)
+        self.assertEqual(availability.fe_node_ids, self.REFERENCE_IDS)
+        self.assertEqual(availability.available_components("PART-A:1"), (True, False, True))
+        self.assertEqual(availability.available_components("PART-B:1"), (False, False, True))
+        self.assertEqual(availability.available_components("PART-A:2"), (False, False, False))
+        self.assertEqual(availability.node_map_hash, node_map.content_hash)  # M
+        zero_valued = GeneralizedEigenResult(
+            eigenvalues=np.array([1.0]),
+            frequencies_hz=np.array([11.0]),
+            eigenvectors=np.zeros((len(self.DOFS), 1)),
+            dofs=self.DOFS,
+            rigid_body_eigenvalues=np.array([]),
+        )
+        candidate = self.adapter()(zero_valued)
+        self.assertEqual(candidate.metadata["stage_a_fe_availability"], availability)
+
+    def test_adapter_metadata_is_derived_from_the_contract(self):
+        candidate = self.adapter()(self.eigenpairs())
+        contract = candidate.metadata["stage_a_fe_availability"]
+        self.assertIsInstance(contract, StageAFeAvailability)
+        self.assertEqual(candidate.metadata["stage_a_fe_availability_hash"], contract.content_hash)
+        for mode in candidate.modes:
+            np.testing.assert_array_equal(mode.metadata["fe_available_dofs"], contract.mask_array())
+
+    # C
+    def test_reference_or_experimental_masks_are_never_copied(self):
+        reference = self.reference()
+        reference.modes[0].measured_dofs = np.zeros((3, 3), dtype=bool)
+        first = self.adapter(reference=reference)(self.eigenpairs())
+        reference.modes[0].measured_dofs = np.ones((3, 3), dtype=bool)
+        second = self.adapter(reference=reference)(self.eigenpairs())
+        self.assertEqual(
+            first.metadata["stage_a_fe_availability"], second.metadata["stage_a_fe_availability"]
+        )
+
+    def test_unmapped_dof_or_unknown_target_is_refused(self):
+        node_map = StageAMatrixNodeMap.from_mapping({101: "PART-A:1", 102: "PART-B:1"})
+        with self.assertRaisesRegex(StageAFeAvailabilityError, "no FE target"):
+            build_stage_a_fe_availability(self.REFERENCE_IDS, node_map, self.DOFS)
+        node_map = StageAMatrixNodeMap.from_mapping({101: "PART-A:1", 102: "PART-C:1", 103: "PART-A:2"})
+        with self.assertRaisesRegex(StageAFeAvailabilityError, "not in the reference FE grid"):
+            build_stage_a_fe_availability(self.REFERENCE_IDS, node_map, self.DOFS)
+
+
+class StageARequiredFeComponentsTests(unittest.TestCase):
+    # D
+    def test_signed_permutation_requires_single_fe_component(self):
+        required = required_fe_components(_registration(FE_U1_TO_EXP_U3, ONLY_U3))
+        self.assertEqual(required, {"PART-A:1": (True, False, False)})
+
+    def test_identity_rotation_requires_same_component(self):
+        required = required_fe_components(_registration(np.eye(3), ONLY_U3))
+        self.assertEqual(required, {"PART-A:1": (False, False, True)})
+
+    # E
+    def test_tilted_rotation_requires_every_contributing_component(self):
+        angle = 0.3
+        tilted = [
+            [1.0, 0.0, 0.0],
+            [0.0, np.cos(angle), -np.sin(angle)],
+            [0.0, np.sin(angle), np.cos(angle)],
+        ]
+        required = required_fe_components(_registration(tilted, ONLY_U3))
+        self.assertEqual(required, {"PART-A:1": (False, True, True)})
+
+    # F
+    def test_tiny_nonzero_coefficient_is_conservatively_required(self):
+        epsilon = 1.0e-9
+        nearly_identity = [
+            [1.0, 0.0, epsilon],
+            [0.0, 1.0, 0.0],
+            [-epsilon, 0.0, 1.0],
+        ]
+        registration = _registration(nearly_identity, ONLY_U3)
+        self.assertNotEqual(registration.rotation[0][2], 0.0)
+        self.assertEqual(
+            required_fe_components(registration), {"PART-A:1": (True, False, True)}
+        )
+
+    # J
+    def test_requirements_accumulate_over_experimental_nodes(self):
+        registration = _registration(
+            np.eye(3),
+            [[False, False, True], [True, False, False], [False, True, False]],
+            experimental_node_ids=(1, 2, 3),
+            mapped_fe_node_ids=("PART-A:1", "PART-A:1", "PART-B:1"),
+        )
+        self.assertEqual(
+            required_fe_components(registration),
+            {"PART-A:1": (True, False, True), "PART-B:1": (False, True, False)},
+        )
+
+    def test_nodes_without_measured_components_require_nothing(self):
+        registration = _registration(
+            np.eye(3),
+            [[False, False, True], [False, False, False]],
+            experimental_node_ids=(1, 2),
+            mapped_fe_node_ids=("PART-A:1", "PART-B:1"),
+        )
+        self.assertEqual(required_fe_components(registration), {"PART-A:1": (False, False, True)})
+
+
+class StageAPolicyBCheckTests(unittest.TestCase):
+    IDS = ("PART-A:1", "PART-B:1")
+
+    def availability(self, mask, node_map_hash="c" * 64, ids=IDS):
+        return StageAFeAvailability(fe_node_ids=ids, available=mask, node_map_hash=node_map_hash)
+
+    # G
+    def test_all_required_components_available_passes(self):
+        registration = _registration(FE_U1_TO_EXP_U3, ONLY_U3)
+        availability = self.availability([[True, False, False], [False, False, False]])
+        self.assertTrue(check_required_fe_availability(registration, availability))
+
+    # H
+    def test_unavailable_required_component_is_refused_with_node_and_component(self):
+        registration = _registration(np.eye(3), ONLY_U3)
+        availability = self.availability([[True, True, False], [True, True, True]])
+        with self.assertRaises(StageAFeAvailabilityError) as context:
+            check_required_fe_availability(registration, availability)
+        message = str(context.exception)
+        self.assertIn("PART-A:1", message)
+        self.assertIn("U3", message)
+        self.assertIn("UNAVAILABLE", message)
+        self.assertEqual(
+            context.exception.violations,
+            (("PART-A:1", "U3", "not active in the matrix eigenvector DOFs"),),
+        )
+
+    def test_required_node_absent_from_contract_is_refused(self):
+        registration = _registration(
+            np.eye(3), ONLY_U3, mapped_fe_node_ids=("PART-C:1",)
+        )
+        availability = self.availability([[True] * 3, [True] * 3])
+        with self.assertRaisesRegex(StageAFeAvailabilityError, "PART-C:1.*absent"):
+            check_required_fe_availability(registration, availability)
+
+    # I
+    def test_missing_non_required_component_does_not_block(self):
+        registration = _registration(np.eye(3), ONLY_U3)
+        availability = self.availability([[False, False, True], [False, False, False]])
+        self.assertTrue(check_required_fe_availability(registration, availability))
+
+    # K / L
+    def test_numeric_zero_in_candidate_vector_cannot_satisfy_availability(self):
+        reference = MappedAdapterFixture().reference()
+        dofs = (AbaqusDof(101, 1), AbaqusDof(102, 3), AbaqusDof(103, 3))
+        node_map = StageAMatrixNodeMap.from_mapping(
+            {101: "PART-A:1", 102: "PART-B:1", 103: "PART-A:2"}
+        )
+        candidate = MatrixEigenmodeDatasetAdapter(reference, dofs, node_map=node_map)(
+            GeneralizedEigenResult(
+                eigenvalues=np.array([1.0]),
+                frequencies_hz=np.array([11.0]),
+                eigenvectors=np.array([[1.0], [2.0], [3.0]]),
+                dofs=dofs,
+                rigid_body_eigenvalues=np.array([]),
+            )
+        )
+        mode = candidate.modes[0]
+        row = mode.node_ids.tolist().index("PART-A:1")
+        self.assertEqual(mode.vectors[row, 2], 0.0)  # zero-filled, not measured data
+        self.assertTrue(np.all(np.isfinite(mode.vectors)))  # no NaN workaround
+        registration = _registration(np.eye(3), ONLY_U3)
+        with self.assertRaisesRegex(StageAFeAvailabilityError, "PART-A:1.*U3"):
+            check_required_fe_availability(
+                registration, candidate.metadata["stage_a_fe_availability"], node_map=node_map
+            )
+
+    # M
+    def test_node_map_provenance_must_match(self):
+        registration = _registration(np.eye(3), ONLY_U3)
+        availability = self.availability([[True] * 3, [True] * 3], node_map_hash="c" * 64)
+        other_map = StageAMatrixNodeMap.from_mapping({1: "PART-A:1"})
+        with self.assertRaisesRegex(StageAFeAvailabilityError, "node map"):
+            check_required_fe_availability(registration, availability, node_map=other_map)
+
+    def test_malformed_arguments_are_refused(self):
+        registration = _registration(np.eye(3), ONLY_U3)
+        with self.assertRaises(StageAFeAvailabilityError):
+            check_required_fe_availability(registration, {"PART-A:1": (True, True, True)})
+        with self.assertRaises(StageAFeAvailabilityError):
+            check_required_fe_availability(
+                {"measured": True}, self.availability([[True] * 3, [True] * 3])
+            )
+
+    def test_measured_contract_is_not_mutated(self):
+        registration = _registration(np.eye(3), ONLY_U3)
+        before = registration.to_dict()
+        with self.assertRaises(StageAFeAvailabilityError):
+            check_required_fe_availability(
+                registration, self.availability([[False] * 3, [False] * 3])
+            )
+        self.assertEqual(registration.to_dict(), before)
+
+
+class StageAExportPrecheckTests(unittest.TestCase):
+    def test_export_precheck_refuses_required_dof_that_was_never_exported(self):
+        node_map = StageAMatrixNodeMap.from_mapping({101: "PART-A:1"})
+        exported = (AbaqusDof(101, 1), AbaqusDof(101, 2))
+        registration = _registration(np.eye(3), ONLY_U3)
+        with self.assertRaisesRegex(StageAFeAvailabilityError, "PART-A:1.*U3.*not exported"):
+            precheck_required_fe_export(registration, node_map, exported)
+        self.assertTrue(
+            precheck_required_fe_export(
+                registration, node_map, exported + (AbaqusDof(101, 3),)
+            )
+        )
 
 
 class StageABasisIdentityVersioningTests(unittest.TestCase):

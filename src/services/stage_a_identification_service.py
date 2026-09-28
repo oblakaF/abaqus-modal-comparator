@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import Enum
 import hashlib
+import json
 import math
 from typing import Callable, Mapping, Sequence, Tuple
 
@@ -18,6 +19,7 @@ import numpy as np
 
 from domain.modal_observation import InclusionStatus, ModalCluster, ModalObservation
 from domain.parameter_model import ParameterPrior
+from domain.registration import FrozenRegistration
 from modal_core import ComparisonResult, ModalDataset, ModeShape, compare_modal_datasets
 
 from .identifiability_service import (
@@ -62,6 +64,290 @@ class ComparatorPairingError(ValueError):
 
 STAGE_A_MAPPED_DOF_IDENTITY_SCHEMA = "stage-a-dof-mapping/2"
 FE_DOF_AVAILABILITY_SOURCE = "stage_a_matrix_active_dofs"
+STAGE_A_FE_AVAILABILITY_SCHEMA = "stage-a-fe-availability/1"
+_FE_COMPONENT_NAMES = ("U1", "U2", "U3")
+
+
+class StageAFeAvailabilityError(ValueError):
+    """FE DOF availability is malformed or does not satisfy Policy B."""
+
+    def __init__(
+        self, message: str, violations: Sequence[Tuple[str, str, str]] = ()
+    ) -> None:
+        super().__init__(message)
+        self.violations = tuple(violations)
+
+
+def _qualified_fe_node_id(value: object) -> str:
+    if not isinstance(value, str):
+        raise StageAFeAvailabilityError(
+            f"FE node IDs must be 'INSTANCE:label' strings: {value!r}"
+        )
+    instance, separator, label = value.rpartition(":")
+    if not separator or not instance.strip():
+        raise StageAFeAvailabilityError(f"FE node ID has no instance name: {value!r}")
+    try:
+        int(label)
+    except ValueError as exc:
+        raise StageAFeAvailabilityError(
+            f"FE node ID label is not an integer: {value!r}"
+        ) from exc
+    return str(value)
+
+
+@dataclass(frozen=True)
+class StageAFeAvailability:
+    """Which FE U1/U2/U3 components a matrix candidate actually carries.
+
+    ``available`` is True only for translational DOFs that are active in the
+    matrix eigenvector DOFs.  Everything else is UNAVAILABLE -- never a known
+    zero -- and is never inferred from displacement values, ODB output masks,
+    or experimental measurement masks.
+    """
+
+    fe_node_ids: Tuple[str, ...]
+    available: Tuple[Tuple[bool, bool, bool], ...]
+    node_map_hash: str
+    source: str = FE_DOF_AVAILABILITY_SOURCE
+    schema_version: str = STAGE_A_FE_AVAILABILITY_SCHEMA
+
+    def __post_init__(self) -> None:
+        if self.schema_version != STAGE_A_FE_AVAILABILITY_SCHEMA:
+            raise StageAFeAvailabilityError(
+                f"Unsupported FE availability schema: {self.schema_version!r}."
+            )
+        if self.source != FE_DOF_AVAILABILITY_SOURCE:
+            raise StageAFeAvailabilityError(
+                f"FE availability source must be {FE_DOF_AVAILABILITY_SOURCE!r}."
+            )
+        node_map_hash = self.node_map_hash
+        if (
+            not isinstance(node_map_hash, str)
+            or len(node_map_hash) != 64
+            or any(character not in "0123456789abcdef" for character in node_map_hash)
+        ):
+            raise StageAFeAvailabilityError("node_map_hash must be a SHA-256 hex digest.")
+        node_ids = tuple(
+            _qualified_fe_node_id(item) for item in _plain_sequence(self.fe_node_ids)
+        )
+        if len(set(node_ids)) != len(node_ids):
+            raise StageAFeAvailabilityError("FE availability node IDs must be unique.")
+        rows = []
+        for row in _plain_sequence(self.available):
+            items = tuple(_plain_sequence(row))
+            if len(items) != len(_FE_COMPONENT_NAMES) or not all(
+                isinstance(item, bool) for item in items
+            ):
+                raise StageAFeAvailabilityError(
+                    "FE availability must be an N x 3 boolean mask."
+                )
+            rows.append(items)
+        if len(rows) != len(node_ids):
+            raise StageAFeAvailabilityError(
+                "FE availability must have one mask row per FE node."
+            )
+        object.__setattr__(self, "fe_node_ids", node_ids)
+        object.__setattr__(self, "available", tuple(rows))
+        object.__setattr__(self, "_by_node", dict(zip(node_ids, rows)))
+
+    @property
+    def content_hash(self) -> str:
+        payload = json.dumps(
+            {
+                "schema_version": self.schema_version,
+                "source": self.source,
+                "node_map_hash": self.node_map_hash,
+                "nodes": sorted(
+                    [node_id, list(row)] for node_id, row in zip(self.fe_node_ids, self.available)
+                ),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    def has_node(self, fe_node_id: str) -> bool:
+        return fe_node_id in self._by_node
+
+    def available_components(self, fe_node_id: str) -> Tuple[bool, bool, bool]:
+        try:
+            return self._by_node[fe_node_id]
+        except KeyError as exc:
+            raise StageAFeAvailabilityError(
+                f"FE node {fe_node_id} is absent from the FE availability contract."
+            ) from exc
+
+    def mask_array(self) -> np.ndarray:
+        """Return a new, detached N x 3 boolean array in FE-grid order."""
+        return np.array(self.available, dtype=bool).reshape(-1, len(_FE_COMPONENT_NAMES))
+
+
+def _plain_sequence(value: object) -> list:
+    if hasattr(value, "tolist"):
+        value = value.tolist()
+    if not isinstance(value, (list, tuple)):
+        raise StageAFeAvailabilityError(
+            f"Expected a sequence, not {type(value).__name__}."
+        )
+    return list(value)
+
+
+def build_stage_a_fe_availability(
+    reference_node_ids: Sequence[object],
+    node_map: StageAMatrixNodeMap,
+    dofs: Sequence[AbaqusDof],
+) -> StageAFeAvailability:
+    """Build FE availability from the active matrix DOFs through the node map.
+
+    ``dofs`` are the eigenvector DOFs of one solve (``GeneralizedEigenResult.dofs``):
+    a translational DOF listed there is AVAILABLE, every other one is not.
+    """
+    if not isinstance(node_map, StageAMatrixNodeMap):
+        raise StageAFeAvailabilityError("An explicit StageAMatrixNodeMap is required.")
+    node_ids = [
+        _qualified_fe_node_id(item)
+        for item in np.asarray(reference_node_ids, dtype=object).reshape(-1)
+    ]
+    rows: dict[str, int] = {}
+    for index, node_id in enumerate(node_ids):
+        if node_id in rows:
+            raise StageAFeAvailabilityError("Reference FE node IDs must be unique.")
+        rows[node_id] = index
+    unknown = [target for _, target in node_map.entries if target not in rows]
+    if unknown:
+        raise StageAFeAvailabilityError(
+            f"{len(unknown)} node-map target(s) are not in the reference FE grid "
+            f"(first: {unknown[0]!r})."
+        )
+    available = np.zeros((len(node_ids), len(_FE_COMPONENT_NAMES)), dtype=bool)
+    for dof in dofs:
+        try:
+            fe_node = node_map.fe_node_id(dof.node_label)
+        except StageAMatrixNodeMapError as exc:
+            raise StageAFeAvailabilityError(str(exc)) from exc
+        if 1 <= dof.dof <= 3:
+            available[rows[fe_node], dof.dof - 1] = True
+    return StageAFeAvailability(
+        fe_node_ids=tuple(node_ids),
+        available=available,
+        node_map_hash=node_map.content_hash,
+    )
+
+
+def required_fe_components(
+    registration: FrozenRegistration,
+) -> dict[str, Tuple[bool, bool, bool]]:
+    """Return the FE U1/U2/U3 components each mapped FE node must provide.
+
+    The comparator rotates FE row vectors as ``experimental = fe @ R``, so a
+    measured experimental component ``j`` needs every FE component ``k`` with
+    ``R[k][j] != 0``.  The test is exact: a tiny nonzero coefficient is
+    conservatively required rather than silently dropped.
+    """
+    if not isinstance(registration, FrozenRegistration):
+        raise StageAFeAvailabilityError("A FrozenRegistration is required.")
+    rotation = registration.rotation
+    required: dict[str, list[bool]] = {}
+    for fe_node, measured in zip(
+        registration.mapped_fe_node_ids, registration.measured_dof_contract
+    ):
+        for component, is_measured in enumerate(measured):
+            if not is_measured:
+                continue
+            need = required.setdefault(fe_node, [False, False, False])
+            for fe_component in range(len(_FE_COMPONENT_NAMES)):
+                if rotation[fe_component][component] != 0.0:
+                    need[fe_component] = True
+    return {fe_node: tuple(need) for fe_node, need in sorted(required.items())}
+
+
+def _refuse_violations(violations: list[Tuple[str, str, str]]) -> None:
+    if violations:
+        details = "; ".join(
+            f"{fe_node} {component} ({reason})"
+            for fe_node, component, reason in violations[:5]
+        )
+        more = f" and {len(violations) - 5} more" if len(violations) > 5 else ""
+        raise StageAFeAvailabilityError(
+            "Policy B refused: FE components required by the frozen measurement "
+            f"contract are UNAVAILABLE: {details}{more}.",
+            violations,
+        )
+
+
+def check_required_fe_availability(
+    registration: FrozenRegistration,
+    availability: StageAFeAvailability,
+    *,
+    node_map: StageAMatrixNodeMap | None = None,
+) -> bool:
+    """Policy B: every required FE component must be AVAILABLE (else refuse).
+
+    This is the authoritative per-candidate check.  Unavailable components are
+    never treated as zero, and the frozen measurement contract is never reduced.
+    """
+    if not isinstance(availability, StageAFeAvailability):
+        raise StageAFeAvailabilityError("A StageAFeAvailability contract is required.")
+    required = required_fe_components(registration)
+    if node_map is not None and (
+        not isinstance(node_map, StageAMatrixNodeMap)
+        or availability.node_map_hash != node_map.content_hash
+    ):
+        raise StageAFeAvailabilityError(
+            "The FE availability contract was not built from the supplied node map."
+        )
+    violations: list[Tuple[str, str, str]] = []
+    for fe_node, need in required.items():
+        if not availability.has_node(fe_node):
+            names = ",".join(
+                name for name, flag in zip(_FE_COMPONENT_NAMES, need) if flag
+            )
+            violations.append(
+                (fe_node, names, "absent from the FE availability contract")
+            )
+            continue
+        have = availability.available_components(fe_node)
+        for name, needed, present in zip(_FE_COMPONENT_NAMES, need, have):
+            if needed and not present:
+                violations.append(
+                    (fe_node, name, "not active in the matrix eigenvector DOFs")
+                )
+    _refuse_violations(violations)
+    return True
+
+
+def precheck_required_fe_export(
+    registration: FrozenRegistration,
+    node_map: StageAMatrixNodeMap,
+    exported_dofs: Sequence[AbaqusDof],
+) -> bool:
+    """Necessary (not sufficient) basis-level check: required DOFs were exported.
+
+    A DOF absent from the matrix export can never become active, so this can
+    refuse early.  Passing it proves nothing about activity in a particular
+    eigen-solve; ``check_required_fe_availability`` remains authoritative.
+    """
+    if not isinstance(node_map, StageAMatrixNodeMap):
+        raise StageAFeAvailabilityError("An explicit StageAMatrixNodeMap is required.")
+    required = required_fe_components(registration)
+    exported: dict[str, set[int]] = {}
+    for dof in exported_dofs:
+        if not 1 <= dof.dof <= 3:
+            continue
+        try:
+            fe_node = node_map.fe_node_id(dof.node_label)
+        except StageAMatrixNodeMapError as exc:
+            raise StageAFeAvailabilityError(str(exc)) from exc
+        exported.setdefault(fe_node, set()).add(dof.dof - 1)
+    violations = [
+        (fe_node, _FE_COMPONENT_NAMES[component], "not exported by the matrix basis")
+        for fe_node, need in required.items()
+        for component in range(len(_FE_COMPONENT_NAMES))
+        if need[component] and component not in exported.get(fe_node, set())
+    ]
+    _refuse_violations(violations)
+    return True
 
 
 class PairingProviderMode(str, Enum):
@@ -470,10 +756,17 @@ class MatrixEigenmodeDatasetAdapter:
             raise ComparatorPairingError(
                 "Eigenvector rows do not match the active Abaqus DOF ordering."
             )
+        availability: StageAFeAvailability | None = None
         if self.node_map is None:
             locations = self._legacy_locations(dofs)
         else:
             locations = self._mapped_locations(dofs)
+            try:
+                availability = build_stage_a_fe_availability(
+                    self._node_ids, self.node_map, dofs
+                )
+            except StageAFeAvailabilityError as exc:
+                raise ComparatorPairingError(str(exc)) from exc
         if not locations:
             raise ComparatorPairingError(
                 "No translational matrix DOFs map to the reference comparator grid."
@@ -481,6 +774,12 @@ class MatrixEigenmodeDatasetAdapter:
         available = np.zeros((len(self._node_ids), 3), dtype=bool)
         for _, node_row, component in locations:
             available[node_row, component] = True
+        if availability is not None:
+            if not np.array_equal(available, availability.mask_array()):
+                raise ComparatorPairingError(
+                    "Candidate vector placement disagrees with the FE availability contract."
+                )
+            available = availability.mask_array()
 
         modes: list[ModeShape] = []
         for mode_index, frequency in enumerate(eigenpairs.frequencies_hz):
@@ -510,8 +809,10 @@ class MatrixEigenmodeDatasetAdapter:
             "source": "stage_a_affine_matrix_eigensolver",
             "fe_dof_availability_source": FE_DOF_AVAILABILITY_SOURCE,
         }
-        if self.node_map is not None:
+        if availability is not None:
             metadata["stage_a_node_map_hash"] = self.node_map.content_hash
+            metadata["stage_a_fe_availability"] = availability
+            metadata["stage_a_fe_availability_hash"] = availability.content_hash
         return ModalDataset(
             source_name="Stage-A affine matrix candidate",
             source_path=self._reference_abaqus.source_path,
