@@ -32,6 +32,13 @@ from .registration import (
     FrozenRegistration,
     RegistrationMismatchError,
 )
+from .identification_model import (
+    EFFECTIVE_FACE_SHEET_MODEL,
+    STAGE_A_BENDING_MODEL,
+    IdentificationModelDefinition,
+    IdentificationParameterDefinition,
+    ModelWorkflowStatus,
+)
 from .specimen import (
     CoreFamily,
     Design,
@@ -45,6 +52,11 @@ from .specimen import (
 __all__ = [
     "CoreFamily",
     "Design",
+    "EFFECTIVE_FACE_SHEET_MODEL",
+    "IdentificationModelDefinition",
+    "IdentificationParameterDefinition",
+    "ModelWorkflowStatus",
+    "STAGE_A_BENDING_MODEL",
     "EvidenceProvenance",
     "EvidenceRecord",
     "EvidenceSourceIdentity",
