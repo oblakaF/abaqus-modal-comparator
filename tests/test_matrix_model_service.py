@@ -26,7 +26,10 @@ from services.matrix_model_service import (
     DirectAbaqusEvaluation,
     MatrixModelError,
     StageAAbaqusPointEvaluationError,
+    STAGE_A_MATRIX_NODE_MAP_SCHEMA,
     StageAAffineBasis,
+    StageAMatrixNodeMap,
+    StageAMatrixNodeMapError,
     StageAMatrixParameters,
     build_stage_a_affine_basis,
     evaluate_stage_a_abaqus_point,
@@ -744,6 +747,111 @@ class StageAAbaqusPointEvaluationTests(unittest.TestCase):
         self.assertEqual(captured.exception.stage, "job_output_validation")
         reader.assert_not_called()
         extractor.assert_not_called()
+
+
+class StageAMatrixNodeMapTests(unittest.TestCase):
+    MAPPING = {101: "PART-A:1", 102: "PART-B:1", 103: "PART-A:2"}
+
+    def test_overlapping_labels_in_two_instances_are_distinct_targets(self):
+        node_map = StageAMatrixNodeMap.from_mapping(self.MAPPING)
+        self.assertEqual(node_map.fe_node_id(101), "PART-A:1")
+        self.assertEqual(node_map.fe_node_id(102), "PART-B:1")
+        self.assertEqual(node_map.matrix_nodes, (101, 102, 103))
+        self.assertEqual(node_map.schema_version, STAGE_A_MATRIX_NODE_MAP_SCHEMA)
+
+    def test_hash_is_order_independent_and_target_sensitive(self):
+        first = StageAMatrixNodeMap.from_mapping(self.MAPPING)
+        reordered = StageAMatrixNodeMap.from_mapping(dict(reversed(list(self.MAPPING.items()))))
+        changed = StageAMatrixNodeMap.from_mapping({**self.MAPPING, 102: "PART-B:2"})
+        self.assertEqual(first.content_hash, reordered.content_hash)
+        self.assertEqual(first, reordered)
+        self.assertNotEqual(first.content_hash, changed.content_hash)
+        self.assertRegex(first.content_hash, r"^[0-9a-f]{64}$")
+
+    def test_round_trip_and_tamper_detection(self):
+        node_map = StageAMatrixNodeMap.from_mapping(self.MAPPING)
+        payload = node_map.to_dict()
+        self.assertEqual(StageAMatrixNodeMap.from_dict(payload), node_map)
+        tampered = {**payload, "entries": [[101, "PART-A:1"], [102, "PART-A:9"], [103, "PART-A:2"]]}
+        with self.assertRaisesRegex(StageAMatrixNodeMapError, "content_hash"):
+            StageAMatrixNodeMap.from_dict(tampered)
+        with self.assertRaisesRegex(StageAMatrixNodeMapError, "schema"):
+            StageAMatrixNodeMap.from_dict({**payload, "schema_version": "other/9"})
+
+    def test_duplicate_fe_target_is_refused(self):
+        with self.assertRaisesRegex(StageAMatrixNodeMapError, "more than one matrix node"):
+            StageAMatrixNodeMap.from_mapping({101: "PART-A:1", 102: "PART-A:1"})
+
+    def test_duplicate_matrix_source_is_refused(self):
+        with self.assertRaisesRegex(StageAMatrixNodeMapError, "more than one FE target"):
+            StageAMatrixNodeMap(entries=((101, "PART-A:1"), (101, "PART-B:1")))
+
+    def test_targets_must_be_instance_qualified_and_sources_positive_integers(self):
+        invalid = (
+            {101: "1"},
+            {101: ":1"},
+            {101: "PART-A:x"},
+            {101: 1},
+            {0: "PART-A:1"},
+            {True: "PART-A:1"},
+            {"101": "PART-A:1"},
+            {},
+        )
+        for mapping in invalid:
+            with self.subTest(mapping=mapping):
+                with self.assertRaises(StageAMatrixNodeMapError):
+                    StageAMatrixNodeMap.from_mapping(mapping)
+
+    def test_unknown_matrix_node_lookup_is_refused(self):
+        node_map = StageAMatrixNodeMap.from_mapping(self.MAPPING)
+        with self.assertRaisesRegex(StageAMatrixNodeMapError, "no FE target"):
+            node_map.fe_node_id(999)
+
+    def test_basis_accepts_only_a_node_map_covering_exactly_its_nodes(self):
+        node_map = StageAMatrixNodeMap.from_mapping({1: "PART-A:1", 2: "PART-B:1", 3: "PART-A:2"})
+        basis = build_stage_a_affine_basis(
+            StageAMatrixParameters(10.0, 2.0, 3.0),
+            diagonal_pair((1.0, 2.0, 3.0)),
+            (
+                (StageAMatrixParameters(11.0, 2.0, 3.0), diagonal_pair((2.0, 2.0, 3.0))),
+                (StageAMatrixParameters(10.0, 3.0, 3.0), diagonal_pair((1.0, 3.0, 3.0))),
+                (StageAMatrixParameters(10.0, 2.0, 4.0), diagonal_pair((1.0, 2.0, 4.0))),
+            ),
+            node_map=node_map,
+        )
+        self.assertIs(basis.node_map, node_map)
+        for mapping in ({1: "PART-A:1", 2: "PART-B:1"}, {**{1: "PART-A:1", 2: "PART-B:1", 3: "PART-A:2"}, 4: "PART-A:3"}):
+            with self.subTest(mapping=mapping):
+                with self.assertRaisesRegex(ValueError, "node_map"):
+                    StageAAffineBasis(
+                        reference_parameters=basis.reference_parameters,
+                        reference_stiffness=basis.reference_stiffness,
+                        basis_matrices=basis.basis_matrices,
+                        mass=basis.mass,
+                        dofs=basis.dofs,
+                        node_map=StageAMatrixNodeMap.from_mapping(mapping),
+                    )
+        with self.assertRaises(TypeError):
+            StageAAffineBasis(
+                reference_parameters=basis.reference_parameters,
+                reference_stiffness=basis.reference_stiffness,
+                basis_matrices=basis.basis_matrices,
+                mass=basis.mass,
+                dofs=basis.dofs,
+                node_map={1: "PART-A:1", 2: "PART-B:1", 3: "PART-A:2"},
+            )
+
+    def test_basis_without_node_map_is_still_supported(self):
+        basis = build_stage_a_affine_basis(
+            StageAMatrixParameters(10.0, 2.0, 3.0),
+            diagonal_pair((1.0, 2.0, 3.0)),
+            (
+                (StageAMatrixParameters(11.0, 2.0, 3.0), diagonal_pair((2.0, 2.0, 3.0))),
+                (StageAMatrixParameters(10.0, 3.0, 3.0), diagonal_pair((1.0, 3.0, 3.0))),
+                (StageAMatrixParameters(10.0, 2.0, 4.0), diagonal_pair((1.0, 2.0, 4.0))),
+            ),
+        )
+        self.assertIsNone(basis.node_map)
 
 
 if __name__ == "__main__":

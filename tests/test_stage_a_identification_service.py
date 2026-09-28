@@ -1,3 +1,6 @@
+import copy
+from dataclasses import replace
+import hashlib
 from pathlib import Path
 import sys
 import unittest
@@ -22,18 +25,22 @@ from services.matrix_model_service import (
     AbaqusDof,
     GeneralizedEigenResult,
     StageAAffineBasis,
+    StageAMatrixNodeMap,
+    StageAMatrixNodeMapError,
     StageAMatrixParameters,
     solve_generalized_eigenproblem,
 )
 from services.specimen_comparison_service import comparison_to_observations
 from services.stage_a_identification_service import (
     ComparatorPairingError,
+    MatrixEigenmodeDatasetAdapter,
     PairingProviderMode,
     ProductionComparisonPairingProvider,
     StageACampaignPolicy,
     StageAIdentificationError,
     create_production_pairing_provider,
     identify_stage_a,
+    stage_a_basis_identity,
 )
 from tests import test_core
 
@@ -463,6 +470,188 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
         self.assertTrue(result.inverse_result.pairing_changed_at_optimum)
         self.assertFalse(result.inverse_result.success)
         self.assertTrue(any("Pairing changed" in item for item in result.warnings))
+
+
+class MappedMatrixEigenmodeAdapterTests(unittest.TestCase):
+    """Explicit matrix-node -> INSTANCE:label mapping (multi-instance safe)."""
+
+    REFERENCE_IDS = ("PART-B:1", "PART-A:1", "PART-A:2")
+    REFERENCE_COORDINATES = ((10.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 5.0, 0.0))
+    # Matrix node 101 carries U1+U3, 102 only U3, 103 only a rotation.
+    DOFS = (
+        AbaqusDof(101, 1),
+        AbaqusDof(101, 3),
+        AbaqusDof(102, 3),
+        AbaqusDof(103, 4),
+    )
+    MAPPING = {101: "PART-A:1", 102: "PART-B:1", 103: "PART-A:2"}
+
+    def reference(self, node_ids=REFERENCE_IDS):
+        mode = ModeShape(
+            number=1,
+            frequency_hz=10.0,
+            node_ids=np.asarray(node_ids, dtype=object),
+            coordinates=np.asarray(self.REFERENCE_COORDINATES),
+            vectors=np.zeros((len(node_ids), 3)),
+        )
+        mode.measured_dofs = np.ones((len(node_ids), 3), dtype=bool)
+        return ModalDataset("Abaqus ODB", Path("reference.odb"), [mode])
+
+    def eigenpairs(self, dofs=DOFS):
+        vectors = np.arange(1.0, 1.0 + 2 * len(dofs)).reshape(len(dofs), 2)
+        return GeneralizedEigenResult(
+            eigenvalues=np.array([1.0, 4.0]),
+            frequencies_hz=np.array([11.0, 22.0]),
+            eigenvectors=vectors,
+            dofs=tuple(dofs),
+            rigid_body_eigenvalues=np.array([]),
+        )
+
+    def adapter(self, mapping=MAPPING, reference=None):
+        return MatrixEigenmodeDatasetAdapter(
+            reference or self.reference(),
+            self.DOFS,
+            node_map=StageAMatrixNodeMap.from_mapping(mapping),
+        )
+
+    # A / B
+    def test_overlapping_labels_map_to_distinct_instance_nodes(self):
+        candidate = self.adapter()(self.eigenpairs())
+        mode = candidate.sorted_modes()[0]
+        self.assertEqual(tuple(mode.node_ids.tolist()), self.REFERENCE_IDS)
+        np.testing.assert_array_equal(mode.coordinates, self.REFERENCE_COORDINATES)
+        by_id = dict(zip(mode.node_ids.tolist(), mode.vectors))
+        # eigenvector rows: (101,1)=1, (101,3)=3, (102,3)=5 for the first mode
+        np.testing.assert_array_equal(by_id["PART-A:1"], [1.0, 0.0, 3.0])
+        np.testing.assert_array_equal(by_id["PART-B:1"], [0.0, 0.0, 5.0])
+        np.testing.assert_array_equal(by_id["PART-A:2"], [0.0, 0.0, 0.0])
+        self.assertEqual(
+            candidate.metadata["stage_a_node_map_hash"],
+            StageAMatrixNodeMap.from_mapping(self.MAPPING).content_hash,
+        )
+
+    # C
+    def test_missing_map_entry_is_refused(self):
+        with self.assertRaisesRegex(ComparatorPairingError, "no FE target"):
+            MatrixEigenmodeDatasetAdapter(
+                self.reference(),
+                self.DOFS,
+                node_map=StageAMatrixNodeMap.from_mapping({101: "PART-A:1", 102: "PART-B:1"}),
+            )
+        adapter = self.adapter()
+        with self.assertRaisesRegex(ComparatorPairingError, "no FE target"):
+            adapter(self.eigenpairs(self.DOFS + (AbaqusDof(104, 3),)))
+
+    # D
+    def test_duplicate_fe_target_is_refused(self):
+        with self.assertRaises(StageAMatrixNodeMapError):
+            self.adapter({101: "PART-A:1", 102: "PART-A:1", 103: "PART-A:2"})
+
+    # E
+    def test_unknown_target_fe_node_is_refused(self):
+        with self.assertRaisesRegex(ComparatorPairingError, "not in the reference FE grid"):
+            self.adapter({101: "PART-A:1", 102: "PART-C:1", 103: "PART-A:2"})
+
+    def test_reference_grid_must_use_instance_qualified_ids(self):
+        with self.assertRaisesRegex(ComparatorPairingError, "INSTANCE:label"):
+            self.adapter(reference=self.reference(node_ids=(1, 2, 3)))
+
+    # I
+    def test_fe_availability_comes_from_matrix_active_dofs_only(self):
+        candidate = self.adapter()(self.eigenpairs())
+        for mode in candidate.modes:
+            self.assertFalse(hasattr(mode, "measured_dofs"))
+            self.assertNotIn("measured_dofs", mode.metadata)
+            availability = dict(zip(mode.node_ids.tolist(), mode.metadata["fe_available_dofs"].tolist()))
+            self.assertEqual(availability["PART-A:1"], [True, False, True])
+            self.assertEqual(availability["PART-B:1"], [False, False, True])
+            self.assertEqual(availability["PART-A:2"], [False, False, False])
+            self.assertEqual(
+                mode.metadata["fe_dof_availability_source"], "stage_a_matrix_active_dofs"
+            )
+        reduced = self.adapter()(self.eigenpairs(self.DOFS[1:]))
+        first = dict(zip(reduced.modes[0].node_ids.tolist(), reduced.modes[0].metadata["fe_available_dofs"].tolist()))
+        self.assertEqual(first["PART-A:1"], [False, False, True])
+
+    # J
+    def test_mapped_path_never_compares_labels_with_fe_ids(self):
+        with mock.patch(
+            "services.stage_a_identification_service._node_key",
+            side_effect=AssertionError("label matching must not be used"),
+        ):
+            candidate = self.adapter()(self.eigenpairs())
+        self.assertEqual(len(candidate.modes), 2)
+
+    # K
+    def test_legacy_unmapped_adapter_still_matches_exact_labels(self):
+        reference = self.reference(node_ids=(1, 2, 3))
+        dofs = (AbaqusDof(1, 3), AbaqusDof(2, 3))
+        eigenpairs = GeneralizedEigenResult(
+            eigenvalues=np.array([1.0]),
+            frequencies_hz=np.array([5.0]),
+            eigenvectors=np.array([[2.0], [3.0]]),
+            dofs=dofs,
+            rigid_body_eigenvalues=np.array([]),
+        )
+        candidate = MatrixEigenmodeDatasetAdapter(reference, dofs)(eigenpairs)
+        np.testing.assert_array_equal(candidate.modes[0].vectors[:, 2], [2.0, 3.0, 0.0])
+        self.assertNotIn("stage_a_node_map_hash", candidate.metadata)
+
+    def test_production_provider_factory_forwards_the_basis_node_map(self):
+        fixture = SyntheticProductionFixture()
+        mapping = {int(node): f"PLATE-1:{int(node)}" for node in fixture.node_ids}
+        node_map = StageAMatrixNodeMap.from_mapping(mapping)
+        basis = replace(fixture.basis, node_map=node_map)
+        comparison = copy.copy(fixture.comparison)
+        comparison.abaqus = self._qualified(fixture.comparison.abaqus)
+        provider = create_production_pairing_provider(comparison, basis, coordinate_scale_override=1.0)
+        self.assertIs(provider.candidate_dataset_adapter.node_map, node_map)
+
+    @staticmethod
+    def _qualified(dataset):
+        modes = []
+        for mode in dataset.sorted_modes():
+            modes.append(
+                ModeShape(
+                    number=mode.number,
+                    frequency_hz=mode.frequency_hz,
+                    node_ids=np.asarray([f"PLATE-1:{int(item)}" for item in mode.node_ids], dtype=object),
+                    coordinates=mode.coordinates,
+                    vectors=mode.vectors,
+                )
+            )
+        return ModalDataset(dataset.source_name, dataset.source_path, modes)
+
+
+class StageABasisIdentityVersioningTests(unittest.TestCase):
+    # G
+    def test_unmapped_identity_is_unchanged_and_mapped_identity_is_versioned(self):
+        fixture = SyntheticProductionFixture()
+        legacy = stage_a_basis_identity(fixture.basis)
+        expected_dofs = hashlib.sha256()
+        for dof in fixture.basis.dofs:
+            expected_dofs.update(f"{dof.node_label!r}:{dof.dof}\n".encode("utf-8"))
+        self.assertEqual(set(legacy), {"basis_km_hash", "dof_mapping_hash"})
+        self.assertEqual(legacy["dof_mapping_hash"], expected_dofs.hexdigest())
+
+        mapping = {int(node): f"PLATE-1:{int(node)}" for node in fixture.node_ids}
+        mapped = stage_a_basis_identity(
+            replace(fixture.basis, node_map=StageAMatrixNodeMap.from_mapping(mapping))
+        )
+        self.assertEqual(mapped["basis_km_hash"], legacy["basis_km_hash"])
+        self.assertNotEqual(mapped["dof_mapping_hash"], legacy["dof_mapping_hash"])
+        self.assertEqual(mapped["dof_mapping_schema"], "stage-a-dof-mapping/2")
+        self.assertEqual(
+            mapped["node_map_hash"], StageAMatrixNodeMap.from_mapping(mapping).content_hash
+        )
+
+        other = dict(mapping)
+        other[1] = "PLATE-2:1"
+        changed = stage_a_basis_identity(
+            replace(fixture.basis, node_map=StageAMatrixNodeMap.from_mapping(other))
+        )
+        self.assertNotEqual(changed["dof_mapping_hash"], mapped["dof_mapping_hash"])
+        self.assertNotEqual(changed["node_map_hash"], mapped["node_map_hash"])
 
 
 if __name__ == "__main__":

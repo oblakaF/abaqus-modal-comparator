@@ -140,6 +140,129 @@ class AbaqusMatrixPair:
         object.__setattr__(self, "dofs", tuple(self.dofs))
 
 
+STAGE_A_MATRIX_NODE_MAP_SCHEMA = "stage-a-matrix-node-map/1"
+
+
+class StageAMatrixNodeMapError(ValueError):
+    """A matrix-node to FE-node map is incomplete, ambiguous, or malformed."""
+
+
+def _qualified_fe_node_id(value: object) -> str:
+    if not isinstance(value, str):
+        raise StageAMatrixNodeMapError(
+            f"FE node target must be an 'INSTANCE:label' string: {value!r}"
+        )
+    instance, separator, label = value.rpartition(":")
+    if not separator or not instance.strip():
+        raise StageAMatrixNodeMapError(f"FE node target has no instance name: {value!r}")
+    try:
+        int(label)
+    except ValueError as exc:
+        raise StageAMatrixNodeMapError(
+            f"FE node target label is not an integer: {value!r}"
+        ) from exc
+    return value
+
+
+@dataclass(frozen=True)
+class StageAMatrixNodeMap:
+    """Explicit, verified map from Abaqus matrix node numbers to FE node IDs.
+
+    Matrix files identify nodes by an integer only; the FE/ODB grid uses
+    ``INSTANCE:label``.  The map is always supplied explicitly -- it is never
+    derived by matching labels or guessing instance names -- and must be
+    one-to-one in both directions.
+    """
+
+    entries: Tuple[Tuple[int, str], ...]
+    schema_version: str = STAGE_A_MATRIX_NODE_MAP_SCHEMA
+
+    def __post_init__(self) -> None:
+        if self.schema_version != STAGE_A_MATRIX_NODE_MAP_SCHEMA:
+            raise StageAMatrixNodeMapError(
+                f"Unsupported matrix node map schema: {self.schema_version!r}."
+            )
+        entries = []
+        for item in self.entries:
+            matrix_node, fe_node = tuple(item)
+            if (
+                isinstance(matrix_node, bool)
+                or not isinstance(matrix_node, (int, np.integer))
+                or int(matrix_node) <= 0
+            ):
+                raise StageAMatrixNodeMapError(
+                    f"Matrix node numbers must be positive integers: {matrix_node!r}"
+                )
+            entries.append((int(matrix_node), _qualified_fe_node_id(fe_node)))
+        if not entries:
+            raise StageAMatrixNodeMapError("A matrix node map must not be empty.")
+        entries.sort()
+        sources = [matrix_node for matrix_node, _ in entries]
+        if len(set(sources)) != len(sources):
+            raise StageAMatrixNodeMapError(
+                "A matrix node is mapped to more than one FE target."
+            )
+        targets = [fe_node for _, fe_node in entries]
+        if len(set(targets)) != len(targets):
+            raise StageAMatrixNodeMapError(
+                "An FE target is mapped from more than one matrix node."
+            )
+        object.__setattr__(self, "entries", tuple(entries))
+        object.__setattr__(self, "_targets", dict(entries))
+
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[int, str]) -> "StageAMatrixNodeMap":
+        if not isinstance(mapping, Mapping):
+            raise StageAMatrixNodeMapError("The matrix node map must be a mapping.")
+        return cls(entries=tuple(mapping.items()))
+
+    @property
+    def matrix_nodes(self) -> Tuple[int, ...]:
+        return tuple(matrix_node for matrix_node, _ in self.entries)
+
+    @property
+    def content_hash(self) -> str:
+        payload = json.dumps(
+            {"schema_version": self.schema_version, "entries": [list(item) for item in self.entries]},
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    def fe_node_id(self, matrix_node: int) -> str:
+        try:
+            return self._targets[int(matrix_node)]
+        except KeyError as exc:
+            raise StageAMatrixNodeMapError(
+                f"Matrix node {matrix_node} has no FE target in the node map."
+            ) from exc
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "entries": [list(item) for item in self.entries],
+            "content_hash": self.content_hash,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> "StageAMatrixNodeMap":
+        if not isinstance(payload, Mapping):
+            raise StageAMatrixNodeMapError("The serialized node map must be a mapping.")
+        entries = payload.get("entries")
+        if not isinstance(entries, (list, tuple)):
+            raise StageAMatrixNodeMapError("The serialized node map has no entries list.")
+        node_map = cls(
+            entries=tuple(tuple(item) for item in entries),
+            schema_version=payload.get("schema_version"),
+        )
+        if payload.get("content_hash") != node_map.content_hash:
+            raise StageAMatrixNodeMapError(
+                "The serialized node map content_hash does not match its entries."
+            )
+        return node_map
+
+
 @dataclass(frozen=True)
 class _CoordinateEntries:
     values: dict[tuple[AbaqusDof, AbaqusDof], float]
@@ -432,9 +555,23 @@ class StageAAffineBasis:
     mass: sparse.csr_matrix
     dofs: Tuple[AbaqusDof, ...]
     mass_derivative_D11: sparse.csr_matrix | None = None
+    # Explicit matrix-node -> INSTANCE:label map.  None keeps the legacy
+    # label-only DOF identity, which is not multi-instance safe.
+    node_map: StageAMatrixNodeMap | None = None
 
     def __post_init__(self) -> None:
         size = len(self.dofs)
+        if self.node_map is not None:
+            if not isinstance(self.node_map, StageAMatrixNodeMap):
+                raise TypeError("node_map must be StageAMatrixNodeMap or None.")
+            basis_nodes = {dof.node_label for dof in self.dofs}
+            mapped_nodes = set(self.node_map.matrix_nodes)
+            if basis_nodes != mapped_nodes:
+                raise ValueError(
+                    "node_map must map exactly the basis matrix nodes "
+                    f"(unmapped: {len(basis_nodes - mapped_nodes)}, "
+                    f"not in basis: {len(mapped_nodes - basis_nodes)})."
+                )
         reference = sparse.csr_matrix(self.reference_stiffness, dtype=float)
         mass = sparse.csr_matrix(self.mass, dtype=float)
         basis = tuple(sparse.csr_matrix(item, dtype=float) for item in self.basis_matrices)
@@ -507,6 +644,7 @@ def build_stage_a_affine_basis(
     *,
     mass_rtol: float = 1.0e-12,
     mass_atol: float = 1.0e-14,
+    node_map: StageAMatrixNodeMap | None = None,
 ) -> StageAAffineBasis:
     """Recover three affine K contributions from four admissible Abaqus jobs.
 
@@ -583,6 +721,7 @@ def build_stage_a_affine_basis(
         mass=reference_matrices.mass,
         dofs=reference_matrices.dofs,
         mass_derivative_D11=mass_derivative_d11,
+        node_map=node_map,
     )
 
 

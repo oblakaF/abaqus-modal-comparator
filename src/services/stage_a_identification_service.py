@@ -43,6 +43,8 @@ from .matrix_model_service import (
     GeneralizedEigenResult,
     MatrixModelError,
     StageAAffineBasis,
+    StageAMatrixNodeMap,
+    StageAMatrixNodeMapError,
     StageAMatrixParameters,
     solve_generalized_eigenproblem,
 )
@@ -56,6 +58,10 @@ class StageAIdentificationError(RuntimeError):
 
 class ComparatorPairingError(ValueError):
     """The reviewed comparator could not provide a complete current pairing."""
+
+
+STAGE_A_MAPPED_DOF_IDENTITY_SCHEMA = "stage-a-dof-mapping/2"
+FE_DOF_AVAILABILITY_SOURCE = "stage_a_matrix_active_dofs"
 
 
 class PairingProviderMode(str, Enum):
@@ -232,9 +238,24 @@ def stage_a_basis_identity(affine_model: StageAAffineBasis) -> Mapping[str, str]
     dof_hasher = hashlib.sha256()
     for dof in affine_model.dofs:
         dof_hasher.update(f"{dof.node_label!r}:{dof.dof}\n".encode("utf-8"))
+    if affine_model.node_map is None:
+        # Legacy label-only DOF identity; values are unchanged for unmapped bases.
+        return {
+            "basis_km_hash": basis_hasher.hexdigest(),
+            "dof_mapping_hash": dof_hasher.hexdigest(),
+        }
+    # A mapped basis has a different, versioned DOF identity that can never
+    # equal the legacy label-only hash.
+    node_map_hash = affine_model.node_map.content_hash
+    mapped_hasher = hashlib.sha256()
+    mapped_hasher.update(f"{STAGE_A_MAPPED_DOF_IDENTITY_SCHEMA}\n".encode("utf-8"))
+    mapped_hasher.update(bytes.fromhex(dof_hasher.hexdigest()))
+    mapped_hasher.update(bytes.fromhex(node_map_hash))
     return {
         "basis_km_hash": basis_hasher.hexdigest(),
-        "dof_mapping_hash": dof_hasher.hexdigest(),
+        "dof_mapping_hash": mapped_hasher.hexdigest(),
+        "dof_mapping_schema": STAGE_A_MAPPED_DOF_IDENTITY_SCHEMA,
+        "node_map_hash": node_map_hash,
     }
 
 
@@ -362,12 +383,21 @@ class MatrixEigenmodeDatasetAdapter:
     Translational Abaqus DOFs 1..3 are copied to the existing comparator grid;
     rotational shell DOFs remain matrix-only and are intentionally not exposed
     as displacement components.
+
+    With an explicit ``node_map`` every matrix node is resolved to its exact
+    ``INSTANCE:label`` FE node; unmapped nodes or targets outside the reference
+    grid are refused.  Without a map, the legacy synthetic path matches matrix
+    labels to reference node IDs by exact value, which is not multi-instance
+    safe.  Candidate modes record which U1..U3 components the matrix actually
+    carries as FE availability, never as experimental measurement.
     """
 
     def __init__(
         self,
         reference_abaqus: ModalDataset,
         basis_dofs: Sequence[AbaqusDof],
+        *,
+        node_map: StageAMatrixNodeMap | None = None,
     ) -> None:
         modes = reference_abaqus.sorted_modes()
         if not modes:
@@ -376,20 +406,55 @@ class MatrixEigenmodeDatasetAdapter:
             )
         reference = modes[0]
         node_ids = np.asarray(reference.node_ids, dtype=object).reshape(-1)
-        if len(set(_node_key(item) for item in node_ids)) != len(node_ids):
-            raise ComparatorPairingError("Reference Abaqus node IDs must be unique.")
         self._reference_abaqus = reference_abaqus
         self._node_ids = node_ids.copy()
         self._coordinates = np.asarray(reference.coordinates, dtype=float).copy()
         self._basis_dofs = tuple(basis_dofs)
-        self._row_by_node = {_node_key(item): index for index, item in enumerate(node_ids)}
-
-    def __call__(self, eigenpairs: GeneralizedEigenResult) -> ModalDataset:
-        dofs = eigenpairs.dofs if eigenpairs.dofs is not None else self._basis_dofs
-        if len(dofs) != eigenpairs.eigenvectors.shape[0]:
+        self.node_map = node_map
+        if node_map is None:
+            if len(set(_node_key(item) for item in node_ids)) != len(node_ids):
+                raise ComparatorPairingError("Reference Abaqus node IDs must be unique.")
+            self._row_by_node = {
+                _node_key(item): index for index, item in enumerate(node_ids)
+            }
+            return
+        if not isinstance(node_map, StageAMatrixNodeMap):
+            raise TypeError("node_map must be StageAMatrixNodeMap or None.")
+        if not all(isinstance(item, str) for item in node_ids):
             raise ComparatorPairingError(
-                "Eigenvector rows do not match the active Abaqus DOF ordering."
+                "A mapped Stage-A candidate requires reference FE node IDs of the "
+                "form INSTANCE:label."
             )
+        row_by_fe_id: dict[str, int] = {}
+        for index, item in enumerate(node_ids):
+            if item in row_by_fe_id:
+                raise ComparatorPairingError("Reference Abaqus node IDs must be unique.")
+            row_by_fe_id[item] = index
+        unknown = [target for _, target in node_map.entries if target not in row_by_fe_id]
+        if unknown:
+            raise ComparatorPairingError(
+                f"{len(unknown)} node-map target(s) are not in the reference FE grid "
+                f"(first: {unknown[0]!r})."
+            )
+        self._row_by_fe_id = row_by_fe_id
+        self._mapped_locations(self._basis_dofs)
+
+    def _mapped_locations(
+        self, dofs: Sequence[AbaqusDof]
+    ) -> list[tuple[int, int, int]]:
+        locations: list[tuple[int, int, int]] = []
+        for vector_row, dof in enumerate(dofs):
+            try:
+                fe_node = self.node_map.fe_node_id(dof.node_label)
+            except StageAMatrixNodeMapError as exc:
+                raise ComparatorPairingError(str(exc)) from exc
+            if 1 <= dof.dof <= 3:
+                locations.append((vector_row, self._row_by_fe_id[fe_node], dof.dof - 1))
+        return locations
+
+    def _legacy_locations(
+        self, dofs: Sequence[AbaqusDof]
+    ) -> list[tuple[int, int, int]]:
         locations: list[tuple[int, int, int]] = []
         for vector_row, dof in enumerate(dofs):
             if not 1 <= dof.dof <= 3:
@@ -397,10 +462,25 @@ class MatrixEigenmodeDatasetAdapter:
             node_row = self._row_by_node.get(_node_key(dof.node_label))
             if node_row is not None:
                 locations.append((vector_row, node_row, dof.dof - 1))
+        return locations
+
+    def __call__(self, eigenpairs: GeneralizedEigenResult) -> ModalDataset:
+        dofs = eigenpairs.dofs if eigenpairs.dofs is not None else self._basis_dofs
+        if len(dofs) != eigenpairs.eigenvectors.shape[0]:
+            raise ComparatorPairingError(
+                "Eigenvector rows do not match the active Abaqus DOF ordering."
+            )
+        if self.node_map is None:
+            locations = self._legacy_locations(dofs)
+        else:
+            locations = self._mapped_locations(dofs)
         if not locations:
             raise ComparatorPairingError(
                 "No translational matrix DOFs map to the reference comparator grid."
             )
+        available = np.zeros((len(self._node_ids), 3), dtype=bool)
+        for _, node_row, component in locations:
+            available[node_row, component] = True
 
         modes: list[ModeShape] = []
         for mode_index, frequency in enumerate(eigenpairs.frequencies_hz):
@@ -419,14 +499,24 @@ class MatrixEigenmodeDatasetAdapter:
                     metadata={
                         "source": "stage_a_affine_matrix_eigensolver",
                         "elastic_mode_index": mode_index + 1,
+                        # FE availability of U1..U3 in the active matrix DOFs;
+                        # deliberately not ``measured_dofs`` (experimental).
+                        "fe_available_dofs": available.copy(),
+                        "fe_dof_availability_source": FE_DOF_AVAILABILITY_SOURCE,
                     },
                 )
             )
+        metadata = {
+            "source": "stage_a_affine_matrix_eigensolver",
+            "fe_dof_availability_source": FE_DOF_AVAILABILITY_SOURCE,
+        }
+        if self.node_map is not None:
+            metadata["stage_a_node_map_hash"] = self.node_map.content_hash
         return ModalDataset(
             source_name="Stage-A affine matrix candidate",
             source_path=self._reference_abaqus.source_path,
             modes=modes,
-            metadata={"source": "stage_a_affine_matrix_eigensolver"},
+            metadata=metadata,
             history=list(self._reference_abaqus.history),
         )
 
@@ -537,7 +627,9 @@ def create_production_pairing_provider(
 ) -> ProductionComparisonPairingProvider:
     """Create the production adapter without changing comparator thresholds."""
 
-    adapter = MatrixEigenmodeDatasetAdapter(comparison.abaqus, affine_model.dofs)
+    adapter = MatrixEigenmodeDatasetAdapter(
+        comparison.abaqus, affine_model.dofs, node_map=affine_model.node_map
+    )
     return ProductionComparisonPairingProvider(
         comparison,
         adapter,
