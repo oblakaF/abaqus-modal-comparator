@@ -12,6 +12,8 @@ from typing import Mapping, Sequence, Tuple
 
 import numpy as np
 
+from .modal_cluster_service import _orthonormal_basis
+
 
 SP13_PRIMARY_OBSERVABLE_IDS = ("A7", "A12", "A8_A9_CENTER", "A8_A9_SPLITTING")
 SP13_FITTED_PARAMETER_IDS = ("effective_face_Ex", "effective_face_Ey", "effective_face_Gxy")
@@ -159,6 +161,28 @@ def family_frequency_residual(
     )
 
 
+def _family_vectors(values: object, name: str) -> np.ndarray:
+    """Return real or complex family vectors without discarding imaginary parts."""
+    array = np.asarray(values)
+    if array.dtype.kind not in "iufc":
+        raise FamilyResidualValidationError(f"{name} family vectors must be numeric.")
+    return array.astype(np.complex128 if np.iscomplexobj(array) else np.float64)
+
+
+def _two_mode_basis(vectors: np.ndarray, name: str) -> np.ndarray:
+    """Orthonormal basis of a 2 x N family, using the modal-cluster SVD rank rule."""
+    try:
+        basis = _orthonormal_basis(vectors.T, None)
+    except ValueError as exc:
+        raise FamilyResidualValidationError(f"{name} family subspace: {exc}") from exc
+    if basis.shape[1] != 2:
+        raise FamilyResidualValidationError(
+            f"{name} family vectors are rank deficient (numerical rank "
+            f"{basis.shape[1]}, not 2); they do not span a two-mode family."
+        )
+    return basis
+
+
 def two_mode_subspace_evidence(
     baseline_mode_vectors: np.ndarray,
     candidate_mode_vectors: np.ndarray,
@@ -166,8 +190,15 @@ def two_mode_subspace_evidence(
     baseline_member_ids: Sequence[int],
     candidate_member_ids: Sequence[int],
 ) -> FamilyIdentityEvidence:
-    baseline = np.asarray(baseline_mode_vectors, dtype=float)
-    candidate = np.asarray(candidate_mode_vectors, dtype=float)
+    """Principal angles between two two-mode families (rows are mode vectors).
+
+    Real and complex vectors are both supported.  Each family's orthonormal
+    basis comes from the same SVD numerical-rank rule as ``subspace_mac``; a
+    family whose rank is not 2 is refused, never padded to a nominal basis.
+    Canonical correlations are the singular values of ``Qb^H Qc``.
+    """
+    baseline = _family_vectors(baseline_mode_vectors, "Baseline")
+    candidate = _family_vectors(candidate_mode_vectors, "Candidate")
     if baseline.ndim != 2 or candidate.ndim != 2 or baseline.shape != candidate.shape:
         raise FamilyResidualValidationError(
             "Baseline and candidate family vectors must have the same 2 x N shape."
@@ -180,9 +211,9 @@ def two_mode_subspace_evidence(
     candidate_ids = tuple(int(value) for value in candidate_member_ids)
     if len(baseline_ids) != 2 or len(candidate_ids) != 2:
         raise FamilyResidualValidationError("Family member identity requires two IDs per basis.")
-    qb = np.linalg.qr(baseline.T)[0][:, :2]
-    qc = np.linalg.qr(candidate.T)[0][:, :2]
-    singular = np.linalg.svd(qb.T @ qc, compute_uv=False)
+    qb = _two_mode_basis(baseline, "Baseline")
+    qc = _two_mode_basis(candidate, "Candidate")
+    singular = np.linalg.svd(qb.conj().T @ qc, compute_uv=False)
     squared = np.clip(singular**2, 0.0, 1.0)
     angles = np.degrees(np.arccos(np.clip(singular, -1.0, 1.0)))
     return FamilyIdentityEvidence(
