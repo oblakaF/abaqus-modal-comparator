@@ -17,10 +17,22 @@ from typing import Callable, Mapping, Sequence, Tuple
 
 import numpy as np
 
+from coordinate_calibration import CoordinateCalibration
 from domain.modal_observation import InclusionStatus, ModalCluster, ModalObservation
 from domain.parameter_model import ParameterPrior
-from domain.registration import FrozenRegistration
+from domain.registration import FrozenRegistration, RegistrationMismatchError
 from modal_core import ComparisonResult, ModalDataset, ModeShape, compare_modal_datasets
+from reviewed_core import (
+    GeometryOrientationAmbiguousError,
+    _candidate_summary,
+    _explicit_measurement_mask,
+    experimental_measurement_masks,
+)
+from scientific_state import (
+    calibration_fingerprint,
+    experimental_source_content_identity,
+    modal_dataset_geometry_identity,
+)
 
 from .identifiability_service import (
     IdentifiabilityResult,
@@ -60,6 +72,20 @@ class StageAIdentificationError(RuntimeError):
 
 class ComparatorPairingError(ValueError):
     """The reviewed comparator could not provide a complete current pairing."""
+
+
+class StageAProductionPairingRefusal(Exception):
+    """Production pairing violates a frozen scientific contract.
+
+    Raised for node-map, experimental-source, FE-geometry, Policy-B,
+    calibration, and orientation violations.  Deliberately not a ValueError or
+    RuntimeError: the generic pairing-failure, optimizer-evaluation, and
+    fixed-pair fallback handlers must never catch it.
+    """
+
+    def __init__(self, contract: str, message: str) -> None:
+        super().__init__(message)
+        self.contract = contract
 
 
 STAGE_A_MAPPED_DOF_IDENTITY_SCHEMA = "stage-a-dof-mapping/2"
@@ -823,24 +849,74 @@ class MatrixEigenmodeDatasetAdapter:
 
 
 class ProductionComparisonPairingProvider:
-    """Adapt the current reviewed comparator to ``ComparisonPairingProvider``."""
+    """Adapt the current reviewed comparator to ``ComparisonPairingProvider``.
+
+    The provider runs only under an explicit ``FrozenRegistration``: the
+    experimental source, FE geometry, calibration, orientation, and required
+    FE components are taken from it, never re-selected.  Every candidate is
+    built through an explicit matrix node map and checked for FE geometry
+    identity and Policy-B availability before the comparator is called.
+    Contract violations raise ``StageAProductionPairingRefusal``; only
+    ordinary comparator pairing failures raise ``ComparatorPairingError``.
+    """
 
     def __init__(
         self,
         reference_comparison: ComparisonResult,
         candidate_dataset_adapter: MatrixEigenmodeDatasetAdapter,
         *,
+        registration: FrozenRegistration | None = None,
         comparator: ComparatorFunction = compare_modal_datasets,
         coordinate_scale_override: float | None = None,
     ) -> None:
+        if not isinstance(registration, FrozenRegistration):
+            raise StageAProductionPairingRefusal(
+                "registration",
+                "Production Stage-A pairing requires an explicit FrozenRegistration.",
+            )
+        if coordinate_scale_override is not None:
+            raise StageAProductionPairingRefusal(
+                "calibration",
+                "A coordinate_scale_override cannot replace the frozen registration "
+                "calibration.",
+            )
+        if (
+            not isinstance(candidate_dataset_adapter, MatrixEigenmodeDatasetAdapter)
+            or not isinstance(candidate_dataset_adapter.node_map, StageAMatrixNodeMap)
+        ):
+            raise StageAProductionPairingRefusal(
+                "node_map",
+                "Production Stage-A pairing requires a MatrixEigenmodeDatasetAdapter "
+                "with an explicit StageAMatrixNodeMap.",
+            )
         if not reference_comparison.experimental.modes:
             raise ComparatorPairingError(
                 "The reference comparison has no experimental mode shapes."
             )
+        self.registration = registration
+        self.node_map = candidate_dataset_adapter.node_map
+        self.node_map_hash = self.node_map.content_hash
+        self.geometry_calibration = _frozen_calibration(registration)
+        self.orientation_selection = {
+            "candidate_id": registration.orientation_candidate_id
+        }
+        self.experimental_source_identity = _verified_experimental_source(
+            registration, reference_comparison
+        )
+        _require_fe_geometry(
+            registration, self.experimental_source_identity, reference_comparison.abaqus
+        )
+        _require_measurement_contract(registration, reference_comparison.experimental)
+        try:
+            precheck_required_fe_export(
+                registration, self.node_map, candidate_dataset_adapter._basis_dofs
+            )
+        except StageAFeAvailabilityError as exc:
+            raise StageAProductionPairingRefusal("policy_b", str(exc)) from exc
         self.reference_comparison = reference_comparison
         self.candidate_dataset_adapter = candidate_dataset_adapter
         self.comparator = comparator
-        self.coordinate_scale_override = coordinate_scale_override
+        self.coordinate_scale_override = None
         self.call_count = 0
         self.failure_count = 0
         self.last_error = ""
@@ -874,19 +950,46 @@ class ProductionComparisonPairingProvider:
             metadata=dict(self.reference_comparison.experimental.metadata),
             history=list(self.reference_comparison.experimental.history),
         )
-        candidate = self.candidate_dataset_adapter(eigenpairs)
+        candidate = self._checked_candidate(eigenpairs)
         try:
             comparison = self.comparator(
                 candidate,
                 experimental,
-                coordinate_scale_override=self.coordinate_scale_override,
+                geometry_calibration=self.geometry_calibration,
+                orientation_selection=dict(self.orientation_selection),
             )
+        except GeometryOrientationAmbiguousError as exc:
+            # With a candidate requested, ambiguity means the frozen candidate
+            # was not among the comparator's candidates.
+            self.failure_count += 1
+            self.last_error = str(exc)
+            raise StageAProductionPairingRefusal(
+                "orientation_candidate_id",
+                "The frozen orientation candidate is not available to the "
+                f"comparator: {exc}",
+            ) from exc
         except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
             self.failure_count += 1
             self.last_error = str(exc)
+            if _is_no_geometry_candidates_error(exc):
+                raise StageAProductionPairingRefusal(
+                    "orientation_candidate_id",
+                    "The comparator produced no geometry-alignment candidate for the "
+                    f"frozen registration state: {exc}",
+                ) from exc
             raise ComparatorPairingError(
                 f"Production comparator pairing failed: {exc}"
             ) from exc
+        selected = str(_candidate_summary(comparison.geometry)["candidate_id"])
+        if selected != self.registration.orientation_candidate_id:
+            self.failure_count += 1
+            self.last_error = (
+                f"The comparator selected geometry candidate {selected}, not the "
+                f"frozen candidate {self.registration.orientation_candidate_id}."
+            )
+            raise StageAProductionPairingRefusal(
+                "orientation_candidate_id", self.last_error
+            )
         paired_by_experimental = {
             int(pair.experimental_mode): pair for pair in comparison.pairs
         }
@@ -918,22 +1021,158 @@ class ProductionComparisonPairingProvider:
             warnings=tuple(comparison.warnings),
         )
 
+    def _checked_candidate(self, eigenpairs: GeneralizedEigenResult) -> ModalDataset:
+        """Build one candidate and enforce the frozen FE contracts on it."""
+        try:
+            candidate = self.candidate_dataset_adapter(eigenpairs)
+        except ComparatorPairingError as exc:
+            raise StageAProductionPairingRefusal("node_map", str(exc)) from exc
+        _require_fe_geometry(
+            self.registration, self.experimental_source_identity, candidate
+        )
+        availability = candidate.metadata.get("stage_a_fe_availability")
+        if not isinstance(availability, StageAFeAvailability):
+            raise StageAProductionPairingRefusal(
+                "policy_b", "The candidate carries no typed FE availability contract."
+            )
+        if (
+            candidate.metadata.get("stage_a_node_map_hash") != self.node_map_hash
+            or availability.node_map_hash != self.node_map_hash
+        ):
+            raise StageAProductionPairingRefusal(
+                "node_map",
+                "The candidate was not built from the provider's frozen node map.",
+            )
+        try:
+            check_required_fe_availability(
+                self.registration, availability, node_map=self.node_map
+            )
+        except StageAFeAvailabilityError as exc:
+            raise StageAProductionPairingRefusal("policy_b", str(exc)) from exc
+        return candidate
+
+
+# The reviewed comparator reports an empty candidate set only as this exact
+# RuntimeError (reviewed_core); there is no typed exception for it.
+_NO_GEOMETRY_CANDIDATES_MESSAGE = "No geometry-alignment candidates were generated."
+
+
+def _is_no_geometry_candidates_error(exc: BaseException) -> bool:
+    return type(exc) is RuntimeError and str(exc) == _NO_GEOMETRY_CANDIDATES_MESSAGE
+
+
+def _frozen_calibration(registration: FrozenRegistration) -> CoordinateCalibration:
+    try:
+        calibration = CoordinateCalibration.from_mapping(registration.calibration)
+        state = calibration.to_dict()
+    except (TypeError, ValueError) as exc:
+        raise StageAProductionPairingRefusal(
+            "calibration", f"The frozen calibration is not usable: {exc}"
+        ) from exc
+    if calibration_fingerprint(state) != registration.calibration_fingerprint:
+        raise StageAProductionPairingRefusal(
+            "calibration",
+            "The frozen calibration does not round-trip to its fingerprint.",
+        )
+    return calibration
+
+
+def _verified_experimental_source(
+    registration: FrozenRegistration, comparison: ComparisonResult
+) -> dict[str, object]:
+    identity = experimental_source_content_identity(comparison.experimental.source_path)
+    if identity is None:
+        raise StageAProductionPairingRefusal(
+            "experimental_source_identity",
+            "The experimental source file is not readable, so its content identity "
+            "cannot be verified; the legacy path/size/mtime identity is not used.",
+        )
+    try:
+        registration.check_compatible(identity, registration.fe_geometry_identity)
+    except RegistrationMismatchError as exc:
+        raise StageAProductionPairingRefusal(exc.field, str(exc)) from exc
+    return identity
+
+
+def _require_fe_geometry(
+    registration: FrozenRegistration,
+    experimental_identity: Mapping[str, object],
+    dataset: ModalDataset,
+) -> None:
+    try:
+        geometry = modal_dataset_geometry_identity(dataset)
+        registration.check_compatible(experimental_identity, geometry)
+    except RegistrationMismatchError as exc:
+        raise StageAProductionPairingRefusal(exc.field, str(exc)) from exc
+    except ValueError as exc:
+        raise StageAProductionPairingRefusal(
+            "fe_geometry_identity", f"FE geometry identity unavailable: {exc}"
+        ) from exc
+
+
+def _require_measurement_contract(
+    registration: FrozenRegistration, experimental: ModalDataset
+) -> None:
+    """The comparator's experimental masks must be the frozen measurement contract."""
+    modes = experimental.sorted_modes()
+    node_ids = modes[0].node_ids
+    current_ids = [
+        item.item() if isinstance(item, np.generic) else item
+        for item in np.asarray(node_ids, dtype=object).reshape(-1)
+    ]
+    frozen = np.asarray(registration.measured_dof_contract, dtype=bool)
+    if current_ids != list(registration.experimental_node_ids) or any(
+        _explicit_measurement_mask(mode) is None for mode in modes
+    ):
+        raise StageAProductionPairingRefusal(
+            "measured_dof_contract",
+            "The experimental nodes or explicit measured-DOF masks do not match the "
+            "frozen registration.",
+        )
+    for mask in experimental_measurement_masks(modes, node_ids):
+        if not np.array_equal(np.asarray(mask, dtype=bool), frozen):
+            raise StageAProductionPairingRefusal(
+                "measured_dof_contract",
+                "An experimental measured-DOF mask differs from the frozen "
+                "measurement contract.",
+            )
+
 
 def create_production_pairing_provider(
     comparison: ComparisonResult,
     affine_model: StageAAffineBasis,
     *,
+    registration: FrozenRegistration | None = None,
     comparator: ComparatorFunction = compare_modal_datasets,
     coordinate_scale_override: float | None = None,
 ) -> ProductionComparisonPairingProvider:
-    """Create the production adapter without changing comparator thresholds."""
+    """Create the frozen production adapter without changing comparator thresholds.
 
-    adapter = MatrixEigenmodeDatasetAdapter(
-        comparison.abaqus, affine_model.dofs, node_map=affine_model.node_map
-    )
+    Requires an explicit ``FrozenRegistration`` and a basis with an explicit
+    ``StageAMatrixNodeMap``; anything else is a ``StageAProductionPairingRefusal``.
+    """
+
+    if not isinstance(registration, FrozenRegistration):
+        raise StageAProductionPairingRefusal(
+            "registration",
+            "Production Stage-A pairing requires an explicit FrozenRegistration.",
+        )
+    if affine_model.node_map is None:
+        raise StageAProductionPairingRefusal(
+            "node_map",
+            "Production Stage-A pairing requires an explicit matrix node map; "
+            "matrix labels are never matched to FE node IDs implicitly.",
+        )
+    try:
+        adapter = MatrixEigenmodeDatasetAdapter(
+            comparison.abaqus, affine_model.dofs, node_map=affine_model.node_map
+        )
+    except ComparatorPairingError as exc:
+        raise StageAProductionPairingRefusal("node_map", str(exc)) from exc
     return ProductionComparisonPairingProvider(
         comparison,
         adapter,
+        registration=registration,
         comparator=comparator,
         coordinate_scale_override=coordinate_scale_override,
     )
@@ -1158,11 +1397,18 @@ def identify_stage_a(
     covariance_observation_ids: Sequence[str] | None = None,
     priors: Mapping[str, ParameterPrior] | None = None,
     pairing_provider: ComparisonPairingProvider | None = None,
+    registration: FrozenRegistration | None = None,
     validation_evidence: ModelValidationEvidence | None = None,
     model_template_hash: str | None = None,
     abaqus_version: str | None = None,
 ) -> StageAIdentificationResult:
-    """Run the complete production Stage-A pipeline through the existing services."""
+    """Run the complete production Stage-A pipeline through the existing services.
+
+    Without an injected ``pairing_provider`` the production comparator pairing
+    runs under ``registration`` (a FrozenRegistration), which is then required.
+    ``StageAProductionPairingRefusal`` always propagates: a frozen-contract
+    violation never becomes a fixed-pair fallback.
+    """
 
     if not isinstance(comparison, ComparisonResult):
         raise TypeError("comparison must be ComparisonResult.")
@@ -1208,19 +1454,32 @@ def identify_stage_a(
         expected_rigid_body_modes=solver_configuration.expected_rigid_body_modes,
         dofs=affine_model.dofs,
     )
+    if registration is not None and pairing_provider is not None:
+        if not (
+            isinstance(pairing_provider, ProductionComparisonPairingProvider)
+            and pairing_provider.registration == registration
+        ):
+            raise StageAIdentificationError(
+                "registration applies to the production pairing provider; it does "
+                "not match the injected pairing_provider."
+            )
     active_provider = pairing_provider
     fallback_reason = ""
     if active_provider is None:
         try:
             active_provider = create_production_pairing_provider(
-                comparison, affine_model
+                comparison, affine_model, registration=registration
             )
+        except StageAProductionPairingRefusal:
+            raise
         except ComparatorPairingError as exc:
             fallback_reason = str(exc)
     pairing_mode = PairingProviderMode.COMPARATOR
     if active_provider is not None:
         try:
             initial_pairing = active_provider(usable, initial_eigenpairs)
+        except StageAProductionPairingRefusal:
+            raise
         except (ValueError, RuntimeError, MatrixModelError) as exc:
             fallback_reason = str(exc)
             initial_pairing = None
@@ -1340,6 +1599,8 @@ def identify_stage_a(
             identifiability_metadata_reference=reference,
             comparison_pairing_provider=active_provider,
         )
+    except StageAProductionPairingRefusal:
+        raise
     except (InverseSolverValidationError, MatrixModelError, ValueError) as exc:
         raise StageAIdentificationError(f"Stage-A inverse solve failed: {exc}") from exc
 
@@ -1509,6 +1770,11 @@ def identify_stage_a(
         "pairing_provider_calls": getattr(active_provider, "call_count", None),
         "pairing_provider_failures": getattr(active_provider, "failure_count", None),
         "pairing_fallback_reason": fallback_reason or None,
+        "frozen_registration_hash": (
+            active_provider.registration.registration_hash
+            if isinstance(active_provider, ProductionComparisonPairingProvider)
+            else None
+        ),
         "identifiability_evaluated_at": "fitted_optimum",
         "initial_identifiability": {
             "rank": initial_identifiability.rank,
@@ -1561,6 +1827,7 @@ __all__ = [
     "StageACampaignPolicy",
     "StageAIdentificationError",
     "StageAIdentificationResult",
+    "StageAProductionPairingRefusal",
     "assess_model_validation_evidence",
     "create_production_pairing_provider",
     "identify_stage_a",

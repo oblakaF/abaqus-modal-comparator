@@ -1,9 +1,10 @@
-import copy
 import dataclasses
 from dataclasses import replace
 import hashlib
+import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -14,9 +15,17 @@ from scipy import sparse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from coordinate_calibration import CoordinateCalibration
 from domain.registration import FrozenRegistration
 from modal_core import ModalDataset, ModeShape, compare_modal_datasets
-from scientific_state import calibration_fingerprint
+from registration_factory import build_frozen_registration
+from reviewed_core import GeometryOrientationAmbiguousError, _candidate_summary
+from scientific_state import (
+    calibration_fingerprint,
+    experimental_source_content_identity,
+    modal_dataset_geometry_identity,
+    source_identity_matches,
+)
 from services.identifiability_service import ParameterPrecisionRequirement
 from services.inverse_solver import (
     InverseSolverConfiguration,
@@ -43,6 +52,7 @@ from services.stage_a_identification_service import (
     StageAFeAvailability,
     StageAFeAvailabilityError,
     StageAIdentificationError,
+    StageAProductionPairingRefusal,
     build_stage_a_fe_availability,
     check_required_fe_availability,
     create_production_pairing_provider,
@@ -51,11 +61,36 @@ from services.stage_a_identification_service import (
     required_fe_components,
     stage_a_basis_identity,
 )
-from tests import test_core
+from services import stage_a_identification_service as stage_a_service
+
+
+# Real experimental source files, so content identity (SHA-256) is checked
+# exactly as in production.
+_SOURCE_DIRECTORY = tempfile.TemporaryDirectory(prefix="stage-a-sources-")
+
+
+def tearDownModule():
+    _SOURCE_DIRECTORY.cleanup()
 
 
 class SyntheticProductionFixture:
-    def __init__(self, *, rank_deficient=False, mass_dependent=False):
+    """Synthetic plate in the frozen production contract.
+
+    FE nodes are ``PLATE-1:<label>``, matrix labels map to them through an
+    explicit node map, the experiment measures U3 only, and the registration
+    is frozen from the reference comparison by the real registration factory.
+    """
+
+    INSTANCE = "PLATE-1"
+
+    def __init__(
+        self,
+        *,
+        rank_deficient=False,
+        mass_dependent=False,
+        experimental_order=None,
+        unmeasured_experimental_rows=(),
+    ):
         grid_x, grid_y = np.meshgrid(np.arange(4.0), np.arange(3.0))
         self.coordinates = np.column_stack(
             (grid_x.ravel(), 1.3 * grid_y.ravel(), np.zeros(grid_x.size))
@@ -67,6 +102,12 @@ class SyntheticProductionFixture:
         # reason unrelated to what these tests verify.
         self.coordinates[-1] += np.array([0.05, -0.03, 0.0])
         self.node_ids = np.arange(1, len(self.coordinates) + 1)
+        self.fe_node_ids = np.asarray(
+            [f"{self.INSTANCE}:{int(item)}" for item in self.node_ids], dtype=object
+        )
+        self.node_map = StageAMatrixNodeMap.from_mapping(
+            dict(zip((int(item) for item in self.node_ids), self.fe_node_ids.tolist()))
+        )
         centered = self.coordinates - np.mean(self.coordinates, axis=0)
         rigid_z = np.column_stack(
             (np.ones(len(centered)), centered[:, 0], centered[:, 1])
@@ -111,6 +152,7 @@ class SyntheticProductionFixture:
             mass=sparse.eye(len(self.node_ids), format="csr"),
             dofs=self.dofs,
             mass_derivative_D11=mass_derivative_D11,
+            node_map=self.node_map,
         )
         truth_modes = solve_generalized_eigenproblem(
             reference,
@@ -120,17 +162,40 @@ class SyntheticProductionFixture:
             dofs=self.dofs,
         )
         abaqus_modes = [
-            self._mode(index + 1, truth_modes.frequencies_hz[index], truth_modes.eigenvectors[:, index])
+            self._mode(
+                index + 1,
+                truth_modes.frequencies_hz[index],
+                truth_modes.eigenvectors[:, index],
+                self.fe_node_ids,
+            )
             for index in range(8)
         ]
-        experimental_modes = [
-            self._mode(index + 1, truth_modes.frequencies_hz[index], 2.5 * truth_modes.eigenvectors[:, index])
-            for index in range(6)
-        ]
+        order = tuple(range(6)) if experimental_order is None else tuple(experimental_order)
+        measured = np.zeros((len(self.node_ids), 3), dtype=bool)
+        measured[:, 2] = True
+        measured[list(unmeasured_experimental_rows), :] = False
+        experimental_modes = []
+        for number, index in enumerate(order, start=1):
+            mode = self._mode(
+                number,
+                truth_modes.frequencies_hz[index],
+                2.5 * truth_modes.eigenvectors[:, index],
+                self.node_ids,
+            )
+            mode.measured_dofs = measured.copy()
+            experimental_modes.append(mode)
+        handle, name = tempfile.mkstemp(suffix=".unv", dir=_SOURCE_DIRECTORY.name)
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(f"synthetic experiment {order} {truth_modes.frequencies_hz.tolist()}\n")
+        self.source_path = Path(name)
+        self.calibration = CoordinateCalibration(mode="manual", manual_scale=1.0)
         self.comparison = compare_modal_datasets(
             ModalDataset("Abaqus", Path("synthetic.odb"), abaqus_modes),
-            ModalDataset("Experiment", Path("synthetic.unv"), experimental_modes),
-            coordinate_scale_override=1.0,
+            ModalDataset("Experiment", self.source_path, experimental_modes),
+            geometry_calibration=self.calibration,
+        )
+        self.registration = build_frozen_registration(
+            self.comparison, calibration=self.calibration
         )
         self.bounds = StageAParameterBounds(
             D11=(8.0, 16.0),
@@ -138,13 +203,13 @@ class SyntheticProductionFixture:
             coupling_ratio=(0.05, 0.35),
         )
 
-    def _mode(self, number, frequency, values):
+    def _mode(self, number, frequency, values, node_ids):
         vectors = np.zeros((len(self.node_ids), 3), dtype=float)
         vectors[:, 2] = values
         return ModeShape(
             number=number,
             frequency_hz=float(frequency),
-            node_ids=self.node_ids,
+            node_ids=node_ids,
             coordinates=self.coordinates,
             vectors=vectors,
         )
@@ -176,35 +241,41 @@ class SyntheticProductionFixture:
             test_run_id="run-1",
             observation_standard_deviations=0.003,
         )
+        if "pairing_provider" not in changes:
+            # Default production pairing runs under the frozen registration.
+            values["registration"] = self.registration
         values.update(changes)
         return identify_stage_a(**values)
 
+    def eigenpairs(self, parameters=None):
+        parameters = self.truth if parameters is None else parameters
+        return solve_generalized_eigenproblem(
+            self.basis.reconstruct_stiffness(parameters),
+            self.basis.reconstruct_mass(parameters),
+            8,
+            expected_rigid_body_modes=3,
+            dofs=self.dofs,
+        )
+
+    def provider(self, **changes):
+        values = dict(registration=self.registration)
+        values.update(changes)
+        return create_production_pairing_provider(self.comparison, self.basis, **values)
+
+    def observations(self):
+        return comparison_to_observations(
+            self.comparison, "synthetic-design", "SP-SYNTHETIC", "run-1"
+        )
+
 
 class ProductionPairingProviderTests(unittest.TestCase):
-    def test_existing_comparator_fixture_pairing_and_mac_are_adapted_verbatim(self):
-        fixture = test_core.ModalCoreTests()
-        comparison = fixture.synthetic_result()
-        observations = comparison_to_observations(
-            comparison, "fixture-design", "SP-FIXTURE", "run-1"
-        )
-
-        class ExistingDatasetAdapter:
-            def __call__(self, eigenpairs):
-                del eigenpairs
-                return comparison.abaqus
-
-        provider = ProductionComparisonPairingProvider(
-            comparison,
-            ExistingDatasetAdapter(),
-        )
-        dummy = GeneralizedEigenResult(
-            eigenvalues=np.ones(3),
-            frequencies_hz=np.ones(3),
-            eigenvectors=np.eye(3),
-            dofs=None,
-            rigid_body_eigenvalues=np.array([]),
-        )
-        pairing = provider(observations, dummy)
+    def test_comparator_pairing_and_mac_are_adapted_verbatim(self):
+        # Experimental modes 2 and 3 are swapped, so the comparator's
+        # assignment is not the identity and must be copied, not assumed.
+        fixture = SyntheticProductionFixture(experimental_order=(0, 2, 1, 3, 4, 5))
+        observations = fixture.observations()
+        provider = fixture.provider()
+        pairing = provider(observations, fixture.eigenpairs())
         by_experimental = {
             pair.experimental_mode: pair for pair in provider.last_comparison.pairs
         }
@@ -228,16 +299,19 @@ class ProductionPairingProviderTests(unittest.TestCase):
                 assignment.mac,
                 by_experimental[observation.experimental_mode_id].mac,
             )
-        self.assertTrue(any(pair.order_changed for pair in provider.last_comparison.pairs))
+        self.assertTrue(
+            any(
+                pair.abaqus_mode != pair.experimental_mode
+                for pair in provider.last_comparison.pairs
+            )
+        )
         self.assertEqual(pairing.method, "existing reviewed modal comparator")
 
 
 class StageAIdentificationOrchestrationTests(unittest.TestCase):
     def test_end_to_end_comparison_to_identifiability_to_solver_recovers_truth(self):
         fixture = SyntheticProductionFixture()
-        provider = create_production_pairing_provider(
-            fixture.comparison, fixture.basis, coordinate_scale_override=1.0
-        )
+        provider = fixture.provider()
         result = fixture.identify(pairing_provider=provider)
         errors = {
             name: abs(result.inverse_result.fitted_parameters[name] / truth - 1.0)
@@ -283,9 +357,7 @@ class StageAIdentificationOrchestrationTests(unittest.TestCase):
     def test_mass_dependent_basis_recovers_truth_and_reports_affine_mass_provenance(self):
         fixture = SyntheticProductionFixture(mass_dependent=True)
         self.assertIsNotNone(fixture.basis.mass_derivative_D11)
-        provider = create_production_pairing_provider(
-            fixture.comparison, fixture.basis, coordinate_scale_override=1.0
-        )
+        provider = fixture.provider()
         result = fixture.identify(pairing_provider=provider)
         errors = {
             name: abs(result.inverse_result.fitted_parameters[name] / truth - 1.0)
@@ -612,28 +684,9 @@ class MappedMatrixEigenmodeAdapterTests(MappedAdapterFixture, unittest.TestCase)
 
     def test_production_provider_factory_forwards_the_basis_node_map(self):
         fixture = SyntheticProductionFixture()
-        mapping = {int(node): f"PLATE-1:{int(node)}" for node in fixture.node_ids}
-        node_map = StageAMatrixNodeMap.from_mapping(mapping)
-        basis = replace(fixture.basis, node_map=node_map)
-        comparison = copy.copy(fixture.comparison)
-        comparison.abaqus = self._qualified(fixture.comparison.abaqus)
-        provider = create_production_pairing_provider(comparison, basis, coordinate_scale_override=1.0)
-        self.assertIs(provider.candidate_dataset_adapter.node_map, node_map)
-
-    @staticmethod
-    def _qualified(dataset):
-        modes = []
-        for mode in dataset.sorted_modes():
-            modes.append(
-                ModeShape(
-                    number=mode.number,
-                    frequency_hz=mode.frequency_hz,
-                    node_ids=np.asarray([f"PLATE-1:{int(item)}" for item in mode.node_ids], dtype=object),
-                    coordinates=mode.coordinates,
-                    vectors=mode.vectors,
-                )
-            )
-        return ModalDataset(dataset.source_name, dataset.source_path, modes)
+        provider = fixture.provider()
+        self.assertIs(provider.candidate_dataset_adapter.node_map, fixture.basis.node_map)
+        self.assertEqual(provider.node_map_hash, fixture.node_map.content_hash)
 
 
 def _registration(
@@ -947,7 +1000,7 @@ class StageABasisIdentityVersioningTests(unittest.TestCase):
     # G
     def test_unmapped_identity_is_unchanged_and_mapped_identity_is_versioned(self):
         fixture = SyntheticProductionFixture()
-        legacy = stage_a_basis_identity(fixture.basis)
+        legacy = stage_a_basis_identity(replace(fixture.basis, node_map=None))
         expected_dofs = hashlib.sha256()
         for dof in fixture.basis.dofs:
             expected_dofs.update(f"{dof.node_label!r}:{dof.dof}\n".encode("utf-8"))
@@ -958,6 +1011,7 @@ class StageABasisIdentityVersioningTests(unittest.TestCase):
         mapped = stage_a_basis_identity(
             replace(fixture.basis, node_map=StageAMatrixNodeMap.from_mapping(mapping))
         )
+        self.assertEqual(stage_a_basis_identity(fixture.basis), mapped)
         self.assertEqual(mapped["basis_km_hash"], legacy["basis_km_hash"])
         self.assertNotEqual(mapped["dof_mapping_hash"], legacy["dof_mapping_hash"])
         self.assertEqual(mapped["dof_mapping_schema"], "stage-a-dof-mapping/2")
@@ -972,6 +1026,483 @@ class StageABasisIdentityVersioningTests(unittest.TestCase):
         )
         self.assertNotEqual(changed["dof_mapping_hash"], mapped["dof_mapping_hash"])
         self.assertNotEqual(changed["node_map_hash"], mapped["node_map_hash"])
+
+
+
+def _rebuilt_registration(registration, **changes):
+    """Seal a new registration that differs from ``registration`` only in ``changes``."""
+    fields = registration.to_dict()
+    del fields["registration_hash"], fields["registration_schema_version"]
+    fields.update(changes)
+    return FrozenRegistration.create(**fields)
+
+
+def _without_dof(eigenpairs, node_label, component=3):
+    """The same solve with one DOF absent from the active eigenvector DOFs."""
+    keep = [
+        index
+        for index, dof in enumerate(eigenpairs.dofs)
+        if (dof.node_label, dof.dof) != (node_label, component)
+    ]
+    return GeneralizedEigenResult(
+        eigenvalues=eigenpairs.eigenvalues,
+        frequencies_hz=eigenpairs.frequencies_hz,
+        eigenvectors=eigenpairs.eigenvectors[keep, :],
+        dofs=tuple(eigenpairs.dofs[index] for index in keep),
+        rigid_body_eigenvalues=eigenpairs.rigid_body_eigenvalues,
+    )
+
+
+class ComparatorSpy:
+    """Record the keyword arguments and results of the real comparator."""
+
+    def __init__(self, after_call=None):
+        self.calls = []
+        self.results = []
+        self.after_call = after_call
+
+    def __call__(self, *args, **kwargs):
+        self.calls.append(kwargs)
+        result = compare_modal_datasets(*args, **kwargs)
+        self.results.append(result)
+        if self.after_call is not None:
+            self.after_call(len(self.calls))
+        return result
+
+
+class FrozenProductionPairingTests(unittest.TestCase):
+    """Production pairing runs only under the FrozenRegistration."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.fixture = SyntheticProductionFixture()
+        cls.observations = cls.fixture.observations()
+        cls.eigenpairs = cls.fixture.eigenpairs()
+
+    def assertRefused(self, contract, callable_, *args, **kwargs):
+        with self.assertRaises(StageAProductionPairingRefusal) as context:
+            callable_(*args, **kwargs)
+        self.assertEqual(context.exception.contract, contract, str(context.exception))
+        return context.exception
+
+    # A
+    def test_provider_refuses_missing_frozen_registration(self):
+        fixture = self.fixture
+        self.assertRefused(
+            "registration", create_production_pairing_provider, fixture.comparison, fixture.basis
+        )
+        adapter = MatrixEigenmodeDatasetAdapter(
+            fixture.comparison.abaqus, fixture.dofs, node_map=fixture.node_map
+        )
+        self.assertRefused(
+            "registration", ProductionComparisonPairingProvider, fixture.comparison, adapter
+        )
+        self.assertRefused(
+            "registration", fixture.provider, registration=fixture.registration.to_dict()
+        )
+
+    # B
+    def test_provider_refuses_missing_explicit_node_map(self):
+        fixture = self.fixture
+        self.assertRefused(
+            "node_map",
+            create_production_pairing_provider,
+            fixture.comparison,
+            replace(fixture.basis, node_map=None),
+            registration=fixture.registration,
+        )
+        legacy_adapter = MatrixEigenmodeDatasetAdapter(fixture.comparison.abaqus, fixture.dofs)
+
+        class OdbDatasetAdapter:
+            def __call__(self, eigenpairs):
+                return fixture.comparison.abaqus
+
+        for adapter in (legacy_adapter, OdbDatasetAdapter()):
+            with self.subTest(type(adapter).__name__):
+                self.assertRefused(
+                    "node_map",
+                    ProductionComparisonPairingProvider,
+                    fixture.comparison,
+                    adapter,
+                    registration=fixture.registration,
+                )
+
+    # C
+    def test_same_path_size_mtime_with_different_content_is_refused(self):
+        fixture = self.fixture
+        current = experimental_source_content_identity(fixture.source_path)
+        forged = dict(current, sha256="0" * 64)
+        self.assertTrue(source_identity_matches(forged, current))  # path-style "match"
+        registration = build_frozen_registration(
+            fixture.comparison,
+            calibration=fixture.calibration,
+            experimental_source_identity=forged,
+        )
+        self.assertRefused(
+            "experimental_source_identity", fixture.provider, registration=registration
+        )
+
+    def test_unreadable_experimental_source_is_refused(self):
+        fixture = SyntheticProductionFixture()
+        os.remove(fixture.source_path)
+        self.assertRefused("experimental_source_identity", fixture.provider)
+
+    # D
+    def test_fe_geometry_mismatch_is_refused(self):
+        fixture = self.fixture
+        geometry = dict(fixture.registration.fe_geometry_identity)
+        geometry["sha256"] = "f" * 64
+        registration = _rebuilt_registration(
+            fixture.registration, fe_geometry_identity=geometry
+        )
+        self.assertRefused("fe_geometry_identity", fixture.provider, registration=registration)
+
+    # E
+    def test_required_dof_never_exported_is_refused_before_any_comparison(self):
+        fixture = self.fixture
+        # The experiment's U3 would need FE U1, which the basis never exports.
+        registration = _rebuilt_registration(fixture.registration, rotation=FE_U1_TO_EXP_U3)
+        spy = ComparatorSpy()
+        refusal = self.assertRefused(
+            "policy_b", fixture.provider, registration=registration, comparator=spy
+        )
+        self.assertIn("not exported", str(refusal))
+        self.assertEqual(spy.calls, [])
+        with mock.patch.object(
+            stage_a_service, "solve_stage_a_inverse", side_effect=AssertionError("optimized")
+        ) as solver:
+            self.assertRefused(
+                "policy_b",
+                fixture.identify,
+                registration=registration,
+                campaign_policy=StageACampaignPolicy(allow_fixed_pair_fallback=True),
+            )
+        solver.assert_not_called()
+
+    # F
+    def test_inactive_required_component_is_refused(self):
+        spy = ComparatorSpy()
+        provider = self.fixture.provider(comparator=spy)
+        refusal = self.assertRefused(
+            "policy_b", provider, self.observations, _without_dof(self.eigenpairs, 5)
+        )
+        self.assertIn("PLATE-1:5", str(refusal))
+        self.assertIn("U3", str(refusal))
+        self.assertEqual(spy.calls, [])
+
+    # G
+    def test_policy_b_is_checked_on_every_call(self):
+        provider = self.fixture.provider()
+        other = self.fixture.eigenpairs(StageAMatrixParameters(10.0, 2.0, 6.0))
+        with mock.patch.object(
+            stage_a_service,
+            "check_required_fe_availability",
+            wraps=stage_a_service.check_required_fe_availability,
+        ) as check:
+            provider(self.observations, self.eigenpairs)
+            provider(self.observations, other)
+        self.assertEqual(check.call_count, 2)
+        for call in check.call_args_list:
+            self.assertIs(call.args[0], self.fixture.registration)
+            self.assertIs(call.kwargs["node_map"], self.fixture.node_map)
+        # A later candidate is checked afresh, not accepted from an earlier call.
+        self.assertRefused(
+            "policy_b", provider, self.observations, _without_dof(self.eigenpairs, 7)
+        )
+
+    # H
+    def test_missing_non_required_component_does_not_block(self):
+        provider = self.fixture.provider()
+        pairing = provider(self.observations, self.eigenpairs)
+        candidate = provider.candidate_dataset_adapter(self.eigenpairs)
+        availability = candidate.metadata["stage_a_fe_availability"]
+        self.assertFalse(availability.mask_array()[:, :2].any())  # U1/U2 never available
+        self.assertEqual(len(pairing.assignments), len(self.observations))
+
+        fixture = SyntheticProductionFixture(unmeasured_experimental_rows=(4,))
+        self.assertEqual(fixture.registration.measured_dof_contract[4], (False, False, False))
+        label = int(fixture.registration.mapped_fe_node_ids[4].rpartition(":")[2])
+        observations = fixture.observations()
+        pairing = fixture.provider()(observations, _without_dof(fixture.eigenpairs(), label))
+        self.assertEqual(len(pairing.assignments), len(observations))
+
+    # I / J / M
+    def test_comparator_receives_frozen_calibration_and_orientation(self):
+        spy = ComparatorSpy()
+        registration = self.fixture.registration
+        provider = self.fixture.provider(comparator=spy)
+        pairing = provider(self.observations, self.eigenpairs)
+        kwargs = spy.calls[-1]
+        self.assertEqual(set(kwargs), {"geometry_calibration", "orientation_selection"})
+        self.assertIsInstance(kwargs["geometry_calibration"], CoordinateCalibration)
+        self.assertEqual(
+            kwargs["geometry_calibration"],
+            CoordinateCalibration.from_mapping(registration.calibration),
+        )
+        self.assertEqual(
+            calibration_fingerprint(kwargs["geometry_calibration"].to_dict()),
+            registration.calibration_fingerprint,
+        )
+        self.assertEqual(
+            kwargs["orientation_selection"],
+            {"candidate_id": registration.orientation_candidate_id},
+        )
+        result = spy.results[-1]
+        self.assertEqual(
+            _candidate_summary(result.geometry)["candidate_id"],
+            registration.orientation_candidate_id,
+        )
+        self.assertEqual(result.metadata["orientation_source"], "user_confirmed")
+        self.assertIs(provider.last_comparison, result)
+        self.assertEqual(len(pairing.assignments), len(self.observations))
+
+    # K
+    def test_coordinate_scale_override_is_refused(self):
+        spy = ComparatorSpy()
+        for scale in (1.0, 2.0):
+            with self.subTest(scale=scale):
+                self.assertRefused(
+                    "calibration",
+                    self.fixture.provider,
+                    coordinate_scale_override=scale,
+                    comparator=spy,
+                )
+        self.assertEqual(spy.calls, [])
+
+    def test_calibration_that_does_not_round_trip_is_refused(self):
+        calibration = dict(self.fixture.registration.calibration, unexpected_field=1)
+        registration = _rebuilt_registration(
+            self.fixture.registration,
+            calibration=calibration,
+            calibration_fingerprint=calibration_fingerprint(calibration),
+        )
+        self.assertRefused("calibration", self.fixture.provider, registration=registration)
+
+    def test_experimental_mask_differing_from_frozen_contract_is_refused(self):
+        registration = _rebuilt_registration(
+            self.fixture.registration,
+            measured_dof_contract=[[True, False, True]] * len(self.fixture.node_ids),
+        )
+        self.assertRefused(
+            "measured_dof_contract", self.fixture.provider, registration=registration
+        )
+
+    # L
+    def test_comparator_candidate_fallback_is_refused(self):
+        registration = _rebuilt_registration(
+            self.fixture.registration, orientation_candidate_id="geometry-00000000deadbeef"
+        )
+        spy = ComparatorSpy()
+        provider = self.fixture.provider(registration=registration, comparator=spy)
+        refusal = self.assertRefused(
+            "orientation_candidate_id", provider, self.observations, self.eigenpairs
+        )
+        # The real comparator fell back to the unique geometry and returned normally.
+        self.assertEqual(len(spy.results), 1)
+        self.assertEqual(spy.results[0].metadata["orientation_source"], "geometry_unique")
+        self.assertIn("geometry-00000000deadbeef", str(refusal))
+        self.assertIsNone(provider.last_comparison)
+
+    def test_orientation_ambiguity_under_frozen_candidate_is_refused(self):
+        def ambiguous(*args, **kwargs):
+            raise GeometryOrientationAmbiguousError("2 candidates", [])
+
+        provider = self.fixture.provider(comparator=ambiguous)
+        self.assertRefused(
+            "orientation_candidate_id", provider, self.observations, self.eigenpairs
+        )
+
+    def test_no_geometry_candidate_is_refused_and_never_falls_back(self):
+        # The real comparator, left with no geometry-alignment candidate for
+        # the frozen state, raises its plain RuntimeError.
+        spy = ComparatorSpy()
+        provider = self.fixture.provider(comparator=spy)
+        with mock.patch(
+            "reviewed_core.geometry_alignment_candidates", return_value=[]
+        ), mock.patch.object(
+            stage_a_service, "_fixed_pairing", wraps=stage_a_service._fixed_pairing
+        ) as fixed:
+            refusal = self.assertRefused(
+                "orientation_candidate_id",
+                self.fixture.identify,
+                pairing_provider=provider,
+                campaign_policy=StageACampaignPolicy(allow_fixed_pair_fallback=True),
+            )
+        fixed.assert_not_called()
+        self.assertEqual(len(spy.calls), 1)
+        self.assertIsInstance(refusal.__cause__, RuntimeError)
+        self.assertEqual(
+            str(refusal.__cause__), "No geometry-alignment candidates were generated."
+        )
+
+    # N
+    def test_fe_geometry_identity_is_checked_on_every_call(self):
+        provider = self.fixture.provider()
+        with mock.patch.object(
+            stage_a_service,
+            "modal_dataset_geometry_identity",
+            wraps=modal_dataset_geometry_identity,
+        ) as identity:
+            provider(self.observations, self.eigenpairs)
+            provider(self.observations, self.eigenpairs)
+        self.assertEqual(identity.call_count, 2)
+        provider.candidate_dataset_adapter._coordinates[0, 0] += 1.0e-9
+        self.assertRefused(
+            "fe_geometry_identity", provider, self.observations, self.eigenpairs
+        )
+
+    # O
+    def test_node_map_provenance_mismatch_is_refused(self):
+        provider = self.fixture.provider()
+        mapping = dict(self.fixture.node_map.entries)
+        mapping[1], mapping[2] = mapping[2], mapping[1]
+        provider.candidate_dataset_adapter.node_map = StageAMatrixNodeMap.from_mapping(mapping)
+        self.assertRefused("node_map", provider, self.observations, self.eigenpairs)
+
+    def test_unmapped_candidate_dof_is_a_node_map_refusal(self):
+        provider = self.fixture.provider()
+        eigenpairs = self.eigenpairs
+        extra = GeneralizedEigenResult(
+            eigenvalues=eigenpairs.eigenvalues,
+            frequencies_hz=eigenpairs.frequencies_hz,
+            eigenvectors=np.vstack((eigenpairs.eigenvectors, eigenpairs.eigenvectors[:1])),
+            dofs=eigenpairs.dofs + (AbaqusDof(999, 3),),
+            rigid_body_eigenvalues=eigenpairs.rigid_body_eigenvalues,
+        )
+        self.assertRefused("node_map", provider, self.observations, extra)
+
+    # P
+    def test_hard_refusal_never_uses_fixed_pair_fallback(self):
+        fixture = self.fixture
+        fallback = StageACampaignPolicy(allow_fixed_pair_fallback=True)
+        real_solve = stage_a_service.solve_generalized_eigenproblem
+
+        def solve_without_u3_of_node_5(*args, **kwargs):
+            return _without_dof(real_solve(*args, **kwargs), 5)
+
+        # Calls 1 and 2 are the initial pairing and the solver's initial
+        # evaluation; call 3 is inside the optimizer's objective, which turns
+        # ValueErrors into failed evaluations.
+        def corrupt_geometry_after_second_call(count):
+            if count == 2:
+                provider.candidate_dataset_adapter._coordinates[0, 0] += 1.0
+
+        spy = ComparatorSpy(after_call=corrupt_geometry_after_second_call)
+        provider = fixture.provider(comparator=spy)
+        cases = (
+            ("missing registration", "registration", dict(registration=None), None),
+            (
+                "Policy B at initial pairing",
+                "policy_b",
+                {},
+                solve_without_u3_of_node_5,
+            ),
+            (
+                "FE geometry during optimization",
+                "fe_geometry_identity",
+                dict(pairing_provider=provider),
+                None,
+            ),
+        )
+        for name, contract, changes, solve in cases:
+            with self.subTest(name), mock.patch.object(
+                stage_a_service, "_fixed_pairing", wraps=stage_a_service._fixed_pairing
+            ) as fixed, mock.patch.object(
+                stage_a_service,
+                "solve_generalized_eigenproblem",
+                side_effect=solve or real_solve,
+            ):
+                self.assertRefused(
+                    contract, fixture.identify, campaign_policy=fallback, **changes
+                )
+                fixed.assert_not_called()
+        # The first refused optimizer evaluation stopped the identification.
+        self.assertEqual(len(spy.calls), 2)
+        self.assertEqual(provider.call_count, 3)
+
+    # Q
+    def test_ordinary_comparator_failure_may_still_fall_back(self):
+        fixture = self.fixture
+
+        def failing_comparator(*args, **kwargs):
+            raise ValueError("ordinary comparator failure")
+
+        provider = fixture.provider(comparator=failing_comparator)
+        with self.assertRaisesRegex(StageAIdentificationError, "pairing is unavailable"):
+            fixture.identify(pairing_provider=provider)
+        result = fixture.identify(
+            pairing_provider=provider,
+            requested_parameter_subset=("D11", "D66"),
+            solver_configuration=fixture.configuration(global_max_iterations=5),
+            campaign_policy=StageACampaignPolicy(allow_fixed_pair_fallback=True),
+        )
+        self.assertEqual(result.pairing_provider_mode, PairingProviderMode.FIXED_PAIR_FALLBACK)
+        self.assertIn("ordinary comparator failure", result.metadata["pairing_fallback_reason"])
+
+    def test_other_runtime_errors_remain_ordinary_pairing_failures(self):
+        # Only the comparator's exact no-candidate RuntimeError is a refusal.
+        class OtherRuntimeError(RuntimeError):
+            pass
+
+        failures = (
+            RuntimeError("ordinary comparator runtime failure"),
+            OtherRuntimeError("No geometry-alignment candidates were generated."),
+        )
+        for failure in failures:
+            with self.subTest(type(failure).__name__):
+
+                def failing_comparator(*args, **kwargs):
+                    raise failure
+
+                provider = self.fixture.provider(comparator=failing_comparator)
+                result = self.fixture.identify(
+                    pairing_provider=provider,
+                    requested_parameter_subset=("D11", "D66"),
+                    solver_configuration=self.fixture.configuration(global_max_iterations=5),
+                    campaign_policy=StageACampaignPolicy(allow_fixed_pair_fallback=True),
+                )
+                self.assertEqual(
+                    result.pairing_provider_mode, PairingProviderMode.FIXED_PAIR_FALLBACK
+                )
+                self.assertIn(str(failure), result.metadata["pairing_fallback_reason"])
+
+    # R
+    def test_repeated_inverse_calls_use_the_same_frozen_state(self):
+        spy = ComparatorSpy()
+        provider = self.fixture.provider(comparator=spy)
+        other = self.fixture.eigenpairs(StageAMatrixParameters(10.0, 2.0, 6.0))
+        first = provider(self.observations, self.eigenpairs)
+        second = provider(self.observations, other)
+        self.assertEqual(len(first.assignments), len(second.assignments))
+        self.assertEqual(spy.calls[0], spy.calls[1])
+        self.assertIsNot(spy.calls[0]["orientation_selection"], provider.orientation_selection)
+        self.assertEqual(
+            {_candidate_summary(item.geometry)["candidate_id"] for item in spy.results},
+            {self.fixture.registration.orientation_candidate_id},
+        )
+        self.assertEqual({item.geometry.coordinate_scale for item in spy.results}, {1.0})
+
+    def test_default_identification_runs_under_the_frozen_registration(self):
+        fixture = self.fixture
+        result = fixture.identify(
+            requested_parameter_subset=("D11", "D66"),
+            solver_configuration=fixture.configuration(global_max_iterations=5),
+        )
+        self.assertEqual(result.pairing_provider_mode, PairingProviderMode.COMPARATOR)
+        self.assertEqual(
+            result.metadata["frozen_registration_hash"],
+            fixture.registration.registration_hash,
+        )
+        self.assertGreater(result.metadata["pairing_provider_calls"], 1)
+
+    def test_registration_cannot_be_combined_with_a_different_provider(self):
+        def custom(observations, eigenpairs):
+            raise AssertionError("not called")
+
+        with self.assertRaisesRegex(StageAIdentificationError, "registration"):
+            self.fixture.identify(
+                pairing_provider=custom, registration=self.fixture.registration
+            )
 
 
 if __name__ == "__main__":
