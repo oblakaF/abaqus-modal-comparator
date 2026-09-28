@@ -11,15 +11,17 @@ sensitivity services, identifiability services, or inverse solvers.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import math
+from types import MappingProxyType
 from typing import ClassVar, Iterable, Union
 from uuid import uuid4
 
-from .evidence import EvidenceProvenance, EvidenceRecord, EvidenceSourceIdentity
+from .evidence import EvidenceProvenance, EvidenceRecord
 from .identification_model import IdentificationModelDefinition
+from .registration import FROZEN_REGISTRATION_SCHEMA, FrozenRegistration
 
 
 EVIDENCE_RECORD_TYPES = frozenset(
@@ -266,22 +268,34 @@ class MaterialIdentificationTaskDefinition:
         )
 
 
+def _optional_text(value: object, name: str) -> str | None:
+    return None if value is None else _text(value, name)
+
+
 @dataclass(frozen=True)
 class MaterialIdentificationSourceIdentities:
-    experimental: EvidenceSourceIdentity
-    fe_model: EvidenceSourceIdentity
-    calibration: EvidenceSourceIdentity
+    """Descriptive, non-authoritative labels for the specimen and its sources.
+
+    The scientific experiment identity (SHA-256 content identity), the FE
+    geometry identity, and the calibration are owned by the bound
+    ``FrozenRegistration``; nothing here can contradict them.  Evidence
+    references are still matched against these labels.
+    """
+
+    specimen_label: str
+    source_label: str | None = None
+    source_uri: str | None = None
 
     def __post_init__(self) -> None:
-        for name in ("experimental", "fe_model", "calibration"):
-            if not isinstance(getattr(self, name), EvidenceSourceIdentity):
-                raise TypeError(f"{name} must be an EvidenceSourceIdentity.")
+        object.__setattr__(self, "specimen_label", _text(self.specimen_label, "specimen_label"))
+        object.__setattr__(self, "source_label", _optional_text(self.source_label, "source_label"))
+        object.__setattr__(self, "source_uri", _optional_text(self.source_uri, "source_uri"))
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "experimental": self.experimental.to_dict(),
-            "fe_model": self.fe_model.to_dict(),
-            "calibration": self.calibration.to_dict(),
+            "specimen_label": self.specimen_label,
+            "source_label": self.source_label,
+            "source_uri": self.source_uri,
         }
 
     @classmethod
@@ -290,11 +304,151 @@ class MaterialIdentificationSourceIdentities:
     ) -> "MaterialIdentificationSourceIdentities":
         if not isinstance(payload, Mapping):
             raise TypeError("source_identities must be a mapping.")
+        unknown = sorted(set(payload) - {"specimen_label", "source_label", "source_uri"})
+        if unknown:
+            raise ValueError(f"Unknown source identity fields: {unknown}.")
         return cls(
-            experimental=EvidenceSourceIdentity.from_dict(payload["experimental"]),
-            fe_model=EvidenceSourceIdentity.from_dict(payload["fe_model"]),
-            calibration=EvidenceSourceIdentity.from_dict(payload["calibration"]),
+            specimen_label=payload["specimen_label"],
+            source_label=payload.get("source_label"),
+            source_uri=payload.get("source_uri"),
         )
+
+
+_HEX64 = frozenset("0123456789abcdef")
+_REFERENCE_ORIGIN = object()  # only from_registration may build a reference
+FE_GEOMETRY_IDENTITY_V2 = "fe-geometry-identity/2"
+
+
+def _is_sha256(value: object) -> bool:
+    return isinstance(value, str) and len(value) == 64 and set(value) <= _HEX64
+
+
+def _frozen_json(value: object) -> object:
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): _frozen_json(item) for key, item in sorted(value.items())})
+    if isinstance(value, (list, tuple)):
+        return tuple(_frozen_json(item) for item in value)
+    return value
+
+
+def _plain_json(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {key: _plain_json(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_plain_json(item) for item in value]
+    return value
+
+
+@dataclass(frozen=True)
+class FrozenRegistrationReference:
+    """Exact binding of a session to one sealed ``FrozenRegistration``.
+
+    Carries only what identifies the registration: its sealed hash, schema,
+    experimental content identity, and FE geometry identity v2.  Calibration,
+    orientation, and node mapping stay inside the registration; no FE
+    stiffness/model identity is involved.  Built only by ``from_registration``.
+    """
+
+    registration_hash: str
+    registration_schema_version: str
+    experimental_source_identity: Mapping[str, object]
+    fe_geometry_identity: Mapping[str, object]
+    _origin: object = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self._origin is not _REFERENCE_ORIGIN:
+            raise TypeError(
+                "FrozenRegistrationReference must be built with from_registration() "
+                "from a real FrozenRegistration."
+            )
+        if not _is_sha256(self.registration_hash):
+            raise ValueError("registration_hash must be a lowercase SHA-256 digest.")
+        if self.registration_schema_version != FROZEN_REGISTRATION_SCHEMA:
+            raise ValueError(
+                f"registration_schema_version must be {FROZEN_REGISTRATION_SCHEMA!r}."
+            )
+        experimental = self.experimental_source_identity
+        if not isinstance(experimental, Mapping) or not _is_sha256(experimental.get("sha256")):
+            raise ValueError(
+                "The registration's experimental source identity has no SHA-256 content "
+                "identity; a legacy path/size/mtime identity cannot bind a session."
+            )
+        geometry = self.fe_geometry_identity
+        if not isinstance(geometry, Mapping) or geometry.get("schema_version") != FE_GEOMETRY_IDENTITY_V2:
+            raise ValueError(
+                f"The registration's FE geometry identity must be {FE_GEOMETRY_IDENTITY_V2!r}."
+            )
+        if not _is_sha256(geometry.get("sha256")):
+            raise ValueError("The FE geometry identity has no SHA-256 digest.")
+        object.__setattr__(self, "experimental_source_identity", _frozen_json(experimental))
+        object.__setattr__(self, "fe_geometry_identity", _frozen_json(geometry))
+
+    @classmethod
+    def from_registration(cls, registration: FrozenRegistration) -> "FrozenRegistrationReference":
+        if not isinstance(registration, FrozenRegistration):
+            raise TypeError("A real FrozenRegistration is required.")
+        return cls(
+            registration_hash=registration.registration_hash,
+            registration_schema_version=registration.registration_schema_version,
+            experimental_source_identity=_plain_json(registration.experimental_source_identity),
+            fe_geometry_identity=_plain_json(registration.fe_geometry_identity),
+            _origin=_REFERENCE_ORIGIN,
+        )
+
+    @property
+    def experimental_content_sha256(self) -> str:
+        return str(self.experimental_source_identity["sha256"])
+
+    @property
+    def fe_geometry_sha256(self) -> str:
+        return str(self.fe_geometry_identity["sha256"])
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "registration_hash": self.registration_hash,
+            "registration_schema_version": self.registration_schema_version,
+            "experimental_source_identity": _plain_json(self.experimental_source_identity),
+            "fe_geometry_identity": _plain_json(self.fe_geometry_identity),
+        }
+
+
+RegistrationCatalog = Union[
+    FrozenRegistration,
+    Mapping[str, FrozenRegistration],
+    Iterable[FrozenRegistration],
+]
+
+
+def resolve_registration_reference(
+    payload: object, registrations: RegistrationCatalog
+) -> FrozenRegistrationReference:
+    """Rebuild a stored reference from the exact registration it names.
+
+    The stored fields must equal those derived from the registration, so a
+    tampered hash, experimental identity, or geometry identity is refused.
+    """
+
+    if not isinstance(payload, Mapping):
+        raise TypeError("registration reference must be a mapping.")
+    if isinstance(registrations, FrozenRegistration):
+        candidates = (registrations,)
+    elif isinstance(registrations, Mapping):
+        candidates = tuple(registrations.values())
+    else:
+        candidates = tuple(registrations)
+    if not all(isinstance(item, FrozenRegistration) for item in candidates):
+        raise TypeError("registrations must contain FrozenRegistration records.")
+    stored_hash = payload.get("registration_hash")
+    match = next((item for item in candidates if item.registration_hash == stored_hash), None)
+    if match is None:
+        raise ValueError(f"Unknown FrozenRegistration {stored_hash!r}.")
+    reference = FrozenRegistrationReference.from_registration(match)
+    if dict(payload) != reference.to_dict():
+        raise ValueError(
+            "The stored registration reference differs from FrozenRegistration "
+            f"{stored_hash!r}."
+        )
+    return reference
 
 
 @dataclass(frozen=True)
@@ -370,21 +524,35 @@ class SessionReadiness:
 
 @dataclass(frozen=True)
 class MaterialIdentificationSession:
+    """One identification session with two independent bindings.
+
+    ``task_definition`` binds the identification model (id + definition hash);
+    ``registration_reference`` binds the exact FrozenRegistration (hash,
+    experimental content identity, FE geometry identity v2).  A session
+    without a registration may exist but is never production-ready.
+    """
+
     schema_version: str
     session_id: str
     created_at: datetime
     task_definition: MaterialIdentificationTaskDefinition
     source_identities: MaterialIdentificationSourceIdentities
+    registration_reference: FrozenRegistrationReference | None = None
     evidence_references: tuple[MaterialIdentificationEvidenceReference, ...] = ()
 
-    # 2.0: the task references an IdentificationModelDefinition (id + hash)
-    # instead of the fixed Ex/Ey/Gxy parameter set of 1.0.
-    SCHEMA_VERSION: ClassVar[str] = "material-identification-session/2.0"
+    # 3.0: the session binds a FrozenRegistration; source identities are
+    # descriptive labels only (no duplicate experiment/FE/calibration identity).
+    SCHEMA_VERSION: ClassVar[str] = "material-identification-session/3.0"
     _UNSUPPORTED_SCHEMAS: ClassVar[Mapping[str, str]] = {
         "material-identification-session/1.0": (
             "schema 1.0 hard-coded the Ex/Ey/Gxy parameter set and cannot be "
             "reinterpreted as a model-referenced session; recreate the session "
             "against an IdentificationModelDefinition."
+        ),
+        "material-identification-session/2.0": (
+            "schema 2.0 has no FrozenRegistration binding and stored experiment, FE "
+            "model, and calibration identities that the registration now owns; "
+            "recreate the session with its FrozenRegistration."
         ),
     }
 
@@ -411,6 +579,12 @@ class MaterialIdentificationSession:
             raise TypeError(
                 "source_identities must be MaterialIdentificationSourceIdentities."
             )
+        if self.registration_reference is not None and not isinstance(
+            self.registration_reference, FrozenRegistrationReference
+        ):
+            raise TypeError(
+                "registration_reference must be a FrozenRegistrationReference or None."
+            )
         references = tuple(self.evidence_references)
         if not all(
             isinstance(item, MaterialIdentificationEvidenceReference)
@@ -425,8 +599,8 @@ class MaterialIdentificationSession:
         for reference in references:
             if reference.source_identities != self.source_identities:
                 raise ValueError(
-                    f"Evidence {reference.evidence_id!r} source mismatch: its experimental, "
-                    "FE model, or calibration identity differs from the session."
+                    f"Evidence {reference.evidence_id!r} source mismatch: its source "
+                    "labels differ from the session."
                 )
         object.__setattr__(self, "evidence_references", references)
 
@@ -436,6 +610,7 @@ class MaterialIdentificationSession:
         *,
         task_definition: MaterialIdentificationTaskDefinition,
         source_identities: MaterialIdentificationSourceIdentities,
+        registration: FrozenRegistration | None = None,
         evidence_references: tuple[MaterialIdentificationEvidenceReference, ...] = (),
         session_id: str | None = None,
         created_at: datetime | None = None,
@@ -446,6 +621,11 @@ class MaterialIdentificationSession:
             created_at=created_at or datetime.now(timezone.utc),
             task_definition=task_definition,
             source_identities=source_identities,
+            registration_reference=(
+                None
+                if registration is None
+                else FrozenRegistrationReference.from_registration(registration)
+            ),
             evidence_references=evidence_references,
         )
 
@@ -472,6 +652,22 @@ class MaterialIdentificationSession:
                 )
             elif task.bounds_for(parameter_id) is None:
                 reasons.append(f"Selected parameter {parameter_id!r} has no bounds.")
+        registration = self.registration_reference
+        if registration is None:
+            reasons.append(
+                "No FrozenRegistration is bound; a production session requires one."
+            )
+        else:
+            if not _is_sha256(registration.registration_hash):
+                reasons.append("The bound registration hash is not a SHA-256 digest.")
+            if not _is_sha256(registration.experimental_source_identity.get("sha256")):
+                reasons.append(
+                    "The bound experimental source identity has no SHA-256 content identity."
+                )
+            if registration.fe_geometry_identity.get("schema_version") != FE_GEOMETRY_IDENTITY_V2:
+                reasons.append(
+                    f"The bound FE geometry identity is not {FE_GEOMETRY_IDENTITY_V2!r}."
+                )
         for reference in self.evidence_references:
             if reference.source_identities != self.source_identities:
                 reasons.append(
@@ -486,6 +682,11 @@ class MaterialIdentificationSession:
             "created_at": self.created_at.isoformat().replace("+00:00", "Z"),
             "task_definition": self.task_definition.to_dict(),
             "source_identities": self.source_identities.to_dict(),
+            "registration": (
+                None
+                if self.registration_reference is None
+                else self.registration_reference.to_dict()
+            ),
             "evidence_references": [
                 item.to_dict() for item in self.evidence_references
             ],
@@ -502,9 +703,13 @@ class MaterialIdentificationSession:
 
     @classmethod
     def from_dict(
-        cls, payload: Mapping[str, object], *, models: ModelCatalog
+        cls,
+        payload: Mapping[str, object],
+        *,
+        models: ModelCatalog,
+        registrations: RegistrationCatalog = (),
     ) -> "MaterialIdentificationSession":
-        """Restore a session; ``models`` must contain its exact model definition."""
+        """Restore a session against its exact model definition and registration."""
         if not isinstance(payload, Mapping):
             raise TypeError("session payload must be a mapping.")
         schema = payload.get("schema_version")
@@ -519,6 +724,7 @@ class MaterialIdentificationSession:
             timestamp = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
         except ValueError as error:
             raise ValueError("created_at must be a valid ISO-8601 value.") from error
+        stored_registration = payload["registration"]
         return cls(
             schema_version=payload["schema_version"],
             session_id=payload["session_id"],
@@ -528,6 +734,11 @@ class MaterialIdentificationSession:
             ),
             source_identities=MaterialIdentificationSourceIdentities.from_dict(
                 payload["source_identities"]
+            ),
+            registration_reference=(
+                None
+                if stored_registration is None
+                else resolve_registration_reference(stored_registration, registrations)
             ),
             evidence_references=tuple(
                 MaterialIdentificationEvidenceReference.from_dict(item)
@@ -539,21 +750,28 @@ class MaterialIdentificationSession:
 
     @classmethod
     def from_json(
-        cls, payload: str, *, models: ModelCatalog
+        cls,
+        payload: str,
+        *,
+        models: ModelCatalog,
+        registrations: RegistrationCatalog = (),
     ) -> "MaterialIdentificationSession":
         if not isinstance(payload, str):
             raise TypeError("JSON payload must be a string.")
-        return cls.from_dict(json.loads(payload), models=models)
-
+        return cls.from_dict(json.loads(payload), models=models, registrations=registrations)
 
 
 __all__ = [
+    "FE_GEOMETRY_IDENTITY_V2",
+    "FrozenRegistrationReference",
     "MaterialIdentificationEvidenceReference",
     "MaterialIdentificationSession",
     "MaterialIdentificationSourceIdentities",
     "MaterialIdentificationTaskDefinition",
     "ModelCatalog",
     "ParameterBounds",
+    "RegistrationCatalog",
     "SessionReadiness",
     "resolve_identification_model",
+    "resolve_registration_reference",
 ]
