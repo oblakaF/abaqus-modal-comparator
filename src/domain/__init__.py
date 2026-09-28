@@ -1,5 +1,17 @@
 """Domain contracts for multi-specimen inverse identification."""
 
+from .evidence import (
+    EvidenceProvenance,
+    EvidenceRecord,
+    EvidenceSourceIdentity,
+    IdentificationEvidence,
+    IdentifiabilityEvidence,
+    SensitivityEvidence,
+    ValidationEvidence,
+    evidence_content_hash,
+    evidence_from_dict,
+    evidence_from_json,
+)
 from .identification_campaign import IdentificationCampaign
 from .modal_observation import (
     InclusionStatus,
@@ -27,9 +39,14 @@ from .specimen import (
 __all__ = [
     "CoreFamily",
     "Design",
+    "EvidenceProvenance",
+    "EvidenceRecord",
+    "EvidenceSourceIdentity",
     "FaceSectionFamily",
     "IdentificationCampaign",
+    "IdentificationEvidence",
     "IdentificationParameter",
+    "IdentifiabilityEvidence",
     "InclusionStatus",
     "InterfaceFamily",
     "ModalCluster",
@@ -41,5 +58,10 @@ __all__ = [
     "ParameterScope",
     "PhysicalSpecimen",
     "PrimaryMeasurement",
+    "SensitivityEvidence",
     "TestRun",
+    "ValidationEvidence",
+    "evidence_content_hash",
+    "evidence_from_dict",
+    "evidence_from_json",
 ]
