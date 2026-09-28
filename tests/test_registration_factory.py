@@ -182,6 +182,10 @@ class UnambiguousGeometryTests(FactoryFixture):
             registration.to_dict()["fe_geometry_identity"],
             modal_dataset_geometry_identity(result.abaqus),
         )
+        self.assertEqual(
+            registration.fe_geometry_identity["schema_version"], "fe-geometry-identity/2"
+        )
+        self.assertNotIn("dof_count", registration.fe_geometry_identity)
 
     # F
     def test_mapping_matches_the_finished_comparison(self):

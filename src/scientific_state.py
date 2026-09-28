@@ -97,14 +97,15 @@ def source_identity_matches(left: object, right: object) -> bool:
     return all(left.get(key) == right.get(key) for key in required)
 
 
-FE_GEOMETRY_IDENTITY_SCHEMA = "fe-geometry-identity/1"
+# v2: mesh identity only.  v1 also hashed each dataset's measured_dofs bits,
+# which made ODB- and matrix-derived views of the same mesh differ.
+FE_GEOMETRY_IDENTITY_SCHEMA = "fe-geometry-identity/2"
 FE_DOF_COMPONENTS = ("U1", "U2", "U3")
 
 # One canonical record per node, big-endian and packed:
-# instance index (uint32), node label (int64), x/y/z (float64), DOF bits (uint8,
-# bit 0 = U1, bit 1 = U2, bit 2 = U3).
+# instance index (uint32), node label (int64), x/y/z (float64).
 _FE_GEOMETRY_RECORD = np.dtype(
-    [("instance", ">u4"), ("label", ">i8"), ("xyz", ">f8", (3,)), ("dofs", "u1")]
+    [("instance", ">u4"), ("label", ">i8"), ("xyz", ">f8", (3,))]
 )
 
 
@@ -123,12 +124,13 @@ def _split_fe_node_id(node_id: object) -> tuple[str, int]:
 def fe_geometry_identity(
     node_ids: Sequence[object],
     coordinates: object,
-    dof_mask: object,
 ) -> dict[str, Any]:
-    """Return a deterministic identity of FE registration geometry.
+    """Return a deterministic identity of an FE mesh used for registration.
 
-    Only node identity ("INSTANCE:label"), node coordinates, and the explicit
-    per-node translational DOF map enter the SHA-256.  The result is
+    Only node identity ("INSTANCE:label") and node coordinates enter the
+    SHA-256, together with the fixed translational component namespace
+    U1/U2/U3.  Per-dataset DOF availability (ODB output, matrix active DOFs,
+    experimental measurement) is deliberately excluded.  The result is
     independent of input node order; coordinates are hashed as exact IEEE-754
     float64 values (with -0.0 folded to 0.0), not as formatted text.
     """
@@ -139,11 +141,6 @@ def fe_geometry_identity(
         raise ValueError("FE coordinates must have shape (node_count, 3).")
     if not np.all(np.isfinite(xyz)):
         raise ValueError("FE coordinates must be finite.")
-    mask = np.asarray(dof_mask)
-    if mask.dtype != np.bool_:
-        raise TypeError("FE DOF map must be a boolean array.")
-    if mask.shape != (count, len(FE_DOF_COMPONENTS)):
-        raise ValueError("FE DOF map must have shape (node_count, 3).")
 
     instances = sorted({instance for instance, _ in parsed})
     instance_index = {name: index for index, name in enumerate(instances)}
@@ -151,7 +148,6 @@ def fe_geometry_identity(
     records["instance"] = [instance_index[instance] for instance, _ in parsed]
     records["label"] = [label for _, label in parsed]
     records["xyz"] = xyz + 0.0
-    records["dofs"] = mask.astype(np.uint8) @ np.array([1, 2, 4], dtype=np.uint8)
     records = records[np.lexsort((records["label"], records["instance"]))]
     duplicate = (np.diff(records["instance"].astype(np.int64)) == 0) & (
         np.diff(records["label"]) == 0
@@ -173,7 +169,6 @@ def fe_geometry_identity(
         "node_count": count,
         "instances": instances,
         "dof_components": list(FE_DOF_COMPONENTS),
-        "dof_count": int(np.count_nonzero(mask)),
         "sha256": digest.hexdigest(),
     }
 
@@ -181,34 +176,26 @@ def fe_geometry_identity(
 def modal_dataset_geometry_identity(dataset: object) -> dict[str, Any]:
     """Return the FE geometry identity shared by every mode of a dataset.
 
-    Frequencies, mode vectors, and all dataset/mode metadata are ignored.  Each
-    mode must carry an explicit ``measured_dofs`` map (it is never inferred)
-    and all modes must describe the same geometry.
+    Frequencies, mode vectors, DOF availability masks (``measured_dofs`` or
+    ``fe_available_dofs``), and all dataset/mode metadata are ignored; masks
+    may differ between modes or be absent.  All modes must describe the same
+    node identities and coordinates.
     """
     modes = list(getattr(dataset, "modes", None) or ())
     if not modes:
         raise ValueError("FE geometry identity requires at least one mode.")
 
-    def mode_inputs(mode: object) -> tuple[Any, Any, Any]:
-        mask = getattr(mode, "measured_dofs", None)
-        if mask is None:
-            raise ValueError(
-                f"Mode {getattr(mode, 'number', '?')} has no explicit DOF map "
-                "(measured_dofs); it is not inferred."
-            )
-        return mode.node_ids, mode.coordinates, mask
-
-    reference_inputs = mode_inputs(modes[0])
+    reference_inputs = (modes[0].node_ids, modes[0].coordinates)
     reference = fe_geometry_identity(*reference_inputs)
     for mode in modes[1:]:
-        inputs = mode_inputs(mode)
+        inputs = (mode.node_ids, mode.coordinates)
         if all(
             np.array_equal(np.asarray(current), np.asarray(expected))
             for current, expected in zip(inputs, reference_inputs)
         ):
             continue
         if fe_geometry_identity(*inputs) != reference:
-            raise ValueError("All modes must share the same FE geometry and DOF map.")
+            raise ValueError("All modes must share the same FE geometry.")
     return reference
 
 
