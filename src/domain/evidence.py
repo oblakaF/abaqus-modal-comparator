@@ -67,6 +67,11 @@ def _json_value(value: object, path: str = "content") -> Any:
     raise TypeError(f"{path} contains unsupported value type {type(value).__name__}.")
 
 
+def _schema_major(schema_version: str, version: str) -> str:
+    """Return the same schema family at another version, e.g. '.../1.0'."""
+    return schema_version.rsplit("/", 1)[0] + "/" + version
+
+
 def _json_output(value: object) -> Any:
     if isinstance(value, Mapping):
         return {key: _json_output(item) for key, item in value.items()}
@@ -75,20 +80,128 @@ def _json_output(value: object) -> Any:
     return value
 
 
-def evidence_content_hash(content: Mapping[str, object]) -> str:
-    """Return the canonical SHA-256 digest for validated evidence content."""
-
-    if not isinstance(content, Mapping):
-        raise TypeError("content must be a mapping.")
-    normalized = _json_output(_json_value(content))
-    encoded = json.dumps(
-        normalized,
+def _canonical_json(value: object) -> bytes:
+    return json.dumps(
+        value,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
         allow_nan=False,
     ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+
+
+def evidence_content_hash(content: Mapping[str, object]) -> str:
+    """Return the canonical SHA-256 digest for validated evidence content."""
+
+    if not isinstance(content, Mapping):
+        raise TypeError("content must be a mapping.")
+    return hashlib.sha256(_canonical_json(_json_output(_json_value(content)))).hexdigest()
+
+
+@dataclass(frozen=True)
+class EvidenceScientificBinding:
+    """Which model definition, registration, and experiment content a result belongs to.
+
+    Hashes only: the registration hash seals calibration, orientation, FE
+    geometry, and node mapping; the model hash seals the parameterization; the
+    experimental SHA-256 makes the source content explicit.  No payloads and no
+    parameter values are carried.  The producer that knows these values (the
+    runner) supplies them; nothing here infers them.
+    """
+
+    identification_model_id: str
+    identification_model_hash: str
+    registration_hash: str
+    experimental_content_sha256: str
+
+    FIELD_NAMES: ClassVar[tuple[str, ...]] = (
+        "identification_model_id",
+        "identification_model_hash",
+        "registration_hash",
+        "experimental_content_sha256",
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "identification_model_id",
+            _required_text(self.identification_model_id, "identification_model_id"),
+        )
+        for name in self.FIELD_NAMES[1:]:
+            object.__setattr__(self, name, _content_hash(getattr(self, name), name))
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        identification_model_id: str,
+        identification_model_hash: str,
+        registration_hash: str,
+        experimental_content_sha256: str,
+    ) -> "EvidenceScientificBinding":
+        return cls(
+            identification_model_id=identification_model_id,
+            identification_model_hash=identification_model_hash,
+            registration_hash=registration_hash,
+            experimental_content_sha256=experimental_content_sha256,
+        )
+
+    def matches(
+        self,
+        *,
+        identification_model_id: str,
+        identification_model_hash: str,
+        registration_hash: str,
+        experimental_content_sha256: str,
+    ) -> bool:
+        """Exact scientific match on all four identities; descriptive labels play no part."""
+        expected = (
+            identification_model_id,
+            identification_model_hash,
+            registration_hash,
+            experimental_content_sha256,
+        )
+        return tuple(getattr(self, name) for name in self.FIELD_NAMES) == expected
+
+    def to_dict(self) -> dict[str, object]:
+        return {name: getattr(self, name) for name in self.FIELD_NAMES}
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> "EvidenceScientificBinding":
+        if not isinstance(payload, Mapping):
+            raise TypeError("scientific_binding must be a mapping.")
+        missing = [name for name in cls.FIELD_NAMES if name not in payload]
+        unknown = sorted(set(payload) - set(cls.FIELD_NAMES))
+        if missing or unknown:
+            raise ValueError(
+                f"Invalid scientific_binding: missing {missing}, unknown {unknown}."
+            )
+        return cls(**{name: payload[name] for name in cls.FIELD_NAMES})
+
+
+_BOUND_RECORD_HASH_DOMAIN = b"evidence-scientific-binding/1\n"
+
+
+def evidence_record_hash(
+    content: Mapping[str, object],
+    scientific_binding: EvidenceScientificBinding | None,
+) -> str:
+    """Digest sealing an evidence record's content and scientific binding.
+
+    Unbound records keep the content-only digest.  Bound records hash a
+    domain-separated document of content plus binding, so a bound record can
+    never share a digest with an unbound one or with a different binding.
+    """
+
+    if scientific_binding is None:
+        return evidence_content_hash(content)
+    if not isinstance(scientific_binding, EvidenceScientificBinding):
+        raise TypeError("scientific_binding must be an EvidenceScientificBinding or None.")
+    document = {
+        "content": _json_output(_json_value(content)),
+        "scientific_binding": scientific_binding.to_dict(),
+    }
+    return hashlib.sha256(_BOUND_RECORD_HASH_DOMAIN + _canonical_json(document)).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -192,7 +305,15 @@ EvidenceT = TypeVar("EvidenceT", bound="EvidenceRecord")
 
 @dataclass(frozen=True, kw_only=True)
 class EvidenceRecord:
-    """Base versioned envelope shared by every evidence category."""
+    """Base versioned envelope shared by every evidence category.
+
+    ``source_identity`` and ``provenance.artifacts`` say where an artifact came
+    from.  ``scientific_binding`` says which model definition, registration, and
+    experiment content the scientific result belongs to; ``None`` marks an
+    explicitly UNBOUND (historical) record that is never scientifically
+    compatible with a bound session.  There is no implied equivalence between
+    the two.
+    """
 
     schema_version: str
     evidence_id: str
@@ -203,12 +324,21 @@ class EvidenceRecord:
     provenance: EvidenceProvenance
     status: str
     content: Mapping[str, object]
+    scientific_binding: EvidenceScientificBinding | None = None
 
     RECORD_TYPE: ClassVar[str] = "evidence"
-    SCHEMA_VERSION: ClassVar[str] = "evidence/1.0"
+    # 2.0 adds an explicit scientific_binding (object or null) that is sealed
+    # into content_hash; 1.0 records had no way to state a binding.
+    SCHEMA_VERSION: ClassVar[str] = "evidence/2.0"
 
     def __post_init__(self) -> None:
         schema = _required_text(self.schema_version, "schema_version")
+        if schema == _schema_major(self.SCHEMA_VERSION, "1.0"):
+            raise ValueError(
+                f"Unsupported evidence schema {schema!r}: 1.0 records cannot state a "
+                "scientific binding; re-create the record as "
+                f"{self.SCHEMA_VERSION!r} (explicitly unbound if historical)."
+            )
         if schema != self.SCHEMA_VERSION:
             raise ValueError(
                 f"{type(self).__name__} requires schema_version {self.SCHEMA_VERSION!r}."
@@ -241,11 +371,46 @@ class EvidenceRecord:
             raise TypeError("content must be a mapping.")
         content = _json_value(self.content)
         object.__setattr__(self, "content", content)
+        if self.scientific_binding is not None and not isinstance(
+            self.scientific_binding, EvidenceScientificBinding
+        ):
+            raise TypeError(
+                "scientific_binding must be an EvidenceScientificBinding or None."
+            )
         supplied_hash = _content_hash(self.content_hash, "content_hash")
-        expected_hash = evidence_content_hash(content)
+        expected_hash = evidence_record_hash(content, self.scientific_binding)
         if supplied_hash != expected_hash:
-            raise ValueError("content_hash does not match the canonical evidence content.")
+            raise ValueError(
+                "content_hash does not match the canonical evidence content and "
+                "scientific binding."
+            )
         object.__setattr__(self, "content_hash", supplied_hash)
+
+    @property
+    def binding_status(self) -> str:
+        return "BOUND" if self.scientific_binding is not None else "UNBOUND"
+
+    def scientifically_compatible_with(
+        self,
+        *,
+        identification_model_id: str,
+        identification_model_hash: str,
+        registration_hash: str,
+        experimental_content_sha256: str,
+    ) -> bool:
+        """True only for a bound record whose binding matches exactly.
+
+        Unbound (historical) evidence is never compatible, whatever its
+        descriptive source labels say.
+        """
+        if self.scientific_binding is None:
+            return False
+        return self.scientific_binding.matches(
+            identification_model_id=identification_model_id,
+            identification_model_hash=identification_model_hash,
+            registration_hash=registration_hash,
+            experimental_content_sha256=experimental_content_sha256,
+        )
 
     @classmethod
     def create(
@@ -258,6 +423,7 @@ class EvidenceRecord:
         parent_ids: tuple[str, ...] = (),
         evidence_id: str | None = None,
         timestamp: datetime | None = None,
+        scientific_binding: EvidenceScientificBinding | None = None,
     ) -> EvidenceT:
         normalized_content = _json_value(content)
         return cls(
@@ -266,10 +432,11 @@ class EvidenceRecord:
             timestamp=timestamp or datetime.now(timezone.utc),
             source_identity=source_identity,
             parent_ids=parent_ids,
-            content_hash=evidence_content_hash(normalized_content),
+            content_hash=evidence_record_hash(normalized_content, scientific_binding),
             provenance=provenance,
             status=status,
             content=normalized_content,
+            scientific_binding=scientific_binding,
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -284,6 +451,11 @@ class EvidenceRecord:
             "provenance": self.provenance.to_dict(),
             "status": self.status,
             "content": _json_output(self.content),
+            "scientific_binding": (
+                None
+                if self.scientific_binding is None
+                else self.scientific_binding.to_dict()
+            ),
         }
 
     def to_json(self, *, indent: int = 2) -> str:
@@ -311,6 +483,17 @@ class EvidenceRecord:
         parent_ids = payload["parent_ids"]
         if not isinstance(parent_ids, (tuple, list)):
             raise TypeError("parent_ids must be a sequence.")
+        if payload.get("schema_version") == _schema_major(cls.SCHEMA_VERSION, "1.0"):
+            raise ValueError(
+                f"Unsupported evidence schema {payload['schema_version']!r}: 1.0 records "
+                "cannot state a scientific binding and are not reinterpreted."
+            )
+        if "scientific_binding" not in payload:
+            raise ValueError(
+                "Evidence payload must state scientific_binding explicitly "
+                "(null for unbound historical evidence)."
+            )
+        binding = payload["scientific_binding"]
         return cls(
             schema_version=payload["schema_version"],
             evidence_id=payload["evidence_id"],
@@ -321,6 +504,9 @@ class EvidenceRecord:
             provenance=EvidenceProvenance.from_dict(payload["provenance"]),
             status=payload["status"],
             content=payload["content"],
+            scientific_binding=(
+                None if binding is None else EvidenceScientificBinding.from_dict(binding)
+            ),
         )
 
     @classmethod
@@ -333,25 +519,25 @@ class EvidenceRecord:
 @dataclass(frozen=True, kw_only=True)
 class SensitivityEvidence(EvidenceRecord):
     RECORD_TYPE: ClassVar[str] = "sensitivity"
-    SCHEMA_VERSION: ClassVar[str] = "sensitivity-evidence/1.0"
+    SCHEMA_VERSION: ClassVar[str] = "sensitivity-evidence/2.0"
 
 
 @dataclass(frozen=True, kw_only=True)
 class IdentifiabilityEvidence(EvidenceRecord):
     RECORD_TYPE: ClassVar[str] = "identifiability"
-    SCHEMA_VERSION: ClassVar[str] = "identifiability-evidence/1.0"
+    SCHEMA_VERSION: ClassVar[str] = "identifiability-evidence/2.0"
 
 
 @dataclass(frozen=True, kw_only=True)
 class IdentificationEvidence(EvidenceRecord):
     RECORD_TYPE: ClassVar[str] = "identification"
-    SCHEMA_VERSION: ClassVar[str] = "identification-evidence/1.0"
+    SCHEMA_VERSION: ClassVar[str] = "identification-evidence/2.0"
 
 
 @dataclass(frozen=True, kw_only=True)
 class ValidationEvidence(EvidenceRecord):
     RECORD_TYPE: ClassVar[str] = "validation"
-    SCHEMA_VERSION: ClassVar[str] = "validation-evidence/1.0"
+    SCHEMA_VERSION: ClassVar[str] = "validation-evidence/2.0"
 
 
 _EVIDENCE_TYPES: Mapping[str, type[EvidenceRecord]] = {
@@ -385,6 +571,7 @@ def evidence_from_json(payload: str) -> EvidenceRecord:
 __all__ = [
     "EvidenceProvenance",
     "EvidenceRecord",
+    "EvidenceScientificBinding",
     "EvidenceSourceIdentity",
     "IdentificationEvidence",
     "IdentifiabilityEvidence",
@@ -393,4 +580,5 @@ __all__ = [
     "evidence_content_hash",
     "evidence_from_dict",
     "evidence_from_json",
+    "evidence_record_hash",
 ]
