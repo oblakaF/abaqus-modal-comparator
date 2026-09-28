@@ -97,6 +97,7 @@ class _FakeScrollbar(_FakeWidget):
 class _FakeVariable:
     def __init__(self, value=""):
         self.value = value
+        self.traces = []
 
     def get(self):
         return self.value
@@ -104,8 +105,9 @@ class _FakeVariable:
     def set(self, value):
         self.value = value
 
-    def trace_add(self, _mode, _callback):
-        return None
+    def trace_add(self, mode, callback):
+        self.traces.append((mode, callback))
+        return f"trace-{len(self.traces)}"
 
 
 def _widget_texts(widget):
@@ -235,6 +237,21 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
         application = self._application()
         self.assertEqual(len(application.material_identification_pages), 7)
         self.assertFalse(hasattr(application, "material_identification_solver"))
+
+    def test_variable_trace_callback_accepts_tk_arguments(self):
+        application = self._application()
+
+        mode, callback = application.abaqus_path.traces[0]
+
+        self.assertEqual(mode, "write")
+        callback("PY_VAR0", "", "write")
+
+        def fail_refresh():
+            raise RuntimeError("refresh failed")
+
+        application._refresh_material_identification_pages = fail_refresh
+        with self.assertRaisesRegex(RuntimeError, "refresh failed"):
+            callback("PY_VAR0", "", "write")
 
     def test_project_evidence_page_renders_current_empty_states(self):
         application = self._application()
@@ -868,18 +885,31 @@ class MaterialIdentificationGuiShellTests(unittest.TestCase):
         )
 
     def test_existing_tabs_remain_present_and_ordered(self):
-        from ui_policy import FULL_TAB_LABELS
+        from ui_policy import FULL_TAB_LABELS, LayoutMode, responsive_layout_width
 
         application = self.application
-        application.ui_scale_percent.set(100)
-        self.root.geometry("1600x900")
-        self.root.update_idletasks()
-        application._apply_responsive_layout()
-        labels = tuple(
-            application.tabs.tab(tab, "text") for tab in application.tabs.tabs()
-        )
-        self.assertEqual(labels, FULL_TAB_LABELS)
-        self.assertEqual(len(labels), 10)
+        self.root.deiconify()
+        try:
+            application.ui_scale_percent.set(100)
+            self.root.geometry("1600x900")
+            self.root.update_idletasks()
+            logical_width = responsive_layout_width(
+                self.root.winfo_width(),
+                float(self.root.tk.call("tk", "scaling")),
+                application.ui_scale_percent.get(),
+            )
+            application._apply_responsive_layout()
+            labels = tuple(
+                application.tabs.tab(tab, "text")
+                for tab in application.tabs.tabs()
+            )
+
+            self.assertGreaterEqual(logical_width, 1500)
+            self.assertIs(application._layout_mode, LayoutMode.WIDE)
+            self.assertEqual(labels, FULL_TAB_LABELS)
+            self.assertEqual(len(labels), 10)
+        finally:
+            self.root.withdraw()
 
     def test_project_starts_without_identification_backend(self):
         application = self.application

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -297,6 +298,56 @@ class ResponsivePolicyTests(unittest.TestCase):
         self.assertGreater(wide, compact)
         self.assertGreaterEqual(compact, 280)
         self.assertLessEqual(wide, 1320)
+
+    def test_responsive_layout_initializes_unset_label_wraplength(self):
+        import main
+
+        class FakeTk:
+            @staticmethod
+            def call(*_args):
+                return 96 / 72
+
+        class FakeLabel:
+            def __init__(self):
+                self.master = SimpleNamespace(winfo_width=lambda: 800)
+                self.wraplength = ""
+
+            def cget(self, option):
+                self.assert_option(option)
+                return self.wraplength
+
+            def configure(self, *, wraplength):
+                self.wraplength = wraplength
+
+            @staticmethod
+            def assert_option(option):
+                if option != "wraplength":
+                    raise AssertionError(option)
+
+        label = FakeLabel()
+        application = SimpleNamespace(
+            root=SimpleNamespace(winfo_width=lambda: 1024, tk=FakeTk()),
+            ui_scale_percent=SimpleNamespace(get=lambda: 100),
+            _responsive_layout_signature=(LayoutMode.COMPACT, 100),
+            _responsive_wrap_labels=[label],
+            input_tab=object(),
+            table_tab=object(),
+            shape_tab=object(),
+            plot_tab=object(),
+            frf_tab=object(),
+            cmif_tab=object(),
+            advanced_tab=object(),
+            manual_review_tab=object(),
+            material_identification_tab=object(),
+            details_tab=object(),
+        )
+
+        main.app.ModalComparatorApp._apply_responsive_layout(application)
+
+        self.assertEqual(
+            label.wraplength,
+            text_wrap_width(800, LayoutMode.COMPACT),
+        )
 
     def test_table_policy_keeps_scientific_minimums_and_headings(self):
         policy = table_width_policy("comparison")

@@ -2077,7 +2077,8 @@ def install_responsive_workflow(app_module) -> None:
             try:
                 container_width = int(label.master.winfo_width())
                 wrap = text_wrap_width(container_width, mode)
-                if int(label.cget("wraplength")) != wrap:
+                current_wrap = label.cget("wraplength")
+                if current_wrap == "" or int(current_wrap) != wrap:
                     label.configure(wraplength=wrap)
             except (tk.TclError, ValueError):
                 pass

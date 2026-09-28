@@ -1992,6 +1992,12 @@ def install_material_identification_ui(app_module) -> None:
             self._refresh_material_identification_pages,
             add="+",
         )
+
+        def refresh_material_identification_pages_from_trace(
+            _variable_name, _index, _operation
+        ) -> None:
+            self._refresh_material_identification_pages()
+
         for variable_name in (
             "abaqus_path",
             "experimental_path",
@@ -1999,7 +2005,9 @@ def install_material_identification_ui(app_module) -> None:
         ):
             variable = getattr(self, variable_name, None)
             if variable is not None and hasattr(variable, "trace_add"):
-                variable.trace_add("write", self._refresh_material_identification_pages)
+                variable.trace_add(
+                    "write", refresh_material_identification_pages_from_trace
+                )
 
     application_class.__init__ = material_identification_init
     application_class._install_material_identification_tab = (
