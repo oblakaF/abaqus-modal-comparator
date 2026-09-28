@@ -45,6 +45,7 @@ from services.matrix_model_service import (
 from services.specimen_comparison_service import comparison_to_observations
 from services.stage_a_identification_service import (
     ComparatorPairingError,
+    MacEvidencePairingError,
     MatrixEigenmodeDatasetAdapter,
     PairingProviderMode,
     ProductionComparisonPairingProvider,
@@ -1503,6 +1504,304 @@ class FrozenProductionPairingTests(unittest.TestCase):
             self.fixture.identify(
                 pairing_provider=custom, registration=self.fixture.registration
             )
+
+
+
+def _make_mac_less(pair):
+    """What the comparator records for a frequency-only match."""
+    pair.mac = None
+    pair.status = "Frequency match"
+
+
+class MacEvidencePolicyTests(unittest.TestCase):
+    """D-FREQONLY: a pair without MAC never becomes an inverse-fit observation."""
+
+    def quick_identify(self, fixture, **changes):
+        values = dict(
+            requested_parameter_subset=("D11", "D66"),
+            solver_configuration=fixture.configuration(global_max_iterations=5),
+        )
+        values.update(changes)
+        return fixture.identify(**values)
+
+    @staticmethod
+    def by_experimental_mode(result, mode):
+        return next(item for item in result.observations if item.experimental_mode_id == mode)
+
+    # A
+    def test_observation_with_mac_is_fitted_as_before(self):
+        fixture = SyntheticProductionFixture()
+        result = self.quick_identify(fixture)
+        for observation in result.observations:
+            if observation.experimental_mode_id == 1:
+                continue  # campaign exclusion
+            self.assertIsNotNone(observation.mac)
+            self.assertEqual(observation.inclusion_status.value, "included")
+            self.assertNotIn("pre_mac_policy_inclusion_status", observation.metadata)
+            self.assertIn(observation.observation_id, result.inverse_result.observation_ids)
+        self.assertEqual(result.effective_observation_count, 5)
+
+    # B / C / G
+    def test_frequency_match_without_mac_is_excluded_but_kept_in_diagnostics(self):
+        fixture = SyntheticProductionFixture()
+        pair = fixture.comparison.pairs[2]
+        _make_mac_less(pair)
+        result = self.quick_identify(fixture)
+        observation = self.by_experimental_mode(result, pair.experimental_mode)
+        self.assertIsNone(observation.mac)
+        self.assertEqual(observation.inclusion_status.value, "excluded")
+        self.assertIn("MAC unavailable", observation.reason)
+        self.assertIn("Frequency match", observation.reason)
+        self.assertEqual(observation.metadata["pre_mac_policy_inclusion_status"], "included")
+        self.assertNotIn(observation.observation_id, result.inverse_result.observation_ids)
+        self.assertIn(
+            observation.observation_id,
+            {item.observation_id for item in result.excluded_observations},
+        )
+        self.assertEqual(result.effective_observation_count, 4)
+        # G: the comparator result and the audit trail still carry the pair.
+        self.assertIs(fixture.comparison.pairs[2], pair)
+        self.assertIsNone(pair.mac)
+        self.assertEqual(pair.status, "Frequency match")
+        self.assertIsNone(observation.metadata["source_pair"]["mac"])
+
+    def test_manual_acceptance_cannot_admit_a_mac_less_pair(self):
+        fixture = SyntheticProductionFixture()
+        pair = fixture.comparison.pairs[2]
+        _make_mac_less(pair)
+        pair.manual_decision = "accepted"
+        result = self.quick_identify(fixture)
+        observation = self.by_experimental_mode(result, pair.experimental_mode)
+        self.assertEqual(observation.inclusion_status.value, "excluded")
+        self.assertNotIn(observation.observation_id, result.inverse_result.observation_ids)
+
+    # D
+    def test_mixed_case_fits_exactly_the_mac_valid_observations(self):
+        fixture = SyntheticProductionFixture()
+        _make_mac_less(fixture.comparison.pairs[2])  # E3
+        provider = fixture.provider()
+        seen = []
+        real_call = provider.__call__
+
+        def recording_provider(observations, eigenpairs):
+            seen.append(tuple(item.experimental_mode_id for item in observations))
+            return real_call(observations, eigenpairs)
+
+        result = self.quick_identify(
+            fixture,
+            pairing_provider=recording_provider,
+            campaign_policy=StageACampaignPolicy(excluded_experimental_mode_ids=(1, 5, 6)),
+        )
+        fitted = {
+            self.by_experimental_mode(result, mode).observation_id for mode in (2, 4)
+        }
+        self.assertEqual(set(result.inverse_result.observation_ids), fitted)
+        self.assertEqual(result.effective_observation_count, 2)
+        self.assertEqual(set(seen), {(2, 4)})
+
+    # E
+    def test_all_mac_less_fails_before_any_fit(self):
+        fixture = SyntheticProductionFixture()
+        for pair in fixture.comparison.pairs:
+            _make_mac_less(pair)
+        with mock.patch.object(
+            stage_a_service, "solve_stage_a_inverse", side_effect=AssertionError("fitted")
+        ) as solver, mock.patch.object(
+            stage_a_service,
+            "solve_generalized_eigenproblem",
+            side_effect=AssertionError("solved"),
+        ) as eigen, mock.patch.object(
+            stage_a_service, "_fixed_pairing", side_effect=AssertionError("fixed pairs")
+        ) as fixed:
+            with self.assertRaisesRegex(StageAIdentificationError, "No usable scalar.*MAC"):
+                self.quick_identify(
+                    fixture,
+                    campaign_policy=StageACampaignPolicy(allow_fixed_pair_fallback=True),
+                )
+        solver.assert_not_called()
+        eigen.assert_not_called()
+        fixed.assert_not_called()
+
+    # F
+    def test_numeric_zero_mac_is_not_treated_as_missing(self):
+        fixture = SyntheticProductionFixture()
+        observations = fixture.observations()
+        zero = replace(observations[2], mac=0.0)
+        missing = replace(observations[3], mac=None)
+        policed = stage_a_service._apply_mac_evidence_policy((zero, missing))
+        self.assertIs(policed[0], zero)
+        self.assertEqual(policed[0].inclusion_status.value, "included")
+        self.assertEqual(policed[1].inclusion_status.value, "excluded")
+
+        pair = fixture.comparison.pairs[2]
+        pair.mac = 0.0
+        pair.manual_decision = "accepted"  # the existing upstream gate decides
+        result = self.quick_identify(fixture)
+        observation = self.by_experimental_mode(result, pair.experimental_mode)
+        self.assertEqual(observation.mac, 0.0)
+        self.assertEqual(observation.inclusion_status.value, "included")
+        self.assertIn(observation.observation_id, result.inverse_result.observation_ids)
+
+    def test_non_finite_mac_is_refused_by_the_existing_convention(self):
+        fixture = SyntheticProductionFixture()
+        fixture.comparison.pairs[2].mac = float("nan")
+        with self.assertRaisesRegex(ValueError, "MAC must be between zero and one"):
+            self.quick_identify(fixture)
+
+    # H
+    def test_fixed_pair_fallback_does_not_reintroduce_mac_less_observation(self):
+        fixture = SyntheticProductionFixture()
+        pair = fixture.comparison.pairs[2]
+        _make_mac_less(pair)
+
+        def failing_provider(observations, eigenpairs):
+            raise ComparatorPairingError("fixture pairing unavailable")
+
+        with mock.patch.object(
+            stage_a_service, "_fixed_pairing", wraps=stage_a_service._fixed_pairing
+        ) as fixed:
+            result = self.quick_identify(
+                fixture,
+                pairing_provider=failing_provider,
+                campaign_policy=StageACampaignPolicy(allow_fixed_pair_fallback=True),
+            )
+        self.assertEqual(result.pairing_provider_mode, PairingProviderMode.FIXED_PAIR_FALLBACK)
+        fixed_modes = {item.experimental_mode_id for item in fixed.call_args.args[0]}
+        self.assertNotIn(pair.experimental_mode, fixed_modes)
+        observation = self.by_experimental_mode(result, pair.experimental_mode)
+        self.assertNotIn(observation.observation_id, result.inverse_result.observation_ids)
+
+    def test_production_re_pairing_without_mac_is_an_ordinary_pairing_failure(self):
+        fixture = SyntheticProductionFixture()
+
+        def mac_less_comparator(*args, **kwargs):
+            result = compare_modal_datasets(*args, **kwargs)
+            for pair in result.pairs:
+                if pair.experimental_mode == 3:
+                    _make_mac_less(pair)
+            return result
+
+        provider = fixture.provider(comparator=mac_less_comparator)
+        with self.assertRaisesRegex(MacEvidencePairingError, "mode\\(s\\) 3 have no MAC"):
+            provider(fixture.observations(), fixture.eigenpairs())
+        self.assertIsNone(provider.last_comparison)
+        self.assertEqual(provider.failure_count, 1)
+        # Observations that do not involve the MAC-less pair still pair normally.
+        others = tuple(
+            item for item in fixture.observations() if item.experimental_mode_id != 3
+        )
+        pairing = provider(others, fixture.eigenpairs())
+        self.assertTrue(all(item.mac is not None for item in pairing.assignments))
+
+
+
+class MacLessComparator:
+    """Real comparator whose pair for experimental mode 3 loses its MAC on chosen calls."""
+
+    def __init__(self, mac_less_calls):
+        self.mac_less_calls = set(mac_less_calls)
+        self.calls = 0
+
+    def __call__(self, *args, **kwargs):
+        self.calls += 1
+        result = compare_modal_datasets(*args, **kwargs)
+        if self.calls in self.mac_less_calls:
+            for pair in result.pairs:
+                if pair.experimental_mode == 3:
+                    _make_mac_less(pair)
+        return result
+
+
+class MacEvidencePairingTests(unittest.TestCase):
+    """Production re-pairing without MAC: refuse initially, fail only the trial later."""
+
+    def identify(self, fixture, provider, **changes):
+        values = dict(
+            pairing_provider=provider,
+            requested_parameter_subset=("D11", "D66"),
+            solver_configuration=fixture.configuration(global_max_iterations=5),
+        )
+        values.update(changes)
+        return fixture.identify(**values)
+
+    # A / B
+    def test_initial_mac_less_pairing_is_refused_without_fixed_pairs(self):
+        for allow_fallback in (True, False):
+            with self.subTest(allow_fixed_pair_fallback=allow_fallback):
+                fixture = SyntheticProductionFixture()
+                provider = fixture.provider(comparator=MacLessComparator({1}))
+                with mock.patch.object(
+                    stage_a_service, "_fixed_pairing", wraps=stage_a_service._fixed_pairing
+                ) as fixed, mock.patch.object(
+                    stage_a_service,
+                    "solve_stage_a_inverse",
+                    side_effect=AssertionError("fitted"),
+                ) as solver:
+                    with self.assertRaisesRegex(
+                        StageAIdentificationError, "no MAC evidence.*mode\\(s\\) 3"
+                    ) as context:
+                        self.identify(
+                            fixture,
+                            provider,
+                            campaign_policy=StageACampaignPolicy(
+                                allow_fixed_pair_fallback=allow_fallback
+                            ),
+                        )
+                self.assertIsInstance(context.exception.__cause__, MacEvidencePairingError)
+                self.assertEqual(fixed.call_count, 0)
+                solver.assert_not_called()
+
+    # C
+    def test_mac_less_optimizer_trial_fails_only_that_evaluation(self):
+        fixture = SyntheticProductionFixture()
+        # Call 1 is the initial pairing and call 2 the solver's initial
+        # evaluation; calls 3-5 are optimizer trial points.
+        comparator = MacLessComparator({3, 4, 5})
+        provider = fixture.provider(comparator=comparator)
+        result = self.identify(fixture, provider)
+        self.assertEqual(result.pairing_provider_mode, PairingProviderMode.COMPARATOR)
+        self.assertGreater(comparator.calls, 5)  # optimization continued
+        failed = [
+            entry
+            for entry in result.inverse_result.convergence_history
+            if not entry.success and "no MAC" in (entry.message or "")
+        ]
+        self.assertEqual(len(failed), 3)
+        self.assertTrue(all(entry.stage == "global" for entry in failed))
+        self.assertEqual(provider.failure_count, 3)
+        self.assertTrue(
+            all(item.mac is not None for item in result.inverse_result.final_pairing.assignments)
+        )
+        self.assertIn(
+            self.mode_observation_id(result, 3), result.inverse_result.observation_ids
+        )
+
+    @staticmethod
+    def mode_observation_id(result, mode):
+        return next(
+            item.observation_id
+            for item in result.observations
+            if item.experimental_mode_id == mode
+        )
+
+    # D
+    def test_ordinary_initial_pairing_failure_keeps_fixed_pair_fallback(self):
+        fixture = SyntheticProductionFixture()
+
+        def failing_comparator(*args, **kwargs):
+            raise ValueError("ordinary comparator failure")
+
+        provider = fixture.provider(comparator=failing_comparator)
+        with mock.patch.object(
+            stage_a_service, "_fixed_pairing", wraps=stage_a_service._fixed_pairing
+        ) as fixed:
+            result = self.identify(
+                fixture,
+                provider,
+                campaign_policy=StageACampaignPolicy(allow_fixed_pair_fallback=True),
+            )
+        self.assertEqual(fixed.call_count, 1)
+        self.assertEqual(result.pairing_provider_mode, PairingProviderMode.FIXED_PAIR_FALLBACK)
 
 
 if __name__ == "__main__":

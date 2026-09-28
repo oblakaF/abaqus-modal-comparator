@@ -74,6 +74,15 @@ class ComparatorPairingError(ValueError):
     """The reviewed comparator could not provide a complete current pairing."""
 
 
+class MacEvidencePairingError(ComparatorPairingError):
+    """A requested observation could not be re-paired with valid MAC evidence.
+
+    At an optimizer trial point this is an ordinary failed evaluation; at the
+    initial production pairing ``identify_stage_a`` refuses instead of falling
+    back to fixed pairs.
+    """
+
+
 class StageAProductionPairingRefusal(Exception):
     """Production pairing violates a frozen scientific contract.
 
@@ -1003,6 +1012,18 @@ class ProductionComparisonPairingProvider:
                 + ", ".join(map(str, missing_pairs))
             )
             raise ComparatorPairingError(self.last_error)
+        mac_less = tuple(
+            item for item in experimental_ids if paired_by_experimental[item].mac is None
+        )
+        if mac_less:
+            self.failure_count += 1
+            self.last_error = (
+                "Comparator pair(s) for experimental mode(s) "
+                + ", ".join(map(str, mac_less))
+                + " have no MAC; a frequency-only match does not prove mode identity "
+                "for inverse identification."
+            )
+            raise MacEvidencePairingError(self.last_error)
         self.last_comparison = comparison
         self.last_error = ""
         assignments = tuple(
@@ -1208,6 +1229,44 @@ def _apply_campaign_policy(
     return tuple(result)
 
 
+MAC_UNAVAILABLE_REASON = (
+    "MAC unavailable: a frequency-only match does not prove mode identity, so the "
+    "pair is excluded from inverse identification"
+)
+
+
+def _apply_mac_evidence_policy(
+    observations: Sequence[ModalObservation],
+) -> Tuple[ModalObservation, ...]:
+    """Exclude observations without MAC evidence from the inverse fit (D-FREQONLY).
+
+    The comparator result is not changed, so frequency-only matches remain in
+    diagnostics and reports.  Only ``mac is None`` is excluded: a numeric MAC,
+    including 0.0, is left to the existing upstream gates, and no MAC is ever
+    inferred from frequency.
+    """
+    result: list[ModalObservation] = []
+    for observation in observations:
+        if (
+            observation.mac is not None
+            or observation.inclusion_status == InclusionStatus.EXCLUDED
+        ):
+            result.append(observation)
+            continue
+        metadata = dict(observation.metadata)
+        metadata["pre_mac_policy_inclusion_status"] = observation.inclusion_status.value
+        metadata["pre_mac_policy_inclusion_reason"] = observation.reason
+        result.append(
+            replace(
+                observation,
+                inclusion_status=InclusionStatus.EXCLUDED,
+                reason=f"{MAC_UNAVAILABLE_REASON} (comparator: {observation.reason})",
+                metadata=metadata,
+            )
+        )
+    return tuple(result)
+
+
 def _excluded_clusters(
     clusters: Sequence[ModalCluster],
 ) -> Tuple[ModalCluster, ...]:
@@ -1279,7 +1338,8 @@ def _usable_scalar_observations(
             weights.append(1.0)
     if not usable:
         raise StageAIdentificationError(
-            "No usable scalar modal observations remain after campaign and cluster policy."
+            "No usable scalar modal observations remain after campaign, MAC-evidence, "
+            "and cluster policy; frequency-only (MAC-less) pairs are never fitted."
         )
     return tuple(usable), np.asarray(weights, dtype=float), tuple(excluded)
 
@@ -1434,7 +1494,9 @@ def identify_stage_a(
         test_run_id,
         relative_frequency_gap=policy.cluster_relative_frequency_gap,
     )
-    observations = _apply_campaign_policy(cluster_analysis.observations, policy)
+    observations = _apply_mac_evidence_policy(
+        _apply_campaign_policy(cluster_analysis.observations, policy)
+    )
     clusters = _excluded_clusters(cluster_analysis.clusters)
     usable, numerical_weights, preliminary_exclusions = _usable_scalar_observations(
         observations, clusters, solver_configuration
@@ -1480,6 +1542,12 @@ def identify_stage_a(
             initial_pairing = active_provider(usable, initial_eigenpairs)
         except StageAProductionPairingRefusal:
             raise
+        except MacEvidencePairingError as exc:
+            # Fixed pairs must not stand in for missing MAC evidence.
+            raise StageAIdentificationError(
+                "Initial production pairing has no MAC evidence; Stage-A "
+                f"identification is refused without fixed-pair fallback: {exc}"
+            ) from exc
         except (ValueError, RuntimeError, MatrixModelError) as exc:
             fallback_reason = str(exc)
             initial_pairing = None
@@ -1820,6 +1888,7 @@ def identify_stage_a(
 __all__ = [
     "C3B2_MODE_IDENTITY_CAVEAT",
     "ComparatorPairingError",
+    "MacEvidencePairingError",
     "MatrixEigenmodeDatasetAdapter",
     "ModelValidationEvidence",
     "PairingProviderMode",
