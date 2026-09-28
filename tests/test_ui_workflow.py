@@ -180,6 +180,74 @@ class SourceBoundScientificStateTests(unittest.TestCase):
             self.assertIsNone(application._confirmed_orientation)
             self.assertIsNone(application._source_calibration_binding)
 
+    def test_run_confirmation_is_reused_until_calibration_inputs_change(self):
+        import main
+        import ui_workflow
+
+        class Variable:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+            def set(self, value):
+                self.value = value
+
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            manifest = directory / "manifest.json"
+            experiment = directory / "SP05.unv"
+            manifest.write_text("{}", encoding="utf-8")
+            experiment.write_text("SP05", encoding="utf-8")
+
+            application = type("FakeApplication", (), {})()
+            application.abaqus_path = Variable(str(manifest))
+            application.experimental_path = Variable(str(experiment))
+            application.workspace_path = Variable(str(directory / "workspace"))
+            application.start_mode = Variable("1")
+            application.end_mode = Variable("20")
+            application.coordinate_mapping_mode = Variable("calibrated_physical")
+            application.abaqus_model_unit = Variable("mm")
+            application.experimental_coordinate_unit = Variable("m")
+            application.experimental_unit_source = Variable("manually selected")
+            application.calibration_provenance = Variable("")
+            application.abaqus_command = Variable("abaqus")
+            application.experimental_modal_set_key = Variable("")
+            application.available_experimental_modal_sets = ()
+            application._modal_set_discovery_state = "ready"
+            application._source_calibration_binding = None
+            application._confirmed_orientation = None
+            application._active_orientation_selection = None
+            application._suppress_source_state_tracking = False
+            persistent_changes = []
+            application._on_persistent_change = lambda: persistent_changes.append(True)
+            application._source_calibration = (
+                main.app.ModalComparatorApp._source_calibration.__get__(application)
+            )
+            application._bind_source_calibration = (
+                main.app.ModalComparatorApp._bind_source_calibration.__get__(application)
+            )
+            application._valid_orientation_selection = lambda _calibration: None
+
+            validate = main.app.ModalComparatorApp._validate.__get__(application)
+            with patch.object(
+                ui_workflow.messagebox, "askokcancel", return_value=True
+            ) as confirmation:
+                self.assertIsNotNone(validate())
+                self.assertIsNotNone(validate())
+                confirmation.assert_called_once()
+
+                application.experimental_coordinate_unit.set("cm")
+                main.app.ModalComparatorApp._source_calibration_changed(application)
+                self.assertIsNone(application._source_calibration_binding)
+
+                self.assertIsNotNone(validate())
+                self.assertEqual(confirmation.call_count, 2)
+
+            self.assertIsNotNone(application._source_calibration_binding)
+            self.assertEqual(len(persistent_changes), 3)
+
 
 class ResponsivePolicyTests(unittest.TestCase):
     def test_practical_minimum_window_size_is_stable(self):

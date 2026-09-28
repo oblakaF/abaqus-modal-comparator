@@ -461,9 +461,12 @@ def install_responsive_workflow(app_module) -> None:
         except (TypeError, ValueError):
             return None
 
-    def bind_source_calibration(self) -> bool:
+    def bind_source_calibration(
+        self, calibration: Optional[CoordinateCalibration] = None
+    ) -> bool:
         identity = experimental_source_identity(self.experimental_path.get())
-        calibration = self._source_calibration()
+        if calibration is None:
+            calibration = self._source_calibration()
         if identity is None or calibration is None:
             self._source_calibration_binding = None
             return False
@@ -511,7 +514,20 @@ def install_responsive_workflow(app_module) -> None:
             return
         self._confirmed_orientation = None
         self._active_orientation_selection = None
-        self._bind_source_calibration()
+        identity = experimental_source_identity(self.experimental_path.get())
+        calibration = self._source_calibration()
+        binding = self._source_calibration_binding
+        binding_still_valid = (
+            calibration is not None
+            and isinstance(binding, Mapping)
+            and source_identity_matches(
+                binding.get("experimental_source_identity"), identity
+            )
+            and binding.get("calibration_fingerprint")
+            == calibration_fingerprint(calibration.to_dict())
+        )
+        if not binding_still_valid:
+            self._source_calibration_binding = None
         self._on_persistent_change()
 
     def valid_orientation_selection(self, calibration: CoordinateCalibration):
@@ -1022,13 +1038,22 @@ def install_responsive_workflow(app_module) -> None:
         )
         if not binding_valid:
             self._active_orientation_selection = None
-            messagebox.showwarning(
+            accepted = messagebox.askokcancel(
                 "Confirm experimental calibration",
                 "The geometry/calibration values are not confirmed for the selected "
                 "experimental source. Re-enter or confirm its coordinate unit, mapping "
                 "mode, dimensions/scale, and provenance before analysis.",
             )
-            return None
+            if not accepted:
+                return None
+            if not self._bind_source_calibration(calibration):
+                messagebox.showwarning(
+                    "Confirm experimental calibration",
+                    "The calibration could not be bound to the selected experimental "
+                    "source. Check that the source still exists and try again.",
+                )
+                return None
+            self._on_persistent_change()
         self._active_orientation_selection = self._valid_orientation_selection(
             calibration
         )

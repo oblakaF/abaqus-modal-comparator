@@ -391,7 +391,8 @@ class PolymaxNativeTkTests(unittest.TestCase):
                     application.calibration_provenance.set(
                         "SP05 measured specimen dimensions"
                     )
-                    self.assertIsNotNone(application._source_calibration_binding)
+                    self.assertIsNone(application._source_calibration_binding)
+                    self.assertTrue(application._bind_source_calibration())
                     orientation = {
                         "candidate_id": "geometry-test-candidate",
                         "rotation": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
