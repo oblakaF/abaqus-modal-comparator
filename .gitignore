@@ -23,6 +23,16 @@ modal_comparator_output/
 *.mdl
 *.pac
 
+# Abaqus replay/recovery files
+abaqus.rpy*
+abaqus1.rec
+
+# Local calculation data and derived analysis outputs stay local-only.
+# Git stores only docs/agent_handoff/ANALYSIS_MANIFEST.sha256.
+analysis/
+_sp13_orientation_extraction/
+_sp13_real1_cache/
+
 # Experimental raw data should stay local
 *.lms
 *.unv
