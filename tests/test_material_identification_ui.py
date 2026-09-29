@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 import csv
 import json
@@ -10,6 +11,302 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+
+from domain.evidence import (
+    EvidenceProvenance,
+    EvidenceScientificBinding,
+    EvidenceSourceIdentity,
+    IdentificationEvidence,
+    IdentifiabilityEvidence,
+    SensitivityEvidence,
+    ValidationEvidence,
+)
+from domain.identification_model import (
+    EFFECTIVE_FACE_SHEET_MODEL,
+    STAGE_A_BENDING_MODEL,
+    IdentificationModelDefinition,
+    IdentificationParameterDefinition,
+    ModelWorkflowStatus,
+)
+from domain.material_identification_session import (
+    MaterialIdentificationSession,
+    MaterialIdentificationSourceIdentities,
+    MaterialIdentificationTaskDefinition,
+)
+from domain.registration import FrozenRegistration
+from scientific_state import calibration_fingerprint
+from sp13_evidence_adapter import HISTORICAL_STATUS, SP13EvidenceBundle
+
+
+TIMESTAMP = datetime(2026, 9, 29, 9, 0, tzinfo=timezone.utc)
+PROVENANCE = EvidenceProvenance(producer="material-identification UI test")
+SOURCE = EvidenceSourceIdentity(
+    source_id="synthetic-output",
+    source_type="service-output",
+    uri="project://synthetic/output",
+    content_hash="4" * 64,
+)
+
+
+def _synthetic_historical_bundle() -> SP13EvidenceBundle:
+    """Small synthetic UNBOUND bundle in the legacy historical SP13 layout.
+
+    Presentation fixture only: the frozen-artifact loader is tested by
+    test_sp13_evidence_adapter.  Values are synthetic, not REAL-4 results.
+    """
+
+    source = EvidenceSourceIdentity(
+        source_id="synthetic/sp13_historical",
+        source_type="frozen-sp13-artifact",
+        uri="synthetic://sp13/historical",
+        content_hash="5" * 64,
+    )
+    provenance = EvidenceProvenance(
+        producer="synthetic historical SP13 view fixture",
+        method="synthetic stand-in for read-only serialization of frozen artifacts",
+        details={"specimen": "SP13", "historical_status": HISTORICAL_STATUS},
+    )
+
+    def record(record_type, name, status, content):
+        return record_type.create(
+            evidence_id=f"sp13-{name}-synthetic",
+            timestamp=TIMESTAMP,
+            source_identity=source,
+            provenance=provenance,
+            status=status,
+            content=content,
+            scientific_binding=None,
+        )
+
+    def svd(condition_number):
+        return {
+            "parameter_order": ("face_Ex", "face_Ey", "face_Gxy", "core_scale"),
+            "singular_values": (4.0, 3.0, 2.0, 0.1),
+            "numerical_rank": 4,
+            "condition_number": condition_number,
+            "weakest_right_singular_vector": (0.1, 0.2, 0.3, -0.9),
+        }
+
+    def validation_row(model, observable, category, experimental, fe, error, status):
+        return {
+            "model": model,
+            "observable": observable,
+            "category": category,
+            "experimental_value": experimental,
+            "FE_value": fe,
+            "equivalent_error_percent": error,
+            "identity_status": status,
+        }
+
+    return SP13EvidenceBundle(
+        sensitivity=record(
+            SensitivityEvidence,
+            "sensitivity",
+            "SYNTHETIC_FROZEN",
+            {
+                # CSV cells are stored as text in the historical layout.
+                "raw_sensitivity_matrix": (
+                    {"observable": "SYN_A1", "baseline_frequency_hz": "10.0",
+                     "face_Ex": "0.125", "face_Ey": "0.25", "face_Gxy": "0.5",
+                     "core_scale": "0.0625"},
+                ),
+            },
+        ),
+        identifiability=record(
+            IdentifiabilityEvidence,
+            "identifiability",
+            "SYNTHETIC_FROZEN",
+            {"models": {"U": svd(40.0), "P": svd(50.0)}},
+        ),
+        identification=record(
+            IdentificationEvidence,
+            "identification",
+            "SYNTHETIC_HISTORICAL_RECOMMENDATION",
+            {
+                "identified_properties": {
+                    "models": {
+                        "U": {"properties_MPa": {"Ex": 41000.0, "Ey": 52000.0, "Gxy": 6100.0}},
+                        "P": {"properties_MPa": {"Ex": 43000.0, "Ey": 51000.0, "Gxy": 7300.0}},
+                    },
+                    "stability": {
+                        "Ex": "RELATIVELY_STABLE",
+                        "Ey": "RELATIVELY_STABLE",
+                        "Gxy": "WEIGHTING_SENSITIVE",
+                        "U_P_symmetric_difference_percent": {"Ex": 5.0, "Ey": 2.0, "Gxy": 18.0},
+                    },
+                }
+            },
+        ),
+        validation=record(
+            ValidationEvidence,
+            "validation",
+            "SYNTHETIC_HISTORICAL_RECOMMENDATION",
+            {
+                "validation_rows": (
+                    validation_row("BASELINE", "SYN_A1", "PRIMARY", "10.0", "11.0", "10.0", "PASS"),
+                    validation_row("U", "SYN_A1", "PRIMARY", "10.0", "10.5", "5.0",
+                                   "mode 1; MAC=0.990000000; margin=0.900000000; PASS"),
+                    validation_row("P", "SYN_H1", "HOLDOUT_DIAGNOSTIC", "30.0", "29.0", "-3.25",
+                                   "local-family continuation mode 9; MAC=0.600000000; "
+                                   "margin=0.300000000; DIAGNOSTIC_ONLY"),
+                    validation_row("P", "SYN_A3_center", "HOLDOUT", "20.0", "19.5", "-2.5",
+                                   "modes [3, 4]; min canonical correlation squared=0.990000000; "
+                                   "max angle=1.000000 deg; PASS"),
+                ),
+            },
+        ),
+    )
+
+
+def _registration():
+    calibration = {"mode": "manual", "manual_scale": 1.0}
+    return FrozenRegistration.create(
+        experimental_source_identity={
+            "path": "project/specimen/experiment.unv",
+            "size": 4096,
+            "mtime_ns": 1,
+            "sha256": "1" * 64,
+        },
+        experimental_modal_set_identity=None,
+        fe_geometry_identity={
+            "schema_version": "fe-geometry-identity/2",
+            "node_count": 2,
+            "instances": ["PLATE-1"],
+            "dof_components": ["U1", "U2", "U3"],
+            "sha256": "2" * 64,
+        },
+        calibration=calibration,
+        calibration_fingerprint=calibration_fingerprint(calibration),
+        orientation_candidate_id="geometry-0123456789abcdef",
+        rotation=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        translation=[0.0, 0.0, 0.0],
+        coordinate_scales=[1.0, 1.0, 1.0],
+        experimental_node_ids=[1, 2],
+        mapped_fe_node_ids=["PLATE-1:1", "PLATE-1:2"],
+        measured_dof_contract=[[False, False, True], [False, False, True]],
+        registration_metrics={},
+    )
+
+
+REGISTRATION = _registration()
+
+# A model the UI has never heard of: it must render without any UI change.
+THIRD_MODEL = IdentificationModelDefinition.create(
+    model_id="synthetic_spring_mass",
+    display_name="Synthetic spring-mass test model",
+    parameter_definitions=(
+        IdentificationParameterDefinition(
+            parameter_id="k1", display_name="k1", unit="N/m",
+            meaning="Synthetic spring stiffness.",
+        ),
+        IdentificationParameterDefinition(
+            parameter_id="m1", display_name="m1", unit="kg",
+            meaning="Synthetic lumped mass.",
+        ),
+    ),
+    frozen_assumptions=("Synthetic assumption: linear springs.",),
+    limitations=("Synthetic limitation: test model only.",),
+    workflow_status=ModelWorkflowStatus.RESEARCH,
+)
+
+
+def _session(model, specimen="SP14"):
+    task = MaterialIdentificationTaskDefinition(
+        model=model,
+        selected_parameter_ids=model.parameter_ids,
+        parameter_bounds={},
+        weighting_selection="U",
+        provenance=PROVENANCE,
+    )
+    return MaterialIdentificationSession.create(
+        session_id=f"{model.model_id}-ui-session",
+        created_at=TIMESTAMP,
+        task_definition=task,
+        source_identities=MaterialIdentificationSourceIdentities(specimen_label=specimen),
+        registration=REGISTRATION,
+    )
+
+
+def _binding(session, **overrides):
+    registration = session.registration_reference
+    fields = {
+        "identification_model_id": session.task_definition.identification_model_id,
+        "identification_model_hash": session.task_definition.identification_model_hash,
+        "registration_hash": registration.registration_hash,
+        "experimental_content_sha256": registration.experimental_content_sha256,
+    }
+    fields.update(overrides)
+    return EvidenceScientificBinding.create(**fields)
+
+
+def _bound(record_type, session, name, status, content, **overrides):
+    return record_type.create(
+        evidence_id=f"bound-{name}",
+        timestamp=TIMESTAMP,
+        source_identity=SOURCE,
+        provenance=PROVENANCE,
+        status=status,
+        content=content,
+        scientific_binding=_binding(session, **overrides),
+    )
+
+
+def _bound_sensitivity(session, parameter_ids, rows):
+    # The shape the production runner stores.
+    return _bound(
+        SensitivityEvidence,
+        session,
+        "sensitivity",
+        "COMPLETED",
+        {
+            "raw_sensitivity_matrix": tuple(
+                {"observable": observable, "baseline_frequency_hz": 30.0}
+                for observable, _values in rows
+            ),
+            "observation_ids": tuple(observable for observable, _values in rows),
+            "parameter_ids": tuple(parameter_ids),
+            "scaled_sensitivity": tuple(tuple(values) for _id, values in rows),
+        },
+    )
+
+
+def _bound_identifiability(session, observability):
+    return _bound(
+        IdentifiabilityEvidence,
+        session,
+        "identifiability",
+        "NOT_ASSESSED",
+        {
+            "models": {
+                "U": {
+                    "parameter_order": tuple(observability),
+                    "singular_values": tuple(float(3 - index) for index in range(len(observability))),
+                    "numerical_rank": len(observability),
+                    "condition_number": 3.0,
+                    "deficient_directions": (),
+                    "parameter_observability": dict(observability),
+                }
+            }
+        },
+    )
+
+
+def _bound_identification(session, values, unit, **overrides):
+    # The committed adapter stores every model under "properties_MPa".
+    return _bound(
+        IdentificationEvidence,
+        session,
+        "identification",
+        "COMPLETED",
+        {
+            "identified_properties": {
+                "models": {
+                    "U": {"properties_MPa": dict(values), "parameter_unit": unit, "uncertainty": {}}
+                }
+            }
+        },
+        **overrides,
+    )
 
 
 class _FakeWidget:
@@ -120,7 +417,7 @@ def _widget_texts(widget):
     return texts
 
 
-class MaterialIdentificationInstallerTests(unittest.TestCase):
+class _ApplicationHarness:
     def _application(self):
         import material_identification_ui
 
@@ -160,49 +457,21 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
 
     def _application_with_report_evidence(self):
         application = self._application()
-        application.identified_properties = {
-            "recommendation": "ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL",
-            "models": {
-                "U": {"properties_MPa": {"Ex": 45.0, "Ey": 60.0, "Gxy": 8.0}},
-                "P": {"properties_MPa": {"Ex": 48.0, "Ey": 59.0, "Gxy": 7.0}},
-            },
-            "stability": {
-                "Ex": "RELATIVELY_STABLE",
-                "Ey": "RELATIVELY_STABLE",
-                "Gxy": "WEIGHTING_SENSITIVE",
-                "U_P_symmetric_difference_percent": {
-                    "Ex": 4.0,
-                    "Ey": 1.0,
-                    "Gxy": 17.0,
-                },
-            },
-        }
-        application.validation_evidence = {
-            "recommendation": "ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL",
-            "primary_observables": (
-                {
-                    "model": "U",
-                    "observable": "A7",
-                    "experimental_frequency_hz": 31.4,
-                    "fe_frequency_hz": 29.8,
-                    "frequency_error_percent": -5.2,
-                    "status": "PASS",
-                },
-            ),
-            "holdouts": (
-                {
-                    "model": "P",
-                    "observable": "A10+A11",
-                    "experimental_frequency_hz": 95.45,
-                    "fe_frequency_hz": 93.25,
-                    "frequency_error_percent": -2.3,
-                    "status": "IMPROVES",
-                },
-            ),
-        }
-        application._refresh_material_identification_pages()
+        application.bind_material_identification_evidence(
+            _synthetic_historical_bundle()
+        )
         return application
 
+    def _page_text(self, application, step_label):
+        return "\n".join(
+            _widget_texts(application.material_identification_pages[step_label])
+        )
+
+    def _all_texts(self, application):
+        return "\n".join(_widget_texts(application.material_identification_tab))
+
+
+class MaterialIdentificationInstallerTests(_ApplicationHarness, unittest.TestCase):
     def test_tab_creation_contains_all_gui_zero_sections(self):
         from ui_policy import MATERIAL_IDENTIFICATION_STEP_LABELS
 
@@ -235,7 +504,7 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
 
     def test_project_startup_builds_shell_without_backend(self):
         application = self._application()
-        self.assertEqual(len(application.material_identification_pages), 7)
+        self.assertEqual(len(application.material_identification_pages), 8)
         self.assertFalse(hasattr(application, "material_identification_solver"))
 
     def test_variable_trace_callback_accepts_tk_arguments(self):
@@ -270,10 +539,125 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             },
         )
 
-    def test_task_definition_page_renders_supported_scope_and_interpretation(self):
+    def test_data_readiness_page_has_explicit_empty_state(self):
         application = self._application()
-        page = application.material_identification_pages["2. Task Definition"]
+        page = application.material_identification_pages[
+            "2. Data Readiness Check"
+        ]
         text = "\n".join(_widget_texts(page))
+        self.assertIn("does not calculate corrections", text)
+        self.assertIn("READY permits documented progression", text)
+        self.assertEqual(
+            application.material_readiness_status_label.kwargs["text"],
+            "BLOCKED",
+        )
+        self.assertEqual(
+            application.material_readiness_empty_label.kwargs["text"],
+            "No data-readiness evidence available.",
+        )
+        self.assertEqual(
+            tuple(application.material_readiness_experimental_table.items.values()),
+            (
+                ("Modal data available", "BLOCKED", "No stored readiness evidence"),
+                ("Mode shapes available", "BLOCKED", "No stored readiness evidence"),
+                ("Coordinates available", "BLOCKED", "No stored readiness evidence"),
+                ("Registration status", "BLOCKED", "No stored readiness evidence"),
+            ),
+        )
+        self.assertEqual(len(application.material_readiness_fe_table.items), 5)
+
+    def test_data_readiness_page_renders_ready_state(self):
+        application = self._application()
+        application.data_readiness_evidence = {
+            "overall_status": "READY",
+            "experimental": {
+                "modal_data": {"status": "READY", "detail": "7 fitted modes"},
+                "mode_shapes": {"status": "READY", "detail": "121 points"},
+                "coordinates": {"status": "READY", "detail": "Grid loaded"},
+                "registration": {"status": "READY", "detail": "Frozen transform"},
+            },
+            "fe": {
+                "model_files": {"status": "READY", "detail": "CAE/INP/ODB frozen"},
+                "geometry_consistency": {"status": "READY", "detail": "Consistent"},
+                "thickness_consistency": {"status": "READY", "detail": "Consistent"},
+                "material_provenance": {"status": "READY", "detail": "Documented"},
+                "adhesive_representation": {"status": "READY", "detail": "Documented"},
+            },
+        }
+
+        application._refresh_material_identification_pages()
+
+        self.assertEqual(
+            application.material_readiness_status_label.kwargs["text"], "READY"
+        )
+        self.assertEqual(application.material_readiness_empty_label.kwargs["text"], "")
+        self.assertEqual(
+            tuple(application.material_readiness_experimental_table.items.values())[0],
+            ("Modal data available", "READY", "7 fitted modes"),
+        )
+        self.assertEqual(
+            tuple(application.material_readiness_fe_table.items.values())[-1],
+            ("Adhesive representation status", "READY", "Documented"),
+        )
+
+    def test_data_readiness_page_renders_blocked_state(self):
+        application = self._application()
+        application.data_readiness_evidence = {
+            "experimental": {
+                "modal_data": {"status": "READY", "detail": "Available"},
+                "mode_shapes": {"status": "READY", "detail": "Available"},
+                "coordinates": {"status": "READY", "detail": "Available"},
+                "registration": {
+                    "status": "BLOCKED",
+                    "detail": "Physical axes are not documented",
+                },
+            },
+            "fe": {
+                "model_files": {"status": "READY", "detail": "Available"},
+                "geometry_consistency": {
+                    "status": "WARNING",
+                    "detail": "Review dimensions",
+                },
+                "thickness_consistency": {
+                    "status": "BLOCKED",
+                    "detail": "Core thickness conflict",
+                },
+                "material_provenance": {
+                    "status": "WARNING",
+                    "detail": "Layup unknown",
+                },
+                "adhesive_representation": {
+                    "status": "BLOCKED",
+                    "detail": "Mass conflict unresolved",
+                },
+            },
+        }
+
+        application._refresh_material_identification_pages()
+
+        self.assertEqual(
+            application.material_readiness_status_label.kwargs["text"],
+            "BLOCKED",
+        )
+        self.assertIn(
+            ("Registration status", "BLOCKED", "Physical axes are not documented"),
+            tuple(application.material_readiness_experimental_table.items.values()),
+        )
+        self.assertIn(
+            (
+                "Adhesive representation status",
+                "BLOCKED",
+                "Mass conflict unresolved",
+            ),
+            tuple(application.material_readiness_fe_table.items.values()),
+        )
+
+    def test_task_definition_page_renders_supported_scope_and_interpretation(self):
+        # The SP13 face-sheet wording belongs to the historical SP13 import only.
+        application = self._application_with_report_evidence()
+        page = application.material_identification_pages["3. Task Definition"]
+        text = "\n".join(_widget_texts(page))
+        self.assertIn(HISTORICAL_STATUS, text)
         self.assertIn(
             "Effective homogeneous face-sheet property identification", text
         )
@@ -286,7 +670,7 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
 
     def test_modal_correspondence_page_renders_tables_and_scientific_wording(self):
         application = self._application()
-        page = application.material_identification_pages["3. Modal Correspondence"]
+        page = application.material_identification_pages["4. Modal Correspondence"]
         text = "\n".join(_widget_texts(page))
         self.assertIn("without new matching", text)
         self.assertIn("MAC/subspace are identity validation only", text)
@@ -381,7 +765,7 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
 
     def test_sensitivity_page_renders_required_sections_and_wording(self):
         application = self._application()
-        page = application.material_identification_pages["4. Sensitivity"]
+        page = application.material_identification_pages["5. Sensitivity"]
         text = "\n".join(_widget_texts(page))
         self.assertIn("Sensitivity indicates influence", text)
         self.assertIn("does not automatically mean identifiable material truth", text)
@@ -389,6 +773,18 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             "Sensitivity matrix",
             "Observability summary",
             "Identifiability summary",
+        ):
+            self.assertIn(expected, text)
+        # Nothing bound: no parameter columns and no SP13 frozen-parameter wording.
+        self.assertEqual(
+            application.material_sensitivity_table.kwargs["columns"], ("observable", "type")
+        )
+        self.assertNotIn("Core frozen", text)
+
+        # The historical SP13 import keeps its legacy columns and wording.
+        application.bind_material_identification_evidence(_synthetic_historical_bundle())
+        text = "\n".join(_widget_texts(page))
+        for expected in (
             "Core frozen",
             "Density frozen",
             "Adhesive frozen",
@@ -399,6 +795,10 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             tuple(application.material_sensitivity_table.headings),
             ("observable", "type", "ex", "ey", "gxy"),
         )
+        self.assertEqual(
+            application.material_sensitivity_table.kwargs["columns"],
+            ("observable", "type", "ex", "ey", "gxy"),
+        )
 
     def test_sensitivity_page_has_explicit_empty_state(self):
         application = self._application()
@@ -407,10 +807,8 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             "No sensitivity or identifiability evidence available.",
         )
         self.assertEqual(application.material_sensitivity_table.items, {})
-        self.assertEqual(
-            tuple(application.material_observability_table.items.values()),
-            (("Ex", "unavailable"), ("Ey", "unavailable"), ("Gxy", "unavailable")),
-        )
+        # Nothing bound: no model, so no placeholder parameter rows.
+        self.assertEqual(tuple(application.material_observability_table.items.values()), ())
         self.assertEqual(
             tuple(application.material_identifiability_table.items.values()),
             (
@@ -421,60 +819,40 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             ),
         )
 
-    def test_sensitivity_page_displays_existing_evidence_without_recalculation(self):
-        application = self._application()
-        application.sensitivity_result = SimpleNamespace(
-            observation_ids=("mode-8", "family-A8-A9"),
-            observable_types={
-                "mode-8": "scalar",
-                "family-A8-A9": "family",
-            },
-            parameter_ids=("Ey", "Ex", "Gxy"),
-            scaled_sensitivity=((0.2, 0.1, 0.3), (-0.5, 0.4, 0.0)),
-        )
-        application.identifiability_result = SimpleNamespace(
-            rank=2,
-            condition_number=125.0,
-            singular_values=(4.0, 1.0, 0.032),
-            parameter_observability={
-                "Ex": "OBSERVABLE",
-                "Ey": "PARTIALLY_OBSERVABLE",
-                "Gxy": "UNOBSERVABLE",
-            },
-            deficient_directions=(
-                SimpleNamespace(
-                    parameter_loadings={"Ex": 0.7, "Ey": -0.714, "Gxy": 0.0}
-                ),
-            ),
-        )
-
-        application._refresh_material_identification_pages()
-
-        self.assertEqual(
-            tuple(application.material_sensitivity_table.items.values()),
-            (
-                ("mode-8", "Scalar mode", "0.1", "0.2", "0.3"),
-                ("family-A8-A9", "Family observable", "0.4", "-0.5", "0"),
-            ),
+        # A historical import without identifiability keeps its legacy placeholders.
+        bundle = _synthetic_historical_bundle()
+        application.bind_material_identification_evidence(
+            SP13EvidenceBundle(bundle.sensitivity, None, None, None)
         )
         self.assertEqual(
             tuple(application.material_observability_table.items.values()),
-            (("Ex", "strong"), ("Ey", "weak"), ("Gxy", "unavailable")),
+            (("Ex", "unavailable"), ("Ey", "unavailable"), ("Gxy", "unavailable")),
+        )
+
+    def test_sensitivity_page_displays_typed_historical_sp13_evidence(self):
+        application = self._application()
+        application.bind_material_identification_evidence(_synthetic_historical_bundle())
+
+        self.assertEqual(
+            tuple(application.material_sensitivity_table.items.values())[0],
+            ("SYN_A1", "Scalar mode", "0.125", "0.25", "0.5"),
         )
         self.assertEqual(
-            tuple(application.material_identifiability_table.items.values()),
-            (
-                ("Rank", "2"),
-                ("Condition number", "125"),
-                ("Singular values", "4, 1, 0.032"),
-                ("Weakest direction", "Ex +0.700, Ey -0.714, Gxy +0.000"),
-            ),
+            tuple(application.material_observability_table.items.values()),
+            (("Ex", "unavailable"), ("Ey", "unavailable"), ("Gxy", "unavailable")),
         )
+        summary = tuple(application.material_identifiability_table.items.values())
+        self.assertEqual(summary[0], ("Rank", "U: 4; P: 4"))
+        self.assertEqual(
+            summary[1], ("Condition number", "U: 40; P: 50")
+        )
+        self.assertIn("core_scale -0.900", summary[3][1])
         self.assertEqual(application.material_sensitivity_empty_label.kwargs["text"], "")
 
     def test_identification_page_renders_interpretation_and_limitations(self):
-        application = self._application()
-        page = application.material_identification_pages["5. Identification"]
+        # The SP13 interpretation and limitations belong to the historical import.
+        application = self._application_with_report_evidence()
+        page = application.material_identification_pages["6. Identification"]
         text = "\n".join(_widget_texts(page))
         self.assertIn("Model U", text)
         self.assertIn("Model P", text)
@@ -498,10 +876,23 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             application.material_identification_empty_label.kwargs["text"],
             "No effective-property identification result available.",
         )
+        # Nothing bound: no model, so no placeholder parameter rows.
+        self.assertEqual(tuple(application.material_model_u_table.items.values()), ())
+        self.assertEqual(tuple(application.material_model_p_table.items.values()), ())
+        self.assertEqual(
+            application.material_identification_status_label.kwargs["text"],
+            "NO_IDENTIFICATION_RESULT",
+        )
+
+        # A historical import without identification keeps its legacy empty rows.
         unavailable_rows = (
             ("Ex", "—", "—"),
             ("Ey", "—", "—"),
             ("Gxy", "—", "—"),
+        )
+        bundle = _synthetic_historical_bundle()
+        application.bind_material_identification_evidence(
+            SP13EvidenceBundle(bundle.sensitivity, None, None, None)
         )
         self.assertEqual(
             tuple(application.material_model_u_table.items.values()), unavailable_rows
@@ -514,79 +905,61 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             "NO_IDENTIFICATION_RESULT",
         )
 
-    def test_identification_page_displays_stored_u_p_record(self):
+    def test_identification_page_displays_typed_u_p_record(self):
         application = self._application()
-        application.identified_properties = {
-            "recommendation": "ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL",
-            "models": {
-                "U": {
-                    "properties_MPa": {
-                        "Ex": 45927.2590467,
-                        "Ey": 60716.9435522,
-                        "Gxy": 8194.19208355,
-                    }
-                },
-                "P": {
-                    "properties_MPa": {
-                        "Ex": 47854.4727274,
-                        "Ey": 60291.0545452,
-                        "Gxy": 6906.64847093,
-                    }
-                },
-            },
-            "stability": {
-                "Ex": "RELATIVELY_STABLE",
-                "Ey": "RELATIVELY_STABLE",
-                "Gxy": "WEIGHTING_SENSITIVE",
-                "U_P_symmetric_difference_percent": {
-                    "Ex": 4.11,
-                    "Ey": 0.704,
-                    "Gxy": 17.053,
-                },
-            },
-        }
-
-        application._refresh_material_identification_pages()
+        application.bind_material_identification_evidence(_synthetic_historical_bundle())
 
         self.assertEqual(
             tuple(application.material_model_u_table.items.values()),
             (
-                ("Ex", "45927.3", "MPa"),
-                ("Ey", "60716.9", "MPa"),
-                ("Gxy", "8194.19", "MPa"),
+                ("Ex", "41000", "MPa"),
+                ("Ey", "52000", "MPa"),
+                ("Gxy", "6100", "MPa"),
             ),
         )
         self.assertEqual(
             tuple(application.material_model_p_table.items.values()),
             (
-                ("Ex", "47854.5", "MPa"),
-                ("Ey", "60291.1", "MPa"),
-                ("Gxy", "6906.65", "MPa"),
+                ("Ex", "43000", "MPa"),
+                ("Ey", "51000", "MPa"),
+                ("Gxy", "7300", "MPa"),
             ),
         )
         self.assertEqual(
             tuple(application.material_identification_comparison_table.items.values()),
             (
-                ("Ex", "4.11", "relatively stable"),
-                ("Ey", "0.704", "relatively stable"),
-                ("Gxy", "17.053", "weighting-sensitive"),
+                ("Ex", "5", "relatively stable"),
+                ("Ey", "2", "relatively stable"),
+                ("Gxy", "18", "weighting-sensitive"),
             ),
         )
         self.assertEqual(
             application.material_identification_status_label.kwargs["text"],
-            "ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL",
+            "SYNTHETIC_HISTORICAL_RECOMMENDATION",
         )
         self.assertEqual(application.material_identification_empty_label.kwargs["text"], "")
 
     def test_validation_page_renders_sections_badge_and_limitations(self):
         application = self._application()
-        page = application.material_identification_pages["6. Validation"]
+        page = application.material_identification_pages["7. Validation"]
         text = "\n".join(_widget_texts(page))
         for expected in (
             "Overall validation status",
             "Primary observable validation",
             "Holdout validation",
             "NOT USED FOR IDENTIFICATION",
+        ):
+            self.assertIn(expected, text)
+        self.assertEqual(
+            tuple(application.material_primary_validation_table.headings),
+            ("model", "observable", "experimental", "fe", "residual", "status"),
+        )
+        self.assertNotIn("Laminate architecture unknown", text)
+
+        # The SP13 model limitations belong to the historical import.
+        application.bind_material_identification_evidence(_synthetic_historical_bundle())
+        text = "\n".join(_widget_texts(page))
+        for expected in (
             "Effective properties only",
             "Laminate architecture unknown",
             "Core frozen",
@@ -594,10 +967,6 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             "Adhesive frozen",
         ):
             self.assertIn(expected, text)
-        self.assertEqual(
-            tuple(application.material_primary_validation_table.headings),
-            ("model", "observable", "experimental", "fe", "residual", "status"),
-        )
 
     def test_validation_page_has_explicit_empty_state(self):
         application = self._application()
@@ -612,100 +981,51 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             "NO_VALIDATION_EVIDENCE",
         )
 
-    def test_validation_page_displays_stored_primary_and_holdout_rows(self):
+    def test_validation_page_displays_typed_primary_and_holdout_rows(self):
         application = self._application()
-        application.validation_evidence = {
-            "recommendation": "ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL",
-            "validation_rows": (
-                {
-                    "model": "U",
-                    "category": "PRIMARY",
-                    "observable": "A7",
-                    "experimental_value": 31.4234,
-                    "FE_value": 29.787,
-                    "equivalent_error_percent": -5.20756,
-                    "identity_status": "PASS",
-                },
-                {
-                    "model": "U",
-                    "category": "HOLDOUT",
-                    "observable": "A10+A11",
-                    "experimental_value": 95.4542,
-                    "FE_value": 95.4514,
-                    "equivalent_error_percent": -0.002976,
-                    "comparison_to_baseline": "IMPROVES",
-                },
-                {
-                    "model": "P",
-                    "category": "HOLDOUT",
-                    "observable": "A13+A14",
-                    "experimental_value": 209.127,
-                    "FE_value": 205.864,
-                    "equivalent_error_percent": -1.56029,
-                    "comparison_to_baseline": "IMPROVES",
-                },
-                {
-                    "model": "P",
-                    "category": "HOLDOUT_DIAGNOSTIC",
-                    "observable": "EXP10/A15 diagnostic",
-                    "experimental_value": 228.607,
-                    "FE_value": 229.56,
-                    "equivalent_error_percent": 0.416883,
-                    "identity_status": "DIAGNOSTIC_ONLY",
-                },
-            ),
-        }
+        application.bind_material_identification_evidence(_synthetic_historical_bundle())
 
-        application._refresh_material_identification_pages()
-
-        self.assertEqual(
-            tuple(application.material_primary_validation_table.items.values()),
-            (("U", "A7", "31.4234", "29.787", "-5.20756", "PASS"),),
-        )
-        self.assertEqual(
-            tuple(application.material_holdout_validation_table.items.values()),
-            (
-                ("U", "A10+A11", "95.4542", "95.4514", "-0.002976", "IMPROVES"),
-                ("P", "A13+A14", "209.127", "205.864", "-1.56029", "IMPROVES"),
-                (
-                    "P",
-                    "EXP10/A15 diagnostic",
-                    "228.607",
-                    "229.56",
-                    "0.416883",
-                    "DIAGNOSTIC_ONLY",
-                ),
-            ),
-        )
+        primary = tuple(application.material_primary_validation_table.items.values())
+        holdout = tuple(application.material_holdout_validation_table.items.values())
+        self.assertIn(("U", "SYN_A1", "10", "10.5", "5", "mode 1; MAC=0.990000000; margin=0.900000000; PASS"), primary)
+        self.assertIn(("P", "SYN_H1", "30", "29", "-3.25", "local-family continuation mode 9; MAC=0.600000000; margin=0.300000000; DIAGNOSTIC_ONLY"), holdout)
         self.assertEqual(
             application.material_holdout_validation_badge.kwargs["text"],
             "NOT USED FOR IDENTIFICATION",
         )
         self.assertEqual(
             application.material_validation_status_label.kwargs["text"],
-            "ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL",
+            "SYNTHETIC_HISTORICAL_RECOMMENDATION",
         )
         self.assertEqual(application.material_validation_empty_label.kwargs["text"], "")
 
     def test_report_page_renders_all_required_sections(self):
         application = self._application()
-        page = application.material_identification_pages["7. Report"]
+        page = application.material_identification_pages["8. Report"]
         text = "\n".join(_widget_texts(page))
         for expected in (
             "Project summary",
             "Task definition",
+            "Identification result",
+            "Validation evidence",
+            "Export PDF report",
+            "Export JSON evidence",
+            "Export CSV tables",
+        ):
+            self.assertIn(expected, text)
+        self.assertNotIn("Unknown: Ex, Ey, Gxy", text)
+
+        # The SP13 task and limitation wording belongs to the historical import.
+        application.bind_material_identification_evidence(_synthetic_historical_bundle())
+        text = "\n".join(_widget_texts(page))
+        for expected in (
             "Effective homogeneous face-sheet property identification",
             "Unknown: Ex, Ey, Gxy",
             "Frozen: core, density, adhesive, geometry",
-            "Identification result",
-            "Validation evidence",
             "Effective properties only",
             "not ply/fibre constants",
             "unknown laminate architecture",
             "frozen core/interface assumptions",
-            "Export PDF report",
-            "Export JSON evidence",
-            "Export CSV tables",
         ):
             self.assertIn(expected, text)
 
@@ -742,22 +1062,32 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
         self.assertEqual(application.material_report_empty_label.kwargs["text"], "")
         self.assertEqual(
             application.material_report_validation_status_label.kwargs["text"],
-            "Validation status: ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL",
+            "Validation status: SYNTHETIC_HISTORICAL_RECOMMENDATION",
         )
-        self.assertEqual(
-            tuple(application.material_report_validation_table.items.values()),
+        rows = tuple(application.material_report_validation_table.items.values())
+        self.assertIn(
             (
-                ("PRIMARY", "U", "A7", "31.4", "29.8", "-5.2", "PASS"),
-                (
-                    "NOT USED FOR IDENTIFICATION",
-                    "P",
-                    "A10+A11",
-                    "95.45",
-                    "93.25",
-                    "-2.3",
-                    "IMPROVES",
-                ),
+                "PRIMARY",
+                "U",
+                "SYN_A1",
+                "10",
+                "10.5",
+                "5",
+                "mode 1; MAC=0.990000000; margin=0.900000000; PASS",
             ),
+            rows,
+        )
+        self.assertIn(
+            (
+                "NOT USED FOR IDENTIFICATION",
+                "P",
+                "SYN_A3_center",
+                "20",
+                "19.5",
+                "-2.5",
+                "modes [3, 4]; min canonical correlation squared=0.990000000; max angle=1.000000 deg; PASS",
+            ),
+            rows,
         )
 
     def test_report_exporters_write_pdf_json_and_csv_from_snapshot(self):
@@ -786,7 +1116,7 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             payload = json.loads(json_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 payload["validation"]["status"],
-                "ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL",
+                "SYNTHETIC_HISTORICAL_RECOMMENDATION",
             )
             with csv_path.open(newline="", encoding="utf-8-sig") as stream:
                 rows = list(csv.DictReader(stream))
@@ -796,7 +1126,331 @@ class MaterialIdentificationInstallerTests(unittest.TestCase):
             reader = PdfReader(pdf_path)
             report_text = "\n".join(page.extract_text() or "" for page in reader.pages)
             self.assertIn("Effective Material Identification Report", report_text)
-            self.assertIn("ACCEPT_AS_ENGINEERING_EFFECTIVE_MODEL", report_text)
+            self.assertIn("SYNTHETIC_HISTORICAL_RECOMMENDATION", report_text)
+
+
+class ModelDrivenMaterialIdentificationUiTests(_ApplicationHarness, unittest.TestCase):
+    """Production pages are driven by the session's IdentificationModelDefinition."""
+
+    def stage_a_application(self, **evidence):
+        application = self._application()
+        session = _session(STAGE_A_BENDING_MODEL)
+        application.bind_material_identification_session(session, **evidence)
+        return application, session
+
+    def stage_a_evidence(self, session):
+        return {
+            "sensitivity": _bound_sensitivity(
+                session,
+                ("D11", "D12", "D66"),
+                (("EXP1_A7", (0.1, 0.2, 0.3)), ("EXP2_A9", (0.4, 0.5, 0.6))),
+            ),
+            "identifiability": _bound_identifiability(
+                session,
+                {"D11": "OBSERVABLE", "D12": "PARTIALLY_OBSERVABLE", "D66": "UNOBSERVABLE"},
+            ),
+            "identification": _bound_identification(
+                session, {"D11": 12.0, "D12": 2.4, "D66": 5.0}, "N·m"
+            ),
+        }
+
+    def assert_no_face_sheet_parameters(self, application):
+        text = self._all_texts(application)
+        for forbidden in ("• Ex", "• Gxy", "Unknown: Ex", "MPa", "Gxy weighting-sensitive",
+                          "Laminate architecture unknown", "Core frozen", "face-sheet"):
+            self.assertNotIn(forbidden, text)
+        for table in (
+            application.material_sensitivity_table,
+            application.material_observability_table,
+            application.material_model_u_table,
+            application.material_model_p_table,
+            application.material_identification_comparison_table,
+            application.material_report_identification_table,
+        ):
+            for row in table.items.values():
+                self.assertNotIn(row[0], ("Ex", "Ey", "Gxy"))
+                self.assertNotIn("MPa", row)
+
+    # A / B
+    def test_stage_a_bound_session_renders_d11_d12_d66_in_newton_metres(self):
+        application = self._application()
+        session = _session(STAGE_A_BENDING_MODEL)
+        application.bind_material_identification_session(
+            session, **self.stage_a_evidence(session)
+        )
+
+        self.assertEqual(
+            application.material_sensitivity_table.kwargs["columns"],
+            ("observable", "type", "d11", "d12", "d66"),
+        )
+        self.assertEqual(
+            tuple(
+                application.material_sensitivity_table.headings[key]["text"]
+                for key in ("d11", "d12", "d66")
+            ),
+            ("D11", "D12", "D66"),
+        )
+        self.assertEqual(
+            tuple(application.material_sensitivity_table.items.values()),
+            (
+                ("EXP1_A7", "Scalar mode", "0.1", "0.2", "0.3"),
+                ("EXP2_A9", "Scalar mode", "0.4", "0.5", "0.6"),
+            ),
+        )
+        self.assertEqual(
+            tuple(application.material_observability_table.items.values()),
+            (("D11", "strong"), ("D12", "weak"), ("D66", "unavailable")),
+        )
+        self.assertEqual(
+            tuple(application.material_model_u_table.items.values()),
+            (("D11", "12", "N·m"), ("D12", "2.4", "N·m"), ("D66", "5", "N·m")),
+        )
+        self.assertEqual(
+            tuple(application.material_report_identification_table.items.values())[0],
+            ("D11", "12 N·m", "—", "—", "Unavailable"),
+        )
+        self.assert_no_face_sheet_parameters(application)
+
+    # C
+    def test_effective_face_bound_session_renders_ex_ey_gxy_in_mpa(self):
+        application = self._application()
+        session = _session(EFFECTIVE_FACE_SHEET_MODEL)
+        application.bind_material_identification_session(
+            session,
+            sensitivity=_bound_sensitivity(
+                session, ("Ex", "Ey", "Gxy"), (("EXP1_A7", (0.1, 0.2, 0.3)),)
+            ),
+            identification=_bound_identification(
+                session, {"Ex": 45000.0, "Ey": 60000.0, "Gxy": 8000.0}, "MPa"
+            ),
+        )
+
+        self.assertEqual(
+            application.material_sensitivity_table.kwargs["columns"],
+            ("observable", "type", "ex", "ey", "gxy"),
+        )
+        self.assertEqual(
+            tuple(application.material_model_u_table.items.values()),
+            (("Ex", "45000", "MPa"), ("Ey", "60000", "MPa"), ("Gxy", "8000", "MPa")),
+        )
+        text = self._page_text(application, "3. Task Definition")
+        self.assertIn("Effective homogeneous face-sheet properties (effective_face_sheet)", text)
+        self.assertIn("• Ex [MPa] — Effective homogeneous face-sheet modulus along X.", text)
+        # The research model's own wording, not the historical SP13 conclusions.
+        self.assertNotIn(HISTORICAL_STATUS, self._all_texts(application))
+        self.assertNotIn("Gxy weighting-sensitive", self._all_texts(application))
+
+    # D
+    def test_an_unknown_third_model_renders_without_ui_changes(self):
+        application = self._application()
+        session = _session(THIRD_MODEL)
+        application.bind_material_identification_session(
+            session,
+            sensitivity=_bound_sensitivity(session, ("k1", "m1"), (("SYN_1", (0.7, 0.3)),)),
+            identification=_bound_identification(session, {"k1": 1500.0}, "N/m"),
+        )
+
+        self.assertEqual(
+            application.material_sensitivity_table.kwargs["columns"],
+            ("observable", "type", "k1", "m1"),
+        )
+        self.assertEqual(
+            tuple(application.material_model_u_table.items.values()),
+            (("k1", "1500", "N/m"), ("m1", "—", "—")),
+        )
+        text = self._page_text(application, "3. Task Definition")
+        self.assertIn("• k1 [N/m] — Synthetic spring stiffness.", text)
+        self.assertIn("• m1 [kg] — Synthetic lumped mass.", text)
+        self.assertIn("Synthetic assumption: linear springs.", text)
+        self.assert_no_face_sheet_parameters(application)
+
+    # E
+    def test_specimen_and_identification_model_are_distinct_concepts(self):
+        application = self._application()
+        # "SP13" is only a specimen label here; the model is Stage A.
+        session = _session(STAGE_A_BENDING_MODEL, specimen="SP13")
+        application.bind_material_identification_session(session)
+
+        context = application.material_task_context_label.kwargs["text"]
+        self.assertIn("Specimen / source: SP13", context)
+        self.assertIn(
+            "Identification model: Stage A plate bending stiffness (stage_a_bending)", context
+        )
+        self.assertIn(f"FrozenRegistration: {REGISTRATION.registration_hash}", context)
+        self.assertNotIn(HISTORICAL_STATUS, context)
+
+        from material_identification_ui import report_evidence_snapshot
+
+        task = report_evidence_snapshot(application)["task_definition"]
+        self.assertEqual(task["specimen"], "SP13")
+        self.assertEqual(task["identification_model_id"], "stage_a_bending")
+        self.assertEqual(task["identification_model_hash"], STAGE_A_BENDING_MODEL.definition_hash)
+        self.assertEqual(task["registration_hash"], REGISTRATION.registration_hash)
+        self.assertEqual(
+            [item["parameter_id"] for item in task["unknown_parameters"]], ["D11", "D12", "D66"]
+        )
+        self.assert_no_face_sheet_parameters(application)
+
+    # F
+    def test_production_assumptions_and_limitations_come_from_the_model(self):
+        application, _session_ = self.stage_a_application()
+        texts = self._all_texts(application)
+        for assumption in STAGE_A_BENDING_MODEL.frozen_assumptions:
+            self.assertIn(assumption, application.material_task_frozen_label.kwargs["text"])
+            self.assertIn(assumption, application.material_sensitivity_frozen_label.kwargs["text"])
+        for limitation in STAGE_A_BENDING_MODEL.limitations:
+            for label in (
+                application.material_identification_limitations_label,
+                application.material_validation_limitations_label,
+                application.material_report_limitations_label,
+            ):
+                self.assertIn(limitation, label.kwargs["text"])
+
+        from material_identification_ui import report_evidence_snapshot
+
+        snapshot = report_evidence_snapshot(application)
+        self.assertEqual(snapshot["limitations"], list(STAGE_A_BENDING_MODEL.limitations))
+        for static_sp13 in ("Gxy weighting-sensitive", "Laminate architecture unknown",
+                            "Core frozen", "Density frozen", "Adhesive frozen"):
+            self.assertNotIn(static_sp13, texts)
+        # workflow_status is not turned into a validation statement.
+        self.assertNotIn("production", application.material_task_workflow_label.kwargs["text"])
+
+    # G
+    def test_historical_sp13_stays_historical_and_unbound(self):
+        from material_identification_ui import material_identification_presentation
+
+        application, _session_ = self.stage_a_application()
+        bundle = _synthetic_historical_bundle()
+        application.bind_material_identification_evidence(bundle)
+
+        presentation = material_identification_presentation(application)
+        self.assertEqual(presentation.kind, "historical")
+        self.assertIsNone(presentation.model)
+        self.assertIsNone(application.material_identification_session)
+        self.assertIsNone(application.material_identification_evidence_view_model.model)
+        self.assertEqual(presentation.specimen_label, "SP13")
+        self.assertEqual(bundle.binding_status, "UNBOUND")
+        self.assertIn(HISTORICAL_STATUS, application.material_identification_scope_label.kwargs["text"])
+        context = application.material_task_context_label.kwargs["text"]
+        self.assertIn("Specimen / source: SP13 (historical import)", context)
+        self.assertIn(f"Identification model: not bound — {HISTORICAL_STATUS}", context)
+        self.assertEqual(
+            tuple(application.material_model_u_table.items.values())[0], ("Ex", "41000", "MPa")
+        )
+
+    # H
+    def test_empty_stage_a_session_shows_its_model_not_ex_ey_gxy(self):
+        application, _session_ = self.stage_a_application()
+
+        self.assertEqual(
+            tuple(application.material_model_u_table.items.values()),
+            (("D11", "—", "—"), ("D12", "—", "—"), ("D66", "—", "—")),
+        )
+        self.assertEqual(
+            tuple(application.material_observability_table.items.values()),
+            (("D11", "unavailable"), ("D12", "unavailable"), ("D66", "unavailable")),
+        )
+        self.assertEqual(application.material_sensitivity_table.items, {})
+        self.assertEqual(
+            application.material_sensitivity_table.kwargs["columns"], ("observable", "type")
+        )
+        self.assert_no_face_sheet_parameters(application)
+
+    # I
+    def test_empty_effective_face_session_shows_its_selected_model_parameters(self):
+        application = self._application()
+        application.bind_material_identification_session(_session(EFFECTIVE_FACE_SHEET_MODEL))
+
+        self.assertEqual(
+            tuple(application.material_model_u_table.items.values()),
+            (("Ex", "—", "—"), ("Ey", "—", "—"), ("Gxy", "—", "—")),
+        )
+        self.assertIn(
+            "Identification model: Effective homogeneous face-sheet properties "
+            "(effective_face_sheet)",
+            application.material_task_context_label.kwargs["text"],
+        )
+
+    def test_nothing_bound_shows_a_neutral_state(self):
+        application = self._application()
+        self.assertIn("none selected", application.material_task_context_label.kwargs["text"])
+        for table in (
+            application.material_observability_table,
+            application.material_model_u_table,
+            application.material_model_p_table,
+            application.material_identification_comparison_table,
+            application.material_report_identification_table,
+        ):
+            self.assertEqual(table.items, {})
+        self.assert_no_face_sheet_parameters(application)
+
+    # J
+    def test_identification_status_is_not_presented_as_validation(self):
+        application = self._application()
+        session = _session(STAGE_A_BENDING_MODEL)
+        evidence = self.stage_a_evidence(session)
+        application.bind_material_identification_session(
+            session, identification=evidence["identification"]
+        )
+
+        page = self._page_text(application, "6. Identification")
+        self.assertEqual(application.material_identification_status_label.kwargs["text"], "COMPLETED")
+        self.assertIn("Stored identification status", page)
+        self.assertNotIn("Stored validation state", page)
+        self.assertIn("is not a validation of material properties", page)
+        self.assertEqual(
+            application.material_validation_status_label.kwargs["text"], "NO_VALIDATION_EVIDENCE"
+        )
+        texts = self._all_texts(application).lower()
+        for claim in ("validated material", "material properties are validated",
+                      "converged identification is validated"):
+            self.assertNotIn(claim, texts)
+
+    # K
+    def test_sensitivity_subset_headers_match_only_rendered_parameters(self):
+        application = self._application()
+        session = _session(STAGE_A_BENDING_MODEL)
+        application.bind_material_identification_session(
+            session,
+            sensitivity=_bound_sensitivity(session, ("D66", "D11"), (("EXP1_A7", (0.6, 0.1)),)),
+        )
+
+        self.assertEqual(
+            application.material_sensitivity_table.kwargs["columns"],
+            ("observable", "type", "d11", "d66"),
+        )
+        self.assertEqual(
+            tuple(application.material_sensitivity_table.items.values()),
+            (("EXP1_A7", "Scalar mode", "0.1", "0.6"),),
+        )
+
+    def test_session_binding_refuses_evidence_it_does_not_own(self):
+        from material_identification_evidence_view import EvidenceModelBindingError
+
+        application, session = self.stage_a_application()
+        other_registration = _bound_identification(
+            session, {"D11": 12.0}, "N·m", registration_hash="e" * 64
+        )
+        other_experiment = _bound_identification(
+            session, {"D11": 12.0}, "N·m", experimental_content_sha256="f" * 64
+        )
+        for record in (other_registration, other_experiment):
+            with self.subTest(record=record.scientific_binding):
+                with self.assertRaisesRegex(ValueError, "different FrozenRegistration"):
+                    application.bind_material_identification_session(
+                        session, identification=record
+                    )
+        face_session = _session(EFFECTIVE_FACE_SHEET_MODEL)
+        with self.assertRaises(EvidenceModelBindingError) as context:
+            application.bind_material_identification_session(
+                session,
+                identification=_bound_identification(face_session, {"Ex": 1.0}, "MPa"),
+            )
+        self.assertEqual(context.exception.reason, "model_id")
+        # Nothing was bound by the refused calls.
+        self.assertIs(application.material_identification_session, session)
+        self.assertIsNone(application.material_identification_evidence_view_model.identification)
 
 
 class ProjectEvidenceStatusTests(unittest.TestCase):
@@ -915,7 +1569,7 @@ class MaterialIdentificationGuiShellTests(unittest.TestCase):
         application = self.application
         self.assertIsNone(application.result)
         self.assertFalse(application.running)
-        self.assertEqual(len(application.material_identification_pages), 7)
+        self.assertEqual(len(application.material_identification_pages), 8)
 
 
 if __name__ == "__main__":

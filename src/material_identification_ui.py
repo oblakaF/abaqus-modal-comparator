@@ -3,17 +3,31 @@
 This module intentionally contains no scientific execution path. It presents
 current project state and the supported task definition without starting
 Abaqus or connecting an identification backend.
+
+The pages present one of three contexts (``material_identification_presentation``):
+nothing bound, an explicit historical SP13 import (UNBOUND), or a production
+session whose BOUND evidence is rendered against the session's authoritative
+``IdentificationModelDefinition``.  Parameter ids, order, units, assumptions and
+limitations of production results come only from that definition.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 import csv
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import textwrap
 from tkinter import filedialog, messagebox, ttk
 
+from domain.identification_model import IdentificationModelDefinition
+from domain.material_identification_session import MaterialIdentificationSession
+from material_identification_evidence_view import (
+    EMPTY_EVIDENCE_VIEW_MODEL,
+    MaterialIdentificationEvidenceViewModel,
+)
+from sp13_evidence_adapter import HISTORICAL_STATUS, SP13EvidenceBundle
 from ui_policy import MATERIAL_IDENTIFICATION_STEP_LABELS
 
 
@@ -30,7 +44,346 @@ _EVIDENCE_ROW_LABELS = (
 _STEP_DESCRIPTIONS = {
 }
 
-_EFFECTIVE_PARAMETER_IDS = ("Ex", "Ey", "Gxy")
+# Wording of the explicit historical SP13 import only (UNBOUND REAL-4 records).
+# It describes that frozen study, not any current IdentificationModelDefinition,
+# and is never shown for production or unbound-nothing states.
+_HISTORICAL_SP13_TEXT = {
+    "workflow": "Effective homogeneous face-sheet property identification",
+    "unknowns": ("Ex", "Ey", "Gxy"),
+    "frozen": ("Core", "Density", "Adhesive", "Geometry"),
+    "task_interpretation": (
+        "Effective homogeneous face-sheet properties\n\n"
+        "Results are not true fibre properties, ply properties, or unique "
+        "laminate constants."
+    ),
+    "identification_interpretation": (
+        "Effective homogeneous face-sheet properties\n"
+        "Not true fibre properties, ply properties, or unique laminate constants."
+    ),
+    "identification_limitations": (
+        "Laminate architecture unknown",
+        "Core frozen",
+        "Density frozen",
+        "Adhesive frozen",
+        "Gxy weighting-sensitive",
+    ),
+    "validation_limitations": (
+        "Effective properties only",
+        "Laminate architecture unknown",
+        "Core frozen",
+        "Density frozen",
+        "Adhesive frozen",
+    ),
+    "report_limitations": (
+        "Effective properties only",
+        "Not ply or fibre constants",
+        "Unknown laminate architecture",
+        "Frozen core and interface assumptions",
+    ),
+    "report_limitations_text": (
+        "Effective properties only; not ply/fibre constants; unknown laminate "
+        "architecture; frozen core/interface assumptions."
+    ),
+}
+
+_NO_MODEL_TEXT = "No identification model selected."
+
+_READINESS_EXPERIMENTAL_ROWS = (
+    ("modal_data", "Modal data available"),
+    ("mode_shapes", "Mode shapes available"),
+    ("coordinates", "Coordinates available"),
+    ("registration", "Registration status"),
+)
+
+_READINESS_FE_ROWS = (
+    ("model_files", "CAE / INP / ODB availability"),
+    ("geometry_consistency", "Geometry consistency"),
+    ("thickness_consistency", "Thickness consistency"),
+    ("material_provenance", "Material / provenance status"),
+    ("adhesive_representation", "Adhesive representation status"),
+)
+
+_READINESS_STATES = {"READY", "WARNING", "BLOCKED"}
+
+
+def _evidence_view_model(app) -> MaterialIdentificationEvidenceViewModel:
+    view_model = getattr(app, "material_identification_evidence_view_model", None)
+    if view_model is None:
+        return EMPTY_EVIDENCE_VIEW_MODEL
+    if not isinstance(view_model, MaterialIdentificationEvidenceViewModel):
+        raise TypeError(
+            "material_identification_evidence_view_model must be a "
+            "MaterialIdentificationEvidenceViewModel."
+        )
+    return view_model
+
+
+@dataclass(frozen=True)
+class MaterialIdentificationPresentation:
+    """The identification context the pages present.
+
+    ``kind`` is ``"none"`` (nothing bound), ``"historical"`` (UNBOUND historical
+    SP13 import) or ``"production"`` (BOUND evidence rendered against ``model``).
+    The specimen label and the identification model are separate concepts.
+    """
+
+    kind: str
+    view_model: MaterialIdentificationEvidenceViewModel
+    specimen_label: str | None = None
+    model: IdentificationModelDefinition | None = None
+    registration_hash: str | None = None
+
+
+def _view_records(view_model: MaterialIdentificationEvidenceViewModel) -> tuple:
+    return tuple(
+        record
+        for record in (
+            view_model.sensitivity,
+            view_model.identifiability,
+            view_model.identification,
+            view_model.validation,
+        )
+        if record is not None
+    )
+
+
+def _historical_specimen(records) -> str | None:
+    for record in records:
+        details = getattr(record.provenance, "details", None)
+        if isinstance(details, Mapping) and str(details.get("specimen") or "").strip():
+            return str(details["specimen"]).strip()
+    return None
+
+
+def material_identification_presentation(app) -> MaterialIdentificationPresentation:
+    """Classify what is bound; never infer a model from specimen or parameter names."""
+
+    view_model = _evidence_view_model(app)
+    session = getattr(app, "material_identification_session", None)
+    if session is not None:
+        if not isinstance(session, MaterialIdentificationSession):
+            raise TypeError(
+                "material_identification_session must be a MaterialIdentificationSession."
+            )
+        model = session.task_definition.model
+        if (
+            view_model.model is None
+            or view_model.model.definition_hash != model.definition_hash
+        ):
+            raise ValueError(
+                "The bound evidence view is not rendered against the session's "
+                "identification model."
+            )
+        registration = session.registration_reference
+        return MaterialIdentificationPresentation(
+            kind="production",
+            view_model=view_model,
+            specimen_label=session.source_identities.specimen_label,
+            model=model,
+            registration_hash=(
+                None if registration is None else registration.registration_hash
+            ),
+        )
+    if view_model.model is not None:
+        return MaterialIdentificationPresentation(
+            kind="production", view_model=view_model, model=view_model.model
+        )
+    records = _view_records(view_model)
+    if records:
+        return MaterialIdentificationPresentation(
+            kind="historical",
+            view_model=view_model,
+            specimen_label=_historical_specimen(records),
+        )
+    return MaterialIdentificationPresentation(kind="none", view_model=view_model)
+
+
+def session_evidence_view_model(
+    session: MaterialIdentificationSession,
+    *,
+    sensitivity=None,
+    identifiability=None,
+    identification=None,
+    validation=None,
+) -> MaterialIdentificationEvidenceViewModel:
+    """Build the production view for a session, refusing evidence it does not own.
+
+    The view checks each record's model id and definition hash; this also
+    requires the registration and experimental content of every record to be
+    the session's own FrozenRegistration, so results are never shown under
+    another specimen's registration.
+    """
+
+    if not isinstance(session, MaterialIdentificationSession):
+        raise TypeError("session must be a MaterialIdentificationSession.")
+    view_model = MaterialIdentificationEvidenceViewModel(
+        sensitivity=sensitivity,
+        identifiability=identifiability,
+        identification=identification,
+        validation=validation,
+        model=session.task_definition.model,
+    )
+    records = _view_records(view_model)
+    registration = session.registration_reference
+    if records and registration is None:
+        raise ValueError(
+            "The session has no FrozenRegistration, so its evidence cannot be presented."
+        )
+    for record in records:
+        binding = record.scientific_binding
+        if (
+            binding.registration_hash != registration.registration_hash
+            or binding.experimental_content_sha256
+            != registration.experimental_content_sha256
+        ):
+            raise ValueError(
+                f"{record.RECORD_TYPE} evidence {record.evidence_id!r} belongs to a "
+                "different FrozenRegistration or experiment than the session."
+            )
+    return view_model
+
+
+def _bullets(items) -> str:
+    return "\n".join(f"• {item}" for item in items)
+
+
+def model_presentation_text(
+    presentation: MaterialIdentificationPresentation,
+) -> dict[str, str]:
+    """Page wording for the bound context; production text comes from the model."""
+
+    if presentation.kind == "production":
+        model = presentation.model
+        parameters = model.parameter_definitions
+        specimen = presentation.specimen_label or "Not stated"
+        registration = presentation.registration_hash or "not bound"
+        frozen = model.frozen_assumptions
+        return {
+            "scope": (
+                f"Identification model: {model.display_name} ({model.model_id}). "
+                "Parameters, units, assumptions and limitations come from the model "
+                "definition."
+            ),
+            "context": (
+                f"Specimen / source: {specimen}\n"
+                f"Identification model: {model.display_name} ({model.model_id})\n"
+                f"FrozenRegistration: {registration}"
+            ),
+            "workflow": model.display_name,
+            "unknowns": "\n".join(
+                f"• {item.display_name} [{item.unit}] — {item.meaning}"
+                for item in parameters
+            ),
+            "frozen": _bullets(frozen) or "None stated by the model definition.",
+            "frozen_inline": "; ".join(frozen) or "None stated by the model definition.",
+            "task_interpretation": "\n".join(model.limitations),
+            "identification_interpretation": "\n".join(model.limitations),
+            "identification_limitations": _bullets(model.limitations),
+            "validation_limitations": _bullets(model.limitations),
+            "report_task": "\n".join(
+                (
+                    model.display_name,
+                    f"Specimen / source: {specimen}",
+                    "Unknown: "
+                    + ", ".join(f"{item.display_name} [{item.unit}]" for item in parameters),
+                    "Frozen assumptions: " + ("; ".join(frozen) or "none stated"),
+                )
+            ),
+            "report_limitations": "; ".join(model.limitations),
+        }
+    if presentation.kind == "historical":
+        text = _HISTORICAL_SP13_TEXT
+        specimen = presentation.specimen_label or "Not stated"
+        return {
+            "scope": (
+                f"Historical import of specimen {specimen} ({HISTORICAL_STATUS}): "
+                "results are labelled effective homogeneous face-sheet properties, not "
+                "true fibre properties, ply properties, or unique laminate constants."
+            ),
+            "context": (
+                f"Specimen / source: {specimen} (historical import)\n"
+                f"Identification model: not bound — {HISTORICAL_STATUS}\n"
+                "FrozenRegistration: none (historical import)"
+            ),
+            "workflow": text["workflow"],
+            "unknowns": _bullets(text["unknowns"]),
+            "frozen": _bullets(text["frozen"]),
+            "frozen_inline": "    ".join(f"{item} frozen" for item in text["frozen"]),
+            "task_interpretation": text["task_interpretation"],
+            "identification_interpretation": text["identification_interpretation"],
+            "identification_limitations": _bullets(text["identification_limitations"]),
+            "validation_limitations": _bullets(text["validation_limitations"]),
+            "report_task": "\n".join(
+                (
+                    text["workflow"],
+                    "Unknown: " + ", ".join(text["unknowns"]),
+                    "Frozen: " + ", ".join(item.lower() for item in text["frozen"]),
+                    f"Historical import: {HISTORICAL_STATUS}",
+                )
+            ),
+            "report_limitations": text["report_limitations_text"],
+        }
+    return {
+        "scope": (
+            "No identification model is bound. Results are labelled by the "
+            "identification model of the bound session."
+        ),
+        "context": (
+            "Specimen / source: not bound\n"
+            "Identification model: none selected\n"
+            "FrozenRegistration: not bound"
+        ),
+        "workflow": "No identification task is bound.",
+        "unknowns": _NO_MODEL_TEXT,
+        "frozen": _NO_MODEL_TEXT,
+        "frozen_inline": _NO_MODEL_TEXT,
+        "task_interpretation": _NO_MODEL_TEXT,
+        "identification_interpretation": _NO_MODEL_TEXT,
+        "identification_limitations": _NO_MODEL_TEXT,
+        "validation_limitations": _NO_MODEL_TEXT,
+        "report_task": "No identification task is bound.",
+        "report_limitations": _NO_MODEL_TEXT,
+    }
+
+
+def _sensitivity_columns(
+    presentation: MaterialIdentificationPresentation, view: Mapping[str, object]
+) -> tuple[tuple[str, str], ...]:
+    """(column key, heading) for the parameter columns actually rendered.
+
+    Production headings are the model parameters present in the sensitivity
+    evidence, in model order; every rendered value is checked against the
+    stored matrix under that label, so a column can never be mislabelled.
+    """
+
+    matrix = tuple(view["matrix"])
+    if presentation.kind == "none" or not matrix:
+        return ()
+    if presentation.kind == "historical":
+        names = tuple(name for name, _status in view["observability"])
+    else:
+        model = presentation.model
+        content = presentation.view_model.sensitivity.content
+        stored_ids = tuple(str(item) for item in content["parameter_ids"])
+        stored_rows = tuple(content["scaled_sensitivity"])
+        names = tuple(item for item in model.parameter_ids if item in stored_ids)
+        for row, stored in zip(matrix, stored_rows):
+            expected = tuple(float(stored[stored_ids.index(name)]) for name in names)
+            if tuple(row[2:]) != expected:
+                raise ValueError(
+                    "Rendered sensitivity values do not match the stored matrix; "
+                    "the parameter columns cannot be labelled safely."
+                )
+        names = tuple(model.parameter(item).display_name for item in names)
+    if any(len(row) - 2 != len(names) for row in matrix):
+        raise ValueError(
+            "Rendered sensitivity rows do not match the parameter columns; the "
+            "columns cannot be labelled safely."
+        )
+    keys = tuple(name.lower() for name in names)
+    if len(set(keys)) != len(keys):
+        keys = tuple(f"parameter_{index}" for index in range(len(names)))
+    return tuple(zip(keys, names))
 
 
 def _record_value(record, *names, default=None):
@@ -165,222 +518,18 @@ def modal_correspondence_view(result) -> dict[str, tuple]:
     }
 
 
-def _existing_evidence(app, kind: str):
-    attribute_names = {
-        "sensitivity": (
-            "material_sensitivity_result",
-            "sensitivity_result",
-            "sensitivity",
-        ),
-        "identifiability": (
-            "material_identifiability_result",
-            "identifiability_result",
-            "identifiability",
-        ),
-    }[kind]
-    containers = (
-        app,
-        getattr(app, "material_identification_result", None),
-        getattr(app, "result", None),
-    )
-    for container in containers:
-        if container is None:
-            continue
-        for name in attribute_names:
-            value = _record_value(container, name, default=None)
-            if value is not None:
-                return value
-        metadata = _record_value(container, "metadata", default={}) or {}
-        if isinstance(metadata, Mapping):
-            for name in attribute_names:
-                if metadata.get(name) is not None:
-                    return metadata[name]
-    return None
-
-
-def _sequence(value: object) -> tuple:
-    if value is None:
-        return ()
-    if hasattr(value, "tolist"):
-        value = value.tolist()
-    if isinstance(value, str):
-        return (value,)
-    try:
-        return tuple(value)
-    except TypeError:
-        return (value,)
-
-
-def _effective_parameter_indexes(parameter_ids) -> dict[str, int]:
-    lookup = {
-        str(identifier).strip().lower(): index
-        for index, identifier in enumerate(_sequence(parameter_ids))
-    }
-    return {
-        parameter: lookup[parameter.lower()]
-        for parameter in _EFFECTIVE_PARAMETER_IDS
-        if parameter.lower() in lookup
-    }
-
-
-def _observable_kind(sensitivity, observation_id: str, index: int) -> str:
-    kinds = _record_value(
-        sensitivity,
-        "observable_types",
-        "observation_types",
-        default=None,
-    )
-    if isinstance(kinds, Mapping):
-        value = kinds.get(observation_id, "")
-    else:
-        values = _sequence(kinds)
-        value = values[index] if index < len(values) else ""
-    normalized = str(value or "").strip().lower()
-    if normalized in {"family", "cluster", "family_observable"}:
-        return "Family observable"
-    family_ids = {
-        str(value)
-        for value in _sequence(
-            _record_value(sensitivity, "family_observation_ids", default=())
-        )
-    }
-    return "Family observable" if observation_id in family_ids else "Scalar mode"
-
-
-def _observability_label(value: object) -> str:
-    normalized = _status_value(value).upper().replace(" ", "_")
-    if normalized in {"OBSERVABLE", "STRONG", "PASS"}:
-        return "strong"
-    if normalized in {
-        "PARTIALLY_OBSERVABLE",
-        "PARTIAL",
-        "WEAK",
-        "REVIEW",
-    }:
-        return "weak"
-    return "unavailable"
-
-
-def _weakest_direction_text(identifiability) -> str:
-    explicit = _record_value(identifiability, "weakest_direction", default=None)
-    if explicit is not None:
-        return str(explicit)
-    directions = _sequence(
-        _record_value(identifiability, "deficient_directions", default=())
-    )
-    if not directions:
-        return "Unavailable"
-    direction = directions[-1]
-    loadings = _record_value(direction, "parameter_loadings", default={}) or {}
-    if isinstance(loadings, Mapping) and loadings:
-        return ", ".join(
-            f"{parameter} {float(value):+.3f}"
-            for parameter, value in loadings.items()
-        )
-    dominant = _record_value(direction, "dominant_parameter", default=None)
-    return str(dominant) if dominant else "Unavailable"
-
-
 def sensitivity_evidence_view(app) -> dict[str, object]:
-    """Present stored sensitivity evidence without deriving sensitivities or SVDs."""
+    """Render only the typed evidence view model bound to the application.
 
-    sensitivity = _existing_evidence(app, "sensitivity")
-    identifiability = _existing_evidence(app, "identifiability")
-    matrix_rows = []
-    if sensitivity is not None:
-        parameter_indexes = _effective_parameter_indexes(
-            _record_value(sensitivity, "parameter_ids", default=())
-        )
-        observation_ids = _sequence(
-            _record_value(
-                sensitivity,
-                "observation_ids",
-                "observable_ids",
-                default=(),
-            )
-        )
-        matrix = _sequence(
-            _record_value(
-                sensitivity,
-                "scaled_sensitivity",
-                "sensitivity_matrix",
-                default=(),
-            )
-        )
-        for index, observation_id in enumerate(observation_ids):
-            values = _sequence(matrix[index]) if index < len(matrix) else ()
-            parameter_values = tuple(
-                (
-                    float(values[parameter_indexes[parameter]])
-                    if parameter in parameter_indexes
-                    and parameter_indexes[parameter] < len(values)
-                    else None
-                )
-                for parameter in _EFFECTIVE_PARAMETER_IDS
-            )
-            matrix_rows.append(
-                (
-                    str(observation_id),
-                    _observable_kind(sensitivity, str(observation_id), index),
-                    *parameter_values,
-                )
-            )
+    With nothing bound there is no parameter list to present, so no
+    placeholder parameter rows are shown.
+    """
 
-    observability_source = (
-        _record_value(identifiability, "parameter_observability", default={}) or {}
-        if identifiability is not None
-        else {}
-    )
-    observability_lookup = (
-        {
-            str(parameter).strip().lower(): status
-            for parameter, status in observability_source.items()
-        }
-        if isinstance(observability_source, Mapping)
-        else {}
-    )
-    observability = tuple(
-        (
-            parameter,
-            _observability_label(observability_lookup.get(parameter.lower())),
-        )
-        for parameter in _EFFECTIVE_PARAMETER_IDS
-    )
-
-    if identifiability is None:
-        summary = (
-            ("Rank", "Unavailable"),
-            ("Condition number", "Unavailable"),
-            ("Singular values", "Unavailable"),
-            ("Weakest direction", "Unavailable"),
-        )
-    else:
-        singular_values = _sequence(
-            _record_value(identifiability, "singular_values", default=())
-        )
-        summary = (
-            ("Rank", str(_record_value(identifiability, "rank", default="Unavailable"))),
-            (
-                "Condition number",
-                _format_number(
-                    _record_value(
-                        identifiability, "condition_number", default=None
-                    )
-                ),
-            ),
-            (
-                "Singular values",
-                ", ".join(_format_number(value) for value in singular_values)
-                or "Unavailable",
-            ),
-            ("Weakest direction", _weakest_direction_text(identifiability)),
-        )
-    return {
-        "available": sensitivity is not None or identifiability is not None,
-        "matrix": tuple(matrix_rows),
-        "observability": observability,
-        "identifiability": summary,
-    }
+    presentation = material_identification_presentation(app)
+    view = presentation.view_model.sensitivity_view()
+    if presentation.kind == "none":
+        view = {**view, "observability": ()}
+    return view
 
 
 def _format_number(value: object) -> str:
@@ -392,299 +541,24 @@ def _format_number(value: object) -> str:
         return str(value)
 
 
-def _mapping_value(mapping, key: str, default=None):
-    if not isinstance(mapping, Mapping):
-        return default
-    if key in mapping:
-        return mapping[key]
-    wanted = key.strip().lower()
-    for current_key, value in mapping.items():
-        if str(current_key).strip().lower() == wanted:
-            return value
-    return default
-
-
-def _existing_identification_record(app):
-    attribute_names = (
-        "effective_property_identification_result",
-        "identified_properties",
-        "material_identification_record",
-        "material_identification_result",
-        "identification_record",
-    )
-    for name in attribute_names:
-        value = getattr(app, name, None)
-        if value is not None:
-            return value
-    result = getattr(app, "result", None)
-    metadata = _record_value(result, "metadata", default={}) or {}
-    if isinstance(metadata, Mapping):
-        for name in attribute_names:
-            if metadata.get(name) is not None:
-                return metadata[name]
-    return None
-
-
-def _model_record(record, model_name: str):
-    models = _record_value(record, "models", default={}) or {}
-    if isinstance(models, Mapping):
-        model = _mapping_value(models, model_name)
-        if model is not None:
-            return model
-    for name in (
-        f"model_{model_name.lower()}",
-        f"model_{model_name}",
-        f"case_{model_name.lower()}",
-        f"case_{model_name}",
-    ):
-        model = _record_value(record, name, default=None)
-        if model is not None:
-            return model
-    return None
-
-
-def _property_mapping(model):
-    if model is None:
-        return {}, "MPa"
-    for name, unit in (
-        ("properties_MPa", "MPa"),
-        ("effective_homogeneous_face_sheet_properties_MPa", "MPa"),
-        ("properties", ""),
-        ("effective_properties", ""),
-        ("fitted_parameters", ""),
-    ):
-        properties = _record_value(model, name, default=None)
-        if isinstance(properties, Mapping):
-            declared_unit = _record_value(model, "unit", "units", default=unit)
-            if isinstance(declared_unit, Mapping):
-                declared_unit = unit
-            return properties, str(declared_unit or unit)
-    if isinstance(model, Mapping) and any(
-        _mapping_value(model, parameter) is not None
-        for parameter in _EFFECTIVE_PARAMETER_IDS
-    ):
-        return model, str(_mapping_value(model, "unit", ""))
-    return {}, "MPa"
-
-
-def _stored_parameter_differences(record) -> Mapping:
-    stability = _record_value(record, "stability", default={}) or {}
-    if isinstance(stability, Mapping):
-        for key in (
-            "U_P_symmetric_difference_percent",
-            "u_p_symmetric_difference_percent",
-            "parameter_differences",
-            "differences",
-        ):
-            values = _mapping_value(stability, key)
-            if isinstance(values, Mapping):
-                return values
-    for key in ("parameter_differences", "differences"):
-        values = _record_value(record, key, default=None)
-        if isinstance(values, Mapping):
-            return values
-    return {}
-
-
-def _weighting_status(record, parameter: str) -> str:
-    stability = _record_value(record, "stability", default={}) or {}
-    value = _mapping_value(stability, parameter)
-    if value is None:
-        statuses = _record_value(record, "weighting_sensitivity", default={}) or {}
-        value = _mapping_value(statuses, parameter)
-    normalized = _status_value(value).upper().replace("-", "_").replace(" ", "_")
-    if normalized == "WEIGHTING_SENSITIVE":
-        return "weighting-sensitive"
-    if normalized in {"RELATIVELY_STABLE", "STABLE"}:
-        return "relatively stable"
-    return _status_value(value) or "Unavailable"
-
-
 def identification_result_view(app) -> dict[str, object]:
-    """Adapt a stored U/P effective-property record without numerical work."""
+    """Render only the typed identification evidence bound to the application.
 
-    record = _existing_identification_record(app)
-    model_u = _model_record(record, "U") if record is not None else None
-    model_p = _model_record(record, "P") if record is not None else None
-    properties_u, unit_u = _property_mapping(model_u)
-    properties_p, unit_p = _property_mapping(model_p)
-    differences = _stored_parameter_differences(record) if record is not None else {}
+    Rows, order and units come from the bound view (the model definition for
+    production evidence); with nothing bound no parameter rows are shown.
+    """
 
-    def property_rows(properties, unit):
-        return tuple(
-            (
-                parameter,
-                _mapping_value(properties, parameter),
-                unit or "Not stated",
-            )
-            for parameter in _EFFECTIVE_PARAMETER_IDS
-        )
-
-    status = "NO_IDENTIFICATION_RESULT"
-    if record is not None:
-        status = _status_value(
-            _record_value(
-                record,
-                "validation_state",
-                "recommendation",
-                "status",
-                "record_status",
-                default=status,
-            )
-        ) or status
-    available = any(
-        _mapping_value(properties, parameter) is not None
-        for properties in (properties_u, properties_p)
-        for parameter in _EFFECTIVE_PARAMETER_IDS
-    )
-    comparison = tuple(
-        (
-            parameter,
-            _mapping_value(differences, parameter),
-            _weighting_status(record, parameter) if record is not None else "Unavailable",
-        )
-        for parameter in _EFFECTIVE_PARAMETER_IDS
-    )
-    return {
-        "available": available,
-        "model_u": property_rows(properties_u, unit_u),
-        "model_p": property_rows(properties_p, unit_p),
-        "comparison": comparison,
-        "status": status,
-    }
-
-
-def _existing_validation_record(app):
-    attribute_names = (
-        "effective_property_validation",
-        "material_validation_result",
-        "validation_evidence",
-        "validation_result",
-        "validation_record",
-    )
-    for name in attribute_names:
-        value = getattr(app, name, None)
-        if value is not None:
-            return value
-    result = getattr(app, "result", None)
-    metadata = _record_value(result, "metadata", default={}) or {}
-    if isinstance(metadata, Mapping):
-        for name in attribute_names:
-            if metadata.get(name) is not None:
-                return metadata[name]
-    return None
-
-
-def _validation_rows(record, category: str) -> tuple:
-    if record is None:
-        return ()
-    direct_names = {
-        "primary": ("primary_observables", "primary_validation", "primary"),
-        "holdout": ("holdout_validation", "holdouts", "holdout"),
-    }[category]
-    for name in direct_names:
-        rows = _record_value(record, name, default=None)
-        if rows is not None:
-            return _sequence(rows)
-    rows = _record_value(
-        record,
-        "validation_rows",
-        "rows",
-        "observations",
-        default=(),
-    )
-    selected = []
-    for row in _sequence(rows):
-        row_category = _status_value(
-            _record_value(row, "category", "role", default="")
-        ).upper()
-        if category == "primary" and row_category == "PRIMARY":
-            selected.append(row)
-        elif category == "holdout" and row_category in {
-            "HOLDOUT",
-            "HOLDOUT_DIAGNOSTIC",
-            "VALIDATION",
-        }:
-            selected.append(row)
-    return tuple(selected)
-
-
-def _validation_row(record) -> tuple:
-    model = _record_value(record, "model", "case", default="—")
-    observable = _record_value(
-        record,
-        "observable",
-        "name",
-        "label",
-        "observable_id",
-        default="Unlabelled observable",
-    )
-    experimental = _record_value(
-        record,
-        "experimental_frequency_hz",
-        "experimental_frequency",
-        "experimental_value",
-        default=None,
-    )
-    fe_value = _record_value(
-        record,
-        "fe_frequency_hz",
-        "FE_frequency_hz",
-        "fe_frequency",
-        "FE_value",
-        "calculated_frequency_hz",
-        default=None,
-    )
-    residual = _record_value(
-        record,
-        "equivalent_error_percent",
-        "frequency_error_percent",
-        "residual",
-        "error",
-        "FE_minus_EXP_residual",
-        default=None,
-    )
-    status = _record_value(
-        record,
-        "validation_status",
-        "status",
-        "identity_status",
-        "result",
-        "assessment",
-        "comparison_to_baseline",
-        default="Not stated",
-    )
-    return model, observable, experimental, fe_value, residual, status
+    presentation = material_identification_presentation(app)
+    view = presentation.view_model.identification_view()
+    if presentation.kind == "none":
+        view = {**view, "model_u": (), "model_p": (), "comparison": ()}
+    return view
 
 
 def validation_evidence_view(app) -> dict[str, object]:
-    """Adapt stored validation rows without calculating validation metrics."""
+    """Render only the typed validation evidence bound to the application."""
 
-    record = _existing_validation_record(app)
-    identification_record = _existing_identification_record(app)
-    status_source = record if record is not None else identification_record
-    status = "NO_VALIDATION_EVIDENCE"
-    if status_source is not None:
-        status = _status_value(
-            _record_value(
-                status_source,
-                "overall_status",
-                "validation_status",
-                "recommendation",
-                "status",
-                default=status,
-            )
-        ) or status
-    return {
-        "available": record is not None,
-        "status": status,
-        "primary": tuple(
-            _validation_row(row) for row in _validation_rows(record, "primary")
-        ),
-        "holdout": tuple(
-            _validation_row(row) for row in _validation_rows(record, "holdout")
-        ),
-    }
+    return _evidence_view_model(app).validation_view()
 
 
 def _json_safe(value):
@@ -707,6 +581,7 @@ def report_evidence_snapshot(app) -> dict[str, object]:
     """Build a deterministic report snapshot from existing presentation records."""
 
     project = project_evidence_status(app)
+    presentation = material_identification_presentation(app)
     identification = identification_result_view(app)
     validation = validation_evidence_view(app)
 
@@ -716,19 +591,55 @@ def report_evidence_snapshot(app) -> dict[str, object]:
             for parameter, value, unit in rows
         }
 
+    text = model_presentation_text(presentation)
+    task_definition: dict[str, object] = {
+        "context": presentation.kind,
+        "specimen": presentation.specimen_label,
+        "description_lines": text["report_task"].splitlines(),
+    }
+    if presentation.kind == "production":
+        model = presentation.model
+        task_definition.update(
+            {
+                "identification_model_id": model.model_id,
+                "identification_model_name": model.display_name,
+                "identification_model_hash": model.definition_hash,
+                "registration_hash": presentation.registration_hash,
+                "unknown_parameters": [
+                    {
+                        "parameter_id": item.parameter_id,
+                        "display_name": item.display_name,
+                        "unit": item.unit,
+                    }
+                    for item in model.parameter_definitions
+                ],
+                "frozen_assumptions": list(model.frozen_assumptions),
+            }
+        )
+        limitations = list(model.limitations)
+    elif presentation.kind == "historical":
+        task_definition.update(
+            {
+                "historical_status": HISTORICAL_STATUS,
+                "workflow": _HISTORICAL_SP13_TEXT["workflow"],
+                "unknown_parameters": list(_HISTORICAL_SP13_TEXT["unknowns"]),
+                "frozen": [item.lower() for item in _HISTORICAL_SP13_TEXT["frozen"]],
+            }
+        )
+        limitations = list(_HISTORICAL_SP13_TEXT["report_limitations"])
+    else:
+        task_definition["unknown_parameters"] = []
+        limitations = []
+
     snapshot = {
-        "schema_version": "effective-material-identification-gui-6",
+        "schema_version": "material-identification-gui-7",
         "project_summary": {
             "specimen_or_project": project["project"],
             "fe_model": project["fe_model"],
             "experimental_dataset": project["experimental_data"],
             "provenance_status": project["provenance"],
         },
-        "task_definition": {
-            "workflow": "Effective homogeneous face-sheet property identification",
-            "unknown_parameters": list(_EFFECTIVE_PARAMETER_IDS),
-            "frozen": ["core", "density", "adhesive", "geometry"],
-        },
+        "task_definition": task_definition,
         "identification_result": {
             "available": identification["available"],
             "status": identification["status"],
@@ -774,12 +685,7 @@ def report_evidence_snapshot(app) -> dict[str, object]:
                 ]
             ],
         },
-        "limitations": [
-            "Effective properties only",
-            "Not ply or fibre constants",
-            "Unknown laminate architecture",
-            "Frozen core and interface assumptions",
-        ],
+        "limitations": limitations,
     }
     snapshot["report_available"] = bool(
         identification["available"] or validation["available"]
@@ -882,9 +788,7 @@ def _report_lines(snapshot) -> list[str]:
         f"Provenance: {project['provenance_status']}",
         "",
         "TASK DEFINITION",
-        "Effective homogeneous face-sheet property identification",
-        "Unknown: Ex, Ey, Gxy",
-        "Frozen: core, density, adhesive, geometry",
+        *snapshot["task_definition"]["description_lines"],
         "",
         "IDENTIFICATION RESULT",
         f"Status: {identification['status']}",
@@ -1032,6 +936,75 @@ def project_evidence_status(app) -> dict[str, str]:
     }
 
 
+def _readiness_record(app):
+    for attribute in (
+        "data_readiness_evidence",
+        "material_data_readiness",
+        "readiness_evidence",
+    ):
+        record = getattr(app, attribute, None)
+        if isinstance(record, Mapping):
+            return record
+    return None
+
+
+def _readiness_rows(section, definitions) -> tuple[tuple[str, str, str, str], ...]:
+    source = section if isinstance(section, Mapping) else {}
+    rows = []
+    for key, label in definitions:
+        item = source.get(key)
+        if isinstance(item, Mapping):
+            status = _status_value(
+                _record_value(item, "status", "state", default="")
+            ).upper()
+            detail = _status_value(
+                _record_value(item, "detail", "evidence", "message", default="")
+            )
+        else:
+            status = _status_value(item).upper()
+            detail = ""
+        if status not in _READINESS_STATES:
+            status = "BLOCKED"
+            if not detail:
+                detail = "No stored readiness evidence"
+        rows.append((key, label, status, detail or "Stored evidence available"))
+    return tuple(rows)
+
+
+def data_readiness_view(app) -> dict[str, object]:
+    """Present an existing readiness record without inspecting or fixing data."""
+
+    record = _readiness_record(app)
+    experimental = _readiness_rows(
+        _record_value(record, "experimental", default={}) if record else {},
+        _READINESS_EXPERIMENTAL_ROWS,
+    )
+    fe = _readiness_rows(
+        _record_value(record, "fe", "finite_element", default={}) if record else {},
+        _READINESS_FE_ROWS,
+    )
+    stored_overall = _status_value(
+        _record_value(record, "overall_status", "status", default="")
+        if record
+        else ""
+    ).upper()
+    states = tuple(row[2] for row in (*experimental, *fe))
+    if stored_overall in _READINESS_STATES:
+        overall = stored_overall
+    elif "BLOCKED" in states:
+        overall = "BLOCKED"
+    elif "WARNING" in states:
+        overall = "WARNING"
+    else:
+        overall = "READY"
+    return {
+        "available": record is not None,
+        "overall_status": overall,
+        "experimental": experimental,
+        "fe": fe,
+    }
+
+
 def _build_project_evidence_page(app, page) -> None:
     section = ttk.LabelFrame(page, text="1. Project Evidence", padding=16)
     section.pack(fill="both", expand=True)
@@ -1072,19 +1045,20 @@ def _build_project_evidence_page(app, page) -> None:
     ).pack(anchor="nw", fill="x")
 
 
-def _build_task_definition_page(page) -> None:
-    section = ttk.LabelFrame(page, text="2. Task Definition", padding=16)
+def _build_task_definition_page(app, page) -> None:
+    section = ttk.LabelFrame(page, text="3. Task Definition", padding=16)
     section.pack(fill="both", expand=True)
+    app.material_task_context_label = ttk.Label(
+        section, text="", justify="left", wraplength=1000
+    )
+    app.material_task_context_label.pack(anchor="nw", fill="x", pady=(0, 10))
     ttk.Label(
         section,
-        text="Supported first workflow",
+        text="Identification task",
         style="Section.TLabel",
     ).pack(anchor="nw")
-    ttk.Label(
-        section,
-        text="Effective homogeneous face-sheet property identification",
-        justify="left",
-    ).pack(anchor="nw", pady=(4, 14))
+    app.material_task_workflow_label = ttk.Label(section, text="", justify="left")
+    app.material_task_workflow_label.pack(anchor="nw", pady=(4, 14))
 
     columns = ttk.Frame(section)
     columns.pack(fill="x")
@@ -1092,10 +1066,14 @@ def _build_task_definition_page(page) -> None:
     unknown.pack(side="left", anchor="n", fill="both", expand=True, padx=(0, 6))
     frozen = ttk.LabelFrame(columns, text="Frozen", padding=12)
     frozen.pack(side="left", anchor="n", fill="both", expand=True, padx=(6, 0))
-    for parameter in ("Ex", "Ey", "Gxy"):
-        ttk.Label(unknown, text=f"• {parameter}").pack(anchor="w", pady=2)
-    for group in ("Core", "Density", "Adhesive", "Geometry"):
-        ttk.Label(frozen, text=f"• {group}").pack(anchor="w", pady=2)
+    app.material_task_unknowns_label = ttk.Label(
+        unknown, text="", justify="left", wraplength=480
+    )
+    app.material_task_unknowns_label.pack(anchor="w", pady=2)
+    app.material_task_frozen_label = ttk.Label(
+        frozen, text="", justify="left", wraplength=480
+    )
+    app.material_task_frozen_label.pack(anchor="w", pady=2)
 
     interpretation = ttk.LabelFrame(
         section,
@@ -1103,16 +1081,36 @@ def _build_task_definition_page(page) -> None:
         padding=12,
     )
     interpretation.pack(fill="x", pady=(14, 0))
-    ttk.Label(
+    app.material_task_interpretation_label = ttk.Label(
         interpretation,
-        text=(
-            "Effective homogeneous face-sheet properties\n\n"
-            "Results are not true fibre properties, ply properties, or unique "
-            "laminate constants."
-        ),
+        text="",
         justify="left",
         wraplength=1000,
-    ).pack(anchor="nw", fill="x")
+    )
+    app.material_task_interpretation_label.pack(anchor="nw", fill="x")
+
+
+def _refresh_model_texts(app) -> None:
+    """Apply the bound context's wording to every page that describes the model."""
+
+    text = model_presentation_text(material_identification_presentation(app))
+    for attribute, key in (
+        ("material_identification_scope_label", "scope"),
+        ("material_task_context_label", "context"),
+        ("material_task_workflow_label", "workflow"),
+        ("material_task_unknowns_label", "unknowns"),
+        ("material_task_frozen_label", "frozen"),
+        ("material_task_interpretation_label", "task_interpretation"),
+        ("material_sensitivity_frozen_label", "frozen_inline"),
+        ("material_identification_interpretation_label", "identification_interpretation"),
+        ("material_identification_limitations_label", "identification_limitations"),
+        ("material_validation_limitations_label", "validation_limitations"),
+        ("material_report_task_label", "report_task"),
+        ("material_report_limitations_label", "report_limitations"),
+    ):
+        label = getattr(app, attribute, None)
+        if label is not None:
+            label.configure(text=text[key])
 
 
 def _build_read_only_table(parent, columns, headings, widths, *, height):
@@ -1138,6 +1136,90 @@ def _build_read_only_table(parent, columns, headings, widths, *, height):
     table.pack(side="left", fill="both", expand=True)
     scroll.pack(side="right", fill="y")
     return table
+
+
+def _build_data_readiness_page(app, page) -> None:
+    ttk.Label(
+        page,
+        text=(
+            "Read-only preflight gate from stored project evidence. The check "
+            "reports readiness and does not calculate corrections or resolve conflicts."
+        ),
+        justify="left",
+        wraplength=1100,
+    ).pack(anchor="nw", fill="x", pady=(0, 8))
+
+    status_card = ttk.Frame(page, style="MetricCard.TFrame", padding=(12, 9))
+    status_card.pack(fill="x", pady=(0, 8))
+    ttk.Label(
+        status_card,
+        text="Data readiness gate",
+        style="MetricCaption.TLabel",
+    ).pack(anchor="w")
+    app.material_readiness_status_label = ttk.Label(
+        status_card,
+        text="BLOCKED",
+        style="MetricValue.TLabel",
+    )
+    app.material_readiness_status_label.pack(anchor="w", pady=(2, 0))
+
+    app.material_readiness_empty_label = ttk.Label(
+        page,
+        text="No data-readiness evidence available.",
+        justify="left",
+    )
+    app.material_readiness_empty_label.pack(anchor="nw", fill="x", pady=(0, 8))
+
+    tables = ttk.Frame(page)
+    tables.pack(fill="both", expand=True)
+    experimental = ttk.LabelFrame(tables, text="Experimental", padding=8)
+    experimental.pack(
+        side="left", fill="both", expand=True, anchor="n", padx=(0, 5)
+    )
+    fe = ttk.LabelFrame(tables, text="FE", padding=8)
+    fe.pack(side="left", fill="both", expand=True, anchor="n", padx=(5, 0))
+    app.material_readiness_experimental_table = _build_read_only_table(
+        experimental,
+        ("check", "state", "evidence"),
+        ("Check", "State", "Existing evidence"),
+        (210, 100, 360),
+        height=4,
+    )
+    app.material_readiness_fe_table = _build_read_only_table(
+        fe,
+        ("check", "state", "evidence"),
+        ("Check", "State", "Existing evidence"),
+        (220, 100, 350),
+        height=5,
+    )
+    ttk.Label(
+        page,
+        text=(
+            "READY permits documented progression; WARNING requires engineering "
+            "review; BLOCKED prevents progression. No state changes project data."
+        ),
+        style="Secondary.TLabel",
+        justify="left",
+        wraplength=1100,
+    ).pack(anchor="nw", fill="x", pady=(10, 0))
+
+
+def _refresh_data_readiness_page(app) -> None:
+    if not hasattr(app, "material_readiness_experimental_table"):
+        return
+    view = data_readiness_view(app)
+    _replace_table_rows(
+        app.material_readiness_experimental_table,
+        ((label, status, detail) for _, label, status, detail in view["experimental"]),
+    )
+    _replace_table_rows(
+        app.material_readiness_fe_table,
+        ((label, status, detail) for _, label, status, detail in view["fe"]),
+    )
+    app.material_readiness_status_label.configure(text=view["overall_status"])
+    app.material_readiness_empty_label.configure(
+        text="" if view["available"] else "No data-readiness evidence available."
+    )
 
 
 def _build_modal_correspondence_page(app, page) -> None:
@@ -1316,11 +1398,12 @@ def _build_sensitivity_page(app, page) -> None:
 
     matrix = ttk.LabelFrame(page, text="Sensitivity matrix", padding=8)
     matrix.pack(fill="both", expand=True)
+    # Parameter columns are added on refresh from what the evidence renders.
     app.material_sensitivity_table = _build_read_only_table(
         matrix,
-        ("observable", "type", "ex", "ey", "gxy"),
-        ("Observable", "Observable type", "Ex", "Ey", "Gxy"),
-        (220, 160, 120, 120, 120),
+        ("observable", "type"),
+        ("Observable", "Observable type"),
+        (220, 160),
         height=6,
     )
 
@@ -1355,19 +1438,32 @@ def _build_sensitivity_page(app, page) -> None:
 
     frozen = ttk.LabelFrame(page, text="Frozen parameters", padding=8)
     frozen.pack(fill="x", pady=(10, 0))
-    for label in (
-        "Core frozen",
-        "Density frozen",
-        "Adhesive frozen",
-        "Geometry frozen",
+    app.material_sensitivity_frozen_label = ttk.Label(
+        frozen, text="", justify="left", wraplength=1050
+    )
+    app.material_sensitivity_frozen_label.pack(side="left", padx=(0, 28))
+
+
+def _configure_sensitivity_columns(table, parameter_columns) -> None:
+    columns = ("observable", "type", *(key for key, _heading in parameter_columns))
+    table.configure(columns=columns)
+    for key, heading, width in (
+        ("observable", "Observable", 220),
+        ("type", "Observable type", 160),
+        *((key, heading, 120) for key, heading in parameter_columns),
     ):
-        ttk.Label(frozen, text=label).pack(side="left", padx=(0, 28))
+        table.heading(key, text=heading)
+        table.column(key, width=width, minwidth=min(width, 80), anchor="center")
 
 
 def _refresh_sensitivity_page(app) -> None:
     if not hasattr(app, "material_sensitivity_table"):
         return
     view = sensitivity_evidence_view(app)
+    _configure_sensitivity_columns(
+        app.material_sensitivity_table,
+        _sensitivity_columns(material_identification_presentation(app), view),
+    )
     _replace_table_rows(
         app.material_sensitivity_table,
         (
@@ -1397,7 +1493,7 @@ def _build_identification_page(app, page) -> None:
     ttk.Label(
         page,
         text=(
-            "Read-only effective-property identification results. Stored U/P cases "
+            "Read-only identification results. Stored U/P cases "
             "are displayed without running an inverse or optimizer."
         ),
         justify="left",
@@ -1414,7 +1510,7 @@ def _build_identification_page(app, page) -> None:
     status_card.pack(fill="x", pady=(0, 10))
     ttk.Label(
         status_card,
-        text="Stored validation state",
+        text="Stored identification status",
         style="MetricCaption.TLabel",
     ).pack(anchor="w")
     app.material_identification_status_label = ttk.Label(
@@ -1424,6 +1520,17 @@ def _build_identification_page(app, page) -> None:
         wraplength=1000,
     )
     app.material_identification_status_label.pack(anchor="w", pady=(3, 0))
+    ttk.Label(
+        status_card,
+        text=(
+            "The identification status reports the stored result only. A completed "
+            "or converged identification is not a validation of material properties; "
+            "see 7. Validation."
+        ),
+        style="Secondary.TLabel",
+        justify="left",
+        wraplength=1000,
+    ).pack(anchor="w", pady=(3, 0))
 
     models = ttk.Frame(page)
     models.pack(fill="both", expand=True)
@@ -1434,14 +1541,14 @@ def _build_identification_page(app, page) -> None:
     app.material_model_u_table = _build_read_only_table(
         model_u,
         ("parameter", "value", "unit"),
-        ("Effective property", "Value", "Unit"),
+        ("Parameter", "Value", "Unit"),
         (160, 190, 100),
         height=3,
     )
     app.material_model_p_table = _build_read_only_table(
         model_p,
         ("parameter", "value", "unit"),
-        ("Effective property", "Value", "Unit"),
+        ("Parameter", "Value", "Unit"),
         (160, 190, 100),
         height=3,
     )
@@ -1460,28 +1567,20 @@ def _build_identification_page(app, page) -> None:
         page, text="Scientific interpretation", padding=8
     )
     interpretation.pack(fill="x", pady=(10, 0))
-    ttk.Label(
+    app.material_identification_interpretation_label = ttk.Label(
         interpretation,
-        text=(
-            "Effective homogeneous face-sheet properties\n"
-            "Not true fibre properties, ply properties, or unique laminate constants."
-        ),
+        text="",
         justify="left",
         wraplength=1050,
-    ).pack(anchor="nw", fill="x")
+    )
+    app.material_identification_interpretation_label.pack(anchor="nw", fill="x")
 
     limitations = ttk.LabelFrame(page, text="Limitations", padding=8)
     limitations.pack(fill="x", pady=(10, 0))
-    for text in (
-        "Laminate architecture unknown",
-        "Core frozen",
-        "Density frozen",
-        "Adhesive frozen",
-        "Gxy weighting-sensitive",
-    ):
-        ttk.Label(limitations, text=f"• {text}").pack(
-            side="left", anchor="w", padx=(0, 20)
-        )
+    app.material_identification_limitations_label = ttk.Label(
+        limitations, text="", justify="left", wraplength=1050
+    )
+    app.material_identification_limitations_label.pack(anchor="nw", fill="x")
 
 
 def _refresh_identification_page(app) -> None:
@@ -1588,16 +1687,10 @@ def _build_validation_page(app, page) -> None:
 
     limitations = ttk.LabelFrame(page, text="Model limitations", padding=8)
     limitations.pack(fill="x", pady=(10, 0))
-    for text in (
-        "Effective properties only",
-        "Laminate architecture unknown",
-        "Core frozen",
-        "Density frozen",
-        "Adhesive frozen",
-    ):
-        ttk.Label(limitations, text=f"• {text}").pack(
-            side="left", anchor="w", padx=(0, 24)
-        )
+    app.material_validation_limitations_label = ttk.Label(
+        limitations, text="", justify="left", wraplength=1050
+    )
+    app.material_validation_limitations_label.pack(anchor="nw", fill="x")
 
 
 def _refresh_validation_page(app) -> None:
@@ -1660,16 +1753,13 @@ def _build_report_page(app, page) -> None:
         (180, 410),
         height=4,
     )
-    ttk.Label(
+    app.material_report_task_label = ttk.Label(
         task,
-        text=(
-            "Effective homogeneous face-sheet property identification\n"
-            "Unknown: Ex, Ey, Gxy\n"
-            "Frozen: core, density, adhesive, geometry"
-        ),
+        text="",
         justify="left",
         wraplength=480,
-    ).pack(anchor="nw", fill="x")
+    )
+    app.material_report_task_label.pack(anchor="nw", fill="x")
 
     identification = ttk.LabelFrame(
         page, text="Identification result", padding=8
@@ -1701,15 +1791,13 @@ def _build_report_page(app, page) -> None:
 
     limitations = ttk.LabelFrame(page, text="Limitations", padding=8)
     limitations.pack(fill="x", pady=(10, 0))
-    ttk.Label(
+    app.material_report_limitations_label = ttk.Label(
         limitations,
-        text=(
-            "Effective properties only; not ply/fibre constants; unknown laminate "
-            "architecture; frozen core/interface assumptions."
-        ),
+        text="",
         justify="left",
         wraplength=1050,
-    ).pack(anchor="nw", fill="x")
+    )
+    app.material_report_limitations_label.pack(anchor="nw", fill="x")
 
     exports = ttk.LabelFrame(page, text="Export options", padding=8)
     exports.pack(fill="x", pady=(10, 0))
@@ -1770,7 +1858,8 @@ def _refresh_report_page(app) -> None:
                     "weighting_sensitivity_status", "Unavailable"
                 ),
             )
-            for parameter in _EFFECTIVE_PARAMETER_IDS
+            # Parameter order is the rendered order (the model's, for production).
+            for parameter in identification["model_u"]
         ),
     )
     validation = snapshot["validation"]
@@ -1849,7 +1938,46 @@ def install_material_identification_ui(app_module) -> None:
 
     def material_identification_init(self, root) -> None:
         original_init(self, root)
+        self.material_identification_evidence_view_model = EMPTY_EVIDENCE_VIEW_MODEL
+        self.material_identification_session = None
         self._install_material_identification_tab()
+
+    def bind_material_identification_evidence(
+        self, bundle: SP13EvidenceBundle
+    ) -> None:
+        """Bind a frozen historical (UNBOUND) bundle; no session or model applies."""
+
+        view_model = MaterialIdentificationEvidenceViewModel.from_bundle(bundle)
+        self.material_identification_session = None
+        self.material_identification_evidence_view_model = view_model
+        self._refresh_material_identification_pages()
+
+    def bind_material_identification_session(
+        self,
+        session: MaterialIdentificationSession,
+        *,
+        sensitivity=None,
+        identifiability=None,
+        identification=None,
+        validation=None,
+    ) -> None:
+        """Bind a production session and its BOUND evidence (possibly none yet).
+
+        The session's own model definition drives every parameter row; evidence
+        bound to another model, definition, registration or experiment is
+        refused before anything is bound.
+        """
+
+        view_model = session_evidence_view_model(
+            session,
+            sensitivity=sensitivity,
+            identifiability=identifiability,
+            identification=identification,
+            validation=validation,
+        )
+        self.material_identification_session = session
+        self.material_identification_evidence_view_model = view_model
+        self._refresh_material_identification_pages()
 
     def refresh_material_identification_pages(self, _event=None) -> None:
         labels = getattr(self, "material_identification_evidence_labels", {})
@@ -1857,6 +1985,8 @@ def install_material_identification_ui(app_module) -> None:
             label = labels.get(key)
             if label is not None:
                 label.configure(text=value)
+        _refresh_model_texts(self)
+        _refresh_data_readiness_page(self)
         _refresh_modal_correspondence_page(self)
         _refresh_sensitivity_page(self)
         _refresh_identification_page(self)
@@ -1944,15 +2074,13 @@ def install_material_identification_ui(app_module) -> None:
             justify="left",
             wraplength=1200,
         ).pack(anchor="w", pady=(4, 0))
-        ttk.Label(
+        self.material_identification_scope_label = ttk.Label(
             heading,
-            text=(
-                "Results are labelled effective homogeneous face-sheet properties, "
-                "not true fibre properties, ply properties, or unique laminate constants."
-            ),
+            text="",
             justify="left",
             wraplength=1200,
-        ).pack(anchor="w", pady=(4, 0))
+        )
+        self.material_identification_scope_label.pack(anchor="w", pady=(4, 0))
 
         self.material_identification_notebook = ttk.Notebook(
             self.material_identification_tab
@@ -1966,17 +2094,19 @@ def install_material_identification_ui(app_module) -> None:
             self.material_identification_pages[step_label] = page
             if step_label == "1. Project Evidence":
                 _build_project_evidence_page(self, page)
-            elif step_label == "2. Task Definition":
-                _build_task_definition_page(page)
-            elif step_label == "3. Modal Correspondence":
+            elif step_label == "2. Data Readiness Check":
+                _build_data_readiness_page(self, page)
+            elif step_label == "3. Task Definition":
+                _build_task_definition_page(self, page)
+            elif step_label == "4. Modal Correspondence":
                 _build_modal_correspondence_page(self, page)
-            elif step_label == "4. Sensitivity":
+            elif step_label == "5. Sensitivity":
                 _build_sensitivity_page(self, page)
-            elif step_label == "5. Identification":
+            elif step_label == "6. Identification":
                 _build_identification_page(self, page)
-            elif step_label == "6. Validation":
+            elif step_label == "7. Validation":
                 _build_validation_page(self, page)
-            elif step_label == "7. Report":
+            elif step_label == "8. Report":
                 _build_report_page(self, page)
             else:
                 _build_unavailable_page(page, step_label)
@@ -2016,6 +2146,12 @@ def install_material_identification_ui(app_module) -> None:
     application_class._refresh_material_identification_pages = (
         refresh_material_identification_pages
     )
+    application_class.bind_material_identification_evidence = (
+        bind_material_identification_evidence
+    )
+    application_class.bind_material_identification_session = (
+        bind_material_identification_session
+    )
     application_class._export_material_report = export_material_report
     application_class._export_material_report_pdf = export_material_report_pdf
     application_class._export_material_report_json = export_material_report_json
@@ -2028,10 +2164,15 @@ __all__ = [
     "export_material_identification_csv",
     "export_material_identification_json",
     "export_material_identification_pdf",
+    "data_readiness_view",
     "identification_result_view",
+    "material_identification_presentation",
+    "MaterialIdentificationPresentation",
     "modal_correspondence_view",
+    "model_presentation_text",
     "project_evidence_status",
     "report_evidence_snapshot",
     "sensitivity_evidence_view",
+    "session_evidence_view_model",
     "validation_evidence_view",
 ]

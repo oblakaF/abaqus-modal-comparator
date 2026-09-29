@@ -58,12 +58,13 @@ COMPACT_TAB_LABELS = (
 
 MATERIAL_IDENTIFICATION_STEP_LABELS = (
     "1. Project Evidence",
-    "2. Task Definition",
-    "3. Modal Correspondence",
-    "4. Sensitivity",
-    "5. Identification",
-    "6. Validation",
-    "7. Report",
+    "2. Data Readiness Check",
+    "3. Task Definition",
+    "4. Modal Correspondence",
+    "5. Sensitivity",
+    "6. Identification",
+    "7. Validation",
+    "8. Report",
 )
 
 
