@@ -590,18 +590,28 @@ def _mass_mac_matrix(
     return np.clip(np.abs(cross) ** 2 / denominator, 0.0, 1.0)
 
 
+def _same_grid_mode_tracking(
+    reference: GeneralizedEigenResult,
+    candidate: GeneralizedEigenResult,
+    basis: StageAAffineBasis,
+) -> dict[int, Tuple[int, float]]:
+    """Map reference FE mode IDs to candidate FE mode IDs by mass-MAC Hungarian."""
+
+    mac = _mass_mac_matrix(reference, candidate, basis)
+    reference_indexes, candidate_indexes = optimize.linear_sum_assignment(-mac)
+    return {
+        int(reference_index) + 1: (int(candidate_index) + 1, float(mac[reference_index, candidate_index]))
+        for reference_index, candidate_index in zip(reference_indexes, candidate_indexes)
+    }
+
+
 def _synthetic_pairing(
     observations: Tuple[ModalObservation, ...],
     reference: GeneralizedEigenResult,
     candidate: GeneralizedEigenResult,
     basis: StageAAffineBasis,
 ) -> PairingResult:
-    mac = _mass_mac_matrix(reference, candidate, basis)
-    reference_indexes, candidate_indexes = optimize.linear_sum_assignment(-mac)
-    tracked = {
-        int(reference_index) + 1: (int(candidate_index) + 1, float(mac[reference_index, candidate_index]))
-        for reference_index, candidate_index in zip(reference_indexes, candidate_indexes)
-    }
+    tracked = _same_grid_mode_tracking(reference, candidate, basis)
     assignments = tuple(
         ModeAssignment(
             observation_id=item.observation_id,
@@ -618,6 +628,96 @@ def _synthetic_pairing(
         method="fixed experimental pair with same-grid FE MAC identity tracking",
         warnings=warnings,
     )
+
+
+class _UnresolvedLocalBranch(Exception):
+    """A tracked FE branch is numerically degenerate; local refinement must stop."""
+
+
+def _numerically_degenerate_modes(
+    eigenpairs: GeneralizedEigenResult,
+    mode_ids: Sequence[int],
+) -> Tuple[int, ...]:
+    """Return the requested FE mode IDs that share a numerically unresolved eigenvalue.
+
+    NUMERICALLY_DEGENERATE means the eigenvalue separation is within the
+    machine-precision resolution of the returned spectrum, using the same
+    ``100 * eps * n * spectral scale`` rule the generalized eigensolver applies
+    to numerical zero; there the eigenvectors of the tie are an arbitrary basis
+    of their span.  Any larger separation is CLOSE_BUT_RESOLVED and is tracked
+    normally.  This is not a physical closeness or modal-family threshold.
+    """
+
+    values = np.asarray(eigenpairs.eigenvalues, dtype=float)
+    spectrum = np.concatenate(
+        (values, np.asarray(eigenpairs.rigid_body_eigenvalues, dtype=float))
+    )
+    scale = max(float(np.max(np.abs(spectrum))), 1.0)
+    resolution = (
+        100.0 * np.finfo(float).eps * scale * max(eigenpairs.eigenvectors.shape[0], 1)
+    )
+    return tuple(
+        mode_id
+        for mode_id in mode_ids
+        if np.count_nonzero(np.abs(values - values[mode_id - 1]) <= resolution) > 1
+    )
+
+
+@dataclass(frozen=True)
+class _LocalBranchTracker:
+    """Follow the global-best FE branches through local candidates.
+
+    The reference eigenvectors and their FE mode IDs are fixed at the
+    global-best point; each local candidate re-identifies their current FE
+    eigen-indices by FE-to-FE same-grid mass-MAC with Hungarian assignment.
+    No experimental data or comparison provider is used.
+    """
+
+    reference: GeneralizedEigenResult
+    reference_pairing: PairingResult
+    basis: StageAAffineBasis
+
+    def __post_init__(self) -> None:
+        self._require_resolved(
+            self.reference,
+            tuple(item.fe_mode_id for item in self.reference_pairing.assignments),
+            "global-best reference",
+        )
+
+    @staticmethod
+    def _require_resolved(
+        eigenpairs: GeneralizedEigenResult, mode_ids: Sequence[int], location: str
+    ) -> None:
+        degenerate = _numerically_degenerate_modes(eigenpairs, mode_ids)
+        if degenerate:
+            raise _UnresolvedLocalBranch(
+                "Local refinement refused: tracked FE mode(s) "
+                + ", ".join(str(item) for item in sorted(degenerate))
+                + f" are numerically degenerate at the {location} (eigenvalue "
+                "separation within machine-precision resolution), so the branch "
+                "identity is not resolvable. The global-stage solution is retained; "
+                "review the modal family manually."
+            )
+
+    def pairing(self, eigenpairs: GeneralizedEigenResult) -> PairingResult:
+        tracked = _same_grid_mode_tracking(self.reference, eigenpairs, self.basis)
+        assignments = tuple(
+            ModeAssignment(
+                observation_id=item.observation_id,
+                fe_mode_id=tracked[item.fe_mode_id][0],
+                tracking_mac=tracked[item.fe_mode_id][1],
+            )
+            for item in self.reference_pairing.assignments
+        )
+        self._require_resolved(
+            eigenpairs,
+            tuple(item.fe_mode_id for item in assignments),
+            "local candidate",
+        )
+        return PairingResult(
+            assignments=assignments,
+            method="local FE-to-FE mass-MAC branch tracking from the global-best reference",
+        )
 
 
 def _validated_pairing(
@@ -883,7 +983,8 @@ def solve_stage_a_inverse(
         )
 
     def evaluate(
-        vector: Sequence[float], pairing: PairingResult | None = None
+        vector: Sequence[float],
+        pairing_rule: Callable[[GeneralizedEigenResult], PairingResult] = dynamic_pairing,
     ) -> _CandidateEvaluation:
         parameters = _parameters_from_vector(vector, subset, initial_parameters)
         eigenpairs = solve_generalized_eigenproblem(
@@ -893,7 +994,7 @@ def solve_stage_a_inverse(
             expected_rigid_body_modes=configuration.expected_rigid_body_modes,
             dofs=affine_model.dofs,
         )
-        selected_pairing = dynamic_pairing(eigenpairs) if pairing is None else pairing
+        selected_pairing = pairing_rule(eigenpairs)
         predicted = _predicted_frequencies(
             selected_pairing, fitted_observations, eigenpairs
         )
@@ -1075,7 +1176,17 @@ def solve_stage_a_inverse(
         )
 
     global_evaluation = best_evaluation
-    frozen_pairing = global_evaluation.pairing
+    # Local refinement follows the global-best FE branches (FE-to-FE mass-MAC),
+    # not frozen eigen-indices; the comparison provider is not called locally.
+    reference_signature = global_evaluation.pairing.signature
+    local_refusal = ""
+    try:
+        branch_tracker = _LocalBranchTracker(
+            global_evaluation.eigenpairs, global_evaluation.pairing, affine_model
+        )
+    except _UnresolvedLocalBranch as exc:
+        branch_tracker = None
+        local_refusal = str(exc)
     local_evaluation_count = 0
     latest_local_evaluation = global_evaluation
 
@@ -1083,7 +1194,7 @@ def solve_stage_a_inverse(
         nonlocal local_evaluation_count, latest_local_evaluation
         local_evaluation_count += 1
         try:
-            latest_local_evaluation = evaluate(vector, frozen_pairing)
+            latest_local_evaluation = evaluate(vector, branch_tracker.pairing)
             history.append(
                 OptimizationHistoryEntry(
                     stage="local",
@@ -1092,7 +1203,7 @@ def solve_stage_a_inverse(
                     physical_parameters=_parameter_mapping(latest_local_evaluation.parameters),
                     objective=latest_local_evaluation.objective,
                     success=True,
-                    pairing_signature=frozen_pairing.signature,
+                    pairing_signature=latest_local_evaluation.pairing.signature,
                 )
             )
             return latest_local_evaluation.least_squares_residuals
@@ -1107,7 +1218,7 @@ def solve_stage_a_inverse(
                     ),
                     objective=_FAILED_OBJECTIVE,
                     success=False,
-                    pairing_signature=frozen_pairing.signature,
+                    pairing_signature=reference_signature,
                     message=str(exc),
                 )
             )
@@ -1116,7 +1227,7 @@ def solve_stage_a_inverse(
             )
 
     def local_jacobian(vector: np.ndarray) -> np.ndarray:
-        candidate = evaluate(vector, frozen_pairing)
+        candidate = evaluate(vector, branch_tracker.pairing)
         return _analytic_local_jacobian(
             vector,
             candidate,
@@ -1131,6 +1242,8 @@ def solve_stage_a_inverse(
     lower = np.asarray([item[0] for item in transformed_bounds], dtype=float)
     upper = np.asarray([item[1] for item in transformed_bounds], dtype=float)
     try:
+        if branch_tracker is None:
+            raise _UnresolvedLocalBranch(local_refusal)
         local_result = optimize.least_squares(
             local_residual,
             best_vector,
@@ -1145,19 +1258,27 @@ def solve_stage_a_inverse(
         local_success = bool(local_result.success)
         local_message = str(local_result.message)
         local_iterations = int(local_result.nfev)
-        local_frozen_evaluation = evaluate(local_result.x, frozen_pairing)
+        local_tracked_evaluation = evaluate(local_result.x, branch_tracker.pairing)
         final_vector = np.asarray(local_result.x, dtype=float)
+    except _UnresolvedLocalBranch as exc:
+        local_success = False
+        local_message = str(exc)
+        local_iterations = local_evaluation_count
+        local_tracked_evaluation = global_evaluation
+        final_vector = best_vector
     except (RuntimeError, ValueError, FloatingPointError, MatrixModelError) as exc:
         local_success = False
         local_message = f"least_squares failed: {exc}"
         local_iterations = local_evaluation_count
-        local_frozen_evaluation = global_evaluation
+        local_tracked_evaluation = global_evaluation
         final_vector = best_vector
     if not local_success:
         warnings.append(local_message or "least_squares did not converge.")
 
     final_evaluation = evaluate(final_vector)
-    pairing_changed = final_evaluation.pairing.signature != frozen_pairing.signature
+    pairing_changed = (
+        final_evaluation.pairing.signature != local_tracked_evaluation.pairing.signature
+    )
     if pairing_changed:
         warnings.append(
             "Pairing changed at the local optimum; repeat the global/local cycle or review manually."
@@ -1175,7 +1296,6 @@ def solve_stage_a_inverse(
     fixed_values = {
         name: final_values[name] for name in STAGE_A_PARAMETER_IDS if name not in subset
     }
-    del local_frozen_evaluation
     return InverseIdentificationResult(
         fitted_parameters=fitted_values,
         fixed_parameters=fixed_values,

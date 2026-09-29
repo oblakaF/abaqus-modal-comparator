@@ -802,6 +802,311 @@ class StageAInverseSolverMassDependentTests(unittest.TestCase):
         )
 
 
+class LocalBranchTrackingTests(unittest.TestCase):
+    """Local refinement follows global-best FE branches, not frozen eigen-indices.
+
+    Diagonal fixture with M = I: branch P (lambda = 20 D11) crosses the fixed
+    branch Q (lambda = 100) exactly at D11 = 5; A, R and H are spectators.
+    """
+
+    SIGMA = 0.003
+    BRANCH_DOF = {"A": 0, "P": 1, "Q": 2, "R": 3}
+
+    def build(self, truth_d11, observed=("A", "P", "Q")):
+        truth = StageAMatrixParameters(truth_d11, 0.5, 5.0)
+        diagonal = np.array([45.0, 20.0 * truth_d11, 100.0, 300.0 + 10.0 * truth_d11, 800.0])
+        self.basis = StageAAffineBasis(
+            reference_parameters=truth,
+            reference_stiffness=sparse.diags(diagonal, format="csr"),
+            basis_matrices=(
+                sparse.diags([0.0, 20.0, 0.0, 10.0, 0.0], format="csr"),
+                sparse.diags([0.3, 0.0, 0.0, 0.0, 0.0], format="csr"),
+                sparse.diags([1.0, 0.0, 0.0, 0.0, 0.0], format="csr"),
+            ),
+            mass=sparse.identity(5, format="csr"),
+            dofs=tuple(AbaqusDof(index + 1, 1) for index in range(5)),
+        )
+        reference_order = list(np.argsort(diagonal, kind="stable"))
+        frequencies = np.sqrt(diagonal) / (2.0 * math.pi)
+        self.observed = tuple(
+            ModalObservation(
+                observation_id=f"obs_{name}",
+                physical_specimen_id="SP_SYNTHETIC",
+                test_run_id="run_1",
+                fe_mode_id=reference_order.index(self.BRANCH_DOF[name]) + 1,
+                experimental_mode_id=index + 1,
+                fe_frequency_hz=frequencies[self.BRANCH_DOF[name]],
+                experimental_frequency_hz=frequencies[self.BRANCH_DOF[name]],
+                mac=1.0,
+            )
+            for index, name in enumerate(observed)
+        )
+        self.provider_calls = 0
+
+    def provider(self, observations, eigenpairs):
+        """Memoryless shape pairing against the experimental unit-vector shapes."""
+
+        self.provider_calls += 1
+        vectors = np.asarray(eigenpairs.eigenvectors, dtype=float)
+        rows = [self.BRANCH_DOF[item.observation_id[4:]] for item in observations]
+        mac = vectors[rows, :] ** 2 / np.sum(vectors**2, axis=0)[np.newaxis, :]
+        observation_indexes, mode_indexes = inverse_solver_module.optimize.linear_sum_assignment(-mac)
+        return PairingResult(
+            assignments=tuple(
+                ModeAssignment(
+                    observations[row].observation_id,
+                    int(column) + 1,
+                    mac=float(mac[row, column]),
+                )
+                for row, column in zip(observation_indexes, mode_indexes)
+            ),
+            method="test shape adapter",
+        )
+
+    def solve(self, global_d11, tracking_mode=ModeTrackingMode.COMPARISON_BACKED):
+        global_vector = np.array([math.log(global_d11)])
+
+        def fixed_global(objective, bounds, **kwargs):
+            del bounds, kwargs
+            return mock.Mock(
+                success=True,
+                message="fixed global best",
+                nfev=1,
+                x=global_vector,
+                fun=objective(global_vector),
+            )
+
+        with mock.patch(
+            "services.inverse_solver.optimize.differential_evolution",
+            side_effect=fixed_global,
+        ):
+            return solve_stage_a_inverse(
+                self.basis,
+                self.observed,
+                ("D11",),
+                StageAMatrixParameters(global_d11, 0.5, 5.0),
+                StageAParameterBounds(D11=(3.0, 9.0), D66=(3.0, 8.0), coupling_ratio=(0.01, 0.35)),
+                InverseSolverConfiguration(
+                    mode_count=5,
+                    expected_rigid_body_modes=0,
+                    random_seed=5,
+                    tracking_mode=tracking_mode,
+                    local_max_evaluations=100,
+                ),
+                observation_standard_deviations=np.full(len(self.observed), self.SIGMA),
+                comparison_pairing_provider=(
+                    self.provider
+                    if tracking_mode == ModeTrackingMode.COMPARISON_BACKED
+                    else None
+                ),
+            )
+
+    @staticmethod
+    def local_signatures(result):
+        return [
+            dict(item.pairing_signature)
+            for item in result.convergence_history
+            if item.stage == "local" and item.success
+        ]
+
+    def test_pre_crossing_start_follows_the_branch_to_the_true_optimum(self):
+        for tracking_mode in ModeTrackingMode:
+            with self.subTest(tracking_mode=tracking_mode.value):
+                self.build(6.0)
+                result = self.solve(4.5, tracking_mode)
+                self.assertEqual(dict(result.global_pairing.signature)["obs_P"], 2)
+                self.assertAlmostEqual(result.fitted_parameters["D11"], 6.0, delta=1.0e-7)
+                self.assertLess(result.objective_final, 1.0e-10)
+                self.assertTrue(result.local_success)
+                self.assertFalse(result.pairing_changed_at_optimum)
+                self.assertTrue(result.success)
+                self.assertEqual(
+                    dict(result.final_pairing.signature),
+                    {"obs_A": 1, "obs_P": 3, "obs_Q": 2},
+                )
+                tracked_indexes = {item["obs_P"] for item in self.local_signatures(result)}
+                self.assertEqual(tracked_indexes, {2, 3})
+
+    def test_local_stop_on_a_numerically_degenerate_crossing_is_not_silent(self):
+        self.build(6.0)
+
+        def crossing_landing(fun, x0, **kwargs):
+            del x0, kwargs
+            # exp(log 5) lands within one ulp of the exact P/Q eigenvalue tie.
+            landing = np.array([math.log(5.0)])
+            return optimize_result(landing, fun(landing))
+
+        with mock.patch(
+            "services.inverse_solver.optimize.least_squares",
+            side_effect=crossing_landing,
+        ):
+            result = self.solve(4.5)
+        self.assertFalse(result.success)
+        self.assertFalse(result.local_success)
+        self.assertTrue(any("numerically degenerate" in item for item in result.warnings))
+        self.assertEqual(result.fitted_parameters["D11"], 4.5)
+
+    def test_local_jacobian_is_the_tracked_branch_derivative_on_both_sides(self):
+        self.build(6.0)
+        captured = {}
+        real_least_squares = inverse_solver_module.optimize.least_squares
+
+        def capturing(fun, x0, **kwargs):
+            captured["fun"], captured["jac"] = fun, kwargs["jac"]
+            return real_least_squares(fun, x0, **kwargs)
+
+        with mock.patch(
+            "services.inverse_solver.optimize.least_squares",
+            side_effect=capturing,
+        ):
+            result = self.solve(4.5)
+        rows = {item: index for index, item in enumerate(result.observation_ids)}
+        step = 1.0e-7
+        for d11 in (4.9, 5.1):
+            with self.subTest(D11=d11):
+                point = np.array([math.log(d11)])
+                analytic = captured["jac"](point)
+                finite_difference = (
+                    captured["fun"](point + step) - captured["fun"](point - step)
+                ) / (2.0 * step)
+                np.testing.assert_allclose(
+                    analytic[:, 0], finite_difference, rtol=1.0e-6, atol=1.0e-6
+                )
+                self.assertAlmostEqual(analytic[rows["obs_P"], 0], 0.5 / self.SIGMA, places=6)
+                self.assertAlmostEqual(analytic[rows["obs_Q"], 0], 0.0, places=9)
+
+    def test_close_non_crossing_branches_keep_the_global_pairing(self):
+        self.build(4.9)
+        result = self.solve(4.5)
+        global_signature = dict(result.global_pairing.signature)
+        self.assertEqual(global_signature, {"obs_A": 1, "obs_P": 2, "obs_Q": 3})
+        self.assertAlmostEqual(result.fitted_parameters["D11"], 4.9, delta=1.0e-7)
+        self.assertTrue(result.success)
+        self.assertFalse(result.pairing_changed_at_optimum)
+        self.assertEqual(dict(result.final_pairing.signature), global_signature)
+        self.assertTrue(
+            all(item == global_signature for item in self.local_signatures(result))
+        )
+
+    def eigenpairs(self, d11):
+        parameters = StageAMatrixParameters(d11, 0.5, 5.0)
+        return solve_generalized_eigenproblem(
+            self.basis.reconstruct_stiffness(parameters),
+            self.basis.mass,
+            5,
+            expected_rigid_body_modes=0,
+            dofs=self.basis.dofs,
+        )
+
+    def test_tracker_changes_index_but_keeps_branch_and_refuses_only_numerical_ties(self):
+        self.build(6.0)
+        reference = self.eigenpairs(4.5)
+        tracker = inverse_solver_module._LocalBranchTracker(
+            reference, self.provider(self.observed, reference), self.basis
+        )
+        cases = (
+            (4.8, 2, 3),
+            (5.0 * (1.0 - 1.0e-9), 2, 3),  # close but numerically resolved
+            (5.0 * (1.0 + 1.0e-9), 3, 2),
+            (6.0, 3, 2),
+        )
+        for d11, p_mode, q_mode in cases:
+            with self.subTest(D11=d11):
+                pairing = tracker.pairing(self.eigenpairs(d11))
+                by_id = {item.observation_id: item for item in pairing.assignments}
+                self.assertEqual(by_id["obs_P"].fe_mode_id, p_mode)
+                self.assertEqual(by_id["obs_Q"].fe_mode_id, q_mode)
+                self.assertEqual(by_id["obs_A"].fe_mode_id, 1)
+                for item in pairing.assignments:
+                    self.assertAlmostEqual(item.tracking_mac, 1.0, places=12)
+                    self.assertIsNone(item.mac)
+        self.assertEqual(self.provider_calls, 1)
+        with self.assertRaisesRegex(
+            inverse_solver_module._UnresolvedLocalBranch, "numerically degenerate"
+        ):
+            tracker.pairing(self.eigenpairs(5.0))
+        with self.assertRaisesRegex(
+            inverse_solver_module._UnresolvedLocalBranch, "global-best reference"
+        ):
+            degenerate = self.eigenpairs(5.0)
+            inverse_solver_module._LocalBranchTracker(
+                degenerate, self.provider(self.observed, degenerate), self.basis
+            )
+
+    def test_degenerate_global_best_refuses_local_refinement(self):
+        self.build(6.0)
+        with mock.patch(
+            "services.inverse_solver.optimize.least_squares",
+            side_effect=AssertionError("local refinement started"),
+        ) as local:
+            result = self.solve(5.0)
+        local.assert_not_called()
+        self.assertTrue(result.global_stage_acceptable)
+        self.assertFalse(result.local_success)
+        self.assertFalse(result.success)
+        self.assertEqual(result.local_iterations, 0)
+        self.assertIn("numerically degenerate", result.local_message)
+        self.assertTrue(any("global-stage solution is retained" in item for item in result.warnings))
+        self.assertEqual(result.fitted_parameters["D11"], math.exp(math.log(5.0)))
+
+    def test_degenerate_local_candidate_stops_refinement_and_keeps_global_solution(self):
+        self.build(6.0)
+        visited = []
+
+        def local_through_tie(fun, x0, **kwargs):
+            del kwargs
+            for d11 in (4.8, 5.0):
+                point = np.array([math.log(d11)])
+                visited.append(d11)
+                fun(point)
+            return optimize_result(x0, fun(x0))
+
+        with mock.patch(
+            "services.inverse_solver.optimize.least_squares",
+            side_effect=local_through_tie,
+        ):
+            result = self.solve(4.5)
+        self.assertEqual(visited, [4.8, 5.0])
+        self.assertFalse(result.local_success)
+        self.assertFalse(result.success)
+        self.assertFalse(result.pairing_changed_at_optimum)
+        self.assertEqual(result.fitted_parameters["D11"], 4.5)
+        self.assertEqual(result.local_iterations, 2)
+        self.assertIn("local candidate", result.local_message)
+
+    def test_local_residual_and_jacobian_never_call_the_pairing_provider(self):
+        self.build(6.0)
+        real_least_squares = inverse_solver_module.optimize.least_squares
+        calls = {}
+
+        def counting(fun, x0, **kwargs):
+            calls["before"] = self.provider_calls
+            outcome = real_least_squares(fun, x0, **kwargs)
+            calls["after"] = self.provider_calls
+            return outcome
+
+        with mock.patch(
+            "services.inverse_solver.optimize.least_squares",
+            side_effect=counting,
+        ):
+            result = self.solve(4.5)
+        self.assertTrue(result.success)
+        self.assertGreater(len(self.local_signatures(result)), 1)
+        self.assertEqual(calls["after"], calls["before"])
+        self.assertEqual(self.provider_calls, calls["after"] + 1)  # final re-pair guard only
+
+
+def optimize_result(x, values):
+    return inverse_solver_module.optimize.OptimizeResult(
+        x=x,
+        fun=values,
+        success=True,
+        status=1,
+        message="synthetic local stop",
+        nfev=1,
+    )
+
+
 class SolverIdentifiabilityGateTests(unittest.TestCase):
     """Rank deficiency is a hard block; the override covers full-rank conditioning only."""
 
