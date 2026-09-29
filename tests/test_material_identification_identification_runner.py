@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 import math
 from pathlib import Path
@@ -22,7 +23,13 @@ from domain.evidence import (
     evidence_content_hash,
     evidence_record_hash,
 )
-from domain.identification_model import STAGE_A_BENDING_MODEL
+from domain.identification_model import (
+    EFFECTIVE_FACE_SHEET_MODEL,
+    STAGE_A_BENDING_MODEL,
+    IdentificationModelDefinition,
+    IdentificationParameterDefinition,
+    ModelWorkflowStatus,
+)
 from domain.registration import FrozenRegistration
 from scientific_state import calibration_fingerprint
 from domain.material_identification_session import (
@@ -83,6 +90,28 @@ def _test_registration(experiment_digit="1", geometry_digit="2"):
 
 
 REGISTRATION = _test_registration()
+
+# Synthetic model whose parameters do not all share one unit.
+MIXED_UNIT_MODEL = IdentificationModelDefinition.create(
+    model_id="synthetic_mixed_units",
+    display_name="Synthetic mixed-unit test model",
+    parameter_definitions=(
+        IdentificationParameterDefinition(
+            parameter_id="a1", display_name="a1", unit="N·m", meaning="Synthetic stiffness 1."
+        ),
+        IdentificationParameterDefinition(
+            parameter_id="a2", display_name="a2", unit="N·m", meaning="Synthetic stiffness 2."
+        ),
+        IdentificationParameterDefinition(
+            parameter_id="m1", display_name="m1", unit="kg/m²", meaning="Synthetic areal mass."
+        ),
+    ),
+    frozen_assumptions=("Synthetic test model.",),
+    limitations=("Synthetic test model only.",),
+    workflow_status=ModelWorkflowStatus.RESEARCH,
+)
+
+_DEFAULT_UNIT = object()
 
 
 class _MockIdentificationExecutor:
@@ -623,6 +652,208 @@ class MaterialIdentificationIdentificationRunnerTests(unittest.TestCase):
             self.execute(runner)
 
         self.assertEqual(runner.record.status, MaterialIdentificationRunStatus.FAILED)
+
+    # --- C6-HARDEN: fitted parameters and their unit against the session model ---
+
+    def use_session(self, model, selected):
+        """Rebind the fixture to another model / selection with fresh bound inputs."""
+        task = MaterialIdentificationTaskDefinition(
+            model=model,
+            selected_parameter_ids=selected,
+            # Readiness needs bounds for every selected parameter, in the model unit.
+            parameter_bounds={
+                item: ParameterBounds(-1.0e6, 1.0e6, model.parameter(item).unit)
+                for item in selected
+            },
+            weighting_selection="U",
+            provenance=self.provenance,
+        )
+        self.session = MaterialIdentificationSession.create(
+            session_id=f"{model.model_id}-unit-session",
+            created_at=datetime(2026, 9, 27, 8, 0, tzinfo=timezone.utc),
+            task_definition=task,
+            source_identities=self.sources,
+            registration=REGISTRATION,
+        )
+        self.sensitivity = self.sensitivity_input()
+        self.identifiability = self.identifiability_input(self.sensitivity)
+        self.sensitivity_reference = self.reference(self.sensitivity)
+        self.identifiability_reference = self.reference(self.identifiability)
+
+    def unit_output(self, fitted, unit=_DEFAULT_UNIT):
+        fields = dict(
+            result=replace(self.inverse_result(), fitted_parameters=dict(fitted)),
+            model_id="U",
+            source_identities=self.sources,
+            source_identity=self.identification_source,
+            provenance=self.provenance,
+            timestamp=self.evidence_timestamp,
+            status="COMPLETED",
+        )
+        if unit is not _DEFAULT_UNIT:
+            fields["parameter_unit"] = unit
+        return IdentificationExecutionOutput(**fields)
+
+    def prebuilt_properties(self, properties, unit):
+        return IdentificationEvidence.create(
+            evidence_id="prebuilt-identification",
+            timestamp=self.evidence_timestamp,
+            source_identity=EvidenceSourceIdentity(
+                source_id="external-identification", source_type="external-executor"
+            ),
+            provenance=EvidenceProvenance(producer="external identification producer"),
+            status="COMPLETED",
+            parent_ids=(self.sensitivity.evidence_id, self.identifiability.evidence_id),
+            content={
+                "identified_properties": {
+                    "models": {"U": {"properties_MPa": dict(properties), "parameter_unit": unit}}
+                }
+            },
+            scientific_binding=self.session_binding(),
+        )
+
+    def assert_refused(self, output, reason, *mentions):
+        executor = _MockIdentificationExecutor(output)
+        runner = self.runner(executor)
+        with self.assertRaises(MaterialIdentificationEvidenceBindingError) as context:
+            self.execute(runner)
+        self.assertEqual(context.exception.reason, reason)
+        for text in mentions:
+            self.assertIn(text, str(context.exception))
+        self.assertEqual(len(executor.calls), 1)
+        self.assertEqual(runner.record.status, MaterialIdentificationRunStatus.FAILED)
+        self.assertEqual(runner.record.evidence_references, ())
+        self.assertEqual(runner.record.errors, (str(context.exception),))
+        return context.exception
+
+    def assert_accepted(self, output, unit, fitted_ids):
+        completed = self.execute(self.runner(_MockIdentificationExecutor(output)))
+        self.assertEqual(completed.run.status, MaterialIdentificationRunStatus.COMPLETED)
+        stored = completed.evidence.identification.content["identified_properties"]["models"]["U"]
+        self.assertEqual(stored["parameter_unit"], unit)
+        self.assertEqual(tuple(stored["properties_MPa"]), fitted_ids)
+        self.assertEqual(len(completed.run.evidence_references), 1)
+        return completed
+
+    # A
+    def test_stage_a_result_declared_in_mpa_is_refused(self):
+        self.assert_refused(
+            self.unit_output({"D11": 12.0, "D12": 2.4, "D66": 5.0}, "MPa"),
+            "parameter_unit", "'MPa'", "'N·m'",
+        )
+
+    # B
+    def test_effective_face_result_declared_in_newton_metres_is_refused(self):
+        self.use_session(EFFECTIVE_FACE_SHEET_MODEL, ("Ex", "Ey", "Gxy"))
+        self.assert_refused(
+            self.unit_output({"Ex": 45000.0, "Ey": 60000.0, "Gxy": 8000.0}, "N·m"),
+            "parameter_unit", "'N·m'", "'MPa'",
+        )
+
+    # C
+    def test_stage_a_result_with_omitted_unit_defaulting_to_mpa_is_refused(self):
+        output = self.unit_output({"D11": 12.0, "D12": 2.4, "D66": 5.0})
+        self.assertEqual(output.parameter_unit, "MPa")  # the unchanged default
+        self.assert_refused(output, "parameter_unit")
+
+    # D
+    def test_parameters_outside_the_session_model_are_refused(self):
+        for unit in ("N·m", "MPa"):
+            with self.subTest(unit=unit):
+                self.assert_refused(
+                    self.unit_output({"Ex": 45000.0, "Ey": 60000.0, "Gxy": 8000.0}, unit),
+                    "parameter_ids", "Ex", "Ey", "Gxy",
+                )
+
+    # E
+    def test_model_parameter_outside_the_session_selection_is_refused(self):
+        self.use_session(STAGE_A_BENDING_MODEL, ("D11", "D66"))
+        self.assert_refused(
+            self.unit_output({"D11": 12.0, "D12": 2.4, "D66": 5.0}, "N·m"),
+            "parameter_ids", "D12",
+        )
+
+    # F
+    def test_fitted_subset_of_the_selection_is_accepted(self):
+        self.assert_accepted(
+            self.unit_output({"D11": 12.0, "D66": 5.0}, "N·m"), "N·m", ("D11", "D66")
+        )
+        self.use_session(STAGE_A_BENDING_MODEL, ("D11", "D66"))
+        self.assert_accepted(
+            self.unit_output({"D11": 12.0, "D66": 5.0}, "N·m"), "N·m", ("D11", "D66")
+        )
+
+    # G
+    def test_prebuilt_record_with_wrong_unit_is_refused_unchanged(self):
+        prebuilt = self.prebuilt_properties({"D11": 12.0, "D12": 2.4, "D66": 5.0}, "MPa")
+        before = prebuilt.to_dict()
+        self.assert_refused(prebuilt, "parameter_unit")
+        self.assertEqual(prebuilt.to_dict(), before)
+        self.assertEqual(
+            prebuilt.content["identified_properties"]["models"]["U"]["parameter_unit"], "MPa"
+        )
+
+    # H
+    def test_direct_complete_with_wrong_unit_is_refused(self):
+        record = self.prebuilt_properties({"D11": 12.0, "D12": 2.4, "D66": 5.0}, "MPa")
+        before = record.to_dict()
+        runner = self.runner(_MockIdentificationExecutor())
+        runner.prepare()
+        runner.start()
+        with self.assertRaises(MaterialIdentificationEvidenceBindingError) as context:
+            runner.complete(
+                evidence=MaterialIdentificationEvidenceResults(identification=record),
+                evidence_references=(self.reference(record),),
+            )
+        self.assertEqual(context.exception.reason, "parameter_unit")
+        self.assertEqual(runner.record.status, MaterialIdentificationRunStatus.RUNNING)
+        self.assertEqual(runner.record.evidence_references, ())
+        self.assertEqual(record.to_dict(), before)
+
+    # I
+    def test_fitted_parameters_with_two_model_units_are_refused(self):
+        self.use_session(MIXED_UNIT_MODEL, ("a1", "a2", "m1"))
+        for unit in ("N·m", "kg/m²"):
+            with self.subTest(unit=unit):
+                error = self.assert_refused(
+                    self.unit_output({"a1": 1.0, "m1": 2.0}, unit), "mixed_units", "N·m", "kg/m²"
+                )
+                self.assertIn("one scalar parameter_unit", str(error))
+
+    # J
+    def test_single_unit_fitted_subset_of_a_mixed_unit_model_is_accepted(self):
+        self.use_session(MIXED_UNIT_MODEL, ("a1", "a2", "m1"))
+        self.assert_accepted(self.unit_output({"a1": 1.0, "a2": 2.0}, "N·m"), "N·m", ("a1", "a2"))
+        self.assert_accepted(self.unit_output({"m1": 3.0}, "kg/m²"), "kg/m²", ("m1",))
+        self.assert_refused(self.unit_output({"a1": 1.0, "a2": 2.0}, "kg/m²"), "parameter_unit")
+
+    # K
+    def test_stage_a_result_in_newton_metres_is_accepted(self):
+        self.assert_accepted(
+            self.unit_output({"D11": 12.0, "D12": 2.4, "D66": 5.0}, "N·m"),
+            "N·m", ("D11", "D12", "D66"),
+        )
+        prebuilt = self.prebuilt_properties({"D11": 12.0, "D12": 2.4, "D66": 5.0}, "N·m")
+        completed = self.execute(self.runner(_MockIdentificationExecutor(prebuilt)))
+        self.assertIs(completed.evidence.identification, prebuilt)
+
+    # L
+    def test_effective_face_result_in_mpa_is_accepted(self):
+        self.use_session(EFFECTIVE_FACE_SHEET_MODEL, ("Ex", "Ey", "Gxy"))
+        self.assert_accepted(
+            self.unit_output({"Ex": 45000.0, "Ey": 60000.0, "Gxy": 8000.0}, "MPa"),
+            "MPa", ("Ex", "Ey", "Gxy"),
+        )
+
+    # M
+    def test_entries_without_fitted_properties_need_no_unit(self):
+        # The existing empty prebuilt shape stays valid (see the prebuilt tests above).
+        empty = self.prebuilt(self.session_binding())
+        self.assertEqual(empty.content, {"identified_properties": {"models": {}}})
+        self.assertIs(self.execute(self.runner(_MockIdentificationExecutor(empty))).evidence.identification, empty)
+        no_properties = self.prebuilt_properties({}, "unused")
+        completed = self.execute(self.runner(_MockIdentificationExecutor(no_properties)))
+        self.assertIs(completed.evidence.identification, no_properties)
 
 
 if __name__ == "__main__":

@@ -101,7 +101,11 @@ class MaterialIdentificationEvidenceBindingError(MaterialIdentificationRunnerErr
     ``"sensitivity_unbound"``, ``"identifiability_unbound"``,
     ``"sensitivity_binding"``, ``"identifiability_binding"``,
     ``"input_binding_mismatch"``; a prebuilt output that does not derive from
-    exactly the supplied inputs uses ``"parent_ids"``.
+    exactly the supplied inputs uses ``"parent_ids"``.  Identification results
+    whose fitted parameters are not selected session parameters use
+    ``"parameter_ids"``; fitted parameters that need more than one model unit
+    use ``"mixed_units"``; a declared unit other than the model's uses
+    ``"parameter_unit"``.
     """
 
     def __init__(self, reason: str, message: str) -> None:
@@ -189,6 +193,64 @@ def _require_identification_inputs(
             raise MaterialIdentificationEvidenceBindingError(
                 f"{role}_binding", f"{role} input: {error}"
             ) from error
+
+
+def _require_model_units(
+    record: IdentificationEvidence, session: MaterialIdentificationSession
+) -> None:
+    """Fitted properties must be selected parameters declared in their model unit.
+
+    Units come only from the session's model definition, per actually fitted
+    parameter.  The current execution/evidence contract carries one scalar
+    ``parameter_unit`` per entry, so fitted parameters needing two units are
+    refused rather than mislabelled.  Entries without fitted properties need no
+    unit.  The record is only inspected, never repaired.
+    """
+
+    identified = record.content.get("identified_properties")
+    entries = identified.get("models") if isinstance(identified, Mapping) else None
+    if not isinstance(entries, Mapping):
+        return
+    task = session.task_definition
+    model = task.model
+    label = f"identification evidence {record.evidence_id!r}"
+    for name, entry in entries.items():
+        if not isinstance(entry, Mapping) or "properties_MPa" not in entry:
+            continue
+        # "properties_MPa" is only the stored key name; it never states a unit.
+        properties = entry["properties_MPa"]
+        if not isinstance(properties, Mapping):
+            raise MaterialIdentificationEvidenceBindingError(
+                "parameter_ids",
+                f"{label} entry {name!r} does not map parameter ids to fitted values.",
+            )
+        fitted = tuple(str(key) for key in properties)
+        if not fitted:
+            continue
+        # Selected ids are validated against the model by the task definition.
+        outside = [item for item in fitted if item not in task.selected_parameter_ids]
+        if outside:
+            raise MaterialIdentificationEvidenceBindingError(
+                "parameter_ids",
+                f"{label} entry {name!r} fits {outside}, which are not selected "
+                f"parameters {list(task.selected_parameter_ids)} of model "
+                f"{model.model_id!r}.",
+            )
+        units = sorted({model.parameter(item).unit for item in fitted})
+        if len(units) != 1:
+            raise MaterialIdentificationEvidenceBindingError(
+                "mixed_units",
+                f"{label} entry {name!r} fits parameters with model units {units}; the "
+                "current identification execution/evidence contract has one scalar "
+                "parameter_unit and cannot represent this result.",
+            )
+        declared = entry.get("parameter_unit")
+        if declared != units[0]:
+            raise MaterialIdentificationEvidenceBindingError(
+                "parameter_unit",
+                f"{label} entry {name!r} declares parameter_unit {declared!r}, but model "
+                f"{model.model_id!r} defines {list(fitted)} in {units[0]!r}.",
+            )
 
 
 def _identification_parent_ids(
@@ -729,6 +791,9 @@ class MaterialIdentificationRunner:
             expected = _scientific_binding_for_session(self._session)
             for record in results.records():
                 _require_session_binding(record, expected)
+            # Every accepted identification record, however it was produced.
+            if results.identification is not None:
+                _require_model_units(results.identification, self._session)
         reference_by_type = {item.record_type: item for item in references}
         for record in results.records():
             reference = reference_by_type.get(record.RECORD_TYPE)
