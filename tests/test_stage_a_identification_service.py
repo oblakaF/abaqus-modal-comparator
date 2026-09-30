@@ -1918,5 +1918,168 @@ class IdentifiabilityOverridePolicyTests(unittest.TestCase):
         self.assertIsNone(parameters["rcond"].default)
 
 
+class _InverseReached(Exception):
+    """Sentinel: the initial scientific sensitivity was accepted."""
+
+
+def _fixed_provider(mode_ids):
+    def provider(observations, eigenpairs):
+        del eigenpairs
+        return PairingResult(
+            assignments=tuple(
+                ModeAssignment(item.observation_id, mode_id, mac=0.99)
+                for item, mode_id in zip(observations, mode_ids)
+            ),
+            method="fixed integration provider",
+        )
+
+    return provider
+
+
+class ObservedModeSensitivityContractTests(unittest.TestCase):
+    """Stage A requests exactly its paired FE modes from the sensitivity service."""
+
+    def tied_fixture(self, parameters):
+        """FE elastic modes 3 and 4 form an exact doublet at ``parameters`` only."""
+
+        fixture = SyntheticProductionFixture()
+        stiffness = fixture.basis.reconstruct_stiffness(parameters).toarray()
+        lower, upper = fixture.elastic_vectors[:, 2], fixture.elastic_vectors[:, 3]
+        shift = upper @ stiffness @ upper - lower @ stiffness @ lower
+        tied = StageAAffineBasis(
+            reference_parameters=fixture.truth,
+            reference_stiffness=fixture.basis.reference_stiffness
+            + sparse.csr_matrix(shift * np.outer(lower, lower)),
+            basis_matrices=fixture.basis.basis_matrices,
+            mass=fixture.basis.mass,
+            dofs=fixture.dofs,
+            node_map=fixture.node_map,
+        )
+        values = solve_generalized_eigenproblem(
+            tied.reconstruct_stiffness(parameters),
+            tied.reconstruct_mass(parameters),
+            8,
+            expected_rigid_body_modes=3,
+            dofs=fixture.dofs,
+        ).eigenvalues
+        self.assertLess(abs(values[3] - values[2]), 1.0e-6)
+        self.assertGreater(min(np.diff(values[[0, 1, 3, 4, 5, 6, 7]])), 1.0e3)
+        return fixture, tied
+
+    def test_initial_and_optimum_sensitivity_request_their_own_paired_modes(self):
+        fixture = SyntheticProductionFixture()
+        calls = 0
+        first_observations = []
+
+        def provider(observations, eigenpairs):
+            nonlocal calls
+            del eigenpairs
+            calls += 1
+            if not first_observations:
+                first_observations.extend(observations)
+            mode_ids = list(range(2, len(observations) + 2))
+            if calls >= 4:
+                mode_ids[0], mode_ids[1] = mode_ids[1], mode_ids[0]
+            return PairingResult(
+                assignments=tuple(
+                    ModeAssignment(item.observation_id, mode_id, mac=0.99)
+                    for item, mode_id in zip(observations, mode_ids)
+                ),
+                method="stateful integration provider",
+            )
+
+        global_vector = np.log([fixture.truth.D11, fixture.truth.D66])
+
+        def fake_global(objective, bounds, **kwargs):
+            del bounds, kwargs
+            return mock.Mock(
+                success=True,
+                message="synthetic global convergence",
+                nfev=1,
+                x=global_vector,
+                fun=objective(global_vector),
+            )
+
+        with mock.patch(
+            "services.inverse_solver.optimize.differential_evolution",
+            side_effect=fake_global,
+        ), mock.patch.object(
+            stage_a_service,
+            "compute_stage_a_sensitivity",
+            wraps=stage_a_service.compute_stage_a_sensitivity,
+        ) as spy:
+            result = fixture.identify(
+                pairing_provider=provider,
+                requested_parameter_subset=("D11", "D66"),
+                initial_parameters=fixture.truth,
+            )
+        self.assertEqual(spy.call_count, 2)
+        initial_ids = tuple(range(2, len(first_observations) + 2))
+        final_by_id = {
+            item.observation_id: item.fe_mode_id
+            for item in result.inverse_result.final_pairing.assignments
+        }
+        final_ids = tuple(final_by_id[item.observation_id] for item in first_observations)
+        self.assertNotEqual(final_ids, initial_ids)
+        self.assertEqual(spy.call_args_list[0].kwargs["observed_mode_ids"], initial_ids)
+        self.assertEqual(spy.call_args_list[1].kwargs["observed_mode_ids"], final_ids)
+        # Every fitted observation keeps its row; none is silently omitted.
+        self.assertEqual(len(final_ids), result.effective_observation_count)
+
+    def test_fitted_degenerate_mode_at_initial_point_is_refused_before_fitting(self):
+        initial = StageAMatrixParameters(9.0, 0.9, 7.0)
+        fixture, tied = self.tied_fixture(initial)
+        with mock.patch.object(
+            stage_a_service, "solve_stage_a_inverse", side_effect=AssertionError("fitted")
+        ) as solver:
+            with self.assertRaisesRegex(
+                StageAIdentificationError,
+                "initial sensitivity.*FE mode 3 .*numerically degenerate",
+            ):
+                fixture.identify(
+                    affine_model=tied,
+                    initial_parameters=initial,
+                    pairing_provider=_fixed_provider((2, 3, 4, 5, 6)),
+                )
+        solver.assert_not_called()
+
+    def test_unrelated_doublet_does_not_block_initial_sensitivity(self):
+        initial = StageAMatrixParameters(9.0, 0.9, 7.0)
+        fixture, tied = self.tied_fixture(initial)
+        with mock.patch.object(
+            stage_a_service, "solve_stage_a_inverse", side_effect=_InverseReached
+        ) as solver:
+            with self.assertRaises(_InverseReached):
+                fixture.identify(
+                    affine_model=tied,
+                    initial_parameters=initial,
+                    pairing_provider=_fixed_provider((1, 2, 5, 6, 7)),
+                )
+        solver.assert_called_once()
+
+    def test_fitted_degenerate_mode_at_optimum_is_refused(self):
+        tied_point = StageAMatrixParameters(9.0, 0.9, 7.0)
+        fixture, tied = self.tied_fixture(tied_point)
+        inverse_result = SimpleNamespace(
+            fixed_parameters={},
+            fitted_parameters=dict(zip(("D11", "D12", "D66"), tied_point.values)),
+            final_pairing=_fixed_provider((2, 3, 4, 5, 6))(
+                fixture.observations()[1:], None
+            ),
+        )
+        with mock.patch.object(
+            stage_a_service, "solve_stage_a_inverse", return_value=inverse_result
+        ):
+            with self.assertRaisesRegex(
+                StageAIdentificationError,
+                "optimum sensitivity.*FE mode 3 .*numerically degenerate",
+            ):
+                fixture.identify(
+                    affine_model=tied,
+                    initial_parameters=StageAMatrixParameters(11.0, 2.0, 5.5),
+                    pairing_provider=_fixed_provider((1, 2, 5, 6, 7)),
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

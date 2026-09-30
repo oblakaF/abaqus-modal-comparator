@@ -63,7 +63,7 @@ from .matrix_model_service import (
     solve_generalized_eigenproblem,
 )
 from .modal_cluster_service import cluster_comparison_result
-from .sensitivity_service import compute_stage_a_sensitivity
+from .sensitivity_service import ScalarModeSensitivityRefusal, compute_stage_a_sensitivity
 
 
 class StageAIdentificationError(RuntimeError):
@@ -1633,25 +1633,29 @@ def identify_stage_a(
         for item in observations
     )
 
-    sensitivity = compute_stage_a_sensitivity(
-        affine_model,
-        initial_parameters,
-        solver_configuration.mode_count,
-        expected_rigid_body_modes=solver_configuration.expected_rigid_body_modes,
-        finite_difference_relative_steps=(),
-    )
-    mode_indexes = np.asarray(
-        [assignment_by_id[item.observation_id] - 1 for item in usable], dtype=int
-    )
+    try:
+        # Rows come back in ``usable`` order: exactly the initially paired modes.
+        sensitivity = compute_stage_a_sensitivity(
+            affine_model,
+            initial_parameters,
+            solver_configuration.mode_count,
+            expected_rigid_body_modes=solver_configuration.expected_rigid_body_modes,
+            finite_difference_relative_steps=(),
+            observed_mode_ids=tuple(
+                assignment_by_id[item.observation_id] for item in usable
+            ),
+        )
+    except ScalarModeSensitivityRefusal as exc:
+        raise StageAIdentificationError(
+            f"Stage-A initial sensitivity refused: {exc}"
+        ) from exc
     try:
         parameter_indexes = [sensitivity.parameter_ids.index(item) for item in requested]
     except ValueError as exc:
         raise StageAIdentificationError(
             f"Unsupported requested Stage-A parameter: {exc.args[0]}."
         ) from exc
-    requested_sensitivity = sensitivity.scaled_sensitivity[
-        np.ix_(mode_indexes, parameter_indexes)
-    ]
+    requested_sensitivity = sensitivity.scaled_sensitivity[:, parameter_indexes]
     weighted_sensitivity = numerical_weights[:, np.newaxis] ** 0.5 * requested_sensitivity
     whitening = whiten_sensitivity(
         weighted_sensitivity,
@@ -1756,25 +1760,31 @@ def identify_stage_a(
     final_parameters = StageAMatrixParameters(
         final_values["D11"], final_values["D12"], final_values["D66"]
     )
-    optimum_sensitivity = compute_stage_a_sensitivity(
-        affine_model,
-        final_parameters,
-        solver_configuration.mode_count,
-        expected_rigid_body_modes=solver_configuration.expected_rigid_body_modes,
-        finite_difference_relative_steps=(),
-    )
     final_assignment_by_id = {
         item.observation_id: item.fe_mode_id
         for item in inverse_result.final_pairing.assignments
     }
-    optimum_mode_indexes = np.asarray(
-        [final_assignment_by_id[item.observation_id] - 1 for item in usable], dtype=int
-    )
+    try:
+        # Rows come back in ``usable`` order: exactly the finally paired modes.
+        optimum_sensitivity = compute_stage_a_sensitivity(
+            affine_model,
+            final_parameters,
+            solver_configuration.mode_count,
+            expected_rigid_body_modes=solver_configuration.expected_rigid_body_modes,
+            finite_difference_relative_steps=(),
+            observed_mode_ids=tuple(
+                final_assignment_by_id[item.observation_id] for item in usable
+            ),
+        )
+    except ScalarModeSensitivityRefusal as exc:
+        raise StageAIdentificationError(
+            f"Stage-A optimum sensitivity refused: {exc}"
+        ) from exc
     optimum_parameter_indexes = [
         optimum_sensitivity.parameter_ids.index(item) for item in fitted_subset
     ]
     optimum_requested_sensitivity = optimum_sensitivity.scaled_sensitivity[
-        np.ix_(optimum_mode_indexes, optimum_parameter_indexes)
+        :, optimum_parameter_indexes
     ]
     optimum_weighted_sensitivity = (
         numerical_weights[:, np.newaxis] ** 0.5 * optimum_requested_sensitivity

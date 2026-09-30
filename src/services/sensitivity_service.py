@@ -48,6 +48,10 @@ class ParameterSensitivityCoordinate:
         object.__setattr__(self, "scale", scale)
 
 
+class ScalarModeSensitivityRefusal(ValueError):
+    """An explicitly requested scalar mode has no reliable single-mode sensitivity."""
+
+
 @dataclass(frozen=True)
 class ExcludedSensitivityObservation:
     observation_id: str
@@ -195,6 +199,95 @@ def _normalise_observations(
     return tuple(included_ids), np.asarray(included_indexes, dtype=int), tuple(excluded)
 
 
+def _validated_observed_mode_ids(
+    observed_mode_ids: Sequence[int], returned_count: int
+) -> Tuple[int, ...]:
+    requested = tuple(observed_mode_ids)
+    if not requested:
+        raise ValueError("observed_mode_ids must name at least one FE mode.")
+    for mode_id in requested:
+        if isinstance(mode_id, (bool, np.bool_)) or not isinstance(
+            mode_id, (int, np.integer)
+        ):
+            raise TypeError("observed_mode_ids must be 1-based integer FE mode IDs.")
+        if not 1 <= mode_id <= returned_count:
+            raise ValueError(
+                f"Observed FE mode {mode_id} is outside the returned elastic modes "
+                f"1..{returned_count}."
+            )
+    if len(set(requested)) != len(requested):
+        raise ValueError("observed_mode_ids must be unique.")
+    return tuple(int(mode_id) for mode_id in requested)
+
+
+def _numerically_degenerate_partners(
+    eigenpairs: GeneralizedEigenResult, mode_ids: Sequence[int]
+) -> dict[int, Tuple[str, ...]]:
+    """Return, per requested FE mode ID, the modes it is numerically tied with.
+
+    This is the same machine-precision unresolvedness rule the inverse solver
+    applies to fitted modes (``100 * eps * n * spectral scale``, the rule the
+    generalized eigensolver uses for numerical zero), evaluated on the same
+    returned spectrum and including the already-computed eigenvalue just above
+    the returned window.  It is not a physical closeness, cluster-gap, or
+    modal-family policy and has no configurable threshold.
+    """
+
+    values = np.asarray(eigenpairs.eigenvalues, dtype=float)
+    spectrum = np.concatenate(
+        (values, np.asarray(eigenpairs.rigid_body_eigenvalues, dtype=float))
+    )
+    scale = max(float(np.max(np.abs(spectrum))), 1.0)
+    resolution = (
+        100.0 * np.finfo(float).eps * scale * max(eigenpairs.eigenvectors.shape[0], 1)
+    )
+    compared = values
+    if eigenpairs.next_elastic_eigenvalue is not None:
+        compared = np.append(values, float(eigenpairs.next_elastic_eigenvalue))
+    partners: dict[int, Tuple[str, ...]] = {}
+    for mode_id in mode_ids:
+        tied = np.flatnonzero(np.abs(compared - values[mode_id - 1]) <= resolution)
+        names = tuple(
+            f"FE mode {index + 1}"
+            if index < values.size
+            else "the next elastic eigenvalue above the returned mode window"
+            for index in tied
+            if index != mode_id - 1
+        )
+        if names:
+            partners[mode_id] = names
+    return partners
+
+
+def _require_scalar_observed_modes(
+    eigenpairs: GeneralizedEigenResult, mode_ids: Tuple[int, ...]
+) -> None:
+    """Refuse requested modes without a reliable single-eigenvector sensitivity."""
+
+    partners = _numerically_degenerate_partners(eigenpairs, mode_ids)
+    if partners:
+        raise ScalarModeSensitivityRefusal(
+            "Scalar sensitivity refused: "
+            + "; ".join(
+                f"FE mode {mode_id} is numerically degenerate with "
+                + ", ".join(names)
+                for mode_id, names in partners.items()
+            )
+            + ". Ordinary scalar single-eigenvector Rayleigh sensitivity is not "
+            "scientifically defined reliably for that eigenspace (its eigenvectors "
+            "are an arbitrary basis of the tie). Subspace sensitivity would be a "
+            "separate method and is not an automatic fallback."
+        )
+    guard_mode = int(np.asarray(eigenpairs.eigenvalues).size)
+    if guard_mode in mode_ids:
+        raise ScalarModeSensitivityRefusal(
+            f"Scalar sensitivity refused: FE mode {guard_mode} is the computational "
+            "guard mode (the highest returned elastic mode); a scientifically "
+            f"requested scalar mode must have an ID below {guard_mode}. Request more "
+            "modal headroom (a larger mode_count)."
+        )
+
+
 def generalized_eigen_sensitivity(
     eigenpairs: GeneralizedEigenResult,
     mass: object,
@@ -204,6 +297,7 @@ def generalized_eigen_sensitivity(
     mass_derivatives: Sequence[object | None] | None = None,
     observations: Sequence[str | ModalObservation | ModalCluster] | None = None,
     coordinate_system: StageASensitivityCoordinate = StageASensitivityCoordinate.AFFINE,
+    observed_mode_ids: Sequence[int] | None = None,
 ) -> SensitivityResult:
     """Compute physical and scaled derivatives for simple eigenpairs.
 
@@ -212,6 +306,14 @@ def generalized_eigen_sensitivity(
     parameters use their current value as ``q_scale`` and are therefore the
     usual log/log sensitivities.  Signed parameters use a declared,
     non-vanishing characteristic scale instead.
+
+    ``observed_mode_ids`` (1-based FE elastic mode IDs) is an explicit
+    scientific request: only those rows are returned, in the requested order,
+    as ``mode_<id>``.  Each requested mode must be numerically resolved and
+    below the computational guard mode, otherwise the whole request raises
+    :class:`ScalarModeSensitivityRefusal`; degenerate modes that were not
+    requested do not matter.  ``None`` keeps the legacy full-spectrum,
+    positional ``observations`` behaviour without those checks.
     """
 
     coordinates = tuple(parameter_coordinates)
@@ -233,9 +335,21 @@ def generalized_eigen_sensitivity(
     if vectors.shape != (getattr(mass, "shape", (None, None))[0], values.size):
         raise ValueError("Eigenvectors must be stored by columns and match the mass matrix.")
 
-    observation_ids, included_indexes, excluded = _normalise_observations(
-        observations, values.size
-    )
+    if observed_mode_ids is None:
+        observation_ids, included_indexes, excluded = _normalise_observations(
+            observations, values.size
+        )
+    else:
+        if observations is not None:
+            raise ValueError(
+                "observations and observed_mode_ids are mutually exclusive: "
+                "observations are positional over the whole returned spectrum."
+            )
+        requested = _validated_observed_mode_ids(observed_mode_ids, values.size)
+        _require_scalar_observed_modes(eigenpairs, requested)
+        observation_ids = tuple(f"mode_{mode_id}" for mode_id in requested)
+        included_indexes = np.asarray(requested, dtype=int) - 1
+        excluded = ()
     raw = np.empty((included_indexes.size, len(derivatives)), dtype=float)
     for result_index, mode_index in enumerate(included_indexes):
         eigenvalue = values[mode_index]
@@ -463,10 +577,17 @@ def compute_stage_a_sensitivity(
     ratio_characteristic_scale: float = 1.0,
     finite_difference_relative_steps: Sequence[float] = (0.005, 0.01, 0.02),
     validation_relative_tolerance: float = 5.0e-3,
+    observed_mode_ids: Sequence[int] | None = None,
 ) -> SensitivityResult:
-    """Compute Stage-A analytic sensitivities and optional reconstructed-FD checks."""
+    """Compute Stage-A analytic sensitivities and optional reconstructed-FD checks.
+
+    ``observed_mode_ids`` has the meaning documented on
+    :func:`generalized_eigen_sensitivity`.
+    """
 
     coordinate_system = StageASensitivityCoordinate(coordinate_system)
+    if observed_mode_ids is not None:
+        observed_mode_ids = tuple(observed_mode_ids)
     if not isinstance(parameters, StageAMatrixParameters):
         raise TypeError("parameters must be StageAMatrixParameters.")
     if isinstance(mode_count, bool) or int(mode_count) != mode_count or mode_count <= 0:
@@ -499,11 +620,15 @@ def compute_stage_a_sensitivity(
         mass_derivatives=mass_derivatives,
         observations=observations,
         coordinate_system=coordinate_system,
+        observed_mode_ids=observed_mode_ids,
     )
     if not relative_steps:
         return result
 
-    _, included_indexes, _ = _normalise_observations(observations, mode_count)
+    if observed_mode_ids is None:
+        _, included_indexes, _ = _normalise_observations(observations, mode_count)
+    else:
+        included_indexes = np.asarray(observed_mode_ids, dtype=int) - 1
     validation = _finite_difference_validation(
         basis,
         parameters,
@@ -531,6 +656,7 @@ __all__ = [
     "DerivativeValidation",
     "ExcludedSensitivityObservation",
     "ParameterSensitivityCoordinate",
+    "ScalarModeSensitivityRefusal",
     "SensitivityResult",
     "StageASensitivityCoordinate",
     "analytic_eigenvalue_derivative",

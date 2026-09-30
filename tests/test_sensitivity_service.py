@@ -18,6 +18,7 @@ from services.matrix_model_service import (
     StageAMatrixParameters,
     solve_generalized_eigenproblem,
 )
+from services import sensitivity_service
 from services.sensitivity_service import (
     ParameterSensitivityCoordinate,
     StageASensitivityCoordinate,
@@ -290,6 +291,184 @@ class StageAMassDependentSensitivityTests(unittest.TestCase):
                 with_mass_derivative.raw_derivatives[:, 0],
             )
         )
+
+
+class ObservedModeSensitivityTests(unittest.TestCase):
+    """Explicit observed_mode_ids: only the requested scalar modes are validated."""
+
+    DOFS = tuple(AbaqusDof(index + 1, 1) for index in range(8))
+    # Distinct diagonal slopes, so each row reveals which DOF (mode) it came from.
+    SLOPES = np.arange(1.0, 9.0)
+
+    def solve(self, diagonal, mode_count):
+        return solve_generalized_eigenproblem(
+            sparse.diags(diagonal, format="csr"),
+            sparse.identity(8, format="csr"),
+            mode_count,
+            expected_rigid_body_modes=0,
+            dofs=self.DOFS,
+        )
+
+    def sensitivity(self, eigenpairs, **kwargs):
+        return generalized_eigen_sensitivity(
+            eigenpairs,
+            sparse.identity(8, format="csr"),
+            (sparse.diags(self.SLOPES, format="csr"),),
+            (ParameterSensitivityCoordinate("p", "physical p", 1.0, "characteristic"),),
+            **kwargs,
+        )
+
+    def expected_row(self, diagonal, mode_id):
+        # Unit eigenvector e_k and M = I give d(lambda)/dp = slope_k.
+        index = int(np.argsort(diagonal, kind="stable")[mode_id - 1])
+        return self.SLOPES[index] / (4.0 * math.pi * math.sqrt(diagonal[index]))
+
+    def assert_degenerate_refusal(self, context, mode_id):
+        message = str(context.exception)
+        self.assertIsInstance(
+            context.exception, sensitivity_service.ScalarModeSensitivityRefusal
+        )
+        self.assertIn(f"FE mode {mode_id} ", message)
+        self.assertIn("numerically degenerate", message)
+        self.assertIn("single-eigenvector Rayleigh", message)
+        self.assertIn("not an automatic fallback", message)
+
+    def test_isolated_requested_mode_returns_expected_sensitivity(self):
+        diagonal = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]
+        result = self.sensitivity(self.solve(diagonal, 5), observed_mode_ids=(2,))
+        self.assertEqual(result.observation_ids, ("mode_2",))
+        self.assertEqual(result.raw_derivatives.shape, (1, 1))
+        self.assertAlmostEqual(result.raw_derivatives[0, 0], self.expected_row(diagonal, 2))
+        self.assertAlmostEqual(result.frequencies_hz[0], math.sqrt(20.0) / (2.0 * math.pi))
+
+    def test_interior_exact_doublet_member_is_refused(self):
+        eigenpairs = self.solve([10.0, 20.0, 20.0, 40.0, 50.0, 60.0, 70.0, 80.0], 5)
+        for mode_id in (2, 3):
+            with self.subTest(mode_id=mode_id):
+                with self.assertRaises(ValueError) as context:
+                    self.sensitivity(eigenpairs, observed_mode_ids=(mode_id,))
+                self.assert_degenerate_refusal(context, mode_id)
+
+    def test_upper_window_hidden_doublet_is_refused_as_degenerate(self):
+        # Mode 4 is tied with the uncomputed mode 5 just above the window.
+        eigenpairs = self.solve([10.0, 20.0, 30.0, 40.0, 40.0, 60.0, 70.0, 80.0], 4)
+        self.assertEqual(eigenpairs.next_elastic_eigenvalue, 40.0)
+        with self.assertRaises(ValueError) as context:
+            self.sensitivity(eigenpairs, observed_mode_ids=(4,))
+        self.assert_degenerate_refusal(context, 4)
+        self.assertIn("above the returned mode window", str(context.exception))
+
+    def test_close_but_resolved_neighbour_passes(self):
+        diagonal = [10.0, 20.0, 30.0, 30.3, 50.0, 60.0, 70.0, 80.0]
+        result = self.sensitivity(self.solve(diagonal, 5), observed_mode_ids=(3, 4))
+        np.testing.assert_allclose(
+            result.raw_derivatives[:, 0],
+            [self.expected_row(diagonal, 3), self.expected_row(diagonal, 4)],
+        )
+
+    def test_unrelated_doublet_does_not_invalidate_the_request(self):
+        diagonal = [10.0, 20.0, 30.0, 50.0, 50.0, 60.0, 70.0, 80.0]
+        result = self.sensitivity(self.solve(diagonal, 7), observed_mode_ids=(2, 6))
+        self.assertEqual(result.observation_ids, ("mode_2", "mode_6"))
+        np.testing.assert_allclose(
+            result.raw_derivatives[:, 0],
+            [self.expected_row(diagonal, 2), self.expected_row(diagonal, 6)],
+        )
+
+    def test_one_degenerate_mode_refuses_the_whole_multi_mode_request(self):
+        eigenpairs = self.solve([10.0, 20.0, 30.0, 30.0, 50.0, 60.0, 70.0, 80.0], 6)
+        with self.assertRaises(ValueError) as context:
+            self.sensitivity(eigenpairs, observed_mode_ids=(2, 3))
+        self.assert_degenerate_refusal(context, 3)
+        self.assertNotIn("FE mode 2 ", str(context.exception))
+
+    def test_requested_guard_mode_is_refused(self):
+        eigenpairs = self.solve([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0], 5)
+        with self.assertRaisesRegex(
+            sensitivity_service.ScalarModeSensitivityRefusal,
+            "FE mode 5 is the computational guard mode.*more modal headroom",
+        ):
+            self.sensitivity(eigenpairs, observed_mode_ids=(2, 5))
+        for invalid in ((6,), (0,), (True,), (2, 2), (), (2.5,)):
+            with self.subTest(invalid=invalid), self.assertRaises((ValueError, TypeError)):
+                self.sensitivity(eigenpairs, observed_mode_ids=invalid)
+
+    def test_rows_follow_the_declared_request_order(self):
+        diagonal = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]
+        eigenpairs = self.solve(diagonal, 5)
+        result = self.sensitivity(eigenpairs, observed_mode_ids=(4, 1, 3))
+        self.assertEqual(result.observation_ids, ("mode_4", "mode_1", "mode_3"))
+        np.testing.assert_allclose(
+            result.raw_derivatives[:, 0],
+            [self.expected_row(diagonal, mode_id) for mode_id in (4, 1, 3)],
+        )
+        np.testing.assert_allclose(
+            result.frequencies_hz, eigenpairs.frequencies_hz[[3, 0, 2]]
+        )
+        np.testing.assert_allclose(
+            result.scaled_sensitivity[:, 0],
+            result.raw_derivatives[:, 0] / result.frequencies_hz,
+        )
+
+    def test_explicit_request_cannot_be_combined_with_positional_observations(self):
+        eigenpairs = self.solve([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0], 3)
+        with self.assertRaisesRegex(ValueError, "observed_mode_ids"):
+            self.sensitivity(
+                eigenpairs, observations=("a", "b", "c"), observed_mode_ids=(1,)
+            )
+
+    def test_legacy_none_path_keeps_full_spectrum_behaviour(self):
+        # Without an explicit scientific request, ties and the top returned
+        # mode are not refused: low-level algebraic use is unchanged.
+        diagonal = [10.0, 20.0, 20.0, 40.0, 50.0, 60.0, 70.0, 80.0]
+        result = self.sensitivity(self.solve(diagonal, 4))
+        self.assertEqual(
+            result.observation_ids, ("mode_1", "mode_2", "mode_3", "mode_4")
+        )
+        self.assertAlmostEqual(result.raw_derivatives[3, 0], self.expected_row(diagonal, 4))
+        tied_top = self.solve([10.0, 20.0, 30.0, 40.0, 40.0, 60.0, 70.0, 80.0], 4)
+        self.assertEqual(self.sensitivity(tied_top).raw_derivatives.shape, (4, 1))
+
+
+class ObservedModeStageASensitivityTests(unittest.TestCase):
+    def setUp(self):
+        fixture = StageASensitivityTests()
+        fixture.setUp()
+        self.basis = fixture.basis
+        self.parameters = fixture.parameters
+
+    def test_requested_rows_match_full_rows_and_pass_fd_validation_in_order(self):
+        full = compute_stage_a_sensitivity(
+            self.basis,
+            self.parameters,
+            3,
+            expected_rigid_body_modes=0,
+            finite_difference_relative_steps=(),
+        )
+        requested = compute_stage_a_sensitivity(
+            self.basis,
+            self.parameters,
+            3,
+            expected_rigid_body_modes=0,
+            observed_mode_ids=(2, 1),
+        )
+        self.assertEqual(requested.observation_ids, ("mode_2", "mode_1"))
+        np.testing.assert_allclose(requested.raw_derivatives, full.raw_derivatives[[1, 0]])
+        np.testing.assert_allclose(requested.frequencies_hz, full.frequencies_hz[[1, 0]])
+        self.assertTrue(requested.derivative_validation.consistent)
+        self.assertLess(requested.derivative_validation.worst_relative_error, 1.0e-3)
+
+    def test_requested_guard_mode_is_refused(self):
+        with self.assertRaisesRegex(
+            sensitivity_service.ScalarModeSensitivityRefusal, "guard mode"
+        ):
+            compute_stage_a_sensitivity(
+                self.basis,
+                self.parameters,
+                3,
+                expected_rigid_body_modes=0,
+                observed_mode_ids=(1, 3),
+            )
 
 
 if __name__ == "__main__":
