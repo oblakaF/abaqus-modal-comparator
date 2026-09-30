@@ -741,12 +741,21 @@ class RigidSpectrumHealth:
 
 @dataclass(frozen=True)
 class GeneralizedEigenResult:
+    """The first ``mode_count`` elastic eigenpairs.
+
+    ``next_elastic_eigenvalue`` is the already-computed elastic eigenvalue
+    immediately above the returned window.  It is window-boundary safety
+    metadata only, never an ordinary mode or pairing candidate.  ``None``
+    means the solve holds no further eigenvalue: the spectrum is exhausted.
+    """
+
     eigenvalues: np.ndarray
     frequencies_hz: np.ndarray
     eigenvectors: np.ndarray
     dofs: Tuple[AbaqusDof, ...] | None
     rigid_body_eigenvalues: np.ndarray
     rigid_spectrum_health: RigidSpectrumHealth | None = None
+    next_elastic_eigenvalue: float | None = None
 
 
 def _classify_expected_rigid_spectrum(
@@ -965,6 +974,7 @@ def solve_generalized_eigenproblem(
     if np.any(elastic_values <= 0.0):
         raise MatrixModelError("Rigid-body modes remain in the requested elastic spectrum.")
     frequencies = np.sqrt(elastic_values) / (2.0 * math.pi)
+    boundary = eigenvalues[rigid_count + mode_count : rigid_count + mode_count + 1]
     return GeneralizedEigenResult(
         eigenvalues=elastic_values,
         frequencies_hz=frequencies,
@@ -972,6 +982,7 @@ def solve_generalized_eigenproblem(
         dofs=normalized_dofs,
         rigid_body_eigenvalues=eigenvalues[:rigid_count],
         rigid_spectrum_health=rigid_health,
+        next_elastic_eigenvalue=float(boundary[0]) if boundary.size else None,
     )
 
 

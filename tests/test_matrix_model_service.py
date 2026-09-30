@@ -41,6 +41,7 @@ from services.matrix_model_service import (
     solve_generalized_eigenproblem,
     stage_a_matrix_configurations,
 )
+from services import matrix_model_service
 
 
 DOFS = (AbaqusDof(1, 1), AbaqusDof(2, 1), AbaqusDof(3, 1))
@@ -399,6 +400,58 @@ class GeneralizedEigenproblemTests(unittest.TestCase):
         self.assertEqual(result.rigid_spectrum_health.status, "PASS")
         self.assertEqual(result.rigid_spectrum_health.detected_rigid_mode_count, 6)
         self.assertLess(result.rigid_spectrum_health.rigid_to_first_elastic_ratio, 1.0e-2)
+
+
+class EigenWindowBoundaryTests(unittest.TestCase):
+    """The next elastic eigenvalue above the returned window is safety metadata."""
+
+    def test_dense_solve_reports_the_next_elastic_eigenvalue(self):
+        diagonal = [0.0, 4.0, 9.0, 16.0, 25.0]
+        result = solve_generalized_eigenproblem(
+            sparse.diags(diagonal),
+            sparse.eye(len(diagonal), format="csr"),
+            2,
+            expected_rigid_body_modes=1,
+        )
+        np.testing.assert_allclose(result.eigenvalues, [4.0, 9.0])
+        self.assertEqual(result.eigenvectors.shape[1], 2)
+        self.assertAlmostEqual(result.next_elastic_eigenvalue, 16.0)
+        larger = solve_generalized_eigenproblem(
+            sparse.diags(diagonal),
+            sparse.eye(len(diagonal), format="csr"),
+            3,
+            expected_rigid_body_modes=1,
+        )
+        self.assertEqual(result.next_elastic_eigenvalue, larger.eigenvalues[2])
+
+    def test_sparse_solve_reports_the_already_computed_next_eigenvalue(self):
+        diagonal = 10.0 * np.arange(1, 81, dtype=float)
+        stiffness = sparse.diags(diagonal, format="csr")
+        mass = sparse.eye(len(diagonal), format="csr")
+        with mock.patch(
+            "services.matrix_model_service.sparse_linalg.eigsh",
+            wraps=matrix_model_service.sparse_linalg.eigsh,
+        ) as eigsh:
+            result = solve_generalized_eigenproblem(
+                stiffness, mass, 5, expected_rigid_body_modes=0
+            )
+        self.assertEqual(eigsh.call_count, 1)
+        np.testing.assert_allclose(result.eigenvalues, [10.0, 20.0, 30.0, 40.0, 50.0])
+        larger = solve_generalized_eigenproblem(
+            stiffness, mass, 10, expected_rigid_body_modes=0
+        )
+        self.assertAlmostEqual(
+            result.next_elastic_eigenvalue, larger.eigenvalues[5], places=8
+        )
+
+    def test_exhausted_spectrum_is_reported_explicitly(self):
+        result = solve_generalized_eigenproblem(
+            sparse.diags([4.0, 9.0]),
+            sparse.eye(2, format="csr"),
+            2,
+            expected_rigid_body_modes=0,
+        )
+        self.assertIsNone(result.next_elastic_eigenvalue)
 
 
 class MatrixDeckAndProofTests(unittest.TestCase):

@@ -646,6 +646,8 @@ def _numerically_degenerate_modes(
     to numerical zero; there the eigenvectors of the tie are an arbitrary basis
     of their span.  Any larger separation is CLOSE_BUT_RESOLVED and is tracked
     normally.  This is not a physical closeness or modal-family threshold.
+    The already-computed eigenvalue just above the returned window is compared
+    too, so a tie split by the window edge is not missed.
     """
 
     values = np.asarray(eigenpairs.eigenvalues, dtype=float)
@@ -656,11 +658,35 @@ def _numerically_degenerate_modes(
     resolution = (
         100.0 * np.finfo(float).eps * scale * max(eigenpairs.eigenvectors.shape[0], 1)
     )
+    compared = values
+    if eigenpairs.next_elastic_eigenvalue is not None:
+        compared = np.append(values, float(eigenpairs.next_elastic_eigenvalue))
     return tuple(
         mode_id
         for mode_id in mode_ids
-        if np.count_nonzero(np.abs(values - values[mode_id - 1]) <= resolution) > 1
+        if np.count_nonzero(np.abs(compared - values[mode_id - 1]) <= resolution) > 1
     )
+
+
+class _GuardModePairing(InverseSolverValidationError):
+    """A pairing assigned a fitted observation to the computational guard mode."""
+
+
+def _require_below_guard_mode(pairing: PairingResult, mode_count: int) -> PairingResult:
+    """The highest returned elastic mode is a window guard, never a scalar fitted mode."""
+
+    guarded = sorted(
+        item.observation_id for item in pairing.assignments if item.fe_mode_id >= mode_count
+    )
+    if guarded:
+        raise _GuardModePairing(
+            "Pairing assigned observation(s) "
+            + ", ".join(guarded)
+            + f" to FE mode {mode_count}, the computational guard mode (highest "
+            "returned elastic mode), which is never a scalar fitted mode; request a "
+            "larger mode_count."
+        )
+    return pairing
 
 
 @dataclass(frozen=True)
@@ -714,6 +740,14 @@ class _LocalBranchTracker:
             tuple(item.fe_mode_id for item in assignments),
             "local candidate",
         )
+        guard_mode = int(eigenpairs.eigenvalues.size)
+        if any(item.fe_mode_id >= guard_mode for item in assignments):
+            raise _UnresolvedLocalBranch(
+                "Local refinement refused: a tracked FE branch reached FE mode "
+                f"{guard_mode}, the highest returned mode, i.e. the computational "
+                "mode-window boundary; more modal headroom (a larger mode_count) is "
+                "required. The global-stage solution is retained."
+            )
         return PairingResult(
             assignments=assignments,
             method="local FE-to-FE mass-MAC branch tracking from the global-best reference",
@@ -914,6 +948,18 @@ def solve_stage_a_inverse(
         raise InverseSolverValidationError(
             "mode_count does not include every initially paired FE mode."
         )
+    guarded = sorted(
+        item.observation_id
+        for item in fitted_observations
+        if item.fe_mode_id >= configuration.mode_count
+    )
+    if guarded:
+        raise InverseSolverValidationError(
+            f"FE mode {configuration.mode_count} is the computational guard mode "
+            f"(mode_count = {configuration.mode_count}); a scalar fitted observation "
+            "must use fe_mode_id < mode_count. Request a larger mode_count to fit: "
+            + ", ".join(guarded)
+        )
     if (
         configuration.tracking_mode == ModeTrackingMode.COMPARISON_BACKED
         and comparison_pairing_provider is None
@@ -969,18 +1015,20 @@ def solve_stage_a_inverse(
 
     def dynamic_pairing(eigenpairs: GeneralizedEigenResult) -> PairingResult:
         if configuration.tracking_mode == ModeTrackingMode.FIXED_PAIR_SYNTHETIC:
-            return _synthetic_pairing(
+            pairing = _synthetic_pairing(
                 fitted_observations,
                 tracking_reference_eigenpairs,
                 eigenpairs,
                 affine_model,
             )
-        assert comparison_pairing_provider is not None
-        return _validated_pairing(
-            comparison_pairing_provider(fitted_observations, eigenpairs),
-            fitted_observations,
-            configuration.mode_count,
-        )
+        else:
+            assert comparison_pairing_provider is not None
+            pairing = _validated_pairing(
+                comparison_pairing_provider(fitted_observations, eigenpairs),
+                fitted_observations,
+                configuration.mode_count,
+            )
+        return _require_below_guard_mode(pairing, configuration.mode_count)
 
     def evaluate(
         vector: Sequence[float],
@@ -1275,11 +1323,19 @@ def solve_stage_a_inverse(
     if not local_success:
         warnings.append(local_message or "least_squares did not converge.")
 
-    final_evaluation = evaluate(final_vector)
-    pairing_changed = (
+    guard_refusal = ""
+    try:
+        final_evaluation = evaluate(final_vector)
+    except _GuardModePairing as exc:
+        # A guard-mode re-pair is never accepted; report the tracked state.
+        guard_refusal = str(exc)
+        final_evaluation = local_tracked_evaluation
+    pairing_changed = bool(guard_refusal) or (
         final_evaluation.pairing.signature != local_tracked_evaluation.pairing.signature
     )
-    if pairing_changed:
+    if guard_refusal:
+        warnings.append("Final production re-pair is not accepted: " + guard_refusal)
+    elif pairing_changed:
         warnings.append(
             "Pairing changed at the local optimum; repeat the global/local cycle or review manually."
         )

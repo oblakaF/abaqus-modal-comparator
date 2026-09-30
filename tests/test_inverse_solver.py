@@ -1107,6 +1107,191 @@ def optimize_result(x, values):
     )
 
 
+class ModeWindowGuardTests(unittest.TestCase):
+    """The highest returned elastic mode is a computational guard, never a scalar fitted mode."""
+
+    DOFS = tuple(AbaqusDof(index + 1, 1) for index in range(8))
+
+    def setUp(self):
+        self.fixture = StageAInverseSolverTests()
+        self.fixture.setUp()
+
+    def window(self, diagonal, mode_count):
+        return solve_generalized_eigenproblem(
+            sparse.diags(np.asarray(diagonal, dtype=float), format="csr"),
+            sparse.identity(len(diagonal), format="csr"),
+            mode_count,
+            expected_rigid_body_modes=0,
+            dofs=self.DOFS[: len(diagonal)],
+        )
+
+    def test_exact_pair_split_by_the_upper_edge_is_numerically_degenerate(self):
+        split = self.window([10.0, 20.0, 30.0, 30.0, 50.0, 60.0, 70.0, 80.0], 3)
+        self.assertEqual(
+            inverse_solver_module._numerically_degenerate_modes(split, (1, 2, 3)), (3,)
+        )
+
+    def test_close_but_resolved_pair_split_by_the_edge_is_not_degenerate(self):
+        resolved = self.window([10.0, 20.0, 30.0, 30.3, 50.0, 60.0, 70.0, 80.0], 3)
+        self.assertEqual(
+            inverse_solver_module._numerically_degenerate_modes(resolved, (1, 2, 3)), ()
+        )
+
+    def solve_fixture(self, observations, mode_count, provider=None, fake_global=None):
+        fixture = self.fixture
+        kwargs = {}
+        configuration_changes = {"mode_count": mode_count}
+        if provider is not None:
+            kwargs["comparison_pairing_provider"] = provider
+            configuration_changes["tracking_mode"] = ModeTrackingMode.COMPARISON_BACKED
+        with mock.patch(
+            "services.inverse_solver.optimize.differential_evolution",
+            side_effect=fake_global or AssertionError("fitting started"),
+        ):
+            return solve_stage_a_inverse(
+                fixture.basis,
+                observations,
+                ("D11", "D66"),
+                fixture.truth,
+                fixture.bounds,
+                fixture.configuration(**configuration_changes),
+                observation_standard_deviations=np.full(len(observations), 0.003),
+                **kwargs,
+            )
+
+    def truth_global(self):
+        vector = np.log([self.fixture.truth.D11, self.fixture.truth.D66])
+
+        def fake_global(objective, bounds, **kwargs):
+            del bounds, kwargs
+            return mock.Mock(
+                success=True, message="fixed", nfev=1, x=vector, fun=objective(vector)
+            )
+
+        return fake_global
+
+    def test_observation_on_the_guard_mode_is_refused_before_fitting(self):
+        observations = self.fixture.observations()
+        fitted = observations[:4] + observations[5:]  # FE modes 1-4 and 6
+        with self.assertRaisesRegex(
+            InverseSolverValidationError, "guard mode.*fe_mode_id < mode_count.*obs_6"
+        ), mock.patch(
+            "services.inverse_solver.solve_generalized_eigenproblem",
+            side_effect=AssertionError("eigen-solve started"),
+        ):
+            self.solve_fixture(fitted, 6)
+
+    def test_observations_below_the_guard_mode_remain_valid(self):
+        fitted = self.fixture.observations()[:5]  # FE modes 1-5, guard mode 6
+        result = self.solve_fixture(fitted, 6, fake_global=self.truth_global())
+        self.assertTrue(result.success)
+        self.assertEqual(max(item.fe_mode_id for item in result.final_pairing.assignments), 5)
+
+    def guard_provider(self, guard_calls):
+        calls = 0
+
+        def provider(observations, eigenpairs):
+            nonlocal calls
+            calls += 1
+            mode_ids = [item.fe_mode_id for item in observations]
+            if guard_calls(calls):
+                mode_ids[0] = eigenpairs.eigenvalues.size
+            return PairingResult(
+                assignments=tuple(
+                    ModeAssignment(item.observation_id, mode_id, mac=0.95)
+                    for item, mode_id in zip(observations, mode_ids)
+                ),
+                method="guard-mode adapter",
+            )
+
+        return provider
+
+    def test_global_candidate_paired_to_the_guard_mode_is_an_invalid_candidate(self):
+        recorded = []
+        vector = np.log([self.fixture.truth.D11, self.fixture.truth.D66])
+
+        def fake_global(objective, bounds, **kwargs):
+            del bounds, kwargs
+            recorded.append(objective(vector))
+            return mock.Mock(success=True, message="fixed", nfev=1, x=vector, fun=recorded[-1])
+
+        result = self.solve_fixture(
+            self.fixture.observations(),
+            8,
+            provider=self.guard_provider(lambda call: call == 2),
+            fake_global=fake_global,
+        )
+        self.assertEqual(recorded, [inverse_solver_module._FAILED_OBJECTIVE])
+        failed = [item for item in result.convergence_history if item.stage == "global" and not item.success]
+        self.assertTrue(failed and "guard mode" in failed[0].message)
+        self.assertFalse(result.success)
+
+    def test_final_pairing_on_the_guard_mode_is_never_success(self):
+        result = self.solve_fixture(
+            self.fixture.observations(),
+            8,
+            provider=self.guard_provider(lambda call: call >= 4),
+            fake_global=self.truth_global(),
+        )
+        self.assertTrue(result.global_stage_acceptable)
+        self.assertTrue(result.pairing_changed_at_optimum)
+        self.assertFalse(result.success)
+        self.assertTrue(any("guard mode" in item for item in result.warnings))
+
+    def tracker_fixture(self):
+        # Branch P = 10 D11 moves through fixed entries 20 and 30; mode_count 3.
+        reference = StageAMatrixParameters(1.5, 0.5, 5.0)
+        basis = StageAAffineBasis(
+            reference_parameters=reference,
+            reference_stiffness=sparse.diags([10.0, 20.0, 15.0, 30.0, 80.0], format="csr"),
+            basis_matrices=(
+                sparse.diags([0.0, 0.0, 10.0, 0.0, 0.0], format="csr"),
+                sparse.diags([0.0, 0.0, 0.0, 0.0, 0.001], format="csr"),
+                sparse.diags([0.0, 0.0, 0.0, 0.0, 0.002], format="csr"),
+            ),
+            mass=sparse.identity(5, format="csr"),
+            dofs=self.DOFS[:5],
+        )
+
+        def eigenpairs(d11):
+            parameters = StageAMatrixParameters(d11, 0.5, 5.0)
+            return solve_generalized_eigenproblem(
+                basis.reconstruct_stiffness(parameters),
+                basis.mass,
+                3,
+                expected_rigid_body_modes=0,
+                dofs=basis.dofs,
+            )
+
+        start = eigenpairs(1.5)  # [10, 15 (P), 20]
+        tracker = inverse_solver_module._LocalBranchTracker(
+            start,
+            PairingResult((ModeAssignment("obs_P", 2),), method="test"),
+            basis,
+        )
+        return tracker, eigenpairs
+
+    def test_tracker_follows_interior_branch_away_from_the_window_edge(self):
+        tracker, eigenpairs = self.tracker_fixture()
+        assignment = tracker.pairing(eigenpairs(1.8)).assignments[0]
+        self.assertEqual(assignment.fe_mode_id, 2)
+        self.assertAlmostEqual(assignment.tracking_mac, 1.0, places=12)
+
+    def test_tracker_refuses_when_the_branch_reaches_the_guard_mode(self):
+        tracker, eigenpairs = self.tracker_fixture()
+        with self.assertRaisesRegex(
+            inverse_solver_module._UnresolvedLocalBranch, "mode-window boundary"
+        ):
+            tracker.pairing(eigenpairs(2.5))  # [10, 20, 25 (P)], next 30
+
+    def test_tracker_refuses_a_tie_with_the_hidden_boundary_eigenvalue(self):
+        tracker, eigenpairs = self.tracker_fixture()
+        with self.assertRaisesRegex(
+            inverse_solver_module._UnresolvedLocalBranch, "numerically degenerate"
+        ):
+            tracker.pairing(eigenpairs(3.0))  # [10, 20, 30], hidden next 30
+
+
 class SolverIdentifiabilityGateTests(unittest.TestCase):
     """Rank deficiency is a hard block; the override covers full-rank conditioning only."""
 
