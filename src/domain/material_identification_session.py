@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import hashlib
 import json
 import math
 from types import MappingProxyType
@@ -75,6 +76,9 @@ class ParameterBounds:
             upper=payload["upper"],
             unit=payload["unit"],
         )
+
+
+SCIENTIFIC_TASK_HASH_SCHEMA = "material-identification-task-scientific/1"
 
 
 @dataclass(frozen=True)
@@ -288,6 +292,36 @@ class MaterialIdentificationTaskDefinition:
     @property
     def frozen_assumptions(self) -> tuple[str, ...]:
         return self.model.frozen_assumptions
+
+    @property
+    def scientific_task_hash(self) -> str:
+        """SHA-256 sealing the scientific execution configuration of this task.
+
+        Covers the model identity, the fitted selection (in its stated order),
+        the bounds, the fixed values, and the weighting selection.  Descriptive
+        provenance is excluded; frozen assumptions are already sealed by the
+        model definition hash.
+        """
+
+        document = {
+            "schema": SCIENTIFIC_TASK_HASH_SCHEMA,
+            "identification_model_id": self.identification_model_id,
+            "identification_model_hash": self.identification_model_hash,
+            "selected_parameter_ids": list(self.selected_parameter_ids),
+            "parameter_bounds": [
+                {"parameter_id": parameter_id, **bounds.to_dict()}
+                for parameter_id, bounds in self.parameter_bounds
+            ],
+            "fixed_parameter_values": [
+                {"parameter_id": parameter_id, **fixed.to_dict()}
+                for parameter_id, fixed in self.fixed_parameter_values
+            ],
+            "weighting_selection": self.weighting_selection,
+        }
+        encoded = json.dumps(
+            document, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
 
     def bounds_for(self, parameter_id: str) -> ParameterBounds | None:
         return dict(self.parameter_bounds).get(parameter_id)
@@ -883,6 +917,7 @@ __all__ = [
     "ModelCatalog",
     "ParameterBounds",
     "RegistrationCatalog",
+    "SCIENTIFIC_TASK_HASH_SCHEMA",
     "SessionReadiness",
     "resolve_identification_model",
     "resolve_registration_reference",

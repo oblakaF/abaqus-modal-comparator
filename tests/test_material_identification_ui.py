@@ -232,6 +232,7 @@ def _binding(session, **overrides):
     fields = {
         "identification_model_id": session.task_definition.identification_model_id,
         "identification_model_hash": session.task_definition.identification_model_hash,
+        "identification_task_hash": session.task_definition.scientific_task_hash,
         "registration_hash": registration.registration_hash,
         "experimental_content_sha256": registration.experimental_content_sha256,
     }

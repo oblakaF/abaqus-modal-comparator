@@ -95,7 +95,7 @@ class MaterialIdentificationIdentificationExecutionError(
 class MaterialIdentificationEvidenceBindingError(MaterialIdentificationRunnerError):
     """Evidence does not scientifically belong to the current session.
 
-    ``reason`` is one of ``"unbound"``, ``"model"``, ``"registration"``,
+    ``reason`` is one of ``"unbound"``, ``"model"``, ``"task"``, ``"registration"``,
     ``"experimental_content"`` (or ``"session_unbound"`` when the session itself
     has no registration to bind to).  Identification input checks use
     ``"sensitivity_unbound"``, ``"identifiability_unbound"``,
@@ -128,6 +128,8 @@ def _scientific_binding_for_session(
     return EvidenceScientificBinding.create(
         identification_model_id=task.identification_model_id,
         identification_model_hash=task.identification_model_hash,
+        # Derived only from the committed task; never caller-supplied.
+        identification_task_hash=task.scientific_task_hash,
         registration_hash=registration.registration_hash,
         experimental_content_sha256=registration.experimental_content_sha256,
     )
@@ -151,6 +153,9 @@ def _require_session_binding(
     checks = (
         ("model", ("identification_model_id", "identification_model_hash"),
          "a different identification model definition"),
+        ("task", ("identification_task_hash",),
+         "a different scientific identification task (selection, bounds, fixed "
+         "values, or weighting)"),
         ("registration", ("registration_hash",), "a different FrozenRegistration"),
         ("experimental_content", ("experimental_content_sha256",),
          "different experimental file content"),
@@ -160,7 +165,7 @@ def _require_session_binding(
             raise MaterialIdentificationEvidenceBindingError(
                 reason, f"{label} belongs to {description} than the current session."
             )
-    if not record.scientifically_compatible_with(**expected.to_dict()):
+    if not record.scientifically_compatible_with(**expected.identity()):
         raise MaterialIdentificationEvidenceBindingError(
             "model", f"{label} is not scientifically compatible with the session."
         )

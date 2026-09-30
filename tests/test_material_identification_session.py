@@ -505,11 +505,11 @@ SYNTHETIC_NU12 = FixedParameterValue(0.123456789012345, "1")
 class FixedParameterValueTests(SessionTestBase):
     """CARBON-2B: unfitted model parameters carry an explicit declared value."""
 
-    def carbon_task(self, fixed=None, selected=("E1", "E2", "G12"), **changes):
+    def carbon_task(self, fixed=None, selected=("E1", "E2", "G12"), bounds=None, **changes):
         return self.task(
             EFFECTIVE_FACE_SHEET_V2_MODEL,
             selected=selected,
-            bounds=CARBON_BOUNDS,
+            bounds=CARBON_BOUNDS if bounds is None else bounds,
             fixed_parameter_values={"nu12": SYNTHETIC_NU12} if fixed is None else fixed,
             **changes,
         )
@@ -629,6 +629,63 @@ class FixedParameterValueTests(SessionTestBase):
             SYNTHETIC_NU12.value = 0.5
         with self.assertRaises(dataclasses.FrozenInstanceError):
             task.fixed_parameter_values = ()
+
+    # CARBON-2C (1-7): the scientific task hash seals execution configuration only.
+    def test_scientific_task_hash_is_deterministic(self):
+        first, second = self.carbon_task(), self.carbon_task()
+        self.assertIsNot(first, second)
+        self.assertEqual(first.scientific_task_hash, second.scientific_task_hash)
+        self.assertRegex(first.scientific_task_hash, r"^[0-9a-f]{64}$")
+
+    def test_every_scientific_field_changes_the_task_hash(self):
+        base = self.carbon_task().scientific_task_hash
+        wider = dict(CARBON_BOUNDS, G12=ParameterBounds(1000.0, 25000.0, "MPa"))
+        variants = {
+            "fixed nu12 0.05 vs 0.20": (
+                self.carbon_task(fixed={"nu12": FixedParameterValue(0.05, "1")}),
+                self.carbon_task(fixed={"nu12": FixedParameterValue(0.20, "1")}),
+            ),
+            "selected parameters": (
+                self.carbon_task(),
+                self.carbon_task(
+                    selected=("E1", "E2"),
+                    fixed={"G12": FixedParameterValue(5000.0, "MPa"), "nu12": SYNTHETIC_NU12},
+                ),
+            ),
+            "bounds": (self.carbon_task(), self.carbon_task(bounds=wider)),
+            "weighting selection": (self.carbon_task(), self.carbon_task(weighting_selection="U")),
+        }
+        for name, (first, second) in variants.items():
+            with self.subTest(name):
+                self.assertNotEqual(first.scientific_task_hash, second.scientific_task_hash)
+        self.assertEqual(self.carbon_task().scientific_task_hash, base)
+
+    def test_provenance_only_change_keeps_the_task_hash(self):
+        other = EvidenceProvenance(
+            producer="another author", method="reworded description", details={"note": "x"}
+        )
+        first, second = self.carbon_task(), self.carbon_task(provenance=other)
+        self.assertNotEqual(first.to_dict(), second.to_dict())
+        self.assertEqual(first.scientific_task_hash, second.scientific_task_hash)
+        # Session-level descriptive labels play no part either.
+        labelled = self.session(
+            second, sources=MaterialIdentificationSourceIdentities(specimen_label="panel-b")
+        )
+        self.assertEqual(
+            labelled.task_definition.scientific_task_hash, first.scientific_task_hash
+        )
+
+    def test_task_hash_survives_task_and_session_round_trip(self):
+        session = self.session(self.carbon_task())
+        expected = session.task_definition.scientific_task_hash
+        restored = MaterialIdentificationSession.from_json(
+            session.to_json(), models=CARBON_MODELS, registrations=REGISTRATIONS
+        )
+        self.assertEqual(restored.task_definition.scientific_task_hash, expected)
+        task = MaterialIdentificationTaskDefinition.from_dict(
+            json.loads(json.dumps(session.task_definition.to_dict())), models=CARBON_MODELS
+        )
+        self.assertEqual(task.scientific_task_hash, expected)
 
     def test_fixed_values_are_stored_in_model_parameter_order(self):
         task = self.task(

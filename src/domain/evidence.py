@@ -98,25 +98,42 @@ def evidence_content_hash(content: Mapping[str, object]) -> str:
     return hashlib.sha256(_canonical_json(_json_output(_json_value(content)))).hexdigest()
 
 
+SCIENTIFIC_BINDING_SCHEMA = "evidence-scientific-binding/2"
+_SCIENTIFIC_BINDING_V1_FIELDS = frozenset(
+    (
+        "identification_model_id",
+        "identification_model_hash",
+        "registration_hash",
+        "experimental_content_sha256",
+    )
+)
+
+
 @dataclass(frozen=True)
 class EvidenceScientificBinding:
-    """Which model definition, registration, and experiment content a result belongs to.
+    """Which model, task, registration, and experiment content a result belongs to.
 
-    Hashes only: the registration hash seals calibration, orientation, FE
-    geometry, and node mapping; the model hash seals the parameterization; the
-    experimental SHA-256 makes the source content explicit.  No payloads and no
-    parameter values are carried.  The producer that knows these values (the
-    runner) supplies them; nothing here infers them.
+    Hashes only: the model hash seals the parameterization; the task hash seals
+    the exact scientific task (selection, bounds, fixed values, weighting); the
+    registration hash seals calibration, orientation, FE geometry, and node
+    mapping; the experimental SHA-256 makes the source content explicit.  No
+    payloads and no parameter values are carried.  The producer that knows these
+    values (the runner) supplies them; nothing here infers them.
+
+    Schema ``evidence-scientific-binding/2``: bindings without a task hash
+    (version 1) are refused, never upgraded.
     """
 
     identification_model_id: str
     identification_model_hash: str
+    identification_task_hash: str
     registration_hash: str
     experimental_content_sha256: str
 
     FIELD_NAMES: ClassVar[tuple[str, ...]] = (
         "identification_model_id",
         "identification_model_hash",
+        "identification_task_hash",
         "registration_hash",
         "experimental_content_sha256",
     )
@@ -136,12 +153,14 @@ class EvidenceScientificBinding:
         *,
         identification_model_id: str,
         identification_model_hash: str,
+        identification_task_hash: str,
         registration_hash: str,
         experimental_content_sha256: str,
     ) -> "EvidenceScientificBinding":
         return cls(
             identification_model_id=identification_model_id,
             identification_model_hash=identification_model_hash,
+            identification_task_hash=identification_task_hash,
             registration_hash=registration_hash,
             experimental_content_sha256=experimental_content_sha256,
         )
@@ -151,27 +170,46 @@ class EvidenceScientificBinding:
         *,
         identification_model_id: str,
         identification_model_hash: str,
+        identification_task_hash: str,
         registration_hash: str,
         experimental_content_sha256: str,
     ) -> bool:
-        """Exact scientific match on all four identities; descriptive labels play no part."""
+        """Exact scientific match on all five identities; descriptive labels play no part."""
         expected = (
             identification_model_id,
             identification_model_hash,
+            identification_task_hash,
             registration_hash,
             experimental_content_sha256,
         )
         return tuple(getattr(self, name) for name in self.FIELD_NAMES) == expected
 
-    def to_dict(self) -> dict[str, object]:
+    def identity(self) -> dict[str, str]:
+        """The five scientific identities, without the schema marker."""
         return {name: getattr(self, name) for name in self.FIELD_NAMES}
+
+    def to_dict(self) -> dict[str, object]:
+        return {"schema_version": SCIENTIFIC_BINDING_SCHEMA, **self.identity()}
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, object]) -> "EvidenceScientificBinding":
         if not isinstance(payload, Mapping):
             raise TypeError("scientific_binding must be a mapping.")
-        missing = [name for name in cls.FIELD_NAMES if name not in payload]
-        unknown = sorted(set(payload) - set(cls.FIELD_NAMES))
+        schema = payload.get("schema_version")
+        if schema is None and set(payload) == _SCIENTIFIC_BINDING_V1_FIELDS:
+            raise ValueError(
+                "scientific_binding is evidence-scientific-binding/1, which has no "
+                "identification task hash; it is not accepted as a "
+                f"{SCIENTIFIC_BINDING_SCHEMA} binding. Re-create the evidence."
+            )
+        if schema != SCIENTIFIC_BINDING_SCHEMA:
+            raise ValueError(
+                f"Unsupported scientific_binding schema {schema!r}; expected "
+                f"{SCIENTIFIC_BINDING_SCHEMA!r}."
+            )
+        fields = set(payload) - {"schema_version"}
+        missing = [name for name in cls.FIELD_NAMES if name not in fields]
+        unknown = sorted(fields - set(cls.FIELD_NAMES))
         if missing or unknown:
             raise ValueError(
                 f"Invalid scientific_binding: missing {missing}, unknown {unknown}."
@@ -179,7 +217,7 @@ class EvidenceScientificBinding:
         return cls(**{name: payload[name] for name in cls.FIELD_NAMES})
 
 
-_BOUND_RECORD_HASH_DOMAIN = b"evidence-scientific-binding/1\n"
+_BOUND_RECORD_HASH_DOMAIN = b"evidence-scientific-binding/2\n"
 
 
 def evidence_record_hash(
@@ -395,6 +433,7 @@ class EvidenceRecord:
         *,
         identification_model_id: str,
         identification_model_hash: str,
+        identification_task_hash: str,
         registration_hash: str,
         experimental_content_sha256: str,
     ) -> bool:
@@ -408,6 +447,7 @@ class EvidenceRecord:
         return self.scientific_binding.matches(
             identification_model_id=identification_model_id,
             identification_model_hash=identification_model_hash,
+            identification_task_hash=identification_task_hash,
             registration_hash=registration_hash,
             experimental_content_sha256=experimental_content_sha256,
         )
@@ -575,6 +615,7 @@ __all__ = [
     "EvidenceSourceIdentity",
     "IdentificationEvidence",
     "IdentifiabilityEvidence",
+    "SCIENTIFIC_BINDING_SCHEMA",
     "SensitivityEvidence",
     "ValidationEvidence",
     "evidence_content_hash",

@@ -328,8 +328,10 @@ class MaterialIdentificationIdentificationRunnerTests(unittest.TestCase):
         self.assertEqual(
             evidence.scientific_binding.to_dict(),
             {
+                "schema_version": "evidence-scientific-binding/2",
                 "identification_model_id": self.session.task_definition.identification_model_id,
                 "identification_model_hash": self.session.task_definition.identification_model_hash,
+                "identification_task_hash": self.session.task_definition.scientific_task_hash,
                 "registration_hash": registration.registration_hash,
                 "experimental_content_sha256": registration.experimental_content_sha256,
             },
@@ -418,11 +420,20 @@ class MaterialIdentificationIdentificationRunnerTests(unittest.TestCase):
         fields = {
             "identification_model_id": self.session.task_definition.identification_model_id,
             "identification_model_hash": self.session.task_definition.identification_model_hash,
+            "identification_task_hash": self.session.task_definition.scientific_task_hash,
             "registration_hash": registration.registration_hash,
             "experimental_content_sha256": registration.experimental_content_sha256,
         }
         fields.update(changes)
         return EvidenceScientificBinding.create(**fields)
+
+    def other_task_hash(self):
+        """Task hash of the session's task with only the weighting selection changed."""
+        other = replace(self.session.task_definition, weighting_selection="P")
+        self.assertNotEqual(
+            other.scientific_task_hash, self.session.task_definition.scientific_task_hash
+        )
+        return other.scientific_task_hash
 
     def prebuilt(self, binding, parent_ids=None, evidence_id="prebuilt-identification"):
         if parent_ids is None:
@@ -462,6 +473,8 @@ class MaterialIdentificationIdentificationRunnerTests(unittest.TestCase):
         cases = {
             "unbound": None,
             "model": self.session_binding(identification_model_hash="d" * 64),
+            # Same model, registration and experiment; a different scientific task.
+            "task": self.session_binding(identification_task_hash=self.other_task_hash()),
             "registration": self.session_binding(registration_hash="e" * 64),
             "experimental_content": self.session_binding(experimental_content_sha256="f" * 64),
         }
@@ -565,6 +578,10 @@ class MaterialIdentificationIdentificationRunnerTests(unittest.TestCase):
             ("inputs bound to two other bindings", other_registration,
              self.session_binding(registration_hash="9" * 64), "input_binding_mismatch"),
             ("both inputs bound to another registration", other_registration, other_registration,
+             "sensitivity_binding"),
+            ("both inputs bound to another task",
+             self.session_binding(identification_task_hash=self.other_task_hash()),
+             self.session_binding(identification_task_hash=self.other_task_hash()),
              "sensitivity_binding"),
         )
         for name, sensitivity_binding, identifiability_binding, reason in cases:

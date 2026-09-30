@@ -514,6 +514,7 @@ class HistoricalSP13ImportTests(SyntheticArtifactTestCase):
             scientific_binding=EvidenceScientificBinding.create(
                 identification_model_id=EFFECTIVE_FACE_SHEET_MODEL.model_id,
                 identification_model_hash=EFFECTIVE_FACE_SHEET_MODEL.definition_hash,
+                identification_task_hash="2" * 64,
                 registration_hash=registration.registration_hash,
                 experimental_content_sha256="1" * 64,
             ),
@@ -522,6 +523,7 @@ class HistoricalSP13ImportTests(SyntheticArtifactTestCase):
                 EvidenceScientificBinding.create(
                     identification_model_id=EFFECTIVE_FACE_SHEET_MODEL.model_id,
                     identification_model_hash=EFFECTIVE_FACE_SHEET_MODEL.definition_hash,
+                    identification_task_hash="2" * 64,
                     registration_hash=registration.registration_hash,
                     experimental_content_sha256="1" * 64,
                 ),

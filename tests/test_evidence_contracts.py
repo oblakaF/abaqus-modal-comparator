@@ -16,6 +16,7 @@ from domain.evidence import (
     EvidenceSourceIdentity,
     IdentificationEvidence,
     IdentifiabilityEvidence,
+    SCIENTIFIC_BINDING_SCHEMA,
     SensitivityEvidence,
     ValidationEvidence,
     evidence_content_hash,
@@ -34,6 +35,7 @@ RECORD_TYPES = (
 BINDING_FIELDS = dict(
     identification_model_id="stage_a_bending",
     identification_model_hash="a" * 64,
+    identification_task_hash="7" * 64,
     registration_hash="b" * 64,
     experimental_content_sha256="c" * 64,
 )
@@ -230,7 +232,11 @@ class EvidenceScientificBindingTests(unittest.TestCase):
     def test_bound_evidence(self):
         record = self.create(binding=self.binding())
         self.assertEqual(record.binding_status, "BOUND")
-        self.assertEqual(record.scientific_binding.to_dict(), BINDING_FIELDS)
+        self.assertEqual(
+            record.scientific_binding.to_dict(),
+            {"schema_version": SCIENTIFIC_BINDING_SCHEMA, **BINDING_FIELDS},
+        )
+        self.assertEqual(record.scientific_binding.identity(), BINDING_FIELDS)
         self.assertEqual(
             record.content_hash, evidence_record_hash(record.content, record.scientific_binding)
         )
@@ -249,6 +255,7 @@ class EvidenceScientificBindingTests(unittest.TestCase):
         variants = {
             "model hash": self.create(binding=self.binding(identification_model_hash="d" * 64)),
             "model id": self.create(binding=self.binding(identification_model_id="effective_face_sheet")),
+            "task hash only": self.create(binding=self.binding(identification_task_hash="8" * 64)),
             "registration hash": self.create(binding=self.binding(registration_hash="e" * 64)),
             "experimental sha256": self.create(binding=self.binding(experimental_content_sha256="f" * 64)),
             "unbound": self.create(binding=None),
@@ -285,7 +292,12 @@ class EvidenceScientificBindingTests(unittest.TestCase):
     # I / J / K
     def test_tampered_binding_is_detected(self):
         payload = self.create(binding=self.binding()).to_dict()
-        for name in ("identification_model_hash", "registration_hash", "experimental_content_sha256"):
+        for name in (
+            "identification_model_hash",
+            "identification_task_hash",
+            "registration_hash",
+            "experimental_content_sha256",
+        ):
             with self.subTest(name):
                 tampered = json.loads(json.dumps(payload))
                 tampered["scientific_binding"][name] = "9" * 64
@@ -306,6 +318,8 @@ class EvidenceScientificBindingTests(unittest.TestCase):
             "short model hash": dict(identification_model_hash="a" * 63),
             "non-hex registration": dict(registration_hash="g" * 64),
             "missing sha": dict(experimental_content_sha256=None),
+            "missing task hash": dict(identification_task_hash=None),
+            "short task hash": dict(identification_task_hash="7" * 63),
         }
         for name, change in invalid.items():
             with self.subTest(name), self.assertRaises((TypeError, ValueError)):
@@ -313,7 +327,9 @@ class EvidenceScientificBindingTests(unittest.TestCase):
         upper = self.binding(registration_hash="B" * 64)
         self.assertEqual(upper.registration_hash, "b" * 64)
         with self.assertRaisesRegex(ValueError, "unknown"):
-            EvidenceScientificBinding.from_dict({**BINDING_FIELDS, "calibration": {}})
+            EvidenceScientificBinding.from_dict(
+                {"schema_version": SCIENTIFIC_BINDING_SCHEMA, **BINDING_FIELDS, "calibration": {}}
+            )
         with self.assertRaises(Exception):
             self.binding().registration_hash = "e" * 64
 
@@ -325,6 +341,7 @@ class EvidenceScientificBindingTests(unittest.TestCase):
         mismatches = {
             "model id": dict(identification_model_id="effective_face_sheet"),
             "model hash": dict(identification_model_hash="d" * 64),
+            "task": dict(identification_task_hash="8" * 64),
             "registration": dict(registration_hash="e" * 64),
             "experiment": dict(experimental_content_sha256="f" * 64),
         }
@@ -347,7 +364,8 @@ class EvidenceScientificBindingTests(unittest.TestCase):
     # S / T
     def test_binding_carries_hashes_only(self):
         payload = self.create(binding=self.binding()).to_dict()["scientific_binding"]
-        self.assertEqual(set(payload), set(BINDING_FIELDS))
+        self.assertEqual(set(payload), set(BINDING_FIELDS) | {"schema_version"})
+        self.assertEqual(payload["schema_version"], "evidence-scientific-binding/2")
         text = json.dumps(payload).lower()
         for forbidden in (
             "calibration", "orientation", "rotation", "geometry", "node", "mapped",
@@ -356,7 +374,7 @@ class EvidenceScientificBindingTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertEqual(
             EvidenceScientificBinding.FIELD_NAMES,
-            ("identification_model_id", "identification_model_hash",
+            ("identification_model_id", "identification_model_hash", "identification_task_hash",
              "registration_hash", "experimental_content_sha256"),
         )
 
@@ -372,6 +390,54 @@ class EvidenceScientificBindingTests(unittest.TestCase):
             SensitivityEvidence.from_dict(implicit)
         with self.assertRaisesRegex(TypeError, "EvidenceScientificBinding"):
             self.create(binding=BINDING_FIELDS)
+
+
+    # CARBON-2C (10)
+    def test_record_hash_changes_when_only_the_task_hash_changes(self):
+        base = self.create(binding=self.binding())
+        other = self.create(binding=self.binding(identification_task_hash="8" * 64))
+        self.assertEqual(other.content, base.content)
+        self.assertEqual(
+            {k: v for k, v in other.scientific_binding.identity().items() if k != "identification_task_hash"},
+            {k: v for k, v in base.scientific_binding.identity().items() if k != "identification_task_hash"},
+        )
+        self.assertNotEqual(other.content_hash, base.content_hash)
+        self.assertFalse(other.scientifically_compatible_with(**BINDING_FIELDS))
+
+    # CARBON-2C (11)
+    def test_version_one_binding_without_task_identity_is_refused(self):
+        payload = self.create(binding=self.binding()).to_dict()
+        version_one = {
+            name: BINDING_FIELDS[name]
+            for name in (
+                "identification_model_id",
+                "identification_model_hash",
+                "registration_hash",
+                "experimental_content_sha256",
+            )
+        }
+        with self.assertRaisesRegex(ValueError, "evidence-scientific-binding/1"):
+            EvidenceScientificBinding.from_dict(version_one)
+        old_record = dict(json.loads(json.dumps(payload)), scientific_binding=version_one)
+        with self.assertRaisesRegex(ValueError, "evidence-scientific-binding/1"):
+            SensitivityEvidence.from_dict(old_record)
+        for schema in (None, "evidence-scientific-binding/1", "evidence-scientific-binding/3"):
+            with self.subTest(schema=schema):
+                candidate = {**BINDING_FIELDS}
+                if schema is not None:
+                    candidate["schema_version"] = schema
+                with self.assertRaisesRegex(ValueError, "Unsupported scientific_binding schema"):
+                    EvidenceScientificBinding.from_dict(candidate)
+
+    # CARBON-2C (12)
+    def test_unbound_historical_evidence_stays_unbound(self):
+        record = self.create()
+        restored = evidence_from_json(record.to_json())
+        self.assertEqual(restored, record)
+        self.assertEqual(restored.binding_status, "UNBOUND")
+        self.assertIsNone(restored.to_dict()["scientific_binding"])
+        self.assertEqual(restored.content_hash, evidence_content_hash(record.content))
+        self.assertNotIn("identification_task_hash", record.to_json())
 
 
 if __name__ == "__main__":

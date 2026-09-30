@@ -46,6 +46,7 @@ def _binding(model: IdentificationModelDefinition, **overrides) -> EvidenceScien
     fields = {
         "identification_model_id": model.model_id,
         "identification_model_hash": model.definition_hash,
+        "identification_task_hash": "c" * 64,
         "registration_hash": "a" * 64,
         "experimental_content_sha256": "b" * 64,
     }

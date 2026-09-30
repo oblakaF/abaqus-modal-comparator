@@ -9,11 +9,12 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from domain.evidence import EvidenceProvenance, EvidenceSourceIdentity
-from domain.identification_model import EFFECTIVE_FACE_SHEET_MODEL
+from domain.evidence import EvidenceProvenance, EvidenceSourceIdentity, SensitivityEvidence
+from domain.identification_model import EFFECTIVE_FACE_SHEET_MODEL, EFFECTIVE_FACE_SHEET_V2_MODEL
 from domain.registration import FrozenRegistration
 from scientific_state import calibration_fingerprint
 from domain.material_identification_session import (
+    FixedParameterValue,
     MaterialIdentificationEvidenceReference,
     MaterialIdentificationSession,
     MaterialIdentificationSourceIdentities,
@@ -21,7 +22,9 @@ from domain.material_identification_session import (
     ParameterBounds,
     SessionReadiness,
 )
+import material_identification_runner as runner_module
 from material_identification_runner import (
+    MaterialIdentificationEvidenceBindingError,
     MaterialIdentificationNotReadyError,
     MaterialIdentificationRunRecord,
     MaterialIdentificationRunner,
@@ -234,6 +237,62 @@ class MaterialIdentificationRunnerTests(unittest.TestCase):
 
         self.assertEqual(restored, record)
         self.assertEqual(restored.to_json(), record.to_json())
+
+
+class ScientificTaskBindingTests(unittest.TestCase):
+    """CARBON-2C: runner bindings cover the exact scientific task, not only the model."""
+
+    def carbon_session(self, nu12: float) -> MaterialIdentificationSession:
+        task = MaterialIdentificationTaskDefinition(
+            model=EFFECTIVE_FACE_SHEET_V2_MODEL,
+            selected_parameter_ids=("E1", "E2", "G12"),
+            parameter_bounds={
+                "E1": ParameterBounds(10000.0, 100000.0, "MPa"),
+                "E2": ParameterBounds(10000.0, 100000.0, "MPa"),
+                "G12": ParameterBounds(1000.0, 20000.0, "MPa"),
+            },
+            weighting_selection="U",
+            provenance=EvidenceProvenance(producer="task binding test"),
+            # Task A / Task B fixture values from the supervisor's example.
+            fixed_parameter_values={"nu12": FixedParameterValue(nu12, "1")},
+        )
+        return MaterialIdentificationSession.create(
+            session_id=f"carbon-{nu12}",
+            created_at=datetime(2026, 10, 1, 8, 0, tzinfo=timezone.utc),
+            task_definition=task,
+            source_identities=MaterialIdentificationSourceIdentities(specimen_label="panel"),
+            registration=REGISTRATION,
+        )
+
+    def test_fixed_nu12_changes_the_binding_and_cross_task_evidence_is_refused(self):
+        task_a, task_b = self.carbon_session(0.05), self.carbon_session(0.20)
+        # The runner's only binding source is the committed session state.
+        binding_a = runner_module._scientific_binding_for_session(task_a)
+        binding_b = runner_module._scientific_binding_for_session(task_b)
+        self.assertEqual(
+            binding_a.identification_task_hash,
+            task_a.task_definition.scientific_task_hash,
+        )
+        self.assertNotEqual(binding_a, binding_b)
+        differing = {
+            name
+            for name, value in binding_a.identity().items()
+            if binding_b.identity()[name] != value
+        }
+        self.assertEqual(differing, {"identification_task_hash"})
+        evidence = SensitivityEvidence.create(
+            evidence_id="sensitivity-task-a",
+            timestamp=datetime(2026, 10, 1, 8, 30, tzinfo=timezone.utc),
+            source_identity=EvidenceSourceIdentity(source_id="task-a", source_type="test"),
+            provenance=EvidenceProvenance(producer="task binding test"),
+            status="COMPLETED",
+            content={"stored": True},
+            scientific_binding=binding_a,
+        )
+        runner_module._require_session_binding(evidence, binding_a)
+        with self.assertRaises(MaterialIdentificationEvidenceBindingError) as context:
+            runner_module._require_session_binding(evidence, binding_b)
+        self.assertEqual(context.exception.reason, "task")
 
 
 if __name__ == "__main__":
