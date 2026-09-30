@@ -366,17 +366,85 @@ def effective_face_sheet_model() -> IdentificationModelDefinition:
     )
 
 
+def effective_face_sheet_v2_model() -> IdentificationModelDefinition:
+    """Effective orthotropic carbon face-sheet Engineering Constants (versioned).
+
+    Successor of ``effective_face_sheet`` (Ex/Ey/Gxy), which stays unchanged
+    for historical reproducibility.  The model says what *may* be identified;
+    a campaign may fit a subset (for example E1, E2, G12 with nu12 held at a
+    declared value).  ``research`` status: no live, validated executor exists.
+    """
+
+    return IdentificationModelDefinition.create(
+        model_id="effective_face_sheet_v2",
+        display_name=(
+            "Effective orthotropic carbon face-sheet Engineering Constants for use "
+            "in the calibrated sandwich FE model"
+        ),
+        parameter_definitions=(
+            IdentificationParameterDefinition(
+                parameter_id="E1",
+                display_name="E1",
+                unit="MPa",
+                meaning="Effective face-sheet modulus along material axis 1 (longitudinal).",
+            ),
+            IdentificationParameterDefinition(
+                parameter_id="E2",
+                display_name="E2",
+                unit="MPa",
+                meaning="Effective face-sheet modulus along material axis 2 (transverse).",
+            ),
+            IdentificationParameterDefinition(
+                parameter_id="G12",
+                display_name="G12",
+                unit="MPa",
+                meaning="Effective face-sheet in-plane shear modulus.",
+            ),
+            IdentificationParameterDefinition(
+                parameter_id="nu12",
+                display_name="ν12",
+                unit="1",
+                meaning="Effective face-sheet major in-plane Poisson ratio.",
+            ),
+        ),
+        frozen_assumptions=(
+            "Material axes 1 and 2 follow the orientation declared in the calibrated "
+            "sandwich FE model.",
+            "Carbon face-sheet density is measured independently and fixed by the "
+            "identification campaign.",
+            "Face-sheet geometry and thickness are panel-specific inputs fixed by the "
+            "identification campaign.",
+            "Core geometry and core material are panel-specific inputs, initially fixed.",
+            "The interface and adhesive representation is initially fixed.",
+            "Transverse Engineering Constants (E3, nu13, nu23, G13, G23) are outside "
+            "this model's identified parameter vector.",
+        ),
+        limitations=(
+            "Identified values are effective face-sheet Engineering Constants within "
+            "the calibrated sandwich FE model; they are not fibre properties, "
+            "constituent properties, or coupon-certified lamina constants.",
+            "nu12 may be weakly identifiable or non-identifiable from modal data; a "
+            "campaign may fit E1, E2 and G12 while holding nu12 at a declared value.",
+            "Final direct Abaqus verification of an identified point is required.",
+        ),
+        workflow_status=ModelWorkflowStatus.RESEARCH,
+    )
+
+
 STAGE_A_BENDING_MODEL = stage_a_bending_model()
 EFFECTIVE_FACE_SHEET_MODEL = effective_face_sheet_model()
+EFFECTIVE_FACE_SHEET_V2_MODEL = effective_face_sheet_v2_model()
 
 
 __all__ = [
     "EFFECTIVE_FACE_SHEET_MODEL",
+    "EFFECTIVE_FACE_SHEET_V2_MODEL",
     "IDENTIFICATION_MODEL_SCHEMA",
     "IdentificationModelDefinition",
     "IdentificationParameterDefinition",
     "ModelWorkflowStatus",
     "STAGE_A_BENDING_MODEL",
     "effective_face_sheet_model",
+    "effective_face_sheet_v2_model",
     "stage_a_bending_model",
 ]

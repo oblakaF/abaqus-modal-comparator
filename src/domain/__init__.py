@@ -43,6 +43,7 @@ from .registration import (
 )
 from .identification_model import (
     EFFECTIVE_FACE_SHEET_MODEL,
+    EFFECTIVE_FACE_SHEET_V2_MODEL,
     STAGE_A_BENDING_MODEL,
     IdentificationModelDefinition,
     IdentificationParameterDefinition,
@@ -62,6 +63,7 @@ __all__ = [
     "CoreFamily",
     "Design",
     "EFFECTIVE_FACE_SHEET_MODEL",
+    "EFFECTIVE_FACE_SHEET_V2_MODEL",
     "IdentificationModelDefinition",
     "IdentificationParameterDefinition",
     "ModelWorkflowStatus",
