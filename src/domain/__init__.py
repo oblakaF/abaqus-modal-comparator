@@ -14,6 +14,7 @@ from .evidence import (
 )
 from .identification_campaign import IdentificationCampaign
 from .material_identification_session import (
+    FixedParameterValue,
     MaterialIdentificationEvidenceReference,
     MaterialIdentificationSession,
     MaterialIdentificationSourceIdentities,
@@ -72,6 +73,7 @@ __all__ = [
     "EvidenceRecord",
     "EvidenceSourceIdentity",
     "FaceSectionFamily",
+    "FixedParameterValue",
     "FROZEN_REGISTRATION_SCHEMA",
     "FrozenRegistration",
     "IdentificationCampaign",

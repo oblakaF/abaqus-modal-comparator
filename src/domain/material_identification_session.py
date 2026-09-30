@@ -77,6 +77,36 @@ class ParameterBounds:
         )
 
 
+@dataclass(frozen=True)
+class FixedParameterValue:
+    """A declared campaign value for a model parameter that is not fitted.
+
+    Fixed values are never invented: a model parameter that is neither selected
+    for fitting nor declared here leaves the session not ready.  No bounds apply.
+    """
+
+    value: float
+    unit: str
+
+    def __post_init__(self) -> None:
+        if isinstance(self.value, bool) or not isinstance(self.value, (int, float)):
+            raise TypeError("A fixed parameter value must be a real number.")
+        value = float(self.value)
+        if not math.isfinite(value):
+            raise ValueError("A fixed parameter value must be finite.")
+        object.__setattr__(self, "value", value)
+        object.__setattr__(self, "unit", _text(self.unit, "fixed value unit"))
+
+    def to_dict(self) -> dict[str, object]:
+        return {"value": self.value, "unit": self.unit}
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> "FixedParameterValue":
+        if not isinstance(payload, Mapping):
+            raise TypeError("fixed parameter value must be a mapping.")
+        return cls(value=payload["value"], unit=payload["unit"])
+
+
 ModelCatalog = Union[
     IdentificationModelDefinition,
     Mapping[str, IdentificationModelDefinition],
@@ -133,12 +163,34 @@ def _bounds_items(value: object) -> tuple[tuple[str, ParameterBounds], ...]:
     return tuple(result)
 
 
+def _fixed_items(value: object) -> tuple[tuple[str, FixedParameterValue], ...]:
+    if isinstance(value, Mapping):
+        items = tuple(value.items())
+    elif isinstance(value, (list, tuple)):
+        items = tuple(value)
+    else:
+        raise TypeError("fixed_parameter_values must be a mapping or a sequence of pairs.")
+    result = []
+    for item in items:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            raise TypeError(
+                "fixed_parameter_values entries must be (parameter_id, value) pairs."
+            )
+        parameter_id, fixed = item
+        if not isinstance(fixed, FixedParameterValue):
+            raise TypeError("fixed_parameter_values values must be FixedParameterValue.")
+        result.append((_text(parameter_id, "fixed parameter ID"), fixed))
+    return tuple(result)
+
+
 @dataclass(frozen=True)
 class MaterialIdentificationTaskDefinition:
     """One identification task: a model, a parameter selection, and campaign bounds.
 
     ``model`` is held in memory for validation; serialization stores only its
     id and definition hash, and restoring requires the exact definition.
+    ``selected_parameter_ids`` are fitted; ``fixed_parameter_values`` declare
+    the campaign value of model parameters that are not fitted.
     """
 
     model: IdentificationModelDefinition
@@ -146,6 +198,7 @@ class MaterialIdentificationTaskDefinition:
     parameter_bounds: tuple[tuple[str, ParameterBounds], ...]
     weighting_selection: str
     provenance: EvidenceProvenance
+    fixed_parameter_values: tuple[tuple[str, FixedParameterValue], ...] = ()
 
     def __post_init__(self) -> None:
         model = self.model
@@ -183,6 +236,27 @@ class MaterialIdentificationTaskDefinition:
                     f"{model.model_id!r} defines {expected_unit!r}."
                 )
             bounds[parameter_id] = value
+        fixed = dict()
+        for parameter_id, value in _fixed_items(self.fixed_parameter_values):
+            if parameter_id not in known:
+                raise ValueError(
+                    f"Fixed value for {parameter_id!r}: the parameter is not defined by "
+                    f"identification model {model.model_id!r}."
+                )
+            if parameter_id in fixed:
+                raise ValueError(f"Duplicate fixed value for {parameter_id!r}.")
+            if parameter_id in selected:
+                raise ValueError(
+                    f"Parameter {parameter_id!r} cannot be both selected for fitting "
+                    "and fixed."
+                )
+            expected_unit = model.parameter(parameter_id).unit
+            if value.unit != expected_unit:
+                raise ValueError(
+                    f"Fixed value for {parameter_id!r} uses unit {value.unit!r}; model "
+                    f"{model.model_id!r} defines {expected_unit!r}."
+                )
+            fixed[parameter_id] = value
         if not isinstance(self.provenance, EvidenceProvenance):
             raise TypeError("provenance must be an EvidenceProvenance record.")
         object.__setattr__(self, "selected_parameter_ids", selected)
@@ -191,6 +265,11 @@ class MaterialIdentificationTaskDefinition:
             self,
             "parameter_bounds",
             tuple((item, bounds[item]) for item in known if item in bounds),
+        )
+        object.__setattr__(
+            self,
+            "fixed_parameter_values",
+            tuple((item, fixed[item]) for item in known if item in fixed),
         )
         object.__setattr__(
             self,
@@ -213,6 +292,9 @@ class MaterialIdentificationTaskDefinition:
     def bounds_for(self, parameter_id: str) -> ParameterBounds | None:
         return dict(self.parameter_bounds).get(parameter_id)
 
+    def fixed_value_for(self, parameter_id: str) -> FixedParameterValue | None:
+        return dict(self.fixed_parameter_values).get(parameter_id)
+
     def to_dict(self) -> dict[str, object]:
         return {
             "identification_model_id": self.identification_model_id,
@@ -222,6 +304,10 @@ class MaterialIdentificationTaskDefinition:
             "parameter_bounds": [
                 {"parameter_id": parameter_id, **bounds.to_dict()}
                 for parameter_id, bounds in self.parameter_bounds
+            ],
+            "fixed_parameter_values": [
+                {"parameter_id": parameter_id, **fixed.to_dict()}
+                for parameter_id, fixed in self.fixed_parameter_values
             ],
             "weighting_selection": self.weighting_selection,
             "provenance": self.provenance.to_dict(),
@@ -257,6 +343,21 @@ class MaterialIdentificationTaskDefinition:
                     ),
                 )
             )
+        # Absent in payloads written before fixed values existed: an empty set.
+        fixed = []
+        for item in _sequence(
+            payload.get("fixed_parameter_values", ()), "fixed_parameter_values"
+        ):
+            if not isinstance(item, Mapping):
+                raise TypeError("fixed_parameter_values entries must be mappings.")
+            fixed.append(
+                (
+                    item["parameter_id"],
+                    FixedParameterValue.from_dict(
+                        {key: item[key] for key in ("value", "unit")}
+                    ),
+                )
+            )
         return cls(
             model=model,
             selected_parameter_ids=tuple(
@@ -265,6 +366,7 @@ class MaterialIdentificationTaskDefinition:
             parameter_bounds=tuple(bounds),
             weighting_selection=payload["weighting_selection"],
             provenance=EvidenceProvenance.from_dict(payload["provenance"]),
+            fixed_parameter_values=tuple(fixed),
         )
 
 
@@ -652,6 +754,15 @@ class MaterialIdentificationSession:
                 )
             elif task.bounds_for(parameter_id) is None:
                 reasons.append(f"Selected parameter {parameter_id!r} has no bounds.")
+        # Every model parameter must be fitted or explicitly fixed; nothing is defaulted.
+        accounted = set(task.selected_parameter_ids) | {
+            parameter_id for parameter_id, _ in task.fixed_parameter_values
+        }
+        for parameter_id in task.model.parameter_ids:
+            if parameter_id not in accounted:
+                reasons.append(
+                    f"Model parameter {parameter_id!r} is neither selected nor fixed."
+                )
         registration = self.registration_reference
         if registration is None:
             reasons.append(
@@ -763,6 +874,7 @@ class MaterialIdentificationSession:
 
 __all__ = [
     "FE_GEOMETRY_IDENTITY_V2",
+    "FixedParameterValue",
     "FrozenRegistrationReference",
     "MaterialIdentificationEvidenceReference",
     "MaterialIdentificationSession",

@@ -33,6 +33,7 @@ from domain.identification_model import (
 from domain.registration import FrozenRegistration
 from scientific_state import calibration_fingerprint
 from domain.material_identification_session import (
+    FixedParameterValue,
     MaterialIdentificationEvidenceReference,
     MaterialIdentificationSession,
     MaterialIdentificationSourceIdentities,
@@ -664,6 +665,13 @@ class MaterialIdentificationIdentificationRunnerTests(unittest.TestCase):
             parameter_bounds={
                 item: ParameterBounds(-1.0e6, 1.0e6, model.parameter(item).unit)
                 for item in selected
+            },
+            # Every unselected model parameter is explicitly fixed (synthetic
+            # fixture value, model unit); readiness refuses undeclared ones.
+            fixed_parameter_values={
+                item: FixedParameterValue(1.0, model.parameter(item).unit)
+                for item in model.parameter_ids
+                if item not in selected
             },
             weighting_selection="U",
             provenance=self.provenance,

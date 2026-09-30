@@ -15,11 +15,13 @@ from domain import material_identification_session as session_module
 from domain.evidence import EvidenceProvenance, EvidenceSourceIdentity, SensitivityEvidence
 from domain.identification_model import (
     EFFECTIVE_FACE_SHEET_MODEL,
+    EFFECTIVE_FACE_SHEET_V2_MODEL,
     STAGE_A_BENDING_MODEL,
     IdentificationModelDefinition,
     IdentificationParameterDefinition,
 )
 from domain.material_identification_session import (
+    FixedParameterValue,
     FrozenRegistrationReference,
     MaterialIdentificationEvidenceReference,
     MaterialIdentificationSession,
@@ -488,6 +490,157 @@ class RegistrationBindingTests(SessionTestBase):
             stage_a.to_json(), models=MODELS, registrations=REGISTRATIONS
         )
         self.assertEqual(restored.evidence_references, (reference,))
+
+
+CARBON_MODELS = MODELS + (EFFECTIVE_FACE_SHEET_V2_MODEL,)
+CARBON_BOUNDS = {
+    "E1": ParameterBounds(10000.0, 100000.0, "MPa"),
+    "E2": ParameterBounds(10000.0, 100000.0, "MPa"),
+    "G12": ParameterBounds(1000.0, 20000.0, "MPa"),
+}
+# Obviously synthetic fixture value; not a scientific estimate of nu12.
+SYNTHETIC_NU12 = FixedParameterValue(0.123456789012345, "1")
+
+
+class FixedParameterValueTests(SessionTestBase):
+    """CARBON-2B: unfitted model parameters carry an explicit declared value."""
+
+    def carbon_task(self, fixed=None, selected=("E1", "E2", "G12"), **changes):
+        return self.task(
+            EFFECTIVE_FACE_SHEET_V2_MODEL,
+            selected=selected,
+            bounds=CARBON_BOUNDS,
+            fixed_parameter_values={"nu12": SYNTHETIC_NU12} if fixed is None else fixed,
+            **changes,
+        )
+
+    # 1 / 2
+    def test_carbon_task_fits_three_and_fixes_nu12_and_is_ready(self):
+        task = self.carbon_task()
+        self.assertEqual(task.selected_parameter_ids, ("E1", "E2", "G12"))
+        self.assertEqual(task.fixed_parameter_values, (("nu12", SYNTHETIC_NU12),))
+        self.assertEqual(task.fixed_value_for("nu12"), SYNTHETIC_NU12)
+        self.assertIsNone(task.fixed_value_for("E1"))
+        self.assertIsNone(task.bounds_for("nu12"))
+        session = self.session(task)
+        self.assertEqual(session.readiness().reasons, ())
+        self.assertTrue(session.readiness().ready)
+
+    # 3
+    def test_unfixed_unselected_parameter_is_not_ready(self):
+        readiness = self.session(self.carbon_task(fixed={})).readiness()
+        self.assertFalse(readiness.ready)
+        self.assertEqual(
+            readiness.reasons, ("Model parameter 'nu12' is neither selected nor fixed.",)
+        )
+
+    # 4 / 5 / 6 / 7 / 8
+    def test_invalid_fixed_values_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "both selected for fitting and fixed"):
+            self.carbon_task(selected=("E1", "E2", "G12", "nu12"))
+        with self.assertRaisesRegex(ValueError, "not defined by identification model"):
+            self.carbon_task(fixed={"nu21": SYNTHETIC_NU12})
+        with self.assertRaisesRegex(ValueError, "defines '1'"):
+            self.carbon_task(fixed={"nu12": FixedParameterValue(0.1, "MPa")})
+        for value in (float("nan"), float("inf"), -float("inf")):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "finite"):
+                FixedParameterValue(value, "1")
+        for value in (True, "0.1", None):
+            with self.subTest(value=value), self.assertRaises(TypeError):
+                FixedParameterValue(value, "1")
+        with self.assertRaises(ValueError):
+            FixedParameterValue(0.1, " ")
+        with self.assertRaisesRegex(ValueError, "Duplicate fixed value for 'nu12'"):
+            self.carbon_task(fixed=(("nu12", SYNTHETIC_NU12), ("nu12", SYNTHETIC_NU12)))
+        with self.assertRaises(TypeError):
+            self.carbon_task(fixed={"nu12": 0.1})
+
+    # 9
+    def test_round_trip_preserves_fixed_value_exactly(self):
+        session = self.session(self.carbon_task())
+        text = session.to_json()
+        payload = json.loads(text)
+        self.assertEqual(
+            payload["task_definition"]["fixed_parameter_values"],
+            [{"parameter_id": "nu12", "value": SYNTHETIC_NU12.value, "unit": "1"}],
+        )
+        restored = MaterialIdentificationSession.from_json(
+            text, models=CARBON_MODELS, registrations=REGISTRATIONS
+        )
+        self.assertEqual(restored, session)
+        self.assertEqual(restored.to_json(), text)
+        self.assertEqual(restored.task_definition.fixed_value_for("nu12").value, SYNTHETIC_NU12.value)
+        self.assertTrue(restored.readiness().ready)
+
+    # 10
+    def test_payload_without_fixed_values_restores_as_empty(self):
+        for task, ready in (
+            (self.task(STAGE_A_BENDING_MODEL), True),
+            (self.task(EFFECTIVE_FACE_SHEET_MODEL), True),
+            (self.task(STAGE_A_BENDING_MODEL, selected=("D11", "D66")), False),
+        ):
+            with self.subTest(task.identification_model_id, selected=task.selected_parameter_ids):
+                payload = self.session(task).to_dict()
+                del payload["task_definition"]["fixed_parameter_values"]
+                restored = MaterialIdentificationSession.from_dict(
+                    payload, models=MODELS, registrations=REGISTRATIONS
+                )
+                self.assertEqual(restored.task_definition.fixed_parameter_values, ())
+                self.assertEqual(restored.readiness().ready, ready)
+        self.assertEqual(
+            restored.readiness().reasons,
+            ("Model parameter 'D12' is neither selected nor fixed.",),
+        )
+
+    # 11
+    def test_all_selected_existing_models_stay_ready_without_fixed_values(self):
+        for model in (STAGE_A_BENDING_MODEL, EFFECTIVE_FACE_SHEET_MODEL):
+            with self.subTest(model.model_id):
+                task = self.task(model)
+                self.assertEqual(task.selected_parameter_ids, model.parameter_ids)
+                self.assertEqual(task.fixed_parameter_values, ())
+                self.assertEqual(self.session(task).readiness().reasons, ())
+
+    # 12
+    def test_changing_only_the_fixed_value_changes_serialized_content(self):
+        first = self.session(self.carbon_task())
+        second = self.session(
+            self.carbon_task(fixed={"nu12": FixedParameterValue(0.321, "1")})
+        )
+        self.assertNotEqual(first.task_definition, second.task_definition)
+        self.assertNotEqual(first.task_definition.to_dict(), second.task_definition.to_dict())
+        self.assertNotEqual(first.to_json(), second.to_json())
+        # The model binding itself is unchanged: only the task content differs.
+        self.assertEqual(
+            first.task_definition.identification_model_hash,
+            second.task_definition.identification_model_hash,
+        )
+
+    # 13
+    def test_caller_mutation_cannot_alter_fixed_values(self):
+        fixed = {"nu12": SYNTHETIC_NU12}
+        task = self.carbon_task(fixed=fixed)
+        before = task.to_dict()
+        fixed["nu12"] = FixedParameterValue(0.4, "1")
+        fixed["E1"] = FixedParameterValue(1.0, "MPa")
+        self.assertEqual(task.to_dict(), before)
+        self.assertIsInstance(task.fixed_parameter_values, tuple)
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            SYNTHETIC_NU12.value = 0.5
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            task.fixed_parameter_values = ()
+
+    def test_fixed_values_are_stored_in_model_parameter_order(self):
+        task = self.task(
+            STAGE_A_BENDING_MODEL,
+            selected=("D12",),
+            fixed_parameter_values=(
+                ("D66", FixedParameterValue(5.0, "N·m")),
+                ("D11", FixedParameterValue(12.0, "N·m")),
+            ),
+        )
+        self.assertEqual(tuple(item for item, _ in task.fixed_parameter_values), ("D11", "D66"))
+        self.assertTrue(self.session(task).readiness().ready)
 
 
 if __name__ == "__main__":
