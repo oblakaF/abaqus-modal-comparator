@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import reviewed_core
-
 
 _INSTALLED = False
 
 
 def install_performance_tuning() -> None:
-    """Apply conservative runtime settings without changing accepted-pair physics."""
+    """Apply conservative runtime settings without changing accepted-pair physics.
+
+    It deliberately no longer caps geometry candidates: a cap of eight hid the
+    90-degree axis-swapped family of a nearly square planar scan before the
+    orientation-ambiguity gate. Only the selected candidate is evaluated
+    modally, so the complete plausible set costs no correlation work.
+    """
     global _INSTALLED
     if _INSTALLED:
         return
-    # A square panel has at most eight physically relevant in-plane signed/permuted
-    # orientations after geometry screening. Evaluating 16 modal candidates doubled the
-    # expensive correlation stage without improving the selected orientation in tests.
-    reviewed_core.GEOMETRY_CANDIDATE_LIMIT = 8
     _INSTALLED = True

@@ -31,7 +31,6 @@ FORBIDDEN_COST = 1.0e6
 # cost makes every already-admissible physical pair preferable to two unmatched
 # assignments; it is not a second hidden acceptance threshold.
 UNMATCHED_COST = 1.15
-GEOMETRY_CANDIDATE_LIMIT = 16
 GEOMETRY_RMS_FACTOR = 1.5
 GEOMETRY_RMS_ABSOLUTE_WINDOW = 1.0e-8
 INFERRED_DOF_RELATIVE_NORM = 1.0e-6
@@ -368,12 +367,16 @@ def geometry_alignment_candidates(
         best_rms * GEOMETRY_RMS_FACTOR,
         best_rms + GEOMETRY_RMS_ABSOLUTE_WINDOW,
     )
-    plausible = [
+    # Every geometrically plausible candidate reaches the ambiguity gate. A
+    # count cap would silently drop whole orientation families (e.g. the
+    # 90-degree swap of a nearly square planar scan) before the physical
+    # decision; candidates are cheap because only the selected one is ever
+    # evaluated modally.
+    return [
         candidate
         for candidate in candidates
         if candidate.normalized_rms_distance <= rms_limit
     ]
-    return plausible[:GEOMETRY_CANDIDATE_LIMIT]
 
 
 def _resolve_fe_mapping_node_ids(
