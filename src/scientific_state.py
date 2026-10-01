@@ -217,6 +217,9 @@ def geometry_candidate_id(candidate: Mapping[str, Any]) -> str:
         "mirrored": candidate.get("mirrored"),
         "calibration": candidate.get("calibration"),
     }
+    if candidate.get("fe_mapping_node_subset") is not None:
+        # Explicit FE mapping subset only; full-model candidate ids are unchanged.
+        payload["fe_mapping_node_subset"] = candidate.get("fe_mapping_node_subset")
     encoded = json.dumps(
         payload, sort_keys=True, separators=(",", ":"), default=str
     ).encode("utf-8")

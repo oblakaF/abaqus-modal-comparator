@@ -41,6 +41,7 @@ _RESULT_METRIC_KEYS = (
     "transformed_full_fe_bbox_in_experimental_coordinates",
     "evaluated_geometry_candidate_count",
     "geometry_calibration",
+    "fe_mapping_node_subset",
 )
 _TRANSFORM_METRIC_KEYS = (
     "determinant",

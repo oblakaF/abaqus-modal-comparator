@@ -63,6 +63,8 @@ class GeometryMatch:
     coordinate_scales: Optional[np.ndarray] = None
     calibration_details: Dict[str, Any] = field(default_factory=dict)
     physical_distances: Optional[np.ndarray] = None
+    # Fingerprint of an explicit FE mapping-node subset, when one was used.
+    fe_mapping_node_subset: Optional[Dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         if self.coordinate_scales is None:

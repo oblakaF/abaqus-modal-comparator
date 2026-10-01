@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from itertools import permutations, product
 from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
 
@@ -234,15 +235,28 @@ def geometry_alignment_candidates(
     tolerance_fraction: float = 0.03,
     coordinate_scale_override: Optional[float] = None,
     geometry_calibration: Optional[CoordinateCalibration] = None,
+    fe_node_indices: Optional[Sequence[int]] = None,
+    fe_mapping_node_subset: Optional[Dict[str, object]] = None,
 ) -> List[GeometryMatch]:
     """Return geometrically plausible signed-axis candidates.
 
     A single FE KD-tree is reused. Full transformed FE coordinates are not
     materialized for each candidate; only the selected candidate receives that
     array after modal evaluation.
+
+    ``fe_node_indices`` explicitly restricts the geometry reference (centre,
+    scale and KD-tree search) to those FE rows, e.g. the measured exterior
+    surface of a layered model. Returned mappings still index the full
+    ``abaqus_coordinates`` array; ``fe_mapping_node_subset`` is its
+    fingerprint, carried into each candidate's identity.
     """
-    abaqus = np.asarray(abaqus_coordinates, dtype=float)
+    full_abaqus = np.asarray(abaqus_coordinates, dtype=float)
     experimental = np.asarray(experimental_coordinates, dtype=float)
+    if fe_node_indices is None:
+        subset_to_full = np.arange(len(full_abaqus))
+    else:
+        subset_to_full = np.asarray(fe_node_indices, dtype=int).reshape(-1)
+    abaqus = full_abaqus[subset_to_full]
     if len(abaqus) < 3 or len(experimental) < 3:
         raise ValueError("At least three coordinates are required in both geometries.")
 
@@ -323,7 +337,7 @@ def geometry_alignment_candidates(
                 )
                 candidates.append(
                     GeometryMatch(
-                        experimental_to_abaqus=np.asarray(indices, dtype=int),
+                        experimental_to_abaqus=subset_to_full[np.asarray(indices, dtype=int)],
                         distances=distances,
                         rotation=rotation,
                         coordinate_scale=float(coordinate_scale),
@@ -333,6 +347,9 @@ def geometry_alignment_candidates(
                         coordinate_scales=coordinate_scales,
                         calibration_details=dict(calibration_details),
                         physical_distances=np.linalg.norm(residuals / coordinate_scales, axis=1),
+                        fe_mapping_node_subset=(
+                            None if fe_mapping_node_subset is None else dict(fe_mapping_node_subset)
+                        ),
                     )
                 )
 
@@ -357,6 +374,34 @@ def geometry_alignment_candidates(
         if candidate.normalized_rms_distance <= rms_limit
     ]
     return plausible[:GEOMETRY_CANDIDATE_LIMIT]
+
+
+def _resolve_fe_mapping_node_ids(
+    abaqus_reference: ModeShape,
+    fe_mapping_node_ids: Optional[Sequence[object]],
+) -> Tuple[Optional[np.ndarray], Optional[Dict[str, object]]]:
+    """Resolve an explicit FE mapping-node subset to full-array row indices.
+
+    IDs are matched exactly (as strings) against the reference mode's node
+    IDs. Unknown or duplicated IDs are refused; nothing is guessed.
+    """
+    if fe_mapping_node_ids is None:
+        return None, None
+    requested = [str(node_id) for node_id in fe_mapping_node_ids]
+    if len(set(requested)) != len(requested):
+        raise ValueError("The FE mapping-node subset contains duplicate node IDs.")
+    if len(requested) < 3:
+        raise ValueError("The FE mapping-node subset needs at least three nodes.")
+    lookup = _node_lookup(abaqus_reference)
+    missing = [node_id for node_id in requested if node_id not in lookup]
+    if missing:
+        raise ValueError(
+            f"{len(missing)} FE mapping-node IDs are not in the FE model "
+            f"(for example: {', '.join(missing[:5])})."
+        )
+    indices = np.array(sorted(lookup[node_id] for node_id in requested), dtype=int)
+    digest = hashlib.sha256("\n".join(sorted(requested)).encode("utf-8")).hexdigest()
+    return indices, {"node_count": len(requested), "sha256": digest}
 
 
 def _geometry_equivalence_key(
@@ -393,6 +438,9 @@ def _candidate_summary(candidate: GeometryMatch) -> Dict[str, object]:
         "axis_permutation": axis_permutation,
         "calibration": dict(candidate.calibration_details),
     }
+    if candidate.fe_mapping_node_subset is not None:
+        # Only present for an explicit subset, so full-model ids are unchanged.
+        summary["fe_mapping_node_subset"] = dict(candidate.fe_mapping_node_subset)
     summary["candidate_id"] = geometry_candidate_id(summary)
     return summary
 
@@ -1064,7 +1112,15 @@ def compare_modal_datasets(
     coordinate_scale_override: Optional[float] = None,
     geometry_calibration: Optional[CoordinateCalibration] = None,
     orientation_selection: Optional[Dict[str, object]] = None,
+    fe_mapping_node_ids: Optional[Sequence[object]] = None,
 ) -> ComparisonResult:
+    """Compare FE and experimental modes on one geometry-only registration.
+
+    ``fe_mapping_node_ids`` optionally names the FE nodes the experimental
+    points may map onto (for example the measured exterior surface). It only
+    restricts the geometry search; the FE dataset, its geometry identity and
+    the full-model mode vectors are unchanged.
+    """
     abaqus_modes = abaqus.sorted_modes()
     experimental_modes = experimental.sorted_modes()
     if not abaqus_modes:
@@ -1090,11 +1146,16 @@ def compare_modal_datasets(
         experimental_modes, experimental_node_ids
     )
 
+    fe_node_indices, fe_mapping_node_subset = _resolve_fe_mapping_node_ids(
+        abaqus_reference, fe_mapping_node_ids
+    )
     candidates = geometry_alignment_candidates(
         abaqus_reference.coordinates,
         experimental_coordinates,
         coordinate_scale_override=coordinate_scale_override,
         geometry_calibration=geometry_calibration,
+        fe_node_indices=fe_node_indices,
+        fe_mapping_node_subset=fe_mapping_node_subset,
     )
     # Geometry/orientation is selected using ONLY geometric evidence, before
     # any MAC/frequency/modal quantity is computed -- see
@@ -1190,6 +1251,8 @@ def compare_modal_datasets(
         "mapping_rms_in_abaqus_units": float(np.sqrt(np.mean(geometry.physical_distances ** 2))),
         "mapping_max_residual_in_abaqus_units": float(np.max(geometry.physical_distances)),
     }
+    if fe_mapping_node_subset is not None:
+        result_metadata["fe_mapping_node_subset"] = dict(fe_mapping_node_subset)
     candidate_diagnostics, diagnostic_summaries = _build_candidate_diagnostics(
         abaqus_modes,
         experimental_modes,

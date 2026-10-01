@@ -8,6 +8,7 @@ from scipy.signal import find_peaks, savgol_filter
 
 import universal_reader
 from modal_core import ModeShape
+from reviewed_core import _inferred_measurement_mask
 
 
 _INSTALLED = False
@@ -166,13 +167,17 @@ def _safe_mode_55(dataset: Dict[str, Any], geometry, index: int) -> ModeShape:
 
     component_specs = (("r1", "x", "d1"), ("r2", "y", "d2"), ("r3", "z", "d3"))
     components = []
-    measured = np.zeros((len(node_numbers), 3), dtype=bool)
+    present = np.zeros(3, dtype=bool)
     for component_index, names in enumerate(component_specs):
-        values, present = _component(dataset, names, len(node_numbers))
+        values, present[component_index] = _component(dataset, names, len(node_numbers))
         components.append(values)
-        if present:
-            measured[:, component_index] = True
     vectors = np.column_stack(components)
+    # An exported r1/r2/r3 array is not proof of a measured channel: 1D
+    # vibrometer exports carry structurally zero-filled in-plane arrays. A
+    # present component counts as measured only when this mode's own vector
+    # carries energy in it -- the reviewed-core inference rule, never borrowed
+    # from another mode.
+    measured = _inferred_measurement_mask(vectors) & present[np.newaxis, :]
 
     mode_number = _scalar_int(_first(dataset, ("mode_n", "mode_number", "mode")), index)
     frequency = _scalar(_first(dataset, ("freq", "frequency", "natural_frequency")), None)

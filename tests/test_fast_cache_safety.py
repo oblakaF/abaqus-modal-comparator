@@ -17,11 +17,14 @@ from modal_core import ModalDataset, ModeShape
 
 
 class FastCacheSafetyTests(unittest.TestCase):
-    def test_residual_classifier_pipeline_version_invalidates_older_unv_entries(self):
+    def test_dataset55_dof_pipeline_version_invalidates_older_unv_entries(self):
+        # Zero-filled dataset-55 components are no longer measured DOFs, so
+        # cached datasets carrying the old all-present masks must not be served.
         self.assertEqual(
             _ANALYSIS_PIPELINE_VERSION,
-            "2026.09.16.3-residual-record-classification",
+            "2026.10.01.1-dataset55-zero-filled-dofs",
         )
+        self.assertNotIn("2026.09.16.3-residual-record-classification", _CACHE_VERSION)
         self.assertNotIn("2026.09.16.2-exp-only-dataset58", _CACHE_VERSION)
 
     def test_cache_version_contains_schema_fingerprint(self):
