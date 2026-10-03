@@ -4,11 +4,11 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M1",
-  "current_ministep": "M1.3",
-  "status": "REVIEW_READY",
+  "current_ministep": null,
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M0",
-  "last_accepted_ministep": "M1.3.1",
-  "last_accepted_commit": "f77045d165784244ad731792035398b4e3217421",
+  "last_accepted_ministep": "M1.3",
+  "last_accepted_commit": "4b8d73e48e2faaf8b284c148d25a687d584c69cd",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -43,12 +43,17 @@
     "branch": "auto-id/m1",
     "M1.1": "ACCEPTED",
     "M1.2": "ACCEPTED",
-    "M1.3": "REVIEW_READY",
+    "M1.3": "ACCEPTED",
     "M1.4": "TODO",
     "status": "IN_PROGRESS",
     "M1.3_design_review": "DESIGN_ACCEPTED (D-019, D-021, D-023, D-024, D-026..D-029); no unresolved conflict",
-    "M1.3_implementation": "REVIEW_READY",
-    "M1.3.1": "ACCEPTED"
+    "M1.3_implementation": "ACCEPTED",
+    "M1.3.1": "ACCEPTED",
+    "accepted_limitations": [
+      "coherence evaluation deferred to M1.4",
+      "internal FRF fitting remains a future provider (D-029)",
+      "registration source path/timestamp reconciliation remains future work"
+    ]
   },
   "audit_test_baseline": {
     "ran": 873,
@@ -114,5 +119,5 @@
       }
     ]
   },
-  "next_action": "Supervisor review of M1.3 (external PolyMAX modal preparation provider); do not start M1.4"
+  "next_action": "Wait for SUPERVISOR authorization to start M1.4; do not start M1.4 automatically"
 }

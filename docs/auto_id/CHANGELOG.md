@@ -1283,3 +1283,40 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   5. **Legacy source identity in Stage-A pairing.** The Stage-A production pairing
      limitation recorded in M1.2 is unchanged.
 - **Next gate:** SUPERVISOR review of M1.3. M1.4 must not start before authorization.
+
+## 2026-10-04 — M1 M1.3 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.3 (no new mini-step started)
+- **Status:** M1.3 ACCEPTED. M1 IN_PROGRESS. M1.1, M1.2, M1.3.1 and M1.3 ACCEPTED.
+  M1.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `4b8d73e48e2faaf8b284c148d25a687d584c69cd` on `auto-id/m1`.
+- **Accepted scope:**
+  - `ExternalPolyMAXProvider` is implemented, with no new fitting algorithm.
+  - Frozen external PolyMAX selections are supported (D-026 implemented).
+  - Provider provenance is implemented, and damping is recovered from the stored
+    pole.
+  - M1.1 compatibility and M1.2 fixture compatibility are verified.
+  - SP02 bravo-1 validation passed. SP13 best validation passed using the pinned
+    repeat-a values (D-028).
+  - No Abaqus. Registration, pairing, the identification solver and thresholds are
+    unchanged.
+- **Accepted limitations:**
+  - coherence evaluation is deferred to M1.4;
+  - internal FRF fitting remains a future provider;
+  - registration source path/timestamp reconciliation remains future work.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept external PolyMAX provider milestone`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json` (adds `m1.accepted_limitations`)
+  - `docs/auto_id/ROADMAP.md`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization to start M1.4. `main` is unchanged
+  (`9d30caf`).
