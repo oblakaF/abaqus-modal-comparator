@@ -762,3 +762,75 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR authorization to start M1.2. `main` is unchanged
   (`9d30caf`).
+
+## 2026-10-04 — M1 M1.2 — PolyMAX fixture production path
+
+- **Stage:** M1
+- **Mini-step:** M1.2 (production PolyMAX dataset 55/2414 path)
+- **Status:** REVIEW_READY. M1.1 ACCEPTED. M1.3 and M1.4 TODO (M1.3 not
+  implemented).
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.2): enforce PolyMAX fixture production path`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **What was added:** `services.production_modal_input.load_production_modal_input`.
+  - **Single entry:** it is the only Auto-ID entry for experimental modes. A record is
+    selected only by `fixture_id` in the accepted M0.2 manifest; there is no free
+    file-path entry, and an unknown id raises `KeyError`.
+  - **Checks, all reused without duplication:**
+    - the M0.3 `verify_experiment_fixture` checks, run on the production reader
+      output (captured through its injectable loader): source store, size and
+      SHA-256; hash-sealed FrozenRegistration and its source, modal set and FE
+      geometry bindings; modal set; mode source; mode and point counts; measured-DOF
+      contract replay;
+    - then the M1.1 input-source policy on every mode.
+  - **Returned:** a `ProductionModalInput` with the reader's dataset unchanged
+    (frequencies, damping, node order, shapes), the FrozenRegistration, the report,
+    the source classification and a `provenance()` record.
+- **Refused:**
+  - wrong or missing source;
+  - wrong SHA-256;
+  - wrong modal set;
+  - wrong point count;
+  - wrong DOF contract, as a record or as imported data;
+  - a peak-derived dataset;
+  - a peak-derived or unclassifiable mode inside a fitted set.
+- **Real fixtures through the production path (Windows):**
+  - **SP02/bravo-1:** curve-fitted dataset 55, 9 modes, 121 points, U3, registration
+    `9bf736d3…`, FE `72e8597a…`, source `2671db01…`.
+  - **SP13/best:** 12 modes, 289 points, U3, `a8970e52…`, `34d69d79…`, `f2680235…`.
+  - The production dataset equals a direct reader load mode by mode: frequency,
+    damping, node order and shapes.
+- **Test refactor:** the M0.3 synthetic-fixture builder moved unchanged into
+  `tests/fixture_support.py`, a helper module with no `TestCase`. It is shared by
+  `test_experiment_fixture_regression.py` (same tests and assertions) and the new
+  tests.
+  - The synthetic modes now carry the reader's per-mode curve-fitted labels, so the
+    M1.1 policy sees realistic input.
+- **Files changed:**
+  - added `src/services/production_modal_input.py`
+  - added `tests/test_production_modal_input.py` (13 tests)
+  - added `tests/fixture_support.py`
+  - updated `tests/test_experiment_fixture_regression.py` (uses the shared helper)
+  - updated `docs/auto_id/fixtures/README.md` (production path section)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1.2 → REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO for existing paths. The new service is
+  not yet called by any existing code. Readers, peak extraction, modal algorithms,
+  registration, pairing, MAC, thresholds and `identify_stage_a` are unchanged.
+- **Tests (Windows):**
+  - New `test_production_modal_input`: 13 ran, OK. With the store configured the real
+    fixtures load; without it, 2 subtests skip.
+  - `test_experiment_fixture_regression`: 15 ran, OK, both with and without the store.
+  - Full suite: 938 ran, 0 failures. With the store, 936 passed and 2 skipped (opt-in
+    Abaqus); without it, 933 passed with the same 2 skipped tests plus 6 skipped
+    real-data subtests.
+- **Abaqus run count:** 0
+- **Known limitation (for a later step, not changed here):** production Stage-A
+  pairing (`_verified_experimental_source`) compares the registration's legacy
+  source identity, which includes the original path and modification time. It
+  therefore binds to the original machine location, while this production input
+  binds by store + SHA-256. Reconciling the two is outside M1.2.
+- **Next gate:** SUPERVISOR review of M1.2. M1.3 implementation must not start; a
+  design review follows separately.

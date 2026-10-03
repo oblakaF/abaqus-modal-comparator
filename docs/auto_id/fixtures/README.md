@@ -125,3 +125,24 @@ To run the real-data regression locally:
 set AUTO_ID_FIXTURE_ROOT_SNADWICH=<local root of the snadwich store>
 python -m unittest tests.test_experiment_fixture_regression -v
 ```
+
+## Production path (M1.2)
+
+`services.production_modal_input.load_production_modal_input(fixture_id, roots=...)`
+is the only way Auto-ID takes experimental modes. A record is selected by its
+`fixture_id` in this manifest; there is no free file-path entry.
+
+1. It runs the M0.3 `verify_experiment_fixture` checks on the production reader output.
+2. It applies the M1.1 input-source policy to every mode, so a peak-derived or
+   unclassifiable mode is refused even inside a fitted set.
+3. It returns a `ProductionModalInput`:
+   - the reader's dataset, unchanged (frequencies, damping, node order, shapes);
+   - the hash-sealed `FrozenRegistration`;
+   - the verification report;
+   - the source classification;
+   - a `provenance()` record (fixture, source SHA-256 and store path, modal set,
+     mode source, counts, measured DOFs, registration and FE geometry hashes).
+
+Tests: `tests/test_production_modal_input.py`. The real-data test iterates the
+manifest. The refusal cases use the shared synthetic workspace in
+`tests/fixture_support.py`, so they also run in CI.
