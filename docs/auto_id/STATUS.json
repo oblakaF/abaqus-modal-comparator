@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M0",
-  "current_ministep": null,
+  "current_ministep": "M0.4",
   "status": "IN_PROGRESS",
   "last_accepted_stage": "PRE-M0",
   "last_accepted_ministep": "M0.3",
@@ -30,7 +30,7 @@
     "M0.1": "ACCEPTED",
     "M0.2": "ACCEPTED",
     "M0.3": "ACCEPTED",
-    "M0.4": "TODO",
+    "M0.4": "IN_PROGRESS",
     "status": "IN_PROGRESS"
   },
   "test_baseline": {
@@ -40,5 +40,5 @@
     "skipped": 2,
     "snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3"
   },
-  "next_action": "Wait for supervisor authorization to start M0.4; do not start M0.4 automatically"
+  "next_action": "Record the M0.4 Windows/Linux CI baseline from the CI run of the M0.4 discovery fix"
 }

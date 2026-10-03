@@ -468,3 +468,43 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Tests run:** none (status record only)
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR authorization to start M0.4. `main` is unchanged.
+
+## 2026-10-04 — M0 M0.4 — Hidden test module fixed (part 1 of 2)
+
+- **Stage:** M0
+- **Mini-step:** M0.4 (Windows + Linux CI baseline), part 1: a test-infrastructure
+  defect found while collecting the baseline
+- **Status:** M0.4 IN_PROGRESS. Part 2 records the baseline from the CI run of this
+  commit.
+- **Branch:** `auto-id/m0` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M0.4): collect hidden CMIF UI layout tests`
+- **Defect:** `tests/cmif_ui_layout_test.py` was tracked since `bccd19e`
+  (2026-07-28) and defines `CmifUiLayoutTests` (2 tests). Its name does not match the
+  `test*.py` pattern of `python -m unittest discover -s tests`, so neither local runs
+  nor CI ever collected it. Run directly, both tests pass.
+  - Classification: real defect (test infrastructure), not a platform difference.
+- **Fix:**
+  - The file is renamed to `tests/test_cmif_ui_layout.py` (pure rename, content
+    unchanged).
+  - A new guard `tests/test_suite_discovery.py` fails if any `tests/*.py` file
+    outside the discovery pattern defines a `TestCase`. It fails on the old name and
+    passes after the rename.
+- **Other disabled-test search:**
+  - No `expectedFailure`, no disabled or renamed test methods, and no early-return
+    tests were found. The `_test_registration` helpers are fixtures, not tests.
+  - The only skips are the explicit environment gates documented in part 2.
+- **Files changed:**
+  - renamed `tests/cmif_ui_layout_test.py` → `tests/test_cmif_ui_layout.py`
+  - added `tests/test_suite_discovery.py`
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M0.4 → IN_PROGRESS)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO. Tests only; no `src/` change.
+- **Production code changed:** NO
+- **Tests run (Windows, Python 3.14.6):**
+  - Before the fix: 908 ran, OK. With `AUTO_ID_FIXTURE_ROOT_SNADWICH` set, 2 skipped;
+    without it, 4 skipped.
+  - After the fix: 911 ran, OK, with the same skips.
+- **Abaqus run count:** 0
+- **Next:** part 2 records the Windows/Linux baseline (M0.4 → REVIEW_READY).
