@@ -3,12 +3,12 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "PRE-M0",
+  "current_stage": "M0",
   "current_ministep": null,
   "status": "ACCEPTED",
-  "last_accepted_stage": "PRE-M0",
-  "last_accepted_ministep": "P0.2",
-  "last_accepted_commit": "ec86a772b32a1aaa318b3bc4e9091f7d3f59642e",
+  "last_accepted_stage": "M0",
+  "last_accepted_ministep": "M0.4",
+  "last_accepted_commit": "ad623286a583dc83f08a948bdd8d4967b25486bd",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -20,12 +20,82 @@
     "P0.2": "ACCEPTED",
     "P0.3": "ACCEPTED"
   },
-  "test_baseline": {
+  "freeze_merge": {
+    "pr": 25,
+    "branch": "auto-id/v1.1-roadmap",
+    "main_merge_sha": "05b4e2cad5c68ad7092f25c381b836e291184079"
+  },
+  "m0": {
+    "branch": "auto-id/m0",
+    "M0.1": "ACCEPTED",
+    "M0.2": "ACCEPTED",
+    "M0.3": "ACCEPTED",
+    "M0.4": "ACCEPTED",
+    "status": "ACCEPTED"
+  },
+  "audit_test_baseline": {
     "ran": 873,
     "passed": 870,
     "failed": 1,
     "skipped": 2,
     "snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3"
   },
-  "next_action": "Prepare/merge Auto-ID v1.1 freeze PR to main under HUMAN authorization; after merge record main SHA, then begin M0.1"
+  "ci_baseline": {
+    "reference_commit": "afa218141957d573877e39f6157a4f6ff013dfa9",
+    "command": "python -m unittest discover -s tests -v",
+    "windows": {
+      "python": "3.14.6",
+      "numpy": "2.5.1",
+      "scipy": "1.18.0",
+      "tk": "8.6",
+      "ran": 911,
+      "passed": 909,
+      "failed": 0,
+      "errors": 0,
+      "skipped_tests": 2,
+      "skipped_subtests": 0,
+      "fixture_store": "AUTO_ID_FIXTURE_ROOT_SNADWICH configured",
+      "without_fixture_store": {
+        "passed": 908,
+        "skipped_tests": 2,
+        "skipped_subtests": 2
+      }
+    },
+    "linux": {
+      "runner": "GitHub Actions ubuntu-latest",
+      "workflow": ".github/workflows/tests.yml",
+      "run": "https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/37138643253",
+      "conclusion": "success",
+      "python": "3.11",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "ran": 908,
+      "passed": 902,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 8,
+      "not_collected_class_skip": 3
+    },
+    "skips": [
+      {
+        "tests": "test_stage_a_matrix_abaqus_integration (2)",
+        "platforms": "Windows, Linux",
+        "class": "missing optional external tool (opt-in Abaqus integration)",
+        "gate": "ABAQUS_MATRIX_INTEGRATION=1 and an Abaqus executable"
+      },
+      {
+        "tests": "test_experiment_fixture_regression real-data subtests (2)",
+        "platforms": "Linux; Windows without fixture store",
+        "class": "missing external fixture",
+        "gate": "AUTO_ID_FIXTURE_ROOT_SNADWICH"
+      },
+      {
+        "tests": "Tk GUI tests: MaterialIdentificationGuiShellTests (class, 3), PolymaxNativeTkTests (2), TkRuntimeSmokeTests (1)",
+        "platforms": "Linux",
+        "class": "GUI/headless limitation",
+        "gate": "a display for Tk ($DISPLAY)"
+      }
+    ]
+  },
+  "next_action": "Prepare the M0 stage PR (auto-id/m0 -> main) and merge only under HUMAN authorization; after merge record the main SHA; begin M1 only on SUPERVISOR authorization"
 }
