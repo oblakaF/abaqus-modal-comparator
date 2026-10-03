@@ -4,11 +4,11 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M1",
-  "current_ministep": "M1.2",
-  "status": "REVIEW_READY",
+  "current_ministep": null,
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M0",
-  "last_accepted_ministep": "M1.1",
-  "last_accepted_commit": "2fa48c27b6aa6b5c5e989d6a4523f21224403183",
+  "last_accepted_ministep": "M1.2",
+  "last_accepted_commit": "bc2ffcec3ab5dee876545c2d20faa2bc19fc87cc",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -42,10 +42,11 @@
   "m1": {
     "branch": "auto-id/m1",
     "M1.1": "ACCEPTED",
-    "M1.2": "REVIEW_READY",
+    "M1.2": "ACCEPTED",
     "M1.3": "TODO",
     "M1.4": "TODO",
-    "status": "IN_PROGRESS"
+    "status": "IN_PROGRESS",
+    "M1.3_design_review": "RECORDED_ONLY (ac1e0e3); not approved, not implemented"
   },
   "audit_test_baseline": {
     "ran": 873,
@@ -111,5 +112,5 @@
       }
     ]
   },
-  "next_action": "Supervisor review of M1.2; do not start M1.3 implementation until M1.2 is accepted and the M1.3 design is approved"
+  "next_action": "Wait for supervisor decisions on the M1.3 design and authorization to start M1.3; do not start M1.3 automatically"
 }

@@ -867,3 +867,35 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR review of M1.2, and of the M1.3 design decisions before any
   M1.3 implementation.
+
+## 2026-10-04 — M1 M1.2 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.2 (no new mini-step started)
+- **Status:** M1.2 ACCEPTED. M1 IN_PROGRESS. M1.1 ACCEPTED. M1.3 and M1.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commits
+  `bc2ffcec3ab5dee876545c2d20faa2bc19fc87cc` (M1.2) and
+  `ac1e0e30a7b69cf2c5601b5b649fe13478290725` (M1.3 design review) on `auto-id/m1`.
+- **Accepted scope:**
+  - The production PolyMAX fixture loading path is implemented, with fixture
+    identity taken from the M0.2 manifest.
+  - SHA, source, modal set, DOF and registration checks are enforced.
+  - SP02 bravo-1 and SP13 best are validated.
+  - The M1.1 source policy is reused, and peak-derived input remains refused.
+  - No Abaqus. No registration, pairing or modal-algorithm changes.
+- **M1.3 design review:** RECORDED ONLY. Not approved and not implemented; M1.3 stays
+  TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M1.2 PolyMAX production path`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M1.2 ACCEPTED; M1 stage status; design-review note)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR decisions on the M1.3 design, and authorization to start
+  M1.3. `main` is unchanged (`9d30caf`).
