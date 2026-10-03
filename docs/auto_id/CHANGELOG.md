@@ -991,3 +991,81 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Tests run:** none (documentation only)
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR authorization of the next M1 step.
+
+## 2026-10-04 — M1 M1.3.1 — ModalFittingProvider interface boundary
+
+- **Stage:** M1
+- **Mini-step:** M1.3.1 (first M1.3 implementation sub-step: the provider boundary
+  only)
+- **Status:** M1.3.1 REVIEW_READY. M1.3 design DESIGN_ACCEPTED; M1.3 implementation
+  IN_PROGRESS. M1.1 and M1.2 ACCEPTED. M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.3.1): add modal fitting provider interface`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **What was added:** `src/domain/modal_fitting.py`, the D-021/D-023 boundary with no
+  fitting algorithm.
+  - **`FrfInput`:** the validated H[response, reference, frequency] contract. It
+    requires a strictly increasing finite axis, matching shape, finite values, unique
+    keys, a declared quantity, consistent coherence and coherence status, and a source
+    SHA-256. It has a deterministic `content_hash`.
+  - **`ModalFittingProviderIdentity`:**
+    - name, version, kind (`external` / `internal`) and an exact `mode_source` label;
+    - a provider may not borrow a reader's curve-fitted label or a peak-derived label.
+  - **`ModalFittingProvider`:** a runtime-checkable protocol with an `identity`
+    attribute and `fit(frf, configuration)`.
+  - **`ModalFittingOutput`:**
+    - the `ModalDataset`;
+    - the provider identity;
+    - the provenance;
+    - a QC-summary placeholder (`status` in NOT_EVALUATED / PASSED / FLAGGED /
+      FAILED, filled by M1.4);
+    - per-mode confidence placeholders (`frequency_sd_hz`, `damping_sd`, `None` while
+      not evaluated).
+  - **`ModalFittingProviderRegistry`:** explicit, with no global state. The default is
+    empty, so no provider is admitted in v1.
+  - **`validate_fitting_output` / `run_modal_fitting`:** refuse with
+    `ModalFittingRefusal`, which is not a `ValueError` / `RuntimeError`. Refused:
+    - unknown, impersonating or non-protocol providers;
+    - output from another provider;
+    - a non-`ModalDataset`, empty or non-finite dataset, missing damping, inconsistent
+      points, or mislabelled modes;
+    - missing provenance (FRF source SHA-256, FRF content hash, configuration and its
+      hash, frequency band, pole selection);
+    - provenance that does not match the actual FRF input or configuration;
+    - a band outside the FRF axis;
+    - manual pole selection in a production workflow (D-022);
+    - a missing or invalid QC placeholder, or invalid confidence entries.
+- **Not production input yet (D-023):** a validated output records its M1.1
+  classification. A provider label is `unknown` until the SUPERVISOR admits it, so M1.1
+  still refuses it. It must also be pinned as a fixture and pass the M1.2 path.
+- **Not done (by instruction):**
+  - no fitting algorithm (no PolyMAX, RFP or stabilisation diagram);
+  - no pole selection;
+  - no dataset-58 processing into modes;
+  - no change to readers or identification;
+  - no adapter from the existing FRF builder yet.
+- **Files changed:**
+  - added `src/domain/modal_fitting.py`
+  - added `tests/test_modal_fitting.py` (20 tests; a mock provider returns a fixed
+    synthetic result and does no fitting)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1.3 implementation IN_PROGRESS; M1.3.1 REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO. The new module is not called by any
+  existing code.
+- **Tests (Windows):**
+  - New `test_modal_fitting`: 20 ran, OK. Coverage:
+    - the provider contract;
+    - that a validated output is not yet production input;
+    - unknown, empty-registry, impersonating, non-protocol and label-borrowing
+      providers;
+    - invalid outputs;
+    - missing and mismatched provenance;
+    - D-022 manual selection;
+    - the FRF input contract.
+  - Full suite: 958 ran, 0 failures. With the store configured, 956 passed and 2
+    skipped (opt-in Abaqus); without it, 953 passed with the same 2 skipped tests plus
+    6 skipped real-data subtests.
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR review of M1.3.1.

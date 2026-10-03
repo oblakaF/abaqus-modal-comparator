@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M1",
-  "current_ministep": null,
-  "status": "IN_PROGRESS",
+  "current_ministep": "M1.3.1",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M0",
   "last_accepted_ministep": "M1.2",
   "last_accepted_commit": "bc2ffcec3ab5dee876545c2d20faa2bc19fc87cc",
@@ -47,7 +47,8 @@
     "M1.4": "TODO",
     "status": "IN_PROGRESS",
     "M1.3_design_review": "DESIGN_ACCEPTED (D-019, D-021..D-024); conflict with SPEC resolved by D-023/D-024",
-    "M1.3_implementation": "NOT_STARTED"
+    "M1.3_implementation": "IN_PROGRESS",
+    "M1.3.1": "REVIEW_READY"
   },
   "audit_test_baseline": {
     "ran": 873,
@@ -113,5 +114,5 @@
       }
     ]
   },
-  "next_action": "Wait for SUPERVISOR authorization of the next M1 step; do not start M1.3 implementation automatically"
+  "next_action": "Supervisor review of M1.3.1; do not start further M1.3 work until M1.3.1 is accepted"
 }
