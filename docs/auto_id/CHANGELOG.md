@@ -834,3 +834,36 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   binds by store + SHA-256. Reconciling the two is outside M1.2.
 - **Next gate:** SUPERVISOR review of M1.2. M1.3 implementation must not start; a
   design review follows separately.
+
+## 2026-10-04 — M1 — M1.3 design review added (docs only)
+
+- **Stage:** M1
+- **Mini-step:** none. This is a design review for M1.3, which stays `TODO`; M1.3 is
+  not implemented.
+- **Status:** M1.2 REVIEW_READY (`bc2ffce`). M1.3 TODO. M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): add M1.3 design review`
+- **Content:** `docs/auto_id/M1_3_DESIGN_REVIEW.md` covers:
+  - the purpose, and the current limitation (peak-derived and CMIF candidates are
+    refused; M1.2 accepts only PolyMAX fixtures);
+  - the proposed architecture: dataset 58 → FRF block → multi-mode fit →
+    content-hashed curve-fitted artifact → M1.1 policy (new label refused as
+    `unknown` until accepted) → M1.2 production input;
+  - code locations, interface sketches, required provenance and QC;
+  - the tests needed, including the SPEC §17 M1 gate on SP13 raw FRF;
+  - refusal conditions, non-goals and risks;
+  - nine decisions left to the SUPERVISOR: method family, bands, orders and
+    stabilisation, pole selection and human review, uncertainty model, QC
+    thresholds, raw-FRF fixtures, dependencies, and the M1.3/M1.4 split.
+  - No algorithm is chosen.
+- **Files changed:**
+  - added `docs/auto_id/M1_3_DESIGN_REVIEW.md`
+  - updated `docs/auto_id/ROADMAP.md` (pointer only; statuses unchanged)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (documentation only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR review of M1.2, and of the M1.3 design decisions before any
+  M1.3 implementation.

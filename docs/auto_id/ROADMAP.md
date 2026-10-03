@@ -151,6 +151,8 @@ authorization.
 | M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `TODO` |
 
 Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `REVIEW_READY`; M1.3–M1.4 `TODO`).
+M1.3 design review (proposal, not approved; no implementation):
+[M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md).
 
 **M1 GATE (SP13 raw FRF):** recover ≈ 206.15 Hz and ≈ 212.61 Hz within ±0.05 Hz of
 PolyMAX; no false identification mode around 217.5 Hz; damping within 30 % of PolyMAX
