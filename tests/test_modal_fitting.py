@@ -49,8 +49,9 @@ def frf_input(**changes):
 class MockProvider:
     """Returns a fixed synthetic result; it performs no fitting."""
 
-    def __init__(self, identity=MOCK, **output_changes):
+    def __init__(self, identity=MOCK, extra_provenance=None, **output_changes):
         self.identity = identity
+        self.extra_provenance = extra_provenance or {}
         self.output_changes = output_changes
         self.calls = 0
 
@@ -67,12 +68,15 @@ class MockProvider:
             dataset=dataset,
             provider=self.identity,
             provenance={
+                "provider_name": self.identity.name,
+                "provider_version": self.identity.version,
                 "frf_source_sha256": frf.source_sha256,
                 "frf_content_hash": frf.content_hash,
                 "configuration": dict(configuration),
                 "configuration_hash": canonical_hash(dict(configuration)),
                 "frequency_band_hz": [5.0, 60.0],
                 "pole_selection": "rule_based",
+                **self.extra_provenance,
             },
             qc_summary={"status": "NOT_EVALUATED"},
             confidence={1: {"frequency_sd_hz": None, "damping_sd": None},
@@ -215,6 +219,27 @@ class ProvenanceTests(_ProviderFixture, unittest.TestCase):
         self.assertRefused("provenance.configuration", self.provenance(configuration_hash="d" * 64))
         self.assertRefused("provenance.frequency_band_hz", self.provenance(frequency_band_hz=[0.5, 60.0]))
         self.assertRefused("provenance.pole_selection", self.provenance(pole_selection="automatic-ish"))
+
+    def test_provenance_must_name_the_producing_provider(self):
+        self.assertRefused("provenance.provider", self.provenance(provider_name="someone-else"))
+        self.assertRefused("provenance.provider", self.provenance(provider_version="9"))
+
+    def test_frozen_external_selection_needs_an_external_provider(self):
+        # D-026: the mock provider is internal, so it cannot claim a frozen external selection.
+        frozen = self.provenance(pole_selection="external_frozen_selection", fixture_id="SYN/set-a",
+                                 modal_set="set-a", source_file={"file_name": "x.unv", "sha256": "a" * 64})
+        self.assertRefused("provenance.pole_selection", frozen)
+
+    def test_frozen_external_selection_is_production_admissible_when_pinned(self):
+        external = ModalFittingProviderIdentity("mock-external", "0.1", ProviderKind.EXTERNAL, "mock external/0.1")
+        self.registry.register(external)
+        pinned = dict(pole_selection="external_frozen_selection", fixture_id="SYN/set-a", modal_set="set-a",
+                      source_file={"file_name": "x.unv", "sha256": "a" * 64})
+        self.assertIsNotNone(self.run_provider(MockProvider(external, pinned), FittingWorkflow.PRODUCTION))
+        for missing in ("fixture_id", "modal_set", "source_file"):
+            with self.subTest(missing=missing):
+                partial = {key: value for key, value in pinned.items() if key != missing}
+                self.assertRefused("provenance", MockProvider(external, partial))
 
     def test_manual_pole_selection_only_in_research_workflow(self):
         manual = self.provenance(pole_selection="manual_review")

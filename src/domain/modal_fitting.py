@@ -1,4 +1,4 @@
-"""Modal fitting provider boundary (Auto-ID M1.3.1; D-021, D-022, D-023, D-024).
+"""Modal fitting provider boundary (Auto-ID M1.3.1; D-021, D-023, D-024, D-026).
 
 FRF-to-modal fitting is a separate experimental preparation stage (D-023):
 
@@ -31,8 +31,8 @@ import numpy as np
 from modal_core import ModalDataset
 
 from .modal_input_source import (
-    CURVE_FITTED_MODE_SOURCES,
     PEAK_DERIVED_MODE_SOURCES,
+    READER_CURVE_FITTED_MODE_SOURCES,
     ModalInputSourceClassification,
     classify_modal_dataset,
 )
@@ -43,6 +43,8 @@ _NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 COHERENCE_STATUSES = ("computed", "unavailable", "parse_error")
 QC_STATUSES = ("NOT_EVALUATED", "PASSED", "FLAGGED", "FAILED")
 REQUIRED_PROVENANCE_KEYS = (
+    "provider_name",
+    "provider_version",
     "frf_source_sha256",
     "frf_content_hash",
     "configuration",
@@ -70,7 +72,12 @@ class ProviderKind(str, Enum):
 
 class PoleSelection(str, Enum):
     RULE_BASED = "rule_based"
-    MANUAL_REVIEW = "manual_review"
+    MANUAL_REVIEW = "manual_review"  # live manual selection: research/review workflows only (D-026)
+    EXTERNAL_FROZEN_SELECTION = "external_frozen_selection"  # frozen, pinned external selection (D-026)
+
+
+# D-026: a frozen external selection must pin its source file, modal set and provenance.
+EXTERNAL_FROZEN_PROVENANCE_KEYS = ("fixture_id", "modal_set", "source_file")
 
 
 class FittingWorkflow(str, Enum):
@@ -154,7 +161,7 @@ class ModalFittingProviderIdentity:
         _require(isinstance(self.mode_source, str) and bool(self.mode_source.strip()), "provider.mode_source",
                  "must be declared.")
         # A provider never borrows a reader's curve-fitted label or a peak-derived label.
-        _require(self.mode_source not in CURVE_FITTED_MODE_SOURCES | PEAK_DERIVED_MODE_SOURCES,
+        _require(self.mode_source not in READER_CURVE_FITTED_MODE_SOURCES | PEAK_DERIVED_MODE_SOURCES,
                  "provider.mode_source", "must be the provider's own label, not a reader or peak-derived label.")
 
     @property
@@ -254,6 +261,8 @@ def validate_fitting_output(
     _require(isinstance(provenance, Mapping), "provenance", "must be a mapping.")
     missing = [key for key in REQUIRED_PROVENANCE_KEYS if provenance.get(key) in (None, "", {}, [], ())]
     _require(not missing, "provenance", f"missing {missing}.")
+    _require(provenance["provider_name"] == provider.name and provenance["provider_version"] == provider.version,
+             "provenance.provider", "does not name the provider that produced the output.")
     _require(provenance["frf_source_sha256"] == frf.source_sha256, "provenance.frf_source_sha256",
              "does not match the FRF input source.")
     frf_hash = frf.content_hash
@@ -271,9 +280,20 @@ def validate_fitting_output(
         selection = PoleSelection(provenance["pole_selection"])
     except ValueError:
         raise ModalFittingRefusal("provenance.pole_selection", f"must be one of {[s.value for s in PoleSelection]}.")
-    # D-022: manual mode selection only in research/review workflows.
+    # D-026: live manual mode selection only in research/review workflows.
     _require(not (workflow is FittingWorkflow.PRODUCTION and selection is PoleSelection.MANUAL_REVIEW),
-             "provenance.pole_selection", "manual mode selection is not allowed in a production workflow (D-022).")
+             "provenance.pole_selection", "live manual mode selection is not allowed in a production workflow (D-026).")
+    if selection is PoleSelection.EXTERNAL_FROZEN_SELECTION:
+        # D-026: only an external provider can carry a frozen external selection, and only with
+        # its source file, modal set and provenance pinned.
+        _require(provider.kind is ProviderKind.EXTERNAL, "provenance.pole_selection",
+                 "a frozen external selection requires an external provider (D-026).")
+        absent = [key for key in EXTERNAL_FROZEN_PROVENANCE_KEYS if provenance.get(key) in (None, "", {}, [], ())]
+        _require(not absent, "provenance", f"frozen external selection is missing {absent} (D-026).")
+        source_file = provenance["source_file"]
+        _require(isinstance(source_file, Mapping) and isinstance(source_file.get("sha256"), str)
+                 and bool(_HASH_PATTERN.match(source_file["sha256"])) and bool(source_file.get("file_name")),
+                 "provenance.source_file", "must pin the source file name and SHA-256 (D-026).")
 
     qc = output.qc_summary
     _require(isinstance(qc, Mapping) and qc.get("status") in QC_STATUSES, "qc_summary",

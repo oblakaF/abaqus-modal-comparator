@@ -146,3 +146,23 @@ is the only way Auto-ID takes experimental modes. A record is selected by its
 Tests: `tests/test_production_modal_input.py`. The real-data test iterates the
 manifest. The refusal cases use the shared synthetic workspace in
 `tests/fixture_support.py`, so they also run in CI.
+
+## External PolyMAX provider (M1.3)
+
+`services.external_polymax_provider.prepare_external_polymax_modal_dataset(fixture_id)`
+runs the modal preparation chain for an accepted fixture. Steps:
+
+1. It prepares the FRFs: the pinned export's dataset-58 FRFs are turned into an
+   `FrfInput` by the existing multi-reference FRF builder.
+2. It runs `ExternalPolyMAXProvider`. The provider loads the frozen PolyMAX selection
+   through the M1.2 production path and keeps frequencies, shapes, point order and
+   measured DOFs unchanged.
+   - Damping is PolyMAX's own estimate, read from the stored dataset-55 pole.
+   - The provenance includes `pole_selection = external_frozen_selection` (D-026).
+3. It checks admission (`admitted_provider_registry()`) and validates the output
+   against the M1.3.1 boundary rules.
+4. It applies the M1.1 policy. The provider label
+   `external PolyMAX modal preparation/1` is admitted as curve-fitted.
+
+No FRF fitting, pole extraction or peak picking takes place (D-027). Tests:
+`tests/test_external_polymax_provider.py`. The real-data test iterates the manifest.

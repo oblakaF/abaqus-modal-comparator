@@ -1,7 +1,8 @@
 """Identification input-source policy for experimental modes (Auto-ID M1.1).
 
 SPEC §4 / DECISIONS D-002 / AUDIT K1: production identification accepts only
-curve-fitted experimental modes (Testlab PolyMAX dataset 55, or dataset 2414).
+curve-fitted experimental modes (Testlab PolyMAX dataset 55, or dataset 2414, or the
+output of an admitted ModalFittingProvider).
 Peak-derived modes (FRF peak picking, response-matrix SVD candidates) stay
 available for viewing, diagnostics and QC, but never enter identification.
 
@@ -24,12 +25,16 @@ class ModalInputSource(str, Enum):
 
 
 # Exact ``mode_source`` labels written by the readers (per mode and per dataset).
-CURVE_FITTED_MODE_SOURCES = frozenset(
+READER_CURVE_FITTED_MODE_SOURCES = frozenset(
     {
         "curve-fitted modal dataset",  # universal_reader / universal_hardening, datasets 55 and 2414
         "curve-fitted dataset 55",  # universal_reader, selected dataset-55 modal set
     }
 )
+# Labels of ModalFittingProviders the SUPERVISOR has admitted (D-021, D-023, D-027).
+EXTERNAL_POLYMAX_MODE_SOURCE = "external PolyMAX modal preparation/1"  # M1.3 ExternalPolyMAXProvider
+ADMITTED_PROVIDER_MODE_SOURCES = frozenset({EXTERNAL_POLYMAX_MODE_SOURCE})
+CURVE_FITTED_MODE_SOURCES = READER_CURVE_FITTED_MODE_SOURCES | ADMITTED_PROVIDER_MODE_SOURCES
 PEAK_DERIVED_MODE_SOURCES = frozenset(
     {
         "FRF peak-derived experimental shape",  # dataset 58 peak picking, per mode

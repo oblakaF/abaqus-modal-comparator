@@ -1156,3 +1156,130 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Tests run:** none (documentation only)
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR authorization for the PolyMAX provider implementation.
+
+## 2026-10-04 — M1 M1.3 — External PolyMAX modal preparation provider
+
+- **Stage:** M1
+- **Mini-step:** M1.3 (the first production `ModalFittingProvider`; D-026, D-027)
+- **Status:** M1.3 REVIEW_READY (design DESIGN_ACCEPTED; M1.3.1 interface ACCEPTED).
+  M1.1 and M1.2 ACCEPTED. M1.4 TODO, not started.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.3): implement external PolyMAX modal preparation provider`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Chain implemented** (`services.external_polymax_provider`):
+  1. **FRF preparation (`prepare_frf_input`):** the pinned export's dataset-58 FRFs
+     become an `FrfInput`, using the existing `cmif_separation` multi-reference block
+     builder unchanged. The quantity comes from the UFF spec types; both real exports
+     are `velocity/force`.
+  2. **`ExternalPolyMAXProvider.fit`:**
+     - The configuration is exactly `fixture_id`, `modal_set` and
+       `frequency_band_hz`.
+     - It refuses an unknown fixture, a modal set other than the frozen one, a band
+       outside the FRF axis or one that would trim a frozen mode, and FRFs from a
+       different export.
+     - It loads the frozen PolyMAX selection through M1.2 `load_production_modal_input`
+       and keeps frequencies, shapes, point order and measured DOFs.
+     - Damping comes from the stored dataset-55 pole, zeta = -Re(lambda)/|lambda|. The
+       provider checks that each pole reproduces the reader frequency exactly.
+     - Provenance holds the provider name and version, fitting method, fixture id,
+       modal set, source file identity (name, SHA-256, size, store path), FRF source
+       SHA-256 and content hash, quantity, coherence status, configuration and its
+       hash, band, `pole_selection = external_frozen_selection`, registration and FE
+       geometry hashes, measured DOFs, and damping source.
+     - QC hooks only: per mode, raw frequency resolution, 2*zeta*f and coherence at
+       resonance, with `status = NOT_EVALUATED`; M1.4 defines the policy. Confidence
+       fields are `None` because the export carries no uncertainty.
+  3. **Admission:** `admitted_provider_registry()` explicitly contains
+     `external-polymax` / `1` (external). Other providers stay refused.
+  4. **Validation:** the M1.3.1 `run_modal_fitting` checks, then the M1.1
+     `require_identification_input`.
+- **Accepted modules changed (minimal, required by D-026 and D-027):**
+  - **`domain/modal_input_source.py`:**
+    - the curve-fitted table is split into reader labels and admitted provider labels;
+    - `external PolyMAX modal preparation/1` is admitted;
+    - the classification rules are unchanged.
+  - **`domain/modal_fitting.py`:**
+    - `PoleSelection.EXTERNAL_FROZEN_SELECTION` is added. It is valid only for external
+      providers with a pinned `fixture_id`, `modal_set` and `source_file` (name and
+      SHA-256).
+    - Live `manual_review` stays refused in production (D-026).
+    - Provenance must name the producing provider (`provider_name` /
+      `provider_version`).
+    - Provider identities may not use reader or peak labels; admitted provider labels
+      are allowed.
+- **Real validation (Windows, data store configured):**
+  - **SP02/bravo-1:**
+    - 9 modes, 121 points, U3, registration `9bf736d3...`, FE `72e8597a...`;
+    - classified `curve_fitted`;
+    - frequencies 28.01 ... 219.44 Hz identical to M1.2;
+    - damping equals PolyMAX's stated values (mode 1 zeta = 0.2378 %);
+    - FRF frequency resolution 0.3125 Hz, coherence computed.
+  - **SP13/best:**
+    - 12 modes, 289 points, U3, registration `a8970e52...`, FE `34d69d79...`;
+    - classified `curve_fitted`;
+    - frequencies identical to M1.2, including 205.65 / 212.66 / 228.61 Hz;
+    - damping equals PolyMAX's stated values (mode 1 zeta = 0.2341 %);
+    - FRF frequency resolution 0.15625 Hz.
+  - **SP13 gate (D-028):** the fixture-specific references 205.65 / 212.66 /
+    228.61 Hz are reproduced within +/-0.05 Hz (they are the frozen PolyMAX values),
+    and no mode lies within 1 Hz of the known false 217.5 Hz peak. The old 206.15 /
+    212.61 / 228.75 Hz values are not used.
+  - **Deterministic:** repeated runs give identical provenance.
+- **Files changed:**
+  - added `src/services/external_polymax_provider.py`
+  - added `tests/test_external_polymax_provider.py` (17 tests)
+  - updated `src/domain/modal_fitting.py`
+  - updated `src/domain/modal_input_source.py`
+  - updated `tests/test_modal_fitting.py` (mock provenance names its provider; 3 D-026
+    tests added)
+  - updated `docs/auto_id/fixtures/README.md` (provider section)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1.3 -> REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:**
+  - **YES, admission:** a curve-fitted provider label is newly admitted to the M1.1
+    policy, and frozen external selections are accepted by the provider boundary
+    (D-026).
+  - **NO, everything else:** readers, FRF processing, peak extraction, pairing,
+    registration, identification, thresholds and gates are unchanged, and no existing
+    production path calls the provider. M1.2 output is unchanged.
+- **Tests (Windows):**
+  - `test_external_polymax_provider`: 17 ran, OK. With the store configured both real
+    fixtures pass the full chain; without it, 2 subtests skip.
+    - **Provider:** success, registry admission, provenance, determinism, QC hooks.
+    - **Refusals:**
+      - wrong SHA-256, wrong FRF, wrong fixture;
+      - wrong configuration: modal set, band outside the axis, band trimming a frozen
+        mode, extra key;
+      - wrong provider identity;
+      - missing provenance;
+      - wrong pole-selection type;
+      - a peak-derived source: an FRF-only export is refused by the reader with no
+        peak fallback, and a peak source type is refused by M1.2;
+      - an unknown source type;
+      - a mode without a stored pole.
+    - **Compatibility:** M1.1 policy.
+    - **Real-data regression:** SP02/SP13 compatibility, M1.2 equality, damping
+      against PolyMAX's text, determinism, and the D-028 gate.
+  - `test_modal_fitting`: 23 ran, OK.
+  - Full suite: 978 ran, 0 failures. With the store configured, 976 passed and 2
+    skipped (opt-in Abaqus); without it, 972 passed with the same 2 skipped tests plus
+    8 skipped real-data subtests.
+- **Abaqus run count:** 0
+- **Known limitations:**
+  1. **SP13 coherence.** The existing FRF builder reports SP13 coherence as
+     `unavailable` although the export holds 289 coherence records. The SP13
+     coherence-at-resonance hook is therefore `None`. FRF processing was not changed
+     (out of scope); recorded for M1.4.
+  2. **FRF-only exports.** These are refused through the reader's `ValueError` ("no
+     valid dataset-55 modal sets"), not a typed refusal, because the accepted M0.3
+     loader is unchanged.
+  3. **No raw-FRF recovery.** The provider reproduces the frozen PolyMAX result and
+     does not recover modes from raw FRF; that is future internal-provider work
+     (D-027, D-029).
+  4. **No uncertainty.** Confidence fields are `None` because the PolyMAX exports carry
+     no uncertainty.
+  5. **Legacy source identity in Stage-A pairing.** The Stage-A production pairing
+     limitation recorded in M1.2 is unchanged.
+- **Next gate:** SUPERVISOR review of M1.3. M1.4 must not start before authorization.
