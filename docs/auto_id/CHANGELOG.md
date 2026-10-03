@@ -1101,3 +1101,58 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR authorization of the next M1.3 sub-step. M1.3.2 must not
   start automatically. `main` is unchanged (`9d30caf`).
+
+## 2026-10-04 — M1 — PolyMAX provider decisions resolved (docs only)
+
+- **Stage:** M1
+- **Mini-step:** none. This is a design decision resolution after the M1.3 blocking
+  report. M1.3 provider implementation is NOT STARTED.
+- **Status:**
+  - M1.1 and M1.2 ACCEPTED.
+  - **M1.3 design ACCEPTED** (`DESIGN_ACCEPTED`).
+  - M1.3 provider implementation NOT STARTED; the M1.3.1 interface boundary stays
+    ACCEPTED.
+  - M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): resolve PolyMAX provider decisions`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Decisions appended (SUPERVISOR).** D-018, D-020 and D-022 are not edited.
+  - **D-026 (supersedes D-022):** frozen external modal selections made by a
+    documented, hashed workflow may be production input. Live manual mode selection
+    during an identification run remains forbidden.
+  - **D-027:** the first production `ModalFittingProvider` is an external
+    PolyMAX-compatible adapter, with no new FRF fitting algorithm.
+  - **D-028:** M1 gates use fixture-specific reference values. For SP13 repeat-a these
+    are about 205.65 / 212.66 / 228.61 Hz, not the 2026-09-09 values 206.15 / 212.61 /
+    228.75 Hz.
+  - **D-029:** internal FRF fitting is a future provider, not required before the first
+    PolyMAX-compatible provider.
+- **Design review:** `M1_3_DESIGN_REVIEW.md` stays DESIGN_ACCEPTED.
+  - Section 0 now records the final architecture: Dataset-58 FRF → FRF preparation /
+    external PolyMAX-compatible provider → validated curve-fitted modal dataset → M1.1
+    source policy → M1.2 production loader → Auto-ID.
+  - It also records the decision table, implementation notes from the blocking
+    report, "M1.3 implementation is NOT STARTED", and "No unresolved conflict
+    remains".
+  - Implementation notes: FRFs and fit share one pinned export; damping comes from the
+    stored PolyMAX pole without a reader change; a frozen-external value for
+    `pole_selection` is needed; label admission is still required.
+- **ROADMAP:**
+  - the M1.3 row reads DESIGN_ACCEPTED with the provider implementation NOT STARTED;
+  - the final architecture and the next step are recorded;
+  - a D-028 reference-value note sits beside the M1 GATE, whose original text is
+    unchanged.
+- **STATUS.json:** `m1.M1.3 = DESIGN_ACCEPTED`, `m1.M1.3_implementation = NOT_STARTED`,
+  `m1.M1.3.1 = ACCEPTED`, and a new `next_action`.
+- **Files changed:**
+  - `docs/auto_id/DECISIONS.md`
+  - `docs/auto_id/M1_3_DESIGN_REVIEW.md`
+  - `docs/auto_id/ROADMAP.md`
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO. No code files changed.
+- **Tests run:** none (documentation only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization for the PolyMAX provider implementation.

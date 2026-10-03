@@ -1,93 +1,91 @@
 # M1.3 Design Review — Raw-FRF multi-mode fitting path
 
-- **STATUS: DESIGN_ACCEPTED** (SUPERVISOR, 2026-10-04). The governing decisions are
-  D-019, D-021, D-022, D-023 and D-024 in [DECISIONS.md](DECISIONS.md). D-023
-  supersedes D-018, and D-024 supersedes D-020.
-- **M1.3 implementation is NOT STARTED.** No production code exists for M1.3.
+- **STATUS: DESIGN_ACCEPTED** (SUPERVISOR, 2026-10-04).
+- **Governing decisions:** D-019, D-021, D-023, D-024 and D-026 to D-029 in
+  [DECISIONS.md](DECISIONS.md). Supersessions: D-023 supersedes D-018, D-024
+  supersedes D-020, and D-026 supersedes D-022.
+- **M1.3 implementation is NOT STARTED.** No provider exists. The accepted M1.3.1
+  `ModalFittingProvider` interface boundary (`f77045d`) is the only M1.3 code.
 - **History:**
   - design review `ac1e0e3`;
-  - first freeze `13973b7`, which recorded a SPEC conflict;
-  - resolution in the commit `docs(auto-id): resolve M1.3 FRF fitting architecture`.
-- **Governing:** DECISIONS D-002, D-019, D-021 to D-024; SPEC §4, §6 S1, §17; AUDIT K1;
-  ROADMAP M1.3 and M1.4.
+  - first freeze `13973b7`;
+  - FRF-stage resolution `f1117f3`;
+  - provider-architecture resolution in the commit
+    `docs(auto-id): resolve PolyMAX provider decisions`, after the M1.3 blocking
+    report.
+- **Governing references:** DECISIONS above plus D-002; SPEC §4, §6 S1, §17;
+  AUDIT K1 and §4.2; ROADMAP M1.3 and M1.4.
 
 ## 0. Accepted design (supersedes the proposal below where they differ)
 
-**Approved architecture:** FRF-to-modal fitting is a **separate, validated
-experimental preparation stage** (D-023). Auto-ID material identification never
-consumes raw FRF.
+### 0.1 Final architecture
 
 ```
-dataset-58 FRF records (pinned: store + SHA-256)          <- D-024: modal-preparation input
+Dataset-58 FRF
         |
         v
-+--------------- modal preparation stage ----------------+
-|  QC                                                     |
-|   |                                                     |
-|   v                                                     |
-|  ModalFittingProvider (replaceable; external or internal) |   <- D-021, D-023
-|   |  (rule-based pole selection for production; D-022)    |
-|   v                                                     |
-|  curve-fitted modal estimate + provenance + QC flags    |
-+---------------------------------------------------------+
+FRF preparation / external PolyMAX-compatible provider      (D-023, D-024, D-027)
         |
         v
-validated curve-fitted dataset:
-  provenance, QC, source classification (M1.1), fixture identity validation (M0.2/M1.2)
+validated curve-fitted modal dataset                         (provenance, QC, D-026 frozen selection)
         |
         v
-Auto-ID material identification   (curve-fitted input only; D-019)
+M1.1 source policy                                           (curve_fitted only; D-019)
+        |
+        v
+M1.2 production loader                                       (pinned fixture identity)
+        |
+        v
+Auto-ID
 ```
 
-**Accepted decisions:**
+### 0.2 Decisions
 
 | Id | Decision | Consequence for this design |
 |---|---|---|
 | D-019 | Curve-fitted modal datasets are the only production identification input; peak-derived modes are forbidden. | Already enforced (M1.1 policy, M1.2 production input). Peak picking and CMIF candidates stay diagnostics. |
-| D-021 | Future modal fitting goes through a replaceable `ModalFittingProvider` interface. | The fit service sketched in section 5 becomes one provider implementation behind this interface (section 0.1). |
-| D-022 | Human modal selection only in research/review workflows; production cannot depend on manual mode selection. | Decision 9.4: a provider used for production selects poles by recorded rules only. |
-| D-023 (supersedes D-018) | FRF-to-modal fitting is a separate validated experimental preparation stage. Auto-ID does not directly consume raw FRF. The provider may be external or internal. Its output becomes production input only after provenance, QC, source classification and fixture identity validation. | The "built-in multi-mode fit" of SPEC §4/§6 S1/§17 is an **internal provider** in the preparation stage, not a step inside material identification. |
-| D-024 (supersedes D-020) | Dataset-58 FRF records are valid modal-preparation inputs, including future multi-mode fitting; they are not direct material-identification observations. | FRFs feed QC (M1.4) and the provider, never the identification objective. |
+| D-021 | Future modal fitting goes through a replaceable `ModalFittingProvider` interface. | Implemented as a boundary in M1.3.1. |
+| D-023 (supersedes D-018) | FRF-to-modal fitting is a separate validated experimental preparation stage. Its output becomes production input only after provenance, QC, source classification and fixture identity validation. | Fitting never runs inside material identification. |
+| D-024 (supersedes D-020) | Dataset-58 FRF records are modal-preparation inputs, not material-identification observations. | FRFs feed the provider and QC (M1.4). |
+| D-026 (supersedes D-022) | A frozen external modal selection made by a documented, hashed workflow may be production input. Source file, modal set and provenance are pinned; the selection is unchanged during identification; the exported dataset is immutable. Live manual selection during an identification run remains forbidden. | Operator-selected Testlab PolyMAX sets (`bravo-1`, `best`) are admissible as frozen external selections. The provider must declare such a selection distinctly from live manual selection (see 0.3). |
+| D-027 | The first production provider is an external PolyMAX-compatible adapter, with no new FRF fitting algorithm. | The first provider wraps Testlab PolyMAX's fit of the same pinned export and preserves provenance. |
+| D-028 | M1 validation gates use fixture-specific reference values and never mix acquisitions. For `SP13/best` (repeat-a): about 205.65 / 212.66 / 228.61 Hz. The older 206.15 / 212.61 / 228.75 Hz (2026-09-09 acquisition) are not used for this fixture. | The previous gate-reference mismatch is removed. |
+| D-029 | Internal FRF fitting remains a future provider, not required before the first PolyMAX-compatible provider. | The raw-FRF recovery capability belongs to a later internal provider. |
 
-### 0.1 `ModalFittingProvider` (interface intent; not implemented)
+### 0.3 Notes for the (not yet authorised) provider implementation
 
-A provider takes a pinned FRF block and a recorded configuration. It returns a fitted
-modal result with full provenance (section 6), per-mode QC (section 7) and a
-deterministic content hash, or it refuses.
+These are facts established by the M1.3 blocking report. They are not implemented.
 
-- **External providers:** for example Testlab PolyMAX, whose output already arrives as
-  dataset 55.
-- **Internal providers:** a future built-in multi-mode fit.
+- **FRFs and fit share one export.** The pinned PolyMAX exports contain the dataset-58
+  FRFs together with the fitted dataset-55 sets. For example `SP13_a_polymax.unv`
+  holds 289 FRFs and 289 coherences with one reference (node 1, +Z), Δf 0.15625 Hz,
+  and its `best` set covers the same 289 points. The SP02 export also contains
+  dataset 58.
+- **Damping comes from the stored pole.** The current reader returns NaN damping for
+  these complex PolyMAX modes. PolyMAX's damping is in each dataset-55 record's pole
+  (`eig`), and is equal to the record text, so the adapter can take frequency and
+  damping from the stored pole. The reader is not changed.
+- **A new selection value is needed.** The M1.3.1 validator's `pole_selection` values
+  are `rule_based` / `manual_review`, and `manual_review` is refused in production. A
+  frozen external selection (D-026) needs its own declared value, added with the
+  provider implementation.
+- **Admission is still required.** The provider's `mode_source` label must be
+  admitted to the M1.1 policy before its output can pass M1.1 and M1.2.
 
-Either kind of output reaches Auto-ID only as a **validated curve-fitted dataset**
-(D-023):
-
-- **Provenance:** source FRF identity, provider name and version, configuration and
-  decisions.
-- **QC:** section 7 and M1.4.
-- **Source classification:** an exact provider/version `mode_source` label that the
-  SUPERVISOR has admitted to the M1.1 policy. Until then it is `unknown` and refused.
-- **Fixture identity validation:** the result is pinned as a fixture (store +
-  SHA-256) and passes the M0.3/M1.2 checks.
-
-### 0.2 SPEC consistency (resolved)
-
-- **SPEC §4 and §6 S1** ("built-in multi-mode fit") correspond to an internal
-  `ModalFittingProvider` in the preparation stage.
-- **SPEC §17 / ROADMAP M1 GATE** (SP13 from raw FRF: 206.15 and 212.61 Hz within
-  ±0.05 Hz of PolyMAX, no false 217.5 Hz, ζ within 30 %) is the validation gate for
-  such an internal provider.
-- No SPEC or gate text changes.
-
-### 0.3 Status of the open decisions in section 9
+### 0.4 Status of the open decisions in section 9
 
 - **Resolved:**
-  - **9.4 human review:** D-022.
-  - **Architecture and placement of fitting:** D-021, D-023, D-024.
-- **Still open, decided when an internal provider is built:** 9.1 method family,
+  - **9.4 selection:** D-026.
+  - **Architecture and placement:** D-021, D-023, D-024.
+  - **First provider:** D-027.
+  - **Gate references:** D-028.
+  - **Internal fitting timing:** D-029.
+- **Still open, for a future internal provider (D-029):** 9.1 method family,
   9.2 bands, 9.3 orders and stabilisation, 9.5 uncertainty model, 9.8 dependencies.
 - **Still relevant to QC (M1.4) and to fixtures:** 9.6 QC thresholds, 9.7 raw-FRF
   fixtures, 9.9 split of M1.3/M1.4 scope.
+
+No unresolved conflict remains in this design.
 
 ---
 

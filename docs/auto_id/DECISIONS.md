@@ -212,3 +212,49 @@ observations.
 Rationale / scope: consistent with D-019 (peak-derived modes forbidden for production
 identification) and D-023.
 Supersedes: D-020
+
+## D-026 — Frozen external modal selections
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 decision resolution — PolyMAX provider architecture (SUPERVISOR review of the M1.3 blocking report)
+Decision: A frozen external modal selection created by a documented and hashed workflow
+may be used as a production Auto-ID input. Requirements:
+- the source file identity is pinned;
+- the modal set identity is pinned;
+- provenance is stored;
+- the selection is not changed during identification;
+- the exported modal dataset is immutable.
+
+Live manual mode selection during an Auto-ID identification run remains forbidden.
+Rationale / scope: the prohibition concerns hidden human optimization during
+identification, not historical documented preparation of a frozen experimental modal
+set. Examples are the operator-selected Testlab PolyMAX sets `bravo-1` (SP02) and
+`best` (SP13), pinned in the M0.2 manifest.
+Supersedes: D-022
+
+## D-027 — First production ModalFittingProvider
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 decision resolution — PolyMAX provider architecture (SUPERVISOR review of the M1.3 blocking report)
+Decision: The first production `ModalFittingProvider` will be an external
+PolyMAX-compatible adapter. It will not implement a new FRF fitting algorithm.
+Rationale / scope: it connects validated external modal preparation with Auto-ID
+while preserving provenance. Future internal fitting providers remain possible.
+Supersedes: none
+
+## D-028 — M1 FRF gate uses pinned fixture references
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 decision resolution — PolyMAX provider architecture (SUPERVISOR review of the M1.3 blocking report)
+Decision: M1 validation gates must use the accepted fixture-specific reference values.
+They must not mix values from different acquisitions.
+
+For the accepted SP13 repeat-a fixture (`SP13/best`), use the pinned PolyMAX values:
+approximately 205.65 Hz, 212.66 Hz and 228.61 Hz. The older 206.15 / 212.61 /
+228.75 Hz values are not used for this fixture. If the older acquisition is needed
+later, it must become a separate fixture with its own provenance.
+Rationale / scope: the older values come from the audit's PolyMAX on the 2026-09-09
+acquisition (AUDIT §4.2). The pinned `SP13_a_polymax.unv` (2026-09-10) gives
+205.65 / 212.66 / 228.61 Hz. This decision applies the SPEC §17 / ROADMAP M1 gate
+phrase "±0.05 Hz of PolyMAX" to the fixture-specific PolyMAX values.
+Supersedes: none
+
+## D-029 — Internal FRF fitting is future provider work
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 decision resolution — PolyMAX provider architecture (SUPERVISOR review of the M1.3 blocking report)
+Decision: Internal FRF fitting remains a future `ModalFittingProvider`. It is not
+required before the first production PolyMAX-compatible provider.
+Supersedes: none

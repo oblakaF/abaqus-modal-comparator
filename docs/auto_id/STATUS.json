@@ -43,11 +43,11 @@
     "branch": "auto-id/m1",
     "M1.1": "ACCEPTED",
     "M1.2": "ACCEPTED",
-    "M1.3": "IN_PROGRESS",
+    "M1.3": "DESIGN_ACCEPTED",
     "M1.4": "TODO",
     "status": "IN_PROGRESS",
-    "M1.3_design_review": "DESIGN_ACCEPTED (D-019, D-021..D-024); conflict with SPEC resolved by D-023/D-024",
-    "M1.3_implementation": "IN_PROGRESS",
+    "M1.3_design_review": "DESIGN_ACCEPTED (D-019, D-021, D-023, D-024, D-026..D-029); no unresolved conflict",
+    "M1.3_implementation": "NOT_STARTED",
     "M1.3.1": "ACCEPTED"
   },
   "audit_test_baseline": {
@@ -114,5 +114,5 @@
       }
     ]
   },
-  "next_action": "Wait for SUPERVISOR authorization of the next M1.3 sub-step; do not start M1.3.2 automatically"
+  "next_action": "Implement the first PolyMAX-compatible ModalFittingProvider after SUPERVISOR authorization"
 }

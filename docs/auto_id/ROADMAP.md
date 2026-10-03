@@ -147,27 +147,31 @@ authorization.
 |---|---|---|---|
 | M1.1 | Identification input-source policy | Curve-fitted modes allowed. Peak-derived modes refused for production Auto-ID. | `ACCEPTED` (commit `2fa48c2`) |
 | M1.2 | Production PolyMAX dataset 55/2414 path | Preserve frequency, shape, provenance, measurement DOFs. | `ACCEPTED` (commit `bc2ffce`) |
-| M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `IN_PROGRESS` (design `DESIGN_ACCEPTED`) |
+| M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `DESIGN_ACCEPTED`; provider implementation NOT STARTED |
 | M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `TODO` |
 
-Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `ACCEPTED`; M1.3 `IN_PROGRESS` (design `DESIGN_ACCEPTED`; M1.3.1 `ACCEPTED`); M1.4 `TODO`).
+Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `ACCEPTED`; M1.3 `DESIGN_ACCEPTED`, provider implementation NOT STARTED (M1.3.1 interface `ACCEPTED`); M1.4 `TODO`).
 M1.3 design: `DESIGN_ACCEPTED` ([M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md);
-D-019, D-021 to D-024). M1.3 implementation is IN_PROGRESS:
+D-019, D-021, D-023, D-024, D-026 to D-029). M1.3 provider implementation is NOT
+STARTED.
 
 | Id | Sub-step | Status |
 |---|---|---|
 | M1.3.1 | `ModalFittingProvider` interface boundary (no fitting algorithm) | `ACCEPTED` (commit `f77045d`) |
 
-Architecture: FRF-to-modal fitting is a separate validated experimental preparation
-stage (D-023), with QC and a replaceable `ModalFittingProvider` (external or
-internal; D-021). Its output enters Auto-ID only as a validated curve-fitted dataset
-after provenance, QC, source classification and fixture identity validation. Auto-ID
-material identification never consumes raw FRF (D-023, D-024). The M1 GATE below is
-the validation gate for an internal provider.
+**Final architecture:** Dataset-58 FRF → FRF preparation / external
+PolyMAX-compatible provider (D-027) → validated curve-fitted modal dataset (frozen
+external selection, D-026) → M1.1 source policy → M1.2 production loader → Auto-ID.
+Internal FRF fitting is a future provider (D-029). **Next:** implement the first
+PolyMAX-compatible provider, after SUPERVISOR authorization.
 
 **M1 GATE (SP13 raw FRF):** recover ≈ 206.15 Hz and ≈ 212.61 Hz within ±0.05 Hz of
 PolyMAX; no false identification mode around 217.5 Hz; damping within 30 % of PolyMAX
 (SPEC §17).
+**Reference values (D-028):** gates use fixture-specific PolyMAX values and never mix
+acquisitions. For `SP13/best` (repeat-a) these are about 205.65 / 212.66 / 228.61 Hz. The
+206.15 / 212.61 Hz values above belong to the 2026-09-09 acquisition and apply only if
+that acquisition becomes its own fixture.
 
 ---
 
