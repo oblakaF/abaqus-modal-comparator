@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M0",
-  "current_ministep": null,
-  "status": "IN_PROGRESS",
+  "current_ministep": "M0.2",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "PRE-M0",
   "last_accepted_ministep": "M0.1",
   "last_accepted_commit": "15d6c534031f310b5f26a5e720a59d0e0d2bc070",
@@ -28,7 +28,7 @@
   "m0": {
     "branch": "auto-id/m0",
     "M0.1": "ACCEPTED",
-    "M0.2": "TODO",
+    "M0.2": "REVIEW_READY",
     "M0.3": "TODO",
     "M0.4": "TODO",
     "status": "IN_PROGRESS"
@@ -40,5 +40,5 @@
     "skipped": 2,
     "snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3"
   },
-  "next_action": "Wait for supervisor authorization to start M0.2; do not start M0.2 automatically"
+  "next_action": "Supervisor review of M0.2; do not start M0.3 until M0.2 is accepted"
 }

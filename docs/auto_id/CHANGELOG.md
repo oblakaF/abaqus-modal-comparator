@@ -278,3 +278,65 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR authorization to start M0.2. `main` is unchanged; the
   stage PR comes only at the end of M0.
+
+## 2026-10-03 — M0 M0.2 — Real experiment fixture manifest
+
+- **Stage:** M0
+- **Mini-step:** M0.2 (real experimental fixture manifest; AUDIT J1 groundwork)
+- **Status:** REVIEW_READY. M0.1 ACCEPTED. M0.3–M0.4 TODO.
+- **Branch:** `auto-id/m0` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M0.2): add real experiment fixture manifest`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **What was added:** a deterministic identity layer for real experiments, with schema
+  `experiment-fixture-manifest/1`. It records:
+  - specimen, physical specimen, experiment and test-run identifiers;
+  - the experimental source (file name, SHA-256, size, external location);
+  - the modal set (name, source type, mode count, point count, measured DOFs, face);
+  - the FrozenRegistration identity (path, schema, hash, FE geometry hash);
+  - the FE identity (geometry identity, source INP and reference ODB);
+  - provenance and unresolved fields with reasons.
+- **No local absolute paths:** external files are referenced as a store plus a
+  relative path. The retrieval contract is documented: store roots come from
+  `AUTO_ID_FIXTURE_ROOT_<STORE>`, and files are verified by size and SHA-256. A missing
+  or mismatched file is refused, never substituted.
+- **Records:**
+  - **`SP02/bravo-1`:** `SP02_polymax_retry_260803.unv`, 9 modes, 121 points, U3 only,
+    registration `9bf736d3…c164`, FE geometry `72e8597a…4e6d`.
+  - **`SP13/best`:** `SP13_a_polymax.unv`, 12 modes, 289 points, U3 only, registration
+    `a8970e52…58a4`, FE geometry `34d69d79…5826`.
+  - **Model inputs:** the accepted source INPs (SHA-256 as in the CARBON-5F evidence).
+  - **ODB references:** the CARBON-4C baseline control ODBs.
+- **Unresolved values:** `physical_specimen_id` is null for both records, and
+  `test_run_id` is null for SP13, because accepted evidence does not record them. Each
+  is declared in `unresolved` with its reason; the key model is defined in M2.2.
+- **Files changed:**
+  - added `src/domain/experiment_fixture.py` (schema validator and external-file
+    resolver)
+  - added `docs/auto_id/fixtures/real_experiment_fixtures.json` (manifest)
+  - added `docs/auto_id/fixtures/README.md` (schema and retrieval contract)
+  - added `tests/test_experiment_fixture.py` (19 tests)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M0.2 → REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Large data committed:** NO. No UNV, INP, ODB, scratch or cache files.
+- **Scientific runtime behaviour changed:** NO. The module is new and nothing calls it
+  yet. No pairing, registration, extraction, threshold or gate changed. The
+  registration files are unchanged.
+- **Tests run (Windows):**
+  - New `test_experiment_fixture`: 19 ran, OK. It covers manifest parsing, required
+    fields, unknown fields, hash format, refusal of absolute paths and `..`,
+    registration/FE consistency, unresolved-identifier rules, refusal of missing or
+    mismatched sources, environment roots, and cross-checks against the frozen
+    registration JSONs.
+  - Full suite: 893 ran, OK (skipped=2). Before this step: 874 ran, OK (skipped=2).
+- **One-off local verification (not a committed test):** with the two store roots
+  configured, all 6 external files resolved with size and SHA-256 verified. Real-data
+  regressions belong to M0.3.
+- **Abaqus run count:** 0
+- **Evidence produced:** none (identity records of existing accepted evidence only)
+- **Known limitations:**
+  - The provisional identifiers are replaced by the M2.2 key model.
+  - The ODB SHA-256 identifies one archived reference result; FE identity binds
+    through the geometry identity.
+- **Next gate:** SUPERVISOR review of M0.2. M0.3 must not start before acceptance.
