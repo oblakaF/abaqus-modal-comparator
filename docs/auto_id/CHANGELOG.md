@@ -172,3 +172,27 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Known limitations:** M0.1–M0.4 remain TODO. `main` is unchanged.
 - **Next gate:** merge the freeze branch `auto-id/v1.1-roadmap` to `main` under explicit
   HUMAN authorization. After the merge, record the main SHA, then begin M0.1.
+
+## 2026-10-03 — M0 — Freeze merge recorded; M0.1 started
+
+- **Stage:** M0
+- **Mini-step:** stage transition record + M0.1 → IN_PROGRESS (no implementation in
+  this commit)
+- **Status:** PRE-M0 ACCEPTED and merged. M0.1 IN_PROGRESS. M0.2–M0.4 TODO.
+- **Freeze merge:** PR #25 (`auto-id/v1.1-roadmap` → `main`), merged manually by the
+  HUMAN. The `main` merge SHA is `05b4e2cad5c68ad7092f25c381b836e291184079`.
+- **Authorization:** SUPERVISOR authorized "START M0.1 ONLY".
+- **Branch:** `auto-id/m0` (separate worktree; based on `05b4e2c`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): record freeze merge and start M0.1`
+- **Files changed:**
+  - `docs/auto_id/STATUS.json` (`freeze_merge`, `m0`, current stage/mini-step)
+  - `docs/auto_id/ROADMAP.md` (M0.1 → IN_PROGRESS)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** pre-change baseline on Windows at `05b4e2c`:
+  `python -m unittest discover -s tests`. Ran 873, OK (skipped=2). V7 does not fail on
+  Windows; it is Linux-only.
+- **Abaqus run count:** 0
+- **Next gate:** M0.1 implementation, then SUPERVISOR review.
