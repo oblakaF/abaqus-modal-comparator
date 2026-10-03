@@ -652,3 +652,82 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0 (merge step and this record)
 - **Next gate:** create `auto-id/m1` and begin M1.1 only after SUPERVISOR
   authorization.
+
+## 2026-10-04 — M1 M1.1 — Identification input-source policy
+
+- **Stage:** M1
+- **Mini-step:** M1.1 (identification input-source policy; SPEC §4, D-002, AUDIT K1)
+- **Status:** REVIEW_READY. M1.2–M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree; based on `main` `9d30caf`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.1): enforce identification input source policy`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Policy:** `src/domain/modal_input_source.py` classifies experimental modes as
+  `curve_fitted`, `peak_derived` or `unknown`.
+  - It uses only the exact `mode_source` labels and dataset types the readers emit;
+    unrecognised labels are never guessed from substrings.
+  - **`curve_fitted`:** `curve-fitted modal dataset` and `curve-fitted dataset 55`, or
+    datasets 55/2414 without a label.
+  - **`peak_derived`:** `FRF peak-derived experimental shape`,
+    `dataset 58 FRF peak extraction`, `local response-matrix SVD close-mode candidate`,
+    or dataset 58. A dataset-58 type outranks a contradictory curve-fitted label.
+  - **Datasets:** every mode must be curve-fitted. One peak-derived mode or a
+    peak-derived dataset label makes the dataset `peak_derived`. Any unclassifiable
+    mode, an unknown dataset label, or an empty dataset makes it `unknown`.
+  - `require_identification_input` accepts only `curve_fitted`. It raises
+    `IdentificationInputSourceRefusal` for `peak_derived` (citing SPEC §4 / D-002 /
+    K1) and for `unknown`.
+  - That exception is deliberately neither `ValueError` nor `RuntimeError`, so
+    generic fallback handlers never catch it.
+- **Enforcement boundary:** `identify_stage_a` is the single production entry where
+  experimental modes enter identification; `uncertainty_service` reaches it too. The
+  policy check now runs there before any clustering, pairing or eigen-solve, and
+  applies with or without an injected pairing provider.
+  - The lifecycle runner (`material_identification_runner`) only calls injected
+    executors with typed evidence and has no live executor in `src`.
+  - Later Auto-ID orchestration (M4.6) must call the same domain function.
+- **Not changed:**
+  - Readers, peak extraction, CMIF, MAC, pairing, registration, Abaqus extraction,
+    thresholds and gates are unchanged.
+  - Normal modal comparison still accepts peak-derived modes. Peak-derived modes
+    remain available for viewing, diagnostics and QC.
+  - No raw-FRF fitting was started (M1.3).
+- **Files changed:**
+  - added `src/domain/modal_input_source.py`
+  - updated `src/services/stage_a_identification_service.py` (import, docstring, one
+    policy call at the identification entry)
+  - added `tests/test_modal_input_source.py` (14 tests)
+  - updated `tests/test_stage_a_identification_service.py`: the synthetic experiment
+    now declares itself a curve-fitted set (`dataset_type` 55, `mode_source`). Without
+    a label the new policy correctly refuses it as `unknown`; no assertion changed.
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1 IN_PROGRESS, M1.1 → REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** YES, for identification input only.
+  `identify_stage_a` now refuses peak-derived or unclassifiable experimental modes.
+  - Accepted evidence is unaffected: CARBON-4C/5A use PolyMAX curve-fitted sets
+    (D-002), and the real SP02/bravo-1 and SP13/best imports classify as
+    `curve_fitted`.
+  - Comparison results are unchanged.
+- **Tests (Windows):**
+  - New `test_modal_input_source`: 14 ran, OK. With the fixture store configured both
+    real fixtures are curve-fitted; without it, 2 subtests skip.
+  - What it covers:
+    - acceptance of the real reader's dataset-55 modal set and dataset-2414 modes;
+    - refusal of the real FRF peak extraction (`universal_frf_review`) and of CMIF SVD
+      candidates;
+    - five unknown cases;
+    - mixed sets, and a peak dataset type outranking a contradictory label;
+    - `identify_stage_a` accepting curve-fitted input and refusing peak-derived and
+      unknown input before any computation, also with an injected provider;
+    - comparison of peak-labelled modes giving identical pairs, status, MAC and
+      frequency error.
+  - Stage-A suites (`test_stage_a_identification_service`,
+    `test_uncertainty_and_stage_a_report`): 104 ran, OK.
+  - Full suite: 925 ran, 0 failures. With the store configured, 923 passed and 2
+    skipped (opt-in Abaqus); without it, 921 passed with the same 2 skipped tests plus
+    4 skipped real-data subtests.
+- **Abaqus run count:** 0
+- **Known limitations:** the policy guards the current production identification
+  entry. Later identification entry points must call `require_identification_input`.
+- **Next gate:** SUPERVISOR review of M1.1. M1.2 must not start before acceptance.

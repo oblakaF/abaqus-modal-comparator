@@ -3,9 +3,9 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M0_COMPLETE",
-  "current_ministep": null,
-  "status": "ACCEPTED",
+  "current_stage": "M1",
+  "current_ministep": "M1.1",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M0",
   "last_accepted_ministep": "M0.4",
   "last_accepted_commit": "ad623286a583dc83f08a948bdd8d4967b25486bd",
@@ -40,7 +40,12 @@
     "status": "ACCEPTED"
   },
   "m1": {
-    "status": "NOT_STARTED"
+    "branch": "auto-id/m1",
+    "M1.1": "REVIEW_READY",
+    "M1.2": "TODO",
+    "M1.3": "TODO",
+    "M1.4": "TODO",
+    "status": "IN_PROGRESS"
   },
   "audit_test_baseline": {
     "ran": 873,
@@ -106,5 +111,5 @@
       }
     ]
   },
-  "next_action": "Create auto-id/m1 branch and begin M1.1 after supervisor authorization"
+  "next_action": "Supervisor review of M1.1; do not start M1.2 until M1.1 is accepted"
 }
