@@ -1484,6 +1484,28 @@ class ProjectEvidenceStatusTests(unittest.TestCase):
             },
         )
 
+    def test_selected_source_name_is_independent_of_host_path_flavour(self):
+        # V7: on POSIX hosts pathlib.Path does not split on "\", so a Windows path
+        # displayed whole. Simulate a POSIX host on any OS with PurePosixPath.
+        from pathlib import PurePosixPath
+
+        import material_identification_ui
+
+        with patch.object(material_identification_ui, "Path", PurePosixPath):
+            for value, expected in (
+                (r"C:\models\panel.odb", "Selected — panel.odb"),
+                (r"\\server\share\tests\panel.unv", "Selected — panel.unv"),
+                ("/home/user/tests/panel.unv", "Selected — panel.unv"),
+                ("C:/models/panel.odb", "Selected — panel.odb"),
+                ("panel.odb", "Selected — panel.odb"),
+                ("   ", "Not selected"),
+            ):
+                with self.subTest(value=value):
+                    self.assertEqual(
+                        material_identification_ui._selected_source_status(value),
+                        expected,
+                    )
+
 
 class MaterialIdentificationGuiShellTests(unittest.TestCase):
     @classmethod

@@ -17,7 +17,7 @@ from collections.abc import Mapping
 import csv
 from dataclasses import dataclass
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import textwrap
 from tkinter import filedialog, messagebox, ttk
 
@@ -884,7 +884,9 @@ def _selected_source_status(path_value: object) -> str:
     text = str(path_value or "").strip()
     if not text:
         return "Not selected"
-    return f"Selected — {Path(text).name}"
+    # PureWindowsPath splits on both "\" and "/", so the displayed file name does not
+    # depend on the host OS (a Windows path shown on Linux keeps only its file name).
+    return f"Selected — {PureWindowsPath(text).name}"
 
 
 def project_evidence_status(app) -> dict[str, str]:

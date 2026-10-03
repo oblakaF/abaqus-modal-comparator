@@ -196,3 +196,56 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   Windows; it is Linux-only.
 - **Abaqus run count:** 0
 - **Next gate:** M0.1 implementation, then SUPERVISOR review.
+
+## 2026-10-03 — M0 M0.1 — Fix V7 cross-platform path failure
+
+- **Stage:** M0
+- **Mini-step:** M0.1 (fix V7 cross-platform path failure; AUDIT V7)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m0` (separate worktree; based on `main` `05b4e2c`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M0.1): fix cross-platform path failure`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Earlier commits on this branch:**
+  - `fc20ab3` records the freeze merge SHA and moves M0.1 to IN_PROGRESS in
+    STATUS.json.
+  - `c0a9902` completes `fc20ab3` with the ROADMAP IN_PROGRESS change. It was left out
+    of `fc20ab3` because that edit failed; history was not rewritten.
+- **Cause:** `material_identification_ui._selected_source_status` displayed the
+  selected FE/experimental file name with `pathlib.Path(text).name`. On POSIX hosts
+  `Path` does not split on `\`, so a Windows path such as `C:\models\panel.odb` was
+  displayed whole. The failing test was
+  `ProjectEvidenceStatusTests.test_selected_and_validated_states_display_correctly`,
+  on Linux CI.
+- **Fix:** the display uses `PureWindowsPath(text).name`, which splits on both `\` and
+  `/` on every host. It is a one-line display change in the single owner of the
+  function; no `install_*` layer redefines it. Windows output is unchanged.
+- **Files changed:**
+  - `src/material_identification_ui.py` (import plus the display line)
+  - `tests/test_material_identification_ui.py` (new reproducing test)
+  - `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md` (M0.1 → REVIEW_READY)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Reproducing test:** `test_selected_source_name_is_independent_of_host_path_flavour`
+  simulates a POSIX host on any OS by patching the module's `Path` with
+  `PurePosixPath`.
+  - Against the old source on Windows it fails for the `C:\...` and UNC cases.
+  - With the fix it passes. It also covers POSIX, forward-slash, bare-name and blank
+    inputs.
+- **Scientific runtime behaviour changed:** NO. The change only affects how the
+  selected file name is displayed in the evidence status. No identification
+  mathematics, modal algorithm, extraction, threshold or gate changed.
+- **Production code changed:** YES, display only (`src/material_identification_ui.py`).
+- **Tests run (Windows, local):**
+  - Before, at `05b4e2c`: `python -m unittest discover -s tests` ran 873, OK
+    (skipped=2). V7 does not reproduce natively on Windows.
+  - After: the targeted `ProjectEvidenceStatusTests` ran 2, OK. The
+    `test_material_identification_ui` module ran 42, OK. The full suite ran 874, OK
+    (skipped=2).
+- **Linux:** no local Linux runtime. GitHub Actions (ubuntu-latest) on the pushed
+  branch verifies it, and the result is reported to the SUPERVISOR. The pre-fix Linux
+  CI at `121ba1d` / `6868692` ran 870 with 1 failure (V7) and skipped=6.
+- **Abaqus run count:** 0
+- **Evidence produced:** none
+- **Known limitations:** the Linux CI skip count (6) differs from the audit's Linux
+  count (2). That is a Tk/GUI availability difference to document in M0.4, not M0.1.
+- **Next gate:** SUPERVISOR review of M0.1. M0.2 must not start before acceptance.

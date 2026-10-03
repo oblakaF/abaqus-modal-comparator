@@ -5,7 +5,7 @@
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M0",
   "current_ministep": "M0.1",
-  "status": "IN_PROGRESS",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "PRE-M0",
   "last_accepted_ministep": "P0.2",
   "last_accepted_commit": "ec86a772b32a1aaa318b3bc4e9091f7d3f59642e",
@@ -27,7 +27,7 @@
   },
   "m0": {
     "branch": "auto-id/m0",
-    "M0.1": "IN_PROGRESS",
+    "M0.1": "REVIEW_READY",
     "M0.2": "TODO",
     "M0.3": "TODO",
     "M0.4": "TODO"
@@ -39,5 +39,5 @@
     "skipped": 2,
     "snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3"
   },
-  "next_action": "Implement M0.1 (V7 cross-platform path fix) on auto-id/m0; then supervisor review"
+  "next_action": "Supervisor review of M0.1; do not start M0.2 until M0.1 is accepted"
 }
