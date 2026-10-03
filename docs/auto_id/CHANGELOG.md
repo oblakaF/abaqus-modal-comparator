@@ -438,3 +438,33 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
     it from the ODB would need Abaqus-side extraction, which is out of scope here.
   - Real-data regressions run only where a store root is configured.
 - **Next gate:** SUPERVISOR review of M0.3. M0.4 must not start before acceptance.
+
+## 2026-10-04 — M0 M0.3 — Supervisor acceptance recorded
+
+- **Stage:** M0
+- **Mini-step:** acceptance record for M0.3 (no new mini-step started)
+- **Status:** M0.3 ACCEPTED. M0 IN_PROGRESS. M0.1 and M0.2 ACCEPTED. M0.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `b3e080f50dc7ce66c42101b933f8631bf2249782` on `auto-id/m0`.
+- **Accepted scope:**
+  - Real PolyMAX fixture regressions are added, and the tests consume only the M0.2
+    manifest.
+  - Protected identities: SP02/bravo-1 and SP13/best, the FrozenRegistration hashes,
+    the FE geometry identity references, the modal source type and the measurement
+    DOF contract.
+  - No Abaqus is required, and no scientific algorithm changed.
+  - Modal pairing, registration, thresholds, identification logic and extraction are
+    unchanged.
+- **Branch:** `auto-id/m0` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M0.3 fixture regressions`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M0.3 ACCEPTED; M0 stage status)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization to start M0.4. `main` is unchanged.
