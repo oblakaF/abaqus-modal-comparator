@@ -147,16 +147,16 @@ authorization.
 |---|---|---|---|
 | M1.1 | Identification input-source policy | Curve-fitted modes allowed. Peak-derived modes refused for production Auto-ID. | `ACCEPTED` (commit `2fa48c2`) |
 | M1.2 | Production PolyMAX dataset 55/2414 path | Preserve frequency, shape, provenance, measurement DOFs. | `ACCEPTED` (commit `bc2ffce`) |
-| M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `DESIGN_ACCEPTED`; implementation `IN_PROGRESS` |
+| M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `IN_PROGRESS` (design `DESIGN_ACCEPTED`) |
 | M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `TODO` |
 
-Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `ACCEPTED`; M1.3 `DESIGN_ACCEPTED`, implementation `IN_PROGRESS`; M1.4 `TODO`).
+Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `ACCEPTED`; M1.3 `IN_PROGRESS` (design `DESIGN_ACCEPTED`; M1.3.1 `ACCEPTED`); M1.4 `TODO`).
 M1.3 design: `DESIGN_ACCEPTED` ([M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md);
 D-019, D-021 to D-024). M1.3 implementation is IN_PROGRESS:
 
 | Id | Sub-step | Status |
 |---|---|---|
-| M1.3.1 | `ModalFittingProvider` interface boundary (no fitting algorithm) | `REVIEW_READY` |
+| M1.3.1 | `ModalFittingProvider` interface boundary (no fitting algorithm) | `ACCEPTED` (commit `f77045d`) |
 
 Architecture: FRF-to-modal fitting is a separate validated experimental preparation
 stage (D-023), with QC and a replaceable `ModalFittingProvider` (external or

@@ -1069,3 +1069,35 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
     6 skipped real-data subtests.
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR review of M1.3.1.
+
+## 2026-10-04 — M1 M1.3.1 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.3.1 (no new mini-step started)
+- **Status:** M1.3.1 ACCEPTED. M1.3 IN_PROGRESS (design DESIGN_ACCEPTED). M1.1 and
+  M1.2 ACCEPTED. M1.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `f77045d165784244ad731792035398b4e3217421` on `auto-id/m1`.
+- **Accepted scope:**
+  - The `ModalFittingProvider` boundary is created, with provider identity and
+    provenance contracts.
+  - The registry is explicit, with no global provider state; unknown providers remain
+    unadmitted.
+  - Manual production mode selection remains forbidden.
+  - No fitting algorithm is implemented. FRF processing, readers and identification
+    are unchanged.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept modal fitting provider interface`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json` (`m1.M1.3` now `IN_PROGRESS`, as instructed; design
+    acceptance kept in `M1.3_design_review`)
+  - `docs/auto_id/ROADMAP.md` (M1.3 row and stage status; M1.3.1 ACCEPTED)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization of the next M1.3 sub-step. M1.3.2 must not
+  start automatically. `main` is unchanged (`9d30caf`).
