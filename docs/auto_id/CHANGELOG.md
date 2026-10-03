@@ -370,3 +370,71 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Tests run:** none (status record only)
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR authorization to start M0.3. `main` is unchanged.
+
+## 2026-10-04 — M0 M0.3 — PolyMAX / FrozenRegistration regressions
+
+- **Stage:** M0
+- **Mini-step:** M0.3 (real PolyMAX / FrozenRegistration regressions)
+- **Status:** REVIEW_READY. M0.1 and M0.2 ACCEPTED. M0.4 TODO.
+- **Branch:** `auto-id/m0` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M0.3): add PolyMAX FrozenRegistration regressions`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **What was added:** `verify_experiment_fixture` checks one M0.2 manifest record
+  against its real data. It raises on the first difference and never repairs or
+  substitutes anything.
+  - **Experimental source:** it resolves through the store root, with the pinned size
+    and SHA-256.
+  - **FrozenRegistration:** it is restored with its content hash re-sealed. The
+    registration hash and schema, the bound source (SHA-256 and size), the modal set
+    and the FE geometry identity (SHA-256, node count, schema) must equal the record.
+  - **PolyMAX import:** it uses the production reader with the pinned modal set. The
+    reader's mode source must equal the pinned source type, so a peak-derived source
+    cannot substitute. The modal set key, mode count and point count must match.
+  - **Measurement contract replay:** the imported points must equal the
+    registration's points, with one mapped FE node per point. The frozen DOF set must
+    equal `measured_dofs`, and every mode's measured-DOF mask (production
+    `experimental_measurement_masks`) must equal the frozen contract.
+- **Single source of fixture identity:** the tests iterate the M0.2 manifest. No
+  second fixture list exists. A record whose store root is not configured is skipped
+  with the reason.
+- **Files changed:**
+  - added `src/services/experiment_fixture_regression.py`
+  - added `tests/test_experiment_fixture_regression.py` (15 tests: 1 real-data test
+    over all manifest records, 14 synthetic contract tests)
+  - updated `docs/auto_id/fixtures/README.md` (regression check section)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M0.3 → REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Reproduced identities (Windows, real data):**
+  - **`SP02/bravo-1`:** curve-fitted dataset 55, 9 modes, 121 points, U3 only,
+    registration `9bf736d3…c164`, FE geometry `72e8597a…4e6d`.
+  - **`SP13/best`:** curve-fitted dataset 55, 12 modes, 289 points, U3 only,
+    registration `a8970e52…58a4`, FE geometry `34d69d79…5826`.
+  - **Tampered real records are refused:** a wrong mode count, a wrong DOF set and
+    another modal set (`processing`) are each refused.
+- **Refusal paths tested (synthetic, CI-capable):**
+  - missing store root, missing file, wrong SHA-256;
+  - wrong mode count, wrong point count, wrong modal set;
+  - peak-derived mode source, unregistered source type;
+  - wrong registration hash, edited registration file;
+  - wrong FE identity (SHA-256 or node count);
+  - wrong DOF set, and imported DOFs outside the frozen contract.
+- **Scientific runtime behaviour changed:** NO. Nothing in production calls the new
+  service. No reader, pairing, registration, threshold or gate changed. The
+  registrations are untouched.
+- **Tests run (Windows):**
+  - `test_experiment_fixture_regression` with no store root: 15 ran, OK (the 2
+    real-data subtests skipped with the reason). With `AUTO_ID_FIXTURE_ROOT_SNADWICH`
+    set: both real fixtures reproduced.
+  - Full suite: 908 ran, OK. With no store root, skipped=4; with the store root,
+    skipped=2. Before this step: 893 ran, OK (skipped=2).
+- **Linux CI:** has no real data store, so the real-data subtests skip there and the
+  synthetic contract tests run.
+- **Abaqus run count:** 0
+- **Large data committed:** NO
+- **Known limitations:**
+  - FE geometry identity is checked at the record and registration level. Recomputing
+    it from the ODB would need Abaqus-side extraction, which is out of scope here.
+  - Real-data regressions run only where a store root is configured.
+- **Next gate:** SUPERVISOR review of M0.3. M0.4 must not start before acceptance.

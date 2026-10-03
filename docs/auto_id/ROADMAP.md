@@ -129,11 +129,11 @@ Purpose: make every later Auto-ID change testable against stable real evidence.
 |---|---|---|---|
 | M0.1 | Fix V7 cross-platform path failure | Linux V7 failure gone; no scientific behaviour change; targeted regression passes | `ACCEPTED` (commit `15d6c53`) |
 | M0.2 | Real experimental fixture manifest | SP02/SP13 real fixture identities pinned; SHA-256 recorded; large/private data need not be committed blindly; deterministic local/external fixture retrieval contract documented | `ACCEPTED` (commit `66dfe45`) |
-| M0.3 | Real PolyMAX / FrozenRegistration regressions | SP02 `bravo-1` identity reproduced; SP13 `best` identity reproduced; accepted FrozenRegistration identities reproduced; a peak-derived source cannot silently substitute | `TODO` |
+| M0.3 | Real PolyMAX / FrozenRegistration regressions | SP02 `bravo-1` identity reproduced; SP13 `best` identity reproduced; accepted FrozenRegistration identities reproduced; a peak-derived source cannot silently substitute | `REVIEW_READY` |
 | M0.4 | Windows + Linux CI baseline | Factual test summaries; zero unexplained failures; skips documented; platform behaviour explicit | `TODO` |
 
 **M0 GATE:** trusted green baseline before M1.
-Stage status: `IN_PROGRESS` (M0.1 `ACCEPTED`; M0.2 `ACCEPTED`; M0.3–M0.4 `TODO`).
+Stage status: `IN_PROGRESS` (M0.1 `ACCEPTED`; M0.2 `ACCEPTED`; M0.3 `REVIEW_READY`; M0.4 `TODO`).
 
 ---
 

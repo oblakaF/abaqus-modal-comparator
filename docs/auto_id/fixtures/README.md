@@ -86,3 +86,42 @@ The FE ODB references are the CARBON-4C baseline control ODBs (accepted CARBON-4
 evidence). ODB bytes are not deterministic across solves, so FE identity binds through
 `fe.geometry_identity`. The ODB SHA-256 identifies that particular archived reference
 result only.
+
+## Regression check (M0.3)
+
+`services.experiment_fixture_regression.verify_experiment_fixture(fixture, roots,
+repo_root=...)` checks one manifest record against its real data. It raises on the
+first difference and never repairs or substitutes anything.
+
+1. **Experimental source:** it resolves through the store root, and its size and
+   SHA-256 match.
+2. **Registration:** it loads the FrozenRegistration from its repo path, and
+   `from_dict` re-seals the content hash. The check then compares it with the
+   record:
+   - registration hash and schema;
+   - bound source (SHA-256 and size);
+   - modal set;
+   - FE geometry identity (SHA-256, node count, schema).
+3. **PolyMAX import:** it runs the production reader with the pinned modal set name.
+   - The reader's mode source must equal the source type's registered value; for
+     `polymax-curve-fitted-dataset-55` that is `curve-fitted dataset 55`. A
+     peak-derived source therefore never passes.
+   - The selected modal set key, mode count and point count must match the record.
+4. **Measurement contract replay:**
+   - the imported points must equal the registration's `experimental_node_ids`;
+   - there must be one mapped FE node per point;
+   - the frozen contract's DOF set must equal `measured_dofs`;
+   - every mode's measured-DOF mask, computed by
+     `reviewed_core.experimental_measurement_masks`, must equal the frozen contract.
+
+`tests/test_experiment_fixture_regression.py` runs the check for **every** manifest
+record. The fixture list is never duplicated in the tests. A record whose store is not
+configured is skipped with the reason. The refusal paths are covered by a small
+synthetic fixture, so they also run in CI.
+
+To run the real-data regression locally:
+
+```
+set AUTO_ID_FIXTURE_ROOT_SNADWICH=<local root of the snadwich store>
+python -m unittest tests.test_experiment_fixture_regression -v
+```
