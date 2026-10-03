@@ -899,3 +899,46 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR decisions on the M1.3 design, and authorization to start
   M1.3. `main` is unchanged (`9d30caf`).
+
+## 2026-10-04 — M1 — M1.3 modal input architecture frozen (docs only)
+
+- **Stage:** M1
+- **Mini-step:** none. M1.3 design decision freeze; M1.3 implementation NOT STARTED
+  and still `TODO`.
+- **Status:** M1.1 and M1.2 ACCEPTED. M1.3 design DESIGN_ACCEPTED. M1.3
+  implementation and M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): freeze M1.3 modal input architecture`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Decisions appended (SUPERVISOR):**
+  - **D-018:** no internal FRF→modal fitting in Auto-ID v1 production; only validated
+    curve-fitted datasets are accepted.
+  - **D-019:** curve-fitted datasets are the only production identification input;
+    peak-derived modes are forbidden.
+  - **D-020:** dataset-58 FRFs are QC and future fitting inputs only.
+  - **D-021:** future fitting goes through a replaceable `ModalFittingProvider`.
+  - **D-022:** human modal selection only in research/review workflows.
+- **Design review:** `M1_3_DESIGN_REVIEW.md` is marked DESIGN_ACCEPTED.
+  - A new section 0 records the approved architecture (FRF → QC → optional fitting
+    provider → validated curve-fitted dataset → Auto-ID), the decisions, the
+    provider interface intent and which open decisions remain.
+  - The original proposal is kept below and is superseded where it differs.
+- **Conflict recorded, not resolved:** D-018 conflicts with SPEC §4, §6 S1 and §17,
+  and with the ROADMAP M1 GATE (SP13 from raw FRF), all of which describe a built-in
+  fit. By precedence (SPEC > DECISIONS), the SUPERVISOR must resolve this by a SPEC
+  amendment or a redefined M1 gate before the M1 stage gate. The SPEC and the gate
+  text are unchanged.
+- **Files changed:**
+  - `docs/auto_id/DECISIONS.md` (D-018 to D-022 appended)
+  - `docs/auto_id/M1_3_DESIGN_REVIEW.md`
+  - `docs/auto_id/ROADMAP.md` (M1.3 design note; conflict note)
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO. No FRF processing changed and no fitting algorithm
+  was added.
+- **Tests run:** none (documentation only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR resolution of the D-018 / SPEC / M1-gate conflict, and
+  authorization of the next M1 step.

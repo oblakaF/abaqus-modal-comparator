@@ -131,3 +131,53 @@ Rationale / scope: Twill and plain weave are distinct laminate/material architec
 A successful identification method may transfer between them, but the identified
 material constant must not be transferred across families without physical evidence.
 Supersedes: none
+
+## D-018 — No internal FRF→modal fitting in Auto-ID v1 production
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 design decision freeze (SUPERVISOR, after review of `ac1e0e3` / `docs/auto_id/M1_3_DESIGN_REVIEW.md`)
+Decision: Auto-ID v1 production does not perform internal FRF→modal fitting. It
+accepts only validated curve-fitted modal datasets.
+Rationale / scope: modal identification uncertainty must be separated from material
+identification uncertainty.
+Conflict noted, not resolved here: the frozen SPEC still describes a built-in
+multi-mode fit in three places: §4 (footnote to `modes.unv`), §6 S1 ("or the built-in
+multi-mode fit (M1)") and §17 (M1 acceptance: SP13 from raw FRF). ROADMAP M1.3 and
+the M1 GATE do too. By the precedence rule (SPEC > DECISIONS) these need an explicit
+SUPERVISOR resolution, either a SPEC amendment or a redefined M1 gate, before the
+M1 stage gate is evaluated.
+Supersedes: none
+
+## D-019 — Curve-fitted modal datasets are the only production identification input
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 design decision freeze (SUPERVISOR, after review of `ac1e0e3` / `docs/auto_id/M1_3_DESIGN_REVIEW.md`)
+Decision: Curve-fitted modal datasets are the only production identification input.
+Peak-derived modes are forbidden for production identification.
+Rationale / scope: restates and extends D-002. Implemented by M1.1
+(`domain.modal_input_source`: only `curve_fitted` is admitted; `peak_derived` and
+`unknown` are refused) and M1.2 (`services.production_modal_input`: accepted manifest
+fixtures only).
+Supersedes: none
+
+## D-020 — Dataset-58 FRF data are QC and future fitting inputs only
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 design decision freeze (SUPERVISOR, after review of `ac1e0e3` / `docs/auto_id/M1_3_DESIGN_REVIEW.md`)
+Decision: Dataset-58 FRF data are QC and future fitting inputs only. They are not
+direct Auto-ID identification inputs.
+Rationale / scope: peak picking and CMIF/SVD candidates built from dataset 58 stay
+viewing, diagnostic and QC tools (D-002, D-019).
+Supersedes: none
+
+## D-021 — Modal fitting only through a replaceable ModalFittingProvider
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 design decision freeze (SUPERVISOR, after review of `ac1e0e3` / `docs/auto_id/M1_3_DESIGN_REVIEW.md`)
+Decision: Future modal fitting must be provided through a replaceable
+`ModalFittingProvider` interface.
+Rationale / scope: a provider's output becomes production input only as a validated
+curve-fitted dataset. That means it is pinned, carries provenance, passes QC, and
+carries a provider/version source label that the SUPERVISOR has admitted to the M1.1
+policy. No provider is implemented or active in v1.
+Supersedes: none
+
+## D-022 — Human modal selection only in research/review workflows
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 design decision freeze (SUPERVISOR, after review of `ac1e0e3` / `docs/auto_id/M1_3_DESIGN_REVIEW.md`)
+Decision: Human modal selection is allowed only in research/review workflows.
+Production identification cannot depend on manual mode selection.
+Rationale / scope: a production identification result must be reproducible from
+pinned inputs and recorded rules alone.
+Supersedes: none

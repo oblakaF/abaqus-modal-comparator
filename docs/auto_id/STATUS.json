@@ -46,7 +46,10 @@
     "M1.3": "TODO",
     "M1.4": "TODO",
     "status": "IN_PROGRESS",
-    "M1.3_design_review": "RECORDED_ONLY (ac1e0e3); not approved, not implemented"
+    "M1.3_design_review": "DESIGN_ACCEPTED (D-018..D-022); implementation NOT STARTED",
+    "open_items": [
+      "D-018 (no internal FRF->modal fitting in v1 production) conflicts with SPEC §4, §6 S1, §17 and the ROADMAP M1 GATE (SP13 from raw FRF); SPEC > DECISIONS, so SUPERVISOR resolution (SPEC amendment or redefined M1 gate) is required before the M1 stage gate"
+    ]
   },
   "audit_test_baseline": {
     "ran": 873,
@@ -112,5 +115,5 @@
       }
     ]
   },
-  "next_action": "Wait for supervisor decisions on the M1.3 design and authorization to start M1.3; do not start M1.3 automatically"
+  "next_action": "Wait for SUPERVISOR: resolve the D-018 vs SPEC/M1-gate conflict and authorize the next M1 step; do not start M1.3 implementation"
 }

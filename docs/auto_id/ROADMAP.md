@@ -151,8 +151,16 @@ authorization.
 | M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `TODO` |
 
 Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `ACCEPTED`; M1.3–M1.4 `TODO`).
-M1.3 design review (recorded only by the SUPERVISOR; not approved; no implementation):
-[M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md).
+M1.3 design: `DESIGN_ACCEPTED` (D-018 to D-022; [M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md)).
+M1.3 implementation is NOT STARTED. Approved architecture: FRF → QC → optional
+fitting provider → validated curve-fitted dataset → Auto-ID. Auto-ID v1 production
+does not fit FRFs internally (D-018).
+
+**Open conflict (SUPERVISOR resolution required):** D-018 conflicts with the M1 GATE
+below and with SPEC §4, §6 S1 and §17, which still describe a built-in multi-mode
+fit. Under the precedence rule (SPEC > DECISIONS), the gate is not evaluated until
+the SUPERVISOR resolves this by a SPEC amendment or a redefined M1 gate. The gate
+text is unchanged here.
 
 **M1 GATE (SP13 raw FRF):** recover ≈ 206.15 Hz and ≈ 212.61 Hz within ±0.05 Hz of
 PolyMAX; no false identification mode around 217.5 Hz; damping within 30 % of PolyMAX
