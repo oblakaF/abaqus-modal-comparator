@@ -1,3 +1,8 @@
+> Current Auto-ID implementation is governed by
+> `docs/auto_id/SPEC_V1_1.md` and `docs/auto_id/ROADMAP.md`.
+> This document is retained for historical/design context where it does not
+> conflict with the accepted Auto-ID v1.1 specification.
+
 # Effective Material Identification v1
 
 ## Purpose

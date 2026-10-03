@@ -1,0 +1,31 @@
+{
+  "schema": "auto-id-project-status/v1",
+  "governing_spec": "docs/auto_id/SPEC_V1_1.md",
+  "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
+  "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
+  "current_stage": "PRE-M0",
+  "current_ministep": null,
+  "status": "ACCEPTED",
+  "last_accepted_stage": "PRE-M0",
+  "last_accepted_ministep": "P0.2",
+  "last_accepted_commit": "ec86a772b32a1aaa318b3bc4e9091f7d3f59642e",
+  "carbon5f": {
+    "status": "ACCEPTED",
+    "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
+    "supervisor_acceptance": "ACCEPTED",
+    "evidence": "docs/auto_id/EVIDENCE.md"
+  },
+  "pre_m0": {
+    "P0.1": "ACCEPTED",
+    "P0.2": "ACCEPTED",
+    "P0.3": "ACCEPTED"
+  },
+  "test_baseline": {
+    "ran": 873,
+    "passed": 870,
+    "failed": 1,
+    "skipped": 2,
+    "snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3"
+  },
+  "next_action": "Prepare/merge Auto-ID v1.1 freeze PR to main under HUMAN authorization; after merge record main SHA, then begin M0.1"
+}
