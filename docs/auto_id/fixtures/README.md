@@ -166,3 +166,30 @@ runs the modal preparation chain for an accepted fixture. Steps:
 
 No FRF fitting, pole extraction or peak picking takes place (D-027). Tests:
 `tests/test_external_polymax_provider.py`. The real-data test iterates the manifest.
+
+## Experimental QC (M1.4)
+
+`services.experimental_qc.prepare_auto_id_experimental_input(fixture_id)` runs the
+full experimental input chain:
+
+1. the M1.2 production loader, wrapped by the M1.3 `ExternalPolyMAXProvider`;
+2. the M1.1 input-source policy;
+3. `evaluate_experimental_qc`, which produces an `ExperimentalQCReport`.
+
+It returns the provider dataset unchanged together with the report. QC only reads
+the data and never modifies, reorders or deletes modes.
+
+| Check | Kind | Rule |
+|---|---|---|
+| `provenance` | hard | provider admitted; provenance keys; fixture, source, FRF content, configuration and registration hashes |
+| `measurement_contract` | hard | registration restorable; mode and point counts; point order; measured-DOF contract (production mask function); finite shapes |
+| `frf_completeness` | hard for source identity only | channel coverage, empty channels and point count are warnings |
+| `coherence_quality` | diagnostic | coherence at resonance < 0.9 (SPEC §6 S1); `NOT_AVAILABLE` when the FRF builder has no coherence |
+| `frequency_resolution` | diagnostic | 2ζf < 3Δf unresolved resonance (SPEC §6 S1); close modes |Δf|/f < 3 % as a cluster trigger (SPEC §12.4); Δf, bandwidth and overlap metrics |
+| `modal_confidence` | diagnostic | frequency, damping and shape uncertainty (`NOT_AVAILABLE` when the source has none); phase collinearity (metric only); AutoMAC off-diagonal > 0.5 (SPEC §6 S1) |
+
+- **Overall status:** `FAIL` only if a hard check fails, which raises
+  `ExperimentalQCRefusal`; otherwise `WARNING` if any check warns, else `PASS`.
+- **`NOT_AVAILABLE`:** never degrades the overall status; such items are listed in
+  `not_available`.
+- **Report identity:** the report is deterministic and has a `content_hash`.

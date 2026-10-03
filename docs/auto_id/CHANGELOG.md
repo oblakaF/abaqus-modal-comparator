@@ -1320,3 +1320,128 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR authorization to start M1.4. `main` is unchanged
   (`9d30caf`).
+
+## 2026-10-04 — M1 M1.4 — Experimental QC subsystem
+
+- **Stage:** M1
+- **Mini-step:** M1.4 (experimental QC)
+- **Status:** M1.4 REVIEW_READY. M1.1, M1.2, M1.3.1 and M1.3 ACCEPTED.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.4): implement experimental QC subsystem`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Domain (`src/domain/experimental_qc.py`):**
+  - `ExperimentalQCStatus`: PASS / WARNING / FAIL / NOT_AVAILABLE.
+  - `ExperimentalQCMetric`: a value of `None` means not available.
+  - `QCWarning`: code, check, modes, and the SPEC rule it comes from.
+  - `ExperimentalQCCheck`: carries `hard`; a diagnostic check cannot FAIL by
+    construction.
+  - `ExperimentalQCReport`: fixture id, modal source, provider identity, provenance
+    reference, checks, warnings, metrics, `not_available`, policy, overall status,
+    `admissible`, and a deterministic `content_hash`.
+  - `ExperimentalQCRefusal`: raised for a hard failure; it is not a `ValueError` /
+    `RuntimeError`.
+- **Service (`src/services/experimental_qc.py`):**
+  - `evaluate_experimental_qc(validated, frf, fixture)` builds the report and only
+    reads the dataset.
+  - `prepare_auto_id_experimental_input(fixture_id)` integrates QC after M1.3:
+    M1.2 loader → `ExternalPolyMAXProvider` → M1.1 → QC.
+  - It returns the provider dataset unchanged plus the report. It refuses only on a
+    hard failure, and M1.1 and M1.2 are not bypassed.
+- **Checks:**
+  1. **`provenance` (hard):**
+     - the provider is admitted and the required provenance keys are present
+       (including the D-026 frozen-selection keys);
+     - fixture id, source SHA-256, FRF content hash, configuration hash, registration
+       hash and the dataset label are consistent.
+  2. **`measurement_contract` (hard):**
+     - the FrozenRegistration restores with the pinned hash;
+     - mode and point counts, modal set, shared point list and point order match the
+       registration;
+     - the frozen DOF contract equals the fixture's, and every mode's measured-DOF
+       mask (production `experimental_measurement_masks`) equals the frozen contract;
+     - shapes are finite.
+  3. **`frf_completeness`:** the FRF source identity is hard. Missing or empty
+     channels and an FRF point-count mismatch are warnings. Channel, point, line and
+     band metrics are recorded.
+  4. **`coherence_quality` (diagnostic):** coherence at resonance below 0.9 is flagged
+     (SPEC §6 S1). Missing coherence gives `NOT_AVAILABLE` plus a warning, never
+     FAIL.
+  5. **`frequency_resolution` (diagnostic):**
+     - Δf and its non-uniformity; per mode the half-power bandwidth 2ζf and the
+       bandwidth in lines; per adjacent pair the gap in Hz, relative and in lines, plus
+       the modal overlap.
+     - Flags: unresolved resonance 2ζf < 3Δf (SPEC §6 S1), close modes |Δf|/f < 3 %
+       (SPEC §12.4, "only a trigger"), and damping not available.
+  6. **`modal_confidence` (diagnostic):**
+     - frequency, damping and shape uncertainty are recorded as `NOT_AVAILABLE` when
+       the source has none; nothing is fabricated;
+     - damping ratio;
+     - phase collinearity as a metric only (the SPEC gives no limit);
+     - experimental AutoMAC off-diagonal > 0.5 flagged (SPEC §6 S1).
+  - **No other threshold is applied.**
+- **Real fixtures (Windows, data store configured):**
+  - **SP02/bravo-1:**
+    - overall WARNING, admissible; provenance, contract and FRF completeness PASS;
+    - coherence PASS: computed, every mode ≥ 0.917 at resonance;
+    - resolution WARNING: Δf 0.3125 Hz, modes 1–8 unresolved by 2ζf < 3Δf, and modes
+      4/5 close (90.57 / 91.95 Hz);
+    - modal confidence NOT_AVAILABLE (no uncertainty in the export);
+    - AutoMAC maximum off-diagonal 0.043.
+  - **SP13/best:**
+    - overall WARNING, admissible; provenance, contract and FRF completeness PASS;
+    - coherence NOT_AVAILABLE (the FRF builder reports coherence unavailable; reader
+      not modified);
+    - resolution WARNING: Δf 0.15625 Hz, modes 1–5 unresolved, close pairs 4-5, 9-10
+      and 10-11;
+    - modal confidence NOT_AVAILABLE;
+    - AutoMAC maximum off-diagonal 0.426.
+  - **Metrics available on both:** FRF channels, points, lines and band; Δf;
+    bandwidths; mode gaps and modal overlap; damping; phase collinearity; AutoMAC.
+    SP02 also has coherence at resonance.
+  - **Metrics not available:** coherence at resonance (SP13); frequency, damping and
+    shape uncertainty (both).
+- **Files changed:**
+  - added `src/domain/experimental_qc.py`
+  - added `src/services/experimental_qc.py`
+  - added `tests/test_experimental_qc.py` (18 tests)
+  - updated `tests/test_external_polymax_provider.py` (`synthetic_export` gains an
+    optional `with_coherence`)
+  - updated `docs/auto_id/fixtures/README.md` (QC section)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1.4 → REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO for existing paths.
+  - QC is new and observes only.
+  - The provider, readers, FRF processing, registrations, pairing, identification
+    mathematics and the solver are unchanged.
+  - The new chain `prepare_auto_id_experimental_input` adds a refusal only for hard
+    QC failures (broken provenance, fixture identity or measurement contract).
+- **Tests (Windows):**
+  - New `test_experimental_qc`: 18 ran, OK, with real fixtures when the store is
+    configured. Coverage:
+    - **core:** valid report, determinism, provenance preserved, dataset untouched;
+    - **hard failures:** missing source, invalid fixture, invalid DOF contract,
+      broken provenance (FRF hash, missing source file, configuration hash,
+      unadmitted provider), wrong FRF source, refusal raised by the chain;
+    - **diagnostics:** missing coherence, unavailable uncertainty and AutoMAC, close
+      modes, insufficient resolution, missing damping, low coherence, phase
+      collinearity, a diagnostic check unable to FAIL;
+    - **regression:** SP02 and SP13 QC, M1.3/M1.2 compatibility, determinism.
+  - **Test-order note:** the DOF-contract test sets an explicit measured mask. When
+    the app's `install_*` layers are active in the same process (as in the full
+    suite), the reader attaches explicit masks, which take precedence over vector
+    data.
+  - Full suite: 996 ran, 0 failures. With the store configured, 994 passed and 2
+    skipped (opt-in Abaqus); without it, 989 passed with the same 2 skipped tests
+    plus 10 skipped real-data subtests.
+- **Abaqus run count:** 0
+- **Limitations (not claimed):**
+  - no automatic mode rejection: QC never removes modes;
+  - no complete uncertainty estimation: uncertainty is reported as available or
+    `NOT_AVAILABLE`;
+  - no universal QC thresholds: only the SPEC flag rules above, as warnings, pending
+    scientific validation;
+  - phase complexity has no limit;
+  - SP13 coherence evaluation is limited by the unchanged FRF builder.
+- **Next gate:** SUPERVISOR review of M1.4.

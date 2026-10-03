@@ -58,7 +58,7 @@ KNOWN_FALSE_PEAK_HZ = {"SP13/best": 217.5}
 POLES = {1: complex(-0.15, 2 * math.pi * 12.0), 2: complex(-0.40, 2 * math.pi * 31.5)}
 
 
-def synthetic_export(*, with_dataset_55=True, with_pole=True):
+def synthetic_export(*, with_dataset_55=True, with_pole=True, with_coherence=True):
     """Datasets of a tiny PolyMAX-style export: geometry, dataset-55 set 'Set A', dataset-58 FRFs."""
     datasets = [{"type": 2411, "node_nums": np.array(NODE_IDS), "x": np.array([0.0, 0.1, 0.2]),
                  "y": np.zeros(3), "z": np.zeros(3)}]
@@ -77,7 +77,8 @@ def synthetic_export(*, with_dataset_55=True, with_pole=True):
     for index, node in enumerate(NODE_IDS):
         response = sum((index + 1) / (abs(p) ** 2 - (2 * math.pi * axis) ** 2 + 2j * (-p.real) * 2 * math.pi * axis)
                        for p in POLES.values())
-        for func_type, data in ((4, response), (6, np.full_like(axis, 0.97))):
+        channels = ((4, response), (6, np.full_like(axis, 0.97))) if with_coherence else ((4, response),)
+        for func_type, data in channels:
             datasets.append({"type": 58, "func_type": func_type, "id1": f"FRF {node}", "id2": "H1",
                              "rsp_node": node, "rsp_dir": 3, "ref_node": NODE_IDS[0], "ref_dir": 3, "x": axis,
                              "data": data, "ordinate_spec_data_type": 11, "orddenom_spec_data_type": 13})
