@@ -147,20 +147,18 @@ authorization.
 |---|---|---|---|
 | M1.1 | Identification input-source policy | Curve-fitted modes allowed. Peak-derived modes refused for production Auto-ID. | `ACCEPTED` (commit `2fa48c2`) |
 | M1.2 | Production PolyMAX dataset 55/2414 path | Preserve frequency, shape, provenance, measurement DOFs. | `ACCEPTED` (commit `bc2ffce`) |
-| M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `TODO` |
+| M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `DESIGN_ACCEPTED` (implementation NOT STARTED) |
 | M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `TODO` |
 
-Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `ACCEPTED`; M1.3–M1.4 `TODO`).
-M1.3 design: `DESIGN_ACCEPTED` (D-018 to D-022; [M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md)).
-M1.3 implementation is NOT STARTED. Approved architecture: FRF → QC → optional
-fitting provider → validated curve-fitted dataset → Auto-ID. Auto-ID v1 production
-does not fit FRFs internally (D-018).
-
-**Open conflict (SUPERVISOR resolution required):** D-018 conflicts with the M1 GATE
-below and with SPEC §4, §6 S1 and §17, which still describe a built-in multi-mode
-fit. Under the precedence rule (SPEC > DECISIONS), the gate is not evaluated until
-the SUPERVISOR resolves this by a SPEC amendment or a redefined M1 gate. The gate
-text is unchanged here.
+Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `ACCEPTED`; M1.3 `DESIGN_ACCEPTED`, implementation NOT STARTED; M1.4 `TODO`).
+M1.3 design: `DESIGN_ACCEPTED` ([M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md);
+D-019, D-021 to D-024). M1.3 implementation is NOT STARTED.
+Architecture: FRF-to-modal fitting is a separate validated experimental preparation
+stage (D-023), with QC and a replaceable `ModalFittingProvider` (external or
+internal; D-021). Its output enters Auto-ID only as a validated curve-fitted dataset
+after provenance, QC, source classification and fixture identity validation. Auto-ID
+material identification never consumes raw FRF (D-023, D-024). The M1 GATE below is
+the validation gate for an internal provider.
 
 **M1 GATE (SP13 raw FRF):** recover ≈ 206.15 Hz and ≈ 212.61 Hz within ±0.05 Hz of
 PolyMAX; no false identification mode around 217.5 Hz; damping within 30 % of PolyMAX

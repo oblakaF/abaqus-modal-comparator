@@ -1,88 +1,99 @@
 # M1.3 Design Review — Raw-FRF multi-mode fitting path
 
-- **STATUS: DESIGN_ACCEPTED** (SUPERVISOR, 2026-10-04; decisions D-018 to D-022 in
-  [DECISIONS.md](DECISIONS.md)).
+- **STATUS: DESIGN_ACCEPTED** (SUPERVISOR, 2026-10-04). The governing decisions are
+  D-019, D-021, D-022, D-023 and D-024 in [DECISIONS.md](DECISIONS.md). D-023
+  supersedes D-018, and D-024 supersedes D-020.
 - **M1.3 implementation is NOT STARTED.** No production code exists for M1.3.
-- **Prepared on:** branch `auto-id/m1` (design review `ac1e0e3`; frozen in the commit
-  `docs(auto-id): freeze M1.3 modal input architecture`).
-- **Governing:** DECISIONS D-002 and D-018 to D-022; SPEC §4, §6 S1, §17; AUDIT K1;
+- **History:**
+  - design review `ac1e0e3`;
+  - first freeze `13973b7`, which recorded a SPEC conflict;
+  - resolution in the commit `docs(auto-id): resolve M1.3 FRF fitting architecture`.
+- **Governing:** DECISIONS D-002, D-019, D-021 to D-024; SPEC §4, §6 S1, §17; AUDIT K1;
   ROADMAP M1.3 and M1.4.
 
 ## 0. Accepted design (supersedes the proposal below where they differ)
 
-**Approved architecture:**
+**Approved architecture:** FRF-to-modal fitting is a **separate, validated
+experimental preparation stage** (D-023). Auto-ID material identification never
+consumes raw FRF.
 
 ```
-FRF (dataset 58)
+dataset-58 FRF records (pinned: store + SHA-256)          <- D-024: modal-preparation input
         |
         v
-QC
++--------------- modal preparation stage ----------------+
+|  QC                                                     |
+|   |                                                     |
+|   v                                                     |
+|  ModalFittingProvider (replaceable; external or internal) |   <- D-021, D-023
+|   |  (rule-based pole selection for production; D-022)    |
+|   v                                                     |
+|  curve-fitted modal estimate + provenance + QC flags    |
++---------------------------------------------------------+
         |
         v
-optional fitting provider   (replaceable ModalFittingProvider; none active in v1)
+validated curve-fitted dataset:
+  provenance, QC, source classification (M1.1), fixture identity validation (M0.2/M1.2)
         |
         v
-validated curve-fitted dataset   (pinned, provenance, QC passed, admitted source label)
-        |
-        v
-Auto-ID   (M1.1 source policy + M1.2 production input)
+Auto-ID material identification   (curve-fitted input only; D-019)
 ```
 
 **Accepted decisions:**
 
 | Id | Decision | Consequence for this design |
 |---|---|---|
-| D-018 | Auto-ID v1 production does not perform internal FRF→modal fitting; it accepts only validated curve-fitted modal datasets, so modal-identification uncertainty stays separate from material-identification uncertainty. | No built-in fit runs inside production Auto-ID v1. Section 3's "built-in multi-mode fit" becomes an optional provider outside the production path. |
-| D-019 | Curve-fitted modal datasets are the only production identification input; peak-derived modes are forbidden. | Already enforced (M1.1 policy, M1.2 production input). |
-| D-020 | Dataset-58 FRF data are QC and future fitting inputs only, never direct identification inputs. | FRF data feed QC (M1.4) and, later, a provider. |
-| D-021 | Future modal fitting goes through a replaceable `ModalFittingProvider` interface. | The service sketched in section 5 becomes one implementation of a provider interface (section 0.1). |
-| D-022 | Human modal selection only in research/review workflows; production cannot depend on manual mode selection. | Decision 9.4: a provider used for production must select poles by recorded rules only. Manual selection belongs to research/review results. |
+| D-019 | Curve-fitted modal datasets are the only production identification input; peak-derived modes are forbidden. | Already enforced (M1.1 policy, M1.2 production input). Peak picking and CMIF candidates stay diagnostics. |
+| D-021 | Future modal fitting goes through a replaceable `ModalFittingProvider` interface. | The fit service sketched in section 5 becomes one provider implementation behind this interface (section 0.1). |
+| D-022 | Human modal selection only in research/review workflows; production cannot depend on manual mode selection. | Decision 9.4: a provider used for production selects poles by recorded rules only. |
+| D-023 (supersedes D-018) | FRF-to-modal fitting is a separate validated experimental preparation stage. Auto-ID does not directly consume raw FRF. The provider may be external or internal. Its output becomes production input only after provenance, QC, source classification and fixture identity validation. | The "built-in multi-mode fit" of SPEC §4/§6 S1/§17 is an **internal provider** in the preparation stage, not a step inside material identification. |
+| D-024 (supersedes D-020) | Dataset-58 FRF records are valid modal-preparation inputs, including future multi-mode fitting; they are not direct material-identification observations. | FRFs feed QC (M1.4) and the provider, never the identification objective. |
 
 ### 0.1 `ModalFittingProvider` (interface intent; not implemented)
 
 A provider takes a pinned FRF block and a recorded configuration. It returns a fitted
 modal result with full provenance (section 6), per-mode QC (section 7) and a
-deterministic content hash, or it refuses. Its output reaches Auto-ID only as a
-**validated curve-fitted dataset**:
+deterministic content hash, or it refuses.
 
-- the result is pinned as a fixture (store + SHA-256), like PolyMAX sets in M0.2;
-- the result passes the M0.3/M1.2 checks;
-- the result carries an exact provider/version `mode_source` label;
-- the SUPERVISOR has admitted that label to the M1.1 policy. Until then it is
-  `unknown` and refused.
+- **External providers:** for example Testlab PolyMAX, whose output already arrives as
+  dataset 55.
+- **Internal providers:** a future built-in multi-mode fit.
 
-External tools such as Testlab PolyMAX are, in effect, providers whose output already
-arrives as dataset 55.
+Either kind of output reaches Auto-ID only as a **validated curve-fitted dataset**
+(D-023):
 
-### 0.2 Status of the open decisions in section 9
+- **Provenance:** source FRF identity, provider name and version, configuration and
+  decisions.
+- **QC:** section 7 and M1.4.
+- **Source classification:** an exact provider/version `mode_source` label that the
+  SUPERVISOR has admitted to the M1.1 policy. Until then it is `unknown` and refused.
+- **Fixture identity validation:** the result is pinned as a fixture (store +
+  SHA-256) and passes the M0.3/M1.2 checks.
+
+### 0.2 SPEC consistency (resolved)
+
+- **SPEC §4 and §6 S1** ("built-in multi-mode fit") correspond to an internal
+  `ModalFittingProvider` in the preparation stage.
+- **SPEC §17 / ROADMAP M1 GATE** (SP13 from raw FRF: 206.15 and 212.61 Hz within
+  ±0.05 Hz of PolyMAX, no false 217.5 Hz, ζ within 30 %) is the validation gate for
+  such an internal provider.
+- No SPEC or gate text changes.
+
+### 0.3 Status of the open decisions in section 9
 
 - **Resolved:**
   - **9.4 human review:** D-022.
-  - **Whether a fit runs inside production v1:** D-018 — it does not.
-  - **How fitting plugs in:** D-021.
-- **Still open, needed only when a provider is actually built:** 9.1 method family,
+  - **Architecture and placement of fitting:** D-021, D-023, D-024.
+- **Still open, decided when an internal provider is built:** 9.1 method family,
   9.2 bands, 9.3 orders and stabilisation, 9.5 uncertainty model, 9.8 dependencies.
 - **Still relevant to QC (M1.4) and to fixtures:** 9.6 QC thresholds, 9.7 raw-FRF
   fixtures, 9.9 split of M1.3/M1.4 scope.
 
-### 0.3 Conflict to resolve (recorded in D-018)
-
-The frozen SPEC still describes a built-in multi-mode fit in three places:
-
-- §4, the footnote to `modes.unv`;
-- §6 S1, "or the built-in multi-mode fit (M1)";
-- §17, the M1 acceptance criterion "SP13 from raw FRF".
-
-ROADMAP M1.3 and the **M1 GATE** do too. Under D-018, production v1 cannot meet that
-gate as written. Under the precedence rule (SPEC > DECISIONS), the SUPERVISOR must
-explicitly resolve this, by a SPEC amendment or a redefined M1 gate, before the M1
-stage gate is evaluated. This document does not change the SPEC or the gate.
-
 ---
 
 *The sections below are the original proposal (`ac1e0e3`), kept for the record. Where
-they describe a built-in fit inside production Auto-ID or manual pole selection, they
-are superseded by section 0.*
+they describe the fit as part of material identification or allow manual pole selection
+in production, they are superseded by section 0.*
 
 ## 1. Purpose
 

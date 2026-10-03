@@ -942,3 +942,52 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR resolution of the D-018 / SPEC / M1-gate conflict, and
   authorization of the next M1 step.
+
+## 2026-10-04 — M1 — M1.3 FRF fitting architecture resolved (docs only)
+
+- **Stage:** M1
+- **Mini-step:** none. This is a design decision resolution; M1.3 implementation is
+  NOT STARTED.
+- **Status:** M1.1 and M1.2 ACCEPTED. **M1.3 DESIGN_ACCEPTED**, implementation NOT
+  STARTED. M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree). Commit `13973b7` is kept, not reverted.
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): resolve M1.3 FRF fitting architecture`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **SUPERVISOR resolution of the conflict recorded in `13973b7`:**
+  - **D-023 (supersedes D-018):** FRF-to-modal fitting is a separate validated
+    experimental preparation stage. Auto-ID material identification does not directly
+    consume raw FRF.
+    - The stage may be an external or an internal `ModalFittingProvider`.
+    - Its output becomes production identification input only after provenance, QC,
+      source classification and fixture identity validation.
+  - **D-024 (supersedes D-020):** dataset-58 FRF records are valid modal-preparation
+    inputs, including future multi-mode fitting. They are not direct
+    material-identification observations.
+  - **Kept unchanged:** D-019 (peak-derived modes forbidden for production
+    identification), D-021 (replaceable `ModalFittingProvider`), D-022 (human mode
+    selection only in research/review).
+- **How "replace" was done:** `DECISIONS.md` is append-only, so D-018 and D-020 were
+  not edited. They are superseded by the appended D-023 and D-024, as the decision-log
+  rules require.
+- **Conflict removed:** a built-in fit is an internal provider in the preparation
+  stage. SPEC §4, §6 S1 and §17 and the ROADMAP M1 GATE are therefore consistent with
+  the decisions, and the gate validates an internal provider.
+  - The open-conflict note in ROADMAP and the `open_items` entry in STATUS.json are
+    removed. The SPEC and the gate text are unchanged.
+- **Status values:**
+  - ROADMAP M1.3 row: `DESIGN_ACCEPTED` (implementation NOT STARTED).
+  - STATUS.json: `m1.M1.3 = DESIGN_ACCEPTED`, `m1.M1.3_implementation = NOT_STARTED`.
+  - `DESIGN_ACCEPTED` is a SUPERVISOR-set design status, used as instructed.
+- **Files changed:**
+  - `docs/auto_id/DECISIONS.md` (D-023, D-024 appended)
+  - `docs/auto_id/M1_3_DESIGN_REVIEW.md` (section 0 rewritten for the resolved
+    architecture)
+  - `docs/auto_id/ROADMAP.md`
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (documentation only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization of the next M1 step.

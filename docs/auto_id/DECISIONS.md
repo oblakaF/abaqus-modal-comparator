@@ -181,3 +181,34 @@ Production identification cannot depend on manual mode selection.
 Rationale / scope: a production identification result must be reproducible from
 pinned inputs and recorded rules alone.
 Supersedes: none
+
+## D-023 — FRF-to-modal fitting is a separate validated experimental preparation stage
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 decision resolution (SUPERVISOR review of the D-018 / SPEC conflict recorded in `13973b7`)
+Decision: FRF-to-modal fitting is a separate validated experimental preparation stage.
+Auto-ID material identification does not directly consume raw FRF.
+
+The fitting stage may be implemented as:
+- an external `ModalFittingProvider`;
+- an internal `ModalFittingProvider`.
+
+Its output becomes production identification input only after:
+- provenance;
+- QC;
+- source classification;
+- fixture identity validation.
+Rationale / scope: modal identification uncertainty stays separate from material
+identification uncertainty, because fitting happens in its own validated stage before
+Auto-ID. This resolves the conflict recorded in D-018. A built-in (internal) fit is
+allowed as a preparation-stage provider, so SPEC §4, §6 S1 and §17 (the M1 gate: SP13
+from raw FRF) remain consistent with the decisions. D-019, D-021 and D-022 are
+unchanged.
+Supersedes: D-018
+
+## D-024 — Dataset-58 FRF records are modal-preparation inputs
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 decision resolution (SUPERVISOR review of the D-018 / SPEC conflict recorded in `13973b7`)
+Decision: Dataset-58 FRF records are valid inputs for the modal preparation stage,
+including future multi-mode fitting. They are not direct material-identification
+observations.
+Rationale / scope: consistent with D-019 (peak-derived modes forbidden for production
+identification) and D-023.
+Supersedes: D-020
