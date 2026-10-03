@@ -1,0 +1,31 @@
+{
+  "schema": "auto-id-project-status/v1",
+  "governing_spec": "docs/auto_id/SPEC_V1_1.md",
+  "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
+  "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
+  "current_stage": "PRE-M0",
+  "current_ministep": "P0.1/P0.3",
+  "status": "REVIEW_READY",
+  "last_accepted_stage": null,
+  "last_accepted_ministep": null,
+  "last_accepted_commit": null,
+  "carbon5f": {
+    "status": "IN_PROGRESS",
+    "scientific_result": "PENDING",
+    "supervisor_acceptance": "PENDING",
+    "evidence": "docs/auto_id/EVIDENCE.md"
+  },
+  "pre_m0": {
+    "P0.1": "REVIEW_READY",
+    "P0.2": "BLOCKED_WAITING_FOR_CARBON_5F",
+    "P0.3": "REVIEW_READY"
+  },
+  "test_baseline": {
+    "ran": 873,
+    "passed": 870,
+    "failed": 1,
+    "skipped": 2,
+    "snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3"
+  },
+  "next_action": "Supervisor review of P0.1/P0.3 while CARBON-5F remains in progress"
+}

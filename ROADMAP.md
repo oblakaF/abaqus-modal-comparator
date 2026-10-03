@@ -1,3 +1,26 @@
+## Current implementation priority — Auto-ID v1.1
+
+The active Auto-ID implementation roadmap is:
+
+`docs/auto_id/ROADMAP.md`
+
+The governing specification is:
+
+`docs/auto_id/SPEC_V1_1.md`
+
+The scientific audit is:
+
+`docs/auto_id/AUDIT_121ba1d_V1_1.md`
+
+Audited baseline:
+
+`121ba1d06b7c268b3051f1407a3ea26a9027dca3`
+
+Older sections below are retained as historical/scientific context and do not
+override Auto-ID v1.1 when they conflict.
+
+---
+
 # Roadmap
 
 Working notes for hardening this program toward reproducible scientific use.

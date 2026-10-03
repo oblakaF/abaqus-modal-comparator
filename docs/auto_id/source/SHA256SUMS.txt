@@ -1,0 +1,4 @@
+# SHA-256 of archival accepted Auto-ID v1.1 source documents (copied unchanged).
+# Originals located at %USERPROFILE%\Desktop on 2026-10-03. Verify: sha256sum -c SHA256SUMS.txt
+a8f4dda8abee2da09c17aab1a96a2d49cdf4ff75bde67820d31059e65b49d84b  Spec_AutoID_v1.1.docx
+453245e179b986e3c875d525a6adb600738b0d7d69c7b5f4cd5cb406f3d44908  Audit_ModalComparator_121ba1d_AutoID_v1.1.docx
