@@ -249,3 +249,32 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Known limitations:** the Linux CI skip count (6) differs from the audit's Linux
   count (2). That is a Tk/GUI availability difference to document in M0.4, not M0.1.
 - **Next gate:** SUPERVISOR review of M0.1. M0.2 must not start before acceptance.
+
+## 2026-10-03 — M0 M0.1 — Supervisor acceptance recorded
+
+- **Stage:** M0
+- **Mini-step:** acceptance record for M0.1 (no new mini-step started)
+- **Status:** M0.1 ACCEPTED. M0 IN_PROGRESS. M0.2–M0.4 TODO. PRE-M0 ACCEPTED.
+  CARBON-5F ACCEPTED.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `15d6c534031f310b5f26a5e720a59d0e0d2bc070` on `auto-id/m0`.
+- **Accepted scope:**
+  - The Linux V7 cross-platform path failure is fixed.
+  - The fix uses `PureWindowsPath` for the displayed file name.
+  - No scientific behaviour changed. No identification mathematics changed.
+  - No Abaqus.
+  - No `install_*` layer introduced.
+- **Branch:** `auto-id/m0` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M0.1 cross-platform fix`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M0.1 ACCEPTED; M0 stage status)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization to start M0.2. `main` is unchanged; the
+  stage PR comes only at the end of M0.

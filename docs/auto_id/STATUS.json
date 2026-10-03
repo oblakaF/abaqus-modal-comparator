@@ -4,11 +4,11 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M0",
-  "current_ministep": "M0.1",
-  "status": "REVIEW_READY",
+  "current_ministep": null,
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "PRE-M0",
-  "last_accepted_ministep": "P0.2",
-  "last_accepted_commit": "ec86a772b32a1aaa318b3bc4e9091f7d3f59642e",
+  "last_accepted_ministep": "M0.1",
+  "last_accepted_commit": "15d6c534031f310b5f26a5e720a59d0e0d2bc070",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -27,10 +27,11 @@
   },
   "m0": {
     "branch": "auto-id/m0",
-    "M0.1": "REVIEW_READY",
+    "M0.1": "ACCEPTED",
     "M0.2": "TODO",
     "M0.3": "TODO",
-    "M0.4": "TODO"
+    "M0.4": "TODO",
+    "status": "IN_PROGRESS"
   },
   "test_baseline": {
     "ran": 873,
@@ -39,5 +40,5 @@
     "skipped": 2,
     "snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3"
   },
-  "next_action": "Supervisor review of M0.1; do not start M0.2 until M0.1 is accepted"
+  "next_action": "Wait for supervisor authorization to start M0.2; do not start M0.2 automatically"
 }
