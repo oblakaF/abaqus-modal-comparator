@@ -508,3 +508,75 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   - After the fix: 911 ran, OK, with the same skips.
 - **Abaqus run count:** 0
 - **Next:** part 2 records the Windows/Linux baseline (M0.4 → REVIEW_READY).
+
+## 2026-10-04 — M0 M0.4 — Windows + Linux CI baseline (part 2 of 2)
+
+- **Stage:** M0
+- **Mini-step:** M0.4 (Windows + Linux CI baseline), part 2: the baseline record
+- **Status:** REVIEW_READY. M0.1, M0.2 and M0.3 ACCEPTED.
+- **Branch:** `auto-id/m0` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): record M0.4 CI baseline`
+- **Reference commit for the baseline:** `afa218141957d573877e39f6157a4f6ff013dfa9`
+  (part 1). The command on both platforms is
+  `python -m unittest discover -s tests -v`.
+- **Verification of the M0.3 starting numbers:**
+  - Windows 908 OK / 2 skipped and Linux 905 OK / 8 skipped were confirmed at
+    `e40487e`. On Windows, 2 skipped holds with the fixture store configured; without
+    it, 4 skips are reported (2 tests and 2 subtests).
+  - The 3-test gap between them is `MaterialIdentificationGuiShellTests`. It is
+    skipped at `setUpClass` on Linux, so its 3 tests are not counted as run.
+- **Windows baseline** (local; Windows 10 19045, Python 3.14.6, numpy 2.5.1, scipy
+  1.18.0, Tk 8.6):
+
+  | Condition | Ran | Passed | Failed | Errors | Skipped tests | Skipped subtests |
+  |---|---|---|---|---|---|---|
+  | `AUTO_ID_FIXTURE_ROOT_SNADWICH` set | 911 | 909 | 0 | 0 | 2 | 0 |
+  | no fixture store | 911 | 908 | 0 | 0 | 2 | 2 |
+
+- **Linux CI baseline:** GitHub Actions `ubuntu-latest`, workflow
+  `.github/workflows/tests.yml`, run 37138643253, conclusion **success**. Python
+  3.11, numpy 2.4.6, scipy 1.17.1.
+
+  | Ran | Passed | Failed | Errors | Skipped (unittest count) | Not collected |
+  |---|---|---|---|---|---|
+  | 908 | 902 | 0 | 0 | 8 | 3 |
+
+  - The 8 skips are 5 skipped tests, 2 skipped subtests and 1 class-level skip.
+  - The class-level skip is `MaterialIdentificationGuiShellTests.setUpClass`, which
+    leaves its 3 tests uncollected.
+  - The fixture-regression test, whose subtests all skip, is not counted as passed.
+- **Every skip, classified:**
+
+  | Skipped | Platform | Classification | Enabling condition |
+  |---|---|---|---|
+  | `test_stage_a_matrix_abaqus_integration`: 2 tests | Windows, Linux | Missing optional external tool (opt-in Abaqus integration; Auto-ID also requires a HUMAN gate for Abaqus) | `ABAQUS_MATRIX_INTEGRATION=1` and an Abaqus executable |
+  | `test_experiment_fixture_regression`: 2 real-data subtests | Linux; Windows without the store | Missing external fixture (large data stays outside git, M0.2) | `AUTO_ID_FIXTURE_ROOT_SNADWICH` |
+  | Tk GUI tests: `MaterialIdentificationGuiShellTests` (class, 3), `PolymaxNativeTkTests` (2), `TkRuntimeSmokeTests` (1) | Linux | GUI/headless limitation (no `$DISPLAY`). All 6 run and pass on Windows. | A display for Tk |
+
+  No skip is a real defect, an environment issue or a missing Python dependency.
+- **Failures:** none on either platform.
+- **Hidden or disabled tests:** one hidden module was found and fixed in part 1
+  (`cmif_ui_layout_test.py`, 2 tests; now guarded). No `expectedFailure`, renamed or
+  early-return tests exist. All skips are the explicit gates above.
+- **Platform behaviour that is explicit, not a failure:**
+  - **Different Python stacks:** Windows uses Python 3.14 and CI uses 3.11, and
+    `requirements.txt` sets lower bounds only, so the numpy/scipy versions differ.
+  - **Windows CI:** there is no Windows CI job. The Windows baseline is local.
+- **STATUS.json:**
+  - New `ci_baseline` is the CI reference for future Auto-ID work.
+  - The audit's original `test_baseline` (873/870/1/2 at `121ba1d`) is kept unchanged
+    as `audit_test_baseline`; nothing reads either key.
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M0.4 → REVIEW_READY)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO (over the whole of M0.4)
+- **Abaqus run count:** 0
+- **Open options for the SUPERVISOR (not implemented):**
+  - run the Tk tests on CI under a virtual display (for example `xvfb-run`);
+  - add a `windows-latest` CI job;
+  - pin dependency versions.
+- **Next gate:** SUPERVISOR review of M0.4. M1 must not start before M0.4 is accepted
+  and the M0 gate is decided.
