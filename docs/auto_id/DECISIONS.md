@@ -109,3 +109,25 @@ Decision: After the Auto-ID v1.1 freeze, implementation follows M0→M8 in order
 general re-audit between stages unless a stage discovers a specific blocking
 contradiction.
 Supersedes: none
+
+## D-017 — Bare-plate G12 is material-family specific
+Date: 2026-10-03 · Accepted by: SUPERVISOR · Source: ROADMAP M6 open point (P0.1 review of commit `3362076`)
+Decision: A bare-plate Stage-A G12 obtained from the twill 0.45 carbon family MUST NOT
+be used as the primary G12 material value for the old-plain 0.45 carbon family without
+independent evidence that the two face materials are equivalent in in-plane shear.
+
+The existing twill 350×350 bare plate may be used to:
+- validate the Stage-A identification method;
+- identify G12 for the twill family;
+- provide an independent real-carbon Auto-ID validation case.
+
+It does NOT by itself establish primary G12 for old plain 0.45.
+
+For the old-plain 0.45 family, the preferred primary G12 source is a bare plate
+manufactured from that same material family. If such a plate is unavailable, sandwich
+G12 remains secondary/conditional evidence under SPEC §5.1 and the
+practical-identifiability rules (SPEC §10).
+Rationale / scope: Twill and plain weave are distinct laminate/material architectures.
+A successful identification method may transfer between them, but the identified
+material constant must not be transferred across families without physical evidence.
+Supersedes: none

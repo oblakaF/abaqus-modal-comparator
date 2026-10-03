@@ -54,3 +54,35 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
     supervisor decision.
 - **Next gate:** SUPERVISOR review of P0.1/P0.3. PRE-M0 gate requires P0.1 + P0.2 +
   P0.3 ACCEPTED before M0.
+
+## 2026-10-03 — PRE-M0 P0.1 + P0.3 — Supervisor acceptance recorded; D-017
+
+- **Stage:** PRE-M0
+- **Mini-step:** acceptance record for P0.1 + P0.3 (no new mini-step started)
+- **Status:** P0.1 ACCEPTED · P0.3 ACCEPTED · P0.2 BLOCKED_WAITING_FOR_CARBON_5F.
+  PRE-M0 is **not** complete; M0 not started.
+- **Review basis:** the SUPERVISOR reviewed the actual pushed GitHub commit
+  `3362076253a63bc94e9414733e5f4d467e446419` on `auto-id/v1.1-roadmap`.
+- **Branch:** `auto-id/v1.1-roadmap` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): record P0.1 P0.3 acceptance`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:** `docs/auto_id/ROADMAP.md` (P0.1/P0.3 status; M6 note replaced by
+  the D-017 decision), `docs/auto_id/DECISIONS.md` (D-017 appended),
+  `docs/auto_id/STATUS.json`, `docs/auto_id/CHANGELOG.md` (this entry)
+- **Decision accepted:** D-017, bare-plate G12 is material-family specific. The twill
+  350×350 bare plate is the Stage-A validation / twill-family specimen and does not
+  provide primary G12 for old plain 0.45.
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (CARBON-5F Abaqus solves active). Lightweight validation only:
+  JSON parse, status consistency check, append-only diff check, `git diff --check`.
+- **Test result:** not applicable
+- **Abaqus run count:** 0
+- **Evidence produced:** none
+- **CARBON-5F:** untouched. IN_PROGRESS, scientific result PENDING, supervisor
+  acceptance PENDING.
+- **Known limitations:** P0.2 remains blocked until a final CARBON-5F report is
+  SUPERVISOR-ACCEPTED.
+- **Next gate:** CARBON-5F completion → supervisor acceptance of its final report →
+  P0.2.

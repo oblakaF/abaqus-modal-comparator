@@ -103,9 +103,11 @@ push.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| P0.1 | Freeze SPEC v1.1, AUDIT v1.1, roadmap and governance documents | `REVIEW_READY` |
+| P0.1 | Freeze SPEC v1.1, AUDIT v1.1, roadmap and governance documents | `ACCEPTED` (commit `3362076`) |
 | P0.2 | Record final accepted CARBON-5F evidence appendix | `BLOCKED_WAITING_FOR_CARBON_5F` |
-| P0.3 | Establish permanent branch / mini-step / GitHub reporting protocol | `REVIEW_READY` |
+| P0.3 | Establish permanent branch / mini-step / GitHub reporting protocol | `ACCEPTED` (commit `3362076`) |
+
+PRE-M0 is **not complete**: P0.2 is still blocked. M0 must not begin.
 
 **P0.2 scope (only after a final CARBON-5F report is SUPERVISOR-ACCEPTED and an
 explicit prompt provides it):** update [EVIDENCE.md](EVIDENCE.md); add [s_E, s_G, s_k];
@@ -239,11 +241,13 @@ work.
 
 **M6 GATE:** critical priors and uncertainties are physically supported, not guessed.
 
-> **Open point, recorded but not decided by this freeze:** the archival SPEC names the
-> **twill 350×350** bare plate for M6, while SPEC §13 places that plate in the twill
-> 0.45 family and M7 targets the old plain 0.45 family. Whether Stage-A G12 from the
-> twill plate may serve as the primary G12 source for old-plain sandwiches is a
-> supervisor/human decision before M6 begins.
+> **Decided ([D-017](DECISIONS.md#d-017--bare-plate-g12-is-material-family-specific)), bare-plate G12 is material-family specific:**
+>
+> - the **twill 350×350** bare plate is the Stage-A real-carbon validation specimen and
+>   the twill-family specimen;
+> - it does **not** provide primary G12 for **old plain 0.45**;
+> - old plain 0.45 requires its own bare-plate evidence for primary G12, unless the
+>   sandwich-only conditional path satisfies SPEC §5.1.
 
 ---
 
