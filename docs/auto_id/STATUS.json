@@ -4,11 +4,11 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M0",
-  "current_ministep": "M0.4",
-  "status": "REVIEW_READY",
-  "last_accepted_stage": "PRE-M0",
-  "last_accepted_ministep": "M0.3",
-  "last_accepted_commit": "b3e080f50dc7ce66c42101b933f8631bf2249782",
+  "current_ministep": null,
+  "status": "ACCEPTED",
+  "last_accepted_stage": "M0",
+  "last_accepted_ministep": "M0.4",
+  "last_accepted_commit": "ad623286a583dc83f08a948bdd8d4967b25486bd",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -30,8 +30,8 @@
     "M0.1": "ACCEPTED",
     "M0.2": "ACCEPTED",
     "M0.3": "ACCEPTED",
-    "M0.4": "REVIEW_READY",
-    "status": "IN_PROGRESS"
+    "M0.4": "ACCEPTED",
+    "status": "ACCEPTED"
   },
   "audit_test_baseline": {
     "ran": 873,
@@ -97,5 +97,5 @@
       }
     ]
   },
-  "next_action": "Supervisor review of M0.4; do not start M1 until M0.4 is accepted and the M0 gate is decided"
+  "next_action": "Prepare the M0 stage PR (auto-id/m0 -> main) and merge only under HUMAN authorization; after merge record the main SHA; begin M1 only on SUPERVISOR authorization"
 }

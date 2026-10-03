@@ -580,3 +580,37 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   - pin dependency versions.
 - **Next gate:** SUPERVISOR review of M0.4. M1 must not start before M0.4 is accepted
   and the M0 gate is decided.
+
+## 2026-10-04 — M0 — Supervisor acceptance of M0.4; M0 stage ACCEPTED
+
+- **Stage:** M0
+- **Mini-step:** acceptance record for M0.4 and the M0 stage (no new mini-step
+  started)
+- **Status:** M0.1, M0.2, M0.3 and M0.4 are ACCEPTED. **M0 ACCEPTED (M0 gate
+  ACCEPTED).** M1 TODO, not started.
+- **Review basis:** the SUPERVISOR reviewed commits `afa2181` and
+  `ad623286a583dc83f08a948bdd8d4967b25486bd` on `auto-id/m0`.
+- **Accepted scope:**
+  - The Windows and Linux CI baselines are recorded.
+  - The test discovery gap is fixed: the hidden CMIF UI layout tests are now
+    collected, and a discovery guard is added.
+  - All remaining skips are classified, and no unexplained failures remain.
+  - No scientific behaviour changed. Modal algorithms, Abaqus, identification,
+    registration and Auto-ID mathematics are unchanged.
+- **CI reference for later Auto-ID work:** `STATUS.json` `ci_baseline`, at
+  `afa2181`.
+- **Branch:** `auto-id/m0` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M0 CI baseline`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M0.4 ACCEPTED; M0 stage and gate ACCEPTED)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** prepare the M0 stage PR (`auto-id/m0` → `main`). Merge it only under
+  explicit HUMAN authorization, then record the `main` merge SHA. M1 begins only on
+  SUPERVISOR authorization after that. `main` is unchanged (`05b4e2c`).
