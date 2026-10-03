@@ -144,3 +144,31 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   - q_G is deferred to M5.
 - **Next gate:** SUPERVISOR review of P0.2. Once P0.1, P0.2 and P0.3 are all ACCEPTED,
   the PRE-M0 gate is met. M0 must not start before that.
+
+## 2026-10-03 — PRE-M0 — Supervisor acceptance of P0.2; PRE-M0 gate closed
+
+- **Stage:** PRE-M0
+- **Mini-step:** acceptance record for P0.2 (no new mini-step started)
+- **Status:** P0.1 ACCEPTED · P0.2 ACCEPTED · P0.3 ACCEPTED. **PRE-M0 gate ACCEPTED.**
+  M0 has **not** begun.
+- **Review basis:** the SUPERVISOR reviewed the actual pushed GitHub commit
+  `ec86a772b32a1aaa318b3bc4e9091f7d3f59642e` on `auto-id/v1.1-roadmap`.
+- **Branch:** `auto-id/v1.1-roadmap` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): close PRE-M0 freeze gate`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/ROADMAP.md` (P0.2 → ACCEPTED; PRE-M0 gate ACCEPTED)
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **CARBON-5F:** evidence ACCEPTED, scope as recorded in [EVIDENCE.md](EVIDENCE.md).
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (documentation only). Lightweight validation only: JSON parse,
+  status consistency check, append-only diff check, `git diff --check`.
+- **Test result:** not applicable
+- **Abaqus run count:** 0 by this worker
+- **Evidence produced:** none
+- **Known limitations:** M0.1–M0.4 remain TODO. `main` is unchanged.
+- **Next gate:** merge the freeze branch `auto-id/v1.1-roadmap` to `main` under explicit
+  HUMAN authorization. After the merge, record the main SHA, then begin M0.1.

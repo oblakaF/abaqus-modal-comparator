@@ -104,11 +104,11 @@ push.
 | Id | Mini-step | Status |
 |---|---|---|
 | P0.1 | Freeze SPEC v1.1, AUDIT v1.1, roadmap and governance documents | `ACCEPTED` (commit `3362076`) |
-| P0.2 | Record final accepted CARBON-5F evidence appendix | `REVIEW_READY` |
+| P0.2 | Record final accepted CARBON-5F evidence appendix | `ACCEPTED` (commit `ec86a77`) |
 | P0.3 | Establish permanent branch / mini-step / GitHub reporting protocol | `ACCEPTED` (commit `3362076`) |
 
-PRE-M0 is **not complete**: P0.2 is `REVIEW_READY` and awaits SUPERVISOR acceptance.
-M0 must not begin.
+PRE-M0 is **complete**. M0 may begin only after this freeze branch is merged to `main`
+under explicit HUMAN authorization.
 
 **P0.2 scope (only after a final CARBON-5F report is SUPERVISOR-ACCEPTED and an
 explicit prompt provides it):** update [EVIDENCE.md](EVIDENCE.md); add [s_E, s_G, s_k];
@@ -117,6 +117,7 @@ behaviour; state explicitly what CARBON-5F does **not** establish about the k_co
 prior; update STATUS/ROADMAP/CHANGELOG; commit and push.
 
 **PRE-M0 GATE:** P0.1, P0.2 and P0.3 must all be `ACCEPTED` before M0 begins.
+Gate status: `ACCEPTED`.
 
 ---
 

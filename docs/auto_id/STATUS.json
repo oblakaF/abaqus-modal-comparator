@@ -4,11 +4,11 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "PRE-M0",
-  "current_ministep": "P0.2",
-  "status": "REVIEW_READY",
-  "last_accepted_stage": null,
-  "last_accepted_ministep": "P0.1/P0.3",
-  "last_accepted_commit": "3362076253a63bc94e9414733e5f4d467e446419",
+  "current_ministep": null,
+  "status": "ACCEPTED",
+  "last_accepted_stage": "PRE-M0",
+  "last_accepted_ministep": "P0.2",
+  "last_accepted_commit": "ec86a772b32a1aaa318b3bc4e9091f7d3f59642e",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -17,7 +17,7 @@
   },
   "pre_m0": {
     "P0.1": "ACCEPTED",
-    "P0.2": "REVIEW_READY",
+    "P0.2": "ACCEPTED",
     "P0.3": "ACCEPTED"
   },
   "test_baseline": {
@@ -27,5 +27,5 @@
     "skipped": 2,
     "snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3"
   },
-  "next_action": "Supervisor review of P0.2; do not start M0 until P0.2 is accepted"
+  "next_action": "Prepare/merge Auto-ID v1.1 freeze PR to main under HUMAN authorization; after merge record main SHA, then begin M0.1"
 }
