@@ -340,3 +340,33 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   - The ODB SHA-256 identifies one archived reference result; FE identity binds
     through the geometry identity.
 - **Next gate:** SUPERVISOR review of M0.2. M0.3 must not start before acceptance.
+
+## 2026-10-04 — M0 M0.2 — Supervisor acceptance recorded
+
+- **Stage:** M0
+- **Mini-step:** acceptance record for M0.2 (no new mini-step started)
+- **Status:** M0.2 ACCEPTED. M0 IN_PROGRESS. M0.1 ACCEPTED. M0.3–M0.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `66dfe45a5d3a0a7b023c7c5eb9919ba737033b34` on `auto-id/m0`.
+- **Accepted scope:**
+  - The real experiment fixture manifest is created.
+  - The SP02 `bravo-1` and SP13 `best` identities are pinned.
+  - The experimental source hashes are verified.
+  - The FrozenRegistration hashes and FE geometry identities are linked.
+  - The U3 measurement contracts are recorded.
+  - External large data stays outside git, and SHA verification is required before
+    use.
+  - Missing identifiers are explicitly unresolved, not invented.
+- **Branch:** `auto-id/m0` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M0.2 fixture manifest`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M0.2 ACCEPTED; M0 stage status)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization to start M0.3. `main` is unchanged.
