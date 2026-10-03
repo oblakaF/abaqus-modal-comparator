@@ -145,12 +145,12 @@ authorization.
 
 | Id | Mini-step | Content | Status |
 |---|---|---|---|
-| M1.1 | Identification input-source policy | Curve-fitted modes allowed. Peak-derived modes refused for production Auto-ID. | `REVIEW_READY` |
+| M1.1 | Identification input-source policy | Curve-fitted modes allowed. Peak-derived modes refused for production Auto-ID. | `ACCEPTED` (commit `2fa48c2`) |
 | M1.2 | Production PolyMAX dataset 55/2414 path | Preserve frequency, shape, provenance, measurement DOFs. | `TODO` |
 | M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `TODO` |
 | M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `TODO` |
 
-Stage status: `IN_PROGRESS` (M1.1 `REVIEW_READY`; M1.2–M1.4 `TODO`).
+Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2–M1.4 `TODO`).
 
 **M1 GATE (SP13 raw FRF):** recover ≈ 206.15 Hz and ≈ 212.61 Hz within ±0.05 Hz of
 PolyMAX; no false identification mode around 217.5 Hz; damping within 30 % of PolyMAX

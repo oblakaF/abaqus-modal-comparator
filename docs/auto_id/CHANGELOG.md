@@ -731,3 +731,34 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Known limitations:** the policy guards the current production identification
   entry. Later identification entry points must call `require_identification_input`.
 - **Next gate:** SUPERVISOR review of M1.1. M1.2 must not start before acceptance.
+
+## 2026-10-04 — M1 M1.1 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.1 (no new mini-step started)
+- **Status:** M1.1 ACCEPTED. M1 IN_PROGRESS. M1.2–M1.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `2fa48c27b6aa6b5c5e989d6a4523f21224403183` on `auto-id/m1`.
+- **Accepted scope:**
+  - The identification input-source policy is implemented: `curve_fitted` is
+    accepted; `peak_derived` and `unknown` are refused for identification.
+  - Normal modal comparison is unchanged, and peak-derived data remains available for
+    diagnostics/QC.
+  - The existing SP02/bravo-1 and SP13/best PolyMAX evidence remains valid.
+  - No Abaqus. No change to registration, MAC, pairing, thresholds or modal
+    algorithms.
+  - No raw-FRF fitting is implemented yet (M1.3).
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M1.1 input source policy`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M1.1 ACCEPTED; M1 stage status)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization to start M1.2. `main` is unchanged
+  (`9d30caf`).
