@@ -133,8 +133,11 @@ Purpose: make every later Auto-ID change testable against stable real evidence.
 | M0.4 | Windows + Linux CI baseline | Factual test summaries; zero unexplained failures; skips documented; platform behaviour explicit | `ACCEPTED` (commits `afa2181`, `ad62328`) |
 
 **M0 GATE:** trusted green baseline before M1.
-Stage status: `ACCEPTED` (M0.1–M0.4 `ACCEPTED`; M0 GATE `ACCEPTED`, CI reference `afa2181`). M1 may begin only after
-the M0 stage PR is merged to `main` under explicit HUMAN authorization.
+Stage status: `ACCEPTED` (M0.1–M0.4 `ACCEPTED`; M0 GATE `ACCEPTED`, CI reference `afa2181`).
+
+**M0 merge completed into `main`** (PR #26). Main merge commit:
+`4ec80abd3110b41aea586387faf42d4ad90fa9d0`. M1 may begin only after explicit SUPERVISOR
+authorization.
 
 ---
 

@@ -3,7 +3,7 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M0",
+  "current_stage": "M0_COMPLETE",
   "current_ministep": null,
   "status": "ACCEPTED",
   "last_accepted_stage": "M0",
@@ -32,6 +32,15 @@
     "M0.3": "ACCEPTED",
     "M0.4": "ACCEPTED",
     "status": "ACCEPTED"
+  },
+  "main_merge": {
+    "stage": "M0",
+    "pr": 26,
+    "merge_commit": "4ec80abd3110b41aea586387faf42d4ad90fa9d0",
+    "status": "ACCEPTED"
+  },
+  "m1": {
+    "status": "NOT_STARTED"
   },
   "audit_test_baseline": {
     "ran": 873,
@@ -97,5 +106,5 @@
       }
     ]
   },
-  "next_action": "Prepare the M0 stage PR (auto-id/m0 -> main) and merge only under HUMAN authorization; after merge record the main SHA; begin M1 only on SUPERVISOR authorization"
+  "next_action": "Create auto-id/m1 branch and begin M1.1 after supervisor authorization"
 }

@@ -614,3 +614,41 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Next gate:** prepare the M0 stage PR (`auto-id/m0` → `main`). Merge it only under
   explicit HUMAN authorization, then record the `main` merge SHA. M1 begins only on
   SUPERVISOR authorization after that. `main` is unchanged (`05b4e2c`).
+
+## 2026-10-04 — M0 — M0 stage merged to main
+
+- **Stage:** M0 (stage completion record; no new mini-step started)
+- **Status:** M0 merged to `main` and ACCEPTED. `current_stage` is `M0_COMPLETE`.
+  M1 NOT_STARTED.
+- **Merge:** PR #26 (`auto-id/m0` → `main`), a normal merge commit
+  `4ec80abd3110b41aea586387faf42d4ad90fa9d0`.
+  - Its parents are `05b4e2c` (previous `main`) and `63fa250` (the reviewed M0 head).
+  - The merged tree is identical to the reviewed head.
+  - The HUMAN authorized the merge and the SUPERVISOR accepted it.
+- **Accepted mini-steps:**
+  - M0.1 (`15d6c53`)
+  - M0.2 (`66dfe45`)
+  - M0.3 (`b3e080f`)
+  - M0.4 (`afa2181`, `ad62328`)
+  - Stage acceptance: `63fa250`
+- **Production changes in the merge:** limited to the accepted M0 infrastructure:
+  - the M0.1 display line in `src/material_identification_ui.py`;
+  - new `src/domain/experiment_fixture.py` (M0.2);
+  - new `src/services/experiment_fixture_regression.py` (M0.3).
+  No scientific behaviour changed.
+- **Branch:** this record is committed directly on `main`, by explicit SUPERVISOR
+  instruction ("documentation synchronization commit only"). This is an authorized
+  exception to the no-direct-push-to-`main` rule. `auto-id/m0` is kept.
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): record M0 main merge completion`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json` (`main_merge`, `m1`, `current_stage`, `next_action`)
+  - `docs/auto_id/ROADMAP.md` (merge note)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO (in this commit)
+- **Tests run:** none (not requested)
+- **Abaqus run count:** 0 (merge step and this record)
+- **Next gate:** create `auto-id/m1` and begin M1.1 only after SUPERVISOR
+  authorization.
