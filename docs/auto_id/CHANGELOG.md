@@ -86,3 +86,61 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   SUPERVISOR-ACCEPTED.
 - **Next gate:** CARBON-5F completion → supervisor acceptance of its final report →
   P0.2.
+
+## 2026-10-03 — PRE-M0 P0.2 — CARBON-5F evidence appendix
+
+- **Stage:** PRE-M0
+- **Mini-step:** P0.2 (record final accepted CARBON-5F evidence appendix)
+- **Status:** REVIEW_READY. P0.1 ACCEPTED · P0.3 ACCEPTED. PRE-M0 is **not** accepted
+  until the SUPERVISOR reviews this P0.2 commit. M0 not started.
+- **Branch:** `auto-id/v1.1-roadmap` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): record CARBON-5F core sensitivity evidence`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/EVIDENCE.md` (CARBON-5F entry IN_PROGRESS → ACCEPTED)
+  - `docs/auto_id/ROADMAP.md` (P0.2 → REVIEW_READY)
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **CARBON-5F:** SUPERVISOR-ACCEPTED (diagnostic sensitivity evidence).
+  - Exactly 4 authorized Abaqus solves: SP02/SP13 × CORE_MINUS/CORE_PLUS.
+  - k_core = 0.90 / 1.10.
+  - No retries and no extra solves.
+  - All runs had exact FE geometry identity and exact FrozenRegistration replay. All 19
+    post-run checks passed. Mass was unchanged and production pairing was unchanged.
+- **s_core summary:**
+  - Mean S_core over fit rows: SP02 0.0109, SP13 0.0139 (ratio ≈ 1.28).
+  - FE7 holdout: SP02 0.0152, SP13 0.0183.
+  - ±10 % frequency changes ≈ 0.06–0.21 %.
+  - SP13 FE8/FE9 ordering and mixing were unchanged.
+- **Conclusion scope:** the tested common scalar k_core is ruled out as a realistic
+  cause of the SP13 common ~6 % deficit and of the FE7 deficit. Here k_core is the
+  proportional scaling of all six current core stiffness constants.
+  - The conclusion is **not** generalised to:
+    - core model-form effects in general;
+    - core geometry;
+    - anisotropic changes of individual core constants;
+    - interface/contact effects.
+  - k_core ≈ 77 (and any k_core = 0.5 / 1.5 statement) is labelled a first-order
+    extrapolation, not an Abaqus-verified state.
+- **q_G:** NOT YET PRODUCTION-VALID / DEFERRED TO M5. No value was recorded.
+  CARBON-5F provides the s_k column only.
+- **k_core prior:** not provided by CARBON-5F. Independent core-tile evidence is still
+  required (D-006, M6.3).
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (documentation-only step). Lightweight validation only: JSON
+  parse, status consistency check, scope/overclaim check, append-only diff check,
+  `git diff --check`.
+- **Test result:** not applicable
+- **Abaqus run count:**
+  - 0 by this documentation worker.
+  - The 4 CARBON-5F solves were run earlier under the human Abaqus gate.
+- **Evidence produced:** CARBON-5F EVIDENCE entry (compact summary and identities
+  only; ODBs not in Git).
+- **Known limitations:**
+  - The CARBON-5F archive location is local research scratch and is not recorded in
+    Git.
+  - q_G is deferred to M5.
+- **Next gate:** SUPERVISOR review of P0.2. Once P0.1, P0.2 and P0.3 are all ACCEPTED,
+  the PRE-M0 gate is met. M0 must not start before that.

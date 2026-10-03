@@ -104,10 +104,11 @@ push.
 | Id | Mini-step | Status |
 |---|---|---|
 | P0.1 | Freeze SPEC v1.1, AUDIT v1.1, roadmap and governance documents | `ACCEPTED` (commit `3362076`) |
-| P0.2 | Record final accepted CARBON-5F evidence appendix | `BLOCKED_WAITING_FOR_CARBON_5F` |
+| P0.2 | Record final accepted CARBON-5F evidence appendix | `REVIEW_READY` |
 | P0.3 | Establish permanent branch / mini-step / GitHub reporting protocol | `ACCEPTED` (commit `3362076`) |
 
-PRE-M0 is **not complete**: P0.2 is still blocked. M0 must not begin.
+PRE-M0 is **not complete**: P0.2 is `REVIEW_READY` and awaits SUPERVISOR acceptance.
+M0 must not begin.
 
 **P0.2 scope (only after a final CARBON-5F report is SUPERVISOR-ACCEPTED and an
 explicit prompt provides it):** update [EVIDENCE.md](EVIDENCE.md); add [s_E, s_G, s_k];
