@@ -2603,3 +2603,46 @@ first internal provider.
 - **Not started:** M4.3 real validation, M4.4 real cluster confirmation, M4.6, M4.9.
 - **Code changed:** none.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.3 — Real validation of the modal-family classifier on SP13 shapes
+
+- **Stage:** M4 (IN_PROGRESS); SUPERVISOR-authorised M4.3 real validation only
+- **Status:** M4.3 REVIEW_READY. Not accepted by the worker. Thresholds unchanged and
+  still **PROVISIONAL**.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Input:**
+  - the validated SP13 baseline shape pack `SP13_a46d08b52995e078` (content
+    `7941545b…`): measured outer surface, 29 754 nodes, U3 out-of-plane;
+  - the M4.2 candidate frozen set (observation hash `922888c7…`).
+- **Added — `services.modal_family_classifier`:** the reporting helpers
+  `mirror_coverage` and `classify_shape_pack_modes`. Classification logic and policy
+  values are unchanged.
+- **Added — `docs/auto_id/fe_shapes/SP13_a46d08b52995e078.families.json`** (schema
+  `auto-id/modal-family-classification/v1`, PENDING SUPERVISOR REVIEW): parity scores,
+  nodal-line counts and family keys for modes 7–30, the frozen-row families and the
+  holdout selection.
+- **Results:**
+  - **Coverage:** mirror coverage is 1.0 for x, y, diagonal and antidiagonal. The panel
+    is 510 × 520 mm (near-square 1.9 %), so diagonal parities are computed. No refusal.
+  - **All 24 modes classified.** The parity and nodal-line parity are consistent for
+    every mode (odd parity ↔ odd nodal count).
+  - **Lowest torsion-dominated (odd-odd) family:** FE 7 (22.49 Hz), `Px:O|Py:O|nx:1|ny:1`.
+  - **Frozen rows:**
+    - R1 = FE 10 (85.85 Hz): `Px:O|Py:E|nx:1|ny:2` (P_x −1.000, P_y +1.000);
+    - R2 = FE 11 (87.77 Hz): `Px:E|Py:O|nx:2|ny:1` (P_x +1.000, P_y −1.000).
+
+    They are the odd-even / even-odd counterpart families of the near-square panel.
+  - **Holdout selection (k_int not enabled) behaves as defined:**
+    - no torsion-family holdout, because no odd-odd family is among the frozen rows;
+    - the validation holdout is the highest accepted family, R2;
+    - one fit row remains (R1), fewer than the 2 parameters. M4.7 would refuse this
+      objective design.
+- **Tests:** `tests/test_m4_3_real_classification.py`:
+  - unit tests for the helpers;
+  - record checks without a store;
+  - a store-gated recomputation from the pack.
+
+  The M4.3 and M4 guard suites pass.
+- **Not started:** M4.4, M4.6, M4.9. M4.2 freeze criteria are unchanged.
+- **Abaqus run count:** 0

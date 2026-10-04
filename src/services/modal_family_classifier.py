@@ -164,6 +164,31 @@ def classify_surface_mode(coordinates: np.ndarray, values: np.ndarray,
                       nodal_x, nodal_y, policy.policy_hash)
 
 
+def mirror_coverage(coordinates: np.ndarray,
+                    policy: FamilyClassifierPolicy = PROVISIONAL_FAMILY_CLASSIFIER) -> dict[str, float]:
+    """Share of surface nodes with a mirror node under each reflection (evidence; same rule as the parities)."""
+
+    coordinates = np.asarray(coordinates, dtype=float)
+    low, high = coordinates.min(axis=0), coordinates.max(axis=0)
+    half = (high - low) / 2.0
+    normalised = (coordinates - (low + high) / 2.0) / half
+    tolerance = policy.mirror_tolerance * 2.0 * min(half) / max(half)
+    tree = cKDTree(normalised)
+    u, v = normalised[:, 0], normalised[:, 1]
+    reflections = {"x": np.column_stack([-u, v]), "y": np.column_stack([u, -v]),
+                   "diagonal": np.column_stack([v, u]), "antidiagonal": np.column_stack([-v, -u])}
+    return {name: float((tree.query(mirrored)[0] <= tolerance).mean()) for name, mirrored in reflections.items()}
+
+
+def classify_shape_pack_modes(pack, policy: FamilyClassifierPolicy = PROVISIONAL_FAMILY_CLASSIFIER
+                              ) -> dict[int, ModeFamily]:
+    """Classify every mode of an FE shape pack (outer surface: in-plane x, y and out-of-plane U3)."""
+
+    coordinates = np.asarray(pack.coordinates, dtype=float)[:, :2]
+    return {mode: classify_surface_mode(coordinates, np.asarray(pack.displacements[k][:, 2], dtype=float), policy)
+            for k, mode in enumerate(pack.mode_numbers)}
+
+
 @dataclass(frozen=True)
 class ClassifiedRow:
     row_id: str

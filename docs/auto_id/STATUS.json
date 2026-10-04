@@ -319,7 +319,16 @@
         "SP02 remains excluded from identification (NOT_FROZEN: 1 strict row < 2)",
         "freeze criteria and MAC/frequency thresholds unchanged"
       ]
+    },
+    "M4.3_real_validation": {
+      "pack": "SP13_a46d08b52995e078 (content 7941545b59390a65...)",
+      "record": "docs/auto_id/fe_shapes/SP13_a46d08b52995e078.families.json",
+      "policy": "auto-id/modal-family/v1-provisional (thresholds unchanged, PROVISIONAL)",
+      "mirror_coverage": "1.0 for x, y, diagonal, antidiagonal (SP13 510 x 520 mm, near-square 1.9 %)",
+      "modes": "24/24 classified; parity / nodal-line parity consistent for all; lowest odd-odd family FE 7 (22.49 Hz)",
+      "frozen_rows": "R1 FE 10 Px:O|Py:E|nx:1|ny:2; R2 FE 11 Px:E|Py:O|nx:2|ny:1",
+      "holdouts": "no torsion holdout (no odd-odd family among frozen rows); validation holdout R2 (highest accepted family); fit rows: R1 only (1 < 2 parameters)"
     }
   },
-  "next_action": "Await SUPERVISOR instruction; not started: M4.3 real validation, M4.4 real cluster confirmation, M4.6, M4.9"
+  "next_action": "SUPERVISOR review of M4.3 real validation; not started: M4.4 real cluster confirmation, M4.6, M4.9"
 }

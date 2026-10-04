@@ -276,3 +276,20 @@ Possible remaining causes remain outside CARBON-5F scope:
     (MAC 0.889).
   - **SP02 NOT_FROZEN:** 1 strict pair < 2.
 - **Normative vs diagnostic:** normative for M4.2 only after SUPERVISOR acceptance.
+
+## M4.3 — Modal-family classifier on real SP13 FE shapes
+
+- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Kind:** diagnostic validation of the PROVISIONAL classifier policy
+  `auto-id/modal-family/v1-provisional`, with thresholds unchanged.
+- **Input:** validated shape pack `SP13_a46d08b52995e078` (content `7941545b…`).
+- **Result:**
+  - mirror coverage 100 %;
+  - 24/24 modes classified, with parity and nodal-line counts consistent;
+  - lowest odd-odd family: FE 7;
+  - frozen rows: R1 (FE 10) odd-even, R2 (FE 11) even-odd;
+  - holdout rule: no torsion holdout among the frozen rows; validation holdout R2.
+
+  Record: [fe_shapes/SP13_a46d08b52995e078.families.json](fe_shapes/SP13_a46d08b52995e078.families.json).
+- **Normative vs diagnostic:** diagnostic; thresholds stay PROVISIONAL until a separate
+  decision.

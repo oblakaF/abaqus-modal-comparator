@@ -59,6 +59,14 @@ nodal-line counts) but no numbers.
 
 Promoting the values to final, or changing them, needs a separate decision.
 
+**Validation run (2026-10-04, SP13 baseline shape pack; values unchanged).** The
+proposed check is met:
+- every frozen row classifies, with mirror coverage 1.0 on all four reflections;
+- the lowest odd-odd family is identified (FE 7, 22.49 Hz).
+
+Details are in `docs/auto_id/fe_shapes/SP13_a46d08b52995e078.families.json`. The values
+remain PROVISIONAL.
+
 ---
 
 ## 2. M4.8 — LM hyperparameters

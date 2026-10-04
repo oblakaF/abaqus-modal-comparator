@@ -347,6 +347,11 @@ First batch reviewed by the SUPERVISOR:
   - SP13 is the candidate frozen observation set.
   - SP02 remains excluded from identification.
   - Criteria and thresholds are unchanged.
+- M4.3 real validation on the SP13 baseline shape pack: `REVIEW_READY`.
+  - 24/24 modes classified; mirror coverage 100 %.
+  - Frozen rows: R1 (FE 10) is odd-even, R2 (FE 11) is even-odd.
+  - Holdouts: no torsion holdout; the validation holdout is R2; one fit row remains.
+  - Thresholds unchanged and PROVISIONAL.
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---
