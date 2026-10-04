@@ -3,9 +3,9 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M1",
+  "current_stage": "M2",
   "current_ministep": null,
-  "status": "ACCEPTED",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M1",
   "last_accepted_ministep": "M1.4",
   "last_accepted_commit": "ef95cbe937d379ac9299d1261ebcf3c1bd5b6616",
@@ -33,12 +33,20 @@
     "M0.4": "ACCEPTED",
     "status": "ACCEPTED"
   },
-  "main_merge": {
-    "stage": "M0",
-    "pr": 26,
-    "merge_commit": "4ec80abd3110b41aea586387faf42d4ad90fa9d0",
-    "status": "ACCEPTED"
-  },
+  "main_merges": [
+    {
+      "stage": "M0",
+      "pr": 26,
+      "merge_commit": "4ec80abd3110b41aea586387faf42d4ad90fa9d0",
+      "status": "ACCEPTED"
+    },
+    {
+      "stage": "M1",
+      "pr": 27,
+      "merge_commit": "d00120514bdd75bc4421891486218c3cf87d3438",
+      "status": "ACCEPTED"
+    }
+  ],
   "m1": {
     "branch": "auto-id/m1",
     "M1.1": "ACCEPTED",
@@ -63,6 +71,10 @@
       "reference_values": "fixture-specific (D-028, SPEC §19 item 4); SP13/best ~205.65/212.66/228.61 Hz",
       "spec_resolution": "SPEC §19 items 4-5 (D-030, D-031) resolve the former BLOCKED_SPEC_GATE",
       "suspension_threshold": "NOT_AVAILABLE for SP02/bravo-1 and SP13/best pending the M2 passport (never guessed)"
+    },
+    "merged_to_main": {
+      "pr": 27,
+      "merge_commit": "d00120514bdd75bc4421891486218c3cf87d3438"
     }
   },
   "audit_test_baseline": {
@@ -129,8 +141,51 @@
       }
     ]
   },
-  "next_action": "Merge the M1 stage PR (auto-id/m1 -> main) only under explicit HUMAN authorization; then record the main merge SHA; M2 only on SUPERVISOR authorization",
   "m2": {
-    "status": "NOT_STARTED"
-  }
+    "branch": "auto-id/m2",
+    "base": "d00120514bdd75bc4421891486218c3cf87d3438",
+    "M2.1": "REVIEW_READY",
+    "M2.2": "REVIEW_READY",
+    "M2.3": "REVIEW_READY",
+    "M2.4": "REVIEW_READY",
+    "M2.5": "REVIEW_READY",
+    "status": "REVIEW_READY",
+    "gate": {
+      "software_regression_gate": "PASS",
+      "historical_accepted_registration_replay": "PASS — regression compatibility, full content equality: SP02 9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164, SP13 a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4; source_identity_basis=legacy_accepted_registration; tests/test_m2_stage_gate.py",
+      "no_mac_driven_registration": "PASS (build runs with MAC/frequency functions disabled; diagnostic never selects a perturbation)",
+      "unit_safe_physical_registration": "PASS (passport mm converted to the Abaqus model unit mm/cm/m/um; synthetic mm/cm/m equivalence tests)",
+      "production_readiness_guard": "require_production_ready(): refuses LEGACY_REPLAY / INCOMPLETE basis, missing physical reference, non-traceable orientation, legacy source identity, missing physical_specimen_id; never refuses for missing uncertainty alone",
+      "current_sp02_sp13_production_physical_readiness": "NOT_READY",
+      "registration_basis_status_sp02_sp13": "LEGACY_REPLAY (documented_centered_alignment replay of the accepted registration; not SPEC §11 physical evidence)",
+      "uncertainty_availability_sp02_sp13": "NOT_AVAILABLE (no measured uncertainty); registration_limited not evaluable",
+      "registration_limited_pairing_change": "DEFERRED_M4",
+      "sp13_121_289_setup_pair": "UNCONFIRMED (same panel / independent remount not established)",
+      "suspension_threshold_sp02_sp13": "NOT_AVAILABLE (no measured value)"
+    },
+    "missing_physical_evidence_sp02_sp13": [
+      "physical registration reference: corner-A marker (UNV node, FE x/y, x-axis node) or measured scan-to-panel-edge offsets",
+      "physically traceable orientation reference (corner_A_marker or panel_edges)",
+      "physical_specimen_id",
+      "content-based experimental source identity in a new physical registration (the replay keeps the legacy path/mtime record)"
+    ],
+    "missing_uncertainty_sp02_sp13": [
+      "geometry_calibration.uncertainty.translation_mm",
+      "geometry_calibration.uncertainty.scale_rel",
+      "geometry_calibration.uncertainty.rotation_deg"
+    ],
+    "not_recorded_sp02_sp13": [
+      "plan dimensions, masses, face thickness, core height, suspension_max_hz, acquisition protocol id"
+    ],
+    "final_rework": "unit-safe physical registration; separate registration basis / uncertainty availability; production readiness guard; typed identity namespaces; non-finite MAC handling",
+    "final_rework_commit": "a9e6322b42e2f4339fa9131da2bce4ac27c3055a",
+    "final_rework_tests": {
+      "focused_m2": "84 ran, OK (real-data stage gate included)",
+      "related_m1_stage_a": "209 ran, 207 passed, 2 skipped (opt-in Abaqus)",
+      "windows_full": "1090 ran, 0 failures; with stores 1088 passed / 2 skipped; without stores 1081 passed / 2 skipped tests / 14 skipped subtests",
+      "linux_ci": "https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/37172600996 — success, Python 3.11, 1087 ran, OK (skipped=20)",
+      "abaqus_runs": 0
+    }
+  },
+  "next_action": "Supervisor review of M2 (stage PR auto-id/m2 -> main); do not start M3"
 }

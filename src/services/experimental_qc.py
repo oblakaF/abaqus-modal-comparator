@@ -514,17 +514,32 @@ def prepare_auto_id_experimental_input(
     manifest: ExperimentFixtureManifest | None = None,
     repo_root: Path = REPO_ROOT,
     suspension_threshold: TrustedSuspensionThreshold | None = None,
+    specimen_passport=None,
 ) -> AutoIDExperimentalInput:
     """M1.2 -> M1.3 provider -> M1.1 -> M1.4 QC -> mode eligibility.
 
-    Refuses only on a hard QC failure.  ``suspension_threshold`` must be a trusted
-    physical value (M2 passport); without it, suspension screening is NOT_AVAILABLE.
+    Refuses only on a hard QC failure.  The suspension threshold is either a
+    ``TrustedSuspensionThreshold`` or, from M2, the physical value recorded in the
+    ``specimen_passport`` for this fixture's run; never both, and never guessed.
+    Without a trusted value, suspension screening is NOT_AVAILABLE.
     """
 
     manifest = load_experiment_fixture_manifest(FIXTURE_MANIFEST_PATH) if manifest is None else manifest
     roots = fixture_roots_from_environment() if roots is None else roots
     validated = prepare_external_polymax_modal_dataset(fixture_id, roots=roots, manifest=manifest, repo_root=repo_root)
     fixture = manifest.fixture(fixture_id)
+    if specimen_passport is not None:
+        from domain.specimen_manifest import SpecimenManifest, SpecimenManifestError
+
+        if not isinstance(specimen_passport, SpecimenManifest):
+            raise TypeError("specimen_passport must be a SpecimenManifest.")
+        if suspension_threshold is not None:
+            raise TypeError("give the suspension threshold either explicitly or through the specimen passport, not both.")
+        if specimen_passport.acquisition.fixture_id != fixture_id:
+            raise SpecimenManifestError("acquisition.fixture_id",
+                                        f"the passport describes fixture {specimen_passport.acquisition.fixture_id!r}, "
+                                        f"not {fixture_id!r}.")
+        suspension_threshold = specimen_passport.trusted_suspension_threshold()
     threshold = _require_trusted(suspension_threshold)
     report = evaluate_experimental_qc(validated, prepare_frf_input(fixture, roots), fixture, repo_root=repo_root,
                                       suspension_threshold=threshold)
