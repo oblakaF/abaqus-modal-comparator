@@ -2088,3 +2088,52 @@ first internal provider.
     forward-builder code and are unchanged.
 - **Tests:** M3 suites 44 ran, OK (121 subtests).
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M3.5 — Byte-for-byte regression; M3 stage REVIEW_READY
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:**
+  - M3.1–M3.5 REVIEW_READY.
+  - M3 stage REVIEW_READY.
+  - Not accepted by the worker.
+  - M4 not started.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Regression anchors** (`docs/auto_id/forward_models/accepted_forward_jobs.json`):
+  - **Contents:** the 5 accepted CARBON-4C / CARBON-5A candidates (52000/4500,
+    49400/4500, 54600/4500, 52000/4275, 52000/4725 MPa) with, per specimen, the
+    archived generated INP SHA-256, the accepted provenance hash, the 1-based changed
+    lines and the evaluation hash.
+  - **Source:** `carbon-project-archive:carbon4c/step1_prepare.json` and
+    `carbon5a/prepare.json`, pinned by SHA-256.
+- **Stage gate** (`tests/test_m3_stage_gate.py`, real data, store `snadwich`;
+  skipped without it). For every archived candidate × SP02/SP13:
+  - the universal builder's bytes are identical to the live accepted builder
+    (`shared_carbon_forward.write_forward_job_inp`, unchanged since `121ba1d`) on the
+    same pinned reference INP;
+  - the generated SHA-256 and the changed-line numbers equal the archive;
+  - the job name equals the accepted name (the archived ODB names);
+  - the accepted `shared-carbon-forward-job/1` provenance hash and the evaluation hash,
+    rebuilt from the generic provenance, equal both the archive and the live builder.
+
+  End-to-end `prepare_forward_jobs` writes the archived baseline files and names
+  deterministically.
+- **Result:** **PASS** — 10/10 archived jobs byte-identical; 17 subtests OK.
+- **Extended check (one-off, read-only):** 12 further candidates × 2 specimens gave
+  24 / 24 byte-identical files. The candidates include awkward floats, 45000/4000,
+  100000/1000 and 1234.5678/9.875.
+- **Physics:** unchanged. The only changed lines are the carbon E1/E2/G12 record and,
+  for SP02, the accepted eigenvalue request 15 → 30. There is no INP metadata
+  difference.
+- **EVIDENCE.md:** new entry "M3 — Universal forward builder byte-for-byte
+  regression", PENDING SUPERVISOR REVIEW.
+- **Unchanged:** `src/services/shared_carbon_forward.py` (oracle), SPEC, DECISIONS,
+  the M0.2 fixture manifest, passports and registrations.
+- **Tests (Windows, Python 3.14.6):**
+  - **Full suite with stores:** 1136 ran; 1134 passed, 0 failures, 0 errors, 2 skipped
+    (opt-in Abaqus).
+  - **Full suite without stores:** 1134 ran; 1125 passed, 0 failures. Skipped: the
+    M3 gate class, the 2 Abaqus tests and 14 real-data subtests.
+  - **Linux CI:** recorded with the stage PR.
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR review of the M3 batch (stage PR `auto-id/m3` → `main`).

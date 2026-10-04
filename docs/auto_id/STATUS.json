@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M3",
-  "current_ministep": "M3.4",
-  "status": "IN_PROGRESS",
+  "current_ministep": "M3.5",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M2",
   "last_accepted_ministep": "M2.5",
   "last_accepted_commit": "a9e6322b42e2f4339fa9131da2bce4ac27c3055a",
@@ -206,9 +206,17 @@
     "M3.2": "REVIEW_READY",
     "M3.3": "REVIEW_READY",
     "M3.4": "REVIEW_READY",
-    "M3.5": "TODO",
-    "status": "IN_PROGRESS",
-    "batch_authorisation": "SUPERVISOR: M3.1-M3.5 as one supervised stage batch; no Abaqus; shared_carbon_forward.py kept unchanged as regression oracle"
+    "M3.5": "REVIEW_READY",
+    "status": "REVIEW_READY",
+    "batch_authorisation": "SUPERVISOR: M3.1-M3.5 as one supervised stage batch; no Abaqus; shared_carbon_forward.py kept unchanged as regression oracle",
+    "gate": {
+      "byte_for_byte_regression": "PASS (tests/test_m3_stage_gate.py: 5 archived CARBON-4C/5A candidates x SP02/SP13 identical to the live accepted builder and to the archived SHA-256, changed lines, provenance and evaluation hashes)",
+      "extended_oracle_matrix": "24/24 identical (12 further candidates x 2 specimens; one-off, read-only)",
+      "physics_change": "none (only E1/E2/G12 of the carbon record; SP02 eigenvalue request 15 -> 30 as accepted)",
+      "accepted_builder": "src/services/shared_carbon_forward.py unchanged (regression oracle)",
+      "abaqus_runs": 0
+    },
+    "regression_anchors": "docs/auto_id/forward_models/accepted_forward_jobs.json"
   },
-  "next_action": "M3 per ROADMAP order (SUPERVISOR-authorised stage batch); no self-acceptance; STOP for SUPERVISOR review"
+  "next_action": "SUPERVISOR review of the M3 batch (stage PR auto-id/m3 -> main); do not start M4"
 }
