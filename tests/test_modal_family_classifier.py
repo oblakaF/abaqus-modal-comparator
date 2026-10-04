@@ -64,7 +64,11 @@ class ParityTests(unittest.TestCase):
         order = np.random.default_rng(1).permutation(len(points))
         first = classify_surface_mode(points, u * v)
         shuffled = classify_surface_mode(points[order], (u * v)[order])
-        self.assertEqual(first, shuffled)
+        # The classification is identical; the scores agree to round-off (summation order differs).
+        self.assertEqual((first.key, first.parity_x, first.parity_y), (shuffled.key, shuffled.parity_x,
+                                                                       shuffled.parity_y))
+        for name in ("p_x", "p_y", "p_diagonal", "p_antidiagonal"):
+            self.assertAlmostEqual(getattr(first, name), getattr(shuffled, name), places=12)
         jittered, ju, jv = plate(jitter=0.5)
         self.assertEqual(classify_surface_mode(jittered, ju * jv).key, first.key)
 

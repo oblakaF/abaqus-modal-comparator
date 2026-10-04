@@ -2478,3 +2478,15 @@ first internal provider.
 - **Unchanged:** the M3 contracts (`shared_carbon_forward.py`, `forward_builder.py`,
   manifests, INP generation), the comparator, Stage-A services and `inverse_solver`.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4 first batch — Linux CI test fix (M4.3 test only)
+
+- **Linux CI** on `4ad6379` (run 37182692754) reported one failure:
+  `test_modal_family_classifier.ParityTests.test_independent_of_node_order_and_mild_mesh_irregularity`.
+  - **Cause:** under node reordering the summation order changes, so P_x came out as
+    −1.0000000000000002 on Linux and −1.0 on Windows. The test compared the whole
+    result exactly, floats included.
+  - **Unchanged:** the family key, parities and nodal-line counts.
+- **Fix (test only):** classification fields are compared exactly, and the parity
+  scores to 1e-12. No change to `services.modal_family_classifier`.
+- **Abaqus run count:** 0
