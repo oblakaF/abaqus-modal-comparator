@@ -225,7 +225,7 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 ## M3 — Universal forward builder byte-for-byte regression
 
-- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Status:** ACCEPTED (SUPERVISOR, M3 review; PR #29)
 - **Kind:** software regression; **not** a material result. No Abaqus.
 - **Purpose:** show that the manifest-driven builder (`src/services/forward_builder.py`)
   generates exactly the accepted shared-carbon forward INPs.
@@ -247,4 +247,5 @@ Possible remaining causes remain outside CARBON-5F scope:
     - Changed lines, the accepted provenance hashes and the evaluation hashes all
       reproduce.
   - **Extended matrix:** 24 / 24 further candidate files are identical.
-- **Normative vs diagnostic:** normative for M3 only after SUPERVISOR acceptance.
+- **Normative vs diagnostic:** normative for the M3 gate (forward-builder regression);
+  not a material result.

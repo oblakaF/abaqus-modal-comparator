@@ -3,12 +3,12 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M3",
-  "current_ministep": "M3.5",
-  "status": "REVIEW_READY",
-  "last_accepted_stage": "M2",
-  "last_accepted_ministep": "M2.5",
-  "last_accepted_commit": "a9e6322b42e2f4339fa9131da2bce4ac27c3055a",
+  "current_stage": "M4",
+  "current_ministep": null,
+  "status": "NOT_STARTED",
+  "last_accepted_stage": "M3",
+  "last_accepted_ministep": "M3.5",
+  "last_accepted_commit": "3d862511e2fcb70670479b3f774f146658ae7ecb",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -50,6 +50,12 @@
       "stage": "M2",
       "pr": 28,
       "merge_commit": "7af9038c5486560c5d2d0b6d571a354766e29d77",
+      "status": "ACCEPTED"
+    },
+    {
+      "stage": "M3",
+      "pr": 29,
+      "merge_commit": "0fd63d69a78f251bd51721880bae9b425b98951e",
       "status": "ACCEPTED"
     }
   ],
@@ -202,12 +208,12 @@
   "m3": {
     "branch": "auto-id/m3",
     "base": "7af9038c5486560c5d2d0b6d571a354766e29d77",
-    "M3.1": "REVIEW_READY",
-    "M3.2": "REVIEW_READY",
-    "M3.3": "REVIEW_READY",
-    "M3.4": "REVIEW_READY",
-    "M3.5": "REVIEW_READY",
-    "status": "REVIEW_READY",
+    "M3.1": "ACCEPTED",
+    "M3.2": "ACCEPTED",
+    "M3.3": "ACCEPTED",
+    "M3.4": "ACCEPTED",
+    "M3.5": "ACCEPTED",
+    "status": "ACCEPTED",
     "batch_authorisation": "SUPERVISOR: M3.1-M3.5 as one supervised stage batch; no Abaqus; shared_carbon_forward.py kept unchanged as regression oracle",
     "gate": {
       "byte_for_byte_regression": "PASS (tests/test_m3_stage_gate.py: 5 archived CARBON-4C/5A candidates x SP02/SP13 identical to the live accepted builder and to the archived SHA-256, changed lines, provenance and evaluation hashes)",
@@ -223,7 +229,25 @@
       "windows_full_without_stores": "1134 ran; 1125 passed, 0 failures; skipped: M3 gate class, 2 Abaqus, 14 real-data subtests",
       "linux_ci": "https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/37178115819 - success, Python 3.11, 1131 ran, OK (skipped=21: 14 data-store subtests, 1 M3 gate class without store, 2 opt-in Abaqus, 4 headless Tk)",
       "abaqus_runs": 0
+    },
+    "accepted_by": "SUPERVISOR (review complete); merge explicitly authorised by the HUMAN supervisor",
+    "accepted_head": "febfa5bf513f2291d4cc071ccf64130cf51eb803",
+    "merged_to_main": {
+      "pr": 29,
+      "merge_commit": "0fd63d69a78f251bd51721880bae9b425b98951e"
     }
   },
-  "next_action": "SUPERVISOR review of the M3 batch (stage PR auto-id/m3 -> main); do not start M4"
+  "m4": {
+    "M4.1": "TODO",
+    "M4.2": "TODO",
+    "M4.3": "TODO",
+    "M4.4": "TODO",
+    "M4.5": "TODO",
+    "M4.6": "TODO",
+    "M4.7": "TODO",
+    "M4.8": "TODO",
+    "M4.9": "TODO",
+    "status": "NOT_STARTED"
+  },
+  "next_action": "M4 NOT_STARTED; await SUPERVISOR instruction before any M4 work"
 }

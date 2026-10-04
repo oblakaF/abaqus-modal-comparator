@@ -265,17 +265,18 @@ current SP02/SP13 production physical readiness `NOT_READY`).
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M3.1 | Manifest-driven material location | `REVIEW_READY` |
-| M3.2 | Generic candidate rewrite | `REVIEW_READY` |
-| M3.3 | Generic provenance / job hash | `REVIEW_READY` |
-| M3.4 | Remove production hard-coding of SP02, SP13, `D:\Snadwich` and specific machine paths from the generic Auto-ID path | `REVIEW_READY` |
-| M3.5 | Regression against the current accepted shared-carbon builder | `REVIEW_READY` |
+| M3.1 | Manifest-driven material location | `ACCEPTED` |
+| M3.2 | Generic candidate rewrite | `ACCEPTED` |
+| M3.3 | Generic provenance / job hash | `ACCEPTED` |
+| M3.4 | Remove production hard-coding of SP02, SP13, `D:\Snadwich` and specific machine paths from the generic Auto-ID path | `ACCEPTED` |
+| M3.5 | Regression against the current accepted shared-carbon builder | `ACCEPTED` |
 
 **M3 GATE:** the generic builder reproduces the accepted SP02/SP13 reference INPs
 byte-for-byte, except any explicitly versioned metadata difference proven irrelevant.
 No physics change.
 
-Stage status: `REVIEW_READY` (branch `auto-id/m3`, based on `main` `7af9038`).
+Stage status: `ACCEPTED` (M3.1–M3.5 `ACCEPTED` by the SUPERVISOR; byte-for-byte regression `PASS`).
+**M3 merged into `main`** (PR #29, merge commit `0fd63d69a78f251bd51721880bae9b425b98951e`).
 M3.1–M3.5 run as one SUPERVISOR-authorised stage batch. No Abaqus. The accepted
 shared-carbon builder stays unchanged as the regression oracle.
 
@@ -324,6 +325,8 @@ M4.9 synthetic truth: E = 45000 MPa, G12 = 4000 MPa, controlled frequency noise
 
 **M4 GATE:** recover the truth within 1σ in ≤ 20 authorised Abaqus solves. An
 artificial branch exchange must trigger refusal, not silent re-pairing.
+
+Stage status: `NOT_STARTED`.
 
 ---
 
