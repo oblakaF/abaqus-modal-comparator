@@ -2265,3 +2265,43 @@ first internal provider.
 - **Unchanged:** M3 contracts (`shared_carbon_forward.py`, `forward_builder.py`,
   manifests), the normal comparator and Stage-A pairing.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.3 — Physical modal-family classifier and family holdouts
+
+- **Stage:** M4 first development batch
+- **Status:** M4.3 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.modal_family_classifier`** (SPEC §12.2):
+  - `classify_surface_mode(coordinates, values, policy)` works on outer-surface FE
+    shapes: in-plane (x, y) and the out-of-plane component.
+  - **Parities:** continuous P_x = φᵀR_xφ/φᵀφ and P_y about the mid-lines, using
+    nearest-mirror-node mapping in normalised coordinates.
+  - **Near-square panels:** diagonal and antidiagonal parities as well.
+  - **Nodal lines:** counted as median sign changes along the rows and columns of a
+    resampling grid.
+  - **Family key:** parities plus nodal-line counts. Torsion-dominated means odd-odd.
+  - **Refused:** a mesh that is not symmetric enough (mirror coverage below the
+    policy), and degenerate input.
+- **`FamilyClassifierPolicy`:**
+  - SPEC §12.2 gives no numbers, so the thresholds are explicit, hashed and marked
+    **provisional**: `auto-id/modal-family/v1-provisional`.
+  - **Values:** parity threshold 0.80, mirror tolerance 2 % of min(Lx, Ly), mirror
+    coverage ≥ 95 %, near-square ≤ 5 %, 41 × 41 nodal grid, amplitude floor 5 %.
+  - The policy hash is recorded in every `ModeFamily`.
+- **Added — `select_holdouts(rows, k_int_enabled)`** (SPEC §12.3, D-010):
+  - **Torsion holdout:** the lowest torsion-dominated (≈ odd-odd) family, when k_int
+    is not enabled.
+  - **Validation holdout:** the highest accepted family.
+  - Every row of a held-out family is held out.
+  - Order is by experimental frequency, never by FE mode number.
+- **Real shapes:** not available in this batch (FE shapes are not archived;
+  extraction needs the HUMAN gate). Tests use analytic plate shapes:
+  - odd-odd torsion, even-even bending, odd-even, even-odd and mixed shapes;
+  - shuffled node order and a jittered mesh;
+  - near-square versus rectangular panels;
+  - a non-symmetric mesh.
+- **Tests:** `tests/test_modal_family_classifier.py`: 11 ran, OK. M4 guard extended.
+- **Unchanged:** M3 contracts and the existing comparator, cluster and Stage-A
+  services.
+- **Abaqus run count:** 0

@@ -14,6 +14,7 @@ M4_MODULES = (
     "src/domain/frozen_observations.py",
     "src/services/baseline_freeze.py",
     "src/services/archived_baseline.py",
+    "src/services/modal_family_classifier.py",
 )
 FORBIDDEN_TEXT = ("SP02", "SP13", "SP-02", "SP-13", "Snadwich", "snadwich", "carbon_project_archive", "D:\\",
                   "CFRP_T300_PlainWeave", "CFRP_Face")
