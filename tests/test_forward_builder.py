@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
 import hashlib
+import json
 import tempfile
 
 from domain.forward_model_manifest import (
@@ -246,6 +247,108 @@ class OracleEquivalenceTests(unittest.TestCase):
                         self.assertEqual(rendered.sha256, oracle.generated_inp_sha256)
                         self.assertEqual(rendered.engineering_constants.to_dict(),
                                          oracle.engineering_constants.to_dict())
+
+
+class ProvenanceTests(unittest.TestCase):
+    """M3.3: generic provenance and job hash, by content only."""
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.output = Path(self._directory.name) / "jobs"
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def job(self, candidate, text=SYNTHETIC_INP, output=None, **overrides):
+        from services.forward_builder import prepare_forward_job
+
+        model, raw = synthetic_model(text, **overrides)
+        return prepare_forward_job(model, candidate, raw, output or self.output)
+
+    def test_job_is_content_addressed_and_deterministic(self):
+        first = self.job(carbon_candidate(49000.0, 4400.0))
+        second = self.job(carbon_candidate(49000.0, 4400.0), output=Path(self._directory.name) / "elsewhere")
+        self.assertEqual(first.job_hash, second.job_hash)  # the output directory is not part of the job
+        self.assertEqual(first.generated_inp_sha256, hashlib.sha256(first.generated_inp.read_bytes()).hexdigest())
+        self.assertEqual(first.job_name, f"SYN_{first.generated_inp_sha256[:16]}")
+        self.assertEqual(first.generated_inp.name, first.job_name + ".inp")
+        self.assertEqual(self.job(carbon_candidate(49000.0, 4400.0)).generated_inp, first.generated_inp)
+
+    def test_provenance_content(self):
+        job = self.job(carbon_candidate(49000.0, 4400.0))
+        document = job.provenance
+        self.assertEqual(document["schema"], "auto-id/forward-job/v1")
+        self.assertEqual(document["candidate"], {"E_in_plane_mpa": 49000.0, "G12_mpa": 4400.0})
+        self.assertEqual(document["engineering_constants"]["E2"], 49000.0)
+        self.assertEqual(document["engineering_constants"]["nu12"], 0.05)
+        self.assertEqual(document["material"], {"role": "face", "name": "CFRP_Face",
+                                                "elastic_type": "ENGINEERING CONSTANTS"})
+        self.assertEqual(document["frequency_request"]["elastic_mode_count"], 24)
+        self.assertEqual(document["registration_hash"], "a" * 64)
+        self.assertEqual(document["generated_inp"]["sha256"], job.generated_inp_sha256)
+        self.assertEqual(document["specimen"]["design_id"], "DES-SYN")
+        lines = SYNTHETIC_INP.splitlines()
+        self.assertEqual([lines[n - 1] for n in document["generated_inp"]["changed_lines"]],
+                         [CARBON_DATA[0].rstrip("\n"), CARBON_DATA[1].rstrip("\n"), FREQUENCY_DATA.rstrip("\n")])
+
+    def test_no_machine_path_or_timestamp(self):
+        job = self.job(carbon_candidate(49000.0, 4400.0))
+        text = json.dumps(job.provenance)
+        for forbidden in (self._directory.name, str(self.output), "mtime", "timestamp", ":\\\\", "generated_inp_path"):
+            self.assertNotIn(forbidden, text)
+
+    def test_job_hash_follows_every_input(self):
+        base = self.job(carbon_candidate(49000.0, 4400.0)).job_hash
+        self.assertNotEqual(self.job(carbon_candidate(49000.0, 4400.5)).job_hash, base)
+        self.assertNotEqual(self.job(carbon_candidate(49000.0, 4400.0),
+                                     registration__registration_hash="b" * 64).job_hash, base)
+        self.assertNotEqual(self.job(carbon_candidate(49000.0, 4400.0), job_prefix="SYNB").job_hash, base)
+        self.assertNotEqual(self.job(carbon_candidate(49000.0, 4400.0),
+                                     provenance__source_of_truth=["other"]).job_hash, base)  # manifest hash
+
+    def test_existing_job_with_other_content_is_refused(self):
+        job = self.job(carbon_candidate(49000.0, 4400.0))
+        job.generated_inp.write_bytes(b"tampered")
+        with self.assertRaises(ForwardBuildError):
+            self.job(carbon_candidate(49000.0, 4400.0))
+
+    def test_evaluation(self):
+        from services.forward_builder import prepare_forward_evaluation
+
+        first, raw_a = synthetic_model()
+        other_text = SYNTHETIC_INP.replace(FREQUENCY_DATA, "30, , , , ,\n")
+        second, raw_b = synthetic_model(other_text, forward_model_id="SYN_B/carbon-property-set-v1",
+                                        job_prefix="SYNB", frequency_request__source_eigenvalue_count=30,
+                                        registration__registration_hash="c" * 64)
+        candidate = carbon_candidate(51000.0, 4450.0)
+        evaluation = prepare_forward_evaluation([first, second], [raw_a, raw_b], candidate, self.output)
+        self.assertEqual([job.registration_hash for job in evaluation.jobs], ["a" * 64, "c" * 64])
+        self.assertTrue(all(job.engineering_constants.E1 == 51000.0 for job in evaluation.jobs))
+        again = prepare_forward_evaluation([first, second], [raw_a, raw_b], candidate, self.output)
+        self.assertEqual(again.evaluation_hash, evaluation.evaluation_hash)
+        other = prepare_forward_evaluation([first, second], [raw_a, raw_b], carbon_candidate(51000.0, 4451.0),
+                                           self.output)
+        self.assertNotEqual(other.evaluation_hash, evaluation.evaluation_hash)
+        with self.assertRaises(ForwardBuildError):
+            prepare_forward_evaluation([first, first], [raw_a, raw_a], candidate, self.output)
+        with self.assertRaises(ForwardBuildError):
+            prepare_forward_evaluation([first], [raw_a, raw_b], candidate, self.output)
+
+    def test_job_carries_the_same_facts_as_the_accepted_builder(self):
+        raw = SYNTHETIC_INP.encode("latin-1")
+        source = Path(self._directory.name) / "source.inp"
+        source.write_bytes(raw)
+        baseline = SpecimenForwardBaseline(
+            specimen_id="SP-SYN", job_prefix="SYN", source_inp=source, source_inp_sha256=hashlib.sha256(raw).hexdigest(),
+            carbon_material_name="CFRP_Face", source_engineering_constants=CarbonEngineeringConstants(**SOURCE_CONSTANTS),
+            source_eigenvalue_count=15, requested_eigenvalue_count=30, registration_hash="a" * 64)
+        oracle = write_forward_job_inp(baseline, SharedCarbonCandidate(49000.0, 4400.0), Path(self._directory.name) / "o")
+        job = self.job(carbon_candidate(49000.0, 4400.0))
+        self.assertEqual(job.generated_inp.name, oracle.generated_inp.name)
+        for name in ("source_inp_sha256", "generated_inp_sha256", "registration_hash", "requested_eigenvalue_count",
+                     "elastic_mode_count"):
+            self.assertEqual(getattr(job, name), getattr(oracle, name), name)
+        self.assertEqual(job.engineering_constants.to_dict(), oracle.engineering_constants.to_dict())
 
 
 if __name__ == "__main__":

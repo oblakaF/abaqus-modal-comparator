@@ -2010,3 +2010,39 @@ first internal provider.
 - **Tests:** `tests/test_forward_builder.py` + `tests/test_forward_model_manifest.py`:
   30 ran, OK (83 subtests).
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M3.3 — Generic provenance and job hash
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:** M3.3 REVIEW_READY; M3 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Provenance** (`services.forward_builder.forward_job_provenance`, schema
+  `auto-id/forward-job/v1`, builder `auto-id/forward-builder/v1`). It records:
+  - the forward model id and manifest hash;
+  - the passport hash and identities (design, physical specimen, test run);
+  - the source INP name, SHA-256 and size;
+  - material role, name and elastic type;
+  - parameterisation, candidate and all nine constants;
+  - registration hash and eigenvalue request;
+  - generated INP SHA-256, size, job name and 1-based changed lines.
+
+  It records no machine path and no timestamp.
+- **Job hash:** the canonical SHA-256 of the provenance (`job_hash`).
+- **Job name:** content-addressed, `<job_prefix>_<first 16 hex of the generated SHA-256>`.
+  This is the accepted naming, so existing ODB names (for example
+  `SP02_f3e592281bebce66`) stay valid.
+- **Writing:** `prepare_forward_job` writes `<job_name>.inp` atomically. It refuses an
+  existing file with different content.
+- **Evaluation:** `prepare_forward_evaluation` makes one job per forward model for one
+  shared candidate. Its `evaluation_hash` covers schema, parameterisation, candidate
+  and each model's job hash. Duplicate forward models or job prefixes are refused.
+- **Equivalence:** on the synthetic model the job name, source and generated SHA-256,
+  registration hash, eigenvalue counts and constants equal the accepted builder's.
+  The generic provenance schema is new by design. Reproduction of the accepted
+  builder's historical provenance and evaluation hashes is checked in the M3.5
+  regression.
+- **Unchanged:** `src/services/shared_carbon_forward.py`, the regression oracle.
+- **Tests:** `tests/test_forward_builder.py` + `tests/test_forward_model_manifest.py`:
+  37 ran, OK (83 subtests).
+- **Abaqus run count:** 0

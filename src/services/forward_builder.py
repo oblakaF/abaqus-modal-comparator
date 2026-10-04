@@ -18,7 +18,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-from typing import Optional
+import os
+from pathlib import Path
+from typing import Optional, Sequence
 
 from domain.forward_model_manifest import (
     ENGINEERING_CONSTANTS_TYPE,
@@ -26,6 +28,7 @@ from domain.forward_model_manifest import (
     EngineeringConstants,
     ForwardCandidate,
     FrequencyRequest,
+    canonical_hash,
 )
 
 
@@ -259,3 +262,138 @@ def render_forward_input(model: BoundForwardModel, candidate: ForwardCandidate, 
 
     content = join_inp_lines(lines)
     return RenderedForwardInput(content, hashlib.sha256(content).hexdigest(), source_sha, constants, changed)
+
+
+# ----------------------------------------------------------------------------- M3.3 provenance / job hash
+
+FORWARD_JOB_SCHEMA = "auto-id/forward-job/v1"
+FORWARD_EVALUATION_SCHEMA = "auto-id/forward-evaluation/v1"
+FORWARD_BUILDER_ID = "auto-id/forward-builder/v1"
+
+
+def forward_job_name(job_prefix: str, generated_sha256: str) -> str:
+    """Content-addressed job name, ``<prefix>_<first 16 hex of the generated INP SHA-256>``."""
+    return f"{job_prefix}_{generated_sha256[:16]}"
+
+
+@dataclass(frozen=True)
+class PreparedForwardJob:
+    forward_model_id: str
+    candidate: ForwardCandidate
+    engineering_constants: EngineeringConstants
+    source_inp_sha256: str
+    generated_inp: Path
+    generated_inp_sha256: str
+    job_name: str
+    registration_hash: str
+    requested_eigenvalue_count: int
+    elastic_mode_count: int
+    provenance: dict
+    job_hash: str  # canonical SHA-256 of ``provenance``
+
+
+@dataclass(frozen=True)
+class PreparedForwardEvaluation:
+    candidate: ForwardCandidate
+    jobs: tuple[PreparedForwardJob, ...]
+    evaluation_hash: str
+
+
+def forward_job_provenance(model: BoundForwardModel, candidate: ForwardCandidate,
+                           rendered: RenderedForwardInput) -> dict:
+    """Everything that determines the job, by content: no machine path, no timestamp."""
+
+    manifest, passport = model.manifest, model.passport
+    request = manifest.frequency_request
+    return {
+        "schema": FORWARD_JOB_SCHEMA,
+        "builder": FORWARD_BUILDER_ID,
+        "forward_model": {"forward_model_id": manifest.forward_model_id, "manifest_hash": manifest.manifest_hash},
+        "specimen": {
+            "passport_manifest_hash": passport.manifest_hash,
+            "design_id": str(passport.design_id),
+            "physical_specimen_id": None if passport.physical_specimen_id is None else str(passport.physical_specimen_id),
+            "test_run_id": str(passport.test_run_id),
+        },
+        "source_inp": {"file_name": manifest.model_input.file_name, "sha256": rendered.source_sha256,
+                       "size_bytes": manifest.model_input.size_bytes},
+        "material": {"role": manifest.material_role, "name": model.material_name,
+                     "elastic_type": ENGINEERING_CONSTANTS_TYPE},
+        "parameterisation": manifest.parameterisation.parameterisation_id,
+        "candidate": candidate.to_dict(),
+        "engineering_constants": rendered.engineering_constants.to_dict(),
+        "registration_hash": manifest.registration_hash,
+        "frequency_request": {"source_eigenvalue_count": request.source_eigenvalue_count,
+                              "requested_eigenvalue_count": request.requested_eigenvalue_count,
+                              "elastic_mode_count": request.elastic_mode_count},
+        "generated_inp": {"sha256": rendered.sha256, "size_bytes": len(rendered.content),
+                          "job_name": forward_job_name(manifest.job_prefix, rendered.sha256),
+                          "changed_lines": [index + 1 for index in rendered.changed_lines]},
+    }
+
+
+def _write_content_addressed(target: Path, content: bytes, sha256: str) -> None:
+    if target.exists():
+        if hashlib.sha256(target.read_bytes()).hexdigest() != sha256:
+            raise ForwardBuildError(f"{target} exists with different content.")
+        return
+    partial = target.with_name(target.name + ".partial")
+    partial.write_bytes(content)
+    os.replace(partial, target)
+
+
+def prepare_forward_job(model: BoundForwardModel, candidate: ForwardCandidate, source: bytes,
+                        output_directory: Path) -> PreparedForwardJob:
+    """Render and write one forward job INP (content-addressed name) with its provenance."""
+
+    rendered = render_forward_input(model, candidate, source)
+    provenance = forward_job_provenance(model, candidate, rendered)
+    name = provenance["generated_inp"]["job_name"]
+    output_directory = Path(output_directory)
+    output_directory.mkdir(parents=True, exist_ok=True)
+    target = output_directory / f"{name}.inp"
+    _write_content_addressed(target, rendered.content, rendered.sha256)
+    request = model.manifest.frequency_request
+    return PreparedForwardJob(
+        forward_model_id=model.manifest.forward_model_id,
+        candidate=candidate,
+        engineering_constants=rendered.engineering_constants,
+        source_inp_sha256=rendered.source_sha256,
+        generated_inp=target,
+        generated_inp_sha256=rendered.sha256,
+        job_name=name,
+        registration_hash=model.manifest.registration_hash,
+        requested_eigenvalue_count=request.requested_eigenvalue_count,
+        elastic_mode_count=request.elastic_mode_count,
+        provenance=provenance,
+        job_hash=canonical_hash(provenance),
+    )
+
+
+def forward_evaluation_hash(candidate: ForwardCandidate, jobs: Sequence[PreparedForwardJob]) -> str:
+    return canonical_hash({
+        "schema": FORWARD_EVALUATION_SCHEMA,
+        "parameterisation": candidate.parameterisation_id,
+        "candidate": candidate.to_dict(),
+        "jobs": [{"forward_model_id": job.forward_model_id, "job_hash": job.job_hash} for job in jobs],
+    })
+
+
+def _check_distinct(models: Sequence[BoundForwardModel]) -> None:
+    for attribute in ("forward_model_id", "job_prefix"):
+        values = [getattr(model.manifest, attribute) for model in models]
+        if len(set(values)) != len(values):
+            raise ForwardBuildError(f"Each forward model may appear only once in an evaluation ({attribute}).")
+
+
+
+def prepare_forward_evaluation(models: Sequence[BoundForwardModel], sources: Sequence[bytes],
+                               candidate: ForwardCandidate, output_directory: Path) -> PreparedForwardEvaluation:
+    """One forward job per forward model for a single shared candidate (no Abaqus)."""
+
+    if len(models) != len(sources) or not models:
+        raise ForwardBuildError("Give one reference INP per forward model.")
+    _check_distinct(models)
+    jobs = tuple(prepare_forward_job(model, candidate, source, output_directory)
+                 for model, source in zip(models, sources))
+    return PreparedForwardEvaluation(candidate, jobs, forward_evaluation_hash(candidate, jobs))
