@@ -1445,3 +1445,30 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
   - phase complexity has no limit;
   - SP13 coherence evaluation is limited by the unchanged FRF builder.
 - **Next gate:** SUPERVISOR review of M1.4.
+
+## 2026-10-04 — M1 M1.4 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.4 (no new mini-step started)
+- **Status:** M1.4 ACCEPTED. M1.1, M1.2, M1.3.1 and M1.3 ACCEPTED. M1 stage closure
+  follows separately.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `c411bb9842fbdb6feb546fbdf3cbf3ae7ba6634f` on `auto-id/m1`.
+- **Accepted scope:**
+  - The experimental QC subsystem is implemented. QC is observational and never
+    modifies modal datasets.
+  - Provenance, fixture identity and the measurement contract are hard checks.
+    Coherence, frequency resolution, the close-mode trigger, AutoMAC and phase
+    complexity are diagnostic.
+  - `NOT_AVAILABLE` remains explicit, and no uncertainty values are invented.
+  - SP02/bravo-1 and SP13/best pass all hard checks.
+  - No Abaqus. No pairing, registration or identification-solver changes.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M1.4 experimental QC`
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`,
+  `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
