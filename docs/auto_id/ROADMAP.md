@@ -150,7 +150,8 @@ authorization.
 | M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `ACCEPTED` (commit `4b8d73e`) |
 | M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `ACCEPTED` (commits `c411bb9`, `ef95cbe`: suspension-aware QC) |
 
-Stage status: `ACCEPTED` (M1.1–M1.4 `ACCEPTED`; Gate A `PASS`; Gate B `FUTURE_INTERNAL_PROVIDER`). The M1 stage PR is prepared; it merges only under HUMAN authorization.
+Stage status: `ACCEPTED` (M1.1–M1.4 `ACCEPTED`; Gate A `PASS`; Gate B `FUTURE_INTERNAL_PROVIDER`).
+**M1 merged into `main`** (PR #27, merge commit `d00120514bdd75bc4421891486218c3cf87d3438`).
 M1.3 design: `DESIGN_ACCEPTED` ([M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md);
 D-019, D-021, D-023, D-024, D-026 to D-029). M1.3 implementation is `ACCEPTED`.
 
@@ -205,15 +206,32 @@ result and does not re-fit raw FRF.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M2.1 | `specimen_manifest` schema / domain / hash | `TODO` |
-| M2.2 | Family / design / specimen / test-run identities with distinct keys `design_id`, `physical_specimen_id`, `test_run_id` | `TODO` |
-| M2.3 | FrozenRegistration generated from physical calibration / passport | `TODO` |
-| M2.4 | Registration uncertainty diagnostic (never optimisation) | `TODO` |
-| M2.5 | Acquisition / remount linkage for Σ_setup | `TODO` |
+| M2.1 | `specimen_manifest` schema / domain / hash | `REVIEW_READY` |
+| M2.2 | Family / design / specimen / test-run identities with distinct keys `design_id`, `physical_specimen_id`, `test_run_id` | `REVIEW_READY` |
+| M2.3 | FrozenRegistration generated from physical calibration / passport | `REVIEW_READY` |
+| M2.4 | Registration uncertainty diagnostic (never optimisation) | `REVIEW_READY` |
+| M2.5 | Acquisition / remount linkage for Σ_setup | `REVIEW_READY` |
 
 **M2 GATE:** SP02/SP13 reproduce the accepted FrozenRegistration identities. The
 registration perturbation diagnostic never changes the chosen geometry by optimising
 MAC.
+
+Stage status: `REVIEW_READY` (M2.1–M2.5 `REVIEW_READY`; branch `auto-id/m2`, based on `main`
+`d001205`).
+
+**M2 gate evidence:**
+- **SP02/SP13 reproduction:** both reproduce their accepted identities through the
+  passport path (`9bf736d3…`, `a8970e52…`; `tests/test_m2_stage_gate.py`), and the
+  registration build runs with the MAC/frequency functions disabled.
+- **Diagnostic:** perturbations stay within measured uncertainty; the diagnostic never
+  selects or returns a perturbation.
+- **Physical completeness:** the SP02/SP13 basis is the historical
+  `documented_centered_alignment`, so both are **not physically complete** under
+  SPEC §11. They need a corner-A marker or measured edge offsets, plus measured
+  calibration uncertainty ([specimens/README.md](specimens/README.md)).
+- **Uncertainty and registration-limited:** with no measured uncertainty, the
+  uncertainty diagnostic is `NOT_AVAILABLE`. `registration-limited` is executable for
+  the 0.8 MAC crossing; the pairing-change trigger is `DEFERRED_M4`.
 
 ---
 

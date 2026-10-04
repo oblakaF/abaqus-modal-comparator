@@ -1674,3 +1674,140 @@ first internal provider.
 - **Next gate:** the M1 stage PR (`auto-id/m1` → `main`) merges only under explicit
   HUMAN authorization. Afterwards, record the main merge SHA. M2 starts only on
   SUPERVISOR authorization.
+
+## 2026-10-04 — M1 merged to main; M2 started
+
+- **Stage:** M1 → M2
+- **M1 merge:** PR #27 (`auto-id/m1` → `main`), merge commit `d00120514bdd75bc4421891486218c3cf87d3438`, recorded
+  in `STATUS.json` (`main_merges`, `m1.merged_to_main`) and in the ROADMAP.
+- **M2 branch:** `auto-id/m2`, created from exactly `d00120514bdd75bc4421891486218c3cf87d3438` (separate worktree).
+
+## 2026-10-04 — M2 — Specimen passport and physical registration (M2.1–M2.5)
+
+- **Stage:** M2
+- **Status:** M2.1–M2.5 REVIEW_READY. M2 stage REVIEW_READY. Not accepted by the
+  worker.
+- **Branch:** `auto-id/m2`
+- **Commits:**
+  - `ab728a2` — passport, identities and remount linkage.
+  - `a00817c` — physical registration, uncertainty diagnostic, path/timestamp
+    reconciliation, M1 integration and the stage gate.
+  - The commit that introduces this entry — documentation.
+- **M2.1 — `domain.specimen_manifest`:**
+  - **Schema:** strict `auto-id/specimen/v1.1` passport.
+  - **Specimen types:** sandwich, bare_plate, core_tile.
+  - **Physical measurements:** plan, masses, face thickness (9+ points per sheet),
+    core height, materials, and `suspension_max_hz` with its source.
+  - **Geometry calibration:** mode, coordinate calibration with provenance, measured
+    FE surface, traceable orientation (axes, reference, source), measured uncertainty,
+    corner A or panel-edge offsets.
+  - **FE geometry reference:** identity plus a pinned file.
+  - **Acquisition:** session, grid, fixture link, protocol, remount link with kind and
+    evidence.
+  - **Refused:**
+    - missing schema, unknown fields or unsupported types;
+    - collapsed or empty identities;
+    - invalid values, or nulls without a declared reason;
+    - incomplete calibration or unknown modes;
+    - untraceable orientation;
+    - absolute paths;
+    - legacy extent-fit calibration.
+  - **No defaults:** the illustrative 18 Hz is never used.
+  - **Hash:** a deterministic canonical `manifest_hash`, independent of key order.
+- **M2.2 — identities:** typed `FamilyId`, `DesignId`, `PhysicalSpecimenId`,
+  `TestRunId`, which must be distinct.
+  - A remount keeps `physical_specimen_id` and gets a new `test_run_id`.
+  - The SP02/SP13 `test_run_id` values are the recorded acquisition container names.
+    They supersede the provisional M0.2 run labels; the M0.2 manifest is unchanged.
+- **M2.3 — `services.physical_registration`:**
+  - **Inputs:** a FrozenRegistration built from the passport calibration, the pinned
+    experimental geometry and the identity-verified FE geometry. No MAC, frequency,
+    mode-shape or identification input.
+  - **Modes:**
+    - `corner_coordinates_mm`: documented axes checked by the corner-A marker; the
+      marker cannot override them, and a contradictory marker is refused.
+    - `scan_to_panel_edges`: measured offsets.
+    - `documented_centered_alignment`: historical. It uses the existing geometric
+      candidate whose rotation **equals** the documented one, never ranked by modal
+      agreement, and is never physically complete.
+  - **Deterministic.**
+  - **FE geometry for SP02/SP13:** the authenticated CARBON-4C extraction, copied to
+    the `carbon-project-archive` store (`fe_geometry/SP02_fe_geometry.csv` sha
+    `79bffd96…`, `fe_geometry/SP13_fe_geometry.csv` sha `78d19737…`) and recorded in
+    `ARCHIVE_MANIFEST.json`. The FE identities equal the accepted `72e8597a…` /
+    `34d69d79…`.
+- **M2 gate — accepted FrozenRegistration reproduction: PASS.**
+  - **SP02:** `9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164`.
+  - **SP13:** `a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4`.
+  - Both are reproduced exactly (hash and full content) from the passports.
+  - **Legacy source identity:** the experimental source's legacy path/mtime come from
+    the referenced accepted registration, verified by its hash and by the fixture
+    SHA-256/size. They are not stored in the passport.
+  - **Physical basis:** the historical documented centred alignment. **Not physically
+    complete:** missing a corner-A marker or measured edge offsets, and measured
+    translation/scale/rotation uncertainty.
+- **M2.4 — `services.registration_uncertainty`:**
+  - It uses a deterministic ±σ perturbation set from measured uncertainty only, and
+    reports nominal, minimum and maximum MAC per accepted pair.
+  - `registration_limited` is true on a 0.8 crossing; false only when every component
+    was evaluated; null when not evaluable.
+  - It never returns, selects or feeds back a best perturbation. The nominal
+    registration is unchanged.
+  - **Executable now:** the MAC-threshold trigger.
+  - **Deferred:** the pairing-change trigger (`DEFERRED_M4`).
+  - **SP02/SP13:** `NOT_AVAILABLE`.
+- **M2.5 — `domain.acquisition_linkage`:**
+  - **Classification:** frequency + shape, frequency only (different grid), not
+    eligible (different panel, same run or different protocol), insufficiently
+    documented (no panel id, remount link or protocol).
+  - **Link validation:** unique run ids; remounts of known runs on the same recorded
+    panel; no cycles.
+  - No Σ_setup value is computed, and specimen scatter is never Σ_setup.
+  - **SP13 121/289:** UNCONFIRMED (same panel / independent remount not established);
+    at most frequency-only once documented.
+- **M1 integration:** `prepare_auto_id_experimental_input(..., specimen_passport=)`
+  takes the trusted suspension threshold from the passport. It refuses a passport for
+  another fixture and a passport combined with an explicit threshold.
+  - **SP02/SP13:** suspension remains `NOT_AVAILABLE`; hard QC passes.
+- **Path/timestamp debt (M1 accepted limitation): resolved for content-hashed
+  registrations.**
+  - `FrozenRegistration.check_content_compatible` checks SHA-256 + size and ignores
+    path/mtime.
+  - Stage-A pairing uses it when the registration has a content hash, and the legacy
+    exact check otherwise.
+  - New physical registrations record `store:relative_path` and no mtime.
+  - The accepted `check_compatible` contract is unchanged.
+- **Files:**
+  - **added code:** `src/domain/specimen_manifest.py`,
+    `src/domain/acquisition_linkage.py`, `src/services/physical_registration.py`,
+    `src/services/registration_uncertainty.py`;
+  - **added data and docs:** `docs/auto_id/specimens/{SP02,SP13}.specimen.json`,
+    `docs/auto_id/specimens/README.md`;
+  - **added tests:** `tests/m2_support.py`, `tests/test_specimen_manifest.py` (23),
+    `tests/test_acquisition_linkage.py` (14), `tests/test_physical_registration.py`
+    (17), `tests/test_registration_uncertainty.py` (9),
+    `tests/test_passport_qc_integration.py` (4), `tests/test_m2_stage_gate.py` (1, real
+    data);
+  - **updated:** `src/domain/registration.py` (content check),
+    `src/services/stage_a_identification_service.py` (content-based registration
+    check), `src/services/experimental_qc.py` (passport threshold), and
+    `docs/auto_id/STATUS.json`, `ROADMAP.md`, `CHANGELOG.md`.
+- **Scientific runtime behaviour changed:**
+  - **YES, in two places:**
+    - Stage-A pairing now accepts a registration whose experimental source has the
+      same content at another path/mtime; different content is still refused.
+    - A passport-supplied suspension threshold reaches M1.4 eligibility.
+  - **NO:** no M1 threshold, pairing, registration content, modal algorithm or
+    material parameter changed.
+- **Tests:**
+  - **Focused M2 + related M1 suites:** 254 ran, OK.
+  - **Full Windows suite** (Python 3.14.6): 1074 ran, 0 failures. With both data
+    stores configured, 1072 passed and 2 skipped (opt-in Abaqus). Without stores, 1065
+    passed with 2 skipped tests and 14 skipped real-data subtests.
+  - **Linux CI** on `a00817c` (ubuntu-latest, Python 3.11, run 37171058455):
+    1071 ran, OK, skipped=20 — 14 data-store subtests, 2 opt-in Abaqus, 4 headless Tk.
+    These are the categories classified in M0.4.
+- **Abaqus run count:** 0
+- **Not done (by instruction):** M3 not started; no optimisation; no Σ_setup value; no
+  invented measurements.
+- **Next gate:** SUPERVISOR review of M2 (stage PR `auto-id/m2` → `main`).
