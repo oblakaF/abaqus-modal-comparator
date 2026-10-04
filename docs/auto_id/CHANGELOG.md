@@ -2305,3 +2305,43 @@ first internal provider.
 - **Unchanged:** M3 contracts and the existing comparator, cluster and Stage-A
   services.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.4 — Cluster trigger and principal-angle confirmation
+
+- **Stage:** M4 first development batch
+- **Status:** M4.4 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.identification_clusters`** (SPEC §12.4, D-009):
+  - **`cluster_triggers(rows)`:** |Δf|/f < 3 % in experimental **or** FE frequency is
+    only a trigger. Rows that link transitively form one group.
+  - **`confirm_cluster(row_ids, baseline_shapes, perturbed_shapes, weights)`:**
+    - Requires all directions of carbon v1: E_in_plane ± 5 % and G12 ± 5 %.
+    - **CONFIRMED** when individual identity is unstable (best FE-to-FE MAC < 0.9, or
+      no unique counterpart) in at least one direction, **and** the 2-mode subspace is
+      stable (both principal-angle cos² > 0.95) and uniquely identified in **every**
+      direction.
+    - **INDEPENDENT** when identity is stable everywhere: two observations.
+    - **UNSTABLE** when the subspace is unstable or ambiguous: a refusal.
+    - **UNSUPPORTED** for groups of more than two modes: reported, not confirmed.
+    - Optional mass weighting.
+  - **`cluster_log_residual(fe_hz, experimental_hz)`:** r_C = (1/n_C)·Σ ln(f_FE/f_EXP),
+    independent of the pairing of members. A confirmed cluster is one residual, never
+    two independent observations.
+- **Thresholds:** 3 %, 0.95 and 0.9 are the SPEC values, as named constants. The
+  directions follow carbon v1. k_core directions are outside M4 (no new
+  parameterisation; M3 contracts unchanged).
+- **Real shapes:** not available in this batch. The ±5 % CARBON-5A ODBs are archived,
+  but extracting shapes is Abaqus Python, which needs the HUMAN gate. Tests use
+  synthetic orthonormal shapes:
+  - a rotating pair confirms;
+  - a close but distinct pair stays two observations;
+  - a single unstable direction is enough;
+  - subspace leakage or ambiguity is refused;
+  - 3-mode groups are unsupported;
+  - weighting is applied;
+  - the residual is assignment-invariant.
+- **Tests:** `tests/test_identification_clusters.py`: 13 ran, OK. M4 guard extended.
+- **Unchanged:** `modal_cluster_service.py`, `family_residual_service.py` (not
+  imported), and the M3 contracts.
+- **Abaqus run count:** 0
