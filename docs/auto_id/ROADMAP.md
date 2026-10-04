@@ -342,6 +342,11 @@ First batch reviewed by the SUPERVISOR:
 - ODB shape-extraction gate (HUMAN-authorised; review PASS): 6 validated shape packs
   ([fe_shapes/](fe_shapes/README.md)). M4.2 integrated with complete MAC matrices: back to
   `REVIEW_READY`. SP13 is FROZEN (2 rows); SP02 is NOT_FROZEN (1 strict pair < 2).
+- SUPERVISOR review of M4.2:
+  - M4.2 is unblocked and `REVIEW_READY` (not `ACCEPTED`).
+  - SP13 is the candidate frozen observation set.
+  - SP02 remains excluded from identification.
+  - Criteria and thresholds are unchanged.
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---

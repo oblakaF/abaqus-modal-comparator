@@ -309,7 +309,17 @@
       "SP13": "FROZEN: R1 exp 4 - FE 10 (MAC 0.888), R2 exp 5 - FE 11 (MAC 0.889)",
       "observation_hash_SP13": "922888c7285c8ff0892afab6f37f3840b286991d2814598e28cce208ea18dd5b",
       "note": "SP13 R1/R2 are 2.2 % apart (cluster trigger); M4.4 real confirmation not started"
+    },
+    "M4.2_supervisor_review": {
+      "date": "2026-10-04",
+      "status": "REVIEW_READY (not ACCEPTED)",
+      "notes": [
+        "M4.2 is unblocked",
+        "SP13 is the candidate frozen observation set (R1 exp 4 - FE 10, R2 exp 5 - FE 11)",
+        "SP02 remains excluded from identification (NOT_FROZEN: 1 strict row < 2)",
+        "freeze criteria and MAC/frequency thresholds unchanged"
+      ]
     }
   },
-  "next_action": "SUPERVISOR review of the M4.2 shape-pack integration; M4.3 real validation, M4.4 real cluster confirmation, M4.6 and M4.9 not started"
+  "next_action": "Await SUPERVISOR instruction; not started: M4.3 real validation, M4.4 real cluster confirmation, M4.6, M4.9"
 }

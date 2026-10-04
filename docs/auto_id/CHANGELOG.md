@@ -2588,3 +2588,18 @@ first internal provider.
   - SPEC and DECISIONS.
 - **Abaqus run count in this step:** 0. The extraction gate's 6 Abaqus Python runs are
   recorded above.
+
+## 2026-10-04 — M4.2 — SUPERVISOR review note recorded
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Review of the M4.2 shape-pack integration:** result acknowledged. M4.2 stays
+  **REVIEW_READY**, not ACCEPTED.
+  - M4.2 is **unblocked**: complete MAC evidence for SP13 is available.
+  - **SP13** is the **candidate frozen observation set**: R1 exp 4 ↔ FE 10, R2 exp 5 ↔
+    FE 11 (observation hash `922888c7…`).
+  - **SP02** remains **NOT_FROZEN** and is **excluded from identification**. The strict
+    policy requires at least 2 valid observation rows; SP02 has 1.
+- **Unchanged:** freeze criteria and MAC/frequency thresholds.
+- **Not started:** M4.3 real validation, M4.4 real cluster confirmation, M4.6, M4.9.
+- **Code changed:** none.
+- **Abaqus run count:** 0
