@@ -2646,3 +2646,43 @@ first internal provider.
   The M4.3 and M4 guard suites pass.
 - **Not started:** M4.4, M4.6, M4.9. M4.2 freeze criteria are unchanged.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.4 — Real cluster confirmation of SP13 R1/R2: INDEPENDENT
+
+- **Stage:** M4 (IN_PROGRESS); SUPERVISOR-authorised M4.4 real confirmation only
+- **Status:** M4.4 REVIEW_READY. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Input:**
+  - the validated SP13 shape packs: baseline, plus the CARBON-5A ±5 % E_in_plane and
+    G12 states;
+  - the M4.2 frozen candidate rows R1 (exp 4 ↔ FE 10) and R2 (exp 5 ↔ FE 11);
+  - the M4.3 families: R1 `Px:O|Py:E|nx:1|ny:2`, R2 `Px:E|Py:O|nx:2|ny:1`.
+- **Method:** `services.identification_clusters` unchanged, with the approved criteria
+  only:
+  - |Δf|/f < 3 % is a trigger only;
+  - CONFIRMED only if individual identity is unstable (FE-to-FE MAC < 0.9, or no
+    unique counterpart) in at least one direction, while the 2-mode subspace is stable
+    (both cos² > 0.95) and unique in every direction.
+  - All 24 perturbed modes were candidates; there was no preselection.
+- **Basis:** primary, the full outer-surface U1–U3 vectors; sensitivity check, U3 only.
+- **Result:**
+  - **Trigger fired:** experimental spacing 2.25 %, FE spacing 2.24 %.
+  - **Decision: INDEPENDENT.** In each of E+, E−, G12+, G12−:
+    - each branch has exactly one counterpart ≥ 0.9 (FE 10 → 10, FE 11 → 11) with
+      MAC 0.999998;
+    - the cross-MAC to the other branch is ≈ 0;
+    - subspace cos² is 0.999998.
+
+    The same decision holds on the U3 basis.
+  - Perturbed frequencies move as expected (FE 10: 84.27 Hz at E−, 87.40 Hz at E+).
+- **Interpretation:** R1 (odd-even) and R2 (even-odd) are different symmetry classes;
+  the symmetric E/G12 perturbations do not mix them. R1 and R2 stay **two independent
+  observations**; no cluster residual applies.
+- **Added:**
+  - `docs/auto_id/fe_shapes/SP13.R1-R2.cluster.json` (schema
+    `auto-id/cluster-confirmation/v1`, PENDING SUPERVISOR REVIEW);
+  - `tests/test_m4_4_real_cluster.py`: record checks, plus a store-gated recomputation.
+- **Unchanged:** cluster thresholds, M4.2 freeze criteria, the M4.3 provisional policy,
+  and the M3 contracts. M4.6 and M4.9 not started.
+- **Abaqus run count:** 0. The existing gate shape packs were enough.

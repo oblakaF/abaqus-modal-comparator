@@ -328,7 +328,14 @@
       "modes": "24/24 classified; parity / nodal-line parity consistent for all; lowest odd-odd family FE 7 (22.49 Hz)",
       "frozen_rows": "R1 FE 10 Px:O|Py:E|nx:1|ny:2; R2 FE 11 Px:E|Py:O|nx:2|ny:1",
       "holdouts": "no torsion holdout (no odd-odd family among frozen rows); validation holdout R2 (highest accepted family); fit rows: R1 only (1 < 2 parameters)"
+    },
+    "M4.4_real_confirmation": {
+      "record": "docs/auto_id/fe_shapes/SP13.R1-R2.cluster.json",
+      "trigger": "fired (experimental 2.25 %, FE 2.24 %): trigger only",
+      "decision": "INDEPENDENT: R1 (FE 10) and R2 (FE 11) are two independent branches, not a cluster",
+      "evidence": "all four +/-5 % E/G12 directions: unique counterpart per branch, FE-to-FE MAC 0.999998; cross-MAC ~0; subspace cos2 0.999998; same on surface U1-U3 (primary) and U3",
+      "criteria": "unchanged (3 % trigger, MAC 0.9, cos2 0.95)"
     }
   },
-  "next_action": "SUPERVISOR review of M4.3 real validation; not started: M4.4 real cluster confirmation, M4.6, M4.9"
+  "next_action": "SUPERVISOR review of M4.4 real confirmation; M4.6 and M4.9 not started"
 }

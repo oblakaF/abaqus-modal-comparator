@@ -293,3 +293,19 @@ Possible remaining causes remain outside CARBON-5F scope:
   Record: [fe_shapes/SP13_a46d08b52995e078.families.json](fe_shapes/SP13_a46d08b52995e078.families.json).
 - **Normative vs diagnostic:** diagnostic; thresholds stay PROVISIONAL until a separate
   decision.
+
+## M4.4 — Cluster confirmation of SP13 R1/R2 on real FE shapes
+
+- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Kind:** observation-design diagnostic. **Not** a material result.
+- **Input:** validated SP13 baseline and CARBON-5A ±5 % E/G12 shape packs; M4.2 rows
+  R1/R2; M4.3 families.
+- **Result:**
+  - the 2.2 % trigger fired;
+  - the decision is **INDEPENDENT**: individual FE-to-FE MAC is 0.999998 with unique
+    counterparts in all four directions, and the cross-MAC is ≈ 0;
+  - R1 and R2 remain two observations.
+
+  Record: [fe_shapes/SP13.R1-R2.cluster.json](fe_shapes/SP13.R1-R2.cluster.json).
+- **Normative vs diagnostic:** diagnostic; normative for the SP13 observation design
+  only after SUPERVISOR acceptance.

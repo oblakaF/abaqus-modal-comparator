@@ -352,6 +352,10 @@ First batch reviewed by the SUPERVISOR:
   - Frozen rows: R1 (FE 10) is odd-even, R2 (FE 11) is even-odd.
   - Holdouts: no torsion holdout; the validation holdout is R2; one fit row remains.
   - Thresholds unchanged and PROVISIONAL.
+- M4.4 real cluster confirmation of SP13 R1/R2: `REVIEW_READY`.
+  - The trigger fired, but the decision is **INDEPENDENT**: individual identity is stable
+    (MAC 0.999998) in all ±5 % E/G12 directions.
+  - R1 and R2 remain two observations. Criteria unchanged.
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---
