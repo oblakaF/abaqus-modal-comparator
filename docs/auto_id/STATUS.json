@@ -371,8 +371,9 @@
       "shape_pack": "content SHA 7941545b59390a65010645584b6bd5ab142ab9097f40333ca8d427654a612eca identical to the validated baseline pack; min FE-to-FE MAC 1.0",
       "m3_contracts": "unchanged",
       "run_directory": "D:\\abaqus_m4_smoke (ODB kept until review)",
-      "archive_proposal": "provenance only (journal, comparison, extraction manifest, logs) under carbon-project-archive/m4_smoke/; no duplicate shape pack (reference fe_shapes/SP13_a46d08b52995e078.npz)"
+      "archive_proposal": "provenance only (journal, comparison, extraction manifest, logs) under carbon-project-archive/m4_smoke/; no duplicate shape pack (reference fe_shapes/SP13_a46d08b52995e078.npz) [PROPOSAL ONLY; not approved yet]",
+      "supervisor_review": "ACCEPTED 2026-10-05 (verdict REPRODUCED)"
     }
   },
-  "next_action": "SUPERVISOR review of M4.6 and the SP13 smoke gate (EVIDENCE PENDING); archive proposal pending; M4.9 not started"
+  "next_action": "Await SUPERVISOR instruction; archive of the smoke provenance remains a proposal; M4.9 not started"
 }

@@ -312,7 +312,7 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 ## M4.6 — SP13 p0 smoke gate (real Abaqus through the M4.6 path)
 
-- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05). Verdict REPRODUCED.
 - **Kind:** software and solver reproducibility check. **Not** a material result.
 - **Authorisation:** HUMAN gate. 1 Abaqus 2024 solve plus 1 pinned `extract_odb.py`
   extraction of `SP13_a46d08b52995e078` (p0); no LM loop, no M4.9.

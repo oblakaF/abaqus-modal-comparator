@@ -2836,3 +2836,17 @@ first internal provider.
   referencing the existing `fe_shapes/SP13_a46d08b52995e078.npz`; no duplicate pack.
   The ODB stays in `D:\abaqus_m4_smoke` until review.
 - **Abaqus run count:** 1 solve plus 1 Abaqus Python extraction (authorised).
+
+## 2026-10-05 — M4.6 — SP13 smoke gate ACCEPTED by the SUPERVISOR
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Review:** the SUPERVISOR accepts the SP13 p0 smoke gate.
+  - The real M4.6 smoke-gate verdict is confirmed as **REPRODUCED**: 30/30 eigenfrequencies
+    exact, and the shape-pack content SHA `7941545b…` identical to the validated baseline pack.
+  - EVIDENCE.md "M4.6 — SP13 p0 smoke gate" moves from PENDING SUPERVISOR REVIEW to
+    **ACCEPTED**.
+- **Archive action:** remains a **proposal** until separately approved (provenance only,
+  under `carbon-project-archive/m4_smoke/`; no duplicate pack). The ODB stays in
+  `D:baqus_m4_smoke`.
+- **Not started:** M4.9. No additional Abaqus.
+- **Code changed:** none.

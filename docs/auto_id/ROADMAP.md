@@ -363,6 +363,8 @@ First batch reviewed by the SUPERVISOR:
   - 30/30 eigenfrequencies exact.
   - Shape-pack content SHA identical to the validated baseline pack.
   - M3 contracts unchanged.
+  - **SUPERVISOR ACCEPTED** (2026-10-05). The archive of the smoke provenance remains a
+    proposal.
 - SUPERVISOR review of M4.4:
   - `REVIEW_READY`: R1/R2 are independent branches; no cluster merging.
   - **Unresolved:** the M4.3 holdout selection leaves one fit row for two parameters.

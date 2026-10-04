@@ -346,6 +346,11 @@ started.
 | Shape pack | Content SHA **`7941545b59390a65…` identical** to the validated baseline pack; minimum MAC 1.0 |
 | M3 contracts | Unchanged |
 
+### 7.3a SUPERVISOR review
+
+**ACCEPTED** (2026-10-05). Verdict **REPRODUCED** confirmed. The archive action below
+remains a proposal until separately approved.
+
 ### 7.4 Archive proposal (pending)
 
 - **Do not duplicate** the identical shape pack. Reference the existing
