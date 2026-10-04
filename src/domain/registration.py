@@ -377,6 +377,42 @@ class FrozenRegistration:
                 )
         return True
 
+    def check_content_compatible(
+        self,
+        experimental_identity: object,
+        fe_geometry_identity: object,
+    ) -> bool:
+        """Content-based compatibility: return True, or raise RegistrationMismatchError.
+
+        The experimental source must have the frozen SHA-256 and size; its path and
+        modification time are workstation details and are ignored.  The FE geometry
+        identity must equal the frozen one exactly (it is already content-based).  A
+        registration frozen without a content hash cannot be checked this way.
+        """
+        frozen = self.experimental_source_identity
+        if not isinstance(frozen.get("sha256"), str):
+            raise RegistrationMismatchError(
+                "experimental_source_identity",
+                "The registration records no content hash; only the legacy exact check applies.",
+            )
+        supplied = experimental_identity if isinstance(experimental_identity, Mapping) else {}
+        if supplied.get("sha256") != frozen.get("sha256") or supplied.get("size") != frozen.get("size"):
+            raise RegistrationMismatchError(
+                "experimental_source_identity",
+                "The registration is not valid for the current experimental source content.",
+            )
+        try:
+            matches = isinstance(fe_geometry_identity, Mapping) and _canonical_bytes(
+                _freeze_json(fe_geometry_identity, "fe_geometry_identity")
+            ) == _canonical_bytes(self.fe_geometry_identity)
+        except (TypeError, ValueError):
+            matches = False
+        if not matches:
+            raise RegistrationMismatchError(
+                "fe_geometry_identity", "The registration is not valid for the current fe_geometry_identity."
+            )
+        return True
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, FrozenRegistration):
             return NotImplemented

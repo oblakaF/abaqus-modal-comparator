@@ -1099,6 +1099,19 @@ def _frozen_calibration(registration: FrozenRegistration) -> CoordinateCalibrati
     return calibration
 
 
+def _check_registration(
+    registration: FrozenRegistration,
+    experimental_identity: Mapping[str, object],
+    fe_geometry_identity: Mapping[str, object],
+) -> None:
+    """Content-based check (SHA-256 + size; path/mtime ignored) when the registration records
+    a content hash (Auto-ID M2 path/timestamp reconciliation); legacy exact check otherwise."""
+    if isinstance(registration.experimental_source_identity.get("sha256"), str):
+        registration.check_content_compatible(experimental_identity, fe_geometry_identity)
+    else:
+        registration.check_compatible(experimental_identity, fe_geometry_identity)
+
+
 def _verified_experimental_source(
     registration: FrozenRegistration, comparison: ComparisonResult
 ) -> dict[str, object]:
@@ -1110,7 +1123,7 @@ def _verified_experimental_source(
             "cannot be verified; the legacy path/size/mtime identity is not used.",
         )
     try:
-        registration.check_compatible(identity, registration.fe_geometry_identity)
+        _check_registration(registration, identity, registration.fe_geometry_identity)
     except RegistrationMismatchError as exc:
         raise StageAProductionPairingRefusal(exc.field, str(exc)) from exc
     return identity
@@ -1123,7 +1136,7 @@ def _require_fe_geometry(
 ) -> None:
     try:
         geometry = modal_dataset_geometry_identity(dataset)
-        registration.check_compatible(experimental_identity, geometry)
+        _check_registration(registration, experimental_identity, geometry)
     except RegistrationMismatchError as exc:
         raise StageAProductionPairingRefusal(exc.field, str(exc)) from exc
     except ValueError as exc:
