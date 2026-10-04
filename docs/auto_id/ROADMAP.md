@@ -150,7 +150,7 @@ authorization.
 | M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `ACCEPTED` (commit `4b8d73e`) |
 | M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `ACCEPTED` (commit `c411bb9`) |
 
-Stage status: `IN_PROGRESS` (M1.1 `ACCEPTED`; M1.2 `ACCEPTED`; M1.3 `ACCEPTED`; M1.4 `ACCEPTED`).
+Stage status: `BLOCKED_SPEC_GATE` (M1.1–M1.4 `ACCEPTED`; Gate A `PASS`; see the M1 GATE below).
 M1.3 design: `DESIGN_ACCEPTED` ([M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md);
 D-019, D-021, D-023, D-024, D-026 to D-029). M1.3 implementation is `ACCEPTED`.
 
@@ -167,14 +167,46 @@ Internal FRF fitting is a future provider (D-029). The first provider
 evaluation deferred to M1.4; internal fitting remains a future provider;
 registration source path/timestamp reconciliation remains future work.
 
-**M1 GATE (SP13 raw FRF):** recover ≈ 206.15 Hz and ≈ 212.61 Hz within ±0.05 Hz of
-PolyMAX; no false identification mode around 217.5 Hz; damping within 30 % of PolyMAX
-(SPEC §17).
-**Reference values (D-028):** gates use fixture-specific PolyMAX values and never mix
-acquisitions. For `SP13/best` (repeat-a) these are about 205.65 / 212.66 / 228.61 Hz. The
-206.15 / 212.61 Hz values above belong to the 2026-09-09 acquisition and apply only if
-that acquisition becomes its own fixture.
+**M1 GATE (stage closure)**
 
+**Reference values are fixture-specific (D-028).**
+- **`SP13/best` (repeat-a, 2026-09-10):** the pinned PolyMAX values are about 205.65 /
+  212.66 / 228.61 Hz.
+- **Historical:** 206.15 / 212.61 / 228.75 Hz belong to the 2026-09-09 acquisition.
+  They are historical evidence only, unless that acquisition becomes its own fixture.
+
+**Gate A — external PolyMAX-compatible provider (the current production path):**
+`PASS`. Evidence: `tests/test_m1_stage_gate.py` (commit `f5279dd`) on `SP02/bravo-1`
+and `SP13/best`. It shows that:
+- the pinned dataset-58 FRF and the frozen PolyMAX modal selection come from the same
+  accepted export;
+- fixture and source provenance is exact: source SHA-256, modal set, counts, U3
+  contract, FrozenRegistration and FE identity;
+- the provider reproduces the frozen PolyMAX modal dataset, identical to the M1.2
+  production input, with damping from the stored PolyMAX poles;
+- no peak-derived candidate enters production identification: real peak-derived modes
+  from the same export are refused;
+- the experimental QC hard checks pass, and the dataset passes through QC unchanged;
+- for `SP13/best`, the D-028 references are reproduced within ±0.05 Hz, with no mode
+  within 1 Hz of 217.5 Hz.
+
+The external provider does **not** independently re-fit raw FRF or rediscover these
+poles. It reproduces the frozen PolyMAX result.
+
+**Gate B — raw-FRF recovery by an internal `ModalFittingProvider`:** recover the
+fixture's PolyMAX poles from raw FRF within ±0.05 Hz, with no false candidate and ζ
+within 30 % of PolyMAX. This is the SPEC §17 M1 row criterion, for the built-in fit of
+SPEC §4. It is **not claimed** and belongs to a future internal provider (D-029).
+
+**Stage status: `BLOCKED_SPEC_GATE`.** SPEC §4 still assigns the built-in multi-mode
+fit to stage M1:
+
+> If `modes.unv` is absent and only `frf.unv` exists, modes are built by the built-in
+> **multi-mode** fit (stage M1).
+
+SPEC outranks DECISIONS, so D-029 cannot move that fit out of M1. Closing M1 needs a
+SPEC amendment (a proposed §19 text is recorded in CHANGELOG and STATUS) or an accepted
+internal provider.
 ---
 
 ## M2 — Specimen manifest + physical registration

@@ -5,7 +5,7 @@
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M1",
   "current_ministep": null,
-  "status": "IN_PROGRESS",
+  "status": "BLOCKED_SPEC_GATE",
   "last_accepted_stage": "M0",
   "last_accepted_ministep": "M1.4",
   "last_accepted_commit": "c411bb9842fbdb6feb546fbdf3cbf3ae7ba6634f",
@@ -45,7 +45,7 @@
     "M1.2": "ACCEPTED",
     "M1.3": "ACCEPTED",
     "M1.4": "ACCEPTED",
-    "status": "IN_PROGRESS",
+    "status": "BLOCKED_SPEC_GATE",
     "M1.3_design_review": "DESIGN_ACCEPTED (D-019, D-021, D-023, D-024, D-026..D-029); no unresolved conflict",
     "M1.3_implementation": "ACCEPTED",
     "M1.3.1": "ACCEPTED",
@@ -53,7 +53,18 @@
       "coherence evaluation deferred to M1.4",
       "internal FRF fitting remains a future provider (D-029)",
       "registration source path/timestamp reconciliation remains future work"
-    ]
+    ],
+    "gate": {
+      "gate_a_external_polymax_provider": "PASS (tests/test_m1_stage_gate.py, commit f5279dd; SP02/bravo-1, SP13/best)",
+      "gate_b_internal_raw_frf_recovery": "NOT CLAIMED (future internal ModalFittingProvider, D-029)",
+      "reference_values": "fixture-specific (D-028); SP13/best ~205.65/212.66/228.61 Hz",
+      "blocking_sentence": "SPEC §4, footnote to `modes.unv`: \"If `modes.unv` is absent and only `frf.unv` exists, modes are built by the built-in **multi-mode** fit (stage M1).\"",
+      "reason": "SPEC (precedence 1) still assigns the built-in multi-mode fit to stage M1; DECISIONS (precedence 2) cannot override it",
+      "resolution_options": [
+        "SUPERVISOR SPEC amendment (proposed §19 item 4 text in CHANGELOG)",
+        "accepted internal ModalFittingProvider passing Gate B"
+      ]
+    }
   },
   "audit_test_baseline": {
     "ran": 873,
@@ -119,5 +130,8 @@
       }
     ]
   },
-  "next_action": "M1 stage closure: resolve the M1 gate and verify the stage"
+  "next_action": "SUPERVISOR: resolve BLOCKED_SPEC_GATE (SPEC §19 amendment or internal provider); no M1 stage PR until then; M2 not started",
+  "m2": {
+    "status": "NOT_STARTED"
+  }
 }

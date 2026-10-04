@@ -1472,3 +1472,91 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Production code changed:** NO
 - **Tests run:** none (status record only)
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M1 — Stage-closure verification; M1 BLOCKED_SPEC_GATE
+
+- **Stage:** M1 (stage closure)
+- **Status:** M1.1, M1.2, M1.3.1, M1.3 and M1.4 ACCEPTED. **M1 stage
+  `BLOCKED_SPEC_GATE`.** M2 NOT STARTED. No stage PR created.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commits in this closure:**
+  - `b41af39` — M1.4 acceptance record.
+  - `f5279dd` — `tests/test_m1_stage_gate.py`.
+  - The commit that introduces this entry — M1 gate rewrite and stage state.
+- **M1 gate text rewritten (ROADMAP)** without changing scientific intent:
+  - fixture-specific references (D-028);
+  - the old 206.15 / 212.61 / 228.75 Hz values marked as historical (2026-09-09
+    acquisition);
+  - **Gate A**, the external PolyMAX provider: **PASS**;
+  - **Gate B**, raw-FRF recovery by an internal provider: **not claimed**, future
+    work (D-029);
+  - the external provider is stated explicitly not to re-fit raw FRF.
+- **Gate A evidence** (Windows, data store configured; `test_m1_stage_gate`, plus the
+  per-milestone real-data tests):
+  - **SP02/bravo-1:**
+    - source SHA-256 `2671db01…`, modal set `bravo-1`, 9 modes, 121 points, U3;
+    - registration `9bf736d3…`, FE `72e8597a…`;
+    - provider `external-polymax/1`, `external_frozen_selection`, damping equals the
+      stored poles;
+    - QC overall WARNING, with provenance, contract and FRF completeness PASS;
+    - dataset identical to M1.2 and unchanged through QC;
+    - the real FRF peak path (26 candidates) is refused by M1.1.
+  - **SP13/best:**
+    - source SHA-256 `f2680235…`, modal set `best`, 12 modes, 289 points, U3;
+    - registration `a8970e52…`, FE `34d69d79…`;
+    - provider and damping as for SP02;
+    - QC overall WARNING, hard checks PASS (coherence NOT_AVAILABLE);
+    - D-028 references 205.65 / 212.66 / 228.61 Hz reproduced, no mode within 1 Hz of
+      217.5 Hz;
+    - the real FRF peak path (22 candidates; 205.62 / 212.66 / 222.66 / 228.59 Hz in
+      195–235 Hz, 230.89 Hz missed) is refused by M1.1.
+- **Why the stage is blocked.** SPEC §4, footnote to `modes.unv`: "If `modes.unv` is absent and only `frf.unv` exists, modes are built by the built-in **multi-mode** fit (stage M1)."
+  - This normative sentence assigns the built-in multi-mode fit (FRF-only packages) to
+    stage M1. The accepted M1 refuses FRF-only packages, and D-029 defers internal
+    fitting.
+  - By document precedence, SPEC (1) outranks DECISIONS (2), so no new decision can
+    supersede it. The SPEC's own mechanism is a SUPERVISOR clarification in §19.
+  - The §17 M1 row ("built-in multi-mode fit"; "SP13 from raw FRF … found") conflicts
+    too, although §17 labels its criteria archival.
+  - §6 S1 ("dataset 55 (priority) or the built-in multi-mode fit") is satisfied.
+- **Proposed SPEC §19 clarification** (for SUPERVISOR decision; not applied):
+
+**4. Modal preparation stage and the M1 gate (D-023, D-027, D-028, D-029).**
+The built-in multi-mode fit named in §4 (footnote to `modes.unv`), §6 S1 and the §17 M1
+row is an internal `ModalFittingProvider` of the separate modal preparation stage
+(D-023). It is future provider work (D-029) and not a condition for closing stage M1.
+
+Stage M1 closes on the external PolyMAX-compatible provider (D-027). Its conditions:
+- the pinned FRF and the frozen PolyMAX selection come from the same accepted export;
+- fixture and source provenance is exact;
+- the provider reproduces the frozen modal dataset, with damping from the stored
+  poles;
+- no peak-derived input enters identification;
+- the experimental QC hard checks pass.
+
+Until an internal provider is accepted, a package with only `frf.unv` is refused.
+
+M1 gate reference values are fixture-specific (D-028). For SP13 repeat-a (`SP13/best`)
+they are about 205.65 / 212.66 / 228.61 Hz. The §17 values 206.15 / 212.61 Hz belong
+to the 2026-09-09 acquisition.
+
+The raw-FRF recovery criterion of the §17 M1 row becomes the acceptance gate of the
+first internal provider.
+
+- **Tests:**
+  - **Focused M1 suites** (fixture, regression, source policy, production input,
+    modal fitting, provider, QC, stage gate, Stage-A identification, discovery guard),
+    store configured: 211 ran, OK.
+  - **Full Windows suite** (Python 3.14.6): 997 ran, 0 failures. With the store
+    configured, 995 passed and 2 skipped (opt-in Abaqus). Without it, 989 passed with
+    2 skipped tests and 12 skipped real-data subtests.
+  - **Linux CI** on `f5279dd` (ubuntu-latest, Python 3.11, run 37164499562): 994 ran,
+    OK, skipped=18.
+    - 12 real-fixture subtests: 6 real-data tests × 2 fixtures, no store on CI;
+    - 2 opt-in Abaqus tests;
+    - 4 headless-Tk skips, one of them class-level.
+    - These are the categories classified in M0.4; none are new.
+- **Scientific runtime behaviour changed:** NO (documentation and tests only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR resolution of `BLOCKED_SPEC_GATE`. No M1 stage PR before
+  then. M2 not started.
