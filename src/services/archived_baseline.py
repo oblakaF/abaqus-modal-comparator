@@ -27,6 +27,7 @@ from domain.experimental_qc import ExperimentalModeEligibility
 from domain.frozen_observations import BaselineIdentity
 
 from .baseline_freeze import BaselineEvidence, build_baseline_evidence
+from .fe_shape_pack import FEShapePack
 from .identification_pairing import ModeFrequency
 
 
@@ -173,3 +174,91 @@ def load_archived_baseline(path: Path) -> ArchivedBaseline:
     with open(path, encoding="utf-8") as handle:
         data = json.load(handle)
     return parse_archived_baseline(data, record_hash(data))
+
+
+# ----------------------------------------------------------------------------- complete MAC matrix from a shape pack
+
+SHAPE_PACK_EVIDENCE_SOURCE = "archived-carbon4c-replay+fe-shape-pack"
+RECORDED_MAC_TOLERANCE = 1.0e-9
+
+
+def _mac(left: np.ndarray, right: np.ndarray) -> float:
+    """|a^H b|^2 / (a^H a * b^H b): the comparator's modal assurance criterion (modal_core), on given DOFs."""
+    norm_left = float(np.vdot(left, left).real)
+    norm_right = float(np.vdot(right, right).real)
+    if norm_left <= 1e-30 or norm_right <= 1e-30:
+        raise ArchivedBaselineError("mac", "a shape vector is zero on the measured DOFs.")
+    return float(np.clip(abs(np.vdot(left, right)) ** 2 / (norm_left * norm_right), 0.0, 1.0))
+
+
+def _bind_pack(baseline: ArchivedBaseline, pack: FEShapePack, registration) -> None:
+    record = pack.record
+    subset = dict(registration.registration_metrics).get("fe_mapping_node_subset") or {}
+    checks = {
+        "job_name": record.job_name == baseline.job_name,
+        "generated_inp_sha256": record.generated_inp_sha256 == baseline.generated_inp_sha256,
+        "odb_sha256": record.odb.sha256 == baseline.odb.sha256,
+        "fe_geometry_sha256": record.fe_geometry_sha256 == baseline.fe_geometry_sha256,
+        "state": record.state == "BASELINE",
+        "registration_hash": registration.registration_hash == baseline.registration_hash,
+        "registration_fe_geometry": dict(registration.fe_geometry_identity).get("sha256") == baseline.fe_geometry_sha256,
+        "node_set": subset.get("sha256") == record.node_set_sha256,
+        "fe_modes": tuple(mode.number for mode in baseline.fe_modes) == pack.mode_numbers,
+        "fe_frequencies_exact": tuple(mode.frequency_hz for mode in baseline.fe_modes) == pack.frequencies_hz,
+    }
+    failed = sorted(name for name, ok in checks.items() if not ok)
+    if failed:
+        raise ArchivedBaselineError("shape_pack", f"the pack does not belong to this baseline: {failed}.")
+
+
+def complete_mac_matrix(baseline: ArchivedBaseline, pack: FEShapePack, registration,
+                        experimental_modes) -> np.ndarray:
+    """Experimental x FE MAC on the registration's measured DOFs, from the validated pack.
+
+    FE shapes at the registration-mapped nodes are rotated into the experimental frame (R of the
+    FrozenRegistration) and compared on the measured-DOF contract.  Every MAC value recorded in the
+    archived baseline must be reproduced (<= 1e-9), or the matrix is refused.
+    """
+
+    _bind_pack(baseline, pack, registration)
+    modes = {mode.number: mode for mode in experimental_modes}
+    expected = [(mode.number, mode.frequency_hz) for mode in baseline.experimental_modes]
+    if sorted(modes) != [number for number, _ in expected] or any(
+            float(modes[number].frequency_hz) != frequency for number, frequency in expected):
+        raise ArchivedBaselineError("experimental", "experimental modes differ from the archived baseline record.")
+    rotation = np.asarray(registration.rotation, dtype=float)
+    mask = np.asarray(registration.measured_dof_contract, dtype=bool)
+    experimental_ids = [str(value) for value in registration.experimental_node_ids]
+    if mask.shape != (len(experimental_ids), 3) or not mask.any():
+        raise ArchivedBaselineError("registration", "measured-DOF contract must be (points, 3) with measured DOFs.")
+    fe_rows = pack.rows(registration.mapped_fe_node_ids)
+    fe_vectors = {mode.number: pack.displacements[pack.mode_index(mode.number)][fe_rows].astype(np.float64) @ rotation
+                  for mode in baseline.fe_modes}
+    matrix = np.empty((len(baseline.experimental_modes), len(baseline.fe_modes)))
+    for i, (number, _) in enumerate(expected):
+        mode = modes[number]
+        index = {str(value): k for k, value in enumerate(np.asarray(mode.node_ids, dtype=object).tolist())}
+        missing = [node for node in experimental_ids if node not in index]
+        if missing:
+            raise ArchivedBaselineError("experimental", f"mode {number} lacks registered points {missing[:3]}.")
+        experimental = np.asarray(mode.vectors)[[index[node] for node in experimental_ids]]
+        for j, fe_mode in enumerate(baseline.fe_modes):
+            matrix[i, j] = _mac(fe_vectors[fe_mode.number][mask], experimental[mask])
+    rows = {mode.number: i for i, mode in enumerate(baseline.experimental_modes)}
+    columns = {mode.number: j for j, mode in enumerate(baseline.fe_modes)}
+    worst = max(abs(matrix[rows[e.experimental_mode], columns[e.fe_mode]] - e.mac) for e in baseline.mac_entries)
+    if worst > RECORDED_MAC_TOLERANCE:
+        raise ArchivedBaselineError("mac_entries", f"recorded MAC values not reproduced (max difference {worst:.3g}).")
+    return matrix
+
+
+def shape_pack_evidence(baseline: ArchivedBaseline, pack: FEShapePack, registration, experimental_modes,
+                        forward_model_id: str, eligibility: ExperimentalModeEligibility) -> BaselineEvidence:
+    """Baseline evidence with the complete MAC matrix from the validated shape pack."""
+
+    matrix = complete_mac_matrix(baseline, pack, registration, experimental_modes)
+    identity = BaselineIdentity(forward_model_id, baseline.job_name, baseline.generated_inp_sha256,
+                                baseline.fe_geometry_sha256, baseline.registration_hash,
+                                baseline.experimental_source_sha256, baseline.modal_set, baseline.measured_dofs,
+                                SHAPE_PACK_EVIDENCE_SOURCE, baseline.record_sha256, pack.record.content_sha256)
+    return build_baseline_evidence(identity, baseline.experimental_modes, eligibility, baseline.fe_modes, matrix)

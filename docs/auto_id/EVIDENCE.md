@@ -249,3 +249,30 @@ Possible remaining causes remain outside CARBON-5F scope:
   - **Extended matrix:** 24 / 24 further candidate files are identical.
 - **Normative vs diagnostic:** normative for the M3 gate (forward-builder regression);
   not a material result.
+
+## M4 — ODB shape-extraction gate and M4.2 complete-MAC baseline freeze
+
+- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Kind:** data preparation and observation freeze; **not** a material result.
+- **Gate:**
+  - HUMAN-authorised 2026-10-04; supervisor review of the extraction: PASS.
+  - Abaqus 2024 Python on SHA-verified copies of 6 archived ODBs: SP02 and SP13
+    CARBON-4C baselines, and SP13 CARBON-5A E± / G±.
+  - Pinned `extract_odb.py` `039aa067…`.
+  - The archived originals are unchanged.
+- **Validation (all PASS):**
+  - V1 ODB integrity;
+  - V2 completeness;
+  - V3 FE geometry identity;
+  - V4 frequencies exactly equal to the archive;
+  - V5 node set equal to the registration subset;
+  - V6 MAC reproduction (direct, and the comparator read-only; max |ΔMAC| ≤ 6.7e-16);
+  - V7 lossless float32;
+  - V8 deterministic content hash.
+- **Artifacts:** `carbon-project-archive:fe_shapes/<job>.npz` and
+  `.provenance.json`, pinned by [fe_shapes/](fe_shapes/README.md).
+- **M4.2 result** (strict pairing, complete MAC matrices):
+  - **SP13 FROZEN** with 2 rows: exp 4 ↔ FE 10 (MAC 0.888) and exp 5 ↔ FE 11
+    (MAC 0.889).
+  - **SP02 NOT_FROZEN:** 1 strict pair < 2.
+- **Normative vs diagnostic:** normative for M4.2 only after SUPERVISOR acceptance.

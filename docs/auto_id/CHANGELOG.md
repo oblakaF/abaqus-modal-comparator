@@ -2532,3 +2532,59 @@ first internal provider.
        and unchanged M3 contracts.
 - **Code changed:** none.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.2 — Validated shape packs integrated; complete-MAC baseline freeze
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Status:**
+  - M4.2 moves from `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION` to REVIEW_READY.
+  - Not accepted by the worker.
+  - Not started: M4.3 real validation, M4.4 real cluster confirmation, M4.6, M4.9.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **ODB shape-extraction gate** (HUMAN-authorised 2026-10-04; supervisor review PASS):
+  - 6 Abaqus 2024 Python extractions (Tier A: SP02 and SP13 baselines; Tier B: SP13
+    E± and G±), with the pinned, unchanged `extract_odb.py`, on SHA-verified scratch
+    copies.
+  - The archived ODBs are unchanged. No solver runs.
+  - V1–V8 all PASS.
+  - Shape packs and provenance are in `carbon-project-archive/fe_shapes/`. Raw
+    extractions are temporary (`D:\abaqus_scratch_m4`, kept unchanged for now).
+- **Added — `services.fe_shape_pack`:**
+  - pack record parser (`auto-id/fe-shape-pack-record/v1`);
+  - deterministic content hash, independent of the zip layout;
+  - node-set hash, defined like the registration subset fingerprint;
+  - `load_shape_pack(record, roots)`, which verifies file SHA-256, content, node set,
+    modes and frequencies, and refuses any difference.
+- **Added — `docs/auto_id/fe_shapes/`:** six pinned `<job>.shape-pack.json` records and
+  a README. They bind to the M3 accepted-job anchors, the fixture ODB references, the
+  passports' FE geometry and the registration subsets.
+- **`services.archived_baseline`:**
+  - `complete_mac_matrix` and `shape_pack_evidence` bind pack, baseline record,
+    FrozenRegistration and M1 experimental modes by identity: job, generated INP, ODB,
+    FE geometry, registration, node set, FE modes and exact frequencies.
+  - The full experimental × FE MAC matrix is computed in the experimental frame on the
+    measured-DOF contract (comparator formula).
+  - Every archived MAC entry must be reproduced (≤ 1e-9).
+  - `BaselineIdentity` gains `shape_pack_content_sha256`.
+  - The M4.2 freeze logic is unchanged: with complete evidence the strict policy now
+    decides.
+- **M4.2 result** (strict policy, M1 eligibility, no unknown MAC entries):
+  - **SP13 FROZEN:** R1 exp 4 ↔ FE 10 (MAC 0.888) and R2 exp 5 ↔ FE 11 (MAC 0.889).
+    Observation hash `922888c7…`.
+  - **SP02 NOT_FROZEN:** only exp 2 ↔ FE 8 (MAC 0.958) passes the strict gates, below
+    the required 2.
+  - **Observation:** SP13 R1/R2 are 2.2 % apart, which would trigger the M4.4 cluster
+    check. Real cluster confirmation is not started.
+- **Tests:**
+  - `tests/test_fe_shape_pack.py`: hash, loader, refusals, pinned records; store-gated
+    load of all six packs.
+  - `tests/test_baseline_freeze.py`: synthetic complete-matrix binding and refusals;
+    store-gated real freeze of SP02/SP13.
+  - The M4 guard covers `fe_shape_pack.py`.
+- **Unchanged:**
+  - the M3 contracts (`shared_carbon_forward.py`, `forward_builder.py`, manifests);
+  - the M4.1 policy, the freeze algorithm, and the v1 baseline records;
+  - SPEC and DECISIONS.
+- **Abaqus run count in this step:** 0. The extraction gate's 6 Abaqus Python runs are
+  recorded above.

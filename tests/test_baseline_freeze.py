@@ -25,7 +25,17 @@ from domain.frozen_observations import BaselineIdentity, FreezeStatus, Observati
 from domain.identification_pairing_policy import STRICT_IDENTIFICATION_PAIRING as STRICT
 from domain.identification_pairing_policy import IdentificationPairingPolicy, PairingPolicyError
 from domain.specimen_manifest import load_specimen_manifest
-from services.archived_baseline import ArchivedBaselineError, load_archived_baseline, parse_archived_baseline
+from services.archived_baseline import (
+    SHAPE_PACK_EVIDENCE_SOURCE,
+    ArchivedBaseline,
+    ArchivedBaselineError,
+    MacEntry,
+    complete_mac_matrix,
+    load_archived_baseline,
+    parse_archived_baseline,
+    shape_pack_evidence,
+)
+from services.fe_shape_pack import FEShapePack, ShapePackRecord, load_shape_pack, load_shape_pack_record, node_set_sha256
 from services.baseline_freeze import BaselineEvidenceError, build_baseline_evidence, freeze_baseline
 from services.identification_pairing import ModeFrequency
 
@@ -203,6 +213,136 @@ class ArchivedBaselineStoreTests(unittest.TestCase):
                                  [(m.number, float(m.frequency_hz)) for m in chain.dataset.sorted_modes()])
                 frozen = freeze_baseline(baseline.evidence(forward.forward_model_id, chain.eligibility), STRICT)
                 self.assertIs(frozen.status, FreezeStatus.NOT_FROZEN)
+
+
+def _synthetic_shape_pack_case(**changes):
+    """A consistent baseline / pack / registration / experiment quadruple with known MACs."""
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    from domain.experiment_fixture import ExternalFileReference, LocationReference
+
+    generated = "0123456789abcdef" + "0" * 48
+    job = f"SYN_{generated[:16]}"
+    ids = ("TOP:1", "TOP:2", "TOP:3", "TOP:4")
+    odb = ExternalFileReference("odb", f"{job}.odb", "5" * 64, 10, LocationReference("synthetic", f"runs/{job}.odb"))
+    file = ExternalFileReference("pack", f"{job}.npz", "6" * 64, 10, LocationReference("synthetic", f"x/{job}.npz"))
+    fe_modes = (ModeFrequency(7, 10.0), ModeFrequency(8, 20.0), ModeFrequency(9, 30.0))
+    record = ShapePackRecord(job, "SYN", "BASELINE", generated, odb, file, "7" * 64, 4, node_set_sha256(ids), "syn",
+                             "1" * 64, (7, 8, 9), (10.0, 20.0, 30.0), {"V1_pass": True})
+    displacements = np.zeros((3, 4, 3), dtype=np.float32)
+    displacements[:, :, :2] = np.random.default_rng(2).normal(size=(3, 4, 2))  # unmeasured in-plane components
+    displacements[0, :, 2] = [1.0, 0.0, 0.0, 0.0]
+    displacements[1, :, 2] = [0.0, 1.0, 0.0, 0.0]
+    displacements[2, :, 2] = [0.0, 0.0, 1.0, 1.0]
+    pack = FEShapePack(record, ids, np.zeros((4, 3)), (7, 8, 9), (10.0, 20.0, 30.0), displacements)
+    registration = SimpleNamespace(
+        registration_hash="2" * 64, fe_geometry_identity={"sha256": "1" * 64},
+        registration_metrics={"fe_mapping_node_subset": {"node_count": 4, "sha256": node_set_sha256(ids)}},
+        rotation=np.eye(3), measured_dof_contract=[[False, False, True]] * 4,
+        experimental_node_ids=(11, 12, 13, 14), mapped_fe_node_ids=ids)
+    shapes = ([1.0, 0, 0, 0], [0, 1.0, 0, 0], [0, 0, 1.0, 1.0])
+    experiment = []
+    for number, (frequency, u3) in enumerate(zip((10.2, 19.8, 30.5), shapes), start=1):
+        vectors = np.zeros((4, 3), dtype=complex)
+        vectors[:, 2] = np.array(u3) * (1.0 + 0.2j)
+        experiment.append(SimpleNamespace(number=number, frequency_hz=frequency, node_ids=[11, 12, 13, 14],
+                                          vectors=vectors))
+    baseline = ArchivedBaseline(
+        "SYN/baseline", "fm.json", "8" * 64, {"E_in_plane_mpa": 52000.0, "G12_mpa": 4500.0}, job, generated, odb,
+        file, "1" * 64, "2" * 64, "SYN/set", "3" * 64, "set", ("U3",),
+        (ModeFrequency(1, 10.2), ModeFrequency(2, 19.8), ModeFrequency(3, 30.5)), fe_modes,
+        (MacEntry(1, 7, 1.0, "pair"), MacEntry(2, 8, 1.0, "pair")), "9" * 64)
+    baseline = replace(baseline, **{k: v for k, v in changes.items() if k in baseline.__dataclass_fields__})
+    if "pack_record" in changes:
+        pack = replace(pack, record=replace(record, **changes["pack_record"]))
+    if "registration" in changes:
+        for key, value in changes["registration"].items():
+            setattr(registration, key, value)
+    return baseline, pack, registration, experiment
+
+
+class ShapePackEvidenceTests(unittest.TestCase):
+    """M4.2 integration: the complete MAC matrix comes from a validated pack bound to the baseline."""
+
+    def test_complete_matrix_and_freeze(self):
+        baseline, pack, registration, experiment = _synthetic_shape_pack_case()
+        matrix = complete_mac_matrix(baseline, pack, registration, experiment)
+        np.testing.assert_allclose(matrix, np.eye(3), atol=1e-12)  # U3 only; in-plane components ignored
+        evidence = shape_pack_evidence(baseline, pack, registration, experiment, "SYN/fm",
+                                       eligibility([1, 2, 3]))
+        self.assertFalse(np.isnan(evidence.mac_matrix()).any())
+        self.assertEqual(evidence.identity.evidence_source, SHAPE_PACK_EVIDENCE_SOURCE)
+        self.assertEqual(evidence.identity.shape_pack_content_sha256, "7" * 64)
+        frozen = freeze_baseline(evidence, STRICT)
+        self.assertIs(frozen.status, FreezeStatus.FROZEN)
+        self.assertEqual([(r.experimental_mode, r.fe_mode) for r in frozen.rows], [(1, 7), (2, 8), (3, 9)])
+
+    def test_pack_must_belong_to_the_baseline(self):
+        from dataclasses import replace
+
+        baseline, pack, registration, experiment = _synthetic_shape_pack_case()
+        other_odb = replace(pack.record.odb, sha256="f" * 64)
+        with self.assertRaises(ArchivedBaselineError):
+            complete_mac_matrix(baseline, replace(pack, record=replace(pack.record, odb=other_odb)), registration,
+                                experiment)
+        for changes in ({"pack_record": {"job_name": "SYN_ffffffffffffffff"}},
+                        {"pack_record": {"fe_geometry_sha256": "f" * 64}},
+                        {"pack_record": {"state": "E_PLUS"}},
+                        {"pack_record": {"node_set_sha256": "f" * 64}},
+                        {"registration": {"registration_hash": "f" * 64}},
+                        {"fe_modes": (ModeFrequency(7, 10.0), ModeFrequency(8, 20.0), ModeFrequency(9, 30.0001))}):
+            with self.subTest(changes=changes), self.assertRaises(ArchivedBaselineError):
+                complete_mac_matrix(*_synthetic_shape_pack_case(**changes))
+
+    def test_recorded_mac_must_be_reproduced(self):
+        baseline, pack, registration, experiment = _synthetic_shape_pack_case(
+            mac_entries=(MacEntry(1, 7, 0.95, "pair"),))
+        with self.assertRaises(ArchivedBaselineError) as caught:
+            complete_mac_matrix(baseline, pack, registration, experiment)
+        self.assertEqual(caught.exception.field, "mac_entries")
+
+    def test_experimental_modes_must_match_the_record(self):
+        baseline, pack, registration, experiment = _synthetic_shape_pack_case()
+        experiment[1].frequency_hz = 19.9
+        with self.assertRaises(ArchivedBaselineError):
+            complete_mac_matrix(baseline, pack, registration, experiment)
+
+
+class ShapePackFreezeStoreTests(unittest.TestCase):
+    """Store-gated M4.2 result: strict freeze with the complete MAC matrices of the validated packs."""
+
+    EXPECTED = {"SP02": (FreezeStatus.NOT_FROZEN, [(2, 8)]), "SP13": (FreezeStatus.FROZEN, [(4, 10), (5, 11)])}
+    JOBS = {"SP02": "SP02_f3e592281bebce66", "SP13": "SP13_a46d08b52995e078"}
+
+    def test_real_baselines(self):
+        roots = fixture_roots_from_environment()
+        missing = sorted({"snadwich", "carbon-project-archive"} - set(roots))
+        if missing:
+            self.skipTest(f"data stores {missing} not configured")
+        from domain.registration import FrozenRegistration
+        from services import experimental_qc as qc
+
+        for name, (status, pairs) in self.EXPECTED.items():
+            with self.subTest(name=name):
+                baseline = load_archived_baseline(BASELINES / f"{name}.carbon4c-baseline.json")
+                forward = load_forward_model_manifest(ROOT / baseline.forward_model_path)
+                passport = load_specimen_manifest(ROOT / forward.specimen_passport.path)
+                chain = qc.prepare_auto_id_experimental_input(baseline.fixture_id, roots=roots,
+                                                              specimen_passport=passport)
+                registration = FrozenRegistration.from_dict(json.loads(
+                    (ROOT / f"docs/registrations/{name}_frozen_registration.json").read_text(encoding="utf-8")))
+                pack = load_shape_pack(load_shape_pack_record(
+                    ROOT / "docs/auto_id/fe_shapes" / f"{self.JOBS[name]}.shape-pack.json"), roots)
+                evidence = shape_pack_evidence(baseline, pack, registration, chain.dataset.sorted_modes(),
+                                               forward.forward_model_id, chain.eligibility)
+                frozen = freeze_baseline(evidence, STRICT)
+                self.assertIs(frozen.status, status)
+                self.assertEqual(frozen.unknown_mac_entries, ())
+                found = frozen.rows if frozen.frozen else frozen.provisional_rows
+                self.assertEqual([(r.experimental_mode, r.fe_mode) for r in found], pairs)
+                if not frozen.frozen:
+                    self.assertEqual(frozen.reasons, ("1 strict pairs < required 2",))
 
 
 if __name__ == "__main__":

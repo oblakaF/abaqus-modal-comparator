@@ -50,6 +50,7 @@ class BaselineIdentity:
     measured_dofs: tuple[str, ...]
     evidence_source: str  # for example "archived-carbon4c-replay"
     evidence_record_sha256: str | None
+    shape_pack_content_sha256: str | None = None  # FE shapes behind a complete MAC matrix (validated pack)
 
 
 @dataclass(frozen=True)

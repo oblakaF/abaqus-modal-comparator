@@ -239,7 +239,7 @@
   },
   "m4": {
     "M4.1": "REVIEW_READY",
-    "M4.2": "BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION",
+    "M4.2": "REVIEW_READY",
     "M4.3": "REVIEW_READY",
     "M4.4": "REVIEW_READY",
     "M4.5": "REVIEW_READY",
@@ -296,7 +296,20 @@
         ]
       }
     },
-    "decision_record": "docs/auto_id/M4_DECISION_RECORD.md (PROPOSED; awaiting SUPERVISOR decision)"
+    "decision_record": "docs/auto_id/M4_DECISION_RECORD.md (PROPOSED; awaiting SUPERVISOR decision)",
+    "odb_shape_extraction_gate": {
+      "authorised": "HUMAN 2026-10-04 (Tier A + Tier B, measured outer surface); review PASS",
+      "abaqus_python_runs": 6,
+      "abaqus_solver_runs": 0,
+      "packs": "docs/auto_id/fe_shapes/*.shape-pack.json (archive: carbon-project-archive/fe_shapes/)",
+      "validation": "V1-V8 PASS for all six packs (V6 for baselines)"
+    },
+    "M4.2_integration": {
+      "SP02": "NOT_FROZEN: 1 strict pair (exp 2 - FE 8, MAC 0.958) < required 2; complete evidence",
+      "SP13": "FROZEN: R1 exp 4 - FE 10 (MAC 0.888), R2 exp 5 - FE 11 (MAC 0.889)",
+      "observation_hash_SP13": "922888c7285c8ff0892afab6f37f3840b286991d2814598e28cce208ea18dd5b",
+      "note": "SP13 R1/R2 are 2.2 % apart (cluster trigger); M4.4 real confirmation not started"
+    }
   },
-  "next_action": "SUPERVISOR decisions on docs/auto_id/M4_DECISION_RECORD.md (classifier values, LM hyperparameters, M4.9 acceptance); HUMAN gate for ODB shape extraction before M4.2; M4.6/M4.9 not started"
+  "next_action": "SUPERVISOR review of the M4.2 shape-pack integration; M4.3 real validation, M4.4 real cluster confirmation, M4.6 and M4.9 not started"
 }

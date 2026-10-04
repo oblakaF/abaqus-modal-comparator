@@ -311,7 +311,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 | Id | Mini-step | Status |
 |---|---|---|
 | M4.1 | `IdentificationPairingPolicy` | `REVIEW_READY` |
-| M4.2 | Baseline observation / pair freeze | `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION` |
+| M4.2 | Baseline observation / pair freeze | `REVIEW_READY` |
 | M4.3 | Physical modal-family classifier: P_x/P_y, nodal structure, diagonal symmetry when relevant | `REVIEW_READY` |
 | M4.4 | Cluster trigger + principal-angle / subspace confirmation | `REVIEW_READY` |
 | M4.5 | FE-to-FE branch tracker | `REVIEW_READY` |
@@ -339,6 +339,9 @@ First batch reviewed by the SUPERVISOR:
 - M4.2 is `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION`: the archived baseline lacks FE mode shapes,
   and Abaqus Python extraction needs a separate HUMAN gate.
 - M4.6 and M4.9 have not started.
+- ODB shape-extraction gate (HUMAN-authorised; review PASS): 6 validated shape packs
+  ([fe_shapes/](fe_shapes/README.md)). M4.2 integrated with complete MAC matrices: back to
+  `REVIEW_READY`. SP13 is FROZEN (2 rows); SP02 is NOT_FROZEN (1 strict pair < 2).
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---
