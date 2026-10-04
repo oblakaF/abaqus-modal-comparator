@@ -2148,3 +2148,26 @@ first internal provider.
 - **Stage PR:** `auto-id/m3` → `main`. Not merged; merge only under HUMAN
   authorisation.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M3 accepted and merged to main; M4 not started
+
+- **Stage:** M3 → (M4 NOT_STARTED)
+- **M3 acceptance:**
+  - M3.1–M3.5 and the M3 stage are ACCEPTED by the SUPERVISOR after review.
+  - Accepted head: `febfa5b`. Last implementation commit: `3d86251`.
+- **M3 merge:** PR #29 (`auto-id/m3` → `main`), merge commit `0fd63d69a78f251bd51721880bae9b425b98951e`.
+  - The HUMAN supervisor explicitly authorised it; it used the normal merge-commit
+    method.
+  - Recorded in `STATUS.json` (`main_merges`, `m3.merged_to_main`,
+    `last_accepted_stage = M3`) and in the ROADMAP.
+- **M3 conclusions (unchanged):**
+  - byte-for-byte regression against the accepted shared-carbon builder PASS;
+  - no physics change;
+  - the generic forward path has no SP02/SP13/`D:\Snadwich` literals;
+  - `shared_carbon_forward.py` stays as the regression oracle.
+- **EVIDENCE.md:** "M3 — Universal forward builder byte-for-byte regression" moves
+  from PENDING SUPERVISOR REVIEW to ACCEPTED.
+- **M4:** NOT_STARTED; M4.1–M4.9 are `TODO`. No M4 work has been done.
+- **Bookkeeping branch:** `auto-id/m3-closure`, created from exactly `0fd63d69a78f251bd51721880bae9b425b98951e`.
+- **Code / scientific logic changed:** none.
+- **Abaqus run count:** 0
