@@ -317,7 +317,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 | M4.5 | FE-to-FE branch tracker | `REVIEW_READY` |
 | M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `TODO` |
 | M4.7 | Log-frequency objective | `REVIEW_READY` |
-| M4.8 | Bounded LM / trust step with the correct minus sign | `TODO` |
+| M4.8 | Bounded LM / trust step with the correct minus sign | `REVIEW_READY` |
 | M4.9 | Synthetic digital-twin recovery | `TODO` |
 
 M4.9 synthetic truth: E = 45000 MPa, G12 = 4000 MPa, controlled frequency noise
@@ -333,6 +333,8 @@ First development batch (SUPERVISOR-authorised): M4.1–M4.5, M4.7, M4.8. Rules 
 - the archived CARBON-4C baseline replay is the M4.2 reference observation source;
 - SP02/SP13 are development and test only (M2 production readiness `NOT_READY`);
 - the M3 contracts are unchanged.
+
+First batch status: `REVIEW_READY` (M4.1–M4.5, M4.7, M4.8). M4.6 and M4.9 remain `TODO`.
 
 ---
 

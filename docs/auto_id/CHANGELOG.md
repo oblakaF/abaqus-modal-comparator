@@ -2415,3 +2415,66 @@ first internal provider.
 
   M4 guard extended.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.8 — Bounded LM / trust step; first M4 development batch REVIEW_READY
+
+- **Stage:** M4 first development batch
+- **Status:**
+  - M4.8 REVIEW_READY.
+  - The batch M4.1–M4.5, M4.7 and M4.8 is REVIEW_READY.
+  - The M4 stage remains IN_PROGRESS: M4.6 and M4.9 are `TODO` and not authorised.
+  - Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.identification_step`** (SPEC §6 S4, §8):
+  - **Step:** `lm_step` computes Δx = −(J_rᵀJ_r + μ·diag(J_rᵀJ_r))⁻¹J_rᵀr in x = ln p
+    (minus sign tested). A parameter without sensitivity is refused.
+  - **`run_bounded_lm(evaluate, start, bounds, settings)`:**
+    - one call of the caller's residual function is one authorised solve;
+    - the Jacobian comes from central finite differences at exactly p·(1 ± 0.05),
+      2·n_p solves (for p0 these are the CARBON-5A E± / G± candidates), then Broyden
+      updates;
+    - finite differences are repeated only after a step failure;
+    - steps are projected onto the physical bounds;
+    - a step is accepted only if Φ actually decreases; otherwise μ ← 10μ.
+  - **Stop rules:**
+    - `CONVERGED` when max|Δx_j| < 0.2·sd_j, with local sd from (JᵀJ)⁻¹;
+    - `MAX_ITERATIONS` after 5 iterations;
+    - `REFUSED` on `BranchTrackingRefusal` or `ObservationFreezeRefusal`: no further
+      solves, no re-pairing;
+    - `STEP_REJECTED`;
+    - `SOLVE_BUDGET`.
+  - **Exact physical values:** physical parameter values are the source of truth.
+    Solves get p0 and the ±5 % points exactly, never exp(ln p), so candidate INPs keep
+    their accepted M3 identities.
+  - **Settings:** the SPEC values are defaults (5 iterations, 0.2·sd, μ × 10, ±5 %).
+    μ₀, μ decrease, step attempts and the solve budget have no SPEC value and must be
+    given explicitly.
+- **Tests:** `tests/test_identification_step.py`, analytic log-linear models only (no
+  solver):
+  - synthetic recovery from 52000/4500 to 45000/4000 with 0.3 % noise, within the
+    local 1σ in ≤ 20 evaluations;
+  - exact finite-difference points;
+  - a rejected step gives μ × 10 and a Jacobian refresh after a Broyden update;
+  - Φ never increases;
+  - refusal propagation;
+  - budget and iteration stops;
+  - validation.
+
+  13 ran, OK. M4 guard extended.
+- **Batch verification (Windows, Python 3.14.6):**
+  - **Full suite with stores:** 1217 ran; 1215 passed, 0 failures, 2 skipped (opt-in
+    Abaqus).
+  - **Full suite without stores:** 1215 ran; 1205 passed, 0 failures. Skipped: the M3
+    gate class, the M4.2 store test, 2 Abaqus tests and 14 real-data subtests.
+  - **Linux CI:** recorded after push.
+- **Batch findings for review:**
+  - The archived CARBON-4C baseline cannot be strictly frozen (M4.2): FE shapes are
+    not archived, so both baselines are NOT_FROZEN (INCOMPLETE_EVIDENCE).
+  - The thresholds of the M4.3 family classifier are provisional; SPEC §12.2 gives
+    none.
+- **Not done (by instruction):** M4.6 (solve pipeline), M4.9 (digital twin), any
+  Abaqus or Abaqus Python run.
+- **Unchanged:** the M3 contracts (`shared_carbon_forward.py`, `forward_builder.py`,
+  manifests, INP generation), the comparator, Stage-A services and `inverse_solver`.
+- **Abaqus run count:** 0
