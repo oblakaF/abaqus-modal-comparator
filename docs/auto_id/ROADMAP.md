@@ -311,7 +311,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 | Id | Mini-step | Status |
 |---|---|---|
 | M4.1 | `IdentificationPairingPolicy` | `REVIEW_READY` |
-| M4.2 | Baseline observation / pair freeze | `TODO` |
+| M4.2 | Baseline observation / pair freeze | `REVIEW_READY` |
 | M4.3 | Physical modal-family classifier: P_x/P_y, nodal structure, diagonal symmetry when relevant | `TODO` |
 | M4.4 | Cluster trigger + principal-angle / subspace confirmation | `TODO` |
 | M4.5 | FE-to-FE branch tracker | `TODO` |

@@ -2210,3 +2210,58 @@ first internal provider.
 - **Tests:** `tests/test_identification_pairing.py` +
   `tests/test_m4_generic_guard.py`: 15 ran, OK.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.2 — Baseline observation / pair freeze
+
+- **Stage:** M4 first development batch
+- **Status:** M4.2 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `domain.frozen_observations`** (schema `auto-id/frozen-observations/v1`):
+  - **`BaselineIdentity`** records content identities only: forward model, M3 job name
+    and generated INP SHA-256, FE geometry, registration, experimental source, modal
+    set, measured DOFs and evidence source.
+  - **`FrozenObservationSet`:**
+    - status `FROZEN` / `NOT_FROZEN` with reasons;
+    - rows (`R1…`), only when FROZEN;
+    - provisional rows, for review;
+    - excluded modes with reasons;
+    - unknown MAC entries;
+    - `observation_hash`.
+  - **`require_frozen()`** raises `ObservationFreezeRefusal`, which is not a
+    ValueError/RuntimeError.
+- **Added — `services.baseline_freeze`:**
+  - `BaselineEvidence` carries the experimental modes, the M1
+    `ExperimentalModeEligibility`, the elastic FE modes, and a MAC matrix with NaN for
+    unknown entries.
+  - `freeze_baseline(evidence, policy)` requires a strict policy.
+  - Modes that M1 eligibility excludes never enter, even with a perfect match. FE
+    frequencies never select experimental modes.
+  - The set is FROZEN only when the M4.1 pairing is COMPLETE.
+- **Added — `services.archived_baseline`** and
+  `docs/auto_id/baselines/{SP02,SP13}.carbon4c-baseline.json` + `README.md` (the
+  approved replay source).
+  - **Sources:** the archived CARBON-4C post-solve records and ODBs (pinned by
+    SHA-256), the M3 baseline generated INP SHA-256 and job name, and the M1 production
+    mode frequencies.
+  - **Record hash:** canonical, independent of key order and line endings.
+  - **Not run:** no Abaqus, no Abaqus Python.
+- **Finding — archived replay is not final:**
+  - The FE mode shapes are not archived. Only the recorded MACs exist: the
+    accepted-comparator pairs and the best candidate of each rejected mode.
+  - Under the strict policy both baselines are **NOT_FROZEN (INCOMPLETE_EVIDENCE)**.
+    - SP02: 17 unknown frequency-admissible entries; provisional pair exp 2 ↔ FE 8;
+      below coverage.
+    - SP13: 28 unknown entries; provisional pairs 4↔10 and 5↔11.
+  - A final freeze needs FE shapes from the archived ODBs, i.e. Abaqus Python, which
+    needs a separate HUMAN gate.
+- **Tests:** `tests/test_baseline_freeze.py`:
+  - synthetic freeze behaviour;
+  - record identity links to M0–M3 (no store needed);
+  - store-gated agreement with the archive and the M1 modal input;
+  - the M4 guard extended.
+
+  M4 suites: 27 ran, OK.
+- **Unchanged:** M3 contracts (`shared_carbon_forward.py`, `forward_builder.py`,
+  manifests), the normal comparator and Stage-A pairing.
+- **Abaqus run count:** 0
