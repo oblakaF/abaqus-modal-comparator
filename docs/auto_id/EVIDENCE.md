@@ -309,3 +309,27 @@ Possible remaining causes remain outside CARBON-5F scope:
   Record: [fe_shapes/SP13.R1-R2.cluster.json](fe_shapes/SP13.R1-R2.cluster.json).
 - **Normative vs diagnostic:** diagnostic; normative for the SP13 observation design
   only after SUPERVISOR acceptance.
+
+## M4.6 — SP13 p0 smoke gate (real Abaqus through the M4.6 path)
+
+- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Kind:** software and solver reproducibility check. **Not** a material result.
+- **Authorisation:** HUMAN gate. 1 Abaqus 2024 solve plus 1 pinned `extract_odb.py`
+  extraction of `SP13_a46d08b52995e078` (p0); no LM loop, no M4.9.
+- **Inputs:**
+  - generated INP `a46d08b52995e078…` (the M3 rendering);
+  - solver profile `SP13/abaqus-2024/v1` (`79aebbfe…`);
+  - pinned extraction script `039aa067…`.
+- **Result: REPRODUCED.**
+  - **30/30** eigenfrequencies (EIGFREQ, modes 1–30) are exactly equal to the
+    CARBON-4C archive.
+  - The shape-pack content SHA `7941545b59390a65…` is identical to the validated
+    baseline pack (minimum MAC 1.0).
+  - The ODB differs only in run metadata (same size 715 614 536 bytes; SHA
+    `56da620e…`).
+  - Wall-clock 620 s; memory peak 18 GB.
+- **Artifacts:** `D:\abaqus_m4_smoke` (journal, comparison, extraction manifest,
+  logs; ODB kept until review). Archive proposal: provenance only, under
+  `carbon-project-archive/m4_smoke/`, referencing the existing pack.
+- **Normative vs diagnostic:** after acceptance, establishes that the M4.6 solve and
+  extraction path reproduces the accepted CARBON-4C SP13 baseline.

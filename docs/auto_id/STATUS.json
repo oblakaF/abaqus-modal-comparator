@@ -357,7 +357,22 @@
       "data": "docs/auto_id/solver_profiles/{SP02,SP13}.json",
       "fake_solver_result": "converged to 45006 / 4000.2 from 52000 / 4500 in 6 evaluations (truth 45000 / 4000); resume replays all evaluations with 0 solves",
       "abaqus_runs": 0
+    },
+    "M4.6_smoke_gate": {
+      "authorised": "HUMAN 2026-10-04/05: 1 Abaqus 2024 solve + 1 pinned extract_odb.py extraction of SP13_a46d08b52995e078 (p0); no LM loop, no M4.9; RAM threshold updated by the human supervisor (19 GB was a conservative reference peak; ~15.75 GB available accepted)",
+      "abaqus_solves": 1,
+      "abaqus_python_extractions": 1,
+      "job": "SP13_a46d08b52995e078 (generated INP a46d08b52995e078213e78156c585c2b5a483c2c5954ace7cdc77e136b746253)",
+      "solver_profile": "SP13/abaqus-2024/v1 (79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e)",
+      "solve": "completed (.sta marker, Abaqus 2024); ODB 715614536 bytes, SHA 56da620e1df7af9551ddf745fcc45b62d64612f11adfa05a7700d536fb27c0f2 (differs from archived 8c89585d... as expected: ODB run metadata); wall-clock 620 s, memory peak 18 GB",
+      "extraction": "pinned extract_odb.py 039aa067...; all checks PASS; raw extraction deleted after validation",
+      "verdict": "REPRODUCED",
+      "frequencies": "30/30 EIGFREQ exactly equal to carbon4c/post_solve_SP13.json (max relative difference 0.0)",
+      "shape_pack": "content SHA 7941545b59390a65010645584b6bd5ab142ab9097f40333ca8d427654a612eca identical to the validated baseline pack; min FE-to-FE MAC 1.0",
+      "m3_contracts": "unchanged",
+      "run_directory": "D:\\abaqus_m4_smoke (ODB kept until review)",
+      "archive_proposal": "provenance only (journal, comparison, extraction manifest, logs) under carbon-project-archive/m4_smoke/; no duplicate shape pack (reference fe_shapes/SP13_a46d08b52995e078.npz)"
     }
   },
-  "next_action": "SUPERVISOR review of M4.6; real Abaqus requires a HUMAN gate; M4.9 not started"
+  "next_action": "SUPERVISOR review of M4.6 and the SP13 smoke gate (EVIDENCE PENDING); archive proposal pending; M4.9 not started"
 }

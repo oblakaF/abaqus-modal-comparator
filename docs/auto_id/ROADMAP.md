@@ -358,6 +358,11 @@ First batch reviewed by the SUPERVISOR:
   - R1 and R2 remain two observations. Criteria unchanged.
 - M4.6 resumable pipeline (architecture plus fake-solver tests; no real Abaqus):
   `REVIEW_READY`.
+- M4.6 SP13 smoke gate (HUMAN-authorised: 1 Abaqus 2024 solve plus 1 pinned extraction):
+  **REPRODUCED**.
+  - 30/30 eigenfrequencies exact.
+  - Shape-pack content SHA identical to the validated baseline pack.
+  - M3 contracts unchanged.
 - SUPERVISOR review of M4.4:
   - `REVIEW_READY`: R1/R2 are independent branches; no cluster merging.
   - **Unresolved:** the M4.3 holdout selection leaves one fit row for two parameters.

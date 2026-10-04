@@ -2793,3 +2793,46 @@ first internal provider.
 - **Test:** `test_failed_solve_is_not_retried_on_resume_without_authorisation`.
 - **Abaqus run count:** 0
 
+## 2026-10-05 — M4.6 — SP13 p0 smoke gate: REPRODUCED
+
+- **Stage:** M4 (IN_PROGRESS); M4.6 REVIEW_READY
+- **Authorisation:** HUMAN supervisor.
+  - **Scope:** exactly 1 Abaqus 2024 solve and 1 pinned `extract_odb.py` extraction for
+    `SP13_a46d08b52995e078` (p0). No LM loop, no M4.9, no other candidates, no retry
+    on failure.
+  - **Run directory:** `D:\abaqus_m4_smoke` (`D:\abaqus_scratch_m4` untouched).
+  - **Memory:** the first pre-flights stopped at about 9.4–9.9 GB available against the
+    archived 19 GB peak. The human supervisor then closed applications and ruled that
+    19 GB was a conservative reference peak, not a hard requirement. Grounds: the
+    Abaqus minimum memory estimate (3.9 GB, archived `.dat`), the archived SP13
+    behaviour, and the available virtual memory and disk. About 15.75 GB available
+    was accepted.
+- **Pre-flight:** all PASS.
+  - job identity: generated INP SHA `a46d08b5…`;
+  - solver profile `SP13/abaqus-2024/v1` (`79aebbfe…`);
+  - Abaqus executable;
+  - pinned script `039aa067…`;
+  - archived reference pack;
+  - fresh run directory;
+  - disk.
+- **Solve:** completed (`.sta` completion marker, `.dat` "Abaqus 2024").
+  - ODB 715 614 536 bytes, the same size as the archive. SHA `56da620e…` differs from
+    the archived `8c89585d…`, as expected, because of the ODB run metadata.
+  - Wall-clock 620 s (archive 584 s); memory peak 18 GB.
+- **Extraction:** pinned `extract_odb.py` through the controlled M4.6 path.
+  - All checks PASS: modes and history, finite and real values, FE geometry identity,
+    node set = registration subset (29 754), deterministic content.
+  - The raw extraction was deleted after validation (retention rule).
+- **Verdict: REPRODUCED.**
+  - **30/30** EIGFREQ values (modes 1–30) are exactly equal to
+    `carbon4c/post_solve_SP13.json` (maximum relative difference 0.0).
+  - The new shape-pack content SHA `7941545b59390a65…` is **identical** to the
+    validated baseline pack; the minimum FE-to-FE MAC is 1.0.
+- **Unchanged:** M3 contracts, all code (HEAD `7f9d4b1` at run time), `abaqus_bridge.py`,
+  `extract_odb.py`, solver profiles.
+- **Evidence:** EVIDENCE.md entry "M4.6 — SP13 p0 smoke gate", PENDING SUPERVISOR REVIEW.
+- **Archive proposal** (not executed): archive smoke provenance only (journal,
+  comparison, extraction manifest, logs) under `carbon-project-archive/m4_smoke/`,
+  referencing the existing `fe_shapes/SP13_a46d08b52995e078.npz`; no duplicate pack.
+  The ODB stays in `D:\abaqus_m4_smoke` until review.
+- **Abaqus run count:** 1 solve plus 1 Abaqus Python extraction (authorised).

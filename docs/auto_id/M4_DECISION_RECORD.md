@@ -305,3 +305,57 @@ started.
 - Fake-solver tests are allowed.
 - **No real Abaqus solve.**
 - **No M4.9.**
+
+---
+
+## 7. M4.6 SP13 smoke gate (HUMAN authorisation and result, 2026-10-04/05)
+
+### 7.1 Authorisation
+
+- **Scope:** exactly **1 Abaqus 2024 solve** and **1 pinned `extract_odb.py`
+  extraction** for `SP13_a46d08b52995e078` (p0, 52000 / 4500 MPa).
+- **Constraints:**
+  - the approved SP13 solver profile;
+  - run directory `D:\abaqus_m4_smoke`;
+  - no LM loop, no M4.9, no other candidates;
+  - no code or M3 changes;
+  - no retry on failure.
+- **Expected verdict:** REPRODUCED, meaning all 30 EIGFREQ values match the archive
+  and the generated shape-pack content SHA matches the validated baseline pack.
+  NUMERICALLY CONSISTENT or NOT REPRODUCED means stop and report.
+
+### 7.2 Memory threshold (HUMAN decision)
+
+- **Initial threshold:** 19 GB available RAM, the archived peak of this job.
+- **Updated:** 19 GB was a conservative reference peak, not a hard requirement.
+  About 15.75 GB available was accepted.
+- **Grounds:**
+  - the Abaqus minimum memory estimate of 3.9 GB (archived `.dat`; memory to minimise
+    I/O is 43.6 GB);
+  - the archived SP13 behaviour;
+  - the available virtual memory (commit limit 77 GB) and disk.
+- **Observed:** a memory peak of 18 GB and 620 s wall-clock (archive 584 s).
+
+### 7.3 Result: **REPRODUCED**
+
+| Check | Result |
+|---|---|
+| Solve | Completed: `.sta` marker, Abaqus 2024; ODB 715 614 536 bytes (SHA `56da620e…`; it differs from the archive only through ODB run metadata) |
+| Extraction | Pinned script `039aa067…`; all checks PASS; raw deleted after validation |
+| Frequencies | **30/30 EIGFREQ exactly equal** to `carbon4c/post_solve_SP13.json` |
+| Shape pack | Content SHA **`7941545b59390a65…` identical** to the validated baseline pack; minimum MAC 1.0 |
+| M3 contracts | Unchanged |
+
+### 7.4 Archive proposal (pending)
+
+- **Do not duplicate** the identical shape pack. Reference the existing
+  `carbon-project-archive:fe_shapes/SP13_a46d08b52995e078.npz`.
+- **Archive smoke provenance only**, under `carbon-project-archive/m4_smoke/`:
+  - `journal.json` (hash-chained: solve, extraction, comparison);
+  - `comparison.json`;
+  - `extraction_manifest.json`;
+  - logs: `solve.log`, `.sta`, `.msg`, `.dat`, `.prt`, `.com`.
+
+  Each file is pinned by SHA-256 in `ARCHIVE_MANIFEST.json`.
+- **ODB:** kept in `D:\abaqus_m4_smoke` until the run review is complete (retention
+  rule). Its later archiving or deletion needs a decision.
