@@ -29,6 +29,7 @@ No Abaqus or Abaqus Python runs.
 | 3 | Archived CARBON-5A ±5 % solves | **Not allowed** as Jacobian or branch evidence until a gated ODB shape extraction is approved **and** completed. M3 byte identity alone is not sufficient. |
 | 4 | M4.9 | SP13 stays the first twin specimen. G12 identifiability is an **observed result, not a modified acceptance criterion**. The proposed 8 % rule is **not** added. |
 | 5 | Status | M4.2 stays BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION. M4.6 and M4.9 stay TODO. No Abaqus. No implementation of M4.6 / M4.9. |
+| 8 | M4.6 design (see §6) | **Approved:** solver profiles as separate data; reuse of the validated p0 and ±5 % pack evaluations (counted in the 20; identification evaluations and actual Abaqus solves tracked separately); the validated full extraction only; guards (`subprocess` only in `forward_solver.py`, no `abaqus_bridge` cache path, `run_abaqus_extraction` only as a controlled helper); retention rules. **M4.6 scope:** architecture plus fake-solver tests, no real solve, no M4.9. |
 | 7 | Observation design (see §5) | Real SP13 identification is **refused** (option C). The M4.9 twin follows option B, with a synthetic experiment of truth FE modes 7–30. Observations come from the normal M4.3 / M4.4 policies, the torsion holdout from policy (not hard-coded), and twin clusters from the validated SP13 ±5 % packs (no new extraction). |
 | 6 | M4.9 budget clarification | The truth-generation solve is a **separate** authorised Abaqus solve and does **not** count toward the 20. The identification loop has at most **20** Abaqus solves in total, p0 included. Abaqus Python ODB shape extraction needs a **separate HUMAN Abaqus gate**, does **not** count toward the 20, and is data preparation, not optimisation. |
 
@@ -252,3 +253,55 @@ contradict them. They become final with the DECISIONS entry.
 
 - M4.6 and M4.9 are not started; each needs its own authorisation.
 - No code change follows from these decisions at this point.
+
+---
+
+## 6. M4.6 design (SUPERVISOR decisions, 2026-10-04)
+
+Source: the M4.6 preparation review (worker, review only). Implementation has not
+started.
+
+### 6.1 Solver profiles
+
+- **Approved as separate data**, for example `docs/auto_id/solver_profiles/<specimen>.json`.
+- Abaqus version, `cpus`, the command template and the scratch policy stay **outside**
+  the M3 forward-model manifests.
+- The M3 forward contracts are unchanged (`forward_builder.py`, `forward_model_manifest.py`,
+  forward-model JSONs, and `shared_carbon_forward.py` as the oracle).
+
+### 6.2 Reuse of archived evaluations
+
+- **Approved.** The validated p0 (CARBON-4C baseline) and ±5 % (CARBON-5A E± / G12±)
+  shape-pack evaluations may be reused.
+- **Reused evaluations count toward the 20-evaluation budget.**
+- Two counts are tracked separately:
+  - **(a)** identification evaluations (reused and new);
+  - **(b)** actual Abaqus solves executed.
+
+### 6.3 Extraction
+
+- Keep the **validated full extraction path**: the pinned, unchanged
+  `abaqus_scripts/extract_odb.py` (`039aa067…`) plus the validated pack build and checks.
+- **No surface-only extractor in M4.6.** Any new Abaqus Python extractor needs a
+  separate gate.
+
+### 6.4 Guards
+
+- `subprocess` may be imported **only** in `forward_solver.py`.
+- The existing `abaqus_bridge` cache path (`load_or_extract_odb`, path/size/mtime
+  signature) must **not** be used.
+- `run_abaqus_extraction` may be reused **only** as an execution helper under the new
+  controlled path, with content identities and no path/mtime cache.
+
+### 6.5 Retention
+
+- Temporary raw extractions are deleted after the pack validates.
+- Validated ODBs are kept until the run review is complete.
+- Shape packs and provenance are kept permanently.
+
+### 6.6 M4.6 scope
+
+- Implement and test the **architecture only**.
+- Fake-solver tests are allowed.
+- **No real Abaqus solve.**
+- **No M4.9.**
