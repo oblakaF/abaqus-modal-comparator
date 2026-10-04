@@ -17,9 +17,16 @@ byte-for-byte.  It prepares jobs only: no Abaqus execution, extraction or pairin
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from typing import Optional
 
-from domain.forward_model_manifest import ENGINEERING_CONSTANTS_TYPE, EngineeringConstants
+from domain.forward_model_manifest import (
+    ENGINEERING_CONSTANTS_TYPE,
+    BoundForwardModel,
+    EngineeringConstants,
+    ForwardCandidate,
+    FrequencyRequest,
+)
 
 
 # Material options that may appear inside a *Material block of these inputs.
@@ -62,6 +69,10 @@ def _data_lines(lines: list[str], start: int) -> list[int]:
         indices.append(index)
         index += 1
     return indices
+
+
+def _strip_ending(line: str) -> str:
+    return line.rstrip("\r\n")
 
 
 def _line_ending(line: str) -> str:
@@ -134,3 +145,117 @@ def locate_engineering_constants(lines: list[str], material_name: str) -> Engine
     except ValueError as exc:
         raise ForwardBuildError(f"Material {material_name!r}: unreadable Engineering Constants: {exc}") from exc
     return EngineeringConstantsRecord(material_name, blocks[0], elastic[0], tuple(data), positions, values)
+
+
+# ----------------------------------------------------------------------------- M3.2 generic candidate rewrite
+
+def _format(value: float) -> str:
+    return repr(float(value))
+
+
+def rewrite_engineering_constants(lines: list[str], record: EngineeringConstantsRecord,
+                                  constants: EngineeringConstants, variable: tuple[str, ...]) -> None:
+    """Write the ``variable`` constants of ``constants`` into the located record, in place.
+
+    Every other value keeps its source text.  A record line is re-emitted as its values
+    joined by ``", "``, keeping a trailing comma and the line ending.  A constant outside
+    ``variable`` must equal the source value: a candidate never changes a fixed constant.
+    """
+
+    names = EngineeringConstants.names()
+    unknown = set(variable) - set(names)
+    if unknown:
+        raise ForwardBuildError(f"Unknown Engineering Constants {sorted(unknown)}.")
+    for name in names:
+        if name not in variable and getattr(constants, name) != getattr(record.values, name):
+            raise ForwardBuildError(
+                f"Material {record.material_name!r}: fixed constant {name} would change from "
+                f"{getattr(record.values, name)} to {getattr(constants, name)}.")
+    rows = [_tokens(lines[index]) for index in record.data_lines]
+    for position, (row, column) in enumerate(record.positions):
+        if names[position] in variable:
+            rows[row][column] = _format(getattr(constants, names[position]))
+    for row, index in enumerate(record.data_lines):
+        line = lines[index]
+        values = [token for token in rows[row] if token]
+        trailing_comma = "," if line.rstrip().endswith(",") else ""
+        lines[index] = ", ".join(values) + trailing_comma + _line_ending(line)
+
+
+def locate_eigenvalue_request(lines: list[str]) -> tuple[int, int]:
+    """(data-line index, eigenvalue count) of the single ``*Frequency`` request."""
+    frequency = [i for i, line in enumerate(lines) if _keyword(line) == "frequency"]
+    if len(frequency) != 1:
+        raise ForwardBuildError(f"Expected exactly one *Frequency step request; found {len(frequency)}.")
+    data = _data_lines(lines, frequency[0])
+    if not data:
+        raise ForwardBuildError("The *Frequency request has no data line.")
+    try:
+        count = int(_tokens(lines[data[0]])[0])
+    except ValueError as exc:
+        raise ForwardBuildError("The *Frequency eigenvalue count is not an integer.") from exc
+    return data[0], count
+
+
+def rewrite_eigenvalue_request(lines: list[str], request: FrequencyRequest) -> Optional[int]:
+    """Set the eigenvalue count; returns the changed line index, or None when unchanged."""
+    index, current = locate_eigenvalue_request(lines)
+    if current != request.source_eigenvalue_count:
+        raise ForwardBuildError(
+            f"The source requests {current} eigenvalues; the manifest records {request.source_eigenvalue_count}.")
+    if request.requested_eigenvalue_count == current:
+        return None
+    line = lines[index]
+    first, separator, rest = _strip_ending(line).partition(",")
+    lines[index] = str(request.requested_eigenvalue_count) + separator + rest + _line_ending(line)
+    return index
+
+
+@dataclass(frozen=True)
+class RenderedForwardInput:
+    """Generated INP bytes plus what changed; nothing is written to disk."""
+
+    content: bytes
+    sha256: str
+    source_sha256: str
+    engineering_constants: EngineeringConstants
+    changed_lines: tuple[int, ...]  # 0-based indices into the source lines
+
+
+def render_forward_input(model: BoundForwardModel, candidate: ForwardCandidate, source: bytes) -> RenderedForwardInput:
+    """Rewrite the reference INP for one candidate; only the authorised lines may change."""
+
+    manifest = model.manifest
+    if not isinstance(candidate, ForwardCandidate):
+        raise TypeError("candidate must be a ForwardCandidate.")
+    if candidate.parameterisation_id != manifest.parameterisation.parameterisation_id:
+        raise ForwardBuildError(f"Candidate parameterisation {candidate.parameterisation_id!r} differs from the "
+                                f"forward model's {manifest.parameterisation.parameterisation_id!r}.")
+    source_sha = hashlib.sha256(source).hexdigest()
+    if source_sha != manifest.model_input.sha256 or len(source) != manifest.model_input.size_bytes:
+        raise ForwardBuildError(f"{manifest.forward_model_id}: reference INP SHA-256/size differ from the manifest.")
+
+    source_lines = split_inp_lines(source)
+    lines = list(source_lines)
+    record = locate_engineering_constants(lines, model.material_name)
+    if record.values != manifest.source_engineering_constants:
+        raise ForwardBuildError(f"{manifest.forward_model_id}: source Engineering Constants "
+                                f"{record.values.to_dict()} differ from the manifest.")
+    constants = candidate.engineering_constants()
+    variable = manifest.parameterisation.variable_constants
+    rewrite_engineering_constants(lines, record, constants, variable)
+    frequency_line = rewrite_eigenvalue_request(lines, manifest.frequency_request)
+
+    # Independent post-check: only the record and the eigenvalue request may differ.
+    if len(lines) != len(source_lines):
+        raise ForwardBuildError("The rewrite changed the number of INP lines.")
+    changed = tuple(i for i, (old, new) in enumerate(zip(source_lines, lines)) if old != new)
+    allowed = set(record.data_lines) | ({frequency_line} if frequency_line is not None else set())
+    if not set(changed) <= allowed:
+        raise ForwardBuildError(f"Unauthorised INP lines changed: {sorted(set(changed) - allowed)[:5]}.")
+    written = locate_engineering_constants(lines, model.material_name).values
+    if written != constants:
+        raise ForwardBuildError("The written Engineering Constants differ from the candidate.")
+
+    content = join_inp_lines(lines)
+    return RenderedForwardInput(content, hashlib.sha256(content).hexdigest(), source_sha, constants, changed)

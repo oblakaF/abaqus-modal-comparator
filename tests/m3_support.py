@@ -118,3 +118,12 @@ def forward_dict(passport=None, inp: bytes | None = None, **overrides) -> dict:
 
 def forward_manifest(passport=None, inp: bytes | None = None, **overrides):
     return parse_forward_model_manifest(forward_dict(passport, inp, **overrides))
+
+
+def synthetic_model(text: str = SYNTHETIC_INP, **overrides):
+    """(bound forward model, source bytes) for a synthetic INP."""
+    from domain.forward_model_manifest import bind_forward_model
+
+    raw = text.encode("latin-1")
+    passport = synthetic_passport()
+    return bind_forward_model(forward_manifest(passport, raw, **overrides), passport), raw

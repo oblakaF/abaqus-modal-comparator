@@ -1972,3 +1972,41 @@ first internal provider.
 - **Tests:** `tests/m3_support.py`, `tests/test_forward_model_manifest.py`,
   `tests/test_forward_builder.py` (location): 20 ran, OK.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M3.2 — Generic candidate rewrite
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:** M3.2 REVIEW_READY; M3 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Domain (`domain.forward_model_manifest`):**
+  - A `Parameterisation` maps candidate parameters to the constants they set.
+    `carbon-property-set/v1` maps `E_in_plane_mpa` → E1 and E2, and `G12_mpa` → G12;
+    E3, ν12, ν13, ν23, G13 and G23 are fixed. A parameterisation must determine all
+    nine constants, and no constant may be both set and fixed.
+  - `ForwardCandidate` and `carbon_candidate`: exactly the parameterisation's
+    parameters, each finite and positive. Fixed constants are not candidate fields.
+- **Service (`services.forward_builder`):**
+  - `rewrite_engineering_constants` writes only the variable constants. A fixed
+    constant that would change is refused.
+  - `rewrite_eigenvalue_request` sets the count on the single `*Frequency` request.
+  - `render_forward_input(model, candidate, source_bytes)`:
+    - checks the source SHA-256/size, the source constants and the eigenvalue request
+      against the manifest;
+    - rewrites the record and the request;
+    - **independent post-check:** same line count, changed lines limited to the record
+      and the eigenvalue request, and the re-read record equal to the candidate.
+  - Mesh, geometry, core, density, adhesive, ties and every other line are copied
+    unchanged.
+- **Oracle equivalence:** on 8 synthetic INP variants × 7 candidates, the output is
+  byte-identical to the accepted builder (`shared_carbon_forward.write_forward_job_inp`).
+  - **Variants:** LF, CRLF, a comment inside the record, no trailing comma, trailing
+    spaces, a one-line record, an unchanged eigenvalue request, lower-case keywords.
+  - **Candidates:** include awkward floats.
+- **Real-data sanity check** (read-only; no Abaqus): the CARBON-4C baseline candidate
+  (52000/4500) reproduces the archived generated INP SHA-256 for SP02 (`f3e59228…`)
+  and SP13 (`a46d08b5…`), with the archived changed-line numbers.
+- **Unchanged:** `src/services/shared_carbon_forward.py`, the regression oracle.
+- **Tests:** `tests/test_forward_builder.py` + `tests/test_forward_model_manifest.py`:
+  30 ran, OK (83 subtests).
+- **Abaqus run count:** 0

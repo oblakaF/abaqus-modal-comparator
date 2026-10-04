@@ -87,12 +87,39 @@ class EngineeringConstants:
 
 @dataclass(frozen=True)
 class Parameterisation:
-    """Which Engineering Constants a forward candidate may set; every other constant is fixed."""
+    """Which Engineering Constants a forward candidate may set; every other constant is fixed.
+
+    ``parameter_targets`` maps each candidate parameter to the constants it sets; one
+    parameter may set several constants (E_in_plane sets E1 and E2 together).
+    """
 
     parameterisation_id: str
     material_role: str  # passport materials role whose record is rewritten
-    variable_constants: tuple[str, ...]
+    parameter_targets: Mapping[str, tuple[str, ...]]
     fixed_constants: Mapping[str, float]
+
+    def __post_init__(self) -> None:
+        targets = [name for names in self.parameter_targets.values() for name in names]
+        if len(set(targets)) != len(targets) or set(targets) & set(self.fixed_constants):
+            raise ValueError("each Engineering Constant is set by at most one parameter and is never also fixed.")
+        if set(targets) | set(self.fixed_constants) != set(EngineeringConstants.names()):
+            raise ValueError("a parameterisation must determine all nine Engineering Constants.")
+
+    @property
+    def parameters(self) -> tuple[str, ...]:
+        return tuple(self.parameter_targets)
+
+    @property
+    def variable_constants(self) -> tuple[str, ...]:
+        names = {name for targets in self.parameter_targets.values() for name in targets}
+        return tuple(name for name in EngineeringConstants.names() if name in names)
+
+    def engineering_constants(self, parameters: Mapping[str, float]) -> EngineeringConstants:
+        values = dict(self.fixed_constants)
+        for parameter, targets in self.parameter_targets.items():
+            for name in targets:
+                values[name] = parameters[parameter]
+        return EngineeringConstants(**values)
 
 
 # CARBON PROPERTY SET v1 (SPEC §5.2): E1 = E2 = E_in_plane and G12 vary; E3, ν12, ν13, ν23,
@@ -100,12 +127,57 @@ class Parameterisation:
 CARBON_PROPERTY_SET_V1 = Parameterisation(
     parameterisation_id="carbon-property-set/v1",
     material_role="face",
-    variable_constants=("E1", "E2", "G12"),
+    parameter_targets={"E_in_plane_mpa": ("E1", "E2"), "G12_mpa": ("G12",)},
     fixed_constants={"E3": 6700.0, "nu12": 0.05, "nu13": 0.30, "nu23": 0.30, "G13": 2200.0, "G23": 2200.0},
 )
 PARAMETERISATIONS: Mapping[str, Parameterisation] = {
     CARBON_PROPERTY_SET_V1.parameterisation_id: CARBON_PROPERTY_SET_V1,
 }
+
+
+@dataclass(frozen=True)
+class ForwardCandidate:
+    """One candidate: values for exactly the parameters of a known parameterisation.
+
+    Values are finite and positive.  Fixed constants are not candidate fields, so a
+    candidate can never set them.
+    """
+
+    parameterisation_id: str
+    parameters: tuple[tuple[str, float], ...]  # in the parameterisation's parameter order
+
+    @classmethod
+    def create(cls, parameterisation_id: str, **values: float) -> "ForwardCandidate":
+        if parameterisation_id not in PARAMETERISATIONS:
+            raise ValueError(f"unknown parameterisation {parameterisation_id!r}.")
+        expected = PARAMETERISATIONS[parameterisation_id].parameters
+        if set(values) != set(expected):
+            raise ValueError(f"{parameterisation_id} candidates set exactly {', '.join(expected)}.")
+        checked = []
+        for name in expected:
+            value = values[name]
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise TypeError(f"{name} must be a real number.")
+            if not math.isfinite(float(value)) or float(value) <= 0.0:
+                raise ValueError(f"{name} must be finite and positive.")
+            checked.append((name, float(value)))
+        return cls(parameterisation_id, tuple(checked))
+
+    @property
+    def parameterisation(self) -> Parameterisation:
+        return PARAMETERISATIONS[self.parameterisation_id]
+
+    def to_dict(self) -> dict[str, float]:
+        return dict(self.parameters)
+
+    def engineering_constants(self) -> EngineeringConstants:
+        return self.parameterisation.engineering_constants(self.to_dict())
+
+
+def carbon_candidate(e_in_plane_mpa: float, g12_mpa: float) -> ForwardCandidate:
+    """A carbon property set v1 candidate (E1 = E2 = E_in_plane, G12)."""
+    return ForwardCandidate.create(CARBON_PROPERTY_SET_V1.parameterisation_id,
+                                   E_in_plane_mpa=e_in_plane_mpa, G12_mpa=g12_mpa)
 
 
 @dataclass(frozen=True)
