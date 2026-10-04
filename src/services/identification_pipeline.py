@@ -34,7 +34,7 @@ from domain.identification_run import RunIdentityError, RunJournal, RunLock, Sol
 from .branch_tracker import BranchTrackingRefusal, FEModalState, RefusalKind, track_branches
 from .fe_shape_pack import FEShapePack, ShapePackRecord, load_shape_pack
 from .forward_builder import prepare_forward_job, read_reference_input
-from .forward_solver import SolveExecutor, solve_forward_job, solve_hash, verify_solve
+from .forward_solver import SolveExecutor, SolveFailure, solve_forward_job, solve_hash, verify_solve
 from .identification_objective import ObjectiveDesign, evaluate_objective
 from .identification_step import LMResult, LMSettings, ParameterBounds, run_bounded_lm
 from .shape_extraction import ExtractionExecutor, ExtractionExpectation, extract_shape_pack, load_run_pack
@@ -61,6 +61,7 @@ class PipelineConfig:
     extraction_executor: ExtractionExecutor
     archived_packs: Mapping[str, ShapePackRecord] = field(default_factory=dict)  # job_name → validated record
     extra_identity: Mapping[str, Any] = field(default_factory=dict)  # e.g. the twin's noise seed
+    retry_failed_solves: bool = False  # explicit authorisation to re-attempt a journalled failed solve
 
 
 def run_identity(config: PipelineConfig) -> dict:
@@ -156,13 +157,27 @@ class IdentificationPipeline:
         solve = self.journal.find("solve", solve_hash=key)
         solve_dir = self.run_dir / "solves" / job.job_name
         if solve is None:
+            failures = [f for f in self.journal.records("solve_failure") if f["solve_hash"] == key]
+            retried = [r for r in self.journal.records("solve_retry") if r["solve_hash"] == key]
+            if len(failures) > len(retried):  # no automatic retry: a failed solve stays failed on resume
+                if not config.retry_failed_solves:
+                    raise SolveFailure(f"{job.job_name}: a previous solve failed ({failures[-1]['reason']}); "
+                                       "retry only with an explicit retry_failed_solves authorisation.")
+                self.journal.append("solve_retry", {"solve_hash": key, "job_name": job.job_name,
+                                                    "after_failures": len(failures)})
             scratch = None
             if config.profile.scratch_store is not None:
                 if config.profile.scratch_store not in config.roots:
                     raise RunIdentityError(f"solver scratch store {config.profile.scratch_store!r} not configured.")
                 scratch = Path(config.roots[config.profile.scratch_store])
-            record = solve_forward_job(job, config.profile, solve_dir, config.abaqus_command, config.solve_executor,
-                                       scratch)
+            try:
+                record = solve_forward_job(job, config.profile, solve_dir, config.abaqus_command,
+                                           config.solve_executor, scratch)
+            except SolveFailure as failure:
+                self.solves_executed += 1  # an attempted Abaqus solve is still an executed solve
+                self.journal.append("solve_failure", {"solve_hash": key, "job_name": job.job_name,
+                                                      "reason": str(failure)})
+                raise
             self.solves_executed += 1
             solve = self.journal.append("solve", dict(record.to_dict(), executed=True))["record"]
             source = "new-solve"
@@ -235,7 +250,9 @@ class IdentificationPipeline:
         evaluations = self.journal.records("evaluation")
         return {"identification_evaluations_journalled": len(evaluations),
                 "reused_archived_evaluations": sum(e["fe_source"] == "archived-validated-pack" for e in evaluations),
-                "abaqus_solves_executed_total": sum(bool(s.get("executed")) for s in self.journal.records("solve")),
+                "abaqus_solves_executed_total": (sum(bool(s.get("executed")) for s in self.journal.records("solve"))
+                                                 + len(self.journal.records("solve_failure"))),
+                "failed_solves": len(self.journal.records("solve_failure")),
                 "abaqus_solves_executed_this_session": self.solves_executed,
                 "evaluations_replayed_this_session": self.replayed_evaluations}
 

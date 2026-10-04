@@ -231,6 +231,22 @@ class RefusalTests(_Tmp):
         self.assertEqual(pipeline.journal.records("solve"), [])
         self.assertFalse((pipeline.run_dir / ".run.lock").exists())
 
+    def test_failed_solve_is_not_retried_on_resume_without_authorisation(self):
+        p0_job = build_config(self.tmp).frozen.identity.job_name
+        with self.assertRaises(SolveFailure):
+            self.pipeline(solve_executor=FakeSolver(fail_jobs={p0_job})).run()
+        healthy = FakeSolver()
+        with self.assertRaises(SolveFailure):  # plain resume: no silent retry
+            self.pipeline(solve_executor=healthy).run()
+        self.assertEqual(healthy.commands, [])
+        retried = self.pipeline(solve_executor=healthy, retry_failed_solves=True)
+        result = retried.run()
+        self.assertIs(result.status, LMStatus.CONVERGED)
+        self.assertEqual(len(retried.journal.records("solve_retry")), 1)
+        counts = retried.counts()
+        self.assertEqual(counts["failed_solves"], 1)
+        self.assertEqual(counts["abaqus_solves_executed_total"], len(healthy.commands) + 1)  # the failed attempt too
+
     def test_configuration_identity_mismatches_are_refused(self):
         config = build_config(self.tmp)
         with self.assertRaises(RunIdentityError):

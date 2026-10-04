@@ -2776,3 +2776,20 @@ first internal provider.
 - **Unchanged:** M3 contracts, `abaqus_bridge.py`, `extract_odb.py`, M4.1–M4.5, M4.7,
   M4.8 logic, SPEC, DECISIONS.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.6 — No silent retry of failed solves on resume
+
+- **Stage:** M4 (IN_PROGRESS); M4.6 REVIEW_READY
+- **Gap found during worker review of M4.6 (`a0bc28b`):** after a `SolveFailure`, a
+  plain resume would have re-run the failed solve. That is an implicit retry, contrary
+  to "no automatic retries".
+- **Fix (`services.identification_pipeline`):**
+  - a failed solve is journalled (`solve_failure`);
+  - a resumed run refuses that job with `SolveFailure` unless
+    `PipelineConfig.retry_failed_solves` is set explicitly;
+  - each authorised retry is journalled (`solve_retry`);
+  - failed attempts count as executed Abaqus solves (`failed_solves`,
+    `abaqus_solves_executed_total`).
+- **Test:** `test_failed_solve_is_not_retried_on_resume_without_authorisation`.
+- **Abaqus run count:** 0
+
