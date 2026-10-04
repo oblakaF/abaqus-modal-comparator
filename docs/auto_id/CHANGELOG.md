@@ -2379,3 +2379,39 @@ first internal provider.
 - **Unchanged:** `inverse_solver.py` (Stage-A tracking), the comparator, and the M3
   contracts.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.7 — Log-frequency objective
+
+- **Stage:** M4 first development batch (M4.6 not authorised; skipped by SUPERVISOR
+  decision)
+- **Status:** M4.7 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.identification_objective`** (SPEC §7, §8, §12.3–12.4):
+  - **Residuals:** r_i = (ln f_FE − ln f_EXP)/σ_i for frozen fit rows. Each confirmed
+    cluster is **one** term, r_C = mean ln(f_FE/f_EXP), with σ_C = √(Σσ_i²)/n_C.
+  - **Objective:** Φ = ½‖r‖² over fit terms only. Notation follows SPEC §8: the
+    objective is never named like the Jacobian.
+  - **Inputs:** FE frequencies come only from FE-to-FE tracking (M4.5). MAC is not an
+    input; it never enters Φ.
+  - **Holdouts:** holdout rows and clusters are evaluated and reported, never part of
+    Φ.
+  - **`RowSigma`:** σ² = σ_meas² + σ_setup², explicit per row, never defaulted.
+    `PROVISIONAL_SETUP_SD` (0.3 %, SPEC §7) is a named constant. It must be passed
+    explicitly and is flagged (`provisional_uncertainty`).
+  - **`build_objective_design`** requires a FROZEN set and refuses:
+    - missing σ;
+    - an unconfirmed or split cluster;
+    - unknown holdout rows;
+    - fewer fit terms than parameters.
+  - **`evaluate_objective`** refuses tracking that does not cover exactly the design's
+    rows and clusters.
+- **Tests:** `tests/test_identification_objective.py`: 6 ran, OK.
+  - residuals and Φ computed by hand;
+  - a cluster is one term;
+  - holdouts are excluded from Φ;
+  - Φ does not change with tracking MAC;
+  - refusals.
+
+  M4 guard extended.
+- **Abaqus run count:** 0

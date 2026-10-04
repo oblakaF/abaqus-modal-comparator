@@ -17,6 +17,7 @@ M4_MODULES = (
     "src/services/modal_family_classifier.py",
     "src/services/identification_clusters.py",
     "src/services/branch_tracker.py",
+    "src/services/identification_objective.py",
 )
 FORBIDDEN_TEXT = ("SP02", "SP13", "SP-02", "SP-13", "Snadwich", "snadwich", "carbon_project_archive", "D:\\",
                   "CFRP_T300_PlainWeave", "CFRP_Face")

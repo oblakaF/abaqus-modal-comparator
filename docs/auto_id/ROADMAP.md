@@ -316,7 +316,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 | M4.4 | Cluster trigger + principal-angle / subspace confirmation | `REVIEW_READY` |
 | M4.5 | FE-to-FE branch tracker | `REVIEW_READY` |
 | M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `TODO` |
-| M4.7 | Log-frequency objective | `TODO` |
+| M4.7 | Log-frequency objective | `REVIEW_READY` |
 | M4.8 | Bounded LM / trust step with the correct minus sign | `TODO` |
 | M4.9 | Synthetic digital-twin recovery | `TODO` |
 
