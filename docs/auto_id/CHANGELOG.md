@@ -2137,3 +2137,14 @@ first internal provider.
   - **Linux CI:** recorded with the stage PR.
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR review of the M3 batch (stage PR `auto-id/m3` → `main`).
+
+## 2026-10-04 — M3 — Linux CI recorded; stage PR
+
+- **Stage:** M3 (REVIEW_READY; not accepted by the worker; M4 not started)
+- **Linux CI** on `3d86251` (ubuntu-latest, Python 3.11, run 37178115819): success.
+  - 1131 ran, OK, skipped=21.
+  - Skips: 14 data-store subtests, the M3 gate class (no `snadwich` store on CI),
+    2 opt-in Abaqus tests and 4 headless-Tk tests.
+- **Stage PR:** `auto-id/m3` → `main`. Not merged; merge only under HUMAN
+  authorisation.
+- **Abaqus run count:** 0

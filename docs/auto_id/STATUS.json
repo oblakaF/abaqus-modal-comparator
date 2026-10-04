@@ -216,7 +216,14 @@
       "accepted_builder": "src/services/shared_carbon_forward.py unchanged (regression oracle)",
       "abaqus_runs": 0
     },
-    "regression_anchors": "docs/auto_id/forward_models/accepted_forward_jobs.json"
+    "regression_anchors": "docs/auto_id/forward_models/accepted_forward_jobs.json",
+    "verification": {
+      "commit": "3d862511e2fcb70670479b3f774f146658ae7ecb",
+      "windows_full_with_stores": "1136 ran; 1134 passed, 0 failures, 2 skipped (opt-in Abaqus)",
+      "windows_full_without_stores": "1134 ran; 1125 passed, 0 failures; skipped: M3 gate class, 2 Abaqus, 14 real-data subtests",
+      "linux_ci": "https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/37178115819 - success, Python 3.11, 1131 ran, OK (skipped=21: 14 data-store subtests, 1 M3 gate class without store, 2 opt-in Abaqus, 4 headless Tk)",
+      "abaqus_runs": 0
+    }
   },
   "next_action": "SUPERVISOR review of the M3 batch (stage PR auto-id/m3 -> main); do not start M4"
 }
