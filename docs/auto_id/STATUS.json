@@ -270,7 +270,14 @@
         "M4.2: archived CARBON-4C baselines NOT_FROZEN (INCOMPLETE_EVIDENCE): FE shapes not archived; final freeze needs Abaqus Python extraction (HUMAN gate)",
         "M4.3: family-classifier thresholds provisional (SPEC 12.2 gives none)"
       ],
-      "abaqus_runs": 0
+      "abaqus_runs": 0,
+      "verification": {
+        "commit": "a3224843608f3a872b8ae3a1cb3c600cf7ffad23",
+        "windows_full_with_stores": "1217 ran; 1215 passed, 0 failures, 2 skipped (opt-in Abaqus)",
+        "windows_full_without_stores": "1215 ran; 1205 passed, 0 failures; skipped: M3 gate class, M4.2 store test, 2 Abaqus, 14 real-data subtests",
+        "linux_ci": "https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/37182809657 - success, Python 3.11, 1212 ran, OK (skipped=22: 14 data-store subtests, M3 gate class, M4.2 store test, 2 opt-in Abaqus, 4 headless Tk)",
+        "linux_ci_previous_failure": "run 37182692754 on 4ad6379: M4.3 test compared floats exactly under node reordering; test fixed in a322484, classifier unchanged"
+      }
     }
   },
   "next_action": "SUPERVISOR review of the first M4 batch (M4.1-M4.5, M4.7, M4.8); M4.6/M4.9 need new authorisation"

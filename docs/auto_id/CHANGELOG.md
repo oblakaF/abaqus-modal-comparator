@@ -2490,3 +2490,17 @@ first internal provider.
 - **Fix (test only):** classification fields are compared exactly, and the parity
   scores to 1e-12. No change to `services.modal_family_classifier`.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4 first batch — verification recorded
+
+- **Linux CI** on `a322484` (ubuntu-latest, Python 3.11, run 37182809657): success.
+  - 1212 ran, OK, skipped=22.
+  - Skips: 14 data-store subtests, the M3 gate class, the M4.2 store test, 2 opt-in
+    Abaqus tests and 4 headless-Tk tests.
+- **Windows:** full suite with stores 1217 ran, 1215 passed, 2 skipped.
+- **Status:**
+  - The first M4 batch (M4.1–M4.5, M4.7, M4.8) is REVIEW_READY.
+  - M4.6 and M4.9 remain `TODO` and need new SUPERVISOR authorisation.
+  - The M4 stage stays IN_PROGRESS.
+- **Abaqus run count:** 0
+
