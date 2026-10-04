@@ -1,0 +1,91 @@
+{
+  "schema": "auto-id/specimen/v1.1",
+  "specimen_type": "sandwich",
+  "family_id": "CFRP-T300-plain-0.45-oldstock",
+  "design_id": "SP-13",
+  "physical_specimen_id": null,
+  "test_run_id": "SP13_a_500by500_Glue420_Auxetic_newSP01_260910",
+  "plan_mm": null,
+  "masses_g": null,
+  "face_thickness_mm": null,
+  "core_height_mm": null,
+  "materials": {
+    "face": "CFRP_Face",
+    "core": "PLA_Basic_Core"
+  },
+  "suspension_max_hz": null,
+  "geometry_calibration": {
+    "mode": "documented_centered_alignment",
+    "coordinate_calibration": {
+      "abaqus_unit": "mm",
+      "dimension_unit": null,
+      "experimental_unit": "m",
+      "manual_scale": null,
+      "mode": "calibrated_physical",
+      "physical_height": null,
+      "physical_width": null,
+      "provenance": "CARBON-3D-R3: Abaqus SP13_mesh_local_v1_modal is in mm (face plates 510 x 520 mm; t/mm^3 and MPa). Experimental source is the accepted SP-13 REAL-1 lineage frozen in analysis/sp13_real_baseline/SOURCE_FREEZE.json: SP13_a_polymax.unv (Simcenter PolyMAX set Best, child of the Polytec parent SP13_a_500by500_Glue420_Auxetic_newSP01_260910_polytec.unv, METRIC_ABS_(SI)), so coordinates are in metres. Accepted fixed Polytec frame and specimen mounting convention: measured TOP exterior face, no X/Y swap, same-sign identity (experimental +x = FE +X, +y = FE +Y). The centre-to-centre placement is the accepted centred approximation (USER_CONFIRMED_CENTERED_APPROXIMATION / CENTERED_APPROXIMATION), not a measured edge registration. The production nearest-node exterior-surface mapping stored here was validated against the accepted REAL-1 bilinear interpolation in CARBON-3D-R2; the bilinear weights are not stored in this registration.",
+      "scan_coverage": null
+    },
+    "measured_surface": {
+      "fe_instance": "CFRP_PLATE_TOP",
+      "side": "max_z",
+      "label": "TOP exterior face"
+    },
+    "orientation": {
+      "experimental_axes_in_fe": [
+        "+X",
+        "+Y",
+        "+Z"
+      ],
+      "reference": "documented_convention",
+      "source": "accepted FrozenRegistration calibration provenance: measured TOP exterior face, no X/Y swap, experimental +x = FE +X and +y = FE +Y (user-confirmed convention)"
+    },
+    "uncertainty": {
+      "translation_mm": null,
+      "scale_rel": null,
+      "rotation_deg": null
+    },
+    "legacy_registration": {
+      "path": "docs/registrations/SP13_frozen_registration.json",
+      "registration_hash": "a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4"
+    }
+  },
+  "fe_reference": {
+    "model_name": "SP13_mesh_local_v1_modal",
+    "geometry_identity": {
+      "schema_version": "fe-geometry-identity/2",
+      "sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826",
+      "node_count": 1585637
+    },
+    "geometry_file": {
+      "role": "FE node coordinates (instance,node_label,x,y,z) extracted from the CARBON-4C reference ODB",
+      "file_name": "SP13_fe_geometry.csv",
+      "sha256": "78d197376f7a5cce644d7c0eeb218df3151d3c349284caffa48c333f3ff11d39",
+      "size_bytes": 108154972,
+      "location": {
+        "store": "carbon-project-archive",
+        "relative_path": "fe_geometry/SP13_fe_geometry.csv"
+      }
+    }
+  },
+  "acquisition": {
+    "session": "2026-09-10 repeat a acquisition",
+    "grid": {
+      "grid_id": "SP-13-scan-289pt",
+      "point_count": 289
+    },
+    "fixture_id": "SP13/best",
+    "protocol_id": null,
+    "remount_of": null
+  },
+  "identify": "default",
+  "unavailable": {
+    "physical_specimen_id": "no physical panel identifier is recorded in accepted evidence; a run-independent panel identity cannot be established from file names",
+    "plan_mm": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2); FE plan dimensions are model values, not measurements",
+    "masses_g": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2)",
+    "face_thickness_mm": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2)",
+    "core_height_mm": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2)",
+    "suspension_max_hz": "no physically measured suspension threshold is recorded (SPEC §19 item 5); never replaced by a default"
+  }
+}
