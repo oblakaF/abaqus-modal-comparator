@@ -2504,3 +2504,31 @@ first internal provider.
   - The M4 stage stays IN_PROGRESS.
 - **Abaqus run count:** 0
 
+## 2026-10-04 — M4 first batch — SUPERVISOR review recorded; decision record prepared
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Review:**
+  - M4.1, M4.3, M4.4, M4.5, M4.7 and M4.8 are acknowledged as REVIEW_READY. They are
+    not ACCEPTED.
+  - M4.2 is **not accepted** and is now `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION`.
+    The archived baseline lacks the FE mode shapes that strict frozen observation
+    generation needs. Abaqus Python extraction needs a separate HUMAN gate, which has
+    not been given; no extraction was run.
+  - M4.6 and M4.9 have not started.
+- **Added — `docs/auto_id/M4_DECISION_RECORD.md`** (PROPOSED, awaiting SUPERVISOR
+  decision; not a DECISIONS.md entry). It covers:
+  1. the M4.3 provisional classifier values, with rationale, risks and a proposed
+     real-shape validation once extraction is authorised;
+  2. the M4.8 LM hyperparameters: μ₀ = 1e-3, μ ÷ 10 after an accepted step, 3 step
+     attempts per iteration, and a solve budget of 20 per specimen counting every
+     evaluation. The SPEC-fixed values are unchanged. Two questions are open: whether
+     the reference solve counts, and whether archived ±5 % solves can be reused;
+  3. exact M4.9 acceptance requirements:
+     - **prerequisites:** M4.2 unblocked, M4.6 authorised, the solve command pinned
+       to the CARBON-4C/5A convention, and a HUMAN gate;
+     - **twin definition:** truth, a noise seed and σ;
+     - **pass criteria:** convergence within budget, 1σ recovery (with an open point
+       on the weak G12 direction), branch-exchange refusal, determinism, provenance,
+       and unchanged M3 contracts.
+- **Code changed:** none.
+- **Abaqus run count:** 0

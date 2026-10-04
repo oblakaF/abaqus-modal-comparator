@@ -239,7 +239,7 @@
   },
   "m4": {
     "M4.1": "REVIEW_READY",
-    "M4.2": "REVIEW_READY",
+    "M4.2": "BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION",
     "M4.3": "REVIEW_READY",
     "M4.4": "REVIEW_READY",
     "M4.5": "REVIEW_READY",
@@ -261,7 +261,7 @@
         "M4.7",
         "M4.8"
       ],
-      "status": "REVIEW_READY",
+      "status": "REVIEWED",
       "not_authorised": [
         "M4.6",
         "M4.9"
@@ -277,8 +277,26 @@
         "windows_full_without_stores": "1215 ran; 1205 passed, 0 failures; skipped: M3 gate class, M4.2 store test, 2 Abaqus, 14 real-data subtests",
         "linux_ci": "https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/37182809657 - success, Python 3.11, 1212 ran, OK (skipped=22: 14 data-store subtests, M3 gate class, M4.2 store test, 2 opt-in Abaqus, 4 headless Tk)",
         "linux_ci_previous_failure": "run 37182692754 on 4ad6379: M4.3 test compared floats exactly under node reordering; test fixed in a322484, classifier unchanged"
+      },
+      "review": {
+        "acknowledged_review_ready": [
+          "M4.1",
+          "M4.3",
+          "M4.4",
+          "M4.5",
+          "M4.7",
+          "M4.8"
+        ],
+        "blocked": {
+          "M4.2": "archived baseline lacks FE mode shapes required for strict frozen observation generation; Abaqus Python ODB shape extraction requires a separate HUMAN gate"
+        },
+        "not_started": [
+          "M4.6",
+          "M4.9"
+        ]
       }
-    }
+    },
+    "decision_record": "docs/auto_id/M4_DECISION_RECORD.md (PROPOSED; awaiting SUPERVISOR decision)"
   },
-  "next_action": "SUPERVISOR review of the first M4 batch (M4.1-M4.5, M4.7, M4.8); M4.6/M4.9 need new authorisation"
+  "next_action": "SUPERVISOR decisions on docs/auto_id/M4_DECISION_RECORD.md (classifier values, LM hyperparameters, M4.9 acceptance); HUMAN gate for ODB shape extraction before M4.2; M4.6/M4.9 not started"
 }
