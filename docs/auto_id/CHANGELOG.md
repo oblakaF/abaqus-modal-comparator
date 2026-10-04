@@ -1893,3 +1893,12 @@ first internal provider.
   - **Linux CI:** recorded in the follow-up entry.
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR review of M2 (PR #28).
+
+## 2026-10-04 — M2 — Final rework: Linux CI recorded
+
+- **Stage:** M2 (REVIEW_READY; not accepted by the worker)
+- **Linux CI** on `a9e6322` (ubuntu-latest, Python 3.11, run 37172600996): success.
+  1087 ran, OK, skipped=20 (14 data-store subtests, 2 opt-in Abaqus, 4 headless Tk).
+  These are the categories classified in M0.4.
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR review of M2 (PR #28).

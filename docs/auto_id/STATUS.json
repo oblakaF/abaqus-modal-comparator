@@ -177,7 +177,15 @@
     "not_recorded_sp02_sp13": [
       "plan dimensions, masses, face thickness, core height, suspension_max_hz, acquisition protocol id"
     ],
-    "final_rework": "unit-safe physical registration; separate registration basis / uncertainty availability; production readiness guard; typed identity namespaces; non-finite MAC handling"
+    "final_rework": "unit-safe physical registration; separate registration basis / uncertainty availability; production readiness guard; typed identity namespaces; non-finite MAC handling",
+    "final_rework_commit": "a9e6322b42e2f4339fa9131da2bce4ac27c3055a",
+    "final_rework_tests": {
+      "focused_m2": "84 ran, OK (real-data stage gate included)",
+      "related_m1_stage_a": "209 ran, 207 passed, 2 skipped (opt-in Abaqus)",
+      "windows_full": "1090 ran, 0 failures; with stores 1088 passed / 2 skipped; without stores 1081 passed / 2 skipped tests / 14 skipped subtests",
+      "linux_ci": "https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/37172600996 — success, Python 3.11, 1087 ran, OK (skipped=20)",
+      "abaqus_runs": 0
+    }
   },
   "next_action": "Supervisor review of M2 (stage PR auto-id/m2 -> main); do not start M3"
 }
