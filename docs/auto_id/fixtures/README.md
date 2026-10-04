@@ -187,9 +187,20 @@ the data and never modifies, reorders or deletes modes.
 | `coherence_quality` | diagnostic | coherence at resonance < 0.9 (SPEC §6 S1); `NOT_AVAILABLE` when the FRF builder has no coherence |
 | `frequency_resolution` | diagnostic | 2ζf < 3Δf unresolved resonance (SPEC §6 S1); close modes |Δf|/f < 3 % as a cluster trigger (SPEC §12.4); Δf, bandwidth and overlap metrics |
 | `modal_confidence` | diagnostic | frequency, damping and shape uncertainty (`NOT_AVAILABLE` when the source has none); phase collinearity (metric only); AutoMAC off-diagonal > 0.5 (SPEC §6 S1) |
+| `suspension_threshold` | diagnostic | modes below a **trusted** physical `suspension_max_hz` (SPEC §6 S1, §19 item 5); `NOT_AVAILABLE` without one; never guessed |
 
 - **Overall status:** `FAIL` only if a hard check fails, which raises
   `ExperimentalQCRefusal`; otherwise `WARNING` if any check warns, else `PASS`.
 - **`NOT_AVAILABLE`:** never degrades the overall status; such items are listed in
   `not_available`.
 - **Report identity:** the report is deterministic and has a `content_hash`.
+
+**Suspension threshold and eligibility (SPEC §19 item 5).**
+- `prepare_auto_id_experimental_input(..., suspension_threshold=TrustedSuspensionThreshold(value, source))`
+  accepts only a documented physical value. The M2 passport supplies it.
+- The result's `eligibility` lists eligible and excluded modes.
+- `identification_dataset()` is the explicit view that material identification must
+  use. It leaves out modes below the trusted threshold, and `require_eligible()`
+  refuses them. The provider `dataset` is never changed.
+- The historical SP02/SP13 fixtures have no accepted value, so their suspension QC is
+  `NOT_AVAILABLE`.

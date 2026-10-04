@@ -1560,3 +1560,117 @@ first internal provider.
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR resolution of `BLOCKED_SPEC_GATE`. No M1 stage PR before
   then. M2 not started.
+
+## 2026-10-04 — M1 — Final closure: SPEC §19 items 4–5, suspension-aware QC, M1 ACCEPTED
+
+- **Stage:** M1 (final stage closure)
+- **Status:** M1.1, M1.2, M1.3 and M1.4 ACCEPTED. **M1 Gate A PASS. M1 Gate B
+  `FUTURE_INTERNAL_PROVIDER`. M1 stage ACCEPTED** (SUPERVISOR-authorized conditional
+  closure). `BLOCKED_SPEC_GATE` is removed. M2 NOT STARTED.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commits:**
+  - `ef95cbe` — `auto-id(M1.4): add suspension-aware QC and mode eligibility`.
+  - The commit that introduces this entry — the normative SPEC amendment and the
+    stage-closure documents.
+- **SPEC §19 (normative; SUPERVISOR-authorized):**
+  - **Item 4, M1 modal-preparation scope and staged internal fitting:**
+    - Auto-ID never consumes raw FRF.
+    - Fitting is a separate stage behind `ModalFittingProvider`.
+    - The first provider is the external frozen PolyMAX-compatible provider.
+    - FRF-only packages are refused until an internal provider is implemented,
+      admitted and validated. An internal fitter is not an M1 closure condition.
+    - The §17 raw-FRF recovery criterion is the gate of the first internal provider.
+    - Peak-derived modes are prohibited without exception.
+    - Fixture references are not mixed; SP13/best is about 205.65 / 212.66 /
+      228.61 Hz, and the 2026-09-09 values are historical.
+    - It supersedes the earlier stage-assignment wording of §4, §6 S1 and §17 where
+      they differ. The historical text is unchanged.
+  - **Item 5, suspension threshold ownership:**
+    - `suspension_max_hz` is a physical passport / acquisition property (M2) and is
+      never guessed.
+    - The §4.1 example value 18.0 is illustrative, not a default.
+    - QC evaluates the threshold when a trusted value exists, and is `NOT_AVAILABLE`
+      otherwise.
+    - Modes below the threshold must not enter material identification once M2
+      supplies it.
+    - M1 closes without inventing the value; one-button readiness needs M2.
+- **DECISIONS:** D-030 and D-031 appended for traceability. Earlier entries are
+  unchanged.
+- **Suspension-aware QC (`ef95cbe`):**
+  - **`TrustedSuspensionThreshold`:** a finite positive value plus its documented
+    physical source. It is the only accepted input; nothing infers the value from
+    modal or FE frequencies, and there is no default.
+  - **QC check `suspension_threshold` (diagnostic):** `NOT_AVAILABLE` without a
+    trusted value. With one, it reports the threshold, the modes below it and the
+    lowest mode at or above it.
+  - **`ExperimentalModeEligibility`:** kept separate from the observational QC
+    report, on `AutoIDExperimentalInput`.
+    - `identification_dataset()` is the explicit view without the excluded modes.
+    - `require_eligible()` raises `ExperimentalModeEligibilityRefusal`.
+    - The provider dataset is never changed.
+  - **`prepare_auto_id_experimental_input`** takes an optional
+    `suspension_threshold`. The M0.2 manifest is not changed.
+- **M1 gate (ROADMAP) rewritten:**
+  - **Gate A**, the initial production modal-input layer, has explicit conditions,
+    including honest suspension handling: **PASS**.
+  - **Gate B**, the first internal provider, keeps the original raw-FRF scientific
+    requirement: `FUTURE_INTERNAL_PROVIDER`, not passed.
+- **Stage verification** (`test_m1_stage_gate`, Windows, data store configured): the
+  chain is manifest → M1.1 → M1.2 → M1.3 → M1.4 QC → mode eligibility → Auto-ID
+  input.
+  - **SP02/bravo-1:**
+    - source SHA-256 `2671db01…`, modal set `bravo-1`, 9 modes, 121 points, U3;
+    - registration `9bf736d3…`, FE `72e8597a…`;
+    - `external-polymax/1` with `external_frozen_selection`, damping equals the
+      stored poles;
+    - QC hard checks PASS, suspension `NOT_AVAILABLE`, all modes eligible pending M2;
+    - dataset unchanged and equal to M1.2;
+    - real peak-derived modes refused;
+    - deterministic.
+  - **SP13/best:**
+    - source SHA-256 `f2680235…`, modal set `best`, 12 modes, 289 points, U3;
+    - registration `a8970e52…`, FE `34d69d79…`;
+    - provider and damping as for SP02;
+    - QC hard checks PASS, coherence and suspension `NOT_AVAILABLE`;
+    - D-028 references 205.65 / 212.66 / 228.61 Hz reproduced, no mode within 1 Hz of
+      217.5 Hz;
+    - real peak-derived modes refused;
+    - deterministic.
+- **Tests:**
+  - **`test_experimental_qc`:** 27 tests, 9 of them new suspension tests. They cover:
+    - an absent threshold giving `NOT_AVAILABLE`;
+    - a supplied threshold identifying the modes below it;
+    - a threshold below all modes giving PASS;
+    - identification blocking modes below the threshold;
+    - the dataset staying unchanged;
+    - no inference from modal frequencies;
+    - no FE input, and untrusted plain values refused;
+    - a trusted threshold requiring a physical source;
+    - deterministic reports.
+  - **`test_m1_stage_gate`:** now also checks suspension `NOT_AVAILABLE`, full
+    eligibility and determinism.
+  - **Focused M1 suites, store configured:** 220 ran, OK.
+  - **Full Windows suite** (Python 3.14.6): 1006 ran, 0 failures. With the store
+    configured, 1004 passed and 2 skipped (opt-in Abaqus). Without it, 998 passed
+    with 2 skipped tests and 12 skipped real-data subtests.
+  - **Linux CI** on `ef95cbe` (ubuntu-latest, Python 3.11, run 37167897161): 1003
+    ran, OK, skipped=18 — 12 real-fixture subtests, 2 opt-in Abaqus, 4 headless Tk.
+    These are the categories classified in M0.4.
+- **Accepted limitations:**
+  - historical fixtures have suspension `NOT_AVAILABLE` until M2;
+  - SP13 coherence is `NOT_AVAILABLE` with the unchanged FRF builder;
+  - the exports carry no modal uncertainty;
+  - internal fitting is future work (Gate B);
+  - registration source path/timestamp reconciliation remains future work;
+  - there is no automatic mode rejection beyond the explicit suspension eligibility,
+    and no universal QC thresholds.
+- **Scientific runtime behaviour changed:**
+  - **YES, for the Auto-ID input only:** a trusted suspension threshold now excludes
+    modes below it from `identification_dataset()`.
+  - **NO, everything else:** no trusted value exists yet, so the historical fixtures
+    are unaffected. Readers, the provider, registration, pairing and identification
+    are unchanged.
+- **Abaqus run count:** 0
+- **Next gate:** the M1 stage PR (`auto-id/m1` → `main`) merges only under explicit
+  HUMAN authorization. Afterwards, record the main merge SHA. M2 starts only on
+  SUPERVISOR authorization.

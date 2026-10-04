@@ -591,3 +591,40 @@ the archival DOCX wording could be read more loosely.
    as zero information.
 3. **Peak-derived modes** are prohibited for production identification. The frozen
    CARBON-4C/5A studies are unaffected (PolyMAX provenance; see the audit, K1).
+4. **M1 modal-preparation scope and staged internal fitting** (SUPERVISOR,
+   2026-10-04; D-023, D-027, D-028, D-029, D-030). This item clarifies the phrases
+   "built-in multi-mode fit (stage M1)" in §4 (footnote to `modes.unv`), §6 S1 and the
+   §17 M1 row. It is normative and supersedes their earlier stage-assignment wording
+   where they differ.
+   - Material Auto-ID **never** consumes raw FRF directly. Modal fitting is a
+     separate modal-preparation stage behind `ModalFittingProvider`.
+   - The first production provider is the accepted external frozen
+     PolyMAX-compatible provider (D-027). An internal built-in multi-mode fitting
+     provider remains future provider work (D-029).
+   - An FRF-only package (no `modes.unv`) is **refused** until such an internal
+     provider is implemented, admitted and validated. Implementing an internal fitter
+     is therefore **not** a closure condition for the initial M1 production
+     modal-input layer.
+   - The raw-FRF recovery criterion of the archival §17 M1 row is the acceptance gate
+     of the **first internal** `ModalFittingProvider`, not of the external
+     PolyMAX-compatible provider.
+   - Peak-derived modes remain prohibited without exception.
+   - Fixture-specific acquisition references **MUST NOT** be mixed (D-028).
+     - For the accepted SP13 repeat-a fixture (`SP13/best`), the reference frozen
+       PolyMAX frequencies are about 205.65 / 212.66 / 228.61 Hz.
+     - The values 206.15 / 212.61 / 228.75 Hz belong to the older 2026-09-09
+       acquisition. They stay historical until that acquisition is pinned as a
+       separate fixture.
+5. **Suspension threshold ownership** (SUPERVISOR, 2026-10-04; D-031).
+   - `suspension_max_hz` is a **physical** specimen / test-run property. It comes
+     from the specimen passport or acquisition data defined in M2. The value 18.0 in
+     the §4.1 `specimen.json` example is illustrative, not a default.
+   - It **MUST NOT** be guessed from frequencies, FE results or existing modal sets.
+   - M1 QC supports evaluating the threshold when a trusted value is supplied. If no
+     trusted threshold exists, the QC status is `NOT_AVAILABLE`.
+   - The absence of a trusted threshold in the historical SP02/SP13 regression
+     fixtures is never silently replaced by a default such as 18 Hz.
+   - Once M2 supplies `suspension_max_hz`, modes below it **MUST NOT** enter material
+     identification (§6 S1).
+   - M1 may close as the modal-input / QC subsystem without inventing the M2 passport
+     value. Complete one-button production readiness still requires M2.

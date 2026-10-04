@@ -5,10 +5,10 @@
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M1",
   "current_ministep": null,
-  "status": "BLOCKED_SPEC_GATE",
-  "last_accepted_stage": "M0",
+  "status": "ACCEPTED",
+  "last_accepted_stage": "M1",
   "last_accepted_ministep": "M1.4",
-  "last_accepted_commit": "c411bb9842fbdb6feb546fbdf3cbf3ae7ba6634f",
+  "last_accepted_commit": "ef95cbe937d379ac9299d1261ebcf3c1bd5b6616",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -45,25 +45,24 @@
     "M1.2": "ACCEPTED",
     "M1.3": "ACCEPTED",
     "M1.4": "ACCEPTED",
-    "status": "BLOCKED_SPEC_GATE",
+    "status": "ACCEPTED",
     "M1.3_design_review": "DESIGN_ACCEPTED (D-019, D-021, D-023, D-024, D-026..D-029); no unresolved conflict",
     "M1.3_implementation": "ACCEPTED",
     "M1.3.1": "ACCEPTED",
     "accepted_limitations": [
-      "coherence evaluation deferred to M1.4",
-      "internal FRF fitting remains a future provider (D-029)",
-      "registration source path/timestamp reconciliation remains future work"
+      "suspension_max_hz not pinned for historical fixtures; NOT_AVAILABLE until M2",
+      "SP13 coherence NOT_AVAILABLE with the unchanged FRF builder",
+      "no modal uncertainty in the PolyMAX exports (NOT_AVAILABLE)",
+      "internal FRF fitting is a future provider (Gate B, D-029)",
+      "registration source path/timestamp reconciliation remains future work",
+      "no automatic mode rejection; no universal QC thresholds beyond SPEC flag rules"
     ],
     "gate": {
-      "gate_a_external_polymax_provider": "PASS (tests/test_m1_stage_gate.py, commit f5279dd; SP02/bravo-1, SP13/best)",
-      "gate_b_internal_raw_frf_recovery": "NOT CLAIMED (future internal ModalFittingProvider, D-029)",
-      "reference_values": "fixture-specific (D-028); SP13/best ~205.65/212.66/228.61 Hz",
-      "blocking_sentence": "SPEC §4, footnote to `modes.unv`: \"If `modes.unv` is absent and only `frf.unv` exists, modes are built by the built-in **multi-mode** fit (stage M1).\"",
-      "reason": "SPEC (precedence 1) still assigns the built-in multi-mode fit to stage M1; DECISIONS (precedence 2) cannot override it",
-      "resolution_options": [
-        "SUPERVISOR SPEC amendment (proposed §19 item 4 text in CHANGELOG)",
-        "accepted internal ModalFittingProvider passing Gate B"
-      ]
+      "gate_a_initial_production_modal_input": "PASS (tests/test_m1_stage_gate.py; SP02/bravo-1, SP13/best)",
+      "gate_b_first_internal_provider": "FUTURE_INTERNAL_PROVIDER",
+      "reference_values": "fixture-specific (D-028, SPEC §19 item 4); SP13/best ~205.65/212.66/228.61 Hz",
+      "spec_resolution": "SPEC §19 items 4-5 (D-030, D-031) resolve the former BLOCKED_SPEC_GATE",
+      "suspension_threshold": "NOT_AVAILABLE for SP02/bravo-1 and SP13/best pending the M2 passport (never guessed)"
     }
   },
   "audit_test_baseline": {
@@ -130,7 +129,7 @@
       }
     ]
   },
-  "next_action": "SUPERVISOR: resolve BLOCKED_SPEC_GATE (SPEC §19 amendment or internal provider); no M1 stage PR until then; M2 not started",
+  "next_action": "Merge the M1 stage PR (auto-id/m1 -> main) only under explicit HUMAN authorization; then record the main merge SHA; M2 only on SUPERVISOR authorization",
   "m2": {
     "status": "NOT_STARTED"
   }

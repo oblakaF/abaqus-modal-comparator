@@ -258,3 +258,32 @@ Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: M1.3 decision resolution 
 Decision: Internal FRF fitting remains a future `ModalFittingProvider`. It is not
 required before the first production PolyMAX-compatible provider.
 Supersedes: none
+
+## D-030 — M1 modal-preparation scope; internal fitting staged (SPEC §19 item 4)
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: SPEC §19 item 4 (M1 final closure)
+Decision: For traceability, record the normative SPEC §19 item 4.
+- The "built-in multi-mode fit (stage M1)" wording of §4, §6 S1 and §17 is clarified:
+  Auto-ID never consumes raw FRF, and fitting is a separate modal-preparation stage
+  behind `ModalFittingProvider`.
+- The first production provider is the external frozen PolyMAX-compatible provider.
+- FRF-only packages are refused until an internal provider is implemented, admitted
+  and validated. An internal fitter is not an M1 closure condition.
+- The §17 raw-FRF recovery criterion is the gate of the first internal provider.
+- References are fixture-specific (SP13/best ≈ 205.65 / 212.66 / 228.61 Hz).
+Rationale / scope: resolves the stage-assignment conflict recorded as
+`BLOCKED_SPEC_GATE` (`48e809e`). Consistent with D-023, D-027, D-028 and D-029.
+Supersedes: none
+
+## D-031 — Suspension threshold ownership (SPEC §19 item 5)
+Date: 2026-10-04 · Accepted by: SUPERVISOR · Source: SPEC §19 item 5 (M1 final closure)
+Decision: For traceability, record the normative SPEC §19 item 5.
+- `suspension_max_hz` is a physical specimen / test-run property from the M2 passport
+  or acquisition data. It is never guessed from modal frequencies, FE results or
+  existing modal sets, and has no default.
+- M1 QC evaluates it when a trusted value is supplied, and is `NOT_AVAILABLE`
+  otherwise.
+- Once supplied, modes below it must not enter material identification.
+Rationale / scope: implemented in M1.4 as `TrustedSuspensionThreshold`, the
+`suspension_threshold` QC check and `ExperimentalModeEligibility` (`ef95cbe`).
+SP02/bravo-1 and SP13/best stay `NOT_AVAILABLE` until M2.
+Supersedes: none
