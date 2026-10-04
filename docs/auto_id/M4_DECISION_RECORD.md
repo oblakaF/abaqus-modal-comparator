@@ -1,26 +1,40 @@
 # M4 decision record — open parameters before M4.6 / M4.9
 
-**Status:** PROPOSED. This document is the worker's preparation and awaits a
-SUPERVISOR decision. It is not a DECISIONS.md entry; accepted items are appended there
-by the supervisor's decision.
+**Status:** PROPOSED, with SUPERVISOR review decisions recorded (2026-10-04). It is not
+yet a DECISIONS.md entry. The supervisor transfers accepted items there by a later
+decision.
 
-**Date:** 2026-10-04. **Branch:** `auto-id/m4`.
+**Branch:** `auto-id/m4`.
 
 **Scope:** three items the first M4 batch left as explicit inputs or provisional
-values. No code changes are proposed here. Every value below is already explicit in
-code (hashed policy or required argument), so a decision changes data, not logic.
+values. No code changes are made or proposed here; every value is already explicit in
+code (hashed policy or required argument).
 
-**Batch review status:**
+**Batch status:**
 
 | Mini-step | Status |
 |---|---|
 | M4.1, M4.3, M4.4, M4.5, M4.7, M4.8 | REVIEW_READY (acknowledged) |
-| M4.2 | `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION` |
-| M4.6, M4.9 | TODO; not authorised |
+| M4.2 | `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION` (kept) |
+| M4.6, M4.9 | TODO; not authorised; implementation not started |
+
+No Abaqus or Abaqus Python runs.
+
+## SUPERVISOR review decisions (2026-10-04)
+
+| # | Topic | Decision |
+|---|---|---|
+| 1 | M4.3 classifier | The current thresholds stay **PROVISIONAL** and are not promoted to final policy. They are validated after real FE shape extraction. Any change needs a separate decision. |
+| 2 | M4.8 LM | **Approved:** μ₀ = 1e-3; accepted step μ ← μ/10; rejected step μ ← 10μ; at most 3 step attempts per iteration. **Solve budget: 20 Abaqus solves in total; the initial p0 reference evaluation counts toward it.** |
+| 3 | Archived CARBON-5A ±5 % solves | **Not allowed** as Jacobian or branch evidence until a gated ODB shape extraction is approved **and** completed. M3 byte identity alone is not sufficient. |
+| 4 | M4.9 | SP13 stays the first twin specimen. G12 identifiability is an **observed result, not a modified acceptance criterion**. The proposed 8 % rule is **not** added. |
+| 5 | Status | M4.2 stays BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION. M4.6 and M4.9 stay TODO. No Abaqus. No implementation of M4.6 / M4.9. |
 
 ---
 
 ## 1. M4.3 — modal-family classifier policy (`auto-id/modal-family/v1-provisional`)
+
+**Decision:** PROVISIONAL, not final. The values below stay frozen by policy hash.
 
 SPEC §12.2 fixes the quantities (P_x, P_y, diagonal parities for near-square panels,
 nodal-line counts) but no numbers.
@@ -34,68 +48,66 @@ nodal-line counts) but no numbers.
 | `nodal_grid_points` | 41 | Resampling grid for counting nodal lines | ≈ 12.5 mm spacing on a 500 mm panel; resolves about 8 half-waves | Too coarse: higher families are miscounted. |
 | `nodal_amplitude_floor` | 0.05 | \|w\| < 5 % of max is treated as zero when counting sign changes | Suppresses noise crossings near nodal lines | Too high: weak lobes are missed. |
 
-**Options:**
-- **(A) Accept the values as provisional v1.** They are frozen by policy hash and
-  revisited once real FE shapes exist.
-- **(B) Defer acceptance** until the classifier has been run on real SP02/SP13
-  outer-surface shapes. This needs the same gated ODB shape extraction as M4.2.
+**Validation after the extraction gate.**
+- **Run:** the classifier on the baseline outer-surface shapes of every frozen row.
+- **Record as evidence:** P_x, P_y, the diagonal parities, nodal counts and mirror
+  coverage per mode.
+- **Proposed check:**
+  - every frozen row classifies without a coverage refusal;
+  - the lowest torsion-dominated (odd-odd) family is identified.
 
-**Worker recommendation: (B), with (A) as the interim state.**
-- Keep the values as provisional (already hashed).
-- When the extraction gate is authorised, run the classifier on the baseline shapes of
-  every frozen row and record P_x, P_y, the diagonal parities, nodal counts and mirror
-  coverage per mode, as evidence.
-- Then fix v1 (or a v2 with justified changes) by decision.
-
-**Acceptance check proposed for that run:**
-- every frozen row classifies without a coverage refusal;
-- the lowest torsion-dominated (odd-odd) family is identified.
+Promoting the values to final, or changing them, needs a separate decision.
 
 ---
 
 ## 2. M4.8 — LM hyperparameters
 
-The SPEC-given values stay fixed:
+**Decision: approved.**
 
-| Value | Source |
-|---|---|
-| μ increase × 10 on a rejected step | SPEC §8 |
-| ≤ 5 iterations | SPEC §8 |
-| Stop when max\|Δx_j\| < 0.2·sd_j | SPEC §8 |
-| ±5 % central differences | SPEC §6 S4 |
+| Parameter | Value | Source |
+|---|---|---|
+| `mu_initial` (μ₀) | **1e-3** | SUPERVISOR decision. D = diag(JᵀJ) makes μ dimensionless; starts near Gauss–Newton. |
+| `mu_decrease` (accepted step) | **10** (μ ← μ/10) | SUPERVISOR decision |
+| `mu_increase` (rejected step) | **10** (μ ← 10μ) | SPEC §8; confirmed |
+| `max_step_attempts` | **3 per iteration** | SUPERVISOR decision |
+| `solve_budget` | **20 Abaqus solves in total, including the initial p0 reference evaluation** | SUPERVISOR decision |
+| `max_iterations` | 5 | SPEC §8 (unchanged) |
+| stop rule | max\|Δx_j\| < 0.2·sd_j | SPEC §8 (unchanged) |
+| finite differences | central, p·(1 ± 0.05) | SPEC §6 S4 (unchanged) |
 
-The SPEC gives no values for the following; the code requires them explicitly.
+**How this maps to the existing code** (M4.8, no change needed):
+- `LMSettings(mu_initial=1e-3, mu_decrease=10.0, max_step_attempts=3, solve_budget=20)`;
+  the SPEC defaults cover the rest.
+- The loop's budget already counts every evaluation it requests: the reference r(x₀),
+  all finite-difference solves and every trial step. That matches "p0 counts".
 
-| Parameter | Proposed | Rationale | Alternatives |
-|---|---|---|---|
-| `mu_initial` (μ₀) | **1e-3** | D = diag(JᵀJ) makes μ dimensionless. 1e-3 starts close to Gauss–Newton (the classic Marquardt choice). The problem is nearly log-linear (CARBON-5A: smooth ±5 % response). | 1e-2 (more conservative first step) |
-| `mu_decrease` | **10** (μ ← μ/10 after an accepted step) | Standard Marquardt / Nielsen schedule, symmetric to the SPEC × 10 increase | 1 (keep μ): fewer large steps, but slower |
-| `max_step_attempts` | **3 per iteration** | μ can rise to 1 (three × 10 increases from 1e-3), which is already strongly damped. After a first rejection the finite-difference Jacobian is refreshed (2·n_p = 4 solves), so 3 attempts can cost up to 3 + 4 solves. | 2 (cheaper); 4 (more robust) |
-| `solve_budget` | **20 per specimen per identification run, counting every evaluation the loop requests** (reference r(x₀), all finite-difference solves and every trial step) | Matches the M4 gate (≤ 20 authorised solves) and SPEC §8 ("about 10–20 per specimen" for two global parameters) | 15 (tighter); 20 excluding the reference solve |
+**Solve count:**
+- **Expected**, for the nearly linear two-parameter case: 1 reference + 4
+  finite-difference solves + about 1 trial per iteration over 2–4 iterations, about
+  7–9 solves.
+- **Over budget:** reaching 20 ends the run with `SOLVE_BUDGET`. That is a non-result,
+  never an identification.
 
-**Expected solve count for the nearly linear two-parameter case:**
-- 1 reference solve;
-- 4 finite-difference solves;
-- about 1 trial per iteration for 2–4 iterations;
-- **about 7–9 in total.**
-
-**Worst case inside the budget:** a refresh (4) plus 3 rejected attempts in one
-iteration. The budget ends the run with `SOLVE_BUDGET`, which is a non-result and
-never an identification.
-
-**Questions for the supervisor:**
-1. Does the reference solve at p0 count toward the 20? Proposed: yes. If an archived
-   baseline is reused, it counts as 0 solves but is still recorded.
-2. Can the four archived CARBON-5A ±5 % solves serve as the first finite-difference
-   Jacobian, as zero new solves? Their INPs are byte-identical to the jobs the loop
-   would generate (M3).
-
-   This is possible only after shape extraction (Abaqus Python, gated), because
-   tracking needs shapes.
+**Still open, for the M4.9 gate wording:** whether the twin's truth-generation solve
+and the Abaqus Python extraction runs fall inside the 20, or are authorised
+separately. The decision above fixes the identification loop's 20, including p0.
 
 ---
 
-## 3. M4.9 — exact acceptance requirements (proposal)
+## 3. Archived CARBON-5A ±5 % solves
+
+**Decision:** not allowed as Jacobian or branch evidence until a gated ODB shape
+extraction is approved **and** completed.
+- M3 byte identity of their INPs is not sufficient on its own.
+- The same holds for the archived CARBON-4C baseline (M4.2 stays blocked).
+
+---
+
+## 4. M4.9 — acceptance requirements
+
+The SUPERVISOR decisions (SP13 first; G12 identifiability observed; no 8 % rule) are
+applied below. The remaining items are the worker's proposal; the review did not
+contradict them. They become final with the DECISIONS entry.
 
 ### Prerequisites (each separately authorised)
 
@@ -113,32 +125,31 @@ never an identification.
      ```
 
      with cpus = 8 for SP02 and 1 for SP13.
-3. **HUMAN gate for M4.9,** stating the specimen(s), the solve budget and the
-   extraction runs.
+3. **HUMAN gate for M4.9,** stating the specimen, the solve budget and the extraction
+   runs.
 
 ### Synthetic-twin definition (SPEC §17 M4)
 
 | Item | Requirement |
 |---|---|
-| Specimen | **One specimen first; worker proposal SP13** (stronger E/G12 response in CARBON-5A; 12 PolyMAX modes). SP02 only by a separate decision. |
+| Specimen | **SP13** (SUPERVISOR decision). SP02 only by a separate decision. |
 | Truth | E_in_plane = 45000 MPa, G12 = 4000 MPa (carbon-property-set/v1; everything else unchanged) |
 | Synthetic experiment | The truth solve's FE modes, read through the accepted FrozenRegistration onto the measured grid (U3). Frequencies multiplied by (1 + ε_i), ε_i ~ N(0, 0.003²), with a fixed recorded seed. |
 | Start | E = 52000, G12 = 4500 MPa (p0) |
-| Observations | Frozen at p0 under `STRICT_IDENTIFICATION_PAIRING` against the synthetic experiment. FROZEN status required. Holdouts by family (M4.3). At least 2 fit terms. |
+| Observations | Frozen at p0 under `STRICT_IDENTIFICATION_PAIRING` against the synthetic experiment. FROZEN status required. Holdouts by family (M4.3, provisional policy). At least 2 fit terms. |
 | σ | Per row σ = 0.003 (the injected noise), explicit. No provisional setup term in the twin, because the data are synthetic. |
-| Solve budget | ≤ 20 identification solves, counted as in §2. The truth solve and the extraction runs are authorised and recorded separately. |
+| LM | The approved settings of §2. |
+| Solve budget | 20 Abaqus solves for the identification, including p0 (§2) |
 
 ### Pass criteria (all required)
 
 1. **Convergence:** status `CONVERGED`, within the budget.
-2. **Recovery within 1σ:** |ln(p̂_j / p_true,j)| ≤ sd_j for both E_in_plane and G12.
-   sd_j is the local sqrt(diag((JᵀJ)⁻¹)) at p̂ from the whitened residuals; this is the
-   M4 stop-rule sd, not the M5 `statistical_sd`.
-   - **Open point:** CARBON-5A shows G12 is the weak direction, so sd_G may be large
-     and a 1σ check of G12 nearly empty.
-   - **Proposal:** report sd_G. If sd_G > 8 % (the SPEC §10 fit threshold), record
-     G12 as "not identifiable in this twin", and require the 1σ recovery for E alone.
-     The full verdict remains M5's.
+2. **Recovery within 1σ (SPEC §17), unmodified:** |ln(p̂_j / p_true,j)| ≤ sd_j for
+   **both** E_in_plane and G12. sd_j is the local sqrt(diag((JᵀJ)⁻¹)) at p̂ from the
+   whitened residuals; this is the M4 stop-rule sd, not the M5 `statistical_sd`.
+   - **Observed, not a criterion change (SUPERVISOR decision):** G12 identifiability.
+     Report sd_G and sd_E as observed results. No 8 % rule or other threshold is
+     added. The production identifiability verdict stays with M5.
 3. **Branch-exchange refusal:**
    - **Setup:** an artificial exchange (shape mixing ≥ 45° between two tracked modes)
      injected into one candidate's FE state between iterations, without an extra
