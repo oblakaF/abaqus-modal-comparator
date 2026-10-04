@@ -206,18 +206,19 @@ result and does not re-fit raw FRF.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M2.1 | `specimen_manifest` schema / domain / hash | `REVIEW_READY` |
-| M2.2 | Family / design / specimen / test-run identities with distinct keys `design_id`, `physical_specimen_id`, `test_run_id` | `REVIEW_READY` |
-| M2.3 | FrozenRegistration generated from physical calibration / passport | `REVIEW_READY` |
-| M2.4 | Registration uncertainty diagnostic (never optimisation) | `REVIEW_READY` |
-| M2.5 | Acquisition / remount linkage for Σ_setup | `REVIEW_READY` |
+| M2.1 | `specimen_manifest` schema / domain / hash | `ACCEPTED` |
+| M2.2 | Family / design / specimen / test-run identities with distinct keys `design_id`, `physical_specimen_id`, `test_run_id` | `ACCEPTED` |
+| M2.3 | FrozenRegistration generated from physical calibration / passport | `ACCEPTED` |
+| M2.4 | Registration uncertainty diagnostic (never optimisation) | `ACCEPTED` |
+| M2.5 | Acquisition / remount linkage for Σ_setup | `ACCEPTED` |
 
 **M2 GATE:** SP02/SP13 reproduce the accepted FrozenRegistration identities. The
 registration perturbation diagnostic never changes the chosen geometry by optimising
 MAC.
 
-Stage status: `REVIEW_READY` (M2.1–M2.5 `REVIEW_READY`; branch `auto-id/m2`, based on `main`
-`d001205`).
+Stage status: `ACCEPTED` (M2.1–M2.5 `ACCEPTED` by the SUPERVISOR; software / regression gate `PASS`;
+current SP02/SP13 production physical readiness `NOT_READY`).
+**M2 merged into `main`** (PR #28, merge commit `7af9038c5486560c5d2d0b6d571a354766e29d77`).
 
 **M2 gate evidence:**
 
@@ -268,6 +269,8 @@ Stage status: `REVIEW_READY` (M2.1–M2.5 `REVIEW_READY`; branch `auto-id/m2`, b
 **M3 GATE:** the generic builder reproduces the accepted SP02/SP13 reference INPs
 byte-for-byte, except any explicitly versioned metadata difference proven irrelevant.
 No physics change.
+
+Stage status: `NOT_STARTED` (branch `auto-id/m3`, based on `main` `7af9038`).
 
 ---
 

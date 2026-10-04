@@ -1902,3 +1902,32 @@ first internal provider.
   These are the categories classified in M0.4.
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR review of M2 (PR #28).
+
+## 2026-10-04 — M2 merged to main; M3 branch created; supervised stage batches
+
+- **Stage:** M2 → M3
+- **M2 acceptance:**
+  - M2.1–M2.5 and the M2 stage are ACCEPTED by the SUPERVISOR, before the HUMAN
+    merge.
+  - Accepted head: `5c60abc`. Last implementation commit: `a9e6322`.
+- **M2 merge:** PR #28 (`auto-id/m2` → `main`), merge commit `7af9038c5486560c5d2d0b6d571a354766e29d77`.
+  - Recorded in `STATUS.json` (`main_merges`, `m2.merged_to_main`,
+    `last_accepted_stage = M2`) and in the ROADMAP.
+- **M2 conclusions (unchanged, intentionally separate facts):**
+  - software / regression gate PASS;
+  - SP02/SP13 historical accepted-registration replay PASS;
+  - SP02/SP13 production physical readiness NOT_READY.
+- **M3 branch:** `auto-id/m3`, created from exactly `7af9038c5486560c5d2d0b6d571a354766e29d77` (separate worktree).
+  - M3 is `NOT_STARTED`; M3.1–M3.5 are `TODO`.
+- **Governance (execution granularity only):** `CLAUDE.md` and `AGENTS.md` are
+  updated identically.
+  - **Default:** one mini-step at a time.
+  - **Exception:** a SUPERVISOR-authorised batch of named mini-steps within one stage
+    may run without stopping between mini-steps. Roadmap order is kept, and each
+    mini-step only reaches `REVIEW_READY`. There is no self-acceptance and no future
+    stage.
+  - **Unchanged:** the Abaqus, destructive-git and merge HUMAN gates.
+  - **Stage PR:** only after the whole batch is `REVIEW_READY`, then STOP.
+  - No scientific rule changed; no DECISIONS entry is required.
+- **Code changed:** none.
+- **Abaqus run count:** 0
