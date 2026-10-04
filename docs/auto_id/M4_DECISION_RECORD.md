@@ -29,6 +29,7 @@ No Abaqus or Abaqus Python runs.
 | 3 | Archived CARBON-5A ±5 % solves | **Not allowed** as Jacobian or branch evidence until a gated ODB shape extraction is approved **and** completed. M3 byte identity alone is not sufficient. |
 | 4 | M4.9 | SP13 stays the first twin specimen. G12 identifiability is an **observed result, not a modified acceptance criterion**. The proposed 8 % rule is **not** added. |
 | 5 | Status | M4.2 stays BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION. M4.6 and M4.9 stay TODO. No Abaqus. No implementation of M4.6 / M4.9. |
+| 6 | M4.9 budget clarification | The truth-generation solve is a **separate** authorised Abaqus solve and does **not** count toward the 20. The identification loop has at most **20** Abaqus solves in total, p0 included. Abaqus Python ODB shape extraction needs a **separate HUMAN Abaqus gate**, does **not** count toward the 20, and is data preparation, not optimisation. |
 
 ---
 
@@ -88,9 +89,13 @@ Promoting the values to final, or changing them, needs a separate decision.
 - **Over budget:** reaching 20 ends the run with `SOLVE_BUDGET`. That is a non-result,
   never an identification.
 
-**Still open, for the M4.9 gate wording:** whether the twin's truth-generation solve
-and the Abaqus Python extraction runs fall inside the 20, or are authorised
-separately. The decision above fixes the identification loop's 20, including p0.
+**Budget clarification (SUPERVISOR decision, 2026-10-04):**
+
+| Abaqus activity | Counts toward the 20? | Authorisation |
+|---|---|---|
+| Identification-loop solves: the p0 evaluation, all finite-difference solves, every trial step | **Yes — at most 20 in total, p0 included** | M4.9 HUMAN gate |
+| Twin truth-generation solve (45000 / 4000) | **No** | A separate authorised Abaqus solve |
+| Abaqus Python ODB shape extraction | **No** | A separate HUMAN Abaqus gate. It is data preparation, not optimisation. |
 
 ---
 
@@ -139,7 +144,7 @@ contradict them. They become final with the DECISIONS entry.
 | Observations | Frozen at p0 under `STRICT_IDENTIFICATION_PAIRING` against the synthetic experiment. FROZEN status required. Holdouts by family (M4.3, provisional policy). At least 2 fit terms. |
 | σ | Per row σ = 0.003 (the injected noise), explicit. No provisional setup term in the twin, because the data are synthetic. |
 | LM | The approved settings of §2. |
-| Solve budget | 20 Abaqus solves for the identification, including p0 (§2) |
+| Solve budget | At most 20 Abaqus solves for the identification loop, p0 included (§2). The truth-generation solve and the ODB shape extractions are authorised separately and do not count. |
 
 ### Pass criteria (all required)
 
