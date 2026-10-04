@@ -356,6 +356,9 @@ First batch reviewed by the SUPERVISOR:
   - The trigger fired, but the decision is **INDEPENDENT**: individual identity is stable
     (MAC 0.999998) in all ±5 % E/G12 directions.
   - R1 and R2 remain two observations. Criteria unchanged.
+- SUPERVISOR review of M4.4:
+  - `REVIEW_READY`: R1/R2 are independent branches; no cluster merging.
+  - **Unresolved:** the M4.3 holdout selection leaves one fit row for two parameters.
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---

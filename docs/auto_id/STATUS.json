@@ -335,7 +335,17 @@
       "decision": "INDEPENDENT: R1 (FE 10) and R2 (FE 11) are two independent branches, not a cluster",
       "evidence": "all four +/-5 % E/G12 directions: unique counterpart per branch, FE-to-FE MAC 0.999998; cross-MAC ~0; subspace cos2 0.999998; same on surface U1-U3 (primary) and U3",
       "criteria": "unchanged (3 % trigger, MAC 0.9, cos2 0.95)"
+    },
+    "M4.4_supervisor_review": {
+      "date": "2026-10-04",
+      "status": "REVIEW_READY (not ACCEPTED)",
+      "notes": [
+        "R1/R2 are confirmed independent branches, not a cluster",
+        "no cluster residual merging applies",
+        "unresolved: M4.3 holdout selection leaves one fit row (R1) for two parameters",
+        "cluster criteria, M4.3 thresholds and M4.2 freeze criteria unchanged"
+      ]
     }
   },
-  "next_action": "SUPERVISOR review of M4.4 real confirmation; M4.6 and M4.9 not started"
+  "next_action": "Await SUPERVISOR instruction on the unresolved SP13 holdout consequence; M4.6 and M4.9 not started"
 }

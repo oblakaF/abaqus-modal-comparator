@@ -2686,3 +2686,16 @@ first internal provider.
 - **Unchanged:** cluster thresholds, M4.2 freeze criteria, the M4.3 provisional policy,
   and the M3 contracts. M4.6 and M4.9 not started.
 - **Abaqus run count:** 0. The existing gate shape packs were enough.
+
+## 2026-10-04 — M4.4 — SUPERVISOR review note recorded
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Review of M4.4:** M4.4 stays **REVIEW_READY**, not ACCEPTED.
+  - R1/R2 are confirmed **independent branches, not a cluster**.
+  - No cluster residual merging applies.
+  - **Unresolved:** the M4.3 holdout consequence. The current holdout selection (no
+    torsion holdout; validation holdout R2) leaves one fit row (R1) for two parameters.
+- **Unchanged:** cluster criteria, M4.3 thresholds, M4.2 freeze criteria.
+- **Not started:** M4.6, M4.9.
+- **Code changed:** none.
+- **Abaqus run count:** 0
