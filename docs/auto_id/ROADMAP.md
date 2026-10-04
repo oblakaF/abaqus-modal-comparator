@@ -220,18 +220,38 @@ Stage status: `REVIEW_READY` (M2.1–M2.5 `REVIEW_READY`; branch `auto-id/m2`, b
 `d001205`).
 
 **M2 gate evidence:**
-- **SP02/SP13 reproduction:** both reproduce their accepted identities through the
-  passport path (`9bf736d3…`, `a8970e52…`; `tests/test_m2_stage_gate.py`), and the
-  registration build runs with the MAC/frequency functions disabled.
-- **Diagnostic:** perturbations stay within measured uncertainty; the diagnostic never
-  selects or returns a perturbation.
-- **Physical completeness:** the SP02/SP13 basis is the historical
-  `documented_centered_alignment`, so both are **not physically complete** under
-  SPEC §11. They need a corner-A marker or measured edge offsets, plus measured
-  calibration uncertainty ([specimens/README.md](specimens/README.md)).
-- **Uncertainty and registration-limited:** with no measured uncertainty, the
-  uncertainty diagnostic is `NOT_AVAILABLE`. `registration-limited` is executable for
-  the 0.8 MAC crossing; the pairing-change trigger is `DEFERRED_M4`.
+
+| Gate | Result |
+|---|---|
+| Software / regression gate | **PASS** |
+| Current SP02/SP13 production physical readiness | **NOT_READY** |
+
+- **Historical accepted-registration replay (regression compatibility):** SP02 and
+  SP13 reproduce their accepted identities through the passport path with full
+  content equality (`9bf736d3…`, `a8970e52…`; `tests/test_m2_stage_gate.py`).
+  - The build runs with the MAC/frequency functions disabled.
+  - `source_identity_basis` stays `legacy_accepted_registration`.
+- **Two separate statuses:**
+  - **Registration basis** (`PHYSICAL` / `LEGACY_REPLAY` / `INCOMPLETE`) describes the
+    nominal registration.
+  - **Uncertainty availability** (`AVAILABLE` / `PARTIAL` / `NOT_AVAILABLE`) is
+    reported separately. A physical registration without measured uncertainty is
+    still `PHYSICAL`.
+  - SP02/SP13 are `LEGACY_REPLAY`, which is not SPEC §11 evidence, with uncertainty
+    `NOT_AVAILABLE`.
+- **Production guard:** `require_production_ready()` refuses `LEGACY_REPLAY`, a missing
+  physical reference, a non-traceable orientation, a legacy source identity or a
+  missing `physical_specimen_id`. It never refuses for missing uncertainty alone, and
+  never upgrades a replay. It refuses SP02/SP13 and names the missing evidence
+  ([specimens/README.md](specimens/README.md)).
+- **Units:** passport lengths (mm) are converted to the Abaqus model unit (mm/cm/m/µm).
+- **Diagnostic:**
+  - Perturbations stay within measured uncertainty; the diagnostic never selects or
+    returns a perturbation.
+  - A non-finite MAC is recorded as an invalid perturbation and is excluded from the
+    range.
+  - "Not registration-limited" needs complete evidence.
+  - The 0.8 MAC crossing is executable; the pairing-change trigger is `DEFERRED_M4`.
 
 ---
 

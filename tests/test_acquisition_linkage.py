@@ -106,6 +106,17 @@ class AcquisitionLinkValidationTests(unittest.TestCase):
         with self.assertRaises(SpecimenManifestError):
             validate_acquisition_links([run("RUN-A", None), run("RUN-B", None, remount_of="RUN-A")])
 
+    def test_one_physical_specimen_with_contradictory_identities_is_refused(self):
+        for extra in ({"design_id": "DES-OTHER"}, {"family_id": "FAM-OTHER"}):
+            with self.subTest(extra=extra), self.assertRaises(SpecimenManifestError) as caught:
+                validate_acquisition_links([run("RUN-A", "PANEL-1"), run("RUN-B", "PANEL-1", **extra)])
+            self.assertEqual(caught.exception.field, "physical_specimen_id")
+        # Unrelated runs of different panels may share a design.
+        validate_acquisition_links([run("RUN-A", "PANEL-1"), run("RUN-B", "PANEL-2")])
+
+    def test_equal_tokens_across_namespaces_are_not_a_conflict(self):
+        validate_acquisition_links([run("X", "X", design_id="X", family_id="X")])
+
     def test_remount_cycle_is_refused(self):
         with self.assertRaises(SpecimenManifestError):
             validate_acquisition_links([run("RUN-A", remount_of="RUN-B"), run("RUN-B", remount_of="RUN-A")])

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 from pathlib import Path
 import sys
@@ -18,12 +19,18 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 import modal_core
 import reviewed_core
+from coordinate_calibration import UNIT_TO_METRES
 from domain.registration import FrozenRegistration, RegistrationMismatchError
-from domain.specimen_manifest import parse_specimen_manifest
+from domain.specimen_manifest import (
+    RegistrationBasisStatus as Basis,
+    UncertaintyAvailability as Uncertainty,
+    parse_specimen_manifest,
+)
 from m2_support import (
     CALIBRATION,
     PLATE_Y,
     STEP,
+    calibration,
     experiment,
     fixture_for,
     grid_points_mm,
@@ -31,7 +38,12 @@ from m2_support import (
     passport_for,
     synthetic_fe,
 )
-from services.physical_registration import PhysicalRegistrationRefusal, build_physical_registration
+from services.physical_registration import (
+    PhysicalRegistrationRefusal,
+    ProductionReadinessRefusal,
+    build_physical_registration,
+    require_production_physical_registration,
+)
 from services.stage_a_identification_service import _check_registration
 
 
@@ -56,8 +68,10 @@ def true_top_ids(points=None) -> list[str]:
 
 
 class _SyntheticRegistration:
+    UNIT = "mm"
+
     def setUp(self):
-        self.fe = synthetic_fe()
+        self.fe = synthetic_fe(self.UNIT)
         self.fixture = fixture_for(self.fe)
 
     def build(self, passport, data=None):
@@ -73,7 +87,8 @@ class RegistrationModeTests(_SyntheticRegistration, unittest.TestCase):
     def test_corner_coordinates_mode(self):
         result = self.build(passport_for(self.fe))
         self.assertTruth(result)
-        self.assertTrue(result.physically_complete)
+        self.assertIs(result.registration_basis_status, Basis.PHYSICAL)
+        self.assertTrue(result.production_ready)
         np.testing.assert_allclose(result.registration.translation, (0.25, -0.1, -1.002), atol=1e-12)
         self.assertEqual(result.registration.registration_metrics["orientation_source"], "corner_A_marker")
         self.assertAlmostEqual(result.registration.registration_metrics["corner_A_marker_angle_deg"], 0.0)
@@ -91,12 +106,17 @@ class RegistrationModeTests(_SyntheticRegistration, unittest.TestCase):
         self.assertTruth(result)
         self.assertEqual(result.registration.registration_metrics["orientation_source"], "panel_edges")
 
-    def test_documented_centered_mode_is_never_physically_complete(self):
+    def test_documented_centered_mode_is_never_physical(self):
         result = self.build(passport_for(self.fe, geometry_calibration=copy.deepcopy(CENTERED)))
         self.assertTruth(result)
-        self.assertFalse(result.physically_complete)
-        self.assertIn("geometry_calibration.uncertainty.translation_mm", result.missing_physical_evidence)
+        self.assertIs(result.registration_basis_status, Basis.INCOMPLETE)
+        self.assertIs(result.uncertainty_availability, Uncertainty.NOT_AVAILABLE)
+        self.assertEqual(result.missing_physical_evidence, (
+            "physical registration reference (corner-A marker or measured scan-to-panel-edge offsets)",))
+        self.assertIn("geometry_calibration.uncertainty.translation_mm", result.missing_uncertainty)
         self.assertEqual(result.registration.registration_metrics["orientation_source"], "user_confirmed")
+        with self.assertRaises(ProductionReadinessRefusal):
+            result.require_production_ready()
 
     def test_content_source_identity_has_no_machine_path_or_timestamp(self):
         result = self.build(passport_for(self.fe))
@@ -156,6 +176,100 @@ class DeterminismAndProhibitionTests(_SyntheticRegistration, unittest.TestCase):
         result = self.build(wrong_unit)
         self.assertEqual(list(result.registration.coordinate_scales), [1.0, 1.0, 1.0])  # passport governs; no refit
         self.assertNotEqual(list(result.registration.mapped_fe_node_ids), true_top_ids())
+
+
+class _UnitRegistration(_SyntheticRegistration):
+    """The same physical plate and scan in an FE model of another length unit; passport values stay in mm."""
+
+    def passport(self, mode):
+        if mode == "corner":
+            return passport_for(self.fe, geometry_calibration__coordinate_calibration=calibration(self.UNIT))
+        edges = copy.deepcopy(EDGES)
+        edges["coordinate_calibration"] = calibration(self.UNIT)
+        return passport_for(self.fe, geometry_calibration=edges)
+
+    def test_corner_and_edge_registration_are_unit_safe(self):
+        reference = synthetic_fe("mm")
+        for mode in ("corner", "edges"):
+            with self.subTest(unit=self.UNIT, mode=mode):
+                result = self.build(self.passport(mode))
+                self.assertTruth(result)  # identical FE nodes as in the mm model
+                factor = UNIT_TO_METRES[self.UNIT]
+                np.testing.assert_allclose(result.registration.coordinate_scales, (factor,) * 3, rtol=1e-12)
+                np.testing.assert_allclose(result.registration.translation, (0.25, -0.1, -1.002), atol=1e-12)
+                self.assertEqual(len(result.surface_node_ids), int(sum(n.startswith("TOP:") for n in reference.node_ids)))
+                self.assertIs(result.registration_basis_status, Basis.PHYSICAL)
+
+
+class MillimetreUnitTests(_UnitRegistration, unittest.TestCase):
+    UNIT = "mm"
+
+
+class CentimetreUnitTests(_UnitRegistration, unittest.TestCase):
+    UNIT = "cm"
+
+
+class MetreUnitTests(_UnitRegistration, unittest.TestCase):
+    UNIT = "m"
+
+    def test_same_physical_geometry_gives_equivalent_mapping(self):
+        mm = synthetic_fe("mm")
+        mm_result = build_physical_registration(
+            passport_for(mm), roots={}, fe_geometry=mm, experimental=(experiment(), fixture_for(mm)))
+        for mode in ("corner", "edges"):
+            with self.subTest(mode=mode):
+                result = self.build(self.passport(mode))
+                self.assertEqual(result.registration.mapped_fe_node_ids, mm_result.registration.mapped_fe_node_ids)
+                np.testing.assert_allclose(result.registration.translation, mm_result.registration.translation,
+                                           atol=1e-12)
+                np.testing.assert_array_equal(result.registration.rotation, mm_result.registration.rotation)
+
+
+class ProductionReadinessTests(_SyntheticRegistration, unittest.TestCase):
+    REFERENCE = "physical registration reference (corner-A marker or measured scan-to-panel-edge offsets)"
+
+    def test_physical_registration_without_uncertainty_is_production_ready(self):
+        result = self.build(passport_for(self.fe, geometry_calibration__uncertainty={
+            "translation_mm": None, "scale_rel": None, "rotation_deg": None}))
+        self.assertIs(result.registration_basis_status, Basis.PHYSICAL)
+        self.assertIs(result.uncertainty_availability, Uncertainty.NOT_AVAILABLE)
+        self.assertEqual(len(result.missing_uncertainty), 3)
+        self.assertEqual(result.production_readiness_issues(), ())
+        self.assertIs(result.require_production_ready(), result.registration)
+        self.assertIs(require_production_physical_registration(result), result.registration)
+
+    def test_legacy_replay_is_refused_and_never_upgraded(self):
+        physical = self.build(passport_for(self.fe))
+        legacy = dataclasses.replace(physical, registration_basis_status=Basis.LEGACY_REPLAY,
+                                     missing_physical_evidence=(self.REFERENCE,),
+                                     orientation_reference="documented_convention", physical_specimen_id=None,
+                                     source_identity_basis="legacy_accepted_registration")
+        with self.assertRaises(ProductionReadinessRefusal) as caught:
+            require_production_physical_registration(legacy)
+        reasons = caught.exception.reasons
+        self.assertTrue(any("LEGACY_REPLAY" in reason for reason in reasons))
+        self.assertIn(f"missing {self.REFERENCE}", reasons)
+        self.assertTrue(any("orientation is not physically traceable" in reason for reason in reasons))
+        self.assertTrue(any("legacy path/mtime" in reason for reason in reasons))
+        self.assertIn("physical_specimen_id is not recorded", reasons)
+        self.assertIs(legacy.registration_basis_status, Basis.LEGACY_REPLAY)  # unchanged by the refusal
+        self.assertFalse(issubclass(ProductionReadinessRefusal, (ValueError, RuntimeError)))
+
+    def test_each_contract_failure_refuses_on_its_own(self):
+        physical = self.build(passport_for(self.fe))
+        for changes in ({"registration_basis_status": Basis.INCOMPLETE},
+                        {"missing_physical_evidence": (self.REFERENCE,)},
+                        {"orientation_reference": "documented_convention"},
+                        {"source_identity_basis": "legacy_accepted_registration"},
+                        {"physical_specimen_id": None}):
+            with self.subTest(changes=changes):
+                broken = dataclasses.replace(physical, **changes)
+                self.assertEqual(len(broken.production_readiness_issues()), 1)
+                with self.assertRaises(ProductionReadinessRefusal):
+                    broken.require_production_ready()
+        # Uncertainty availability alone is never a refusal.
+        self.assertTrue(dataclasses.replace(physical, uncertainty_availability=Uncertainty.NOT_AVAILABLE,
+                                            missing_uncertainty=("x",)).production_ready)
 
 
 class MeasuredScaleTests(_SyntheticRegistration, unittest.TestCase):

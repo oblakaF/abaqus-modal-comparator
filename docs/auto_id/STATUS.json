@@ -151,19 +151,33 @@
     "M2.5": "REVIEW_READY",
     "status": "REVIEW_READY",
     "gate": {
-      "accepted_registration_reproduction": "PASS (SP02 9bf736d3..., SP13 a8970e52...; tests/test_m2_stage_gate.py)",
+      "software_regression_gate": "PASS",
+      "historical_accepted_registration_replay": "PASS — regression compatibility, full content equality: SP02 9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164, SP13 a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4; source_identity_basis=legacy_accepted_registration; tests/test_m2_stage_gate.py",
       "no_mac_driven_registration": "PASS (build runs with MAC/frequency functions disabled; diagnostic never selects a perturbation)",
-      "physical_basis_sp02_sp13": "documented_centered_alignment (historical); physically INCOMPLETE",
-      "registration_uncertainty_sp02_sp13": "NOT_AVAILABLE (no measured uncertainty); registration_limited not evaluable",
+      "unit_safe_physical_registration": "PASS (passport mm converted to the Abaqus model unit mm/cm/m/um; synthetic mm/cm/m equivalence tests)",
+      "production_readiness_guard": "require_production_ready(): refuses LEGACY_REPLAY / INCOMPLETE basis, missing physical reference, non-traceable orientation, legacy source identity, missing physical_specimen_id; never refuses for missing uncertainty alone",
+      "current_sp02_sp13_production_physical_readiness": "NOT_READY",
+      "registration_basis_status_sp02_sp13": "LEGACY_REPLAY (documented_centered_alignment replay of the accepted registration; not SPEC §11 physical evidence)",
+      "uncertainty_availability_sp02_sp13": "NOT_AVAILABLE (no measured uncertainty); registration_limited not evaluable",
       "registration_limited_pairing_change": "DEFERRED_M4",
       "sp13_121_289_setup_pair": "UNCONFIRMED (same panel / independent remount not established)",
       "suspension_threshold_sp02_sp13": "NOT_AVAILABLE (no measured value)"
     },
     "missing_physical_evidence_sp02_sp13": [
-      "corner-A marker (UNV node, FE x/y, x-axis node) or measured scan-to-panel-edge offsets",
-      "measured calibration uncertainty: translation_mm, scale_rel, rotation_deg",
-      "physical_specimen_id, plan dimensions, masses, face thickness, core height, suspension_max_hz, acquisition protocol id"
-    ]
+      "physical registration reference: corner-A marker (UNV node, FE x/y, x-axis node) or measured scan-to-panel-edge offsets",
+      "physically traceable orientation reference (corner_A_marker or panel_edges)",
+      "physical_specimen_id",
+      "content-based experimental source identity in a new physical registration (the replay keeps the legacy path/mtime record)"
+    ],
+    "missing_uncertainty_sp02_sp13": [
+      "geometry_calibration.uncertainty.translation_mm",
+      "geometry_calibration.uncertainty.scale_rel",
+      "geometry_calibration.uncertainty.rotation_deg"
+    ],
+    "not_recorded_sp02_sp13": [
+      "plan dimensions, masses, face thickness, core height, suspension_max_hz, acquisition protocol id"
+    ],
+    "final_rework": "unit-safe physical registration; separate registration basis / uncertainty availability; production readiness guard; typed identity namespaces; non-finite MAC handling"
   },
   "next_action": "Supervisor review of M2 (stage PR auto-id/m2 -> main); do not start M3"
 }

@@ -32,7 +32,7 @@ from typing import Any, Mapping
 import numpy as np
 from scipy.spatial import cKDTree
 
-from coordinate_calibration import scale_candidates
+from coordinate_calibration import millimetres_to_model_units, scale_candidates
 from domain.experiment_fixture import (
     ExperimentFixtureManifest,
     fixture_roots_from_environment,
@@ -44,7 +44,9 @@ from domain.specimen_manifest import (
     CORNER_COORDINATES,
     DOCUMENTED_CENTERED,
     PANEL_EDGES,
+    RegistrationBasisStatus,
     SpecimenManifest,
+    UncertaintyAvailability,
 )
 from modal_core import ModalDataset, ModeShape
 from reviewed_core import (
@@ -60,7 +62,8 @@ import universal_reader
 from .production_modal_input import FIXTURE_MANIFEST_PATH, REPO_ROOT
 
 
-SURFACE_TOLERANCE = 1.0e-4  # FE length units; same rule as the accepted CARBON-4C replay
+SURFACE_TOLERANCE_MM = 1.0e-4  # physical; the accepted CARBON-4C replay rule for mm models
+PHYSICAL_ORIENTATION_REFERENCES = ("corner_A_marker", "panel_edges")
 _COMPONENTS = ("U1", "U2", "U3")
 
 
@@ -81,25 +84,78 @@ class FEGeometry:
     coordinates: np.ndarray  # (n, 3) FE units
     identity: Mapping[str, Any]
 
-    def surface_node_ids(self, instance: str, side: str) -> list[str]:
+    def surface_node_ids(self, instance: str, side: str, abaqus_unit: str) -> list[str]:
         instances = np.array([value.split(":")[0] for value in self.node_ids])
         z = self.coordinates[:, 2]
         selected = instances == instance
         if not np.any(selected):
             raise PhysicalRegistrationRefusal("measured_surface.fe_instance", f"{instance!r} is not in the FE model.")
         level = float(z[selected].max() if side == "max_z" else z[selected].min())
-        return self.node_ids[selected & (np.abs(z - level) <= SURFACE_TOLERANCE)].tolist()
+        tolerance = millimetres_to_model_units(SURFACE_TOLERANCE_MM, abaqus_unit)
+        return self.node_ids[selected & (np.abs(z - level) <= tolerance)].tolist()
+
+
+class ProductionReadinessRefusal(Exception):
+    """A registration may be replayed for regression, but is not a production SPEC §11 registration.
+
+    Not a ValueError/RuntimeError, so generic fallback handlers never swallow it.
+    """
+
+    def __init__(self, reasons: tuple[str, ...]) -> None:
+        super().__init__("not production-ready: " + "; ".join(reasons))
+        self.reasons = reasons
 
 
 @dataclass(frozen=True)
 class PhysicalRegistrationResult:
     registration: FrozenRegistration
     calibration_mode: str
-    physically_complete: bool
-    missing_physical_evidence: tuple[str, ...]
+    registration_basis_status: RegistrationBasisStatus  # physical basis of the nominal registration
+    uncertainty_availability: UncertaintyAvailability  # measured calibration uncertainty, separately
+    missing_physical_evidence: tuple[str, ...]  # nominal-registration gaps only
+    missing_uncertainty: tuple[str, ...]
+    orientation_reference: str
+    physical_specimen_id: str | None
     manifest_hash: str
     source_identity_basis: str  # "legacy_accepted_registration" or "content"
     surface_node_ids: tuple[str, ...]
+
+    def production_readiness_issues(self) -> tuple[str, ...]:
+        """Why this registration may not be used by production Auto-ID (empty: ready).
+
+        Missing calibration *uncertainty* is not an issue here: it makes the M2.4 diagnostic
+        NOT_AVAILABLE / PARTIAL but does not invalidate a physical nominal registration.
+        """
+        issues = []
+        if self.registration_basis_status is RegistrationBasisStatus.LEGACY_REPLAY:
+            issues.append("registration basis is LEGACY_REPLAY (historical accepted registration, not SPEC §11 "
+                          "physical calibration)")
+        elif self.registration_basis_status is not RegistrationBasisStatus.PHYSICAL:
+            issues.append(f"registration basis is {self.registration_basis_status.value}")
+        issues.extend(f"missing {item}" for item in self.missing_physical_evidence)
+        if self.orientation_reference not in PHYSICAL_ORIENTATION_REFERENCES:
+            issues.append(f"orientation is not physically traceable (reference {self.orientation_reference!r})")
+        if self.source_identity_basis != "content":
+            issues.append("experimental source identity is the legacy path/mtime record, not a content identity")
+        if self.physical_specimen_id is None:
+            issues.append("physical_specimen_id is not recorded")
+        return tuple(issues)
+
+    @property
+    def production_ready(self) -> bool:
+        return not self.production_readiness_issues()
+
+    def require_production_ready(self) -> FrozenRegistration:
+        """Return the registration for production Auto-ID, or raise ProductionReadinessRefusal."""
+        issues = self.production_readiness_issues()
+        if issues:
+            raise ProductionReadinessRefusal(issues)
+        return self.registration
+
+
+def require_production_physical_registration(result: PhysicalRegistrationResult) -> FrozenRegistration:
+    """Production Auto-ID boundary: a historical replay is never silently upgraded to physical."""
+    return result.require_production_ready()
 
 
 def load_fe_geometry(manifest: SpecimenManifest, roots: Mapping[str, Path]) -> FEGeometry:
@@ -209,8 +265,10 @@ def _corner_translation(manifest, fe, surface_indices, rotation, scales, dataset
             raise PhysicalRegistrationRefusal("geometry_calibration.corner_A", f"UNV node {node} is not on the grid.")
     a = reference.coordinates[lookup[corner.unv_node]]
     b = reference.coordinates[lookup[corner.x_axis_towards_unv_node]]
+    unit = manifest.geometry_calibration.calibration.abaqus_unit
     surface_z = float(fe.coordinates[surface_indices, 2].mean())
-    fe_corner = np.array([corner.fe_xy_mm[0], corner.fe_xy_mm[1], surface_z])
+    fe_corner = np.array([millimetres_to_model_units(corner.fe_xy_mm[0], unit),
+                          millimetres_to_model_units(corner.fe_xy_mm[1], unit), surface_z])
     translation = a - (fe_corner @ rotation) * scales
     direction = ((b - a) / scales) @ rotation.T
     angle = math.degrees(math.atan2(direction[1], direction[0]))
@@ -225,8 +283,10 @@ def _edge_translation(manifest, fe, surface_indices, rotation, scales, dataset) 
     offsets = manifest.geometry_calibration.panel_edges
     experimental = dataset.sorted_modes()[0].coordinates
     in_fe = (experimental / scales) @ rotation.T
+    unit = manifest.geometry_calibration.calibration.abaqus_unit
     surface = fe.coordinates[surface_indices]
-    target = np.array([surface[:, 0].min() + offsets.x_mm, surface[:, 1].min() + offsets.y_mm,
+    target = np.array([surface[:, 0].min() + millimetres_to_model_units(offsets.x_mm, unit),
+                       surface[:, 1].min() + millimetres_to_model_units(offsets.y_mm, unit),
                        float(surface[:, 2].mean())])
     shift = target - np.array([in_fe[:, 0].min(), in_fe[:, 1].min(), float(in_fe[:, 2].mean())])
     return -(shift @ rotation) * scales, {}
@@ -275,7 +335,7 @@ def build_physical_registration(
     reference = dataset.sorted_modes()[0]
     experimental_coordinates = np.asarray(reference.coordinates, dtype=float)
     surface = calibration.measured_surface
-    surface_ids = fe.surface_node_ids(surface.fe_instance, surface.side)
+    surface_ids = fe.surface_node_ids(surface.fe_instance, surface.side, calibration.calibration.abaqus_unit)
     holder = ModeShape(0, 1.0, fe.node_ids.astype(object), fe.coordinates, np.zeros((len(fe.node_ids), 3)))
     surface_indices, subset = _resolve_fe_mapping_node_ids(holder, surface_ids)
     rotation = calibration.orientation.rotation
@@ -373,8 +433,12 @@ def build_physical_registration(
     return PhysicalRegistrationResult(
         registration=registration,
         calibration_mode=calibration.mode,
-        physically_complete=calibration.physically_complete,
+        registration_basis_status=calibration.registration_basis_status,
+        uncertainty_availability=calibration.uncertainty_availability,
         missing_physical_evidence=calibration.missing_physical_evidence,
+        missing_uncertainty=calibration.missing_uncertainty,
+        orientation_reference=calibration.orientation.reference,
+        physical_specimen_id=None if manifest.physical_specimen_id is None else str(manifest.physical_specimen_id),
         manifest_hash=manifest.manifest_hash,
         source_identity_basis=basis,
         surface_node_ids=tuple(surface_ids),

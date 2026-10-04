@@ -72,9 +72,17 @@ def parse(**overrides):
     return parse_specimen_manifest(passport_dict(**overrides))
 
 
-def synthetic_fe():
+def calibration(unit: str = "mm") -> dict:
+    """The synthetic coordinate calibration for an FE model whose length unit is ``unit``."""
+    return {**CALIBRATION, "abaqus_unit": unit}
+
+
+def synthetic_fe(unit: str = "mm"):
+    """The same physical plate (dimensions in mm) expressed in the FE model length unit ``unit``."""
+    from coordinate_calibration import millimetres_to_model_units
     from services.physical_registration import FEGeometry
 
+    factor = millimetres_to_model_units(1.0, unit)
     xs = np.arange(0.0, PLATE_X + STEP / 2, STEP)
     ys = np.arange(0.0, PLATE_Y + STEP / 2, STEP)
     grid = np.array([(x, y) for x in xs for y in ys])
@@ -84,7 +92,7 @@ def synthetic_fe():
             ids.append(f"{instance}:{label}")
             coords.append((x, y, z))
     ids = np.array(ids)
-    coords = np.array(coords, dtype=float)
+    coords = np.array(coords, dtype=float) * factor
     return FEGeometry(ids, coords, fe_geometry_identity(ids.tolist(), coords))
 
 

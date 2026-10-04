@@ -1811,3 +1811,85 @@ first internal provider.
 - **Not done (by instruction):** M3 not started; no optimisation; no Σ_setup value; no
   invented measurements.
 - **Next gate:** SUPERVISOR review of M2 (stage PR `auto-id/m2` → `main`).
+
+## 2026-10-04 — M2 — Final supervisor rework: units, registration basis, production readiness
+
+- **Stage:** M2
+- **Status:** M2.1–M2.5 REVIEW_READY. M2 stage REVIEW_READY. Not accepted by the
+  worker.
+- **Branch:** `auto-id/m2` (PR #28)
+- **Commit:** the commit that introduces this entry.
+- **Unit-safe physical registration:**
+  - Passport lengths are physical mm: `corner_A.fe_xy_mm`, `panel_edges.x_mm/y_mm`,
+    `uncertainty.translation_mm` and the surface tolerance.
+  - They are converted to the Abaqus model unit `coordinate_calibration.abaqus_unit`
+    (mm/cm/m/µm) with `coordinate_calibration.millimetres_to_model_units`
+    (`UNIT_TO_METRES`).
+  - Experimental raw units and the comparator convention are unchanged.
+- **Status model:**
+  - `GeometryCalibration.physically_complete` is replaced by two separate facts:
+    - `registration_basis_status`: `PHYSICAL` / `LEGACY_REPLAY` / `INCOMPLETE`;
+    - `uncertainty_availability`: `AVAILABLE` / `PARTIAL` / `NOT_AVAILABLE`.
+  - `missing_physical_evidence` now lists nominal-registration gaps only;
+    `missing_uncertainty` is separate.
+  - A physical registration without measured uncertainty stays `PHYSICAL`.
+  - `documented_centered_alignment` is `LEGACY_REPLAY` (with an accepted registration
+    reference) or `INCOMPLETE`, never `PHYSICAL`.
+- **Production readiness guard:**
+  - `PhysicalRegistrationResult.require_production_ready()` and
+    `require_production_physical_registration()` raise `ProductionReadinessRefusal`
+    with explicit reasons.
+  - They refuse a non-physical basis, a missing physical reference, a non-traceable
+    orientation, a legacy path/mtime source identity, or a missing
+    `physical_specimen_id`.
+  - Missing uncertainty alone is never a refusal.
+  - A replay is never upgraded.
+- **Identity namespaces:**
+  - The cross-namespace string-inequality rule is removed; the typed IDs are the
+    namespaces, so `DesignId("X") ≠ PhysicalSpecimenId("X")`.
+  - `validate_acquisition_links` now also refuses one `physical_specimen_id` with
+    contradictory `design_id`/`family_id`.
+  - Duplicate run ids, impossible remount links and same-run remounts are still
+    refused.
+- **Non-finite MAC:**
+  - A missing or non-finite MAC is recorded as an invalid perturbation
+    (`PairMacRange.invalid_perturbations`, value `None`) and never enters min/max or
+    the crossing.
+  - A missing nominal MAC cannot cross.
+  - Incomplete evidence gives `PARTIAL` with `registration_limited = None`; a real
+    crossing among valid values still gives `True`.
+- **Historical replay:**
+  - SP02 `9bf736d3…c164` and SP13 `a8970e52…58a4` still reproduce with full content
+    equality (`source_identity_basis = legacy_accepted_registration`).
+  - Both are `LEGACY_REPLAY` with uncertainty `NOT_AVAILABLE`.
+  - `require_production_ready()` refuses both.
+- **Gate framing:**
+  - SOFTWARE / REGRESSION GATE = PASS.
+  - CURRENT SP02/SP13 PRODUCTION PHYSICAL READINESS = NOT_READY.
+- **Files:**
+  - **code:** `src/coordinate_calibration.py`, `src/domain/specimen_manifest.py`,
+    `src/domain/acquisition_linkage.py`, `src/services/physical_registration.py`,
+    `src/services/registration_uncertainty.py`;
+  - **tests:** `tests/m2_support.py`, `tests/test_specimen_manifest.py`,
+    `tests/test_acquisition_linkage.py`, `tests/test_physical_registration.py`,
+    `tests/test_registration_uncertainty.py`, `tests/test_m2_stage_gate.py`;
+  - **docs:** `docs/auto_id/STATUS.json`, `ROADMAP.md`, `CHANGELOG.md`,
+    `specimens/README.md`.
+- **SPEC / DECISIONS:** unchanged (no contradiction found; implementation fixes only).
+- **Scientific runtime behaviour changed:**
+  - **YES:**
+    - Physical registration in a non-mm FE model now uses the correct physical
+      lengths.
+    - Non-finite MACs no longer reach the uncertainty range or crossing.
+    - Equal tokens across identity namespaces are accepted.
+  - **NO:** no accepted registration, M1 threshold, pairing, modal algorithm or
+    material parameter changed.
+- **Tests:**
+  - **Focused M2:** 84 ran, OK, including the real-data stage gate.
+  - **Related M1 + Stage-A:** 209 ran, 207 passed, 2 skipped (opt-in Abaqus).
+  - **Full Windows suite** (Python 3.14.6): 1090 ran, 0 failures, 0 errors. With both
+    data stores, 1088 passed and 2 skipped (opt-in Abaqus). Without stores, 1081
+    passed with 2 skipped tests and 14 skipped real-data subtests.
+  - **Linux CI:** recorded in the follow-up entry.
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR review of M2 (PR #28).

@@ -19,11 +19,13 @@ from domain.specimen_manifest import (
     DesignId,
     FamilyId,
     PhysicalSpecimenId,
+    RegistrationBasisStatus as Basis,
     SpecimenManifestError,
     TestRunId,
+    UncertaintyAvailability as Uncertainty,
     parse_specimen_manifest,
 )
-from m2_support import parse, passport_dict
+from m2_support import CALIBRATION, parse, passport_dict
 
 
 def bare_plate(**overrides):
@@ -46,8 +48,10 @@ class ValidPassportTests(unittest.TestCase):
         self.assertEqual(manifest.specimen_type, "sandwich")
         self.assertEqual((manifest.plan_mm.lx_mm, manifest.plan_mm.ly_mm), (100.0, 80.0))
         self.assertEqual(len(manifest.face_thickness_mm["top"]), 9)
-        self.assertTrue(manifest.geometry_calibration.physically_complete)
+        self.assertIs(manifest.geometry_calibration.registration_basis_status, Basis.PHYSICAL)
+        self.assertIs(manifest.geometry_calibration.uncertainty_availability, Uncertainty.AVAILABLE)
         self.assertEqual(manifest.geometry_calibration.missing_physical_evidence, ())
+        self.assertEqual(manifest.geometry_calibration.missing_uncertainty, ())
 
     def test_valid_bare_plate_passport(self):
         manifest = parse_specimen_manifest(bare_plate())
@@ -113,12 +117,18 @@ class IdentityTests(unittest.TestCase):
         self.assertIsInstance(manifest.physical_specimen_id, PhysicalSpecimenId)
         self.assertIsInstance(manifest.test_run_id, TestRunId)
 
-    def test_identities_must_not_collapse(self):
+    def test_equal_tokens_in_different_namespaces_are_not_one_identity(self):
+        # The typed IDs are the namespaces: an equal string in two namespaces is neither refused nor conflated.
+        self.assertNotEqual(DesignId("X"), PhysicalSpecimenId("X"))
+        self.assertNotEqual(FamilyId("X"), DesignId("X"))
         for changes in ({"physical_specimen_id": "DES-SYN"}, {"test_run_id": "PANEL-SYN-1"},
-                        {"design_id": "FAM-plain-0.45"}):
-            with self.subTest(changes=changes), self.assertRaises(SpecimenManifestError) as caught:
-                parse(**changes)
-            self.assertEqual(caught.exception.field, "identities")
+                        {"design_id": "FAM-plain-0.45"},
+                        {"family_id": "X", "design_id": "X", "physical_specimen_id": "X", "test_run_id": "X"}):
+            with self.subTest(changes=changes):
+                manifest = parse(**changes)
+                self.assertNotEqual(manifest.design_id, manifest.physical_specimen_id)
+                self.assertNotEqual(manifest.physical_specimen_id, manifest.test_run_id)
+                self.assertNotEqual(manifest.family_id, manifest.design_id)
 
     def test_missing_or_empty_identities_are_refused(self):
         for key in ("family_id", "design_id", "test_run_id"):
@@ -223,7 +233,33 @@ class MalformedPassportTests(unittest.TestCase):
         manifest = parse(geometry_calibration__uncertainty={"translation_mm": None, "scale_rel": 0.01,
                                                             "rotation_deg": None})
         self.assertEqual(manifest.geometry_calibration.uncertainty.missing, ("translation_mm", "rotation_deg"))
-        self.assertFalse(manifest.geometry_calibration.physically_complete)
+        # Missing uncertainty does not demote a physical nominal registration.
+        self.assertIs(manifest.geometry_calibration.registration_basis_status, Basis.PHYSICAL)
+        self.assertIs(manifest.geometry_calibration.uncertainty_availability, Uncertainty.PARTIAL)
+        self.assertEqual(manifest.geometry_calibration.missing_physical_evidence, ())
+        self.assertEqual(manifest.geometry_calibration.missing_uncertainty,
+                         ("geometry_calibration.uncertainty.translation_mm",
+                          "geometry_calibration.uncertainty.rotation_deg"))
+
+    def test_physical_registration_without_uncertainty_is_still_physical(self):
+        manifest = parse(geometry_calibration__uncertainty={"translation_mm": None, "scale_rel": None,
+                                                            "rotation_deg": None})
+        self.assertIs(manifest.geometry_calibration.registration_basis_status, Basis.PHYSICAL)
+        self.assertIs(manifest.geometry_calibration.uncertainty_availability, Uncertainty.NOT_AVAILABLE)
+        self.assertEqual(manifest.geometry_calibration.missing_physical_evidence, ())
+
+    def test_documented_convention_without_accepted_registration_is_incomplete(self):
+        manifest = parse(geometry_calibration={
+            "mode": "documented_centered_alignment",
+            "coordinate_calibration": dict(CALIBRATION),
+            "measured_surface": {"fe_instance": "TOP", "side": "max_z", "label": "TOP exterior face"},
+            "orientation": {"experimental_axes_in_fe": ["+X", "+Y", "+Z"], "reference": "documented_convention",
+                            "source": "documented convention"},
+            "uncertainty": {"translation_mm": 1.0, "scale_rel": 0.005, "rotation_deg": 0.5}})
+        # Measured uncertainty never upgrades a documented convention to a physical registration.
+        self.assertIs(manifest.geometry_calibration.registration_basis_status, Basis.INCOMPLETE)
+        self.assertIs(manifest.geometry_calibration.uncertainty_availability, Uncertainty.AVAILABLE)
+        self.assertEqual(len(manifest.geometry_calibration.missing_physical_evidence), 1)
 
 
 class HistoricalPassportTests(unittest.TestCase):
@@ -236,7 +272,10 @@ class HistoricalPassportTests(unittest.TestCase):
 
                 manifest = load_specimen_manifest(ROOT / "docs" / "auto_id" / "specimens" / f"{name}.specimen.json")
                 self.assertEqual(manifest.geometry_calibration.mode, "documented_centered_alignment")
-                self.assertFalse(manifest.geometry_calibration.physically_complete)
+                self.assertIs(manifest.geometry_calibration.registration_basis_status, Basis.LEGACY_REPLAY)
+                self.assertIs(manifest.geometry_calibration.uncertainty_availability, Uncertainty.NOT_AVAILABLE)
+                self.assertEqual(manifest.geometry_calibration.missing_physical_evidence, (
+                    "physical registration reference (corner-A marker or measured scan-to-panel-edge offsets)",))
                 self.assertIsNone(manifest.suspension_max_hz)
                 self.assertIsNone(manifest.trusted_suspension_threshold())
                 self.assertIsNone(manifest.physical_specimen_id)

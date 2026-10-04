@@ -92,6 +92,13 @@ def _optional_float(value: Any) -> Optional[float]:
     return float(str(value).replace(",", "."))
 
 
+def millimetres_to_model_units(value_mm: float, abaqus_unit: str) -> float:
+    """Convert a physical length in millimetres to the Abaqus model length unit."""
+    if abaqus_unit not in UNIT_TO_METRES:
+        raise ValueError(f"Unknown Abaqus model length unit: {abaqus_unit!r}")
+    return float(value_mm) * UNIT_TO_METRES["mm"] / UNIT_TO_METRES[abaqus_unit]
+
+
 def scale_candidates(
     calibration: CoordinateCalibration,
     experimental_coordinates: np.ndarray,

@@ -90,10 +90,19 @@ def validate_acquisition_links(manifests: Iterable[SpecimenManifest]) -> None:
     """Refuse ambiguous run identities and impossible remount links within a set of passports."""
 
     by_run: dict = {}
+    by_specimen: dict = {}
     for manifest in manifests:
         if manifest.test_run_id in by_run:
             raise SpecimenManifestError("test_run_id", f"{manifest.test_run_id} is used by more than one passport.")
         by_run[manifest.test_run_id] = manifest
+        if manifest.physical_specimen_id is not None:
+            identity = (manifest.design_id, manifest.family_id)
+            known = by_specimen.setdefault(manifest.physical_specimen_id, identity)
+            if known != identity:
+                raise SpecimenManifestError(
+                    "physical_specimen_id",
+                    f"{manifest.physical_specimen_id} carries contradictory design/family identities "
+                    f"({known[0]}/{known[1]} and {identity[0]}/{identity[1]}).")
     for manifest in by_run.values():
         target_id = manifest.acquisition.remount_of
         if target_id is None:

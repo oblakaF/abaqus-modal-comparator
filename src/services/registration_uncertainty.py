@@ -3,6 +3,13 @@
 Perturbs the *nominal* physical registration only within the passport's measured
 calibration uncertainty (deterministic set: ±translation along FE X and Y, ±scale,
 ±in-plane rotation) and reports, per accepted pair, the nominal MAC and its range.
+The translation uncertainty is a physical length in mm and is converted to the FE
+model unit recorded in the registration's calibration.
+
+A perturbation whose MAC cannot be evaluated (missing or non-finite) is recorded as
+invalid: it never enters the MAC range, and "not registration-limited" is only
+claimed when every required perturbation was evaluated.  A real threshold crossing
+found among the valid perturbations is conclusive.
 
 It is a diagnostic only.  It never selects, returns or feeds back a "best" perturbation:
 the nominal registration is unchanged and is the only registration in use.  Missing
@@ -25,6 +32,7 @@ from typing import Mapping, Sequence
 import numpy as np
 from scipy.spatial import cKDTree
 
+from coordinate_calibration import millimetres_to_model_units
 from domain.registration import FrozenRegistration
 from domain.specimen_manifest import GeometryUncertainty
 from modal_core import ModalDataset, modal_assurance_criterion
@@ -61,11 +69,16 @@ class PerturbationOutcome:
 class PairMacRange:
     experimental_mode: int
     fe_mode: int
-    nominal_mac: float
-    minimum_mac: float
-    maximum_mac: float
-    per_perturbation: tuple[tuple[str, float], ...]
+    nominal_mac: float | None  # None: the nominal MAC itself could not be evaluated
+    minimum_mac: float | None  # over the nominal and every VALID perturbation
+    maximum_mac: float | None
+    per_perturbation: tuple[tuple[str, float | None], ...]  # None: invalid / not evaluable
+    invalid_perturbations: tuple[str, ...]
     crosses_threshold: bool
+
+    @property
+    def complete(self) -> bool:
+        return self.nominal_mac is not None and not self.invalid_perturbations
 
 
 @dataclass(frozen=True)
@@ -106,14 +119,15 @@ def _experimental_in_fe(registration: FrozenRegistration, coordinates: np.ndarra
     return ((np.asarray(coordinates, float) - translation) / scales) @ rotation.T
 
 
-def _perturbed_points(points: np.ndarray, perturbation: Perturbation) -> np.ndarray:
+def _perturbed_points(points: np.ndarray, perturbation: Perturbation, abaqus_unit: str) -> np.ndarray:
     """Apply a perturbation in the FE frame about the grid centroid (in-plane rotation about FE Z)."""
     centre = points.mean(axis=0)
     local = points - centre
     angle = math.radians(perturbation.rotation_deg)
     turn = np.array([[math.cos(angle), -math.sin(angle), 0.0], [math.sin(angle), math.cos(angle), 0.0], [0, 0, 1.0]])
     local = (local @ turn.T) / (1.0 + perturbation.scale_rel)
-    return local + centre + np.array([perturbation.translation_mm[0], perturbation.translation_mm[1], 0.0])
+    shift = [millimetres_to_model_units(value, abaqus_unit) for value in perturbation.translation_mm]
+    return local + centre + np.array([shift[0], shift[1], 0.0])
 
 
 def _map(points: np.ndarray, fe: FEGeometry, surface_indices: np.ndarray) -> list[str]:
@@ -123,12 +137,18 @@ def _map(points: np.ndarray, fe: FEGeometry, surface_indices: np.ndarray) -> lis
 
 
 def _pair_mac(registration, fe_modes: Mapping[int, Mapping[str, np.ndarray]], experimental: ModalDataset,
-              mapped_ids: Sequence[str], exp_mode: int, fe_mode: int, components: list[int]) -> float:
+              mapped_ids: Sequence[str], exp_mode: int, fe_mode: int, components: list[int]) -> float | None:
+    """MAC on the measured DOFs, or None when it cannot be evaluated (never NaN)."""
     rotation = np.asarray(registration.rotation, float)
-    exp = {mode.number: mode for mode in experimental.modes}[exp_mode]
-    fe_vectors = np.array([fe_modes[fe_mode][node_id] for node_id in mapped_ids], dtype=complex) @ rotation
+    exp = {mode.number: mode for mode in experimental.modes}.get(exp_mode)
+    shapes = fe_modes.get(fe_mode)
+    if exp is None or shapes is None or any(node_id not in shapes for node_id in mapped_ids):
+        return None
+    fe_vectors = np.array([shapes[node_id] for node_id in mapped_ids], dtype=complex) @ rotation
     value = modal_assurance_criterion(fe_vectors[:, components], np.asarray(exp.vectors)[:, components])
-    return float("nan") if value is None else float(value)
+    if value is None or not math.isfinite(float(value)):
+        return None
+    return float(value)
 
 
 def evaluate_registration_uncertainty(
@@ -149,6 +169,7 @@ def evaluate_registration_uncertainty(
     """
 
     perturbations, unavailable = perturbation_set(uncertainty)
+    abaqus_unit = str(registration.calibration.get("abaqus_unit", "mm"))
     components = [_COMPONENTS[name] for name in measured_dofs]
     lookup = {value: index for index, value in enumerate(fe.node_ids.tolist())}
     surface_indices = np.array(sorted(lookup[node] for node in surface_node_ids), dtype=int)
@@ -157,7 +178,7 @@ def evaluate_registration_uncertainty(
 
     outcomes, mapped_sets = [], []
     for perturbation in perturbations:
-        mapped = _map(_perturbed_points(nominal_points, perturbation), fe, surface_indices)
+        mapped = _map(_perturbed_points(nominal_points, perturbation, abaqus_unit), fe, surface_indices)
         mapped_sets.append(mapped)
         outcomes.append(PerturbationOutcome(
             perturbation,
@@ -165,24 +186,28 @@ def evaluate_registration_uncertainty(
             int(sum(a != b for a, b in zip(mapped, nominal_ids))),
         ))
 
-    pairs, limited = [], False
+    pairs, limited, incomplete = [], False, False
     for exp_mode, fe_mode in accepted_pairs:
         nominal = _pair_mac(registration, fe_mode_shapes, experimental, nominal_ids, exp_mode, fe_mode, components)
         values = tuple((outcome.perturbation.name,
                         _pair_mac(registration, fe_mode_shapes, experimental, mapped, exp_mode, fe_mode, components))
                        for outcome, mapped in zip(outcomes, mapped_sets))
-        allowed = [nominal] + [value for _, value in values]
-        crosses = bool(values) and min(allowed) < threshold <= max(allowed)
+        invalid = tuple(name for name, value in values if value is None)
+        valid = [value for value in [nominal] + [value for _, value in values] if value is not None]
+        # A crossing needs a valid nominal MAC and a valid perturbed MAC on the other side of the threshold.
+        crosses = (nominal is not None and len(valid) > 1 and min(valid) < threshold <= max(valid))
         limited |= crosses
-        pairs.append(PairMacRange(int(exp_mode), int(fe_mode), nominal, min(allowed), max(allowed), values, crosses))
+        incomplete |= nominal is None or bool(invalid)
+        pairs.append(PairMacRange(int(exp_mode), int(fe_mode), nominal, min(valid) if valid else None,
+                                  max(valid) if valid else None, values, invalid, crosses))
 
     if not perturbations:
         status = UncertaintyStatus.NOT_AVAILABLE
-    elif unavailable:
+    elif unavailable or incomplete:
         status = UncertaintyStatus.PARTIAL
     else:
         status = UncertaintyStatus.EVALUATED
-    # A found crossing is conclusive; "not limited" needs every component evaluated.
+    # A found crossing is conclusive; "not limited" needs every component and every MAC evaluated.
     if limited:
         flag = True
     else:

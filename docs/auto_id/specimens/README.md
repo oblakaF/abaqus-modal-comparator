@@ -12,9 +12,12 @@ four things:
 | `test_run_id` | one experimental acquisition |
 
 The four identity keys are typed (`FamilyId`, `DesignId`, `PhysicalSpecimenId`,
-`TestRunId`) and must be distinct. A remount shares `physical_specimen_id` and has a
-new `test_run_id`. A different panel always has a different `physical_specimen_id`,
-even with the same design and family.
+`TestRunId`). The type is the namespace: `DesignId("X")` is not
+`PhysicalSpecimenId("X")`, so the same token in two namespaces is allowed and never
+conflated. A remount shares `physical_specimen_id` and has a new `test_run_id`. A
+different panel always has a different `physical_specimen_id`, even with the same
+design and family. One physical specimen cannot carry two different design or family
+identities.
 
 ## Rules
 
@@ -38,11 +41,36 @@ even with the same design and family.
 - **Never used:** MAC, frequencies, mode shapes, or trying orientations against modal
   agreement.
 
-| Mode | Physical basis | Physically complete |
+| Mode | Physical basis | Registration basis status |
 |---|---|---|
-| `corner_coordinates_mm` | Documented axes checked by the corner-A → x-axis marker; translation from the corner-A correspondence; scale from the physical calibration | yes, if the uncertainty is measured |
-| `scan_to_panel_edges` | Documented axes; translation from measured scan-grid-to-panel-edge offsets | yes, if the uncertainty is measured |
-| `documented_centered_alignment` | Historical accepted basis: documented axis convention + centre-to-centre placement | **never** |
+| `corner_coordinates_mm` | Documented axes checked by the corner-A → x-axis marker; translation from the corner-A correspondence; scale from the physical calibration | `PHYSICAL` |
+| `scan_to_panel_edges` | Documented axes; translation from measured scan-grid-to-panel-edge offsets | `PHYSICAL` |
+| `documented_centered_alignment` | Historical accepted basis: documented axis convention + centre-to-centre placement | `LEGACY_REPLAY` with an accepted registration reference, otherwise `INCOMPLETE`; **never** `PHYSICAL` |
+
+**Units.** Passport lengths are physical millimetres: `corner_A.fe_xy_mm`,
+`panel_edges.x_mm/y_mm`, `uncertainty.translation_mm` and the surface tolerance. They
+are converted to the Abaqus model unit `coordinate_calibration.abaqus_unit` (mm, cm, m
+or µm). Experimental raw units are unchanged; the comparator convention
+experimental = (FE · R) · scales + translation is kept.
+
+**Two separate facts.**
+- **Registration basis status** describes the nominal registration only.
+- **Uncertainty availability** (`AVAILABLE` / `PARTIAL` / `NOT_AVAILABLE`) records
+  whether the calibration uncertainty was measured. A physical registration without
+  measured uncertainty is still `PHYSICAL`; only the M2.4 diagnostic becomes
+  `NOT_AVAILABLE` / `PARTIAL`.
+
+**Production readiness.** `PhysicalRegistrationResult.require_production_ready()`
+returns the registration for production Auto-ID, or raises
+`ProductionReadinessRefusal` with its reasons. It refuses:
+- a basis that is not `PHYSICAL` (`LEGACY_REPLAY` or `INCOMPLETE`);
+- a missing physical reference;
+- an orientation reference other than `corner_A_marker` / `panel_edges`;
+- an experimental source identity that is the legacy path/mtime record;
+- a missing `physical_specimen_id`.
+
+It never refuses for missing uncertainty alone, and a replay is never upgraded to
+`PHYSICAL`.
 
 ## Registration uncertainty (M2.4)
 
@@ -50,8 +78,13 @@ even with the same design and family.
 only.
 - It perturbs within the measured uncertainty (±translation X/Y, ±scale, ±in-plane
   rotation).
+- Translation uncertainty is in mm and is converted to the FE model unit.
 - It reports nominal, minimum and maximum MAC per accepted pair.
-- It sets `registration_limited` on a 0.8 crossing.
+- A MAC that cannot be evaluated (missing or non-finite) marks that perturbation
+  invalid. It never enters the minimum/maximum or the crossing, and the status becomes
+  `PARTIAL`.
+- It sets `registration_limited = True` on a real 0.8 crossing. It sets `False` only
+  when every component and every MAC was evaluated; otherwise the flag is `None`.
 - It never selects or returns a "best" perturbation.
 - It is `NOT_AVAILABLE` without measured uncertainty.
 - The pairing-change trigger of SPEC §11 needs the M4 pairing policy
@@ -71,7 +104,10 @@ only.
 `validate_acquisition_links` refuses:
 - reused run ids;
 - remounts of unknown runs or of other panels;
-- cycles.
+- cycles;
+- one `physical_specimen_id` with contradictory `design_id` / `family_id`.
+
+A run that is a remount of itself is refused when the passport is parsed.
 
 No Σ_setup value is computed.
 
@@ -88,20 +124,33 @@ No Σ_setup value is computed.
   - `test_run_id`: the recorded acquisition container names. These replace the
     provisional M0.2 run labels.
 
-The passport path reproduces the accepted registrations exactly: SP02 `9bf736d3…c164`,
-SP13 `a8970e52…58a4` (`tests/test_m2_stage_gate.py`). Their physical basis is the
-**historical documented centred alignment**, so they are **not** physically complete.
+**Historical accepted-registration replay (regression compatibility).** The passport
+path reproduces the accepted registrations with full content equality: SP02
+`9bf736d3…c164`, SP13 `a8970e52…58a4` (`tests/test_m2_stage_gate.py`;
+`source_identity_basis = legacy_accepted_registration`).
 
-**What is missing for a physically complete (SPEC §11) registration of these panels:**
+| Fact | SP02 / SP13 |
+|---|---|
+| Software / regression gate | PASS |
+| Registration basis status | `LEGACY_REPLAY` (not SPEC §11 evidence) |
+| Uncertainty availability | `NOT_AVAILABLE` |
+| Production physical readiness | **NOT_READY** (`require_production_ready()` refuses) |
+
+**Missing physical evidence (the readiness refusal names these):**
 - **A physical reference:** either
   - a corner-A marker: the UNV node at corner A, its FE x/y coordinates, and the UNV
     node towards FE +X; or
   - measured scan-grid-to-panel-edge offsets.
-- **Measured calibration uncertainty:** translation (mm), scale (relative) and
-  rotation (deg).
+- **A physically traceable orientation reference** (`corner_A_marker` or
+  `panel_edges`).
+- **The physical panel id** (`physical_specimen_id`).
+- **A content-based experimental source identity:** a new physical registration
+  records it; the replay keeps the legacy path/mtime record.
+
+**Missing uncertainty (separate; does not block readiness on its own):** translation
+(mm), scale (relative) and rotation (deg).
 
 **Also not recorded in accepted evidence** (all declared `unavailable`):
-- the physical panel id;
 - measured plan dimensions, masses, face thickness and core height;
 - the suspension threshold;
 - the acquisition protocol id.

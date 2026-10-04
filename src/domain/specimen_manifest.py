@@ -18,6 +18,7 @@ Rules:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 import hashlib
 import json
 import math
@@ -56,6 +57,22 @@ _TOP_KEYS = {
     "plan_mm", "masses_g", "face_thickness_mm", "core_height_mm", "materials", "suspension_max_hz",
     "geometry_calibration", "fe_reference", "acquisition", "identify", "unavailable",
 }
+
+
+class RegistrationBasisStatus(str, Enum):
+    """Physical basis of the NOMINAL registration (SPEC §11), independent of uncertainty."""
+
+    PHYSICAL = "PHYSICAL"  # corner-A marker or measured scan-to-panel-edge offsets
+    LEGACY_REPLAY = "LEGACY_REPLAY"  # replay of an accepted historical registration; not SPEC §11 evidence
+    INCOMPLETE = "INCOMPLETE"  # documented convention without a physical reference or accepted registration
+
+
+class UncertaintyAvailability(str, Enum):
+    """Whether the passport's calibration uncertainty components were measured."""
+
+    AVAILABLE = "AVAILABLE"
+    PARTIAL = "PARTIAL"
+    NOT_AVAILABLE = "NOT_AVAILABLE"
 
 
 class SpecimenManifestError(ValueError):
@@ -241,16 +258,29 @@ class GeometryCalibration:
         return CoordinateCalibration.from_mapping(self.coordinate_calibration)
 
     @property
-    def physically_complete(self) -> bool:
-        return self.mode in PHYSICAL_CALIBRATION_MODES and not self.uncertainty.missing
+    def registration_basis_status(self) -> RegistrationBasisStatus:
+        if self.mode in PHYSICAL_CALIBRATION_MODES:
+            return RegistrationBasisStatus.PHYSICAL
+        if self.legacy_registration is not None:
+            return RegistrationBasisStatus.LEGACY_REPLAY
+        return RegistrationBasisStatus.INCOMPLETE
+
+    @property
+    def uncertainty_availability(self) -> UncertaintyAvailability:
+        if not self.uncertainty.available:
+            return UncertaintyAvailability.NOT_AVAILABLE
+        return UncertaintyAvailability.PARTIAL if self.uncertainty.missing else UncertaintyAvailability.AVAILABLE
 
     @property
     def missing_physical_evidence(self) -> tuple[str, ...]:
-        missing = []
-        if self.mode not in PHYSICAL_CALIBRATION_MODES:
-            missing.append("physical registration reference (corner-A marker or measured scan-to-panel-edge offsets)")
-        missing.extend(f"geometry_calibration.uncertainty.{name}" for name in self.uncertainty.missing)
-        return tuple(missing)
+        """What the NOMINAL registration lacks to be a SPEC §11 physical registration (uncertainty excluded)."""
+        if self.registration_basis_status is RegistrationBasisStatus.PHYSICAL:
+            return ()
+        return ("physical registration reference (corner-A marker or measured scan-to-panel-edge offsets)",)
+
+    @property
+    def missing_uncertainty(self) -> tuple[str, ...]:
+        return tuple(f"geometry_calibration.uncertainty.{name}" for name in self.uncertainty.missing)
 
 
 @dataclass(frozen=True)
@@ -536,10 +566,6 @@ def parse_specimen_manifest(data: object) -> SpecimenManifest:
     specimen = None
     if _nullable(data, "physical_specimen_id", unavailable) is not None:
         specimen = _identity(PhysicalSpecimenId, data["physical_specimen_id"], "physical_specimen_id")
-    values = [str(item) for item in (family, design, specimen, run) if item is not None]
-    if len(set(values)) != len(values):
-        _fail("identities", "family_id, design_id, physical_specimen_id and test_run_id must be distinct "
-                            "(a design is not a physical specimen, and a specimen is not a run).")
 
     plan = None
     if _nullable(data, "plan_mm", unavailable) is not None:
