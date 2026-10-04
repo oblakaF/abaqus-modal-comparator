@@ -268,7 +268,7 @@ current SP02/SP13 production physical readiness `NOT_READY`).
 | M3.1 | Manifest-driven material location | `REVIEW_READY` |
 | M3.2 | Generic candidate rewrite | `REVIEW_READY` |
 | M3.3 | Generic provenance / job hash | `REVIEW_READY` |
-| M3.4 | Remove production hard-coding of SP02, SP13, `D:\Snadwich` and specific machine paths from the generic Auto-ID path | `TODO` |
+| M3.4 | Remove production hard-coding of SP02, SP13, `D:\Snadwich` and specific machine paths from the generic Auto-ID path | `REVIEW_READY` |
 | M3.5 | Regression against the current accepted shared-carbon builder | `TODO` |
 
 **M3 GATE:** the generic builder reproduces the accepted SP02/SP13 reference INPs

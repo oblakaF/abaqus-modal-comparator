@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M3",
-  "current_ministep": "M3.3",
+  "current_ministep": "M3.4",
   "status": "IN_PROGRESS",
   "last_accepted_stage": "M2",
   "last_accepted_ministep": "M2.5",
@@ -205,7 +205,7 @@
     "M3.1": "REVIEW_READY",
     "M3.2": "REVIEW_READY",
     "M3.3": "REVIEW_READY",
-    "M3.4": "TODO",
+    "M3.4": "REVIEW_READY",
     "M3.5": "TODO",
     "status": "IN_PROGRESS",
     "batch_authorisation": "SUPERVISOR: M3.1-M3.5 as one supervised stage batch; no Abaqus; shared_carbon_forward.py kept unchanged as regression oracle"

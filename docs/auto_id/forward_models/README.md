@@ -46,6 +46,28 @@ Specimen-specific values live here as data, never in code.
 There is no parameterisation with E1 ≠ E2 (SPEC §5.2). The source constants in a
 manifest must carry the fixed values exactly.
 
+## Building forward jobs (M3.2–M3.4)
+
+`services.forward_builder`:
+
+```python
+model = load_bound_forward_model(manifest_path, repo_root, fixtures)  # manifest + pinned passport
+roots = fixture_roots_from_environment()  # AUTO_ID_FIXTURE_ROOT_<STORE>
+evaluation = prepare_forward_jobs([model, ...], carbon_candidate(E_in_plane, G12), roots, output_dir)
+```
+
+- **Rewrite:** only the parameterisation's variable constants of the located record,
+  plus the eigenvalue count of the single `*Frequency` request when the manifest asks
+  for more. A post-check refuses any other changed line.
+- **Job name:** `<job_prefix>_<first 16 hex of the generated INP SHA-256>`
+  (content-addressed; the accepted naming).
+- **Provenance** (`auto-id/forward-job/v1`): manifest, passport, source INP,
+  material, candidate, constants, registration, eigenvalue request, generated SHA-256
+  and changed lines. It holds no machine path and no timestamp. `job_hash` is its
+  canonical SHA-256; `evaluation_hash` covers all jobs of one candidate.
+- **No defaults:** there are no default specimens, materials or paths. The reference
+  INP is read only from its configured store and verified by size and SHA-256.
+
 ## Accepted manifests
 
 | File | Reference INP | Material (passport role `face`) | Eigenvalues (source → job) | Registration |

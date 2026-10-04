@@ -19,17 +19,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import os
-from pathlib import Path
-from typing import Optional, Sequence
+from pathlib import Path, PurePosixPath
+from typing import Mapping, Optional, Sequence
 
+from domain.experiment_fixture import ExperimentFixtureManifest, resolve_external_file
 from domain.forward_model_manifest import (
     ENGINEERING_CONSTANTS_TYPE,
     BoundForwardModel,
     EngineeringConstants,
     ForwardCandidate,
     FrequencyRequest,
+    bind_forward_model,
     canonical_hash,
+    load_forward_model_manifest,
 )
+from domain.specimen_manifest import load_specimen_manifest
 
 
 # Material options that may appear inside a *Material block of these inputs.
@@ -397,3 +401,35 @@ def prepare_forward_evaluation(models: Sequence[BoundForwardModel], sources: Seq
     jobs = tuple(prepare_forward_job(model, candidate, source, output_directory)
                  for model, source in zip(models, sources))
     return PreparedForwardEvaluation(candidate, jobs, forward_evaluation_hash(candidate, jobs))
+
+
+# ----------------------------------------------------------------------------- M3.4 manifest-driven inputs
+
+def load_bound_forward_model(manifest_path: Path, repo_root: Path,
+                             fixtures: Optional[ExperimentFixtureManifest] = None) -> BoundForwardModel:
+    """Load a forward-model manifest and its pinned passport (repository-relative), then bind them."""
+
+    manifest = load_forward_model_manifest(manifest_path)
+    passport_path = Path(repo_root).joinpath(*PurePosixPath(manifest.specimen_passport.path).parts)
+    return bind_forward_model(manifest, load_specimen_manifest(passport_path), fixtures)
+
+
+def read_reference_input(model: BoundForwardModel, roots: Mapping[str, Path]) -> bytes:
+    """Read the pinned reference INP from its configured store (``AUTO_ID_FIXTURE_ROOT_<STORE>``).
+
+    Refuses an unconfigured store, a missing file or a size mismatch; the SHA-256 is
+    verified on the bytes actually used, when the job is rendered.
+    """
+
+    return resolve_external_file(model.manifest.model_input, roots, verify_sha256=False).read_bytes()
+
+
+def prepare_forward_jobs(models: Sequence[BoundForwardModel], candidate: ForwardCandidate,
+                         roots: Mapping[str, Path], output_directory: Path) -> PreparedForwardEvaluation:
+    """Prepare one job per explicitly given forward model; there are no default specimens."""
+
+    if not models:
+        raise ForwardBuildError("Give at least one forward model; there are no default specimens.")
+    _check_distinct(models)
+    return prepare_forward_evaluation(models, [read_reference_input(model, roots) for model in models],
+                                      candidate, output_directory)

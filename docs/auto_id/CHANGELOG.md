@@ -2046,3 +2046,45 @@ first internal provider.
 - **Tests:** `tests/test_forward_builder.py` + `tests/test_forward_model_manifest.py`:
   37 ran, OK (83 subtests).
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M3.4 — No SP02/SP13/`D:\Snadwich` hard-coding in the generic forward path
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:** M3.4 REVIEW_READY; M3 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Manifest-driven inputs (`services.forward_builder`):**
+  - `load_bound_forward_model(manifest_path, repo_root, fixtures)` loads a manifest
+    and its repository-relative pinned passport, then binds them.
+  - `read_reference_input(model, roots)` reads the reference INP only from its
+    configured store (`AUTO_ID_FIXTURE_ROOT_<STORE>`). It refuses an unconfigured
+    store, a missing file or a size mismatch. The SHA-256 is verified on the bytes
+    used.
+  - `prepare_forward_jobs(models, candidate, roots, output_directory)` takes explicit
+    forward models only; there are no default specimens.
+- **Where the old hard-coded values now live:**
+
+  | Accepted builder | Generic path |
+  |---|---|
+  | `sp02_forward_baseline` / `sp13_forward_baseline` | `docs/auto_id/forward_models/{SP02,SP13}.forward.json` |
+  | `D:\Snadwich\…` source paths | store + relative path |
+  | `_SP0x_SOURCE_INP_SHA256` | pinned `model_input` |
+  | material names | passport `materials.face` |
+  | eigenvalue counts | manifest `frequency_request` |
+  | `SP0x_REGISTRATION_HASH` | manifest `registration`, cross-checked with the fixture |
+
+- **Guard tests** (`tests/test_forward_builder_generic.py`):
+  - The generic modules contain no specimen, material, store or machine-path literal
+    and do not import the legacy builder.
+  - No builder entry point has a default.
+  - The accepted manifests hold no machine path.
+  - A never-seen third specimen (another store, material, prefix and eigenvalue
+    request) builds from manifest + store alone.
+- **Scope:**
+  - The accepted builder `src/services/shared_carbon_forward.py` keeps its hard-coded
+    values unchanged as the M3.5 regression oracle; it is not on the generic path.
+  - Historical SP13 evidence viewers (`sp13_evidence_adapter.py`,
+    `material_identification_*`) and the older `family_residual_service.py` are not
+    forward-builder code and are unchanged.
+- **Tests:** M3 suites 44 ran, OK (121 subtests).
+- **Abaqus run count:** 0
