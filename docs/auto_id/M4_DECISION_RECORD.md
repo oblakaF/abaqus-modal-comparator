@@ -29,6 +29,7 @@ No Abaqus or Abaqus Python runs.
 | 3 | Archived CARBON-5A ±5 % solves | **Not allowed** as Jacobian or branch evidence until a gated ODB shape extraction is approved **and** completed. M3 byte identity alone is not sufficient. |
 | 4 | M4.9 | SP13 stays the first twin specimen. G12 identifiability is an **observed result, not a modified acceptance criterion**. The proposed 8 % rule is **not** added. |
 | 5 | Status | M4.2 stays BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION. M4.6 and M4.9 stay TODO. No Abaqus. No implementation of M4.6 / M4.9. |
+| 7 | Observation design (see §5) | Real SP13 identification is **refused** (option C). The M4.9 twin follows option B, with a synthetic experiment of truth FE modes 7–30. Observations come from the normal M4.3 / M4.4 policies, the torsion holdout from policy (not hard-coded), and twin clusters from the validated SP13 ±5 % packs (no new extraction). |
 | 6 | M4.9 budget clarification | The truth-generation solve is a **separate** authorised Abaqus solve and does **not** count toward the 20. The identification loop has at most **20** Abaqus solves in total, p0 included. Abaqus Python ODB shape extraction needs a **separate HUMAN Abaqus gate**, does **not** count toward the 20, and is data preparation, not optimisation. |
 
 ---
@@ -147,9 +148,9 @@ contradict them. They become final with the DECISIONS entry.
 |---|---|
 | Specimen | **SP13** (SUPERVISOR decision). SP02 only by a separate decision. |
 | Truth | E_in_plane = 45000 MPa, G12 = 4000 MPa (carbon-property-set/v1; everything else unchanged) |
-| Synthetic experiment | The truth solve's FE modes, read through the accepted FrozenRegistration onto the measured grid (U3). Frequencies multiplied by (1 + ε_i), ε_i ~ N(0, 0.003²), with a fixed recorded seed. |
+| Synthetic experiment | The truth solve's FE modes, read through the accepted FrozenRegistration onto the measured grid (U3). Frequencies multiplied by (1 + ε_i), ε_i ~ N(0, 0.003²), with a fixed recorded seed. **Built from the truth solve, never from real PolyMAX observations. Initial mode set: all available FE modes 7–30** (SUPERVISOR decision, §5). |
 | Start | E = 52000, G12 = 4500 MPa (p0) |
-| Observations | Frozen at p0 under `STRICT_IDENTIFICATION_PAIRING` against the synthetic experiment. FROZEN status required. Holdouts by family (M4.3, provisional policy). At least 2 fit terms. |
+| Observations | Frozen at p0 under `STRICT_IDENTIFICATION_PAIRING` against the synthetic experiment. FROZEN status required. Holdouts by family (M4.3, provisional policy). At least 2 fit terms. **The usable observations are decided by the normal M4.3 family policy and M4.4 cluster confirmation; nothing is hand-picked** (§5). |
 | σ | Per row σ = 0.003 (the injected noise), explicit. No provisional setup term in the twin, because the data are synthetic. |
 | LM | The approved settings of §2. |
 | Solve budget | At most 20 Abaqus solves for the identification loop, p0 included (§2). The truth-generation solve and the ODB shape extractions are authorised separately and do not count. |
@@ -190,3 +191,64 @@ contradict them. They become final with the DECISIONS entry.
 - **M5:** practical identifiability, q_G, `statistical_sd`, Birge and model-form
   robustness.
 - **Real SP02/SP13 identification:** production physical readiness is `NOT_READY`.
+
+---
+
+## 5. Observation design (SUPERVISOR decisions, 2026-10-04)
+
+**Context:**
+- **Frozen set:** the SP13 candidate frozen set has R1 (exp 4 ↔ FE 10) and R2 (exp 5 ↔
+  FE 11).
+- **M4.4 result:** the two are independent branches, not a cluster.
+- **M4.3 holdout result:** no torsion family among the rows; the validation holdout is
+  R2, which leaves R1 as the only fit row.
+- **Worker estimate** (diagnostic, local, carbon-only, σ = 0.3 %; from the ±5 %
+  central differences of the pinned SP13 pack frequencies): the R1/R2 sensitivity
+  rows are near-collinear.
+  - R1 (FE 10): S_E 0.3646, S_G12 0.1234. R2 (FE 11): S_E 0.3662, S_G12 0.1207.
+  - The rows are 0.45° apart, with condition number about 250.
+  - sd(ln E) ≈ 0.44 and sd(ln G12) ≈ 1.32, even with both rows fitted.
+  - This is not the SPEC §10 verdict, which belongs to M5.
+
+### 5.1 Real SP13: option C accepted
+
+- Real SP13 identification is **refused**.
+- **Reason:** insufficient strict observations, and near-collinear sensitivity
+  directions of R1/R2.
+- MAC and frequency gates are **not** relaxed.
+- The holdout policy is **not** overridden for real data.
+- Option A (fitting both R1 and R2) is not adopted.
+
+### 5.2 M4.9 synthetic twin: option B
+
+- The synthetic experiment is built from the **truth solve**, never from real PolyMAX
+  observations.
+- **Initial synthetic mode set:** all available FE modes 7–30 of the truth solve.
+- The usable observations are decided by the normal pipeline:
+  - the strict M4.1/M4.2 freeze at p0 against the synthetic experiment;
+  - the M4.3 family policy (provisional thresholds, holdouts by family);
+  - M4.4 cluster confirmation for triggered pairs.
+- Nothing is hand-selected.
+
+### 5.3 Torsion holdout
+
+- With k_int disabled, the normal M4.3 policy (`select_holdouts`) picks the **lowest
+  torsion-dominated (odd-odd) family among the frozen rows** as the torsion holdout.
+- On the validated SP13 baseline shapes, the lowest odd-odd family is FE 7 (22.49 Hz,
+  `Px:O|Py:O|nx:1|ny:1`; M4.3 record). It is therefore the expected torsion-holdout
+  candidate once it is a frozen twin row.
+- FE 7 is **not hard-coded**. The selection follows from the policy and the twin's
+  frozen rows.
+
+### 5.4 Twin clusters
+
+- M4.4 confirmation inside the twin may reuse the validated SP13 ±5 % shape packs
+  (E±, G12±).
+- **No new extraction is authorised.**
+- Expected triggered pairs (from the baseline frequencies; to be confirmed, not
+  assumed) include FE 13/14, 17/18, 20–22 and 26/27.
+
+### 5.5 Status
+
+- M4.6 and M4.9 are not started; each needs its own authorisation.
+- No code change follows from these decisions at this point.
