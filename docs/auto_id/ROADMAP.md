@@ -315,7 +315,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 | M4.3 | Physical modal-family classifier: P_x/P_y, nodal structure, diagonal symmetry when relevant | `REVIEW_READY` |
 | M4.4 | Cluster trigger + principal-angle / subspace confirmation | `REVIEW_READY` |
 | M4.5 | FE-to-FE branch tracker | `REVIEW_READY` |
-| M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `TODO` |
+| M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `REVIEW_READY` |
 | M4.7 | Log-frequency objective | `REVIEW_READY` |
 | M4.8 | Bounded LM / trust step with the correct minus sign | `REVIEW_READY` |
 | M4.9 | Synthetic digital-twin recovery | `TODO` |
@@ -356,6 +356,8 @@ First batch reviewed by the SUPERVISOR:
   - The trigger fired, but the decision is **INDEPENDENT**: individual identity is stable
     (MAC 0.999998) in all ±5 % E/G12 directions.
   - R1 and R2 remain two observations. Criteria unchanged.
+- M4.6 resumable pipeline (architecture plus fake-solver tests; no real Abaqus):
+  `REVIEW_READY`.
 - SUPERVISOR review of M4.4:
   - `REVIEW_READY`: R1/R2 are independent branches; no cluster merging.
   - **Unresolved:** the M4.3 holdout selection leaves one fit row for two parameters.

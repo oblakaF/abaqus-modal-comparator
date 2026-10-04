@@ -243,7 +243,7 @@
     "M4.3": "REVIEW_READY",
     "M4.4": "REVIEW_READY",
     "M4.5": "REVIEW_READY",
-    "M4.6": "TODO",
+    "M4.6": "REVIEW_READY",
     "M4.7": "REVIEW_READY",
     "M4.8": "REVIEW_READY",
     "M4.9": "TODO",
@@ -345,7 +345,19 @@
         "unresolved: M4.3 holdout selection leaves one fit row (R1) for two parameters",
         "cluster criteria, M4.3 thresholds and M4.2 freeze criteria unchanged"
       ]
+    },
+    "M4.6_architecture": {
+      "scope": "architecture + fake-solver tests only (SUPERVISOR authorisation); no real Abaqus, no Abaqus Python",
+      "modules": [
+        "src/domain/identification_run.py",
+        "src/services/forward_solver.py",
+        "src/services/shape_extraction.py",
+        "src/services/identification_pipeline.py"
+      ],
+      "data": "docs/auto_id/solver_profiles/{SP02,SP13}.json",
+      "fake_solver_result": "converged to 45006 / 4000.2 from 52000 / 4500 in 6 evaluations (truth 45000 / 4000); resume replays all evaluations with 0 solves",
+      "abaqus_runs": 0
     }
   },
-  "next_action": "Await SUPERVISOR instruction on the unresolved SP13 holdout consequence; M4.6 and M4.9 not started"
+  "next_action": "SUPERVISOR review of M4.6; real Abaqus requires a HUMAN gate; M4.9 not started"
 }

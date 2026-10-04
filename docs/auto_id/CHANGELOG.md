@@ -2699,3 +2699,80 @@ first internal provider.
 - **Not started:** M4.6, M4.9.
 - **Code changed:** none.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.6 — Resumable identification pipeline (architecture, fake solver)
+
+- **Stage:** M4 (IN_PROGRESS); SUPERVISOR-authorised M4.6 only
+- **Status:** M4.6 REVIEW_READY. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Scope** (M4_DECISION_RECORD.md §6): architecture and fake-solver tests only. No real
+  Abaqus, no Abaqus Python, no M4.9.
+- **Added — `domain.identification_run`:**
+  - `SolverProfile` (schema `auto-id/solver-profile/v1`): separate data with an exact
+    template, no machine paths, and a profile hash that excludes provenance.
+  - `RunJournal`: atomic (`.partial` + replace), append-only, SHA-256 hash-chained, and
+    bound to the run identity; a broken chain or another run's identity is refused.
+  - `RunLock`: one writer per run directory.
+- **Added — `services.forward_solver`:**
+  - the only M4 module importing `subprocess`;
+  - renders the pinned profile command;
+  - verifies the M3 INP SHA before solving;
+  - accepts a solve only with the `.sta` completion marker, the `.dat` version marker
+    and an ODB, identified by SHA-256 and size;
+  - `SolveFailure` with no automatic retry;
+  - `verify_solve` re-checks the content on reuse;
+  - the executor is injectable (real `subprocess` only under a HUMAN gate).
+- **Added — `services.shape_extraction`:**
+  - the gate's validated pack build in the repository: format 2 from the pinned,
+    unchanged `extract_odb.py` (SHA `039aa067…`);
+  - checks: modes and history, finite and real values, FE geometry identity, exact
+    EIGFREQ frequencies, node set = expected registration subset, lossless storage, and
+    the content hash stable on reload;
+  - the extraction identity is content-only;
+  - raw extraction is deleted after validation (retention rule);
+  - the real executor uses `abaqus_bridge.run_abaqus_extraction` only as an execution
+    helper (no `abaqus_bridge` cache); no new extractor.
+- **Added — `services.identification_pipeline`:** the M4.8 residual function, chaining
+  candidate → M3 `prepare_forward_job` → validated archived pack, journalled solve or
+  new solve → validated pack → FE state → FE-to-FE tracking (M4.5) → objective (M4.7).
+  - **Run hash** binds: forward model and passport, solver profile, frozen set,
+    objective design, pairing policy, LM settings, bounds, start, extraction expectation,
+    archived packs and extra identity.
+  - **Journal:** each evaluation is journalled once and replayed on resume (refusals
+    included). Identification evaluations (reused and new) and actual Abaqus solves are
+    counted separately; reused archived evaluations count toward the budget.
+  - **Identity checks:** the start point's M3 job must equal the frozen baseline job;
+    the pack must match job, FE geometry, node set and modes.
+- **Added — `docs/auto_id/solver_profiles/{SP02,SP13}.json` + README:** the archived
+  CARBON-4C/5A convention (SP02 cpus 8 with a scratch store; SP13 cpus 1).
+- **Fake-solver results** (`tests/test_identification_pipeline.py`, `tests/m4_6_support.py`):
+  - **End to end:** from 52000/4500 to 45006/4000.2 (truth 45000/4000), CONVERGED in 6
+    evaluations (p0, 4 finite differences, 1 trial). Each INP is byte-identical to the M3
+    rendering.
+  - **Determinism:** identical run hash, evaluation hashes and result across run roots.
+  - **Resume:**
+    - after an interruption (crash after 3 solves), every job is solved exactly once
+      across sessions;
+    - after completion, all evaluations are replayed with 0 solves;
+    - after an interrupted extraction, the journalled solve is reused.
+  - **Content identity:** a tampered ODB (same mtime) and a tampered pack are refused.
+  - **Reuse:** with archived p0 and ±5 % packs, 5 evaluations are reused, and
+    solves = evaluations − 5.
+  - **Budget:** reused evaluations count toward it (budget 5 → SOLVE_BUDGET with 0
+    solves).
+  - **Refusals:**
+    - a branch exchange gives REFUSED, no further solves, and REFUSED again on resume
+      with 0 solves;
+    - a failed solve gives SolveFailure, no journal entry and the lock released;
+    - configuration identity mismatches are refused.
+  - **Profiles:** the accepted profiles render the archived command exactly.
+- **M4 guard (allow-list):**
+  - `subprocess` only in `forward_solver.py`;
+  - `abaqus_bridge.run_abaqus_extraction` only in `shape_extraction.py`;
+  - `forward_builder` only in the pipeline;
+  - no `load_or_extract_odb`, `_source_signature`, `_cache_is_valid` or `fast_cache`;
+  - no specimen literals.
+- **Unchanged:** M3 contracts, `abaqus_bridge.py`, `extract_odb.py`, M4.1–M4.5, M4.7,
+  M4.8 logic, SPEC, DECISIONS.
+- **Abaqus run count:** 0
