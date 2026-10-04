@@ -310,7 +310,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M4.1 | `IdentificationPairingPolicy` | `TODO` |
+| M4.1 | `IdentificationPairingPolicy` | `REVIEW_READY` |
 | M4.2 | Baseline observation / pair freeze | `TODO` |
 | M4.3 | Physical modal-family classifier: P_x/P_y, nodal structure, diagonal symmetry when relevant | `TODO` |
 | M4.4 | Cluster trigger + principal-angle / subspace confirmation | `TODO` |
@@ -326,7 +326,13 @@ M4.9 synthetic truth: E = 45000 MPa, G12 = 4000 MPa, controlled frequency noise
 **M4 GATE:** recover the truth within 1σ in ≤ 20 authorised Abaqus solves. An
 artificial branch exchange must trigger refusal, not silent re-pairing.
 
-Stage status: `NOT_STARTED`.
+Stage status: `IN_PROGRESS` (branch `auto-id/m4`, based on `main` `6185b05`).
+First development batch (SUPERVISOR-authorised): M4.1–M4.5, M4.7, M4.8. Rules for the batch:
+- no Abaqus execution; Abaqus Python on archived ODBs counts as an Abaqus run;
+- no real solve pipeline; M4.6 and M4.9 need new authorisation;
+- the archived CARBON-4C baseline replay is the M4.2 reference observation source;
+- SP02/SP13 are development and test only (M2 production readiness `NOT_READY`);
+- the M3 contracts are unchanged.
 
 ---
 

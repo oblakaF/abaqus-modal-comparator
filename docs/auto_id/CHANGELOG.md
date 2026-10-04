@@ -2171,3 +2171,42 @@ first internal provider.
 - **Bookkeeping branch:** `auto-id/m3-closure`, created from exactly `0fd63d69a78f251bd51721880bae9b425b98951e`.
 - **Code / scientific logic changed:** none.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.1 — IdentificationPairingPolicy
+
+- **Stage:** M4, first development batch (SUPERVISOR-authorised: M4.1–M4.5, M4.7,
+  M4.8; no Abaqus; M4.6 and M4.9 not authorised)
+- **Status:** M4.1 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`, created from `main` `6185b05`.
+- **Commit:** the commit that introduces this entry.
+- **Added — `domain.identification_pairing_policy`:**
+  - `IdentificationPairingPolicy` is immutable and hashed (`policy_hash`); its schema
+    is `auto-id/identification-pairing-policy/v1`.
+  - **`STRICT_IDENTIFICATION_PAIRING`** (SPEC §12.1):
+    - MAC ≥ 0.80;
+    - |Δf|/f_EXP ≤ 15 %;
+    - FE-to-FE tracking MAC ≥ 0.90;
+    - coverage ≥ 2 rows, the number of free parameters of carbon-property-set/v1;
+    - assignment tie tolerance 1e-9.
+  - `is_strict` and `require_strict()` reject weaker policies.
+- **Added — `services.identification_pairing.pair_baseline(policy, experimental, fe, mac)`:**
+  - The policy is a required argument.
+  - The gates (MAC, frequency) are applied to every pair **before** the assignment.
+  - The assignment is Hungarian: maximum number of pairs first, then maximum total MAC.
+  - **Status:**
+    - `AMBIGUOUS` when the optimal assignment is not unique within the tie tolerance;
+    - `INCOMPLETE_EVIDENCE` when a frequency-admissible MAC entry is unknown (NaN);
+    - `INSUFFICIENT_COVERAGE` when there are fewer pairs than the policy requires;
+    - otherwise `COMPLETE`. Only `COMPLETE` is final.
+  - Each unpaired experimental mode carries a reason.
+- **Unchanged:**
+  - the normal comparator and its defaults;
+  - the Stage-A pairing provider (MAC ≥ 0.50);
+  - `inverse_solver`;
+  - all M3 contracts.
+- **Added — `tests/test_m4_generic_guard.py`:** for every new M4 module, no specimen,
+  material or machine-path literal, and no import of `subprocess`, `abaqus_bridge`,
+  `matrix_model_service`, `forward_builder`, `shared_carbon_forward` or `modal_core`.
+- **Tests:** `tests/test_identification_pairing.py` +
+  `tests/test_m4_generic_guard.py`: 15 ran, OK.
+- **Abaqus run count:** 0
