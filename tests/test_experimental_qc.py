@@ -22,10 +22,12 @@ from domain.experiment_fixture import (
     load_experiment_fixture_manifest,
 )
 from domain.experimental_qc import (
+    ExperimentalModeEligibilityRefusal,
     ExperimentalQCCheck,
     ExperimentalQCRefusal,
     ExperimentalQCReport,
     ExperimentalQCStatus,
+    TrustedSuspensionThreshold,
 )
 from domain.modal_fitting import FrfInput, ModalFittingProviderRegistry, canonical_hash
 from fixture_support import MANIFEST_PATH, build_synthetic_fixture_workspace, manifest_from_record
@@ -57,7 +59,7 @@ def frf(df=0.1, coherence=None, low=1.0, high=300.0):
                     coherence=None if coherence is None else np.full(axis.size, coherence), source_sha256="a" * 64)
 
 
-class SyntheticChainTests(unittest.TestCase):
+class _SyntheticChainFixture:
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -82,6 +84,8 @@ class SyntheticChainTests(unittest.TestCase):
         return qc.evaluate_experimental_qc(validated, frf_input, fixture or self.fixture,
                                            repo_root=self.workspace.repo_root, **kwargs)
 
+
+class SyntheticChainTests(_SyntheticChainFixture, unittest.TestCase):
     # Core -------------------------------------------------------------------------------
     def test_valid_report(self):
         result = self.chain()
@@ -96,7 +100,7 @@ class SyntheticChainTests(unittest.TestCase):
         self.assertIs(report.check(qc.COHERENCE_QUALITY).status, S.PASS)
         self.assertEqual([check.name for check in report.checks],
                          [qc.PROVENANCE, qc.MEASUREMENT_CONTRACT, qc.FRF_COMPLETENESS, qc.COHERENCE_QUALITY,
-                          qc.FREQUENCY_RESOLUTION, qc.MODAL_CONFIDENCE])
+                          qc.FREQUENCY_RESOLUTION, qc.MODAL_CONFIDENCE, qc.SUSPENSION_THRESHOLD])
         self.assertIs(result.dataset, result.provider_output.output.dataset)
 
     def test_report_is_deterministic(self):
@@ -205,6 +209,95 @@ class SyntheticChainTests(unittest.TestCase):
         self.assertTrue(report.admissible)
 
 
+class SuspensionThresholdTests(_SyntheticChainFixture, unittest.TestCase):
+    """SPEC §6 S1 / §19 item 5: trusted physical threshold only; never guessed; QC stays observational."""
+
+    THRESHOLD = TrustedSuspensionThreshold(20.0, "synthetic passport: suspension modes measured below 20 Hz")
+
+    def chain(self, threshold=None):
+        return qc.prepare_auto_id_experimental_input("SYN/set-a", roots=self.workspace.roots, manifest=self.manifest,
+                                                     repo_root=self.workspace.repo_root,
+                                                     suspension_threshold=threshold)
+
+    def test_absent_threshold_is_not_available(self):
+        result = self.chain()
+        check = result.qc_report.check(qc.SUSPENSION_THRESHOLD)
+        self.assertIs(check.status, S.NOT_AVAILABLE)
+        self.assertEqual([w.code for w in check.warnings], ["SUSPENSION_THRESHOLD_NOT_AVAILABLE"])
+        self.assertIsNone(next(m.value for m in check.metrics if m.name == "suspension_max_hz"))
+        self.assertIs(result.eligibility.status, S.NOT_AVAILABLE)
+        self.assertFalse(result.eligibility.suspension_verified)
+        self.assertEqual(result.eligibility.excluded_modes, ())
+        self.assertEqual(result.eligibility.eligible_modes, (1, 2))
+        self.assertTrue(result.qc_report.admissible)
+
+    def test_supplied_threshold_identifies_modes_below_it(self):
+        result = self.chain(self.THRESHOLD)  # synthetic modes: 12.0 Hz and 31.5 Hz
+        check = result.qc_report.check(qc.SUSPENSION_THRESHOLD)
+        metrics = {m.name: m.value for m in check.metrics}
+        self.assertIs(check.status, S.WARNING)
+        self.assertEqual(check.warnings[0].modes, (1,))
+        self.assertEqual(metrics["suspension_max_hz"], 20.0)
+        self.assertEqual(metrics["modes_below_suspension_threshold"], 1)
+        self.assertEqual(metrics["lowest_mode_at_or_above_threshold"], 2)
+        self.assertAlmostEqual(metrics["lowest_frequency_at_or_above_threshold"], 31.5)
+        self.assertEqual(result.eligibility.excluded_modes, (1,))
+        self.assertEqual(result.eligibility.eligible_modes, (2,))
+        self.assertTrue(result.qc_report.admissible)  # observational: a warning, not a refusal
+
+    def test_threshold_below_all_modes_passes(self):
+        result = self.chain(TrustedSuspensionThreshold(5.0, "synthetic passport"))
+        self.assertIs(result.qc_report.check(qc.SUSPENSION_THRESHOLD).status, S.PASS)
+        self.assertEqual(result.eligibility.excluded_modes, ())
+
+    def test_identification_blocks_modes_below_trusted_threshold(self):
+        result = self.chain(self.THRESHOLD)
+        identification = result.identification_dataset()
+        self.assertEqual([mode.number for mode in identification.modes], [2])
+        self.assertEqual(identification.metadata["mode_eligibility"]["excluded_modes"], [1])
+        with self.assertRaises(ExperimentalModeEligibilityRefusal) as caught:
+            result.eligibility.require_eligible([1, 2])
+        self.assertEqual(caught.exception.modes, (1,))
+        result.eligibility.require_eligible([2])
+        self.assertFalse(issubclass(ExperimentalModeEligibilityRefusal, (ValueError, RuntimeError)))
+
+    def test_qc_and_eligibility_never_change_the_dataset(self):
+        result = self.chain(self.THRESHOLD)
+        self.assertEqual([mode.number for mode in result.dataset.modes], [1, 2])
+        self.assertIs(result.dataset, result.provider_output.output.dataset)
+        self.assertEqual([m.number for m in result.identification_dataset().modes], [2])
+        self.assertEqual([mode.number for mode in result.dataset.modes], [1, 2])
+
+    def test_threshold_is_never_inferred_from_modal_frequencies(self):
+        # A 12 Hz mode exists, yet without a trusted value nothing is screened or excluded.
+        result = self.chain()
+        self.assertIn(12.0, [round(mode.frequency_hz, 6) for mode in result.dataset.modes])
+        self.assertEqual(result.eligibility.excluded_modes, ())
+        self.assertIs(result.qc_report.check(qc.SUSPENSION_THRESHOLD).status, S.NOT_AVAILABLE)
+
+    def test_threshold_is_never_inferred_from_fe_frequencies(self):
+        # The QC path has no FE input at all, and only a TrustedSuspensionThreshold is accepted.
+        import inspect
+
+        for function in (qc.evaluate_experimental_qc, qc.prepare_auto_id_experimental_input, qc.evaluate_mode_eligibility):
+            names = " ".join(inspect.signature(function).parameters).lower()
+            for forbidden in ("fe", "abaqus", "odb", "model"):
+                self.assertNotIn(forbidden, names.split(), (function.__name__, forbidden))
+        for untrusted in (18.0, {"suspension_max_hz": 18.0}):
+            with self.subTest(untrusted=untrusted), self.assertRaises(TypeError):
+                self.chain(untrusted)
+
+    def test_trusted_threshold_requires_a_physical_source(self):
+        for value, source in ((0.0, "x"), (float("nan"), "x"), (-3.0, "x"), (18.0, " "), (True, "x")):
+            with self.subTest(value=value, source=source), self.assertRaises(ValueError):
+                TrustedSuspensionThreshold(value, source)
+
+    def test_suspension_report_is_deterministic(self):
+        self.assertEqual(self.chain(self.THRESHOLD).qc_report.content_hash,
+                         self.chain(self.THRESHOLD).qc_report.content_hash)
+        self.assertNotEqual(self.chain(self.THRESHOLD).qc_report.content_hash, self.chain().qc_report.content_hash)
+
+
 class DiagnosticRuleTests(unittest.TestCase):
     def test_close_mode_warning(self):
         dataset = ModalDataset("x", Path("x"), [mode(1, 100.0), mode(2, 102.0), mode(3, 150.0)])
@@ -279,6 +372,9 @@ class RealFixtureQCTests(unittest.TestCase):
                 if expected is not None:
                     self.assertIs(report.check(qc.COHERENCE_QUALITY).status, expected)
                 self.assertIs(report.check(qc.MODAL_CONFIDENCE).status, S.NOT_AVAILABLE)
+                # No accepted physical suspension_max_hz is pinned for these fixtures (M2): NOT_AVAILABLE.
+                self.assertIs(report.check(qc.SUSPENSION_THRESHOLD).status, S.NOT_AVAILABLE)
+                self.assertFalse(result.eligibility.suspension_verified)
 
                 # Deterministic.
                 again = qc.prepare_auto_id_experimental_input(fixture.fixture_id, roots=roots).qc_report

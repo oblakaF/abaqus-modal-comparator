@@ -156,6 +156,75 @@ class ExperimentalQCReport:
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+@dataclass(frozen=True)
+class TrustedSuspensionThreshold:
+    """A physically documented suspension threshold (SPEC §6 S1, §19 item 5).
+
+    It is a specimen / test-run property from the M2 passport or acquisition record.
+    It is never derived from modal frequencies, FE results or existing modal sets, and
+    there is no default value.
+    """
+
+    suspension_max_hz: float
+    source: str  # where the physical value is documented
+
+    def __post_init__(self) -> None:
+        value = self.suspension_max_hz
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0.0:
+            raise ValueError("suspension_max_hz must be a finite positive frequency in Hz.")
+        if not isinstance(self.source, str) or not self.source.strip():
+            raise ValueError("a trusted suspension threshold must name its documented physical source.")
+
+
+class ExperimentalModeEligibilityRefusal(Exception):
+    """A mode below the trusted suspension threshold was requested for material identification.
+
+    Not a ValueError/RuntimeError, so generic fallback handlers never swallow it.
+    """
+
+    def __init__(self, modes: tuple[int, ...], threshold: TrustedSuspensionThreshold) -> None:
+        super().__init__(
+            f"modes {list(modes)} lie below the trusted suspension threshold "
+            f"{threshold.suspension_max_hz:g} Hz ({threshold.source}) and must not enter material "
+            "identification (SPEC §6 S1)."
+        )
+        self.modes = modes
+        self.threshold = threshold
+
+
+@dataclass(frozen=True)
+class ExperimentalModeEligibility:
+    """Which modes may enter material identification; kept apart from the QC report.
+
+    ``NOT_AVAILABLE`` means no trusted suspension threshold was supplied (pending the
+    M2 passport): no mode is excluded and none is guessed.
+    """
+
+    status: ExperimentalQCStatus  # PASS (threshold applied) or NOT_AVAILABLE
+    threshold: TrustedSuspensionThreshold | None
+    eligible_modes: tuple[int, ...]
+    excluded_modes: tuple[int, ...]  # strictly below the trusted threshold
+
+    @property
+    def suspension_verified(self) -> bool:
+        return self.threshold is not None
+
+    def require_eligible(self, modes) -> None:
+        requested = tuple(int(mode) for mode in modes)
+        blocked = tuple(mode for mode in requested if mode in self.excluded_modes)
+        if blocked:
+            raise ExperimentalModeEligibilityRefusal(blocked, self.threshold)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status.value,
+            "suspension_max_hz": None if self.threshold is None else self.threshold.suspension_max_hz,
+            "threshold_source": None if self.threshold is None else self.threshold.source,
+            "eligible_modes": list(self.eligible_modes),
+            "excluded_modes": list(self.excluded_modes),
+        }
+
+
 class ExperimentalQCRefusal(Exception):
     """A hard QC check failed (broken provenance, fixture identity or measurement contract).
 

@@ -95,6 +95,13 @@ class M1StageGateTests(unittest.TestCase):
                 for name in (qc.PROVENANCE, qc.MEASUREMENT_CONTRACT, qc.FRF_COMPLETENESS):
                     self.assertIs(report.check(name).status, ExperimentalQCStatus.PASS, name)
 
+                # Suspension threshold: no accepted physical value is pinned (M2); never guessed.
+                self.assertIs(report.check(qc.SUSPENSION_THRESHOLD).status, ExperimentalQCStatus.NOT_AVAILABLE)
+                self.assertIs(result.eligibility.status, ExperimentalQCStatus.NOT_AVAILABLE)
+                self.assertEqual(result.eligibility.eligible_modes, tuple(mode.number for mode in modes))
+                self.assertEqual([m.number for m in result.identification_dataset().modes],
+                                 [m.number for m in modes])
+
                 # Dataset unchanged through QC, and equal to the M1.2 production input.
                 self.assertIs(dataset, output.dataset)
                 production = load_production_modal_input(fixture.fixture_id, roots=roots)
@@ -102,6 +109,11 @@ class M1StageGateTests(unittest.TestCase):
                     self.assertEqual(mode.frequency_hz, reference.frequency_hz)
                     self.assertEqual(list(mode.node_ids), list(reference.node_ids))
                     np.testing.assert_array_equal(mode.vectors, reference.vectors)
+
+                # Deterministic chain.
+                again = qc.prepare_auto_id_experimental_input(fixture.fixture_id, roots=roots)
+                self.assertEqual(again.qc_report.content_hash, report.content_hash)
+                self.assertEqual(again.provider_output.output.provenance, provenance)
 
                 # D-028 fixture-specific references.
                 frequencies = np.array([mode.frequency_hz for mode in modes])

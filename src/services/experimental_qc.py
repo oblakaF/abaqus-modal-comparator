@@ -14,9 +14,14 @@ Checks (hard = may FAIL and refuse; diagnostic = PASS / WARNING / NOT_AVAILABLE)
                                       SPEC §12.4 trigger: close modes |df|/f < 3 %;
 - modal_confidence      (diagnostic)  uncertainty availability; phase complexity (metric
                                       only, the SPEC gives no limit); SPEC §6 S1 flag:
-                                      experimental AutoMAC off-diagonal > 0.5.
+                                      experimental AutoMAC off-diagonal > 0.5;
+- suspension_threshold  (diagnostic)  SPEC §6 S1 / §19 item 5: modes below a *trusted*
+                                      physical suspension_max_hz; NOT_AVAILABLE without one.
 
-No threshold other than these SPEC flag rules is applied.
+No threshold other than these SPEC flag rules is applied.  The suspension threshold is
+never guessed: it is accepted only as a ``TrustedSuspensionThreshold`` (M2 passport /
+acquisition record).  Which modes may enter material identification is a separate
+``ExperimentalModeEligibility``; the provider dataset itself is never changed.
 """
 
 from __future__ import annotations
@@ -37,12 +42,14 @@ from domain.experiment_fixture import (
 )
 from domain.experimental_qc import (
     QC_POLICY_VERSION,
+    ExperimentalModeEligibility,
     ExperimentalQCCheck,
     ExperimentalQCMetric,
     ExperimentalQCRefusal,
     ExperimentalQCReport,
     ExperimentalQCStatus,
     QCWarning,
+    TrustedSuspensionThreshold,
 )
 from domain.modal_fitting import (
     EXTERNAL_FROZEN_PROVENANCE_KEYS,
@@ -72,6 +79,7 @@ FRF_COMPLETENESS = "frf_completeness"
 COHERENCE_QUALITY = "coherence_quality"
 FREQUENCY_RESOLUTION = "frequency_resolution"
 MODAL_CONFIDENCE = "modal_confidence"
+SUSPENSION_THRESHOLD = "suspension_threshold"
 
 # Flag rules taken from the SPEC; diagnostic only (warnings), never refusals.
 SPEC_COHERENCE_FLAG = 0.9  # SPEC §6 S1: coherence at resonance < 0.9
@@ -373,6 +381,54 @@ def _confidence_check(validated: ValidatedModalFittingOutput, fixture: Experimen
                                tuple(metrics), tuple(warnings))
 
 
+def _require_trusted(threshold: object) -> TrustedSuspensionThreshold | None:
+    if threshold is not None and not isinstance(threshold, TrustedSuspensionThreshold):
+        raise TypeError("suspension threshold must be a TrustedSuspensionThreshold (documented physical value) or None.")
+    return threshold
+
+
+def _suspension_check(dataset: ModalDataset, threshold: TrustedSuspensionThreshold | None) -> ExperimentalQCCheck:
+    modes = dataset.sorted_modes()
+    if threshold is None:
+        metric = ExperimentalQCMetric("suspension_max_hz", None, "Hz", note="no trusted physical value (M2 passport)")
+        warning = QCWarning("SUSPENSION_THRESHOLD_NOT_AVAILABLE",
+                            "no trusted suspension_max_hz is supplied; suspension modes cannot be screened "
+                            "(the value is a physical passport property and is never guessed)",
+                            SUSPENSION_THRESHOLD, rule="SPEC §6 S1, §19 item 5")
+        return ExperimentalQCCheck(SUSPENSION_THRESHOLD, ExperimentalQCStatus.NOT_AVAILABLE, False,
+                                   "suspension threshold not available", (metric,), (warning,))
+    limit = float(threshold.suspension_max_hz)
+    below = tuple(mode.number for mode in modes if mode.frequency_hz < limit)
+    above = [mode for mode in modes if mode.frequency_hz >= limit]
+    metrics = (
+        ExperimentalQCMetric("suspension_max_hz", limit, "Hz", note=threshold.source),
+        ExperimentalQCMetric("modes_below_suspension_threshold", len(below)),
+        ExperimentalQCMetric("lowest_mode_at_or_above_threshold", above[0].number if above else None),
+        ExperimentalQCMetric("lowest_frequency_at_or_above_threshold", above[0].frequency_hz if above else None, "Hz"),
+    )
+    warnings = (QCWarning("MODES_BELOW_SUSPENSION_THRESHOLD",
+                          f"modes below the trusted suspension threshold {limit:g} Hz must not enter material "
+                          "identification", SUSPENSION_THRESHOLD, below, "SPEC §6 S1"),) if below else ()
+    return ExperimentalQCCheck(SUSPENSION_THRESHOLD, _status(list(warnings)), False,
+                               f"threshold {limit:g} Hz; {len(below)} mode(s) below", metrics, warnings)
+
+
+def evaluate_mode_eligibility(
+    dataset: ModalDataset,
+    suspension_threshold: TrustedSuspensionThreshold | None = None,
+) -> ExperimentalModeEligibility:
+    """Which modes may enter material identification (SPEC §6 S1); the dataset is only read."""
+
+    threshold = _require_trusted(suspension_threshold)
+    modes = dataset.sorted_modes()
+    numbers = tuple(mode.number for mode in modes)
+    if threshold is None:
+        return ExperimentalModeEligibility(ExperimentalQCStatus.NOT_AVAILABLE, None, numbers, ())
+    excluded = tuple(mode.number for mode in modes if mode.frequency_hz < threshold.suspension_max_hz)
+    eligible = tuple(number for number in numbers if number not in excluded)
+    return ExperimentalModeEligibility(ExperimentalQCStatus.PASS, threshold, eligible, excluded)
+
+
 def evaluate_experimental_qc(
     validated: ValidatedModalFittingOutput,
     frf: FrfInput,
@@ -380,10 +436,12 @@ def evaluate_experimental_qc(
     *,
     repo_root: Path = REPO_ROOT,
     registry: ModalFittingProviderRegistry | None = None,
+    suspension_threshold: TrustedSuspensionThreshold | None = None,
 ) -> ExperimentalQCReport:
     """Return the QC report for a validated provider output; never modifies the dataset."""
 
     registry = admitted_provider_registry() if registry is None else registry
+    threshold = _require_trusted(suspension_threshold)
     dataset = validated.output.dataset
     provenance = validated.output.provenance if isinstance(validated.output.provenance, Mapping) else {}
     checks = (
@@ -393,6 +451,7 @@ def evaluate_experimental_qc(
         _coherence_check(frf, dataset),
         _resolution_check(frf, dataset),
         _confidence_check(validated, fixture),
+        _suspension_check(dataset, threshold),
     )
     provider = validated.output.provider
     return ExperimentalQCReport(
@@ -415,6 +474,8 @@ def evaluate_experimental_qc(
                 "close_modes": f"|df|/f < {SPEC_CLUSTER_TRIGGER:.0%} trigger (SPEC §12.4)",
                 "automac": f"off-diagonal > {SPEC_AUTOMAC_FLAG} (SPEC §6 S1)",
                 "phase_collinearity": "metric only (no limit in the SPEC)",
+                "suspension_threshold": "modes below a trusted physical suspension_max_hz (SPEC §6 S1, §19 item 5); "
+                                        "NOT_AVAILABLE without one; never guessed",
             },
             "note": "Diagnostic warnings never refuse or modify modes; no automatic mode rejection.",
         },
@@ -423,11 +484,27 @@ def evaluate_experimental_qc(
 
 @dataclass(frozen=True)
 class AutoIDExperimentalInput:
-    """Experimental input admitted to Auto-ID: provider output plus its QC report."""
+    """Experimental input admitted to Auto-ID: provider output, QC report and mode eligibility.
+
+    ``dataset`` is the provider dataset, unchanged.  ``identification_dataset()`` is the
+    explicit view material identification must use: it leaves out the modes the
+    eligibility result excludes (below a trusted suspension threshold).
+    """
 
     dataset: ModalDataset
     provider_output: ValidatedModalFittingOutput
     qc_report: ExperimentalQCReport
+    eligibility: ExperimentalModeEligibility
+
+    def identification_dataset(self) -> ModalDataset:
+        keep = set(self.eligibility.eligible_modes)
+        return ModalDataset(
+            source_name=self.dataset.source_name,
+            source_path=self.dataset.source_path,
+            modes=[mode for mode in self.dataset.modes if mode.number in keep],
+            metadata={**self.dataset.metadata, "mode_eligibility": self.eligibility.to_dict()},
+            history=list(self.dataset.history),
+        )
 
 
 def prepare_auto_id_experimental_input(
@@ -436,14 +513,22 @@ def prepare_auto_id_experimental_input(
     roots: Mapping[str, Path] | None = None,
     manifest: ExperimentFixtureManifest | None = None,
     repo_root: Path = REPO_ROOT,
+    suspension_threshold: TrustedSuspensionThreshold | None = None,
 ) -> AutoIDExperimentalInput:
-    """M1.2 -> M1.3 provider -> M1.1 -> M1.4 QC.  Refuses only on a hard QC failure."""
+    """M1.2 -> M1.3 provider -> M1.1 -> M1.4 QC -> mode eligibility.
+
+    Refuses only on a hard QC failure.  ``suspension_threshold`` must be a trusted
+    physical value (M2 passport); without it, suspension screening is NOT_AVAILABLE.
+    """
 
     manifest = load_experiment_fixture_manifest(FIXTURE_MANIFEST_PATH) if manifest is None else manifest
     roots = fixture_roots_from_environment() if roots is None else roots
     validated = prepare_external_polymax_modal_dataset(fixture_id, roots=roots, manifest=manifest, repo_root=repo_root)
     fixture = manifest.fixture(fixture_id)
-    report = evaluate_experimental_qc(validated, prepare_frf_input(fixture, roots), fixture, repo_root=repo_root)
+    threshold = _require_trusted(suspension_threshold)
+    report = evaluate_experimental_qc(validated, prepare_frf_input(fixture, roots), fixture, repo_root=repo_root,
+                                      suspension_threshold=threshold)
     if not report.admissible:
         raise ExperimentalQCRefusal(report)
-    return AutoIDExperimentalInput(validated.output.dataset, validated, report)
+    eligibility = evaluate_mode_eligibility(validated.output.dataset, threshold)
+    return AutoIDExperimentalInput(validated.output.dataset, validated, report, eligibility)
