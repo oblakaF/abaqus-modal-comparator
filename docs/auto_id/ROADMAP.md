@@ -16,6 +16,11 @@ History: [CHANGELOG.md](CHANGELOG.md). Evidence: [EVIDENCE.md](EVIDENCE.md).
 
 **ONE MINI-STEP AT A TIME.**
 
+Exception: a SUPERVISOR-authorised batch of named mini-steps within one stage
+runs without stopping between mini-steps (see `CLAUDE.md` / `AGENTS.md`). Each
+mini-step still ends `REVIEW_READY` with its own commit; the worker STOPs after the
+whole batch.
+
 Every mini-step:
 
 ```
@@ -260,7 +265,7 @@ current SP02/SP13 production physical readiness `NOT_READY`).
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M3.1 | Manifest-driven material location | `TODO` |
+| M3.1 | Manifest-driven material location | `REVIEW_READY` |
 | M3.2 | Generic candidate rewrite | `TODO` |
 | M3.3 | Generic provenance / job hash | `TODO` |
 | M3.4 | Remove production hard-coding of SP02, SP13, `D:\Snadwich` and specific machine paths from the generic Auto-ID path | `TODO` |
@@ -270,7 +275,9 @@ current SP02/SP13 production physical readiness `NOT_READY`).
 byte-for-byte, except any explicitly versioned metadata difference proven irrelevant.
 No physics change.
 
-Stage status: `NOT_STARTED` (branch `auto-id/m3`, based on `main` `7af9038`).
+Stage status: `IN_PROGRESS` (branch `auto-id/m3`, based on `main` `7af9038`).
+M3.1–M3.5 run as one SUPERVISOR-authorised stage batch. No Abaqus. The accepted
+shared-carbon builder stays unchanged as the regression oracle.
 
 ---
 

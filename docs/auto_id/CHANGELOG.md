@@ -1931,3 +1931,44 @@ first internal provider.
   - No scientific rule changed; no DECISIONS entry is required.
 - **Code changed:** none.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M3.1 — Manifest-driven material location
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:** M3.1 REVIEW_READY; M3 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Added — `domain.forward_model_manifest`** (schema `auto-id/forward-model/v1`):
+  - **Contents:** the pinned reference INP (store + relative path, SHA-256, size), the
+    passport (path + canonical hash), job prefix, material role and accepted source
+    Engineering Constants, parameterisation, eigenvalue request, registration, and
+    provenance.
+  - **Parameterisation registry:** `carbon-property-set/v1`, with E1, E2 and G12
+    variable and E3, ν12, ν13, ν23, G13, G23 fixed. There is no E1 ≠ E2 entry.
+  - **Refused:**
+    - unknown fields;
+    - machine paths;
+    - a bad job prefix;
+    - an unknown parameterisation or role;
+    - source fixed constants that differ from the property set;
+    - eigenvalue counts of 6 or fewer.
+  - **`bind_forward_model`:** pins the passport by hash and resolves the material name
+    from the passport `materials` by role (SPEC §4). For a linked fixture it requires
+    the model input, registration and FE model name to agree.
+- **Added — `services.forward_builder.locate_engineering_constants`:** locates the
+  named material's unique nine-value `*Elastic, type=ENGINEERING CONSTANTS` record.
+  It refuses missing or duplicate materials, several or zero `*Elastic` options, other
+  types and temperature-dependent or unreadable records. INP splitting and joining is
+  lossless (latin-1, line endings kept).
+- **Added — data:** `docs/auto_id/forward_models/{SP02,SP13}.forward.json` and
+  `README.md`. They hold the values the accepted builder hard-coded, now bound to the
+  passports and the M0.2 fixture records.
+- **Checked on the real reference INPs** (read-only; no Abaqus): the located records
+  are 0-based lines 2077229–2077230 (SP02) and 1957764–1957765 (SP13). The CARBON-4C
+  archive records these as 1-based lines 2077230–2077231 and 1957765–1957766.
+- **Governance:** the ROADMAP execution rule notes the supervised-batch exception
+  (CLAUDE.md / AGENTS.md).
+- **Unchanged:** `src/services/shared_carbon_forward.py`, the regression oracle.
+- **Tests:** `tests/m3_support.py`, `tests/test_forward_model_manifest.py`,
+  `tests/test_forward_builder.py` (location): 20 ran, OK.
+- **Abaqus run count:** 0

@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M3",
-  "current_ministep": null,
-  "status": "NOT_STARTED",
+  "current_ministep": "M3.1",
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M2",
   "last_accepted_ministep": "M2.5",
   "last_accepted_commit": "a9e6322b42e2f4339fa9131da2bce4ac27c3055a",
@@ -202,12 +202,13 @@
   "m3": {
     "branch": "auto-id/m3",
     "base": "7af9038c5486560c5d2d0b6d571a354766e29d77",
-    "M3.1": "TODO",
+    "M3.1": "REVIEW_READY",
     "M3.2": "TODO",
     "M3.3": "TODO",
     "M3.4": "TODO",
     "M3.5": "TODO",
-    "status": "NOT_STARTED"
+    "status": "IN_PROGRESS",
+    "batch_authorisation": "SUPERVISOR: M3.1-M3.5 as one supervised stage batch; no Abaqus; shared_carbon_forward.py kept unchanged as regression oracle"
   },
   "next_action": "M3 per ROADMAP order (SUPERVISOR-authorised stage batch); no self-acceptance; STOP for SUPERVISOR review"
 }
