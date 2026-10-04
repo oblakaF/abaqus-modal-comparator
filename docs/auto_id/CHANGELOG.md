@@ -2850,3 +2850,59 @@ first internal provider.
   `D:baqus_m4_smoke`.
 - **Not started:** M4.9. No additional Abaqus.
 - **Code changed:** none.
+
+## 2026-10-05 — M4.9 preparation (fake solver only): REVIEW_READY; real gate NOT STARTED
+
+- **Stage:** M4 (IN_PROGRESS); M4.9 `IN_PROGRESS` (preparation `REVIEW_READY`).
+- **Authorisation:** SUPERVISOR, M4.9 PREPARATION ONLY. Excluded: real Abaqus truth solve,
+  identification solves, Abaqus Python, M4.9 gate execution, changes to acceptance criteria,
+  M4_DECISION_RECORD decisions or M3 contracts.
+- **New module** `src/services/synthetic_twin.py`:
+  - `TwinDefinition`: truth, start, noise sd, **explicit noise seed** (no default), FE modes, σ,
+    k_int; content-hashed (free-text provenance excluded).
+  - Deterministic noise: SHA-256(seed, mode) with Box–Muller, independent of NumPy.
+  - `solve_truth`: the truth M3 job solved and extracted through the M4.6 components in its own
+    journal. Resumable; a failed truth solve is not retried without authorisation; never counted
+    in the 20 identification evaluations.
+  - `build_synthetic_experiment`: truth FE modes 7–30 on the measured grid through the
+    registration (R, measured-DOF contract), frequencies × (1 + sd·ε). Modes are numbered by
+    synthetic frequency; FE numbers appear in provenance only. No real PolyMAX data.
+  - `design_twin_observations`: strict freeze at p0, then M4.3 families and holdouts, then M4.4
+    triggers and confirmation with the ±5 % packs (surface U1U2U3), then the M4.7 design
+    (σ = 0.003, no provisional setup term).
+    - Nothing is hand-selected.
+    - UNSTABLE or UNSUPPORTED groups, or a design that `build_objective_design` refuses, make the
+      twin design REFUSED.
+  - `prepare_twin`: the twin's `PipelineConfig`. The twin definition hash, seed, experiment hash,
+    truth-pack hash and provenance hash go into the run identity; p0 and ±5 % must be validated
+    archived packs (otherwise refused). It writes a deterministic `twin_provenance.json`.
+  - `assess_recovery`: M4.9 criteria 1–2 unchanged (CONVERGED; |ln(p̂/p_true)| ≤ local sd).
+- **Unchanged:** M3 (`forward_builder.py`, `forward_model_manifest.py`, `shared_carbon_forward.py`,
+  manifests), `extract_odb.py`, all M4.1–M4.8 modules, acceptance criteria, M4_DECISION_RECORD, the
+  smoke-gate records, EVIDENCE.
+- **Guard:** `tests/test_m4_generic_guard.py` now also checks `synthetic_twin.py`;
+  `forward_builder` is allowed there read-only (SUPERVISOR to confirm, §6.4).
+- **Tests:** `tests/test_synthetic_twin.py` (26, with the plate-like fake in
+  `tests/m4_9_twin_support.py`) and `tests/test_m4_9_sp13_readiness.py` (3; 1 store-gated).
+  - Fake twin: 24 rows FROZEN; the torsion holdout is found by the policy; the rotating
+    near-degenerate pair is CONFIRMED (one cluster term); the stable close pair is INDEPENDENT.
+    CONVERGED in 6 evaluations (5 reused archived packs, 1 solve).
+  - A determinism; B resume without duplicate evaluations; C budget (p0 counts, reused packs
+    count, the truth solve is separate); D injected exchange REFUSED with no re-pairing and no
+    solve on resume; E cluster residual only when CONFIRMED.
+  - SP13 readiness (no Abaqus): the start and ±5 % points render exactly to the validated pack
+    jobs; the truth job has no pack.
+  - Full suite: Windows 1290 tests OK (23 skipped) without data stores; 1292 OK (2 skipped) with both stores.
+- **Decisions needed (not decided by the worker):**
+  1. Noise seed of the real SP13 twin: the definition requires an explicit seed (no default); no SP13 twin definition is committed until the SUPERVISOR fixes it.
+  2. UNSTABLE or UNSUPPORTED (>2-mode) trigger groups in the twin: implemented as a REFUSED design (no row is dropped silently); confirm, or define another rule.
+  3. A CONFIRMED cluster split by the holdout selection: build_objective_design refuses, so the twin design is REFUSED; confirm, or define a rule.
+  4. Real-gate criterion 3 (artificial branch exchange): the fake tests inject the exchange through the extraction executor; the mechanism and evidence for the real gate are not decided.
+  5. Guard allow-list (M4_DECISION_RECORD.md §6.4): services/synthetic_twin.py imports forward_builder read-only (truth job, ±5 % job names); confirm the extension.
+  6. Retention of the real truth ODB and pack after the M4.9 gate (archive or delete) is not decided.
+- **Status discrepancies (recorded, not changed):**
+  - The M4.9-preparation instruction says 'main: M4.6 ACCEPTED'; recorded state: M4.6 REVIEW_READY (only the SP13 smoke gate is ACCEPTED) and M4 is not merged to main. Not changed by the worker.
+  - The instruction says 'M4.7 waiting for M4.9 observation pipeline'; recorded state: M4.7 REVIEW_READY. Not changed by the worker.
+- **Correction note:** the previous entry's run directory `D:\abaqus_m4_smoke` contains a
+  stray control character. Not edited (append-only); this note is the correction.
+- **Abaqus runs:** 0. **Real Abaqus M4.9 gate NOT STARTED.**

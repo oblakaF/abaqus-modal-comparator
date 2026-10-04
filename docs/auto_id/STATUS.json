@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M4",
-  "current_ministep": "M4.8",
+  "current_ministep": "M4.9",
   "status": "IN_PROGRESS",
   "last_accepted_stage": "M3",
   "last_accepted_ministep": "M3.5",
@@ -246,7 +246,7 @@
     "M4.6": "REVIEW_READY",
     "M4.7": "REVIEW_READY",
     "M4.8": "REVIEW_READY",
-    "M4.9": "TODO",
+    "M4.9": "IN_PROGRESS",
     "status": "IN_PROGRESS",
     "branch": "auto-id/m4",
     "base": "6185b0565fb666ce26e533ac7b72a102de496f24",
@@ -373,7 +373,39 @@
       "run_directory": "D:\\abaqus_m4_smoke (ODB kept until review)",
       "archive_proposal": "provenance only (journal, comparison, extraction manifest, logs) under carbon-project-archive/m4_smoke/; no duplicate shape pack (reference fe_shapes/SP13_a46d08b52995e078.npz) [PROPOSAL ONLY; not approved yet]",
       "supervisor_review": "ACCEPTED 2026-10-05 (verdict REPRODUCED)"
+    },
+    "M4.9_preparation": {
+      "status": "REVIEW_READY",
+      "real_m4_9_gate": "NOT STARTED (separate HUMAN gate)",
+      "authorised": "SUPERVISOR 2026-10-05: M4.9 PREPARATION ONLY; no real Abaqus truth solve, no identification solves, no Abaqus Python, no M3 change, acceptance criteria unchanged",
+      "modules": [
+        "src/services/synthetic_twin.py"
+      ],
+      "tests": [
+        "tests/test_synthetic_twin.py",
+        "tests/m4_9_twin_support.py",
+        "tests/test_m4_9_sp13_readiness.py",
+        "tests/test_m4_generic_guard.py (synthetic_twin.py added; forward_builder allowed read-only)"
+      ],
+      "pipeline": "twin definition (explicit seed) -> truth solve + extraction (own journal, not in the 20) -> synthetic experiment (registration R, U3, SHA-256/Box-Muller noise) -> strict freeze -> M4.3 families/holdouts -> M4.4 triggers/confirmation (±5 % packs) -> M4.7 design -> M4.6 pipeline (twin hashes and seed in the run identity) -> assessment of criteria 1-2",
+      "fake_solver_result": "plate-like fake: 24 rows FROZEN; torsion holdout found by policy; rotating pair CONFIRMED (one cluster term), stable close pair INDEPENDENT; CONVERGED in 6 evaluations (5 reused, 1 solve); A-E pass",
+      "sp13_readiness": "start and ±5 % points render to the validated pack jobs (SP13_a46d08b52995e078, SP13_a9df66283a168786, SP13_0e861d03c333bb0b, SP13_0328066b74b6fd78, SP13_4c0f189b9727feaf); the truth job has no pack (needs the gated solve)",
+      "real_gate_budget_if_authorised": "1 truth solve + 1 extraction (separate); identification <= 20 evaluations incl. 5 reused archived packs, so <= 15 Abaqus solves + 15 extractions",
+      "tests_result": "Windows 1290 tests OK (23 skipped) without data stores; 1292 OK (2 skipped) with both stores",
+      "abaqus_runs": 0,
+      "decisions_needed": [
+        "Noise seed of the real SP13 twin: the definition requires an explicit seed (no default); no SP13 twin definition is committed until the SUPERVISOR fixes it.",
+        "UNSTABLE or UNSUPPORTED (>2-mode) trigger groups in the twin: implemented as a REFUSED design (no row is dropped silently); confirm, or define another rule.",
+        "A CONFIRMED cluster split by the holdout selection: build_objective_design refuses, so the twin design is REFUSED; confirm, or define a rule.",
+        "Real-gate criterion 3 (artificial branch exchange): the fake tests inject the exchange through the extraction executor; the mechanism and evidence for the real gate are not decided.",
+        "Guard allow-list (M4_DECISION_RECORD.md §6.4): services/synthetic_twin.py imports forward_builder read-only (truth job, ±5 % job names); confirm the extension.",
+        "Retention of the real truth ODB and pack after the M4.9 gate (archive or delete) is not decided."
+      ],
+      "status_discrepancies": [
+        "The M4.9-preparation instruction says 'main: M4.6 ACCEPTED'; recorded state: M4.6 REVIEW_READY (only the SP13 smoke gate is ACCEPTED) and M4 is not merged to main. Not changed by the worker.",
+        "The instruction says 'M4.7 waiting for M4.9 observation pipeline'; recorded state: M4.7 REVIEW_READY. Not changed by the worker."
+      ]
     }
   },
-  "next_action": "Await SUPERVISOR instruction; archive of the smoke provenance remains a proposal; M4.9 not started"
+  "next_action": "SUPERVISOR review of the M4.9 preparation (REVIEW_READY) and its decisions needed; real M4.9 gate NOT STARTED (needs a separate HUMAN gate); smoke archive remains a proposal"
 }

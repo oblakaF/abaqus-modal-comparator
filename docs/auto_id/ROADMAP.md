@@ -318,7 +318,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 | M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `REVIEW_READY` |
 | M4.7 | Log-frequency objective | `REVIEW_READY` |
 | M4.8 | Bounded LM / trust step with the correct minus sign | `REVIEW_READY` |
-| M4.9 | Synthetic digital-twin recovery | `TODO` |
+| M4.9 | Synthetic digital-twin recovery | `IN_PROGRESS` |
 
 M4.9 synthetic truth: E = 45000 MPa, G12 = 4000 MPa, controlled frequency noise
 ≈ 0.3 %; start E = 52000 MPa, G12 = 4500 MPa.
@@ -368,6 +368,11 @@ First batch reviewed by the SUPERVISOR:
 - SUPERVISOR review of M4.4:
   - `REVIEW_READY`: R1/R2 are independent branches; no cluster merging.
   - **Unresolved:** the M4.3 holdout selection leaves one fit row for two parameters.
+- M4.9 preparation (fake solver only; no Abaqus): `REVIEW_READY`.
+  - Twin builder, observation pipeline and M4.6 integration in
+    `services/synthetic_twin.py`; tests A–E pass.
+  - **Real M4.9 gate: NOT STARTED** (separate HUMAN gate). Decisions needed: see
+    CHANGELOG 2026-10-05 "M4.9 preparation".
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---

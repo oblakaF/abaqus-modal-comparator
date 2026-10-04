@@ -4,7 +4,8 @@ M4.6 allow-list (M4_DECISION_RECORD.md §6.4):
 - ``subprocess`` only in ``services/forward_solver.py``;
 - ``abaqus_bridge`` only in ``services/shape_extraction.py`` and only ``run_abaqus_extraction``
   (execution helper); its path/size/mtime cache (``load_or_extract_odb``) is never used;
-- ``forward_builder`` (M3) only in ``services/identification_pipeline.py``;
+- ``forward_builder`` (M3) only in ``services/identification_pipeline.py`` and, for the twin's truth
+  job and the ±5 % job names (M4.9 preparation; read-only use of the M3 API), ``services/synthetic_twin.py``;
 - never ``shared_carbon_forward``, ``matrix_model_service``, ``sp13_evidence_adapter`` or ``modal_core``.
 """
 
@@ -32,6 +33,7 @@ M4_MODULES = (
     "src/services/forward_solver.py",
     "src/services/shape_extraction.py",
     "src/services/identification_pipeline.py",
+    "src/services/synthetic_twin.py",
 )
 FORBIDDEN_TEXT = ("SP02", "SP13", "SP-02", "SP-13", "Snadwich", "snadwich", "carbon_project_archive", "D:\\",
                   "CFRP_T300_PlainWeave", "CFRP_Face", "load_or_extract_odb", "_source_signature",
@@ -43,6 +45,7 @@ ALLOWED = {
     "src/services/forward_solver.py": {"subprocess"},
     "src/services/shape_extraction.py": {"abaqus_bridge"},
     "src/services/identification_pipeline.py": {"forward_builder", "services.forward_builder"},
+    "src/services/synthetic_twin.py": {"forward_builder", "services.forward_builder"},
 }
 
 
