@@ -1,0 +1,51 @@
+{
+  "schema": "auto-id/forward-model/v1",
+  "forward_model_id": "SP02_Modal_V02/carbon-property-set-v1",
+  "specimen_passport": {
+    "path": "docs/auto_id/specimens/SP02.specimen.json",
+    "manifest_hash": "c84274ec9c2b428b96b10f8402cd8e68bcafbb262875875ec5ce62ddcd9f0e9a"
+  },
+  "model_input": {
+    "role": "accepted source Abaqus input",
+    "file_name": "SP02_Modal_V02.inp",
+    "sha256": "574ae78a897f5a666989716c54549969f13ca2919ad3af1f3ca658580a4ba8a5",
+    "size_bytes": 123452260,
+    "location": {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_Modal_V02.inp"
+    }
+  },
+  "job_prefix": "SP02",
+  "material": {
+    "role": "face",
+    "elastic_type": "ENGINEERING CONSTANTS",
+    "source_engineering_constants": {
+      "E1": 52000.0,
+      "E2": 52000.0,
+      "E3": 6700.0,
+      "nu12": 0.05,
+      "nu13": 0.3,
+      "nu23": 0.3,
+      "G12": 4500.0,
+      "G13": 2200.0,
+      "G23": 2200.0
+    }
+  },
+  "parameterisation": "carbon-property-set/v1",
+  "frequency_request": {
+    "source_eigenvalue_count": 15,
+    "requested_eigenvalue_count": 30
+  },
+  "registration": {
+    "registration_hash": "9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164",
+    "path": "docs/registrations/SP02_frozen_registration.json"
+  },
+  "provenance": {
+    "source_of_truth": [
+      "docs/auto_id/fixtures/real_experiment_fixtures.json (SP02/bravo-1: pinned model input and registration)",
+      "docs/auto_id/specimens/SP02.specimen.json (material names by role)",
+      "docs/auto_id/EVIDENCE.md (CARBON-4C forward/replay chain; CARBON-5F source INP SHA-256)",
+      "accepted shared-carbon builder src/services/shared_carbon_forward.py at 121ba1d06b7c268b3051f1407a3ea26a9027dca3 (source Engineering Constants; forward job requests 30 eigenvalues (24 elastic modes; CARBON-4C))"
+    ]
+  }
+}

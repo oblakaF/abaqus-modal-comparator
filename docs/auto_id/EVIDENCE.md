@@ -221,3 +221,30 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 - Local research scratch.
 - ODBs and solver files are not in Git.
+
+
+## M3 — Universal forward builder byte-for-byte regression
+
+- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Kind:** software regression; **not** a material result. No Abaqus.
+- **Purpose:** show that the manifest-driven builder (`src/services/forward_builder.py`)
+  generates exactly the accepted shared-carbon forward INPs.
+- **Inputs:**
+  - reference INPs `SP02_Modal_V02.inp` `574ae78a…` and
+    `SP13_mesh_local_v1_modal.inp` `9d410584…` (store `snadwich`);
+  - forward-model manifests `docs/auto_id/forward_models/{SP02,SP13}.forward.json`;
+  - archived job identities
+    [forward_models/accepted_forward_jobs.json](forward_models/accepted_forward_jobs.json),
+    from `carbon-project-archive:carbon4c/step1_prepare.json` and
+    `carbon5a/prepare.json`, pinned by SHA-256.
+- **Compact result:**
+  - **Archived candidates:** CARBON-4C baseline and CARBON-5A E± / G± × SP02/SP13
+    (10 jobs).
+    - The bytes are identical to the live accepted builder.
+    - The generated SHA-256 equals the archive. For example, SP02 baseline
+      `f3e59228…` and SP13 baseline `a46d08b5…` are the names of the archived CARBON-4C
+      ODBs.
+    - Changed lines, the accepted provenance hashes and the evaluation hashes all
+      reproduce.
+  - **Extended matrix:** 24 / 24 further candidate files are identical.
+- **Normative vs diagnostic:** normative for M3 only after SUPERVISOR acceptance.

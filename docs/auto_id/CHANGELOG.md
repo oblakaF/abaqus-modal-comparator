@@ -1902,3 +1902,249 @@ first internal provider.
   These are the categories classified in M0.4.
 - **Abaqus run count:** 0
 - **Next gate:** SUPERVISOR review of M2 (PR #28).
+
+## 2026-10-04 — M2 merged to main; M3 branch created; supervised stage batches
+
+- **Stage:** M2 → M3
+- **M2 acceptance:**
+  - M2.1–M2.5 and the M2 stage are ACCEPTED by the SUPERVISOR, before the HUMAN
+    merge.
+  - Accepted head: `5c60abc`. Last implementation commit: `a9e6322`.
+- **M2 merge:** PR #28 (`auto-id/m2` → `main`), merge commit `7af9038c5486560c5d2d0b6d571a354766e29d77`.
+  - Recorded in `STATUS.json` (`main_merges`, `m2.merged_to_main`,
+    `last_accepted_stage = M2`) and in the ROADMAP.
+- **M2 conclusions (unchanged, intentionally separate facts):**
+  - software / regression gate PASS;
+  - SP02/SP13 historical accepted-registration replay PASS;
+  - SP02/SP13 production physical readiness NOT_READY.
+- **M3 branch:** `auto-id/m3`, created from exactly `7af9038c5486560c5d2d0b6d571a354766e29d77` (separate worktree).
+  - M3 is `NOT_STARTED`; M3.1–M3.5 are `TODO`.
+- **Governance (execution granularity only):** `CLAUDE.md` and `AGENTS.md` are
+  updated identically.
+  - **Default:** one mini-step at a time.
+  - **Exception:** a SUPERVISOR-authorised batch of named mini-steps within one stage
+    may run without stopping between mini-steps. Roadmap order is kept, and each
+    mini-step only reaches `REVIEW_READY`. There is no self-acceptance and no future
+    stage.
+  - **Unchanged:** the Abaqus, destructive-git and merge HUMAN gates.
+  - **Stage PR:** only after the whole batch is `REVIEW_READY`, then STOP.
+  - No scientific rule changed; no DECISIONS entry is required.
+- **Code changed:** none.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M3.1 — Manifest-driven material location
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:** M3.1 REVIEW_READY; M3 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Added — `domain.forward_model_manifest`** (schema `auto-id/forward-model/v1`):
+  - **Contents:** the pinned reference INP (store + relative path, SHA-256, size), the
+    passport (path + canonical hash), job prefix, material role and accepted source
+    Engineering Constants, parameterisation, eigenvalue request, registration, and
+    provenance.
+  - **Parameterisation registry:** `carbon-property-set/v1`, with E1, E2 and G12
+    variable and E3, ν12, ν13, ν23, G13, G23 fixed. There is no E1 ≠ E2 entry.
+  - **Refused:**
+    - unknown fields;
+    - machine paths;
+    - a bad job prefix;
+    - an unknown parameterisation or role;
+    - source fixed constants that differ from the property set;
+    - eigenvalue counts of 6 or fewer.
+  - **`bind_forward_model`:** pins the passport by hash and resolves the material name
+    from the passport `materials` by role (SPEC §4). For a linked fixture it requires
+    the model input, registration and FE model name to agree.
+- **Added — `services.forward_builder.locate_engineering_constants`:** locates the
+  named material's unique nine-value `*Elastic, type=ENGINEERING CONSTANTS` record.
+  It refuses missing or duplicate materials, several or zero `*Elastic` options, other
+  types and temperature-dependent or unreadable records. INP splitting and joining is
+  lossless (latin-1, line endings kept).
+- **Added — data:** `docs/auto_id/forward_models/{SP02,SP13}.forward.json` and
+  `README.md`. They hold the values the accepted builder hard-coded, now bound to the
+  passports and the M0.2 fixture records.
+- **Checked on the real reference INPs** (read-only; no Abaqus): the located records
+  are 0-based lines 2077229–2077230 (SP02) and 1957764–1957765 (SP13). The CARBON-4C
+  archive records these as 1-based lines 2077230–2077231 and 1957765–1957766.
+- **Governance:** the ROADMAP execution rule notes the supervised-batch exception
+  (CLAUDE.md / AGENTS.md).
+- **Unchanged:** `src/services/shared_carbon_forward.py`, the regression oracle.
+- **Tests:** `tests/m3_support.py`, `tests/test_forward_model_manifest.py`,
+  `tests/test_forward_builder.py` (location): 20 ran, OK.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M3.2 — Generic candidate rewrite
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:** M3.2 REVIEW_READY; M3 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Domain (`domain.forward_model_manifest`):**
+  - A `Parameterisation` maps candidate parameters to the constants they set.
+    `carbon-property-set/v1` maps `E_in_plane_mpa` → E1 and E2, and `G12_mpa` → G12;
+    E3, ν12, ν13, ν23, G13 and G23 are fixed. A parameterisation must determine all
+    nine constants, and no constant may be both set and fixed.
+  - `ForwardCandidate` and `carbon_candidate`: exactly the parameterisation's
+    parameters, each finite and positive. Fixed constants are not candidate fields.
+- **Service (`services.forward_builder`):**
+  - `rewrite_engineering_constants` writes only the variable constants. A fixed
+    constant that would change is refused.
+  - `rewrite_eigenvalue_request` sets the count on the single `*Frequency` request.
+  - `render_forward_input(model, candidate, source_bytes)`:
+    - checks the source SHA-256/size, the source constants and the eigenvalue request
+      against the manifest;
+    - rewrites the record and the request;
+    - **independent post-check:** same line count, changed lines limited to the record
+      and the eigenvalue request, and the re-read record equal to the candidate.
+  - Mesh, geometry, core, density, adhesive, ties and every other line are copied
+    unchanged.
+- **Oracle equivalence:** on 8 synthetic INP variants × 7 candidates, the output is
+  byte-identical to the accepted builder (`shared_carbon_forward.write_forward_job_inp`).
+  - **Variants:** LF, CRLF, a comment inside the record, no trailing comma, trailing
+    spaces, a one-line record, an unchanged eigenvalue request, lower-case keywords.
+  - **Candidates:** include awkward floats.
+- **Real-data sanity check** (read-only; no Abaqus): the CARBON-4C baseline candidate
+  (52000/4500) reproduces the archived generated INP SHA-256 for SP02 (`f3e59228…`)
+  and SP13 (`a46d08b5…`), with the archived changed-line numbers.
+- **Unchanged:** `src/services/shared_carbon_forward.py`, the regression oracle.
+- **Tests:** `tests/test_forward_builder.py` + `tests/test_forward_model_manifest.py`:
+  30 ran, OK (83 subtests).
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M3.3 — Generic provenance and job hash
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:** M3.3 REVIEW_READY; M3 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Provenance** (`services.forward_builder.forward_job_provenance`, schema
+  `auto-id/forward-job/v1`, builder `auto-id/forward-builder/v1`). It records:
+  - the forward model id and manifest hash;
+  - the passport hash and identities (design, physical specimen, test run);
+  - the source INP name, SHA-256 and size;
+  - material role, name and elastic type;
+  - parameterisation, candidate and all nine constants;
+  - registration hash and eigenvalue request;
+  - generated INP SHA-256, size, job name and 1-based changed lines.
+
+  It records no machine path and no timestamp.
+- **Job hash:** the canonical SHA-256 of the provenance (`job_hash`).
+- **Job name:** content-addressed, `<job_prefix>_<first 16 hex of the generated SHA-256>`.
+  This is the accepted naming, so existing ODB names (for example
+  `SP02_f3e592281bebce66`) stay valid.
+- **Writing:** `prepare_forward_job` writes `<job_name>.inp` atomically. It refuses an
+  existing file with different content.
+- **Evaluation:** `prepare_forward_evaluation` makes one job per forward model for one
+  shared candidate. Its `evaluation_hash` covers schema, parameterisation, candidate
+  and each model's job hash. Duplicate forward models or job prefixes are refused.
+- **Equivalence:** on the synthetic model the job name, source and generated SHA-256,
+  registration hash, eigenvalue counts and constants equal the accepted builder's.
+  The generic provenance schema is new by design. Reproduction of the accepted
+  builder's historical provenance and evaluation hashes is checked in the M3.5
+  regression.
+- **Unchanged:** `src/services/shared_carbon_forward.py`, the regression oracle.
+- **Tests:** `tests/test_forward_builder.py` + `tests/test_forward_model_manifest.py`:
+  37 ran, OK (83 subtests).
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M3.4 — No SP02/SP13/`D:\Snadwich` hard-coding in the generic forward path
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:** M3.4 REVIEW_READY; M3 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Manifest-driven inputs (`services.forward_builder`):**
+  - `load_bound_forward_model(manifest_path, repo_root, fixtures)` loads a manifest
+    and its repository-relative pinned passport, then binds them.
+  - `read_reference_input(model, roots)` reads the reference INP only from its
+    configured store (`AUTO_ID_FIXTURE_ROOT_<STORE>`). It refuses an unconfigured
+    store, a missing file or a size mismatch. The SHA-256 is verified on the bytes
+    used.
+  - `prepare_forward_jobs(models, candidate, roots, output_directory)` takes explicit
+    forward models only; there are no default specimens.
+- **Where the old hard-coded values now live:**
+
+  | Accepted builder | Generic path |
+  |---|---|
+  | `sp02_forward_baseline` / `sp13_forward_baseline` | `docs/auto_id/forward_models/{SP02,SP13}.forward.json` |
+  | `D:\Snadwich\…` source paths | store + relative path |
+  | `_SP0x_SOURCE_INP_SHA256` | pinned `model_input` |
+  | material names | passport `materials.face` |
+  | eigenvalue counts | manifest `frequency_request` |
+  | `SP0x_REGISTRATION_HASH` | manifest `registration`, cross-checked with the fixture |
+
+- **Guard tests** (`tests/test_forward_builder_generic.py`):
+  - The generic modules contain no specimen, material, store or machine-path literal
+    and do not import the legacy builder.
+  - No builder entry point has a default.
+  - The accepted manifests hold no machine path.
+  - A never-seen third specimen (another store, material, prefix and eigenvalue
+    request) builds from manifest + store alone.
+- **Scope:**
+  - The accepted builder `src/services/shared_carbon_forward.py` keeps its hard-coded
+    values unchanged as the M3.5 regression oracle; it is not on the generic path.
+  - Historical SP13 evidence viewers (`sp13_evidence_adapter.py`,
+    `material_identification_*`) and the older `family_residual_service.py` are not
+    forward-builder code and are unchanged.
+- **Tests:** M3 suites 44 ran, OK (121 subtests).
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M3.5 — Byte-for-byte regression; M3 stage REVIEW_READY
+
+- **Stage:** M3 (SUPERVISOR-authorised batch M3.1–M3.5)
+- **Status:**
+  - M3.1–M3.5 REVIEW_READY.
+  - M3 stage REVIEW_READY.
+  - Not accepted by the worker.
+  - M4 not started.
+- **Branch:** `auto-id/m3`
+- **Commit:** the commit that introduces this entry.
+- **Regression anchors** (`docs/auto_id/forward_models/accepted_forward_jobs.json`):
+  - **Contents:** the 5 accepted CARBON-4C / CARBON-5A candidates (52000/4500,
+    49400/4500, 54600/4500, 52000/4275, 52000/4725 MPa) with, per specimen, the
+    archived generated INP SHA-256, the accepted provenance hash, the 1-based changed
+    lines and the evaluation hash.
+  - **Source:** `carbon-project-archive:carbon4c/step1_prepare.json` and
+    `carbon5a/prepare.json`, pinned by SHA-256.
+- **Stage gate** (`tests/test_m3_stage_gate.py`, real data, store `snadwich`;
+  skipped without it). For every archived candidate × SP02/SP13:
+  - the universal builder's bytes are identical to the live accepted builder
+    (`shared_carbon_forward.write_forward_job_inp`, unchanged since `121ba1d`) on the
+    same pinned reference INP;
+  - the generated SHA-256 and the changed-line numbers equal the archive;
+  - the job name equals the accepted name (the archived ODB names);
+  - the accepted `shared-carbon-forward-job/1` provenance hash and the evaluation hash,
+    rebuilt from the generic provenance, equal both the archive and the live builder.
+
+  End-to-end `prepare_forward_jobs` writes the archived baseline files and names
+  deterministically.
+- **Result:** **PASS** — 10/10 archived jobs byte-identical; 17 subtests OK.
+- **Extended check (one-off, read-only):** 12 further candidates × 2 specimens gave
+  24 / 24 byte-identical files. The candidates include awkward floats, 45000/4000,
+  100000/1000 and 1234.5678/9.875.
+- **Physics:** unchanged. The only changed lines are the carbon E1/E2/G12 record and,
+  for SP02, the accepted eigenvalue request 15 → 30. There is no INP metadata
+  difference.
+- **EVIDENCE.md:** new entry "M3 — Universal forward builder byte-for-byte
+  regression", PENDING SUPERVISOR REVIEW.
+- **Unchanged:** `src/services/shared_carbon_forward.py` (oracle), SPEC, DECISIONS,
+  the M0.2 fixture manifest, passports and registrations.
+- **Tests (Windows, Python 3.14.6):**
+  - **Full suite with stores:** 1136 ran; 1134 passed, 0 failures, 0 errors, 2 skipped
+    (opt-in Abaqus).
+  - **Full suite without stores:** 1134 ran; 1125 passed, 0 failures. Skipped: the
+    M3 gate class, the 2 Abaqus tests and 14 real-data subtests.
+  - **Linux CI:** recorded with the stage PR.
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR review of the M3 batch (stage PR `auto-id/m3` → `main`).
+
+## 2026-10-04 — M3 — Linux CI recorded; stage PR
+
+- **Stage:** M3 (REVIEW_READY; not accepted by the worker; M4 not started)
+- **Linux CI** on `3d86251` (ubuntu-latest, Python 3.11, run 37178115819): success.
+  - 1131 ran, OK, skipped=21.
+  - Skips: 14 data-store subtests, the M3 gate class (no `snadwich` store on CI),
+    2 opt-in Abaqus tests and 4 headless-Tk tests.
+- **Stage PR:** `auto-id/m3` → `main`. Not merged; merge only under HUMAN
+  authorisation.
+- **Abaqus run count:** 0

@@ -19,7 +19,19 @@ EVIDENCE > older roadmap/design/history documents (`docs/auto_id/README.md`).
 
 ## Work rules
 
-- One mini-step only: the one named in STATUS/ROADMAP.
+- **Default: one mini-step at a time**, the one named in STATUS/ROADMAP.
+- **Exception: a supervised stage batch.** When the SUPERVISOR explicitly authorises
+  a coherent batch of named mini-steps within one roadmap stage, the worker may
+  implement all of them without stopping between them. In such a batch:
+  - roadmap order is still preserved;
+  - each mini-step moves only `TODO → IN_PROGRESS → REVIEW_READY`;
+  - the worker never self-ACCEPTs a mini-step or the stage;
+  - no future stage may be started;
+  - the HUMAN gates for Abaqus, destructive git and merges to `main` are unchanged;
+  - the stage PR is created only after the whole authorised batch is `REVIEW_READY`;
+  - the worker then STOPS for SUPERVISOR review.
+
+  This changes execution granularity only; no scientific rule is relaxed.
 - Never skip roadmap order. Never invent the next stage.
 - Do not reopen global architecture audits unless a specific blocker demands it.
 - Small, coherent diffs. No unrelated refactor or opportunistic cleanup.

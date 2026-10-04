@@ -16,6 +16,11 @@ History: [CHANGELOG.md](CHANGELOG.md). Evidence: [EVIDENCE.md](EVIDENCE.md).
 
 **ONE MINI-STEP AT A TIME.**
 
+Exception: a SUPERVISOR-authorised batch of named mini-steps within one stage
+runs without stopping between mini-steps (see `CLAUDE.md` / `AGENTS.md`). Each
+mini-step still ends `REVIEW_READY` with its own commit; the worker STOPs after the
+whole batch.
+
 Every mini-step:
 
 ```
@@ -206,18 +211,19 @@ result and does not re-fit raw FRF.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M2.1 | `specimen_manifest` schema / domain / hash | `REVIEW_READY` |
-| M2.2 | Family / design / specimen / test-run identities with distinct keys `design_id`, `physical_specimen_id`, `test_run_id` | `REVIEW_READY` |
-| M2.3 | FrozenRegistration generated from physical calibration / passport | `REVIEW_READY` |
-| M2.4 | Registration uncertainty diagnostic (never optimisation) | `REVIEW_READY` |
-| M2.5 | Acquisition / remount linkage for Σ_setup | `REVIEW_READY` |
+| M2.1 | `specimen_manifest` schema / domain / hash | `ACCEPTED` |
+| M2.2 | Family / design / specimen / test-run identities with distinct keys `design_id`, `physical_specimen_id`, `test_run_id` | `ACCEPTED` |
+| M2.3 | FrozenRegistration generated from physical calibration / passport | `ACCEPTED` |
+| M2.4 | Registration uncertainty diagnostic (never optimisation) | `ACCEPTED` |
+| M2.5 | Acquisition / remount linkage for Σ_setup | `ACCEPTED` |
 
 **M2 GATE:** SP02/SP13 reproduce the accepted FrozenRegistration identities. The
 registration perturbation diagnostic never changes the chosen geometry by optimising
 MAC.
 
-Stage status: `REVIEW_READY` (M2.1–M2.5 `REVIEW_READY`; branch `auto-id/m2`, based on `main`
-`d001205`).
+Stage status: `ACCEPTED` (M2.1–M2.5 `ACCEPTED` by the SUPERVISOR; software / regression gate `PASS`;
+current SP02/SP13 production physical readiness `NOT_READY`).
+**M2 merged into `main`** (PR #28, merge commit `7af9038c5486560c5d2d0b6d571a354766e29d77`).
 
 **M2 gate evidence:**
 
@@ -259,15 +265,43 @@ Stage status: `REVIEW_READY` (M2.1–M2.5 `REVIEW_READY`; branch `auto-id/m2`, b
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M3.1 | Manifest-driven material location | `TODO` |
-| M3.2 | Generic candidate rewrite | `TODO` |
-| M3.3 | Generic provenance / job hash | `TODO` |
-| M3.4 | Remove production hard-coding of SP02, SP13, `D:\Snadwich` and specific machine paths from the generic Auto-ID path | `TODO` |
-| M3.5 | Regression against the current accepted shared-carbon builder | `TODO` |
+| M3.1 | Manifest-driven material location | `REVIEW_READY` |
+| M3.2 | Generic candidate rewrite | `REVIEW_READY` |
+| M3.3 | Generic provenance / job hash | `REVIEW_READY` |
+| M3.4 | Remove production hard-coding of SP02, SP13, `D:\Snadwich` and specific machine paths from the generic Auto-ID path | `REVIEW_READY` |
+| M3.5 | Regression against the current accepted shared-carbon builder | `REVIEW_READY` |
 
 **M3 GATE:** the generic builder reproduces the accepted SP02/SP13 reference INPs
 byte-for-byte, except any explicitly versioned metadata difference proven irrelevant.
 No physics change.
+
+Stage status: `REVIEW_READY` (branch `auto-id/m3`, based on `main` `7af9038`).
+M3.1–M3.5 run as one SUPERVISOR-authorised stage batch. No Abaqus. The accepted
+shared-carbon builder stays unchanged as the regression oracle.
+
+**M3 gate evidence:**
+
+| Gate | Result |
+|---|---|
+| Byte-for-byte regression against the accepted shared-carbon builder | **PASS** |
+| Physics change | none |
+
+- **Archived jobs:** for the 5 accepted CARBON-4C / CARBON-5A candidates × SP02/SP13
+  (10 jobs that were solved in Abaqus), the universal builder's INP bytes are
+  identical to the live accepted builder (`shared_carbon_forward`, unchanged since
+  `121ba1d`) on the same pinned reference INPs (`tests/test_m3_stage_gate.py`).
+- **Archived identities reproduced:** generated INP SHA-256, changed-line numbers,
+  the accepted provenance and evaluation hashes, and the job names (= archived ODB
+  names) ([forward_models/accepted_forward_jobs.json](forward_models/accepted_forward_jobs.json)).
+- **Extended check:** a one-off matrix of 12 further candidates × 2 specimens (awkward
+  floats, the M4 twin start 45000/4000, extremes) gave 24 / 24 identical files.
+- **Synthetic:** 8 INP variants × 7 candidates are identical to the accepted builder.
+- **Only E1/E2/G12 change:** the carbon record and, for SP02, the eigenvalue request
+  15 → 30 are the only changed lines. Mesh, geometry, core, density, adhesive and
+  ties are unchanged; a post-check enforces this on every job.
+- **Metadata:** none differs in the INP. The generic provenance schema
+  (`auto-id/forward-job/v1`) is new and versioned. It is a separate document, not
+  INP content, and it reproduces the accepted provenance hashes.
 
 ---
 
