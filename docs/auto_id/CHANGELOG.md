@@ -652,3 +652,1025 @@ SHA · files changed · scientific behaviour changed (YES/NO) · tests run · te
 - **Abaqus run count:** 0 (merge step and this record)
 - **Next gate:** create `auto-id/m1` and begin M1.1 only after SUPERVISOR
   authorization.
+
+## 2026-10-04 — M1 M1.1 — Identification input-source policy
+
+- **Stage:** M1
+- **Mini-step:** M1.1 (identification input-source policy; SPEC §4, D-002, AUDIT K1)
+- **Status:** REVIEW_READY. M1.2–M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree; based on `main` `9d30caf`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.1): enforce identification input source policy`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Policy:** `src/domain/modal_input_source.py` classifies experimental modes as
+  `curve_fitted`, `peak_derived` or `unknown`.
+  - It uses only the exact `mode_source` labels and dataset types the readers emit;
+    unrecognised labels are never guessed from substrings.
+  - **`curve_fitted`:** `curve-fitted modal dataset` and `curve-fitted dataset 55`, or
+    datasets 55/2414 without a label.
+  - **`peak_derived`:** `FRF peak-derived experimental shape`,
+    `dataset 58 FRF peak extraction`, `local response-matrix SVD close-mode candidate`,
+    or dataset 58. A dataset-58 type outranks a contradictory curve-fitted label.
+  - **Datasets:** every mode must be curve-fitted. One peak-derived mode or a
+    peak-derived dataset label makes the dataset `peak_derived`. Any unclassifiable
+    mode, an unknown dataset label, or an empty dataset makes it `unknown`.
+  - `require_identification_input` accepts only `curve_fitted`. It raises
+    `IdentificationInputSourceRefusal` for `peak_derived` (citing SPEC §4 / D-002 /
+    K1) and for `unknown`.
+  - That exception is deliberately neither `ValueError` nor `RuntimeError`, so
+    generic fallback handlers never catch it.
+- **Enforcement boundary:** `identify_stage_a` is the single production entry where
+  experimental modes enter identification; `uncertainty_service` reaches it too. The
+  policy check now runs there before any clustering, pairing or eigen-solve, and
+  applies with or without an injected pairing provider.
+  - The lifecycle runner (`material_identification_runner`) only calls injected
+    executors with typed evidence and has no live executor in `src`.
+  - Later Auto-ID orchestration (M4.6) must call the same domain function.
+- **Not changed:**
+  - Readers, peak extraction, CMIF, MAC, pairing, registration, Abaqus extraction,
+    thresholds and gates are unchanged.
+  - Normal modal comparison still accepts peak-derived modes. Peak-derived modes
+    remain available for viewing, diagnostics and QC.
+  - No raw-FRF fitting was started (M1.3).
+- **Files changed:**
+  - added `src/domain/modal_input_source.py`
+  - updated `src/services/stage_a_identification_service.py` (import, docstring, one
+    policy call at the identification entry)
+  - added `tests/test_modal_input_source.py` (14 tests)
+  - updated `tests/test_stage_a_identification_service.py`: the synthetic experiment
+    now declares itself a curve-fitted set (`dataset_type` 55, `mode_source`). Without
+    a label the new policy correctly refuses it as `unknown`; no assertion changed.
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1 IN_PROGRESS, M1.1 → REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** YES, for identification input only.
+  `identify_stage_a` now refuses peak-derived or unclassifiable experimental modes.
+  - Accepted evidence is unaffected: CARBON-4C/5A use PolyMAX curve-fitted sets
+    (D-002), and the real SP02/bravo-1 and SP13/best imports classify as
+    `curve_fitted`.
+  - Comparison results are unchanged.
+- **Tests (Windows):**
+  - New `test_modal_input_source`: 14 ran, OK. With the fixture store configured both
+    real fixtures are curve-fitted; without it, 2 subtests skip.
+  - What it covers:
+    - acceptance of the real reader's dataset-55 modal set and dataset-2414 modes;
+    - refusal of the real FRF peak extraction (`universal_frf_review`) and of CMIF SVD
+      candidates;
+    - five unknown cases;
+    - mixed sets, and a peak dataset type outranking a contradictory label;
+    - `identify_stage_a` accepting curve-fitted input and refusing peak-derived and
+      unknown input before any computation, also with an injected provider;
+    - comparison of peak-labelled modes giving identical pairs, status, MAC and
+      frequency error.
+  - Stage-A suites (`test_stage_a_identification_service`,
+    `test_uncertainty_and_stage_a_report`): 104 ran, OK.
+  - Full suite: 925 ran, 0 failures. With the store configured, 923 passed and 2
+    skipped (opt-in Abaqus); without it, 921 passed with the same 2 skipped tests plus
+    4 skipped real-data subtests.
+- **Abaqus run count:** 0
+- **Known limitations:** the policy guards the current production identification
+  entry. Later identification entry points must call `require_identification_input`.
+- **Next gate:** SUPERVISOR review of M1.1. M1.2 must not start before acceptance.
+
+## 2026-10-04 — M1 M1.1 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.1 (no new mini-step started)
+- **Status:** M1.1 ACCEPTED. M1 IN_PROGRESS. M1.2–M1.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `2fa48c27b6aa6b5c5e989d6a4523f21224403183` on `auto-id/m1`.
+- **Accepted scope:**
+  - The identification input-source policy is implemented: `curve_fitted` is
+    accepted; `peak_derived` and `unknown` are refused for identification.
+  - Normal modal comparison is unchanged, and peak-derived data remains available for
+    diagnostics/QC.
+  - The existing SP02/bravo-1 and SP13/best PolyMAX evidence remains valid.
+  - No Abaqus. No change to registration, MAC, pairing, thresholds or modal
+    algorithms.
+  - No raw-FRF fitting is implemented yet (M1.3).
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M1.1 input source policy`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M1.1 ACCEPTED; M1 stage status)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization to start M1.2. `main` is unchanged
+  (`9d30caf`).
+
+## 2026-10-04 — M1 M1.2 — PolyMAX fixture production path
+
+- **Stage:** M1
+- **Mini-step:** M1.2 (production PolyMAX dataset 55/2414 path)
+- **Status:** REVIEW_READY. M1.1 ACCEPTED. M1.3 and M1.4 TODO (M1.3 not
+  implemented).
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.2): enforce PolyMAX fixture production path`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **What was added:** `services.production_modal_input.load_production_modal_input`.
+  - **Single entry:** it is the only Auto-ID entry for experimental modes. A record is
+    selected only by `fixture_id` in the accepted M0.2 manifest; there is no free
+    file-path entry, and an unknown id raises `KeyError`.
+  - **Checks, all reused without duplication:**
+    - the M0.3 `verify_experiment_fixture` checks, run on the production reader
+      output (captured through its injectable loader): source store, size and
+      SHA-256; hash-sealed FrozenRegistration and its source, modal set and FE
+      geometry bindings; modal set; mode source; mode and point counts; measured-DOF
+      contract replay;
+    - then the M1.1 input-source policy on every mode.
+  - **Returned:** a `ProductionModalInput` with the reader's dataset unchanged
+    (frequencies, damping, node order, shapes), the FrozenRegistration, the report,
+    the source classification and a `provenance()` record.
+- **Refused:**
+  - wrong or missing source;
+  - wrong SHA-256;
+  - wrong modal set;
+  - wrong point count;
+  - wrong DOF contract, as a record or as imported data;
+  - a peak-derived dataset;
+  - a peak-derived or unclassifiable mode inside a fitted set.
+- **Real fixtures through the production path (Windows):**
+  - **SP02/bravo-1:** curve-fitted dataset 55, 9 modes, 121 points, U3, registration
+    `9bf736d3…`, FE `72e8597a…`, source `2671db01…`.
+  - **SP13/best:** 12 modes, 289 points, U3, `a8970e52…`, `34d69d79…`, `f2680235…`.
+  - The production dataset equals a direct reader load mode by mode: frequency,
+    damping, node order and shapes.
+- **Test refactor:** the M0.3 synthetic-fixture builder moved unchanged into
+  `tests/fixture_support.py`, a helper module with no `TestCase`. It is shared by
+  `test_experiment_fixture_regression.py` (same tests and assertions) and the new
+  tests.
+  - The synthetic modes now carry the reader's per-mode curve-fitted labels, so the
+    M1.1 policy sees realistic input.
+- **Files changed:**
+  - added `src/services/production_modal_input.py`
+  - added `tests/test_production_modal_input.py` (13 tests)
+  - added `tests/fixture_support.py`
+  - updated `tests/test_experiment_fixture_regression.py` (uses the shared helper)
+  - updated `docs/auto_id/fixtures/README.md` (production path section)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1.2 → REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO for existing paths. The new service is
+  not yet called by any existing code. Readers, peak extraction, modal algorithms,
+  registration, pairing, MAC, thresholds and `identify_stage_a` are unchanged.
+- **Tests (Windows):**
+  - New `test_production_modal_input`: 13 ran, OK. With the store configured the real
+    fixtures load; without it, 2 subtests skip.
+  - `test_experiment_fixture_regression`: 15 ran, OK, both with and without the store.
+  - Full suite: 938 ran, 0 failures. With the store, 936 passed and 2 skipped (opt-in
+    Abaqus); without it, 933 passed with the same 2 skipped tests plus 6 skipped
+    real-data subtests.
+- **Abaqus run count:** 0
+- **Known limitation (for a later step, not changed here):** production Stage-A
+  pairing (`_verified_experimental_source`) compares the registration's legacy
+  source identity, which includes the original path and modification time. It
+  therefore binds to the original machine location, while this production input
+  binds by store + SHA-256. Reconciling the two is outside M1.2.
+- **Next gate:** SUPERVISOR review of M1.2. M1.3 implementation must not start; a
+  design review follows separately.
+
+## 2026-10-04 — M1 — M1.3 design review added (docs only)
+
+- **Stage:** M1
+- **Mini-step:** none. This is a design review for M1.3, which stays `TODO`; M1.3 is
+  not implemented.
+- **Status:** M1.2 REVIEW_READY (`bc2ffce`). M1.3 TODO. M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): add M1.3 design review`
+- **Content:** `docs/auto_id/M1_3_DESIGN_REVIEW.md` covers:
+  - the purpose, and the current limitation (peak-derived and CMIF candidates are
+    refused; M1.2 accepts only PolyMAX fixtures);
+  - the proposed architecture: dataset 58 → FRF block → multi-mode fit →
+    content-hashed curve-fitted artifact → M1.1 policy (new label refused as
+    `unknown` until accepted) → M1.2 production input;
+  - code locations, interface sketches, required provenance and QC;
+  - the tests needed, including the SPEC §17 M1 gate on SP13 raw FRF;
+  - refusal conditions, non-goals and risks;
+  - nine decisions left to the SUPERVISOR: method family, bands, orders and
+    stabilisation, pole selection and human review, uncertainty model, QC
+    thresholds, raw-FRF fixtures, dependencies, and the M1.3/M1.4 split.
+  - No algorithm is chosen.
+- **Files changed:**
+  - added `docs/auto_id/M1_3_DESIGN_REVIEW.md`
+  - updated `docs/auto_id/ROADMAP.md` (pointer only; statuses unchanged)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (documentation only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR review of M1.2, and of the M1.3 design decisions before any
+  M1.3 implementation.
+
+## 2026-10-04 — M1 M1.2 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.2 (no new mini-step started)
+- **Status:** M1.2 ACCEPTED. M1 IN_PROGRESS. M1.1 ACCEPTED. M1.3 and M1.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commits
+  `bc2ffcec3ab5dee876545c2d20faa2bc19fc87cc` (M1.2) and
+  `ac1e0e30a7b69cf2c5601b5b649fe13478290725` (M1.3 design review) on `auto-id/m1`.
+- **Accepted scope:**
+  - The production PolyMAX fixture loading path is implemented, with fixture
+    identity taken from the M0.2 manifest.
+  - SHA, source, modal set, DOF and registration checks are enforced.
+  - SP02 bravo-1 and SP13 best are validated.
+  - The M1.1 source policy is reused, and peak-derived input remains refused.
+  - No Abaqus. No registration, pairing or modal-algorithm changes.
+- **M1.3 design review:** RECORDED ONLY. Not approved and not implemented; M1.3 stays
+  TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M1.2 PolyMAX production path`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/ROADMAP.md` (M1.2 ACCEPTED; M1 stage status; design-review note)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR decisions on the M1.3 design, and authorization to start
+  M1.3. `main` is unchanged (`9d30caf`).
+
+## 2026-10-04 — M1 — M1.3 modal input architecture frozen (docs only)
+
+- **Stage:** M1
+- **Mini-step:** none. M1.3 design decision freeze; M1.3 implementation NOT STARTED
+  and still `TODO`.
+- **Status:** M1.1 and M1.2 ACCEPTED. M1.3 design DESIGN_ACCEPTED. M1.3
+  implementation and M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): freeze M1.3 modal input architecture`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Decisions appended (SUPERVISOR):**
+  - **D-018:** no internal FRF→modal fitting in Auto-ID v1 production; only validated
+    curve-fitted datasets are accepted.
+  - **D-019:** curve-fitted datasets are the only production identification input;
+    peak-derived modes are forbidden.
+  - **D-020:** dataset-58 FRFs are QC and future fitting inputs only.
+  - **D-021:** future fitting goes through a replaceable `ModalFittingProvider`.
+  - **D-022:** human modal selection only in research/review workflows.
+- **Design review:** `M1_3_DESIGN_REVIEW.md` is marked DESIGN_ACCEPTED.
+  - A new section 0 records the approved architecture (FRF → QC → optional fitting
+    provider → validated curve-fitted dataset → Auto-ID), the decisions, the
+    provider interface intent and which open decisions remain.
+  - The original proposal is kept below and is superseded where it differs.
+- **Conflict recorded, not resolved:** D-018 conflicts with SPEC §4, §6 S1 and §17,
+  and with the ROADMAP M1 GATE (SP13 from raw FRF), all of which describe a built-in
+  fit. By precedence (SPEC > DECISIONS), the SUPERVISOR must resolve this by a SPEC
+  amendment or a redefined M1 gate before the M1 stage gate. The SPEC and the gate
+  text are unchanged.
+- **Files changed:**
+  - `docs/auto_id/DECISIONS.md` (D-018 to D-022 appended)
+  - `docs/auto_id/M1_3_DESIGN_REVIEW.md`
+  - `docs/auto_id/ROADMAP.md` (M1.3 design note; conflict note)
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO. No FRF processing changed and no fitting algorithm
+  was added.
+- **Tests run:** none (documentation only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR resolution of the D-018 / SPEC / M1-gate conflict, and
+  authorization of the next M1 step.
+
+## 2026-10-04 — M1 — M1.3 FRF fitting architecture resolved (docs only)
+
+- **Stage:** M1
+- **Mini-step:** none. This is a design decision resolution; M1.3 implementation is
+  NOT STARTED.
+- **Status:** M1.1 and M1.2 ACCEPTED. **M1.3 DESIGN_ACCEPTED**, implementation NOT
+  STARTED. M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree). Commit `13973b7` is kept, not reverted.
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): resolve M1.3 FRF fitting architecture`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **SUPERVISOR resolution of the conflict recorded in `13973b7`:**
+  - **D-023 (supersedes D-018):** FRF-to-modal fitting is a separate validated
+    experimental preparation stage. Auto-ID material identification does not directly
+    consume raw FRF.
+    - The stage may be an external or an internal `ModalFittingProvider`.
+    - Its output becomes production identification input only after provenance, QC,
+      source classification and fixture identity validation.
+  - **D-024 (supersedes D-020):** dataset-58 FRF records are valid modal-preparation
+    inputs, including future multi-mode fitting. They are not direct
+    material-identification observations.
+  - **Kept unchanged:** D-019 (peak-derived modes forbidden for production
+    identification), D-021 (replaceable `ModalFittingProvider`), D-022 (human mode
+    selection only in research/review).
+- **How "replace" was done:** `DECISIONS.md` is append-only, so D-018 and D-020 were
+  not edited. They are superseded by the appended D-023 and D-024, as the decision-log
+  rules require.
+- **Conflict removed:** a built-in fit is an internal provider in the preparation
+  stage. SPEC §4, §6 S1 and §17 and the ROADMAP M1 GATE are therefore consistent with
+  the decisions, and the gate validates an internal provider.
+  - The open-conflict note in ROADMAP and the `open_items` entry in STATUS.json are
+    removed. The SPEC and the gate text are unchanged.
+- **Status values:**
+  - ROADMAP M1.3 row: `DESIGN_ACCEPTED` (implementation NOT STARTED).
+  - STATUS.json: `m1.M1.3 = DESIGN_ACCEPTED`, `m1.M1.3_implementation = NOT_STARTED`.
+  - `DESIGN_ACCEPTED` is a SUPERVISOR-set design status, used as instructed.
+- **Files changed:**
+  - `docs/auto_id/DECISIONS.md` (D-023, D-024 appended)
+  - `docs/auto_id/M1_3_DESIGN_REVIEW.md` (section 0 rewritten for the resolved
+    architecture)
+  - `docs/auto_id/ROADMAP.md`
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (documentation only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization of the next M1 step.
+
+## 2026-10-04 — M1 M1.3.1 — ModalFittingProvider interface boundary
+
+- **Stage:** M1
+- **Mini-step:** M1.3.1 (first M1.3 implementation sub-step: the provider boundary
+  only)
+- **Status:** M1.3.1 REVIEW_READY. M1.3 design DESIGN_ACCEPTED; M1.3 implementation
+  IN_PROGRESS. M1.1 and M1.2 ACCEPTED. M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.3.1): add modal fitting provider interface`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **What was added:** `src/domain/modal_fitting.py`, the D-021/D-023 boundary with no
+  fitting algorithm.
+  - **`FrfInput`:** the validated H[response, reference, frequency] contract. It
+    requires a strictly increasing finite axis, matching shape, finite values, unique
+    keys, a declared quantity, consistent coherence and coherence status, and a source
+    SHA-256. It has a deterministic `content_hash`.
+  - **`ModalFittingProviderIdentity`:**
+    - name, version, kind (`external` / `internal`) and an exact `mode_source` label;
+    - a provider may not borrow a reader's curve-fitted label or a peak-derived label.
+  - **`ModalFittingProvider`:** a runtime-checkable protocol with an `identity`
+    attribute and `fit(frf, configuration)`.
+  - **`ModalFittingOutput`:**
+    - the `ModalDataset`;
+    - the provider identity;
+    - the provenance;
+    - a QC-summary placeholder (`status` in NOT_EVALUATED / PASSED / FLAGGED /
+      FAILED, filled by M1.4);
+    - per-mode confidence placeholders (`frequency_sd_hz`, `damping_sd`, `None` while
+      not evaluated).
+  - **`ModalFittingProviderRegistry`:** explicit, with no global state. The default is
+    empty, so no provider is admitted in v1.
+  - **`validate_fitting_output` / `run_modal_fitting`:** refuse with
+    `ModalFittingRefusal`, which is not a `ValueError` / `RuntimeError`. Refused:
+    - unknown, impersonating or non-protocol providers;
+    - output from another provider;
+    - a non-`ModalDataset`, empty or non-finite dataset, missing damping, inconsistent
+      points, or mislabelled modes;
+    - missing provenance (FRF source SHA-256, FRF content hash, configuration and its
+      hash, frequency band, pole selection);
+    - provenance that does not match the actual FRF input or configuration;
+    - a band outside the FRF axis;
+    - manual pole selection in a production workflow (D-022);
+    - a missing or invalid QC placeholder, or invalid confidence entries.
+- **Not production input yet (D-023):** a validated output records its M1.1
+  classification. A provider label is `unknown` until the SUPERVISOR admits it, so M1.1
+  still refuses it. It must also be pinned as a fixture and pass the M1.2 path.
+- **Not done (by instruction):**
+  - no fitting algorithm (no PolyMAX, RFP or stabilisation diagram);
+  - no pole selection;
+  - no dataset-58 processing into modes;
+  - no change to readers or identification;
+  - no adapter from the existing FRF builder yet.
+- **Files changed:**
+  - added `src/domain/modal_fitting.py`
+  - added `tests/test_modal_fitting.py` (20 tests; a mock provider returns a fixed
+    synthetic result and does no fitting)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1.3 implementation IN_PROGRESS; M1.3.1 REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO. The new module is not called by any
+  existing code.
+- **Tests (Windows):**
+  - New `test_modal_fitting`: 20 ran, OK. Coverage:
+    - the provider contract;
+    - that a validated output is not yet production input;
+    - unknown, empty-registry, impersonating, non-protocol and label-borrowing
+      providers;
+    - invalid outputs;
+    - missing and mismatched provenance;
+    - D-022 manual selection;
+    - the FRF input contract.
+  - Full suite: 958 ran, 0 failures. With the store configured, 956 passed and 2
+    skipped (opt-in Abaqus); without it, 953 passed with the same 2 skipped tests plus
+    6 skipped real-data subtests.
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR review of M1.3.1.
+
+## 2026-10-04 — M1 M1.3.1 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.3.1 (no new mini-step started)
+- **Status:** M1.3.1 ACCEPTED. M1.3 IN_PROGRESS (design DESIGN_ACCEPTED). M1.1 and
+  M1.2 ACCEPTED. M1.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `f77045d165784244ad731792035398b4e3217421` on `auto-id/m1`.
+- **Accepted scope:**
+  - The `ModalFittingProvider` boundary is created, with provider identity and
+    provenance contracts.
+  - The registry is explicit, with no global provider state; unknown providers remain
+    unadmitted.
+  - Manual production mode selection remains forbidden.
+  - No fitting algorithm is implemented. FRF processing, readers and identification
+    are unchanged.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept modal fitting provider interface`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json` (`m1.M1.3` now `IN_PROGRESS`, as instructed; design
+    acceptance kept in `M1.3_design_review`)
+  - `docs/auto_id/ROADMAP.md` (M1.3 row and stage status; M1.3.1 ACCEPTED)
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization of the next M1.3 sub-step. M1.3.2 must not
+  start automatically. `main` is unchanged (`9d30caf`).
+
+## 2026-10-04 — M1 — PolyMAX provider decisions resolved (docs only)
+
+- **Stage:** M1
+- **Mini-step:** none. This is a design decision resolution after the M1.3 blocking
+  report. M1.3 provider implementation is NOT STARTED.
+- **Status:**
+  - M1.1 and M1.2 ACCEPTED.
+  - **M1.3 design ACCEPTED** (`DESIGN_ACCEPTED`).
+  - M1.3 provider implementation NOT STARTED; the M1.3.1 interface boundary stays
+    ACCEPTED.
+  - M1.4 TODO.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): resolve PolyMAX provider decisions`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Decisions appended (SUPERVISOR).** D-018, D-020 and D-022 are not edited.
+  - **D-026 (supersedes D-022):** frozen external modal selections made by a
+    documented, hashed workflow may be production input. Live manual mode selection
+    during an identification run remains forbidden.
+  - **D-027:** the first production `ModalFittingProvider` is an external
+    PolyMAX-compatible adapter, with no new FRF fitting algorithm.
+  - **D-028:** M1 gates use fixture-specific reference values. For SP13 repeat-a these
+    are about 205.65 / 212.66 / 228.61 Hz, not the 2026-09-09 values 206.15 / 212.61 /
+    228.75 Hz.
+  - **D-029:** internal FRF fitting is a future provider, not required before the first
+    PolyMAX-compatible provider.
+- **Design review:** `M1_3_DESIGN_REVIEW.md` stays DESIGN_ACCEPTED.
+  - Section 0 now records the final architecture: Dataset-58 FRF → FRF preparation /
+    external PolyMAX-compatible provider → validated curve-fitted modal dataset → M1.1
+    source policy → M1.2 production loader → Auto-ID.
+  - It also records the decision table, implementation notes from the blocking
+    report, "M1.3 implementation is NOT STARTED", and "No unresolved conflict
+    remains".
+  - Implementation notes: FRFs and fit share one pinned export; damping comes from the
+    stored PolyMAX pole without a reader change; a frozen-external value for
+    `pole_selection` is needed; label admission is still required.
+- **ROADMAP:**
+  - the M1.3 row reads DESIGN_ACCEPTED with the provider implementation NOT STARTED;
+  - the final architecture and the next step are recorded;
+  - a D-028 reference-value note sits beside the M1 GATE, whose original text is
+    unchanged.
+- **STATUS.json:** `m1.M1.3 = DESIGN_ACCEPTED`, `m1.M1.3_implementation = NOT_STARTED`,
+  `m1.M1.3.1 = ACCEPTED`, and a new `next_action`.
+- **Files changed:**
+  - `docs/auto_id/DECISIONS.md`
+  - `docs/auto_id/M1_3_DESIGN_REVIEW.md`
+  - `docs/auto_id/ROADMAP.md`
+  - `docs/auto_id/STATUS.json`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO. No code files changed.
+- **Tests run:** none (documentation only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization for the PolyMAX provider implementation.
+
+## 2026-10-04 — M1 M1.3 — External PolyMAX modal preparation provider
+
+- **Stage:** M1
+- **Mini-step:** M1.3 (the first production `ModalFittingProvider`; D-026, D-027)
+- **Status:** M1.3 REVIEW_READY (design DESIGN_ACCEPTED; M1.3.1 interface ACCEPTED).
+  M1.1 and M1.2 ACCEPTED. M1.4 TODO, not started.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.3): implement external PolyMAX modal preparation provider`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Chain implemented** (`services.external_polymax_provider`):
+  1. **FRF preparation (`prepare_frf_input`):** the pinned export's dataset-58 FRFs
+     become an `FrfInput`, using the existing `cmif_separation` multi-reference block
+     builder unchanged. The quantity comes from the UFF spec types; both real exports
+     are `velocity/force`.
+  2. **`ExternalPolyMAXProvider.fit`:**
+     - The configuration is exactly `fixture_id`, `modal_set` and
+       `frequency_band_hz`.
+     - It refuses an unknown fixture, a modal set other than the frozen one, a band
+       outside the FRF axis or one that would trim a frozen mode, and FRFs from a
+       different export.
+     - It loads the frozen PolyMAX selection through M1.2 `load_production_modal_input`
+       and keeps frequencies, shapes, point order and measured DOFs.
+     - Damping comes from the stored dataset-55 pole, zeta = -Re(lambda)/|lambda|. The
+       provider checks that each pole reproduces the reader frequency exactly.
+     - Provenance holds the provider name and version, fitting method, fixture id,
+       modal set, source file identity (name, SHA-256, size, store path), FRF source
+       SHA-256 and content hash, quantity, coherence status, configuration and its
+       hash, band, `pole_selection = external_frozen_selection`, registration and FE
+       geometry hashes, measured DOFs, and damping source.
+     - QC hooks only: per mode, raw frequency resolution, 2*zeta*f and coherence at
+       resonance, with `status = NOT_EVALUATED`; M1.4 defines the policy. Confidence
+       fields are `None` because the export carries no uncertainty.
+  3. **Admission:** `admitted_provider_registry()` explicitly contains
+     `external-polymax` / `1` (external). Other providers stay refused.
+  4. **Validation:** the M1.3.1 `run_modal_fitting` checks, then the M1.1
+     `require_identification_input`.
+- **Accepted modules changed (minimal, required by D-026 and D-027):**
+  - **`domain/modal_input_source.py`:**
+    - the curve-fitted table is split into reader labels and admitted provider labels;
+    - `external PolyMAX modal preparation/1` is admitted;
+    - the classification rules are unchanged.
+  - **`domain/modal_fitting.py`:**
+    - `PoleSelection.EXTERNAL_FROZEN_SELECTION` is added. It is valid only for external
+      providers with a pinned `fixture_id`, `modal_set` and `source_file` (name and
+      SHA-256).
+    - Live `manual_review` stays refused in production (D-026).
+    - Provenance must name the producing provider (`provider_name` /
+      `provider_version`).
+    - Provider identities may not use reader or peak labels; admitted provider labels
+      are allowed.
+- **Real validation (Windows, data store configured):**
+  - **SP02/bravo-1:**
+    - 9 modes, 121 points, U3, registration `9bf736d3...`, FE `72e8597a...`;
+    - classified `curve_fitted`;
+    - frequencies 28.01 ... 219.44 Hz identical to M1.2;
+    - damping equals PolyMAX's stated values (mode 1 zeta = 0.2378 %);
+    - FRF frequency resolution 0.3125 Hz, coherence computed.
+  - **SP13/best:**
+    - 12 modes, 289 points, U3, registration `a8970e52...`, FE `34d69d79...`;
+    - classified `curve_fitted`;
+    - frequencies identical to M1.2, including 205.65 / 212.66 / 228.61 Hz;
+    - damping equals PolyMAX's stated values (mode 1 zeta = 0.2341 %);
+    - FRF frequency resolution 0.15625 Hz.
+  - **SP13 gate (D-028):** the fixture-specific references 205.65 / 212.66 /
+    228.61 Hz are reproduced within +/-0.05 Hz (they are the frozen PolyMAX values),
+    and no mode lies within 1 Hz of the known false 217.5 Hz peak. The old 206.15 /
+    212.61 / 228.75 Hz values are not used.
+  - **Deterministic:** repeated runs give identical provenance.
+- **Files changed:**
+  - added `src/services/external_polymax_provider.py`
+  - added `tests/test_external_polymax_provider.py` (17 tests)
+  - updated `src/domain/modal_fitting.py`
+  - updated `src/domain/modal_input_source.py`
+  - updated `tests/test_modal_fitting.py` (mock provenance names its provider; 3 D-026
+    tests added)
+  - updated `docs/auto_id/fixtures/README.md` (provider section)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1.3 -> REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:**
+  - **YES, admission:** a curve-fitted provider label is newly admitted to the M1.1
+    policy, and frozen external selections are accepted by the provider boundary
+    (D-026).
+  - **NO, everything else:** readers, FRF processing, peak extraction, pairing,
+    registration, identification, thresholds and gates are unchanged, and no existing
+    production path calls the provider. M1.2 output is unchanged.
+- **Tests (Windows):**
+  - `test_external_polymax_provider`: 17 ran, OK. With the store configured both real
+    fixtures pass the full chain; without it, 2 subtests skip.
+    - **Provider:** success, registry admission, provenance, determinism, QC hooks.
+    - **Refusals:**
+      - wrong SHA-256, wrong FRF, wrong fixture;
+      - wrong configuration: modal set, band outside the axis, band trimming a frozen
+        mode, extra key;
+      - wrong provider identity;
+      - missing provenance;
+      - wrong pole-selection type;
+      - a peak-derived source: an FRF-only export is refused by the reader with no
+        peak fallback, and a peak source type is refused by M1.2;
+      - an unknown source type;
+      - a mode without a stored pole.
+    - **Compatibility:** M1.1 policy.
+    - **Real-data regression:** SP02/SP13 compatibility, M1.2 equality, damping
+      against PolyMAX's text, determinism, and the D-028 gate.
+  - `test_modal_fitting`: 23 ran, OK.
+  - Full suite: 978 ran, 0 failures. With the store configured, 976 passed and 2
+    skipped (opt-in Abaqus); without it, 972 passed with the same 2 skipped tests plus
+    8 skipped real-data subtests.
+- **Abaqus run count:** 0
+- **Known limitations:**
+  1. **SP13 coherence.** The existing FRF builder reports SP13 coherence as
+     `unavailable` although the export holds 289 coherence records. The SP13
+     coherence-at-resonance hook is therefore `None`. FRF processing was not changed
+     (out of scope); recorded for M1.4.
+  2. **FRF-only exports.** These are refused through the reader's `ValueError` ("no
+     valid dataset-55 modal sets"), not a typed refusal, because the accepted M0.3
+     loader is unchanged.
+  3. **No raw-FRF recovery.** The provider reproduces the frozen PolyMAX result and
+     does not recover modes from raw FRF; that is future internal-provider work
+     (D-027, D-029).
+  4. **No uncertainty.** Confidence fields are `None` because the PolyMAX exports carry
+     no uncertainty.
+  5. **Legacy source identity in Stage-A pairing.** The Stage-A production pairing
+     limitation recorded in M1.2 is unchanged.
+- **Next gate:** SUPERVISOR review of M1.3. M1.4 must not start before authorization.
+
+## 2026-10-04 — M1 M1.3 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.3 (no new mini-step started)
+- **Status:** M1.3 ACCEPTED. M1 IN_PROGRESS. M1.1, M1.2, M1.3.1 and M1.3 ACCEPTED.
+  M1.4 TODO.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `4b8d73e48e2faaf8b284c148d25a687d584c69cd` on `auto-id/m1`.
+- **Accepted scope:**
+  - `ExternalPolyMAXProvider` is implemented, with no new fitting algorithm.
+  - Frozen external PolyMAX selections are supported (D-026 implemented).
+  - Provider provenance is implemented, and damping is recovered from the stored
+    pole.
+  - M1.1 compatibility and M1.2 fixture compatibility are verified.
+  - SP02 bravo-1 validation passed. SP13 best validation passed using the pinned
+    repeat-a values (D-028).
+  - No Abaqus. Registration, pairing, the identification solver and thresholds are
+    unchanged.
+- **Accepted limitations:**
+  - coherence evaluation is deferred to M1.4;
+  - internal FRF fitting remains a future provider;
+  - registration source path/timestamp reconciliation remains future work.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept external PolyMAX provider milestone`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Files changed:**
+  - `docs/auto_id/STATUS.json` (adds `m1.accepted_limitations`)
+  - `docs/auto_id/ROADMAP.md`
+  - `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR authorization to start M1.4. `main` is unchanged
+  (`9d30caf`).
+
+## 2026-10-04 — M1 M1.4 — Experimental QC subsystem
+
+- **Stage:** M1
+- **Mini-step:** M1.4 (experimental QC)
+- **Status:** M1.4 REVIEW_READY. M1.1, M1.2, M1.3.1 and M1.3 ACCEPTED.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M1.4): implement experimental QC subsystem`
+  (`git log --format=%H -1 -- docs/auto_id/CHANGELOG.md`)
+- **Domain (`src/domain/experimental_qc.py`):**
+  - `ExperimentalQCStatus`: PASS / WARNING / FAIL / NOT_AVAILABLE.
+  - `ExperimentalQCMetric`: a value of `None` means not available.
+  - `QCWarning`: code, check, modes, and the SPEC rule it comes from.
+  - `ExperimentalQCCheck`: carries `hard`; a diagnostic check cannot FAIL by
+    construction.
+  - `ExperimentalQCReport`: fixture id, modal source, provider identity, provenance
+    reference, checks, warnings, metrics, `not_available`, policy, overall status,
+    `admissible`, and a deterministic `content_hash`.
+  - `ExperimentalQCRefusal`: raised for a hard failure; it is not a `ValueError` /
+    `RuntimeError`.
+- **Service (`src/services/experimental_qc.py`):**
+  - `evaluate_experimental_qc(validated, frf, fixture)` builds the report and only
+    reads the dataset.
+  - `prepare_auto_id_experimental_input(fixture_id)` integrates QC after M1.3:
+    M1.2 loader → `ExternalPolyMAXProvider` → M1.1 → QC.
+  - It returns the provider dataset unchanged plus the report. It refuses only on a
+    hard failure, and M1.1 and M1.2 are not bypassed.
+- **Checks:**
+  1. **`provenance` (hard):**
+     - the provider is admitted and the required provenance keys are present
+       (including the D-026 frozen-selection keys);
+     - fixture id, source SHA-256, FRF content hash, configuration hash, registration
+       hash and the dataset label are consistent.
+  2. **`measurement_contract` (hard):**
+     - the FrozenRegistration restores with the pinned hash;
+     - mode and point counts, modal set, shared point list and point order match the
+       registration;
+     - the frozen DOF contract equals the fixture's, and every mode's measured-DOF
+       mask (production `experimental_measurement_masks`) equals the frozen contract;
+     - shapes are finite.
+  3. **`frf_completeness`:** the FRF source identity is hard. Missing or empty
+     channels and an FRF point-count mismatch are warnings. Channel, point, line and
+     band metrics are recorded.
+  4. **`coherence_quality` (diagnostic):** coherence at resonance below 0.9 is flagged
+     (SPEC §6 S1). Missing coherence gives `NOT_AVAILABLE` plus a warning, never
+     FAIL.
+  5. **`frequency_resolution` (diagnostic):**
+     - Δf and its non-uniformity; per mode the half-power bandwidth 2ζf and the
+       bandwidth in lines; per adjacent pair the gap in Hz, relative and in lines, plus
+       the modal overlap.
+     - Flags: unresolved resonance 2ζf < 3Δf (SPEC §6 S1), close modes |Δf|/f < 3 %
+       (SPEC §12.4, "only a trigger"), and damping not available.
+  6. **`modal_confidence` (diagnostic):**
+     - frequency, damping and shape uncertainty are recorded as `NOT_AVAILABLE` when
+       the source has none; nothing is fabricated;
+     - damping ratio;
+     - phase collinearity as a metric only (the SPEC gives no limit);
+     - experimental AutoMAC off-diagonal > 0.5 flagged (SPEC §6 S1).
+  - **No other threshold is applied.**
+- **Real fixtures (Windows, data store configured):**
+  - **SP02/bravo-1:**
+    - overall WARNING, admissible; provenance, contract and FRF completeness PASS;
+    - coherence PASS: computed, every mode ≥ 0.917 at resonance;
+    - resolution WARNING: Δf 0.3125 Hz, modes 1–8 unresolved by 2ζf < 3Δf, and modes
+      4/5 close (90.57 / 91.95 Hz);
+    - modal confidence NOT_AVAILABLE (no uncertainty in the export);
+    - AutoMAC maximum off-diagonal 0.043.
+  - **SP13/best:**
+    - overall WARNING, admissible; provenance, contract and FRF completeness PASS;
+    - coherence NOT_AVAILABLE (the FRF builder reports coherence unavailable; reader
+      not modified);
+    - resolution WARNING: Δf 0.15625 Hz, modes 1–5 unresolved, close pairs 4-5, 9-10
+      and 10-11;
+    - modal confidence NOT_AVAILABLE;
+    - AutoMAC maximum off-diagonal 0.426.
+  - **Metrics available on both:** FRF channels, points, lines and band; Δf;
+    bandwidths; mode gaps and modal overlap; damping; phase collinearity; AutoMAC.
+    SP02 also has coherence at resonance.
+  - **Metrics not available:** coherence at resonance (SP13); frequency, damping and
+    shape uncertainty (both).
+- **Files changed:**
+  - added `src/domain/experimental_qc.py`
+  - added `src/services/experimental_qc.py`
+  - added `tests/test_experimental_qc.py` (18 tests)
+  - updated `tests/test_external_polymax_provider.py` (`synthetic_export` gains an
+    optional `with_coherence`)
+  - updated `docs/auto_id/fixtures/README.md` (QC section)
+  - updated `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`
+    (M1.4 → REVIEW_READY)
+  - updated `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO for existing paths.
+  - QC is new and observes only.
+  - The provider, readers, FRF processing, registrations, pairing, identification
+    mathematics and the solver are unchanged.
+  - The new chain `prepare_auto_id_experimental_input` adds a refusal only for hard
+    QC failures (broken provenance, fixture identity or measurement contract).
+- **Tests (Windows):**
+  - New `test_experimental_qc`: 18 ran, OK, with real fixtures when the store is
+    configured. Coverage:
+    - **core:** valid report, determinism, provenance preserved, dataset untouched;
+    - **hard failures:** missing source, invalid fixture, invalid DOF contract,
+      broken provenance (FRF hash, missing source file, configuration hash,
+      unadmitted provider), wrong FRF source, refusal raised by the chain;
+    - **diagnostics:** missing coherence, unavailable uncertainty and AutoMAC, close
+      modes, insufficient resolution, missing damping, low coherence, phase
+      collinearity, a diagnostic check unable to FAIL;
+    - **regression:** SP02 and SP13 QC, M1.3/M1.2 compatibility, determinism.
+  - **Test-order note:** the DOF-contract test sets an explicit measured mask. When
+    the app's `install_*` layers are active in the same process (as in the full
+    suite), the reader attaches explicit masks, which take precedence over vector
+    data.
+  - Full suite: 996 ran, 0 failures. With the store configured, 994 passed and 2
+    skipped (opt-in Abaqus); without it, 989 passed with the same 2 skipped tests
+    plus 10 skipped real-data subtests.
+- **Abaqus run count:** 0
+- **Limitations (not claimed):**
+  - no automatic mode rejection: QC never removes modes;
+  - no complete uncertainty estimation: uncertainty is reported as available or
+    `NOT_AVAILABLE`;
+  - no universal QC thresholds: only the SPEC flag rules above, as warnings, pending
+    scientific validation;
+  - phase complexity has no limit;
+  - SP13 coherence evaluation is limited by the unchanged FRF builder.
+- **Next gate:** SUPERVISOR review of M1.4.
+
+## 2026-10-04 — M1 M1.4 — Supervisor acceptance recorded
+
+- **Stage:** M1
+- **Mini-step:** acceptance record for M1.4 (no new mini-step started)
+- **Status:** M1.4 ACCEPTED. M1.1, M1.2, M1.3.1 and M1.3 ACCEPTED. M1 stage closure
+  follows separately.
+- **Review basis:** the SUPERVISOR reviewed commit
+  `c411bb9842fbdb6feb546fbdf3cbf3ae7ba6634f` on `auto-id/m1`.
+- **Accepted scope:**
+  - The experimental QC subsystem is implemented. QC is observational and never
+    modifies modal datasets.
+  - Provenance, fixture identity and the measurement contract are hard checks.
+    Coherence, frequency resolution, the close-mode trigger, AutoMAC and phase
+    complexity are diagnostic.
+  - `NOT_AVAILABLE` remains explicit, and no uncertainty values are invented.
+  - SP02/bravo-1 and SP13/best pass all hard checks.
+  - No Abaqus. No pairing, registration or identification-solver changes.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept M1.4 experimental QC`
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`,
+  `docs/auto_id/CHANGELOG.md` (this entry)
+- **Scientific runtime behaviour changed:** NO
+- **Production code changed:** NO
+- **Tests run:** none (status record only)
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M1 — Stage-closure verification; M1 BLOCKED_SPEC_GATE
+
+- **Stage:** M1 (stage closure)
+- **Status:** M1.1, M1.2, M1.3.1, M1.3 and M1.4 ACCEPTED. **M1 stage
+  `BLOCKED_SPEC_GATE`.** M2 NOT STARTED. No stage PR created.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commits in this closure:**
+  - `b41af39` — M1.4 acceptance record.
+  - `f5279dd` — `tests/test_m1_stage_gate.py`.
+  - The commit that introduces this entry — M1 gate rewrite and stage state.
+- **M1 gate text rewritten (ROADMAP)** without changing scientific intent:
+  - fixture-specific references (D-028);
+  - the old 206.15 / 212.61 / 228.75 Hz values marked as historical (2026-09-09
+    acquisition);
+  - **Gate A**, the external PolyMAX provider: **PASS**;
+  - **Gate B**, raw-FRF recovery by an internal provider: **not claimed**, future
+    work (D-029);
+  - the external provider is stated explicitly not to re-fit raw FRF.
+- **Gate A evidence** (Windows, data store configured; `test_m1_stage_gate`, plus the
+  per-milestone real-data tests):
+  - **SP02/bravo-1:**
+    - source SHA-256 `2671db01…`, modal set `bravo-1`, 9 modes, 121 points, U3;
+    - registration `9bf736d3…`, FE `72e8597a…`;
+    - provider `external-polymax/1`, `external_frozen_selection`, damping equals the
+      stored poles;
+    - QC overall WARNING, with provenance, contract and FRF completeness PASS;
+    - dataset identical to M1.2 and unchanged through QC;
+    - the real FRF peak path (26 candidates) is refused by M1.1.
+  - **SP13/best:**
+    - source SHA-256 `f2680235…`, modal set `best`, 12 modes, 289 points, U3;
+    - registration `a8970e52…`, FE `34d69d79…`;
+    - provider and damping as for SP02;
+    - QC overall WARNING, hard checks PASS (coherence NOT_AVAILABLE);
+    - D-028 references 205.65 / 212.66 / 228.61 Hz reproduced, no mode within 1 Hz of
+      217.5 Hz;
+    - the real FRF peak path (22 candidates; 205.62 / 212.66 / 222.66 / 228.59 Hz in
+      195–235 Hz, 230.89 Hz missed) is refused by M1.1.
+- **Why the stage is blocked.** SPEC §4, footnote to `modes.unv`: "If `modes.unv` is absent and only `frf.unv` exists, modes are built by the built-in **multi-mode** fit (stage M1)."
+  - This normative sentence assigns the built-in multi-mode fit (FRF-only packages) to
+    stage M1. The accepted M1 refuses FRF-only packages, and D-029 defers internal
+    fitting.
+  - By document precedence, SPEC (1) outranks DECISIONS (2), so no new decision can
+    supersede it. The SPEC's own mechanism is a SUPERVISOR clarification in §19.
+  - The §17 M1 row ("built-in multi-mode fit"; "SP13 from raw FRF … found") conflicts
+    too, although §17 labels its criteria archival.
+  - §6 S1 ("dataset 55 (priority) or the built-in multi-mode fit") is satisfied.
+- **Proposed SPEC §19 clarification** (for SUPERVISOR decision; not applied):
+
+**4. Modal preparation stage and the M1 gate (D-023, D-027, D-028, D-029).**
+The built-in multi-mode fit named in §4 (footnote to `modes.unv`), §6 S1 and the §17 M1
+row is an internal `ModalFittingProvider` of the separate modal preparation stage
+(D-023). It is future provider work (D-029) and not a condition for closing stage M1.
+
+Stage M1 closes on the external PolyMAX-compatible provider (D-027). Its conditions:
+- the pinned FRF and the frozen PolyMAX selection come from the same accepted export;
+- fixture and source provenance is exact;
+- the provider reproduces the frozen modal dataset, with damping from the stored
+  poles;
+- no peak-derived input enters identification;
+- the experimental QC hard checks pass.
+
+Until an internal provider is accepted, a package with only `frf.unv` is refused.
+
+M1 gate reference values are fixture-specific (D-028). For SP13 repeat-a (`SP13/best`)
+they are about 205.65 / 212.66 / 228.61 Hz. The §17 values 206.15 / 212.61 Hz belong
+to the 2026-09-09 acquisition.
+
+The raw-FRF recovery criterion of the §17 M1 row becomes the acceptance gate of the
+first internal provider.
+
+- **Tests:**
+  - **Focused M1 suites** (fixture, regression, source policy, production input,
+    modal fitting, provider, QC, stage gate, Stage-A identification, discovery guard),
+    store configured: 211 ran, OK.
+  - **Full Windows suite** (Python 3.14.6): 997 ran, 0 failures. With the store
+    configured, 995 passed and 2 skipped (opt-in Abaqus). Without it, 989 passed with
+    2 skipped tests and 12 skipped real-data subtests.
+  - **Linux CI** on `f5279dd` (ubuntu-latest, Python 3.11, run 37164499562): 994 ran,
+    OK, skipped=18.
+    - 12 real-fixture subtests: 6 real-data tests × 2 fixtures, no store on CI;
+    - 2 opt-in Abaqus tests;
+    - 4 headless-Tk skips, one of them class-level.
+    - These are the categories classified in M0.4; none are new.
+- **Scientific runtime behaviour changed:** NO (documentation and tests only)
+- **Abaqus run count:** 0
+- **Next gate:** SUPERVISOR resolution of `BLOCKED_SPEC_GATE`. No M1 stage PR before
+  then. M2 not started.
+
+## 2026-10-04 — M1 — Final closure: SPEC §19 items 4–5, suspension-aware QC, M1 ACCEPTED
+
+- **Stage:** M1 (final stage closure)
+- **Status:** M1.1, M1.2, M1.3 and M1.4 ACCEPTED. **M1 Gate A PASS. M1 Gate B
+  `FUTURE_INTERNAL_PROVIDER`. M1 stage ACCEPTED** (SUPERVISOR-authorized conditional
+  closure). `BLOCKED_SPEC_GATE` is removed. M2 NOT STARTED.
+- **Branch:** `auto-id/m1` (separate worktree)
+- **Commits:**
+  - `ef95cbe` — `auto-id(M1.4): add suspension-aware QC and mode eligibility`.
+  - The commit that introduces this entry — the normative SPEC amendment and the
+    stage-closure documents.
+- **SPEC §19 (normative; SUPERVISOR-authorized):**
+  - **Item 4, M1 modal-preparation scope and staged internal fitting:**
+    - Auto-ID never consumes raw FRF.
+    - Fitting is a separate stage behind `ModalFittingProvider`.
+    - The first provider is the external frozen PolyMAX-compatible provider.
+    - FRF-only packages are refused until an internal provider is implemented,
+      admitted and validated. An internal fitter is not an M1 closure condition.
+    - The §17 raw-FRF recovery criterion is the gate of the first internal provider.
+    - Peak-derived modes are prohibited without exception.
+    - Fixture references are not mixed; SP13/best is about 205.65 / 212.66 /
+      228.61 Hz, and the 2026-09-09 values are historical.
+    - It supersedes the earlier stage-assignment wording of §4, §6 S1 and §17 where
+      they differ. The historical text is unchanged.
+  - **Item 5, suspension threshold ownership:**
+    - `suspension_max_hz` is a physical passport / acquisition property (M2) and is
+      never guessed.
+    - The §4.1 example value 18.0 is illustrative, not a default.
+    - QC evaluates the threshold when a trusted value exists, and is `NOT_AVAILABLE`
+      otherwise.
+    - Modes below the threshold must not enter material identification once M2
+      supplies it.
+    - M1 closes without inventing the value; one-button readiness needs M2.
+- **DECISIONS:** D-030 and D-031 appended for traceability. Earlier entries are
+  unchanged.
+- **Suspension-aware QC (`ef95cbe`):**
+  - **`TrustedSuspensionThreshold`:** a finite positive value plus its documented
+    physical source. It is the only accepted input; nothing infers the value from
+    modal or FE frequencies, and there is no default.
+  - **QC check `suspension_threshold` (diagnostic):** `NOT_AVAILABLE` without a
+    trusted value. With one, it reports the threshold, the modes below it and the
+    lowest mode at or above it.
+  - **`ExperimentalModeEligibility`:** kept separate from the observational QC
+    report, on `AutoIDExperimentalInput`.
+    - `identification_dataset()` is the explicit view without the excluded modes.
+    - `require_eligible()` raises `ExperimentalModeEligibilityRefusal`.
+    - The provider dataset is never changed.
+  - **`prepare_auto_id_experimental_input`** takes an optional
+    `suspension_threshold`. The M0.2 manifest is not changed.
+- **M1 gate (ROADMAP) rewritten:**
+  - **Gate A**, the initial production modal-input layer, has explicit conditions,
+    including honest suspension handling: **PASS**.
+  - **Gate B**, the first internal provider, keeps the original raw-FRF scientific
+    requirement: `FUTURE_INTERNAL_PROVIDER`, not passed.
+- **Stage verification** (`test_m1_stage_gate`, Windows, data store configured): the
+  chain is manifest → M1.1 → M1.2 → M1.3 → M1.4 QC → mode eligibility → Auto-ID
+  input.
+  - **SP02/bravo-1:**
+    - source SHA-256 `2671db01…`, modal set `bravo-1`, 9 modes, 121 points, U3;
+    - registration `9bf736d3…`, FE `72e8597a…`;
+    - `external-polymax/1` with `external_frozen_selection`, damping equals the
+      stored poles;
+    - QC hard checks PASS, suspension `NOT_AVAILABLE`, all modes eligible pending M2;
+    - dataset unchanged and equal to M1.2;
+    - real peak-derived modes refused;
+    - deterministic.
+  - **SP13/best:**
+    - source SHA-256 `f2680235…`, modal set `best`, 12 modes, 289 points, U3;
+    - registration `a8970e52…`, FE `34d69d79…`;
+    - provider and damping as for SP02;
+    - QC hard checks PASS, coherence and suspension `NOT_AVAILABLE`;
+    - D-028 references 205.65 / 212.66 / 228.61 Hz reproduced, no mode within 1 Hz of
+      217.5 Hz;
+    - real peak-derived modes refused;
+    - deterministic.
+- **Tests:**
+  - **`test_experimental_qc`:** 27 tests, 9 of them new suspension tests. They cover:
+    - an absent threshold giving `NOT_AVAILABLE`;
+    - a supplied threshold identifying the modes below it;
+    - a threshold below all modes giving PASS;
+    - identification blocking modes below the threshold;
+    - the dataset staying unchanged;
+    - no inference from modal frequencies;
+    - no FE input, and untrusted plain values refused;
+    - a trusted threshold requiring a physical source;
+    - deterministic reports.
+  - **`test_m1_stage_gate`:** now also checks suspension `NOT_AVAILABLE`, full
+    eligibility and determinism.
+  - **Focused M1 suites, store configured:** 220 ran, OK.
+  - **Full Windows suite** (Python 3.14.6): 1006 ran, 0 failures. With the store
+    configured, 1004 passed and 2 skipped (opt-in Abaqus). Without it, 998 passed
+    with 2 skipped tests and 12 skipped real-data subtests.
+  - **Linux CI** on `ef95cbe` (ubuntu-latest, Python 3.11, run 37167897161): 1003
+    ran, OK, skipped=18 — 12 real-fixture subtests, 2 opt-in Abaqus, 4 headless Tk.
+    These are the categories classified in M0.4.
+- **Accepted limitations:**
+  - historical fixtures have suspension `NOT_AVAILABLE` until M2;
+  - SP13 coherence is `NOT_AVAILABLE` with the unchanged FRF builder;
+  - the exports carry no modal uncertainty;
+  - internal fitting is future work (Gate B);
+  - registration source path/timestamp reconciliation remains future work;
+  - there is no automatic mode rejection beyond the explicit suspension eligibility,
+    and no universal QC thresholds.
+- **Scientific runtime behaviour changed:**
+  - **YES, for the Auto-ID input only:** a trusted suspension threshold now excludes
+    modes below it from `identification_dataset()`.
+  - **NO, everything else:** no trusted value exists yet, so the historical fixtures
+    are unaffected. Readers, the provider, registration, pairing and identification
+    are unchanged.
+- **Abaqus run count:** 0
+- **Next gate:** the M1 stage PR (`auto-id/m1` → `main`) merges only under explicit
+  HUMAN authorization. Afterwards, record the main merge SHA. M2 starts only on
+  SUPERVISOR authorization.

@@ -125,3 +125,82 @@ To run the real-data regression locally:
 set AUTO_ID_FIXTURE_ROOT_SNADWICH=<local root of the snadwich store>
 python -m unittest tests.test_experiment_fixture_regression -v
 ```
+
+## Production path (M1.2)
+
+`services.production_modal_input.load_production_modal_input(fixture_id, roots=...)`
+is the only way Auto-ID takes experimental modes. A record is selected by its
+`fixture_id` in this manifest; there is no free file-path entry.
+
+1. It runs the M0.3 `verify_experiment_fixture` checks on the production reader output.
+2. It applies the M1.1 input-source policy to every mode, so a peak-derived or
+   unclassifiable mode is refused even inside a fitted set.
+3. It returns a `ProductionModalInput`:
+   - the reader's dataset, unchanged (frequencies, damping, node order, shapes);
+   - the hash-sealed `FrozenRegistration`;
+   - the verification report;
+   - the source classification;
+   - a `provenance()` record (fixture, source SHA-256 and store path, modal set,
+     mode source, counts, measured DOFs, registration and FE geometry hashes).
+
+Tests: `tests/test_production_modal_input.py`. The real-data test iterates the
+manifest. The refusal cases use the shared synthetic workspace in
+`tests/fixture_support.py`, so they also run in CI.
+
+## External PolyMAX provider (M1.3)
+
+`services.external_polymax_provider.prepare_external_polymax_modal_dataset(fixture_id)`
+runs the modal preparation chain for an accepted fixture. Steps:
+
+1. It prepares the FRFs: the pinned export's dataset-58 FRFs are turned into an
+   `FrfInput` by the existing multi-reference FRF builder.
+2. It runs `ExternalPolyMAXProvider`. The provider loads the frozen PolyMAX selection
+   through the M1.2 production path and keeps frequencies, shapes, point order and
+   measured DOFs unchanged.
+   - Damping is PolyMAX's own estimate, read from the stored dataset-55 pole.
+   - The provenance includes `pole_selection = external_frozen_selection` (D-026).
+3. It checks admission (`admitted_provider_registry()`) and validates the output
+   against the M1.3.1 boundary rules.
+4. It applies the M1.1 policy. The provider label
+   `external PolyMAX modal preparation/1` is admitted as curve-fitted.
+
+No FRF fitting, pole extraction or peak picking takes place (D-027). Tests:
+`tests/test_external_polymax_provider.py`. The real-data test iterates the manifest.
+
+## Experimental QC (M1.4)
+
+`services.experimental_qc.prepare_auto_id_experimental_input(fixture_id)` runs the
+full experimental input chain:
+
+1. the M1.2 production loader, wrapped by the M1.3 `ExternalPolyMAXProvider`;
+2. the M1.1 input-source policy;
+3. `evaluate_experimental_qc`, which produces an `ExperimentalQCReport`.
+
+It returns the provider dataset unchanged together with the report. QC only reads
+the data and never modifies, reorders or deletes modes.
+
+| Check | Kind | Rule |
+|---|---|---|
+| `provenance` | hard | provider admitted; provenance keys; fixture, source, FRF content, configuration and registration hashes |
+| `measurement_contract` | hard | registration restorable; mode and point counts; point order; measured-DOF contract (production mask function); finite shapes |
+| `frf_completeness` | hard for source identity only | channel coverage, empty channels and point count are warnings |
+| `coherence_quality` | diagnostic | coherence at resonance < 0.9 (SPEC §6 S1); `NOT_AVAILABLE` when the FRF builder has no coherence |
+| `frequency_resolution` | diagnostic | 2ζf < 3Δf unresolved resonance (SPEC §6 S1); close modes |Δf|/f < 3 % as a cluster trigger (SPEC §12.4); Δf, bandwidth and overlap metrics |
+| `modal_confidence` | diagnostic | frequency, damping and shape uncertainty (`NOT_AVAILABLE` when the source has none); phase collinearity (metric only); AutoMAC off-diagonal > 0.5 (SPEC §6 S1) |
+| `suspension_threshold` | diagnostic | modes below a **trusted** physical `suspension_max_hz` (SPEC §6 S1, §19 item 5); `NOT_AVAILABLE` without one; never guessed |
+
+- **Overall status:** `FAIL` only if a hard check fails, which raises
+  `ExperimentalQCRefusal`; otherwise `WARNING` if any check warns, else `PASS`.
+- **`NOT_AVAILABLE`:** never degrades the overall status; such items are listed in
+  `not_available`.
+- **Report identity:** the report is deterministic and has a `content_hash`.
+
+**Suspension threshold and eligibility (SPEC §19 item 5).**
+- `prepare_auto_id_experimental_input(..., suspension_threshold=TrustedSuspensionThreshold(value, source))`
+  accepts only a documented physical value. The M2 passport supplies it.
+- The result's `eligibility` lists eligible and excluded modes.
+- `identification_dataset()` is the explicit view that material identification must
+  use. It leaves out modes below the trusted threshold, and `require_eligible()`
+  refuses them. The provider `dataset` is never changed.
+- The historical SP02/SP13 fixtures have no accepted value, so their suspension QC is
+  `NOT_AVAILABLE`.

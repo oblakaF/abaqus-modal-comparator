@@ -18,6 +18,7 @@ from typing import Callable, Mapping, Sequence, Tuple
 import numpy as np
 
 from coordinate_calibration import CoordinateCalibration
+from domain.modal_input_source import require_identification_input
 from domain.modal_observation import InclusionStatus, ModalCluster, ModalObservation
 from domain.parameter_model import ParameterPrior
 from domain.registration import FrozenRegistration, RegistrationMismatchError
@@ -1524,6 +1525,10 @@ def identify_stage_a(
     ``StageAProductionPairingRefusal`` always propagates: a frozen-contract
     violation never becomes a fixed-pair fallback.
 
+    Only curve-fitted experimental modes are identification input (SPEC §4,
+    D-002): peak-derived or unclassifiable modes raise
+    ``IdentificationInputSourceRefusal`` before any computation.
+
     A rank-deficient fitted subset is a hard block.
     ``solver_configuration.allow_non_identifiable_subset`` only overrides the
     condition-number and collinearity (gamma) limits of a full-rank subset, and
@@ -1540,6 +1545,7 @@ def identify_stage_a(
         raise TypeError("parameter_bounds must be StageAParameterBounds.")
     if not isinstance(solver_configuration, InverseSolverConfiguration):
         raise TypeError("solver_configuration must be InverseSolverConfiguration.")
+    require_identification_input(comparison.experimental)
     policy = campaign_policy or StageACampaignPolicy()
     requested = tuple(str(item).strip() for item in requested_parameter_subset)
     if not requested or len(set(requested)) != len(requested):
