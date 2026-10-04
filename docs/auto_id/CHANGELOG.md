@@ -2345,3 +2345,37 @@ first internal provider.
 - **Unchanged:** `modal_cluster_service.py`, `family_residual_service.py` (not
   imported), and the M3 contracts.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.5 — FE-to-FE branch tracker
+
+- **Stage:** M4 first development batch
+- **Status:** M4.5 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.branch_tracker`** (SPEC §12.1, D-008, AUDIT V4):
+  - `FEModalState` holds the modes of one solved state on one node/DOF set, with the
+    FE geometry and node-set identities.
+  - `track_branches(policy, reference, candidate, rows, clusters, weights)`:
+    - follows each frozen row (row → reference FE mode) by **FE-to-FE MAC only**;
+    - requires MAC ≥ the policy's `tracking_minimum_mac` (0.90) and a unique
+      assignment;
+    - follows confirmed 2-mode clusters as a subspace (exactly one candidate pair with
+      both cos² > 0.95);
+    - optional mass weighting.
+  - **Refusals** (`BranchTrackingRefusal`, which is not a ValueError/RuntimeError):
+    - `BRANCH_LOSS`: no candidate reaches 0.90;
+    - `AMBIGUOUS`: several candidates reach 0.90 for one branch;
+    - `BRANCH_EXCHANGE`: one candidate is claimed by several branches;
+    - `CLUSTER_LOSS`: no unique candidate pair spans the cluster subspace.
+  - Rows are never added or dropped. Experimental data are not an input (checked by
+    signature), so the normal comparator never re-pairs.
+  - A frequency-order change with stable shapes is tracked correctly and recorded
+    (`order_changes`) as evidence.
+  - States on different FE geometry or node sets are refused.
+- **M4 gate element (tested here on synthetic shapes):** an artificial branch exchange
+  — two tracked modes exchanging character (45° mixing) between iterations — gives a
+  refusal, not silent re-pairing.
+- **Tests:** `tests/test_branch_tracker.py`: 11 ran, OK. M4 guard extended.
+- **Unchanged:** `inverse_solver.py` (Stage-A tracking), the comparator, and the M3
+  contracts.
+- **Abaqus run count:** 0

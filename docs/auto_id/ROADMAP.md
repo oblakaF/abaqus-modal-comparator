@@ -314,7 +314,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 | M4.2 | Baseline observation / pair freeze | `REVIEW_READY` |
 | M4.3 | Physical modal-family classifier: P_x/P_y, nodal structure, diagonal symmetry when relevant | `REVIEW_READY` |
 | M4.4 | Cluster trigger + principal-angle / subspace confirmation | `REVIEW_READY` |
-| M4.5 | FE-to-FE branch tracker | `TODO` |
+| M4.5 | FE-to-FE branch tracker | `REVIEW_READY` |
 | M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `TODO` |
 | M4.7 | Log-frequency objective | `TODO` |
 | M4.8 | Bounded LM / trust step with the correct minus sign | `TODO` |
