@@ -145,15 +145,60 @@ authorization.
 
 | Id | Mini-step | Content | Status |
 |---|---|---|---|
-| M1.1 | Identification input-source policy | Curve-fitted modes allowed. Peak-derived modes refused for production Auto-ID. | `TODO` |
-| M1.2 | Production PolyMAX dataset 55/2414 path | Preserve frequency, shape, provenance, measurement DOFs. | `TODO` |
-| M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `TODO` |
-| M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `TODO` |
+| M1.1 | Identification input-source policy | Curve-fitted modes allowed. Peak-derived modes refused for production Auto-ID. | `ACCEPTED` (commit `2fa48c2`) |
+| M1.2 | Production PolyMAX dataset 55/2414 path | Preserve frequency, shape, provenance, measurement DOFs. | `ACCEPTED` (commit `bc2ffce`) |
+| M1.3 | Raw-FRF multi-mode fitting path | Dataset 58 may be used for identification only through an accepted multi-mode fit. Peak-only stays QC/screening. | `ACCEPTED` (commit `4b8d73e`) |
+| M1.4 | Experimental QC | Suspension threshold; resolution; unresolved resonance (2ζf < 3Δf); coherence at resonance (< 0.9); phase complexity. | `ACCEPTED` (commits `c411bb9`, `ef95cbe`: suspension-aware QC) |
 
-**M1 GATE (SP13 raw FRF):** recover ≈ 206.15 Hz and ≈ 212.61 Hz within ±0.05 Hz of
-PolyMAX; no false identification mode around 217.5 Hz; damping within 30 % of PolyMAX
-(SPEC §17).
+Stage status: `ACCEPTED` (M1.1–M1.4 `ACCEPTED`; Gate A `PASS`; Gate B `FUTURE_INTERNAL_PROVIDER`). The M1 stage PR is prepared; it merges only under HUMAN authorization.
+M1.3 design: `DESIGN_ACCEPTED` ([M1_3_DESIGN_REVIEW.md](M1_3_DESIGN_REVIEW.md);
+D-019, D-021, D-023, D-024, D-026 to D-029). M1.3 implementation is `ACCEPTED`.
 
+| Id | Sub-step | Status |
+|---|---|---|
+| M1.3.1 | `ModalFittingProvider` interface boundary (no fitting algorithm) | `ACCEPTED` (commit `f77045d`) |
+| M1.3 provider | `ExternalPolyMAXProvider`: external PolyMAX modal preparation provider (D-026, D-027) | `ACCEPTED` (commit `4b8d73e`) |
+
+**Final architecture:** Dataset-58 FRF → FRF preparation / external
+PolyMAX-compatible provider (D-027) → validated curve-fitted modal dataset (frozen
+external selection, D-026) → M1.1 source policy → M1.2 production loader → Auto-ID.
+Internal FRF fitting is a future provider (D-029). The first provider
+(`services.external_polymax_provider`) is ACCEPTED. Accepted limitations: coherence
+evaluation deferred to M1.4; internal fitting remains a future provider;
+registration source path/timestamp reconciliation remains future work.
+
+**M1 GATE (stage closure; SPEC §19 items 4–5)**
+
+**Reference values are fixture-specific (D-028, SPEC §19 item 4).**
+- **`SP13/best` (repeat-a, 2026-09-10):** the frozen PolyMAX values are about 205.65 /
+  212.66 / 228.61 Hz.
+- **Historical:** 206.15 / 212.61 / 228.75 Hz belong to the 2026-09-09 acquisition.
+  They stay historical until that acquisition is pinned as a separate fixture.
+
+**M1 Gate A — initial production modal-input layer: `PASS`.**
+Evidence: `tests/test_m1_stage_gate.py` plus the per-milestone real-data tests, on
+`SP02/bravo-1` and `SP13/best`. Gate A requires all of the following:
+- the curve-fitted source policy is enforced (M1.1);
+- fixture identity and provenance are pinned (M0.2 manifest, M1.2 loader);
+- the `ExternalPolyMAXProvider` is accepted (M1.3);
+- the frozen `SP02/bravo-1` and `SP13/best` datasets are reproduced;
+- fixture-specific reference frequencies are used;
+- damping is recovered from the stored PolyMAX poles;
+- peak-derived substitution is refused, including real peak-derived modes from the
+  same export;
+- the M1.4 hard QC checks pass;
+- the suspension threshold is represented honestly: evaluated when a trusted value
+  exists, otherwise `NOT_AVAILABLE` pending M2. Both historical fixtures are
+  `NOT_AVAILABLE`;
+- QC does not mutate the modal dataset.
+
+**M1 Gate B — first internal `ModalFittingProvider`: `FUTURE_INTERNAL_PROVIDER`.**
+It is not part of the initial M1 closure (SPEC §19 item 4, D-029). Its future gate
+keeps the original scientific requirement:
+raw FRF → independent internal fitting → recovery against the acquisition-specific
+PolyMAX reference → damping agreement → no false peak-derived modes.
+Gate B has **not** been passed. The external provider reproduces the frozen PolyMAX
+result and does not re-fit raw FRF.
 ---
 
 ## M2 — Specimen manifest + physical registration

@@ -186,6 +186,8 @@ class SyntheticProductionFixture:
                 self.node_ids,
             )
             mode.measured_dofs = measured.copy()
+            # The synthetic experiment stands in for a curve-fitted PolyMAX set (M1.1 policy).
+            mode.metadata.update(dataset_type=55, mode_source="curve-fitted modal dataset")
             experimental_modes.append(mode)
         handle, name = tempfile.mkstemp(suffix=".unv", dir=_SOURCE_DIRECTORY.name)
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
