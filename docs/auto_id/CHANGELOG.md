@@ -2984,3 +2984,28 @@ first internal provider.
   definition.
 - **Full suite:** docs/provenance only; code unchanged since 4ce5e6a (Windows 1296 OK/24 skipped without stores, 1301 OK/2 skipped with stores; Linux CI 1293 OK).
 - **Decision needed:** how M4.9 proceeds.
+
+## 2026-10-05 — M4.4 N-mode cluster design review (analysis only)
+
+- **Stage:** M4 (IN_PROGRESS); M4.9 `IN_PROGRESS`. The SUPERVISOR acknowledged the truth-gate
+  verdict REFUSED_BEFORE_IDENTIFICATION. Policy is unchanged.
+- **Document:** `docs/auto_id/M4_4_NMODE_CLUSTER_REVIEW.md` (PROPOSAL).
+  - Compares the options:
+    - A, N-dimensional subspace examination (A1: INDEPENDENT only; A2: full N-mode confirmation);
+    - B, symmetry subdivision;
+    - C, permanent refusal.
+  - For each: validity, SPEC §12.4 compatibility, the M4.7 and M4.5 effects, acceptance, code
+    and risk.
+- **Evidence** (read-only diagnostics on validated packs; no Abaqus):
+  - the members of FE 13–15 and FE 20–23 are mutually orthogonal (p0 MAC 0.0000) and of
+    distinct parity classes, except the (0,4)/(4,0) pair;
+  - each is individually stable (MAC ≥ 0.9998, unique counterpart) in E±, G12± and at the truth;
+  - the N-subspace cos² is ≥ 0.9999.
+- **Side finding:** the (4,4) mode at FE 30 leaves the extracted range 7–30 in some states.
+  That is why exp 24 was excluded. It is an edge-of-mode-set risk for a later LM loop.
+- **Recommendation:** A1. A2 deferred; B only as corroborating evidence; C until decided.
+- **Truth artifacts (proposal):**
+  - pack → `carbon-project-archive:fe_shapes/SP13_bb3e5d7d131bed4f.npz`;
+  - provenance → `carbon-project-archive:m4_twin/SP13_truth_gate/` (SHA-pinned);
+  - ODB temporary (§8.6).
+- **Code changed:** none. **Abaqus runs:** 0.

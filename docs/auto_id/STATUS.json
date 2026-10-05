@@ -425,8 +425,16 @@
       "parameter_count": 2,
       "verdict": "REFUSED_BEFORE_IDENTIFICATION",
       "artifacts": "D:\\abaqus_m4_truth (truth ODB kept until M4.9 review; truth pack + journal + readiness report); provenance copies in docs/auto_id/twins/SP13_truth_gate/",
-      "evidence": "EVIDENCE.md 'M4.9 — SP13 truth gate' PENDING SUPERVISOR REVIEW"
+      "evidence": "EVIDENCE.md 'M4.9 — SP13 truth gate' PENDING SUPERVISOR REVIEW",
+      "supervisor_review": "2026-10-05: result acknowledged (REFUSED_BEFORE_IDENTIFICATION); policy unchanged; analysis requested"
+    },
+    "nmode_cluster_review": {
+      "status": "PROPOSAL (analysis only; no code, no Abaqus, no policy change)",
+      "document": "docs/auto_id/M4_4_NMODE_CLUSTER_REVIEW.md",
+      "evidence": "validated packs: FE 13-15 and FE 20-23 members individually stable (MAC >= 0.9998, unique) in E±, G12± and truth; N-subspace cos2 >= 0.9999; cross-member p0 MAC 0.0000",
+      "recommendation": "A1 (N > 2 groups may be INDEPENDENT under the existing identity test; N-mode confirmation stays UNSUPPORTED/REFUSED); A2 deferred; B as evidence only; C until decided",
+      "truth_artifact_location_proposal": "pack -> carbon-project-archive:fe_shapes/; provenance -> carbon-project-archive:m4_twin/SP13_truth_gate/ (SHA-pinned manifest)"
     }
   },
-  "next_action": "SUPERVISOR review of the M4.9 truth gate (REFUSED_BEFORE_IDENTIFICATION: UNSUPPORTED >2-mode groups FE 13-15 and FE 20-23); decision needed on how M4.9 proceeds; no identification loop"
+  "next_action": "SUPERVISOR decision on the N-mode cluster review (A1 / A2 / B / C) and on the truth artifact location; no policy change, no Abaqus until then"
 }
