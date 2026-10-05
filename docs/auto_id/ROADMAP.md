@@ -326,8 +326,8 @@ M4.9 synthetic truth: E = 45000 MPa, G12 = 4000 MPa, controlled frequency noise
 **M4 GATE:** recover the truth within 1σ in ≤ 20 authorised Abaqus solves. An
 artificial branch exchange must trigger refusal, not silent re-pairing.
 
-Stage status: `REVIEW_READY` (M4.1–M4.9 `ACCEPTED` by the SUPERVISOR, 2026-10-05; **M4 GATE: `PASS`**;
-stage PR `auto-id/m4` → `main` prepared, **not merged**; branch based on `main` `6185b05`).
+Stage status: `ACCEPTED` (M4.1–M4.9 `ACCEPTED` by the SUPERVISOR, 2026-10-05; **M4 GATE: `PASS`**;
+merged to `main` by PR #31, merge commit `ee22e33`, with HUMAN authorisation).
 
 **M4 GATE: `PASS`** (SUPERVISOR, 2026-10-05; `tests/test_m4_stage_gate.py`, records only, no Abaqus):
 - **Recovery:** the synthetic twin was recovered within 1σ: E 45005.45 / G12 4012.20 MPa against the truth
@@ -430,6 +430,8 @@ First batch reviewed by the SUPERVISOR:
 | M5.7 | Leave-one-family-out `model_form_robustness` | `TODO` |
 | M5.8 | Residual family pattern test | `TODO` |
 | M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `TODO` |
+
+Stage status: `NOT_STARTED` (requires an explicit SUPERVISOR instruction).
 
 **M5 GATE:**
 

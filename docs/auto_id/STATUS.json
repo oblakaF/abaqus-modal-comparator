@@ -3,12 +3,12 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M4",
-  "current_ministep": "M4.9",
-  "status": "REVIEW_READY",
-  "last_accepted_stage": "M3",
-  "last_accepted_ministep": "M3.5",
-  "last_accepted_commit": "3d862511e2fcb70670479b3f774f146658ae7ecb",
+  "current_stage": "M5",
+  "current_ministep": null,
+  "status": "NOT_STARTED",
+  "last_accepted_stage": "M4",
+  "last_accepted_ministep": "M4.9",
+  "last_accepted_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -56,6 +56,12 @@
       "stage": "M3",
       "pr": 29,
       "merge_commit": "0fd63d69a78f251bd51721880bae9b425b98951e",
+      "status": "ACCEPTED"
+    },
+    {
+      "stage": "M4",
+      "pr": 31,
+      "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d",
       "status": "ACCEPTED"
     }
   ],
@@ -247,7 +253,7 @@
     "M4.7": "ACCEPTED",
     "M4.8": "ACCEPTED",
     "M4.9": "ACCEPTED",
-    "status": "REVIEW_READY",
+    "status": "ACCEPTED",
     "branch": "auto-id/m4",
     "base": "6185b0565fb666ce26e533ac7b72a102de496f24",
     "batch_authorisation": "SUPERVISOR: first development batch M4.1-M4.5, M4.7, M4.8; no Abaqus execution (Abaqus Python on archived ODBs counts); no real solve pipeline; M4.6/M4.9 need new authorisation; archived CARBON-4C baseline replay approved as M4.2 reference source; SP02/SP13 development/test only; M3 contracts unchanged",
@@ -406,12 +412,13 @@
       "M4.7": "ACCEPTED",
       "M4.9_preparation": "ACCEPTED",
       "M4.9_real_gate": "EXECUTED (truth gate and identification loop)",
-      "auto-id/m4_merged_to_main": false,
+      "auto-id/m4_merged_to_main": true,
       "M4.9_truth_gate": "ACCEPTED (evidence): REFUSED_BEFORE_IDENTIFICATION before A1",
       "M4.9_identification_loop": "ACCEPTED (evidence): CONVERGED, both within 1 sigma",
       "M4.9_readiness_after_A1": "ACCEPTED (evidence): READY_FOR_IDENTIFICATION",
       "M4_stage_gate": "PASS",
-      "M5": "NOT STARTED"
+      "M5": "NOT STARTED",
+      "M4_stage": "ACCEPTED and merged (PR #31)"
     },
     "M4.9_truth_gate": {
       "authorised": "HUMAN 2026-10-05: exactly 1 SP13 truth Abaqus 2024 solve (E 45000, G12 4000) + 1 pinned extract_odb.py extraction, outside the 20-evaluation budget; no LM, no identification solves",
@@ -504,7 +511,7 @@
       "tests_result": "code unchanged since 7597b60 (Windows 1306 OK/25 skipped without stores, 1311 OK/2 skipped with stores; Linux CI 1303 OK); docs-only rerun below"
     },
     "stage_gate": "PASS (SUPERVISOR 2026-10-05): twin recovered within 1 sigma (6/20 evaluations, 1 new solve); branch-exchange negative control REFUSED; deterministic replay; M3 unchanged; tests/test_m4_stage_gate.py",
-    "stage_pr": "READY_FOR_STAGE_PR (auto-id/m4 -> main); not merged; HUMAN merge authorisation required",
+    "stage_pr": "MERGED: PR #31 (auto-id/m4 -> main), merge commit ee22e3389127a49ada2bc4d887fc757bcea9d69d",
     "supervisor_acceptance": {
       "date": "2026-10-05",
       "decision": "M4.1-M4.9 ACCEPTED; six pending M4 EVIDENCE entries ACCEPTED; M4 stage-level scientific gate PASS",
@@ -516,7 +523,26 @@
       ],
       "decisions_promoted": "DECISIONS.md D-033..D-038 (D-032 already recorded)"
     },
-    "stage_closure_tests": "Windows 1325 OK (27 skipped) without data stores; 1330 OK (2 skipped) with both stores; tests/test_m4_stage_gate.py 17 passed + 2 store-gated skipped (no stores) / 19 passed (stores); targeted M4 + M3 gate 196 passed"
+    "stage_closure_tests": "Windows 1325 OK (27 skipped) without data stores; 1330 OK (2 skipped) with both stores; tests/test_m4_stage_gate.py 17 passed + 2 store-gated skipped (no stores) / 19 passed (stores); targeted M4 + M3 gate 196 passed",
+    "accepted_by": "SUPERVISOR (M4.1-M4.9 and stage gate accepted 2026-10-05); merge explicitly authorised by the HUMAN supervisor",
+    "accepted_head": "7a5486489c1492ddefffa164ba9d0377fa72e3ed",
+    "merged_to_main": {
+      "pr": 31,
+      "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
+    }
   },
-  "next_action": "HUMAN merge authorisation for the M4 stage PR (auto-id/m4 -> main); after the merge record the main merge SHA; M5 NOT STARTED"
+  "next_action": "M5 NOT_STARTED; await SUPERVISOR instruction before any M5 work",
+  "m5": {
+    "status": "NOT_STARTED",
+    "M5.1": "TODO",
+    "M5.2": "TODO",
+    "M5.3": "TODO",
+    "M5.4": "TODO",
+    "M5.5": "TODO",
+    "M5.6": "TODO",
+    "M5.7": "TODO",
+    "M5.8": "TODO",
+    "M5.9": "TODO",
+    "note": "not started; requires explicit SUPERVISOR instruction (ROADMAP order)"
+  }
 }

@@ -759,3 +759,16 @@ D-032 already records A1.
 - The stage PR `auto-id/m4` → `main` is prepared and **not merged**.
 - `last_accepted_stage` stays M3 until the HUMAN merge.
 - **M5 not started.** No Abaqus during closure.
+
+---
+
+## 13. M4 merged to main (HUMAN, 2026-10-05)
+
+- **Merge:** PR #31 merged with a merge commit by explicit HUMAN authorisation.
+  - **Merge commit:** `ee22e3389127a49ada2bc4d887fc757bcea9d69d`.
+  - **Reviewed head:** `7a5486489c1492ddefffa164ba9d0377fa72e3ed`.
+- **Status:** the M4 stage is ACCEPTED, and the §12 qualifications stay in force.
+- **M5:** not started.
+- **Retained artifacts:** the temporary ODBs and rendered INPs are still retained.
+  - **Deletable:** they may be deleted under §6.5 / §8.6 / §11.1 by a separate, explicit action.
+  - **Kept:** archived provenance is permanent.

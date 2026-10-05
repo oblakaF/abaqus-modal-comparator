@@ -3121,3 +3121,23 @@ first internal provider.
   - The committed copies of the two archive manifests were added.
 - **Full suite:** Windows 1325 OK (27 skipped) without data stores; 1330 OK (2 skipped) with both stores; tests/test_m4_stage_gate.py 17 passed + 2 store-gated skipped (no stores) / 19 passed (stores); targeted M4 + M3 gate 196 passed.
 - **Abaqus runs during closure:** 0. No artifacts deleted.
+
+## 2026-10-05 — M4 merged to main (PR #31)
+
+- **Stage:** M4 **ACCEPTED** and merged. PR #31 (`auto-id/m4` → `main`), merged with a merge commit
+  under explicit HUMAN authorisation.
+  - **Merge commit:** `ee22e3389127a49ada2bc4d887fc757bcea9d69d`. Parents: `main` `6185b05` and the reviewed head `7a54864`.
+  - **Tree:** identical to the reviewed head.
+- **STATUS:**
+  - `last_accepted_stage` = M4, `last_accepted_ministep` = M4.9, `last_accepted_commit` = the
+    merge commit;
+  - `main_merges` gains M4 / PR #31.
+- **Qualifications kept:**
+  - the M4.3 classifier thresholds remain PROVISIONAL;
+  - real SP13 identification remains refused (option C);
+  - SP02 remains NOT_FROZEN;
+  - the M4.9 bounds remain development-only twin bounds.
+- **M5:** `NOT_STARTED`; M5.1–M5.9 `TODO`.
+- **Bookkeeping branch:** `auto-id/m4-closure`, created from the merge commit.
+- **Unchanged:** code and scientific logic. No Abaqus. Retained ODB / INP artifacts are not
+  deleted.
