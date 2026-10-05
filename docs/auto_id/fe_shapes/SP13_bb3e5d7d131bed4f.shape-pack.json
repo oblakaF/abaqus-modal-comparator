@@ -1,0 +1,119 @@
+{
+  "schema": "auto-id/fe-shape-pack-record/v1",
+  "job_name": "SP13_bb3e5d7d131bed4f",
+  "specimen": "SP13",
+  "state": "TWIN_TRUTH",
+  "generated_inp_sha256": "bb3e5d7d131bed4f8b1da5fdc51d4dcd79247ed31740a97423318b5e66a8a672",
+  "odb": {
+    "role": "M4.9 twin truth ODB (Abaqus 2024); temporary, not archived (\u00a78.6)",
+    "file_name": "SP13_bb3e5d7d131bed4f.odb",
+    "sha256": "57282e50448a9e8bb387336b1f0e0f8f56478ba85cd596effc8a67bacf7b69c4",
+    "size_bytes": 715614536,
+    "location": {
+      "store": "m4-truth-run",
+      "relative_path": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/solves/SP13_bb3e5d7d131bed4f/SP13_bb3e5d7d131bed4f.odb"
+    }
+  },
+  "pack": {
+    "role": "FE shape pack (auto-id/fe-shape-pack/v1)",
+    "file_name": "SP13_bb3e5d7d131bed4f.npz",
+    "sha256": "eeebae21c5e3c4f181f56cfe84115d63c62ebc949124e5446788d50359bee8fa",
+    "size_bytes": 13569410,
+    "location": {
+      "store": "carbon-project-archive",
+      "relative_path": "fe_shapes/SP13_bb3e5d7d131bed4f.npz"
+    }
+  },
+  "content_sha256": "758add0c22b824c55c7149c75462b08e4233ba04d5b423c7a31ef64fc5e98945",
+  "node_set": {
+    "definition": "passport measured_surface: instance CFRP_PLATE_TOP, side max_z, |z - max| <= 1e-4 mm",
+    "node_count": 29754,
+    "sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db"
+  },
+  "fe_geometry_sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826",
+  "mode_numbers": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "frequencies_hz": [
+    21.244264602661133,
+    67.721923828125,
+    70.74366760253906,
+    80.27136993408203,
+    82.07325744628906,
+    129.35989379882812,
+    186.41722106933594,
+    191.0371856689453,
+    195.0724639892578,
+    201.87657165527344,
+    234.1251220703125,
+    236.60491943359375,
+    321.3499450683594,
+    359.7221374511719,
+    367.7025146484375,
+    368.5542907714844,
+    374.48028564453125,
+    396.7492980957031,
+    404.992919921875,
+    467.7637939453125,
+    468.8406066894531,
+    582.7950439453125,
+    588.8150024414062,
+    590.8931884765625
+  ],
+  "extraction": {
+    "script": "abaqus_scripts/extract_odb.py",
+    "script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+    "abaqus": "Abaqus 2024",
+    "extraction_id": "cc19811317e9e1d99831c912d83792c35f6f43a88cfff01f3c670af557719721",
+    "format_version": 2,
+    "command": "M4.6 controlled path: pinned extract_odb.py, modes 7-30",
+    "start_mode": 7,
+    "end_mode": 30,
+    "raw_extraction": "temporary validation material only (deleted after validation)"
+  },
+  "validation": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+  },
+  "provenance_record": {
+    "role": "M4.9 truth-gate provenance (archive manifest pinning journal, reports, logs)",
+    "file_name": "ARCHIVE_MANIFEST.json",
+    "sha256": "fab59ec57ddd83289c0e30f1d54ba8c30b8ba9544d93403232bee6c28d94920c",
+    "size_bytes": 4364,
+    "location": {
+      "store": "carbon-project-archive",
+      "relative_path": "m4_twin/SP13_truth_gate/ARCHIVE_MANIFEST.json"
+    }
+  }
+}

@@ -238,10 +238,21 @@ class ObservationDesignTests(_Tmp):
             observation.require_usable()
 
     def test_unsupported_trigger_group_refuses_the_design(self):
-        preparation = self.prepare(**self.variant("triple"))
+        preparation = self.prepare(**self.variant("triple-rotating"))
         self.assert_refused_without_exclusion(preparation, "UNSUPPORTED")
         group = [c for c in preparation.observation_design.clusters if c.status is ClusterStatus.UNSUPPORTED]
         self.assertEqual(len(group[0].row_ids), 3)
+
+    def test_individually_stable_three_mode_group_is_independent(self):
+        # M4_DECISION_RECORD §10 (A1): all members stay independent rows; no N-mode cluster term.
+        preparation = self.prepare(**self.variant("triple"))
+        observation = preparation.observation_design
+        triple = [c for c in observation.clusters if len(c.row_ids) == 3]
+        self.assertEqual([c.status for c in triple], [ClusterStatus.INDEPENDENT])
+        self.assertIs(observation.status, DesignStatus.USABLE)
+        self.assertTrue(set(triple[0].row_ids) <= set(observation.design.fit_rows))
+        self.assertTrue(all(len(c) == 2 for c in observation.design.fit_clusters))
+        self.assertEqual(len(observation.frozen.rows), 24)
 
     def test_unstable_trigger_group_refuses_the_design(self):
         preparation = self.prepare(**self.variant("leak"))

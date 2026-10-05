@@ -408,7 +408,8 @@
       "M4.9_real_gate": "NOT STARTED",
       "auto-id/m4_merged_to_main": false,
       "M4.9_truth_gate": "EXECUTED: REFUSED_BEFORE_IDENTIFICATION (PENDING SUPERVISOR REVIEW)",
-      "M4.9_identification_loop": "NOT STARTED (not authorised)"
+      "M4.9_identification_loop": "NOT STARTED (not authorised)",
+      "M4.9_readiness_after_A1": "READY_FOR_IDENTIFICATION (PENDING SUPERVISOR REVIEW)"
     },
     "M4.9_truth_gate": {
       "authorised": "HUMAN 2026-10-05: exactly 1 SP13 truth Abaqus 2024 solve (E 45000, G12 4000) + 1 pinned extract_odb.py extraction, outside the 20-evaluation budget; no LM, no identification solves",
@@ -429,12 +430,34 @@
       "supervisor_review": "2026-10-05: result acknowledged (REFUSED_BEFORE_IDENTIFICATION); policy unchanged; analysis requested"
     },
     "nmode_cluster_review": {
-      "status": "PROPOSAL (analysis only; no code, no Abaqus, no policy change)",
+      "status": "DECIDED: A1 approved (SUPERVISOR 2026-10-05; D-032)",
       "document": "docs/auto_id/M4_4_NMODE_CLUSTER_REVIEW.md",
       "evidence": "validated packs: FE 13-15 and FE 20-23 members individually stable (MAC >= 0.9998, unique) in E±, G12± and truth; N-subspace cos2 >= 0.9999; cross-member p0 MAC 0.0000",
       "recommendation": "A1 (N > 2 groups may be INDEPENDENT under the existing identity test; N-mode confirmation stays UNSUPPORTED/REFUSED); A2 deferred; B as evidence only; C until decided",
       "truth_artifact_location_proposal": "pack -> carbon-project-archive:fe_shapes/; provenance -> carbon-project-archive:m4_twin/SP13_truth_gate/ (SHA-pinned manifest)"
+    },
+    "M4.4_nmode_A1": {
+      "status": "IMPLEMENTED (A1, D-032); readiness re-run READY_FOR_IDENTIFICATION (PENDING SUPERVISOR REVIEW)",
+      "abaqus_runs": 0,
+      "fe_13_15": "INDEPENDENT",
+      "fe_20_23": "INDEPENDENT",
+      "counts": {
+        "frozen_rows": 23,
+        "holdout_rows": 2,
+        "fit_rows": 21,
+        "cluster_terms": 0,
+        "parameters": 2
+      },
+      "m4_7_design_valid": true,
+      "open_risk": "R23 (FE 29, validation holdout) at the upper extracted-mode boundary; possible BRANCH_LOSS in the LM loop; extraction range not expanded without a separate decision",
+      "tests_result": "Windows 1306 OK (25 skipped) without data stores; 1311 OK (2 skipped) with both stores"
+    },
+    "truth_artifacts_archived": {
+      "pack": "carbon-project-archive/fe_shapes/SP13_bb3e5d7d131bed4f.npz (eeebae21...; content 758add0c...)",
+      "record": "docs/auto_id/fe_shapes/SP13_bb3e5d7d131bed4f.shape-pack.json (TWIN_TRUTH)",
+      "provenance": "carbon-project-archive/m4_twin/SP13_truth_gate/ (ARCHIVE_MANIFEST.json fab59ec5...)",
+      "truth_odb": "D:\\abaqus_m4_truth (not archived; until M4.9 review)"
     }
   },
-  "next_action": "SUPERVISOR decision on the N-mode cluster review (A1 / A2 / B / C) and on the truth artifact location; no policy change, no Abaqus until then"
+  "next_action": "SUPERVISOR review of A1 and the readiness re-run (READY_FOR_IDENTIFICATION); the real M4.9 identification loop needs a separate HUMAN gate (bounds, budget, run directory)"
 }

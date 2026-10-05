@@ -10,7 +10,9 @@ assigned by ascending frequency in every state, as Abaqus does.  Two deliberate 
   exact), about 20° at the truth (MAC ≈ 0.883 ≥ 0.8): a cluster M4.4 must CONFIRM;
 - ``stable``: (2,1)/(1,2), 2 % apart, fixed shapes: triggered, but INDEPENDENT.
 
-Variants: ``triple`` (a third mode within 3 % of ``stable``: UNSUPPORTED group), ``leak`` (the
+Variants: ``triple`` (a third, stable mode within 3 % of ``stable``: a 3-mode group that A1 makes
+INDEPENDENT), ``triple-rotating`` (the same group, but ``stable-1`` rotates with the third mode under E:
+UNSUPPORTED), ``leak`` (the
 rotating pair's first mode rotates towards a distant mode instead, so the pair's subspace is not
 stable: UNSTABLE), ``top-pair`` (the rotating pair is the highest slot, so the validation holdout
 takes one member of the CONFIRMED cluster: split).
@@ -83,7 +85,7 @@ _SINGLE_WAVES = [(2, 2), (3, 0), (0, 3), (3, 1), (1, 3), (3, 2), (2, 3), (3, 3),
                  (4, 2), (2, 4), (4, 3), (3, 4), (4, 4), (5, 0), (0, 5)]
 _EXPONENTS = [(0.48, 0.02), (0.32, 0.18), (0.42, 0.08), (0.36, 0.14), (0.5, 0.0), (0.3, 0.2)]
 ROTATING_SLOT, STABLE_SLOT, TOP_SLOT = 5, 9, 21
-VARIANTS = (None, "triple", "leak", "top-pair")
+VARIANTS = (None, "triple", "triple-rotating", "leak", "top-pair")
 
 
 def fake_modes(variant: str | None = None) -> list[FakeMode]:
@@ -102,10 +104,12 @@ def fake_modes(variant: str | None = None) -> list[FakeMode]:
             modes += [FakeMode("stable-1", (2, 1), f0, a, b), FakeMode("stable-2", (1, 2), f0 * 1.02, a, b)]
         else:
             waves = next(singles)
-            if variant == "triple" and slot == STABLE_SLOT + 1:
+            name = f"single-{waves[0]}{waves[1]}"
+            if variant in ("triple", "triple-rotating") and slot == STABLE_SLOT + 1:
                 f0 = 20.0 * 1.12 ** STABLE_SLOT * 1.04
                 a, b = _EXPONENTS[STABLE_SLOT % len(_EXPONENTS)]
-            modes.append(FakeMode(f"single-{waves[0]}{waves[1]}", waves, f0, a, b))
+                name = "triple-3"
+            modes.append(FakeMode(name, waves, f0, a, b))
     assert len(modes) == len(MODES)
     return modes
 
@@ -123,6 +127,10 @@ def fake_state(e: float, g: float, rotation_deg: float = 20.0, variant: str | No
     a, b = shapes["rotating-1"], shapes[partner]
     shapes["rotating-1"] = math.cos(theta) * a + math.sin(theta) * b
     shapes[partner] = -math.sin(theta) * a + math.cos(theta) * b
+    if variant == "triple-rotating":
+        a, b = shapes["stable-1"], shapes["triple-3"]
+        shapes["stable-1"] = math.cos(theta) * a + math.sin(theta) * b
+        shapes["triple-3"] = -math.sin(theta) * a + math.cos(theta) * b
     if exchange is not None and exchange(e, g):  # injected loss of character between two fit modes
         left, right = shapes["single-22"].copy(), shapes["single-30"].copy()
         shapes["single-22"], shapes["single-30"] = (left + right) / math.sqrt(2), (left - right) / math.sqrt(2)

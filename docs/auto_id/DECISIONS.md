@@ -287,3 +287,30 @@ Rationale / scope: implemented in M1.4 as `TrustedSuspensionThreshold`, the
 `suspension_threshold` QC check and `ExperimentalModeEligibility` (`ef95cbe`).
 SP02/bravo-1 and SP13/best stay `NOT_AVAILABLE` until M2.
 Supersedes: none
+
+## D-032 — N-mode trigger groups: independence only (M4.4, option A1)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §12.4; D-009; M4_DECISION_RECORD §10
+Decision: A frequency-trigger group of N > 2 modes is INDEPENDENT only if, in every approved
+±5 % direction:
+- every baseline member has exactly one distinct FE-to-FE match with MAC ≥ 0.90, and no
+  competing match at or above that threshold;
+- the N-dimensional subspace of the matches is stable, with every principal-angle
+  cos² > 0.95.
+
+Consequences:
+- Members of an INDEPENDENT group stay independent observation rows. No N-mode cluster
+  residual is created.
+- If any condition fails, the group is UNSUPPORTED and the observation design is REFUSED.
+  Nothing is split, discarded, merged or hand-picked.
+- The 2-mode path (D-009) is unchanged. No new thresholds.
+- N-mode confirmation (option A2) is not adopted. Symmetry subdivision (B) is corroborating
+  evidence only, never a decision rule.
+
+Rationale / scope:
+- SPEC §12.4 makes frequency closeness only a trigger and defines confirmation for 2-mode
+  clusters. A1 applies the existing identity test and adds no confirmation rule, so no SPEC
+  change is required.
+- It narrows the §8.2 refusal of N > 2 groups (M4_DECISION_RECORD) to groups that fail the
+  test.
+
+Supersedes: none

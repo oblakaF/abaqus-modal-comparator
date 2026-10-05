@@ -3009,3 +3009,37 @@ first internal provider.
   - provenance → `carbon-project-archive:m4_twin/SP13_truth_gate/` (SHA-pinned);
   - ODB temporary (§8.6).
 - **Code changed:** none. **Abaqus runs:** 0.
+
+## 2026-10-05 — M4.4 A1 (N-mode independence) implemented; M4.9 readiness re-run: READY_FOR_IDENTIFICATION
+
+- **Stage:** M4 (IN_PROGRESS); M4.4 `REVIEW_READY` (extended); M4.9 `IN_PROGRESS`. The
+  identification loop was **not started**.
+- **Decision:** SUPERVISOR approved option A1. Recorded as DECISIONS.md D-032 and
+  M4_DECISION_RECORD §10. No SPEC change is required.
+- **Code:** `src/services/identification_clusters.py`.
+  - N > 2 trigger groups are INDEPENDENT only with unique matches (MAC ≥ 0.9) and a stable
+    N-subspace (cos² > 0.95) in every direction; otherwise UNSUPPORTED.
+  - The 2-mode path is unchanged; no new thresholds.
+- **Tests:**
+  - 7 new cluster tests: 3- and 4-mode INDEPENDENT; ambiguous, rotating and unstable-subspace
+    → UNSUPPORTED; validation; 2-mode unchanged.
+  - Twin: a stable triple → INDEPENDENT with the design USABLE; a rotating triple →
+    UNSUPPORTED with the design REFUSED.
+  - TWIN_TRUTH pack record tests.
+- **Truth artifacts archived (approved):**
+  - `carbon-project-archive/fe_shapes/SP13_bb3e5d7d131bed4f.npz`;
+  - `m4_twin/SP13_truth_gate/` with `ARCHIVE_MANIFEST.json` (SHA-256 per file), indexed in the
+    global archive manifest under `m4_twin`;
+  - repository record `fe_shapes/SP13_bb3e5d7d131bed4f.shape-pack.json` (TWIN_TRUTH).
+
+  The ODB was not archived; the p0/±5 % packs were not duplicated.
+- **Readiness re-run (0 Abaqus solves, 0 extractions; resumed truth journal):**
+  - same freeze (`05a5443a…`);
+  - FE 13–15 INDEPENDENT; FE 20–23 INDEPENDENT;
+  - 23 frozen rows: 2 holdouts (R1, R23) and 21 fit rows; 0 cluster terms;
+  - the M4.7 design is **valid**. Verdict **READY_FOR_IDENTIFICATION**.
+  - Evidence: EVIDENCE "M4.9 — SP13 observation readiness after A1" (PENDING SUPERVISOR REVIEW).
+- **Open risk (recorded):** R23 (FE 29) sits at the upper extracted-mode boundary. The range is
+  not expanded.
+- **Full suite:** Windows 1306 OK (25 skipped) without data stores; 1311 OK (2 skipped) with both stores.
+- **Abaqus runs:** 0.

@@ -10,8 +10,13 @@ direction):
   cos²θ₁ > 0.95 and cos²θ₂ > 0.95 (principal angles / canonical correlations).
 
 A confirmed cluster contributes one residual, r_C = (1/n_C)·Σ ln(f_FE / f_EXP), which is
-assignment-invariant; it is never counted as two independent observations.  Clusters
-of more than two modes are reported, not confirmed (SPEC §12.4 defines 2-mode clusters).
+assignment-invariant; it is never counted as two independent observations.
+
+Groups of more than two modes (M4_DECISION_RECORD §10, option A1): they are never confirmed
+as one cluster (SPEC §12.4 defines 2-mode clusters).  They are INDEPENDENT only when, in every
+tested direction, every member has exactly one distinct FE-to-FE counterpart with MAC ≥ 0.9
+and the N-dimensional subspace those counterparts span is stable (every principal-angle
+cos² > 0.95).  Otherwise they are UNSUPPORTED.  The 2-mode path is unchanged.
 """
 
 from __future__ import annotations
@@ -39,7 +44,7 @@ class ClusterStatus(str, Enum):
     CONFIRMED = "CONFIRMED"  # one cluster observation
     INDEPENDENT = "INDEPENDENT"  # individual identity stable in every direction: two observations
     UNSTABLE = "UNSTABLE"  # subspace not stable, or not uniquely identified: a scientific refusal
-    UNSUPPORTED = "UNSUPPORTED"  # more than two modes triggered together
+    UNSUPPORTED = "UNSUPPORTED"  # more than two modes triggered together, not individually stable (A1)
 
 
 @dataclass(frozen=True)
@@ -126,10 +131,10 @@ def principal_cos2(left: np.ndarray, right: np.ndarray) -> tuple[float, ...]:
 @dataclass(frozen=True)
 class DirectionEvidence:
     direction: str
-    individual_macs: tuple[float, float]  # best FE-to-FE MAC of each baseline mode in this direction
-    individual_stable: bool  # both modes have a unique perturbed counterpart with MAC ≥ 0.9
-    subspace_modes: Optional[tuple[int, int]]  # indices of the perturbed pair spanning the subspace
-    cos2: tuple[float, float]
+    individual_macs: tuple[float, ...]  # best FE-to-FE MAC of each baseline mode in this direction
+    individual_stable: bool  # every mode has a unique perturbed counterpart with MAC ≥ 0.9
+    subspace_modes: Optional[tuple[int, ...]]  # indices of the perturbed modes spanning the subspace
+    cos2: tuple[float, ...]
     subspace_stable: bool
     subspace_unique: bool
 
@@ -162,6 +167,39 @@ def _subspace(baseline: np.ndarray, perturbed: np.ndarray) -> tuple[Optional[tup
     return pair, cos2, len(passing) <= 1
 
 
+def _independent_group(row_ids: tuple[str, ...], baseline: np.ndarray, perturbed_shapes: Mapping[str, np.ndarray],
+                       weights: Optional[np.ndarray], required_directions: Sequence[str]) -> ClusterConfirmation:
+    """A1 (M4_DECISION_RECORD §10): an N > 2 group is INDEPENDENT or UNSUPPORTED, never CONFIRMED."""
+
+    evidence, failures = [], []
+    for direction in required_directions:
+        perturbed = _weighted(perturbed_shapes[direction], weights)
+        if perturbed.ndim != 2 or perturbed.shape[0] < len(row_ids) or perturbed.shape[1] != baseline.shape[1]:
+            raise ClusterInputError(f"{direction}: need at least {len(row_ids)} perturbed shapes of the baseline length.")
+        macs = np.array([[fe_mac(a, b) for b in perturbed] for a in baseline])
+        admissible = macs >= BRANCH_MINIMUM_MAC
+        counterparts = [int(np.argmax(row)) for row in admissible]
+        unique = all(row.sum() == 1 for row in admissible) and len(set(counterparts)) == len(counterparts)
+        cos2 = principal_cos2(baseline, perturbed[counterparts]) if unique else tuple(0.0 for _ in row_ids)
+        stable = unique and min(cos2) > SUBSPACE_MINIMUM_COS2
+        evidence.append(DirectionEvidence(direction, tuple(float(v) for v in macs.max(axis=1)), unique,
+                                          tuple(counterparts) if unique else None, tuple(float(v) for v in cos2),
+                                          stable, unique))
+        if not unique:
+            failures.append(f"{direction}: not every member has exactly one distinct counterpart with MAC ≥ "
+                            f"{BRANCH_MINIMUM_MAC}")
+        elif not stable:
+            failures.append(f"{direction}: {len(row_ids)}-dimensional subspace not stable "
+                            f"(min cos² {min(cos2):.4f} ≤ {SUBSPACE_MINIMUM_COS2})")
+    if failures:
+        return ClusterConfirmation(row_ids, ClusterStatus.UNSUPPORTED, tuple(evidence),
+                                   (f"{len(row_ids)}-mode group is not individually stable (A1); SPEC §12.4 "
+                                    "defines 2-mode clusters only",) + tuple(failures))
+    return ClusterConfirmation(row_ids, ClusterStatus.INDEPENDENT, tuple(evidence),
+                               (f"{len(row_ids)}-mode group: every member individually stable with a stable "
+                                "subspace in every direction (A1): independent observations",))
+
+
 def confirm_cluster(row_ids: Sequence[str], baseline_shapes: np.ndarray, perturbed_shapes: Mapping[str, np.ndarray],
                     weights: Optional[np.ndarray] = None,
                     required_directions: Sequence[str] = CARBON_V1_DIRECTIONS) -> ClusterConfirmation:
@@ -170,10 +208,16 @@ def confirm_cluster(row_ids: Sequence[str], baseline_shapes: np.ndarray, perturb
     ``baseline_shapes`` is 2 × n (the two baseline FE modes); ``perturbed_shapes[direction]``
     is k × n (the FE modes of the perturbed state considered for this cluster, k ≥ 2).
     Shapes are on one common node/DOF set; ``weights`` (for example nodal masses) is optional.
+    Groups of N > 2 modes (N × n baseline) are only examined for independence (A1).
     """
 
     row_ids = tuple(row_ids)
     baseline = _weighted(baseline_shapes, weights)
+    if len(row_ids) > 2 and baseline.ndim == 2 and baseline.shape[0] == len(row_ids):
+        missing = sorted(set(required_directions) - set(perturbed_shapes))
+        if missing:
+            raise ClusterInputError(f"perturbed shapes missing for directions {missing}.")
+        return _independent_group(row_ids, baseline, perturbed_shapes, weights, required_directions)
     if len(row_ids) != 2 or baseline.ndim != 2 or baseline.shape[0] != 2:
         return ClusterConfirmation(row_ids, ClusterStatus.UNSUPPORTED, (),
                                    ("SPEC §12.4 defines 2-mode clusters; this group is not confirmable",))

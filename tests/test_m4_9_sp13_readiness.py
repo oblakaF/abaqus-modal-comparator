@@ -2,7 +2,8 @@
 
 Checks that the twin's start point and its ±5 % finite-difference points (computed exactly as the
 M4.8 loop does) are the M3 jobs of the validated SP13 shape packs, so the M4.9 run reuses them,
-and that the truth candidate is not among them (the truth solve is a separate HUMAN gate).
+and that the truth candidate is not among them (its pack is the archived TWIN_TRUTH pack of the
+M4.9 truth gate).
 
 Also: the committed SP13 twin definition (fixed seed, SUPERVISOR §8.1) and the branch-exchange
 **negative control** on the validated real SP13 packs (§8.4). The negative control injects a
@@ -81,7 +82,9 @@ class StoreTests(unittest.TestCase):
                     self.assertEqual((job.job_name, job.generated_inp_sha256),
                                      (record.job_name, record.generated_inp_sha256))
             self.assertNotIn(truth.job_name, EXPECTED_JOBS.values())
-            self.assertFalse((SHAPES / f"{truth.job_name}.shape-pack.json").exists())
+            # Since the truth gate (M4_DECISION_RECORD §9–§10) the truth pack is archived as TWIN_TRUTH.
+            record = load_shape_pack_record(SHAPES / f"{truth.job_name}.shape-pack.json")
+            self.assertEqual((record.state, record.generated_inp_sha256), ("TWIN_TRUTH", truth.generated_inp_sha256))
 
 
 class TwinDefinitionTests(unittest.TestCase):

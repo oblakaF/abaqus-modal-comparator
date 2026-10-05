@@ -119,6 +119,86 @@ class ConfirmationTests(unittest.TestCase):
         self.assertAlmostEqual(principal_cos2(BASELINE, np.array([A, C]))[1], 0.0, places=12)
 
 
+SHAPES = np.linalg.qr(np.random.default_rng(11).normal(size=(N, 8)))[0].T  # 8 orthonormal shapes
+
+
+def tilted(member, toward, angle_deg):
+    angle = math.radians(angle_deg)
+    return math.cos(angle) * SHAPES[member] + math.sin(angle) * SHAPES[toward]
+
+
+class NModeIndependenceTests(unittest.TestCase):
+    """M4_DECISION_RECORD §10 (option A1): N > 2 groups are INDEPENDENT or UNSUPPORTED, never CONFIRMED."""
+
+    def group(self, n, perturbed_for):
+        baseline = SHAPES[:n]
+        return confirm_cluster(tuple(f"R{k}" for k in range(1, n + 1)), baseline,
+                               {d: perturbed_for(d) for d in CARBON_V1_DIRECTIONS})
+
+    def test_stable_three_mode_group_is_independent(self):
+        # Small tilts out of the group (MAC ≈ 0.997) and a reordered state: still one counterpart each.
+        result = self.group(3, lambda d: np.array([SHAPES[7], tilted(2, 6, 3.0), tilted(0, 5, 3.0), SHAPES[1]]))
+        self.assertIs(result.status, S.INDEPENDENT)
+        for item in result.directions:
+            self.assertEqual(item.subspace_modes, (2, 3, 1))
+            self.assertTrue(item.individual_stable and item.subspace_stable)
+            self.assertGreater(min(item.cos2), 0.95)
+
+    def test_stable_four_mode_group_is_independent(self):
+        result = self.group(4, lambda d: np.array([SHAPES[0], SHAPES[1], tilted(2, 6, 5.0), SHAPES[3], SHAPES[7]]))
+        self.assertIs(result.status, S.INDEPENDENT)
+        self.assertEqual(len(result.directions), 4)
+        self.assertTrue(all(len(item.individual_macs) == 4 for item in result.directions))
+
+    def test_ambiguous_member_is_unsupported(self):
+        # Member 0 has two counterparts with MAC ≥ 0.9 in one direction (no unique match).
+        def perturbed(direction):
+            extra = [tilted(0, 6, 15.0)] if direction == "G12_mpa-" else [SHAPES[6]]
+            return np.array([SHAPES[0], SHAPES[1], SHAPES[2]] + extra)
+
+        result = self.group(3, perturbed)
+        self.assertIs(result.status, S.UNSUPPORTED)
+        bad = [item.direction for item in result.directions if not item.individual_stable]
+        self.assertEqual(bad, ["G12_mpa-"])
+
+    def test_rotating_member_inside_the_group_is_unsupported(self):
+        # Two members exchange character (rotation 30° inside the group): subspace stable, identity not.
+        def perturbed(direction):
+            angle = math.radians(30.0 if direction.startswith("E") else 0.0)
+            return np.array([math.cos(angle) * SHAPES[0] + math.sin(angle) * SHAPES[1],
+                             -math.sin(angle) * SHAPES[0] + math.cos(angle) * SHAPES[1], SHAPES[2], SHAPES[3]])
+
+        result = self.group(3, perturbed)
+        self.assertIs(result.status, S.UNSUPPORTED)  # never CONFIRMED as an N-mode cluster
+
+    def test_unstable_n_mode_subspace_is_unsupported(self):
+        # Every member keeps MAC ≈ 0.905 ≥ 0.9 but tilts out of the group: every cos² ≈ 0.905 ≤ 0.95.
+        def perturbed(direction):
+            return np.array([tilted(0, 4, 18.0), tilted(1, 5, 18.0), tilted(2, 6, 18.0), SHAPES[7]])
+
+        result = self.group(3, perturbed)
+        self.assertIs(result.status, S.UNSUPPORTED)
+        for item in result.directions:
+            self.assertTrue(item.individual_stable)
+            self.assertFalse(item.subspace_stable)
+            self.assertLess(max(item.cos2), 0.95)
+        self.assertIn("subspace not stable", " ".join(result.reasons))
+
+    def test_too_few_perturbed_shapes_and_missing_directions(self):
+        with self.assertRaises(ClusterInputError):
+            self.group(3, lambda d: SHAPES[:2])
+        with self.assertRaises(ClusterInputError):
+            confirm_cluster(("R1", "R2", "R3"), SHAPES[:3], {"E_in_plane_mpa+": SHAPES[:4]})
+
+    def test_two_mode_path_is_unchanged(self):
+        # The same rotating pair the 2-mode rule CONFIRMS would be UNSUPPORTED on the N-mode path.
+        self.assertIs(confirm_cluster(("R1", "R2"), BASELINE, directions(30.0)).status, S.CONFIRMED)
+        self.assertIs(confirm_cluster(("R1", "R2"), BASELINE, directions(0.0)).status, S.INDEPENDENT)
+        self.assertIs(confirm_cluster(("R1", "R2"), BASELINE, directions(0.0, leak=0.5)).status, S.UNSTABLE)
+        three = confirm_cluster(("R1", "R2", "R3"), np.array([A, B, D]), directions(30.0))
+        self.assertIs(three.status, S.UNSUPPORTED)
+
+
 class ResidualTests(unittest.TestCase):
     def test_cluster_residual_is_assignment_invariant(self):
         value = cluster_log_residual([205.0, 210.0], [206.0, 212.0])

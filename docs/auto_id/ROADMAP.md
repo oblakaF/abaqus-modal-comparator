@@ -381,6 +381,10 @@ First batch reviewed by the SUPERVISOR:
   - Trigger groups FE 13–15 and FE 20–23 are UNSUPPORTED (> 2 modes), so the
     design is REFUSED under §8.2.
   - The identification loop was not started. A SUPERVISOR decision is needed.
+- M4.4 option A1 (N > 2 groups INDEPENDENT only; D-032): implemented.
+  - The zero-Abaqus readiness re-run gives **READY_FOR_IDENTIFICATION**:
+    FE 13–15 and FE 20–23 are INDEPENDENT; 21 fit terms; holdouts R1 and R23.
+  - The identification loop is NOT STARTED (separate HUMAN gate).
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---

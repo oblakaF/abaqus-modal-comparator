@@ -35,6 +35,7 @@ ANCHORS = ROOT / "docs" / "auto_id" / "forward_models" / "accepted_forward_jobs.
 JOBS = {"SP02_f3e592281bebce66": ("SP02", "BASELINE"), "SP13_a46d08b52995e078": ("SP13", "BASELINE"),
         "SP13_a9df66283a168786": ("SP13", "E_MINUS"), "SP13_0e861d03c333bb0b": ("SP13", "E_PLUS"),
         "SP13_0328066b74b6fd78": ("SP13", "G_MINUS"), "SP13_4c0f189b9727feaf": ("SP13", "G_PLUS")}
+TWIN_TRUTH = "SP13_bb3e5d7d131bed4f"  # M4.9 twin truth pack (SUPERVISOR-approved archive location, 2026-10-05)
 GENERATED = "0123456789abcdef" + "0" * 48
 JOB = f"SYN_{GENERATED[:16]}"
 
@@ -153,7 +154,7 @@ class PinnedRecordTests(unittest.TestCase):
         names = {"BASELINE": "CARBON-4C BASELINE", "E_MINUS": "CARBON-5A E_MINUS", "E_PLUS": "CARBON-5A E_PLUS",
                  "G_MINUS": "CARBON-5A G_MINUS", "G_PLUS": "CARBON-5A G_PLUS"}
         self.assertEqual(sorted(p.name for p in SHAPES.glob("*.shape-pack.json")),
-                         sorted(f"{job}.shape-pack.json" for job in JOBS))
+                         sorted(f"{job}.shape-pack.json" for job in [*JOBS, TWIN_TRUTH]))
         for job, (specimen, state) in JOBS.items():
             with self.subTest(job=job):
                 record = load_shape_pack_record(SHAPES / f"{job}.shape-pack.json")
@@ -172,6 +173,35 @@ class PinnedRecordTests(unittest.TestCase):
                     fixture = next(f for f in fixtures.fixtures if f.fe.odb_reference.file_name == f"{job}.odb")
                     self.assertEqual(record.odb.sha256, fixture.fe.odb_reference.sha256)
                     self.assertTrue(record.validation["V6a_pass"] and record.validation["V6b_pass"])
+
+
+class TwinTruthRecordTests(unittest.TestCase):
+    """The M4.9 truth pack (state TWIN_TRUTH): bound to the twin's truth job and the truth-gate provenance."""
+
+    def test_record(self):
+        record = load_shape_pack_record(SHAPES / f"{TWIN_TRUTH}.shape-pack.json")
+        gate = json.loads((ROOT / "docs/auto_id/twins/SP13_truth_gate/readiness_report.json").read_text(encoding="utf-8"))
+        passport = load_specimen_manifest(ROOT / "docs/auto_id/specimens/SP13.specimen.json")
+        registration = json.loads((ROOT / "docs/registrations/SP13_frozen_registration.json").read_text(encoding="utf-8"))
+        subset = registration["registration_metrics"]["fe_mapping_node_subset"]
+        self.assertEqual((record.specimen, record.state), ("SP13", "TWIN_TRUTH"))
+        self.assertEqual((record.job_name, record.generated_inp_sha256),
+                         (gate["truth_job"]["job_name"], gate["truth_job"]["generated_inp_sha256"]))
+        self.assertEqual(record.content_sha256, gate["truth_pack_content_sha256"])
+        self.assertEqual(record.odb.sha256, gate["truth_solve"]["odb_sha256"])
+        self.assertEqual(record.fe_geometry_sha256, passport.fe_reference.geometry_identity.sha256)
+        self.assertEqual((record.node_set_count, record.node_set_sha256), (subset["node_count"], subset["sha256"]))
+        self.assertEqual(record.mode_numbers, tuple(range(7, 31)))
+        self.assertEqual((record.pack.location.store, record.pack.location.relative_path),
+                         ("carbon-project-archive", f"fe_shapes/{TWIN_TRUTH}.npz"))
+        self.assertNotIn(TWIN_TRUTH, JOBS)  # never a duplicate of the p0 / ±5 % packs
+
+    def test_archived_pack_loads(self):
+        roots = fixture_roots_from_environment()
+        if "carbon-project-archive" not in roots:
+            self.skipTest("data store 'carbon-project-archive' not configured")
+        pack = load_shape_pack(load_shape_pack_record(SHAPES / f"{TWIN_TRUTH}.shape-pack.json"), roots)
+        self.assertEqual(pack.displacements.shape[0], 24)
 
 
 class StoreTests(unittest.TestCase):

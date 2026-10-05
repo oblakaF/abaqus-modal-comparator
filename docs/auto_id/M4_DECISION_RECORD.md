@@ -522,3 +522,83 @@ remains a proposal until separately approved.
 - **Constraint:** under the current SPEC §12.4 and §8.2, the full-mode-set SP13 twin cannot
   reach an M4.7 design while groups of more than two modes are present.
 - **Worker position:** no option is chosen or implemented.
+
+---
+
+## 10. N-mode trigger groups: option A1 (SUPERVISOR decisions, 2026-10-05)
+
+### 10.1 Decision: APPROVE A1 (DECISIONS.md D-032)
+
+- **Rule:** for N > 2 trigger groups, INDEPENDENT only if, in every approved ±5 %
+  direction:
+  - every member has exactly one distinct FE-to-FE match;
+  - the match has MAC ≥ 0.90;
+  - there is no competing match at or above the threshold;
+  - the full N-dimensional subspace is stable (every cos² > 0.95).
+- **Otherwise:** UNSUPPORTED, so the design is REFUSED (§8.2 still applies to these groups).
+- **Unchanged and not adopted:**
+  - the 2-mode path is unchanged; there are no new thresholds;
+  - A2 is not adopted;
+  - B is corroborating evidence only.
+- **Scope of §8.2:** C (refusal) is no longer mandatory for groups that pass A1.
+- **SPEC:** no SPEC text change is required. §12.4 defines closeness as a trigger and the
+  2-mode confirmation; A1 adds no confirmation rule.
+
+### 10.2 Implementation
+
+- **Code:** `identification_clusters.confirm_cluster` gains an N > 2 path,
+  `_independent_group`.
+  - It checks the unique matches (MAC ≥ 0.9) per direction and the principal angles of
+    the matched N-subspace.
+  - The result is INDEPENDENT or UNSUPPORTED, never CONFIRMED.
+- The 2-mode code path is untouched.
+- **Tests:**
+  - stable 3- and 4-mode groups → INDEPENDENT;
+  - an ambiguous member → UNSUPPORTED;
+  - a member rotating inside the group → UNSUPPORTED;
+  - an unstable N-subspace (every member MAC ≈ 0.905, cos² ≈ 0.905) → UNSUPPORTED;
+  - input validation;
+  - the 2-mode path unchanged;
+  - twin level: a stable triple → INDEPENDENT with the design USABLE; a rotating triple →
+    UNSUPPORTED with the design REFUSED.
+
+### 10.3 Truth artifacts (approved location; executed)
+
+- **Pack:** `carbon-project-archive/fe_shapes/SP13_bb3e5d7d131bed4f.npz`.
+  - File `eeebae21…`, content `758add0c…`.
+  - Repository record `docs/auto_id/fe_shapes/SP13_bb3e5d7d131bed4f.shape-pack.json`, state
+    `TWIN_TRUTH`; it loads with all checks.
+- **Provenance:** `carbon-project-archive/m4_twin/SP13_truth_gate/`.
+  - Contents: journal, run pack record, readiness report, twin provenance, extraction
+    manifest, solve logs.
+  - Pinned by SHA-256 in `ARCHIVE_MANIFEST.json` (`fab59ec5…`), which is indexed under
+    `m4_twin` in the archive's global `ARCHIVE_MANIFEST.json` (other keys unchanged).
+- **Not duplicated:** the p0/±5 % packs.
+- **Truth ODB:** kept in `D:\abaqus_m4_truth`, not archived.
+- **Regenerable INPs:** left untouched.
+
+### 10.4 Zero-Abaqus readiness re-run: **READY_FOR_IDENTIFICATION** (pending SUPERVISOR review)
+
+- **Method:** the journalled truth stage was resumed (0 Abaqus solves, 0 Abaqus Python
+  extractions); the truth executors refused any call.
+- **Unchanged inputs:** the freeze, synthetic experiment and truth pack are identical to §9
+  (observation hash `05a5443a…`).
+- **FE 13–15 (R7–R9): INDEPENDENT.** Member MAC ≥ 0.99999; subspace cos² ≥ 0.99999.
+- **FE 20–23 (R14–R17): INDEPENDENT.** Member MAC ≥ 0.99987; subspace cos² ≥ 0.99991.
+- **Other groups (2-mode path): INDEPENDENT, unchanged.** FE 10/11, 17/18, 24/25, 26/27,
+  28/29.
+- **Counts:**
+  - frozen rows 23;
+  - holdouts 2 (R1 torsion FE 7; R23 validation FE 29);
+  - fit rows 21 (R2–R22);
+  - 0 cluster terms;
+  - 21 fit terms for 2 parameters.
+- **M4.7 design:** **valid**.
+
+### 10.5 Open risk (recorded, not addressed)
+
+- R23 (FE 29), the validation holdout, sits at the upper boundary of the extracted mode
+  range (7–30).
+- The neighbouring (4,4) mode leaves the range in some states (§M4_4_NMODE_CLUSTER_REVIEW
+  §1). A tracked row near the boundary may later cause BRANCH_LOSS during the LM loop.
+- The extraction mode range is **not** expanded without a separate decision.

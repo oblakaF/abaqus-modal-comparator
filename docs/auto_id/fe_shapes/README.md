@@ -51,6 +51,7 @@ node set, modes and frequencies against the record, and refuses any difference.
 | `SP13_0e861d03c333bb0b` | SP13 E +5 % | 29 754 | `bac951494c22c82e…` |
 | `SP13_0328066b74b6fd78` | SP13 G12 −5 % | 29 754 | `b30263d23209e1fd…` |
 | `SP13_4c0f189b9727feaf` | SP13 G12 +5 % | 29 754 | `1febd80145e25448…` |
+| `SP13_bb3e5d7d131bed4f` | SP13 M4.9 twin truth (`TWIN_TRUTH`; M4.9 truth gate, not the extraction gate; provenance `m4_twin/SP13_truth_gate/`) | 29 754 | `758add0c22b824c5…` |
 
 **Use so far:** M4.2 builds the complete baseline MAC matrix from these packs.
 

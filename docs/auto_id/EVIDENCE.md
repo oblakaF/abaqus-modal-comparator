@@ -358,3 +358,22 @@ Possible remaining causes remain outside CARBON-5F scope:
   - `docs/auto_id/twins/SP13_truth_gate/`: readiness report, twin provenance, truth
     journal, truth pack record, extraction manifest;
   - `D:\abaqus_m4_truth`.
+
+## M4.9 — SP13 observation readiness after A1 (zero-Abaqus re-run)
+
+- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Kind:** pipeline readiness. **Not** a material identification result.
+- **Inputs:**
+  - the journalled truth stage of the M4.9 truth gate (no new solve or extraction);
+  - the twin definition `c200b293…` (seed 20261005);
+  - the validated p0/±5 % packs;
+  - D-032 (A1).
+- **Result: READY_FOR_IDENTIFICATION.**
+  - Strict freeze FROZEN, 23 rows; observation hash `05a5443a…`, unchanged.
+  - FE 13–15 and FE 20–23 are INDEPENDENT (member MAC ≥ 0.9998, subspace cos² ≥ 0.9999).
+    All seven trigger groups are INDEPENDENT.
+  - Holdouts: R1 (torsion) and R23 (validation). 21 fit terms for 2 parameters; the M4.7
+    design is valid.
+- **Abaqus runs:** 0.
+- **Records:** `docs/auto_id/twins/SP13_truth_gate/readiness_report_a1.json` and
+  `twin_provenance_a1.json`.
