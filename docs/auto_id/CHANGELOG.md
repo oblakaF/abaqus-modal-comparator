@@ -3043,3 +3043,16 @@ first internal provider.
   not expanded.
 - **Full suite:** Windows 1306 OK (25 skipped) without data stores; 1311 OK (2 skipped) with both stores.
 - **Abaqus runs:** 0.
+
+## 2026-10-05 — M4.9 pre-loop decision review (analysis only)
+
+- **Document:** `docs/auto_id/M4_9_PRELOOP_REVIEW.md` (PROPOSAL).
+- **Bounds:** no authoritative E_in_plane / G12 bounds exist; the SPEC requires bounds but gives
+  no values. Proposed development-only bounds: a factor-2 box around p0 in ln p (E 26000–104000,
+  G12 2250–9000).
+- **FE 29 / R23:** in range (mode 29 or 30) in all six validated states; MAC ≥ 0.986; no
+  ambiguity. FE 30 (4,4) leaves the range in E−, G12+ and at the truth. Option A recommended
+  (keep modes 7–30 and accept a refusal).
+- **Run root:** `D:baqus_m4_twin_loop`, with a retention proposal.
+- **Loop gate:** ≤ 20 evaluations including 5 reused; ≤ 15 new solves and 15 extractions.
+- **Unchanged:** code, status, DECISIONS, EVIDENCE. **Abaqus runs:** 0.
