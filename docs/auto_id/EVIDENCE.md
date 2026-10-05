@@ -252,7 +252,7 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 ## M4 — ODB shape-extraction gate and M4.2 complete-MAC baseline freeze
 
-- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
 - **Kind:** data preparation and observation freeze; **not** a material result.
 - **Gate:**
   - HUMAN-authorised 2026-10-04; supervisor review of the extraction: PASS.
@@ -279,7 +279,7 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 ## M4.3 — Modal-family classifier on real SP13 FE shapes
 
-- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
 - **Kind:** diagnostic validation of the PROVISIONAL classifier policy
   `auto-id/modal-family/v1-provisional`, with thresholds unchanged.
 - **Input:** validated shape pack `SP13_a46d08b52995e078` (content `7941545b…`).
@@ -296,7 +296,7 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 ## M4.4 — Cluster confirmation of SP13 R1/R2 on real FE shapes
 
-- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
 - **Kind:** observation-design diagnostic. **Not** a material result.
 - **Input:** validated SP13 baseline and CARBON-5A ±5 % E/G12 shape packs; M4.2 rows
   R1/R2; M4.3 families.
@@ -336,7 +336,7 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 ## M4.9 — SP13 truth gate and observation readiness (synthetic twin)
 
-- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
 - **Kind:** software and pipeline readiness. **Not** a material identification result.
 - **Authorisation:** HUMAN gate. 1 Abaqus 2024 truth solve (SP13, E 45000 / G12 4000
   MPa) plus 1 pinned `extract_odb.py` extraction. No LM, no identification solves.
@@ -361,7 +361,7 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 ## M4.9 — SP13 observation readiness after A1 (zero-Abaqus re-run)
 
-- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
 - **Kind:** pipeline readiness. **Not** a material identification result.
 - **Inputs:**
   - the journalled truth stage of the M4.9 truth gate (no new solve or extraction);
@@ -380,7 +380,7 @@ Possible remaining causes remain outside CARBON-5F scope:
 
 ## M4.9 — SP13 synthetic-twin identification loop (real Abaqus)
 
-- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
 - **Kind:** M4 software / pipeline acceptance on a synthetic digital twin.
   - **Not** a material identification of a real specimen.
   - **Not** an M5 identifiability result.

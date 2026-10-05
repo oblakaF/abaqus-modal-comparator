@@ -3083,3 +3083,41 @@ first internal provider.
   - `docs/auto_id/twins/SP13_identification_loop/`.
 - **Unchanged:** code, M3 contracts, thresholds, bounds, observation set.
 - **Full suite:** code unchanged since 7597b60 (Windows 1306 OK/25 skipped without stores, 1311 OK/2 skipped with stores; Linux CI 1303 OK); docs-only rerun below.
+
+## 2026-10-05 — M4 SUPERVISOR acceptance and stage closure
+
+- **Stage:** M4 `REVIEW_READY`. M4.1–M4.9 **ACCEPTED** (SUPERVISOR); **M4 gate PASS**; stage PR
+  `auto-id/m4` → `main` prepared, **not merged**. `last_accepted_stage` stays M3 until the HUMAN
+  merge. **M5 not started.**
+- **Evidence:** six pending M4 entries **ACCEPTED** (SUPERVISOR, 2026-10-05):
+  - ODB shape-extraction gate with the M4.2 complete-MAC freeze;
+  - M4.3 real classification;
+  - M4.4 R1/R2;
+  - M4.9 truth gate;
+  - readiness after A1;
+  - M4.9 identification loop.
+
+  The scientific text is unchanged. The M4.6 smoke-gate entry stays ACCEPTED.
+- **M4.9 gate result:**
+  - Recovered E = 45005.45 MPa, G12 = 4012.20 MPa; truth E = 45000 MPa, G12 = 4000 MPa. Both
+    within 1σ.
+  - 6/20 evaluations: 5 reused, 1 new identification solve plus 1 extraction.
+  - Deterministic replay PASS.
+  - The branch-exchange negative control is REFUSED, as required.
+  - M3 contracts unchanged.
+- **Qualifications:**
+  - M4.3 classifier thresholds remain PROVISIONAL;
+  - real SP13 identification stays refused (option C);
+  - SP02 stays NOT_FROZEN;
+  - the M4.9 bounds are development-only twin bounds.
+- **Governance:**
+  - M4_DECISION_RECORD §12, plus the stale header and batch table corrected;
+  - DECISIONS.md D-033–D-038 promoted (pairing policy, LM and budget, provisional classifier,
+    twin gate, refusal rules, M3 dependency boundary). The bounds are not promoted.
+- **Stage-gate test:** `tests/test_m4_stage_gate.py` (records only).
+  - Pinned provenance copies, the archive-manifest binding, run identity, journal hash chain,
+    budget, the 1σ result, no active bound, deterministic replay, the negative-control binding;
+  - store-gated M3 re-rendering and archive verification.
+  - The committed copies of the two archive manifests were added.
+- **Full suite:** Windows 1325 OK (27 skipped) without data stores; 1330 OK (2 skipped) with both stores; tests/test_m4_stage_gate.py 17 passed + 2 store-gated skipped (no stores) / 19 passed (stores); targeted M4 + M3 gate 196 passed.
+- **Abaqus runs during closure:** 0. No artifacts deleted.

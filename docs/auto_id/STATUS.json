@@ -5,7 +5,7 @@
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M4",
   "current_ministep": "M4.9",
-  "status": "IN_PROGRESS",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M3",
   "last_accepted_ministep": "M3.5",
   "last_accepted_commit": "3d862511e2fcb70670479b3f774f146658ae7ecb",
@@ -238,16 +238,16 @@
     }
   },
   "m4": {
-    "M4.1": "REVIEW_READY",
-    "M4.2": "REVIEW_READY",
-    "M4.3": "REVIEW_READY",
-    "M4.4": "REVIEW_READY",
-    "M4.5": "REVIEW_READY",
-    "M4.6": "REVIEW_READY",
-    "M4.7": "REVIEW_READY",
-    "M4.8": "REVIEW_READY",
-    "M4.9": "REVIEW_READY",
-    "status": "IN_PROGRESS",
+    "M4.1": "ACCEPTED",
+    "M4.2": "ACCEPTED",
+    "M4.3": "ACCEPTED",
+    "M4.4": "ACCEPTED",
+    "M4.5": "ACCEPTED",
+    "M4.6": "ACCEPTED",
+    "M4.7": "ACCEPTED",
+    "M4.8": "ACCEPTED",
+    "M4.9": "ACCEPTED",
+    "status": "REVIEW_READY",
     "branch": "auto-id/m4",
     "base": "6185b0565fb666ce26e533ac7b72a102de496f24",
     "batch_authorisation": "SUPERVISOR: first development batch M4.1-M4.5, M4.7, M4.8; no Abaqus execution (Abaqus Python on archived ODBs counts); no real solve pipeline; M4.6/M4.9 need new authorisation; archived CARBON-4C baseline replay approved as M4.2 reference source; SP02/SP13 development/test only; M3 contracts unchanged",
@@ -401,15 +401,17 @@
       "hil_gate_risk": "p0 FE trigger groups with >2 modes (FE 13-15, 20-23, 28-30): if all members freeze, the twin design is REFUSED under §8.2 (diagnostic, M4_DECISION_RECORD §8.8)"
     },
     "factual_status": {
-      "M4.6_implementation": "REVIEW_READY",
+      "M4.6_implementation": "ACCEPTED",
       "M4.6_SP13_smoke_gate": "ACCEPTED (verdict REPRODUCED)",
-      "M4.7": "REVIEW_READY",
-      "M4.9_preparation": "REVIEW_READY",
-      "M4.9_real_gate": "NOT STARTED",
+      "M4.7": "ACCEPTED",
+      "M4.9_preparation": "ACCEPTED",
+      "M4.9_real_gate": "EXECUTED (truth gate and identification loop)",
       "auto-id/m4_merged_to_main": false,
-      "M4.9_truth_gate": "EXECUTED: REFUSED_BEFORE_IDENTIFICATION (PENDING SUPERVISOR REVIEW)",
-      "M4.9_identification_loop": "EXECUTED: CONVERGED, both within 1 sigma (REVIEW_READY; PENDING SUPERVISOR REVIEW)",
-      "M4.9_readiness_after_A1": "READY_FOR_IDENTIFICATION (PENDING SUPERVISOR REVIEW)"
+      "M4.9_truth_gate": "ACCEPTED (evidence): REFUSED_BEFORE_IDENTIFICATION before A1",
+      "M4.9_identification_loop": "ACCEPTED (evidence): CONVERGED, both within 1 sigma",
+      "M4.9_readiness_after_A1": "ACCEPTED (evidence): READY_FOR_IDENTIFICATION",
+      "M4_stage_gate": "PASS",
+      "M5": "NOT STARTED"
     },
     "M4.9_truth_gate": {
       "authorised": "HUMAN 2026-10-05: exactly 1 SP13 truth Abaqus 2024 solve (E 45000, G12 4000) + 1 pinned extract_odb.py extraction, outside the 20-evaluation budget; no LM, no identification solves",
@@ -426,7 +428,7 @@
       "parameter_count": 2,
       "verdict": "REFUSED_BEFORE_IDENTIFICATION",
       "artifacts": "D:\\abaqus_m4_truth (truth ODB kept until M4.9 review; truth pack + journal + readiness report); provenance copies in docs/auto_id/twins/SP13_truth_gate/",
-      "evidence": "EVIDENCE.md 'M4.9 — SP13 truth gate' PENDING SUPERVISOR REVIEW",
+      "evidence": "EVIDENCE.md 'M4.9 — SP13 truth gate' ACCEPTED (SUPERVISOR, 2026-10-05)",
       "supervisor_review": "2026-10-05: result acknowledged (REFUSED_BEFORE_IDENTIFICATION); policy unchanged; analysis requested"
     },
     "nmode_cluster_review": {
@@ -437,7 +439,7 @@
       "truth_artifact_location_proposal": "pack -> carbon-project-archive:fe_shapes/; provenance -> carbon-project-archive:m4_twin/SP13_truth_gate/ (SHA-pinned manifest)"
     },
     "M4.4_nmode_A1": {
-      "status": "IMPLEMENTED (A1, D-032); readiness re-run READY_FOR_IDENTIFICATION (PENDING SUPERVISOR REVIEW)",
+      "status": "ACCEPTED (A1, D-032); readiness re-run READY_FOR_IDENTIFICATION (evidence ACCEPTED)",
       "abaqus_runs": 0,
       "fe_13_15": "INDEPENDENT",
       "fe_20_23": "INDEPENDENT",
@@ -498,9 +500,23 @@
       "new_solve": "SP13_aad55d259c1164ca (INP aad55d259c1164ca...; ODB fcd7fe001a4b60a5..., 615 s); pack aea5c21aead1c786...",
       "determinism_replay": "same run hash and identity; 6 evaluations replayed; 0 solves; identical result; journal unchanged",
       "archive": "carbon-project-archive/m4_twin/SP13_identification_loop/ (ARCHIVE_MANIFEST.json 11eb6493...)",
-      "evidence": "EVIDENCE.md 'M4.9 — SP13 synthetic-twin identification loop' PENDING SUPERVISOR REVIEW",
+      "evidence": "EVIDENCE.md 'M4.9 — SP13 synthetic-twin identification loop' ACCEPTED (SUPERVISOR, 2026-10-05)",
       "tests_result": "code unchanged since 7597b60 (Windows 1306 OK/25 skipped without stores, 1311 OK/2 skipped with stores; Linux CI 1303 OK); docs-only rerun below"
-    }
+    },
+    "stage_gate": "PASS (SUPERVISOR 2026-10-05): twin recovered within 1 sigma (6/20 evaluations, 1 new solve); branch-exchange negative control REFUSED; deterministic replay; M3 unchanged; tests/test_m4_stage_gate.py",
+    "stage_pr": "READY_FOR_STAGE_PR (auto-id/m4 -> main); not merged; HUMAN merge authorisation required",
+    "supervisor_acceptance": {
+      "date": "2026-10-05",
+      "decision": "M4.1-M4.9 ACCEPTED; six pending M4 EVIDENCE entries ACCEPTED; M4 stage-level scientific gate PASS",
+      "qualifications": [
+        "M4.3 classifier thresholds remain PROVISIONAL (auto-id/modal-family/v1-provisional)",
+        "real SP13 identification remains refused (strict real observation set insufficient / near-collinear, option C); M4.9 is the synthetic-twin gate, not a real-specimen identification",
+        "SP02 remains NOT_FROZEN and excluded",
+        "M4.9 bounds (E 26000-104000, G12 2250-9000 MPa) are development-only twin bounds, not material bounds"
+      ],
+      "decisions_promoted": "DECISIONS.md D-033..D-038 (D-032 already recorded)"
+    },
+    "stage_closure_tests": "Windows 1325 OK (27 skipped) without data stores; 1330 OK (2 skipped) with both stores; tests/test_m4_stage_gate.py 17 passed + 2 store-gated skipped (no stores) / 19 passed (stores); targeted M4 + M3 gate 196 passed"
   },
-  "next_action": "SUPERVISOR review of M4.9 (REVIEW_READY: CONVERGED, E and G12 within 1 sigma; 1 new solve); pending EVIDENCE entries; then the M4 stage gate; no merge, no M5"
+  "next_action": "HUMAN merge authorisation for the M4 stage PR (auto-id/m4 -> main); after the merge record the main merge SHA; M5 NOT STARTED"
 }

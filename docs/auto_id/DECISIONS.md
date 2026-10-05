@@ -314,3 +314,98 @@ Rationale / scope:
   test.
 
 Supersedes: none
+
+## D-033 — Strict identification pairing policy (M4.1)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §12.1; D-008; M4_DECISION_RECORD §12
+Decision:
+- Identification pairing uses the named, explicitly passed policy
+  `auto-id/identification-pairing/strict-v1`. No implicit default is constructed. Its values:
+  - baseline MAC ≥ 0.80;
+  - |Δf| / f ≤ 15 %;
+  - FE-to-FE tracking MAC ≥ 0.90 with a unique assignment;
+  - at least 2 strict observations;
+  - assignment ties (total-MAC difference < 1e-9) are refused.
+- The baseline is frozen only when the strict pairing is final. Otherwise it is NOT_FROZEN,
+  with the reasons.
+Rationale / scope: the values are those of SPEC §12.1. They are fixed in a hashed policy object
+and must not be relaxed to obtain a result.
+Supersedes: none
+
+## D-034 — Bounded-LM settings and evaluation-budget accounting (M4.8)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §8; M4_DECISION_RECORD §2, §6.2, §11
+Decision:
+- **Settings:** `LMSettings(mu_initial=1e-3, mu_decrease=10, max_step_attempts=3, solve_budget=20)`,
+  with μ × 10 on a rejected step, central finite differences at ±5 %, and the SPEC §8 stop rules.
+- **Budget:** the budget counts identification evaluations: p0, finite-difference points,
+  trial steps and reused archived evaluations.
+- **Counted separately:** actual Abaqus solves. A twin-truth solve and ODB shape extractions are
+  outside the identification budget.
+- **Failures:** a failed solve is never retried automatically.
+Rationale / scope: these are the approved and applied M4 settings. Parameter bounds are a
+per-run input; no general bounds are defined here.
+Supersedes: none
+
+## D-035 — Modal-family classifier thresholds remain provisional (M4.3)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §12.2–12.3; D-010; M4_DECISION_RECORD §1, §12
+Decision:
+- The classifier policy `auto-id/modal-family/v1-provisional` is accepted for use in holdout
+  selection. Its values:
+  - parity threshold 0.80;
+  - mirror tolerance 0.02;
+  - minimum mirror coverage 0.95;
+  - near-square tolerance 0.05;
+  - 41-point nodal grid;
+  - amplitude floor 0.05.
+- These thresholds remain **PROVISIONAL**: they are not physical constants, and their status is
+  shown wherever they are used.
+- They are revisited on further real shapes; any change requires a new decision.
+Rationale / scope: validated on the real SP13 baseline shapes (24/24 classified) and in the twin.
+Supersedes: none
+
+## D-036 — Synthetic-twin gate definition and pass criteria (M4.9)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §17 M4; M4_DECISION_RECORD §4, §5, §8.1, §11
+Decision:
+- **Twin definition:** `docs/auto_id/twins/SP13.twin.json` (hash `c200b293…`):
+  - truth E_in_plane 45000 / G12 4000 MPa; start 52000 / 4500 MPa;
+  - frequency noise ε ~ N(0, 0.003²) with the explicit fixed seed 20261005 (no default seed);
+  - FE modes 7–30 of the truth solve, read through the FrozenRegistration;
+  - σ = 0.003 per row; k_int disabled.
+- **Observations:** decided only by the strict freeze, M4.3 holdouts, M4.4 / A1 and the M4.7
+  design. Nothing is hand-selected.
+- **Pass criteria:**
+  1. CONVERGED within the budget;
+  2. |ln(p̂/p_true)| ≤ local sd for both parameters;
+  3. artificial branch exchange refused;
+  4. deterministic provenance;
+  5. full provenance record;
+  6. M3 contracts unchanged.
+- **Bounds:** the accepted run used E 26000–104000 and G12 2250–9000 MPa as **development-only
+  twin-gate bounds**. They are not physical or material bounds and do not carry over to other
+  runs.
+Rationale / scope: the M4 gate definition, as applied and accepted. The twin is model-consistent
+(it validates the pipeline, not real-specimen accuracy).
+Supersedes: none
+
+## D-037 — Observation-design and tracking refusal rules (M4)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §12.1, §12.4; D-008; D-009; D-032; M4_DECISION_RECORD §8.2–§8.4
+Decision:
+- **Refused designs:** a trigger group that is UNSTABLE, or UNSUPPORTED under D-032, makes the
+  observation design REFUSED. So does a CONFIRMED cluster split between fit and holdout. Groups
+  are never guessed, split, merged or silently excluded.
+- **Refused evaluations:** branch loss, branch exchange, ambiguous tracking or cluster-subspace
+  loss refuses the evaluation, with no re-pairing.
+- **Crossings:** a frequency crossing with stable shapes is tracked, not refused.
+Rationale / scope: these refusals are regular results (D-001). The branch-exchange acceptance
+test is a negative control on validated real packs, not physical FE evidence.
+Supersedes: none
+
+## D-038 — M3 forward-builder dependency boundary (M4.6)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: M4_DECISION_RECORD §6.4, §8.5
+Decision:
+- Only the M4.6 pipeline layer (`services/identification_pipeline.py`) imports the M3 forward
+  builder.
+- Other M4 services obtain M3 job identities through its `forward_jobs` helper.
+- The rule is enforced by `tests/test_m4_generic_guard.py`.
+Rationale / scope: keeps the M3 contract behind one controlled path, together with the
+`subprocess` and `abaqus_bridge` restrictions of §6.4.
+Supersedes: none

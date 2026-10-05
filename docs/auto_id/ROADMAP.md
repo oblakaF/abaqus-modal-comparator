@@ -310,15 +310,15 @@ shared-carbon builder stays unchanged as the regression oracle.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M4.1 | `IdentificationPairingPolicy` | `REVIEW_READY` |
-| M4.2 | Baseline observation / pair freeze | `REVIEW_READY` |
-| M4.3 | Physical modal-family classifier: P_x/P_y, nodal structure, diagonal symmetry when relevant | `REVIEW_READY` |
-| M4.4 | Cluster trigger + principal-angle / subspace confirmation | `REVIEW_READY` |
-| M4.5 | FE-to-FE branch tracker | `REVIEW_READY` |
-| M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `REVIEW_READY` |
-| M4.7 | Log-frequency objective | `REVIEW_READY` |
-| M4.8 | Bounded LM / trust step with the correct minus sign | `REVIEW_READY` |
-| M4.9 | Synthetic digital-twin recovery | `REVIEW_READY` |
+| M4.1 | `IdentificationPairingPolicy` | `ACCEPTED` |
+| M4.2 | Baseline observation / pair freeze | `ACCEPTED` |
+| M4.3 | Physical modal-family classifier: P_x/P_y, nodal structure, diagonal symmetry when relevant | `ACCEPTED` (thresholds PROVISIONAL) |
+| M4.4 | Cluster trigger + principal-angle / subspace confirmation | `ACCEPTED` |
+| M4.5 | FE-to-FE branch tracker | `ACCEPTED` |
+| M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `ACCEPTED` |
+| M4.7 | Log-frequency objective | `ACCEPTED` |
+| M4.8 | Bounded LM / trust step with the correct minus sign | `ACCEPTED` |
+| M4.9 | Synthetic digital-twin recovery | `ACCEPTED` |
 
 M4.9 synthetic truth: E = 45000 MPa, G12 = 4000 MPa, controlled frequency noise
 ≈ 0.3 %; start E = 52000 MPa, G12 = 4500 MPa.
@@ -326,7 +326,30 @@ M4.9 synthetic truth: E = 45000 MPa, G12 = 4000 MPa, controlled frequency noise
 **M4 GATE:** recover the truth within 1σ in ≤ 20 authorised Abaqus solves. An
 artificial branch exchange must trigger refusal, not silent re-pairing.
 
-Stage status: `IN_PROGRESS` (branch `auto-id/m4`, based on `main` `6185b05`).
+Stage status: `REVIEW_READY` (M4.1–M4.9 `ACCEPTED` by the SUPERVISOR, 2026-10-05; **M4 GATE: `PASS`**;
+stage PR `auto-id/m4` → `main` prepared, **not merged**; branch based on `main` `6185b05`).
+
+**M4 GATE: `PASS`** (SUPERVISOR, 2026-10-05; `tests/test_m4_stage_gate.py`, records only, no Abaqus):
+- **Recovery:** the synthetic twin was recovered within 1σ: E 45005.45 / G12 4012.20 MPa against the truth
+  45000 / 4000. |ln error| / sd: E 0.000121 / 0.002064; G12 0.003046 / 0.009951.
+- **Budget:** 6 of 20 identification evaluations (5 reused archived evaluations, 1 new Abaqus
+  solve plus 1 pinned extraction). No bound was active.
+- **Branch exchange:** an artificial exchange is refused (the real-pack negative control gives
+  `BRANCH_LOSS`; no re-pairing).
+- **Determinism and M3:** deterministic journal replay; M3 contracts unchanged.
+- **Abaqus work:** all of it ran under HUMAN gates: 3 solves (smoke, truth, loop) and 9 Abaqus Python
+  runs (6 in the extraction gate, 3 pinned extractions).
+- **Qualifications:**
+  - the M4.3 classifier thresholds stay PROVISIONAL;
+  - real SP13 identification stays refused (its strict real observation set is insufficient and
+    near-collinear; option C), so M4.9 is the synthetic-twin gate, not a real-specimen
+    identification;
+  - SP02 stays NOT_FROZEN and excluded;
+  - the M4.9 bounds are development-only twin bounds.
+- **Evidence:** EVIDENCE.md M4 entries (all `ACCEPTED`); M4_DECISION_RECORD.md §1–§12; DECISIONS.md
+  D-032–D-038.
+
+Stage history (for the record):
 First development batch (SUPERVISOR-authorised): M4.1–M4.5, M4.7, M4.8. Rules for the batch:
 - no Abaqus execution; Abaqus Python on archived ODBs counts as an Abaqus run;
 - no real solve pipeline; M4.6 and M4.9 need new authorisation;
@@ -338,7 +361,7 @@ First batch reviewed by the SUPERVISOR:
 - M4.1, M4.3, M4.4, M4.5, M4.7 and M4.8 are acknowledged as `REVIEW_READY`.
 - M4.2 is `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION`: the archived baseline lacks FE mode shapes,
   and Abaqus Python extraction needs a separate HUMAN gate.
-- M4.6 and M4.9 have not started.
+- M4.6 and M4.9 had not started at that point (both were later completed; see below).
 - ODB shape-extraction gate (HUMAN-authorised; review PASS): 6 validated shape packs
   ([fe_shapes/](fe_shapes/README.md)). M4.2 integrated with complete MAC matrices: back to
   `REVIEW_READY`. SP13 is FROZEN (2 rows); SP02 is NOT_FROZEN (1 strict pair < 2).
@@ -367,20 +390,20 @@ First batch reviewed by the SUPERVISOR:
     proposal.
 - SUPERVISOR review of M4.4:
   - `REVIEW_READY`: R1/R2 are independent branches; no cluster merging.
-  - **Unresolved:** the M4.3 holdout selection leaves one fit row for two parameters.
+  - The M4.3 holdout selection leaves one real fit row for two parameters. This was resolved by option C
+    (real SP13 identification refused, M4_DECISION_RECORD §5.1).
 - M4.9 preparation (fake solver only; no Abaqus): `REVIEW_READY`.
   - Twin builder, observation pipeline and M4.6 integration in
     `services/synthetic_twin.py`; tests A–E pass.
   - SUPERVISOR decisions recorded in M4_DECISION_RECORD.md §8; dependency boundary
     restored (the twin reaches M3 only through the M4.6 pipeline layer).
-  - **Real M4.9 gate: NOT STARTED** (unauthorised; separate HUMAN gate).
-  - `auto-id/m4` is not merged to `main`.
+  - The real M4.9 gate was not started at that point (it later ran under its own HUMAN gates).
 - M4.9 truth / observation-readiness gate (HUMAN-authorised: 1 truth solve + 1
   pinned extraction): **REFUSED_BEFORE_IDENTIFICATION**.
   - Strict freeze: 23 rows.
   - Trigger groups FE 13–15 and FE 20–23 are UNSUPPORTED (> 2 modes), so the
     design is REFUSED under §8.2.
-  - The identification loop was not started. A SUPERVISOR decision is needed.
+  - The identification loop was not started; the SUPERVISOR then decided option A1 (D-032).
 - M4.4 option A1 (N > 2 groups INDEPENDENT only; D-032): implemented.
   - The zero-Abaqus readiness re-run gives **READY_FOR_IDENTIFICATION**:
     FE 13–15 and FE 20–23 are INDEPENDENT; 21 fit terms; holdouts R1 and R23.
@@ -388,8 +411,9 @@ First batch reviewed by the SUPERVISOR:
 - M4.9 real identification loop (HUMAN-authorised): **CONVERGED**.
   - Result: E 45005 MPa, G12 4012 MPa (truth 45000 / 4000); both within 1σ.
   - Effort: 6 evaluations (5 reused, 1 new solve).
-  - Status: `REVIEW_READY`, pending the SUPERVISOR.
-- Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
+  - **ACCEPTED** by the SUPERVISOR (2026-10-05).
+- Decisions: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (accepted). Durable items are promoted to
+  DECISIONS.md D-033–D-038; D-032 records A1.
 
 ---
 

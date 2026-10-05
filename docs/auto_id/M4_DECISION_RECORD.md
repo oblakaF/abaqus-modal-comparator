@@ -1,8 +1,8 @@
-# M4 decision record — open parameters before M4.6 / M4.9
+# M4 decision record (open parameters before M4.6 / M4.9, and later M4 decisions)
 
-**Status:** PROPOSED, with SUPERVISOR review decisions recorded (2026-10-04). It is not
-yet a DECISIONS.md entry. The supervisor transfers accepted items there by a later
-decision.
+**Status:** ACCEPTED with the M4 stage (SUPERVISOR, 2026-10-05; §12). Durable items are
+promoted to DECISIONS.md D-033–D-038; A1 is D-032. Sections §1–§11 keep the decisions as they
+were recorded at the time.
 
 **Branch:** `auto-id/m4`.
 
@@ -10,15 +10,20 @@ decision.
 values. No code changes are made or proposed here; every value is already explicit in
 code (hashed policy or required argument).
 
-**Batch status:**
+**Batch status (current, 2026-10-05):**
 
 | Mini-step | Status |
 |---|---|
-| M4.1, M4.3, M4.4, M4.5, M4.7, M4.8 | REVIEW_READY (acknowledged) |
-| M4.2 | `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION` (kept) |
-| M4.6, M4.9 | TODO; not authorised; implementation not started |
+| M4.1, M4.2, M4.4–M4.9 | `ACCEPTED` (SUPERVISOR, 2026-10-05) |
+| M4.3 | `ACCEPTED`; classifier thresholds remain PROVISIONAL |
+| M4 stage gate | `PASS`; stage PR prepared, not merged |
 
-No Abaqus or Abaqus Python runs.
+**Abaqus work in M4:** all under HUMAN gates.
+- 3 Abaqus 2024 solves: the p0 smoke gate, the twin truth and the identification loop.
+- 9 Abaqus Python runs: 6 in the extraction gate plus 3 pinned extractions.
+
+(At the time of the first batch review, M4.2 was blocked on FE shapes and M4.6 / M4.9 were not
+authorised; §1–§7 below record that state.)
 
 ## SUPERVISOR review decisions (2026-10-04)
 
@@ -706,3 +711,51 @@ R23 21.58.
 | Reused packs | p0 `7941545b…`; E+ `bac95149…`; E− `371050a5…`; G12+ `1febd801…`; G12− `b30263d2…` |
 | Archive | `carbon-project-archive/m4_twin/SP13_identification_loop/` (`ARCHIVE_MANIFEST.json` `11eb6493…`; indexed in the global manifest under `m4_twin`) |
 | ODB | Kept in the run directory until SUPERVISOR review (not archived) |
+
+---
+
+## 12. M4 SUPERVISOR acceptance and stage closure (2026-10-05)
+
+**Decision (SUPERVISOR):**
+- M4.1–M4.9 are **ACCEPTED**.
+- The six pending M4 EVIDENCE entries are **ACCEPTED**:
+  - the ODB shape-extraction gate with the M4.2 complete-MAC freeze;
+  - M4.3 real classification;
+  - M4.4 R1/R2;
+  - the M4.9 truth gate;
+  - the readiness re-run after A1;
+  - the identification loop.
+- The M4 stage-level scientific gate is **PASS**.
+
+**Qualifications kept:**
+- The M4.3 classifier thresholds remain **PROVISIONAL** (`auto-id/modal-family/v1-provisional`).
+- Real SP13 identification remains refused, because the strict real observation set is
+  insufficient and near-collinear (§5.1). The M4.9 result is the synthetic-twin gate, not a
+  real-specimen identification.
+- SP02 remains NOT_FROZEN and excluded.
+- The M4.9 bounds (E 26000–104000, G12 2250–9000 MPa) were accepted for the synthetic-twin gate
+  only. They are not promoted to physical or material bounds.
+
+**Promoted to DECISIONS.md (durable items only):**
+
+| Entry | Content |
+|---|---|
+| D-033 | Strict identification pairing policy |
+| D-034 | Bounded-LM settings and evaluation-budget accounting |
+| D-035 | Classifier thresholds remain provisional |
+| D-036 | Synthetic-twin gate definition and pass criteria (bounds recorded as twin-gate bounds only) |
+| D-037 | Observation-design refusal rules |
+| D-038 | The M3 forward-builder dependency boundary |
+
+D-032 already records A1.
+
+**Stage closure:**
+- **Records-only gate test:** `tests/test_m4_stage_gate.py` (no Abaqus, no temporary run
+  directories):
+  - the committed provenance copies are SHA-pinned and bound to the permanent archive manifests;
+  - it checks the run identity, the journal hash chain, the budget, the 1σ result, no active
+    bound, the deterministic replay and the negative-control binding;
+  - when the stores are configured, it re-renders the M3 jobs and verifies the archive.
+- The stage PR `auto-id/m4` → `main` is prepared and **not merged**.
+- `last_accepted_stage` stays M3 until the HUMAN merge.
+- **M5 not started.** No Abaqus during closure.

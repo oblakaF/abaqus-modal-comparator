@@ -1,0 +1,86 @@
+{
+  "schema": "auto-id/archive-manifest/v1",
+  "gate": "M4.9 truth-generation and observation-readiness gate (HUMAN-authorised 2026-10-05)",
+  "approval": "SUPERVISOR 2026-10-05 (M4_DECISION_RECORD \u00a78.6, \u00a710): truth pack -> fe_shapes/, truth provenance -> m4_twin/SP13_truth_gate/; truth ODB not archived (kept in the run directory until the M4.9 review)",
+  "created_utc": "2026-10-05T02:22:47+00:00",
+  "truth_job": "SP13_bb3e5d7d131bed4f",
+  "truth_odb_not_archived": {
+    "sha256": "57282e50448a9e8bb387336b1f0e0f8f56478ba85cd596effc8a67bacf7b69c4",
+    "bytes": 715614536,
+    "kept_in": "D:\\abaqus_m4_truth (temporary, \u00a78.6)"
+  },
+  "files": [
+    {
+      "file": "fe_shapes/SP13_bb3e5d7d131bed4f.npz",
+      "sha256": "eeebae21c5e3c4f181f56cfe84115d63c62ebc949124e5446788d50359bee8fa",
+      "bytes": 13569410,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/packs/SP13_bb3e5d7d131bed4f.npz"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/journal.json",
+      "sha256": "395abb9bb96c986dd77ce54bb22e6910368a7de3cd4fbd19b1ec4283d5462137",
+      "bytes": 3305,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/journal.json"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/SP13_bb3e5d7d131bed4f.run-shape-pack.json",
+      "sha256": "058dd50a29cf9f0ba270fd4e8d09049becfc48213d41deac57324aa8abff0a8f",
+      "bytes": 2821,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/packs/SP13_bb3e5d7d131bed4f.shape-pack.json"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/readiness_report.json",
+      "sha256": "3d55b4a67b0a5027e49cd8c5dfe853ba5dbcc41ed6c8104e5869293f2c1c5410",
+      "bytes": 23402,
+      "source": "readiness_report.json"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/twin_provenance.json",
+      "sha256": "8a9c36a3ed29b13ef682668ebb828663f63935bba06b415cdfe3b7162c429e1b",
+      "bytes": 12424,
+      "source": "twin/twin_provenance.json"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/truth_extraction_manifest.json",
+      "sha256": "2b199e36925ea4f4d6fe4906eea6b892c7b876b9eec6a9eeb26d51fa83515bc1",
+      "bytes": 38999,
+      "source": "truth_extraction_manifest.json"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/logs/SP13_bb3e5d7d131bed4f.sta",
+      "sha256": "5587c4c536470550f98c3fae823ce357dc1d1059758044bcfdfb72593b901b39",
+      "bytes": 443,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/solves/SP13_bb3e5d7d131bed4f/SP13_bb3e5d7d131bed4f.sta"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/logs/SP13_bb3e5d7d131bed4f.msg",
+      "sha256": "97216f71e096f57abda1d30fc085689a9236b796284d3f796fbfabbded84eda5",
+      "bytes": 8160,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/solves/SP13_bb3e5d7d131bed4f/SP13_bb3e5d7d131bed4f.msg"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/logs/SP13_bb3e5d7d131bed4f.dat",
+      "sha256": "ee0ccbb079ffbbd283d0afd2ad317606996df2c8ca1ce96d07d72426030cf556",
+      "bytes": 46740,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/solves/SP13_bb3e5d7d131bed4f/SP13_bb3e5d7d131bed4f.dat"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/logs/SP13_bb3e5d7d131bed4f.prt",
+      "sha256": "ac9e77f2a54a8802fbd2e35813fd1920371a5f1fb2e2ea75a4d3d74d66d6ab7e",
+      "bytes": 4573,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/solves/SP13_bb3e5d7d131bed4f/SP13_bb3e5d7d131bed4f.prt"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/logs/SP13_bb3e5d7d131bed4f.com",
+      "sha256": "3d32d70dbd08a9864aee18a17a890c57f2fb3a35ef913f74a58bf80cb19e2caa",
+      "bytes": 3418,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/solves/SP13_bb3e5d7d131bed4f/SP13_bb3e5d7d131bed4f.com"
+    },
+    {
+      "file": "m4_twin/SP13_truth_gate/logs/solve.log",
+      "sha256": "688f5e7cec822c007e758e7a48dbf1f471cefa6383fd7f8f85d2ce2a92addb07",
+      "bytes": 1699,
+      "source": "twin/truth/926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b/solves/SP13_bb3e5d7d131bed4f/solve.log"
+    }
+  ]
+}
