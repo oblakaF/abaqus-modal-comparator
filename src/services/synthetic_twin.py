@@ -8,7 +8,9 @@ Everything the M4.9 gate needs, with the real Abaqus solves left to a separate H
    k_int; content-hashed.
 2. Truth stage (``solve_truth``): the truth candidate's M3 forward job, solved and extracted
    through the M4.6 components, journalled apart from the identification loop (the truth
-   solve is not one of the 20 identification evaluations).
+   solve is not one of the 20 identification evaluations).  M3 jobs (truth, start, ±5 %) come
+   only through the M4.6-owned ``identification_pipeline.forward_jobs``; this module never
+   imports the M3 forward builder.
 3. ``build_synthetic_experiment``: truth FE modes read through the FrozenRegistration onto the
    measured grid (FE shapes rotated by R into the experimental frame, unmeasured DOFs zero),
    frequencies × (1 + sd·ε) with ε from a version-independent deterministic generator
@@ -17,9 +19,9 @@ Everything the M4.9 gate needs, with the real Abaqus solves left to a separate H
 4. ``design_twin_observations``: strict baseline freeze at p0 (M4.2), M4.3 family
    classification and holdouts, M4.4 cluster triggers and confirmation with the validated
    ±5 % packs, the M4.7 objective design.  Nothing is hand-selected.  An UNSTABLE or
-   UNSUPPORTED trigger group, or a design ``build_objective_design`` refuses, makes the twin
-   design REFUSED; rows are never silently dropped (how to resolve such a case is a
-   SUPERVISOR decision, not made here).
+   UNSUPPORTED trigger group, or a CONFIRMED cluster split by the holdout selection, makes the
+   twin design REFUSED; nothing is guessed, split, merged or silently excluded (SUPERVISOR
+   decisions, M4_DECISION_RECORD.md §8.2–§8.3).
 5. ``prepare_twin``: stages 2–4, then the M4.6 ``PipelineConfig`` (twin hashes and the seed in
    the run identity) and a deterministic provenance record.
 6. ``assess_recovery``: M4.9 pass criteria 1–2 as recorded (CONVERGED; |ln(p̂_j/p_true,j)| ≤ sd_j
@@ -40,14 +42,13 @@ from typing import Any, Mapping, Optional, Sequence
 import numpy as np
 
 from domain.experimental_qc import ExperimentalModeEligibility, ExperimentalQCStatus
-from domain.forward_model_manifest import BoundForwardModel, ForwardCandidate
+from domain.forward_model_manifest import BoundForwardModel
 from domain.frozen_observations import BaselineIdentity, FrozenObservationSet
 from domain.identification_run import RunJournal, SolverProfile, canonical_hash
 from domain.registration import REGISTRATION_DOF_COMPONENTS
 
 from .baseline_freeze import BaselineEvidence, build_baseline_evidence, freeze_baseline
 from .fe_shape_pack import FEShapePack, load_shape_pack
-from .forward_builder import prepare_forward_job, read_reference_input
 from .forward_solver import SolveExecutor, SolveFailure, solve_forward_job, solve_hash, verify_solve
 from .identification_clusters import (
     CARBON_V1_DIRECTIONS,
@@ -59,7 +60,7 @@ from .identification_clusters import (
 )
 from .identification_objective import ObjectiveDesign, ObjectiveInputError, RowSigma, build_objective_design
 from .identification_pairing import ModeFrequency
-from .identification_pipeline import PipelineConfig
+from .identification_pipeline import PipelineConfig, forward_jobs
 from .identification_step import LMResult, LMStatus
 from .modal_family_classifier import ClassifiedRow, HoldoutSelection, ModeFamily, classify_shape_pack_modes, select_holdouts
 from .shape_extraction import ExtractionExecutor, ExtractionExpectation, extract_shape_pack, load_run_pack
@@ -70,6 +71,14 @@ SYNTHETIC_EXPERIMENT_SCHEMA = "auto-id/synthetic-experiment/v1"
 TWIN_TRUTH_SCHEMA = "auto-id/twin-truth/v1"
 TWIN_PROVENANCE_SCHEMA = "auto-id/twin-provenance/v1"
 TWIN_EVIDENCE_SOURCE = "synthetic-twin"
+# SUPERVISOR decision (M4_DECISION_RECORD.md §8.6): what of the truth stage is kept.
+TRUTH_ARTIFACT_RETENTION = {
+    "truth_shape_pack": "permanent",
+    "truth_provenance_and_run_identities": "permanent",
+    "truth_odb": "temporary until M4.9 review; may then be deleted under the retention rule unless archived "
+                 "by a later SUPERVISOR decision",
+    "archived_p0_and_perturbed_packs": "referenced by content hash; never duplicated",
+}
 _DEFINITION_KEYS = {"schema", "twin_id", "forward_model_id", "truth", "start", "noise_relative_sd", "noise_seed",
                     "mode_numbers", "sigma", "k_int_enabled", "provenance"}
 _PIPELINE_FIELDS = set(PipelineConfig.__dataclass_fields__) - {"frozen", "design"}
@@ -331,11 +340,6 @@ def design_twin_observations(definition: TwinDefinition, frozen: FrozenObservati
 
 # ----------------------------------------------------------------------------- truth stage
 
-def forward_candidate(model: BoundForwardModel, parameters: Mapping[str, float]) -> ForwardCandidate:
-    return ForwardCandidate.create(model.manifest.parameterisation.parameterisation_id,
-                                   **{name: float(value) for name, value in parameters.items()})
-
-
 def solve_truth(definition: TwinDefinition, model: BoundForwardModel, profile: SolverProfile,
                 expectation: ExtractionExpectation, roots: Mapping[str, Path], directory: Path, abaqus_command: str,
                 solve_executor: SolveExecutor, extraction_executor: ExtractionExecutor,
@@ -355,8 +359,7 @@ def solve_truth(definition: TwinDefinition, model: BoundForwardModel, profile: S
     directory = Path(directory) / canonical_hash(identity)
     directory.mkdir(parents=True, exist_ok=True)
     journal = RunJournal(directory / "journal.json", identity)
-    job = prepare_forward_job(model, forward_candidate(model, definition.truth), read_reference_input(model, roots),
-                              directory / "jobs")
+    job = forward_jobs(model, roots, {"truth": definition.truth}, directory / "jobs")["truth"]
     key = solve_hash(job.generated_inp_sha256, profile)
     solve_dir = directory / "solves" / job.job_name
     solve = journal.find("truth_solve", solve_hash=key)
@@ -429,7 +432,8 @@ def _twin_provenance(definition: TwinDefinition, truth_pack: FEShapePack, truth_
                                  "modes": [{"number": m.number, "frequency_hz": m.frequency_hz,
                                             "source_fe_mode": m.source_fe_mode, "truth_fe_hz": m.truth_fe_hz,
                                             "epsilon": m.noise} for m in experiment.modes]},
-        "reused_packs": {key: pack.record.content_sha256 for key, pack in sorted(packs.items())},
+        "reused_packs": {key: pack.record.content_sha256 for key, pack in sorted(packs.items())},  # referenced, not copied
+        "artifact_retention": dict(TRUTH_ARTIFACT_RETENTION),
         "observation_design": {
             "status": observation.status.value, "reasons": list(observation.reasons),
             "freeze_status": observation.frozen.status.value,
@@ -475,16 +479,15 @@ def prepare_twin(definition: TwinDefinition, registration, pipeline_fields: Mapp
                                             *truth_executors, retry_failed_solve=retry_failed_truth_solve)
     experiment = build_synthetic_experiment(definition, truth_pack, registration)
 
-    source = read_reference_input(model, fields["roots"])
     points = {"p0": dict(definition.start)}
     points.update(perturbed_points(definition.start, fields["settings"].finite_difference_step))
-    packs, jobs = {}, {}
-    for key, point in points.items():
-        job = prepare_forward_job(model, forward_candidate(model, point), source, work_directory / "jobs")
+    jobs = forward_jobs(model, fields["roots"], points, work_directory / "jobs")
+    packs = {}
+    for key, job in jobs.items():
         record = fields["archived_packs"].get(job.job_name)
         if record is None or record.generated_inp_sha256 != job.generated_inp_sha256:
             raise TwinError(f"no validated pack for {key} ({job.job_name}); obtaining one needs its own Abaqus gate.")
-        packs[key], jobs[key] = load_shape_pack(record, fields["roots"]), job
+        packs[key] = load_shape_pack(record, fields["roots"])  # validated archive, never duplicated
 
     evidence = twin_baseline_evidence(definition, model, jobs["p0"], packs["p0"], registration, experiment)
     frozen = freeze_baseline(evidence, fields["policy"])

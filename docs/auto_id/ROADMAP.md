@@ -371,8 +371,10 @@ First batch reviewed by the SUPERVISOR:
 - M4.9 preparation (fake solver only; no Abaqus): `REVIEW_READY`.
   - Twin builder, observation pipeline and M4.6 integration in
     `services/synthetic_twin.py`; tests A–E pass.
-  - **Real M4.9 gate: NOT STARTED** (separate HUMAN gate). Decisions needed: see
-    CHANGELOG 2026-10-05 "M4.9 preparation".
+  - SUPERVISOR decisions recorded in M4_DECISION_RECORD.md §8; dependency boundary
+    restored (the twin reaches M3 only through the M4.6 pipeline layer).
+  - **Real M4.9 gate: NOT STARTED** (unauthorised; separate HUMAN gate).
+  - `auto-id/m4` is not merged to `main`.
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---

@@ -2906,3 +2906,49 @@ first internal provider.
 - **Correction note:** the previous entry's run directory `D:\abaqus_m4_smoke` contains a
   stray control character. Not edited (append-only); this note is the correction.
 - **Abaqus runs:** 0. **Real Abaqus M4.9 gate NOT STARTED.**
+
+## 2026-10-05 — M4.9 preparation: SUPERVISOR decisions recorded; dependency boundary restored
+
+- **Stage:** M4 (IN_PROGRESS); M4.9 `IN_PROGRESS`; preparation `REVIEW_READY`. **Real M4.9 gate
+  NOT STARTED** (unauthorised).
+- **Decisions** recorded in M4_DECISION_RECORD.md §8:
+  - fixed seed 20261005;
+  - UNSTABLE / UNSUPPORTED groups are REFUSED;
+  - a CONFIRMED cluster split by the holdout selection is REFUSED;
+  - branch-exchange negative control on the real SP13 packs;
+  - no direct twin → M3 import;
+  - truth artifact retention;
+  - factual status.
+- **Dependency boundary (§8.5):**
+  - `identification_pipeline.py` gains `forward_candidate` and `forward_jobs`. This is
+    additive; the pipeline's own candidate creation now calls `forward_candidate`, with no
+    behaviour change.
+  - `synthetic_twin.py` no longer imports `forward_builder`.
+  - The guard is restored, plus an explicit test that only the pipeline imports it.
+- **SP13 twin definition:** `docs/auto_id/twins/SP13.twin.json`.
+  - Seed 20261005; definition hash `c200b293…`.
+  - Truth/start/noise/σ/modes follow §4–§5.
+- **Truth retention (§8.6):** the provenance carries the retention rule. The twin work
+  directory holds only the truth pack; archived packs are referenced by hash only.
+- **New tests:**
+  - UNSTABLE group REFUSED;
+  - UNSUPPORTED group REFUSED (no row excluded);
+  - CONFIRMED cluster split by the validation holdout REFUSED;
+  - SP13 twin definition (seed explicit, pinned hash, seed changes the hash);
+  - retention / no duplicate packs;
+  - the forward-builder boundary;
+  - **real-pack negative control (store-gated):**
+    - the M4.2 SP13 frozen rows (R1 ↔ FE 10, R2 ↔ FE 11);
+    - 45° in-memory mixing of FE 10/11 in the archived E−5 % candidate, immediately before
+      M4.5, gives REFUSED (`BRANCH_LOSS`);
+    - frozen rows unchanged, 0 solves, pack files unchanged, still refused on replay;
+    - controls: without injection the candidate tracks (R1 → 10, R2 → 11); a pure
+      relabelling is tracked as a crossing (R1 → 11, R2 → 10), not refused;
+    - recorded as a negative control, **not physical FE evidence**.
+- **Full suite:** Windows 1296 tests OK (24 skipped) without data stores; 1301 OK (2 skipped) with both stores.
+- **Worker observation (§8.8, diagnostic):** the pinned SP13 p0 frequencies alone trigger
+  > 2-mode groups (FE 13–15, 20–23, 28–30). If all members freeze in the twin, §8.2 makes
+  the design REFUSED. This is for the SUPERVISOR / HUMAN to weigh before any real gate.
+- **Unchanged:** M3 contracts and files, `extract_odb.py`, acceptance criteria, smoke-gate
+  records, EVIDENCE.
+- **Abaqus runs:** 0 (no Abaqus Python). **Real Abaqus M4.9 gate NOT STARTED.**

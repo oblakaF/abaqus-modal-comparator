@@ -1,0 +1,18 @@
+{
+  "schema": "auto-id/synthetic-twin/v1",
+  "twin_id": "SP13/m4.9-twin/v1",
+  "forward_model_id": "SP13_mesh_local_v1_modal/carbon-property-set-v1",
+  "truth": {"E_in_plane_mpa": 45000.0, "G12_mpa": 4000.0},
+  "start": {"E_in_plane_mpa": 52000.0, "G12_mpa": 4500.0},
+  "noise_relative_sd": 0.003,
+  "noise_seed": 20261005,
+  "mode_numbers": [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
+  "sigma": 0.003,
+  "k_int_enabled": false,
+  "provenance": [
+    "M4_DECISION_RECORD.md §4: truth, start, noise N(0, 0.003^2), sigma 0.003 per row, no provisional setup term",
+    "M4_DECISION_RECORD.md §5.2: FE modes 7-30 of the truth solve; §5.3: k_int disabled, torsion holdout by policy",
+    "M4_DECISION_RECORD.md §8.1: fixed noise seed 20261005 (SUPERVISOR 2026-10-05)",
+    "Preparation only: the real M4.9 gate (truth solve) is NOT STARTED and needs a separate HUMAN gate"
+  ]
+}

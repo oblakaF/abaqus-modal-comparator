@@ -385,27 +385,29 @@
         "tests/test_synthetic_twin.py",
         "tests/m4_9_twin_support.py",
         "tests/test_m4_9_sp13_readiness.py",
-        "tests/test_m4_generic_guard.py (synthetic_twin.py added; forward_builder allowed read-only)"
+        "tests/test_m4_generic_guard.py"
       ],
       "pipeline": "twin definition (explicit seed) -> truth solve + extraction (own journal, not in the 20) -> synthetic experiment (registration R, U3, SHA-256/Box-Muller noise) -> strict freeze -> M4.3 families/holdouts -> M4.4 triggers/confirmation (±5 % packs) -> M4.7 design -> M4.6 pipeline (twin hashes and seed in the run identity) -> assessment of criteria 1-2",
       "fake_solver_result": "plate-like fake: 24 rows FROZEN; torsion holdout found by policy; rotating pair CONFIRMED (one cluster term), stable close pair INDEPENDENT; CONVERGED in 6 evaluations (5 reused, 1 solve); A-E pass",
       "sp13_readiness": "start and ±5 % points render to the validated pack jobs (SP13_a46d08b52995e078, SP13_a9df66283a168786, SP13_0e861d03c333bb0b, SP13_0328066b74b6fd78, SP13_4c0f189b9727feaf); the truth job has no pack (needs the gated solve)",
       "real_gate_budget_if_authorised": "1 truth solve + 1 extraction (separate); identification <= 20 evaluations incl. 5 reused archived packs, so <= 15 Abaqus solves + 15 extractions",
-      "tests_result": "Windows 1290 tests OK (23 skipped) without data stores; 1292 OK (2 skipped) with both stores",
+      "tests_result": "Windows 1296 tests OK (24 skipped) without data stores; 1301 OK (2 skipped) with both stores",
       "abaqus_runs": 0,
-      "decisions_needed": [
-        "Noise seed of the real SP13 twin: the definition requires an explicit seed (no default); no SP13 twin definition is committed until the SUPERVISOR fixes it.",
-        "UNSTABLE or UNSUPPORTED (>2-mode) trigger groups in the twin: implemented as a REFUSED design (no row is dropped silently); confirm, or define another rule.",
-        "A CONFIRMED cluster split by the holdout selection: build_objective_design refuses, so the twin design is REFUSED; confirm, or define a rule.",
-        "Real-gate criterion 3 (artificial branch exchange): the fake tests inject the exchange through the extraction executor; the mechanism and evidence for the real gate are not decided.",
-        "Guard allow-list (M4_DECISION_RECORD.md §6.4): services/synthetic_twin.py imports forward_builder read-only (truth job, ±5 % job names); confirm the extension.",
-        "Retention of the real truth ODB and pack after the M4.9 gate (archive or delete) is not decided."
-      ],
-      "status_discrepancies": [
-        "The M4.9-preparation instruction says 'main: M4.6 ACCEPTED'; recorded state: M4.6 REVIEW_READY (only the SP13 smoke gate is ACCEPTED) and M4 is not merged to main. Not changed by the worker.",
-        "The instruction says 'M4.7 waiting for M4.9 observation pipeline'; recorded state: M4.7 REVIEW_READY. Not changed by the worker."
-      ]
+      "supervisor_review": "2026-10-05: decisions recorded in M4_DECISION_RECORD.md §8 (seed 20261005; UNSTABLE/UNSUPPORTED -> REFUSED; split confirmed cluster -> REFUSED; real-pack branch-exchange negative control; dependency boundary restored; truth artifact retention); preparation stays REVIEW_READY",
+      "twin_definition": "docs/auto_id/twins/SP13.twin.json (seed 20261005; definition hash c200b293...)",
+      "dependency_boundary": "synthetic_twin.py obtains M3 job identities through identification_pipeline.forward_jobs; only identification_pipeline.py imports forward_builder (guard)",
+      "branch_exchange_negative_control": "validated real SP13 packs; 45° in-memory mixing of FE 10/11 in the archived E-5 % candidate just before M4.5 -> REFUSED (BRANCH_LOSS), no re-pairing, no solve, packs unchanged; not physical FE evidence",
+      "truth_artifact_retention": "truth pack + provenance/run identities permanent; truth ODB temporary until M4.9 review; archived p0/±5 % packs never duplicated",
+      "hil_gate_risk": "p0 FE trigger groups with >2 modes (FE 13-15, 20-23, 28-30): if all members freeze, the twin design is REFUSED under §8.2 (diagnostic, M4_DECISION_RECORD §8.8)"
+    },
+    "factual_status": {
+      "M4.6_implementation": "REVIEW_READY",
+      "M4.6_SP13_smoke_gate": "ACCEPTED (verdict REPRODUCED)",
+      "M4.7": "REVIEW_READY",
+      "M4.9_preparation": "REVIEW_READY",
+      "M4.9_real_gate": "NOT STARTED",
+      "auto-id/m4_merged_to_main": false
     }
   },
-  "next_action": "SUPERVISOR review of the M4.9 preparation (REVIEW_READY) and its decisions needed; real M4.9 gate NOT STARTED (needs a separate HUMAN gate); smoke archive remains a proposal"
+  "next_action": "SUPERVISOR review of the reworked M4.9 preparation (REVIEW_READY); real M4.9 gate NOT STARTED and unauthorised; smoke archive remains a proposal"
 }

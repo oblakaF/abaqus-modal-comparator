@@ -364,3 +364,96 @@ remains a proposal until separately approved.
   Each file is pinned by SHA-256 in `ARCHIVE_MANIFEST.json`.
 - **ODB:** kept in `D:\abaqus_m4_smoke` until the run review is complete (retention
   rule). Its later archiving or deletion needs a decision.
+
+---
+
+## 8. M4.9 preparation review (SUPERVISOR decisions, 2026-10-05)
+
+**Scope:** the M4.9 preparation (synthetic twin, fake solver only) stays `REVIEW_READY`.
+- No real Abaqus. The real M4.9 gate is **not started** and stays unauthorised.
+- The acceptance criteria of §4 are unchanged.
+
+### 8.1 Twin noise seed
+
+- Fixed seed **20261005**.
+- It is explicit in the SP13 twin definition (`docs/auto_id/twins/SP13.twin.json`).
+- It is part of the twin identity, hash and provenance.
+- There is no default or implicit seed.
+
+### 8.2 UNSTABLE / UNSUPPORTED modal groups
+
+- **REFUSED.**
+- Unsupported groups are not guessed, split, merged or silently excluded, unless an
+  existing approved policy explicitly allows it.
+
+### 8.3 CONFIRMED cluster split by the holdout selection
+
+- **REFUSED.**
+- A confirmed cluster is one observation unit. The holdout selection must not split its
+  member branches between the fit and validation sets.
+
+### 8.4 Branch-exchange acceptance test
+
+- **No modified artifacts:** no ODB, archived pack or permanent artifact is modified.
+- **No extra solve:** no Abaqus solve is run for this test.
+- **Data:** the validated real SP13 shape-pack data.
+- **Injection:** a controlled in-memory branch permutation, applied immediately before
+  the M4.5 branch tracker.
+- **Required result:** `REFUSED`, with no experimental re-pairing.
+- **Record:** a **negative-control test**, not physical FE evidence.
+- **Worker note** (implementation, no criterion change):
+  - The injected exchange is the §4 criterion 3 form: shape mixing ≥ 45° between two
+    tracked modes (FE 10 / FE 11 of the archived E−5 % candidate). It gives
+    `BRANCH_LOSS`.
+  - A pure relabelling of two candidate modes (a frequency crossing with stable shapes)
+    is tracked, not refused, as §4 criterion 3 and M4.5 require. It is tested as the
+    complementary control.
+
+### 8.5 M3 forward-builder dependency
+
+- **Not approved:** the direct import `synthetic_twin.py → forward_builder`.
+- **Dependency boundary:** only the M4.6 pipeline layer interacts directly with the M3
+  forward builder.
+- **Job identities:** the twin obtains its truth, p0 and ±5 % job identities through the
+  M4.6-owned `identification_pipeline.forward_jobs`.
+- **Guard:** restored, so `synthetic_twin.py` cannot import `forward_builder`.
+- **M3 contracts:** unchanged.
+
+### 8.6 Truth artifacts
+
+| Artifact | Retention |
+|---|---|
+| Truth shape pack | Permanent. |
+| Truth provenance and run identities | Permanent. |
+| Truth ODB | Temporary until the M4.9 review. After M4.9 acceptance it may be deleted under the existing retention rule (§6.5), unless a later SUPERVISOR decision archives it. |
+| Archived p0 / ±5 % packs | Not duplicated; referenced by content hash. |
+
+### 8.7 Factual status
+
+| Item | Status |
+|---|---|
+| M4.6 implementation | `REVIEW_READY` |
+| M4.6 SP13 smoke gate | `ACCEPTED`, verdict REPRODUCED |
+| M4.7 | `REVIEW_READY` |
+| M4.9 preparation | `REVIEW_READY` |
+| M4.9 real gate | **NOT STARTED** |
+| Branch `auto-id/m4` | Not merged to `main` |
+
+### 8.8 Worker observation for the HUMAN gate (diagnostic, no decision)
+
+- **Trigger groups from the pinned SP13 p0 frequencies alone** (cluster triggers fire on
+  experimental **or** FE spacing < 3 %):
+  - FE 10/11;
+  - FE 13–15;
+  - FE 17/18;
+  - FE 20–23;
+  - FE 24/25;
+  - FE 26/27;
+  - FE 28–30.
+- **Consequence under §8.2:** if all members of a > 2-mode group (FE 13–15, 20–23,
+  28–30) become frozen twin rows, the twin design is `REFUSED` (UNSUPPORTED).
+- **What can change this:**
+  - experimental spacing can only merge groups further;
+  - groups shrink only if the strict freeze leaves some member unpaired.
+- **Open question:** whether the real gate should proceed under this risk is for the
+  SUPERVISOR / HUMAN to decide.

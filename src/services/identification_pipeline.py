@@ -88,6 +88,23 @@ def run_identity(config: PipelineConfig) -> dict:
     }
 
 
+def forward_candidate(model: BoundForwardModel, parameters: Mapping[str, float]) -> ForwardCandidate:
+    return ForwardCandidate.create(model.manifest.parameterisation.parameterisation_id,
+                                   **{name: float(value) for name, value in parameters.items()})
+
+
+def forward_jobs(model: BoundForwardModel, roots: Mapping[str, Path], points: Mapping[str, Mapping[str, float]],
+                 directory: Path) -> dict:
+    """M3 forward jobs (content-addressed INP, job name and hashes) of named parameter points; nothing is solved.
+
+    The narrow M4.6-owned access to the M3 forward builder for other M4 services (for example the
+    M4.9 twin's truth, start and ±5 % jobs): only this pipeline layer imports ``forward_builder``.
+    """
+    source = read_reference_input(model, roots)
+    return {key: prepare_forward_job(model, forward_candidate(model, point), source, Path(directory))
+            for key, point in points.items()}
+
+
 def fe_state_from_pack(pack: FEShapePack) -> FEModalState:
     shapes = np.asarray(pack.displacements, dtype=np.float64).reshape(len(pack.mode_numbers), -1)
     return FEModalState(pack.record.job_name, pack.record.fe_geometry_sha256, pack.record.node_set_sha256,
@@ -124,8 +141,7 @@ class IdentificationPipeline:
 
     # ------------------------------------------------------------------ helpers
     def _candidate(self, parameters: Mapping[str, float]) -> ForwardCandidate:
-        return ForwardCandidate.create(self.config.model.manifest.parameterisation.parameterisation_id,
-                                       **{name: float(value) for name, value in parameters.items()})
+        return forward_candidate(self.config.model, parameters)
 
     @staticmethod
     def candidate_hash(candidate: ForwardCandidate) -> str:

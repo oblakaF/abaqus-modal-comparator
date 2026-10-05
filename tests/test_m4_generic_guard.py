@@ -4,8 +4,8 @@ M4.6 allow-list (M4_DECISION_RECORD.md §6.4):
 - ``subprocess`` only in ``services/forward_solver.py``;
 - ``abaqus_bridge`` only in ``services/shape_extraction.py`` and only ``run_abaqus_extraction``
   (execution helper); its path/size/mtime cache (``load_or_extract_odb``) is never used;
-- ``forward_builder`` (M3) only in ``services/identification_pipeline.py`` and, for the twin's truth
-  job and the ±5 % job names (M4.9 preparation; read-only use of the M3 API), ``services/synthetic_twin.py``;
+- ``forward_builder`` (M3) only in ``services/identification_pipeline.py``; other M4 services (for example
+  the M4.9 twin) obtain M3 job identities through its ``forward_jobs`` (SUPERVISOR, M4_DECISION_RECORD §8.5);
 - never ``shared_carbon_forward``, ``matrix_model_service``, ``sp13_evidence_adapter`` or ``modal_core``.
 """
 
@@ -45,7 +45,6 @@ ALLOWED = {
     "src/services/forward_solver.py": {"subprocess"},
     "src/services/shape_extraction.py": {"abaqus_bridge"},
     "src/services/identification_pipeline.py": {"forward_builder", "services.forward_builder"},
-    "src/services/synthetic_twin.py": {"forward_builder", "services.forward_builder"},
 }
 
 
@@ -84,6 +83,11 @@ class M4GuardTests(unittest.TestCase):
                 if _matches(imported, "abaqus_bridge"):
                     with self.subTest(module=module, names=names):
                         self.assertEqual(names, ("run_abaqus_extraction",))
+
+    def test_forward_builder_only_in_the_pipeline(self):
+        users = [module for module in M4_MODULES
+                 if any(_matches(imported, "forward_builder") for imported, _ in _imports(ROOT / module))]
+        self.assertEqual(users, ["src/services/identification_pipeline.py"])
 
     def test_subprocess_only_in_the_solver(self):
         users = [module for module in M4_MODULES

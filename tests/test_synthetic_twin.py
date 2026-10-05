@@ -56,6 +56,12 @@ class _Tmp(unittest.TestCase):
         definition, registration, fields, truth = twin_case(self.tmp / name, **case)
         return prepare_twin(definition, registration, fields, truth, self.tmp / name / "twin")
 
+    @staticmethod
+    def variant(name, **extractor):
+        """The same fake-model variant for the archived packs, the truth and the identification solves."""
+        return {key: TwinFakeExtractor(variant=name, **extractor)
+                for key in ("archive_extractor", "truth_extractor", "extractor")}
+
     def run_twin(self, name="case", **case):
         preparation = self.prepare(name, **case)
         pipeline = IdentificationPipeline(preparation.pipeline_config)
@@ -206,15 +212,54 @@ class ObservationDesignTests(_Tmp):
         self.assertEqual(twin["noise_seed"], 20261005)
         self.assertEqual(twin["synthetic_experiment_sha256"], preparation.experiment.content_sha256)
 
-    def test_unsupported_trigger_group_refuses_the_design(self):
-        preparation = self.prepare(archive_extractor=TwinFakeExtractor(triple=True),
-                                   truth_extractor=TwinFakeExtractor(triple=True))
+    def test_truth_artifact_retention_and_no_duplicate_packs(self):
+        # SUPERVISOR decision §8.6.
+        preparation = self.prepare()
+        retention = preparation.provenance["artifact_retention"]
+        self.assertEqual(retention["truth_shape_pack"], "permanent")
+        self.assertEqual(retention["truth_provenance_and_run_identities"], "permanent")
+        self.assertTrue(retention["truth_odb"].startswith("temporary until M4.9 review"))
+        twin_dir = self.tmp / "case" / "twin"
+        packs = sorted(path.name for path in twin_dir.rglob("*.npz"))
+        self.assertEqual(packs, [f"{preparation.provenance['truth']['job_name']}.npz"])  # archived packs referenced only
+        self.assertEqual(preparation.provenance["truth"]["truth_run_hash"], preparation.truth_journal.run_hash)
+
+    # SUPERVISOR decision §8.2: UNSTABLE / UNSUPPORTED groups -> REFUSED (no guess, split, merge or exclusion).
+    def assert_refused_without_exclusion(self, preparation, reason):
         observation = preparation.observation_design
         self.assertIs(observation.status, DesignStatus.REFUSED)
+        self.assertIsNone(observation.design)
         self.assertIsNone(preparation.pipeline_config)
-        self.assertIn(ClusterStatus.UNSUPPORTED, [c.status for c in observation.clusters])
+        self.assertIs(observation.frozen.status, FreezeStatus.FROZEN)
+        self.assertEqual(len(observation.frozen.rows), 24)  # nothing excluded to rescue the design
+        self.assertIn(reason, " ".join(observation.reasons))
+        self.assertEqual(preparation.provenance["observation_design"]["status"], "REFUSED")
         with self.assertRaises(TwinError):
             observation.require_usable()
+
+    def test_unsupported_trigger_group_refuses_the_design(self):
+        preparation = self.prepare(**self.variant("triple"))
+        self.assert_refused_without_exclusion(preparation, "UNSUPPORTED")
+        group = [c for c in preparation.observation_design.clusters if c.status is ClusterStatus.UNSUPPORTED]
+        self.assertEqual(len(group[0].row_ids), 3)
+
+    def test_unstable_trigger_group_refuses_the_design(self):
+        preparation = self.prepare(**self.variant("leak"))
+        self.assert_refused_without_exclusion(preparation, "UNSTABLE")
+        unstable = [c for c in preparation.observation_design.clusters if c.status is ClusterStatus.UNSTABLE]
+        self.assertEqual(len(unstable), 1)
+        bad = {d.direction for d in unstable[0].directions if not d.subspace_stable}
+        self.assertEqual(bad, {"E_in_plane_mpa+", "E_in_plane_mpa-"})
+
+    # SUPERVISOR decision §8.3: a CONFIRMED cluster split by the holdout selection -> REFUSED.
+    def test_confirmed_cluster_split_by_the_holdout_refuses_the_design(self):
+        preparation = self.prepare(**self.variant("top-pair"))
+        observation = preparation.observation_design
+        confirmed = [c.row_ids for c in observation.clusters if c.status is ClusterStatus.CONFIRMED]
+        self.assertEqual(len(confirmed), 1)
+        held = set(confirmed[0]) & set(observation.holdouts.holdout_row_ids)
+        self.assertEqual(len(held), 1)  # the validation family takes exactly one member
+        self.assert_refused_without_exclusion(preparation, "split between fit and holdout")
 
     def test_modes_without_a_strict_pair_are_excluded_by_the_policy(self):
         # Truth shapes rotated by ~40° in the near-degenerate pair: MAC ≈ 0.59 < 0.8, no strict pair.

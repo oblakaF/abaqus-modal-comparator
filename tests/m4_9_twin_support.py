@@ -9,6 +9,11 @@ assigned by ascending frequency in every state, as Abaqus does.  Two deliberate 
   E by 20°·tanh(36.6·(E/E0 − 1)) — about 19° at ±5 % (individual MAC ≈ 0.894 < 0.9, subspace
   exact), about 20° at the truth (MAC ≈ 0.883 ≥ 0.8): a cluster M4.4 must CONFIRM;
 - ``stable``: (2,1)/(1,2), 2 % apart, fixed shapes: triggered, but INDEPENDENT.
+
+Variants: ``triple`` (a third mode within 3 % of ``stable``: UNSUPPORTED group), ``leak`` (the
+rotating pair's first mode rotates towards a distant mode instead, so the pair's subspace is not
+stable: UNSTABLE), ``top-pair`` (the rotating pair is the highest slot, so the validation holdout
+takes one member of the CONFIRMED cluster: split).
 """
 
 from __future__ import annotations
@@ -30,9 +35,10 @@ from scientific_state import fe_geometry_identity
 from services.fe_shape_pack import node_set_sha256, parse_shape_pack_record
 from services.forward_builder import prepare_forward_job
 from services.forward_solver import solve_forward_job
+from services.identification_pipeline import forward_candidate
 from services.identification_step import parameter_bounds
 from services.shape_extraction import ExtractionExpectation, extract_shape_pack
-from services.synthetic_twin import TWIN_SCHEMA, forward_candidate, parse_twin_definition, perturbed_points
+from services.synthetic_twin import TWIN_SCHEMA, parse_twin_definition, perturbed_points
 
 
 MODES = tuple(range(7, 31))
@@ -76,23 +82,27 @@ class FakeMode:
 _SINGLE_WAVES = [(2, 2), (3, 0), (0, 3), (3, 1), (1, 3), (3, 2), (2, 3), (3, 3), (4, 0), (0, 4), (4, 1), (1, 4),
                  (4, 2), (2, 4), (4, 3), (3, 4), (4, 4), (5, 0), (0, 5)]
 _EXPONENTS = [(0.48, 0.02), (0.32, 0.18), (0.42, 0.08), (0.36, 0.14), (0.5, 0.0), (0.3, 0.2)]
-ROTATING_SLOT, STABLE_SLOT = 5, 9
+ROTATING_SLOT, STABLE_SLOT, TOP_SLOT = 5, 9, 21
+VARIANTS = (None, "triple", "leak", "top-pair")
 
 
-def fake_modes(triple: bool = False) -> list[FakeMode]:
-    """22 frequency slots 12 % apart; the two pairs share a slot.  ``triple`` puts a third mode near ``stable``."""
+def fake_modes(variant: str | None = None) -> list[FakeMode]:
+    """22 frequency slots 12 % apart; each pair shares a slot."""
+    if variant not in VARIANTS:
+        raise ValueError(variant)
+    rotating_slot = TOP_SLOT if variant == "top-pair" else ROTATING_SLOT
     singles = iter(_SINGLE_WAVES)
     modes = [FakeMode("torsion", (1, 1), 20.0, 0.02, 0.49)]
     for slot in range(1, 22):
         f0 = 20.0 * 1.12 ** slot
         a, b = _EXPONENTS[slot % len(_EXPONENTS)]
-        if slot == ROTATING_SLOT:
+        if slot == rotating_slot:
             modes += [FakeMode("rotating-1", (2, 0), f0, a, b), FakeMode("rotating-2", (0, 2), f0 * 1.015, a, b)]
         elif slot == STABLE_SLOT:
             modes += [FakeMode("stable-1", (2, 1), f0, a, b), FakeMode("stable-2", (1, 2), f0 * 1.02, a, b)]
         else:
             waves = next(singles)
-            if triple and slot == STABLE_SLOT + 1:
+            if variant == "triple" and slot == STABLE_SLOT + 1:
                 f0 = 20.0 * 1.12 ** STABLE_SLOT * 1.04
                 a, b = _EXPONENTS[STABLE_SLOT % len(_EXPONENTS)]
             modes.append(FakeMode(f"single-{waves[0]}{waves[1]}", waves, f0, a, b))
@@ -104,14 +114,15 @@ def rotation_angle(e: float, amplitude_deg: float) -> float:
     return math.radians(amplitude_deg) * math.tanh(36.6 * (e / P0["E_in_plane_mpa"] - 1.0))
 
 
-def fake_state(e: float, g: float, rotation_deg: float = 20.0, triple: bool = False, exchange=None):
+def fake_state(e: float, g: float, rotation_deg: float = 20.0, variant: str | None = None, exchange=None):
     """(mode numbers 7–30 by ascending frequency) → (frequency, U3 shape on TOP, name)."""
-    modes = fake_modes(triple)
+    modes = fake_modes(variant)
     shapes = {m.name: plate_shape(*m.waves) for m in modes}
     theta = rotation_angle(e, rotation_deg)
-    a, b = shapes["rotating-1"], shapes["rotating-2"]
+    partner = "single-22" if variant == "leak" else "rotating-2"  # leak: rotation out of the pair's subspace
+    a, b = shapes["rotating-1"], shapes[partner]
     shapes["rotating-1"] = math.cos(theta) * a + math.sin(theta) * b
-    shapes["rotating-2"] = -math.sin(theta) * a + math.cos(theta) * b
+    shapes[partner] = -math.sin(theta) * a + math.cos(theta) * b
     if exchange is not None and exchange(e, g):  # injected loss of character between two fit modes
         left, right = shapes["single-22"].copy(), shapes["single-30"].copy()
         shapes["single-22"], shapes["single-30"] = (left + right) / math.sqrt(2), (left - right) / math.sqrt(2)
@@ -123,8 +134,8 @@ def fake_state(e: float, g: float, rotation_deg: float = 20.0, triple: bool = Fa
 class TwinFakeExtractor:
     """Executor for ``shape_extraction``: a format-2 raw extraction of the plate-like fake ODB."""
 
-    def __init__(self, rotation_deg: float = 20.0, triple: bool = False, exchange=None, fail: bool = False):
-        self.rotation_deg, self.triple, self.exchange, self.fail = rotation_deg, triple, exchange, fail
+    def __init__(self, rotation_deg: float = 20.0, variant: str | None = None, exchange=None, fail: bool = False):
+        self.rotation_deg, self.variant, self.exchange, self.fail = rotation_deg, variant, exchange, fail
         self.calls = 0
 
     def __call__(self, odb: Path, raw: Path, start: int, end: int) -> Path:
@@ -132,7 +143,7 @@ class TwinFakeExtractor:
             raise KeyboardInterrupt("simulated extraction interruption")
         self.calls += 1
         data = json.loads(Path(odb).read_text(encoding="utf-8"))
-        state = fake_state(data["E"], data["G12"], self.rotation_deg, self.triple, self.exchange)
+        state = fake_state(data["E"], data["G12"], self.rotation_deg, self.variant, self.exchange)
         raw.mkdir(parents=True, exist_ok=True)
         with open(raw / "geometry.csv", "w", encoding="utf-8") as handle:
             handle.write("instance,node_label,x,y,z\n")
