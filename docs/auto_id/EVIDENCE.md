@@ -249,3 +249,155 @@ Possible remaining causes remain outside CARBON-5F scope:
   - **Extended matrix:** 24 / 24 further candidate files are identical.
 - **Normative vs diagnostic:** normative for the M3 gate (forward-builder regression);
   not a material result.
+
+## M4 — ODB shape-extraction gate and M4.2 complete-MAC baseline freeze
+
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
+- **Kind:** data preparation and observation freeze; **not** a material result.
+- **Gate:**
+  - HUMAN-authorised 2026-10-04; supervisor review of the extraction: PASS.
+  - Abaqus 2024 Python on SHA-verified copies of 6 archived ODBs: SP02 and SP13
+    CARBON-4C baselines, and SP13 CARBON-5A E± / G±.
+  - Pinned `extract_odb.py` `039aa067…`.
+  - The archived originals are unchanged.
+- **Validation (all PASS):**
+  - V1 ODB integrity;
+  - V2 completeness;
+  - V3 FE geometry identity;
+  - V4 frequencies exactly equal to the archive;
+  - V5 node set equal to the registration subset;
+  - V6 MAC reproduction (direct, and the comparator read-only; max |ΔMAC| ≤ 6.7e-16);
+  - V7 lossless float32;
+  - V8 deterministic content hash.
+- **Artifacts:** `carbon-project-archive:fe_shapes/<job>.npz` and
+  `.provenance.json`, pinned by [fe_shapes/](fe_shapes/README.md).
+- **M4.2 result** (strict pairing, complete MAC matrices):
+  - **SP13 FROZEN** with 2 rows: exp 4 ↔ FE 10 (MAC 0.888) and exp 5 ↔ FE 11
+    (MAC 0.889).
+  - **SP02 NOT_FROZEN:** 1 strict pair < 2.
+- **Normative vs diagnostic:** normative for M4.2 only after SUPERVISOR acceptance.
+
+## M4.3 — Modal-family classifier on real SP13 FE shapes
+
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
+- **Kind:** diagnostic validation of the PROVISIONAL classifier policy
+  `auto-id/modal-family/v1-provisional`, with thresholds unchanged.
+- **Input:** validated shape pack `SP13_a46d08b52995e078` (content `7941545b…`).
+- **Result:**
+  - mirror coverage 100 %;
+  - 24/24 modes classified, with parity and nodal-line counts consistent;
+  - lowest odd-odd family: FE 7;
+  - frozen rows: R1 (FE 10) odd-even, R2 (FE 11) even-odd;
+  - holdout rule: no torsion holdout among the frozen rows; validation holdout R2.
+
+  Record: [fe_shapes/SP13_a46d08b52995e078.families.json](fe_shapes/SP13_a46d08b52995e078.families.json).
+- **Normative vs diagnostic:** diagnostic; thresholds stay PROVISIONAL until a separate
+  decision.
+
+## M4.4 — Cluster confirmation of SP13 R1/R2 on real FE shapes
+
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
+- **Kind:** observation-design diagnostic. **Not** a material result.
+- **Input:** validated SP13 baseline and CARBON-5A ±5 % E/G12 shape packs; M4.2 rows
+  R1/R2; M4.3 families.
+- **Result:**
+  - the 2.2 % trigger fired;
+  - the decision is **INDEPENDENT**: individual FE-to-FE MAC is 0.999998 with unique
+    counterparts in all four directions, and the cross-MAC is ≈ 0;
+  - R1 and R2 remain two observations.
+
+  Record: [fe_shapes/SP13.R1-R2.cluster.json](fe_shapes/SP13.R1-R2.cluster.json).
+- **Normative vs diagnostic:** diagnostic; normative for the SP13 observation design
+  only after SUPERVISOR acceptance.
+
+## M4.6 — SP13 p0 smoke gate (real Abaqus through the M4.6 path)
+
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05). Verdict REPRODUCED.
+- **Kind:** software and solver reproducibility check. **Not** a material result.
+- **Authorisation:** HUMAN gate. 1 Abaqus 2024 solve plus 1 pinned `extract_odb.py`
+  extraction of `SP13_a46d08b52995e078` (p0); no LM loop, no M4.9.
+- **Inputs:**
+  - generated INP `a46d08b52995e078…` (the M3 rendering);
+  - solver profile `SP13/abaqus-2024/v1` (`79aebbfe…`);
+  - pinned extraction script `039aa067…`.
+- **Result: REPRODUCED.**
+  - **30/30** eigenfrequencies (EIGFREQ, modes 1–30) are exactly equal to the
+    CARBON-4C archive.
+  - The shape-pack content SHA `7941545b59390a65…` is identical to the validated
+    baseline pack (minimum MAC 1.0).
+  - The ODB differs only in run metadata (same size 715 614 536 bytes; SHA
+    `56da620e…`).
+  - Wall-clock 620 s; memory peak 18 GB.
+- **Artifacts:** `D:\abaqus_m4_smoke` (journal, comparison, extraction manifest,
+  logs; ODB kept until review). Archive proposal: provenance only, under
+  `carbon-project-archive/m4_smoke/`, referencing the existing pack.
+- **Normative vs diagnostic:** after acceptance, establishes that the M4.6 solve and
+  extraction path reproduces the accepted CARBON-4C SP13 baseline.
+
+## M4.9 — SP13 truth gate and observation readiness (synthetic twin)
+
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
+- **Kind:** software and pipeline readiness. **Not** a material identification result.
+- **Authorisation:** HUMAN gate. 1 Abaqus 2024 truth solve (SP13, E 45000 / G12 4000
+  MPa) plus 1 pinned `extract_odb.py` extraction. No LM, no identification solves.
+- **Truth:**
+  - job `SP13_bb3e5d7d131bed4f`;
+  - generated INP `bb3e5d7d…`;
+  - ODB `57282e50…` (715 614 536 bytes);
+  - pack content `758add0c…`;
+  - wall-clock 621 s.
+- **Twin:**
+  - definition `c200b293…` (seed 20261005, modes 7–30, σ = noise = 0.003);
+  - synthetic experiment `5b0450d8…`.
+- **Result: REFUSED_BEFORE_IDENTIFICATION.**
+  - Strict freeze FROZEN, 23 rows; exp 24 / FE 30 excluded by the policy.
+  - Trigger groups FE 13–15 and FE 20–23 are UNSUPPORTED (> 2 modes; SPEC §12.4).
+  - The other five groups are INDEPENDENT; none is CONFIRMED.
+  - The design is REFUSED under M4_DECISION_RECORD §8.2.
+- **Records:**
+  - `docs/auto_id/twins/SP13_truth_gate/`: readiness report, twin provenance, truth
+    journal, truth pack record, extraction manifest;
+  - `D:\abaqus_m4_truth`.
+
+## M4.9 — SP13 observation readiness after A1 (zero-Abaqus re-run)
+
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
+- **Kind:** pipeline readiness. **Not** a material identification result.
+- **Inputs:**
+  - the journalled truth stage of the M4.9 truth gate (no new solve or extraction);
+  - the twin definition `c200b293…` (seed 20261005);
+  - the validated p0/±5 % packs;
+  - D-032 (A1).
+- **Result: READY_FOR_IDENTIFICATION.**
+  - Strict freeze FROZEN, 23 rows; observation hash `05a5443a…`, unchanged.
+  - FE 13–15 and FE 20–23 are INDEPENDENT (member MAC ≥ 0.9998, subspace cos² ≥ 0.9999).
+    All seven trigger groups are INDEPENDENT.
+  - Holdouts: R1 (torsion) and R23 (validation). 21 fit terms for 2 parameters; the M4.7
+    design is valid.
+- **Abaqus runs:** 0.
+- **Records:** `docs/auto_id/twins/SP13_truth_gate/readiness_report_a1.json` and
+  `twin_provenance_a1.json`.
+
+## M4.9 — SP13 synthetic-twin identification loop (real Abaqus)
+
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-05)
+- **Kind:** M4 software / pipeline acceptance on a synthetic digital twin.
+  - **Not** a material identification of a real specimen.
+  - **Not** an M5 identifiability result.
+  - The bounds are development-only.
+- **Authorisation:** HUMAN gate 2026-10-05 (M4_DECISION_RECORD §11.1).
+- **Result: CONVERGED.**
+  - Estimate: E_in_plane = 45005.45 MPa, G12 = 4012.20 MPa (truth 45000 / 4000).
+  - |ln error| / local sd: E 0.000121 / 0.002064; G12 0.003046 / 0.009951. Both are within 1σ.
+- **Effort:** 6 identification evaluations (5 reused archived, 1 new Abaqus solve, 1 pinned
+  extraction); 2 iterations (Φ 5260.09 → 9.97).
+- **Run quality:**
+  - no refusal and no active bound;
+  - minimum tracking MAC 0.9861;
+  - holdout residuals at p̂: R1 +0.031, R23 −0.311 (whitened).
+- **Determinism:** journal replay gives an identical result with 0 solves.
+- **M3:** unchanged.
+- **Records:**
+  - run `3503c7d4…` in `D:\abaqus_m4_twin_loop`;
+  - archive `m4_twin/SP13_identification_loop/` (manifest `11eb6493…`);
+  - repository copies in `docs/auto_id/twins/SP13_identification_loop/`.

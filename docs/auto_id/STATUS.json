@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M4",
-  "current_ministep": null,
-  "status": "NOT_STARTED",
+  "current_ministep": "M4.9",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M3",
   "last_accepted_ministep": "M3.5",
   "last_accepted_commit": "3d862511e2fcb70670479b3f774f146658ae7ecb",
@@ -238,16 +238,285 @@
     }
   },
   "m4": {
-    "M4.1": "TODO",
-    "M4.2": "TODO",
-    "M4.3": "TODO",
-    "M4.4": "TODO",
-    "M4.5": "TODO",
-    "M4.6": "TODO",
-    "M4.7": "TODO",
-    "M4.8": "TODO",
-    "M4.9": "TODO",
-    "status": "NOT_STARTED"
+    "M4.1": "ACCEPTED",
+    "M4.2": "ACCEPTED",
+    "M4.3": "ACCEPTED",
+    "M4.4": "ACCEPTED",
+    "M4.5": "ACCEPTED",
+    "M4.6": "ACCEPTED",
+    "M4.7": "ACCEPTED",
+    "M4.8": "ACCEPTED",
+    "M4.9": "ACCEPTED",
+    "status": "REVIEW_READY",
+    "branch": "auto-id/m4",
+    "base": "6185b0565fb666ce26e533ac7b72a102de496f24",
+    "batch_authorisation": "SUPERVISOR: first development batch M4.1-M4.5, M4.7, M4.8; no Abaqus execution (Abaqus Python on archived ODBs counts); no real solve pipeline; M4.6/M4.9 need new authorisation; archived CARBON-4C baseline replay approved as M4.2 reference source; SP02/SP13 development/test only; M3 contracts unchanged",
+    "first_batch": {
+      "mini_steps": [
+        "M4.1",
+        "M4.2",
+        "M4.3",
+        "M4.4",
+        "M4.5",
+        "M4.7",
+        "M4.8"
+      ],
+      "status": "REVIEWED",
+      "not_authorised": [
+        "M4.6",
+        "M4.9"
+      ],
+      "findings": [
+        "M4.2: archived CARBON-4C baselines NOT_FROZEN (INCOMPLETE_EVIDENCE): FE shapes not archived; final freeze needs Abaqus Python extraction (HUMAN gate)",
+        "M4.3: family-classifier thresholds provisional (SPEC 12.2 gives none)"
+      ],
+      "abaqus_runs": 0,
+      "verification": {
+        "commit": "a3224843608f3a872b8ae3a1cb3c600cf7ffad23",
+        "windows_full_with_stores": "1217 ran; 1215 passed, 0 failures, 2 skipped (opt-in Abaqus)",
+        "windows_full_without_stores": "1215 ran; 1205 passed, 0 failures; skipped: M3 gate class, M4.2 store test, 2 Abaqus, 14 real-data subtests",
+        "linux_ci": "https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/37182809657 - success, Python 3.11, 1212 ran, OK (skipped=22: 14 data-store subtests, M3 gate class, M4.2 store test, 2 opt-in Abaqus, 4 headless Tk)",
+        "linux_ci_previous_failure": "run 37182692754 on 4ad6379: M4.3 test compared floats exactly under node reordering; test fixed in a322484, classifier unchanged"
+      },
+      "review": {
+        "acknowledged_review_ready": [
+          "M4.1",
+          "M4.3",
+          "M4.4",
+          "M4.5",
+          "M4.7",
+          "M4.8"
+        ],
+        "blocked": {
+          "M4.2": "archived baseline lacks FE mode shapes required for strict frozen observation generation; Abaqus Python ODB shape extraction requires a separate HUMAN gate"
+        },
+        "not_started": [
+          "M4.6",
+          "M4.9"
+        ]
+      }
+    },
+    "decision_record": "docs/auto_id/M4_DECISION_RECORD.md (PROPOSED; awaiting SUPERVISOR decision)",
+    "odb_shape_extraction_gate": {
+      "authorised": "HUMAN 2026-10-04 (Tier A + Tier B, measured outer surface); review PASS",
+      "abaqus_python_runs": 6,
+      "abaqus_solver_runs": 0,
+      "packs": "docs/auto_id/fe_shapes/*.shape-pack.json (archive: carbon-project-archive/fe_shapes/)",
+      "validation": "V1-V8 PASS for all six packs (V6 for baselines)"
+    },
+    "M4.2_integration": {
+      "SP02": "NOT_FROZEN: 1 strict pair (exp 2 - FE 8, MAC 0.958) < required 2; complete evidence",
+      "SP13": "FROZEN: R1 exp 4 - FE 10 (MAC 0.888), R2 exp 5 - FE 11 (MAC 0.889)",
+      "observation_hash_SP13": "922888c7285c8ff0892afab6f37f3840b286991d2814598e28cce208ea18dd5b",
+      "note": "SP13 R1/R2 are 2.2 % apart (cluster trigger); M4.4 real confirmation not started"
+    },
+    "M4.2_supervisor_review": {
+      "date": "2026-10-04",
+      "status": "REVIEW_READY (not ACCEPTED)",
+      "notes": [
+        "M4.2 is unblocked",
+        "SP13 is the candidate frozen observation set (R1 exp 4 - FE 10, R2 exp 5 - FE 11)",
+        "SP02 remains excluded from identification (NOT_FROZEN: 1 strict row < 2)",
+        "freeze criteria and MAC/frequency thresholds unchanged"
+      ]
+    },
+    "M4.3_real_validation": {
+      "pack": "SP13_a46d08b52995e078 (content 7941545b59390a65...)",
+      "record": "docs/auto_id/fe_shapes/SP13_a46d08b52995e078.families.json",
+      "policy": "auto-id/modal-family/v1-provisional (thresholds unchanged, PROVISIONAL)",
+      "mirror_coverage": "1.0 for x, y, diagonal, antidiagonal (SP13 510 x 520 mm, near-square 1.9 %)",
+      "modes": "24/24 classified; parity / nodal-line parity consistent for all; lowest odd-odd family FE 7 (22.49 Hz)",
+      "frozen_rows": "R1 FE 10 Px:O|Py:E|nx:1|ny:2; R2 FE 11 Px:E|Py:O|nx:2|ny:1",
+      "holdouts": "no torsion holdout (no odd-odd family among frozen rows); validation holdout R2 (highest accepted family); fit rows: R1 only (1 < 2 parameters)"
+    },
+    "M4.4_real_confirmation": {
+      "record": "docs/auto_id/fe_shapes/SP13.R1-R2.cluster.json",
+      "trigger": "fired (experimental 2.25 %, FE 2.24 %): trigger only",
+      "decision": "INDEPENDENT: R1 (FE 10) and R2 (FE 11) are two independent branches, not a cluster",
+      "evidence": "all four +/-5 % E/G12 directions: unique counterpart per branch, FE-to-FE MAC 0.999998; cross-MAC ~0; subspace cos2 0.999998; same on surface U1-U3 (primary) and U3",
+      "criteria": "unchanged (3 % trigger, MAC 0.9, cos2 0.95)"
+    },
+    "M4.4_supervisor_review": {
+      "date": "2026-10-04",
+      "status": "REVIEW_READY (not ACCEPTED)",
+      "notes": [
+        "R1/R2 are confirmed independent branches, not a cluster",
+        "no cluster residual merging applies",
+        "unresolved: M4.3 holdout selection leaves one fit row (R1) for two parameters",
+        "cluster criteria, M4.3 thresholds and M4.2 freeze criteria unchanged"
+      ]
+    },
+    "M4.6_architecture": {
+      "scope": "architecture + fake-solver tests only (SUPERVISOR authorisation); no real Abaqus, no Abaqus Python",
+      "modules": [
+        "src/domain/identification_run.py",
+        "src/services/forward_solver.py",
+        "src/services/shape_extraction.py",
+        "src/services/identification_pipeline.py"
+      ],
+      "data": "docs/auto_id/solver_profiles/{SP02,SP13}.json",
+      "fake_solver_result": "converged to 45006 / 4000.2 from 52000 / 4500 in 6 evaluations (truth 45000 / 4000); resume replays all evaluations with 0 solves",
+      "abaqus_runs": 0
+    },
+    "M4.6_smoke_gate": {
+      "authorised": "HUMAN 2026-10-04/05: 1 Abaqus 2024 solve + 1 pinned extract_odb.py extraction of SP13_a46d08b52995e078 (p0); no LM loop, no M4.9; RAM threshold updated by the human supervisor (19 GB was a conservative reference peak; ~15.75 GB available accepted)",
+      "abaqus_solves": 1,
+      "abaqus_python_extractions": 1,
+      "job": "SP13_a46d08b52995e078 (generated INP a46d08b52995e078213e78156c585c2b5a483c2c5954ace7cdc77e136b746253)",
+      "solver_profile": "SP13/abaqus-2024/v1 (79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e)",
+      "solve": "completed (.sta marker, Abaqus 2024); ODB 715614536 bytes, SHA 56da620e1df7af9551ddf745fcc45b62d64612f11adfa05a7700d536fb27c0f2 (differs from archived 8c89585d... as expected: ODB run metadata); wall-clock 620 s, memory peak 18 GB",
+      "extraction": "pinned extract_odb.py 039aa067...; all checks PASS; raw extraction deleted after validation",
+      "verdict": "REPRODUCED",
+      "frequencies": "30/30 EIGFREQ exactly equal to carbon4c/post_solve_SP13.json (max relative difference 0.0)",
+      "shape_pack": "content SHA 7941545b59390a65010645584b6bd5ab142ab9097f40333ca8d427654a612eca identical to the validated baseline pack; min FE-to-FE MAC 1.0",
+      "m3_contracts": "unchanged",
+      "run_directory": "D:\\abaqus_m4_smoke (ODB kept until review)",
+      "archive_proposal": "provenance only (journal, comparison, extraction manifest, logs) under carbon-project-archive/m4_smoke/; no duplicate shape pack (reference fe_shapes/SP13_a46d08b52995e078.npz) [PROPOSAL ONLY; not approved yet]",
+      "supervisor_review": "ACCEPTED 2026-10-05 (verdict REPRODUCED)"
+    },
+    "M4.9_preparation": {
+      "status": "REVIEW_READY",
+      "real_m4_9_gate": "NOT STARTED (separate HUMAN gate)",
+      "authorised": "SUPERVISOR 2026-10-05: M4.9 PREPARATION ONLY; no real Abaqus truth solve, no identification solves, no Abaqus Python, no M3 change, acceptance criteria unchanged",
+      "modules": [
+        "src/services/synthetic_twin.py"
+      ],
+      "tests": [
+        "tests/test_synthetic_twin.py",
+        "tests/m4_9_twin_support.py",
+        "tests/test_m4_9_sp13_readiness.py",
+        "tests/test_m4_generic_guard.py"
+      ],
+      "pipeline": "twin definition (explicit seed) -> truth solve + extraction (own journal, not in the 20) -> synthetic experiment (registration R, U3, SHA-256/Box-Muller noise) -> strict freeze -> M4.3 families/holdouts -> M4.4 triggers/confirmation (±5 % packs) -> M4.7 design -> M4.6 pipeline (twin hashes and seed in the run identity) -> assessment of criteria 1-2",
+      "fake_solver_result": "plate-like fake: 24 rows FROZEN; torsion holdout found by policy; rotating pair CONFIRMED (one cluster term), stable close pair INDEPENDENT; CONVERGED in 6 evaluations (5 reused, 1 solve); A-E pass",
+      "sp13_readiness": "start and ±5 % points render to the validated pack jobs (SP13_a46d08b52995e078, SP13_a9df66283a168786, SP13_0e861d03c333bb0b, SP13_0328066b74b6fd78, SP13_4c0f189b9727feaf); the truth job has no pack (needs the gated solve)",
+      "real_gate_budget_if_authorised": "1 truth solve + 1 extraction (separate); identification <= 20 evaluations incl. 5 reused archived packs, so <= 15 Abaqus solves + 15 extractions",
+      "tests_result": "Windows 1296 tests OK (24 skipped) without data stores; 1301 OK (2 skipped) with both stores",
+      "abaqus_runs": 0,
+      "supervisor_review": "2026-10-05: decisions recorded in M4_DECISION_RECORD.md §8 (seed 20261005; UNSTABLE/UNSUPPORTED -> REFUSED; split confirmed cluster -> REFUSED; real-pack branch-exchange negative control; dependency boundary restored; truth artifact retention); preparation stays REVIEW_READY",
+      "twin_definition": "docs/auto_id/twins/SP13.twin.json (seed 20261005; definition hash c200b293...)",
+      "dependency_boundary": "synthetic_twin.py obtains M3 job identities through identification_pipeline.forward_jobs; only identification_pipeline.py imports forward_builder (guard)",
+      "branch_exchange_negative_control": "validated real SP13 packs; 45° in-memory mixing of FE 10/11 in the archived E-5 % candidate just before M4.5 -> REFUSED (BRANCH_LOSS), no re-pairing, no solve, packs unchanged; not physical FE evidence",
+      "truth_artifact_retention": "truth pack + provenance/run identities permanent; truth ODB temporary until M4.9 review; archived p0/±5 % packs never duplicated",
+      "hil_gate_risk": "p0 FE trigger groups with >2 modes (FE 13-15, 20-23, 28-30): if all members freeze, the twin design is REFUSED under §8.2 (diagnostic, M4_DECISION_RECORD §8.8)"
+    },
+    "factual_status": {
+      "M4.6_implementation": "ACCEPTED",
+      "M4.6_SP13_smoke_gate": "ACCEPTED (verdict REPRODUCED)",
+      "M4.7": "ACCEPTED",
+      "M4.9_preparation": "ACCEPTED",
+      "M4.9_real_gate": "EXECUTED (truth gate and identification loop)",
+      "auto-id/m4_merged_to_main": false,
+      "M4.9_truth_gate": "ACCEPTED (evidence): REFUSED_BEFORE_IDENTIFICATION before A1",
+      "M4.9_identification_loop": "ACCEPTED (evidence): CONVERGED, both within 1 sigma",
+      "M4.9_readiness_after_A1": "ACCEPTED (evidence): READY_FOR_IDENTIFICATION",
+      "M4_stage_gate": "PASS",
+      "M5": "NOT STARTED"
+    },
+    "M4.9_truth_gate": {
+      "authorised": "HUMAN 2026-10-05: exactly 1 SP13 truth Abaqus 2024 solve (E 45000, G12 4000) + 1 pinned extract_odb.py extraction, outside the 20-evaluation budget; no LM, no identification solves",
+      "abaqus_solves": 1,
+      "abaqus_python_extractions": 1,
+      "truth_job": "SP13_bb3e5d7d131bed4f (INP bb3e5d7d131bed4f8b1da5fdc51d4dcd79247ed31740a97423318b5e66a8a672; job_hash 0082ddc30794d94c...)",
+      "solve": "completed (.sta marker, Abaqus 2024); wall-clock 621 s; ODB 715614536 bytes, SHA 57282e50448a9e8b...",
+      "extraction": "pinned 039aa067...; all checks PASS; raw deleted; pack content 758add0c22b824c5..., file eeebae21c5e3c4f1...",
+      "twin": "definition c200b293... (seed 20261005); synthetic experiment 5b0450d8ec131345...",
+      "freeze": "FROZEN, 23 rows (exp 1-23 <-> FE 7-29), 1 excluded (exp 24 / FE 30: MAC below the minimum for every frequency-admissible FE mode); observation hash 05a5443a2f8eef49...",
+      "holdouts": "torsion R1 (FE 7, Px:O|Py:O|nx:1|ny:1); validation R23 (FE 29, Px:O|Py:O|nx:1|ny:5)",
+      "trigger_groups": "['R11', 'R12'] = FE [17, 18] INDEPENDENT; ['R14', 'R15', 'R16', 'R17'] = FE [20, 21, 22, 23] UNSUPPORTED; ['R18', 'R19'] = FE [24, 25] INDEPENDENT; ['R20', 'R21'] = FE [26, 27] INDEPENDENT; ['R22', 'R23'] = FE [28, 29] INDEPENDENT; ['R4', 'R5'] = FE [10, 11] INDEPENDENT; ['R7', 'R8', 'R9'] = FE [13, 14, 15] UNSUPPORTED",
+      "design": "REFUSED: two UNSUPPORTED (>2-mode) trigger groups (M4_DECISION_RECORD §8.2); M4.7 design not built",
+      "parameter_count": 2,
+      "verdict": "REFUSED_BEFORE_IDENTIFICATION",
+      "artifacts": "D:\\abaqus_m4_truth (truth ODB kept until M4.9 review; truth pack + journal + readiness report); provenance copies in docs/auto_id/twins/SP13_truth_gate/",
+      "evidence": "EVIDENCE.md 'M4.9 — SP13 truth gate' ACCEPTED (SUPERVISOR, 2026-10-05)",
+      "supervisor_review": "2026-10-05: result acknowledged (REFUSED_BEFORE_IDENTIFICATION); policy unchanged; analysis requested"
+    },
+    "nmode_cluster_review": {
+      "status": "DECIDED: A1 approved (SUPERVISOR 2026-10-05; D-032)",
+      "document": "docs/auto_id/M4_4_NMODE_CLUSTER_REVIEW.md",
+      "evidence": "validated packs: FE 13-15 and FE 20-23 members individually stable (MAC >= 0.9998, unique) in E±, G12± and truth; N-subspace cos2 >= 0.9999; cross-member p0 MAC 0.0000",
+      "recommendation": "A1 (N > 2 groups may be INDEPENDENT under the existing identity test; N-mode confirmation stays UNSUPPORTED/REFUSED); A2 deferred; B as evidence only; C until decided",
+      "truth_artifact_location_proposal": "pack -> carbon-project-archive:fe_shapes/; provenance -> carbon-project-archive:m4_twin/SP13_truth_gate/ (SHA-pinned manifest)"
+    },
+    "M4.4_nmode_A1": {
+      "status": "ACCEPTED (A1, D-032); readiness re-run READY_FOR_IDENTIFICATION (evidence ACCEPTED)",
+      "abaqus_runs": 0,
+      "fe_13_15": "INDEPENDENT",
+      "fe_20_23": "INDEPENDENT",
+      "counts": {
+        "frozen_rows": 23,
+        "holdout_rows": 2,
+        "fit_rows": 21,
+        "cluster_terms": 0,
+        "parameters": 2
+      },
+      "m4_7_design_valid": true,
+      "open_risk": "R23 (FE 29, validation holdout) at the upper extracted-mode boundary; possible BRANCH_LOSS in the LM loop; extraction range not expanded without a separate decision",
+      "tests_result": "Windows 1306 OK (25 skipped) without data stores; 1311 OK (2 skipped) with both stores"
+    },
+    "truth_artifacts_archived": {
+      "pack": "carbon-project-archive/fe_shapes/SP13_bb3e5d7d131bed4f.npz (eeebae21...; content 758add0c...)",
+      "record": "docs/auto_id/fe_shapes/SP13_bb3e5d7d131bed4f.shape-pack.json (TWIN_TRUTH)",
+      "provenance": "carbon-project-archive/m4_twin/SP13_truth_gate/ (ARCHIVE_MANIFEST.json fab59ec5...)",
+      "truth_odb": "D:\\abaqus_m4_truth (not archived; until M4.9 review)"
+    },
+    "M4.9_identification_loop": {
+      "authorised": "HUMAN 2026-10-05: real M4.9 identification loop; <= 20 evaluations (5 reused); <= 15 new solves + 15 pinned extractions; development-only bounds E 26000-104000, G12 2250-9000; extraction range 7-30 (A)",
+      "run_root": "D:\\abaqus_m4_twin_loop",
+      "run_hash": "3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931",
+      "status": "CONVERGED",
+      "estimate": {
+        "E_in_plane_mpa": 45005.4467567744,
+        "G12_mpa": 4012.2044573188746
+      },
+      "truth": {
+        "E_in_plane_mpa": 45000.0,
+        "G12_mpa": 4000.0
+      },
+      "abs_ln_error": {
+        "E_in_plane_mpa": 0.000121,
+        "G12_mpa": 0.003046
+      },
+      "local_sd_ln": {
+        "E_in_plane_mpa": 0.002064,
+        "G12_mpa": 0.009951
+      },
+      "within_1_sigma": {
+        "E_in_plane_mpa": true,
+        "G12_mpa": true
+      },
+      "identification_evaluations": 6,
+      "reused_archived_evaluations": 5,
+      "new_abaqus_solves": 1,
+      "new_abaqus_python_extractions": 1,
+      "iterations": 2,
+      "phi": [
+        5260.0938,
+        9.9728
+      ],
+      "bound_active": false,
+      "refusals": "none",
+      "rejected_trial_steps": 0,
+      "new_solve": "SP13_aad55d259c1164ca (INP aad55d259c1164ca...; ODB fcd7fe001a4b60a5..., 615 s); pack aea5c21aead1c786...",
+      "determinism_replay": "same run hash and identity; 6 evaluations replayed; 0 solves; identical result; journal unchanged",
+      "archive": "carbon-project-archive/m4_twin/SP13_identification_loop/ (ARCHIVE_MANIFEST.json 11eb6493...)",
+      "evidence": "EVIDENCE.md 'M4.9 — SP13 synthetic-twin identification loop' ACCEPTED (SUPERVISOR, 2026-10-05)",
+      "tests_result": "code unchanged since 7597b60 (Windows 1306 OK/25 skipped without stores, 1311 OK/2 skipped with stores; Linux CI 1303 OK); docs-only rerun below"
+    },
+    "stage_gate": "PASS (SUPERVISOR 2026-10-05): twin recovered within 1 sigma (6/20 evaluations, 1 new solve); branch-exchange negative control REFUSED; deterministic replay; M3 unchanged; tests/test_m4_stage_gate.py",
+    "stage_pr": "READY_FOR_STAGE_PR (auto-id/m4 -> main); not merged; HUMAN merge authorisation required",
+    "supervisor_acceptance": {
+      "date": "2026-10-05",
+      "decision": "M4.1-M4.9 ACCEPTED; six pending M4 EVIDENCE entries ACCEPTED; M4 stage-level scientific gate PASS",
+      "qualifications": [
+        "M4.3 classifier thresholds remain PROVISIONAL (auto-id/modal-family/v1-provisional)",
+        "real SP13 identification remains refused (strict real observation set insufficient / near-collinear, option C); M4.9 is the synthetic-twin gate, not a real-specimen identification",
+        "SP02 remains NOT_FROZEN and excluded",
+        "M4.9 bounds (E 26000-104000, G12 2250-9000 MPa) are development-only twin bounds, not material bounds"
+      ],
+      "decisions_promoted": "DECISIONS.md D-033..D-038 (D-032 already recorded)"
+    },
+    "stage_closure_tests": "Windows 1325 OK (27 skipped) without data stores; 1330 OK (2 skipped) with both stores; tests/test_m4_stage_gate.py 17 passed + 2 store-gated skipped (no stores) / 19 passed (stores); targeted M4 + M3 gate 196 passed"
   },
-  "next_action": "M4 NOT_STARTED; await SUPERVISOR instruction before any M4 work"
+  "next_action": "HUMAN merge authorisation for the M4 stage PR (auto-id/m4 -> main); after the merge record the main merge SHA; M5 NOT STARTED"
 }

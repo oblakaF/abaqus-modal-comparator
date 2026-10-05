@@ -1,0 +1,326 @@
+{
+  "schema": "auto-id/cluster-confirmation/v1",
+  "status": "PENDING SUPERVISOR REVIEW",
+  "specimen": "SP13",
+  "rows": [
+    {
+      "row_id": "R1",
+      "experimental_mode": 4,
+      "experimental_hz": 94.3990939312666,
+      "fe_mode": 10,
+      "fe_hz": 85.85149383544922,
+      "family_key": "Px:O|Py:E|nx:1|ny:2"
+    },
+    {
+      "row_id": "R2",
+      "experimental_mode": 5,
+      "experimental_hz": 96.52110678751086,
+      "fe_mode": 11,
+      "fe_hz": 87.77133178710938,
+      "family_key": "Px:E|Py:O|nx:2|ny:1"
+    }
+  ],
+  "frozen_observation_hash": "922888c7285c8ff0892afab6f37f3840b286991d2814598e28cce208ea18dd5b",
+  "baseline_pack_content_sha256": "7941545b59390a65010645584b6bd5ab142ab9097f40333ca8d427654a612eca",
+  "criteria": {
+    "trigger_relative_spacing": 0.03,
+    "branch_minimum_mac": 0.9,
+    "subspace_minimum_cos2": 0.95,
+    "directions": [
+      "E_in_plane_mpa+",
+      "E_in_plane_mpa-",
+      "G12_mpa+",
+      "G12_mpa-"
+    ],
+    "rule": "CONFIRMED only if individual identity is unstable in >= 1 direction AND the 2-mode subspace is stable and unique in every direction"
+  },
+  "trigger": {
+    "fired": true,
+    "experimental_spacing": 0.02247916550755586,
+    "fe_spacing": 0.022362312708732738
+  },
+  "primary_basis": "surface_U1_U2_U3",
+  "results": {
+    "surface_U1_U2_U3": {
+      "status": "INDEPENDENT",
+      "reasons": [
+        "individual branch identity stable in every direction: two observations"
+      ],
+      "directions": [
+        {
+          "direction": "E_in_plane_mpa+",
+          "pack_content_sha256": "bac951494c22c82edffd1aae25e52cf7014b36b47fff3535a62e23d9f9d771f5",
+          "best_counterparts": [
+            10,
+            11
+          ],
+          "best_individual_mac": [
+            0.9999983868565167,
+            0.9999983545114985
+          ],
+          "cross_mac_R1_to_perturbed_11": 4.4520103673090147e-10,
+          "cross_mac_R2_to_perturbed_10": 5.320859040386284e-11,
+          "counterparts_above_0_9": [
+            1,
+            1
+          ],
+          "individual_stable": true,
+          "subspace_modes": [
+            10,
+            11
+          ],
+          "subspace_cos2": [
+            0.9999983869273995,
+            0.9999983545358636
+          ],
+          "subspace_stable": true,
+          "subspace_unique": true,
+          "perturbed_hz_fe10_fe11": [
+            87.40184020996094,
+            89.36296844482422
+          ]
+        },
+        {
+          "direction": "E_in_plane_mpa-",
+          "pack_content_sha256": "371050a5ff4b4686b2685fc8c84cc058f28ac378b0c9cfb92477bcc737221187",
+          "best_counterparts": [
+            10,
+            11
+          ],
+          "best_individual_mac": [
+            0.9999981405850202,
+            0.9999981071715974
+          ],
+          "cross_mac_R1_to_perturbed_11": 4.1188251490290875e-11,
+          "cross_mac_R2_to_perturbed_10": 4.793920612789155e-10,
+          "counterparts_above_0_9": [
+            1,
+            1
+          ],
+          "individual_stable": true,
+          "subspace_modes": [
+            10,
+            11
+          ],
+          "subspace_cos2": [
+            0.9999981406644688,
+            0.9999981072118777
+          ],
+          "subspace_stable": true,
+          "subspace_unique": true,
+          "perturbed_hz_fe10_fe11": [
+            84.26994323730469,
+            86.14722442626953
+          ]
+        },
+        {
+          "direction": "G12_mpa+",
+          "pack_content_sha256": "1febd80145e25448e6f0e975423cf148e51d0a1e5c38f11129b52302ea308dd2",
+          "best_counterparts": [
+            10,
+            11
+          ],
+          "best_individual_mac": [
+            0.999998351263778,
+            0.9999984227277247
+          ],
+          "cross_mac_R1_to_perturbed_11": 3.827066408173258e-11,
+          "cross_mac_R2_to_perturbed_10": 4.886374620495472e-10,
+          "counterparts_above_0_9": [
+            1,
+            1
+          ],
+          "individual_stable": true,
+          "subspace_modes": [
+            10,
+            11
+          ],
+          "subspace_cos2": [
+            0.9999984228102498,
+            0.9999983513079042
+          ],
+          "subspace_stable": true,
+          "subspace_unique": true,
+          "perturbed_hz_fe10_fe11": [
+            86.378662109375,
+            88.29855346679688
+          ]
+        },
+        {
+          "direction": "G12_mpa-",
+          "pack_content_sha256": "b30263d23209e1fd5d802b99cc1eb7e6d6d57b3a8a61f543ff7891bf4d622311",
+          "best_counterparts": [
+            10,
+            11
+          ],
+          "best_individual_mac": [
+            0.999998253018606,
+            0.9999983235383436
+          ],
+          "cross_mac_R1_to_perturbed_11": 4.925254816562675e-10,
+          "cross_mac_R2_to_perturbed_10": 3.88403159790404e-11,
+          "counterparts_above_0_9": [
+            1,
+            1
+          ],
+          "individual_stable": true,
+          "subspace_modes": [
+            10,
+            11
+          ],
+          "subspace_cos2": [
+            0.9999983236331198,
+            0.999998253051142
+          ],
+          "subspace_stable": true,
+          "subspace_unique": true,
+          "perturbed_hz_fe10_fe11": [
+            85.31879425048828,
+            87.2386703491211
+          ]
+        }
+      ]
+    },
+    "surface_U3": {
+      "status": "INDEPENDENT",
+      "reasons": [
+        "individual branch identity stable in every direction: two observations"
+      ],
+      "directions": [
+        {
+          "direction": "E_in_plane_mpa+",
+          "pack_content_sha256": "bac951494c22c82edffd1aae25e52cf7014b36b47fff3535a62e23d9f9d771f5",
+          "best_counterparts": [
+            10,
+            11
+          ],
+          "best_individual_mac": [
+            0.9999983882832099,
+            0.9999983558487029
+          ],
+          "cross_mac_R1_to_perturbed_11": 4.455434017311803e-10,
+          "cross_mac_R2_to_perturbed_10": 5.332566699488483e-11,
+          "counterparts_above_0_9": [
+            1,
+            1
+          ],
+          "individual_stable": true,
+          "subspace_modes": [
+            10,
+            11
+          ],
+          "subspace_cos2": [
+            0.9999983883540448,
+            0.999998355873119
+          ],
+          "subspace_stable": true,
+          "subspace_unique": true,
+          "perturbed_hz_fe10_fe11": [
+            87.40184020996094,
+            89.36296844482422
+          ]
+        },
+        {
+          "direction": "E_in_plane_mpa-",
+          "pack_content_sha256": "371050a5ff4b4686b2685fc8c84cc058f28ac378b0c9cfb92477bcc737221187",
+          "best_counterparts": [
+            10,
+            11
+          ],
+          "best_individual_mac": [
+            0.999998142228061,
+            0.9999981087047504
+          ],
+          "cross_mac_R1_to_perturbed_11": 4.12912713382818e-11,
+          "cross_mac_R2_to_perturbed_10": 4.797477723808068e-10,
+          "counterparts_above_0_9": [
+            1,
+            1
+          ],
+          "individual_stable": true,
+          "subspace_modes": [
+            10,
+            11
+          ],
+          "subspace_cos2": [
+            0.999998142307463,
+            0.9999981087450851
+          ],
+          "subspace_stable": true,
+          "subspace_unique": true,
+          "perturbed_hz_fe10_fe11": [
+            84.26994323730469,
+            86.14722442626953
+          ]
+        },
+        {
+          "direction": "G12_mpa+",
+          "pack_content_sha256": "1febd80145e25448e6f0e975423cf148e51d0a1e5c38f11129b52302ea308dd2",
+          "best_counterparts": [
+            10,
+            11
+          ],
+          "best_individual_mac": [
+            0.9999983527737909,
+            0.9999984240159646
+          ],
+          "cross_mac_R1_to_perturbed_11": 3.836996259028867e-11,
+          "cross_mac_R2_to_perturbed_10": 4.889955353132234e-10,
+          "counterparts_above_0_9": [
+            1,
+            1
+          ],
+          "individual_stable": true,
+          "subspace_modes": [
+            10,
+            11
+          ],
+          "subspace_cos2": [
+            0.9999984240985507,
+            0.99999835281786
+          ],
+          "subspace_stable": true,
+          "subspace_unique": true,
+          "perturbed_hz_fe10_fe11": [
+            86.378662109375,
+            88.29855346679688
+          ]
+        },
+        {
+          "direction": "G12_mpa-",
+          "pack_content_sha256": "b30263d23209e1fd5d802b99cc1eb7e6d6d57b3a8a61f543ff7891bf4d622311",
+          "best_counterparts": [
+            10,
+            11
+          ],
+          "best_individual_mac": [
+            0.9999982546185231,
+            0.9999983249021085
+          ],
+          "cross_mac_R1_to_perturbed_11": 4.928859147811438e-10,
+          "cross_mac_R2_to_perturbed_10": 3.894059239400602e-11,
+          "counterparts_above_0_9": [
+            1,
+            1
+          ],
+          "individual_stable": true,
+          "subspace_modes": [
+            10,
+            11
+          ],
+          "subspace_cos2": [
+            0.9999983249969908,
+            0.9999982546509576
+          ],
+          "subspace_stable": true,
+          "subspace_unique": true,
+          "perturbed_hz_fe10_fe11": [
+            85.31879425048828,
+            87.2386703491211
+          ]
+        }
+      ]
+    }
+  },
+  "decision": "INDEPENDENT"
+}

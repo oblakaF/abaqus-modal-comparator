@@ -1,0 +1,116 @@
+{
+  "schema": "auto-id/fe-shape-pack-record/v1",
+  "job_name": "SP13_0328066b74b6fd78",
+  "specimen": "SP13",
+  "state": "G_MINUS",
+  "generated_inp_sha256": "0328066b74b6fd78c2756d0678f43c23a91613cf518df664469178795708b182",
+  "odb": {
+    "role": "CARBON-5A G_MINUS ODB (Abaqus 2024)",
+    "file_name": "SP13_0328066b74b6fd78.odb",
+    "sha256": "c39911aaa4f88bf702dab07ad7582f7027a41973b42da3c4ac2e5a94d5d08b9f",
+    "size_bytes": 715614536,
+    "location": {
+      "store": "carbon-project-archive",
+      "relative_path": "carbon5a/runs/G_MINUS_SP13/SP13_0328066b74b6fd78.odb"
+    }
+  },
+  "pack": {
+    "role": "FE shape pack (auto-id/fe-shape-pack/v1)",
+    "file_name": "SP13_0328066b74b6fd78.npz",
+    "sha256": "e6df3943ef4819d152efa5b08f61f7be4106cab858c473cd9595d750f48efc8d",
+    "size_bytes": 13569410,
+    "location": {
+      "store": "carbon-project-archive",
+      "relative_path": "fe_shapes/SP13_0328066b74b6fd78.npz"
+    }
+  },
+  "content_sha256": "b30263d23209e1fd5d802b99cc1eb7e6d6d57b3a8a61f543ff7891bf4d622311",
+  "node_set": {
+    "definition": "passport measured_surface: instance CFRP_PLATE_TOP, side max_z, |z - max| <= 1e-4 mm",
+    "node_count": 29754,
+    "sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db"
+  },
+  "fe_geometry_sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826",
+  "mode_numbers": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "frequencies_hz": [
+    21.95549964904785,
+    72.72115325927734,
+    75.94788360595703,
+    85.31879425048828,
+    87.2386703491211,
+    136.66075134277344,
+    199.9520263671875,
+    204.8291015625,
+    208.4840087890625,
+    215.6405487060547,
+    248.55784606933594,
+    251.0655975341797,
+    340.3649597167969,
+    385.20758056640625,
+    393.462158203125,
+    394.0018005371094,
+    399.83587646484375,
+    422.38397216796875,
+    430.8184814453125,
+    496.2411193847656,
+    497.086669921875,
+    622.8125610351562,
+    626.166259765625,
+    628.122802734375
+  ],
+  "extraction": {
+    "script": "abaqus_scripts/extract_odb.py",
+    "script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+    "abaqus": "Abaqus 2024 (abq2024.bat python)",
+    "command": "abq2024.bat python extract_odb.py --odb <copy> --output <raw> --start-mode 7 --end-mode 30",
+    "start_mode": 7,
+    "end_mode": 30,
+    "format_version": 2,
+    "worked_on": "SHA-verified scratch copy; archived original never opened by Abaqus",
+    "raw_extraction": "temporary validation material only (not archived)"
+  },
+  "validation": {
+    "V1_pass": true,
+    "V2_pass": true,
+    "V3_pass": true,
+    "V4_pass": true,
+    "V5_pass": true,
+    "V7_pass": true,
+    "V8_pass": true
+  },
+  "provenance_record": {
+    "role": "extraction-gate provenance record",
+    "file_name": "SP13_0328066b74b6fd78.provenance.json",
+    "sha256": "124d7fa55db06b7670a708f8f034b2a6a644638301c0de939a24481ac9453239",
+    "size_bytes": 9366,
+    "location": {
+      "store": "carbon-project-archive",
+      "relative_path": "fe_shapes/SP13_0328066b74b6fd78.provenance.json"
+    }
+  }
+}

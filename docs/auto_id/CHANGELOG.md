@@ -2171,3 +2171,953 @@ first internal provider.
 - **Bookkeeping branch:** `auto-id/m3-closure`, created from exactly `0fd63d69a78f251bd51721880bae9b425b98951e`.
 - **Code / scientific logic changed:** none.
 - **Abaqus run count:** 0
+
+## 2026-10-04 — M4.1 — IdentificationPairingPolicy
+
+- **Stage:** M4, first development batch (SUPERVISOR-authorised: M4.1–M4.5, M4.7,
+  M4.8; no Abaqus; M4.6 and M4.9 not authorised)
+- **Status:** M4.1 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`, created from `main` `6185b05`.
+- **Commit:** the commit that introduces this entry.
+- **Added — `domain.identification_pairing_policy`:**
+  - `IdentificationPairingPolicy` is immutable and hashed (`policy_hash`); its schema
+    is `auto-id/identification-pairing-policy/v1`.
+  - **`STRICT_IDENTIFICATION_PAIRING`** (SPEC §12.1):
+    - MAC ≥ 0.80;
+    - |Δf|/f_EXP ≤ 15 %;
+    - FE-to-FE tracking MAC ≥ 0.90;
+    - coverage ≥ 2 rows, the number of free parameters of carbon-property-set/v1;
+    - assignment tie tolerance 1e-9.
+  - `is_strict` and `require_strict()` reject weaker policies.
+- **Added — `services.identification_pairing.pair_baseline(policy, experimental, fe, mac)`:**
+  - The policy is a required argument.
+  - The gates (MAC, frequency) are applied to every pair **before** the assignment.
+  - The assignment is Hungarian: maximum number of pairs first, then maximum total MAC.
+  - **Status:**
+    - `AMBIGUOUS` when the optimal assignment is not unique within the tie tolerance;
+    - `INCOMPLETE_EVIDENCE` when a frequency-admissible MAC entry is unknown (NaN);
+    - `INSUFFICIENT_COVERAGE` when there are fewer pairs than the policy requires;
+    - otherwise `COMPLETE`. Only `COMPLETE` is final.
+  - Each unpaired experimental mode carries a reason.
+- **Unchanged:**
+  - the normal comparator and its defaults;
+  - the Stage-A pairing provider (MAC ≥ 0.50);
+  - `inverse_solver`;
+  - all M3 contracts.
+- **Added — `tests/test_m4_generic_guard.py`:** for every new M4 module, no specimen,
+  material or machine-path literal, and no import of `subprocess`, `abaqus_bridge`,
+  `matrix_model_service`, `forward_builder`, `shared_carbon_forward` or `modal_core`.
+- **Tests:** `tests/test_identification_pairing.py` +
+  `tests/test_m4_generic_guard.py`: 15 ran, OK.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.2 — Baseline observation / pair freeze
+
+- **Stage:** M4 first development batch
+- **Status:** M4.2 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `domain.frozen_observations`** (schema `auto-id/frozen-observations/v1`):
+  - **`BaselineIdentity`** records content identities only: forward model, M3 job name
+    and generated INP SHA-256, FE geometry, registration, experimental source, modal
+    set, measured DOFs and evidence source.
+  - **`FrozenObservationSet`:**
+    - status `FROZEN` / `NOT_FROZEN` with reasons;
+    - rows (`R1…`), only when FROZEN;
+    - provisional rows, for review;
+    - excluded modes with reasons;
+    - unknown MAC entries;
+    - `observation_hash`.
+  - **`require_frozen()`** raises `ObservationFreezeRefusal`, which is not a
+    ValueError/RuntimeError.
+- **Added — `services.baseline_freeze`:**
+  - `BaselineEvidence` carries the experimental modes, the M1
+    `ExperimentalModeEligibility`, the elastic FE modes, and a MAC matrix with NaN for
+    unknown entries.
+  - `freeze_baseline(evidence, policy)` requires a strict policy.
+  - Modes that M1 eligibility excludes never enter, even with a perfect match. FE
+    frequencies never select experimental modes.
+  - The set is FROZEN only when the M4.1 pairing is COMPLETE.
+- **Added — `services.archived_baseline`** and
+  `docs/auto_id/baselines/{SP02,SP13}.carbon4c-baseline.json` + `README.md` (the
+  approved replay source).
+  - **Sources:** the archived CARBON-4C post-solve records and ODBs (pinned by
+    SHA-256), the M3 baseline generated INP SHA-256 and job name, and the M1 production
+    mode frequencies.
+  - **Record hash:** canonical, independent of key order and line endings.
+  - **Not run:** no Abaqus, no Abaqus Python.
+- **Finding — archived replay is not final:**
+  - The FE mode shapes are not archived. Only the recorded MACs exist: the
+    accepted-comparator pairs and the best candidate of each rejected mode.
+  - Under the strict policy both baselines are **NOT_FROZEN (INCOMPLETE_EVIDENCE)**.
+    - SP02: 17 unknown frequency-admissible entries; provisional pair exp 2 ↔ FE 8;
+      below coverage.
+    - SP13: 28 unknown entries; provisional pairs 4↔10 and 5↔11.
+  - A final freeze needs FE shapes from the archived ODBs, i.e. Abaqus Python, which
+    needs a separate HUMAN gate.
+- **Tests:** `tests/test_baseline_freeze.py`:
+  - synthetic freeze behaviour;
+  - record identity links to M0–M3 (no store needed);
+  - store-gated agreement with the archive and the M1 modal input;
+  - the M4 guard extended.
+
+  M4 suites: 27 ran, OK.
+- **Unchanged:** M3 contracts (`shared_carbon_forward.py`, `forward_builder.py`,
+  manifests), the normal comparator and Stage-A pairing.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.3 — Physical modal-family classifier and family holdouts
+
+- **Stage:** M4 first development batch
+- **Status:** M4.3 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.modal_family_classifier`** (SPEC §12.2):
+  - `classify_surface_mode(coordinates, values, policy)` works on outer-surface FE
+    shapes: in-plane (x, y) and the out-of-plane component.
+  - **Parities:** continuous P_x = φᵀR_xφ/φᵀφ and P_y about the mid-lines, using
+    nearest-mirror-node mapping in normalised coordinates.
+  - **Near-square panels:** diagonal and antidiagonal parities as well.
+  - **Nodal lines:** counted as median sign changes along the rows and columns of a
+    resampling grid.
+  - **Family key:** parities plus nodal-line counts. Torsion-dominated means odd-odd.
+  - **Refused:** a mesh that is not symmetric enough (mirror coverage below the
+    policy), and degenerate input.
+- **`FamilyClassifierPolicy`:**
+  - SPEC §12.2 gives no numbers, so the thresholds are explicit, hashed and marked
+    **provisional**: `auto-id/modal-family/v1-provisional`.
+  - **Values:** parity threshold 0.80, mirror tolerance 2 % of min(Lx, Ly), mirror
+    coverage ≥ 95 %, near-square ≤ 5 %, 41 × 41 nodal grid, amplitude floor 5 %.
+  - The policy hash is recorded in every `ModeFamily`.
+- **Added — `select_holdouts(rows, k_int_enabled)`** (SPEC §12.3, D-010):
+  - **Torsion holdout:** the lowest torsion-dominated (≈ odd-odd) family, when k_int
+    is not enabled.
+  - **Validation holdout:** the highest accepted family.
+  - Every row of a held-out family is held out.
+  - Order is by experimental frequency, never by FE mode number.
+- **Real shapes:** not available in this batch (FE shapes are not archived;
+  extraction needs the HUMAN gate). Tests use analytic plate shapes:
+  - odd-odd torsion, even-even bending, odd-even, even-odd and mixed shapes;
+  - shuffled node order and a jittered mesh;
+  - near-square versus rectangular panels;
+  - a non-symmetric mesh.
+- **Tests:** `tests/test_modal_family_classifier.py`: 11 ran, OK. M4 guard extended.
+- **Unchanged:** M3 contracts and the existing comparator, cluster and Stage-A
+  services.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.4 — Cluster trigger and principal-angle confirmation
+
+- **Stage:** M4 first development batch
+- **Status:** M4.4 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.identification_clusters`** (SPEC §12.4, D-009):
+  - **`cluster_triggers(rows)`:** |Δf|/f < 3 % in experimental **or** FE frequency is
+    only a trigger. Rows that link transitively form one group.
+  - **`confirm_cluster(row_ids, baseline_shapes, perturbed_shapes, weights)`:**
+    - Requires all directions of carbon v1: E_in_plane ± 5 % and G12 ± 5 %.
+    - **CONFIRMED** when individual identity is unstable (best FE-to-FE MAC < 0.9, or
+      no unique counterpart) in at least one direction, **and** the 2-mode subspace is
+      stable (both principal-angle cos² > 0.95) and uniquely identified in **every**
+      direction.
+    - **INDEPENDENT** when identity is stable everywhere: two observations.
+    - **UNSTABLE** when the subspace is unstable or ambiguous: a refusal.
+    - **UNSUPPORTED** for groups of more than two modes: reported, not confirmed.
+    - Optional mass weighting.
+  - **`cluster_log_residual(fe_hz, experimental_hz)`:** r_C = (1/n_C)·Σ ln(f_FE/f_EXP),
+    independent of the pairing of members. A confirmed cluster is one residual, never
+    two independent observations.
+- **Thresholds:** 3 %, 0.95 and 0.9 are the SPEC values, as named constants. The
+  directions follow carbon v1. k_core directions are outside M4 (no new
+  parameterisation; M3 contracts unchanged).
+- **Real shapes:** not available in this batch. The ±5 % CARBON-5A ODBs are archived,
+  but extracting shapes is Abaqus Python, which needs the HUMAN gate. Tests use
+  synthetic orthonormal shapes:
+  - a rotating pair confirms;
+  - a close but distinct pair stays two observations;
+  - a single unstable direction is enough;
+  - subspace leakage or ambiguity is refused;
+  - 3-mode groups are unsupported;
+  - weighting is applied;
+  - the residual is assignment-invariant.
+- **Tests:** `tests/test_identification_clusters.py`: 13 ran, OK. M4 guard extended.
+- **Unchanged:** `modal_cluster_service.py`, `family_residual_service.py` (not
+  imported), and the M3 contracts.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.5 — FE-to-FE branch tracker
+
+- **Stage:** M4 first development batch
+- **Status:** M4.5 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.branch_tracker`** (SPEC §12.1, D-008, AUDIT V4):
+  - `FEModalState` holds the modes of one solved state on one node/DOF set, with the
+    FE geometry and node-set identities.
+  - `track_branches(policy, reference, candidate, rows, clusters, weights)`:
+    - follows each frozen row (row → reference FE mode) by **FE-to-FE MAC only**;
+    - requires MAC ≥ the policy's `tracking_minimum_mac` (0.90) and a unique
+      assignment;
+    - follows confirmed 2-mode clusters as a subspace (exactly one candidate pair with
+      both cos² > 0.95);
+    - optional mass weighting.
+  - **Refusals** (`BranchTrackingRefusal`, which is not a ValueError/RuntimeError):
+    - `BRANCH_LOSS`: no candidate reaches 0.90;
+    - `AMBIGUOUS`: several candidates reach 0.90 for one branch;
+    - `BRANCH_EXCHANGE`: one candidate is claimed by several branches;
+    - `CLUSTER_LOSS`: no unique candidate pair spans the cluster subspace.
+  - Rows are never added or dropped. Experimental data are not an input (checked by
+    signature), so the normal comparator never re-pairs.
+  - A frequency-order change with stable shapes is tracked correctly and recorded
+    (`order_changes`) as evidence.
+  - States on different FE geometry or node sets are refused.
+- **M4 gate element (tested here on synthetic shapes):** an artificial branch exchange
+  — two tracked modes exchanging character (45° mixing) between iterations — gives a
+  refusal, not silent re-pairing.
+- **Tests:** `tests/test_branch_tracker.py`: 11 ran, OK. M4 guard extended.
+- **Unchanged:** `inverse_solver.py` (Stage-A tracking), the comparator, and the M3
+  contracts.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.7 — Log-frequency objective
+
+- **Stage:** M4 first development batch (M4.6 not authorised; skipped by SUPERVISOR
+  decision)
+- **Status:** M4.7 REVIEW_READY; M4 stage IN_PROGRESS. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.identification_objective`** (SPEC §7, §8, §12.3–12.4):
+  - **Residuals:** r_i = (ln f_FE − ln f_EXP)/σ_i for frozen fit rows. Each confirmed
+    cluster is **one** term, r_C = mean ln(f_FE/f_EXP), with σ_C = √(Σσ_i²)/n_C.
+  - **Objective:** Φ = ½‖r‖² over fit terms only. Notation follows SPEC §8: the
+    objective is never named like the Jacobian.
+  - **Inputs:** FE frequencies come only from FE-to-FE tracking (M4.5). MAC is not an
+    input; it never enters Φ.
+  - **Holdouts:** holdout rows and clusters are evaluated and reported, never part of
+    Φ.
+  - **`RowSigma`:** σ² = σ_meas² + σ_setup², explicit per row, never defaulted.
+    `PROVISIONAL_SETUP_SD` (0.3 %, SPEC §7) is a named constant. It must be passed
+    explicitly and is flagged (`provisional_uncertainty`).
+  - **`build_objective_design`** requires a FROZEN set and refuses:
+    - missing σ;
+    - an unconfirmed or split cluster;
+    - unknown holdout rows;
+    - fewer fit terms than parameters.
+  - **`evaluate_objective`** refuses tracking that does not cover exactly the design's
+    rows and clusters.
+- **Tests:** `tests/test_identification_objective.py`: 6 ran, OK.
+  - residuals and Φ computed by hand;
+  - a cluster is one term;
+  - holdouts are excluded from Φ;
+  - Φ does not change with tracking MAC;
+  - refusals.
+
+  M4 guard extended.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.8 — Bounded LM / trust step; first M4 development batch REVIEW_READY
+
+- **Stage:** M4 first development batch
+- **Status:**
+  - M4.8 REVIEW_READY.
+  - The batch M4.1–M4.5, M4.7 and M4.8 is REVIEW_READY.
+  - The M4 stage remains IN_PROGRESS: M4.6 and M4.9 are `TODO` and not authorised.
+  - Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Added — `services.identification_step`** (SPEC §6 S4, §8):
+  - **Step:** `lm_step` computes Δx = −(J_rᵀJ_r + μ·diag(J_rᵀJ_r))⁻¹J_rᵀr in x = ln p
+    (minus sign tested). A parameter without sensitivity is refused.
+  - **`run_bounded_lm(evaluate, start, bounds, settings)`:**
+    - one call of the caller's residual function is one authorised solve;
+    - the Jacobian comes from central finite differences at exactly p·(1 ± 0.05),
+      2·n_p solves (for p0 these are the CARBON-5A E± / G± candidates), then Broyden
+      updates;
+    - finite differences are repeated only after a step failure;
+    - steps are projected onto the physical bounds;
+    - a step is accepted only if Φ actually decreases; otherwise μ ← 10μ.
+  - **Stop rules:**
+    - `CONVERGED` when max|Δx_j| < 0.2·sd_j, with local sd from (JᵀJ)⁻¹;
+    - `MAX_ITERATIONS` after 5 iterations;
+    - `REFUSED` on `BranchTrackingRefusal` or `ObservationFreezeRefusal`: no further
+      solves, no re-pairing;
+    - `STEP_REJECTED`;
+    - `SOLVE_BUDGET`.
+  - **Exact physical values:** physical parameter values are the source of truth.
+    Solves get p0 and the ±5 % points exactly, never exp(ln p), so candidate INPs keep
+    their accepted M3 identities.
+  - **Settings:** the SPEC values are defaults (5 iterations, 0.2·sd, μ × 10, ±5 %).
+    μ₀, μ decrease, step attempts and the solve budget have no SPEC value and must be
+    given explicitly.
+- **Tests:** `tests/test_identification_step.py`, analytic log-linear models only (no
+  solver):
+  - synthetic recovery from 52000/4500 to 45000/4000 with 0.3 % noise, within the
+    local 1σ in ≤ 20 evaluations;
+  - exact finite-difference points;
+  - a rejected step gives μ × 10 and a Jacobian refresh after a Broyden update;
+  - Φ never increases;
+  - refusal propagation;
+  - budget and iteration stops;
+  - validation.
+
+  13 ran, OK. M4 guard extended.
+- **Batch verification (Windows, Python 3.14.6):**
+  - **Full suite with stores:** 1217 ran; 1215 passed, 0 failures, 2 skipped (opt-in
+    Abaqus).
+  - **Full suite without stores:** 1215 ran; 1205 passed, 0 failures. Skipped: the M3
+    gate class, the M4.2 store test, 2 Abaqus tests and 14 real-data subtests.
+  - **Linux CI:** recorded after push.
+- **Batch findings for review:**
+  - The archived CARBON-4C baseline cannot be strictly frozen (M4.2): FE shapes are
+    not archived, so both baselines are NOT_FROZEN (INCOMPLETE_EVIDENCE).
+  - The thresholds of the M4.3 family classifier are provisional; SPEC §12.2 gives
+    none.
+- **Not done (by instruction):** M4.6 (solve pipeline), M4.9 (digital twin), any
+  Abaqus or Abaqus Python run.
+- **Unchanged:** the M3 contracts (`shared_carbon_forward.py`, `forward_builder.py`,
+  manifests, INP generation), the comparator, Stage-A services and `inverse_solver`.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4 first batch — Linux CI test fix (M4.3 test only)
+
+- **Linux CI** on `4ad6379` (run 37182692754) reported one failure:
+  `test_modal_family_classifier.ParityTests.test_independent_of_node_order_and_mild_mesh_irregularity`.
+  - **Cause:** under node reordering the summation order changes, so P_x came out as
+    −1.0000000000000002 on Linux and −1.0 on Windows. The test compared the whole
+    result exactly, floats included.
+  - **Unchanged:** the family key, parities and nodal-line counts.
+- **Fix (test only):** classification fields are compared exactly, and the parity
+  scores to 1e-12. No change to `services.modal_family_classifier`.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4 first batch — verification recorded
+
+- **Linux CI** on `a322484` (ubuntu-latest, Python 3.11, run 37182809657): success.
+  - 1212 ran, OK, skipped=22.
+  - Skips: 14 data-store subtests, the M3 gate class, the M4.2 store test, 2 opt-in
+    Abaqus tests and 4 headless-Tk tests.
+- **Windows:** full suite with stores 1217 ran, 1215 passed, 2 skipped.
+- **Status:**
+  - The first M4 batch (M4.1–M4.5, M4.7, M4.8) is REVIEW_READY.
+  - M4.6 and M4.9 remain `TODO` and need new SUPERVISOR authorisation.
+  - The M4 stage stays IN_PROGRESS.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4 first batch — SUPERVISOR review recorded; decision record prepared
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Review:**
+  - M4.1, M4.3, M4.4, M4.5, M4.7 and M4.8 are acknowledged as REVIEW_READY. They are
+    not ACCEPTED.
+  - M4.2 is **not accepted** and is now `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION`.
+    The archived baseline lacks the FE mode shapes that strict frozen observation
+    generation needs. Abaqus Python extraction needs a separate HUMAN gate, which has
+    not been given; no extraction was run.
+  - M4.6 and M4.9 have not started.
+- **Added — `docs/auto_id/M4_DECISION_RECORD.md`** (PROPOSED, awaiting SUPERVISOR
+  decision; not a DECISIONS.md entry). It covers:
+  1. the M4.3 provisional classifier values, with rationale, risks and a proposed
+     real-shape validation once extraction is authorised;
+  2. the M4.8 LM hyperparameters: μ₀ = 1e-3, μ ÷ 10 after an accepted step, 3 step
+     attempts per iteration, and a solve budget of 20 per specimen counting every
+     evaluation. The SPEC-fixed values are unchanged. Two questions are open: whether
+     the reference solve counts, and whether archived ±5 % solves can be reused;
+  3. exact M4.9 acceptance requirements:
+     - **prerequisites:** M4.2 unblocked, M4.6 authorised, the solve command pinned
+       to the CARBON-4C/5A convention, and a HUMAN gate;
+     - **twin definition:** truth, a noise seed and σ;
+     - **pass criteria:** convergence within budget, 1σ recovery (with an open point
+       on the weak G12 direction), branch-exchange refusal, determinism, provenance,
+       and unchanged M3 contracts.
+- **Code changed:** none.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.2 — Validated shape packs integrated; complete-MAC baseline freeze
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Status:**
+  - M4.2 moves from `BLOCKED_WAITING_FOR_ODB_SHAPE_EXTRACTION` to REVIEW_READY.
+  - Not accepted by the worker.
+  - Not started: M4.3 real validation, M4.4 real cluster confirmation, M4.6, M4.9.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **ODB shape-extraction gate** (HUMAN-authorised 2026-10-04; supervisor review PASS):
+  - 6 Abaqus 2024 Python extractions (Tier A: SP02 and SP13 baselines; Tier B: SP13
+    E± and G±), with the pinned, unchanged `extract_odb.py`, on SHA-verified scratch
+    copies.
+  - The archived ODBs are unchanged. No solver runs.
+  - V1–V8 all PASS.
+  - Shape packs and provenance are in `carbon-project-archive/fe_shapes/`. Raw
+    extractions are temporary (`D:\abaqus_scratch_m4`, kept unchanged for now).
+- **Added — `services.fe_shape_pack`:**
+  - pack record parser (`auto-id/fe-shape-pack-record/v1`);
+  - deterministic content hash, independent of the zip layout;
+  - node-set hash, defined like the registration subset fingerprint;
+  - `load_shape_pack(record, roots)`, which verifies file SHA-256, content, node set,
+    modes and frequencies, and refuses any difference.
+- **Added — `docs/auto_id/fe_shapes/`:** six pinned `<job>.shape-pack.json` records and
+  a README. They bind to the M3 accepted-job anchors, the fixture ODB references, the
+  passports' FE geometry and the registration subsets.
+- **`services.archived_baseline`:**
+  - `complete_mac_matrix` and `shape_pack_evidence` bind pack, baseline record,
+    FrozenRegistration and M1 experimental modes by identity: job, generated INP, ODB,
+    FE geometry, registration, node set, FE modes and exact frequencies.
+  - The full experimental × FE MAC matrix is computed in the experimental frame on the
+    measured-DOF contract (comparator formula).
+  - Every archived MAC entry must be reproduced (≤ 1e-9).
+  - `BaselineIdentity` gains `shape_pack_content_sha256`.
+  - The M4.2 freeze logic is unchanged: with complete evidence the strict policy now
+    decides.
+- **M4.2 result** (strict policy, M1 eligibility, no unknown MAC entries):
+  - **SP13 FROZEN:** R1 exp 4 ↔ FE 10 (MAC 0.888) and R2 exp 5 ↔ FE 11 (MAC 0.889).
+    Observation hash `922888c7…`.
+  - **SP02 NOT_FROZEN:** only exp 2 ↔ FE 8 (MAC 0.958) passes the strict gates, below
+    the required 2.
+  - **Observation:** SP13 R1/R2 are 2.2 % apart, which would trigger the M4.4 cluster
+    check. Real cluster confirmation is not started.
+- **Tests:**
+  - `tests/test_fe_shape_pack.py`: hash, loader, refusals, pinned records; store-gated
+    load of all six packs.
+  - `tests/test_baseline_freeze.py`: synthetic complete-matrix binding and refusals;
+    store-gated real freeze of SP02/SP13.
+  - The M4 guard covers `fe_shape_pack.py`.
+- **Unchanged:**
+  - the M3 contracts (`shared_carbon_forward.py`, `forward_builder.py`, manifests);
+  - the M4.1 policy, the freeze algorithm, and the v1 baseline records;
+  - SPEC and DECISIONS.
+- **Abaqus run count in this step:** 0. The extraction gate's 6 Abaqus Python runs are
+  recorded above.
+
+## 2026-10-04 — M4.2 — SUPERVISOR review note recorded
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Review of the M4.2 shape-pack integration:** result acknowledged. M4.2 stays
+  **REVIEW_READY**, not ACCEPTED.
+  - M4.2 is **unblocked**: complete MAC evidence for SP13 is available.
+  - **SP13** is the **candidate frozen observation set**: R1 exp 4 ↔ FE 10, R2 exp 5 ↔
+    FE 11 (observation hash `922888c7…`).
+  - **SP02** remains **NOT_FROZEN** and is **excluded from identification**. The strict
+    policy requires at least 2 valid observation rows; SP02 has 1.
+- **Unchanged:** freeze criteria and MAC/frequency thresholds.
+- **Not started:** M4.3 real validation, M4.4 real cluster confirmation, M4.6, M4.9.
+- **Code changed:** none.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.3 — Real validation of the modal-family classifier on SP13 shapes
+
+- **Stage:** M4 (IN_PROGRESS); SUPERVISOR-authorised M4.3 real validation only
+- **Status:** M4.3 REVIEW_READY. Not accepted by the worker. Thresholds unchanged and
+  still **PROVISIONAL**.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Input:**
+  - the validated SP13 baseline shape pack `SP13_a46d08b52995e078` (content
+    `7941545b…`): measured outer surface, 29 754 nodes, U3 out-of-plane;
+  - the M4.2 candidate frozen set (observation hash `922888c7…`).
+- **Added — `services.modal_family_classifier`:** the reporting helpers
+  `mirror_coverage` and `classify_shape_pack_modes`. Classification logic and policy
+  values are unchanged.
+- **Added — `docs/auto_id/fe_shapes/SP13_a46d08b52995e078.families.json`** (schema
+  `auto-id/modal-family-classification/v1`, PENDING SUPERVISOR REVIEW): parity scores,
+  nodal-line counts and family keys for modes 7–30, the frozen-row families and the
+  holdout selection.
+- **Results:**
+  - **Coverage:** mirror coverage is 1.0 for x, y, diagonal and antidiagonal. The panel
+    is 510 × 520 mm (near-square 1.9 %), so diagonal parities are computed. No refusal.
+  - **All 24 modes classified.** The parity and nodal-line parity are consistent for
+    every mode (odd parity ↔ odd nodal count).
+  - **Lowest torsion-dominated (odd-odd) family:** FE 7 (22.49 Hz), `Px:O|Py:O|nx:1|ny:1`.
+  - **Frozen rows:**
+    - R1 = FE 10 (85.85 Hz): `Px:O|Py:E|nx:1|ny:2` (P_x −1.000, P_y +1.000);
+    - R2 = FE 11 (87.77 Hz): `Px:E|Py:O|nx:2|ny:1` (P_x +1.000, P_y −1.000).
+
+    They are the odd-even / even-odd counterpart families of the near-square panel.
+  - **Holdout selection (k_int not enabled) behaves as defined:**
+    - no torsion-family holdout, because no odd-odd family is among the frozen rows;
+    - the validation holdout is the highest accepted family, R2;
+    - one fit row remains (R1), fewer than the 2 parameters. M4.7 would refuse this
+      objective design.
+- **Tests:** `tests/test_m4_3_real_classification.py`:
+  - unit tests for the helpers;
+  - record checks without a store;
+  - a store-gated recomputation from the pack.
+
+  The M4.3 and M4 guard suites pass.
+- **Not started:** M4.4, M4.6, M4.9. M4.2 freeze criteria are unchanged.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.4 — Real cluster confirmation of SP13 R1/R2: INDEPENDENT
+
+- **Stage:** M4 (IN_PROGRESS); SUPERVISOR-authorised M4.4 real confirmation only
+- **Status:** M4.4 REVIEW_READY. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Input:**
+  - the validated SP13 shape packs: baseline, plus the CARBON-5A ±5 % E_in_plane and
+    G12 states;
+  - the M4.2 frozen candidate rows R1 (exp 4 ↔ FE 10) and R2 (exp 5 ↔ FE 11);
+  - the M4.3 families: R1 `Px:O|Py:E|nx:1|ny:2`, R2 `Px:E|Py:O|nx:2|ny:1`.
+- **Method:** `services.identification_clusters` unchanged, with the approved criteria
+  only:
+  - |Δf|/f < 3 % is a trigger only;
+  - CONFIRMED only if individual identity is unstable (FE-to-FE MAC < 0.9, or no
+    unique counterpart) in at least one direction, while the 2-mode subspace is stable
+    (both cos² > 0.95) and unique in every direction.
+  - All 24 perturbed modes were candidates; there was no preselection.
+- **Basis:** primary, the full outer-surface U1–U3 vectors; sensitivity check, U3 only.
+- **Result:**
+  - **Trigger fired:** experimental spacing 2.25 %, FE spacing 2.24 %.
+  - **Decision: INDEPENDENT.** In each of E+, E−, G12+, G12−:
+    - each branch has exactly one counterpart ≥ 0.9 (FE 10 → 10, FE 11 → 11) with
+      MAC 0.999998;
+    - the cross-MAC to the other branch is ≈ 0;
+    - subspace cos² is 0.999998.
+
+    The same decision holds on the U3 basis.
+  - Perturbed frequencies move as expected (FE 10: 84.27 Hz at E−, 87.40 Hz at E+).
+- **Interpretation:** R1 (odd-even) and R2 (even-odd) are different symmetry classes;
+  the symmetric E/G12 perturbations do not mix them. R1 and R2 stay **two independent
+  observations**; no cluster residual applies.
+- **Added:**
+  - `docs/auto_id/fe_shapes/SP13.R1-R2.cluster.json` (schema
+    `auto-id/cluster-confirmation/v1`, PENDING SUPERVISOR REVIEW);
+  - `tests/test_m4_4_real_cluster.py`: record checks, plus a store-gated recomputation.
+- **Unchanged:** cluster thresholds, M4.2 freeze criteria, the M4.3 provisional policy,
+  and the M3 contracts. M4.6 and M4.9 not started.
+- **Abaqus run count:** 0. The existing gate shape packs were enough.
+
+## 2026-10-04 — M4.4 — SUPERVISOR review note recorded
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Review of M4.4:** M4.4 stays **REVIEW_READY**, not ACCEPTED.
+  - R1/R2 are confirmed **independent branches, not a cluster**.
+  - No cluster residual merging applies.
+  - **Unresolved:** the M4.3 holdout consequence. The current holdout selection (no
+    torsion holdout; validation holdout R2) leaves one fit row (R1) for two parameters.
+- **Unchanged:** cluster criteria, M4.3 thresholds, M4.2 freeze criteria.
+- **Not started:** M4.6, M4.9.
+- **Code changed:** none.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.6 — Resumable identification pipeline (architecture, fake solver)
+
+- **Stage:** M4 (IN_PROGRESS); SUPERVISOR-authorised M4.6 only
+- **Status:** M4.6 REVIEW_READY. Not accepted by the worker.
+- **Branch:** `auto-id/m4`
+- **Commit:** the commit that introduces this entry.
+- **Scope** (M4_DECISION_RECORD.md §6): architecture and fake-solver tests only. No real
+  Abaqus, no Abaqus Python, no M4.9.
+- **Added — `domain.identification_run`:**
+  - `SolverProfile` (schema `auto-id/solver-profile/v1`): separate data with an exact
+    template, no machine paths, and a profile hash that excludes provenance.
+  - `RunJournal`: atomic (`.partial` + replace), append-only, SHA-256 hash-chained, and
+    bound to the run identity; a broken chain or another run's identity is refused.
+  - `RunLock`: one writer per run directory.
+- **Added — `services.forward_solver`:**
+  - the only M4 module importing `subprocess`;
+  - renders the pinned profile command;
+  - verifies the M3 INP SHA before solving;
+  - accepts a solve only with the `.sta` completion marker, the `.dat` version marker
+    and an ODB, identified by SHA-256 and size;
+  - `SolveFailure` with no automatic retry;
+  - `verify_solve` re-checks the content on reuse;
+  - the executor is injectable (real `subprocess` only under a HUMAN gate).
+- **Added — `services.shape_extraction`:**
+  - the gate's validated pack build in the repository: format 2 from the pinned,
+    unchanged `extract_odb.py` (SHA `039aa067…`);
+  - checks: modes and history, finite and real values, FE geometry identity, exact
+    EIGFREQ frequencies, node set = expected registration subset, lossless storage, and
+    the content hash stable on reload;
+  - the extraction identity is content-only;
+  - raw extraction is deleted after validation (retention rule);
+  - the real executor uses `abaqus_bridge.run_abaqus_extraction` only as an execution
+    helper (no `abaqus_bridge` cache); no new extractor.
+- **Added — `services.identification_pipeline`:** the M4.8 residual function, chaining
+  candidate → M3 `prepare_forward_job` → validated archived pack, journalled solve or
+  new solve → validated pack → FE state → FE-to-FE tracking (M4.5) → objective (M4.7).
+  - **Run hash** binds: forward model and passport, solver profile, frozen set,
+    objective design, pairing policy, LM settings, bounds, start, extraction expectation,
+    archived packs and extra identity.
+  - **Journal:** each evaluation is journalled once and replayed on resume (refusals
+    included). Identification evaluations (reused and new) and actual Abaqus solves are
+    counted separately; reused archived evaluations count toward the budget.
+  - **Identity checks:** the start point's M3 job must equal the frozen baseline job;
+    the pack must match job, FE geometry, node set and modes.
+- **Added — `docs/auto_id/solver_profiles/{SP02,SP13}.json` + README:** the archived
+  CARBON-4C/5A convention (SP02 cpus 8 with a scratch store; SP13 cpus 1).
+- **Fake-solver results** (`tests/test_identification_pipeline.py`, `tests/m4_6_support.py`):
+  - **End to end:** from 52000/4500 to 45006/4000.2 (truth 45000/4000), CONVERGED in 6
+    evaluations (p0, 4 finite differences, 1 trial). Each INP is byte-identical to the M3
+    rendering.
+  - **Determinism:** identical run hash, evaluation hashes and result across run roots.
+  - **Resume:**
+    - after an interruption (crash after 3 solves), every job is solved exactly once
+      across sessions;
+    - after completion, all evaluations are replayed with 0 solves;
+    - after an interrupted extraction, the journalled solve is reused.
+  - **Content identity:** a tampered ODB (same mtime) and a tampered pack are refused.
+  - **Reuse:** with archived p0 and ±5 % packs, 5 evaluations are reused, and
+    solves = evaluations − 5.
+  - **Budget:** reused evaluations count toward it (budget 5 → SOLVE_BUDGET with 0
+    solves).
+  - **Refusals:**
+    - a branch exchange gives REFUSED, no further solves, and REFUSED again on resume
+      with 0 solves;
+    - a failed solve gives SolveFailure, no journal entry and the lock released;
+    - configuration identity mismatches are refused.
+  - **Profiles:** the accepted profiles render the archived command exactly.
+- **M4 guard (allow-list):**
+  - `subprocess` only in `forward_solver.py`;
+  - `abaqus_bridge.run_abaqus_extraction` only in `shape_extraction.py`;
+  - `forward_builder` only in the pipeline;
+  - no `load_or_extract_odb`, `_source_signature`, `_cache_is_valid` or `fast_cache`;
+  - no specimen literals.
+- **Unchanged:** M3 contracts, `abaqus_bridge.py`, `extract_odb.py`, M4.1–M4.5, M4.7,
+  M4.8 logic, SPEC, DECISIONS.
+- **Abaqus run count:** 0
+
+## 2026-10-04 — M4.6 — No silent retry of failed solves on resume
+
+- **Stage:** M4 (IN_PROGRESS); M4.6 REVIEW_READY
+- **Gap found during worker review of M4.6 (`a0bc28b`):** after a `SolveFailure`, a
+  plain resume would have re-run the failed solve. That is an implicit retry, contrary
+  to "no automatic retries".
+- **Fix (`services.identification_pipeline`):**
+  - a failed solve is journalled (`solve_failure`);
+  - a resumed run refuses that job with `SolveFailure` unless
+    `PipelineConfig.retry_failed_solves` is set explicitly;
+  - each authorised retry is journalled (`solve_retry`);
+  - failed attempts count as executed Abaqus solves (`failed_solves`,
+    `abaqus_solves_executed_total`).
+- **Test:** `test_failed_solve_is_not_retried_on_resume_without_authorisation`.
+- **Abaqus run count:** 0
+
+## 2026-10-05 — M4.6 — SP13 p0 smoke gate: REPRODUCED
+
+- **Stage:** M4 (IN_PROGRESS); M4.6 REVIEW_READY
+- **Authorisation:** HUMAN supervisor.
+  - **Scope:** exactly 1 Abaqus 2024 solve and 1 pinned `extract_odb.py` extraction for
+    `SP13_a46d08b52995e078` (p0). No LM loop, no M4.9, no other candidates, no retry
+    on failure.
+  - **Run directory:** `D:\abaqus_m4_smoke` (`D:\abaqus_scratch_m4` untouched).
+  - **Memory:** the first pre-flights stopped at about 9.4–9.9 GB available against the
+    archived 19 GB peak. The human supervisor then closed applications and ruled that
+    19 GB was a conservative reference peak, not a hard requirement. Grounds: the
+    Abaqus minimum memory estimate (3.9 GB, archived `.dat`), the archived SP13
+    behaviour, and the available virtual memory and disk. About 15.75 GB available
+    was accepted.
+- **Pre-flight:** all PASS.
+  - job identity: generated INP SHA `a46d08b5…`;
+  - solver profile `SP13/abaqus-2024/v1` (`79aebbfe…`);
+  - Abaqus executable;
+  - pinned script `039aa067…`;
+  - archived reference pack;
+  - fresh run directory;
+  - disk.
+- **Solve:** completed (`.sta` completion marker, `.dat` "Abaqus 2024").
+  - ODB 715 614 536 bytes, the same size as the archive. SHA `56da620e…` differs from
+    the archived `8c89585d…`, as expected, because of the ODB run metadata.
+  - Wall-clock 620 s (archive 584 s); memory peak 18 GB.
+- **Extraction:** pinned `extract_odb.py` through the controlled M4.6 path.
+  - All checks PASS: modes and history, finite and real values, FE geometry identity,
+    node set = registration subset (29 754), deterministic content.
+  - The raw extraction was deleted after validation (retention rule).
+- **Verdict: REPRODUCED.**
+  - **30/30** EIGFREQ values (modes 1–30) are exactly equal to
+    `carbon4c/post_solve_SP13.json` (maximum relative difference 0.0).
+  - The new shape-pack content SHA `7941545b59390a65…` is **identical** to the
+    validated baseline pack; the minimum FE-to-FE MAC is 1.0.
+- **Unchanged:** M3 contracts, all code (HEAD `7f9d4b1` at run time), `abaqus_bridge.py`,
+  `extract_odb.py`, solver profiles.
+- **Evidence:** EVIDENCE.md entry "M4.6 — SP13 p0 smoke gate", PENDING SUPERVISOR REVIEW.
+- **Archive proposal** (not executed): archive smoke provenance only (journal,
+  comparison, extraction manifest, logs) under `carbon-project-archive/m4_smoke/`,
+  referencing the existing `fe_shapes/SP13_a46d08b52995e078.npz`; no duplicate pack.
+  The ODB stays in `D:\abaqus_m4_smoke` until review.
+- **Abaqus run count:** 1 solve plus 1 Abaqus Python extraction (authorised).
+
+## 2026-10-05 — M4.6 — SP13 smoke gate ACCEPTED by the SUPERVISOR
+
+- **Stage:** M4 (IN_PROGRESS)
+- **Review:** the SUPERVISOR accepts the SP13 p0 smoke gate.
+  - The real M4.6 smoke-gate verdict is confirmed as **REPRODUCED**: 30/30 eigenfrequencies
+    exact, and the shape-pack content SHA `7941545b…` identical to the validated baseline pack.
+  - EVIDENCE.md "M4.6 — SP13 p0 smoke gate" moves from PENDING SUPERVISOR REVIEW to
+    **ACCEPTED**.
+- **Archive action:** remains a **proposal** until separately approved (provenance only,
+  under `carbon-project-archive/m4_smoke/`; no duplicate pack). The ODB stays in
+  `D:baqus_m4_smoke`.
+- **Not started:** M4.9. No additional Abaqus.
+- **Code changed:** none.
+
+## 2026-10-05 — M4.9 preparation (fake solver only): REVIEW_READY; real gate NOT STARTED
+
+- **Stage:** M4 (IN_PROGRESS); M4.9 `IN_PROGRESS` (preparation `REVIEW_READY`).
+- **Authorisation:** SUPERVISOR, M4.9 PREPARATION ONLY. Excluded: real Abaqus truth solve,
+  identification solves, Abaqus Python, M4.9 gate execution, changes to acceptance criteria,
+  M4_DECISION_RECORD decisions or M3 contracts.
+- **New module** `src/services/synthetic_twin.py`:
+  - `TwinDefinition`: truth, start, noise sd, **explicit noise seed** (no default), FE modes, σ,
+    k_int; content-hashed (free-text provenance excluded).
+  - Deterministic noise: SHA-256(seed, mode) with Box–Muller, independent of NumPy.
+  - `solve_truth`: the truth M3 job solved and extracted through the M4.6 components in its own
+    journal. Resumable; a failed truth solve is not retried without authorisation; never counted
+    in the 20 identification evaluations.
+  - `build_synthetic_experiment`: truth FE modes 7–30 on the measured grid through the
+    registration (R, measured-DOF contract), frequencies × (1 + sd·ε). Modes are numbered by
+    synthetic frequency; FE numbers appear in provenance only. No real PolyMAX data.
+  - `design_twin_observations`: strict freeze at p0, then M4.3 families and holdouts, then M4.4
+    triggers and confirmation with the ±5 % packs (surface U1U2U3), then the M4.7 design
+    (σ = 0.003, no provisional setup term).
+    - Nothing is hand-selected.
+    - UNSTABLE or UNSUPPORTED groups, or a design that `build_objective_design` refuses, make the
+      twin design REFUSED.
+  - `prepare_twin`: the twin's `PipelineConfig`. The twin definition hash, seed, experiment hash,
+    truth-pack hash and provenance hash go into the run identity; p0 and ±5 % must be validated
+    archived packs (otherwise refused). It writes a deterministic `twin_provenance.json`.
+  - `assess_recovery`: M4.9 criteria 1–2 unchanged (CONVERGED; |ln(p̂/p_true)| ≤ local sd).
+- **Unchanged:** M3 (`forward_builder.py`, `forward_model_manifest.py`, `shared_carbon_forward.py`,
+  manifests), `extract_odb.py`, all M4.1–M4.8 modules, acceptance criteria, M4_DECISION_RECORD, the
+  smoke-gate records, EVIDENCE.
+- **Guard:** `tests/test_m4_generic_guard.py` now also checks `synthetic_twin.py`;
+  `forward_builder` is allowed there read-only (SUPERVISOR to confirm, §6.4).
+- **Tests:** `tests/test_synthetic_twin.py` (26, with the plate-like fake in
+  `tests/m4_9_twin_support.py`) and `tests/test_m4_9_sp13_readiness.py` (3; 1 store-gated).
+  - Fake twin: 24 rows FROZEN; the torsion holdout is found by the policy; the rotating
+    near-degenerate pair is CONFIRMED (one cluster term); the stable close pair is INDEPENDENT.
+    CONVERGED in 6 evaluations (5 reused archived packs, 1 solve).
+  - A determinism; B resume without duplicate evaluations; C budget (p0 counts, reused packs
+    count, the truth solve is separate); D injected exchange REFUSED with no re-pairing and no
+    solve on resume; E cluster residual only when CONFIRMED.
+  - SP13 readiness (no Abaqus): the start and ±5 % points render exactly to the validated pack
+    jobs; the truth job has no pack.
+  - Full suite: Windows 1290 tests OK (23 skipped) without data stores; 1292 OK (2 skipped) with both stores.
+- **Decisions needed (not decided by the worker):**
+  1. Noise seed of the real SP13 twin: the definition requires an explicit seed (no default); no SP13 twin definition is committed until the SUPERVISOR fixes it.
+  2. UNSTABLE or UNSUPPORTED (>2-mode) trigger groups in the twin: implemented as a REFUSED design (no row is dropped silently); confirm, or define another rule.
+  3. A CONFIRMED cluster split by the holdout selection: build_objective_design refuses, so the twin design is REFUSED; confirm, or define a rule.
+  4. Real-gate criterion 3 (artificial branch exchange): the fake tests inject the exchange through the extraction executor; the mechanism and evidence for the real gate are not decided.
+  5. Guard allow-list (M4_DECISION_RECORD.md §6.4): services/synthetic_twin.py imports forward_builder read-only (truth job, ±5 % job names); confirm the extension.
+  6. Retention of the real truth ODB and pack after the M4.9 gate (archive or delete) is not decided.
+- **Status discrepancies (recorded, not changed):**
+  - The M4.9-preparation instruction says 'main: M4.6 ACCEPTED'; recorded state: M4.6 REVIEW_READY (only the SP13 smoke gate is ACCEPTED) and M4 is not merged to main. Not changed by the worker.
+  - The instruction says 'M4.7 waiting for M4.9 observation pipeline'; recorded state: M4.7 REVIEW_READY. Not changed by the worker.
+- **Correction note:** the previous entry's run directory `D:\abaqus_m4_smoke` contains a
+  stray control character. Not edited (append-only); this note is the correction.
+- **Abaqus runs:** 0. **Real Abaqus M4.9 gate NOT STARTED.**
+
+## 2026-10-05 — M4.9 preparation: SUPERVISOR decisions recorded; dependency boundary restored
+
+- **Stage:** M4 (IN_PROGRESS); M4.9 `IN_PROGRESS`; preparation `REVIEW_READY`. **Real M4.9 gate
+  NOT STARTED** (unauthorised).
+- **Decisions** recorded in M4_DECISION_RECORD.md §8:
+  - fixed seed 20261005;
+  - UNSTABLE / UNSUPPORTED groups are REFUSED;
+  - a CONFIRMED cluster split by the holdout selection is REFUSED;
+  - branch-exchange negative control on the real SP13 packs;
+  - no direct twin → M3 import;
+  - truth artifact retention;
+  - factual status.
+- **Dependency boundary (§8.5):**
+  - `identification_pipeline.py` gains `forward_candidate` and `forward_jobs`. This is
+    additive; the pipeline's own candidate creation now calls `forward_candidate`, with no
+    behaviour change.
+  - `synthetic_twin.py` no longer imports `forward_builder`.
+  - The guard is restored, plus an explicit test that only the pipeline imports it.
+- **SP13 twin definition:** `docs/auto_id/twins/SP13.twin.json`.
+  - Seed 20261005; definition hash `c200b293…`.
+  - Truth/start/noise/σ/modes follow §4–§5.
+- **Truth retention (§8.6):** the provenance carries the retention rule. The twin work
+  directory holds only the truth pack; archived packs are referenced by hash only.
+- **New tests:**
+  - UNSTABLE group REFUSED;
+  - UNSUPPORTED group REFUSED (no row excluded);
+  - CONFIRMED cluster split by the validation holdout REFUSED;
+  - SP13 twin definition (seed explicit, pinned hash, seed changes the hash);
+  - retention / no duplicate packs;
+  - the forward-builder boundary;
+  - **real-pack negative control (store-gated):**
+    - the M4.2 SP13 frozen rows (R1 ↔ FE 10, R2 ↔ FE 11);
+    - 45° in-memory mixing of FE 10/11 in the archived E−5 % candidate, immediately before
+      M4.5, gives REFUSED (`BRANCH_LOSS`);
+    - frozen rows unchanged, 0 solves, pack files unchanged, still refused on replay;
+    - controls: without injection the candidate tracks (R1 → 10, R2 → 11); a pure
+      relabelling is tracked as a crossing (R1 → 11, R2 → 10), not refused;
+    - recorded as a negative control, **not physical FE evidence**.
+- **Full suite:** Windows 1296 tests OK (24 skipped) without data stores; 1301 OK (2 skipped) with both stores.
+- **Worker observation (§8.8, diagnostic):** the pinned SP13 p0 frequencies alone trigger
+  > 2-mode groups (FE 13–15, 20–23, 28–30). If all members freeze in the twin, §8.2 makes
+  the design REFUSED. This is for the SUPERVISOR / HUMAN to weigh before any real gate.
+- **Unchanged:** M3 contracts and files, `extract_odb.py`, acceptance criteria, smoke-gate
+  records, EVIDENCE.
+- **Abaqus runs:** 0 (no Abaqus Python). **Real Abaqus M4.9 gate NOT STARTED.**
+
+## 2026-10-05 — M4.9 truth / observation-readiness gate: REFUSED_BEFORE_IDENTIFICATION
+
+- **Stage:** M4 (IN_PROGRESS); M4.9 `IN_PROGRESS`. The identification loop was **not started**.
+- **Authorisation:** HUMAN. Exactly 1 SP13 truth Abaqus 2024 solve (45000 / 4000 MPa) and
+  1 pinned extraction, outside the 20-evaluation budget.
+- **Executed:** 1 solve plus 1 Abaqus Python extraction.
+  - Both were hard-limited to one call each. The identification executors refused any call.
+  - Run directory: `D:\abaqus_m4_truth`.
+  - Pre-flight: all 5 archived packs verified; the truth job has no existing pack; 16.8 GB
+    RAM free.
+- **Truth:**
+  - job `SP13_bb3e5d7d131bed4f`, INP `bb3e5d7d…`;
+  - solve completed in 621 s, ODB `57282e50…`;
+  - pack `758add0c…`, all extraction checks PASS.
+- **Pipeline:** `services.synthetic_twin.prepare_twin`, unchanged; the twin definition is
+  unchanged.
+  - Synthetic experiment `5b0450d8…` (seed 20261005).
+  - Strict freeze FROZEN with 23 rows (exp 24 / FE 30 excluded by the policy).
+  - Holdouts: R1 (FE 7, torsion) and R23 (FE 29, validation).
+- **Trigger groups:** ['R11', 'R12'] = FE [17, 18] INDEPENDENT; ['R14', 'R15', 'R16', 'R17'] = FE [20, 21, 22, 23] UNSUPPORTED; ['R18', 'R19'] = FE [24, 25] INDEPENDENT; ['R20', 'R21'] = FE [26, 27] INDEPENDENT; ['R22', 'R23'] = FE [28, 29] INDEPENDENT; ['R4', 'R5'] = FE [10, 11] INDEPENDENT; ['R7', 'R8', 'R9'] = FE [13, 14, 15] UNSUPPORTED.
+- **Verdict: REFUSED_BEFORE_IDENTIFICATION.**
+  - Groups FE 13–15 and FE 20–23 are UNSUPPORTED (§8.2).
+  - The M4.7 design is not built. Parameter count 2.
+- **Records:**
+  - EVIDENCE "M4.9 — SP13 truth gate" (PENDING SUPERVISOR REVIEW);
+  - M4_DECISION_RECORD §9;
+  - provenance copies in `docs/auto_id/twins/SP13_truth_gate/`.
+- **Unchanged:** code, M3 contracts, policies, thresholds, acceptance criteria, twin
+  definition.
+- **Full suite:** docs/provenance only; code unchanged since 4ce5e6a (Windows 1296 OK/24 skipped without stores, 1301 OK/2 skipped with stores; Linux CI 1293 OK).
+- **Decision needed:** how M4.9 proceeds.
+
+## 2026-10-05 — M4.4 N-mode cluster design review (analysis only)
+
+- **Stage:** M4 (IN_PROGRESS); M4.9 `IN_PROGRESS`. The SUPERVISOR acknowledged the truth-gate
+  verdict REFUSED_BEFORE_IDENTIFICATION. Policy is unchanged.
+- **Document:** `docs/auto_id/M4_4_NMODE_CLUSTER_REVIEW.md` (PROPOSAL).
+  - Compares the options:
+    - A, N-dimensional subspace examination (A1: INDEPENDENT only; A2: full N-mode confirmation);
+    - B, symmetry subdivision;
+    - C, permanent refusal.
+  - For each: validity, SPEC §12.4 compatibility, the M4.7 and M4.5 effects, acceptance, code
+    and risk.
+- **Evidence** (read-only diagnostics on validated packs; no Abaqus):
+  - the members of FE 13–15 and FE 20–23 are mutually orthogonal (p0 MAC 0.0000) and of
+    distinct parity classes, except the (0,4)/(4,0) pair;
+  - each is individually stable (MAC ≥ 0.9998, unique counterpart) in E±, G12± and at the truth;
+  - the N-subspace cos² is ≥ 0.9999.
+- **Side finding:** the (4,4) mode at FE 30 leaves the extracted range 7–30 in some states.
+  That is why exp 24 was excluded. It is an edge-of-mode-set risk for a later LM loop.
+- **Recommendation:** A1. A2 deferred; B only as corroborating evidence; C until decided.
+- **Truth artifacts (proposal):**
+  - pack → `carbon-project-archive:fe_shapes/SP13_bb3e5d7d131bed4f.npz`;
+  - provenance → `carbon-project-archive:m4_twin/SP13_truth_gate/` (SHA-pinned);
+  - ODB temporary (§8.6).
+- **Code changed:** none. **Abaqus runs:** 0.
+
+## 2026-10-05 — M4.4 A1 (N-mode independence) implemented; M4.9 readiness re-run: READY_FOR_IDENTIFICATION
+
+- **Stage:** M4 (IN_PROGRESS); M4.4 `REVIEW_READY` (extended); M4.9 `IN_PROGRESS`. The
+  identification loop was **not started**.
+- **Decision:** SUPERVISOR approved option A1. Recorded as DECISIONS.md D-032 and
+  M4_DECISION_RECORD §10. No SPEC change is required.
+- **Code:** `src/services/identification_clusters.py`.
+  - N > 2 trigger groups are INDEPENDENT only with unique matches (MAC ≥ 0.9) and a stable
+    N-subspace (cos² > 0.95) in every direction; otherwise UNSUPPORTED.
+  - The 2-mode path is unchanged; no new thresholds.
+- **Tests:**
+  - 7 new cluster tests: 3- and 4-mode INDEPENDENT; ambiguous, rotating and unstable-subspace
+    → UNSUPPORTED; validation; 2-mode unchanged.
+  - Twin: a stable triple → INDEPENDENT with the design USABLE; a rotating triple →
+    UNSUPPORTED with the design REFUSED.
+  - TWIN_TRUTH pack record tests.
+- **Truth artifacts archived (approved):**
+  - `carbon-project-archive/fe_shapes/SP13_bb3e5d7d131bed4f.npz`;
+  - `m4_twin/SP13_truth_gate/` with `ARCHIVE_MANIFEST.json` (SHA-256 per file), indexed in the
+    global archive manifest under `m4_twin`;
+  - repository record `fe_shapes/SP13_bb3e5d7d131bed4f.shape-pack.json` (TWIN_TRUTH).
+
+  The ODB was not archived; the p0/±5 % packs were not duplicated.
+- **Readiness re-run (0 Abaqus solves, 0 extractions; resumed truth journal):**
+  - same freeze (`05a5443a…`);
+  - FE 13–15 INDEPENDENT; FE 20–23 INDEPENDENT;
+  - 23 frozen rows: 2 holdouts (R1, R23) and 21 fit rows; 0 cluster terms;
+  - the M4.7 design is **valid**. Verdict **READY_FOR_IDENTIFICATION**.
+  - Evidence: EVIDENCE "M4.9 — SP13 observation readiness after A1" (PENDING SUPERVISOR REVIEW).
+- **Open risk (recorded):** R23 (FE 29) sits at the upper extracted-mode boundary. The range is
+  not expanded.
+- **Full suite:** Windows 1306 OK (25 skipped) without data stores; 1311 OK (2 skipped) with both stores.
+- **Abaqus runs:** 0.
+
+## 2026-10-05 — M4.9 pre-loop decision review (analysis only)
+
+- **Document:** `docs/auto_id/M4_9_PRELOOP_REVIEW.md` (PROPOSAL).
+- **Bounds:** no authoritative E_in_plane / G12 bounds exist; the SPEC requires bounds but gives
+  no values. Proposed development-only bounds: a factor-2 box around p0 in ln p (E 26000–104000,
+  G12 2250–9000).
+- **FE 29 / R23:** in range (mode 29 or 30) in all six validated states; MAC ≥ 0.986; no
+  ambiguity. FE 30 (4,4) leaves the range in E−, G12+ and at the truth. Option A recommended
+  (keep modes 7–30 and accept a refusal).
+- **Run root:** `D:baqus_m4_twin_loop`, with a retention proposal.
+- **Loop gate:** ≤ 20 evaluations including 5 reused; ≤ 15 new solves and 15 extractions.
+- **Unchanged:** code, status, DECISIONS, EVIDENCE. **Abaqus runs:** 0.
+
+## 2026-10-05 — M4.9 real identification loop: CONVERGED (REVIEW_READY)
+
+- **Stage:** M4 (IN_PROGRESS); **M4.9 `REVIEW_READY`**. Not accepted by the worker; no merge;
+  no M5.
+- **Authorisation:** HUMAN gate. Development-only bounds E 26000–104000 / G12 2250–9000;
+  extraction range 7–30 (option A); run root `D:\abaqus_m4_twin_loop`; at most 20 evaluations
+  (5 reused), at most 15 new solves.
+- **Result: CONVERGED.**
+  - Estimate: E 45005.45 / G12 4012.20 MPa (truth 45000 / 4000).
+  - |ln error| / sd: E 0.000121 / 0.002064; G12 0.003046 / 0.009951. Both are within 1σ.
+- **Effort:** 6 evaluations (5 reused); **1 new Abaqus solve plus 1 extraction** (614 s solve).
+- **History:** iteration 1 accepted (Φ 5260.09 → 9.97); iteration 2 step below 0.2·sd, so
+  CONVERGED.
+- **Run quality:**
+  - no rejected step, no refusal, no active bound;
+  - R23 tracked in every evaluation (minimum MAC 0.9861);
+  - holdout residuals at p̂: R1 +0.031, R23 −0.311.
+- **Determinism:** zero-Abaqus journal replay gives an identical result; the journal is unchanged.
+- **Archived (approved):** `carbon-project-archive/m4_twin/SP13_identification_loop/` (manifest
+  `11eb6493…`, indexed globally). The ODB is kept in the run directory until review.
+- **Records:**
+  - EVIDENCE "M4.9 — SP13 synthetic-twin identification loop" (PENDING SUPERVISOR REVIEW);
+  - M4_DECISION_RECORD §11;
+  - `docs/auto_id/twins/SP13_identification_loop/`.
+- **Unchanged:** code, M3 contracts, thresholds, bounds, observation set.
+- **Full suite:** code unchanged since 7597b60 (Windows 1306 OK/25 skipped without stores, 1311 OK/2 skipped with stores; Linux CI 1303 OK); docs-only rerun below.
+
+## 2026-10-05 — M4 SUPERVISOR acceptance and stage closure
+
+- **Stage:** M4 `REVIEW_READY`. M4.1–M4.9 **ACCEPTED** (SUPERVISOR); **M4 gate PASS**; stage PR
+  `auto-id/m4` → `main` prepared, **not merged**. `last_accepted_stage` stays M3 until the HUMAN
+  merge. **M5 not started.**
+- **Evidence:** six pending M4 entries **ACCEPTED** (SUPERVISOR, 2026-10-05):
+  - ODB shape-extraction gate with the M4.2 complete-MAC freeze;
+  - M4.3 real classification;
+  - M4.4 R1/R2;
+  - M4.9 truth gate;
+  - readiness after A1;
+  - M4.9 identification loop.
+
+  The scientific text is unchanged. The M4.6 smoke-gate entry stays ACCEPTED.
+- **M4.9 gate result:**
+  - Recovered E = 45005.45 MPa, G12 = 4012.20 MPa; truth E = 45000 MPa, G12 = 4000 MPa. Both
+    within 1σ.
+  - 6/20 evaluations: 5 reused, 1 new identification solve plus 1 extraction.
+  - Deterministic replay PASS.
+  - The branch-exchange negative control is REFUSED, as required.
+  - M3 contracts unchanged.
+- **Qualifications:**
+  - M4.3 classifier thresholds remain PROVISIONAL;
+  - real SP13 identification stays refused (option C);
+  - SP02 stays NOT_FROZEN;
+  - the M4.9 bounds are development-only twin bounds.
+- **Governance:**
+  - M4_DECISION_RECORD §12, plus the stale header and batch table corrected;
+  - DECISIONS.md D-033–D-038 promoted (pairing policy, LM and budget, provisional classifier,
+    twin gate, refusal rules, M3 dependency boundary). The bounds are not promoted.
+- **Stage-gate test:** `tests/test_m4_stage_gate.py` (records only).
+  - Pinned provenance copies, the archive-manifest binding, run identity, journal hash chain,
+    budget, the 1σ result, no active bound, deterministic replay, the negative-control binding;
+  - store-gated M3 re-rendering and archive verification.
+  - The committed copies of the two archive manifests were added.
+- **Full suite:** Windows 1325 OK (27 skipped) without data stores; 1330 OK (2 skipped) with both stores; tests/test_m4_stage_gate.py 17 passed + 2 store-gated skipped (no stores) / 19 passed (stores); targeted M4 + M3 gate 196 passed.
+- **Abaqus runs during closure:** 0. No artifacts deleted.

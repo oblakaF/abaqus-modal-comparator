@@ -1,0 +1,96 @@
+{
+  "schema": "auto-id/archive-manifest/v1",
+  "gate": "M4.9 real identification loop, SP13 synthetic twin (HUMAN-authorised 2026-10-05)",
+  "approval": "HUMAN 2026-10-05 retention: journal, result record, shape packs, provenance and hashes permanent; ODBs kept in the run directory until SUPERVISOR review",
+  "created_utc": "2026-10-05T05:31:48+00:00",
+  "run_hash": "3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931",
+  "odbs_not_archived": [
+    {
+      "job_name": "SP13_aad55d259c1164ca",
+      "sha256": "fcd7fe001a4b60a574bcd260fb963bc7b49322d9ba18e0b32bcb7718e715ecc4",
+      "bytes": 715614536,
+      "kept_in": "D:\\abaqus_m4_twin_loop\\CFRP-T300-plain-0.45-oldstock\\SP-13\\3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931\\solves\\SP13_aad55d259c1164ca"
+    }
+  ],
+  "reused_archived_packs": "p0 / E\u00b1 / G12\u00b1 (fe_shapes/, not duplicated)",
+  "files": [
+    {
+      "file": "m4_twin/SP13_identification_loop/journal.json",
+      "sha256": "7bb1f97a4352851a9a8972113392bc7fdd6f1a46dd01237596decf268f9947a8",
+      "bytes": 27138,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/journal.json"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/loop_result.json",
+      "sha256": "fcda5733bfaa8e1635f2d5ec2294979930fdcf697aba2109464ff8b71b09f797",
+      "bytes": 2689,
+      "source": "loop_result.json"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/run_identity.json",
+      "sha256": "09d334437c81c6289c044d3b78b35d0485384175c499dd207e4149b0aac56f19",
+      "bytes": 5538,
+      "source": "run_identity.json"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/determinism_replay.json",
+      "sha256": "d92c3f1314b8bff2f5c1264c16f6a42e3bcaaf981119e45a83abd76eab055895",
+      "bytes": 290,
+      "source": "determinism_replay.json"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/packs/SP13_aad55d259c1164ca.npz",
+      "sha256": "6f345c85148619d7333bae6e75f279899e1aa772753a2f1c84e2b8a31d6bac3a",
+      "bytes": 13569410,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/packs/SP13_aad55d259c1164ca.npz"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/packs/SP13_aad55d259c1164ca.run-shape-pack.json",
+      "sha256": "a5adf60e524f68ce8ab241164e936218e2970e6b1da3e5e42087bde72bcfeae6",
+      "bytes": 2813,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/packs/SP13_aad55d259c1164ca.shape-pack.json"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/extraction_manifests/SP13_aad55d259c1164ca.json",
+      "sha256": "5d1a76071351ece53667f36c241ea0af6d0c1fd39d39fc0ffdc8f595e3ba8195",
+      "bytes": 39072,
+      "source": "extraction_manifests/SP13_aad55d259c1164ca.json"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/logs/SP13_aad55d259c1164ca.sta",
+      "sha256": "26c7a0405867ec4bacc6cb4f865972d0820146355eb1cb23465ea050da704a0b",
+      "bytes": 443,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/solves/SP13_aad55d259c1164ca/SP13_aad55d259c1164ca.sta"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/logs/SP13_aad55d259c1164ca.msg",
+      "sha256": "b81d462e3acb054743e7796ff6dcfc5186898d9718ed13e6576557577b24bb78",
+      "bytes": 8160,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/solves/SP13_aad55d259c1164ca/SP13_aad55d259c1164ca.msg"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/logs/SP13_aad55d259c1164ca.dat",
+      "sha256": "2ee3c2cf65cceb0778b8f9f2bbfde17fa0b575c13cdcb8f19145a0b915e8deb0",
+      "bytes": 46740,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/solves/SP13_aad55d259c1164ca/SP13_aad55d259c1164ca.dat"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/logs/SP13_aad55d259c1164ca.prt",
+      "sha256": "ac9e77f2a54a8802fbd2e35813fd1920371a5f1fb2e2ea75a4d3d74d66d6ab7e",
+      "bytes": 4573,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/solves/SP13_aad55d259c1164ca/SP13_aad55d259c1164ca.prt"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/logs/SP13_aad55d259c1164ca.com",
+      "sha256": "54addc36bbdfb9c56ba22752ab861765e21f9fdf28a8c0e54ff493f1cf40b943",
+      "bytes": 3447,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/solves/SP13_aad55d259c1164ca/SP13_aad55d259c1164ca.com"
+    },
+    {
+      "file": "m4_twin/SP13_identification_loop/logs/solve.log",
+      "sha256": "3103e0ba7e66fb24c685806a8adbfd9224b49a24c70b3a1a70b36b013f69c83a",
+      "bytes": 1728,
+      "source": "CFRP-T300-plain-0.45-oldstock/SP-13/3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931/solves/SP13_aad55d259c1164ca/solve.log"
+    }
+  ]
+}

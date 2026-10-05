@@ -1,0 +1,19 @@
+{
+  "schema": "auto-id/solver-profile/v1",
+  "profile_id": "SP02/abaqus-2024/v1",
+  "forward_model_id": "SP02_Modal_V02/carbon-property-set-v1",
+  "job_prefix": "SP02",
+  "abaqus_release": "Abaqus 2024",
+  "command_template": "{abaqus} job={job} input={inp} cpus={cpus}{scratch} interactive ask_delete=OFF",
+  "cpus": 8,
+  "scratch": {
+    "store": "abaqus-scratch"
+  },
+  "completion_marker": "THE ANALYSIS HAS COMPLETED SUCCESSFULLY",
+  "version_marker": "Abaqus 2024",
+  "provenance": [
+    "carbon-project-archive:carbon5a/run_all.py (CPUS SP02 = 8; human decision 2026-10-02: SP02 solver scratch on a D: scratch directory, transient files only)",
+    "carbon-project-archive:carbon5a/runs/*/solve.log (cpus=8 scratch=<dir>)",
+    "carbon-project-archive:carbon4c/run_sp02/solve.log (cpus=8, before the scratch decision)"
+  ]
+}

@@ -1,0 +1,1105 @@
+{
+ "gate": "M4.9 observation-readiness re-run after A1 (M4_DECISION_RECORD \u00a710; 0 Abaqus)",
+ "verdict": "READY_FOR_IDENTIFICATION",
+ "abaqus_solves": 0,
+ "abaqus_python_extractions": 0,
+ "truth_job": {
+  "job_name": "SP13_bb3e5d7d131bed4f",
+  "generated_inp_sha256": "bb3e5d7d131bed4f8b1da5fdc51d4dcd79247ed31740a97423318b5e66a8a672",
+  "job_hash": "0082ddc30794d94c8c65558a17d01eef6e218086c3603ec2ac2dababc605914d"
+ },
+ "truth_solve": {
+  "job_name": "SP13_bb3e5d7d131bed4f",
+  "generated_inp_sha256": "bb3e5d7d131bed4f8b1da5fdc51d4dcd79247ed31740a97423318b5e66a8a672",
+  "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+  "solve_hash": "c30a48309958b9827a3b338d932a3093018e1a876555f656529f1b45364841a5",
+  "odb_sha256": "57282e50448a9e8bb387336b1f0e0f8f56478ba85cd596effc8a67bacf7b69c4",
+  "odb_size_bytes": 715614536,
+  "abaqus_version_line": "Abaqus 2024                                  Date 05-Oct-2026   Time 09:00:45",
+  "command_template": "{abaqus} job={job} input={inp} cpus={cpus}{scratch} interactive ask_delete=OFF",
+  "executed": true
+ },
+ "truth_extraction": {
+  "job_name": "SP13_bb3e5d7d131bed4f",
+  "extraction_id": "cc19811317e9e1d99831c912d83792c35f6f43a88cfff01f3c670af557719721",
+  "odb_sha256": "57282e50448a9e8bb387336b1f0e0f8f56478ba85cd596effc8a67bacf7b69c4",
+  "script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+  "abaqus_release": "Abaqus 2024",
+  "pack_content_sha256": "758add0c22b824c55c7149c75462b08e4233ba04d5b423c7a31ef64fc5e98945",
+  "pack_file_sha256": "eeebae21c5e3c4f181f56cfe84115d63c62ebc949124e5446788d50359bee8fa",
+  "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+  "checks": {
+   "format_version_2": true,
+   "surface_instance_present": true,
+   "modes_complete": true,
+   "history_complete": true,
+   "mode_rows_match_geometry": true,
+   "finite": true,
+   "imaginary_zero": true,
+   "fe_geometry_identity": true,
+   "node_set": true,
+   "deterministic_content": true
+  },
+  "raw_deleted": true
+ },
+ "truth_run_hash": "926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b",
+ "twin_definition_hash": "c200b2930671c9fe47c0ab44c792f326e9f5343d2c491a7723ad2f859b3f8668",
+ "noise_seed": 20261005,
+ "synthetic_experiment_sha256": "5b0450d8ec13134558aa5b7f34a3c0abbc5768fd8b5f47385ead35022901014d",
+ "freeze": {
+  "status": "FROZEN",
+  "reasons": [],
+  "observation_hash": "05a5443a2f8eef4985b8176b762dcf4905600dd0fd0e89551a3ab6f4604e1311",
+  "excluded": [
+   {
+    "experimental_mode": 24,
+    "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+   }
+  ],
+  "provisional_rows": []
+ },
+ "rows": [
+  {
+   "row_id": "R1",
+   "experimental_mode": 1,
+   "experimental_hz": 21.27256120035488,
+   "fe_mode": 7,
+   "fe_hz": 22.489444732666016,
+   "mac": 0.9999998978466348,
+   "relative_frequency_error": 0.057204373316873385,
+   "family": "Px:O|Py:O|nx:1|ny:1",
+   "torsion_dominated": true
+  },
+  {
+   "row_id": "R2",
+   "experimental_mode": 2,
+   "experimental_hz": 67.50732501841216,
+   "fe_mode": 8,
+   "fe_hz": 72.72379302978516,
+   "mac": 0.9999999896919958,
+   "relative_frequency_error": 0.07727262204435208,
+   "family": "Px:E|Py:E|nx:0|ny:2",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R3",
+   "experimental_mode": 3,
+   "experimental_hz": 70.81176748357592,
+   "fe_mode": 9,
+   "fe_hz": 75.9510726928711,
+   "mac": 0.9999999507046404,
+   "relative_frequency_error": 0.07257699379537708,
+   "family": "Px:E|Py:E|nx:2|ny:0",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R4",
+   "experimental_mode": 4,
+   "experimental_hz": 80.34449005204283,
+   "fe_mode": 10,
+   "fe_hz": 85.85149383544922,
+   "mac": 0.9999996194827883,
+   "relative_frequency_error": 0.06854239512677533,
+   "family": "Px:O|Py:E|nx:1|ny:2",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R5",
+   "experimental_mode": 5,
+   "experimental_hz": 81.90477674526531,
+   "fe_mode": 11,
+   "fe_hz": 87.77133178710938,
+   "mac": 0.9999994956493925,
+   "relative_frequency_error": 0.07162653113736978,
+   "family": "Px:E|Py:O|nx:2|ny:1",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R6",
+   "experimental_mode": 6,
+   "experimental_hz": 129.44930660911203,
+   "fe_mode": 12,
+   "fe_hz": 137.98524475097656,
+   "mac": 0.9999993871486553,
+   "relative_frequency_error": 0.06594039292647462,
+   "family": "Px:E|Py:E|nx:2|ny:2",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R7",
+   "experimental_mode": 7,
+   "experimental_hz": 186.01453161488823,
+   "fe_mode": 13,
+   "fe_hz": 199.9770965576172,
+   "mac": 0.9999997258087983,
+   "relative_frequency_error": 0.07506168911381665,
+   "family": "Px:E|Py:O|nx:0|ny:3",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R8",
+   "experimental_mode": 8,
+   "experimental_hz": 192.0455791585106,
+   "fe_mode": 14,
+   "fe_hz": 204.8570098876953,
+   "mac": 0.999997623132065,
+   "relative_frequency_error": 0.06671036524412992,
+   "family": "Px:O|Py:E|nx:3|ny:0",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R9",
+   "experimental_mode": 9,
+   "experimental_hz": 195.6725576591235,
+   "fe_mode": 15,
+   "fe_hz": 208.949951171875,
+   "mac": 0.9999665111256294,
+   "relative_frequency_error": 0.06785516411494827,
+   "family": "Px:O|Py:O|nx:1|ny:3",
+   "torsion_dominated": true
+  },
+  {
+   "row_id": "R10",
+   "experimental_mode": 10,
+   "experimental_hz": 202.47402695179554,
+   "fe_mode": 16,
+   "fe_hz": 216.14474487304688,
+   "mac": 0.9999772827290571,
+   "relative_frequency_error": 0.06751837816959123,
+   "family": "Px:O|Py:O|nx:3|ny:1",
+   "torsion_dominated": true
+  },
+  {
+   "row_id": "R11",
+   "experimental_mode": 11,
+   "experimental_hz": 234.19526503287508,
+   "fe_mode": 17,
+   "fe_hz": 250.09567260742188,
+   "mac": 0.99999801106411,
+   "relative_frequency_error": 0.06789380465192059,
+   "family": "Px:E|Py:O|nx:2|ny:3",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R12",
+   "experimental_mode": 12,
+   "experimental_hz": 236.43935106581472,
+   "fe_mode": 18,
+   "fe_hz": 252.63162231445312,
+   "mac": 0.99999283405218,
+   "relative_frequency_error": 0.06848382545311234,
+   "family": "Px:O|Py:E|nx:3|ny:2",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R13",
+   "experimental_mode": 13,
+   "experimental_hz": 319.9375909385584,
+   "fe_mode": 19,
+   "fe_hz": 342.7955322265625,
+   "mac": 0.9999933135096195,
+   "relative_frequency_error": 0.07144500032318427,
+   "family": "Px:O|Py:O|nx:3|ny:3",
+   "torsion_dominated": true
+  },
+  {
+   "row_id": "R14",
+   "experimental_mode": 14,
+   "experimental_hz": 360.4270649357112,
+   "fe_mode": 20,
+   "fe_hz": 385.30828857421875,
+   "mac": 0.9999746926458536,
+   "relative_frequency_error": 0.06903261730066129,
+   "family": "Px:E|Py:E|nx:0|ny:4",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R15",
+   "experimental_mode": 15,
+   "experimental_hz": 366.3630330181308,
+   "fe_mode": 21,
+   "fe_hz": 393.58349609375,
+   "mac": 0.9998982608098157,
+   "relative_frequency_error": 0.07429915308696576,
+   "family": "Px:E|Py:E|nx:4|ny:0",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R16",
+   "experimental_mode": 16,
+   "experimental_hz": 368.04193851827057,
+   "fe_mode": 22,
+   "fe_hz": 394.4898681640625,
+   "mac": 0.9999955512954846,
+   "relative_frequency_error": 0.07186118449508978,
+   "family": "Px:O|Py:E|nx:1|ny:4",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R17",
+   "experimental_mode": 17,
+   "experimental_hz": 374.5908431868893,
+   "fe_mode": 23,
+   "fe_hz": 400.42010498046875,
+   "mac": 0.9999498564920666,
+   "relative_frequency_error": 0.06895326531164787,
+   "family": "Px:E|Py:O|nx:4|ny:1",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R18",
+   "experimental_mode": 18,
+   "experimental_hz": 398.3920272057271,
+   "fe_mode": 24,
+   "fe_hz": 423.8731994628906,
+   "mac": 0.9994761340782782,
+   "relative_frequency_error": 0.06396004567632874,
+   "family": "Px:E|Py:E|nx:2|ny:4",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R19",
+   "experimental_mode": 19,
+   "experimental_hz": 404.6878819024688,
+   "fe_mode": 25,
+   "fe_hz": 432.45733642578125,
+   "mac": 0.9997069313868948,
+   "relative_frequency_error": 0.06861943676881578,
+   "family": "Px:E|Py:E|nx:4|ny:2",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R20",
+   "experimental_mode": 20,
+   "experimental_hz": 468.2012310088947,
+   "fe_mode": 26,
+   "fe_hz": 499.0053405761719,
+   "mac": 0.9999732551200797,
+   "relative_frequency_error": 0.06579245744591385,
+   "family": "Px:O|Py:E|nx:3|ny:4",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R21",
+   "experimental_mode": 21,
+   "experimental_hz": 471.83386480418545,
+   "fe_mode": 27,
+   "fe_hz": 499.88531494140625,
+   "mac": 0.9999495044283536,
+   "relative_frequency_error": 0.05945196440883351,
+   "family": "Px:E|Py:O|nx:4|ny:3",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R22",
+   "experimental_mode": 22,
+   "experimental_hz": 580.4359036441347,
+   "fe_mode": 28,
+   "fe_hz": 623.0648193359375,
+   "mac": 0.9999866870949857,
+   "relative_frequency_error": 0.07344293387808523,
+   "family": "Px:E|Py:O|nx:0|ny:5",
+   "torsion_dominated": false
+  },
+  {
+   "row_id": "R23",
+   "experimental_mode": 23,
+   "experimental_hz": 589.4349160287782,
+   "fe_mode": 29,
+   "fe_hz": 628.851806640625,
+   "mac": 0.9856995384041369,
+   "relative_frequency_error": 0.0668723374540004,
+   "family": "Px:O|Py:O|nx:1|ny:5",
+   "torsion_dominated": true
+  }
+ ],
+ "holdouts": {
+  "torsion_family": "Px:O|Py:O|nx:1|ny:1",
+  "validation_family": "Px:O|Py:O|nx:1|ny:5",
+  "holdout_row_ids": [
+   "R1",
+   "R23"
+  ],
+  "fit_row_ids": [
+   "R2",
+   "R3",
+   "R4",
+   "R5",
+   "R6",
+   "R7",
+   "R8",
+   "R9",
+   "R10",
+   "R11",
+   "R12",
+   "R13",
+   "R14",
+   "R15",
+   "R16",
+   "R17",
+   "R18",
+   "R19",
+   "R20",
+   "R21",
+   "R22"
+  ],
+  "notes": []
+ },
+ "trigger_groups": [
+  {
+   "row_ids": [
+    "R11",
+    "R12"
+   ],
+   "fe_modes": [
+    17,
+    18
+   ],
+   "experimental_spacing": 0.009582115302905982,
+   "fe_spacing": 0.010139918378403773,
+   "status": "INDEPENDENT",
+   "reasons": [
+    "individual branch identity stable in every direction: two observations"
+   ],
+   "directions": [
+    {
+     "direction": "E_in_plane_mpa+",
+     "individual_macs": [
+      0.999994542347398,
+      0.9999923520305684
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999945432970782,
+      0.9999923528815862
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "E_in_plane_mpa-",
+     "individual_macs": [
+      0.9999937340733045,
+      0.999991627280614
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.999993735132245,
+      0.9999916282572561
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa+",
+     "individual_macs": [
+      0.9999943780238687,
+      0.9999936898410823
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999943790977767,
+      0.9999936908937578
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa-",
+     "individual_macs": [
+      0.9999940187473862,
+      0.9999930956847455
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999940200132545,
+      0.9999930969184834
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    }
+   ]
+  },
+  {
+   "row_ids": [
+    "R14",
+    "R15",
+    "R16",
+    "R17"
+   ],
+   "fe_modes": [
+    20,
+    21,
+    22,
+    23
+   ],
+   "experimental_spacing": 0.017793908745792602,
+   "fe_spacing": 0.02147684792910253,
+   "status": "INDEPENDENT",
+   "reasons": [
+    "4-mode group: every member individually stable with a stable subspace in every direction (A1): independent observations"
+   ],
+   "directions": [
+    {
+     "direction": "E_in_plane_mpa+",
+     "individual_macs": [
+      0.9999824655012625,
+      0.9998698659051909,
+      0.9999605179950053,
+      0.9999663689722544
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999989746213189,
+      0.9999935824186003,
+      0.999971103329562,
+      0.9999100348565754
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "E_in_plane_mpa-",
+     "individual_macs": [
+      0.9999832243596735,
+      0.9998990773114865,
+      0.9999822946661545,
+      0.9999659887216897
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999990400052411,
+      0.9999931844978976,
+      0.9999697696564707,
+      0.9999143750928543
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa+",
+     "individual_macs": [
+      0.9999933082129109,
+      0.999940734289255,
+      0.9999835938776319,
+      0.99998185608697
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999996583605107,
+      0.9999950255500519,
+      0.9999819112524666,
+      0.999949504528441
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa-",
+     "individual_macs": [
+      0.9999917415600748,
+      0.9998734617701942,
+      0.9999310787177225,
+      0.9999790757933016
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999995622954719,
+      0.999994358711449,
+      0.9999791343302398,
+      0.9999364690585054
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    }
+   ]
+  },
+  {
+   "row_ids": [
+    "R18",
+    "R19"
+   ],
+   "fe_modes": [
+    24,
+    25
+   ],
+   "experimental_spacing": 0.015803164387851933,
+   "fe_spacing": 0.02025166246360464,
+   "status": "INDEPENDENT",
+   "reasons": [
+    "individual branch identity stable in every direction: two observations"
+   ],
+   "directions": [
+    {
+     "direction": "E_in_plane_mpa+",
+     "individual_macs": [
+      0.9998904638671596,
+      0.9998959950648564
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.999983912598554,
+      0.9999142885686859
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "E_in_plane_mpa-",
+     "individual_macs": [
+      0.999886065574037,
+      0.9998876503445738
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999820434472069,
+      0.9999177864440815
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa+",
+     "individual_macs": [
+      0.9999634700612929,
+      0.9999698116723393
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999853209832802,
+      0.9999512670028464
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa-",
+     "individual_macs": [
+      0.999955109832997,
+      0.9999657569078912
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999840093149355,
+      0.9999391834594544
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    }
+   ]
+  },
+  {
+   "row_ids": [
+    "R20",
+    "R21"
+   ],
+   "fe_modes": [
+    26,
+    27
+   ],
+   "experimental_spacing": 0.007758701931353415,
+   "fe_spacing": 0.0017634568083345977,
+   "status": "INDEPENDENT",
+   "reasons": [
+    "individual branch identity stable in every direction: two observations"
+   ],
+   "directions": [
+    {
+     "direction": "E_in_plane_mpa+",
+     "individual_macs": [
+      0.9999802975890927,
+      0.9999605193615466
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999865407982688,
+      0.9999667927129029
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "E_in_plane_mpa-",
+     "individual_macs": [
+      0.9999805648690455,
+      0.9999601466511585
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999849323883413,
+      0.9999645309724486
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa+",
+     "individual_macs": [
+      0.9999869152553235,
+      0.9999763632653601
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999870166145052,
+      0.9999764590022642
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa-",
+     "individual_macs": [
+      0.9999858770410177,
+      0.9999734224090581
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999859445024903,
+      0.9999734820526434
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    }
+   ]
+  },
+  {
+   "row_ids": [
+    "R22",
+    "R23"
+   ],
+   "fe_modes": [
+    28,
+    29
+   ],
+   "experimental_spacing": 0.015503886524154076,
+   "fe_spacing": 0.009287937827809426,
+   "status": "INDEPENDENT",
+   "reasons": [
+    "individual branch identity stable in every direction: two observations"
+   ],
+   "directions": [
+    {
+     "direction": "E_in_plane_mpa+",
+     "individual_macs": [
+      0.9999680561944889,
+      0.9957213141168343
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999763045438489,
+      0.9957217058497432
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "E_in_plane_mpa-",
+     "individual_macs": [
+      0.9999832820545547,
+      0.9963389925487204
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999870626420486,
+      0.9963421035526819
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa+",
+     "individual_macs": [
+      0.9999909059809415,
+      0.9992437551890351
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999927485367024,
+      0.9992454796056917
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa-",
+     "individual_macs": [
+      0.9999726103400116,
+      0.9989521750864777
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.999981505125762,
+      0.998948467149472
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    }
+   ]
+  },
+  {
+   "row_ids": [
+    "R4",
+    "R5"
+   ],
+   "fe_modes": [
+    10,
+    11
+   ],
+   "experimental_spacing": 0.01941995888220599,
+   "fe_spacing": 0.022362312708732738,
+   "status": "INDEPENDENT",
+   "reasons": [
+    "individual branch identity stable in every direction: two observations"
+   ],
+   "directions": [
+    {
+     "direction": "E_in_plane_mpa+",
+     "individual_macs": [
+      0.9999983868565167,
+      0.9999983545114985
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999983869273995,
+      0.9999983545358636
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "E_in_plane_mpa-",
+     "individual_macs": [
+      0.9999981405850202,
+      0.9999981071715974
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999981406644688,
+      0.9999981072118777
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa+",
+     "individual_macs": [
+      0.999998351263778,
+      0.9999984227277247
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999984228102498,
+      0.9999983513079042
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa-",
+     "individual_macs": [
+      0.999998253018606,
+      0.9999983235383436
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999983236331198,
+      0.999998253051142
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    }
+   ]
+  },
+  {
+   "row_ids": [
+    "R7",
+    "R8",
+    "R9"
+   ],
+   "fe_modes": [
+    13,
+    14,
+    15
+   ],
+   "experimental_spacing": 0.03242245372586614,
+   "fe_spacing": 0.024402361140752584,
+   "status": "INDEPENDENT",
+   "reasons": [
+    "3-mode group: every member individually stable with a stable subspace in every direction (A1): independent observations"
+   ],
+   "directions": [
+    {
+     "direction": "E_in_plane_mpa+",
+     "individual_macs": [
+      0.9999995481050555,
+      0.9999970758160004,
+      0.9999949994365718
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999995506550382,
+      0.9999971083836248,
+      0.9999950288870129
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "E_in_plane_mpa-",
+     "individual_macs": [
+      0.9999995397604906,
+      0.9999971800655579,
+      0.999994596799652
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999995431929312,
+      0.9999972114832605,
+      0.999994630346175
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa+",
+     "individual_macs": [
+      0.9999996772808749,
+      0.9999983072947018,
+      0.9999990639279652
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999996833855549,
+      0.9999992718477593,
+      0.9999985055092538
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    },
+    {
+     "direction": "G12_mpa-",
+     "individual_macs": [
+      0.9999996194509739,
+      0.9999978259281478,
+      0.9999989115919856
+     ],
+     "individual_stable": true,
+     "cos2": [
+      0.9999996261112335,
+      0.9999992313828161,
+      0.9999981474299455
+     ],
+     "subspace_stable": true,
+     "subspace_unique": true
+    }
+   ]
+  }
+ ],
+ "design_status": "USABLE",
+ "design_reasons": [],
+ "m4_7_design_valid": true,
+ "design": {
+  "fit_rows": [
+   "R2",
+   "R3",
+   "R4",
+   "R5",
+   "R6",
+   "R7",
+   "R8",
+   "R9",
+   "R10",
+   "R11",
+   "R12",
+   "R13",
+   "R14",
+   "R15",
+   "R16",
+   "R17",
+   "R18",
+   "R19",
+   "R20",
+   "R21",
+   "R22"
+  ],
+  "fit_clusters": [],
+  "holdout_rows": [
+   "R1",
+   "R23"
+  ],
+  "holdout_clusters": [],
+  "fit_term_count": 21
+ },
+ "parameter_count": 2,
+ "experiment_modes": [
+  {
+   "number": 1,
+   "frequency_hz": 21.27256120035488,
+   "source_fe_mode": 7,
+   "truth_fe_hz": 21.244264602661133,
+   "epsilon": 0.443988031954167
+  },
+  {
+   "number": 2,
+   "frequency_hz": 67.50732501841216,
+   "source_fe_mode": 8,
+   "truth_fe_hz": 67.721923828125,
+   "epsilon": -1.056274431194463
+  },
+  {
+   "number": 3,
+   "frequency_hz": 70.81176748357592,
+   "source_fe_mode": 9,
+   "truth_fe_hz": 70.74366760253906,
+   "epsilon": 0.3208762157081436
+  },
+  {
+   "number": 4,
+   "frequency_hz": 80.34449005204283,
+   "source_fe_mode": 10,
+   "truth_fe_hz": 80.27136993408203,
+   "epsilon": 0.30363718314034455
+  },
+  {
+   "number": 5,
+   "frequency_hz": 81.90477674526531,
+   "source_fe_mode": 11,
+   "truth_fe_hz": 82.07325744628906,
+   "epsilon": -0.6842695833211754
+  },
+  {
+   "number": 6,
+   "frequency_hz": 129.44930660911203,
+   "source_fe_mode": 12,
+   "truth_fe_hz": 129.35989379882812,
+   "epsilon": 0.23039807176236834
+  },
+  {
+   "number": 7,
+   "frequency_hz": 186.01453161488823,
+   "source_fe_mode": 13,
+   "truth_fe_hz": 186.41722106933594,
+   "epsilon": -0.7200505263369004
+  },
+  {
+   "number": 8,
+   "frequency_hz": 192.0455791585106,
+   "source_fe_mode": 14,
+   "truth_fe_hz": 191.0371856689453,
+   "epsilon": 1.7595064647304977
+  },
+  {
+   "number": 9,
+   "frequency_hz": 195.6725576591235,
+   "source_fe_mode": 15,
+   "truth_fe_hz": 195.0724639892578,
+   "epsilon": 1.0254200885040001
+  },
+  {
+   "number": 10,
+   "frequency_hz": 202.47402695179554,
+   "source_fe_mode": 16,
+   "truth_fe_hz": 201.87657165527344,
+   "epsilon": 0.9865026133267415
+  },
+  {
+   "number": 11,
+   "frequency_hz": 234.19526503287508,
+   "source_fe_mode": 17,
+   "truth_fe_hz": 234.1251220703125,
+   "epsilon": 0.09986535111700323
+  },
+  {
+   "number": 12,
+   "frequency_hz": 236.43935106581472,
+   "source_fe_mode": 18,
+   "truth_fe_hz": 236.60491943359375,
+   "epsilon": -0.23325574150556191
+  },
+  {
+   "number": 13,
+   "frequency_hz": 319.9375909385584,
+   "source_fe_mode": 19,
+   "truth_fe_hz": 321.3499450683594,
+   "epsilon": -1.4650219088524277
+  },
+  {
+   "number": 14,
+   "frequency_hz": 360.4270649357112,
+   "source_fe_mode": 20,
+   "truth_fe_hz": 359.7221374511719,
+   "epsilon": 0.6532148114228029
+  },
+  {
+   "number": 15,
+   "frequency_hz": 366.3630330181308,
+   "source_fe_mode": 21,
+   "truth_fe_hz": 367.7025146484375,
+   "epsilon": -1.2142801829783534
+  },
+  {
+   "number": 16,
+   "frequency_hz": 368.04193851827057,
+   "source_fe_mode": 22,
+   "truth_fe_hz": 368.5542907714844,
+   "epsilon": -0.46338921749386075
+  },
+  {
+   "number": 17,
+   "frequency_hz": 374.5908431868893,
+   "source_fe_mode": 23,
+   "truth_fe_hz": 374.48028564453125,
+   "epsilon": 0.09840975755487766
+  },
+  {
+   "number": 18,
+   "frequency_hz": 398.3920272057271,
+   "source_fe_mode": 24,
+   "truth_fe_hz": 396.7492980957031,
+   "epsilon": 1.3801571234939294
+  },
+  {
+   "number": 19,
+   "frequency_hz": 404.6878819024688,
+   "source_fe_mode": 25,
+   "truth_fe_hz": 404.992919921875,
+   "epsilon": -0.2510644873043078
+  },
+  {
+   "number": 20,
+   "frequency_hz": 468.2012310088947,
+   "source_fe_mode": 26,
+   "truth_fe_hz": 467.7637939453125,
+   "epsilon": 0.311722190590206
+  },
+  {
+   "number": 21,
+   "frequency_hz": 471.83386480418545,
+   "source_fe_mode": 27,
+   "truth_fe_hz": 468.8406066894531,
+   "epsilon": 2.1281277489081387
+  },
+  {
+   "number": 22,
+   "frequency_hz": 580.4359036441347,
+   "source_fe_mode": 28,
+   "truth_fe_hz": 582.7950439453125,
+   "epsilon": -1.3493253049461562
+  },
+  {
+   "number": 23,
+   "frequency_hz": 589.4349160287782,
+   "source_fe_mode": 29,
+   "truth_fe_hz": 588.8150024414062,
+   "epsilon": 0.3509385148144936
+  },
+  {
+   "number": 24,
+   "frequency_hz": 590.448463283392,
+   "source_fe_mode": 30,
+   "truth_fe_hz": 590.8931884765625,
+   "epsilon": -0.2508773733524133
+  }
+ ],
+ "truth_pack_content_sha256": "758add0c22b824c55c7149c75462b08e4233ba04d5b423c7a31ef64fc5e98945"
+}

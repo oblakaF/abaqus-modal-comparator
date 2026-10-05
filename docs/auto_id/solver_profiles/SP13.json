@@ -1,0 +1,16 @@
+{
+  "schema": "auto-id/solver-profile/v1",
+  "profile_id": "SP13/abaqus-2024/v1",
+  "forward_model_id": "SP13_mesh_local_v1_modal/carbon-property-set-v1",
+  "job_prefix": "SP13",
+  "abaqus_release": "Abaqus 2024",
+  "command_template": "{abaqus} job={job} input={inp} cpus={cpus}{scratch} interactive ask_delete=OFF",
+  "cpus": 1,
+  "scratch": null,
+  "completion_marker": "THE ANALYSIS HAS COMPLETED SUCCESSFULLY",
+  "version_marker": "Abaqus 2024",
+  "provenance": [
+    "carbon-project-archive:carbon4c/run_sp13/solve.log (cpus=1)",
+    "carbon-project-archive:carbon5a/runs/*_SP13/solve.log (cpus=1)"
+  ]
+}

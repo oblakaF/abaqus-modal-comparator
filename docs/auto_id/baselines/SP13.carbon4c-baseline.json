@@ -1,0 +1,275 @@
+{
+  "schema": "auto-id/archived-baseline/v1",
+  "baseline_id": "SP13/CARBON-4C-baseline",
+  "forward_model": {
+    "path": "docs/auto_id/forward_models/SP13.forward.json",
+    "manifest_hash": "f54079004c953749feb06bc0cf81c24a8545a74eb9f40d38cb3cd5fc831aa2b9"
+  },
+  "candidate": {
+    "E_in_plane_mpa": 52000.0,
+    "G12_mpa": 4500.0
+  },
+  "job": {
+    "job_name": "SP13_a46d08b52995e078",
+    "generated_inp_sha256": "a46d08b52995e078213e78156c585c2b5a483c2c5954ace7cdc77e136b746253"
+  },
+  "odb": {
+    "role": "CARBON-4C baseline ODB (Abaqus 2024)",
+    "file_name": "SP13_a46d08b52995e078.odb",
+    "sha256": "8c89585d3970765f2a6cb2bc242fff921b03198da2359b8f2990fcaa837d17b0",
+    "size_bytes": 715614536,
+    "location": {
+      "store": "carbon-project-archive",
+      "relative_path": "carbon4c/run_sp13/SP13_a46d08b52995e078.odb"
+    }
+  },
+  "source_record": {
+    "role": "CARBON-4C post-solve record",
+    "file_name": "post_solve_SP13.json",
+    "sha256": "08390b730d1d013cbe5597bd6f77c07ae66bc2456fe093daa4e4ee3e47493650",
+    "size_bytes": 14463,
+    "location": {
+      "store": "carbon-project-archive",
+      "relative_path": "carbon4c/post_solve_SP13.json"
+    }
+  },
+  "fe_geometry_sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826",
+  "registration_hash": "a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4",
+  "experimental": {
+    "fixture_id": "SP13/best",
+    "source_sha256": "f268023583972f0a9c1660bc60631587e8f3330e4fb7495e52d8310906af39fe",
+    "modal_set": "best",
+    "measured_dofs": [
+      "U3"
+    ],
+    "modes": [
+      {
+        "number": 1,
+        "frequency_hz": 31.423392809120724
+      },
+      {
+        "number": 2,
+        "frequency_hz": 74.15872319849791
+      },
+      {
+        "number": 3,
+        "frequency_hz": 80.88190545952885
+      },
+      {
+        "number": 4,
+        "frequency_hz": 94.3990939312666
+      },
+      {
+        "number": 5,
+        "frequency_hz": 96.52110678751086
+      },
+      {
+        "number": 6,
+        "frequency_hz": 147.50448294768242
+      },
+      {
+        "number": 7,
+        "frequency_hz": 205.64887661733076
+      },
+      {
+        "number": 8,
+        "frequency_hz": 212.6644265088215
+      },
+      {
+        "number": 9,
+        "frequency_hz": 222.49383579417693
+      },
+      {
+        "number": 10,
+        "frequency_hz": 228.60697715833666
+      },
+      {
+        "number": 11,
+        "frequency_hz": 230.89085059170534
+      },
+      {
+        "number": 12,
+        "frequency_hz": 261.83534617706255
+      }
+    ]
+  },
+  "fe_modes": [
+    {
+      "number": 7,
+      "frequency_hz": 22.489444732666016
+    },
+    {
+      "number": 8,
+      "frequency_hz": 72.72379302978516
+    },
+    {
+      "number": 9,
+      "frequency_hz": 75.9510726928711
+    },
+    {
+      "number": 10,
+      "frequency_hz": 85.85149383544922
+    },
+    {
+      "number": 11,
+      "frequency_hz": 87.77133178710938
+    },
+    {
+      "number": 12,
+      "frequency_hz": 137.98524475097656
+    },
+    {
+      "number": 13,
+      "frequency_hz": 199.9770965576172
+    },
+    {
+      "number": 14,
+      "frequency_hz": 204.8570098876953
+    },
+    {
+      "number": 15,
+      "frequency_hz": 208.949951171875
+    },
+    {
+      "number": 16,
+      "frequency_hz": 216.14474487304688
+    },
+    {
+      "number": 17,
+      "frequency_hz": 250.09567260742188
+    },
+    {
+      "number": 18,
+      "frequency_hz": 252.63162231445312
+    },
+    {
+      "number": 19,
+      "frequency_hz": 342.7955322265625
+    },
+    {
+      "number": 20,
+      "frequency_hz": 385.30828857421875
+    },
+    {
+      "number": 21,
+      "frequency_hz": 393.58349609375
+    },
+    {
+      "number": 22,
+      "frequency_hz": 394.4898681640625
+    },
+    {
+      "number": 23,
+      "frequency_hz": 400.42010498046875
+    },
+    {
+      "number": 24,
+      "frequency_hz": 423.8731994628906
+    },
+    {
+      "number": 25,
+      "frequency_hz": 432.45733642578125
+    },
+    {
+      "number": 26,
+      "frequency_hz": 499.0053405761719
+    },
+    {
+      "number": 27,
+      "frequency_hz": 499.88531494140625
+    },
+    {
+      "number": 28,
+      "frequency_hz": 623.0648193359375
+    },
+    {
+      "number": 29,
+      "frequency_hz": 628.851806640625
+    },
+    {
+      "number": 30,
+      "frequency_hz": 629.805419921875
+    }
+  ],
+  "mac_entries": [
+    {
+      "experimental_mode": 2,
+      "fe_mode": 9,
+      "mac": 0.6047064995657317,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 3,
+      "fe_mode": 8,
+      "mac": 0.7308109638805347,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 4,
+      "fe_mode": 10,
+      "mac": 0.8877283333204797,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 5,
+      "fe_mode": 11,
+      "mac": 0.8894778258523663,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 6,
+      "fe_mode": 12,
+      "mac": 0.5060000164080669,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 7,
+      "fe_mode": 13,
+      "mac": 0.7695144037787166,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 8,
+      "fe_mode": 14,
+      "mac": 0.7188348118150991,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 10,
+      "fe_mode": 15,
+      "mac": 0.7130284006420955,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 11,
+      "fe_mode": 16,
+      "mac": 0.628243480308404,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 12,
+      "fe_mode": 17,
+      "mac": 0.638332570827575,
+      "origin": "accepted-comparator pair (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 1,
+      "fe_mode": 7,
+      "mac": 0.9884487199100259,
+      "origin": "best-MAC candidate of a rejected experimental mode (CARBON-4C post-solve)"
+    },
+    {
+      "experimental_mode": 9,
+      "fe_mode": 15,
+      "mac": 0.39567125798052766,
+      "origin": "best-MAC candidate of a rejected experimental mode (CARBON-4C post-solve)"
+    }
+  ],
+  "provenance": [
+    "carbon-project-archive:carbon4c/post_solve_SP13.json (frequencies, FE geometry identity, recorded MACs)",
+    "carbon-project-archive:ARCHIVE_MANIFEST.json (ODB SHA-256)",
+    "docs/auto_id/forward_models/accepted_forward_jobs.json (baseline generated INP SHA-256)",
+    "M1 production modal input of fixture SP13/best (experimental frequencies)",
+    "FE mode shapes are not archived; MAC entries not recorded above are unknown"
+  ]
+}
