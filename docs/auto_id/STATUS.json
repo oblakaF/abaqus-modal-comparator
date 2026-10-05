@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M5",
-  "current_ministep": "M5.4",
+  "current_ministep": "M5.8",
   "status": "IN_PROGRESS",
   "last_accepted_stage": "M4",
   "last_accepted_ministep": "M4.9",
@@ -531,7 +531,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "SUPERVISOR review of checkpoint M5-A (M5.1-M5.4 REVIEW_READY); M5.5-M5.9 not started; no Abaqus",
+  "next_action": "SUPERVISOR review of checkpoint M5-B (M5.5, M5.6, M5.8 REVIEW_READY); M5.7 and M5.9 not started; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -539,10 +539,10 @@
     "M5.2": "REVIEW_READY",
     "M5.3": "REVIEW_READY",
     "M5.4": "REVIEW_READY",
-    "M5.5": "TODO",
-    "M5.6": "TODO",
+    "M5.5": "REVIEW_READY",
+    "M5.6": "REVIEW_READY",
     "M5.7": "TODO",
-    "M5.8": "TODO",
+    "M5.8": "REVIEW_READY",
     "M5.9": "TODO",
     "status": "IN_PROGRESS",
     "decision_record": "docs/auto_id/M5_DECISION_RECORD.md (DECISIONS D-039..D-044)",
@@ -552,7 +552,19 @@
       "tests": "tests/test_practical_identifiability.py (16, synthetic + M4.9 twin positive control from records)",
       "scope_note": "M5.1 machinery for explicit/synthetic matrices; real FE nuisance columns and the S4 noise control are outside M5 (D-039)",
       "tests_result": "Windows 1341 OK (27 skipped) without data stores; 1346 OK (2 skipped) with both stores; M5-A 16 passed; targeted M4 regression + M4 and M3 stage gates 120 passed",
+      "abaqus_runs": 0,
+      "supervisor_review": "ACKNOWLEDGED 2026-10-05 (M5.1-M5.4 REVIEW_READY); confirmations in M5_DECISION_RECORD §17.1"
+    },
+    "M5-B": {
+      "module": "src/services/identification_uncertainty.py",
+      "tests": "tests/test_identification_uncertainty.py (19, A-P)",
+      "twin_records_control": "statistical_sd_ln E 0.002064 / G12 0.009951; pattern PASS; chi2/dof 19.946/19, s_B 1.0246; birge_adjusted_sd_ln E 0.002115 / G12 0.010195 (synthetic records-based control, not real-specimen uncertainty)",
+      "implementation_note_for_confirmation": "a cluster whose members span different M4.3 families gets the composite family key (never merged with unrelated families)",
+      "tests_result": "Windows 1360 OK (27 skipped) without data stores; 1365 OK (2 skipped) with both stores; M5-A+M5-B 35 passed; targeted M4 regression + M4 and M3 stage gates 139 passed",
       "abaqus_runs": 0
-    }
+    },
+    "technical_debt": [
+      "tests/test_registration_factory.py::test_no_full_model_contamination flaky (hash substring 'd11'); unrelated to M5; fix separately"
+    ]
   }
 }

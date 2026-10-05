@@ -3180,3 +3180,28 @@ first internal provider.
     NOT_IDENTIFIABLE-compatible.
 - **Full suite:** Windows 1341 OK (27 skipped) without data stores; 1346 OK (2 skipped) with both stores; M5-A 16 passed; targeted M4 regression + M4 and M3 stage gates 120 passed.
 - **Abaqus runs:** 0. No M4 artifact deleted. No M4 scientific result changed.
+
+## 2026-10-05 — M5 checkpoint M5-B (M5.5, M5.8, M5.6) REVIEW_READY
+
+- **Stage:** M5 `IN_PROGRESS` (branch `auto-id/m5`).
+  - M5.1–M5.4 `REVIEW_READY` (acknowledged by the SUPERVISOR).
+  - M5.5, M5.6, M5.8 `REVIEW_READY`.
+  - M5.7, M5.9 `TODO`.
+- **SUPERVISOR M5-A confirmations** recorded (M5_DECISION_RECORD §17.1): sd_ln > 0.08; S~
+  cosines; q on the augmented system; Cholesky whitening; the Linux flake recorded as unrelated
+  debt.
+- **New module:** `src/services/identification_uncertainty.py`.
+  - **M5.5:** `statistical_sd` from the full M5 system only (never an M4 local_sd), with Σ and
+    prior provenance and a context label; rank deficiency refused.
+  - **M5.8:** residual-pattern test per D-043, with strict inequalities and cluster = one term.
+  - **M5.6:** conditional Birge per D-041, populated only when the pattern test passed;
+    `statistical_sd` kept separately.
+- **Tests:** `tests/test_identification_uncertainty.py` (19, A–P).
+- **M4.9 twin synthetic records-based control:**
+  - `statistical_sd_ln`: E 0.002064, G12 0.009951;
+  - pattern PASS; χ²/dof 19.946/19, s_B 1.0246;
+  - `birge_adjusted_sd_ln`: E 0.002115, G12 0.010195.
+
+  Not refused, and not real-specimen uncertainty.
+- **Full suite:** Windows 1360 OK (27 skipped) without data stores; 1365 OK (2 skipped) with both stores; M5-A+M5-B 35 passed; targeted M4 regression + M4 and M3 stage gates 139 passed.
+- **Abaqus runs:** 0. No policy change.

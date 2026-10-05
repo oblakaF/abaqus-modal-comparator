@@ -183,3 +183,79 @@ unchanged.**
 - **DECISIONS.md:** D-039 to D-044.
 - **STATUS and ROADMAP:** M5 `IN_PROGRESS`; M5.1–M5.4 `REVIEW_READY`; M5.5–M5.9 `TODO`.
 - **Abaqus runs:** 0.
+
+---
+
+## 17. M5-A review and checkpoint M5-B (2026-10-05)
+
+### 17.1 SUPERVISOR confirmations of M5-A
+
+- **8 % rule:** the SPEC §10 evidence uses `sd_ln > 0.08`, with no internal conversion to a
+  physical-space threshold.
+- **Cosines:** pairwise sensitivity cosines on the whitened block S~, diagnostics only.
+- **q:** projections on the full augmented system, including the prior rows. There is no q_G
+  threshold.
+- **Whitening:** Cholesky whitening approved. Posterior covariance and conclusions are invariant
+  to the Σ square-root representation.
+- **Linux flake:** the `test_registration_factory` failure does not block M5-A: the path is
+  untouched and the identical commit passed on rerun. It is not fixed inside M5. See the
+  technical-debt note in §17.3.
+
+### 17.2 Checkpoint M5-B implemented (M5.5, M5.8, M5.6)
+
+**Module:** `src/services/identification_uncertainty.py` (new; no Abaqus, no legacy imports).
+
+**M5.5 `statistical_sd()`:**
+- Computed only from a `PracticalSystem`. Anything else, including an M4 `local_sd`, raises a
+  TypeError.
+- Reports `statistical_sd_ln` = √C_jj of the full augmented system, plus
+  `statistical_sd_percent_first_order` = 100·sd_ln (a label, not a policy conversion).
+- Carries the Σ components (name, provenance, provisional), the priors, the provisional inputs, a
+  required `context` label and the system and analysis hashes.
+- Rank deficiency → `REFUSED_RANK_DEFICIENT`, with no numbers (inherited from M5.3).
+
+**M5.8 `residual_pattern_test()` (D-043, exactly):**
+- **Fit families:** grouped by M4.3 family identity. A family with at least two fit terms triggers
+  only if all its terms have the same sign and each has |r| > 2. Singleton families never trigger
+  and are never merged.
+- **Holdouts:** any |r| > 3 fails.
+- **Inequalities:** strict, so |r| = 2 and |r| = 3 do not trigger.
+- **Clusters:** `residual_terms()` binds the M4.7 order (fit rows, then confirmed clusters) to
+  families, and a cluster is one term.
+- **Implementation note for confirmation:** a confirmed cluster whose members share one M4.3
+  family belongs to that family. If its members' families differ, it gets the composite key
+  `F_a+F_b`. It is never merged into an unrelated family and acts as its own group.
+
+**M5.6 `birge_adjustment()` (D-041):**
+- χ² = Σ r² over fit terms only.
+- dof = n_fit_terms − n_fitted_parameters (all system parameters, including nuisance).
+- s_B = √max(1, χ²/dof).
+- **Statuses:**
+  - `AVAILABLE` only when the pattern test passed;
+  - `BLOCKED_PATTERN`: `birge_adjusted_sd` is NOT_AVAILABLE, with the reasons;
+  - `REFUSED_DOF` when dof ≤ 0;
+  - `REFUSED_STATISTICAL` when `statistical_sd` is unavailable.
+- `statistical_sd` is always kept separately; the quantities are never merged (D-012).
+- The fit terms must equal the system's terms, in order.
+
+**Tests:** `tests/test_identification_uncertainty.py` (19; cases A–P plus mixed-sign / one member
+≤ 2 / strict inequalities, rank refusal of Birge, and term binding). The module-boundary guard of
+`tests/test_practical_identifiability.py` covers both M5 modules.
+
+**M4.9 twin synthetic records-based control (P; not real-specimen uncertainty):**
+
+| Quantity | E | G12 |
+|---|---|---|
+| `statistical_sd_ln` | 0.002064 | 0.009951 |
+| `birge_adjusted_sd_ln` | 0.002115 | 0.010195 |
+
+- Pattern test PASS: 21 singleton fit families; holdout |r| at most 0.31.
+- χ² = 19.946 over dof 19, so s_B = 1.0246.
+- Not refused.
+
+### 17.3 Technical debt (unrelated to M5; not fixed in M5)
+
+`tests/test_registration_factory.py::test_no_full_model_contamination` is flaky. It scans the
+serialised registration for the substring `d11`, while the registration hash depends on a
+temporary path and mtime, so it fails by chance (about 1.5 % per run). It is to be fixed
+separately, for example by excluding hash fields from the token scan.

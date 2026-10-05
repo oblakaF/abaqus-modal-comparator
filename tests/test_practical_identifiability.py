@@ -255,12 +255,14 @@ class ModuleBoundaryTests(unittest.TestCase):
     def test_no_abaqus_m3_or_legacy_imports(self):
         import ast
 
-        tree = ast.parse((ROOT / "src" / "services" / "practical_identifiability.py").read_text(encoding="utf-8"))
-        imported = [node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module]
-        imported += [alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names]
-        for forbidden in ("subprocess", "abaqus_bridge", "forward_builder", "shared_carbon_forward",
-                          "identifiability_service", "uncertainty_service", "sensitivity_service", "inverse_solver"):
-            self.assertFalse([m for m in imported if m == forbidden or m.endswith("." + forbidden)], forbidden)
+        for module in ("practical_identifiability.py", "identification_uncertainty.py"):  # all M5 modules
+            tree = ast.parse((ROOT / "src" / "services" / module).read_text(encoding="utf-8"))
+            imported = [node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module]
+            imported += [alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names]
+            for forbidden in ("subprocess", "abaqus_bridge", "forward_builder", "shared_carbon_forward",
+                              "identifiability_service", "uncertainty_service", "sensitivity_service", "inverse_solver"):
+                with self.subTest(module=module, forbidden=forbidden):
+                    self.assertFalse([m for m in imported if m == forbidden or m.endswith("." + forbidden)])
 
 
 class TwinPositiveControlTests(unittest.TestCase):
