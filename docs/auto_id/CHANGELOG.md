@@ -3205,3 +3205,27 @@ first internal provider.
   Not refused, and not real-specimen uncertainty.
 - **Full suite:** Windows 1360 OK (27 skipped) without data stores; 1365 OK (2 skipped) with both stores; M5-A+M5-B 35 passed; targeted M4 regression + M4 and M3 stage gates 139 passed.
 - **Abaqus runs:** 0. No policy change.
+
+## 2026-10-05 — M5 checkpoint M5-C (M5.7 model_form_robustness) REVIEW_READY
+
+- **Stage:** M5 `IN_PROGRESS` (branch `auto-id/m5`).
+  - M5.1–M5.8: `REVIEW_READY`.
+  - M5.9: `TODO`.
+- **SUPERVISOR confirmation:** the cluster family rule (shared family, or a unique composite key;
+  a singleton when alone), recorded in M5_DECISION_RECORD §18.1.
+- **New module:** `src/services/model_form_robustness.py`. Linearised leave-one-family-out at p̂
+  (D-042):
+  - remove all fit terms of a family (re-whitened with the reduced Σ);
+  - keep every prior row;
+  - the same M5.3 rank rule (rcond = 1e-3); a rank-deficient reduced system is refused, with no
+    pseudo-inverse and no override;
+  - range of the estimates in % of p̂;
+  - hash-bound;
+  - labelled `model_form_robustness`, not uncertainty or 1σ.
+- **Tests:** `tests/test_model_form_robustness.py` (15, A–O).
+- **M4.9 twin synthetic records-based control:** 21 families, none refused.
+  - E range 0.222 % (half-range 0.111 %).
+  - G12 range 1.058 % (half-range 0.529 %).
+  - Not real-specimen evidence.
+- **Full suite:** Windows 1375 OK (27 skipped) without data stores; 1380 OK (2 skipped) with both stores; M5-A+B+C 50 passed; targeted M4 regression + M4 and M3 stage gates 154 passed.
+- **Abaqus runs:** 0. No policy change.

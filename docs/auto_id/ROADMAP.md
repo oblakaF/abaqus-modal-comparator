@@ -427,7 +427,7 @@ First batch reviewed by the SUPERVISOR:
 | M5.4 | q_G nuisance-space projection | `REVIEW_READY` |
 | M5.5 | `statistical_sd` | `REVIEW_READY` |
 | M5.6 | Conditional Birge adjustment | `REVIEW_READY` |
-| M5.7 | Leave-one-family-out `model_form_robustness` | `TODO` |
+| M5.7 | Leave-one-family-out `model_form_robustness` | `REVIEW_READY` |
 | M5.8 | Residual family pattern test | `REVIEW_READY` |
 | M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `TODO` |
 
@@ -437,7 +437,9 @@ Stage status: `IN_PROGRESS` (branch `auto-id/m5` from `main` `8f405c3`; SUPERVIS
   synthetic tests. No Abaqus.
 - Checkpoint M5-B (M5.5, M5.8, M5.6) `REVIEW_READY`: `services/identification_uncertainty.py`
   with synthetic tests and the M4.9 twin records-based control. No Abaqus.
-- M5.7 and M5.9 `TODO`.
+- Checkpoint M5-C (M5.7) `REVIEW_READY`: `services/model_form_robustness.py` (linearised
+  leave-one-family-out, D-042). No Abaqus.
+- M5.9 `TODO`.
 
 **M5 GATE:**
 

@@ -259,3 +259,59 @@ unchanged.**
 serialised registration for the substring `d11`, while the registration hash depends on a
 temporary path and mtime, so it fails by chance (about 1.5 % per run). It is to be fixed
 separately, for example by excluding hash fields from the token scan.
+
+---
+
+## 18. M5-B review and checkpoint M5-C (2026-10-05)
+
+### 18.1 SUPERVISOR confirmation: cluster family rule (M5.8, used by M5.7)
+
+1. **Shared family:** if all members of a confirmed cluster share one M4.3 family, the cluster
+   residual is one fit term belonging to that family.
+2. **Mixed families:** if the members span different M4.3 families, the term gets one unique
+   composite family key. It is attached to neither source family and never merged with unrelated
+   families.
+3. **Singleton:** for the pattern test the composite term counts as one family term. Alone in its
+   composite family it is a singleton, and cannot by itself trigger the ≥ 2-member systematic
+   rule. The 2σ / 3σ thresholds are unchanged.
+
+### 18.2 Checkpoint M5-C implemented (M5.7, D-042)
+
+**Module:** `src/services/model_form_robustness.py` (new; no Abaqus, no legacy imports).
+
+**Algorithm** (`linearised_model_form_robustness(system, fit_terms, p_hat)`):
+1. **Linearise at p̂:** r(x̂ + δ) ≈ r̂ + A·δ in ln p. A is the full augmented system of M5.3;
+   r̂ = [fit residuals (whitened, M4.7 order); prior residuals (x̂_nuis − x_0)/sd].
+2. **Families:** taken from `fit_terms` (the M5.8 `ResidualTerm` families, with the cluster rule of
+   §18.1). Holdouts cannot be passed: the fit terms must equal the system's terms, in order.
+3. **For each family F:**
+   - remove all its fit terms. Their observations are removed: e = L·r, then re-whitened with the
+     Cholesky factor of the reduced Σ (rows dropped when Σ is diagonal);
+   - keep every prior row and prior residual;
+   - rebuild the reduced `PracticalSystem` and analyse it with the unchanged M5.3 code (rcond =
+     1e-3);
+   - a rank-deficient reduced system → `REFUSED_RANK_DEFICIENT` (no estimate);
+   - no fit terms left → `REFUSED_NO_FIT_TERMS`;
+   - otherwise δ_F = −(A_FᵀA_F)⁻¹A_Fᵀr̂_F, and the estimate is p̂·exp(δ_F).
+4. **Per parameter, over valid cases only:** min and max estimate, range, half-range, range and
+   half-range in % of p̂, and min / max shift in ln p. Shifts are relative to p̂, the accepted
+   point.
+5. **`supports_green`:** False if any case is refused or none is valid. There is no override and
+   no pseudo-inverse. The full system must itself be full rank.
+6. **Binding:** the result carries the system hash, family-mapping hash, p̂ (and its hash), Σ hash,
+   prior hash and rcond.
+7. **Label:** the output is labelled `model_form_robustness`: not `statistical_sd`, not
+   `birge_adjusted_sd`, not part of Σ, not 1σ.
+
+**Tests:** `tests/test_model_form_robustness.py` (15: A–O and input checks).
+
+**M4.9 twin synthetic records-based control** (not real-specimen model-form robustness):
+- 21 fitted families, none refused; finite results.
+
+| Parameter | p̂ (MPa) | Estimate range (MPa) | Range (% of p̂) | Half-range (% of p̂) |
+|---|---|---|---|---|
+| E_in_plane | 45005.45 | 44945.96 … 45045.75 | 0.222 | 0.111 |
+| G12 | 4012.20 | 3995.06 … 4037.50 | 1.058 | 0.529 |
+
+Numerically stable enough to feed M5.9: all reduced systems are full rank, and max |δ| = 0.0063 in
+ln p.
