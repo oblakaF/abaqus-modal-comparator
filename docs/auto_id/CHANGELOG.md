@@ -3141,3 +3141,42 @@ first internal provider.
 - **Bookkeeping branch:** `auto-id/m4-closure`, created from the merge commit.
 - **Unchanged:** code and scientific logic. No Abaqus. Retained ODB / INP artifacts are not
   deleted.
+
+## 2026-10-05 — M5 started; checkpoint M5-A (M5.1–M5.4) REVIEW_READY
+
+- **Stage:** M5 `IN_PROGRESS` on branch `auto-id/m5` (from `main` `8f405c3`).
+  - M5.1–M5.4: `REVIEW_READY`.
+  - M5.5–M5.9: `TODO`.
+- **SUPERVISOR entry decisions:** M5_DECISION_RECORD.md §1–§16; DECISIONS.md D-039–D-044.
+  - synthetic gate scope;
+  - Broyden J for the twin control;
+  - explicit priors;
+  - rcond 1e-3 as a hard block;
+  - q_G as a diagnostic;
+  - Birge χ² and dof;
+  - linearised leave-one-family-out;
+  - the singleton pattern rule;
+  - family consistency NOT_AVAILABLE ≠ PASS;
+  - the registration-limited source;
+  - S4 deferred but mandatory later.
+- **New module:** `src/services/practical_identifiability.py`. SPEC §10 in ln p:
+  - typed global / nuisance sensitivity matrix (fit terms only; a cluster is one term);
+  - explicit Σ (Cholesky whitening);
+  - explicit nuisance prior rows;
+  - rank at rcond 1e-3 as a hard block with no override;
+  - C and sd foundation;
+  - SPEC §10 sd > 8 % evidence;
+  - q projections (q_G);
+  - diagnostics (condition number, correlation, S~ cosines);
+  - deterministic hashes;
+  - reconstruction of the Broyden-updated LM Jacobian from a journal.
+
+  Legacy Stage-A modules are unchanged.
+- **Tests:** `tests/test_practical_identifiability.py` (16, synthetic).
+  - Cases A–N; a weak-nuisance contrast; a module-boundary guard.
+  - The M4.9 twin positive control: deterministic Broyden reconstruction from the committed
+    journal; the M5 posterior sd of that global-only system equals the recorded value.
+  - Absorption case: q_G ≈ 0.018 and sd(ln G12) ≈ 0.50, above the 0.08 limit, so the evidence is
+    NOT_IDENTIFIABLE-compatible.
+- **Full suite:** Windows 1341 OK (27 skipped) without data stores; 1346 OK (2 skipped) with both stores; M5-A 16 passed; targeted M4 regression + M4 and M3 stage gates 120 passed.
+- **Abaqus runs:** 0. No M4 artifact deleted. No M4 scientific result changed.

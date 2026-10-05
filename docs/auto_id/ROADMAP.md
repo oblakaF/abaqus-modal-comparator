@@ -421,17 +421,21 @@ First batch reviewed by the SUPERVISOR:
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M5.1 | Full global + nuisance sensitivity matrix | `TODO` |
-| M5.2 | Prior rows | `TODO` |
-| M5.3 | Practical rank and posterior uncertainty | `TODO` |
-| M5.4 | q_G nuisance-space projection | `TODO` |
+| M5.1 | Full global + nuisance sensitivity matrix | `REVIEW_READY` |
+| M5.2 | Prior rows | `REVIEW_READY` |
+| M5.3 | Practical rank and posterior uncertainty | `REVIEW_READY` |
+| M5.4 | q_G nuisance-space projection | `REVIEW_READY` |
 | M5.5 | `statistical_sd` | `TODO` |
 | M5.6 | Conditional Birge adjustment | `TODO` |
 | M5.7 | Leave-one-family-out `model_form_robustness` | `TODO` |
 | M5.8 | Residual family pattern test | `TODO` |
 | M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `TODO` |
 
-Stage status: `NOT_STARTED` (requires an explicit SUPERVISOR instruction).
+Stage status: `IN_PROGRESS` (branch `auto-id/m5` from `main` `8f405c3`; SUPERVISOR entry decisions in
+[M5_DECISION_RECORD.md](M5_DECISION_RECORD.md), D-039–D-044).
+- Checkpoint M5-A (M5.1–M5.4) `REVIEW_READY`: `services/practical_identifiability.py` with
+  synthetic tests. No Abaqus.
+- M5.5–M5.9 `TODO`.
 
 **M5 GATE:**
 

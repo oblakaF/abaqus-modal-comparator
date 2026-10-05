@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M5",
-  "current_ministep": null,
-  "status": "NOT_STARTED",
+  "current_ministep": "M5.4",
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M4",
   "last_accepted_ministep": "M4.9",
   "last_accepted_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d",
@@ -531,18 +531,28 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M5 NOT_STARTED; await SUPERVISOR instruction before any M5 work",
+  "next_action": "SUPERVISOR review of checkpoint M5-A (M5.1-M5.4 REVIEW_READY); M5.5-M5.9 not started; no Abaqus",
   "m5": {
-    "status": "NOT_STARTED",
-    "M5.1": "TODO",
-    "M5.2": "TODO",
-    "M5.3": "TODO",
-    "M5.4": "TODO",
+    "branch": "auto-id/m5",
+    "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
+    "M5.1": "REVIEW_READY",
+    "M5.2": "REVIEW_READY",
+    "M5.3": "REVIEW_READY",
+    "M5.4": "REVIEW_READY",
     "M5.5": "TODO",
     "M5.6": "TODO",
     "M5.7": "TODO",
     "M5.8": "TODO",
     "M5.9": "TODO",
-    "note": "not started; requires explicit SUPERVISOR instruction (ROADMAP order)"
+    "status": "IN_PROGRESS",
+    "decision_record": "docs/auto_id/M5_DECISION_RECORD.md (DECISIONS D-039..D-044)",
+    "entry_authorisation": "SUPERVISOR 2026-10-05: M5 entry decisions; checkpoint M5-A only; no Abaqus",
+    "M5-A": {
+      "module": "src/services/practical_identifiability.py",
+      "tests": "tests/test_practical_identifiability.py (16, synthetic + M4.9 twin positive control from records)",
+      "scope_note": "M5.1 machinery for explicit/synthetic matrices; real FE nuisance columns and the S4 noise control are outside M5 (D-039)",
+      "tests_result": "Windows 1341 OK (27 skipped) without data stores; 1346 OK (2 skipped) with both stores; M5-A 16 passed; targeted M4 regression + M4 and M3 stage gates 120 passed",
+      "abaqus_runs": 0
+    }
   }
 }
