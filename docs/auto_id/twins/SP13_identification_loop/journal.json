@@ -1,0 +1,1171 @@
+{
+ "schema": "auto-id/identification-journal/v1",
+ "run_hash": "3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931",
+ "run_identity": {
+  "schema": "auto-id/identification-pipeline/v1",
+  "forward_model": {
+   "forward_model_id": "SP13_mesh_local_v1_modal/carbon-property-set-v1",
+   "manifest_hash": "f54079004c953749feb06bc0cf81c24a8545a74eb9f40d38cb3cd5fc831aa2b9",
+   "passport_manifest_hash": "e8162c3f472e4dae366e78a13c599d8d32a1a0e254109d40c6622bd26670f61f"
+  },
+  "solver_profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+  "observation_hash": "05a5443a2f8eef4985b8176b762dcf4905600dd0fd0e89551a3ab6f4604e1311",
+  "objective_design": {
+   "fit_rows": [
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "R7",
+    "R8",
+    "R9",
+    "R10",
+    "R11",
+    "R12",
+    "R13",
+    "R14",
+    "R15",
+    "R16",
+    "R17",
+    "R18",
+    "R19",
+    "R20",
+    "R21",
+    "R22"
+   ],
+   "fit_clusters": [],
+   "holdout_rows": [
+    "R1",
+    "R23"
+   ],
+   "holdout_clusters": [],
+   "sigmas": {
+    "R1": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R10": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R11": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R12": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R13": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R14": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R15": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R16": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R17": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R18": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R19": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R2": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R20": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R21": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R22": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R23": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R3": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R4": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R5": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R6": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R7": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R8": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    },
+    "R9": {
+     "measurement_sd": 0.003,
+     "setup_sd": 0.0,
+     "setup_provisional": false
+    }
+   }
+  },
+  "pairing_policy_hash": "e3aa4e751a24fb931183227d3a93bc267a78117f41f4c793b31f0e9f42f23ac6",
+  "lm_settings": {
+   "mu_initial": 0.001,
+   "mu_decrease": 10.0,
+   "max_step_attempts": 3,
+   "solve_budget": 20,
+   "max_iterations": 5,
+   "stop_fraction": 0.2,
+   "mu_increase": 10.0,
+   "finite_difference_step": 0.05
+  },
+  "bounds": {
+   "names": [
+    "E_in_plane_mpa",
+    "G12_mpa"
+   ],
+   "lower": [
+    26000.0,
+    2250.0
+   ],
+   "upper": [
+    104000.0,
+    9000.0
+   ]
+  },
+  "start": {
+   "E_in_plane_mpa": 52000.0,
+   "G12_mpa": 4500.0
+  },
+  "extraction_expectation": {
+   "surface_instance": "CFRP_PLATE_TOP",
+   "surface_side": "max_z",
+   "surface_tolerance": 0.0001,
+   "fe_geometry_sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826",
+   "fe_node_count": 1585637,
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "node_count": 29754,
+   "mode_numbers": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+   ]
+  },
+  "archived_packs": {
+   "SP13_0328066b74b6fd78": "b30263d23209e1fd5d802b99cc1eb7e6d6d57b3a8a61f543ff7891bf4d622311",
+   "SP13_0e861d03c333bb0b": "bac951494c22c82edffd1aae25e52cf7014b36b47fff3535a62e23d9f9d771f5",
+   "SP13_4c0f189b9727feaf": "1febd80145e25448e6f0e975423cf148e51d0a1e5c38f11129b52302ea308dd2",
+   "SP13_a46d08b52995e078": "7941545b59390a65010645584b6bd5ab142ab9097f40333ca8d427654a612eca",
+   "SP13_a9df66283a168786": "371050a5ff4b4686b2685fc8c84cc058f28ac378b0c9cfb92477bcc737221187"
+  },
+  "extra": {
+   "gate": "M4.9 identification loop (HUMAN 2026-10-05)",
+   "bounds_status": "development-only (M4.9 twin gate); not production bounds",
+   "twin": {
+    "twin_definition_hash": "c200b2930671c9fe47c0ab44c792f326e9f5343d2c491a7723ad2f859b3f8668",
+    "noise_seed": 20261005,
+    "synthetic_experiment_sha256": "5b0450d8ec13134558aa5b7f34a3c0abbc5768fd8b5f47385ead35022901014d",
+    "truth_pack_content_sha256": "758add0c22b824c55c7149c75462b08e4233ba04d5b423c7a31ef64fc5e98945",
+    "twin_provenance_sha256": "47e6cd2de7ad3e9a0e564908de3f1edfa7ed86a2fb203d6496ac7af270f0d20f"
+   }
+  }
+ },
+ "entries": [
+  {
+   "sequence": 0,
+   "kind": "evaluation",
+   "record": {
+    "candidate_hash": "cc00bccf2181220b8d6dce2a1490578b0f77b126bc21e3a9297ad7b29ad68c3e",
+    "parameters": {
+     "E_in_plane_mpa": 52000.0,
+     "G12_mpa": 4500.0
+    },
+    "job_name": "SP13_a46d08b52995e078",
+    "generated_inp_sha256": "a46d08b52995e078213e78156c585c2b5a483c2c5954ace7cdc77e136b746253",
+    "job_hash": "5e816734def20a9a67fbdb85f25904779c9f2dd0e66e1fa0cf0df83e7254f224",
+    "pack_content_sha256": "7941545b59390a65010645584b6bd5ab142ab9097f40333ca8d427654a612eca",
+    "fe_source": "archived-validated-pack",
+    "refusal": null,
+    "residuals": [
+     24.810832367471985,
+     23.35471944330673,
+     22.098490742015642,
+     23.05920560512013,
+     21.28580253365679,
+     24.12601505177066,
+     21.526495904933718,
+     21.884039072331756,
+     21.778894018791444,
+     21.896100582538065,
+     22.080219347522245,
+     23.002735001454628,
+     22.251381183951164,
+     23.889499450211165,
+     23.13218739610375,
+     22.226637650112124,
+     20.665946386104157,
+     22.122523126437404,
+     21.239537987023677,
+     19.250586572379547,
+     23.623725994625328
+    ],
+    "objective": 5260.093816341703,
+    "tracking": {
+     "R1": [
+      7,
+      0.999999999999969
+     ],
+     "R2": [
+      8,
+      0.9999999999999536
+     ],
+     "R3": [
+      9,
+      0.9999999999999759
+     ],
+     "R4": [
+      10,
+      0.9999999999999655
+     ],
+     "R5": [
+      11,
+      0.9999999999999646
+     ],
+     "R6": [
+      12,
+      0.9999999999999726
+     ],
+     "R7": [
+      13,
+      0.9999999999999569
+     ],
+     "R8": [
+      14,
+      0.9999999999999554
+     ],
+     "R9": [
+      15,
+      0.9999999999999586
+     ],
+     "R10": [
+      16,
+      0.9999999999999514
+     ],
+     "R11": [
+      17,
+      0.99999999999996
+     ],
+     "R12": [
+      18,
+      0.9999999999999646
+     ],
+     "R13": [
+      19,
+      0.9999999999999646
+     ],
+     "R14": [
+      20,
+      0.9999999999999374
+     ],
+     "R15": [
+      21,
+      0.9999999999999569
+     ],
+     "R16": [
+      22,
+      0.9999999999999422
+     ],
+     "R17": [
+      23,
+      0.999999999999959
+     ],
+     "R18": [
+      24,
+      0.9999999999999489
+     ],
+     "R19": [
+      25,
+      0.9999999999999653
+     ],
+     "R20": [
+      26,
+      0.9999999999999482
+     ],
+     "R21": [
+      27,
+      0.9999999999999573
+     ],
+     "R22": [
+      28,
+      0.9999999999999588
+     ],
+     "R23": [
+      29,
+      0.9999999999999555
+     ]
+    },
+    "holdout_residuals": {
+     "R1": 18.542680145734163,
+     "R23": 21.577106304670284
+    },
+    "evaluation_hash": "4292abbad89b3b22a153f85ab581dcd06b03a9cc01f12131742aaabb22f8ba0c"
+   },
+   "previous_hash": "3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931",
+   "entry_hash": "d8c41764dbf35dc15853d36ea4edb0d82f9fc95b833e295d56819a6a23c93291"
+  },
+  {
+   "sequence": 1,
+   "kind": "evaluation",
+   "record": {
+    "candidate_hash": "e68c7212ace2c1a91ea00ff12424d962bc50eae94242d39a04226af6bd49f55e",
+    "parameters": {
+     "E_in_plane_mpa": 54600.0,
+     "G12_mpa": 4500.0
+    },
+    "job_name": "SP13_0e861d03c333bb0b",
+    "generated_inp_sha256": "0e861d03c333bb0b01f6f572bfcf8a0664424a2a7a0d96c8ef6f7e0df7d6f8a0",
+    "job_hash": "51e37b72e86749da49029e5937f47bfaac8b828e352b9e5c20aa803d02ae2c12",
+    "pack_content_sha256": "bac951494c22c82edffd1aae25e52cf7014b36b47fff3535a62e23d9f9d771f5",
+    "fe_source": "archived-validated-pack",
+    "refusal": null,
+    "residuals": [
+     32.8198932041639,
+     31.337244743949867,
+     28.06427399275376,
+     29.049686625608768,
+     26.06958596770781,
+     31.98515350571244,
+     29.340359636464974,
+     29.03476056754132,
+     28.853131236664886,
+     27.730049643864458,
+     27.84876973725166,
+     28.43484932915737,
+     29.891620263652698,
+     31.437449982627836,
+     30.44262829816683,
+     29.359979487625882,
+     27.181178540930457,
+     28.508299625035722,
+     27.068862873359006,
+     25.003980419307997,
+     30.996503256665697
+    ],
+    "objective": 8911.793177424122,
+    "tracking": {
+     "R1": [
+      7,
+      0.9999995820002782
+     ],
+     "R2": [
+      8,
+      0.9999999831875869
+     ],
+     "R3": [
+      9,
+      0.9999998839401306
+     ],
+     "R4": [
+      10,
+      0.9999983868564837
+     ],
+     "R5": [
+      11,
+      0.9999983545114721
+     ],
+     "R6": [
+      12,
+      0.9999979002599058
+     ],
+     "R7": [
+      13,
+      0.9999995481050101
+     ],
+     "R8": [
+      14,
+      0.9999970758159543
+     ],
+     "R9": [
+      15,
+      0.9999949994365321
+     ],
+     "R10": [
+      16,
+      0.9999865669539294
+     ],
+     "R11": [
+      17,
+      0.9999945423473631
+     ],
+     "R12": [
+      18,
+      0.999992352030527
+     ],
+     "R13": [
+      19,
+      0.9999893119547761
+     ],
+     "R14": [
+      20,
+      0.9999824655012102
+     ],
+     "R15": [
+      21,
+      0.9998698659051453
+     ],
+     "R16": [
+      22,
+      0.9999605179949544
+     ],
+     "R17": [
+      23,
+      0.9999663689722055
+     ],
+     "R18": [
+      24,
+      0.9998904638671166
+     ],
+     "R19": [
+      25,
+      0.9998959950648183
+     ],
+     "R20": [
+      26,
+      0.9999802975890517
+     ],
+     "R21": [
+      27,
+      0.9999605193614991
+     ],
+     "R22": [
+      28,
+      0.9999680561944437
+     ],
+     "R23": [
+      30,
+      0.9957213141167924
+     ]
+    },
+    "holdout_residuals": {
+     "R1": 18.74689861138501,
+     "R23": 28.61831707316694
+    },
+    "evaluation_hash": "8d340593fce1ceb6ceca0882876b44e3459d22aa53eef135bba62e230780e55a"
+   },
+   "previous_hash": "d8c41764dbf35dc15853d36ea4edb0d82f9fc95b833e295d56819a6a23c93291",
+   "entry_hash": "5407e2d5d5619b3e29ecff390ce99df7c7b33a3cc2c04c4a8129a35968f86ecb"
+  },
+  {
+   "sequence": 2,
+   "kind": "evaluation",
+   "record": {
+    "candidate_hash": "9b1f3fe2ff28176037c70a0e9b3aebbe597aeed368a4532b0f059ae6e89c4860",
+    "parameters": {
+     "E_in_plane_mpa": 49400.0,
+     "G12_mpa": 4500.0
+    },
+    "job_name": "SP13_a9df66283a168786",
+    "generated_inp_sha256": "a9df66283a168786910492f76d7b47b1f656f503e92d0abeff28dc65bc3f47f4",
+    "job_hash": "ad17f4f40518d31d1031bd2c3028403d52f65548ad534587485297ea6af280d4",
+    "pack_content_sha256": "371050a5ff4b4686b2685fc8c84cc058f28ac378b0c9cfb92477bcc737221187",
+    "fe_source": "archived-validated-pack",
+    "refusal": null,
+    "residuals": [
+     16.391766861896844,
+     14.964126015117724,
+     15.900580235764275,
+     16.833477086526234,
+     16.346778758554652,
+     15.858075555437168,
+     13.305866581495055,
+     14.392126717091891,
+     14.363276319164045,
+     15.830340035448327,
+     16.081495625581255,
+     17.36752877559263,
+     14.203687575081503,
+     15.936324819292597,
+     15.4456980156444,
+     14.722669034841946,
+     13.851440021359629,
+     15.439678858704415,
+     15.167885601250337,
+     13.261870274215326,
+     15.846352331828998
+    ],
+    "objective": 2473.5831133151482,
+    "tracking": {
+     "R1": [
+      7,
+      0.9999995030086225
+     ],
+     "R2": [
+      8,
+      0.9999999824279251
+     ],
+     "R3": [
+      9,
+      0.9999998795311867
+     ],
+     "R4": [
+      10,
+      0.999998140584978
+     ],
+     "R5": [
+      11,
+      0.9999981071715549
+     ],
+     "R6": [
+      12,
+      0.9999975115671044
+     ],
+     "R7": [
+      13,
+      0.9999995397604519
+     ],
+     "R8": [
+      14,
+      0.999997180065513
+     ],
+     "R9": [
+      15,
+      0.9999945967996068
+     ],
+     "R10": [
+      16,
+      0.9999853999470947
+     ],
+     "R11": [
+      17,
+      0.9999937340732619
+     ],
+     "R12": [
+      18,
+      0.9999916272805742
+     ],
+     "R13": [
+      19,
+      0.9999880489486738
+     ],
+     "R14": [
+      20,
+      0.9999832243596175
+     ],
+     "R15": [
+      21,
+      0.9998990773114387
+     ],
+     "R16": [
+      22,
+      0.9999822946660973
+     ],
+     "R17": [
+      23,
+      0.9999659887216514
+     ],
+     "R18": [
+      24,
+      0.9998860655739952
+     ],
+     "R19": [
+      25,
+      0.9998876503445315
+     ],
+     "R20": [
+      26,
+      0.9999805648689911
+     ],
+     "R21": [
+      27,
+      0.9999601466511029
+     ],
+     "R22": [
+      28,
+      0.9999832820545168
+     ],
+     "R23": [
+      29,
+      0.9963389925486759
+     ]
+    },
+    "holdout_residuals": {
+     "R1": 18.32133519772731,
+     "R23": 14.13343226211546
+    },
+    "evaluation_hash": "55bc1e08986f311d4dce8d9df37e0b8aaba6df5dffec7520b88eb9a35e34b657"
+   },
+   "previous_hash": "5407e2d5d5619b3e29ecff390ce99df7c7b33a3cc2c04c4a8129a35968f86ecb",
+   "entry_hash": "496e39f6f8aa8b4902acdcd2ef46ab29eccdcecb24387bafcd6ea113c874bba8"
+  },
+  {
+   "sequence": 3,
+   "kind": "evaluation",
+   "record": {
+    "candidate_hash": "dd2b850cbe44a2926f93785f0ea2c92bf8230774af8d13bd97653d1bd8bcb33e",
+    "parameters": {
+     "E_in_plane_mpa": 52000.0,
+     "G12_mpa": 4725.0
+    },
+    "job_name": "SP13_4c0f189b9727feaf",
+    "generated_inp_sha256": "4c0f189b9727feaf15017b8e40975883f38d5e2f581b9f3f39412c9159e1fb08",
+    "job_hash": "3ee882ee57a6540524f462f25a3e6cf4bd3601f5ca1649eddf6ed1ad1c19c2de",
+    "pack_content_sha256": "1febd80145e25448e6f0e975423cf148e51d0a1e5c38f11129b52302ea308dd2",
+    "fe_source": "archived-validated-pack",
+    "refusal": null,
+    "residuals": [
+     24.821952556575155,
+     23.367610462016703,
+     24.139054495557904,
+     25.05547072333177,
+     24.426512613264784,
+     24.16457111111588,
+     21.568304236480113,
+     22.619354343780707,
+     22.543926670805625,
+     23.915744810749356,
+     24.11545163040844,
+     25.3297057067637,
+     22.331683367632433,
+     23.983151892969623,
+     23.53527074771744,
+     22.698220380558947,
+     21.823517001445875,
+     23.36389627408438,
+     23.058790720692873,
+     21.091275626435646,
+     23.748372554688462
+    ],
+    "objective": 5769.539929241575,
+    "tracking": {
+     "R1": [
+      7,
+      0.9999995680611177
+     ],
+     "R2": [
+      8,
+      0.9999999840361458
+     ],
+     "R3": [
+      9,
+      0.9999999080663577
+     ],
+     "R4": [
+      10,
+      0.9999983512637451
+     ],
+     "R5": [
+      11,
+      0.9999984227276838
+     ],
+     "R6": [
+      12,
+      0.999997662267505
+     ],
+     "R7": [
+      13,
+      0.9999996772808298
+     ],
+     "R8": [
+      14,
+      0.9999983072946653
+     ],
+     "R9": [
+      15,
+      0.9999990639279226
+     ],
+     "R10": [
+      16,
+      0.9999927818556611
+     ],
+     "R11": [
+      17,
+      0.9999943780238244
+     ],
+     "R12": [
+      18,
+      0.9999936898410423
+     ],
+     "R13": [
+      19,
+      0.999990135363071
+     ],
+     "R14": [
+      20,
+      0.9999933082128589
+     ],
+     "R15": [
+      21,
+      0.9999407342892139
+     ],
+     "R16": [
+      22,
+      0.9999835938775832
+     ],
+     "R17": [
+      23,
+      0.9999818560869335
+     ],
+     "R18": [
+      24,
+      0.9999634700612456
+     ],
+     "R19": [
+      25,
+      0.9999698116723005
+     ],
+     "R20": [
+      26,
+      0.9999869152552707
+     ],
+     "R21": [
+      27,
+      0.9999763632653125
+     ],
+     "R22": [
+      28,
+      0.9999909059808929
+     ],
+     "R23": [
+      29,
+      0.999243755188994
+     ]
+    },
+    "holdout_residuals": {
+     "R1": 26.16429684192889,
+     "R23": 21.9424914503709
+    },
+    "evaluation_hash": "3859f775b80cb696530155cd1679eda0e9f5f40662edc2d7de544e15c5aa25ab"
+   },
+   "previous_hash": "496e39f6f8aa8b4902acdcd2ef46ab29eccdcecb24387bafcd6ea113c874bba8",
+   "entry_hash": "4abb59db9c292fd628ffb3b5983c7d1e63a700a756c2f4a36786ad67cb5c5b9f"
+  },
+  {
+   "sequence": 4,
+   "kind": "evaluation",
+   "record": {
+    "candidate_hash": "b808d9cb7d35db28618887941c7daa130f21cb2adf487124facd9ea4d822621e",
+    "parameters": {
+     "E_in_plane_mpa": 52000.0,
+     "G12_mpa": 4275.0
+    },
+    "job_name": "SP13_0328066b74b6fd78",
+    "generated_inp_sha256": "0328066b74b6fd78c2756d0678f43c23a91613cf518df664469178795708b182",
+    "job_hash": "0252de0aa35c2719fc96623eb1b3506beea0f72970659df72ddb7b49edd28af8",
+    "pack_content_sha256": "b30263d23209e1fd5d802b99cc1eb7e6d6d57b3a8a61f543ff7891bf4d622311",
+    "fe_source": "archived-validated-pack",
+    "refusal": null,
+    "residuals": [
+     24.798732620795978,
+     23.340722915648964,
+     20.023748640870014,
+     21.030128880850835,
+     18.070745830157147,
+     24.08422399593017,
+     21.4810817460472,
+     21.139901282864432,
+     21.000426257689497,
+     19.84012202450251,
+     20.00750613218087,
+     20.630834797369896,
+     22.16424647985704,
+     23.78672024384265,
+     22.719528046055554,
+     21.73993620043942,
+     19.49275783921589,
+     20.85691220939771,
+     19.387917368108038,
+     17.379151591775905,
+     23.488743045686117
+    ],
+    "objective": 4784.493332141541,
+    "tracking": {
+     "R1": [
+      7,
+      0.9999995557329459
+     ],
+     "R2": [
+      8,
+      0.9999999819759573
+     ],
+     "R3": [
+      9,
+      0.9999998926752409
+     ],
+     "R4": [
+      10,
+      0.9999982530185705
+     ],
+     "R5": [
+      11,
+      0.9999983235383129
+     ],
+     "R6": [
+      12,
+      0.9999975704216661
+     ],
+     "R7": [
+      13,
+      0.9999996194509243
+     ],
+     "R8": [
+      14,
+      0.9999978259280985
+     ],
+     "R9": [
+      15,
+      0.9999989115919414
+     ],
+     "R10": [
+      16,
+      0.9999920311727956
+     ],
+     "R11": [
+      17,
+      0.9999940187473452
+     ],
+     "R12": [
+      18,
+      0.9999930956847072
+     ],
+     "R13": [
+      19,
+      0.999989289663358
+     ],
+     "R14": [
+      20,
+      0.9999917415600209
+     ],
+     "R15": [
+      21,
+      0.9998734617701561
+     ],
+     "R16": [
+      22,
+      0.9999310787176763
+     ],
+     "R17": [
+      23,
+      0.9999790757932635
+     ],
+     "R18": [
+      24,
+      0.9999551098329557
+     ],
+     "R19": [
+      25,
+      0.9999657569078455
+     ],
+     "R20": [
+      26,
+      0.9999858770409773
+     ],
+     "R21": [
+      27,
+      0.9999734224090147
+     ],
+     "R22": [
+      28,
+      0.9999726103399624
+     ],
+     "R23": [
+      30,
+      0.9989521750864335
+     ]
+    },
+    "holdout_residuals": {
+     "R1": 10.533208639112779,
+     "R23": 21.1904615347341
+    },
+    "evaluation_hash": "f60fb6290b90c52afd0c787b3aa9fc27cd6b6bf4cf5ffc8fc6c6eb9fe9d799de"
+   },
+   "previous_hash": "4abb59db9c292fd628ffb3b5983c7d1e63a700a756c2f4a36786ad67cb5c5b9f",
+   "entry_hash": "b29ce66dc45b04a7522766ce5dccb4e30da9f091782f7473d9c246c19585c1b8"
+  },
+  {
+   "sequence": 5,
+   "kind": "solve",
+   "record": {
+    "job_name": "SP13_aad55d259c1164ca",
+    "generated_inp_sha256": "aad55d259c1164ca5edd5efb2b6e70314574aa641742d627b54ab59576bbeafd",
+    "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+    "solve_hash": "ac3c75b99493685e09df585608e4786cef5be5a158074700b6e294e0db2f3392",
+    "odb_sha256": "fcd7fe001a4b60a574bcd260fb963bc7b49322d9ba18e0b32bcb7718e715ecc4",
+    "odb_size_bytes": 715614536,
+    "abaqus_version_line": "Abaqus 2024                                  Date 05-Oct-2026   Time 13:03:59",
+    "command_template": "{abaqus} job={job} input={inp} cpus={cpus}{scratch} interactive ask_delete=OFF",
+    "executed": true
+   },
+   "previous_hash": "b29ce66dc45b04a7522766ce5dccb4e30da9f091782f7473d9c246c19585c1b8",
+   "entry_hash": "6dbfd710f3f75d2f3a9a00ace1e364726b9d09bbeedc970100d95f78813d0718"
+  },
+  {
+   "sequence": 6,
+   "kind": "extraction",
+   "record": {
+    "job_name": "SP13_aad55d259c1164ca",
+    "extraction_id": "ffdb45c2a4e7b8eeac5338e582f2f14f68476ce079f0d37532619ff10fbe1878",
+    "odb_sha256": "fcd7fe001a4b60a574bcd260fb963bc7b49322d9ba18e0b32bcb7718e715ecc4",
+    "script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+    "abaqus_release": "Abaqus 2024",
+    "pack_content_sha256": "aea5c21aead1c78689b43367b852b7032ef4425702e63ba609dcf6db0b08ce3e",
+    "pack_file_sha256": "6f345c85148619d7333bae6e75f279899e1aa772753a2f1c84e2b8a31d6bac3a",
+    "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+    "checks": {
+     "format_version_2": true,
+     "surface_instance_present": true,
+     "modes_complete": true,
+     "history_complete": true,
+     "mode_rows_match_geometry": true,
+     "finite": true,
+     "imaginary_zero": true,
+     "fe_geometry_identity": true,
+     "node_set": true,
+     "deterministic_content": true
+    },
+    "raw_deleted": true
+   },
+   "previous_hash": "6dbfd710f3f75d2f3a9a00ace1e364726b9d09bbeedc970100d95f78813d0718",
+   "entry_hash": "961c003f6e7995a11bfe817bce123300978bfb1d408a711f03a7c308ea02c546"
+  },
+  {
+   "sequence": 7,
+   "kind": "evaluation",
+   "record": {
+    "candidate_hash": "474047c015c3f50d5bd69045d9bb3533cb0e5248ec568c0eb584658a9940d2d6",
+    "parameters": {
+     "E_in_plane_mpa": 45005.4467567744,
+     "G12_mpa": 4012.2044573188746
+    },
+    "job_name": "SP13_aad55d259c1164ca",
+    "generated_inp_sha256": "aad55d259c1164ca5edd5efb2b6e70314574aa641742d627b54ab59576bbeafd",
+    "job_hash": "a0e685970930f8fdf3ce49231efef442ee94589fa48af8c5bc9d76ba6d2045f1",
+    "pack_content_sha256": "aea5c21aead1c78689b43367b852b7032ef4425702e63ba609dcf6db0b08ce3e",
+    "fe_source": "new-solve",
+    "refusal": null,
+    "residuals": [
+     1.0784921652794803,
+     -0.3001599421918281,
+     -0.16112025335512925,
+     0.8245980631208146,
+     -0.022073066967405925,
+     0.742710646107092,
+     -1.7328612413309112,
+     -0.9600237523332092,
+     -0.9196461232798825,
+     0.041155558681597405,
+     0.37512202414724527,
+     1.6277568728639835,
+     -0.6286525688272704,
+     1.2410906482246038,
+     0.5070978109179928,
+     -0.05113255743793843,
+     -1.2884011741173633,
+     0.34488548907685157,
+     -0.18272786302494146,
+     -1.9912921341038725,
+     1.3781400517570337
+    ],
+    "objective": 9.972787498778976,
+    "tracking": {
+     "R1": [
+      7,
+      0.9999998078140894
+     ],
+     "R2": [
+      8,
+      0.9999999795904463
+     ],
+     "R3": [
+      9,
+      0.9999999141654853
+     ],
+     "R4": [
+      10,
+      0.9999993164024591
+     ],
+     "R5": [
+      11,
+      0.9999991098349005
+     ],
+     "R6": [
+      12,
+      0.9999992426707566
+     ],
+     "R7": [
+      13,
+      0.9999995959772114
+     ],
+     "R8": [
+      14,
+      0.9999959534825763
+     ],
+     "R9": [
+      15,
+      0.9999732806804285
+     ],
+     "R10": [
+      16,
+      0.9999666170657492
+     ],
+     "R11": [
+      17,
+      0.9999976632691058
+     ],
+     "R12": [
+      18,
+      0.9999940098008063
+     ],
+     "R13": [
+      19,
+      0.9999936811849127
+     ],
+     "R14": [
+      20,
+      0.9999657819586892
+     ],
+     "R15": [
+      21,
+      0.9998685368677858
+     ],
+     "R16": [
+      22,
+      0.9999934478386473
+     ],
+     "R17": [
+      23,
+      0.99994700240532
+     ],
+     "R18": [
+      24,
+      0.9996061053887256
+     ],
+     "R19": [
+      25,
+      0.9995886141245693
+     ],
+     "R20": [
+      26,
+      0.999972733768229
+     ],
+     "R21": [
+      27,
+      0.9999480811006117
+     ],
+     "R22": [
+      28,
+      0.9999786725650932
+     ],
+     "R23": [
+      29,
+      0.9861027457356921
+     ]
+    },
+    "holdout_residuals": {
+     "R1": 0.031034694299177563,
+     "R23": -0.31091721313636356
+    },
+    "evaluation_hash": "6676424bf9d4597f1dd2e26215eac57ce330fb41fdd39645f621f1dd836e8fb5"
+   },
+   "previous_hash": "961c003f6e7995a11bfe817bce123300978bfb1d408a711f03a7c308ea02c546",
+   "entry_hash": "2e072f6b092c64f48db4ec723805b4e7673dc9f766251516674826608928ef6f"
+  },
+  {
+   "sequence": 8,
+   "kind": "result",
+   "record": {
+    "status": "CONVERGED",
+    "parameters": {
+     "E_in_plane_mpa": 45005.4467567744,
+     "G12_mpa": 4012.2044573188746
+    },
+    "objective": 9.972787498778976,
+    "identification_evaluations": 6,
+    "iterations": 2,
+    "local_sd": [
+     0.002063945414776677,
+     0.009950726693774791
+    ],
+    "refusal": null,
+    "identification_evaluations_journalled": 6,
+    "reused_archived_evaluations": 5,
+    "abaqus_solves_executed_total": 1,
+    "failed_solves": 0,
+    "abaqus_solves_executed_this_session": 1,
+    "evaluations_replayed_this_session": 0
+   },
+   "previous_hash": "2e072f6b092c64f48db4ec723805b4e7673dc9f766251516674826608928ef6f",
+   "entry_hash": "20104767e6d553d2e17cc4d04d2b81385cc8bdcb245da6b1987b3562605acaf5"
+  }
+ ]
+}

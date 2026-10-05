@@ -3056,3 +3056,30 @@ first internal provider.
 - **Run root:** `D:baqus_m4_twin_loop`, with a retention proposal.
 - **Loop gate:** ≤ 20 evaluations including 5 reused; ≤ 15 new solves and 15 extractions.
 - **Unchanged:** code, status, DECISIONS, EVIDENCE. **Abaqus runs:** 0.
+
+## 2026-10-05 — M4.9 real identification loop: CONVERGED (REVIEW_READY)
+
+- **Stage:** M4 (IN_PROGRESS); **M4.9 `REVIEW_READY`**. Not accepted by the worker; no merge;
+  no M5.
+- **Authorisation:** HUMAN gate. Development-only bounds E 26000–104000 / G12 2250–9000;
+  extraction range 7–30 (option A); run root `D:\abaqus_m4_twin_loop`; at most 20 evaluations
+  (5 reused), at most 15 new solves.
+- **Result: CONVERGED.**
+  - Estimate: E 45005.45 / G12 4012.20 MPa (truth 45000 / 4000).
+  - |ln error| / sd: E 0.000121 / 0.002064; G12 0.003046 / 0.009951. Both are within 1σ.
+- **Effort:** 6 evaluations (5 reused); **1 new Abaqus solve plus 1 extraction** (614 s solve).
+- **History:** iteration 1 accepted (Φ 5260.09 → 9.97); iteration 2 step below 0.2·sd, so
+  CONVERGED.
+- **Run quality:**
+  - no rejected step, no refusal, no active bound;
+  - R23 tracked in every evaluation (minimum MAC 0.9861);
+  - holdout residuals at p̂: R1 +0.031, R23 −0.311.
+- **Determinism:** zero-Abaqus journal replay gives an identical result; the journal is unchanged.
+- **Archived (approved):** `carbon-project-archive/m4_twin/SP13_identification_loop/` (manifest
+  `11eb6493…`, indexed globally). The ODB is kept in the run directory until review.
+- **Records:**
+  - EVIDENCE "M4.9 — SP13 synthetic-twin identification loop" (PENDING SUPERVISOR REVIEW);
+  - M4_DECISION_RECORD §11;
+  - `docs/auto_id/twins/SP13_identification_loop/`.
+- **Unchanged:** code, M3 contracts, thresholds, bounds, observation set.
+- **Full suite:** code unchanged since 7597b60 (Windows 1306 OK/25 skipped without stores, 1311 OK/2 skipped with stores; Linux CI 1303 OK); docs-only rerun below.

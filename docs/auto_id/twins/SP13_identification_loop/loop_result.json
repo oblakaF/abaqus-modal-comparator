@@ -1,0 +1,107 @@
+{
+ "gate": "M4.9 identification loop (HUMAN 2026-10-05)",
+ "run_hash": "3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931",
+ "run_dir": "D:\\abaqus_m4_twin_loop\\CFRP-T300-plain-0.45-oldstock\\SP-13\\3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931",
+ "status": "CONVERGED",
+ "refusal": null,
+ "parameters": {
+  "E_in_plane_mpa": 45005.4467567744,
+  "G12_mpa": 4012.2044573188746
+ },
+ "truth": {
+  "E_in_plane_mpa": 45000.0,
+  "G12_mpa": 4000.0
+ },
+ "assessment": {
+  "criterion_1_converged": true,
+  "criterion_2_within_1_sigma": true,
+  "lm_status": "CONVERGED",
+  "identification_evaluations": 6,
+  "refusal": null,
+  "parameters": {
+   "E_in_plane_mpa": {
+    "estimate": 45005.4467567744,
+    "truth": 45000.0,
+    "abs_ln_error": 0.00012103171479756422,
+    "local_sd_ln": 0.002063945414776677,
+    "within_1_sigma": true
+   },
+   "G12_mpa": {
+    "estimate": 4012.2044573188746,
+    "truth": 4000.0,
+    "abs_ln_error": 0.0030464691266907065,
+    "local_sd_ln": 0.009950726693774791,
+    "within_1_sigma": true
+   }
+  }
+ },
+ "local_sd_ln": [
+  0.002063945414776677,
+  0.009950726693774791
+ ],
+ "objective": 9.972787498778976,
+ "identification_evaluations": 6,
+ "iterations": 2,
+ "history": [
+  {
+   "iteration": 1,
+   "mu": 0.001,
+   "x": [
+    10.858998997563564,
+    8.411832675758411
+   ],
+   "trial_x": [
+    10.714538800467254,
+    8.297096109228718
+   ],
+   "objective_before": 5260.093816341703,
+   "trial_objective": 9.972787498778976,
+   "accepted": true,
+   "note": "accepted"
+  },
+  {
+   "iteration": 2,
+   "mu": 0.0001,
+   "x": [
+    10.714538800467254,
+    8.297096109228718
+   ],
+   "trial_x": [
+    10.714517423188717,
+    8.297378699382849
+   ],
+   "objective_before": 9.972787498778976,
+   "trial_objective": null,
+   "accepted": false,
+   "note": "step below stop_fraction\u00b7sd"
+  }
+ ],
+ "counts": {
+  "identification_evaluations_journalled": 6,
+  "reused_archived_evaluations": 5,
+  "abaqus_solves_executed_total": 1,
+  "failed_solves": 0,
+  "abaqus_solves_executed_this_session": 1,
+  "evaluations_replayed_this_session": 0
+ },
+ "solver_calls": 1,
+ "extractor_calls": 1,
+ "bounds": {
+  "names": [
+   "E_in_plane_mpa",
+   "G12_mpa"
+  ],
+  "lower": [
+   26000.0,
+   2250.0
+  ],
+  "upper": [
+   104000.0,
+   9000.0
+  ]
+ },
+ "bound_active": false,
+ "journal_last_entry_hash": "20104767e6d553d2e17cc4d04d2b81385cc8bdcb245da6b1987b3562605acaf5",
+ "observation_hash": "05a5443a2f8eef4985b8176b762dcf4905600dd0fd0e89551a3ab6f4604e1311",
+ "twin_definition_hash": "c200b2930671c9fe47c0ab44c792f326e9f5343d2c491a7723ad2f859b3f8668"
+}

@@ -602,3 +602,107 @@ remains a proposal until separately approved.
 - The neighbouring (4,4) mode leaves the range in some states (§M4_4_NMODE_CLUSTER_REVIEW
   §1). A tracked row near the boundary may later cause BRANCH_LOSS during the LM loop.
 - The extraction mode range is **not** expanded without a separate decision.
+
+---
+
+## 11. M4.9 real identification loop (HUMAN authorisation and result, 2026-10-05)
+
+### 11.1 Authorisation (HUMAN)
+
+- **Pre-loop review:** accepted (`M4_9_PRELOOP_REVIEW.md`).
+- **Bounds (development-only, M4.9 twin gate only):** E_in_plane 26000–104000 MPa, G12
+  2250–9000 MPa.
+  - Not production bounds, not an M5 conclusion.
+  - Included in the run identity; not changed during the run; an active bound at p̂ must be
+    reported.
+- **Extraction range: option A.** Modes 7–30 unchanged; FE 29 / R23 stays under the normal M4.5
+  contract; no 40-eigenvalue revision.
+- **Run root:** `D:\abaqus_m4_twin_loop` (`<family>\<specimen>\<run_hash>`).
+- **Retention:**
+  - journal, result, shape packs, provenance and hashes are permanent, under
+    `carbon-project-archive/m4_twin/SP13_identification_loop/`;
+  - ODBs are kept until SUPERVISOR review;
+  - INPs are regenerable.
+- **Budget:** at most 20 identification evaluations, of which the 5 reused archived evaluations
+  count. That allows at most 15 new Abaqus 2024 solves plus 15 pinned extractions. The truth
+  solve is outside the budget.
+- **Fixed inputs:**
+  - twin `c200b293…` (seed 20261005);
+  - frozen set `05a5443a…`;
+  - A1 design (21 fit rows R2–R22; holdouts R1, R23; no cluster terms);
+  - the approved LM settings.
+- **Hard stops:**
+  - BRANCH_LOSS or ambiguous tracking;
+  - a refused design or an unsupported group;
+  - solve or extraction failure;
+  - identity or journal mismatch;
+  - budget exhaustion;
+  - an unexpected active bound.
+
+  There is no automatic retry.
+
+### 11.2 Execution
+
+- **Pre-flight:**
+  - 18.8 GB RAM free, 301 GB on D:, no Abaqus solver process;
+  - 5 reused packs and the truth pack verified;
+  - fixed inputs verified by hash (twin, observation set, design rows).
+- **Run:** run hash `3503c7d4…`.
+  - The design was rebuilt from the journalled truth stage with 0 Abaqus.
+  - The M4.6 pipeline ran unchanged.
+  - Driver-level guards only: executors capped at 15; an evaluation touching a bound would stop
+    the run.
+
+### 11.3 Result: **CONVERGED**, M4.9 criteria met (pending SUPERVISOR review)
+
+| Quantity | E_in_plane | G12 |
+|---|---|---|
+| Estimate p̂ (MPa) | 45005.45 | 4012.20 |
+| Truth (MPa) | 45000.0 | 4000.0 |
+| abs(ln(p̂ / p_true)) | 0.000121 | 0.003046 |
+| Local sd (ln), M4 stop-rule sd | 0.002064 | 0.009951 |
+| Within 1σ | **yes** | **yes** |
+
+**Effort and history:**
+- **Identification evaluations:** **6** of 20, of which 5 reused archived packs (p0, E±, G12±).
+- **New work:** **1** Abaqus solve (`SP13_aad55d259c1164ca`, 614 s wall-clock) plus **1** pinned
+  extraction.
+- **Truth solve:** outside the budget.
+- **Iterations:**
+  1. μ = 1e-3: trial (45005.45, 4012.20), Φ 5260.09 → 9.97, accepted.
+  2. μ = 1e-4: the proposed step was below 0.2·sd, so **CONVERGED** without another solve.
+- **Rejected trial steps or refusals:** none. No bound was active.
+
+**Branch tracking (every evaluation):**
+- No refusal. Minimum FE-to-FE MAC 0.9861 (R23 at p̂).
+- R23 (FE 29) tracked as mode 29 at p̂, and as mode 30 at E+ and G12− (a crossing, tracked).
+- R1 → mode 7 everywhere.
+
+**Holdout residuals at p̂ (whitened):** R1 +0.031, R23 −0.311. At p0 they were R1 18.54 and
+R23 21.58.
+
+**Fit:** Φ(p̂) = 9.97 over 21 fit terms.
+
+**Pass criteria (M4_DECISION_RECORD §4):**
+1. CONVERGED within the budget: **met** (6 / 20).
+2. Both parameters within 1σ: **met**.
+3. Branch-exchange negative control: **met earlier**. Real SP13 packs, refused with
+   `BRANCH_LOSS` (§8.4; `tests/test_m4_9_sp13_readiness.py`).
+4. Determinism: **met**. Journal replay: same run hash and identity, all 6 evaluations
+   replayed, 0 solves, identical result, journal unchanged.
+5. Provenance: **recorded** (§11.4).
+6. M3 contracts unchanged: **met** (empty diff against `main`; the M3 gate tests pass).
+
+### 11.4 Provenance
+
+| Item | Value |
+|---|---|
+| Run | `3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931`; journal last entry `20104767…` |
+| Forward model | `SP13_mesh_local_v1_modal/carbon-property-set-v1`, manifest `f5407900…` |
+| Solver profile | `SP13/abaqus-2024/v1` `79aebbfe…`; command convention `{abaqus} job={job} input={inp} cpus={cpus}{scratch} interactive ask_delete=OFF`; Abaqus 2024 |
+| Policies | Pairing `auto-id/identification-pairing/strict-v1` `e3aa4e75…`; classifier `auto-id/modal-family/v1-provisional` `7a8f88ba…`; LM `LMSettings(1e-3, 10, 3, 20)`, finite-difference step 0.05 |
+| Twin | Definition `c200b293…`; seed 20261005; experiment `5b0450d8…`; truth pack `758add0c…` |
+| New solve | INP `aad55d259c1164ca…`; ODB `fcd7fe001a4b60a5…` (715 614 536 bytes); pack content `aea5c21aead1c786…`, file `6f345c85…` |
+| Reused packs | p0 `7941545b…`; E+ `bac95149…`; E− `371050a5…`; G12+ `1febd801…`; G12− `b30263d2…` |
+| Archive | `carbon-project-archive/m4_twin/SP13_identification_loop/` (`ARCHIVE_MANIFEST.json` `11eb6493…`; indexed in the global manifest under `m4_twin`) |
+| ODB | Kept in the run directory until SUPERVISOR review (not archived) |

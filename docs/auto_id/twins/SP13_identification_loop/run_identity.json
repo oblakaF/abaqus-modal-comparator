@@ -1,0 +1,240 @@
+{
+ "archived_packs": {
+  "SP13_0328066b74b6fd78": "b30263d23209e1fd5d802b99cc1eb7e6d6d57b3a8a61f543ff7891bf4d622311",
+  "SP13_0e861d03c333bb0b": "bac951494c22c82edffd1aae25e52cf7014b36b47fff3535a62e23d9f9d771f5",
+  "SP13_4c0f189b9727feaf": "1febd80145e25448e6f0e975423cf148e51d0a1e5c38f11129b52302ea308dd2",
+  "SP13_a46d08b52995e078": "7941545b59390a65010645584b6bd5ab142ab9097f40333ca8d427654a612eca",
+  "SP13_a9df66283a168786": "371050a5ff4b4686b2685fc8c84cc058f28ac378b0c9cfb92477bcc737221187"
+ },
+ "bounds": {
+  "lower": [
+   26000.0,
+   2250.0
+  ],
+  "names": [
+   "E_in_plane_mpa",
+   "G12_mpa"
+  ],
+  "upper": [
+   104000.0,
+   9000.0
+  ]
+ },
+ "extra": {
+  "bounds_status": "development-only (M4.9 twin gate); not production bounds",
+  "gate": "M4.9 identification loop (HUMAN 2026-10-05)",
+  "twin": {
+   "noise_seed": 20261005,
+   "synthetic_experiment_sha256": "5b0450d8ec13134558aa5b7f34a3c0abbc5768fd8b5f47385ead35022901014d",
+   "truth_pack_content_sha256": "758add0c22b824c55c7149c75462b08e4233ba04d5b423c7a31ef64fc5e98945",
+   "twin_definition_hash": "c200b2930671c9fe47c0ab44c792f326e9f5343d2c491a7723ad2f859b3f8668",
+   "twin_provenance_sha256": "47e6cd2de7ad3e9a0e564908de3f1edfa7ed86a2fb203d6496ac7af270f0d20f"
+  }
+ },
+ "extraction_expectation": {
+  "fe_geometry_sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826",
+  "fe_node_count": 1585637,
+  "mode_numbers": [
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28,
+   29,
+   30
+  ],
+  "node_count": 29754,
+  "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+  "surface_instance": "CFRP_PLATE_TOP",
+  "surface_side": "max_z",
+  "surface_tolerance": 0.0001
+ },
+ "forward_model": {
+  "forward_model_id": "SP13_mesh_local_v1_modal/carbon-property-set-v1",
+  "manifest_hash": "f54079004c953749feb06bc0cf81c24a8545a74eb9f40d38cb3cd5fc831aa2b9",
+  "passport_manifest_hash": "e8162c3f472e4dae366e78a13c599d8d32a1a0e254109d40c6622bd26670f61f"
+ },
+ "lm_settings": {
+  "finite_difference_step": 0.05,
+  "max_iterations": 5,
+  "max_step_attempts": 3,
+  "mu_decrease": 10.0,
+  "mu_increase": 10.0,
+  "mu_initial": 0.001,
+  "solve_budget": 20,
+  "stop_fraction": 0.2
+ },
+ "objective_design": {
+  "fit_clusters": [],
+  "fit_rows": [
+   "R2",
+   "R3",
+   "R4",
+   "R5",
+   "R6",
+   "R7",
+   "R8",
+   "R9",
+   "R10",
+   "R11",
+   "R12",
+   "R13",
+   "R14",
+   "R15",
+   "R16",
+   "R17",
+   "R18",
+   "R19",
+   "R20",
+   "R21",
+   "R22"
+  ],
+  "holdout_clusters": [],
+  "holdout_rows": [
+   "R1",
+   "R23"
+  ],
+  "sigmas": {
+   "R1": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R10": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R11": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R12": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R13": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R14": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R15": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R16": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R17": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R18": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R19": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R2": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R20": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R21": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R22": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R23": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R3": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R4": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R5": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R6": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R7": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R8": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   },
+   "R9": {
+    "measurement_sd": 0.003,
+    "setup_provisional": false,
+    "setup_sd": 0.0
+   }
+  }
+ },
+ "observation_hash": "05a5443a2f8eef4985b8176b762dcf4905600dd0fd0e89551a3ab6f4604e1311",
+ "pairing_policy_hash": "e3aa4e751a24fb931183227d3a93bc267a78117f41f4c793b31f0e9f42f23ac6",
+ "schema": "auto-id/identification-pipeline/v1",
+ "solver_profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+ "start": {
+  "E_in_plane_mpa": 52000.0,
+  "G12_mpa": 4500.0
+ }
+}

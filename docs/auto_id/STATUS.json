@@ -246,7 +246,7 @@
     "M4.6": "REVIEW_READY",
     "M4.7": "REVIEW_READY",
     "M4.8": "REVIEW_READY",
-    "M4.9": "IN_PROGRESS",
+    "M4.9": "REVIEW_READY",
     "status": "IN_PROGRESS",
     "branch": "auto-id/m4",
     "base": "6185b0565fb666ce26e533ac7b72a102de496f24",
@@ -408,7 +408,7 @@
       "M4.9_real_gate": "NOT STARTED",
       "auto-id/m4_merged_to_main": false,
       "M4.9_truth_gate": "EXECUTED: REFUSED_BEFORE_IDENTIFICATION (PENDING SUPERVISOR REVIEW)",
-      "M4.9_identification_loop": "NOT STARTED (not authorised)",
+      "M4.9_identification_loop": "EXECUTED: CONVERGED, both within 1 sigma (REVIEW_READY; PENDING SUPERVISOR REVIEW)",
       "M4.9_readiness_after_A1": "READY_FOR_IDENTIFICATION (PENDING SUPERVISOR REVIEW)"
     },
     "M4.9_truth_gate": {
@@ -457,7 +457,50 @@
       "record": "docs/auto_id/fe_shapes/SP13_bb3e5d7d131bed4f.shape-pack.json (TWIN_TRUTH)",
       "provenance": "carbon-project-archive/m4_twin/SP13_truth_gate/ (ARCHIVE_MANIFEST.json fab59ec5...)",
       "truth_odb": "D:\\abaqus_m4_truth (not archived; until M4.9 review)"
+    },
+    "M4.9_identification_loop": {
+      "authorised": "HUMAN 2026-10-05: real M4.9 identification loop; <= 20 evaluations (5 reused); <= 15 new solves + 15 pinned extractions; development-only bounds E 26000-104000, G12 2250-9000; extraction range 7-30 (A)",
+      "run_root": "D:\\abaqus_m4_twin_loop",
+      "run_hash": "3503c7d472c1a5733a5688f3649434cb5a680c2f0e85a21e94c95a93f5e39931",
+      "status": "CONVERGED",
+      "estimate": {
+        "E_in_plane_mpa": 45005.4467567744,
+        "G12_mpa": 4012.2044573188746
+      },
+      "truth": {
+        "E_in_plane_mpa": 45000.0,
+        "G12_mpa": 4000.0
+      },
+      "abs_ln_error": {
+        "E_in_plane_mpa": 0.000121,
+        "G12_mpa": 0.003046
+      },
+      "local_sd_ln": {
+        "E_in_plane_mpa": 0.002064,
+        "G12_mpa": 0.009951
+      },
+      "within_1_sigma": {
+        "E_in_plane_mpa": true,
+        "G12_mpa": true
+      },
+      "identification_evaluations": 6,
+      "reused_archived_evaluations": 5,
+      "new_abaqus_solves": 1,
+      "new_abaqus_python_extractions": 1,
+      "iterations": 2,
+      "phi": [
+        5260.0938,
+        9.9728
+      ],
+      "bound_active": false,
+      "refusals": "none",
+      "rejected_trial_steps": 0,
+      "new_solve": "SP13_aad55d259c1164ca (INP aad55d259c1164ca...; ODB fcd7fe001a4b60a5..., 615 s); pack aea5c21aead1c786...",
+      "determinism_replay": "same run hash and identity; 6 evaluations replayed; 0 solves; identical result; journal unchanged",
+      "archive": "carbon-project-archive/m4_twin/SP13_identification_loop/ (ARCHIVE_MANIFEST.json 11eb6493...)",
+      "evidence": "EVIDENCE.md 'M4.9 — SP13 synthetic-twin identification loop' PENDING SUPERVISOR REVIEW",
+      "tests_result": "code unchanged since 7597b60 (Windows 1306 OK/25 skipped without stores, 1311 OK/2 skipped with stores; Linux CI 1303 OK); docs-only rerun below"
     }
   },
-  "next_action": "SUPERVISOR review of A1 and the readiness re-run (READY_FOR_IDENTIFICATION); the real M4.9 identification loop needs a separate HUMAN gate (bounds, budget, run directory)"
+  "next_action": "SUPERVISOR review of M4.9 (REVIEW_READY: CONVERGED, E and G12 within 1 sigma; 1 new solve); pending EVIDENCE entries; then the M4 stage gate; no merge, no M5"
 }

@@ -1,0 +1,13 @@
+{
+ "run_hash_equal": true,
+ "identity_file_equal": true,
+ "parameters_equal": true,
+ "local_sd_equal": true,
+ "objective_equal": true,
+ "status_equal": true,
+ "evaluations_replayed": 6,
+ "new_solves": 0,
+ "new_extractions": 0,
+ "journal_unchanged": true,
+ "journal_entries": 9
+}

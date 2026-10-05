@@ -318,7 +318,7 @@ shared-carbon builder stays unchanged as the regression oracle.
 | M4.6 | Resumable pipeline: candidate → INP → Abaqus → ODB → extraction → registration → fixed observations → residual | `REVIEW_READY` |
 | M4.7 | Log-frequency objective | `REVIEW_READY` |
 | M4.8 | Bounded LM / trust step with the correct minus sign | `REVIEW_READY` |
-| M4.9 | Synthetic digital-twin recovery | `IN_PROGRESS` |
+| M4.9 | Synthetic digital-twin recovery | `REVIEW_READY` |
 
 M4.9 synthetic truth: E = 45000 MPa, G12 = 4000 MPa, controlled frequency noise
 ≈ 0.3 %; start E = 52000 MPa, G12 = 4500 MPa.
@@ -384,7 +384,11 @@ First batch reviewed by the SUPERVISOR:
 - M4.4 option A1 (N > 2 groups INDEPENDENT only; D-032): implemented.
   - The zero-Abaqus readiness re-run gives **READY_FOR_IDENTIFICATION**:
     FE 13–15 and FE 20–23 are INDEPENDENT; 21 fit terms; holdouts R1 and R23.
-  - The identification loop is NOT STARTED (separate HUMAN gate).
+  - Identification loop: run later under its own HUMAN gate (see the next item).
+- M4.9 real identification loop (HUMAN-authorised): **CONVERGED**.
+  - Result: E 45005 MPa, G12 4012 MPa (truth 45000 / 4000); both within 1σ.
+  - Effort: 6 evaluations (5 reused, 1 new solve).
+  - Status: `REVIEW_READY`, pending the SUPERVISOR.
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---

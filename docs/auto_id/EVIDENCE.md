@@ -377,3 +377,27 @@ Possible remaining causes remain outside CARBON-5F scope:
 - **Abaqus runs:** 0.
 - **Records:** `docs/auto_id/twins/SP13_truth_gate/readiness_report_a1.json` and
   `twin_provenance_a1.json`.
+
+## M4.9 — SP13 synthetic-twin identification loop (real Abaqus)
+
+- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Kind:** M4 software / pipeline acceptance on a synthetic digital twin.
+  - **Not** a material identification of a real specimen.
+  - **Not** an M5 identifiability result.
+  - The bounds are development-only.
+- **Authorisation:** HUMAN gate 2026-10-05 (M4_DECISION_RECORD §11.1).
+- **Result: CONVERGED.**
+  - Estimate: E_in_plane = 45005.45 MPa, G12 = 4012.20 MPa (truth 45000 / 4000).
+  - |ln error| / local sd: E 0.000121 / 0.002064; G12 0.003046 / 0.009951. Both are within 1σ.
+- **Effort:** 6 identification evaluations (5 reused archived, 1 new Abaqus solve, 1 pinned
+  extraction); 2 iterations (Φ 5260.09 → 9.97).
+- **Run quality:**
+  - no refusal and no active bound;
+  - minimum tracking MAC 0.9861;
+  - holdout residuals at p̂: R1 +0.031, R23 −0.311 (whitened).
+- **Determinism:** journal replay gives an identical result with 0 solves.
+- **M3:** unchanged.
+- **Records:**
+  - run `3503c7d4…` in `D:\abaqus_m4_twin_loop`;
+  - archive `m4_twin/SP13_identification_loop/` (manifest `11eb6493…`);
+  - repository copies in `docs/auto_id/twins/SP13_identification_loop/`.
