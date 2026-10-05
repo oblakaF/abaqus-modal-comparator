@@ -333,3 +333,28 @@ Possible remaining causes remain outside CARBON-5F scope:
   `carbon-project-archive/m4_smoke/`, referencing the existing pack.
 - **Normative vs diagnostic:** after acceptance, establishes that the M4.6 solve and
   extraction path reproduces the accepted CARBON-4C SP13 baseline.
+
+## M4.9 — SP13 truth gate and observation readiness (synthetic twin)
+
+- **Status:** PENDING SUPERVISOR REVIEW (worker evidence; not citable until accepted)
+- **Kind:** software and pipeline readiness. **Not** a material identification result.
+- **Authorisation:** HUMAN gate. 1 Abaqus 2024 truth solve (SP13, E 45000 / G12 4000
+  MPa) plus 1 pinned `extract_odb.py` extraction. No LM, no identification solves.
+- **Truth:**
+  - job `SP13_bb3e5d7d131bed4f`;
+  - generated INP `bb3e5d7d…`;
+  - ODB `57282e50…` (715 614 536 bytes);
+  - pack content `758add0c…`;
+  - wall-clock 621 s.
+- **Twin:**
+  - definition `c200b293…` (seed 20261005, modes 7–30, σ = noise = 0.003);
+  - synthetic experiment `5b0450d8…`.
+- **Result: REFUSED_BEFORE_IDENTIFICATION.**
+  - Strict freeze FROZEN, 23 rows; exp 24 / FE 30 excluded by the policy.
+  - Trigger groups FE 13–15 and FE 20–23 are UNSUPPORTED (> 2 modes; SPEC §12.4).
+  - The other five groups are INDEPENDENT; none is CONFIRMED.
+  - The design is REFUSED under M4_DECISION_RECORD §8.2.
+- **Records:**
+  - `docs/auto_id/twins/SP13_truth_gate/`: readiness report, twin provenance, truth
+    journal, truth pack record, extraction manifest;
+  - `D:\abaqus_m4_truth`.

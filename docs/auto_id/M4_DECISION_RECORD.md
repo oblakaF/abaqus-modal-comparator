@@ -457,3 +457,68 @@ remains a proposal until separately approved.
   - groups shrink only if the strict freeze leaves some member unpaired.
 - **Open question:** whether the real gate should proceed under this risk is for the
   SUPERVISOR / HUMAN to decide.
+
+---
+
+## 9. M4.9 truth / observation-readiness gate (HUMAN authorisation and result, 2026-10-05)
+
+### 9.1 Authorisation
+
+- **Approved execution:** exactly **1 SP13 truth Abaqus 2024 solve** (E_in_plane = 45000,
+  G12 = 4000 MPa) and **1 pinned `extract_odb.py` extraction**, outside the
+  20-evaluation budget.
+- **Inputs:** `twins/SP13.twin.json` (seed 20261005, FE modes 7–30), the validated p0 and
+  ±5 % packs, and the M4.1–M4.5 policies unchanged.
+- **Not authorised:**
+  - the bounded LM loop;
+  - identification-loop solves;
+  - threshold, criterion, M3 or twin-definition changes;
+  - support for groups of three or more modes;
+  - M5.
+- **Rules:** REFUSED designs stop the gate; a valid design also stops it.
+
+### 9.2 Result: **REFUSED_BEFORE_IDENTIFICATION** (pending SUPERVISOR review)
+
+| Item | Result |
+|---|---|
+| Truth job | `SP13_bb3e5d7d131bed4f`: generated INP `bb3e5d7d…a672`, job hash `0082ddc3…`; no archived pack existed |
+| Solve | Completed (`.sta` marker, Abaqus 2024); wall-clock 621 s; ODB 715 614 536 bytes, SHA `57282e50…` |
+| Extraction | Pinned script `039aa067…`; all checks PASS; raw deleted. Truth pack content `758add0c…`, node set `bdfec8bf…` |
+| Synthetic experiment | `5b0450d8…`: 24 modes, seed 20261005, ε recorded per FE mode |
+| Strict p0 freeze | **FROZEN**, 23 rows: exp 1–23 ↔ FE 7–29, MAC 0.986–1.000. Exp 24 (FE 30) excluded by the policy: no frequency-admissible FE mode reaches the MAC minimum. Observation hash `05a5443a…` |
+| Holdouts (M4.3) | Torsion R1 (FE 7, `Px:O|Py:O|nx:1|ny:1`); validation R23 (FE 29, `Px:O|Py:O|nx:1|ny:5`); 21 candidate fit rows |
+| Trigger groups (M4.4) | See 9.3 |
+| M4.7 design | **Not built.** The design is REFUSED (§8.2). Parameter count 2 |
+
+### 9.3 Trigger groups (M4.4)
+
+| Group | FE modes | Spacing (exp / FE) | Status |
+|---|---|---|---|
+| R4/R5 | FE 10/11 | 1.94 % / 2.24 % | INDEPENDENT |
+| R7/R8/R9 | FE 13/14/15 | 3.24 % / 2.44 % | **UNSUPPORTED** (3 modes) |
+| R11/R12 | FE 17/18 | 0.96 % / 1.01 % | INDEPENDENT |
+| R14–R17 | FE 20/21/22/23 | 1.78 % / 2.15 % | **UNSUPPORTED** (4 modes) |
+| R18/R19 | FE 24/25 | 1.58 % / 2.03 % | INDEPENDENT |
+| R20/R21 | FE 26/27 | 0.78 % / 0.18 % | INDEPENDENT |
+| R22/R23 | FE 28/29 | 1.55 % / 0.93 % | INDEPENDENT |
+
+- No group is CONFIRMED.
+- The identification loop was **not** started.
+- Nothing was split, discarded or hand-selected.
+
+### 9.4 Artifacts
+
+- `D:\abaqus_m4_truth`:
+  - the truth ODB, kept until the M4.9 review (§8.6);
+  - the truth pack, journal, readiness report and extraction manifest.
+- Generated p0/±5 % INP files (temporary renderings, regenerable) are in `twin/jobs`.
+- Provenance copies (permanent) are in `docs/auto_id/twins/SP13_truth_gate/`.
+- **Open proposal:** the permanent location of the truth shape pack (for example
+  `carbon-project-archive/fe_shapes/`).
+
+### 9.5 Decision needed (SUPERVISOR)
+
+- **Open question:** how M4.9 proceeds after the refusal.
+- **Constraint:** under the current SPEC §12.4 and §8.2, the full-mode-set SP13 twin cannot
+  reach an M4.7 design while groups of more than two modes are present.
+- **Worker position:** no option is chosen or implemented.

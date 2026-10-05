@@ -2952,3 +2952,35 @@ first internal provider.
 - **Unchanged:** M3 contracts and files, `extract_odb.py`, acceptance criteria, smoke-gate
   records, EVIDENCE.
 - **Abaqus runs:** 0 (no Abaqus Python). **Real Abaqus M4.9 gate NOT STARTED.**
+
+## 2026-10-05 — M4.9 truth / observation-readiness gate: REFUSED_BEFORE_IDENTIFICATION
+
+- **Stage:** M4 (IN_PROGRESS); M4.9 `IN_PROGRESS`. The identification loop was **not started**.
+- **Authorisation:** HUMAN. Exactly 1 SP13 truth Abaqus 2024 solve (45000 / 4000 MPa) and
+  1 pinned extraction, outside the 20-evaluation budget.
+- **Executed:** 1 solve plus 1 Abaqus Python extraction.
+  - Both were hard-limited to one call each. The identification executors refused any call.
+  - Run directory: `D:\abaqus_m4_truth`.
+  - Pre-flight: all 5 archived packs verified; the truth job has no existing pack; 16.8 GB
+    RAM free.
+- **Truth:**
+  - job `SP13_bb3e5d7d131bed4f`, INP `bb3e5d7d…`;
+  - solve completed in 621 s, ODB `57282e50…`;
+  - pack `758add0c…`, all extraction checks PASS.
+- **Pipeline:** `services.synthetic_twin.prepare_twin`, unchanged; the twin definition is
+  unchanged.
+  - Synthetic experiment `5b0450d8…` (seed 20261005).
+  - Strict freeze FROZEN with 23 rows (exp 24 / FE 30 excluded by the policy).
+  - Holdouts: R1 (FE 7, torsion) and R23 (FE 29, validation).
+- **Trigger groups:** ['R11', 'R12'] = FE [17, 18] INDEPENDENT; ['R14', 'R15', 'R16', 'R17'] = FE [20, 21, 22, 23] UNSUPPORTED; ['R18', 'R19'] = FE [24, 25] INDEPENDENT; ['R20', 'R21'] = FE [26, 27] INDEPENDENT; ['R22', 'R23'] = FE [28, 29] INDEPENDENT; ['R4', 'R5'] = FE [10, 11] INDEPENDENT; ['R7', 'R8', 'R9'] = FE [13, 14, 15] UNSUPPORTED.
+- **Verdict: REFUSED_BEFORE_IDENTIFICATION.**
+  - Groups FE 13–15 and FE 20–23 are UNSUPPORTED (§8.2).
+  - The M4.7 design is not built. Parameter count 2.
+- **Records:**
+  - EVIDENCE "M4.9 — SP13 truth gate" (PENDING SUPERVISOR REVIEW);
+  - M4_DECISION_RECORD §9;
+  - provenance copies in `docs/auto_id/twins/SP13_truth_gate/`.
+- **Unchanged:** code, M3 contracts, policies, thresholds, acceptance criteria, twin
+  definition.
+- **Full suite:** docs/provenance only; code unchanged since 4ce5e6a (Windows 1296 OK/24 skipped without stores, 1301 OK/2 skipped with stores; Linux CI 1293 OK).
+- **Decision needed:** how M4.9 proceeds.

@@ -375,6 +375,12 @@ First batch reviewed by the SUPERVISOR:
     restored (the twin reaches M3 only through the M4.6 pipeline layer).
   - **Real M4.9 gate: NOT STARTED** (unauthorised; separate HUMAN gate).
   - `auto-id/m4` is not merged to `main`.
+- M4.9 truth / observation-readiness gate (HUMAN-authorised: 1 truth solve + 1
+  pinned extraction): **REFUSED_BEFORE_IDENTIFICATION**.
+  - Strict freeze: 23 rows.
+  - Trigger groups FE 13–15 and FE 20–23 are UNSUPPORTED (> 2 modes), so the
+    design is REFUSED under §8.2.
+  - The identification loop was not started. A SUPERVISOR decision is needed.
 - Open parameters: [M4_DECISION_RECORD.md](M4_DECISION_RECORD.md) (PROPOSED).
 
 ---

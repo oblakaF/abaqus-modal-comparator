@@ -1,0 +1,525 @@
+{
+ "artifact_retention": {
+  "archived_p0_and_perturbed_packs": "referenced by content hash; never duplicated",
+  "truth_odb": "temporary until M4.9 review; may then be deleted under the retention rule unless archived by a later SUPERVISOR decision",
+  "truth_provenance_and_run_identities": "permanent",
+  "truth_shape_pack": "permanent"
+ },
+ "noise_generator": "SHA-256(seed, 'fe-mode:<n>') with Box-Muller (auto-id/twin-noise/v1)",
+ "observation_design": {
+  "clusters": [
+   {
+    "reasons": [
+     "individual branch identity stable in every direction: two observations"
+    ],
+    "row_ids": [
+     "R11",
+     "R12"
+    ],
+    "status": "INDEPENDENT"
+   },
+   {
+    "reasons": [
+     "SPEC §12.4 defines 2-mode clusters; this group is not confirmable"
+    ],
+    "row_ids": [
+     "R14",
+     "R15",
+     "R16",
+     "R17"
+    ],
+    "status": "UNSUPPORTED"
+   },
+   {
+    "reasons": [
+     "individual branch identity stable in every direction: two observations"
+    ],
+    "row_ids": [
+     "R18",
+     "R19"
+    ],
+    "status": "INDEPENDENT"
+   },
+   {
+    "reasons": [
+     "individual branch identity stable in every direction: two observations"
+    ],
+    "row_ids": [
+     "R20",
+     "R21"
+    ],
+    "status": "INDEPENDENT"
+   },
+   {
+    "reasons": [
+     "individual branch identity stable in every direction: two observations"
+    ],
+    "row_ids": [
+     "R22",
+     "R23"
+    ],
+    "status": "INDEPENDENT"
+   },
+   {
+    "reasons": [
+     "individual branch identity stable in every direction: two observations"
+    ],
+    "row_ids": [
+     "R4",
+     "R5"
+    ],
+    "status": "INDEPENDENT"
+   },
+   {
+    "reasons": [
+     "SPEC §12.4 defines 2-mode clusters; this group is not confirmable"
+    ],
+    "row_ids": [
+     "R7",
+     "R8",
+     "R9"
+    ],
+    "status": "UNSUPPORTED"
+   }
+  ],
+  "fit_clusters": null,
+  "fit_rows": null,
+  "freeze_status": "FROZEN",
+  "holdout_clusters": null,
+  "holdout_rows": null,
+  "holdouts": {
+   "fit_row_ids": [
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "R7",
+    "R8",
+    "R9",
+    "R10",
+    "R11",
+    "R12",
+    "R13",
+    "R14",
+    "R15",
+    "R16",
+    "R17",
+    "R18",
+    "R19",
+    "R20",
+    "R21",
+    "R22"
+   ],
+   "holdout_row_ids": [
+    "R1",
+    "R23"
+   ],
+   "notes": [],
+   "torsion_family": "Px:O|Py:O|nx:1|ny:1",
+   "validation_family": "Px:O|Py:O|nx:1|ny:5"
+  },
+  "observation_hash": "05a5443a2f8eef4985b8176b762dcf4905600dd0fd0e89551a3ab6f4604e1311",
+  "reasons": [
+   "trigger group ['R14', 'R15', 'R16', 'R17'] is UNSUPPORTED: SPEC §12.4 defines 2-mode clusters; this group is not confirmable",
+   "trigger group ['R7', 'R8', 'R9'] is UNSUPPORTED: SPEC §12.4 defines 2-mode clusters; this group is not confirmable"
+  ],
+  "rows": [
+   {
+    "experimental_mode": 1,
+    "family": "Px:O|Py:O|nx:1|ny:1",
+    "fe_mode": 7,
+    "mac": 0.9999998978466348,
+    "row_id": "R1"
+   },
+   {
+    "experimental_mode": 2,
+    "family": "Px:E|Py:E|nx:0|ny:2",
+    "fe_mode": 8,
+    "mac": 0.9999999896919958,
+    "row_id": "R2"
+   },
+   {
+    "experimental_mode": 3,
+    "family": "Px:E|Py:E|nx:2|ny:0",
+    "fe_mode": 9,
+    "mac": 0.9999999507046404,
+    "row_id": "R3"
+   },
+   {
+    "experimental_mode": 4,
+    "family": "Px:O|Py:E|nx:1|ny:2",
+    "fe_mode": 10,
+    "mac": 0.9999996194827883,
+    "row_id": "R4"
+   },
+   {
+    "experimental_mode": 5,
+    "family": "Px:E|Py:O|nx:2|ny:1",
+    "fe_mode": 11,
+    "mac": 0.9999994956493925,
+    "row_id": "R5"
+   },
+   {
+    "experimental_mode": 6,
+    "family": "Px:E|Py:E|nx:2|ny:2",
+    "fe_mode": 12,
+    "mac": 0.9999993871486553,
+    "row_id": "R6"
+   },
+   {
+    "experimental_mode": 7,
+    "family": "Px:E|Py:O|nx:0|ny:3",
+    "fe_mode": 13,
+    "mac": 0.9999997258087983,
+    "row_id": "R7"
+   },
+   {
+    "experimental_mode": 8,
+    "family": "Px:O|Py:E|nx:3|ny:0",
+    "fe_mode": 14,
+    "mac": 0.999997623132065,
+    "row_id": "R8"
+   },
+   {
+    "experimental_mode": 9,
+    "family": "Px:O|Py:O|nx:1|ny:3",
+    "fe_mode": 15,
+    "mac": 0.9999665111256294,
+    "row_id": "R9"
+   },
+   {
+    "experimental_mode": 10,
+    "family": "Px:O|Py:O|nx:3|ny:1",
+    "fe_mode": 16,
+    "mac": 0.9999772827290571,
+    "row_id": "R10"
+   },
+   {
+    "experimental_mode": 11,
+    "family": "Px:E|Py:O|nx:2|ny:3",
+    "fe_mode": 17,
+    "mac": 0.99999801106411,
+    "row_id": "R11"
+   },
+   {
+    "experimental_mode": 12,
+    "family": "Px:O|Py:E|nx:3|ny:2",
+    "fe_mode": 18,
+    "mac": 0.99999283405218,
+    "row_id": "R12"
+   },
+   {
+    "experimental_mode": 13,
+    "family": "Px:O|Py:O|nx:3|ny:3",
+    "fe_mode": 19,
+    "mac": 0.9999933135096195,
+    "row_id": "R13"
+   },
+   {
+    "experimental_mode": 14,
+    "family": "Px:E|Py:E|nx:0|ny:4",
+    "fe_mode": 20,
+    "mac": 0.9999746926458536,
+    "row_id": "R14"
+   },
+   {
+    "experimental_mode": 15,
+    "family": "Px:E|Py:E|nx:4|ny:0",
+    "fe_mode": 21,
+    "mac": 0.9998982608098157,
+    "row_id": "R15"
+   },
+   {
+    "experimental_mode": 16,
+    "family": "Px:O|Py:E|nx:1|ny:4",
+    "fe_mode": 22,
+    "mac": 0.9999955512954846,
+    "row_id": "R16"
+   },
+   {
+    "experimental_mode": 17,
+    "family": "Px:E|Py:O|nx:4|ny:1",
+    "fe_mode": 23,
+    "mac": 0.9999498564920666,
+    "row_id": "R17"
+   },
+   {
+    "experimental_mode": 18,
+    "family": "Px:E|Py:E|nx:2|ny:4",
+    "fe_mode": 24,
+    "mac": 0.9994761340782782,
+    "row_id": "R18"
+   },
+   {
+    "experimental_mode": 19,
+    "family": "Px:E|Py:E|nx:4|ny:2",
+    "fe_mode": 25,
+    "mac": 0.9997069313868948,
+    "row_id": "R19"
+   },
+   {
+    "experimental_mode": 20,
+    "family": "Px:O|Py:E|nx:3|ny:4",
+    "fe_mode": 26,
+    "mac": 0.9999732551200797,
+    "row_id": "R20"
+   },
+   {
+    "experimental_mode": 21,
+    "family": "Px:E|Py:O|nx:4|ny:3",
+    "fe_mode": 27,
+    "mac": 0.9999495044283536,
+    "row_id": "R21"
+   },
+   {
+    "experimental_mode": 22,
+    "family": "Px:E|Py:O|nx:0|ny:5",
+    "fe_mode": 28,
+    "mac": 0.9999866870949857,
+    "row_id": "R22"
+   },
+   {
+    "experimental_mode": 23,
+    "family": "Px:O|Py:O|nx:1|ny:5",
+    "fe_mode": 29,
+    "mac": 0.9856995384041369,
+    "row_id": "R23"
+   }
+  ],
+  "status": "REFUSED"
+ },
+ "reused_packs": {
+  "E_in_plane_mpa+": "bac951494c22c82edffd1aae25e52cf7014b36b47fff3535a62e23d9f9d771f5",
+  "E_in_plane_mpa-": "371050a5ff4b4686b2685fc8c84cc058f28ac378b0c9cfb92477bcc737221187",
+  "G12_mpa+": "1febd80145e25448e6f0e975423cf148e51d0a1e5c38f11129b52302ea308dd2",
+  "G12_mpa-": "b30263d23209e1fd5d802b99cc1eb7e6d6d57b3a8a61f543ff7891bf4d622311",
+  "p0": "7941545b59390a65010645584b6bd5ab142ab9097f40333ca8d427654a612eca"
+ },
+ "schema": "auto-id/twin-provenance/v1",
+ "synthetic_experiment": {
+  "content_sha256": "5b0450d8ec13134558aa5b7f34a3c0abbc5768fd8b5f47385ead35022901014d",
+  "modes": [
+   {
+    "epsilon": 0.443988031954167,
+    "frequency_hz": 21.27256120035488,
+    "number": 1,
+    "source_fe_mode": 7,
+    "truth_fe_hz": 21.244264602661133
+   },
+   {
+    "epsilon": -1.056274431194463,
+    "frequency_hz": 67.50732501841216,
+    "number": 2,
+    "source_fe_mode": 8,
+    "truth_fe_hz": 67.721923828125
+   },
+   {
+    "epsilon": 0.3208762157081436,
+    "frequency_hz": 70.81176748357592,
+    "number": 3,
+    "source_fe_mode": 9,
+    "truth_fe_hz": 70.74366760253906
+   },
+   {
+    "epsilon": 0.30363718314034455,
+    "frequency_hz": 80.34449005204283,
+    "number": 4,
+    "source_fe_mode": 10,
+    "truth_fe_hz": 80.27136993408203
+   },
+   {
+    "epsilon": -0.6842695833211754,
+    "frequency_hz": 81.90477674526531,
+    "number": 5,
+    "source_fe_mode": 11,
+    "truth_fe_hz": 82.07325744628906
+   },
+   {
+    "epsilon": 0.23039807176236834,
+    "frequency_hz": 129.44930660911203,
+    "number": 6,
+    "source_fe_mode": 12,
+    "truth_fe_hz": 129.35989379882812
+   },
+   {
+    "epsilon": -0.7200505263369004,
+    "frequency_hz": 186.01453161488823,
+    "number": 7,
+    "source_fe_mode": 13,
+    "truth_fe_hz": 186.41722106933594
+   },
+   {
+    "epsilon": 1.7595064647304977,
+    "frequency_hz": 192.0455791585106,
+    "number": 8,
+    "source_fe_mode": 14,
+    "truth_fe_hz": 191.0371856689453
+   },
+   {
+    "epsilon": 1.0254200885040001,
+    "frequency_hz": 195.6725576591235,
+    "number": 9,
+    "source_fe_mode": 15,
+    "truth_fe_hz": 195.0724639892578
+   },
+   {
+    "epsilon": 0.9865026133267415,
+    "frequency_hz": 202.47402695179554,
+    "number": 10,
+    "source_fe_mode": 16,
+    "truth_fe_hz": 201.87657165527344
+   },
+   {
+    "epsilon": 0.09986535111700323,
+    "frequency_hz": 234.19526503287508,
+    "number": 11,
+    "source_fe_mode": 17,
+    "truth_fe_hz": 234.1251220703125
+   },
+   {
+    "epsilon": -0.23325574150556191,
+    "frequency_hz": 236.43935106581472,
+    "number": 12,
+    "source_fe_mode": 18,
+    "truth_fe_hz": 236.60491943359375
+   },
+   {
+    "epsilon": -1.4650219088524277,
+    "frequency_hz": 319.9375909385584,
+    "number": 13,
+    "source_fe_mode": 19,
+    "truth_fe_hz": 321.3499450683594
+   },
+   {
+    "epsilon": 0.6532148114228029,
+    "frequency_hz": 360.4270649357112,
+    "number": 14,
+    "source_fe_mode": 20,
+    "truth_fe_hz": 359.7221374511719
+   },
+   {
+    "epsilon": -1.2142801829783534,
+    "frequency_hz": 366.3630330181308,
+    "number": 15,
+    "source_fe_mode": 21,
+    "truth_fe_hz": 367.7025146484375
+   },
+   {
+    "epsilon": -0.46338921749386075,
+    "frequency_hz": 368.04193851827057,
+    "number": 16,
+    "source_fe_mode": 22,
+    "truth_fe_hz": 368.5542907714844
+   },
+   {
+    "epsilon": 0.09840975755487766,
+    "frequency_hz": 374.5908431868893,
+    "number": 17,
+    "source_fe_mode": 23,
+    "truth_fe_hz": 374.48028564453125
+   },
+   {
+    "epsilon": 1.3801571234939294,
+    "frequency_hz": 398.3920272057271,
+    "number": 18,
+    "source_fe_mode": 24,
+    "truth_fe_hz": 396.7492980957031
+   },
+   {
+    "epsilon": -0.2510644873043078,
+    "frequency_hz": 404.6878819024688,
+    "number": 19,
+    "source_fe_mode": 25,
+    "truth_fe_hz": 404.992919921875
+   },
+   {
+    "epsilon": 0.311722190590206,
+    "frequency_hz": 468.2012310088947,
+    "number": 20,
+    "source_fe_mode": 26,
+    "truth_fe_hz": 467.7637939453125
+   },
+   {
+    "epsilon": 2.1281277489081387,
+    "frequency_hz": 471.83386480418545,
+    "number": 21,
+    "source_fe_mode": 27,
+    "truth_fe_hz": 468.8406066894531
+   },
+   {
+    "epsilon": -1.3493253049461562,
+    "frequency_hz": 580.4359036441347,
+    "number": 22,
+    "source_fe_mode": 28,
+    "truth_fe_hz": 582.7950439453125
+   },
+   {
+    "epsilon": 0.3509385148144936,
+    "frequency_hz": 589.4349160287782,
+    "number": 23,
+    "source_fe_mode": 29,
+    "truth_fe_hz": 588.8150024414062
+   },
+   {
+    "epsilon": -0.2508773733524133,
+    "frequency_hz": 590.448463283392,
+    "number": 24,
+    "source_fe_mode": 30,
+    "truth_fe_hz": 590.8931884765625
+   }
+  ],
+  "registration_hash": "a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4"
+ },
+ "truth": {
+  "counts_toward_identification_budget": false,
+  "generated_inp_sha256": "bb3e5d7d131bed4f8b1da5fdc51d4dcd79247ed31740a97423318b5e66a8a672",
+  "job_name": "SP13_bb3e5d7d131bed4f",
+  "pack_content_sha256": "758add0c22b824c55c7149c75462b08e4233ba04d5b423c7a31ef64fc5e98945",
+  "truth_run_hash": "926f2f216995e12812d3ed2f35cb18e7041a7b7ce03a2157eaab2a9822b5e17b"
+ },
+ "twin_definition": {
+  "forward_model_id": "SP13_mesh_local_v1_modal/carbon-property-set-v1",
+  "k_int_enabled": false,
+  "mode_numbers": [
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28,
+   29,
+   30
+  ],
+  "noise_relative_sd": 0.003,
+  "noise_seed": 20261005,
+  "schema": "auto-id/synthetic-twin/v1",
+  "sigma": 0.003,
+  "start": {
+   "E_in_plane_mpa": 52000.0,
+   "G12_mpa": 4500.0
+  },
+  "truth": {
+   "E_in_plane_mpa": 45000.0,
+   "G12_mpa": 4000.0
+  },
+  "twin_id": "SP13/m4.9-twin/v1"
+ },
+ "twin_definition_hash": "c200b2930671c9fe47c0ab44c792f326e9f5343d2c491a7723ad2f859b3f8668"
+}

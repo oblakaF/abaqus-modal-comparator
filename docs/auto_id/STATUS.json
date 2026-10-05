@@ -406,8 +406,27 @@
       "M4.7": "REVIEW_READY",
       "M4.9_preparation": "REVIEW_READY",
       "M4.9_real_gate": "NOT STARTED",
-      "auto-id/m4_merged_to_main": false
+      "auto-id/m4_merged_to_main": false,
+      "M4.9_truth_gate": "EXECUTED: REFUSED_BEFORE_IDENTIFICATION (PENDING SUPERVISOR REVIEW)",
+      "M4.9_identification_loop": "NOT STARTED (not authorised)"
+    },
+    "M4.9_truth_gate": {
+      "authorised": "HUMAN 2026-10-05: exactly 1 SP13 truth Abaqus 2024 solve (E 45000, G12 4000) + 1 pinned extract_odb.py extraction, outside the 20-evaluation budget; no LM, no identification solves",
+      "abaqus_solves": 1,
+      "abaqus_python_extractions": 1,
+      "truth_job": "SP13_bb3e5d7d131bed4f (INP bb3e5d7d131bed4f8b1da5fdc51d4dcd79247ed31740a97423318b5e66a8a672; job_hash 0082ddc30794d94c...)",
+      "solve": "completed (.sta marker, Abaqus 2024); wall-clock 621 s; ODB 715614536 bytes, SHA 57282e50448a9e8b...",
+      "extraction": "pinned 039aa067...; all checks PASS; raw deleted; pack content 758add0c22b824c5..., file eeebae21c5e3c4f1...",
+      "twin": "definition c200b293... (seed 20261005); synthetic experiment 5b0450d8ec131345...",
+      "freeze": "FROZEN, 23 rows (exp 1-23 <-> FE 7-29), 1 excluded (exp 24 / FE 30: MAC below the minimum for every frequency-admissible FE mode); observation hash 05a5443a2f8eef49...",
+      "holdouts": "torsion R1 (FE 7, Px:O|Py:O|nx:1|ny:1); validation R23 (FE 29, Px:O|Py:O|nx:1|ny:5)",
+      "trigger_groups": "['R11', 'R12'] = FE [17, 18] INDEPENDENT; ['R14', 'R15', 'R16', 'R17'] = FE [20, 21, 22, 23] UNSUPPORTED; ['R18', 'R19'] = FE [24, 25] INDEPENDENT; ['R20', 'R21'] = FE [26, 27] INDEPENDENT; ['R22', 'R23'] = FE [28, 29] INDEPENDENT; ['R4', 'R5'] = FE [10, 11] INDEPENDENT; ['R7', 'R8', 'R9'] = FE [13, 14, 15] UNSUPPORTED",
+      "design": "REFUSED: two UNSUPPORTED (>2-mode) trigger groups (M4_DECISION_RECORD §8.2); M4.7 design not built",
+      "parameter_count": 2,
+      "verdict": "REFUSED_BEFORE_IDENTIFICATION",
+      "artifacts": "D:\\abaqus_m4_truth (truth ODB kept until M4.9 review; truth pack + journal + readiness report); provenance copies in docs/auto_id/twins/SP13_truth_gate/",
+      "evidence": "EVIDENCE.md 'M4.9 — SP13 truth gate' PENDING SUPERVISOR REVIEW"
     }
   },
-  "next_action": "SUPERVISOR review of the reworked M4.9 preparation (REVIEW_READY); real M4.9 gate NOT STARTED and unauthorised; smoke archive remains a proposal"
+  "next_action": "SUPERVISOR review of the M4.9 truth gate (REFUSED_BEFORE_IDENTIFICATION: UNSUPPORTED >2-mode groups FE 13-15 and FE 20-23); decision needed on how M4.9 proceeds; no identification loop"
 }
