@@ -495,3 +495,53 @@ Decision:
   metric or threshold is created.
 Rationale / scope: separates synthetic-gate exercise from production verdicts.
 Supersedes: none
+
+## D-045 — M5 verdict envelope and semantics (M5.9)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §3, §9; D-012; M5_DECISION_RECORD §19
+Decision:
+- **Comparison space:** the verdict comparison is made in ln p:
+  conservative_ln = max(`birge_adjusted_sd_ln`, model_form_half_range_ln).
+  - ≤ 0.05 → IDENTIFIED;
+  - > 0.05 and ≤ 0.08 → WIDE;
+  - > 0.08 → NOT_IDENTIFIABLE.
+
+  Percent values are for readability only.
+- **Green conditions:** a green or WIDE verdict needs every guard to pass: practical rank,
+  residual pattern and holdout, Birge available, `model_form_robustness` without refused cases,
+  fitting-pair MAC, no branch / pairing loss, not `registration_limited`, no peak-derived input,
+  family consistency (D-044) and the sandwich-G12 policy (D-046).
+- **Missing evidence:** never an implicit PASS.
+- **WIDE:** never hides a block. There is no user override.
+- **Reporting:** the three uncertainty quantities stay separately labelled; the reported value is
+  given only for IDENTIFIED / WIDE.
+Rationale / scope: makes the SPEC §3/§9 verdict decidable without mixing units or labels.
+Supersedes: none
+
+## D-046 — Sandwich G12 policy in the verdict engine (SPEC §5.1)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §5.1; D-004; D-017; M5_DECISION_RECORD §19
+Decision:
+- **Independence:** sandwich G12 may be IDENTIFIED only when every required nuisance quantity
+  (core, and interface where relevant) is constrained by provenance independent of the evaluated
+  modal fit.
+  - Real / production: a PROVISIONAL prior never satisfies this; it may still take part in the
+    calculation, but the verdict carries the limitation.
+  - Synthetic gate: an explicit synthetic-definition constraint may satisfy it; this never
+    generalises to real data.
+- **Bare plate:** without bare-plate support and without a complete §5.1 sandwich path, G12 is
+  NOT_IDENTIFIABLE (`BARE_PLATE_REQUIRED`). Bare-plate evidence is never inferred from the
+  sandwich specimen.
+Rationale / scope: a conservative, explicit implementation of SPEC §5.1.
+Supersedes: none
+
+## D-047 — sd_ln > 0.08 in the M5 verdict: no automatic refit (SPEC §10)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §10; M5_DECISION_RECORD §19
+Decision:
+- **Verdict:** a fitted parameter with `statistical_sd` sd_ln > 0.08 is NOT_IDENTIFIABLE
+  (`SD_ABOVE_8_PERCENT`).
+- **No refit in M5:** M5 does not launch a refit, modify the accepted fit, or silently fix the
+  parameter and recompute the others.
+- **Estimate:** preserved for provenance and never promoted as an identified property.
+- **Later:** a "fix and refit" is a separate estimation action that needs its own authorised
+  workflow.
+Rationale / scope: the verdict engine evaluates the accepted fit and its evidence.
+Supersedes: none

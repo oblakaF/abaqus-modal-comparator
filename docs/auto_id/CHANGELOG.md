@@ -3229,3 +3229,39 @@ first internal provider.
   - Not real-specimen evidence.
 - **Full suite:** Windows 1375 OK (27 skipped) without data stores; 1380 OK (2 skipped) with both stores; M5-A+B+C 50 passed; targeted M4 regression + M4 and M3 stage gates 154 passed.
 - **Abaqus runs:** 0. No policy change.
+
+## 2026-10-05 — M5 checkpoint M5-D (M5.9 verdict engine + M5 stage gate): M5 REVIEW_READY
+
+- **Stage:** M5 `REVIEW_READY`.
+  - M5.1–M5.9 `REVIEW_READY`.
+  - **M5 stage gate PASS** (`tests/test_m5_stage_gate.py`).
+  - Not self-accepted. Last accepted merged stage remains M4. **M6 NOT STARTED.**
+- **SUPERVISOR decisions:** M5_DECISION_RECORD §19; DECISIONS.md D-045 (ln-space envelope and
+  verdict semantics), D-046 (sandwich G12), D-047 (sd > 8 % without refit).
+- **New module:** `src/services/identification_verdict.py`. A pure verdict engine on explicit
+  evidence records:
+  - guards with PASS / FAIL / NOT_AVAILABLE;
+  - D-044 context handling;
+  - the SPEC §5.1 sandwich-G12 policy;
+  - no implicit PASS, no override;
+  - separately labelled uncertainties;
+  - `compute_evidence_chain` (M5.3 → M5.5 → M5.8 → M5.6 → M5.7, no refit).
+- **Tests:**
+  - `tests/test_identification_verdict.py` (9);
+  - `tests/test_m5_stage_gate.py` (9);
+  - `tests/m5_gate_support.py` (synthetic cases A–F, twin control).
+- **Gate outcomes:**
+  - A: IDENTIFIED;
+  - B: q_G 0.0145, G12 NOT_IDENTIFIABLE (sd_ln 0.50);
+  - C: hard block;
+  - D: no green verdict;
+  - E: WIDE (0.0632);
+  - F: G12 BARE_PLATE_REQUIRED / nuisance not independent;
+  - G: labels separate.
+- **M4.9 twin synthetic records-based control:**
+  - conservative_ln E 0.002115 / G12 0.010195;
+  - both IDENTIFIED in the synthetic-gate context, both NOT_IDENTIFIABLE in the production
+    context;
+  - not real-specimen identification.
+- **Full suite:** Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; all M5 tests 68 passed; targeted M4 regression + M5, M4 and M3 stage gates 172 passed.
+- **Abaqus runs:** 0. No refit, no policy change beyond the recorded SUPERVISOR decisions.

@@ -255,7 +255,8 @@ class ModuleBoundaryTests(unittest.TestCase):
     def test_no_abaqus_m3_or_legacy_imports(self):
         import ast
 
-        for module in ("practical_identifiability.py", "identification_uncertainty.py", "model_form_robustness.py"):
+        for module in ("practical_identifiability.py", "identification_uncertainty.py", "model_form_robustness.py",
+                       "identification_verdict.py"):
             tree = ast.parse((ROOT / "src" / "services" / module).read_text(encoding="utf-8"))
             imported = [node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module]
             imported += [alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names]

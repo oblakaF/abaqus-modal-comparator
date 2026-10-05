@@ -429,9 +429,10 @@ First batch reviewed by the SUPERVISOR:
 | M5.6 | Conditional Birge adjustment | `REVIEW_READY` |
 | M5.7 | Leave-one-family-out `model_form_robustness` | `REVIEW_READY` |
 | M5.8 | Residual family pattern test | `REVIEW_READY` |
-| M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `TODO` |
+| M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `REVIEW_READY` |
 
-Stage status: `IN_PROGRESS` (branch `auto-id/m5` from `main` `8f405c3`; SUPERVISOR entry decisions in
+Stage status: `REVIEW_READY` (M5.1–M5.9 `REVIEW_READY`; **M5 GATE: `PASS`**, synthetic and records only,
+0 Abaqus; not yet accepted; branch `auto-id/m5` from `main` `8f405c3`; SUPERVISOR decisions in
 [M5_DECISION_RECORD.md](M5_DECISION_RECORD.md), D-039–D-044).
 - Checkpoint M5-A (M5.1–M5.4) `REVIEW_READY`: `services/practical_identifiability.py` with
   synthetic tests. No Abaqus.
@@ -439,7 +440,14 @@ Stage status: `IN_PROGRESS` (branch `auto-id/m5` from `main` `8f405c3`; SUPERVIS
   with synthetic tests and the M4.9 twin records-based control. No Abaqus.
 - Checkpoint M5-C (M5.7) `REVIEW_READY`: `services/model_form_robustness.py` (linearised
   leave-one-family-out, D-042). No Abaqus.
-- M5.9 `TODO`.
+- Checkpoint M5-D (M5.9) `REVIEW_READY`: `services/identification_verdict.py` plus
+  `tests/test_m5_stage_gate.py` (synthetic gate cases A–G; M4.9 twin records-based control).
+  D-045–D-047.
+- **M5 GATE `PASS`:**
+  - k_core absorption gives q_G ≈ 0 and G12 NOT_IDENTIFIABLE;
+  - rank deficiency is a hard block with no override;
+  - systematic model error gives no green verdict;
+  - the uncertainty labels stay separate.
 
 **M5 GATE:**
 

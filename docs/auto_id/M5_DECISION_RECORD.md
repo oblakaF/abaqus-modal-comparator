@@ -315,3 +315,102 @@ separately, for example by excluding hash fields from the token scan.
 
 Numerically stable enough to feed M5.9: all reduced systems are full rank, and max |δ| = 0.0063 in
 ln p.
+
+---
+
+## 19. M5-C review and checkpoint M5-D: verdict engine and M5 stage gate (2026-10-05)
+
+### 19.1 SUPERVISOR decisions
+
+1. **Envelope in ln p:**
+   - conservative_ln = max(`birge_adjusted_sd_ln`, model_form_half_range_ln);
+   - ≤ 0.05 → eligible for IDENTIFIED; ≤ 0.08 → WIDE; > 0.08 → NOT_IDENTIFIABLE;
+   - percent values are for readability only;
+   - when Birge is unavailable there is no green verdict and no silent use of `statistical_sd`.
+2. **Sandwich G12 (SPEC §5.1):**
+   - green only with nuisance constraints whose provenance is independent of the evaluated fit;
+   - real / production: a PROVISIONAL prior does not count (it may still be part of the
+     calculation);
+   - synthetic gate: an explicit synthetic-definition constraint may count;
+   - no bare-plate support and no complete §5.1 sandwich path → NOT_IDENTIFIABLE
+     (`BARE_PLATE_REQUIRED`).
+3. **Inputs:** explicit evidence records only. No hidden lookups, no GUI defaults, and no implicit
+   PASS from missing evidence.
+4. **Guards:**
+   - all fitting pairs MAC ≥ 0.8 (the strict-pairing minimum; no second threshold);
+   - branch / pairing loss, `registration_limited` (M2 diagnostic; explicit false for synthetic
+     cases) and peak-derived input block green.
+5. **Family consistency:** D-044 exactly. NOT_AVAILABLE is permitted in the synthetic gate and
+   blocks IDENTIFIED in production. It is never converted to PASS.
+6. **sd_ln > 0.08:** that parameter is NOT_IDENTIFIABLE (`SD_ABOVE_8_PERCENT`):
+   - no automatic refit and no change to the accepted fit;
+   - no silent fixing of the parameter;
+   - the estimate is preserved for provenance and never promoted.
+7. **WIDE:** only when every guard passes and 0.05 < conservative_ln ≤ 0.08. It never hides a
+   block. There is no override.
+8. **q_G:** diagnostic only.
+9. **Labels:** `statistical_sd`, `birge_adjusted_sd` and `model_form_robustness` are kept
+   separately in every result.
+
+### 19.2 Implementation
+
+**Verdict engine:** `src/services/identification_verdict.py` (pure; no Abaqus, file system or GUI;
+no legacy Stage-A logic).
+- **Evidence records:**
+  - `GuardEvidence` (PASS / FAIL / NOT_AVAILABLE with provenance);
+  - `fitting_pair_mac_evidence`;
+  - `NuisanceConstraint` and `SandwichG12Evidence`;
+  - `VerdictInputs`, which bundles the rank analysis, `statistical_sd`, pattern, Birge and
+    robustness records (cross-checked by hash to one system), the guards, p̂, the parameter roles
+    and upstream refusals.
+- **`decide_verdicts(inputs)`:**
+  - one parameter-level verdict per **global** parameter; nuisance parameters are specimen
+    parameters, not verdict subjects;
+  - every non-PASS guard is a named block reason, except family-consistency NOT_AVAILABLE in the
+    SYNTHETIC_GATE context;
+  - a constraint record cannot hide a PROVISIONAL prior that the system carries;
+  - the reported value is given only for IDENTIFIED / WIDE; the fitted estimate is always kept
+    for provenance;
+  - there is no override argument.
+- **`compute_evidence_chain`:** runs M5.3 → M5.5 → M5.8 → M5.6 → M5.7 on one accepted system at p̂
+  (no refit).
+
+**Tests:**
+- `tests/test_identification_verdict.py`: guard by guard.
+- `tests/test_m5_stage_gate.py`: the M5 gate.
+- `tests/m5_gate_support.py`: the explicit synthetic cases A–F and the twin control.
+
+### 19.3 Stage-gate outcomes (synthetic; test tolerances only)
+
+| Case | Outcome |
+|---|---|
+| A, positive control | E and G12 IDENTIFIED |
+| B, G12 absorbed by k_core | q_G = 0.0145 (diagnostic). G12 NOT_IDENTIFIABLE (`SD_ABOVE_8_PERCENT`, sd_ln 0.50); E IDENTIFIED |
+| C, rank-deficient | All NOT_IDENTIFIABLE (`RANK_DEFICIENT`). No covariance, no Birge, no robustness, no override |
+| D, systematic pattern / holdout > 3 | Birge BLOCKED_PATTERN; `statistical_sd` preserved; no green verdict |
+| E, WIDE band | WIDE (conservative_ln 0.0632). Any guard failure, or the production context, gives NOT_IDENTIFIABLE |
+| F, missing independent nuisance evidence | G12 NOT_IDENTIFIABLE (`BARE_PLATE_REQUIRED`, `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`); E IDENTIFIED |
+| G, labels | Separate `statistical_sd` / `birge_adjusted_sd` / `model_form_robustness`; no merged field |
+
+### 19.4 Accepted M4.9 twin: synthetic records-based control (not real-specimen identification)
+
+**Inputs:**
+- the Broyden-updated Jacobian from the committed journal;
+- σ = 0.003 (synthetic definition);
+- the accepted residuals;
+- the M5.7 result.
+
+**Guard and pattern evidence:**
+- pattern PASS (21 singleton families); holdouts R1 +0.03, R23 −0.31 (PASS);
+- q_G = 0.761 (diagnostic);
+- family consistency NOT_AVAILABLE (D-044);
+- sandwich G12: the core constraint is the twin definition (D-036), a synthetic definition; bare
+  plate not available.
+
+| Parameter | `statistical_sd_ln` | `birge_adjusted_sd_ln` | MFR half-range (ln) | conservative_ln | Verdict (synthetic gate) |
+|---|---|---|---|---|---|
+| E_in_plane | 0.002064 | 0.002115 | 0.001109 | 0.002115 | IDENTIFIED |
+| G12 | 0.009951 | 0.010195 | 0.005284 | 0.010195 | IDENTIFIED |
+
+**Production context:** the same evidence gives NOT_IDENTIFIABLE for both parameters, through
+family consistency and the sandwich-G12 rules.
