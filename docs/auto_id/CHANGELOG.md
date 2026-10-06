@@ -3141,3 +3141,160 @@ first internal provider.
 - **Bookkeeping branch:** `auto-id/m4-closure`, created from the merge commit.
 - **Unchanged:** code and scientific logic. No Abaqus. Retained ODB / INP artifacts are not
   deleted.
+
+## 2026-10-05 — M5 started; checkpoint M5-A (M5.1–M5.4) REVIEW_READY
+
+- **Stage:** M5 `IN_PROGRESS` on branch `auto-id/m5` (from `main` `8f405c3`).
+  - M5.1–M5.4: `REVIEW_READY`.
+  - M5.5–M5.9: `TODO`.
+- **SUPERVISOR entry decisions:** M5_DECISION_RECORD.md §1–§16; DECISIONS.md D-039–D-044.
+  - synthetic gate scope;
+  - Broyden J for the twin control;
+  - explicit priors;
+  - rcond 1e-3 as a hard block;
+  - q_G as a diagnostic;
+  - Birge χ² and dof;
+  - linearised leave-one-family-out;
+  - the singleton pattern rule;
+  - family consistency NOT_AVAILABLE ≠ PASS;
+  - the registration-limited source;
+  - S4 deferred but mandatory later.
+- **New module:** `src/services/practical_identifiability.py`. SPEC §10 in ln p:
+  - typed global / nuisance sensitivity matrix (fit terms only; a cluster is one term);
+  - explicit Σ (Cholesky whitening);
+  - explicit nuisance prior rows;
+  - rank at rcond 1e-3 as a hard block with no override;
+  - C and sd foundation;
+  - SPEC §10 sd > 8 % evidence;
+  - q projections (q_G);
+  - diagnostics (condition number, correlation, S~ cosines);
+  - deterministic hashes;
+  - reconstruction of the Broyden-updated LM Jacobian from a journal.
+
+  Legacy Stage-A modules are unchanged.
+- **Tests:** `tests/test_practical_identifiability.py` (16, synthetic).
+  - Cases A–N; a weak-nuisance contrast; a module-boundary guard.
+  - The M4.9 twin positive control: deterministic Broyden reconstruction from the committed
+    journal; the M5 posterior sd of that global-only system equals the recorded value.
+  - Absorption case: q_G ≈ 0.018 and sd(ln G12) ≈ 0.50, above the 0.08 limit, so the evidence is
+    NOT_IDENTIFIABLE-compatible.
+- **Full suite:** Windows 1341 OK (27 skipped) without data stores; 1346 OK (2 skipped) with both stores; M5-A 16 passed; targeted M4 regression + M4 and M3 stage gates 120 passed.
+- **Abaqus runs:** 0. No M4 artifact deleted. No M4 scientific result changed.
+
+## 2026-10-05 — M5 checkpoint M5-B (M5.5, M5.8, M5.6) REVIEW_READY
+
+- **Stage:** M5 `IN_PROGRESS` (branch `auto-id/m5`).
+  - M5.1–M5.4 `REVIEW_READY` (acknowledged by the SUPERVISOR).
+  - M5.5, M5.6, M5.8 `REVIEW_READY`.
+  - M5.7, M5.9 `TODO`.
+- **SUPERVISOR M5-A confirmations** recorded (M5_DECISION_RECORD §17.1): sd_ln > 0.08; S~
+  cosines; q on the augmented system; Cholesky whitening; the Linux flake recorded as unrelated
+  debt.
+- **New module:** `src/services/identification_uncertainty.py`.
+  - **M5.5:** `statistical_sd` from the full M5 system only (never an M4 local_sd), with Σ and
+    prior provenance and a context label; rank deficiency refused.
+  - **M5.8:** residual-pattern test per D-043, with strict inequalities and cluster = one term.
+  - **M5.6:** conditional Birge per D-041, populated only when the pattern test passed;
+    `statistical_sd` kept separately.
+- **Tests:** `tests/test_identification_uncertainty.py` (19, A–P).
+- **M4.9 twin synthetic records-based control:**
+  - `statistical_sd_ln`: E 0.002064, G12 0.009951;
+  - pattern PASS; χ²/dof 19.946/19, s_B 1.0246;
+  - `birge_adjusted_sd_ln`: E 0.002115, G12 0.010195.
+
+  Not refused, and not real-specimen uncertainty.
+- **Full suite:** Windows 1360 OK (27 skipped) without data stores; 1365 OK (2 skipped) with both stores; M5-A+M5-B 35 passed; targeted M4 regression + M4 and M3 stage gates 139 passed.
+- **Abaqus runs:** 0. No policy change.
+
+## 2026-10-05 — M5 checkpoint M5-C (M5.7 model_form_robustness) REVIEW_READY
+
+- **Stage:** M5 `IN_PROGRESS` (branch `auto-id/m5`).
+  - M5.1–M5.8: `REVIEW_READY`.
+  - M5.9: `TODO`.
+- **SUPERVISOR confirmation:** the cluster family rule (shared family, or a unique composite key;
+  a singleton when alone), recorded in M5_DECISION_RECORD §18.1.
+- **New module:** `src/services/model_form_robustness.py`. Linearised leave-one-family-out at p̂
+  (D-042):
+  - remove all fit terms of a family (re-whitened with the reduced Σ);
+  - keep every prior row;
+  - the same M5.3 rank rule (rcond = 1e-3); a rank-deficient reduced system is refused, with no
+    pseudo-inverse and no override;
+  - range of the estimates in % of p̂;
+  - hash-bound;
+  - labelled `model_form_robustness`, not uncertainty or 1σ.
+- **Tests:** `tests/test_model_form_robustness.py` (15, A–O).
+- **M4.9 twin synthetic records-based control:** 21 families, none refused.
+  - E range 0.222 % (half-range 0.111 %).
+  - G12 range 1.058 % (half-range 0.529 %).
+  - Not real-specimen evidence.
+- **Full suite:** Windows 1375 OK (27 skipped) without data stores; 1380 OK (2 skipped) with both stores; M5-A+B+C 50 passed; targeted M4 regression + M4 and M3 stage gates 154 passed.
+- **Abaqus runs:** 0. No policy change.
+
+## 2026-10-05 — M5 checkpoint M5-D (M5.9 verdict engine + M5 stage gate): M5 REVIEW_READY
+
+- **Stage:** M5 `REVIEW_READY`.
+  - M5.1–M5.9 `REVIEW_READY`.
+  - **M5 stage gate PASS** (`tests/test_m5_stage_gate.py`).
+  - Not self-accepted. Last accepted merged stage remains M4. **M6 NOT STARTED.**
+- **SUPERVISOR decisions:** M5_DECISION_RECORD §19; DECISIONS.md D-045 (ln-space envelope and
+  verdict semantics), D-046 (sandwich G12), D-047 (sd > 8 % without refit).
+- **New module:** `src/services/identification_verdict.py`. A pure verdict engine on explicit
+  evidence records:
+  - guards with PASS / FAIL / NOT_AVAILABLE;
+  - D-044 context handling;
+  - the SPEC §5.1 sandwich-G12 policy;
+  - no implicit PASS, no override;
+  - separately labelled uncertainties;
+  - `compute_evidence_chain` (M5.3 → M5.5 → M5.8 → M5.6 → M5.7, no refit).
+- **Tests:**
+  - `tests/test_identification_verdict.py` (9);
+  - `tests/test_m5_stage_gate.py` (9);
+  - `tests/m5_gate_support.py` (synthetic cases A–F, twin control).
+- **Gate outcomes:**
+  - A: IDENTIFIED;
+  - B: q_G 0.0145, G12 NOT_IDENTIFIABLE (sd_ln 0.50);
+  - C: hard block;
+  - D: no green verdict;
+  - E: WIDE (0.0632);
+  - F: G12 BARE_PLATE_REQUIRED / nuisance not independent;
+  - G: labels separate.
+- **M4.9 twin synthetic records-based control:**
+  - conservative_ln E 0.002115 / G12 0.010195;
+  - both IDENTIFIED in the synthetic-gate context, both NOT_IDENTIFIABLE in the production
+    context;
+  - not real-specimen identification.
+- **Full suite:** Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; all M5 tests 68 passed; targeted M4 regression + M5, M4 and M3 stage gates 172 passed.
+- **Abaqus runs:** 0. No refit, no policy change beyond the recorded SUPERVISOR decisions.
+
+## 2026-10-06 — M5 SUPERVISOR acceptance and stage closure
+
+- **Stage:** M5.1–M5.9 **ACCEPTED** (SUPERVISOR); **M5 gate PASS**.
+  - Stage status `REVIEW_READY`; stage PR `auto-id/m5` → `main` prepared, **not merged**.
+  - `last_accepted_stage` stays M4 until the HUMAN merge.
+  - **M6 NOT_STARTED.**
+- **Scope:** synthetic stage-gate machinery and software / scientific-pipeline evidence only.
+  **Not** a real-specimen material identification.
+- **Gate results:**
+  - q_G absorption case: q_G ≈ 0 diagnostically; G12 NOT_IDENTIFIABLE from the full uncertainty
+    calculation;
+  - rank-deficient case: hard-blocked, no override;
+  - systematic model error / holdout failure: no green verdict;
+  - WIDE only when every guard passes;
+  - `statistical_sd`, `birge_adjusted_sd` and `model_form_robustness` stay separate.
+- **M4.9 twin records-based synthetic control:** IDENTIFIED in the synthetic-gate context only.
+- **Records:**
+  - EVIDENCE.md "M5 — Practical-identifiability and verdict machinery: synthetic stage gate and
+    M4.9 twin records-based control" (ACCEPTED);
+  - DECISIONS.md D-048 (cluster family identity, promoted from M5_DECISION_RECORD §18.1);
+  - M5_DECISION_RECORD §20 (acceptance), plus the stale header and table refreshed.
+- **Qualifications kept:**
+  - real t_face / k_core columns and priors not available;
+  - real Σ_meas NOT_AVAILABLE;
+  - S4 noise control is future HUMAN-gated work;
+  - production family consistency is later real-data work;
+  - sandwich G12 needs bare-plate and/or independent nuisance evidence;
+  - M4.3 thresholds PROVISIONAL;
+  - real SP13 refused; SP02 NOT_FROZEN.
+- **Full suite:** Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; M5 tests 68 passed (test_m5_stage_gate 9); M5/M4/M3 stage gates + M4 regression 144 passed.
+- **Abaqus:** 0 solves and 0 extractions in M5. M3 and M4 unchanged. No retained artifact
+  deleted. No code change in the closure.

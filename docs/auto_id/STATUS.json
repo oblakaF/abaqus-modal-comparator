@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M5",
-  "current_ministep": null,
-  "status": "NOT_STARTED",
+  "current_ministep": "M5.9",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M4",
   "last_accepted_ministep": "M4.9",
   "last_accepted_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d",
@@ -531,18 +531,88 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M5 NOT_STARTED; await SUPERVISOR instruction before any M5 work",
+  "next_action": "Stage PR auto-id/m5 -> main prepared; await HUMAN merge authorisation; after the merge record the main merge SHA; M6 NOT_STARTED",
   "m5": {
-    "status": "NOT_STARTED",
-    "M5.1": "TODO",
-    "M5.2": "TODO",
-    "M5.3": "TODO",
-    "M5.4": "TODO",
-    "M5.5": "TODO",
-    "M5.6": "TODO",
-    "M5.7": "TODO",
-    "M5.8": "TODO",
-    "M5.9": "TODO",
-    "note": "not started; requires explicit SUPERVISOR instruction (ROADMAP order)"
+    "branch": "auto-id/m5",
+    "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
+    "M5.1": "ACCEPTED",
+    "M5.2": "ACCEPTED",
+    "M5.3": "ACCEPTED",
+    "M5.4": "ACCEPTED",
+    "M5.5": "ACCEPTED",
+    "M5.6": "ACCEPTED",
+    "M5.7": "ACCEPTED",
+    "M5.8": "ACCEPTED",
+    "M5.9": "ACCEPTED",
+    "status": "REVIEW_READY",
+    "decision_record": "docs/auto_id/M5_DECISION_RECORD.md (DECISIONS D-039..D-044)",
+    "entry_authorisation": "SUPERVISOR 2026-10-05: M5 entry decisions; checkpoint M5-A only; no Abaqus",
+    "M5-A": {
+      "module": "src/services/practical_identifiability.py",
+      "tests": "tests/test_practical_identifiability.py (16, synthetic + M4.9 twin positive control from records)",
+      "scope_note": "M5.1 machinery for explicit/synthetic matrices; real FE nuisance columns and the S4 noise control are outside M5 (D-039)",
+      "tests_result": "Windows 1341 OK (27 skipped) without data stores; 1346 OK (2 skipped) with both stores; M5-A 16 passed; targeted M4 regression + M4 and M3 stage gates 120 passed",
+      "abaqus_runs": 0,
+      "supervisor_review": "ACKNOWLEDGED 2026-10-05 (M5.1-M5.4 REVIEW_READY); confirmations in M5_DECISION_RECORD §17.1"
+    },
+    "M5-B": {
+      "module": "src/services/identification_uncertainty.py",
+      "tests": "tests/test_identification_uncertainty.py (19, A-P)",
+      "twin_records_control": "statistical_sd_ln E 0.002064 / G12 0.009951; pattern PASS; chi2/dof 19.946/19, s_B 1.0246; birge_adjusted_sd_ln E 0.002115 / G12 0.010195 (synthetic records-based control, not real-specimen uncertainty)",
+      "tests_result": "Windows 1360 OK (27 skipped) without data stores; 1365 OK (2 skipped) with both stores; M5-A+M5-B 35 passed; targeted M4 regression + M4 and M3 stage gates 139 passed",
+      "abaqus_runs": 0,
+      "supervisor_review": "ACKNOWLEDGED 2026-10-05 (M5.5, M5.6, M5.8 REVIEW_READY); cluster family rule confirmed (M5_DECISION_RECORD §18.1)"
+    },
+    "technical_debt": [
+      "tests/test_registration_factory.py::test_no_full_model_contamination flaky (hash substring 'd11'); unrelated to M5; fix separately"
+    ],
+    "M5-C": {
+      "module": "src/services/model_form_robustness.py",
+      "tests": "tests/test_model_form_robustness.py (15, A-O)",
+      "twin_records_control": "21 families, none refused; E range 0.222 % (half 0.111 %), G12 range 1.058 % (half 0.529 %) of p_hat (synthetic records-based control, not real-specimen evidence)",
+      "tests_result": "Windows 1375 OK (27 skipped) without data stores; 1380 OK (2 skipped) with both stores; M5-A+B+C 50 passed; targeted M4 regression + M4 and M3 stage gates 154 passed",
+      "abaqus_runs": 0,
+      "supervisor_review": "ACKNOWLEDGED 2026-10-05 (M5.7 REVIEW_READY)"
+    },
+    "stage_gate": "PASS (SUPERVISOR 2026-10-06; tests/test_m5_stage_gate.py; synthetic and records only; 0 Abaqus)",
+    "M5-D": {
+      "module": "src/services/identification_verdict.py",
+      "tests": "tests/test_identification_verdict.py (9), tests/test_m5_stage_gate.py (9), tests/m5_gate_support.py",
+      "gate_cases": "A IDENTIFIED; B G12 NOT_IDENTIFIABLE (q_G 0.0145 diagnostic, sd_ln 0.50); C RANK_DEFICIENT hard block; D no green (Birge blocked); E WIDE (0.0632); F G12 BARE_PLATE_REQUIRED + nuisance not independent; G labels separate",
+      "twin_records_control": "conservative_ln E 0.002115 / G12 0.010195; IDENTIFIED in SYNTHETIC_GATE context only; NOT_IDENTIFIABLE in PRODUCTION context; not real-specimen identification",
+      "decisions": "D-045, D-046, D-047",
+      "tests_result": "Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; all M5 tests 68 passed; targeted M4 regression + M5, M4 and M3 stage gates 172 passed",
+      "abaqus_runs": 0
+    },
+    "limitations": [
+      "M5 gate is synthetic; no real nuisance (t_face, k_core) FE columns or priors (D-039)",
+      "real-data production verdicts need family consistency (M7), bare-plate / independent nuisance evidence (M6), measured Sigma_meas and the S4 noise control",
+      "M4.3 classifier thresholds remain PROVISIONAL",
+      "real SP13 identification remains refused; SP02 NOT_FROZEN"
+    ],
+    "stage_pr": "READY_FOR_STAGE_PR (auto-id/m5 -> main); not merged; HUMAN merge authorisation required",
+    "supervisor_acceptance": {
+      "date": "2026-10-06",
+      "decision": "M5.1-M5.9 ACCEPTED; M5 stage-level scientific gate PASS; synthetic stage evidence and the M4.9 twin records-based control accepted as software/scientific-pipeline evidence only",
+      "not_a_claim_of": "real-specimen material identification",
+      "qualifications": [
+        "M5 gate is synthetic scientific/pipeline evidence; it is not a real-specimen material identification",
+        "real t_face and k_core sensitivity columns and priors are not yet available",
+        "real Sigma_meas is NOT_AVAILABLE",
+        "S4 +/-2.5 % real FE noise control remains future HUMAN-gated work",
+        "production family consistency still needs later real-data stages",
+        "sandwich G12 still requires bare-plate and/or independently constrained nuisance evidence (SPEC §5.1)",
+        "M4.3 classifier thresholds remain PROVISIONAL",
+        "real SP13 identification remains refused",
+        "SP02 remains NOT_FROZEN"
+      ],
+      "evidence": "EVIDENCE.md 'M5 — Practical-identifiability and verdict machinery: synthetic stage gate and M4.9 twin records-based control' ACCEPTED (2026-10-06)",
+      "decisions_promoted": "DECISIONS.md D-048 (cluster family identity); D-039..D-047 already recorded"
+    },
+    "merged_to_main": false,
+    "closure_tests": "Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; M5 tests 68 passed (test_m5_stage_gate 9); M5/M4/M3 stage gates + M4 regression 144 passed"
+  },
+  "m6": {
+    "status": "NOT_STARTED"
   }
 }

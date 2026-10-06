@@ -409,3 +409,155 @@ Decision:
 Rationale / scope: keeps the M3 contract behind one controlled path, together with the
 `subprocess` and `abaqus_bridge` restrictions of §6.4.
 Supersedes: none
+
+## D-039 — M5 data scope, twin positive control and S4 noise control (M5)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §6 S4, §7, §17 M5; M5_DECISION_RECORD §1, §2, §6, §12
+Decision:
+- **Synthetic gate:** the M5 stage-gate nuisance and identifiability cases are synthetic. Their
+  sensitivities, Σ, priors and `registration_limited = false` are explicit parts of each case.
+- **Real nuisance work:** real t_face / k_core FE columns and real nuisance priors are not required
+  to close M5; they are future real-application work.
+- **Twin positive control:** the accepted M4.9 twin is a records-based positive control only, not
+  real-specimen evidence. It uses:
+  - its Broyden-updated LM Jacobian, reconstructed deterministically from the journal and labelled
+    as such;
+  - Σ = its synthetic noise (σ = 0.003).
+- **Not interchangeable:** M4 `local_sd` is never used as M5 `statistical_sd`.
+- **Real data:** a missing Σ_meas stays NOT_AVAILABLE.
+- **S4 noise control:** the ±2.5 % noise control is not run in M5. It remains mandatory for real
+  FE sensitivity columns, under a separate HUMAN Abaqus gate.
+Rationale / scope: the SPEC §17 M5 acceptance is stated on synthetic cases; no Abaqus is needed.
+Supersedes: none
+
+## D-040 — Nuisance priors, practical rank and q_G (M5.2–M5.4)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §10; D-006; D-011; M5_DECISION_RECORD §3–§5
+Decision:
+- **Priors:** prior rows exist only for nuisance parameters, with explicit centre and sd in ln p,
+  provenance and a PROVISIONAL flag. There are no default prior values; a missing prior or a
+  non-positive prior sd is refused.
+- **Rank:** practical rank uses rcond = 1e-3. Rank deficiency is a hard block: no covariance, no
+  pseudo-inverse, no override.
+- **Diagnostics:** condition number, correlations and pairwise cosines are diagnostics only.
+- **q_G:** q_G = ‖(I − P_N) a_G‖ / ‖a_G‖ is diagnostic, with no verdict threshold. The verdict
+  follows the full uncertainty and rank calculation.
+Rationale / scope: implements SPEC §10 without inventing thresholds.
+Supersedes: none
+
+## D-041 — Birge χ² and degrees of freedom (M5.6)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §9; M5_DECISION_RECORD §7
+Decision:
+- **χ²:** the sum of squared whitened fit residual terms only. Prior rows and holdouts are
+  excluded; a confirmed cluster is one term.
+- **dof:** n_fit_terms − n_fitted_parameters, counting all estimated parameters, including fitted
+  nuisance parameters. dof ≤ 0 refuses the Birge calculation and a green verdict.
+- **Scaling:** s_B = √max(1, χ²/dof). `birge_adjusted_sd` = `statistical_sd`·s_B, populated only
+  when the residual-pattern test passes.
+Rationale / scope: fills a definition the SPEC leaves implicit.
+Supersedes: none
+
+## D-042 — Linearised leave-one-family-out model_form_robustness (M5.7)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §9, §14; M5_DECISION_RECORD §8
+Decision:
+- **Method:** linearised at p̂. For each fitted modal family, remove all of its fit terms and solve
+  the reduced local linearised system with the same parameter, nuisance and prior contract. There
+  are no nonlinear or Abaqus refits.
+- **Refusal:** a reduced system that is rank-deficient (rcond = 1e-3) refuses that case, and the
+  result cannot support a green verdict.
+- **Reporting:** the range of the estimates in % of p̂. It is not `statistical_sd`, not 1σ, and
+  not part of Σ.
+- **Holdouts:** never promoted into the fit.
+Rationale / scope: the SPEC fixes the quantity, not the refit method.
+Supersedes: none
+
+## D-043 — Residual-pattern test for singleton families (M5.8)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §6 S7; M5_DECISION_RECORD §9
+Decision:
+- **Fit families:** a fit family triggers the systematic-pattern condition only when it has at
+  least two fit residual terms, all of the same sign and each with |r| > 2 (whitened).
+- **Singletons:** a single fit residual cannot establish a family-wide pattern, and unrelated
+  singleton families are never merged.
+- **Holdouts:** any holdout with |r| > 3 (whitened) fails the check, and no green verdict is
+  allowed.
+Rationale / scope: clarifies an ambiguity in the SPEC for single-member families. The 2σ and 3σ
+thresholds are unchanged.
+Supersedes: none
+
+## D-044 — Family consistency NOT_AVAILABLE and the registration-limited source (M5.9)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §3, §13; M5_DECISION_RECORD §10, §11
+Decision:
+- **Family consistency:**
+  - NOT_AVAILABLE is not PASS;
+  - in the explicitly synthetic single-specimen M5 gate it does not by itself stop the M5
+    machinery being exercised or passed;
+  - for real-data production verdicts the SPEC requirement stands: if the required family
+    consistency is unavailable, a green IDENTIFIED verdict is blocked.
+- **registration-limited:** the existing M2 registration diagnostic is its only source; no second
+  metric or threshold is created.
+Rationale / scope: separates synthetic-gate exercise from production verdicts.
+Supersedes: none
+
+## D-045 — M5 verdict envelope and semantics (M5.9)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §3, §9; D-012; M5_DECISION_RECORD §19
+Decision:
+- **Comparison space:** the verdict comparison is made in ln p:
+  conservative_ln = max(`birge_adjusted_sd_ln`, model_form_half_range_ln).
+  - ≤ 0.05 → IDENTIFIED;
+  - > 0.05 and ≤ 0.08 → WIDE;
+  - > 0.08 → NOT_IDENTIFIABLE.
+
+  Percent values are for readability only.
+- **Green conditions:** a green or WIDE verdict needs every guard to pass: practical rank,
+  residual pattern and holdout, Birge available, `model_form_robustness` without refused cases,
+  fitting-pair MAC, no branch / pairing loss, not `registration_limited`, no peak-derived input,
+  family consistency (D-044) and the sandwich-G12 policy (D-046).
+- **Missing evidence:** never an implicit PASS.
+- **WIDE:** never hides a block. There is no user override.
+- **Reporting:** the three uncertainty quantities stay separately labelled; the reported value is
+  given only for IDENTIFIED / WIDE.
+Rationale / scope: makes the SPEC §3/§9 verdict decidable without mixing units or labels.
+Supersedes: none
+
+## D-046 — Sandwich G12 policy in the verdict engine (SPEC §5.1)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §5.1; D-004; D-017; M5_DECISION_RECORD §19
+Decision:
+- **Independence:** sandwich G12 may be IDENTIFIED only when every required nuisance quantity
+  (core, and interface where relevant) is constrained by provenance independent of the evaluated
+  modal fit.
+  - Real / production: a PROVISIONAL prior never satisfies this; it may still take part in the
+    calculation, but the verdict carries the limitation.
+  - Synthetic gate: an explicit synthetic-definition constraint may satisfy it; this never
+    generalises to real data.
+- **Bare plate:** without bare-plate support and without a complete §5.1 sandwich path, G12 is
+  NOT_IDENTIFIABLE (`BARE_PLATE_REQUIRED`). Bare-plate evidence is never inferred from the
+  sandwich specimen.
+Rationale / scope: a conservative, explicit implementation of SPEC §5.1.
+Supersedes: none
+
+## D-047 — sd_ln > 0.08 in the M5 verdict: no automatic refit (SPEC §10)
+Date: 2026-10-05 · Accepted by: SUPERVISOR · Source: SPEC §10; M5_DECISION_RECORD §19
+Decision:
+- **Verdict:** a fitted parameter with `statistical_sd` sd_ln > 0.08 is NOT_IDENTIFIABLE
+  (`SD_ABOVE_8_PERCENT`).
+- **No refit in M5:** M5 does not launch a refit, modify the accepted fit, or silently fix the
+  parameter and recompute the others.
+- **Estimate:** preserved for provenance and never promoted as an identified property.
+- **Later:** a "fix and refit" is a separate estimation action that needs its own authorised
+  workflow.
+Rationale / scope: the verdict engine evaluates the accepted fit and its evidence.
+Supersedes: none
+
+## D-048 — Cluster family identity for the pattern test and leave-one-family-out (M5.7, M5.8)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §6 S7, §9, §12.4; D-042; D-043; M5_DECISION_RECORD §18.1
+Decision:
+- **Shared family:** if all members of a confirmed cluster share one M4.3 modal family, the
+  cluster residual is one fit term belonging to that shared family.
+- **Mixed families:** if the members belong to different M4.3 families, the cluster term gets one
+  unique composite family key. It is attached to neither source family and never merged with
+  unrelated families.
+- **Pattern test:** the composite cluster is one family term. Alone under its key, it is a
+  singleton and cannot trigger the ≥ 2-member systematic-pattern condition (D-043).
+- **Robustness:** `model_form_robustness` (leave-one-family-out, D-042) uses the same family
+  identity.
+Rationale / scope: a durable M5.7/M5.8 semantic rule for clusters. No synthetic or twin-specific
+value is promoted.
+Supersedes: none

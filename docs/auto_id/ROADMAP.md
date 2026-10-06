@@ -421,17 +421,34 @@ First batch reviewed by the SUPERVISOR:
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M5.1 | Full global + nuisance sensitivity matrix | `TODO` |
-| M5.2 | Prior rows | `TODO` |
-| M5.3 | Practical rank and posterior uncertainty | `TODO` |
-| M5.4 | q_G nuisance-space projection | `TODO` |
-| M5.5 | `statistical_sd` | `TODO` |
-| M5.6 | Conditional Birge adjustment | `TODO` |
-| M5.7 | Leave-one-family-out `model_form_robustness` | `TODO` |
-| M5.8 | Residual family pattern test | `TODO` |
-| M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `TODO` |
+| M5.1 | Full global + nuisance sensitivity matrix | `ACCEPTED` |
+| M5.2 | Prior rows | `ACCEPTED` |
+| M5.3 | Practical rank and posterior uncertainty | `ACCEPTED` |
+| M5.4 | q_G nuisance-space projection | `ACCEPTED` |
+| M5.5 | `statistical_sd` | `ACCEPTED` |
+| M5.6 | Conditional Birge adjustment | `ACCEPTED` |
+| M5.7 | Leave-one-family-out `model_form_robustness` | `ACCEPTED` |
+| M5.8 | Residual family pattern test | `ACCEPTED` |
+| M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `ACCEPTED` |
 
-Stage status: `NOT_STARTED` (requires an explicit SUPERVISOR instruction).
+Stage status: `REVIEW_READY` (M5.1–M5.9 `ACCEPTED` by the SUPERVISOR, 2026-10-06; **M5 GATE: `PASS`**,
+synthetic and records only, 0 Abaqus; stage PR `auto-id/m5` → `main` prepared, **not merged**;
+M6 `NOT_STARTED`; branch `auto-id/m5` from `main` `8f405c3`; SUPERVISOR decisions in
+[M5_DECISION_RECORD.md](M5_DECISION_RECORD.md), D-039–D-044).
+- Checkpoint M5-A (M5.1–M5.4) `REVIEW_READY`: `services/practical_identifiability.py` with
+  synthetic tests. No Abaqus.
+- Checkpoint M5-B (M5.5, M5.8, M5.6) `REVIEW_READY`: `services/identification_uncertainty.py`
+  with synthetic tests and the M4.9 twin records-based control. No Abaqus.
+- Checkpoint M5-C (M5.7) `REVIEW_READY`: `services/model_form_robustness.py` (linearised
+  leave-one-family-out, D-042). No Abaqus.
+- Checkpoint M5-D (M5.9) `REVIEW_READY`: `services/identification_verdict.py` plus
+  `tests/test_m5_stage_gate.py` (synthetic gate cases A–G; M4.9 twin records-based control).
+  D-045–D-047.
+- **M5 GATE `PASS`:**
+  - k_core absorption gives q_G ≈ 0 and G12 NOT_IDENTIFIABLE;
+  - rank deficiency is a hard block with no override;
+  - systematic model error gives no green verdict;
+  - the uncertainty labels stay separate.
 
 **M5 GATE:**
 
