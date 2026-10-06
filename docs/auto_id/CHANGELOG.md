@@ -3484,3 +3484,34 @@ first internal provider.
 - **Tests:** `tests/test_sp02_physical_registration.py` (new); `tests/test_sp13_physical_registration.py`
   updated.
 - **Abaqus:** 0 solves, 0 extractions. Pairing policy, thresholds, holdouts and modal data unchanged.
+
+## 2026-10-06 — Specimen catalog: authoritative inventory of every real specimen (documentation checkpoint; zero Abaqus)
+
+- **New:**
+  - `docs/auto_id/SPECIMEN_CATALOG.md`, the canonical readable specimen reference;
+  - `docs/auto_id/specimen_catalog.json`, one deterministic entry per physical specimen with source
+    paths, sizes and SHA-256 (not a runtime dependency);
+  - `tests/test_specimen_catalog.py`.
+- **Sources audited (read-only):**
+  - `D:\Snadwich` (primary);
+  - `I:\Sumin`: raw batch 260909, PolyMAX zip, LMS summaries;
+  - the article project folder (Obsidian specimen vault, reports, photos);
+  - `C:\temp\12 sampls`, `C:\temp`, the CARBON archive;
+  - all repository records.
+- **Results:**
+  - 14 physical specimens with records (SP-01 … SP-13, SP-15). SP-14 is AMBIGUOUS (template note only).
+  - 5 face families; different families are not merged.
+  - SP-06 and SP-15 acquisitions exist outside the store.
+  - Ungoverned PolyMAX exports exist for every specimen with an acquisition.
+  - SP-01 INP/ODB exists in `C:\temp`.
+- **SP-02 identity:** SP02_IDENTITY_RESOLVED_FROM_RECORDS (DERIVED). Evidence: the LMS sheet "SP2 (old)" /
+  "SP10 (new SP2)", the spectrum separation, label chronology and lineage. Pending SUPERVISOR. The
+  passport is not edited.
+- **Contradiction audit:** 21 items. Two are REAL_CONFLICT:
+  - C1: a PolyMAX fit of SP-13 260909 exists, against H9; nothing is changed and Σ_setup stays
+    provisional;
+  - C2: SP-10 260911 is a rotated session.
+- **HUMAN questions:** 6, collected in one section; only Q1 touches the M7 path.
+- `SNADWICH_INVENTORY.md`: pointer to the catalog and a list of superseded statements; history kept.
+- No governed passport, fixture, registration, forward model, baseline, rule or threshold changed.
+  0 Abaqus solves, 0 extractions.

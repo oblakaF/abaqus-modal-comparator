@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the SP-13 physical registration gate (D-062, D-063); no M7, no Abaqus; M6.4 still needs an approved range source",
+  "next_action": "STOP: SUPERVISOR review of the SP-13 HUMAN update, the SP-02 registration gate and the specimen catalog (SP-02 identity from records; C1 vs H9); no M7, no Abaqus; M6.4 still needs an approved range source",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -712,6 +712,19 @@
       "combined_with_sp13": "5 strict rows, 3 fit rows (per-specimen M4.3 holdout), rank 2, cond 6.0 (diagnostic; no M7 fit)",
       "holdout_semantics": "M6_DECISION_RECORD 18.1: mandatory, applied per frozen set (= per specimen); campaign-level reading is an M7 decision",
       "sp10": "M6_DECISION_RECORD 18.2: not needed for observation sufficiency; SP2/SP10 reference scatter test NOT_AVAILABLE",
+      "abaqus_solves": 0,
+      "abaqus_python_extractions": 0,
+      "status": "REVIEW_READY"
+    },
+    "specimen_catalog": {
+      "authorisation": "SUPERVISOR 2026-10-06: FULL SPECIMEN CATALOG - AUTHORITATIVE INVENTORY (documentation/governance checkpoint)",
+      "records": "docs/auto_id/SPECIMEN_CATALOG.md (canonical); docs/auto_id/specimen_catalog.json (machine index, not a runtime dependency)",
+      "specimens": "14 physical specimens with records (SP-01..SP-13, SP-15); SP-14 AMBIGUOUS (no physical record); unnumbered 300x300 records AMBIGUOUS",
+      "families": "old-T300-plain-0.45 (SP-01, SP-02, SP-10, SP-13); old-T300-twill-0.45 (SP-03, SP-11); old-T300-plain-0.25 (SP-04, SP-05); new-T300-plain-0.25 (SP-06..SP-09, SP-12); unassigned (SP-15)",
+      "sp02_identity": "SP02_IDENTITY_RESOLVED_FROM_RECORDS (DERIVED; LMS sheet 'SP2 (old)' = governed Bravo (1); pending SUPERVISOR; passport not edited)",
+      "real_conflicts": "C1: PolyMAX of SP-13 260909 exists (zip) vs H9 - nothing changed, Sigma_setup provisional; C2: SP-10 260911 rotated session",
+      "governed_fixtures": "SP02/bravo-1, SP13/best only; READY_FOR_M7: none unconditionally; best M7 specimens SP-02 + SP-13",
+      "human_questions": "6 (catalog section 10); only Q1 touches the M7 path (Sigma_setup)",
       "abaqus_solves": 0,
       "abaqus_python_extractions": 0,
       "status": "REVIEW_READY"

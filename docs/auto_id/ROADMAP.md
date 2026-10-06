@@ -507,6 +507,12 @@ decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; resc
   - SP-02 identity needs one HUMAN confirmation.
   - Combined with SP-13: 3 fit rows, rank 2. The SP2/SP10 reference scatter test stays
     NOT_AVAILABLE (§18.2).
+- **Specimen catalog 2026-10-06 (documentation/governance checkpoint, zero Abaqus), `REVIEW_READY`:**
+  - `SPECIMEN_CATALOG.md` (canonical) + `specimen_catalog.json` (machine index, not a runtime
+    dependency).
+  - 14 physical specimens with records: SP-01 … SP-13 and SP-15. SP-14 has no physical record.
+  - SP-02 identity: SP02_IDENTITY_RESOLVED_FROM_RECORDS (DERIVED), pending SUPERVISOR.
+  - REAL_CONFLICT C1: a PolyMAX fit of SP-13 260909 exists, against H9. Σ_setup stays provisional.
 
 **M6 GATE (rescoped, SPEC §19 item 6, D-061):**
 

@@ -694,3 +694,37 @@ Possible remaining causes remain outside CARBON-5F scope:
   - By specimen-family: every case keeps rank 2 (condition number ≤ 184).
   - E_in alone is supported in every leave-one-family-out case; G12 depends on the (1,2) family.
 - 0 Abaqus solves, 0 Abaqus Python extractions.
+
+## Specimen catalog: records-only audit of every real specimen (M6 documentation checkpoint)
+
+- **Status:** RECORDED (SUPERVISOR-authorised documentation/governance checkpoint, 2026-10-06), pending
+  SUPERVISOR review.
+- **Kind:** provenance audit. No modal fitting, no MAC, no registration change, no Abaqus.
+- **Records:**
+  - `SPECIMEN_CATALOG.md` (canonical text);
+  - `specimen_catalog.json` (sources, sizes and SHA-256 per reference; verified by
+    `tests/test_specimen_catalog.py` for every configured store).
+- **New evidence beyond the store-only audit:**
+  - **SP-02 identity: SP02_IDENTITY_RESOLVED_FROM_RECORDS (DERIVED).**
+    - `I:\Sumin\Updated_260911\Experiment_Freq_damping_LMS.xlsx`, sheet "SPname_files 260909", labels its
+      columns "SP2 (old)" and "SP10 (new SP2)".
+    - "SP2 (old)" is exactly the governed set Bravo (1) of the 260803 acquisition.
+    - The SP-10-labelled panel is self-consistent across 260831 and 260911 (first six modes within
+      1.5 %) and is 1.3–6.1 % higher than the 260803 panel.
+    - Every frame up to 2026-08-03 is unnumbered, and every frame from 2026-08-22 on is numbered.
+    - Recording `physical_specimen_id` in the SP-02 passport needs SUPERVISOR acceptance.
+  - **SP-13 260909 PolyMAX exists:** `SP13_polymax.unv` in `I:\Sumin\SPname_files_260909_polymax.zip`
+    (Testlab project `SP13_…_260909`, set Bravo (1), 9 modes; the D-028 audit frequencies 206.15 /
+    212.61 / 228.75 Hz come from it).
+    - This conflicts with HUMAN H9.
+    - It is not used, and Σ_setup stays provisional 0.3 %, flagged (catalog C1, question Q1).
+  - **Outside `D:\Snadwich`:**
+    - SP-06 acquisition (260824) and SP-15 acquisition (260901);
+    - ungoverned PolyMAX exports for SP-01, SP-03 … SP-10 (260831), SP-11 (session a), SP-13 (260909)
+      and SP-15;
+    - `C:\temp\SP-01.inp/.odb` (its eigenfrequencies equal the SP-01 spec Abaqus column).
+  - **PLA grade (second-hand):** SP-01 PLA Light; SP-02/SP-13 non-Light (CARBON-5D note citing
+    CARBON-3A).
+  - **No measured material constants exist for any specimen.** The twill report is an FE sensitivity
+    study; the June calibration report gives model-calibration values.
+- 0 Abaqus solves, 0 Abaqus Python extractions.

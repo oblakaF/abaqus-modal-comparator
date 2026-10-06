@@ -1,5 +1,18 @@
 # Real-specimen source inventory (`D:\Snadwich`)
 
+> **Canonical reference since 2026-10-06:** [`SPECIMEN_CATALOG.md`](SPECIMEN_CATALOG.md) and
+> `specimen_catalog.json`, which audit all project stores and not only `D:\Snadwich`. This note is kept
+> as the store-only history.
+>
+> These statements below are superseded by the catalog (§9 there):
+> - SP-06 has an acquisition and PolyMAX (outside the store) (C3);
+> - PolyMAX exports exist for every acquired specimen (C4, C5);
+> - SP-12 is recorded, and SP-15 has an acquisition (C6);
+> - the PLA grade is recorded second-hand (C7);
+> - SP-07 is 30–1000 Hz, and the SP-11 260826 sessions are 0.25 Hz / 0–100 Hz (C8);
+> - the SP-13 remount is documented (C9);
+> - the SP-02 identity is resolved from records (C10).
+
 **Status:** a factual inventory note, accepted by the SUPERVISOR on 2026-10-06.
 - **Basis:** the read-only source audit of 2026-10-06.
 - **What it is not:** it creates no passport, fixture, registration or forward model, and imports
