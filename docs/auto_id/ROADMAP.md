@@ -491,6 +491,11 @@ decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; resc
     nuisance, and Σ_setup stays at the flagged provisional 0.3 %.
   - M6.4 is the remaining executable step (FE-only); it needs an approved range source.
   - The STEEL gate is removed (D-060): results are labelled not externally validated.
+- **SP-13 physical registration gate 2026-10-06 (zero Abaqus; D-062, D-063; §17):**
+  - A production-ready physical registration was rebuilt from the stored PSV records. The legacy
+    centred registration is historical only (point error median 26 mm, max 47 mm).
+  - Strict pairs 4↔10 and 7↔13 are well conditioned (condition number 252 → 6.3), but after the
+    unchanged M4.3 holdout SP-13 alone still has one fit row.
 
 **M6 GATE (rescoped, SPEC §19 item 6, D-061):**
 

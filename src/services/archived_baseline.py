@@ -191,7 +191,8 @@ def _mac(left: np.ndarray, right: np.ndarray) -> float:
     return float(np.clip(abs(np.vdot(left, right)) ** 2 / (norm_left * norm_right), 0.0, 1.0))
 
 
-def _bind_pack(baseline: ArchivedBaseline, pack: FEShapePack, registration) -> None:
+def _bind_pack(baseline: ArchivedBaseline, pack: FEShapePack, registration, *,
+               same_registration: bool = True) -> None:
     record = pack.record
     subset = dict(registration.registration_metrics).get("fe_mapping_node_subset") or {}
     checks = {
@@ -200,12 +201,13 @@ def _bind_pack(baseline: ArchivedBaseline, pack: FEShapePack, registration) -> N
         "odb_sha256": record.odb.sha256 == baseline.odb.sha256,
         "fe_geometry_sha256": record.fe_geometry_sha256 == baseline.fe_geometry_sha256,
         "state": record.state == "BASELINE",
-        "registration_hash": registration.registration_hash == baseline.registration_hash,
         "registration_fe_geometry": dict(registration.fe_geometry_identity).get("sha256") == baseline.fe_geometry_sha256,
         "node_set": subset.get("sha256") == record.node_set_sha256,
         "fe_modes": tuple(mode.number for mode in baseline.fe_modes) == pack.mode_numbers,
         "fe_frequencies_exact": tuple(mode.frequency_hz for mode in baseline.fe_modes) == pack.frequencies_hz,
     }
+    if same_registration:
+        checks["registration_hash"] = registration.registration_hash == baseline.registration_hash
     failed = sorted(name for name, ok in checks.items() if not ok)
     if failed:
         raise ArchivedBaselineError("shape_pack", f"the pack does not belong to this baseline: {failed}.")
@@ -221,6 +223,30 @@ def complete_mac_matrix(baseline: ArchivedBaseline, pack: FEShapePack, registrat
     """
 
     _bind_pack(baseline, pack, registration)
+    matrix = _mac_matrix(baseline, pack, registration, experimental_modes)
+    rows = {mode.number: i for i, mode in enumerate(baseline.experimental_modes)}
+    columns = {mode.number: j for j, mode in enumerate(baseline.fe_modes)}
+    worst = max(abs(matrix[rows[e.experimental_mode], columns[e.fe_mode]] - e.mac) for e in baseline.mac_entries)
+    if worst > RECORDED_MAC_TOLERANCE:
+        raise ArchivedBaselineError("mac_entries", f"recorded MAC values not reproduced (max difference {worst:.3g}).")
+    return matrix
+
+
+def reregistered_mac_matrix(baseline: ArchivedBaseline, pack: FEShapePack, registration,
+                            experimental_modes) -> np.ndarray:
+    """The same MAC matrix for a *different*, independently frozen registration (M6 registration gate).
+
+    Every binding of the pack to the baseline is kept (job, INP, ODB, FE geometry, BASELINE state,
+    measured node set, FE modes and frequencies) except the registration hash; the archived MAC values
+    belong to the archived registration and are therefore not reproduced. The registration must be
+    fixed before this is called; nothing here selects or adjusts it.
+    """
+
+    _bind_pack(baseline, pack, registration, same_registration=False)
+    return _mac_matrix(baseline, pack, registration, experimental_modes)
+
+
+def _mac_matrix(baseline: ArchivedBaseline, pack: FEShapePack, registration, experimental_modes) -> np.ndarray:
     modes = {mode.number: mode for mode in experimental_modes}
     expected = [(mode.number, mode.frequency_hz) for mode in baseline.experimental_modes]
     if sorted(modes) != [number for number, _ in expected] or any(
@@ -244,11 +270,6 @@ def complete_mac_matrix(baseline: ArchivedBaseline, pack: FEShapePack, registrat
         experimental = np.asarray(mode.vectors)[[index[node] for node in experimental_ids]]
         for j, fe_mode in enumerate(baseline.fe_modes):
             matrix[i, j] = _mac(fe_vectors[fe_mode.number][mask], experimental[mask])
-    rows = {mode.number: i for i, mode in enumerate(baseline.experimental_modes)}
-    columns = {mode.number: j for j, mode in enumerate(baseline.fe_modes)}
-    worst = max(abs(matrix[rows[e.experimental_mode], columns[e.fe_mode]] - e.mac) for e in baseline.mac_entries)
-    if worst > RECORDED_MAC_TOLERANCE:
-        raise ArchivedBaselineError("mac_entries", f"recorded MAC values not reproduced (max difference {worst:.3g}).")
     return matrix
 
 
@@ -261,4 +282,20 @@ def shape_pack_evidence(baseline: ArchivedBaseline, pack: FEShapePack, registrat
                                 baseline.fe_geometry_sha256, baseline.registration_hash,
                                 baseline.experimental_source_sha256, baseline.modal_set, baseline.measured_dofs,
                                 SHAPE_PACK_EVIDENCE_SOURCE, baseline.record_sha256, pack.record.content_sha256)
+    return build_baseline_evidence(identity, baseline.experimental_modes, eligibility, baseline.fe_modes, matrix)
+
+
+REREGISTERED_EVIDENCE_SOURCE = "archived-carbon4c-replay+fe-shape-pack+reregistered"
+
+
+def reregistered_shape_pack_evidence(baseline: ArchivedBaseline, pack: FEShapePack, registration, experimental_modes,
+                                     forward_model_id: str,
+                                     eligibility: ExperimentalModeEligibility) -> BaselineEvidence:
+    """Baseline evidence on the archived pack under another frozen registration (identity carries its hash)."""
+
+    matrix = reregistered_mac_matrix(baseline, pack, registration, experimental_modes)
+    identity = BaselineIdentity(forward_model_id, baseline.job_name, baseline.generated_inp_sha256,
+                                baseline.fe_geometry_sha256, registration.registration_hash,
+                                baseline.experimental_source_sha256, baseline.modal_set, baseline.measured_dofs,
+                                REREGISTERED_EVIDENCE_SOURCE, baseline.record_sha256, pack.record.content_sha256)
     return build_baseline_evidence(identity, baseline.experimental_modes, eligibility, baseline.fe_modes, matrix)

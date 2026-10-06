@@ -3426,3 +3426,28 @@ first internal provider.
   - gate `NOT_EVALUATED`;
   - M7 `NOT_STARTED`.
 - **Unchanged:** code (M6-B unchanged). No Abaqus.
+
+## 2026-10-06 — SP-13 physical registration gate (zero Abaqus; D-062, D-063)
+
+- **New code:** `services/psv_video_registration.py` (read-only `.svd` reconstruction; no modal
+  imports), `archived_baseline.reregistered_mac_matrix` / `reregistered_shape_pack_evidence`
+  (existing archived path unchanged), and three tools (reconstruct, build registration,
+  re-evaluate).
+- **Governed files:**
+  - the reconstruction record;
+  - `SP13.physical.specimen.json` (`scan_to_panel_edges` + `camera_grid`; physical_specimen_id
+    SP-13; remount 260909 → 260910 `re_suspension`);
+  - `SP13_physical_registration.json` (`2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823`, production-ready);
+  - the re-evaluation record.
+- **Legacy:** the legacy registration and passport are unchanged, kept as historical provenance.
+- **Result:**
+  - strict pairs legacy (4,10),(5,11) → physical (4,10),(7,13);
+  - MAC 0.888 → 0.958 for 4 ↔ 10; condition number 252 → 6.3;
+  - after the unchanged M4.3 holdout, one fit row: SP-13 alone still insufficient.
+- **Uncertainty:** translation 5.72 mm and rotation 0.49° derived; `scale_rel` NOT_AVAILABLE, so
+  `registration_limited` is NOT_AVAILABLE.
+- **Σ_setup:** provisional 0.3 %; measured `NOT_AVAILABLE_PENDING_MODAL_PREPARATION`.
+- **Tests:** `tests/test_sp13_physical_registration.py` (anti-tuning static checks; pinned files;
+  re-registration binding; store-gated reproduction of the reconstruction, the registration and both
+  freezes).
+- **Abaqus:** 0 solves and 0 extractions. Pairing policy, thresholds and modal data unchanged.

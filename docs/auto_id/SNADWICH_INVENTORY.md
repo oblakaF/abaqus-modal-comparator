@@ -34,7 +34,7 @@ otherwise: 121 points, Δf 0.3125 Hz.
 | SP-09 | new T300 plain, faces 0.235; PLA honeycomb | sandwich | raw FRF 260831 | no | none | EXPERIMENT ONLY | not governed |
 | SP-10 | old T300 plain, faces 0.40/0.39; PLA honeycomb; "copy of SP-02" | sandwich | raw FRF 260831; raw FRF 260911 "b_rotated" (323 points, Δf 0.156 Hz) | **yes:** `SP10_b_polymax.unv` (sets "Bestttt", "Processing_polym") | none | EXPERIMENT ONLY (fitted) | **not governed** |
 | SP-11 | old T300 **twill** 0.45; 350 × 347 × 0.45 mm; 79.59 g | **bare plate** | raw FRF 260824 / 260826 a / 260826 b_center (inconsistent between sessions, D-057) | **no** | none | EXPERIMENT ONLY | identity only (D-049, D-057) |
-| SP-13 | old T300 plain, faces 0.425; PLA auxetic; "copy of SP-01" | sandwich | raw FRF 260909; raw FRF 260910 a (289 points, Δf 0.156 Hz) | yes: `SP13_a_polymax.unv` (Best) | SP13_modal and mesh_local_v1 INP/ODB; interface variants; CAE; core CAD | EXPERIMENT + FE | **governed** (fixture SP13/best) |
+| SP-13 (physical registration from stored PSV records, D-062) | old T300 plain, faces 0.425; PLA auxetic; "copy of SP-01" | sandwich | raw FRF 260909; raw FRF 260910 a (289 points, Δf 0.156 Hz) | yes: `SP13_a_polymax.unv` (Best) | SP13_modal and mesh_local_v1 INP/ODB; interface variants; CAE; core CAD | EXPERIMENT + FE | **governed** (fixture SP13/best) |
 
 There is no SP-12 folder.
 

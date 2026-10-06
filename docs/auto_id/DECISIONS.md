@@ -788,3 +788,65 @@ M6 is not accepted by this decision.
 Rationale / scope: replaces the former acceptance "D11, D66 → E, G12 with uncertainty; repeat of
 the same plate agrees within 1σ", which cannot be executed with the current setup.
 Supersedes: none (the SPEC §17 M6 row is superseded by SPEC §19 item 6)
+
+## D-062 — SP-13 physical registration from stored PSV records; the legacy centred registration is historical only
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SP-13 physical registration gate; SPEC §4.1, §11, §15; D-007, D-045; M6_DECISION_RECORD §17
+Decision:
+- **Basis:** the SP-13 260910a registration is reconstructed from the stored PSV records alone:
+  - camera frame, MeasPoints video coordinates (validated against the UNV) and the default
+    full-frame rectangle;
+  - fitted panel edges;
+  - the measured panel dimensions.
+
+  It is frozen through the unchanged M2 builder:
+  - mode `scan_to_panel_edges` with a `camera_grid` per-axis scale;
+  - registration `2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823`;
+  - passport `SP13.physical.specimen.json` (manifest `943bb3d1946863c61abd39ccac8fa1da625067b9dffdcd6be2c82c3e125d5000`);
+  - reconstruction record SHA-256 `6b45fbfbacad0df939b0b12f8496edddff0525855e0de0312ff5f558c71bb0ae`.
+
+  It is production-ready under the M2 contract.
+- **Legacy registration `a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4`:** geometrically inconsistent with the stored physical scan
+  geometry (point-placement error median 26.0 mm, maximum 47.4 mm; the UNV metric coordinates are
+  anisotropic, x 1.195 and y 0.889 of physical). It is kept only as historical provenance and is
+  never recorded as physically valid.
+- **Face:** the scanner measured the labelled face (HUMAN H3). Binding it to FE TOP is a convention:
+  it is not demonstrable from the records, and the FE stack is through-thickness symmetric.
+- **FE axis signs:**
+  - the nominal +x→+X, +y→+Y continues the accepted legacy convention and was fixed before any
+    pairing evaluation;
+  - the four physically admissible sign mappings are geometrically indistinguishable (identical
+    mapping residuals);
+  - the 180° TOP-face alternative gives the same strict pairs;
+  - the bottom-face alternatives are not evaluable without an Abaqus Python extraction.
+
+  The ambiguity is preserved, not resolved by modal agreement.
+- **Uncertainty:**
+  - `translation_mm` 5.72 (maximum residual of the M2 model against the reconstruction);
+  - `rotation_deg` 0.49 (maximum axis misalignment);
+  - `scale_rel` NOT_AVAILABLE, because no instrument resolution is recorded (HUMAN H5).
+
+  Therefore `registration_limited` stays NOT_AVAILABLE, and no green production verdict may claim
+  the registration uncertainty is closed. D-045 is unchanged.
+- **Anti-tuning:** the transform is derived without modal data and pinned (the record hash is in the
+  passport provenance; the registration hash is pinned by test). A registration change must come
+  from a new reconstruction record, never from pairing or MAC results.
+- **Out of scope:** wiring the fixture manifest and production modal input to the physical
+  registration is later work. The SP-13 fixture still references the legacy registration.
+Rationale / scope: physical evidence replaces a documented convention. Thresholds, pairing policy and
+modal data are unchanged.
+Supersedes: none (the legacy registration stays as historical provenance)
+
+## D-063 — SP-13 260909 → 260910 is a genuine re-suspension: FREQUENCY_ONLY; Σ_setup pending modal preparation
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: HUMAN H6; SPEC §7; D-058, D-059
+Decision:
+- **Remount:** 260909 → 260910 is a genuine same-panel independent re-suspension. The panel was
+  removed and re-suspended; the laser/scanner and shaker installation did not move; the SP-13
+  marking is visible in both stored frames.
+- **Recorded in the physical passport:** `remount_of` = the 260909 run, `remount_kind` =
+  `re_suspension`, and the HUMAN evidence.
+- **Grids differ (121 / 289 points):** FREQUENCY_ONLY repeat evidence. No shape or MAC
+  repeatability is claimed. Protocol comparability is accepted for frequency-only setup/retest use.
+- **Σ_setup:** stays at the SPEC provisional 0.3 %, flagged. A measured Σ_setup is
+  `NOT_AVAILABLE_PENDING_MODAL_PREPARATION`: 260909 is raw FRF only; no internal fitter is used; an
+  accepted external PolyMAX route is not currently available. Not a release blocker (D-059).
+Supersedes: none

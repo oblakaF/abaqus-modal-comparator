@@ -1,0 +1,583 @@
+{
+  "abaqus_python_extractions": 0,
+  "abaqus_solves": 0,
+  "baseline_record_sha256": "24b40e6855eacd5b8797e912ccfc421c5fb3eacfd3b455515fdcd8edf368c64e",
+  "legacy_registration_file": "docs/registrations/SP13_frozen_registration.json",
+  "packs": {
+    "BASELINE": "SP13_a46d08b52995e078",
+    "E_in_plane_mpa+": "SP13_0e861d03c333bb0b",
+    "E_in_plane_mpa-": "SP13_a9df66283a168786",
+    "G12_mpa+": "SP13_4c0f189b9727feaf",
+    "G12_mpa-": "SP13_0328066b74b6fd78"
+  },
+  "physical_registration_file": "docs/registrations/SP13_physical_registration.json",
+  "policy_hash": "e3aa4e751a24fb931183227d3a93bc267a78117f41f4c793b31f0e9f42f23ac6",
+  "policy_id": "auto-id/identification-pairing/strict-v1",
+  "results": {
+    "BOTTOM_FACE_ALTERNATIVES": "not evaluable: the validated packs hold the TOP measured surface only; a bottom-face extraction would need Abaqus Python (not authorised)",
+    "LEGACY": {
+      "best_match_per_experimental_mode": [
+        {
+          "best_fe_mode": 7,
+          "best_mac": 0.988448719910026,
+          "experimental_hz": 31.423392809120724,
+          "experimental_mode": 1,
+          "relative_frequency_error": -0.284308831026725
+        },
+        {
+          "best_fe_mode": 9,
+          "best_mac": 0.6047064995657314,
+          "experimental_hz": 74.15872319849791,
+          "experimental_mode": 2,
+          "relative_frequency_error": 0.02416909861805021
+        },
+        {
+          "best_fe_mode": 8,
+          "best_mac": 0.7308109638805347,
+          "experimental_hz": 80.88190545952885,
+          "experimental_mode": 3,
+          "relative_frequency_error": -0.10086449352786078
+        },
+        {
+          "best_fe_mode": 10,
+          "best_mac": 0.88772833332048,
+          "experimental_hz": 94.3990939312666,
+          "experimental_mode": 4,
+          "relative_frequency_error": -0.09054748027603976
+        },
+        {
+          "best_fe_mode": 11,
+          "best_mac": 0.8894778258523665,
+          "experimental_hz": 96.52110678751086,
+          "experimental_mode": 5,
+          "relative_frequency_error": -0.09065141596090404
+        },
+        {
+          "best_fe_mode": 12,
+          "best_mac": 0.5060000164080669,
+          "experimental_hz": 147.50448294768242,
+          "experimental_mode": 6,
+          "relative_frequency_error": -0.06453524670217775
+        },
+        {
+          "best_fe_mode": 13,
+          "best_mac": 0.7695144037787166,
+          "experimental_hz": 205.64887661733076,
+          "experimental_mode": 7,
+          "relative_frequency_error": -0.027579922404670158
+        },
+        {
+          "best_fe_mode": 14,
+          "best_mac": 0.7188348118150991,
+          "experimental_hz": 212.6644265088215,
+          "experimental_mode": 8,
+          "relative_frequency_error": -0.03671237709708032
+        },
+        {
+          "best_fe_mode": 15,
+          "best_mac": 0.3956712579805275,
+          "experimental_hz": 222.49383579417693,
+          "experimental_mode": 9,
+          "relative_frequency_error": -0.06087307800666898
+        },
+        {
+          "best_fe_mode": 15,
+          "best_mac": 0.7130284006420952,
+          "experimental_hz": 228.60697715833666,
+          "experimental_mode": 10,
+          "relative_frequency_error": -0.08598611569430319
+        },
+        {
+          "best_fe_mode": 16,
+          "best_mac": 0.628243480308404,
+          "experimental_hz": 230.89085059170534,
+          "experimental_mode": 11,
+          "relative_frequency_error": -0.06386613276735972
+        },
+        {
+          "best_fe_mode": 17,
+          "best_mac": 0.638332570827575,
+          "experimental_hz": 261.83534617706255,
+          "experimental_mode": 12,
+          "relative_frequency_error": -0.04483609161653018
+        }
+      ],
+      "cluster_triggers": [
+        {
+          "reasons": [
+            "individual branch identity stable in every direction: two observations"
+          ],
+          "row_ids": [
+            "R1",
+            "R2"
+          ],
+          "status": "INDEPENDENT"
+        }
+      ],
+      "excluded": [
+        {
+          "experimental_mode": 1,
+          "reason": "no FE mode within the frequency gate"
+        },
+        {
+          "experimental_mode": 2,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 3,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 6,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 7,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 8,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 9,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 10,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 11,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 12,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        }
+      ],
+      "holdouts": {
+        "fit_row_ids": [
+          "R1"
+        ],
+        "holdout_row_ids": [
+          "R2"
+        ],
+        "notes": [
+          "no torsion-dominated (odd-odd) family among the accepted rows"
+        ],
+        "torsion_family": null,
+        "validation_family": "Px:E|Py:O|nx:2|ny:1"
+      },
+      "label": "LEGACY centred registration (historical provenance)",
+      "observation_sufficient": false,
+      "reasons": [],
+      "registration_hash": "a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4",
+      "sensitivities": {
+        "R1": {
+          "S_E": 0.3646065173716216,
+          "S_G12": 0.12335622431587442
+        },
+        "R2": {
+          "S_E": 0.3661806770634497,
+          "S_G12": 0.12065955455133782
+        }
+      },
+      "status": "FROZEN",
+      "strict_pairs": [
+        {
+          "experimental_hz": 94.3990939312666,
+          "experimental_mode": 4,
+          "family": "Px:O|Py:E|nx:1|ny:2",
+          "fe_hz": 85.85149383544922,
+          "fe_mode": 10,
+          "mac": 0.88772833332048,
+          "relative_frequency_error": -0.09054748027603976,
+          "row_id": "R1",
+          "torsion_dominated": false
+        },
+        {
+          "experimental_hz": 96.52110678751086,
+          "experimental_mode": 5,
+          "family": "Px:E|Py:O|nx:2|ny:1",
+          "fe_hz": 87.77133178710938,
+          "fe_mode": 11,
+          "mac": 0.8894778258523665,
+          "relative_frequency_error": -0.09065141596090404,
+          "row_id": "R2",
+          "torsion_dominated": false
+        }
+      ],
+      "tracking_refusals": []
+    },
+    "PHYSICAL": {
+      "best_match_per_experimental_mode": [
+        {
+          "best_fe_mode": 7,
+          "best_mac": 0.9873168414928508,
+          "experimental_hz": 31.423392809120724,
+          "experimental_mode": 1,
+          "relative_frequency_error": -0.284308831026725
+        },
+        {
+          "best_fe_mode": 9,
+          "best_mac": 0.578489743369498,
+          "experimental_hz": 74.15872319849791,
+          "experimental_mode": 2,
+          "relative_frequency_error": 0.02416909861805021
+        },
+        {
+          "best_fe_mode": 8,
+          "best_mac": 0.5278996171862165,
+          "experimental_hz": 80.88190545952885,
+          "experimental_mode": 3,
+          "relative_frequency_error": -0.10086449352786078
+        },
+        {
+          "best_fe_mode": 10,
+          "best_mac": 0.9584584247911996,
+          "experimental_hz": 94.3990939312666,
+          "experimental_mode": 4,
+          "relative_frequency_error": -0.09054748027603976
+        },
+        {
+          "best_fe_mode": 23,
+          "best_mac": 0.6743213995027096,
+          "experimental_hz": 96.52110678751086,
+          "experimental_mode": 5,
+          "relative_frequency_error": 3.1485237613570365
+        },
+        {
+          "best_fe_mode": 12,
+          "best_mac": 0.3879337730643529,
+          "experimental_hz": 147.50448294768242,
+          "experimental_mode": 6,
+          "relative_frequency_error": -0.06453524670217775
+        },
+        {
+          "best_fe_mode": 13,
+          "best_mac": 0.9469043137223597,
+          "experimental_hz": 205.64887661733076,
+          "experimental_mode": 7,
+          "relative_frequency_error": -0.027579922404670158
+        },
+        {
+          "best_fe_mode": 14,
+          "best_mac": 0.264866326725885,
+          "experimental_hz": 212.6644265088215,
+          "experimental_mode": 8,
+          "relative_frequency_error": -0.03671237709708032
+        },
+        {
+          "best_fe_mode": 15,
+          "best_mac": 0.45568541861646733,
+          "experimental_hz": 222.49383579417693,
+          "experimental_mode": 9,
+          "relative_frequency_error": -0.06087307800666898
+        },
+        {
+          "best_fe_mode": 15,
+          "best_mac": 0.49983352591882096,
+          "experimental_hz": 228.60697715833666,
+          "experimental_mode": 10,
+          "relative_frequency_error": -0.08598611569430319
+        },
+        {
+          "best_fe_mode": 16,
+          "best_mac": 0.3299967051263628,
+          "experimental_hz": 230.89085059170534,
+          "experimental_mode": 11,
+          "relative_frequency_error": -0.06386613276735972
+        },
+        {
+          "best_fe_mode": 27,
+          "best_mac": 0.622779713156056,
+          "experimental_hz": 261.83534617706255,
+          "experimental_mode": 12,
+          "relative_frequency_error": 0.9091590277630649
+        }
+      ],
+      "cluster_triggers": [],
+      "excluded": [
+        {
+          "experimental_mode": 1,
+          "reason": "no FE mode within the frequency gate"
+        },
+        {
+          "experimental_mode": 2,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 3,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 5,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 6,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 8,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 9,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 10,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 11,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 12,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        }
+      ],
+      "holdouts": {
+        "fit_row_ids": [
+          "R1"
+        ],
+        "holdout_row_ids": [
+          "R2"
+        ],
+        "notes": [
+          "no torsion-dominated (odd-odd) family among the accepted rows"
+        ],
+        "torsion_family": null,
+        "validation_family": "Px:E|Py:O|nx:0|ny:3"
+      },
+      "label": "PHYSICAL registration (nominal, frozen before evaluation)",
+      "observation_sufficient": false,
+      "reasons": [],
+      "registration_hash": "2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823",
+      "sensitivities": {
+        "R1": {
+          "S_E": 0.3646065173716216,
+          "S_G12": 0.12335622431587442
+        },
+        "R2": {
+          "S_E": 0.48340889242231694,
+          "S_G12": 0.0024084034368166717
+        }
+      },
+      "status": "FROZEN",
+      "strict_pairs": [
+        {
+          "experimental_hz": 94.3990939312666,
+          "experimental_mode": 4,
+          "family": "Px:O|Py:E|nx:1|ny:2",
+          "fe_hz": 85.85149383544922,
+          "fe_mode": 10,
+          "mac": 0.9584584247911996,
+          "relative_frequency_error": -0.09054748027603976,
+          "row_id": "R1",
+          "torsion_dominated": false
+        },
+        {
+          "experimental_hz": 205.64887661733076,
+          "experimental_mode": 7,
+          "family": "Px:E|Py:O|nx:0|ny:3",
+          "fe_hz": 199.9770965576172,
+          "fe_mode": 13,
+          "mac": 0.9469043137223597,
+          "relative_frequency_error": -0.027579922404670158,
+          "row_id": "R2",
+          "torsion_dominated": false
+        }
+      ],
+      "tracking_refusals": []
+    },
+    "PHYSICAL_ALTERNATIVE_180": {
+      "best_match_per_experimental_mode": [
+        {
+          "best_fe_mode": 7,
+          "best_mac": 0.9875858846552101,
+          "experimental_hz": 31.423392809120724,
+          "experimental_mode": 1,
+          "relative_frequency_error": -0.284308831026725
+        },
+        {
+          "best_fe_mode": 9,
+          "best_mac": 0.578771151000074,
+          "experimental_hz": 74.15872319849791,
+          "experimental_mode": 2,
+          "relative_frequency_error": 0.02416909861805021
+        },
+        {
+          "best_fe_mode": 8,
+          "best_mac": 0.5282115367107971,
+          "experimental_hz": 80.88190545952885,
+          "experimental_mode": 3,
+          "relative_frequency_error": -0.10086449352786078
+        },
+        {
+          "best_fe_mode": 10,
+          "best_mac": 0.9589159268612436,
+          "experimental_hz": 94.3990939312666,
+          "experimental_mode": 4,
+          "relative_frequency_error": -0.09054748027603976
+        },
+        {
+          "best_fe_mode": 23,
+          "best_mac": 0.6735835402196354,
+          "experimental_hz": 96.52110678751086,
+          "experimental_mode": 5,
+          "relative_frequency_error": 3.1485237613570365
+        },
+        {
+          "best_fe_mode": 12,
+          "best_mac": 0.38713841175145325,
+          "experimental_hz": 147.50448294768242,
+          "experimental_mode": 6,
+          "relative_frequency_error": -0.06453524670217775
+        },
+        {
+          "best_fe_mode": 13,
+          "best_mac": 0.9477431623872802,
+          "experimental_hz": 205.64887661733076,
+          "experimental_mode": 7,
+          "relative_frequency_error": -0.027579922404670158
+        },
+        {
+          "best_fe_mode": 14,
+          "best_mac": 0.2650575366980736,
+          "experimental_hz": 212.6644265088215,
+          "experimental_mode": 8,
+          "relative_frequency_error": -0.03671237709708032
+        },
+        {
+          "best_fe_mode": 15,
+          "best_mac": 0.4556785227139266,
+          "experimental_hz": 222.49383579417693,
+          "experimental_mode": 9,
+          "relative_frequency_error": -0.06087307800666898
+        },
+        {
+          "best_fe_mode": 15,
+          "best_mac": 0.5011556874607204,
+          "experimental_hz": 228.60697715833666,
+          "experimental_mode": 10,
+          "relative_frequency_error": -0.08598611569430319
+        },
+        {
+          "best_fe_mode": 16,
+          "best_mac": 0.3308277539162016,
+          "experimental_hz": 230.89085059170534,
+          "experimental_mode": 11,
+          "relative_frequency_error": -0.06386613276735972
+        },
+        {
+          "best_fe_mode": 27,
+          "best_mac": 0.622562834905644,
+          "experimental_hz": 261.83534617706255,
+          "experimental_mode": 12,
+          "relative_frequency_error": 0.9091590277630649
+        }
+      ],
+      "cluster_triggers": [],
+      "excluded": [
+        {
+          "experimental_mode": 1,
+          "reason": "no FE mode within the frequency gate"
+        },
+        {
+          "experimental_mode": 2,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 3,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 5,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 6,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 8,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 9,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 10,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 11,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 12,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        }
+      ],
+      "holdouts": {
+        "fit_row_ids": [
+          "R1"
+        ],
+        "holdout_row_ids": [
+          "R2"
+        ],
+        "notes": [
+          "no torsion-dominated (odd-odd) family among the accepted rows"
+        ],
+        "torsion_family": null,
+        "validation_family": "Px:E|Py:O|nx:0|ny:3"
+      },
+      "label": "reported alternative +x->-X, +y->-Y (TOP face, det +1, 180 deg) (not selected)",
+      "observation_sufficient": false,
+      "reasons": [],
+      "registration_hash": "336df8d9fb51d00eb4e023ab06cc4539056c0e14027023b422acbfeeb5f72ddb",
+      "sensitivities": {
+        "R1": {
+          "S_E": 0.3646065173716216,
+          "S_G12": 0.12335622431587442
+        },
+        "R2": {
+          "S_E": 0.48340889242231694,
+          "S_G12": 0.0024084034368166717
+        }
+      },
+      "status": "FROZEN",
+      "strict_pairs": [
+        {
+          "experimental_hz": 94.3990939312666,
+          "experimental_mode": 4,
+          "family": "Px:O|Py:E|nx:1|ny:2",
+          "fe_hz": 85.85149383544922,
+          "fe_mode": 10,
+          "mac": 0.9589159268612436,
+          "relative_frequency_error": -0.09054748027603976,
+          "row_id": "R1",
+          "torsion_dominated": false
+        },
+        {
+          "experimental_hz": 205.64887661733076,
+          "experimental_mode": 7,
+          "family": "Px:E|Py:O|nx:0|ny:3",
+          "fe_hz": 199.9770965576172,
+          "fe_mode": 13,
+          "mac": 0.9477431623872802,
+          "relative_frequency_error": -0.027579922404670158,
+          "row_id": "R2",
+          "torsion_dominated": false
+        }
+      ],
+      "tracking_refusals": []
+    }
+  },
+  "schema": "auto-id/sp13-registration-reevaluation/v1"
+}

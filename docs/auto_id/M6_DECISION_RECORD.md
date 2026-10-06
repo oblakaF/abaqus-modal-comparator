@@ -415,3 +415,36 @@ DECISIONS D-059–D-061. SPEC §5, §5.1, §5.3 and §7 are unchanged.
 - M6 is not accepted;
 - M7 is `NOT_STARTED`;
 - no Abaqus, no M6-C, no code change.
+
+---
+
+## 17. SP-13 physical registration gate (SUPERVISOR, 2026-10-06)
+
+**Scope:** zero Abaqus. SP-13 only. No M7 fitting. The anti-tuning rule is mandatory.
+
+**Delivered:**
+- `services/psv_video_registration.py`: read-only `.svd` reconstruction; no modal imports.
+- `tools/reconstruct_psv_registration.py`: writes the evidence record.
+- `tools/build_sp13_physical_registration.py`: builds the registration through the unchanged M2 builder.
+- `tools/sp13_registration_reevaluation.py`: the before/after strict freeze.
+- `services/archived_baseline.reregistered_mac_matrix`: every pack binding except the registration
+  hash; the existing archived path is unchanged.
+- Governed files:
+  - the reconstruction record (sha256 `6b45fbfbacad0df939b0b12f8496edddff0525855e0de0312ff5f558c71bb0ae`);
+  - the physical passport (manifest `943bb3d1946863c61abd39ccac8fa1da625067b9dffdcd6be2c82c3e125d5000`);
+  - the physical registration (`2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823`, production-ready);
+  - the re-evaluation record.
+- Decisions D-062 and D-063.
+
+**Result:**
+- **Strict pairs:**
+  - legacy: (4↔10, 5↔11), nearly collinear (condition number 252);
+  - physical: (4↔10 MAC 0.958; 7↔13 MAC 0.947), condition number 6.3.
+- **Sufficiency:** the M4.3 validation holdout takes R2, leaving one fit row, so SP-13 alone stays
+  insufficient.
+
+**Remaining ambiguities:**
+- FE axis signs: four admissible mappings, geometrically identical; 180° gives the same pairs;
+  the bottom face is not evaluable.
+- Face binding is a convention.
+- `scale_rel` is NOT_AVAILABLE, so `registration_limited` is NOT_AVAILABLE.

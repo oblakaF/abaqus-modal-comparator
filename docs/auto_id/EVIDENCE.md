@@ -447,3 +447,63 @@ Possible remaining causes remain outside CARBON-5F scope:
   - sandwich G12 needs bare-plate and/or independent nuisance evidence;
   - M4.3 thresholds PROVISIONAL;
   - real SP13 refused; SP02 NOT_FROZEN.
+
+## SP-13 physical registration from stored PSV records and strict-pairing re-evaluation (M6 gate)
+
+- **Status:** RECORDED (SUPERVISOR-authorised zero-Abaqus gate, 2026-10-06), pending SUPERVISOR review.
+- **Kind:** registration evidence (geometry only; no modal data) plus a zero-Abaqus re-evaluation on
+  archived packs.
+
+### Pinned sources
+
+| Item | Identity |
+|---|---|
+| `.svd` (snadwich `SP-13/SP13_a_500by500_Glue420_Auxetic_newSP01_260910.svd`) | sha256 `41da4cc1d3a5daa038f558c571128793d44499f09605c7d79f0817b6744b0765` |
+| UNV geometry (snadwich `SP-13/SP13_a_polymax.unv`) | sha256 `f268023583972f0a9c1660bc60631587e8f3330e4fb7495e52d8310906af39fe` |
+| Streams | MeasPoints `6ec1a016…`, VideoBitmap `12171aec…`, VideoSettings `d9b7a797…`, DefaultSettings `b65755cb…` (full values in the record) |
+| Reconstruction record | `registration_evidence/SP13_physical_registration_reconstruction.json`, sha256 `6b45fbfbacad0df939b0b12f8496edddff0525855e0de0312ff5f558c71bb0ae` |
+| Physical passport | `specimens/SP13.physical.specimen.json`, manifest `943bb3d1946863c61abd39ccac8fa1da625067b9dffdcd6be2c82c3e125d5000` |
+| Physical registration | `docs/registrations/SP13_physical_registration.json`, hash `2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823` |
+| Re-evaluation record | `registration_evidence/SP13_registration_reevaluation.json`, sha256 `cda0393579b3498e4a993a22cc6608058fedd0d436fc1099722358e5a7300112` |
+
+### Method
+
+1. **Parser:** a read-only parser of the compound-file `.svd` (`services/psv_video_registration.py`).
+   MeasPoints record k matches UNV node k through one plane homography (residual median 2.3e-4,
+   max 8.0e-4 normalised units, about 0.25 px).
+2. **Pixel normalisation:** taken from the stored default full-frame rectangle (u −0.2222…1.5556,
+   v 0…1): x = 1080·u + 240, y = 1080·v. The scanner-angle alignment confirms isotropy (0.966).
+3. **Panel edges** fitted in the stored frame (rms 0.18–0.25 px; frame scale about 0.57 mm/px).
+   The pixel aspect agrees with the measured 510 × 520 mm to 0.30 %.
+4. **Scan points** mapped into the panel frame (origin bottom-left, +y towards the labelled top).
+
+### Physical transform
+
+- **Scan window:** 366.51 × 496.23 mm.
+- **Edge gaps:** left 72.15, right 71.33, bottom 9.81, top 13.96 mm.
+- **Scan axes vs panel:** −0.26° / +89.51°.
+- **UNV vs physical:** x × 1.195, y × 0.889 (anisotropic).
+- **M2 model** (per-axis scale and translation) **vs reconstruction:** median 2.68 mm, max 5.72 mm.
+- **Legacy centred placement vs physical:** median 26.0 mm, p95 39.4 mm, max 47.4 mm.
+
+### Strict pairing (STRICT policy, MAC ≥ 0.8, |Δf| ≤ 15 %; unchanged data, packs and classifier)
+
+| Registration | Strict pairs (exp ↔ FE, MAC, Δf) | Fit rows after M4.3 holdout |
+|---|---|---|
+| Legacy | 4 ↔ 10 (0.888, −9.1 %); 5 ↔ 11 (0.889, −9.1 %) | R1 only |
+| Physical | 4 ↔ 10 (0.958, −9.1 %); 7 ↔ 13 (0.947, −2.8 %) | R1 only (R2 = validation holdout) |
+| Physical, 180° alternative (reported only) | 4 ↔ 10 (0.959); 7 ↔ 13 (0.948) | R1 only |
+
+**Two-row conditioning** (diagnostic; σ = 0.3 %; carbon-only):
+
+| | Condition number | Angle between rows | sd(ln E) | sd(ln G12) |
+|---|---|---|---|---|
+| Legacy | 252 | 0.45° | 0.44 | 1.32 |
+| Physical | 6.3 | 18.4° | 0.006 | 0.031 |
+
+### Conclusion
+
+- The physical registration removes the collinearity: the pair set changed and is well conditioned.
+- Under the unchanged M4.3 holdout rule (highest accepted family held out), one fit row remains.
+  **SP-13 alone is still observation-insufficient.**
+- 0 Abaqus solves, 0 Abaqus Python extractions.
