@@ -1,7 +1,7 @@
 # M5 decision record
 
-**Status:** SUPERVISOR decisions recorded (2026-10-05, M5 entry). Durable items are promoted to
-DECISIONS.md D-039–D-044.
+**Status:** M5 ACCEPTED by the SUPERVISOR (2026-10-06; §20); M5 gate PASS; stage PR pending, not
+merged. Durable items are promoted to DECISIONS.md D-039–D-048.
 
 **Branch:** `auto-id/m5`, from `main` `8f405c3`.
 
@@ -10,10 +10,22 @@ DECISIONS.md D-039–D-044.
 - No real-specimen identification.
 - No change to M4 scientific results.
 
-| Mini-step | Status |
+| Item | Status |
 |---|---|
-| M5.1–M5.4 | `REVIEW_READY` (checkpoint M5-A) |
-| M5.5–M5.9 | `TODO` |
+| M5.1 | `ACCEPTED` |
+| M5.2 | `ACCEPTED` |
+| M5.3 | `ACCEPTED` |
+| M5.4 | `ACCEPTED` |
+| M5.5 | `ACCEPTED` |
+| M5.6 | `ACCEPTED` |
+| M5.7 | `ACCEPTED` |
+| M5.8 | `ACCEPTED` |
+| M5.9 | `ACCEPTED` |
+| M5 gate | `PASS` |
+| Stage PR | pending, not merged |
+| M6 | `NOT_STARTED` |
+
+(Checkpoints: M5-A = M5.1–M5.4, M5-B = M5.5/M5.6/M5.8, M5-C = M5.7, M5-D = M5.9 plus the stage gate.)
 
 ---
 
@@ -414,3 +426,39 @@ no legacy Stage-A logic).
 
 **Production context:** the same evidence gives NOT_IDENTIFIABLE for both parameters, through
 family consistency and the sandwich-G12 rules.
+
+---
+
+## 20. M5 SUPERVISOR acceptance and stage closure (2026-10-06)
+
+**Decision (SUPERVISOR):**
+- M5.1–M5.9 **ACCEPTED**.
+- The M5 stage-level scientific gate is **PASS**.
+- The synthetic M5 stage evidence and the M4.9 twin records-based positive control are accepted
+  as software / scientific-pipeline evidence only. M5 acceptance is **not** a real-specimen
+  material identification.
+
+**Records:**
+- EVIDENCE.md "M5 — Practical-identifiability and verdict machinery: synthetic stage gate and
+  M4.9 twin records-based control" (ACCEPTED, 2026-10-06);
+- DECISIONS.md D-048, the cluster family identity (promoted from §18.1).
+
+**Qualifications kept:**
+- the M5 gate is synthetic;
+- real t_face / k_core columns and priors are not available;
+- real Σ_meas is NOT_AVAILABLE;
+- the S4 ±2.5 % FE noise control is future HUMAN-gated work;
+- production family consistency needs later real-data stages;
+- sandwich G12 needs bare-plate and/or independent nuisance evidence;
+- M4.3 thresholds remain PROVISIONAL;
+- real SP13 identification remains refused;
+- SP02 remains NOT_FROZEN.
+
+**Stage state before the merge:**
+- M5.1–M5.9 ACCEPTED; M5 gate PASS;
+- stage PR `auto-id/m5` → `main` prepared, not merged;
+- `last_accepted_stage` remains M4 until the HUMAN merge;
+- M6 NOT_STARTED.
+
+**Closure:** no code or scientific change, no Abaqus, and no retained M4 artifact deleted.
+`tests/test_m5_stage_gate.py` is the stage-gate test; there is no duplicate.

@@ -401,3 +401,49 @@ Possible remaining causes remain outside CARBON-5F scope:
   - run `3503c7d4…` in `D:\abaqus_m4_twin_loop`;
   - archive `m4_twin/SP13_identification_loop/` (manifest `11eb6493…`);
   - repository copies in `docs/auto_id/twins/SP13_identification_loop/`.
+
+## M5 — Practical-identifiability and verdict machinery: synthetic stage gate and M4.9 twin records-based control
+
+- **Status:** ACCEPTED (SUPERVISOR, 2026-10-06)
+- **Kind:** software and scientific-pipeline evidence; synthetic stage-gate evidence.
+  - **Not** a real-material identification result.
+  - **Not** a real-specimen identifiability conclusion.
+- **Scope:** the M5.1–M5.9 machinery:
+  - typed global + nuisance sensitivity matrix in ln p, with explicit Σ;
+  - explicit nuisance prior rows;
+  - practical rank at rcond = 1e-3 as a hard block;
+  - q_G (diagnostic);
+  - `statistical_sd`, conditional Birge and linearised leave-one-family-out
+    `model_form_robustness`;
+  - the residual-pattern test;
+  - the IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine.
+- **Gate:** `tests/test_m5_stage_gate.py` (records and synthetic only; deterministic):
+  - **positive synthetic control:** E and G12 IDENTIFIED;
+  - **G12 absorbed by k_core:** q_G = 0.0145 (diagnostic only). G12 NOT_IDENTIFIABLE from the
+    full uncertainty calculation (sd_ln 0.50 > 0.08); no q_G threshold is used;
+  - **rank-deficient:** hard refusal. No covariance, Birge or robustness; no pseudo-inverse; no
+    override;
+  - **systematic residual pattern or holdout |r| > 3:** Birge not available and no green verdict;
+    `statistical_sd` preserved;
+  - **WIDE:** WIDE (conservative_ln 0.0632) only while every guard passes; any guard failure or
+    the production context gives NOT_IDENTIFIABLE;
+  - **missing physical evidence:** sandwich G12 NOT_IDENTIFIABLE (`BARE_PLATE_REQUIRED`,
+    `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`);
+  - **labels:** `statistical_sd`, `birge_adjusted_sd` and `model_form_robustness` stay separate;
+    there is no merged field.
+- **M4.9 twin, records-based synthetic positive control** (committed records only):
+  - inputs: the Broyden-updated Jacobian from the journal; σ = 0.003 (the twin's synthetic
+    definition);
+  - E: `statistical_sd_ln` 0.002064, `birge_adjusted_sd_ln` 0.002115, model-form half-range
+    0.001109 (ln);
+  - G12: 0.009951 / 0.010195 / 0.005284;
+  - pattern PASS; holdouts R1 +0.03 and R23 −0.31; q_G 0.761;
+  - IDENTIFIED in the SYNTHETIC_GATE context only; NOT_IDENTIFIABLE in the PRODUCTION context.
+- **Abaqus:** 0 solves and 0 Abaqus Python extractions in M5. M3 and M4 accepted contracts
+  unchanged.
+- **Qualifications (kept):**
+  - real t_face / k_core columns and priors, a real Σ_meas, the S4 noise control and production
+    family consistency are future real-data work;
+  - sandwich G12 needs bare-plate and/or independent nuisance evidence;
+  - M4.3 thresholds PROVISIONAL;
+  - real SP13 refused; SP02 NOT_FROZEN.

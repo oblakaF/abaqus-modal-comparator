@@ -545,3 +545,19 @@ Decision:
   workflow.
 Rationale / scope: the verdict engine evaluates the accepted fit and its evidence.
 Supersedes: none
+
+## D-048 — Cluster family identity for the pattern test and leave-one-family-out (M5.7, M5.8)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §6 S7, §9, §12.4; D-042; D-043; M5_DECISION_RECORD §18.1
+Decision:
+- **Shared family:** if all members of a confirmed cluster share one M4.3 modal family, the
+  cluster residual is one fit term belonging to that shared family.
+- **Mixed families:** if the members belong to different M4.3 families, the cluster term gets one
+  unique composite family key. It is attached to neither source family and never merged with
+  unrelated families.
+- **Pattern test:** the composite cluster is one family term. Alone under its key, it is a
+  singleton and cannot trigger the ≥ 2-member systematic-pattern condition (D-043).
+- **Robustness:** `model_form_robustness` (leave-one-family-out, D-042) uses the same family
+  identity.
+Rationale / scope: a durable M5.7/M5.8 semantic rule for clusters. No synthetic or twin-specific
+value is promoted.
+Supersedes: none

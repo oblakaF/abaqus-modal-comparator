@@ -421,18 +421,19 @@ First batch reviewed by the SUPERVISOR:
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M5.1 | Full global + nuisance sensitivity matrix | `REVIEW_READY` |
-| M5.2 | Prior rows | `REVIEW_READY` |
-| M5.3 | Practical rank and posterior uncertainty | `REVIEW_READY` |
-| M5.4 | q_G nuisance-space projection | `REVIEW_READY` |
-| M5.5 | `statistical_sd` | `REVIEW_READY` |
-| M5.6 | Conditional Birge adjustment | `REVIEW_READY` |
-| M5.7 | Leave-one-family-out `model_form_robustness` | `REVIEW_READY` |
-| M5.8 | Residual family pattern test | `REVIEW_READY` |
-| M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `REVIEW_READY` |
+| M5.1 | Full global + nuisance sensitivity matrix | `ACCEPTED` |
+| M5.2 | Prior rows | `ACCEPTED` |
+| M5.3 | Practical rank and posterior uncertainty | `ACCEPTED` |
+| M5.4 | q_G nuisance-space projection | `ACCEPTED` |
+| M5.5 | `statistical_sd` | `ACCEPTED` |
+| M5.6 | Conditional Birge adjustment | `ACCEPTED` |
+| M5.7 | Leave-one-family-out `model_form_robustness` | `ACCEPTED` |
+| M5.8 | Residual family pattern test | `ACCEPTED` |
+| M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `ACCEPTED` |
 
-Stage status: `REVIEW_READY` (M5.1–M5.9 `REVIEW_READY`; **M5 GATE: `PASS`**, synthetic and records only,
-0 Abaqus; not yet accepted; branch `auto-id/m5` from `main` `8f405c3`; SUPERVISOR decisions in
+Stage status: `REVIEW_READY` (M5.1–M5.9 `ACCEPTED` by the SUPERVISOR, 2026-10-06; **M5 GATE: `PASS`**,
+synthetic and records only, 0 Abaqus; stage PR `auto-id/m5` → `main` prepared, **not merged**;
+M6 `NOT_STARTED`; branch `auto-id/m5` from `main` `8f405c3`; SUPERVISOR decisions in
 [M5_DECISION_RECORD.md](M5_DECISION_RECORD.md), D-039–D-044).
 - Checkpoint M5-A (M5.1–M5.4) `REVIEW_READY`: `services/practical_identifiability.py` with
   synthetic tests. No Abaqus.

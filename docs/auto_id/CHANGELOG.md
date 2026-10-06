@@ -3265,3 +3265,36 @@ first internal provider.
   - not real-specimen identification.
 - **Full suite:** Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; all M5 tests 68 passed; targeted M4 regression + M5, M4 and M3 stage gates 172 passed.
 - **Abaqus runs:** 0. No refit, no policy change beyond the recorded SUPERVISOR decisions.
+
+## 2026-10-06 — M5 SUPERVISOR acceptance and stage closure
+
+- **Stage:** M5.1–M5.9 **ACCEPTED** (SUPERVISOR); **M5 gate PASS**.
+  - Stage status `REVIEW_READY`; stage PR `auto-id/m5` → `main` prepared, **not merged**.
+  - `last_accepted_stage` stays M4 until the HUMAN merge.
+  - **M6 NOT_STARTED.**
+- **Scope:** synthetic stage-gate machinery and software / scientific-pipeline evidence only.
+  **Not** a real-specimen material identification.
+- **Gate results:**
+  - q_G absorption case: q_G ≈ 0 diagnostically; G12 NOT_IDENTIFIABLE from the full uncertainty
+    calculation;
+  - rank-deficient case: hard-blocked, no override;
+  - systematic model error / holdout failure: no green verdict;
+  - WIDE only when every guard passes;
+  - `statistical_sd`, `birge_adjusted_sd` and `model_form_robustness` stay separate.
+- **M4.9 twin records-based synthetic control:** IDENTIFIED in the synthetic-gate context only.
+- **Records:**
+  - EVIDENCE.md "M5 — Practical-identifiability and verdict machinery: synthetic stage gate and
+    M4.9 twin records-based control" (ACCEPTED);
+  - DECISIONS.md D-048 (cluster family identity, promoted from M5_DECISION_RECORD §18.1);
+  - M5_DECISION_RECORD §20 (acceptance), plus the stale header and table refreshed.
+- **Qualifications kept:**
+  - real t_face / k_core columns and priors not available;
+  - real Σ_meas NOT_AVAILABLE;
+  - S4 noise control is future HUMAN-gated work;
+  - production family consistency is later real-data work;
+  - sandwich G12 needs bare-plate and/or independent nuisance evidence;
+  - M4.3 thresholds PROVISIONAL;
+  - real SP13 refused; SP02 NOT_FROZEN.
+- **Full suite:** Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; M5 tests 68 passed (test_m5_stage_gate 9); M5/M4/M3 stage gates + M4 regression 144 passed.
+- **Abaqus:** 0 solves and 0 extractions in M5. M3 and M4 unchanged. No retained artifact
+  deleted. No code change in the closure.
