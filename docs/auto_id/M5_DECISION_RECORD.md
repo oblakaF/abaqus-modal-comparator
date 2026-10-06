@@ -462,3 +462,13 @@ family consistency and the sandwich-G12 rules.
 
 **Closure:** no code or scientific change, no Abaqus, and no retained M4 artifact deleted.
 `tests/test_m5_stage_gate.py` is the stage-gate test; there is no duplicate.
+
+---
+
+## 21. M5 merged to main (HUMAN, 2026-10-06)
+
+- **Merge:** PR #33 merged with a merge commit by explicit HUMAN authorisation.
+  - **Merge commit:** `ab75315b5977082599e9af181c6c1c41c1d82a70`. Parents: `8f405c3` and the reviewed head `3341568c74a490116b50781c67aa91f4b7be8ef2`.
+  - **Tree:** identical to the reviewed head.
+- **Status:** the M5 stage is ACCEPTED. All §20 qualifications stay in force.
+- **M6:** NOT_STARTED.

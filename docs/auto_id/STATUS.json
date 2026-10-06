@@ -3,12 +3,12 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M5",
-  "current_ministep": "M5.9",
-  "status": "REVIEW_READY",
-  "last_accepted_stage": "M4",
-  "last_accepted_ministep": "M4.9",
-  "last_accepted_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d",
+  "current_stage": "M6",
+  "current_ministep": null,
+  "status": "NOT_STARTED",
+  "last_accepted_stage": "M5",
+  "last_accepted_ministep": "M5.9",
+  "last_accepted_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -62,6 +62,12 @@
       "stage": "M4",
       "pr": 31,
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d",
+      "status": "ACCEPTED"
+    },
+    {
+      "stage": "M5",
+      "pr": 33,
+      "merge_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70",
       "status": "ACCEPTED"
     }
   ],
@@ -531,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "Stage PR auto-id/m5 -> main prepared; await HUMAN merge authorisation; after the merge record the main merge SHA; M6 NOT_STARTED",
+  "next_action": "M6 NOT_STARTED; await SUPERVISOR instruction before any M6 work",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -544,7 +550,7 @@
     "M5.7": "ACCEPTED",
     "M5.8": "ACCEPTED",
     "M5.9": "ACCEPTED",
-    "status": "REVIEW_READY",
+    "status": "ACCEPTED",
     "decision_record": "docs/auto_id/M5_DECISION_RECORD.md (DECISIONS D-039..D-044)",
     "entry_authorisation": "SUPERVISOR 2026-10-05: M5 entry decisions; checkpoint M5-A only; no Abaqus",
     "M5-A": {
@@ -590,7 +596,7 @@
       "M4.3 classifier thresholds remain PROVISIONAL",
       "real SP13 identification remains refused; SP02 NOT_FROZEN"
     ],
-    "stage_pr": "READY_FOR_STAGE_PR (auto-id/m5 -> main); not merged; HUMAN merge authorisation required",
+    "stage_pr": "MERGED: PR #33 (auto-id/m5 -> main), merge commit ab75315b5977082599e9af181c6c1c41c1d82a70",
     "supervisor_acceptance": {
       "date": "2026-10-06",
       "decision": "M5.1-M5.9 ACCEPTED; M5 stage-level scientific gate PASS; synthetic stage evidence and the M4.9 twin records-based control accepted as software/scientific-pipeline evidence only",
@@ -609,10 +615,20 @@
       "evidence": "EVIDENCE.md 'M5 — Practical-identifiability and verdict machinery: synthetic stage gate and M4.9 twin records-based control' ACCEPTED (2026-10-06)",
       "decisions_promoted": "DECISIONS.md D-048 (cluster family identity); D-039..D-047 already recorded"
     },
-    "merged_to_main": false,
-    "closure_tests": "Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; M5 tests 68 passed (test_m5_stage_gate 9); M5/M4/M3 stage gates + M4 regression 144 passed"
+    "merged_to_main": {
+      "pr": 33,
+      "merge_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70"
+    },
+    "closure_tests": "Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; M5 tests 68 passed (test_m5_stage_gate 9); M5/M4/M3 stage gates + M4 regression 144 passed",
+    "accepted_head": "3341568c74a490116b50781c67aa91f4b7be8ef2",
+    "accepted_by": "SUPERVISOR (M5.1-M5.9 and stage gate accepted 2026-10-06); merge explicitly authorised by the HUMAN supervisor"
   },
   "m6": {
-    "status": "NOT_STARTED"
+    "status": "NOT_STARTED",
+    "M6.1": "TODO",
+    "M6.2": "TODO",
+    "M6.3": "TODO",
+    "M6.4": "TODO",
+    "note": "not started; requires explicit SUPERVISOR instruction (ROADMAP order)"
   }
 }

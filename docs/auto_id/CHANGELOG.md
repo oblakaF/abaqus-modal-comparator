@@ -3298,3 +3298,26 @@ first internal provider.
 - **Full suite:** Windows 1393 OK (27 skipped) without data stores; 1398 OK (2 skipped) with both stores; M5 tests 68 passed (test_m5_stage_gate 9); M5/M4/M3 stage gates + M4 regression 144 passed.
 - **Abaqus:** 0 solves and 0 extractions in M5. M3 and M4 unchanged. No retained artifact
   deleted. No code change in the closure.
+
+## 2026-10-06 — M5 merged to main (PR #33)
+
+- **Stage:** M5 **ACCEPTED** and merged. PR #33 (`auto-id/m5` → `main`), merged with a merge commit
+  under explicit HUMAN authorisation.
+  - **Merge commit:** `ab75315b5977082599e9af181c6c1c41c1d82a70`. Parents: `main` `8f405c3` and the reviewed head `3341568`.
+  - **Tree:** identical to the reviewed head.
+- **STATUS:**
+  - `last_accepted_stage` = M5, `last_accepted_ministep` = M5.9, `last_accepted_commit` = the
+    merge commit;
+  - `main_merges` gains M5 / PR #33.
+- **Qualifications kept:**
+  - the M5 gate is synthetic only;
+  - no real t_face / k_core sensitivity columns or priors;
+  - real Σ_meas NOT_AVAILABLE;
+  - the real S4 ±2.5 % FE noise control needs a HUMAN gate;
+  - production family consistency needs later stages;
+  - sandwich G12 needs bare-plate / independent nuisance evidence;
+  - M4.3 thresholds PROVISIONAL;
+  - real SP13 refused; SP02 NOT_FROZEN.
+- **M6:** `NOT_STARTED`; M6.1–M6.4 `TODO`.
+- **Bookkeeping branch:** `auto-id/m5-closure`, created from the merge commit.
+- **Unchanged:** code and scientific logic. No Abaqus. Retained M4 artifacts untouched.
