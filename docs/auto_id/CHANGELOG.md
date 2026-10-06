@@ -3406,3 +3406,23 @@ first internal provider.
   - gate `NOT_EVALUATED`; M7 `NOT_STARTED`.
 - **Unchanged:** SPEC, the ROADMAP mini-step definitions, and all code. M6-B is unchanged.
 - **Abaqus:** none.
+
+## 2026-10-06 — M6 / STEEL normative rescope (SPEC §19 item 6; D-059–D-061)
+
+- **SPEC §19 item 6 (new, normative):** supersedes the §17 M6 acceptance row and the §17 STEEL
+  sentence. SPEC §5, §5.1, §5.3 and §7 are unchanged.
+- **Decisions:**
+  - **D-059:** M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP`, with their
+    consequences kept. It supersedes D-054 in part (the tile plan) and the status labels of D-057
+    and D-058.
+  - **D-060:** STEEL is removed; supersedes D-015. Results are labelled not externally validated.
+  - **D-061:** the rescoped M6 gate.
+- **Documents:** ROADMAP (M6 table and gate; STEEL `SUPERSEDED`), STATUS (`steel_gate`, M6
+  readiness, M6.4 NEEDS_SOURCE), M6_DECISION_RECORD §16.
+- **Status:**
+  - M6 `IN_PROGRESS`;
+  - M6.1–M6.3 `NOT_AVAILABLE_WITH_CURRENT_SETUP`;
+  - M6.4 `TODO` (NEEDS_SOURCE);
+  - gate `NOT_EVALUATED`;
+  - M7 `NOT_STARTED`.
+- **Unchanged:** code (M6-B unchanged). No Abaqus.

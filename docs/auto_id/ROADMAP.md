@@ -467,14 +467,14 @@ work.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `BLOCKED_ON_EXPERIMENT` (D-057) |
-| M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `BLOCKED_ON_EXPERIMENT` (D-058) |
-| M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `TODO` (NEEDS_DATA; feasibility unresolved) |
-| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `TODO` (NEEDS_DECISION) |
+| M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
+| M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
+| M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
+| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `TODO` (NEEDS_SOURCE: variation ranges) |
 
 Stage status: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
-decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-058; M6 gate `NOT_EVALUATED`, cannot
-currently close; M7 `NOT_STARTED`).
+decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; rescoped by SPEC §19 item 6; M6 gate
+`NOT_EVALUATED`; M7 `NOT_STARTED`).
 - Checkpoint M6-A `REVIEW_READY`: entry decisions recorded; HUMAN SP-11 experiment checklist
   [M6_SP11_EXPERIMENT_CHECKLIST.md](M6_SP11_EXPERIMENT_CHECKLIST.md). No Abaqus.
 - Checkpoint M6-B `REVIEW_READY`: `domain/stage_a_experiment.py` + `services/stage_a_validation.py`
@@ -484,10 +484,23 @@ currently close; M7 `NOT_STARTED`).
     data, and no new SP-11 experiment available.
   - The checklist is now a reference record; the real-specimen inventory is in
     [SNADWICH_INVENTORY.md](SNADWICH_INVENTORY.md).
-  - This ROADMAP and SPEC §17 are unchanged; one later rescope decision follows once M6.3 / STEEL
-    feasibility is known.
+  - This ROADMAP and SPEC §17 were unchanged at that point.
+- **M6 rescope 2026-10-06 (SPEC §19 item 6; D-059, D-060, D-061; §16):**
+  - M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP`. Their consequences are kept: G12 follows
+    §5/§5.1 (D-046), there is no real-data Stage-A validation, k_core is only a later PROVISIONAL
+    nuisance, and Σ_setup stays at the flagged provisional 0.3 %.
+  - M6.4 is the remaining executable step (FE-only); it needs an approved range source.
+  - The STEEL gate is removed (D-060): results are labelled not externally validated.
 
-**M6 GATE:** critical priors and uncertainties are physically supported, not guessed.
+**M6 GATE (rescoped, SPEC §19 item 6, D-061):**
+
+- all unavailable physical evidence is explicitly recorded;
+- every missing prior has its conservative verdict consequence encoded;
+- provisional inputs are explicitly flagged;
+- the M6.4 transverse-constant sensitivity budget is closed.
+
+(Former gate: "critical priors and uncertainties are physically supported, not guessed";
+superseded 2026-10-06.)
 
 > **Decided ([D-017](DECISIONS.md#d-017--bare-plate-g12-is-material-family-specific)), bare-plate G12 is material-family specific:**
 >
@@ -509,7 +522,11 @@ its declared uncertainty.
 
 | Id | Gate | Status |
 |---|---|---|
-| STEEL | Independent steel validation | `TODO` |
+| STEEL | Independent steel validation | `SUPERSEDED` (D-060) |
+
+> **Superseded 2026-10-06 (D-060, SPEC §19 item 6):** no steel or external known-stiffness
+> validation is part of the selected release path. Real carbon results are reported as
+> model-calibrated effective constants, labelled **not externally validated**.
 
 ---
 

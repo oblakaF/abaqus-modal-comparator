@@ -740,3 +740,51 @@ Decision:
 Rationale / scope: governance wording must match SPEC (precedence SPEC > DECISIONS).
 Supersedes: D-053 (in part: the "same governed grid and protocol" wording and the expectation of an
 SP-11 repeat; everything else remains in force)
+
+## D-059 — M6.1, M6.2 and M6.3 are NOT_AVAILABLE_WITH_CURRENT_SETUP
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: HUMAN experimental constraints; accepted M6 rescope review (F–K); SPEC §19 item 6; M6_DECISION_RECORD §16
+Decision:
+- **M6.1 (SP-11 bare-plate Stage A):** `NOT_AVAILABLE_WITH_CURRENT_SETUP`. Consequences:
+  - no primary twill G12 evidence;
+  - no real-data Stage-A validation;
+  - the M6-B Stage-A adapter stays in the software, synthetically validated;
+  - this alone is not a release failure.
+- **M6.2 (SP-11 repeat):** `NOT_AVAILABLE_WITH_CURRENT_SETUP`.
+  - The SPEC §7 provisional Σ_setup (0.3 %) stays allowed and FLAGGED.
+  - A measured sandwich-remount estimate may replace it later, only if genuine remount provenance
+    is established from existing records. No session pair is declared a remount without proof.
+- **M6.3 (core tile):** `NOT_AVAILABLE_WITH_CURRENT_SETUP`. Consequences:
+  - there is no independently measured k_core prior;
+  - the sandwich-only G12 route stays closed (D-046);
+  - k_core may later enter M7 only as an explicitly PROVISIONAL nuisance with a
+    SUPERVISOR-approved width, which is not chosen here.
+- **Records kept:** the M6.1–M6.3 scientific requirements and their history (D-049–D-058) are kept;
+  only the expectation of executing them in this project is withdrawn.
+Rationale / scope: missing experiments reduce the scientific claims; they do not invent evidence.
+Supersedes: D-054 (in part: the active plan of one governed tile experiment per topology; the
+requirement that a k_core prior needs physical core-tile evidence remains); D-057 and D-058 (in
+part: the `BLOCKED_ON_EXPERIMENT` status labels, now `NOT_AVAILABLE_WITH_CURRENT_SETUP`)
+
+## D-060 — The STEEL validation gate is removed from the release path
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §17, §19 item 6; ROADMAP STEEL gate; M6_DECISION_RECORD §16
+Decision:
+- **Removal:** no steel or other external known-stiffness validation experiment is part of the
+  selected project release path. No replacement experiment is created.
+- **Labelling:** final real carbon results are reported as model-calibrated effective constants
+  (SPEC §5.2) and labelled **not externally validated**.
+Rationale / scope: the steel experiment was an exploratory idea only. Its removal weakens the
+claim (no external validation); it does not change any scientific rule.
+Supersedes: D-015
+
+## D-061 — Rescoped M6 gate
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §19 item 6; ROADMAP M6 GATE
+Decision: M6 passes when:
+- all unavailable physical evidence is explicitly recorded;
+- every missing prior has its conservative verdict consequence encoded;
+- provisional inputs are explicitly flagged;
+- the M6.4 transverse-constant sensitivity budget is closed.
+
+M6 is not accepted by this decision.
+Rationale / scope: replaces the former acceptance "D11, D66 → E, G12 with uncertainty; repeat of
+the same plate agrees within 1σ", which cannot be executed with the current setup.
+Supersedes: none (the SPEC §17 M6 row is superseded by SPEC §19 item 6)

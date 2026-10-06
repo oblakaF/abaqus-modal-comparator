@@ -1,7 +1,8 @@
 # M6 decision record
 
-**Status:** M6 `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; corrective governance §15). Durable
-items are promoted to DECISIONS.md D-049–D-058; D-057 and D-058 correct parts of D-049 and D-053.
+**Status:** M6 `IN_PROGRESS` (entry decisions; corrective governance §15; rescope §16). Durable items
+are promoted to DECISIONS.md D-049–D-061. D-057–D-059 correct parts of D-049, D-053 and D-054, and
+D-060 supersedes D-015.
 
 **Branch:** `auto-id/m6`, from `main` `ab1dc60`.
 
@@ -18,11 +19,12 @@ items are promoted to DECISIONS.md D-049–D-058; D-057 and D-058 correct parts 
 
 | Item | Status | Readiness |
 |---|---|---|
-| M6.1 | `BLOCKED_ON_EXPERIMENT` | SP-11 evidence blocked (D-057, §15) |
-| M6.2 | `BLOCKED_ON_EXPERIMENT` | no valid SP-11 repeat (D-058, §15) |
-| M6.3 | `TODO` | NEEDS_DATA; physical feasibility unresolved |
-| M6.4 | `TODO` | NEEDS_DECISION (variation ranges) |
-| M6 gate | `NOT_EVALUATED` | cannot currently close |
+| M6.1 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
+| M6.2 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
+| M6.3 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
+| M6.4 | `TODO` | NEEDS_SOURCE (variation ranges) |
+| M6 gate | `NOT_EVALUATED` | rescoped (SPEC §19 item 6, D-061) |
+| STEEL gate | `SUPERSEDED` | D-060 |
 | M7 | `NOT_STARTED` | — |
 
 Checkpoints:
@@ -382,3 +384,34 @@ AVAILABLE_NOT_YET_GOVERNED, MISSING and UNAVAILABLE_FOR_THIS_PROJECT.
 | M7 | `NOT_STARTED` |
 
 M6 is neither failed nor accepted.
+
+---
+
+## 16. M6 / STEEL normative rescope (SUPERVISOR, 2026-10-06)
+
+**Basis:**
+- the accepted rescope review (sections F–K);
+- the HUMAN constraints: no new SP-11 test, no SP-11 repeat, no core-tile test; STEEL is not part of
+  the plan.
+
+**Governance route:** SPEC §19 item 6 (the established normative amendment mechanism), with
+DECISIONS D-059–D-061. SPEC §5, §5.1, §5.3 and §7 are unchanged.
+
+| Item | New status | Consequence kept |
+|---|---|---|
+| M6.1 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | No primary twill G12; no real-data Stage-A validation; the M6-B adapter stays (synthetic validation). Not a release failure by itself. |
+| M6.2 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | SPEC §7 provisional Σ_setup 0.3 % allowed and flagged. A measured sandwich-remount estimate only with proven remount provenance from existing records. |
+| M6.3 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | No measured k_core prior; the §5.1 G12 route stays closed (D-046); k_core later only as a PROVISIONAL nuisance with a SUPERVISOR-approved width (not chosen). D-054's tile plan is superseded in part. |
+| M6.4 | `TODO`, NEEDS_SOURCE | FE-only screening, after an approved range source and a HUMAN Abaqus gate |
+| STEEL | `SUPERSEDED` (D-060) | Results labelled **not externally validated** |
+
+**Rescoped M6 gate (D-061):**
+- all unavailable physical evidence is explicitly recorded;
+- every missing prior has its conservative verdict consequence encoded;
+- provisional inputs are explicitly flagged;
+- the M6.4 budget is closed.
+
+**Not done in this checkpoint:**
+- M6 is not accepted;
+- M7 is `NOT_STARTED`;
+- no Abaqus, no M6-C, no code change.

@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M6",
-  "current_ministep": "M6.1",
+  "current_ministep": "M6.4",
   "status": "IN_PROGRESS",
   "last_accepted_stage": "M5",
   "last_accepted_ministep": "M5.9",
@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP for SUPERVISOR review of the M6-A correction; independent read-only reviews done (M6.4 range sources, M6.3 and STEEL feasibility); one later M6/STEEL rescope decision; no Abaqus, no M6-C, no M7",
+  "next_action": "STOP for SUPERVISOR review of the M6 rescope and the registration feasibility report; M6.4 needs an approved range source before any FE screening (HUMAN Abaqus gate); no M7, no M6-C",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -627,18 +627,18 @@
     "branch": "auto-id/m6",
     "base": "ab1dc6071355fe536a3bec7f593ee804df92583f",
     "status": "IN_PROGRESS",
-    "M6.1": "BLOCKED_ON_EXPERIMENT",
-    "M6.2": "BLOCKED_ON_EXPERIMENT",
-    "M6.3": "TODO",
+    "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
+    "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
+    "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
     "M6.4": "TODO",
     "readiness": {
-      "M6.1": "BLOCKED_ON_EXPERIMENT (D-057: no governed fitted/frozen SP-11 modal set; inconsistent sessions; incomplete physical support data; new SP-11 experiment not available)",
-      "M6.2": "BLOCKED_ON_EXPERIMENT (D-058: no valid documented SP-11 repeat; repeat definition not weakened)",
-      "M6.3": "NEEDS_DATA (no core-tile specimen or test exists); physical feasibility unresolved",
-      "M6.4": "NEEDS_DECISION (no defensible variation ranges yet; D-055)"
+      "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no primary twill G12; no real-data Stage-A validation; M6-B adapter kept",
+      "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): SPEC provisional Sigma_setup 0.3 % allowed and flagged",
+      "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no measured k_core prior; later PROVISIONAL nuisance only",
+      "M6.4": "NEEDS_SOURCE (defensible E3/nu13/nu23/G13/G23 screening ranges; D-055); FE-only; not started"
     },
-    "gate": "NOT_EVALUATED (cannot currently close: M6.1/M6.2 BLOCKED_ON_EXPERIMENT; SPEC/ROADMAP unchanged)",
-    "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-058; D-057/D-058 correct D-049/D-053)",
+    "gate": "NOT_EVALUATED (rescoped gate SPEC §19 item 6 / D-061: unavailable evidence recorded, verdict consequences encoded, provisional inputs flagged, M6.4 budget closed)",
+    "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-061)",
     "entry_authorisation": "SUPERVISOR 2026-10-06: M6 entry review accepted; checkpoints M6-A (governance, SP-11 checklist) and M6-B (Stage-A -> M5 adapter, synthetic tests) only; no Abaqus; no M6-C",
     "experiment_checklist": "docs/auto_id/M6_SP11_EXPERIMENT_CHECKLIST.md (reference requirements for a valid future SP-11 / bare-plate test; not an active HUMAN to-do list)",
     "M6-A": {
@@ -664,6 +664,8 @@
       ]
     },
     "specimen_inventory": "docs/auto_id/SNADWICH_INVENTORY.md (factual D:\\Snadwich inventory; no passports created)",
-    "m7": "NOT_STARTED"
-  }
+    "m7": "NOT_STARTED",
+    "rescope": "2026-10-06 SUPERVISOR: SPEC §19 item 6; D-059 (M6.1-M6.3 NOT_AVAILABLE_WITH_CURRENT_SETUP), D-060 (STEEL removed, supersedes D-015), D-061 (rescoped M6 gate)"
+  },
+  "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated"
 }
