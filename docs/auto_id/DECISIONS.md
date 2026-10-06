@@ -850,3 +850,26 @@ Decision:
   `NOT_AVAILABLE_PENDING_MODAL_PREPARATION`: 260909 is raw FRF only; no internal fitter is used; an
   accepted external PolyMAX route is not currently available. Not a release blocker (D-059).
 Supersedes: none
+
+## D-064 — SP-13 gate accepted; HUMAN facts H7–H10 (orientation, instrument readout, modal preparation, repeat scope)
+Date: 2026-10-06 · Accepted by: SUPERVISOR (HUMAN facts H7–H10) · Source: SUPERVISOR "SP-13 HUMAN evidence update + SP-02 zero-Abaqus physical registration gate"; D-062, D-063; SPEC §7, §11
+Decision:
+- **SP-13 gate:** the SP-13 physical registration result at `173af43` is SUPERVISOR-ACCEPTED. The
+  strict pairs {94.40 Hz ↔ FE 10, 205.65 Hz ↔ FE 13}, the STRICT policy, the M4.3 holdout rule and
+  the anti-tuning provenance are preserved. The transform is not redone or tuned.
+- **H7 (orientation):** SP-13 was scanned in the same in-plane orientation as represented in the
+  Abaqus model: the auxetic-core directions correspond, the label is at the physical top, and the
+  panel was not intentionally flipped or rotated. This is physical evidence for the in-plane FE axis
+  signs (+x→+X, +y→+Y); the 180° alternative is excluded. MAC is never used for signs.
+- **H8 (instruments):** steel ruler 100 cm, smallest graduation 1 mm; dial caliper resolution
+  0.01 mm. These are HUMAN-confirmed instrument/readout resolutions, **not** calibrated instrument
+  accuracy. No calibration or operator uncertainty is recorded, and none may be invented.
+- **H9 (modal preparation):** Simcenter Testlab is not available. There is no PolyMAX fit of
+  260909, so a measured Σ_setup is unavailable. Σ_setup stays at the SPEC provisional 0.3 %, flagged.
+- **H10 (repeat scope):** 260909 → 260910 is comparable for FREQUENCY_ONLY use. No cross-grid
+  shape or MAC claim is made.
+Rationale / scope: records the HUMAN facts and the SUPERVISOR acceptance. The derived quantities
+(the readout `scale_rel` contribution, the M2.4 result, the SP-02 registration) are worker results
+pending SUPERVISOR review (EVIDENCE; M6_DECISION_RECORD §18). The pairing policy, thresholds,
+holdout rule and modal data are unchanged.
+Supersedes: none (D-062 and D-063 stand; H7 resolves the in-plane sign alternative D-062 left open)

@@ -1,0 +1,207 @@
+{
+  "abaqus_python_extractions": 0,
+  "abaqus_solves": 0,
+  "accepted_pairs": [
+    [
+      4,
+      10
+    ],
+    [
+      7,
+      13
+    ]
+  ],
+  "available_components": [
+    "translation_mm",
+    "scale_rel",
+    "rotation_deg"
+  ],
+  "pack": "SP13_a46d08b52995e078",
+  "pairing_change_diagnostic": {
+    "changed_by": [],
+    "nominal_strict_pairs": [
+      [
+        4,
+        10
+      ],
+      [
+        7,
+        13
+      ]
+    ],
+    "pairing_changed": false,
+    "per_perturbation": {
+      "+rotation": [
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "+scale": [
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "+translation_x": [
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "+translation_y": [
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "-rotation": [
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "-scale": [
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "-translation_x": [
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "-translation_y": [
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ]
+    }
+  },
+  "pairing_change_evaluation": "DEFERRED_M4",
+  "pairs": [
+    {
+      "crosses_threshold": false,
+      "experimental_mode": 4,
+      "fe_mode": 10,
+      "invalid_perturbations": [],
+      "maximum_mac": 0.961747312150496,
+      "minimum_mac": 0.9473878926500102,
+      "nominal_mac": 0.9584584247911996,
+      "per_perturbation": {
+        "+rotation": 0.9556907102745672,
+        "+scale": 0.9582339840195347,
+        "+translation_x": 0.9545507054837589,
+        "+translation_y": 0.9585846131740284,
+        "-rotation": 0.961747312150496,
+        "-scale": 0.9588393872222069,
+        "-translation_x": 0.957663452687223,
+        "-translation_y": 0.9473878926500102
+      }
+    },
+    {
+      "crosses_threshold": false,
+      "experimental_mode": 7,
+      "fe_mode": 13,
+      "invalid_perturbations": [],
+      "maximum_mac": 0.9480022542354958,
+      "minimum_mac": 0.920644583764699,
+      "nominal_mac": 0.9469043137223596,
+      "per_perturbation": {
+        "+rotation": 0.9456481360562065,
+        "+scale": 0.9463034901868126,
+        "+translation_x": 0.9468923575394472,
+        "+translation_y": 0.9480022542354958,
+        "-rotation": 0.9469950925372167,
+        "-scale": 0.9467193822598495,
+        "-translation_x": 0.9469153462815032,
+        "-translation_y": 0.920644583764699
+      }
+    }
+  ],
+  "pairs_source": "docs/auto_id/registration_evidence/SP13_registration_reevaluation.json",
+  "passport": "docs/auto_id/specimens/SP13.physical.specimen.json",
+  "passport_sha256_lf": "a3fbfd1d7028657da7db6aae1bf74107861c1ec94ba9d3081df59baef3d55014",
+  "perturbations": [
+    {
+      "name": "+translation_x",
+      "remapped_points": 289
+    },
+    {
+      "name": "-translation_x",
+      "remapped_points": 289
+    },
+    {
+      "name": "+translation_y",
+      "remapped_points": 289
+    },
+    {
+      "name": "-translation_y",
+      "remapped_points": 289
+    },
+    {
+      "name": "+scale",
+      "remapped_points": 34
+    },
+    {
+      "name": "-scale",
+      "remapped_points": 46
+    },
+    {
+      "name": "+rotation",
+      "remapped_points": 151
+    },
+    {
+      "name": "-rotation",
+      "remapped_points": 157
+    }
+  ],
+  "registration_file": "docs/registrations/SP13_physical_registration.json",
+  "registration_hash": "2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823",
+  "registration_limited": false,
+  "registration_limited_both_triggers": false,
+  "schema": "auto-id/registration-uncertainty-evaluation/v1",
+  "status": "EVALUATED",
+  "threshold": 0.8,
+  "unavailable_components": [],
+  "uncertainty": {
+    "rotation_deg": 0.49,
+    "scale_rel": 0.002,
+    "translation_mm": 5.72
+  }
+}

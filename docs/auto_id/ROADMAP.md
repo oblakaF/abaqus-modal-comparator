@@ -496,6 +496,17 @@ decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; resc
     centred registration is historical only (point error median 26 mm, max 47 mm).
   - Strict pairs 4↔10 and 7↔13 are well conditioned (condition number 252 → 6.3), but after the
     unchanged M4.3 holdout SP-13 alone still has one fit row.
+  - SUPERVISOR-ACCEPTED (D-064).
+- **SP-13 HUMAN update and SP-02 physical registration gate 2026-10-06 (zero Abaqus; D-064; §18),
+  `REVIEW_READY`:**
+  - SP-13 (H7, H8): in-plane signs physically established; `scale_rel` 0.002 (readout only).
+    M2.4 is EVALUATED and `registration_limited` is False. Σ_setup stays provisional (H9).
+  - SP-02 has the same Polytec anisotropy, and the legacy registration is wrong by median 29 mm.
+    The physical registration (same method) freezes 3 strict pairs, leaving 2 fit rows after the
+    unchanged M4.3 holdout (condition number 6.1).
+  - SP-02 identity needs one HUMAN confirmation.
+  - Combined with SP-13: 3 fit rows, rank 2. The SP2/SP10 reference scatter test stays
+    NOT_AVAILABLE (§18.2).
 
 **M6 GATE (rescoped, SPEC §19 item 6, D-061):**
 

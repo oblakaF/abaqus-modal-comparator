@@ -39,11 +39,11 @@
         "+Z"
       ],
       "reference": "panel_edges",
-      "source": "panel edges fitted in the stored PSV frame (reconstruction record above); handwritten label at the physical top edge (HUMAN H2); lattice orientation as in the Abaqus model (HUMAN H4); the 510 mm side is horizontal (frame aspect). FE axis signs are not determinable from records: the nominal +x->+X, +y->+Y continues the accepted legacy convention and was fixed before any pairing evaluation; the three alternatives are recorded in the evidence"
+      "source": "panel edges fitted in the stored PSV frame (reconstruction record above); handwritten label at the physical top edge (HUMAN H2); lattice orientation as in the Abaqus model (HUMAN H4); the 510 mm side is horizontal (frame aspect). In-plane FE axis signs: HUMAN H7 (SUPERVISOR-accepted 2026-10-06) - the panel was scanned in the same in-plane orientation as the Abaqus model (auxetic-core directions correspond, label at the physical top, not flipped or rotated), so +x->+X, +y->+Y is physically established and the 180 deg alternative is excluded; MAC was not used. Remaining: the through-thickness face convention (TOP vs BOTTOM face, FE stack symmetric) is a mathematical symmetry of the model, bound to TOP by convention"
     },
     "uncertainty": {
       "translation_mm": 5.72,
-      "scale_rel": null,
+      "scale_rel": 0.002,
       "rotation_deg": 0.49
     },
     "panel_edges": {

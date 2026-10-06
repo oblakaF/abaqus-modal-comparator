@@ -1,0 +1,266 @@
+{
+  "abaqus_python_extractions": 0,
+  "abaqus_solves": 0,
+  "accepted_pairs": [
+    [
+      2,
+      8
+    ],
+    [
+      4,
+      10
+    ],
+    [
+      7,
+      13
+    ]
+  ],
+  "available_components": [
+    "translation_mm",
+    "scale_rel",
+    "rotation_deg"
+  ],
+  "pack": "SP02_f3e592281bebce66",
+  "pairing_change_diagnostic": {
+    "changed_by": [],
+    "nominal_strict_pairs": [
+      [
+        2,
+        8
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        7,
+        13
+      ]
+    ],
+    "pairing_changed": false,
+    "per_perturbation": {
+      "+rotation": [
+        [
+          2,
+          8
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "+scale": [
+        [
+          2,
+          8
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "+translation_x": [
+        [
+          2,
+          8
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "+translation_y": [
+        [
+          2,
+          8
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "-rotation": [
+        [
+          2,
+          8
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "-scale": [
+        [
+          2,
+          8
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "-translation_x": [
+        [
+          2,
+          8
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ],
+      "-translation_y": [
+        [
+          2,
+          8
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          7,
+          13
+        ]
+      ]
+    }
+  },
+  "pairing_change_evaluation": "DEFERRED_M4",
+  "pairs": [
+    {
+      "crosses_threshold": false,
+      "experimental_mode": 2,
+      "fe_mode": 8,
+      "invalid_perturbations": [],
+      "maximum_mac": 0.920506637406943,
+      "minimum_mac": 0.9128736395732783,
+      "nominal_mac": 0.917597174759974,
+      "per_perturbation": {
+        "+rotation": 0.920506637406943,
+        "+scale": 0.9183063791361339,
+        "+translation_x": 0.9145214375676848,
+        "+translation_y": 0.9128736395732783,
+        "-rotation": 0.9157447828034693,
+        "-scale": 0.9173998821913916,
+        "-translation_x": 0.9188594288272869,
+        "-translation_y": 0.9133581548354656
+      }
+    },
+    {
+      "crosses_threshold": false,
+      "experimental_mode": 4,
+      "fe_mode": 10,
+      "invalid_perturbations": [],
+      "maximum_mac": 0.9567986233767869,
+      "minimum_mac": 0.9426546494731811,
+      "nominal_mac": 0.9507510851875456,
+      "per_perturbation": {
+        "+rotation": 0.9567986233767869,
+        "+scale": 0.9506027078623595,
+        "+translation_x": 0.9426546494731811,
+        "+translation_y": 0.9458924135047744,
+        "-rotation": 0.9447022796656225,
+        "-scale": 0.9516520061580837,
+        "-translation_x": 0.9543193643752936,
+        "-translation_y": 0.9446831786542498
+      }
+    },
+    {
+      "crosses_threshold": false,
+      "experimental_mode": 7,
+      "fe_mode": 13,
+      "invalid_perturbations": [],
+      "maximum_mac": 0.9756458396846076,
+      "minimum_mac": 0.9601628896524942,
+      "nominal_mac": 0.9754467069327638,
+      "per_perturbation": {
+        "+rotation": 0.9753002588778059,
+        "+scale": 0.9742758040525715,
+        "+translation_x": 0.9752433110468218,
+        "+translation_y": 0.9601628896524942,
+        "-rotation": 0.9738275924087724,
+        "-scale": 0.9753490955926347,
+        "-translation_x": 0.9756458396846076,
+        "-translation_y": 0.9647270678981373
+      }
+    }
+  ],
+  "pairs_source": "docs/auto_id/registration_evidence/SP02_registration_reevaluation.json",
+  "passport": "docs/auto_id/specimens/SP02.physical.specimen.json",
+  "passport_sha256_lf": "30da6573505c6eed6a916b08dcec16faa7b0d4f5196508cbf15c56b52f22f057",
+  "perturbations": [
+    {
+      "name": "+translation_x",
+      "remapped_points": 121
+    },
+    {
+      "name": "-translation_x",
+      "remapped_points": 121
+    },
+    {
+      "name": "+translation_y",
+      "remapped_points": 121
+    },
+    {
+      "name": "-translation_y",
+      "remapped_points": 121
+    },
+    {
+      "name": "+scale",
+      "remapped_points": 17
+    },
+    {
+      "name": "-scale",
+      "remapped_points": 18
+    },
+    {
+      "name": "+rotation",
+      "remapped_points": 88
+    },
+    {
+      "name": "-rotation",
+      "remapped_points": 89
+    }
+  ],
+  "registration_file": "docs/registrations/SP02_physical_registration.json",
+  "registration_hash": "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c",
+  "registration_limited": false,
+  "registration_limited_both_triggers": false,
+  "schema": "auto-id/registration-uncertainty-evaluation/v1",
+  "status": "EVALUATED",
+  "threshold": 0.8,
+  "unavailable_components": [],
+  "uncertainty": {
+    "rotation_deg": 0.68,
+    "scale_rel": 0.002,
+    "translation_mm": 5.93
+  }
+}

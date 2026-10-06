@@ -448,3 +448,100 @@ DECISIONS D-059–D-061. SPEC §5, §5.1, §5.3 and §7 are unchanged.
   the bottom face is not evaluable.
 - Face binding is a convention.
 - `scale_rel` is NOT_AVAILABLE, so `registration_limited` is NOT_AVAILABLE.
+
+## 18. SP-13 HUMAN evidence update and SP-02 physical registration gate (SUPERVISOR, 2026-10-06)
+
+**Scope:** zero Abaqus. No M7 fitting, no M6-C, no SP-10 FE model. The STRICT policy, thresholds,
+classifier, M4.3 holdout rule and M4.4 cluster rule are unchanged. MAC is never used for
+orientation. The SP-13 gate (`173af43`) is SUPERVISOR-ACCEPTED (D-064). Status of this
+checkpoint: `REVIEW_READY`.
+
+**Delivered:**
+- **Parser fix (behaviour change, tested):** `psv_video_registration.alignment_points` reads the
+  stored point count (SP-02: 27 points). SP-13 is rebuilt bit-identically.
+- **Tools:**
+  - `tools/reconstruct_psv_registration.py`: optional `--dimension-uncertainty`; the default text
+    is unchanged.
+  - `tools/build_physical_registration.py`: the generic passport builder plus the four sign
+    alternatives. The SP-13 tool is unchanged.
+  - `tools/registration_uncertainty_evaluation.py`: M2.4 on the shape-pack surface. It also
+    evaluates the pairing-change trigger with the unchanged STRICT freeze.
+  - `tools/sp02_registration_reevaluation.py`: legacy vs physical freeze, CARBON-5A tracked
+    sensitivities and the combined picture.
+- **Governed files:**
+  - SP-13 passport: `scale_rel` 0.002 and the H7 orientation source. Registration hash unchanged.
+  - SP-13 and SP-02 M2.4 records.
+  - SP-02 reconstruction record, physical passport, physical registration and re-evaluation record.
+  - New SP-02 files only. The legacy SP-02 registration, passport and fixture are unchanged.
+- **Tests:** `tests/test_sp02_physical_registration.py` (new); `tests/test_sp13_physical_registration.py`
+  updated for H7/H8.
+
+**Results:** EVIDENCE, the entry "SP-13 HUMAN evidence update (H7–H10) and SP-02 physical
+registration".
+- **SP-13 M2.4:** EVALUATED; `registration_limited` False.
+- **SP-02:** same Polytec anisotropy (x 1.092, y 0.818). The legacy registration is wrong by median
+  29 mm, max 54 mm.
+- **SP-02 physical strict freeze:** FROZEN, 3 pairs (2↔8, 4↔10, 7↔13). Validation holdout R3.
+  2 fit rows: rank 2, condition number 6.1. `registration_limited` False.
+- **SP-02 identity:** NEEDS_ONE_HUMAN_CONFIRMATION (one question). It does not block the
+  reconstruction.
+
+### 18.1 M4.3 holdout semantics (read-only; rule unchanged)
+
+- **Sources:**
+  - SPEC §12.3: holdouts by physical modal family. Default sandwich holdouts: the lowest
+    torsion-dominated family when k_int is disabled, and the highest accepted family as a
+    validation holdout.
+  - SPEC §5 (k_int row): "the lowest torsional family goes to holdout".
+  - D-010 (family, not mode index).
+  - D-035: only the classifier **thresholds** are provisional.
+  - M4_DECISION_RECORD §5.1: "the holdout policy is not overridden for real data".
+  - M5: holdouts are never promoted into the fit; |r| > 3 fails.
+- **Implementation:** `select_holdouts(rows, k_int_enabled)` acts on the rows of **one frozen
+  observation set**. M4/M5 freeze one specimen at a time, so in practice the rule is applied per
+  specimen.
+- **Classification:**
+  - **Mandatory, not provisional.** The torsion holdout is a model-form safeguard for k_int off.
+    The validation holdout is part of the SPEC default and is applied to real data without override.
+  - **Unit:** defined per frozen set, which is per specimen as built and validated (M4.3 real
+    validation and the M4.9 twin were single-specimen).
+  - **Campaign level:** SPEC §12.3 does not say whether a multi-specimen campaign (§13, M7) applies
+    it per specimen or once to the pooled family set. That choice is an M7 decision, not made here.
+- **Why SP-13 loses a row:**
+  - SP-13 has two strict rows of different families, (1,2) and (0,3), and no torsion family among
+    them.
+  - The highest accepted family (0,3) is held out for validation, which leaves one fit row.
+  - This is the SPEC default working as designed on a two-row set, not a defect.
+- **Effect of the reading on SP-02 + SP-13:**
+  - Per specimen: 3 fit rows.
+  - Pooled by family type: the highest accepted family is (0,3), which holds out both SP-13 R2 and
+    SP-02 R3, so the same 3 fit rows.
+  - Only a specimen-keyed pooled reading would return SP-02 R3 to the fit (4 rows). It is not
+    adopted.
+
+### 18.2 Is SP-10 still needed?
+
+- **Observations:**
+  - SP-02 alone now has 2 fit rows after its unchanged holdout: rank 2, condition number 6.1.
+  - SP-13 adds a third fit row.
+  - Stacked: 5 strict rows, 3 fit rows over 2 specimens and 2 family types. Rank 2, condition
+    number 6.0. sd(ln E) 0.6 % (σ provisional 0.3 %, carbon-only).
+  - E_in remains supported when any one family is left out. G12 rests on the (1,2) family, and G12
+    already follows §5 / §5.1 (`BARE_PLATE_REQUIRED`, D-046).
+- **SPEC route:** SPEC §5 (order step 3) identifies E_in from "sandwiches of the family jointly".
+  SP-02 and SP-13 are two sandwiches of the old-plain-0.45 family (`CFRP-T300-plain-0.45-oldstock`).
+  The §13 consistency test needs N ≥ 2 specimens, so it is evaluable with Δdof = k.
+- **What SP-10 would add:** SPEC §7 and §13 name the SP2/SP10 pair (same design) as the
+  **reference specimen-to-specimen scatter** test.
+  - Without SP-10, an SP-02 vs SP-13 consistency test mixes specimen scatter with core-topology
+    model form (honeycomb vs auxetic).
+  - A failure would therefore not be attributable. A pass remains meaningful.
+  - This reference scatter test must be reported as NOT_AVAILABLE. It is not a gate condition in
+    SPEC §13, ROADMAP M7 ("where scientifically compatible") or §19.
+- **Conditions that remain, unrelated to SP-10:**
+  - the single SP-02 identity confirmation;
+  - SUPERVISOR acceptance of the SP-02 registration;
+  - Σ_setup provisional 0.3 % flagged;
+  - M6 must still pass its rescoped gate (M6.4 NEEDS_SOURCE) before M7 starts.
+- **Worker answer:** SP-02 + SP-13 give a plausible path to E_in without SP-10 (**YES**), with no
+  rule weakened.

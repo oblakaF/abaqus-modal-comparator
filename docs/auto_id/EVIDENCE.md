@@ -507,3 +507,190 @@ Possible remaining causes remain outside CARBON-5F scope:
 - Under the unchanged M4.3 holdout rule (highest accepted family held out), one fit row remains.
   **SP-13 alone is still observation-insufficient.**
 - 0 Abaqus solves, 0 Abaqus Python extractions.
+
+## SP-13 HUMAN evidence update (H7–H10) and SP-02 physical registration from stored PSV records (M6 gate)
+
+- **Status:** RECORDED (SUPERVISOR-authorised zero-Abaqus gate, 2026-10-06), pending SUPERVISOR review.
+  The HUMAN facts H7–H10 are recorded in D-064.
+- **Kind:**
+  - SP-13: uncertainty update only. The transform, registration and strict pairs are unchanged.
+  - SP-02: registration evidence (geometry only; no modal data). Then a zero-Abaqus strict
+    re-evaluation on the existing pack, and a combined diagnostic picture (no M7 fitting).
+
+### SP-13: updated uncertainty state
+
+| Item | Before (D-062) | Now |
+|---|---|---|
+| In-plane FE axis signs | four geometrically identical mappings; nominal by convention | **H7**: +x→+X, +y→+Y physically established; 180° alternative excluded (MAC not used) |
+| Remaining symmetry | — | through-thickness face convention only: TOP seen from +Z vs BOTTOM seen from −Z (the in-plane mirror together with z → −z). The FE stack is through-thickness symmetric, so this is a mathematical symmetry of the model, bound to TOP by convention. Not evaluable on the TOP-only packs. |
+| `translation_mm` | 5.72 | 5.72 (unchanged rule: maximum M2-model residual) |
+| `rotation_deg` | 0.49 | 0.49 (unchanged rule: maximum axis misalignment) |
+| `scale_rel` | NOT_AVAILABLE | **0.002**: H8 readout contribution only. The 1 mm ruler graduation over the shorter 510 mm side is 0.00196, rounded up. No calibration or operator term. |
+| M2.4 status | PARTIAL | **EVALUATED** (no missing component) |
+| `registration_limited` | NOT_AVAILABLE | **False**, both SPEC §11 triggers |
+| Σ_setup | provisional 0.3 % | provisional 0.3 %, flagged (H9: no PolyMAX of 260909) |
+| 260909 → 260910 | FREQUENCY_ONLY | FREQUENCY_ONLY (H10). No 260909 fitted modes exist, so no frequency-only estimate can be computed. |
+
+- **Passport:** `SP13.physical.specimen.json` is now manifest
+  `b857724a7e205cc794fc9a25fae7d1c351e3267855f775d9504fa66cce102731` (D-062 recorded `943bb3d1…`).
+  - Only `uncertainty.scale_rel` and the orientation source text (H7) changed.
+  - The registration hash is unchanged: `2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823`.
+- **M2.4 diagnostic** (`registration_evidence/SP13_registration_uncertainty.json`):
+  - Tool: `tools/registration_uncertainty_evaluation.py`, on the shape-pack surface. Eight
+    deterministic ±σ perturbations.
+  - MAC ranges: 4 ↔ 10 0.947–0.962 (nominal 0.958); 7 ↔ 13 0.921–0.948 (nominal 0.947). No pair
+    crosses 0.8.
+  - Pairing-change trigger: evaluated diagnostically with the unchanged STRICT freeze under every
+    perturbation (the M2.4 service itself still reports `DEFERRED_M4`). The strict pair set is
+    unchanged under all eight perturbations.
+- The dial caliper (0.01 mm) does not enter `scale_rel`; it is the thickness-readout instrument.
+- The audit document lists three 2026-09-09 PolyMAX frequencies (D-028). There is no pinned file
+  for them, so they are not a fixture and are not used for Σ_setup.
+
+### SP-02: Polytec anisotropy (verified before any MAC)
+
+| Item | Identity / value |
+|---|---|
+| `.svd` (snadwich `SP-02/SP02_500by500_Glue420_honeycomb_full_scan_retry_260803.svd`) | sha256 `d974608c9dd4aa497edca69b760e917a2a746bcd99c2806f700bf9a4e1462425` |
+| UNV geometry (snadwich `SP-02/SP02_polymax_retry_260803.unv`, the fixture source) | sha256 `2671db01b6401a9a9bbec7d8c2aa2191b0b35b5ae791756b91c7ccd381a41785` |
+| Reconstruction record | `registration_evidence/SP02_physical_registration_reconstruction.json`, sha256 `b9234f573b6ab98acad4944ff4a2786ac16baab2e29d41c061d55aec5900707e` |
+| Physical passport | `specimens/SP02.physical.specimen.json`, manifest `83739ecd2d0803bba682a3540c44e1437178164a731b48f1921e64b248168159` |
+| Physical registration | `docs/registrations/SP02_physical_registration.json`, hash `9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c` |
+| Re-evaluation record | `registration_evidence/SP02_registration_reevaluation.json`, sha256 `18ec73f0d96c84fb4a13610124470a3cfefc96dbae87df04361baaf430abf62d` |
+| M2.4 record | `registration_evidence/SP02_registration_uncertainty.json`, sha256 `f05b8b7767703fe9877be64662ec8a58ab5324adff1b8689e9defb1852e3f1c5` |
+
+- **Method:** the SP-13 method unchanged (D-062).
+  - One parser fix: the video-alignment table is read from its stored point count (byte 40)
+    instead of a 19-point marker. SP-02 stores 27 points.
+  - With the fixed parser, the SP-13 record is rebuilt bit-identically.
+- **Parser validation:** MeasPoints ↔ UNV homography residual median 1.2e-4, max 4.8e-4 normalised
+  units. Scanner-angle isotropy 0.973.
+- **Dimensions:** spec 515 × 510 × 2.9 mm.
+  - Horizontal 510 / vertical 515 is fixed from the frame aspect: px-per-mm consistency 1.0013,
+    against 0.9820 for the swapped order.
+  - It equals the FE `SP02_Modal_V02` face extents (X 510, Y 515).
+  - It was fixed before any pairing.
+- **Panel edges:** rms bottom 0.24, left 0.43, right 0.20 px; top 3.70 px.
+  - The top edge is bimodal: a bright halo just inside the panel triggers the first-step rule in
+    some columns.
+  - The frozen method was **not** changed. A worker-only silhouette diagnostic (first saturated
+    background row; rms 0.50 px) moves the window height by 0.17 % and the scan points by median
+    1.0 mm, max 3.0 mm.
+  - Both are within the recorded uncertainty (`scale_rel` 0.002, `translation_mm` 5.93).
+
+| Quantity | SP-02 | SP-13 (D-062) |
+|---|---|---|
+| Physical scan window | 368.72 × 499.24 mm | 366.51 × 496.23 mm |
+| Legacy UNV window | 402.54 × 408.30 mm | — |
+| UNV / physical, x and y | 1.0917, 0.8178 | 1.195, 0.889 |
+| Anisotropy x / y | 1.335 | 1.345 |
+| Edge offsets (left, right, bottom, top) | 80.72, 60.56, 9.66, 6.09 mm | 72.15, 71.33, 9.81, 13.96 mm |
+| Scan axes vs panel | +0.68° / +90.68° | −0.26° / +89.51° |
+| Affine residual (UNV → physical) | median 0.26, max 1.12 mm | — |
+| M2 model vs reconstruction | median 2.83, max 5.93 mm | median 2.68, max 5.72 mm |
+| Legacy centred vs physical (reconstruction) | median 30.6, p95 50.0, max 54.6 mm | median 26.0, max 47.4 mm |
+| Legacy registration vs physical registration (FE frame) | median 28.9, p95 48.6, max 54.1 mm; 0 of 121 mapped nodes in common | — |
+
+- **Conclusion (geometry only):** SP-02 has the same anisotropic UNV / video-coordinate distortion as
+  SP-13. The legacy SP-02 registration is geometrically wrong. It is kept as historical provenance
+  only (registration and passport unchanged).
+- **Frozen transform:**
+  - `scan_to_panel_edges` + `camera_grid`; physical width 368.7217, height 499.2446 mm;
+    panel_edges x 80.7213, y 9.6608 mm.
+  - Uncertainty (same rules as SP-13): translation 5.93 mm, rotation 0.68°, `scale_rel` 0.002
+    (H8 readout).
+  - Mapping rms 1.22 mm, max 1.94 mm; 121 unique nodes.
+  - The four sign alternatives are geometrically identical (rms 1.2176 mm).
+  - There is no SP-02 counterpart of H7. The nominal +x→+X, +y→+Y continues the accepted SP-02
+    convention and was fixed before evaluation.
+  - Production readiness: one issue only, `physical_specimen_id is not recorded`.
+
+### SP-02 identity audit (provenance only)
+
+- **File names and records:**
+  - Store folder `SP-02`; run `SP02_500by500_Glue420_honeycomb_full_scan_retry_260803`.
+  - PSV acquisition 03-Aug-26 13:40:35.
+  - The PolyMAX set `Bravo (1)` was processed in the Testlab project
+    `SP02_500by500_Glue420_honeycomb_full_scan_260715`, an SP-02 project from a 2026-07-15 scan
+    that is not in the store.
+  - FE `SP02_Modal_V01/V02` dated 2026-07-25, before the test.
+  - Fixture `physical_specimen_id` null.
+- **Spec chronology:**
+  - SP-02 "copy of SP-10": 515 × 510 × 2.9 mm, faces 0.45, 582.71 g.
+  - SP-10 "copy of SP-02": 520 × 515 × 2.8 mm, faces 0.40/0.39, 555.23 g.
+  - These are two physically different panels.
+- **Stored frames:**
+  - The 260803 panel label reads "500x500 / Plain fiber / honey comb / DP420", with **no specimen
+    number**.
+  - The SP-10 frame (260831) shows a panel labelled "SP_10 / 500x500 / Plain fiber / Honey comb /
+    DP420", in a different room and installation.
+  - A yellow note "Modal" with an unreadable circled mark is on the frame, not on the panel.
+- **Frequencies (records only, not used for any registration):**
+  - SP-10 260911 PolyMAX: 29.29 / 76.82 / 79.73 / 92.87 / 95.27 / 146.01 Hz.
+  - 260803 set: 28.01 / 74.38 / 78.16 / 90.57 / 91.95 / 144.76 Hz.
+  - Offsets +0.9 … +4.6 %, consistent with a different panel.
+- **Not excluded by the label alone:** SP-09 (new T300 plain, PLA honeycomb, DP420) carries the
+  same label text.
+- **Verdict: NEEDS_ONE_HUMAN_CONFIRMATION.** Is the unnumbered panel in the 2026-08-03 frame the
+  physical SP-02 of `SP-02/spec.txt` (515 × 510 × 2.9 mm, 582.71 g)?
+  - The geometric reconstruction is not blocked.
+  - The answer does not change the registration hash (`physical_specimen_id` is not hashed).
+
+### SP-02 strict pairing (STRICT policy unchanged; MAC ≥ 0.8, |Δf| ≤ 15 %; pack `SP02_f3e592281bebce66`)
+
+| Registration | Status | Strict pairs (exp ↔ FE: MAC, Δf) | Holdouts (M4.3, unchanged) | Fit rows |
+|---|---|---|---|---|
+| Legacy | NOT_FROZEN (1 < 2) | 2 ↔ 8: 0.958, +1.2 % | — | — |
+| Physical | FROZEN | 2 ↔ 8: 0.918, +1.2 %; 4 ↔ 10: 0.951, −1.4 %; 7 ↔ 13: 0.975, +2.7 % | validation R3 (family `Px:E\|Py:O\|nx:0\|ny:3`); no torsion family | R1, R2 |
+| Physical, 180° (reported only) | FROZEN | 2 ↔ 8: 0.917; 4 ↔ 10: 0.950; 7 ↔ 13: 0.977 | R3 | R1, R2 |
+
+- **Best match per mode (physical):** MAC 0.897, 0.918, 0.622, 0.951, 0.635, 0.614, 0.975, 0.527,
+  0.244 for modes 1–9.
+  - Mode 1: no FE mode inside the frequency gate (−15.8 %).
+  - Modes 3, 5, 6, 8, 9: MAC < 0.8.
+  - All values are in the record.
+- **M2.4 (SP-02):** EVALUATED.
+  - MAC ranges 0.913–0.921, 0.943–0.957, 0.960–0.976.
+  - No crossing; the strict pair set is unchanged under all eight perturbations.
+  - `registration_limited` False.
+- **Cluster:** no M4.4 trigger among the rows.
+  - FE 10 lies 1.4 % from FE 11.
+  - The CARBON-5A FE-to-FE tracking keeps both branches with MAC ≥ 0.999999 in all ±5 % E / G12
+    states, so the M4.4 confirmation condition (unstable branch identity) is not met.
+- **Sensitivities:** SP-02 has no ±5 % shape packs, so the accepted CARBON-5A frequency and
+  branch-tracking tables are used.
+  - Only branches resolved in all four states are used.
+  - The values equal the archived CARBON-5A `sensitivity.csv`.
+  - R1 (FE 8): S_E 0.493, S_G12 0.0002. R2 (FE 10): 0.362, 0.127. R3 (FE 13): 0.484, 0.0005.
+- **SP-02 alone, fit rows R1 and R2** (diagnostic; σ = 0.3 %; carbon-only): rank 2, condition
+  number 6.08, row angle 19.3°, sd(ln E) 0.006, sd(ln G12) 0.029.
+
+### Combined SP-02 + SP-13 picture (diagnostic stacking; not an M4/M5 contract; no M7 fit)
+
+| Specimen | Row | exp ↔ FE | MAC | Family | Held out (per specimen, unchanged rule) | S_E | S_G12 |
+|---|---|---|---|---|---|---|---|
+| SP-13 | R1 | 4 ↔ 10 | 0.958 | `Px:O\|Py:E\|nx:1\|ny:2` | no | 0.365 | 0.123 |
+| SP-13 | R2 | 7 ↔ 13 | 0.947 | `Px:E\|Py:O\|nx:0\|ny:3` | yes (validation) | 0.483 | 0.002 |
+| SP-02 | R1 | 2 ↔ 8 | 0.918 | `Px:E\|Py:E\|nx:0\|ny:2` | no | 0.493 | 0.0002 |
+| SP-02 | R2 | 4 ↔ 10 | 0.951 | `Px:O\|Py:E\|nx:1\|ny:2` | no | 0.362 | 0.127 |
+| SP-02 | R3 | 7 ↔ 13 | 0.975 | `Px:E\|Py:O\|nx:0\|ny:3` | yes (validation) | 0.484 | 0.0005 |
+
+- **Counts:**
+  - 5 strict rows before holdout: 2 specimens; 3 family types (5 specimen-families).
+  - 3 fit rows after the per-specimen holdout: 2 family types; 3 specimen-families.
+- **Conditioning** (σ = 0.3 %, carbon-only):
+
+  | Row set | Rank | Condition number | Max row angle | sd(ln E) | sd(ln G12) |
+  |---|---|---|---|---|---|
+  | All 5 strict rows | 2 | 6.6 | 19.3° | 0.0036 | 0.020 |
+  | 3 fit rows | 2 | 6.0 | 19.3° | 0.0061 | 0.025 |
+
+  With G12 fixed, sd(ln E) is 0.0042 on the 3 fit rows.
+- **Leave-one-family-out on the 3 fit rows:**
+  - Without the (0,2) family: the two (1,2) rows remain, 0.62° apart, condition number 184. G12
+    is not robust.
+  - Without the (1,2) family (pooled over specimens): one row remains, rank 1, sd(ln E | G12
+    fixed) 0.006.
+  - By specimen-family: every case keeps rank 2 (condition number ≤ 184).
+  - E_in alone is supported in every leave-one-family-out case; G12 depends on the (1,2) family.
+- 0 Abaqus solves, 0 Abaqus Python extractions.

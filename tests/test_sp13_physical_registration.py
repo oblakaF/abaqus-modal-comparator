@@ -35,6 +35,7 @@ from services.psv_video_registration import CompoundFile, PSVRegistrationError, 
 EVIDENCE = ROOT / "docs/auto_id/registration_evidence"
 RECORD = EVIDENCE / "SP13_physical_registration_reconstruction.json"
 REEVALUATION = EVIDENCE / "SP13_registration_reevaluation.json"
+UNCERTAINTY = EVIDENCE / "SP13_registration_uncertainty.json"
 PASSPORT = ROOT / "docs/auto_id/specimens/SP13.physical.specimen.json"
 LEGACY_PASSPORT = ROOT / "docs/auto_id/specimens/SP13.specimen.json"
 REGISTRATION = ROOT / "docs/registrations/SP13_physical_registration.json"
@@ -42,7 +43,8 @@ LEGACY_REGISTRATION = ROOT / "docs/registrations/SP13_frozen_registration.json"
 PHYSICAL_REGISTRATION_HASH = "2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823"
 LEGACY_REGISTRATION_HASH = "a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4"
 TRANSFORM_MODULES = ("src/services/psv_video_registration.py", "tools/reconstruct_psv_registration.py",
-                     "tools/build_sp13_physical_registration.py")
+                     "tools/build_sp13_physical_registration.py", "tools/build_physical_registration.py")
+SCALE_REL_READOUT = 0.002  # HUMAN H8: 1 mm ruler graduation over the shorter 510 mm side (0.00196), rounded up
 MODAL_MODULES = ("identification_pairing", "archived_baseline", "baseline_freeze", "branch_tracker",
                  "identification_clusters", "modal_family_classifier", "fe_shape_pack", "modal_core",
                  "universal_reader", "experimental_qc", "registration_uncertainty")
@@ -94,7 +96,31 @@ class AntiTuningTests(unittest.TestCase):
         self.assertEqual(gc["coordinate_calibration"]["physical_height"], round(m2["physical_height_mm"], 4))
         self.assertEqual(gc["panel_edges"], {"x_mm": round(m2["panel_edges_x_mm"], 4),
                                              "y_mm": round(m2["panel_edges_y_mm"], 4)})
-        self.assertEqual(gc["uncertainty"]["scale_rel"], None)  # not invented (H5: no instrument resolution)
+        # H8: readout resolution only (not calibrated accuracy); no calibration or operator term is added
+        self.assertEqual(gc["uncertainty"]["scale_rel"], SCALE_REL_READOUT)
+        self.assertGreaterEqual(SCALE_REL_READOUT, 1.0 / min(record["panel_dimensions_mm"]))
+        self.assertEqual(gc["uncertainty"]["translation_mm"],
+                         round(m2["residual_vs_reconstruction_mm"]["max"], 2))
+        self.assertEqual(gc["uncertainty"]["rotation_deg"], round(m2["axis_misalignment_deg"], 2))
+
+    def test_h7_orientation_is_recorded_without_changing_the_registration(self):
+        source = json.loads(PASSPORT.read_text(encoding="utf-8"))["geometry_calibration"]["orientation"]["source"]
+        self.assertIn("HUMAN H7", source)
+        self.assertIn("MAC was not used", source)
+        registration = FrozenRegistration.from_dict(json.loads(REGISTRATION.read_text(encoding="utf-8")))
+        self.assertEqual(registration.registration_hash, PHYSICAL_REGISTRATION_HASH)
+
+    def test_uncertainty_diagnostic_consumed_the_current_passport_and_pinned_registration(self):
+        document = json.loads(UNCERTAINTY.read_text(encoding="utf-8"))
+        self.assertEqual(document["registration_hash"], PHYSICAL_REGISTRATION_HASH)
+        self.assertEqual(document["passport_sha256_lf"],
+                         hashlib.sha256(PASSPORT.read_bytes().replace(b"\r\n", b"\n")).hexdigest())
+        self.assertEqual(document["accepted_pairs"], [[4, 10], [7, 13]])
+        self.assertEqual((document["status"], document["unavailable_components"]), ("EVALUATED", []))
+        self.assertIs(document["registration_limited"], False)
+        self.assertIs(document["pairing_change_diagnostic"]["pairing_changed"], False)
+        self.assertIs(document["registration_limited_both_triggers"], False)
+        self.assertEqual((document["abaqus_solves"], document["abaqus_python_extractions"]), (0, 0))
 
     def test_reevaluation_consumed_the_pinned_registration_unchanged(self):
         document = json.loads(REEVALUATION.read_text(encoding="utf-8"))
@@ -117,12 +143,12 @@ class GovernedFileTests(unittest.TestCase):
         status = load_specimen_manifest(LEGACY_PASSPORT).geometry_calibration.registration_basis_status
         self.assertIs(status, RegistrationBasisStatus.LEGACY_REPLAY)
 
-    def test_physical_passport_is_physical_with_partial_uncertainty(self):
+    def test_physical_passport_is_physical_with_complete_uncertainty(self):
         manifest = load_specimen_manifest(PASSPORT)
         gc = manifest.geometry_calibration
         self.assertIs(gc.registration_basis_status, RegistrationBasisStatus.PHYSICAL)
         self.assertEqual(gc.missing_physical_evidence, ())
-        self.assertEqual(gc.missing_uncertainty, ("geometry_calibration.uncertainty.scale_rel",))
+        self.assertEqual(gc.missing_uncertainty, ())  # H8 supplies the readout scale contribution
         self.assertEqual(str(manifest.physical_specimen_id), "SP-13")
         self.assertEqual(manifest.acquisition.remount_kind, "re_suspension")
 
@@ -189,6 +215,19 @@ class StoreReproductionTests(unittest.TestCase):
         result = build_physical_registration(load_specimen_manifest(PASSPORT))
         self.assertEqual(result.registration.registration_hash, PHYSICAL_REGISTRATION_HASH)
         self.assertEqual(result.production_readiness_issues(), ())
+
+    def test_uncertainty_diagnostic_is_reproduced(self):
+        from registration_uncertainty_evaluation import compute
+
+        recorded = json.loads(UNCERTAINTY.read_text(encoding="utf-8"))
+        got = compute(Path(recorded["passport"]), Path(recorded["registration_file"]),
+                      Path("docs/auto_id/baselines/SP13.carbon4c-baseline.json"), recorded["pack"],
+                      Path(recorded["pairs_source"]))
+        self.assertEqual(got["pairing_change_diagnostic"], recorded["pairing_change_diagnostic"])
+        for a, b in zip(got["pairs"], recorded["pairs"]):
+            self.assertAlmostEqual(a["minimum_mac"], b["minimum_mac"], places=12)
+            self.assertAlmostEqual(a["maximum_mac"], b["maximum_mac"], places=12)
+        self.assertIs(got["registration_limited_both_triggers"], False)
 
     def test_strict_freeze_under_both_registrations(self):
         document = json.loads(REEVALUATION.read_text(encoding="utf-8"))

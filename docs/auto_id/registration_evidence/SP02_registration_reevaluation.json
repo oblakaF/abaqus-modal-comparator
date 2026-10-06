@@ -1,0 +1,736 @@
+{
+  "abaqus_python_extractions": 0,
+  "abaqus_solves": 0,
+  "baseline_record_sha256": "e2e31535dfce8f929976607e314119d73e3069842778dadd71a9537f617bbfbc",
+  "combined_sp02_sp13": {
+    "conditioning_all_strict_rows": {
+      "column_cosine_E_G12": 0.529045968860494,
+      "condition_number": 6.635066733847794,
+      "local_sd_ln_E": 0.0035805948659114292,
+      "local_sd_ln_E_with_G12_fixed": 0.0030384683364874016,
+      "local_sd_ln_G12": 0.019976597107183136,
+      "max_row_angle_deg": 19.285580628266477,
+      "note": "diagnostic only: sigma = SPEC provisional 0.3 %, carbon-only (no nuisance); not an M5 verdict",
+      "rank": 2,
+      "rows": [
+        "SP-13:R1",
+        "SP-13:R2",
+        "SP-02:R1",
+        "SP-02:R2",
+        "SP-02:R3"
+      ]
+    },
+    "conditioning_fit_rows": {
+      "column_cosine_E_G12": 0.7222917803919418,
+      "condition_number": 6.01232597728857,
+      "local_sd_ln_E": 0.0060910385200723515,
+      "local_sd_ln_E_with_G12_fixed": 0.004212491888127698,
+      "local_sd_ln_G12": 0.02451406984316154,
+      "max_row_angle_deg": 19.285580628266477,
+      "note": "diagnostic only: sigma = SPEC provisional 0.3 %, carbon-only (no nuisance); not an M5 verdict",
+      "rank": 2,
+      "rows": [
+        "SP-13:R1",
+        "SP-02:R1",
+        "SP-02:R2"
+      ]
+    },
+    "families_after_holdout": [
+      "SP-02:Px:E|Py:E|nx:0|ny:2",
+      "SP-02:Px:O|Py:E|nx:1|ny:2",
+      "SP-13:Px:O|Py:E|nx:1|ny:2"
+    ],
+    "families_before_holdout": [
+      "SP-02:Px:E|Py:E|nx:0|ny:2",
+      "SP-02:Px:E|Py:O|nx:0|ny:3",
+      "SP-02:Px:O|Py:E|nx:1|ny:2",
+      "SP-13:Px:E|Py:O|nx:0|ny:3",
+      "SP-13:Px:O|Py:E|nx:1|ny:2"
+    ],
+    "fit_rows_after_per_specimen_holdout": 3,
+    "leave_one_family_out_fit_rows": {
+      "by_family_pooled_over_specimens": {
+        "without Px:E|Py:E|nx:0|ny:2": {
+          "condition_number": 184.16029344283515,
+          "local_sd_ln_E_with_G12_fixed": 0.005839027245379912,
+          "max_row_angle_deg": 0.6222357603692191,
+          "rank": 2,
+          "rows": [
+            "SP-13:R1",
+            "SP-02:R2"
+          ]
+        },
+        "without Px:O|Py:E|nx:1|ny:2": {
+          "local_sd_ln_E_with_G12_fixed": 0.0060831982924489944,
+          "rank": 1,
+          "rows": [
+            "SP-02:R1"
+          ]
+        }
+      },
+      "by_specimen_family": {
+        "without SP-02:Px:E|Py:E|nx:0|ny:2": {
+          "condition_number": 184.16029344283515,
+          "local_sd_ln_E_with_G12_fixed": 0.005839027245379912,
+          "max_row_angle_deg": 0.6222357603692191,
+          "rank": 2,
+          "rows": [
+            "SP-13:R1",
+            "SP-02:R2"
+          ]
+        },
+        "without SP-02:Px:O|Py:E|nx:1|ny:2": {
+          "condition_number": 6.2836393923485225,
+          "local_sd_ln_E_with_G12_fixed": 0.004891508954709361,
+          "max_row_angle_deg": 18.663344867897077,
+          "rank": 2,
+          "rows": [
+            "SP-13:R1",
+            "SP-02:R1"
+          ]
+        },
+        "without SP-13:Px:O|Py:E|nx:1|ny:2": {
+          "condition_number": 6.083351343638389,
+          "local_sd_ln_E_with_G12_fixed": 0.004903920566038609,
+          "max_row_angle_deg": 19.285580628266477,
+          "rank": 2,
+          "rows": [
+            "SP-02:R1",
+            "SP-02:R2"
+          ]
+        }
+      }
+    },
+    "note": "diagnostic stacking of strict rows; a joint SP-02 + SP-13 estimate is not an M4/M5 contract (each specimen is frozen and held out separately) and is not an M7 fit",
+    "rows": [
+      {
+        "S_E": 0.3646065173716216,
+        "S_G12": 0.12335622431587442,
+        "experimental_mode": 4,
+        "family": "Px:O|Py:E|nx:1|ny:2",
+        "fe_mode": 10,
+        "held_out": false,
+        "mac": 0.9584584247911996,
+        "row_id": "R1",
+        "specimen": "SP-13",
+        "torsion_dominated": false
+      },
+      {
+        "S_E": 0.48340889242231694,
+        "S_G12": 0.0024084034368166717,
+        "experimental_mode": 7,
+        "family": "Px:E|Py:O|nx:0|ny:3",
+        "fe_mode": 13,
+        "held_out": true,
+        "mac": 0.9469043137223597,
+        "row_id": "R2",
+        "specimen": "SP-13",
+        "torsion_dominated": false
+      },
+      {
+        "S_E": 0.49316163238076033,
+        "S_G12": 0.0002472081517657244,
+        "experimental_mode": 2,
+        "family": "Px:E|Py:E|nx:0|ny:2",
+        "fe_mode": 8,
+        "held_out": false,
+        "mac": 0.9175971747599743,
+        "row_id": "R1",
+        "specimen": "SP-02",
+        "torsion_dominated": false
+      },
+      {
+        "S_E": 0.3619893670520365,
+        "S_G12": 0.12686831806759422,
+        "experimental_mode": 4,
+        "family": "Px:O|Py:E|nx:1|ny:2",
+        "fe_mode": 10,
+        "held_out": false,
+        "mac": 0.9507510851875456,
+        "row_id": "R2",
+        "specimen": "SP-02",
+        "torsion_dominated": false
+      },
+      {
+        "S_E": 0.4837071900148189,
+        "S_G12": 0.0005218558251677936,
+        "experimental_mode": 7,
+        "family": "Px:E|Py:O|nx:0|ny:3",
+        "fe_mode": 13,
+        "held_out": true,
+        "mac": 0.975446706932764,
+        "row_id": "R3",
+        "specimen": "SP-02",
+        "torsion_dominated": false
+      }
+    ],
+    "strict_rows_before_holdout": 5
+  },
+  "legacy_registration_file": "docs/registrations/SP02_frozen_registration.json",
+  "legacy_vs_physical_geometry": {
+    "legacy_scales": [
+      0.001,
+      0.001,
+      0.001
+    ],
+    "max_mm": 54.14189871232813,
+    "median_mm": 28.865576522033447,
+    "p95_mm": 48.56861926417246,
+    "physical_scales": [
+      0.001091707373058918,
+      0.0008178283279714014,
+      0.0009448964046618157
+    ],
+    "point_count": 121,
+    "same_mapped_fe_nodes": 0
+  },
+  "pack": "SP02_f3e592281bebce66",
+  "physical_registration_file": "docs/registrations/SP02_physical_registration.json",
+  "policy_hash": "e3aa4e751a24fb931183227d3a93bc267a78117f41f4c793b31f0e9f42f23ac6",
+  "policy_id": "auto-id/identification-pairing/strict-v1",
+  "results": {
+    "BOTTOM_FACE_ALTERNATIVES": "not evaluable: the validated pack holds the TOP measured surface only; a bottom-face extraction would need Abaqus Python (not authorised)",
+    "LEGACY": {
+      "best_match_per_experimental_mode": [
+        {
+          "best_fe_mode": 7,
+          "best_mac": 0.8973949551080387,
+          "experimental_hz": 28.00617702599464,
+          "experimental_mode": 1,
+          "relative_frequency_error": -0.15832572639403922
+        },
+        {
+          "best_fe_mode": 8,
+          "best_mac": 0.9583211958972381,
+          "experimental_hz": 74.37596969581834,
+          "experimental_mode": 2,
+          "relative_frequency_error": 0.011631497594158229
+        },
+        {
+          "best_fe_mode": 9,
+          "best_mac": 0.5817309577597745,
+          "experimental_hz": 78.16162917220217,
+          "experimental_mode": 3,
+          "relative_frequency_error": 0.0011323734911461067
+        },
+        {
+          "best_fe_mode": 10,
+          "best_mac": 0.7620921516156226,
+          "experimental_hz": 90.57491895865455,
+          "experimental_mode": 4,
+          "relative_frequency_error": -0.013776789100748822
+        },
+        {
+          "best_fe_mode": 11,
+          "best_mac": 0.7650120103045255,
+          "experimental_hz": 91.94954020213925,
+          "experimental_mode": 5,
+          "relative_frequency_error": -0.015286257755842704
+        },
+        {
+          "best_fe_mode": 12,
+          "best_mac": 0.6248816377442777,
+          "experimental_hz": 144.76272074303833,
+          "experimental_mode": 6,
+          "relative_frequency_error": -0.004048274455437276
+        },
+        {
+          "best_fe_mode": 28,
+          "best_mac": 0.5160692365505435,
+          "experimental_hz": 201.99945377223358,
+          "experimental_mode": 7,
+          "relative_frequency_error": 2.20230968474937
+        },
+        {
+          "best_fe_mode": 29,
+          "best_mac": 0.4536807079085123,
+          "experimental_hz": 208.216045849403,
+          "experimental_mode": 8,
+          "relative_frequency_error": 2.140721776584774
+        },
+        {
+          "best_fe_mode": 16,
+          "best_mac": 0.25160834371324153,
+          "experimental_hz": 219.44442708453622,
+          "experimental_mode": 9,
+          "relative_frequency_error": 0.017999015893768417
+        }
+      ],
+      "excluded": [
+        {
+          "experimental_mode": 1,
+          "reason": "no FE mode within the frequency gate"
+        },
+        {
+          "experimental_mode": 3,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 4,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 5,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 6,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 7,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 8,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 9,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        }
+      ],
+      "label": "LEGACY centred registration (historical provenance)",
+      "observation_sufficient": false,
+      "reasons": [
+        "1 strict pairs < required 2"
+      ],
+      "registration_hash": "9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164",
+      "sensitivities_carbon5a": {
+        "R1": {
+          "S_E": 0.49316163238076033,
+          "S_G12": 0.0002472081517657244,
+          "min_tracked_mac_u3": 0.9999999021945217,
+          "status": "RESOLVED",
+          "tracked": {
+            "E_in_plane_mpa+": 8,
+            "E_in_plane_mpa-": 8,
+            "G12_mpa+": 8,
+            "G12_mpa-": 8
+          }
+        }
+      },
+      "status": "NOT_FROZEN",
+      "strict_pairs": [
+        {
+          "experimental_hz": 74.37596969581834,
+          "experimental_mode": 2,
+          "family": "Px:E|Py:E|nx:0|ny:2",
+          "fe_hz": 75.24107360839844,
+          "fe_mode": 8,
+          "mac": 0.9583211958972381,
+          "relative_frequency_error": 0.011631497594158229,
+          "row_id": "R1",
+          "torsion_dominated": false
+        }
+      ]
+    },
+    "PHYSICAL": {
+      "best_match_per_experimental_mode": [
+        {
+          "best_fe_mode": 7,
+          "best_mac": 0.8966870468799395,
+          "experimental_hz": 28.00617702599464,
+          "experimental_mode": 1,
+          "relative_frequency_error": -0.15832572639403922
+        },
+        {
+          "best_fe_mode": 8,
+          "best_mac": 0.9175971747599743,
+          "experimental_hz": 74.37596969581834,
+          "experimental_mode": 2,
+          "relative_frequency_error": 0.011631497594158229
+        },
+        {
+          "best_fe_mode": 9,
+          "best_mac": 0.6223885232095124,
+          "experimental_hz": 78.16162917220217,
+          "experimental_mode": 3,
+          "relative_frequency_error": 0.0011323734911461067
+        },
+        {
+          "best_fe_mode": 10,
+          "best_mac": 0.9507510851875456,
+          "experimental_hz": 90.57491895865455,
+          "experimental_mode": 4,
+          "relative_frequency_error": -0.013776789100748822
+        },
+        {
+          "best_fe_mode": 23,
+          "best_mac": 0.6352799067338231,
+          "experimental_hz": 91.94954020213925,
+          "experimental_mode": 5,
+          "relative_frequency_error": 3.510743635159653
+        },
+        {
+          "best_fe_mode": 12,
+          "best_mac": 0.6138592343913218,
+          "experimental_hz": 144.76272074303833,
+          "experimental_mode": 6,
+          "relative_frequency_error": -0.004048274455437276
+        },
+        {
+          "best_fe_mode": 13,
+          "best_mac": 0.975446706932764,
+          "experimental_hz": 201.99945377223358,
+          "experimental_mode": 7,
+          "relative_frequency_error": 0.026870558293706177
+        },
+        {
+          "best_fe_mode": 29,
+          "best_mac": 0.5273890652920223,
+          "experimental_hz": 208.216045849403,
+          "experimental_mode": 8,
+          "relative_frequency_error": 2.140721776584774
+        },
+        {
+          "best_fe_mode": 16,
+          "best_mac": 0.24346618945157297,
+          "experimental_hz": 219.44442708453622,
+          "experimental_mode": 9,
+          "relative_frequency_error": 0.017999015893768417
+        }
+      ],
+      "cluster_triggers": [],
+      "conditioning_fit_rows": {
+        "column_cosine_E_G12": 0.5932920415509565,
+        "condition_number": 6.083351343638389,
+        "local_sd_ln_E": 0.006091922897433479,
+        "local_sd_ln_E_with_G12_fixed": 0.004903920566038609,
+        "local_sd_ln_G12": 0.029375023257000317,
+        "max_row_angle_deg": 19.285580628266477,
+        "note": "diagnostic only: sigma = SPEC provisional 0.3 %, carbon-only (no nuisance); not an M5 verdict",
+        "rank": 2,
+        "rows": [
+          "R1",
+          "R2"
+        ]
+      },
+      "excluded": [
+        {
+          "experimental_mode": 1,
+          "reason": "no FE mode within the frequency gate"
+        },
+        {
+          "experimental_mode": 3,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 5,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 6,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 8,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 9,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        }
+      ],
+      "holdouts": {
+        "fit_row_ids": [
+          "R1",
+          "R2"
+        ],
+        "holdout_row_ids": [
+          "R3"
+        ],
+        "notes": [
+          "no torsion-dominated (odd-odd) family among the accepted rows"
+        ],
+        "torsion_family": null,
+        "validation_family": "Px:E|Py:O|nx:0|ny:3"
+      },
+      "label": "PHYSICAL registration (nominal, frozen before evaluation)",
+      "observation_sufficient": true,
+      "reasons": [],
+      "registration_hash": "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c",
+      "sensitivities_carbon5a": {
+        "R1": {
+          "S_E": 0.49316163238076033,
+          "S_G12": 0.0002472081517657244,
+          "min_tracked_mac_u3": 0.9999999021945217,
+          "status": "RESOLVED",
+          "tracked": {
+            "E_in_plane_mpa+": 8,
+            "E_in_plane_mpa-": 8,
+            "G12_mpa+": 8,
+            "G12_mpa-": 8
+          }
+        },
+        "R2": {
+          "S_E": 0.3619893670520365,
+          "S_G12": 0.12686831806759422,
+          "min_tracked_mac_u3": 0.9999989757380829,
+          "status": "RESOLVED",
+          "tracked": {
+            "E_in_plane_mpa+": 10,
+            "E_in_plane_mpa-": 10,
+            "G12_mpa+": 10,
+            "G12_mpa-": 10
+          }
+        },
+        "R3": {
+          "S_E": 0.4837071900148189,
+          "S_G12": 0.0005218558251677936,
+          "min_tracked_mac_u3": 0.9999995123672518,
+          "status": "RESOLVED",
+          "tracked": {
+            "E_in_plane_mpa+": 13,
+            "E_in_plane_mpa-": 13,
+            "G12_mpa+": 13,
+            "G12_mpa-": 13
+          }
+        }
+      },
+      "status": "FROZEN",
+      "strict_pairs": [
+        {
+          "experimental_hz": 74.37596969581834,
+          "experimental_mode": 2,
+          "family": "Px:E|Py:E|nx:0|ny:2",
+          "fe_hz": 75.24107360839844,
+          "fe_mode": 8,
+          "mac": 0.9175971747599743,
+          "relative_frequency_error": 0.011631497594158229,
+          "row_id": "R1",
+          "torsion_dominated": false
+        },
+        {
+          "experimental_hz": 90.57491895865455,
+          "experimental_mode": 4,
+          "family": "Px:O|Py:E|nx:1|ny:2",
+          "fe_hz": 89.32708740234375,
+          "fe_mode": 10,
+          "mac": 0.9507510851875456,
+          "relative_frequency_error": -0.013776789100748822,
+          "row_id": "R2",
+          "torsion_dominated": false
+        },
+        {
+          "experimental_hz": 201.99945377223358,
+          "experimental_mode": 7,
+          "family": "Px:E|Py:O|nx:0|ny:3",
+          "fe_hz": 207.4272918701172,
+          "fe_mode": 13,
+          "mac": 0.975446706932764,
+          "relative_frequency_error": 0.026870558293706177,
+          "row_id": "R3",
+          "torsion_dominated": false
+        }
+      ]
+    },
+    "PHYSICAL_ALTERNATIVE_180": {
+      "best_match_per_experimental_mode": [
+        {
+          "best_fe_mode": 7,
+          "best_mac": 0.8964043411546456,
+          "experimental_hz": 28.00617702599464,
+          "experimental_mode": 1,
+          "relative_frequency_error": -0.15832572639403922
+        },
+        {
+          "best_fe_mode": 8,
+          "best_mac": 0.9174890222082492,
+          "experimental_hz": 74.37596969581834,
+          "experimental_mode": 2,
+          "relative_frequency_error": 0.011631497594158229
+        },
+        {
+          "best_fe_mode": 9,
+          "best_mac": 0.622304765330299,
+          "experimental_hz": 78.16162917220217,
+          "experimental_mode": 3,
+          "relative_frequency_error": 0.0011323734911461067
+        },
+        {
+          "best_fe_mode": 10,
+          "best_mac": 0.9500516877828339,
+          "experimental_hz": 90.57491895865455,
+          "experimental_mode": 4,
+          "relative_frequency_error": -0.013776789100748822
+        },
+        {
+          "best_fe_mode": 23,
+          "best_mac": 0.6341885948369611,
+          "experimental_hz": 91.94954020213925,
+          "experimental_mode": 5,
+          "relative_frequency_error": 3.510743635159653
+        },
+        {
+          "best_fe_mode": 12,
+          "best_mac": 0.613020757451273,
+          "experimental_hz": 144.76272074303833,
+          "experimental_mode": 6,
+          "relative_frequency_error": -0.004048274455437276
+        },
+        {
+          "best_fe_mode": 13,
+          "best_mac": 0.9768558994393519,
+          "experimental_hz": 201.99945377223358,
+          "experimental_mode": 7,
+          "relative_frequency_error": 0.026870558293706177
+        },
+        {
+          "best_fe_mode": 29,
+          "best_mac": 0.6203434929156364,
+          "experimental_hz": 208.216045849403,
+          "experimental_mode": 8,
+          "relative_frequency_error": 2.140721776584774
+        },
+        {
+          "best_fe_mode": 16,
+          "best_mac": 0.24284994391577366,
+          "experimental_hz": 219.44442708453622,
+          "experimental_mode": 9,
+          "relative_frequency_error": 0.017999015893768417
+        }
+      ],
+      "cluster_triggers": [],
+      "conditioning_fit_rows": {
+        "column_cosine_E_G12": 0.5932920415509565,
+        "condition_number": 6.083351343638389,
+        "local_sd_ln_E": 0.006091922897433479,
+        "local_sd_ln_E_with_G12_fixed": 0.004903920566038609,
+        "local_sd_ln_G12": 0.029375023257000317,
+        "max_row_angle_deg": 19.285580628266477,
+        "note": "diagnostic only: sigma = SPEC provisional 0.3 %, carbon-only (no nuisance); not an M5 verdict",
+        "rank": 2,
+        "rows": [
+          "R1",
+          "R2"
+        ]
+      },
+      "excluded": [
+        {
+          "experimental_mode": 1,
+          "reason": "no FE mode within the frequency gate"
+        },
+        {
+          "experimental_mode": 3,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 5,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 6,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 8,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        },
+        {
+          "experimental_mode": 9,
+          "reason": "MAC below the policy minimum for every frequency-admissible FE mode"
+        }
+      ],
+      "holdouts": {
+        "fit_row_ids": [
+          "R1",
+          "R2"
+        ],
+        "holdout_row_ids": [
+          "R3"
+        ],
+        "notes": [
+          "no torsion-dominated (odd-odd) family among the accepted rows"
+        ],
+        "torsion_family": null,
+        "validation_family": "Px:E|Py:O|nx:0|ny:3"
+      },
+      "label": "reported alternative +x->-X, +y->-Y (TOP face, det +1, 180 deg) (not selected)",
+      "observation_sufficient": true,
+      "reasons": [],
+      "registration_hash": "49df4e0b34d545b45016a7694899e9403566b57b4eb1ba5ed36ed32a4c843b1d",
+      "sensitivities_carbon5a": {
+        "R1": {
+          "S_E": 0.49316163238076033,
+          "S_G12": 0.0002472081517657244,
+          "min_tracked_mac_u3": 0.9999999021945217,
+          "status": "RESOLVED",
+          "tracked": {
+            "E_in_plane_mpa+": 8,
+            "E_in_plane_mpa-": 8,
+            "G12_mpa+": 8,
+            "G12_mpa-": 8
+          }
+        },
+        "R2": {
+          "S_E": 0.3619893670520365,
+          "S_G12": 0.12686831806759422,
+          "min_tracked_mac_u3": 0.9999989757380829,
+          "status": "RESOLVED",
+          "tracked": {
+            "E_in_plane_mpa+": 10,
+            "E_in_plane_mpa-": 10,
+            "G12_mpa+": 10,
+            "G12_mpa-": 10
+          }
+        },
+        "R3": {
+          "S_E": 0.4837071900148189,
+          "S_G12": 0.0005218558251677936,
+          "min_tracked_mac_u3": 0.9999995123672518,
+          "status": "RESOLVED",
+          "tracked": {
+            "E_in_plane_mpa+": 13,
+            "E_in_plane_mpa-": 13,
+            "G12_mpa+": 13,
+            "G12_mpa-": 13
+          }
+        }
+      },
+      "status": "FROZEN",
+      "strict_pairs": [
+        {
+          "experimental_hz": 74.37596969581834,
+          "experimental_mode": 2,
+          "family": "Px:E|Py:E|nx:0|ny:2",
+          "fe_hz": 75.24107360839844,
+          "fe_mode": 8,
+          "mac": 0.9174890222082492,
+          "relative_frequency_error": 0.011631497594158229,
+          "row_id": "R1",
+          "torsion_dominated": false
+        },
+        {
+          "experimental_hz": 90.57491895865455,
+          "experimental_mode": 4,
+          "family": "Px:O|Py:E|nx:1|ny:2",
+          "fe_hz": 89.32708740234375,
+          "fe_mode": 10,
+          "mac": 0.9500516877828339,
+          "relative_frequency_error": -0.013776789100748822,
+          "row_id": "R2",
+          "torsion_dominated": false
+        },
+        {
+          "experimental_hz": 201.99945377223358,
+          "experimental_mode": 7,
+          "family": "Px:E|Py:O|nx:0|ny:3",
+          "fe_hz": 207.4272918701172,
+          "fe_mode": 13,
+          "mac": 0.9768558994393519,
+          "relative_frequency_error": 0.026870558293706177,
+          "row_id": "R3",
+          "torsion_dominated": false
+        }
+      ]
+    }
+  },
+  "schema": "auto-id/sp02-registration-reevaluation/v1",
+  "sensitivity_source": {
+    "branch_tracking": "carbon5a/branch_tracking.csv",
+    "frequencies": "carbon5a/frequencies.csv",
+    "rule": "S = (ln f+ - ln f-) / (ln 1.05 - ln 0.95) on the FE-to-FE tracked branch; only rows resolved in all four states",
+    "store": "carbon-project-archive"
+  }
+}

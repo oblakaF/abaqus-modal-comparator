@@ -1,0 +1,91 @@
+{
+  "schema": "auto-id/specimen/v1.1",
+  "specimen_type": "sandwich",
+  "family_id": "CFRP-T300-plain-0.45-oldstock",
+  "design_id": "SP-02",
+  "physical_specimen_id": null,
+  "test_run_id": "SP02_500by500_Glue420_honeycomb_full_scan_retry_260803",
+  "plan_mm": null,
+  "masses_g": null,
+  "face_thickness_mm": null,
+  "core_height_mm": null,
+  "materials": {
+    "face": "CFRP_T300_PlainWeave",
+    "core": "PLA_Core_Material"
+  },
+  "suspension_max_hz": null,
+  "geometry_calibration": {
+    "mode": "scan_to_panel_edges",
+    "coordinate_calibration": {
+      "mode": "camera_grid",
+      "abaqus_unit": "mm",
+      "experimental_unit": "m",
+      "scan_coverage": "partial",
+      "physical_width": 368.7217,
+      "physical_height": 499.2446,
+      "dimension_unit": "mm",
+      "manual_scale": null,
+      "provenance": "Physical scan window reconstructed from the stored PSV camera frame of SP02_500by500_Glue420_honeycomb_full_scan_retry_260803.svd (registration_evidence/SP02_physical_registration_reconstruction.json, sha256 b9234f573b6ab98acad4944ff4a2786ac16baab2e29d41c061d55aec5900707e): PSV MeasPoints video coordinates validated against the UNV geometry, panel edges fitted in the frame with the SP-13 method unchanged, physical scale from the panel dimensions 510 x 515 mm (spec 515 x 510 x 2.9; horizontal 510 from the frame aspect and the FE X extent). The UNV metric coordinates are anisotropic (x 1.092, y 0.818 of physical); this per-axis camera-grid scale replaces them. No modal data or MAC were used."
+    },
+    "measured_surface": {
+      "fe_instance": "CFRP_FACESHEET-TOP",
+      "side": "max_z",
+      "label": "labelled exterior face measured by the scanner (handwritten label visible in the stored frame); bound to FE TOP by the accepted SP-02 convention: the face sign is not demonstrable from records (FE stack is through-thickness symmetric)"
+    },
+    "orientation": {
+      "experimental_axes_in_fe": [
+        "+X",
+        "+Y",
+        "+Z"
+      ],
+      "reference": "panel_edges",
+      "source": "panel edges fitted in the stored PSV frame (reconstruction record above); unnumbered handwritten label '500x500 / Plain fiber / honey comb / DP420' at the top right of the measured face in the stored frame; the 510 mm side is horizontal (frame aspect, FE X extent 510). FE in-plane axis signs are not determinable from records (no SP-02 counterpart of HUMAN H7): the nominal +x->+X, +y->+Y continues the accepted SP-02 documented convention and was fixed before any pairing evaluation; the 180 deg alternative is reported in the evidence, never selected"
+    },
+    "uncertainty": {
+      "translation_mm": 5.93,
+      "scale_rel": 0.002,
+      "rotation_deg": 0.68
+    },
+    "panel_edges": {
+      "x_mm": 80.7213,
+      "y_mm": 9.6608
+    }
+  },
+  "fe_reference": {
+    "model_name": "SP02_Modal_V02",
+    "geometry_identity": {
+      "schema_version": "fe-geometry-identity/2",
+      "sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d",
+      "node_count": 1663816
+    },
+    "geometry_file": {
+      "role": "FE node coordinates (instance,node_label,x,y,z) extracted from the CARBON-4C reference ODB",
+      "file_name": "SP02_fe_geometry.csv",
+      "sha256": "79bffd963e63887acb03c6dab1b057936aba0e92db714318ef0a075d8a798bc0",
+      "size_bytes": 135600151,
+      "location": {
+        "store": "carbon-project-archive",
+        "relative_path": "fe_geometry/SP02_fe_geometry.csv"
+      }
+    }
+  },
+  "acquisition": {
+    "session": "2026-08-03 retry acquisition",
+    "grid": {
+      "grid_id": "SP-02-scan-121pt",
+      "point_count": 121
+    },
+    "fixture_id": "SP02/bravo-1",
+    "protocol_id": null,
+    "remount_of": null
+  },
+  "identify": "default",
+  "unavailable": {
+    "physical_specimen_id": "NEEDS_ONE_HUMAN_CONFIRMATION: the panel in the 2026-08-03 frame carries no specimen number; run name, Testlab project and spec chronology say SP-02, and it is not the panel labelled SP_10 (260831 frame), but file names alone do not establish a run-independent panel identity",
+    "plan_mm": "nominal 515 x 510 x 2.9 mm in the Snadwich store SP-02/spec.txt (100 cm steel ruler, 1 mm graduation, HUMAN H8); readout resolution only, no calibrated dimension uncertainty, so plan_mm with sd is not available",
+    "masses_g": "available in the Snadwich store SP-02/spec.txt (AVAILABLE_NOT_YET_GOVERNED); not imported by the registration gate",
+    "face_thickness_mm": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2)",
+    "core_height_mm": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2)",
+    "suspension_max_hz": "no physically measured suspension threshold is recorded (SPEC §19 item 5); never replaced by a default"
+  }
+}

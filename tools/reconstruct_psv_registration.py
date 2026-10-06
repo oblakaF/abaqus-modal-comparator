@@ -47,7 +47,11 @@ def file_identity(store: str, relative: str, path: Path) -> dict:
             "size_bytes": len(data)}
 
 
-def build(store: str, svd: str, unv: str, width_mm: float, height_mm: float, dimension_source: str) -> dict:
+NO_RESOLUTION = "NOT_AVAILABLE (no instrument resolution recorded)"
+
+
+def build(store: str, svd: str, unv: str, width_mm: float, height_mm: float, dimension_source: str,
+          dimension_uncertainty: str = NO_RESOLUTION) -> dict:
     roots = fixture_roots_from_environment()
     if store not in roots:
         raise SystemExit(f"data store {store!r} is not configured")
@@ -55,7 +59,7 @@ def build(store: str, svd: str, unv: str, width_mm: float, height_mm: float, dim
     ids, xy = unv_scan_geometry(unv_path)
     sources = {"svd": file_identity(store, svd, svd_path), "unv_geometry": file_identity(store, unv, unv_path),
                "panel_dimensions": {"width_mm": width_mm, "height_mm": height_mm, "source": dimension_source,
-                                    "uncertainty": "NOT_AVAILABLE (no instrument resolution recorded)"}}
+                                    "uncertainty": dimension_uncertainty}}
     result = reconstruct(svd_path.read_bytes(), xy, ids, width_mm, height_mm, sources=sources)
     record = dict(result.record)
     record["unv_node_ids"] = ids
@@ -70,9 +74,12 @@ def main() -> None:
     parser.add_argument("--width-mm", type=float, required=True)
     parser.add_argument("--height-mm", type=float, required=True)
     parser.add_argument("--dimension-source", required=True)
+    parser.add_argument("--dimension-uncertainty", default=NO_RESOLUTION,
+                        help="recorded readout resolution of the dimension measurement (never a calibration claim)")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    record = build(args.store, args.svd, args.unv, args.width_mm, args.height_mm, args.dimension_source)
+    record = build(args.store, args.svd, args.unv, args.width_mm, args.height_mm, args.dimension_source,
+                   args.dimension_uncertainty)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {args.out}")

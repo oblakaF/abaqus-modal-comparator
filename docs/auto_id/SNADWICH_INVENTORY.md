@@ -24,7 +24,7 @@ otherwise: 121 points, Δf 0.3125 Hz.
 | Specimen | Spec description | Type | Experiment | Fitted modes (dataset 55) | FE | Class | Auto-ID governance |
 |---|---|---|---|---|---|---|---|
 | SP-01 (folder `SP-01 -core mass less`) | old T300 plain, faces 0.45; PLA auxetic; 502.13 × 499.25 × 2.9 mm; spec has an experiment-vs-Abaqus table | sandwich | raw FRF 260624 | no | CAE/JNL only (no INP/ODB) | EXPERIMENT + FE (CAE) | not governed |
-| SP-02 | old T300 plain, faces 0.45; PLA honeycomb; "copy of SP-10" | sandwich | raw FRF 260803 retry | yes: `SP02_polymax_retry_260803.unv` (Bravo) | V01 and V02 INP/ODB; CAE | EXPERIMENT + FE | **governed** (fixture SP02/bravo-1) |
+| SP-02 (physical registration from stored PSV records, REVIEW_READY; identity needs one HUMAN confirmation) | old T300 plain, faces 0.45; PLA honeycomb; "copy of SP-10" | sandwich | raw FRF 260803 retry | yes: `SP02_polymax_retry_260803.unv` (Bravo) | V01 and V02 INP/ODB; CAE | EXPERIMENT + FE | **governed** (fixture SP02/bravo-1) |
 | SP-03 | old T300 **twill**, faces 0.45; PLA auxetic | sandwich | raw FRF 260803 | no | none | EXPERIMENT ONLY | not governed |
 | SP-04 | old T300 plain, faces 0.25; TPU honeycomb; 300 class | sandwich | raw FRF 260822 (0–1000 Hz) | no | none | EXPERIMENT ONLY | not governed |
 | SP-05 | old T300 plain, faces 0.245; TPU auxetic; 300 class | sandwich | raw FRF 260706a (0–1000 Hz) | no | `SP05_modal` INP/ODB; CAE; SAT | EXPERIMENT + FE | **not governed** |
@@ -70,7 +70,8 @@ The spec carbon and PLA constants are FE input values, not measurements.
 ## NOT_AVAILABLE (neither source)
 
 - a ≥ 9-point thickness map (any specimen);
-- mass and dimension uncertainties;
+- mass and dimension uncertainties (calibrated); only readout resolutions are known (HUMAN H8: ruler
+  graduation 1 mm, caliper 0.01 mm; D-064);
 - suspension thresholds;
 - excitation attachment masses;
 - documented remounts;

@@ -144,11 +144,14 @@ def default_rectangle(blob: bytes) -> tuple[float, float, float, float]:
 
 def alignment_points(blob: bytes) -> np.ndarray:
     """2D video alignment: rows (scanner angle a, angle b, u, v)."""
-    start = blob.find(bytes.fromhex("13000000"))
-    if start < 0:
+    # Layout: header ... uint32 flag at byte 36, uint32 point count at byte 40, then 28-byte records
+    # (uint32 flag, double angle a, double angle b, float u, float v).
+    if len(blob) < 44:
         raise PSVRegistrationError("video alignment table not found")
-    count = struct.unpack_from("<I", blob, start)[0]
-    rows = [struct.unpack_from("<Iddff", blob, start + 4 + 28 * k)[1:] for k in range(count)]
+    count = struct.unpack_from("<I", blob, 40)[0]
+    if not 3 <= count <= 1000 or len(blob) < 44 + 28 * count:
+        raise PSVRegistrationError(f"video alignment table not valid (count {count})")
+    rows = [struct.unpack_from("<Iddff", blob, 44 + 28 * k)[1:] for k in range(count)]
     return np.array(rows, dtype=float)
 
 

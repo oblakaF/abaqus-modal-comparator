@@ -3451,3 +3451,36 @@ first internal provider.
   re-registration binding; store-gated reproduction of the reconstruction, the registration and both
   freezes).
 - **Abaqus:** 0 solves and 0 extractions. Pairing policy, thresholds and modal data unchanged.
+
+## 2026-10-06 — SP-13 HUMAN evidence update (H7–H10) and SP-02 physical registration gate (zero Abaqus; D-064)
+
+- **SP-13:**
+  - The gate at `173af43` is recorded as SUPERVISOR-ACCEPTED.
+  - The passport takes the H7 orientation source and `scale_rel` 0.002 (H8 readout only). The
+    manifest is now `b857724a…`; the registration hash `2eeeaa86…` is unchanged.
+  - New M2.4 record: EVALUATED, `registration_limited` False (MAC crossing and pairing change both
+    evaluated).
+  - Σ_setup stays at the provisional 0.3 %, flagged (H9). 260909 → 260910 is FREQUENCY_ONLY (H10).
+- **Code:**
+  - `psv_video_registration.alignment_points` reads the stored point count (behaviour change,
+    tested). The SP-13 record is rebuilt bit-identically.
+  - `reconstruct_psv_registration.py`: optional `--dimension-uncertainty`.
+  - New tools: `build_physical_registration.py`, `registration_uncertainty_evaluation.py`,
+    `sp02_registration_reevaluation.py`.
+- **SP-02 governed files (new):**
+  - the reconstruction record (`b9234f57…`);
+  - `SP02.physical.specimen.json` (manifest `83739ecd…`; `physical_specimen_id` null);
+  - `SP02_physical_registration.json` (`9b63f6c8…`);
+  - the re-evaluation and M2.4 records.
+  - The legacy SP-02 registration, passport and fixture are unchanged.
+- **SP-02 result:**
+  - Anisotropy x 1.092 / y 0.818; legacy vs physical median 28.9 mm, max 54.1 mm.
+  - Strict pairs: legacy (2,8) NOT_FROZEN → physical (2,8),(4,10),(7,13) FROZEN.
+  - M4.3 validation holdout R3; fit rows R1, R2 (condition number 6.1). `registration_limited`
+    False.
+  - Identity: NEEDS_ONE_HUMAN_CONFIRMATION.
+- **Combined SP-02 + SP-13 (diagnostic):** 5 strict rows, 3 fit rows, rank 2, condition number 6.0.
+- **Holdout semantics** documented read-only (M6_DECISION_RECORD §18.1); the rule is unchanged.
+- **Tests:** `tests/test_sp02_physical_registration.py` (new); `tests/test_sp13_physical_registration.py`
+  updated.
+- **Abaqus:** 0 solves, 0 extractions. Pairing policy, thresholds, holdouts and modal data unchanged.
