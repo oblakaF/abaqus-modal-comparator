@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M6-A recorded; M6-B (Stage-A -> M5 adapter) next in this authorised batch; then STOP for SUPERVISOR review and real SP-11 data (M6-C not authorised)",
+  "next_action": "STOP: M6-A/M6-B REVIEW_READY for SUPERVISOR review; then real SP-11 experimental data (M6_SP11_EXPERIMENT_CHECKLIST.md) before M6-C; no Abaqus without a HUMAN gate",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -645,6 +645,22 @@
       "scope": "SUPERVISOR entry decisions recorded (D-049..D-056); SP-11 HUMAN experiment checklist",
       "abaqus_runs": 0,
       "status": "REVIEW_READY"
+    },
+    "M6-B": {
+      "modules": "src/domain/stage_a_experiment.py; src/services/stage_a_validation.py",
+      "tests": "tests/test_stage_a_validation.py (27, synthetic; SUPERVISOR items 1-20 + 7 additional) with tests/m6_stage_a_support.py",
+      "scope_note": "Stage-A -> M5 adapter in the STAGE_A_VALIDATION context (D-050); software only; real SP-11 data not admitted (M6-C not authorised); M6.1 not REVIEW_READY",
+      "tests_result": "M6-B 27 passed; M6-B + Stage-A + M5 + M4 guard 261 passed (2 Abaqus-gated skipped); M3/M4/M5 stage gates with stores 30 passed; Windows 1420 OK (27 skipped) without data stores; 1425 OK (2 skipped) with both stores",
+      "abaqus_runs": 0,
+      "abaqus_python_extractions": 0,
+      "status": "REVIEW_READY",
+      "open_items": [
+        "affine-basis validation tolerance (needed before M6-D)",
+        "real-run LM settings and D bounds",
+        "mass / plan-dimension uncertainty propagation",
+        "bare-plate fit/holdout policy",
+        "twill family_id string (checklist A7)"
+      ]
     }
   }
 }

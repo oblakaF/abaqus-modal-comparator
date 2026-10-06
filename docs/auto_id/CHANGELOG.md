@@ -3345,3 +3345,38 @@ first internal provider.
   sections A–E.
 - **Code:** none in this checkpoint.
 - **Abaqus runs:** 0. No retained M4 artifact deleted.
+
+## 2026-10-06 — M6 checkpoint M6-B (Stage-A → M5 adapter) REVIEW_READY
+
+- **Status:**
+  - M6-B `REVIEW_READY`;
+  - M6.1 stays `IN_PROGRESS` / NEEDS_DATA, not `REVIEW_READY`: no real SP-11 data, and M6-C is not
+    authorised;
+  - M6.2–M6.4 unchanged.
+- **New modules:**
+  - `src/domain/stage_a_experiment.py`: typed Stage-A experimental evidence. Every gap is refused
+    together, with typed codes: FRF-only, not curve-fitted, no frozen modal set, < 9 thickness
+    points, attachment / non-contact route, < 2 excitation locations, suspension, mass / plan,
+    geometry calibration, fixed-pair fallback, non-strict policy.
+  - `src/services/stage_a_validation.py`: `run_stage_a_validation`. It runs:
+    - the verified affine Stage-A basis;
+    - strict FE-to-FE tracking;
+    - the M4.8 LM with explicit settings and bounds;
+    - the D12 rank policy (D-051);
+    - ±5 % ln-p sensitivities;
+    - the M5 chain: rank, `statistical_sd`, pattern, Birge, leave-one-family-out;
+    - the M5.9 PRODUCTION verdict embedded (always NOT_IDENTIFIABLE while family consistency is
+      NOT_AVAILABLE);
+    - derived E and G12 with separately labelled frequency, thickness-spatial and gauge components
+      (t⁻³ explicit);
+    - the `STAGE_A_VALIDATION` report with deterministic hashes;
+    - the M6.2 comparison interface (no agreement rule yet).
+- **Unchanged:** the M1–M5 modules and the legacy Stage-A modules.
+- **Worker design choices and open items:** M6_DECISION_RECORD.md §12–§14.
+- **Tests:**
+  - `tests/test_stage_a_validation.py`: 27, synthetic (SUPERVISOR items 1–20 plus 7 more).
+  - Targeted: M6-B + Stage-A + M5 + M4 guard, 261 passed (2 Abaqus-gated tests skipped); M3/M4/M5
+    stage gates with stores, 30 passed.
+  - Full suite, Windows: 1420 OK (27 skipped) without data stores; 1425 OK (2 skipped) with both
+    stores.
+- **Abaqus:** 0 solves and 0 Abaqus Python extractions. No retained M4 artifact deleted.

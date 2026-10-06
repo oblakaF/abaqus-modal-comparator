@@ -192,3 +192,127 @@ Stage-A machinery (§12).
   - M6.1 is not `REVIEW_READY`, because the real SP-11 data are missing;
   - the M6 gate is not evaluated and is not PASS;
   - M7 is `NOT_STARTED`.
+
+---
+
+## 12. Checkpoint M6-B: Stage-A → M5 adapter (worker design, for SUPERVISOR review)
+
+**Modules (new; no change to M1–M5 or legacy modules):**
+- `src/domain/stage_a_experiment.py`: typed experimental evidence records for one Stage-A run.
+  - Contents: the modal input (dataset types, M1.1 classification, frozen modal set), the thickness
+    points (with an optional gauge), excitation, the trusted suspension threshold (M1.4 type), mass
+    and plan dimensions with uncertainties, and the strict-policy pairing.
+  - Every gap is reported together as `StageAInputRefusal`, with a typed code per gap.
+- `src/services/stage_a_validation.py`: the adapter `run_stage_a_validation`, the
+  `STAGE_A_VALIDATION` report, and the M6.2 comparison interface.
+
+**Reused, unchanged:**
+- `StageAAffineBasis` and `solve_generalized_eigenproblem`. Only these two (plus the error type and
+  the parameter record) are imported from `matrix_model_service`; there is no Abaqus job path.
+- M4: `track_branches` (strict policy) and `run_bounded_lm`.
+- M5: `assemble_system`, `analyse_practical_identifiability` and `compute_evidence_chain` (rank,
+  `statistical_sd`, pattern test, Birge, leave-one-family-out), plus `decide_verdicts`.
+- The legacy Stage-A identification, uncertainty and inverse-solver services are not imported.
+
+**Worker choices that need SUPERVISOR review:**
+
+1. **Sensitivities:** central differences ±5 % in ln p on the affine model (SPEC §6 S4,
+   `LMSettings.finite_difference_step`). The same rule handles single rows and confirmed clusters.
+2. **Estimation:** the accepted M4.8 bounded LM.
+   - The settings and parameter bounds are explicit run inputs with no defaults. The tests use the
+     D-034 values.
+   - D12 starts on the governed line ν12·D11.
+   - A non-converged LM is a REFUSED report; it never falls back to another parameter set.
+3. **D12 (D-051):** practical rank of the full (D11, D12, D66) system is checked at the start point
+   and again at p̂. If it is rank-deficient at either point, the governed fixed-ν12 path runs.
+   - That path first checks the rank of its own (D11, D66) system.
+   - If that is rank-deficient too, the run is REFUSED (hard block).
+4. **Tracking:** every evaluation is tracked FE-to-FE from the baseline pairing state (D-008). A
+   tracking refusal anywhere gives a REFUSED report; nothing is re-paired.
+5. **Σ:**
+   - **Typed components:** each component is typed `Sigma_meas` or `Sigma_setup`, and its name must
+     match its kind, so nothing can be relabelled.
+   - **Ordering:** Σ is given over the fit terms, then the holdout rows.
+   - **Holdout whitening:** holdout residuals are whitened by the diagonal of Σ over the holdout
+     rows.
+   - **Provisional term:** `spec_provisional_setup_term` gives the SPEC §7 0.3 % term (sd 0.003 in
+     ln f, first order), flagged PROVISIONAL.
+6. **Thickness (D-052):**
+   - spatial scatter = sample sd (n − 1) of the points;
+   - sd(ln t) ≈ s_t/t̄, first order;
+   - component in E or G12 = 3·s_t/t̄;
+   - gauge component = 3·u_gauge/t̄, only if supplied;
+   - combined `statistical_sd_ln_with_thickness` = the root-sum-square of the independent
+     components, with every component kept and labelled.
+   - E = 12·D11·(1 − ν²)/t³ and G12 = 12·D66/t³ (equal to the existing Stage-A formula). ν is
+     D12/D11 when D12 is fitted; otherwise ν = 0.05.
+   - The Birge factor scales the frequency part only.
+   - The model-form half-range of E and G12 is the linear image of the leave-one-family-out shifts.
+7. **Excitation (SPEC §15):**
+   - at least 2 excitation locations;
+   - a contact route needs a recorded attachment mass, equal to the mass modelled in the forward
+     model;
+   - a route without an attached mass needs an approval reference.
+8. **Production verdict (D-050):**
+   - computed by `decide_verdicts` in the PRODUCTION context, with family consistency NOT_AVAILABLE
+     and the provenance "M7 work";
+   - embedded unchanged in the report;
+   - an internal invariant refuses any IDENTIFIED or WIDE result;
+   - the M5 `VerdictContext` enum is unchanged.
+9. **Units:** SI, with D in N·m and the thickness converted from mm.
+10. **M6.2 interface (D-053):** `stage_a_repeat_comparison_inputs` gives ln estimates,
+    differences and frequency-only `statistical_sd` for two runs.
+    - It requires an eligible M2 `classify_setup_repeat`, the same physical specimen, and the same
+      fitted parameters.
+    - It records a shared thickness characterisation as common-mode.
+    - It has no agreement rule: its status is `AGREEMENT_RULE_PENDING_M6_2_DECISION`.
+    - `SetupScatterEstimator` is an interface only.
+
+**Open items, not decided by the worker:**
+- **N2:** the affine-basis validation tolerance against direct Abaqus solves. It must not be
+  invented and is needed before M6-D.
+- **Real-run LM settings and D bounds** for SP-11.
+- **Mass and plan uncertainties:** propagation of the mass and plan-dimension uncertainties into D.
+  They are recorded, not propagated, and listed as an open condition in every report.
+- **Bare-plate fit/holdout policy:** SPEC §12 holdouts are defined for sandwiches (k_int); the
+  adapter supports holdout rows but does not choose them.
+- **Family-id string for the twill passport** (checklist A7).
+
+## 13. M6-B tests (`tests/test_stage_a_validation.py`, synthetic, no Abaqus)
+
+| SUPERVISOR item | Test |
+|---|---|
+| 1 D11/D66 recovery | `test_01_synthetic_d11_d66_recovery` (fitted-D12 and fixed-ν12 cases) |
+| 2 D12 full rank | `test_02_d12_full_rank_case_is_fitted` |
+| 3 D12 rank-deficient | `test_03_d12_rank_deficient_uses_governed_fixed_path_only` |
+| 4 no pseudo-inverse | `test_04_no_pseudo_inverse` |
+| 5 no override | `test_05_no_scientific_override_and_required_rank_is_a_hard_refusal` |
+| 6 t⁻³ scaling | `test_06_e_and_g12_scale_as_t_to_the_minus_three` (+ `test_06b` formula cross-check) |
+| 7 not /√N | `test_07_spatial_scatter_is_the_sample_sd_not_divided_by_sqrt_n` |
+| 8 gauge separate | `test_08_gauge_uncertainty_is_a_separate_component` |
+| 9 FRF-only refused | `test_09_frf_only_input_is_refused` (through the M1.1 classifier) |
+| 10 frozen set missing | `test_10_missing_frozen_modal_set_is_refused` |
+| 11 < 9 thickness points | `test_11_fewer_than_nine_thickness_points_are_refused` |
+| 12 attachment / non-contact | `test_12_missing_attachment_or_non_contact_evidence_is_refused` |
+| 13 suspension | `test_13_missing_suspension_evidence_is_refused` |
+| 14 no mode-1 exclusion | `test_14_mode_one_is_not_excluded` |
+| 15 no legacy condition thresholds | `test_15_legacy_condition_number_thresholds_are_not_applied` (condition number 342, still fitted) |
+| 16 no fixed-pair fallback | `test_16_legacy_fixed_pair_fallback_is_not_used` |
+| 17 estimate + uncertainty | `test_17_stage_a_validation_reports_estimate_and_labelled_uncertainty` |
+| 18 no production IDENTIFIED | `test_18_no_production_identified_while_family_consistency_is_not_available` |
+| 19 deterministic hashes | `test_19_deterministic_provenance_and_hashes` |
+| 20 no Abaqus / M3 dependency | `test_20_no_abaqus_or_m3_execution_dependency` |
+
+Additional tests:
+- all gaps are listed together;
+- a confirmed cluster is one fit term and holdouts stay out of the fit;
+- a systematic family error is reported, not hidden;
+- a tracking refusal gives a REFUSED report;
+- Σ kinds cannot be relabelled;
+- the M6.2 comparison inputs.
+
+## 14. Data still needed for M6-C
+
+Every HUMAN item of [M6_SP11_EXPERIMENT_CHECKLIST.md](M6_SP11_EXPERIMENT_CHECKLIST.md),
+sections A–E (A7 is a SUPERVISOR confirmation). None is available in the repository records or in
+the data stores today.

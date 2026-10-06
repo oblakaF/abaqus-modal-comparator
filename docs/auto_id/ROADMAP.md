@@ -476,6 +476,8 @@ Stage status: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto
 decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-056; M6 gate not evaluated).
 - Checkpoint M6-A `REVIEW_READY`: entry decisions recorded; HUMAN SP-11 experiment checklist
   [M6_SP11_EXPERIMENT_CHECKLIST.md](M6_SP11_EXPERIMENT_CHECKLIST.md). No Abaqus.
+- Checkpoint M6-B `REVIEW_READY`: `domain/stage_a_experiment.py` + `services/stage_a_validation.py`
+  (Stage-A → M5 adapter, `STAGE_A_VALIDATION` context) with synthetic tests. No Abaqus.
 - M6.1 needs the new SP-11 experiment (D-049) before M6-C; it is not `REVIEW_READY`.
 
 **M6 GATE:** critical priors and uncertainties are physically supported, not guessed.
