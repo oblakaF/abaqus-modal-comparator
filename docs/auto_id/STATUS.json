@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: M6-A/M6-B REVIEW_READY for SUPERVISOR review; then real SP-11 experimental data (M6_SP11_EXPERIMENT_CHECKLIST.md) before M6-C; no Abaqus without a HUMAN gate",
+  "next_action": "STOP for SUPERVISOR review of the M6-A correction; independent read-only reviews done (M6.4 range sources, M6.3 and STEEL feasibility); one later M6/STEEL rescope decision; no Abaqus, no M6-C, no M7",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -627,29 +627,30 @@
     "branch": "auto-id/m6",
     "base": "ab1dc6071355fe536a3bec7f593ee804df92583f",
     "status": "IN_PROGRESS",
-    "M6.1": "IN_PROGRESS",
-    "M6.2": "TODO",
+    "M6.1": "BLOCKED_ON_EXPERIMENT",
+    "M6.2": "BLOCKED_ON_EXPERIMENT",
     "M6.3": "TODO",
     "M6.4": "TODO",
     "readiness": {
-      "M6.1": "NEEDS_DATA (real SP-11 experiment missing; not REVIEW_READY)",
-      "M6.2": "NEEDS_DATA (genuine same-plate remount missing)",
-      "M6.3": "NEEDS_DATA (printed core tiles: auxetic, honeycomb)",
-      "M6.4": "NEEDS_DECISION (defensible variation ranges; D-055)"
+      "M6.1": "BLOCKED_ON_EXPERIMENT (D-057: no governed fitted/frozen SP-11 modal set; inconsistent sessions; incomplete physical support data; new SP-11 experiment not available)",
+      "M6.2": "BLOCKED_ON_EXPERIMENT (D-058: no valid documented SP-11 repeat; repeat definition not weakened)",
+      "M6.3": "NEEDS_DATA (no core-tile specimen or test exists); physical feasibility unresolved",
+      "M6.4": "NEEDS_DECISION (no defensible variation ranges yet; D-055)"
     },
-    "gate": "NOT_EVALUATED",
-    "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-056)",
+    "gate": "NOT_EVALUATED (cannot currently close: M6.1/M6.2 BLOCKED_ON_EXPERIMENT; SPEC/ROADMAP unchanged)",
+    "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-058; D-057/D-058 correct D-049/D-053)",
     "entry_authorisation": "SUPERVISOR 2026-10-06: M6 entry review accepted; checkpoints M6-A (governance, SP-11 checklist) and M6-B (Stage-A -> M5 adapter, synthetic tests) only; no Abaqus; no M6-C",
-    "experiment_checklist": "docs/auto_id/M6_SP11_EXPERIMENT_CHECKLIST.md",
+    "experiment_checklist": "docs/auto_id/M6_SP11_EXPERIMENT_CHECKLIST.md (reference requirements for a valid future SP-11 / bare-plate test; not an active HUMAN to-do list)",
     "M6-A": {
       "scope": "SUPERVISOR entry decisions recorded (D-049..D-056); SP-11 HUMAN experiment checklist",
       "abaqus_runs": 0,
-      "status": "REVIEW_READY"
+      "status": "REVIEW_READY",
+      "correction": "2026-10-06 corrective governance (M6_DECISION_RECORD §15): D-057 corrects D-049, D-058 corrects D-053; checklist re-labelled; inventory note; no SPEC/ROADMAP rescope"
     },
     "M6-B": {
       "modules": "src/domain/stage_a_experiment.py; src/services/stage_a_validation.py",
       "tests": "tests/test_stage_a_validation.py (27, synthetic; SUPERVISOR items 1-20 + 7 additional) with tests/m6_stage_a_support.py",
-      "scope_note": "Stage-A -> M5 adapter in the STAGE_A_VALIDATION context (D-050); software only; real SP-11 data not admitted (M6-C not authorised); M6.1 not REVIEW_READY",
+      "scope_note": "Stage-A -> M5 adapter in the STAGE_A_VALIDATION context (D-050); software only; unchanged by the 2026-10-06 correction; SP-11 cannot currently exercise it (M6.1 BLOCKED_ON_EXPERIMENT)",
       "tests_result": "M6-B 27 passed; M6-B + Stage-A + M5 + M4 guard 261 passed (2 Abaqus-gated skipped); M3/M4/M5 stage gates with stores 30 passed; Windows 1420 OK (27 skipped) without data stores; 1425 OK (2 skipped) with both stores",
       "abaqus_runs": 0,
       "abaqus_python_extractions": 0,
@@ -661,6 +662,8 @@
         "bare-plate fit/holdout policy",
         "twill family_id string (checklist A7)"
       ]
-    }
+    },
+    "specimen_inventory": "docs/auto_id/SNADWICH_INVENTORY.md (factual D:\\Snadwich inventory; no passports created)",
+    "m7": "NOT_STARTED"
   }
 }

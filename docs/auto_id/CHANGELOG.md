@@ -3380,3 +3380,29 @@ first internal provider.
   - Full suite, Windows: 1420 OK (27 skipped) without data stores; 1425 OK (2 skipped) with both
     stores.
 - **Abaqus:** 0 solves and 0 Abaqus Python extractions. No retained M4 artifact deleted.
+
+## 2026-10-06 — M6 corrective governance after the D:\Snadwich source audit (M6-A correction)
+
+- **Basis:** the read-only `D:\Snadwich` source audit, accepted by the SUPERVISOR as the factual
+  basis.
+- **Decisions (append-only):**
+  - **D-057 corrects D-049.** Kept: SP-11 is the twill bare plate, and its data are
+    reconnaissance-only. Removed: "resolution insufficient" as a standalone bar, and "new
+    acquisition required". M6.1 is `BLOCKED_ON_EXPERIMENT` because there is no fitted/frozen
+    modal set, the sessions are inconsistent, the support data are incomplete, and no new
+    experiment is available.
+  - **D-058 corrects D-053.** The repeat wording now follows SPEC §7: the same grid supports
+    frequencies, shapes and MAC; a different grid supports frequency-only. M6.2 is
+    `BLOCKED_ON_EXPERIMENT`; the definition is not weakened.
+- **Documents:**
+  - M6_DECISION_RECORD.md §15 added, with superseded / corrected notes in §3, §7 and §14;
+  - M6_SP11_EXPERIMENT_CHECKLIST.md re-labelled as reference requirements (AVAILABLE_NOT_YET_GOVERNED
+    / MISSING / UNAVAILABLE_FOR_THIS_PROJECT);
+  - new SNADWICH_INVENTORY.md (a factual inventory; no passports).
+- **Status:**
+  - M6 `IN_PROGRESS`; M6-A `REVIEW_READY` (corrected); M6-B `REVIEW_READY`;
+  - M6.1 and M6.2 `BLOCKED_ON_EXPERIMENT`;
+  - M6.3 `TODO` (NEEDS_DATA, feasibility unresolved); M6.4 `TODO` (NEEDS_DECISION);
+  - gate `NOT_EVALUATED`; M7 `NOT_STARTED`.
+- **Unchanged:** SPEC, the ROADMAP mini-step definitions, and all code. M6-B is unchanged.
+- **Abaqus:** none.

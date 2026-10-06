@@ -467,18 +467,25 @@ work.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `IN_PROGRESS` (NEEDS_DATA) |
-| M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `TODO` (NEEDS_DATA) |
-| M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `TODO` (NEEDS_DATA) |
+| M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `BLOCKED_ON_EXPERIMENT` (D-057) |
+| M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `BLOCKED_ON_EXPERIMENT` (D-058) |
+| M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `TODO` (NEEDS_DATA; feasibility unresolved) |
 | M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `TODO` (NEEDS_DECISION) |
 
 Stage status: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
-decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-056; M6 gate not evaluated).
+decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-058; M6 gate `NOT_EVALUATED`, cannot
+currently close; M7 `NOT_STARTED`).
 - Checkpoint M6-A `REVIEW_READY`: entry decisions recorded; HUMAN SP-11 experiment checklist
   [M6_SP11_EXPERIMENT_CHECKLIST.md](M6_SP11_EXPERIMENT_CHECKLIST.md). No Abaqus.
 - Checkpoint M6-B `REVIEW_READY`: `domain/stage_a_experiment.py` + `services/stage_a_validation.py`
   (Stage-A → M5 adapter, `STAGE_A_VALIDATION` context) with synthetic tests. No Abaqus.
-- M6.1 needs the new SP-11 experiment (D-049) before M6-C; it is not `REVIEW_READY`.
+- Corrective governance 2026-10-06 (§15; D-057, D-058): M6.1 and M6.2 are `BLOCKED_ON_EXPERIMENT`.
+  - Reasons: no governed fitted SP-11 modal set, inconsistent sessions, incomplete physical support
+    data, and no new SP-11 experiment available.
+  - The checklist is now a reference record; the real-specimen inventory is in
+    [SNADWICH_INVENTORY.md](SNADWICH_INVENTORY.md).
+  - This ROADMAP and SPEC §17 are unchanged; one later rescope decision follows once M6.3 / STEEL
+    feasibility is known.
 
 **M6 GATE:** critical priors and uncertainties are physically supported, not guessed.
 

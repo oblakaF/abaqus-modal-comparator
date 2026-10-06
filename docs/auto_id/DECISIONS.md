@@ -690,3 +690,53 @@ Unrelated legacy code is not rewritten. The governed path is a new adapter aroun
 Stage-A machinery.
 Rationale / scope: one scientific rule set (M5) for real Stage-A results.
 Supersedes: none
+
+## D-057 — SP-11 M6.1 evidence is BLOCKED_ON_EXPERIMENT (corrects D-049)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: real-specimen source audit of `D:\Snadwich` (accepted 2026-10-06); HUMAN physical constraint; SPEC §6 S1, §15, §17; D-024, D-026, D-031; M6_DECISION_RECORD §15
+Decision:
+- **Kept from D-049:**
+  - SP-11 (old T300 twill 0.45 bare plate) is the M6 twill bare plate;
+  - its existing data are reconnaissance-only for the current M6.1 contract.
+- **No longer reasons or requirements:**
+  - frequency resolution alone is not a reason to refuse SP-11, because the accepted SP02 and SP13
+    lineages also started from raw FRFs coarser than SPEC §15; M1 QC records resolution as a flag;
+  - "new acquisition required" is no longer an actionable requirement: the HUMAN has stated that a
+    new SP-11 experiment is not physically available with the present setup.
+- **Current state:** SP-11 M6.1 evidence is `BLOCKED_ON_EXPERIMENT` because:
+  - there is no governed fitted / frozen modal set (dataset 58 only; no dataset 55);
+  - the three available sessions (260824, 260826 a, 260826 b_center) are inconsistent with each
+    other;
+  - required physical support data are incomplete: no ≥ 9-point thickness map, no mass or
+    dimension uncertainty, no attachment mass for the contact excitation, no suspension threshold;
+  - a new valid SP-11 experiment is not available.
+- **Status of the old FRFs:** they are not declared invalid or useless. They remain reconnaissance
+  and modal-preparation source data (D-024).
+Rationale / scope: records the factual blockers found by the source audit, instead of a resolution
+bar that the accepted fixtures do not satisfy either. SPEC §17 and ROADMAP M6.1 are unchanged; any
+stage rescope is a separate later decision.
+Supersedes: D-049 (in part: the "frequency resolution insufficient" reason and the "new acquisition"
+requirement; the identity and the reconnaissance-only scope remain in force)
+
+## D-058 — Setup-repeat wording aligned with SPEC §7; SP-11 M6.2 BLOCKED_ON_EXPERIMENT (corrects D-053)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §7, §15; M2 `classify_setup_repeat` (M2.5); M6_DECISION_RECORD §15
+Decision:
+- **Repeat definition (SPEC §7, unchanged in substance):** a setup repeat is a genuine remount,
+  re-suspension or excitation reinstallation of the same physical specimen, with `remount_of`
+  provenance and a comparable acquisition protocol.
+  - On the same grid it supports frequencies, shapes and MAC.
+  - A same-panel independent remount on a different grid supports a frequency-only estimate
+    (SPEC §7).
+  - This replaces D-053's "same governed grid and protocol" wording, which omitted the SPEC §7
+    frequency-only case. No new repeat criterion is introduced; the M2 classifier already
+    implements this.
+- **SP-11 M6.2:** `BLOCKED_ON_EXPERIMENT`. No documented remount links the existing sessions, and a
+  new valid repeat is not available. The repeat definition is not weakened to make the old
+  sessions qualify.
+- **Kept from D-053:**
+  - shared plate quantities are never counted as setup scatter;
+  - the estimator and agreement rule are a later M6.2 decision;
+  - the provisional Σ_setup is flagged;
+  - Σ_meas is never invented.
+Rationale / scope: governance wording must match SPEC (precedence SPEC > DECISIONS).
+Supersedes: D-053 (in part: the "same governed grid and protocol" wording and the expectation of an
+SP-11 repeat; everything else remains in force)

@@ -1,7 +1,7 @@
 # M6 decision record
 
-**Status:** M6 `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06). Durable items are promoted
-to DECISIONS.md D-049–D-056.
+**Status:** M6 `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; corrective governance §15). Durable
+items are promoted to DECISIONS.md D-049–D-058; D-057 and D-058 correct parts of D-049 and D-053.
 
 **Branch:** `auto-id/m6`, from `main` `ab1dc60`.
 
@@ -18,11 +18,11 @@ to DECISIONS.md D-049–D-056.
 
 | Item | Status | Readiness |
 |---|---|---|
-| M6.1 | `IN_PROGRESS` | NEEDS_DATA: real SP-11 data missing; not `REVIEW_READY` |
-| M6.2 | `TODO` | NEEDS_DATA |
-| M6.3 | `TODO` | NEEDS_DATA |
-| M6.4 | `TODO` | NEEDS_DECISION |
-| M6 gate | not evaluated | — |
+| M6.1 | `BLOCKED_ON_EXPERIMENT` | SP-11 evidence blocked (D-057, §15) |
+| M6.2 | `BLOCKED_ON_EXPERIMENT` | no valid SP-11 repeat (D-058, §15) |
+| M6.3 | `TODO` | NEEDS_DATA; physical feasibility unresolved |
+| M6.4 | `TODO` | NEEDS_DECISION (variation ranges) |
+| M6 gate | `NOT_EVALUATED` | cannot currently close |
 | M7 | `NOT_STARTED` | — |
 
 Checkpoints:
@@ -72,6 +72,9 @@ Checkpoints:
 - **No synthetic substitute:** no modal data are manufactured from these FRFs.
 
 ## 3. New SP-11 acquisition (D-049)
+
+> **Superseded by §15 / D-057 (2026-10-06):** a new SP-11 experiment is not physically available. The
+> requirement below is no longer actionable; frequency resolution alone is no longer a reason.
 
 - **Requirement:** M6.1 must use a new experiment. The 260824 and 260826 FRFs are not sufficient
   for M6.1 acceptance.
@@ -125,6 +128,10 @@ Checkpoints:
 - **Cubic dependence:** E, G12 ∝ t⁻³ stays explicit, so the thickness uncertainty remains visible.
 
 ## 7. M6.2 repeat principle and Σ before M6.2 (D-053)
+
+> **Corrected by §15 / D-058:** the repeat wording follows SPEC §7. The same grid supports
+> frequencies, shapes and MAC; a same-panel remount on a different grid supports frequency-only.
+> SP-11 M6.2 is `BLOCKED_ON_EXPERIMENT`.
 
 - **What counts as a repeat:** a valid M6.2 repeat is a genuine remount, re-suspension and
   excitation reinstallation of the SAME SP-11 specimen, under the same governed grid and protocol.
@@ -313,6 +320,65 @@ Additional tests:
 
 ## 14. Data still needed for M6-C
 
+> **Corrected by §15 (2026-10-06):** nominal SP-11 values exist in `D:\Snadwich\SP-11\spec.txt`
+> (AVAILABLE_NOT_YET_GOVERNED). The checklist is now a reference record, not a HUMAN to-do list.
+
 Every HUMAN item of [M6_SP11_EXPERIMENT_CHECKLIST.md](M6_SP11_EXPERIMENT_CHECKLIST.md),
 sections A–E (A7 is a SUPERVISOR confirmation). None is available in the repository records or in
 the data stores today.
+
+---
+
+## 15. Corrective governance after the real-specimen source audit (SUPERVISOR, 2026-10-06)
+
+**Basis:** the `D:\Snadwich` source audit, accepted as the factual basis
+([SNADWICH_INVENTORY.md](SNADWICH_INVENTORY.md)), and the HUMAN constraint that a new SP-11
+experiment is not physically available.
+
+**D-057 (corrects D-049):**
+- **Kept:** SP-11 is the M6 twill bare plate, and its existing data are reconnaissance-only for the
+  current M6.1 contract.
+- **Removed as reasons:**
+  - "resolution insufficient" as a standalone bar (the accepted SP02/SP13 lineages also started
+    from coarser raw FRFs);
+  - "new acquisition required" as an actionable requirement.
+- **M6.1 is `BLOCKED_ON_EXPERIMENT` because:**
+  - there is no governed fitted / frozen modal set;
+  - the sessions are inconsistent;
+  - the physical support data are incomplete: no thickness map, no mass or dimension uncertainty,
+    no attachment mass, no suspension threshold;
+  - no new valid SP-11 experiment is available.
+- **The old FRFs** stay reconnaissance and modal-preparation source data.
+
+**D-058 (corrects D-053):**
+- **Wording:** the repeat wording now matches SPEC §7. The same grid supports frequencies, shapes
+  and MAC; a same-panel independent remount on a different grid supports frequency-only. No new
+  criterion.
+- **M6.2:** `BLOCKED_ON_EXPERIMENT`. The definition is not weakened.
+
+**Checklist:** [M6_SP11_EXPERIMENT_CHECKLIST.md](M6_SP11_EXPERIMENT_CHECKLIST.md) is re-labelled
+"Reference requirements for a valid future SP-11 / bare-plate test", with three groups:
+AVAILABLE_NOT_YET_GOVERNED, MISSING and UNAVAILABLE_FOR_THIS_PROJECT.
+
+**Unchanged:**
+- **SPEC and ROADMAP:** M6.1 and M6.2 stay in the contract. There is no stage rescope (option C2)
+  yet: one deliberate rescope decision follows only once the feasibility of M6.3 and of the STEEL
+  gate is known.
+- **M6-B code and tests:** unchanged, and remain valid. The generic Stage-A adapter is kept for any
+  future valid bare-plate evidence.
+
+**Status:**
+
+| Item | Status |
+|---|---|
+| M6 | `IN_PROGRESS` |
+| M6-A | `REVIEW_READY` (corrected) |
+| M6-B | `REVIEW_READY` |
+| M6.1 | `BLOCKED_ON_EXPERIMENT` |
+| M6.2 | `BLOCKED_ON_EXPERIMENT` |
+| M6.3 | `TODO`, NEEDS_DATA, feasibility unresolved |
+| M6.4 | `TODO`, NEEDS_DECISION |
+| M6 gate | `NOT_EVALUATED` (cannot currently close) |
+| M7 | `NOT_STARTED` |
+
+M6 is neither failed nor accepted.
