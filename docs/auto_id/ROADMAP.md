@@ -431,10 +431,10 @@ First batch reviewed by the SUPERVISOR:
 | M5.8 | Residual family pattern test | `ACCEPTED` |
 | M5.9 | IDENTIFIED / WIDE / NOT_IDENTIFIABLE verdict engine | `ACCEPTED` |
 
-Stage status: `REVIEW_READY` (M5.1–M5.9 `ACCEPTED` by the SUPERVISOR, 2026-10-06; **M5 GATE: `PASS`**,
-synthetic and records only, 0 Abaqus; stage PR `auto-id/m5` → `main` prepared, **not merged**;
-M6 `NOT_STARTED`; branch `auto-id/m5` from `main` `8f405c3`; SUPERVISOR decisions in
-[M5_DECISION_RECORD.md](M5_DECISION_RECORD.md), D-039–D-044).
+Stage status: `ACCEPTED` (M5.1–M5.9 `ACCEPTED` by the SUPERVISOR, 2026-10-06; **M5 GATE: `PASS`**,
+synthetic and records only, 0 Abaqus; merged to `main` by PR #33, merge commit `ab75315`,
+with HUMAN authorisation; SUPERVISOR decisions in [M5_DECISION_RECORD.md](M5_DECISION_RECORD.md),
+D-039–D-048).
 - Checkpoint M5-A (M5.1–M5.4) `REVIEW_READY`: `services/practical_identifiability.py` with
   synthetic tests. No Abaqus.
 - Checkpoint M5-B (M5.5, M5.8, M5.6) `REVIEW_READY`: `services/identification_uncertainty.py`
@@ -471,6 +471,8 @@ work.
 | M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `TODO` |
 | M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `TODO` |
 | M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `TODO` |
+
+Stage status: `NOT_STARTED` (requires an explicit SUPERVISOR instruction).
 
 **M6 GATE:** critical priors and uncertainties are physically supported, not guessed.
 
