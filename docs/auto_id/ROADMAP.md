@@ -467,12 +467,16 @@ work.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `TODO` |
-| M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `TODO` |
-| M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `TODO` |
-| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `TODO` |
+| M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `IN_PROGRESS` (NEEDS_DATA) |
+| M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `TODO` (NEEDS_DATA) |
+| M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `TODO` (NEEDS_DATA) |
+| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `TODO` (NEEDS_DECISION) |
 
-Stage status: `NOT_STARTED` (requires an explicit SUPERVISOR instruction).
+Stage status: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
+decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-056; M6 gate not evaluated).
+- Checkpoint M6-A `REVIEW_READY`: entry decisions recorded; HUMAN SP-11 experiment checklist
+  [M6_SP11_EXPERIMENT_CHECKLIST.md](M6_SP11_EXPERIMENT_CHECKLIST.md). No Abaqus.
+- M6.1 needs the new SP-11 experiment (D-049) before M6-C; it is not `REVIEW_READY`.
 
 **M6 GATE:** critical priors and uncertainties are physically supported, not guessed.
 

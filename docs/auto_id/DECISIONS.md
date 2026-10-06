@@ -561,3 +561,132 @@ Decision:
 Rationale / scope: a durable M5.7/M5.8 semantic rule for clusters. No synthetic or twin-specific
 value is promoted.
 Supersedes: none
+
+## D-049 — SP-11 is the M6 twill bare plate; new acquisition required (M6.1)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §13, §15, §17; ROADMAP M6.1; D-017, D-026, D-030; M6_DECISION_RECORD §2–§3
+Decision:
+- **Identity:** SP-11 "Old CFRP Twill Plate 350x350" is the intended M6 specimen: the twill 350×350
+  bare plate (nominal about 350 × 347 × 0.45 mm, mass record about 79.59 g, old T300 twill family).
+- **Old recordings (260824, 260826 a, 260826 b_center):** planning and modal reconnaissance only;
+  never identification input. Reasons:
+  - FRF-only input is refused (D-030);
+  - the frequency resolution is insufficient (SPEC §15);
+  - no governed frozen modal set exists (D-026).
+
+  No modal data are manufactured from them.
+- **New acquisition:** M6.1 uses a new SP-11 experiment that satisfies the current SPEC, M1 and M2
+  contracts (M6_SP11_EXPERIMENT_CHECKLIST.md).
+Rationale / scope: the SPEC §17 M6 specimen is identified from the records. D-017 is unchanged:
+twill G12 is not primary old-plain G12.
+Supersedes: none
+
+## D-050 — M6.1 is a STAGE_A_VALIDATION result, not a production verdict
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §3, §13, §17; D-044, D-045; M6_DECISION_RECORD §4
+Decision:
+- **Context:** M6.1 is a real Stage-A validation and calibration result in the typed context
+  `STAGE_A_VALIDATION`.
+- **It may report:**
+  - D11 and D66;
+  - D12 if practically identifiable;
+  - derived E and G12;
+  - separately labelled uncertainties;
+  - rank and identifiability diagnostics;
+  - repeat agreement after M6.2.
+- **No production verdict:** M6 acceptance does not grant a production IDENTIFIED material-property
+  verdict under the M5.9 PRODUCTION context while the required family consistency is
+  NOT_AVAILABLE.
+  - NOT_AVAILABLE is never mapped to PASS.
+  - The result is never relabelled as production IDENTIFIED.
+- **Boundary:**
+  - M6 proves the real Stage-A estimate and its physical uncertainty support.
+  - M7 remains responsible for production family consistency and the sandwich verdicts.
+Rationale / scope: resolves the M6/M7 dependency found in the M6 entry review. The M5.9 engine is
+unchanged.
+Supersedes: none
+
+## D-051 — Stage-A D12 policy (M6.1)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §5, §5.2, §10; D-040; M6_DECISION_RECORD §5
+Decision:
+- **When D12 is fitted:** only when the full Stage-A system (D11, D12, D66) is practically full
+  rank at the M5 rule rcond = 1e-3. No new rank threshold.
+- **Otherwise:**
+  - no pseudo-inverse, no conditioning override, no legacy fixed-pair fallback;
+  - the governed fixed-ν12 formulation is used: D12 = ν12·D11, ν12 = 0.05 (SPEC §5/§5.2);
+  - the record states explicitly that D12 was not identified.
+Rationale / scope: implements SPEC §5 "D12/D11 where possible; ν12 default 0.05" with the accepted
+rank rule.
+Supersedes: none
+
+## D-052 — Bare-plate thickness propagation (M6.1)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §5, §7, §15; M6_DECISION_RECORD §6
+Decision:
+- **No FE column:** for the bare plate, thickness is not an FE nuisance column. It is propagated
+  analytically from D to E and G12 in ln p, from the ≥ 9 physical thickness measurements.
+- **Spatial contribution:** the measured spatial scatter, not the standard error of the mean. It is
+  never divided by √N.
+- **Gauge:** a known gauge or instrument uncertainty stays a separate measurement component,
+  combined under the uncertainty model. It is never invented.
+- **Cubic dependence:** E, G12 ∝ t⁻³ stays explicit.
+Rationale / scope: SPEC §7 gives δE/E ≈ 3·δt/t for a bare plate; the physical non-uniformity of the
+plate is not reduced by sampling it more often.
+Supersedes: none
+
+## D-053 — M6.2 repeat principle and Σ before M6.2
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §7, §15; D-003; M6_DECISION_RECORD §7
+Decision:
+- **Valid repeat:** a genuine remount, re-suspension and excitation reinstallation of the same SP-11
+  specimen, under the same governed grid and protocol, with `remount_of` provenance. The old
+  sessions do not qualify on current documentation.
+- **Estimator:** the final Σ_setup estimator and the 1σ agreement rule are a dedicated M6.2
+  decision, taken after real repeat data exist. The software only prepares the interface.
+- **Agreement comparison:** in ln space, on the inferred Stage-A mechanical quantities. Shared
+  systematic quantities of the same plate (above all its thickness characterisation) are not
+  double-counted as setup scatter.
+- **Before M6.2:**
+  - the SPEC-authorised provisional Σ_setup (0.3 %) may be used and stays PROVISIONAL;
+  - final M6 acceptance requires the measured M6.2 evidence;
+  - Σ_meas is not invented;
+  - setup scatter is never relabelled as measurement uncertainty.
+Rationale / scope: keeps Σ explicit and physically grounded (SPEC §7, D-003).
+Supersedes: none
+
+## D-054 — Core-tile policy; CARBON-5F scope (M6.3)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §5.3, §15; D-006; M6_DECISION_RECORD §8
+Decision:
+- **Evidence:** M6.3 requires physical core-tile evidence.
+- **CARBON-5F:** sensitivity and context evidence only. It is not a k_core prior, not a current M5
+  sensitivity column, and not a substitute for the core-tile experiment.
+- **Plan:** one governed tile experiment per lattice topology that will need an independent k_core
+  prior in M7 (currently auxetic and honeycomb).
+Rationale / scope: restates D-006 for M6 execution. No manufacturing or model execution is
+authorised by this decision.
+Supersedes: none
+
+## D-055 — M6.4 ranges not invented; sandwich t_face and interface deferred
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §5, §5.1, §12; M6_DECISION_RECORD §9
+Decision:
+- **M6.4:**
+  - no variation ranges are invented for E3, ν13, ν23, G13 and G23;
+  - M6.4 stays NEEDS_DECISION until an approved source or decision supports defensible ranges;
+  - the SPEC 0.3 % frequency-effect criterion is unchanged;
+  - no M6.4 FE jobs yet.
+- **Sandwich t_face:** no morphing in M6; it is M7 work.
+- **Interface:** no interface nuisance experiment in M6 unless a later governing decision requires
+  one. k_int stays off by default, with the holdout semantics preserved.
+Rationale / scope: avoids guessed ranges and keeps the M6/M7 stage boundary.
+Supersedes: none
+
+## D-056 — Legacy Stage-A rules are excluded from the governed M6 path
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §6 S1, §10, §12.1; D-031, D-033, D-040; M6_DECISION_RECORD §10
+Decision: the governed Stage-A path does not inherit legacy rules that conflict with accepted
+Auto-ID policy. It rejects:
+- automatic mode-1 exclusion on presumed suspension influence;
+- the legacy condition-number and collinearity policy thresholds;
+- the conditioning override;
+- the fixed-pair fallback;
+- any route that bypasses the M5 rank and refusal logic.
+
+Unrelated legacy code is not rewritten. The governed path is a new adapter around the accepted
+Stage-A machinery.
+Rationale / scope: one scientific rule set (M5) for real Stage-A results.
+Supersedes: none

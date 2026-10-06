@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M6",
-  "current_ministep": null,
-  "status": "NOT_STARTED",
+  "current_ministep": "M6.1",
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M5",
   "last_accepted_ministep": "M5.9",
   "last_accepted_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70",
@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M6 NOT_STARTED; await SUPERVISOR instruction before any M6 work",
+  "next_action": "M6-A recorded; M6-B (Stage-A -> M5 adapter) next in this authorised batch; then STOP for SUPERVISOR review and real SP-11 data (M6-C not authorised)",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -624,11 +624,27 @@
     "accepted_by": "SUPERVISOR (M5.1-M5.9 and stage gate accepted 2026-10-06); merge explicitly authorised by the HUMAN supervisor"
   },
   "m6": {
-    "status": "NOT_STARTED",
-    "M6.1": "TODO",
+    "branch": "auto-id/m6",
+    "base": "ab1dc6071355fe536a3bec7f593ee804df92583f",
+    "status": "IN_PROGRESS",
+    "M6.1": "IN_PROGRESS",
     "M6.2": "TODO",
     "M6.3": "TODO",
     "M6.4": "TODO",
-    "note": "not started; requires explicit SUPERVISOR instruction (ROADMAP order)"
+    "readiness": {
+      "M6.1": "NEEDS_DATA (real SP-11 experiment missing; not REVIEW_READY)",
+      "M6.2": "NEEDS_DATA (genuine same-plate remount missing)",
+      "M6.3": "NEEDS_DATA (printed core tiles: auxetic, honeycomb)",
+      "M6.4": "NEEDS_DECISION (defensible variation ranges; D-055)"
+    },
+    "gate": "NOT_EVALUATED",
+    "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-056)",
+    "entry_authorisation": "SUPERVISOR 2026-10-06: M6 entry review accepted; checkpoints M6-A (governance, SP-11 checklist) and M6-B (Stage-A -> M5 adapter, synthetic tests) only; no Abaqus; no M6-C",
+    "experiment_checklist": "docs/auto_id/M6_SP11_EXPERIMENT_CHECKLIST.md",
+    "M6-A": {
+      "scope": "SUPERVISOR entry decisions recorded (D-049..D-056); SP-11 HUMAN experiment checklist",
+      "abaqus_runs": 0,
+      "status": "REVIEW_READY"
+    }
   }
 }

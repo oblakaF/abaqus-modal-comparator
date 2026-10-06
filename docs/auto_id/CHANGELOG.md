@@ -3321,3 +3321,27 @@ first internal provider.
 - **M6:** `NOT_STARTED`; M6.1–M6.4 `TODO`.
 - **Bookkeeping branch:** `auto-id/m5-closure`, created from the merge commit.
 - **Unchanged:** code and scientific logic. No Abaqus. Retained M4 artifacts untouched.
+
+## 2026-10-06 — M6 started; checkpoint M6-A (entry decisions, SP-11 experiment checklist)
+
+- **Stage:** M6 `IN_PROGRESS` on branch `auto-id/m6` (from `main` `ab1dc60`).
+  - M6.1 `IN_PROGRESS`, readiness NEEDS_DATA (not `REVIEW_READY`).
+  - M6.2 and M6.3 `TODO`, NEEDS_DATA.
+  - M6.4 `TODO`, NEEDS_DECISION.
+  - M6 gate not evaluated; M7 `NOT_STARTED`.
+- **SUPERVISOR entry decisions:** M6_DECISION_RECORD.md §1–§11; DECISIONS.md D-049–D-056.
+  - SP-11 is the M6 twill bare plate; its old FRFs are reconnaissance only; a new acquisition is
+    required;
+  - `STAGE_A_VALIDATION` context, never production IDENTIFIED while family consistency is
+    NOT_AVAILABLE (M7);
+  - D12 fitted only at full practical rank (rcond 1e-3), otherwise governed fixed ν12;
+  - analytic thickness propagation, spatial scatter not divided by √N, t⁻³ explicit;
+  - M6.2 repeat principle, with the estimator deferred; provisional Σ_setup flagged; Σ_meas never
+    invented;
+  - core tiles per topology (CARBON-5F is context only);
+  - M6.4 ranges not invented; sandwich t_face and interface deferred;
+  - legacy Stage-A rules excluded.
+- **New document:** M6_SP11_EXPERIMENT_CHECKLIST.md, the exact HUMAN measurements before M6-C,
+  sections A–E.
+- **Code:** none in this checkpoint.
+- **Abaqus runs:** 0. No retained M4 artifact deleted.
