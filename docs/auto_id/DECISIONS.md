@@ -561,3 +561,447 @@ Decision:
 Rationale / scope: a durable M5.7/M5.8 semantic rule for clusters. No synthetic or twin-specific
 value is promoted.
 Supersedes: none
+
+## D-049 — SP-11 is the M6 twill bare plate; new acquisition required (M6.1)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §13, §15, §17; ROADMAP M6.1; D-017, D-026, D-030; M6_DECISION_RECORD §2–§3
+Decision:
+- **Identity:** SP-11 "Old CFRP Twill Plate 350x350" is the intended M6 specimen: the twill 350×350
+  bare plate (nominal about 350 × 347 × 0.45 mm, mass record about 79.59 g, old T300 twill family).
+- **Old recordings (260824, 260826 a, 260826 b_center):** planning and modal reconnaissance only;
+  never identification input. Reasons:
+  - FRF-only input is refused (D-030);
+  - the frequency resolution is insufficient (SPEC §15);
+  - no governed frozen modal set exists (D-026).
+
+  No modal data are manufactured from them.
+- **New acquisition:** M6.1 uses a new SP-11 experiment that satisfies the current SPEC, M1 and M2
+  contracts (M6_SP11_EXPERIMENT_CHECKLIST.md).
+Rationale / scope: the SPEC §17 M6 specimen is identified from the records. D-017 is unchanged:
+twill G12 is not primary old-plain G12.
+Supersedes: none
+
+## D-050 — M6.1 is a STAGE_A_VALIDATION result, not a production verdict
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §3, §13, §17; D-044, D-045; M6_DECISION_RECORD §4
+Decision:
+- **Context:** M6.1 is a real Stage-A validation and calibration result in the typed context
+  `STAGE_A_VALIDATION`.
+- **It may report:**
+  - D11 and D66;
+  - D12 if practically identifiable;
+  - derived E and G12;
+  - separately labelled uncertainties;
+  - rank and identifiability diagnostics;
+  - repeat agreement after M6.2.
+- **No production verdict:** M6 acceptance does not grant a production IDENTIFIED material-property
+  verdict under the M5.9 PRODUCTION context while the required family consistency is
+  NOT_AVAILABLE.
+  - NOT_AVAILABLE is never mapped to PASS.
+  - The result is never relabelled as production IDENTIFIED.
+- **Boundary:**
+  - M6 proves the real Stage-A estimate and its physical uncertainty support.
+  - M7 remains responsible for production family consistency and the sandwich verdicts.
+Rationale / scope: resolves the M6/M7 dependency found in the M6 entry review. The M5.9 engine is
+unchanged.
+Supersedes: none
+
+## D-051 — Stage-A D12 policy (M6.1)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §5, §5.2, §10; D-040; M6_DECISION_RECORD §5
+Decision:
+- **When D12 is fitted:** only when the full Stage-A system (D11, D12, D66) is practically full
+  rank at the M5 rule rcond = 1e-3. No new rank threshold.
+- **Otherwise:**
+  - no pseudo-inverse, no conditioning override, no legacy fixed-pair fallback;
+  - the governed fixed-ν12 formulation is used: D12 = ν12·D11, ν12 = 0.05 (SPEC §5/§5.2);
+  - the record states explicitly that D12 was not identified.
+Rationale / scope: implements SPEC §5 "D12/D11 where possible; ν12 default 0.05" with the accepted
+rank rule.
+Supersedes: none
+
+## D-052 — Bare-plate thickness propagation (M6.1)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §5, §7, §15; M6_DECISION_RECORD §6
+Decision:
+- **No FE column:** for the bare plate, thickness is not an FE nuisance column. It is propagated
+  analytically from D to E and G12 in ln p, from the ≥ 9 physical thickness measurements.
+- **Spatial contribution:** the measured spatial scatter, not the standard error of the mean. It is
+  never divided by √N.
+- **Gauge:** a known gauge or instrument uncertainty stays a separate measurement component,
+  combined under the uncertainty model. It is never invented.
+- **Cubic dependence:** E, G12 ∝ t⁻³ stays explicit.
+Rationale / scope: SPEC §7 gives δE/E ≈ 3·δt/t for a bare plate; the physical non-uniformity of the
+plate is not reduced by sampling it more often.
+Supersedes: none
+
+## D-053 — M6.2 repeat principle and Σ before M6.2
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §7, §15; D-003; M6_DECISION_RECORD §7
+Decision:
+- **Valid repeat:** a genuine remount, re-suspension and excitation reinstallation of the same SP-11
+  specimen, under the same governed grid and protocol, with `remount_of` provenance. The old
+  sessions do not qualify on current documentation.
+- **Estimator:** the final Σ_setup estimator and the 1σ agreement rule are a dedicated M6.2
+  decision, taken after real repeat data exist. The software only prepares the interface.
+- **Agreement comparison:** in ln space, on the inferred Stage-A mechanical quantities. Shared
+  systematic quantities of the same plate (above all its thickness characterisation) are not
+  double-counted as setup scatter.
+- **Before M6.2:**
+  - the SPEC-authorised provisional Σ_setup (0.3 %) may be used and stays PROVISIONAL;
+  - final M6 acceptance requires the measured M6.2 evidence;
+  - Σ_meas is not invented;
+  - setup scatter is never relabelled as measurement uncertainty.
+Rationale / scope: keeps Σ explicit and physically grounded (SPEC §7, D-003).
+Supersedes: none
+
+## D-054 — Core-tile policy; CARBON-5F scope (M6.3)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §5.3, §15; D-006; M6_DECISION_RECORD §8
+Decision:
+- **Evidence:** M6.3 requires physical core-tile evidence.
+- **CARBON-5F:** sensitivity and context evidence only. It is not a k_core prior, not a current M5
+  sensitivity column, and not a substitute for the core-tile experiment.
+- **Plan:** one governed tile experiment per lattice topology that will need an independent k_core
+  prior in M7 (currently auxetic and honeycomb).
+Rationale / scope: restates D-006 for M6 execution. No manufacturing or model execution is
+authorised by this decision.
+Supersedes: none
+
+## D-055 — M6.4 ranges not invented; sandwich t_face and interface deferred
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §5, §5.1, §12; M6_DECISION_RECORD §9
+Decision:
+- **M6.4:**
+  - no variation ranges are invented for E3, ν13, ν23, G13 and G23;
+  - M6.4 stays NEEDS_DECISION until an approved source or decision supports defensible ranges;
+  - the SPEC 0.3 % frequency-effect criterion is unchanged;
+  - no M6.4 FE jobs yet.
+- **Sandwich t_face:** no morphing in M6; it is M7 work.
+- **Interface:** no interface nuisance experiment in M6 unless a later governing decision requires
+  one. k_int stays off by default, with the holdout semantics preserved.
+Rationale / scope: avoids guessed ranges and keeps the M6/M7 stage boundary.
+Supersedes: none
+
+## D-056 — Legacy Stage-A rules are excluded from the governed M6 path
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §6 S1, §10, §12.1; D-031, D-033, D-040; M6_DECISION_RECORD §10
+Decision: the governed Stage-A path does not inherit legacy rules that conflict with accepted
+Auto-ID policy. It rejects:
+- automatic mode-1 exclusion on presumed suspension influence;
+- the legacy condition-number and collinearity policy thresholds;
+- the conditioning override;
+- the fixed-pair fallback;
+- any route that bypasses the M5 rank and refusal logic.
+
+Unrelated legacy code is not rewritten. The governed path is a new adapter around the accepted
+Stage-A machinery.
+Rationale / scope: one scientific rule set (M5) for real Stage-A results.
+Supersedes: none
+
+## D-057 — SP-11 M6.1 evidence is BLOCKED_ON_EXPERIMENT (corrects D-049)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: real-specimen source audit of `D:\Snadwich` (accepted 2026-10-06); HUMAN physical constraint; SPEC §6 S1, §15, §17; D-024, D-026, D-031; M6_DECISION_RECORD §15
+Decision:
+- **Kept from D-049:**
+  - SP-11 (old T300 twill 0.45 bare plate) is the M6 twill bare plate;
+  - its existing data are reconnaissance-only for the current M6.1 contract.
+- **No longer reasons or requirements:**
+  - frequency resolution alone is not a reason to refuse SP-11, because the accepted SP02 and SP13
+    lineages also started from raw FRFs coarser than SPEC §15; M1 QC records resolution as a flag;
+  - "new acquisition required" is no longer an actionable requirement: the HUMAN has stated that a
+    new SP-11 experiment is not physically available with the present setup.
+- **Current state:** SP-11 M6.1 evidence is `BLOCKED_ON_EXPERIMENT` because:
+  - there is no governed fitted / frozen modal set (dataset 58 only; no dataset 55);
+  - the three available sessions (260824, 260826 a, 260826 b_center) are inconsistent with each
+    other;
+  - required physical support data are incomplete: no ≥ 9-point thickness map, no mass or
+    dimension uncertainty, no attachment mass for the contact excitation, no suspension threshold;
+  - a new valid SP-11 experiment is not available.
+- **Status of the old FRFs:** they are not declared invalid or useless. They remain reconnaissance
+  and modal-preparation source data (D-024).
+Rationale / scope: records the factual blockers found by the source audit, instead of a resolution
+bar that the accepted fixtures do not satisfy either. SPEC §17 and ROADMAP M6.1 are unchanged; any
+stage rescope is a separate later decision.
+Supersedes: D-049 (in part: the "frequency resolution insufficient" reason and the "new acquisition"
+requirement; the identity and the reconnaissance-only scope remain in force)
+
+## D-058 — Setup-repeat wording aligned with SPEC §7; SP-11 M6.2 BLOCKED_ON_EXPERIMENT (corrects D-053)
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §7, §15; M2 `classify_setup_repeat` (M2.5); M6_DECISION_RECORD §15
+Decision:
+- **Repeat definition (SPEC §7, unchanged in substance):** a setup repeat is a genuine remount,
+  re-suspension or excitation reinstallation of the same physical specimen, with `remount_of`
+  provenance and a comparable acquisition protocol.
+  - On the same grid it supports frequencies, shapes and MAC.
+  - A same-panel independent remount on a different grid supports a frequency-only estimate
+    (SPEC §7).
+  - This replaces D-053's "same governed grid and protocol" wording, which omitted the SPEC §7
+    frequency-only case. No new repeat criterion is introduced; the M2 classifier already
+    implements this.
+- **SP-11 M6.2:** `BLOCKED_ON_EXPERIMENT`. No documented remount links the existing sessions, and a
+  new valid repeat is not available. The repeat definition is not weakened to make the old
+  sessions qualify.
+- **Kept from D-053:**
+  - shared plate quantities are never counted as setup scatter;
+  - the estimator and agreement rule are a later M6.2 decision;
+  - the provisional Σ_setup is flagged;
+  - Σ_meas is never invented.
+Rationale / scope: governance wording must match SPEC (precedence SPEC > DECISIONS).
+Supersedes: D-053 (in part: the "same governed grid and protocol" wording and the expectation of an
+SP-11 repeat; everything else remains in force)
+
+## D-059 — M6.1, M6.2 and M6.3 are NOT_AVAILABLE_WITH_CURRENT_SETUP
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: HUMAN experimental constraints; accepted M6 rescope review (F–K); SPEC §19 item 6; M6_DECISION_RECORD §16
+Decision:
+- **M6.1 (SP-11 bare-plate Stage A):** `NOT_AVAILABLE_WITH_CURRENT_SETUP`. Consequences:
+  - no primary twill G12 evidence;
+  - no real-data Stage-A validation;
+  - the M6-B Stage-A adapter stays in the software, synthetically validated;
+  - this alone is not a release failure.
+- **M6.2 (SP-11 repeat):** `NOT_AVAILABLE_WITH_CURRENT_SETUP`.
+  - The SPEC §7 provisional Σ_setup (0.3 %) stays allowed and FLAGGED.
+  - A measured sandwich-remount estimate may replace it later, only if genuine remount provenance
+    is established from existing records. No session pair is declared a remount without proof.
+- **M6.3 (core tile):** `NOT_AVAILABLE_WITH_CURRENT_SETUP`. Consequences:
+  - there is no independently measured k_core prior;
+  - the sandwich-only G12 route stays closed (D-046);
+  - k_core may later enter M7 only as an explicitly PROVISIONAL nuisance with a
+    SUPERVISOR-approved width, which is not chosen here.
+- **Records kept:** the M6.1–M6.3 scientific requirements and their history (D-049–D-058) are kept;
+  only the expectation of executing them in this project is withdrawn.
+Rationale / scope: missing experiments reduce the scientific claims; they do not invent evidence.
+Supersedes: D-054 (in part: the active plan of one governed tile experiment per topology; the
+requirement that a k_core prior needs physical core-tile evidence remains); D-057 and D-058 (in
+part: the `BLOCKED_ON_EXPERIMENT` status labels, now `NOT_AVAILABLE_WITH_CURRENT_SETUP`)
+
+## D-060 — The STEEL validation gate is removed from the release path
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §17, §19 item 6; ROADMAP STEEL gate; M6_DECISION_RECORD §16
+Decision:
+- **Removal:** no steel or other external known-stiffness validation experiment is part of the
+  selected project release path. No replacement experiment is created.
+- **Labelling:** final real carbon results are reported as model-calibrated effective constants
+  (SPEC §5.2) and labelled **not externally validated**.
+Rationale / scope: the steel experiment was an exploratory idea only. Its removal weakens the
+claim (no external validation); it does not change any scientific rule.
+Supersedes: D-015
+
+## D-061 — Rescoped M6 gate
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SPEC §19 item 6; ROADMAP M6 GATE
+Decision: M6 passes when:
+- all unavailable physical evidence is explicitly recorded;
+- every missing prior has its conservative verdict consequence encoded;
+- provisional inputs are explicitly flagged;
+- the M6.4 transverse-constant sensitivity budget is closed.
+
+M6 is not accepted by this decision.
+Rationale / scope: replaces the former acceptance "D11, D66 → E, G12 with uncertainty; repeat of
+the same plate agrees within 1σ", which cannot be executed with the current setup.
+Supersedes: none (the SPEC §17 M6 row is superseded by SPEC §19 item 6)
+
+## D-062 — SP-13 physical registration from stored PSV records; the legacy centred registration is historical only
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: SP-13 physical registration gate; SPEC §4.1, §11, §15; D-007, D-045; M6_DECISION_RECORD §17
+Decision:
+- **Basis:** the SP-13 260910a registration is reconstructed from the stored PSV records alone:
+  - camera frame, MeasPoints video coordinates (validated against the UNV) and the default
+    full-frame rectangle;
+  - fitted panel edges;
+  - the measured panel dimensions.
+
+  It is frozen through the unchanged M2 builder:
+  - mode `scan_to_panel_edges` with a `camera_grid` per-axis scale;
+  - registration `2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823`;
+  - passport `SP13.physical.specimen.json` (manifest `943bb3d1946863c61abd39ccac8fa1da625067b9dffdcd6be2c82c3e125d5000`);
+  - reconstruction record SHA-256 `6b45fbfbacad0df939b0b12f8496edddff0525855e0de0312ff5f558c71bb0ae`.
+
+  It is production-ready under the M2 contract.
+- **Legacy registration `a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4`:** geometrically inconsistent with the stored physical scan
+  geometry (point-placement error median 26.0 mm, maximum 47.4 mm; the UNV metric coordinates are
+  anisotropic, x 1.195 and y 0.889 of physical). It is kept only as historical provenance and is
+  never recorded as physically valid.
+- **Face:** the scanner measured the labelled face (HUMAN H3). Binding it to FE TOP is a convention:
+  it is not demonstrable from the records, and the FE stack is through-thickness symmetric.
+- **FE axis signs:**
+  - the nominal +x→+X, +y→+Y continues the accepted legacy convention and was fixed before any
+    pairing evaluation;
+  - the four physically admissible sign mappings are geometrically indistinguishable (identical
+    mapping residuals);
+  - the 180° TOP-face alternative gives the same strict pairs;
+  - the bottom-face alternatives are not evaluable without an Abaqus Python extraction.
+
+  The ambiguity is preserved, not resolved by modal agreement.
+- **Uncertainty:**
+  - `translation_mm` 5.72 (maximum residual of the M2 model against the reconstruction);
+  - `rotation_deg` 0.49 (maximum axis misalignment);
+  - `scale_rel` NOT_AVAILABLE, because no instrument resolution is recorded (HUMAN H5).
+
+  Therefore `registration_limited` stays NOT_AVAILABLE, and no green production verdict may claim
+  the registration uncertainty is closed. D-045 is unchanged.
+- **Anti-tuning:** the transform is derived without modal data and pinned (the record hash is in the
+  passport provenance; the registration hash is pinned by test). A registration change must come
+  from a new reconstruction record, never from pairing or MAC results.
+- **Out of scope:** wiring the fixture manifest and production modal input to the physical
+  registration is later work. The SP-13 fixture still references the legacy registration.
+Rationale / scope: physical evidence replaces a documented convention. Thresholds, pairing policy and
+modal data are unchanged.
+Supersedes: none (the legacy registration stays as historical provenance)
+
+## D-063 — SP-13 260909 → 260910 is a genuine re-suspension: FREQUENCY_ONLY; Σ_setup pending modal preparation
+Date: 2026-10-06 · Accepted by: SUPERVISOR · Source: HUMAN H6; SPEC §7; D-058, D-059
+Decision:
+- **Remount:** 260909 → 260910 is a genuine same-panel independent re-suspension. The panel was
+  removed and re-suspended; the laser/scanner and shaker installation did not move; the SP-13
+  marking is visible in both stored frames.
+- **Recorded in the physical passport:** `remount_of` = the 260909 run, `remount_kind` =
+  `re_suspension`, and the HUMAN evidence.
+- **Grids differ (121 / 289 points):** FREQUENCY_ONLY repeat evidence. No shape or MAC
+  repeatability is claimed. Protocol comparability is accepted for frequency-only setup/retest use.
+- **Σ_setup:** stays at the SPEC provisional 0.3 %, flagged. A measured Σ_setup is
+  `NOT_AVAILABLE_PENDING_MODAL_PREPARATION`: 260909 is raw FRF only; no internal fitter is used; an
+  accepted external PolyMAX route is not currently available. Not a release blocker (D-059).
+Supersedes: none
+
+## D-064 — SP-13 gate accepted; HUMAN facts H7–H10 (orientation, instrument readout, modal preparation, repeat scope)
+Date: 2026-10-06 · Accepted by: SUPERVISOR (HUMAN facts H7–H10) · Source: SUPERVISOR "SP-13 HUMAN evidence update + SP-02 zero-Abaqus physical registration gate"; D-062, D-063; SPEC §7, §11
+Decision:
+- **SP-13 gate:** the SP-13 physical registration result at `173af43` is SUPERVISOR-ACCEPTED. The
+  strict pairs {94.40 Hz ↔ FE 10, 205.65 Hz ↔ FE 13}, the STRICT policy, the M4.3 holdout rule and
+  the anti-tuning provenance are preserved. The transform is not redone or tuned.
+- **H7 (orientation):** SP-13 was scanned in the same in-plane orientation as represented in the
+  Abaqus model: the auxetic-core directions correspond, the label is at the physical top, and the
+  panel was not intentionally flipped or rotated. This is physical evidence for the in-plane FE axis
+  signs (+x→+X, +y→+Y); the 180° alternative is excluded. MAC is never used for signs.
+- **H8 (instruments):** steel ruler 100 cm, smallest graduation 1 mm; dial caliper resolution
+  0.01 mm. These are HUMAN-confirmed instrument/readout resolutions, **not** calibrated instrument
+  accuracy. No calibration or operator uncertainty is recorded, and none may be invented.
+- **H9 (modal preparation):** Simcenter Testlab is not available. There is no PolyMAX fit of
+  260909, so a measured Σ_setup is unavailable. Σ_setup stays at the SPEC provisional 0.3 %, flagged.
+- **H10 (repeat scope):** 260909 → 260910 is comparable for FREQUENCY_ONLY use. No cross-grid
+  shape or MAC claim is made.
+Rationale / scope: records the HUMAN facts and the SUPERVISOR acceptance. The derived quantities
+(the readout `scale_rel` contribution, the M2.4 result, the SP-02 registration) are worker results
+pending SUPERVISOR review (EVIDENCE; M6_DECISION_RECORD §18). The pairing policy, thresholds,
+holdout rule and modal data are unchanged.
+Supersedes: none (D-062 and D-063 stand; H7 resolves the in-plane sign alternative D-062 left open)
+
+## D-065 — Specimen catalog accepted; SP-02 identity and physical registration accepted and active; SP-13 260909 PolyMAX frozen; H9 clarified
+Date: 2026-10-07 · Accepted by: SUPERVISOR · Source: SUPERVISOR "Catalog acceptance + SP-02 acceptance + SP-13 260909 PolyMAX provenance gate" and its confirmation of 2026-10-07; SPEC §7; D-026, D-027, D-028, D-062, D-063, D-064
+Decision:
+- **Specimen catalog:** commit `bb62060` (`SPECIMEN_CATALOG.md`, `specimen_catalog.json`) is the canonical
+  specimen inventory. Catalog questions already answered there are not reopened. SP-12, SP-14, SP-15 and
+  the unnumbered 300×300 panels stay unresolved catalog entries; they are not M7 blockers.
+- **SP-02 identity:** the record-based resolution is accepted. "SP2 (old)" is the physical SP-02;
+  "SP10 (new SP2)" is the separate physical SP-10. No further HUMAN identity confirmation is required.
+- **SP-02 physical registration:** the result of `09c05a0` (`9b63f6c8…`) is accepted.
+  - The active SP-02 passport and fixture are bound to it.
+  - The legacy registration `9bf736d3…` is kept only as historical provenance.
+  - Anti-tuning evidence and the M4 pairing/holdout policies are unchanged.
+- **SP-13 260909 PolyMAX:**
+  - `SP13_polymax.unv` in `I:\Sumin\SPname_files_260909_polymax.zip` is accepted as the confirmed
+    external PolyMAX fit of the physical SP-13 260909 session.
+  - Its set "Bravo (1)" (31.64, 74.14, 80.82, 94.43, 96.55, 147.86, 206.15, 212.61, 228.75 Hz) is frozen through the D-026 / D-027 route, with no refit.
+  - Per D-028 it is a separate governed fixture, used FREQUENCY_ONLY.
+- **H9 clarified:** H9 means only that Simcenter Testlab is not available now, so no new fit or refit can
+  be made. It does not deny that a historical PolyMAX fit of 260909 exists. The confirmed historical fit
+  does not contradict HUMAN evidence.
+- **Σ_setup:** not recomputed. It stays at the SPEC provisional 0.3 %, flagged.
+  - No estimator and no cross-grid mode matching are invented.
+  - A measured Σ_setup is deferred to a separate decision and blocks neither release nor M7.
+- **M6:** not accepted. M6.4 remains the M6 blocker. No M7 fitting.
+Rationale / scope: records SUPERVISOR acceptances and the governed updates they authorise. The
+implementation (records, tests) is a worker result pending SUPERVISOR review (EVIDENCE).
+Supersedes: D-064 (in part: the H9 wording "there is no PolyMAX fit of 260909" is clarified as above;
+everything else in D-064 stands)
+
+## D-066 — M6.4 interim screening envelope, screening rule and observation set; practical accuracy target
+Date: 2026-10-07 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M6.4 FINAL SCREENING PLAN — SUPERVISOR RANGE DECISION" and "SUPERVISOR CLARIFICATION — PRACTICAL ACCURACY TARGET" (2026-10-07); SPEC §5, §5.2, §19 item 6; D-055, D-061, D-064, D-065
+Decision:
+- **Basis:** commit `8b4afff` and the D-065 governed updates are accepted as the basis of M6.4.
+- **Screening envelope (the M6.4 range source):**
+  - E3 5.0–10.0 GPa; ν13 0.20–0.40; ν23 0.20–0.40; G13 2.2–5.0 GPa; G23 2.2–5.0 GPa.
+  - Basis `LITERATURE_INTERIM_SCREENING_ENVELOPE`, not `MATERIAL_SPECIFIC`. It is not a measured
+    property, not a material-specific prior and not a calibrated uncertainty distribution. It is a
+    conservative envelope for deciding whether the fixed constants matter to the Auto-ID result.
+  - Literature close-woven analogue: E3 ≈ 5–10 GPa, ν13/ν23 ≈ 0.2–0.4, G13/G23 ≈ 3–5 GPa.
+  - The G13/G23 lower bound includes the governed baseline 2.2 GPa on purpose. That value is not claimed
+    as literature-supported.
+- **Screening rule (SPEC §5 criterion unchanged):**
+  - One constant at a time, both envelope endpoints, at the governed reference candidate (E_in 52 000 MPa,
+    G12 4 500 MPa; the CARBON-4C baseline). An endpoint equal to the baseline needs no solve (Δf ≡ 0).
+    E_in and G12 are not refitted.
+  - Output: the frequencies of the frozen observation rows (fit and holdout). Each row is followed from the
+    baseline by FE-to-FE MAC tracking (M4.5); it is never re-paired.
+  - max |Δf/f| < 0.3 % on every row, specimen and endpoint → `NEGLIGIBLE_FOR_BUDGET`; otherwise
+    `INCLUDE_IN_UNCERTAINTY_BUDGET`. A tracking refusal leaves the constant unclassified and is escalated.
+  - `INCLUDE_IN_UNCERTAINTY_BUDGET` is bookkeeping. It is not a failure and never a reason to re-tune the
+    model. The signed per-row effects are recorded. How they propagate into M7 is decided at M7 entry;
+    they are not placed in Σ.
+- **Observation set (accepted):**
+  - SP-02 physical strict freeze: R1 FE 8 and R2 FE 10 (fit), R3 FE 13 (holdout);
+  - SP-13 physical strict freeze: R1 FE 10 (fit), R2 FE 13 (holdout).
+  - The forward models `SP02.forward.json` and `SP13.forward.json` serve the FE model only. FE-to-FE
+    tracking does not depend on the registration.
+- **Practical accuracy target (M7 real-data interpretation):**
+  - Acceptance needs:
+    - correct physical mode identity and acceptable MAC;
+    - frequency agreement preferably within ~5 %. Up to ~10 % is acceptable for the intended engineering
+      use when the modal shape is correct and there is no systematic branch mismatch.
+  - The goal is useful effective material-property ranges, not metrology-grade constituent constants.
+  - Not done:
+    - properties are not optimised merely to reduce frequency error (for example from 4 % to 1 %);
+    - a useful E_in range is not rejected for lacking sub-percent agreement;
+    - identified constants are not reported with excessive numerical precision.
+  - The 0.3 % M6.4 criterion is not this target. How the target maps onto the M5 verdict (Σ, pattern test)
+    is an M7-entry decision. No M4 threshold or M5 rule is changed here.
+- **Thickness context:** face-sheet thickness scatter is physical geometry for the later t_face nuisance,
+  not an M6.4 range:
+  - old nominal ~0.45 mm: local ~0.40–0.50 mm, mostly ~0.44–0.45 mm;
+  - new nominal ~0.25 mm: local ~0.23–0.28 mm, mostly ~0.25 mm.
+- **Execution:** M6.4a (zero Abaqus: envelope record, guarded screening path, tests) is authorised. The
+  solves need a separate HUMAN Abaqus gate that names the exact manifest hash. M6 is not accepted; no M7.
+Rationale / scope: gives M6.4 its approved range source and fixes the screening reading. The SPEC
+criterion, geometry, registration, pairing, modal selection, M4 thresholds and M5 rules are unchanged.
+Supersedes: D-055 in part. The M6.4 item "NEEDS_DECISION, no M6.4 FE jobs yet" is resolved by this
+envelope. The 0.3 % criterion stands, and so do the t_face and interface items of D-055.
+
+## D-067 — M6.4a accepted; HUMAN Abaqus gate M6.4b authorised for manifest 6d34179c…
+Date: 2026-10-07 · Accepted by: SUPERVISOR / HUMAN · Source: SUPERVISOR "M6.4a — SUPERVISOR ACCEPT" with "HUMAN ABAQUS GATE — M6.4b" (2026-10-07); D-066
+Decision:
+- **M6.4a:** commit `403ff94` is accepted. The screening design, the guarded implementation, the frozen
+  observation-mode set and `LITERATURE_INTERIM_SCREENING_ENVELOPE` are accepted.
+- **HUMAN Abaqus gate M6.4b:** authorised for manifest `6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922` only.
+  - Scope: exactly 16 Abaqus solves and 16 Abaqus Python shape extractions (SP-02 and SP-13, 8 states each).
+  - The archived baseline packs are reused. There are no baseline solves and no extra perturbations.
+  - A retry that creates an additional scientific evaluation must be reported first.
+  - Only the authorised constant changes, at its authorised endpoint. E_in/E1/E2, G12, ν12, geometry,
+    thickness, core, registration, experimental data, pairing thresholds, modal-family rules, holdout rules
+    and the M5 verdict policy do not change.
+- **Tracking:** the existing FE-to-FE tracking (MAC ≥ 0.90, unique). No mode is identified by number
+  alone, and none is substituted manually. A refusal is recorded as `NOT_CLASSIFIED_TRACKING_REFUSED`.
+- **Interpretation (restated):**
+  - The 0.3 % criterion is only the fixed-constant budget screening rule. A result ≥ 0.3 % is not a failed
+    model; it means `INCLUDE_IN_UNCERTAINTY_BUDGET`.
+  - The envelope is not a probability distribution, and the effects are not placed in Σ.
+  - The real-data engineering target stays: correct mode identity / acceptable MAC; frequency preferably
+    within ~5 %, up to ~10 % acceptable. Properties are not tuned for sub-percent agreement.
+- **After the screening:** if every constant is classified, the evidence is complete and no tracking
+  refusal is unresolved, the rescoped M6 gate is evaluated. The M7 propagation policy is not decided here.
+  M7 stays NOT_STARTED. No merge to `main`.
+Rationale / scope: records the acceptance and the HUMAN Abaqus authorisation. The execution and the result
+are worker results pending SUPERVISOR review (EVIDENCE).
+Supersedes: none
+
+## D-068 — M6.4b accepted; M7-entry wiring of the active SP-02 / SP-13 inputs; M6 closure record
+Date: 2026-10-08 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M6 FINAL ACCEPTANCE PREPARATION + M7 ENTRY CLEANUP" (2026-10-08); D-062, D-064, D-065, D-066, D-067
+Decision:
+- **M6.4b:** the screening result (commit `345c06f`) is accepted. E3, ν13, ν23, G13 and G23 are
+  `NEGLIGIBLE_FOR_BUDGET`; they stay fixed. M6.4 is CLOSED.
+- **M7-entry wiring (active inputs only):**
+  - SP-02: the active forward binding uses the physical registration fixture `SP02/bravo-1-physical`
+    (new manifest `forward_models/SP02.physical.forward.json`, bound to the physical passport).
+  - SP-13: a new active fixture `SP13/best-physical` (same source, modal set and FE as `SP13/best`, on the
+    accepted physical registration `2eeeaa86…`). The physical passport names it, and the new manifest
+    `forward_models/SP13.physical.forward.json` binds it.
+  - **Kept:** all legacy registrations; the M0–M5 frozen baselines; historical provenance. `SP02/bravo-1`,
+    `SP13/best`, the legacy passports, `SP02.forward.json` and `SP13.forward.json` are unchanged and still
+    bind. Old M4 records are not rewritten.
+- **M6 closure record:**
+  - M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059);
+  - M6.4 is CLOSED and the transverse constants are fixed;
+  - Σ_setup stays provisional 0.3 %, flagged;
+  - no new experiments;
+  - the M6 gate is a PASS candidate pending final SUPERVISOR acceptance.
+- **Not started:** M7 fitting, identification runs, Abaqus.
+Rationale / scope: prepares the M7 inputs on the accepted physical registrations without touching the frozen
+M0–M5 evidence. The wiring is a worker result pending SUPERVISOR review (EVIDENCE).
+Supersedes: none

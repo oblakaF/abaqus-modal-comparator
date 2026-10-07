@@ -1,0 +1,176 @@
+{
+  "schema": "auto-id/frozen-external-modal-set/v1",
+  "fixture_id": "SP13/260909-bravo-1",
+  "specimen_id": "SP13",
+  "physical_specimen_id": "SP-13",
+  "experiment_id": "SP13_500by500_Glue420_Auxetic_newSP01_260909",
+  "test_run_id": "260909",
+  "use_scope": "FREQUENCY_ONLY",
+  "governance": {
+    "route": "D-026 frozen external modal selection; D-027 external PolyMAX adapter (no refit, no new fitting)",
+    "separate_fixture": "D-028: the 2026-09-09 acquisition becomes a separate fixture with its own provenance",
+    "acceptance": "SUPERVISOR 2026-10-07 (D-065): provenance confirmed; candidate set 'Bravo (1)' frozen",
+    "not_in_fixture_manifest": "the M0.2 fixture manifest requires a FrozenRegistration and an FE model; the 121-point 260909 grid has no registration, and FREQUENCY_ONLY use needs none"
+  },
+  "source": {
+    "role": "archived Simcenter Testlab PolyMAX export",
+    "archive": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "sha256": "c7f91f6f84cdb011e2c6ea18b733bd49ae0f62d4b1e251c38c6dab4bb3e1c336",
+      "size_bytes": 64090215
+    },
+    "member": {
+      "name": "SP13_polymax.unv",
+      "sha256": "c036cdf36230c8deab413a5a2b4da8147cea68248c7d82ec3b0297c6705308c9",
+      "size_bytes": 13816938,
+      "zip_crc32": "24fa491c",
+      "zip_timestamp": "2026-09-10T12:10:58"
+    }
+  },
+  "modal_set": {
+    "name": "bravo-1",
+    "display_name": "Bravo (1)",
+    "source_type": "polymax-curve-fitted-dataset-55",
+    "mode_count": 9,
+    "measurement_point_count": 121,
+    "measured_dofs": [
+      "U3"
+    ],
+    "measured_face": "labelled exterior face (HUMAN H3)",
+    "testlab_project": "SP13_500by500_Glue420_Auxetic_newSP01_260909",
+    "export_timestamp": "10-09-2026 12:10:58",
+    "residual_band_hz": [
+      21.2454,
+      244.3041
+    ],
+    "other_sets_in_file": [
+      "re (11)",
+      "Bravo (8)",
+      "Processing (14)"
+    ]
+  },
+  "frozen_modes": [
+    {
+      "number": 1,
+      "frequency_hz": 31.640480151498068,
+      "damping_ratio": 0.002948
+    },
+    {
+      "number": 2,
+      "frequency_hz": 74.13596404163577,
+      "damping_ratio": 0.001171
+    },
+    {
+      "number": 3,
+      "frequency_hz": 80.81553784825952,
+      "damping_ratio": 0.001117
+    },
+    {
+      "number": 4,
+      "frequency_hz": 94.42933337045407,
+      "damping_ratio": 0.001247
+    },
+    {
+      "number": 5,
+      "frequency_hz": 96.54991383221048,
+      "damping_ratio": 0.001238
+    },
+    {
+      "number": 6,
+      "frequency_hz": 147.8584435411188,
+      "damping_ratio": 0.004733
+    },
+    {
+      "number": 7,
+      "frequency_hz": 206.1502146880702,
+      "damping_ratio": 0.000774
+    },
+    {
+      "number": 8,
+      "frequency_hz": 212.6103138281702,
+      "damping_ratio": 0.001266
+    },
+    {
+      "number": 9,
+      "frequency_hz": 228.75180815655025,
+      "damping_ratio": 0.002746
+    }
+  ],
+  "frozen_modes_source": "src/universal_reader.py load_universal_modal_file(modal_set='bravo-1'); damping from the dataset-55 ID line",
+  "geometry": {
+    "node_count": 121,
+    "node_set_sha256": "1e96dba020e6328eb357a2e40ee40dac7a1e4864a6efe1a7eae4b72c958f6e7d",
+    "identical_to_raw_acquisition": true,
+    "max_coordinate_difference_m": 7.850462293418876e-17
+  },
+  "raw_acquisition": {
+    "unv": {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_500by500_Glue420_Auxetic_newSP01_260909.unv",
+      "sha256": "6f1787dca7cf70948a76901abb7cf5fcc52d85a3c6cccec24dbcb18cbd39c754",
+      "size_bytes": 13141382
+    },
+    "svd": {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_500by500_Glue420_Auxetic_newSP01_260909.svd",
+      "sha256": "fdd3f8a411821f6eabdb0930cd28c9b43eaf4ab3a934be511852264515cb713a",
+      "size_bytes": 6000640
+    },
+    "psv_acquired": "09-Sep-26 09:00:10",
+    "points": 121,
+    "frequency_range_hz": [
+      0.3125,
+      500.0
+    ],
+    "frequency_resolution_hz": 0.3125,
+    "label": "SP-13 visible in the stored frame (D-063)"
+  },
+  "provenance_audit": {
+    "verdict": "SP13_260909_POLYMAX_PROVENANCE_CONFIRMED",
+    "evidence": [
+      "embedded Testlab project name equals the 260909 run name; export time 10-09-2026 12:10:58, after the 260909 acquisition (09-Sep-26 09:00:10) and before the 260910a acquisition (10-Sep-26 17:38:17)",
+      "the 121 geometry nodes equal the raw 260909 acquisition (same ids; coordinates identical to 1e-16 m); every other 121-point acquisition differs by 3-430 mm (each scan grid is unique)",
+      "the fitted shapes reproduce the raw 260909 H1 at the fitted frequency on the same grid (MAC per mode below); mode 7 (206.15 Hz) is barely excited (mean |H1| 0.18 vs 2.2 at 212.5 Hz; SPEC section 15)",
+      "the fitted band 21.25-244.30 Hz lies inside the raw 0.3125-500 Hz band",
+      "the LMS summary (I:\\Sumin\\Updated_260911\\Experiment_Freq_damping_LMS.xlsx, sheet 'SPname_files 260909', column 'SP13 (new SP1)') tabulates the same frequencies and damping",
+      "AUDIT section 4.2 and D-028 cite 206.15 / 212.61 / 228.75 Hz as the PolyMAX of the 2026-09-09 acquisition"
+    ],
+    "shape_mac_to_raw_260909_h1": [
+      0.989,
+      0.9903,
+      0.9847,
+      0.97,
+      0.9927,
+      0.9571,
+      0.3837,
+      0.9544,
+      0.9808
+    ],
+    "frequency_agreement_role": "supporting only, after provenance was established"
+  },
+  "registration": {
+    "status": "NOT_AVAILABLE",
+    "reason": "no FrozenRegistration exists for the 121-point 260909 grid; not required for FREQUENCY_ONLY use (SPEC section 7, D-063)"
+  },
+  "fe": {
+    "status": "NOT_APPLICABLE",
+    "reason": "frequency-only repeat evidence; no FE pairing on this grid"
+  },
+  "relation_to_governed_fixture": {
+    "fixture": "SP13/best",
+    "session": "260910 a",
+    "points": 289,
+    "relation": "260910a is a genuine same-panel re-suspension of 260909 (HUMAN H6, D-063); different grid; FREQUENCY_ONLY; no cross-grid shape or MAC claim",
+    "mode_correspondence": "NOT_ESTABLISHED: no governed cross-grid correspondence rule exists, and the LMS mode labels of the two sessions disagree; nothing is invented"
+  },
+  "sigma_setup": {
+    "status": "PROVISIONAL",
+    "value_percent": 0.3,
+    "flagged": true,
+    "reason": "SUPERVISOR 2026-10-07: do not recompute; the estimator is a later decision (D-053, D-058) and cross-grid mode matching is not governed; deferred, not a release or M7 blocker"
+  },
+  "h9": "HUMAN H9 (clarified 2026-10-07, D-065): Simcenter Testlab is not available now, so no new fit or refit can be made; it does not deny this historical fit",
+  "abaqus_solves": 0,
+  "abaqus_python_extractions": 0
+}

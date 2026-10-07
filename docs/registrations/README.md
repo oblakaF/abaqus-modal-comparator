@@ -13,6 +13,24 @@ Accepted `frozen-registration/1` artifacts for the primary shared-carbon pair
 - FrozenRegistration hash: `9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164`.
 - 121 points, U3-only measurement contract, TOP exterior face.
 
+## SP-02 physical registration (M6 gate, 2026-10-06; ACCEPTED and ACTIVE, D-065)
+
+- `SP02_physical_registration.json`, hash `9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c`: `scan_to_panel_edges` + `camera_grid`,
+  reconstructed from the stored PSV frame with the SP-13 method (record in
+  `docs/auto_id/registration_evidence/`).
+- Production-ready. Its passport carries `physical_specimen_id` "SP-02" (identity accepted, D-065). It
+  is the active SP-02 registration through fixture `SP02/bravo-1-physical`.
+- The legacy `SP02_frozen_registration.json` below is historical provenance only: it is
+  physically inconsistent (point error median 29 mm, max 54 mm).
+
+## SP-13 physical registration (M6 gate, 2026-10-06; D-062)
+
+- `SP13_physical_registration.json`, hash `2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823`: `scan_to_panel_edges` + `camera_grid`,
+  reconstructed from the stored PSV frame (record in `docs/auto_id/registration_evidence/`).
+  Production-ready. After HUMAN H8: `scale_rel` 0.002 (readout only); `registration_limited` False.
+- The legacy `SP13_frozen_registration.json` below is historical provenance only: it is
+  physically inconsistent (point error median 26 mm, max 47 mm).
+
 ## SP-13
 
 - Auxetic core.

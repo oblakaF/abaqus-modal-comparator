@@ -3321,3 +3321,348 @@ first internal provider.
 - **M6:** `NOT_STARTED`; M6.1–M6.4 `TODO`.
 - **Bookkeeping branch:** `auto-id/m5-closure`, created from the merge commit.
 - **Unchanged:** code and scientific logic. No Abaqus. Retained M4 artifacts untouched.
+
+## 2026-10-06 — M6 started; checkpoint M6-A (entry decisions, SP-11 experiment checklist)
+
+- **Stage:** M6 `IN_PROGRESS` on branch `auto-id/m6` (from `main` `ab1dc60`).
+  - M6.1 `IN_PROGRESS`, readiness NEEDS_DATA (not `REVIEW_READY`).
+  - M6.2 and M6.3 `TODO`, NEEDS_DATA.
+  - M6.4 `TODO`, NEEDS_DECISION.
+  - M6 gate not evaluated; M7 `NOT_STARTED`.
+- **SUPERVISOR entry decisions:** M6_DECISION_RECORD.md §1–§11; DECISIONS.md D-049–D-056.
+  - SP-11 is the M6 twill bare plate; its old FRFs are reconnaissance only; a new acquisition is
+    required;
+  - `STAGE_A_VALIDATION` context, never production IDENTIFIED while family consistency is
+    NOT_AVAILABLE (M7);
+  - D12 fitted only at full practical rank (rcond 1e-3), otherwise governed fixed ν12;
+  - analytic thickness propagation, spatial scatter not divided by √N, t⁻³ explicit;
+  - M6.2 repeat principle, with the estimator deferred; provisional Σ_setup flagged; Σ_meas never
+    invented;
+  - core tiles per topology (CARBON-5F is context only);
+  - M6.4 ranges not invented; sandwich t_face and interface deferred;
+  - legacy Stage-A rules excluded.
+- **New document:** M6_SP11_EXPERIMENT_CHECKLIST.md, the exact HUMAN measurements before M6-C,
+  sections A–E.
+- **Code:** none in this checkpoint.
+- **Abaqus runs:** 0. No retained M4 artifact deleted.
+
+## 2026-10-06 — M6 checkpoint M6-B (Stage-A → M5 adapter) REVIEW_READY
+
+- **Status:**
+  - M6-B `REVIEW_READY`;
+  - M6.1 stays `IN_PROGRESS` / NEEDS_DATA, not `REVIEW_READY`: no real SP-11 data, and M6-C is not
+    authorised;
+  - M6.2–M6.4 unchanged.
+- **New modules:**
+  - `src/domain/stage_a_experiment.py`: typed Stage-A experimental evidence. Every gap is refused
+    together, with typed codes: FRF-only, not curve-fitted, no frozen modal set, < 9 thickness
+    points, attachment / non-contact route, < 2 excitation locations, suspension, mass / plan,
+    geometry calibration, fixed-pair fallback, non-strict policy.
+  - `src/services/stage_a_validation.py`: `run_stage_a_validation`. It runs:
+    - the verified affine Stage-A basis;
+    - strict FE-to-FE tracking;
+    - the M4.8 LM with explicit settings and bounds;
+    - the D12 rank policy (D-051);
+    - ±5 % ln-p sensitivities;
+    - the M5 chain: rank, `statistical_sd`, pattern, Birge, leave-one-family-out;
+    - the M5.9 PRODUCTION verdict embedded (always NOT_IDENTIFIABLE while family consistency is
+      NOT_AVAILABLE);
+    - derived E and G12 with separately labelled frequency, thickness-spatial and gauge components
+      (t⁻³ explicit);
+    - the `STAGE_A_VALIDATION` report with deterministic hashes;
+    - the M6.2 comparison interface (no agreement rule yet).
+- **Unchanged:** the M1–M5 modules and the legacy Stage-A modules.
+- **Worker design choices and open items:** M6_DECISION_RECORD.md §12–§14.
+- **Tests:**
+  - `tests/test_stage_a_validation.py`: 27, synthetic (SUPERVISOR items 1–20 plus 7 more).
+  - Targeted: M6-B + Stage-A + M5 + M4 guard, 261 passed (2 Abaqus-gated tests skipped); M3/M4/M5
+    stage gates with stores, 30 passed.
+  - Full suite, Windows: 1420 OK (27 skipped) without data stores; 1425 OK (2 skipped) with both
+    stores.
+- **Abaqus:** 0 solves and 0 Abaqus Python extractions. No retained M4 artifact deleted.
+
+## 2026-10-06 — M6 corrective governance after the D:\Snadwich source audit (M6-A correction)
+
+- **Basis:** the read-only `D:\Snadwich` source audit, accepted by the SUPERVISOR as the factual
+  basis.
+- **Decisions (append-only):**
+  - **D-057 corrects D-049.** Kept: SP-11 is the twill bare plate, and its data are
+    reconnaissance-only. Removed: "resolution insufficient" as a standalone bar, and "new
+    acquisition required". M6.1 is `BLOCKED_ON_EXPERIMENT` because there is no fitted/frozen
+    modal set, the sessions are inconsistent, the support data are incomplete, and no new
+    experiment is available.
+  - **D-058 corrects D-053.** The repeat wording now follows SPEC §7: the same grid supports
+    frequencies, shapes and MAC; a different grid supports frequency-only. M6.2 is
+    `BLOCKED_ON_EXPERIMENT`; the definition is not weakened.
+- **Documents:**
+  - M6_DECISION_RECORD.md §15 added, with superseded / corrected notes in §3, §7 and §14;
+  - M6_SP11_EXPERIMENT_CHECKLIST.md re-labelled as reference requirements (AVAILABLE_NOT_YET_GOVERNED
+    / MISSING / UNAVAILABLE_FOR_THIS_PROJECT);
+  - new SNADWICH_INVENTORY.md (a factual inventory; no passports).
+- **Status:**
+  - M6 `IN_PROGRESS`; M6-A `REVIEW_READY` (corrected); M6-B `REVIEW_READY`;
+  - M6.1 and M6.2 `BLOCKED_ON_EXPERIMENT`;
+  - M6.3 `TODO` (NEEDS_DATA, feasibility unresolved); M6.4 `TODO` (NEEDS_DECISION);
+  - gate `NOT_EVALUATED`; M7 `NOT_STARTED`.
+- **Unchanged:** SPEC, the ROADMAP mini-step definitions, and all code. M6-B is unchanged.
+- **Abaqus:** none.
+
+## 2026-10-06 — M6 / STEEL normative rescope (SPEC §19 item 6; D-059–D-061)
+
+- **SPEC §19 item 6 (new, normative):** supersedes the §17 M6 acceptance row and the §17 STEEL
+  sentence. SPEC §5, §5.1, §5.3 and §7 are unchanged.
+- **Decisions:**
+  - **D-059:** M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP`, with their
+    consequences kept. It supersedes D-054 in part (the tile plan) and the status labels of D-057
+    and D-058.
+  - **D-060:** STEEL is removed; supersedes D-015. Results are labelled not externally validated.
+  - **D-061:** the rescoped M6 gate.
+- **Documents:** ROADMAP (M6 table and gate; STEEL `SUPERSEDED`), STATUS (`steel_gate`, M6
+  readiness, M6.4 NEEDS_SOURCE), M6_DECISION_RECORD §16.
+- **Status:**
+  - M6 `IN_PROGRESS`;
+  - M6.1–M6.3 `NOT_AVAILABLE_WITH_CURRENT_SETUP`;
+  - M6.4 `TODO` (NEEDS_SOURCE);
+  - gate `NOT_EVALUATED`;
+  - M7 `NOT_STARTED`.
+- **Unchanged:** code (M6-B unchanged). No Abaqus.
+
+## 2026-10-06 — SP-13 physical registration gate (zero Abaqus; D-062, D-063)
+
+- **New code:** `services/psv_video_registration.py` (read-only `.svd` reconstruction; no modal
+  imports), `archived_baseline.reregistered_mac_matrix` / `reregistered_shape_pack_evidence`
+  (existing archived path unchanged), and three tools (reconstruct, build registration,
+  re-evaluate).
+- **Governed files:**
+  - the reconstruction record;
+  - `SP13.physical.specimen.json` (`scan_to_panel_edges` + `camera_grid`; physical_specimen_id
+    SP-13; remount 260909 → 260910 `re_suspension`);
+  - `SP13_physical_registration.json` (`2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823`, production-ready);
+  - the re-evaluation record.
+- **Legacy:** the legacy registration and passport are unchanged, kept as historical provenance.
+- **Result:**
+  - strict pairs legacy (4,10),(5,11) → physical (4,10),(7,13);
+  - MAC 0.888 → 0.958 for 4 ↔ 10; condition number 252 → 6.3;
+  - after the unchanged M4.3 holdout, one fit row: SP-13 alone still insufficient.
+- **Uncertainty:** translation 5.72 mm and rotation 0.49° derived; `scale_rel` NOT_AVAILABLE, so
+  `registration_limited` is NOT_AVAILABLE.
+- **Σ_setup:** provisional 0.3 %; measured `NOT_AVAILABLE_PENDING_MODAL_PREPARATION`.
+- **Tests:** `tests/test_sp13_physical_registration.py` (anti-tuning static checks; pinned files;
+  re-registration binding; store-gated reproduction of the reconstruction, the registration and both
+  freezes).
+- **Abaqus:** 0 solves and 0 extractions. Pairing policy, thresholds and modal data unchanged.
+
+## 2026-10-06 — SP-13 HUMAN evidence update (H7–H10) and SP-02 physical registration gate (zero Abaqus; D-064)
+
+- **SP-13:**
+  - The gate at `173af43` is recorded as SUPERVISOR-ACCEPTED.
+  - The passport takes the H7 orientation source and `scale_rel` 0.002 (H8 readout only). The
+    manifest is now `b857724a…`; the registration hash `2eeeaa86…` is unchanged.
+  - New M2.4 record: EVALUATED, `registration_limited` False (MAC crossing and pairing change both
+    evaluated).
+  - Σ_setup stays at the provisional 0.3 %, flagged (H9). 260909 → 260910 is FREQUENCY_ONLY (H10).
+- **Code:**
+  - `psv_video_registration.alignment_points` reads the stored point count (behaviour change,
+    tested). The SP-13 record is rebuilt bit-identically.
+  - `reconstruct_psv_registration.py`: optional `--dimension-uncertainty`.
+  - New tools: `build_physical_registration.py`, `registration_uncertainty_evaluation.py`,
+    `sp02_registration_reevaluation.py`.
+- **SP-02 governed files (new):**
+  - the reconstruction record (`b9234f57…`);
+  - `SP02.physical.specimen.json` (manifest `83739ecd…`; `physical_specimen_id` null);
+  - `SP02_physical_registration.json` (`9b63f6c8…`);
+  - the re-evaluation and M2.4 records.
+  - The legacy SP-02 registration, passport and fixture are unchanged.
+- **SP-02 result:**
+  - Anisotropy x 1.092 / y 0.818; legacy vs physical median 28.9 mm, max 54.1 mm.
+  - Strict pairs: legacy (2,8) NOT_FROZEN → physical (2,8),(4,10),(7,13) FROZEN.
+  - M4.3 validation holdout R3; fit rows R1, R2 (condition number 6.1). `registration_limited`
+    False.
+  - Identity: NEEDS_ONE_HUMAN_CONFIRMATION.
+- **Combined SP-02 + SP-13 (diagnostic):** 5 strict rows, 3 fit rows, rank 2, condition number 6.0.
+- **Holdout semantics** documented read-only (M6_DECISION_RECORD §18.1); the rule is unchanged.
+- **Tests:** `tests/test_sp02_physical_registration.py` (new); `tests/test_sp13_physical_registration.py`
+  updated.
+- **Abaqus:** 0 solves, 0 extractions. Pairing policy, thresholds, holdouts and modal data unchanged.
+
+## 2026-10-06 — Specimen catalog: authoritative inventory of every real specimen (documentation checkpoint; zero Abaqus)
+
+- **New:**
+  - `docs/auto_id/SPECIMEN_CATALOG.md`, the canonical readable specimen reference;
+  - `docs/auto_id/specimen_catalog.json`, one deterministic entry per physical specimen with source
+    paths, sizes and SHA-256 (not a runtime dependency);
+  - `tests/test_specimen_catalog.py`.
+- **Sources audited (read-only):**
+  - `D:\Snadwich` (primary);
+  - `I:\Sumin`: raw batch 260909, PolyMAX zip, LMS summaries;
+  - the article project folder (Obsidian specimen vault, reports, photos);
+  - `C:\temp\12 sampls`, `C:\temp`, the CARBON archive;
+  - all repository records.
+- **Results:**
+  - 14 physical specimens with records (SP-01 … SP-13, SP-15). SP-14 is AMBIGUOUS (template note only).
+  - 5 face families; different families are not merged.
+  - SP-06 and SP-15 acquisitions exist outside the store.
+  - Ungoverned PolyMAX exports exist for every specimen with an acquisition.
+  - SP-01 INP/ODB exists in `C:\temp`.
+- **SP-02 identity:** SP02_IDENTITY_RESOLVED_FROM_RECORDS (DERIVED). Evidence: the LMS sheet "SP2 (old)" /
+  "SP10 (new SP2)", the spectrum separation, label chronology and lineage. Pending SUPERVISOR. The
+  passport is not edited.
+- **Contradiction audit:** 21 items. Two are REAL_CONFLICT:
+  - C1: a PolyMAX fit of SP-13 260909 exists, against H9; nothing is changed and Σ_setup stays
+    provisional;
+  - C2: SP-10 260911 is a rotated session.
+- **HUMAN questions:** 6, collected in one section; only Q1 touches the M7 path.
+- `SNADWICH_INVENTORY.md`: pointer to the catalog and a list of superseded statements; history kept.
+- No governed passport, fixture, registration, forward model, baseline, rule or threshold changed.
+  0 Abaqus solves, 0 extractions.
+
+## 2026-10-07 — D-065: catalog accepted; SP-02 active on the physical registration; SP-13 260909 PolyMAX frozen (zero Abaqus)
+
+- **DECISIONS:** D-065 records the SUPERVISOR acceptances, the H9 clarification and that Σ_setup stays
+  provisional.
+- **SP-02:**
+  - new active fixture `SP02/bravo-1-physical` (physical registration `9b63f6c8…`);
+  - `SP02.physical.specimen.json` takes `physical_specimen_id` "SP-02" and the new fixture;
+  - the legacy chain (`SP02/bravo-1`, legacy passport, forward manifest, archived baseline) is unchanged
+    as historical provenance;
+  - the M2.4 record was regenerated (only the passport hash changed).
+- **SP-13 260909:**
+  - provenance audit CONFIRMED;
+  - frozen FREQUENCY_ONLY record `fixtures/SP13_260909.frozen-modal-set.json` (fixture
+    `SP13/260909-bravo-1`, set "Bravo (1)", 9 modes); no refit.
+- **Catalog:** status ACCEPTED; C1 resolved (EXPECTED_HISTORICAL); Q1 answered; SP-02/SP-13 entries
+  updated.
+- **Tests:**
+  - new `tests/test_sp13_260909_frozen_modal_set.py`;
+  - updated `test_experiment_fixture`, `test_sp02_physical_registration`, `test_specimen_catalog`.
+- Σ_setup provisional 0.3 %. M6 not accepted (M6.4). 0 Abaqus solves, 0 extractions.
+
+## 2026-10-07 — M6 — M6.4a: screening envelope and guarded screening path (zero Abaqus)
+
+- **Stage:** M6
+- **Mini-step:** M6.4a (M6.4 `IN_PROGRESS`)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m6`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M6.4a): transverse screening envelope, guarded screening path and HUMAN Abaqus manifest (zero Abaqus)`
+- **Files changed:**
+  - created:
+    - `src/domain/transverse_screening.py`, `src/services/transverse_screening.py`;
+    - `tools/m6_4_transverse_screening.py`;
+    - `tests/test_m6_4_transverse_screening.py`;
+    - `docs/auto_id/screening/M6_4_transverse_envelope.json`, `docs/auto_id/screening/README.md`.
+  - updated:
+    - `src/services/forward_builder.py` (additive screening path);
+    - `docs/auto_id/DECISIONS.md` (D-066), `docs/auto_id/M6_DECISION_RECORD.md` (§19);
+    - `docs/auto_id/EVIDENCE.md`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/STATUS.json`;
+    - `docs/auto_id/forward_models/README.md`.
+- **Scientific behaviour changed:** YES, additively: a new screening path. The fitting path,
+  parameterisations, thresholds, pairing and M5 rules are unchanged.
+- **Decision:** D-066:
+  - envelope `LITERATURE_INTERIM_SCREENING_ENVELOPE`;
+  - the SPEC §5 rule on the frozen rows;
+  - the practical 5–10 % target for M7 interpretation;
+  - the D-065 updates accepted as the basis.
+- **Tests run:**
+  - the full suite on Windows, with and without data stores;
+  - `test_m6_4_transverse_screening` (28);
+  - a targeted mutation check (6 of 6 killed).
+- **Test result:** Windows with the snadwich and carbon-project-archive stores 1511 OK (5 skipped: 3 need the sumin store and pass with it, 24 OK; 2 are Abaqus-gated); without data stores 1502 OK (48 skipped); test_m6_4_transverse_screening 28 OK (24 OK, 1 class skipped without stores)
+- **Abaqus run count:** 0 (0 Abaqus Python extractions).
+- **Evidence produced:** the HUMAN Abaqus manifest `6d34179c787c8b0e…` (EVIDENCE).
+- **Known limitations:**
+  - no screening result yet;
+  - the classification is local to the CARBON-4C reference point;
+  - the M7 propagation mechanism for a budgeted constant is not chosen.
+- **Next gate:** SUPERVISOR review of M6.4a. Then the HUMAN Abaqus gate for M6.4b: 16 solves and
+  16 extractions under manifest `6d34179c787c8b0e…`.
+
+## 2026-10-08 — M6 — M6.4b: transverse-constant screening result; M6 gate evaluated (HUMAN Abaqus gate)
+
+- **Stage:** M6
+- **Mini-step:** M6.4b (M6.4 `REVIEW_READY`; M6.4a ACCEPTED, D-067)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m6`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M6.4b): transverse-constant screening result - all five NEGLIGIBLE_FOR_BUDGET; M6 gate evaluated`
+- **Files changed:**
+  - created:
+    - `docs/auto_id/screening/M6_4_transverse_screening_result.json`;
+    - `docs/auto_id/screening/M6_4_run_evidence.json`;
+    - `tests/test_m6_4_screening_result.py`.
+  - updated:
+    - `docs/auto_id/DECISIONS.md` (D-067), `docs/auto_id/M6_DECISION_RECORD.md` (§20);
+    - `docs/auto_id/EVIDENCE.md`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/STATUS.json`;
+    - `docs/auto_id/screening/README.md`.
+- **Scientific behaviour changed:** NO. The tool is unchanged from `403ff94`; this mini-step only records the
+  result.
+- **Tests run:**
+  - the M6.4 tests, the M6 tests, the M5 gate, the M4 guard and gates, the M3 gate;
+  - the full suite on Windows, with and without data stores;
+  - the result reproduction from the run store.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1516 OK (2 Abaqus-gated skipped); without data stores 1507 OK (49 skipped); targeted M6.4 + M6 + M5 gate + M4 guard/gate + M3 gate 152 OK; result reproduction from the run store OK
+- **Abaqus run count:** 16 solves and 16 Abaqus Python extractions (HUMAN gate D-067; 0 failures, 0 retries).
+- **Evidence produced:** EVIDENCE "M6.4b". All five constants are `NEGLIGIBLE_FOR_BUDGET` (max 0.0353 %);
+  the M6 gate worker evaluation is PASS.
+- **Known limitations:**
+  - the classification is local to the CARBON-4C reference point;
+  - the open items, which are not gate conditions, are listed in M6_DECISION_RECORD §20.
+- **Next gate:** SUPERVISOR review of M6.4b and of the M6 gate. Then the M6 stage PR. A merge needs explicit
+  HUMAN authorisation. M7 NOT_STARTED.
+
+## 2026-10-08 — M6 — D-068: M7-entry wiring of the active SP-02 / SP-13 inputs; M6 closure record (zero Abaqus)
+
+- **Stage:** M6 (closure preparation)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m6`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M6): D-068 - active SP-02/SP-13 inputs on the physical registrations; M6 closure record (zero Abaqus)`
+- **Decision:** D-068:
+  - M6.4b accepted, M6.4 CLOSED;
+  - the M7-entry wiring of the active inputs only;
+  - the M6 closure record, with the M6 gate a PASS candidate.
+- **Files changed:**
+  - created:
+    - `docs/auto_id/forward_models/SP02.physical.forward.json`, `docs/auto_id/forward_models/SP13.physical.forward.json`;
+    - `tests/test_m7_entry_wiring.py`.
+  - updated:
+    - `docs/auto_id/fixtures/real_experiment_fixtures.json` (new fixture `SP13/best-physical`; insertion only);
+    - `docs/auto_id/specimens/SP13.physical.specimen.json` (`acquisition.fixture_id`);
+    - `docs/auto_id/registration_evidence/SP13_registration_uncertainty.json` (regenerated; passport hash only);
+    - `tests/test_experiment_fixture.py`, `tests/test_sp13_physical_registration.py`, `tests/test_specimen_catalog.py`;
+    - `docs/auto_id/SPECIMEN_CATALOG.md`, `docs/auto_id/specimen_catalog.json`;
+    - DECISIONS, M6_DECISION_RECORD (§21), EVIDENCE, ROADMAP, STATUS;
+    - the fixtures, forward-model and specimens READMEs.
+- **Scientific behaviour changed:** NO. These are new governed bindings. The frozen M0–M5 records, legacy chains
+  and rules are unchanged (54 content hashes compared, 0 changed).
+- **Tests run:** the full suite on Windows, with and without data stores; the wiring, fixture, registration,
+  catalog, forward, M3/M4/M5 gate and M6.4 tests.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); wiring + fixture + registration + catalog + forward + M3/M4/M5 gate + M6.4 tests included
+- **Abaqus run count:** 0 (no identification run).
+- **Next gate:** SUPERVISOR review of D-068 and final M6 acceptance. Then the M6 stage PR; a merge needs
+  explicit HUMAN authorisation. M7 NOT_STARTED.
+
+## 2026-10-08 — M6 — SUPERVISOR acceptance and stage closure; stage PR prepared
+
+- **Stage:** M6
+- **Status:** ACCEPTED (SUPERVISOR 2026-10-08). M6 gate PASS. Stage PR `auto-id/m6` → `main` prepared, not
+  merged.
+- **Branch:** `auto-id/m6`
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): M6 SUPERVISOR acceptance and stage closure`
+- **Accepted scope:**
+  - M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP` (intentional);
+  - M6.4 is `ACCEPTED` (M6.4a + M6.4b): E3, ν13, ν23, G13, G23 are `NEGLIGIBLE_FOR_BUDGET` and stay fixed;
+  - the active fixtures are `SP02/bravo-1-physical` and `SP13/best-physical`; the legacy registrations are
+    historical;
+  - Σ_setup 0.3 % PROVISIONAL, Σ_meas NOT_AVAILABLE.
+- **Files changed:** `docs/auto_id/STATUS.json`, `ROADMAP.md`, `CHANGELOG.md`, `M6_DECISION_RECORD.md` (§22) and
+  `EVIDENCE.md` (governance records only).
+- **Scientific behaviour changed:** NO (docs only).
+- **Verification before the PR:** no Abaqus artifacts; M3/M4 changes additive only; no M5 change; frozen M0–M5
+  records unchanged.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); M6 test modules 143 OK; M5 + M4 + M3 stage gates and M4 guard 34 OK
+- **Abaqus run count:** 0.
+- **Limitations kept:** see M6_DECISION_RECORD §22.
+- **Next gate:** HUMAN merge authorisation for the stage PR. After the merge, the `main` merge SHA is recorded.
+  M7 `NOT_STARTED`.

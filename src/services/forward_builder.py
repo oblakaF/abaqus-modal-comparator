@@ -12,6 +12,11 @@ INP and changes only:
 
 Mesh, geometry, core, density, adhesive, ties and every other line are copied
 byte-for-byte.  It prepares jobs only: no Abaqus execution, extraction or pairing.
+
+M6.4 adds one guarded, separate path for transverse-constant screening jobs
+(``prepare_screening_job``): the candidate is the screening envelope's reference point and
+exactly one screened fixed constant is set to one approved envelope endpoint.  The fitting
+path above is unchanged; screening perturbations are never fitted.
 """
 
 from __future__ import annotations
@@ -34,6 +39,12 @@ from domain.forward_model_manifest import (
     load_forward_model_manifest,
 )
 from domain.specimen_manifest import load_specimen_manifest
+from domain.transverse_screening import (
+    ScreeningEnvelope,
+    ScreeningEnvelopeError,
+    ScreeningPerturbation,
+    screened_constants,
+)
 
 
 # Material options that may appear inside a *Material block of these inputs.
@@ -231,7 +242,11 @@ class RenderedForwardInput:
 
 def render_forward_input(model: BoundForwardModel, candidate: ForwardCandidate, source: bytes) -> RenderedForwardInput:
     """Rewrite the reference INP for one candidate; only the authorised lines may change."""
+    return _render(model, candidate, source, None)
 
+
+def _render(model: BoundForwardModel, candidate: ForwardCandidate, source: bytes,
+            perturbation: Optional[ScreeningPerturbation]) -> RenderedForwardInput:
     manifest = model.manifest
     if not isinstance(candidate, ForwardCandidate):
         raise TypeError("candidate must be a ForwardCandidate.")
@@ -250,6 +265,9 @@ def render_forward_input(model: BoundForwardModel, candidate: ForwardCandidate, 
                                 f"{record.values.to_dict()} differ from the manifest.")
     constants = candidate.engineering_constants()
     variable = manifest.parameterisation.variable_constants
+    if perturbation is not None:  # M6.4 screening: exactly one fixed constant at an envelope endpoint
+        constants = screened_constants(constants, perturbation)
+        variable = variable + (perturbation.constant,)
     rewrite_engineering_constants(lines, record, constants, variable)
     frequency_line = rewrite_eigenvalue_request(lines, manifest.frequency_request)
 
@@ -433,3 +451,72 @@ def prepare_forward_jobs(models: Sequence[BoundForwardModel], candidate: Forward
     _check_distinct(models)
     return prepare_forward_evaluation(models, [read_reference_input(model, roots) for model in models],
                                       candidate, output_directory)
+
+
+# ----------------------------------------------------------------------------- M6.4 transverse screening jobs
+
+SCREENING_JOB_SCHEMA = "auto-id/screening-forward-job/v1"
+
+
+def render_screening_input(model: BoundForwardModel, envelope: ScreeningEnvelope, perturbation: ScreeningPerturbation,
+                           source: bytes) -> RenderedForwardInput:
+    """Rewrite the reference INP for one screening perturbation of the envelope's reference candidate.
+
+    Refuses a perturbation that is not one of the envelope's endpoint perturbations, a forward
+    model of another parameterisation, and a screened constant that is not fixed by it.  The
+    post-check of the fitting path applies unchanged (only the record and eigenvalue lines).
+    """
+
+    if not isinstance(envelope, ScreeningEnvelope):
+        raise TypeError("envelope must be a ScreeningEnvelope.")
+    try:
+        envelope.require_perturbation(perturbation)
+    except ScreeningEnvelopeError as exc:
+        raise ForwardBuildError(str(exc)) from exc
+    parameterisation = model.manifest.parameterisation
+    if parameterisation.parameterisation_id != envelope.parameterisation_id:
+        raise ForwardBuildError(f"{model.manifest.forward_model_id} uses {parameterisation.parameterisation_id!r}, "
+                                f"the envelope screens {envelope.parameterisation_id!r}.")
+    if perturbation.constant not in parameterisation.fixed_constants:
+        raise ForwardBuildError(f"{perturbation.constant} is not a fixed constant of {parameterisation.parameterisation_id}.")
+    candidate = ForwardCandidate.create(envelope.parameterisation_id, **envelope.reference_candidate)
+    try:
+        rendered = _render(model, candidate, source, perturbation)
+    except ScreeningEnvelopeError as exc:
+        raise ForwardBuildError(str(exc)) from exc
+    changed = [name for name in EngineeringConstants.names()
+               if getattr(rendered.engineering_constants, name) != getattr(candidate.engineering_constants(), name)]
+    if changed != [perturbation.constant]:
+        raise ForwardBuildError(f"A screening job must change exactly {perturbation.constant}; changed {changed}.")
+    return rendered
+
+
+def prepare_screening_job(model: BoundForwardModel, envelope: ScreeningEnvelope, perturbation: ScreeningPerturbation,
+                          source: bytes, output_directory: Path) -> PreparedForwardJob:
+    """Render and write one screening job INP (content-addressed name) with its screening provenance."""
+
+    rendered = render_screening_input(model, envelope, perturbation, source)
+    candidate = ForwardCandidate.create(envelope.parameterisation_id, **envelope.reference_candidate)
+    provenance = forward_job_provenance(model, candidate, rendered)
+    provenance["schema"] = SCREENING_JOB_SCHEMA
+    provenance["screening"] = dict(perturbation.to_dict(), basis=envelope.basis, decision=envelope.decision)
+    name = provenance["generated_inp"]["job_name"]
+    output_directory = Path(output_directory)
+    output_directory.mkdir(parents=True, exist_ok=True)
+    target = output_directory / f"{name}.inp"
+    _write_content_addressed(target, rendered.content, rendered.sha256)
+    request = model.manifest.frequency_request
+    return PreparedForwardJob(
+        forward_model_id=model.manifest.forward_model_id,
+        candidate=candidate,
+        engineering_constants=rendered.engineering_constants,
+        source_inp_sha256=rendered.source_sha256,
+        generated_inp=target,
+        generated_inp_sha256=rendered.sha256,
+        job_name=name,
+        registration_hash=model.manifest.registration_hash,
+        requested_eigenvalue_count=request.requested_eigenvalue_count,
+        elastic_mode_count=request.elastic_mode_count,
+        provenance=provenance,
+        job_hash=canonical_hash(provenance),
+    )

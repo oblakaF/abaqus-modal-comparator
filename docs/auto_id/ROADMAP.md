@@ -467,14 +467,99 @@ work.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `TODO` |
-| M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `TODO` |
-| M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `TODO` |
-| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `TODO` |
+| M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
+| M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
+| M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
+| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `ACCEPTED` (CLOSED; D-066–D-068): all five `NEGLIGIBLE_FOR_BUDGET`, kept fixed |
 
-Stage status: `NOT_STARTED` (requires an explicit SUPERVISOR instruction).
+Stage status: **`ACCEPTED`** (SUPERVISOR 2026-10-08; M6 gate PASS; stage PR `auto-id/m6` → `main` prepared,
+not merged; M7 `NOT_STARTED`). History: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
+decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; rescoped by SPEC §19 item 6; M6 gate
+`NOT_EVALUATED`; M7 `NOT_STARTED`).
+- Checkpoint M6-A `REVIEW_READY`: entry decisions recorded; HUMAN SP-11 experiment checklist
+  [M6_SP11_EXPERIMENT_CHECKLIST.md](M6_SP11_EXPERIMENT_CHECKLIST.md). No Abaqus.
+- Checkpoint M6-B `REVIEW_READY`: `domain/stage_a_experiment.py` + `services/stage_a_validation.py`
+  (Stage-A → M5 adapter, `STAGE_A_VALIDATION` context) with synthetic tests. No Abaqus.
+- Corrective governance 2026-10-06 (§15; D-057, D-058): M6.1 and M6.2 are `BLOCKED_ON_EXPERIMENT`.
+  - Reasons: no governed fitted SP-11 modal set, inconsistent sessions, incomplete physical support
+    data, and no new SP-11 experiment available.
+  - The checklist is now a reference record; the real-specimen inventory is in
+    [SNADWICH_INVENTORY.md](SNADWICH_INVENTORY.md).
+  - This ROADMAP and SPEC §17 were unchanged at that point.
+- **M6 rescope 2026-10-06 (SPEC §19 item 6; D-059, D-060, D-061; §16):**
+  - M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP`. Their consequences are kept: G12 follows
+    §5/§5.1 (D-046), there is no real-data Stage-A validation, k_core is only a later PROVISIONAL
+    nuisance, and Σ_setup stays at the flagged provisional 0.3 %.
+  - M6.4 is the remaining executable step (FE-only); it needs an approved range source.
+  - The STEEL gate is removed (D-060): results are labelled not externally validated.
+- **SP-13 physical registration gate 2026-10-06 (zero Abaqus; D-062, D-063; §17):**
+  - A production-ready physical registration was rebuilt from the stored PSV records. The legacy
+    centred registration is historical only (point error median 26 mm, max 47 mm).
+  - Strict pairs 4↔10 and 7↔13 are well conditioned (condition number 252 → 6.3), but after the
+    unchanged M4.3 holdout SP-13 alone still has one fit row.
+  - SUPERVISOR-ACCEPTED (D-064).
+- **SP-13 HUMAN update and SP-02 physical registration gate 2026-10-06 (zero Abaqus; D-064; §18),
+  `REVIEW_READY`:**
+  - SP-13 (H7, H8): in-plane signs physically established; `scale_rel` 0.002 (readout only).
+    M2.4 is EVALUATED and `registration_limited` is False. Σ_setup stays provisional (H9).
+  - SP-02 has the same Polytec anisotropy, and the legacy registration is wrong by median 29 mm.
+    The physical registration (same method) freezes 3 strict pairs, leaving 2 fit rows after the
+    unchanged M4.3 holdout (condition number 6.1).
+  - SP-02 identity needs one HUMAN confirmation.
+  - Combined with SP-13: 3 fit rows, rank 2. The SP2/SP10 reference scatter test stays
+    NOT_AVAILABLE (§18.2).
+- **Specimen catalog 2026-10-06 (documentation/governance checkpoint, zero Abaqus), `REVIEW_READY`:**
+  - `SPECIMEN_CATALOG.md` (canonical) + `specimen_catalog.json` (machine index, not a runtime
+    dependency).
+  - 14 physical specimens with records: SP-01 … SP-13 and SP-15. SP-14 has no physical record.
+  - SP-02 identity: SP02_IDENTITY_RESOLVED_FROM_RECORDS (DERIVED), pending SUPERVISOR.
+  - REAL_CONFLICT C1: a PolyMAX fit of SP-13 260909 exists, against H9. Σ_setup stays provisional.
+  - SUPERVISOR-ACCEPTED 2026-10-07 (D-065).
+- **D-065 governed updates 2026-10-07 (zero Abaqus), `REVIEW_READY`:**
+  - SP-02 is active on the accepted physical registration (fixture `SP02/bravo-1-physical`). The
+    legacy chain is historical.
+  - The SP-13 260909 PolyMAX set "Bravo (1)" is frozen as the FREQUENCY_ONLY fixture
+    `SP13/260909-bravo-1` (provenance confirmed).
+  - Σ_setup stays provisional 0.3 %. M6.4 remains the M6 blocker.
+  - SUPERVISOR-ACCEPTED 2026-10-07 as the M6.4 basis (D-066).
+- **M6.4 screening (D-066):**
+  - Envelope `LITERATURE_INTERIM_SCREENING_ENVELOPE` (not material-specific): E3 5–10 GPa, ν13/ν23
+    0.2–0.4, G13/G23 2.2–5 GPa.
+  - Rule: the SPEC §5 0.3 % on the frozen observation rows, one constant at a time, both endpoints,
+    FE-to-FE tracking. The criterion is bookkeeping, not a fit target.
+  - **M6.4a (zero Abaqus), `REVIEW_READY`:**
+    - the envelope record `screening/M6_4_transverse_envelope.json`;
+    - the guarded screening path: `forward_builder.prepare_screening_job`,
+      `services/transverse_screening.py`, `tools/m6_4_transverse_screening.py`;
+    - tests;
+    - HUMAN Abaqus manifest `6d34179c…`: 16 solves, 16 extractions; the baselines are reused.
+  - **M6.4b, `TODO`:** the 16 solves and extractions under a HUMAN Abaqus gate, then the result record.
+  - M6.4a SUPERVISOR-ACCEPTED 2026-10-07 (D-067). The HUMAN Abaqus gate was authorised for manifest
+    `6d34179c…`.
+  - **M6.4b (16 solves, 16 extractions, 0 failures), `REVIEW_READY`:**
+    - E3, ν13, ν23, G13 and G23 are all `NEGLIGIBLE_FOR_BUDGET`. The global max |Δf/f| is
+      0.0353 % (G23, SP-13 R2).
+    - Every frozen row was tracked, with no refusal.
+    - Result `screening/M6_4_transverse_screening_result.json`.
+  - **M6 gate (rescoped): worker evaluation PASS**, pending SUPERVISOR (M6_DECISION_RECORD §20).
+  - M6.4b SUPERVISOR-ACCEPTED 2026-10-08 (D-068). M6.4 is CLOSED.
+- **M7-entry wiring and M6 closure record (D-068, zero Abaqus), `REVIEW_READY`:**
+  - The active inputs are on the physical registrations:
+    - SP-02: `SP02/bravo-1-physical` + `SP02.physical.forward.json`;
+    - SP-13: `SP13/best-physical` (new) + `SP13.physical.forward.json`.
+  - The historical M0–M5 chains are unchanged.
+  - M6 gate: **PASS candidate**, pending final SUPERVISOR acceptance.
+  - The remaining M7 prerequisites are listed in M6_DECISION_RECORD §21. M7 NOT_STARTED.
 
-**M6 GATE:** critical priors and uncertainties are physically supported, not guessed.
+**M6 GATE (rescoped, SPEC §19 item 6, D-061): PASS (SUPERVISOR 2026-10-08; M6_DECISION_RECORD §22)**
+
+- all unavailable physical evidence is explicitly recorded;
+- every missing prior has its conservative verdict consequence encoded;
+- provisional inputs are explicitly flagged;
+- the M6.4 transverse-constant sensitivity budget is closed.
+
+(Former gate: "critical priors and uncertainties are physically supported, not guessed";
+superseded 2026-10-06.)
 
 > **Decided ([D-017](DECISIONS.md#d-017--bare-plate-g12-is-material-family-specific)), bare-plate G12 is material-family specific:**
 >
@@ -496,7 +581,11 @@ its declared uncertainty.
 
 | Id | Gate | Status |
 |---|---|---|
-| STEEL | Independent steel validation | `TODO` |
+| STEEL | Independent steel validation | `SUPERSEDED` (D-060) |
+
+> **Superseded 2026-10-06 (D-060, SPEC §19 item 6):** no steel or external known-stiffness
+> validation is part of the selected release path. Real carbon results are reported as
+> model-calibrated effective constants, labelled **not externally validated**.
 
 ---
 

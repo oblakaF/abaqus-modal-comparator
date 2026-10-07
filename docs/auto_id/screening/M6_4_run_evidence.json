@@ -1,0 +1,661 @@
+{
+ "schema": "auto-id/transverse-screening-run-evidence/v1",
+ "manifest_hash": "6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922",
+ "journal": {
+  "schema": "auto-id/identification-journal/v1",
+  "run_hash": "6def52361ef8ebed571905d9459822351fd5d6127a615591fd1f8bbb9a4cd46a",
+  "entries": 32,
+  "last_entry_hash": "32fe53c60021c2661578dbde31c26309be84ec7fb43b857e5cd8c234902c2a2d"
+ },
+ "counts": {
+  "successful_solves": 16,
+  "successful_extractions": 16,
+  "solve_failures": 0,
+  "retries": 0,
+  "baseline_solves": 0
+ },
+ "abaqus_release": "Abaqus 2024",
+ "jobs": [
+  {
+   "specimen": "SP02",
+   "perturbation_id": "E3-low",
+   "constant": "E3",
+   "endpoint": "low",
+   "value": 5000.0,
+   "job_name": "SP02_7ecb36decc403fda",
+   "generated_inp_sha256": "7ecb36decc403fdadbcf68ea7129785a7f5308a7ad3420f375f8efa2becf7b74",
+   "solver_profile_id": "SP02/abaqus-2024/v1",
+   "profile_hash": "a62351240100d5ba55b2f8aa6fa1392c4337681fa6ee94df750b429f9f2db476",
+   "solve_hash": "01bf0764a9ff7f936176cd627956697af95e97329eb57faed657a157273aafe6",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP02_7ecb36decc403fda/SP02_7ecb36decc403fda.odb",
+    "sha256": "88850c8e5a47dca58f9df089d5e4e78690cc3f5ff9802ce4bdbb651bc79d146c",
+    "size_bytes": 751590276
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 16:33:12",
+   "extraction_id": "ec6c4350409f638445ec2a880923108b4308457ab40f835baf1f7f16ba4ec33f",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP02_7ecb36decc403fda.npz",
+    "file_sha256": "93fbadb29d928ffb961c739891ac3f236767d3acdf253272071b958495363f15",
+    "content_sha256": "3a06be74b3bef29377b6ed082bb64720b1f38d070e06da8924321a9886995f3c"
+   },
+   "node_set_sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP02",
+   "perturbation_id": "E3-high",
+   "constant": "E3",
+   "endpoint": "high",
+   "value": 10000.0,
+   "job_name": "SP02_f3eed68a26571fba",
+   "generated_inp_sha256": "f3eed68a26571fba6a0f09fdacfd52ffba36e0591920d75161684ebdc40a2060",
+   "solver_profile_id": "SP02/abaqus-2024/v1",
+   "profile_hash": "a62351240100d5ba55b2f8aa6fa1392c4337681fa6ee94df750b429f9f2db476",
+   "solve_hash": "ad5fad4b4b4e90b9386f676b948018aef79457bc0a306d82b404f0a35c46f645",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP02_f3eed68a26571fba/SP02_f3eed68a26571fba.odb",
+    "sha256": "d392e71ead4a672f8ac763d94f4046edf9779c098b5a00302d24defb87ded041",
+    "size_bytes": 751590276
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 17:32:00",
+   "extraction_id": "d4a4b443b9b65c7169fc75b86fad2ecb67cae65a5b9b6e4c1667f56dddc02439",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP02_f3eed68a26571fba.npz",
+    "file_sha256": "57a7e45c007259af33c797beb0bc476e32120a8f18d86df0e968afcdcbf48afd",
+    "content_sha256": "07addb815dd10fe864ffda7d2e1b8c1cb24e8ce089ff53f3dc00ba5ca3b827f7"
+   },
+   "node_set_sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP02",
+   "perturbation_id": "nu13-low",
+   "constant": "nu13",
+   "endpoint": "low",
+   "value": 0.2,
+   "job_name": "SP02_4ef95a55171cc3d8",
+   "generated_inp_sha256": "4ef95a55171cc3d89246457a1d24d85ec841a1d419dec744bd1ebb8a7bc668e4",
+   "solver_profile_id": "SP02/abaqus-2024/v1",
+   "profile_hash": "a62351240100d5ba55b2f8aa6fa1392c4337681fa6ee94df750b429f9f2db476",
+   "solve_hash": "374a139e230e031c01f254d089e6f1935cba04919551e5a199f9f9671d96681d",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP02_4ef95a55171cc3d8/SP02_4ef95a55171cc3d8.odb",
+    "sha256": "a86dff76603f6e08b850388f47c71e628d3c49e092cb032149ec3280cf37c631",
+    "size_bytes": 751590276
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 18:18:19",
+   "extraction_id": "43a882f8cb841384eb8ffef0ca8bf48ac1069c227b7bf5444db3cf8fa72d9508",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP02_4ef95a55171cc3d8.npz",
+    "file_sha256": "bfce16f06f565fea60038d904a4b8fd68fd0e09615ac2043218267269cbbdeda",
+    "content_sha256": "f40646933621994bc0a09c5fa5f985bea9a37d943d36e9679d4a27dbf66bb9c1"
+   },
+   "node_set_sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP02",
+   "perturbation_id": "nu13-high",
+   "constant": "nu13",
+   "endpoint": "high",
+   "value": 0.4,
+   "job_name": "SP02_fe01394cc4ef1535",
+   "generated_inp_sha256": "fe01394cc4ef15356c9a92ef06dc345b9dde1d603741ac3fa0dc827a2b279c70",
+   "solver_profile_id": "SP02/abaqus-2024/v1",
+   "profile_hash": "a62351240100d5ba55b2f8aa6fa1392c4337681fa6ee94df750b429f9f2db476",
+   "solve_hash": "4c57dbb8fc9d60b424ffde9a048b3a4fff6681d90248ed94f2be4badba7b9a68",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP02_fe01394cc4ef1535/SP02_fe01394cc4ef1535.odb",
+    "sha256": "e96a958017128f8f95b4beafa5c66073db74a2b84f9e4d9a7e6af64f0299f2f2",
+    "size_bytes": 751590276
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 19:04:52",
+   "extraction_id": "67b17e9355f6535c9f4eeeb91a730fde01a3a15c62d66215f4ade261456437da",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP02_fe01394cc4ef1535.npz",
+    "file_sha256": "c4368c3e971be926b297c2dda3a16576c435ebb9e68993a739880d84b1beac47",
+    "content_sha256": "b1905b14cff537485689258ee98bc6e121649e5731cf99553749236c7d6a5161"
+   },
+   "node_set_sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP02",
+   "perturbation_id": "nu23-low",
+   "constant": "nu23",
+   "endpoint": "low",
+   "value": 0.2,
+   "job_name": "SP02_6bf74401677e7e75",
+   "generated_inp_sha256": "6bf74401677e7e7514edcb4f09f92c60d762311e04aba6bd8b5ed347c519ec26",
+   "solver_profile_id": "SP02/abaqus-2024/v1",
+   "profile_hash": "a62351240100d5ba55b2f8aa6fa1392c4337681fa6ee94df750b429f9f2db476",
+   "solve_hash": "ba42ed0a4f15c42470c314695e2c12c9d3027b896088035fa6724d1fbaf7b550",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP02_6bf74401677e7e75/SP02_6bf74401677e7e75.odb",
+    "sha256": "93f783e827bed74cf3fa9963a22fd4d104fa9a19c17ab941aadb7b6c8429e59e",
+    "size_bytes": 751590276
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 19:38:22",
+   "extraction_id": "ee9ff459080cd366b76b2f5c520c4a5d272edf58152c50fb3e5788e955b33501",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP02_6bf74401677e7e75.npz",
+    "file_sha256": "b5762b79cc266c13947bad5940f8084b735f53c12e75d5c529fd2dbb2b412b61",
+    "content_sha256": "fd61451fdb3dba06f4abf0a08a007a5b5faba638ef814b15e7b4d485a250b61a"
+   },
+   "node_set_sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP02",
+   "perturbation_id": "nu23-high",
+   "constant": "nu23",
+   "endpoint": "high",
+   "value": 0.4,
+   "job_name": "SP02_47b309d68e48a957",
+   "generated_inp_sha256": "47b309d68e48a9571099b83684f63504183109c78db085d18e6fc2db83ee4307",
+   "solver_profile_id": "SP02/abaqus-2024/v1",
+   "profile_hash": "a62351240100d5ba55b2f8aa6fa1392c4337681fa6ee94df750b429f9f2db476",
+   "solve_hash": "73d69ec13fafb7efa26f86704bea1399a5eb1a7da8bbbf0b809c49c2e699ff1b",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP02_47b309d68e48a957/SP02_47b309d68e48a957.odb",
+    "sha256": "b7beddd7e9f62b478b7550cb5a75b5145ab9c5e2c1fd9862bb983f765e922ed5",
+    "size_bytes": 751590276
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 20:14:01",
+   "extraction_id": "539b0781497905c60bd0227bcb4d5b10a70ebed8113b6e929e4c9b810dcd13ec",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP02_47b309d68e48a957.npz",
+    "file_sha256": "1178a83e02025732ce9764e1aa9a3792d790d712454426f98faec7a2323d0f04",
+    "content_sha256": "538a95a8fef17c00ff1d5cbc2cc46409eca12048ce750ac9139a7b43f4087d4c"
+   },
+   "node_set_sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP02",
+   "perturbation_id": "G13-high",
+   "constant": "G13",
+   "endpoint": "high",
+   "value": 5000.0,
+   "job_name": "SP02_5732bef18649d4bb",
+   "generated_inp_sha256": "5732bef18649d4bb66b03af5a53df7e46717997b484084104b65062188bf3ac8",
+   "solver_profile_id": "SP02/abaqus-2024/v1",
+   "profile_hash": "a62351240100d5ba55b2f8aa6fa1392c4337681fa6ee94df750b429f9f2db476",
+   "solve_hash": "fa608a6cb5fbd0be463b1b44df1157790e10a9c9355f0f8a68ee98979e89d6bc",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP02_5732bef18649d4bb/SP02_5732bef18649d4bb.odb",
+    "sha256": "b848f38f10469e60a430cc2834cf28e8facd9c4af3f797c9f83c658d515836bd",
+    "size_bytes": 751590276
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 20:53:24",
+   "extraction_id": "0291f3b75d0428425da60ef64654a1468edb125e29bff1bce1ee99d4820704bf",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP02_5732bef18649d4bb.npz",
+    "file_sha256": "75842c41f482393cd72294aa6dc02eea69ff9d0224cc174862768c84e1c97766",
+    "content_sha256": "eaa7d6365e0fd6a8e1708d66d69b207d173cfe7226999a8c19c66996e9de5fd3"
+   },
+   "node_set_sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP02",
+   "perturbation_id": "G23-high",
+   "constant": "G23",
+   "endpoint": "high",
+   "value": 5000.0,
+   "job_name": "SP02_c93b3e3cb8ae511e",
+   "generated_inp_sha256": "c93b3e3cb8ae511e6aeaca2d51d577267a3eda7d7c860ecce453a62e283646d3",
+   "solver_profile_id": "SP02/abaqus-2024/v1",
+   "profile_hash": "a62351240100d5ba55b2f8aa6fa1392c4337681fa6ee94df750b429f9f2db476",
+   "solve_hash": "372bf38121a9a49389267b9ac5e04a24de58f32519c43f53aab3fbc2b6a23790",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP02_c93b3e3cb8ae511e/SP02_c93b3e3cb8ae511e.odb",
+    "sha256": "f6862a179e13ea2415760766f809e5f5a39ca59f3c08b7b78e48e997f99c2ff8",
+    "size_bytes": 751590276
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 21:30:39",
+   "extraction_id": "9d38ef79e8d199d359724e2112c5bf3534a80bf8a0448110f33a059c96dd82b7",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP02_c93b3e3cb8ae511e.npz",
+    "file_sha256": "bee00b545acd300cc59f746bbe68b2d05d11b0d88d9282f1cdbd3691b5ec4c72",
+    "content_sha256": "6efdd30210ffc04cb126231f4613406cf8c911493fcdb3a5a28cb65838cd051a"
+   },
+   "node_set_sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP13",
+   "perturbation_id": "E3-low",
+   "constant": "E3",
+   "endpoint": "low",
+   "value": 5000.0,
+   "job_name": "SP13_81a5cedfe42b38d3",
+   "generated_inp_sha256": "81a5cedfe42b38d389dd10ae57bf9c32def65d6a3acd51205986ea78e129d9d2",
+   "solver_profile_id": "SP13/abaqus-2024/v1",
+   "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+   "solve_hash": "1a21f7921735f6839f7e0c3aa06e5a906ad2381f81b9567e015b9b6c4ea0aa69",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP13_81a5cedfe42b38d3/SP13_81a5cedfe42b38d3.odb",
+    "sha256": "d84d9af6fd978ec402904918d55e8c78c84fc53f68a3335a500d3bc06d85e03c",
+    "size_bytes": 715614536
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 22:02:33",
+   "extraction_id": "2ce176e6647497358888874bfc6d5b1d7f3cf4cf6293ce753ba17aa55911e33f",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP13_81a5cedfe42b38d3.npz",
+    "file_sha256": "f1f751327ca8165279c7b260a03f986061ebd83c549f92fde353aee90fbe87d6",
+    "content_sha256": "7a383e0c30070b7b4da10a79a95ca879e6cc7902fa80cbea980ebe67e0475d78"
+   },
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP13",
+   "perturbation_id": "E3-high",
+   "constant": "E3",
+   "endpoint": "high",
+   "value": 10000.0,
+   "job_name": "SP13_3fc1cad51076cfd2",
+   "generated_inp_sha256": "3fc1cad51076cfd2b4e6818290bc93f7df5cc5a5e3c2c27c4449504092308f02",
+   "solver_profile_id": "SP13/abaqus-2024/v1",
+   "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+   "solve_hash": "e19db03767da03ebace87201743c8aba94674daadb5433f1ccc5063c2c472513",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP13_3fc1cad51076cfd2/SP13_3fc1cad51076cfd2.odb",
+    "sha256": "b4a02de95a583668538ddc697c35573a186405fc4e7847273fe7c7778609f6ad",
+    "size_bytes": 715614536
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 22:29:53",
+   "extraction_id": "b4c52f85b6b24ae059485da0505b5dea1bb5969e815d1a5bc38a8c34601ff75c",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP13_3fc1cad51076cfd2.npz",
+    "file_sha256": "91663783e4532fcac49ce624f2e612aef3f3974f358318b6606cbce50d7f9538",
+    "content_sha256": "b25e5a52b52359d50f02e7e20a5de94c4e4f12dd174df033967cd6e79e35b54c"
+   },
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP13",
+   "perturbation_id": "nu13-low",
+   "constant": "nu13",
+   "endpoint": "low",
+   "value": 0.2,
+   "job_name": "SP13_7ac63eb2905930ec",
+   "generated_inp_sha256": "7ac63eb2905930ec4a4ebebd6b97a7f6bfa893b330c36d37fcf79092c670e924",
+   "solver_profile_id": "SP13/abaqus-2024/v1",
+   "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+   "solve_hash": "7d00a3099921f79a7b95a5a625c333ef13c560ccae636a0f9a378ab5b8fbc76d",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP13_7ac63eb2905930ec/SP13_7ac63eb2905930ec.odb",
+    "sha256": "8efca8f66c7f883518e650a04239801ac4b93f5887e5411817bfbef833767c04",
+    "size_bytes": 715614536
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 22:54:38",
+   "extraction_id": "aa8ce1eb25b5fc54824e2d18700fde3a4d592729a05f06f7019f0832fa32909f",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP13_7ac63eb2905930ec.npz",
+    "file_sha256": "068fdede4b1140b260877fe3624999151cbc2dbcd9ea3ae10e8173033105f15b",
+    "content_sha256": "9eb053bc0752e58b53c06f92dc2e682380d206422331a2b079731fc9c809a895"
+   },
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP13",
+   "perturbation_id": "nu13-high",
+   "constant": "nu13",
+   "endpoint": "high",
+   "value": 0.4,
+   "job_name": "SP13_9771af6aa8d4373c",
+   "generated_inp_sha256": "9771af6aa8d4373ce5277f4535b2141af8c133d4f10e21cd3b410f434fa420db",
+   "solver_profile_id": "SP13/abaqus-2024/v1",
+   "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+   "solve_hash": "485ac0b0844c25596228e2d0d57dbeffb83b477f9aeac3bfa3fdf1d160719e44",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP13_9771af6aa8d4373c/SP13_9771af6aa8d4373c.odb",
+    "sha256": "0fa42e61b5c43befa51944331c84f0d5e3f6267df9ef8ce51f04586f2f4a6aeb",
+    "size_bytes": 715614536
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 23:18:09",
+   "extraction_id": "bc196d509d697fff1f4736e7555d03310907e1eb1f783244b97c92c505ee235d",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP13_9771af6aa8d4373c.npz",
+    "file_sha256": "7a38c9779588ef3013a146a5620dc94f7151b019f40f343dc663bd5d8cbd3e95",
+    "content_sha256": "2e36367ce0bdbfbe7ca28fa1f09e8384d4bf51fa97da04e693a8bc7cbfc4a1c2"
+   },
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP13",
+   "perturbation_id": "nu23-low",
+   "constant": "nu23",
+   "endpoint": "low",
+   "value": 0.2,
+   "job_name": "SP13_eb9383c49c9e1f2d",
+   "generated_inp_sha256": "eb9383c49c9e1f2d0b64cf1161b5f6af4d5e46565729d80cdad56ba7214d26d3",
+   "solver_profile_id": "SP13/abaqus-2024/v1",
+   "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+   "solve_hash": "8512ff548d59a9ebc4126df7da9bae663f8a2b59c566d1649c38dd2710e547fe",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP13_eb9383c49c9e1f2d/SP13_eb9383c49c9e1f2d.odb",
+    "sha256": "4b5f94ebc2fc879de7beab0f418afd5f2ff4c57d945e1bd108a5673463282c23",
+    "size_bytes": 715614536
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 07-Oct-2026   Time 23:41:35",
+   "extraction_id": "9a22dc85f3aba8c123de009c140832e0ec6f05574fec08a884fa12c728f15700",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP13_eb9383c49c9e1f2d.npz",
+    "file_sha256": "d23eb2e005af1cb76544650c937bab2831365df35c7e3bcc5cb46ce9134f074d",
+    "content_sha256": "2594e9377cdf35d1092c58be7695b183bf351801ae99d0280855e80a75d0cb18"
+   },
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP13",
+   "perturbation_id": "nu23-high",
+   "constant": "nu23",
+   "endpoint": "high",
+   "value": 0.4,
+   "job_name": "SP13_8f84df93ab40549c",
+   "generated_inp_sha256": "8f84df93ab40549c369f44da4c5571017b39df4ed463b9af6721d6fc3b29dc8c",
+   "solver_profile_id": "SP13/abaqus-2024/v1",
+   "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+   "solve_hash": "0c0b17241c176e4ac1af871b4b3f5986a0424afcd174d238a4888b3819117582",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP13_8f84df93ab40549c/SP13_8f84df93ab40549c.odb",
+    "sha256": "9e2f065a77e6fd4f3c27c1d17444dd77e21062428e5d2886588191c2942127ac",
+    "size_bytes": 715614536
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 08-Oct-2026   Time 00:05:05",
+   "extraction_id": "15e38762990a45e8fff56b9ea33cee5f536d351051fb06562dbb899af89caeb7",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP13_8f84df93ab40549c.npz",
+    "file_sha256": "c47f76386fded839c15859fd3c2fab3f63d3bb91f4b62ff419522edc23aa829b",
+    "content_sha256": "b4b7fee70934054d7a88419c7ea7f3559303482f60cf10576863a34f8c4caaa8"
+   },
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP13",
+   "perturbation_id": "G13-high",
+   "constant": "G13",
+   "endpoint": "high",
+   "value": 5000.0,
+   "job_name": "SP13_b0af3095b6111c09",
+   "generated_inp_sha256": "b0af3095b6111c09b8078f029f1ae45cf1ae2fb43db0eb24670b325b710cb1ef",
+   "solver_profile_id": "SP13/abaqus-2024/v1",
+   "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+   "solve_hash": "505126cbac4a6661b152864dd49ed6d5b29bbbd1b780b6bb25a60680d59dad38",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP13_b0af3095b6111c09/SP13_b0af3095b6111c09.odb",
+    "sha256": "1c3f60f09a3bff77a9b97143bbd8319b2efcbc75c2f0b4d623080e439cc0955f",
+    "size_bytes": 715614536
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 08-Oct-2026   Time 00:28:19",
+   "extraction_id": "950c1860cd6426cfe02252e40f9e2d4643e84b0f051a177562c66906fa50f24d",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP13_b0af3095b6111c09.npz",
+    "file_sha256": "6b6cf658d814e92f5510fa66056905210008cc15d877b3810db7af54c1334e4d",
+    "content_sha256": "560258fb7b85b6d19ab824667531e5683a1fe14a6bf528b31d7c14ab5537d451"
+   },
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  },
+  {
+   "specimen": "SP13",
+   "perturbation_id": "G23-high",
+   "constant": "G23",
+   "endpoint": "high",
+   "value": 5000.0,
+   "job_name": "SP13_0fcc8454363f3fa4",
+   "generated_inp_sha256": "0fcc8454363f3fa4756b91d4cf8f541278fcaa351f53d377c0f00653e88a98c2",
+   "solver_profile_id": "SP13/abaqus-2024/v1",
+   "profile_hash": "79aebbfee092d9cc8f35ebea024745ae99f23de41e58e1310bf6d1e0d0b8e28e",
+   "solve_hash": "d2ad9ec10e469f2f1a2114bc41c7217e047e32e07a1f68e310dde0eba528e5d2",
+   "odb": {
+    "store": "m6-4-screening-run",
+    "relative_path": "solves/SP13_0fcc8454363f3fa4/SP13_0fcc8454363f3fa4.odb",
+    "sha256": "00981df4195fb36f05ef55e2c87e29705bd41594a29f7ac3861207ca9e3628f9",
+    "size_bytes": 715614536
+   },
+   "abaqus_version_line": "Abaqus 2024                                  Date 08-Oct-2026   Time 00:51:28",
+   "extraction_id": "8c9508e5c99756d47116e7a7de2e3654c5a0f5a28172c97ee860bfe3477514cc",
+   "extraction_script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pack": {
+    "store": "m6-4-screening-run",
+    "relative_path": "packs/SP13_0fcc8454363f3fa4.npz",
+    "file_sha256": "44e854b0c4cf2056c8f583884489f23c35e84df42dfbe2056a9e74f08a6789d2",
+    "content_sha256": "25f794153adc1032dbdafc05a998fb1a0996b2de2ecc9c1f2a8b1722cc31bd7b"
+   },
+   "node_set_sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+   "extraction_checks": {
+    "format_version_2": true,
+    "surface_instance_present": true,
+    "modes_complete": true,
+    "history_complete": true,
+    "mode_rows_match_geometry": true,
+    "finite": true,
+    "imaginary_zero": true,
+    "fe_geometry_identity": true,
+    "node_set": true,
+    "deterministic_content": true
+   }
+  }
+ ],
+ "note": "Run-store data (ODBs, packs, journal) are not committed; this record pins them by content."
+}

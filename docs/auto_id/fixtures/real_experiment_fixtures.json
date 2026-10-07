@@ -78,6 +78,77 @@
       ]
     },
     {
+      "fixture_id": "SP02/bravo-1-physical",
+      "specimen_id": "SP02",
+      "physical_specimen_id": "SP-02",
+      "experiment_id": "SP02_500by500_Glue420_honeycomb_full_scan_retry_260803",
+      "test_run_id": "retry_260803",
+      "experimental_source": {
+        "role": "Simcenter PolyMAX fitted-mode UNV",
+        "file_name": "SP02_polymax_retry_260803.unv",
+        "sha256": "2671db01b6401a9a9bbec7d8c2aa2191b0b35b5ae791756b91c7ccd381a41785",
+        "size_bytes": 13597269,
+        "location": {
+          "store": "snadwich",
+          "relative_path": "SP-02/SP02_polymax_retry_260803.unv"
+        }
+      },
+      "modal_set": {
+        "name": "bravo-1",
+        "display_name": "Bravo (1)",
+        "source_type": "polymax-curve-fitted-dataset-55",
+        "mode_count": 9,
+        "measurement_point_count": 121,
+        "measured_dofs": ["U3"],
+        "measured_face": "TOP exterior face"
+      },
+      "registration": {
+        "path": "docs/registrations/SP02_physical_registration.json",
+        "schema_version": "frozen-registration/1",
+        "registration_hash": "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c",
+        "fe_geometry_sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d"
+      },
+      "fe": {
+        "model_name": "SP02_Modal_V02",
+        "geometry_identity": {
+          "schema_version": "fe-geometry-identity/2",
+          "sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d",
+          "node_count": 1663816
+        },
+        "model_input": {
+          "role": "accepted source Abaqus input",
+          "file_name": "SP02_Modal_V02.inp",
+          "sha256": "574ae78a897f5a666989716c54549969f13ca2919ad3af1f3ca658580a4ba8a5",
+          "size_bytes": 123452260,
+          "location": {
+            "store": "snadwich",
+            "relative_path": "SP-02/SP02_Modal_V02.inp"
+          }
+        },
+        "odb_reference": {
+          "role": "CARBON-4C baseline control ODB (reference result with this FE geometry identity)",
+          "file_name": "SP02_f3e592281bebce66.odb",
+          "sha256": "67f581afd57324bbe0445ae4ab83b67e3464f2ef1b91c26ec246f6aed6e61d78",
+          "size_bytes": 751590276,
+          "location": {
+            "store": "carbon-project-archive",
+            "relative_path": "carbon4c/run_sp02/SP02_f3e592281bebce66.odb"
+          }
+        }
+      },
+      "provenance": {
+        "created": "2026-10-07",
+        "source_of_truth": [
+          "docs/auto_id/DECISIONS.md D-065 (SUPERVISOR 2026-10-07: SP-02 identity and physical registration accepted; active SP-02 input bound to the physical registration)",
+          "docs/registrations/SP02_physical_registration.json (accepted physical registration, 09c05a0)",
+          "docs/auto_id/specimens/SP02.physical.specimen.json (physical passport, physical_specimen_id SP-02)",
+          "docs/auto_id/SPECIMEN_CATALOG.md section 7 (SP-02 identity resolved from records)",
+          "Experimental source, modal set and FE identity are those of the historical fixture SP02/bravo-1, which remains the legacy-registration record of the M0-M4 chain"
+        ]
+      },
+      "unresolved": []
+    },
+    {
       "fixture_id": "SP13/best",
       "specimen_id": "SP13",
       "physical_specimen_id": null,
@@ -152,6 +223,81 @@
           "field": "physical_specimen_id",
           "reason": "No physical specimen identifier is recorded in accepted evidence; the design/specimen/test-run key model is defined in M2.2."
         },
+        {
+          "field": "test_run_id",
+          "reason": "Accepted evidence records the run only as prose ('SP13 repeat a acquired 2026-09-10', SOURCE_FREEZE.json); no formal test-run key exists until M2.2."
+        }
+      ]
+    },
+    {
+      "fixture_id": "SP13/best-physical",
+      "specimen_id": "SP13",
+      "physical_specimen_id": "SP-13",
+      "experiment_id": "SP13_a_500by500_Glue420_Auxetic_newSP01_260910",
+      "test_run_id": null,
+      "experimental_source": {
+        "role": "Simcenter PolyMAX fitted-mode UNV",
+        "file_name": "SP13_a_polymax.unv",
+        "sha256": "f268023583972f0a9c1660bc60631587e8f3330e4fb7495e52d8310906af39fe",
+        "size_bytes": 38541973,
+        "location": {
+          "store": "snadwich",
+          "relative_path": "SP-13/SP13_a_polymax.unv"
+        }
+      },
+      "modal_set": {
+        "name": "best",
+        "display_name": "Best",
+        "source_type": "polymax-curve-fitted-dataset-55",
+        "mode_count": 12,
+        "measurement_point_count": 289,
+        "measured_dofs": ["U3"],
+        "measured_face": "TOP exterior face"
+      },
+      "registration": {
+        "path": "docs/registrations/SP13_physical_registration.json",
+        "schema_version": "frozen-registration/1",
+        "registration_hash": "2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823",
+        "fe_geometry_sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826"
+      },
+      "fe": {
+        "model_name": "SP13_mesh_local_v1_modal",
+        "geometry_identity": {
+          "schema_version": "fe-geometry-identity/2",
+          "sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826",
+          "node_count": 1585637
+        },
+        "model_input": {
+          "role": "accepted source Abaqus input",
+          "file_name": "SP13_mesh_local_v1_modal.inp",
+          "sha256": "9d4105840e527354dbd0bb4d0d0012f7708125aa94619b0dcc486fd76dc70571",
+          "size_bytes": 115733227,
+          "location": {
+            "store": "snadwich",
+            "relative_path": "SP-13/SP13_mesh_local_v1_modal/SP13_mesh_local_v1_modal.inp"
+          }
+        },
+        "odb_reference": {
+          "role": "CARBON-4C baseline control ODB (reference result with this FE geometry identity)",
+          "file_name": "SP13_a46d08b52995e078.odb",
+          "sha256": "8c89585d3970765f2a6cb2bc242fff921b03198da2359b8f2990fcaa837d17b0",
+          "size_bytes": 715614536,
+          "location": {
+            "store": "carbon-project-archive",
+            "relative_path": "carbon4c/run_sp13/SP13_a46d08b52995e078.odb"
+          }
+        }
+      },
+      "provenance": {
+        "created": "2026-10-08",
+        "source_of_truth": [
+          "docs/auto_id/DECISIONS.md D-068 (SUPERVISOR 2026-10-08: M7-entry wiring; active SP-13 input bound to the accepted physical registration)",
+          "docs/registrations/SP13_physical_registration.json (accepted physical registration, D-062 / D-064)",
+          "docs/auto_id/specimens/SP13.physical.specimen.json (physical passport, physical_specimen_id SP-13)",
+          "Experimental source, modal set and FE identity are those of the historical fixture SP13/best, which remains the legacy-registration record of the M0-M5 chain"
+        ]
+      },
+      "unresolved": [
         {
           "field": "test_run_id",
           "reason": "Accepted evidence records the run only as prose ('SP13 repeat a acquired 2026-09-10', SOURCE_FREEZE.json); no formal test-run key exists until M2.2."

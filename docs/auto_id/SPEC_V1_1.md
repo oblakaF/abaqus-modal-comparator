@@ -628,3 +628,31 @@ the archival DOCX wording could be read more loosely.
      identification (§6 S1).
    - M1 may close as the modal-input / QC subsystem without inventing the M2 passport
      value. Complete one-button production readiness still requires M2.
+6. **M6 rescope and removal of the STEEL gate** (SUPERVISOR, 2026-10-06; D-059, D-060, D-061).
+   This item is normative. It supersedes the §17 M6 acceptance row ("Bare plate (twill
+   350×350) via Stage A; then core tile — D11, D66 → E, G12 with uncertainty; repeat of the
+   same plate agrees within 1σ") and the §17 sentence making an independent steel experiment
+   the validation gate after M6 (D-015). §5, §5.1, §5.3 and §7 are unchanged.
+   - **Unavailable physical evidence:** with the current experimental setup, the bare twill
+     plate Stage-A experiment (SP-11), its same-plate repeat, and the printed core-tile
+     experiment are `NOT_AVAILABLE_WITH_CURRENT_SETUP`. They are recorded, not deleted.
+     Their consequences are kept through the existing rules:
+     - no primary twill G12 evidence, so G12 follows §5 / §5.1 (`BARE_PLATE_REQUIRED` /
+       `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`, D-046);
+     - no real-data Stage-A validation (the Stage-A software remains, validated on
+       synthetic data only);
+     - no independently measured k_core prior, so k_core may enter later stages only as an
+       explicitly PROVISIONAL nuisance with a SUPERVISOR-approved width (§5.3);
+     - Σ_setup uses the §7 provisional 0.3 %, flagged, unless a genuine same-panel remount is
+       established from existing records (§7).
+   - **Rescoped M6 acceptance.** M6 passes when:
+     - all unavailable physical evidence is explicitly recorded;
+     - every missing prior has its conservative verdict consequence encoded;
+     - provisional inputs are explicitly flagged;
+     - the transverse-constant sensitivity budget (ROADMAP M6.4) is closed.
+   - **No external validation gate:** no steel or other known-stiffness validation
+     experiment is part of the selected release path. Real carbon results **MUST** be
+     reported as model-calibrated effective constants (§5.2) and labelled **not externally
+     validated**.
+   - Refusal remains a valid result (§1, §3). Missing evidence reduces the scientific claims;
+     it is never replaced by a guessed value.

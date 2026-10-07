@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M6",
-  "current_ministep": null,
-  "status": "NOT_STARTED",
+  "current_ministep": "M6 (stage closure)",
+  "status": "ACCEPTED",
   "last_accepted_stage": "M5",
   "last_accepted_ministep": "M5.9",
   "last_accepted_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70",
@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M6 NOT_STARTED; await SUPERVISOR instruction before any M6 work",
+  "next_action": "Stage PR auto-id/m6 -> main prepared; await HUMAN merge authorisation; after the merge record the main merge SHA; M7 NOT_STARTED (no M7 records, code or runs)",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -624,11 +624,219 @@
     "accepted_by": "SUPERVISOR (M5.1-M5.9 and stage gate accepted 2026-10-06); merge explicitly authorised by the HUMAN supervisor"
   },
   "m6": {
-    "status": "NOT_STARTED",
-    "M6.1": "TODO",
-    "M6.2": "TODO",
-    "M6.3": "TODO",
-    "M6.4": "TODO",
-    "note": "not started; requires explicit SUPERVISOR instruction (ROADMAP order)"
-  }
+    "branch": "auto-id/m6",
+    "base": "ab1dc6071355fe536a3bec7f593ee804df92583f",
+    "status": "ACCEPTED",
+    "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
+    "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
+    "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
+    "M6.4": "ACCEPTED",
+    "readiness": {
+      "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no primary twill G12; no real-data Stage-A validation; M6-B adapter kept",
+      "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): SPEC provisional Sigma_setup 0.3 % allowed and flagged",
+      "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no measured k_core prior; later PROVISIONAL nuisance only",
+      "M6.4": "CLOSED (D-067, D-068): E3, nu13, nu23, G13, G23 NEGLIGIBLE_FOR_BUDGET (max 0.0353 %); transverse constants fixed"
+    },
+    "gate": "PASS (SUPERVISOR 2026-10-08; rescoped gate SPEC §19 item 6 / D-061: unavailable evidence recorded, missing-prior consequences encoded, provisional inputs flagged, M6.4 budget closed)",
+    "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-061, D-062..D-068)",
+    "entry_authorisation": "SUPERVISOR 2026-10-06: M6 entry review accepted; checkpoints M6-A (governance, SP-11 checklist) and M6-B (Stage-A -> M5 adapter, synthetic tests) only; no Abaqus; no M6-C",
+    "experiment_checklist": "docs/auto_id/M6_SP11_EXPERIMENT_CHECKLIST.md (reference requirements for a valid future SP-11 / bare-plate test; not an active HUMAN to-do list)",
+    "M6-A": {
+      "scope": "SUPERVISOR entry decisions recorded (D-049..D-056); SP-11 HUMAN experiment checklist",
+      "abaqus_runs": 0,
+      "status": "ACCEPTED",
+      "correction": "2026-10-06 corrective governance (M6_DECISION_RECORD §15): D-057 corrects D-049, D-058 corrects D-053; checklist re-labelled; inventory note; no SPEC/ROADMAP rescope"
+    },
+    "M6-B": {
+      "modules": "src/domain/stage_a_experiment.py; src/services/stage_a_validation.py",
+      "tests": "tests/test_stage_a_validation.py (27, synthetic; SUPERVISOR items 1-20 + 7 additional) with tests/m6_stage_a_support.py",
+      "scope_note": "Stage-A -> M5 adapter in the STAGE_A_VALIDATION context (D-050); software only; unchanged by the 2026-10-06 correction; SP-11 cannot currently exercise it (M6.1 BLOCKED_ON_EXPERIMENT)",
+      "tests_result": "M6-B 27 passed; M6-B + Stage-A + M5 + M4 guard 261 passed (2 Abaqus-gated skipped); M3/M4/M5 stage gates with stores 30 passed; Windows 1420 OK (27 skipped) without data stores; 1425 OK (2 skipped) with both stores",
+      "abaqus_runs": 0,
+      "abaqus_python_extractions": 0,
+      "status": "ACCEPTED",
+      "open_items": [
+        "affine-basis validation tolerance (needed before M6-D)",
+        "real-run LM settings and D bounds",
+        "mass / plan-dimension uncertainty propagation",
+        "bare-plate fit/holdout policy",
+        "twill family_id string (checklist A7)"
+      ]
+    },
+    "specimen_inventory": "docs/auto_id/SNADWICH_INVENTORY.md (factual D:\\Snadwich inventory; no passports created)",
+    "m7": "NOT_STARTED",
+    "rescope": "2026-10-06 SUPERVISOR: SPEC §19 item 6; D-059 (M6.1-M6.3 NOT_AVAILABLE_WITH_CURRENT_SETUP), D-060 (STEEL removed, supersedes D-015), D-061 (rescoped M6 gate)",
+    "sp13_registration_gate": {
+      "authorisation": "SUPERVISOR 2026-10-06: zero-Abaqus SP-13 physical registration gate",
+      "reconstruction_record": "docs/auto_id/registration_evidence/SP13_physical_registration_reconstruction.json (6b45fbfbacad0df939b0b12f8496edddff0525855e0de0312ff5f558c71bb0ae)",
+      "physical_passport": "docs/auto_id/specimens/SP13.physical.specimen.json (manifest 8366c163581a79796915ccbf913a9ac170180c079294f577984b1901ff870b77 after D-068 fixture binding; b857724a7e205cc794fc9a25fae7d1c351e3267855f775d9504fa66cce102731 after the H7/H8 update; 943bb3d1946863c61abd39ccac8fa1da625067b9dffdcd6be2c82c3e125d5000 at 173af43)",
+      "physical_registration": "docs/registrations/SP13_physical_registration.json (2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823, unchanged); production-ready; ACTIVE through fixture SP13/best-physical (D-068)",
+      "legacy_registration": "a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4: historical provenance only (point error median 26.0 mm, max 47.4 mm)",
+      "strict_pairs": {
+        "legacy": "(4,10) MAC 0.888, (5,11) MAC 0.889; cond 252",
+        "physical": "(4,10) MAC 0.958, (7,13) MAC 0.947; cond 6.3"
+      },
+      "observation_sufficiency": "SP13_REAL_DATA_STILL_INSUFFICIENT: unchanged M4.3 holdout leaves 1 fit row",
+      "remount": "260909 -> 260910 re_suspension, FREQUENCY_ONLY (D-063)",
+      "sigma_setup": "provisional 0.3 % flagged; measured NOT_AVAILABLE_PENDING_MODAL_PREPARATION",
+      "decisions": "D-062, D-063",
+      "abaqus_solves": 0,
+      "abaqus_python_extractions": 0,
+      "status": "ACCEPTED",
+      "acceptance": "SUPERVISOR 2026-10-06 (result at 173af43; D-064)"
+    },
+    "sp13_human_update": {
+      "authorisation": "SUPERVISOR 2026-10-06: SP-13 HUMAN evidence update (H7-H10)",
+      "facts": "D-064: H7 in-plane orientation as in the Abaqus model; H8 ruler 1 mm / caliper 0.01 mm readout resolutions (not calibrated accuracy); H9 no Testlab, no PolyMAX of 260909; H10 260909->260910 FREQUENCY_ONLY",
+      "orientation": "in-plane signs +x->+X, +y->+Y physically established (H7); 180 deg alternative excluded; remaining through-thickness face convention is a mathematical symmetry (TOP by convention)",
+      "uncertainty": "translation_mm 5.72, rotation_deg 0.49, scale_rel 0.002 (H8 readout only; 1 mm / 510 mm rounded up)",
+      "m2_4": "docs/auto_id/registration_evidence/SP13_registration_uncertainty.json: EVALUATED; MAC 4-10 0.947-0.962, 7-13 0.921-0.948; pairing unchanged under all 8 perturbations; registration_limited False",
+      "sigma_setup": "provisional 0.3 % flagged (H9)",
+      "abaqus_solves": 0,
+      "abaqus_python_extractions": 0,
+      "status": "ACCEPTED"
+    },
+    "sp02_registration_gate": {
+      "authorisation": "SUPERVISOR 2026-10-06: SP-02 zero-Abaqus physical registration gate (same method as SP-13)",
+      "reconstruction_record": "docs/auto_id/registration_evidence/SP02_physical_registration_reconstruction.json (b9234f573b6ab98acad4944ff4a2786ac16baab2e29d41c061d55aec5900707e)",
+      "physical_passport": "docs/auto_id/specimens/SP02.physical.specimen.json (manifest 83739ecd2d0803bba682a3540c44e1437178164a731b48f1921e64b248168159)",
+      "physical_registration": "docs/registrations/SP02_physical_registration.json (9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c); production-ready; ACTIVE through fixture SP02/bravo-1-physical (D-065)",
+      "anisotropy": "UNV/physical x 1.0917, y 0.8178 (same Polytec distortion as SP-13); window 368.72 x 499.24 mm",
+      "legacy_registration": "9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164: historical provenance only (vs physical median 28.9 mm, max 54.1 mm)",
+      "identity": "RESOLVED_FROM_RECORDS and SUPERVISOR-ACCEPTED (D-065): SP2 (old) = physical SP-02; SP10 (new SP2) = separate physical SP-10",
+      "strict_pairs": {
+        "legacy": "NOT_FROZEN: (2,8) MAC 0.958 only",
+        "physical": "FROZEN: (2,8) MAC 0.918, (4,10) MAC 0.951, (7,13) MAC 0.975; validation holdout R3; fit R1, R2; cond 6.1"
+      },
+      "m2_4": "docs/auto_id/registration_evidence/SP02_registration_uncertainty.json: EVALUATED; registration_limited False (both triggers)",
+      "combined_with_sp13": "5 strict rows, 3 fit rows (per-specimen M4.3 holdout), rank 2, cond 6.0 (diagnostic; no M7 fit)",
+      "holdout_semantics": "M6_DECISION_RECORD 18.1: mandatory, applied per frozen set (= per specimen); campaign-level reading is an M7 decision",
+      "sp10": "M6_DECISION_RECORD 18.2: not needed for observation sufficiency; SP2/SP10 reference scatter test NOT_AVAILABLE",
+      "abaqus_solves": 0,
+      "abaqus_python_extractions": 0,
+      "status": "ACCEPTED",
+      "acceptance": "SUPERVISOR 2026-10-07 (result at 09c05a0; D-065)"
+    },
+    "specimen_catalog": {
+      "authorisation": "SUPERVISOR 2026-10-06: FULL SPECIMEN CATALOG - AUTHORITATIVE INVENTORY (documentation/governance checkpoint)",
+      "records": "docs/auto_id/SPECIMEN_CATALOG.md (canonical); docs/auto_id/specimen_catalog.json (machine index, not a runtime dependency)",
+      "specimens": "14 physical specimens with records (SP-01..SP-13, SP-15); SP-14 AMBIGUOUS (no physical record); unnumbered 300x300 records AMBIGUOUS",
+      "families": "old-T300-plain-0.45 (SP-01, SP-02, SP-10, SP-13); old-T300-twill-0.45 (SP-03, SP-11); old-T300-plain-0.25 (SP-04, SP-05); new-T300-plain-0.25 (SP-06..SP-09, SP-12); unassigned (SP-15)",
+      "sp02_identity": "SP02_IDENTITY_RESOLVED_FROM_RECORDS (DERIVED; LMS sheet 'SP2 (old)' = governed Bravo (1); pending SUPERVISOR; passport not edited)",
+      "real_conflicts": "C1: PolyMAX of SP-13 260909 exists (zip) vs H9 - nothing changed, Sigma_setup provisional; C2: SP-10 260911 rotated session",
+      "governed_fixtures": "SP02/bravo-1, SP13/best only; READY_FOR_M7: none unconditionally; best M7 specimens SP-02 + SP-13",
+      "human_questions": "6 (catalog section 10); only Q1 touches the M7 path (Sigma_setup)",
+      "abaqus_solves": 0,
+      "abaqus_python_extractions": 0,
+      "status": "ACCEPTED",
+      "acceptance": "SUPERVISOR 2026-10-07 (D-065): bb62060 is the canonical specimen inventory"
+    },
+    "d065_governed_updates": {
+      "authorisation": "SUPERVISOR 2026-10-07: catalog + SP-02 acceptance + SP-13 260909 PolyMAX provenance gate (D-065)",
+      "sp02_active": "fixture SP02/bravo-1-physical (physical registration 9b63f6c8...); passport SP02.physical.specimen.json physical_specimen_id SP-02",
+      "sp02_historical": "fixture SP02/bravo-1 + legacy passport + SP02.forward.json + CARBON-4C baseline unchanged (legacy registration 9bf736d3...)",
+      "sp13_260909": "SP13_260909_POLYMAX_PROVENANCE_CONFIRMED; frozen FREQUENCY_ONLY fixture SP13/260909-bravo-1 (docs/auto_id/fixtures/SP13_260909.frozen-modal-set.json; member sha256 c036cdf36230c8deab413a5a2b4da8147cea68248c7d82ec3b0297c6705308c9)",
+      "sigma_setup": "provisional 0.3 % flagged (not recomputed; estimator and cross-grid matching not invented; deferred, not a release/M7 blocker)",
+      "remaining_m6_blocker": "M6.4 (range source approved by D-066; screening result pending)",
+      "abaqus_solves": 0,
+      "abaqus_python_extractions": 0,
+      "status": "ACCEPTED",
+      "acceptance": "SUPERVISOR 2026-10-07: commit 8b4afff accepted as the M6.4 basis (D-066)"
+    },
+    "m6_4": {
+      "decision": "D-066, D-067, D-068",
+      "envelope": "docs/auto_id/screening/M6_4_transverse_envelope.json (d29e848566afaadc1a73234d531f83383810e7ec2f7ac0471c0965aa6fd2036d)",
+      "basis": "LITERATURE_INTERIM_SCREENING_ENVELOPE (not MATERIAL_SPECIFIC)",
+      "ranges": "E3 5000-10000 MPa; nu13 0.2-0.4; nu23 0.2-0.4; G13 2200-5000 MPa; G23 2200-5000 MPa",
+      "rule": "SPEC §5: max |df/f| < 0.3 % on the frozen rows (fit + holdout), one constant at a time, both endpoints, FE-to-FE tracking -> NEGLIGIBLE_FOR_BUDGET, else INCLUDE_IN_UNCERTAINTY_BUDGET (bookkeeping; not a fit target)",
+      "observation_rows": "SP02 R1 FE8, R2 FE10 (fit), R3 FE13 (holdout); SP13 R1 FE10 (fit), R2 FE13 (holdout)",
+      "practical_target": "M7 real-data interpretation: correct mode identity / MAC; frequency preferably within ~5 %, up to ~10 % acceptable (D-066)",
+      "M6.4a": {
+        "scope": "envelope record; guarded screening path (forward_builder.prepare_screening_job, services/transverse_screening.py, tools/m6_4_transverse_screening.py); tests",
+        "tests": "tests/test_m6_4_transverse_screening.py (28; 4 store-gated)",
+        "tests_result": "Windows with the snadwich and carbon-project-archive stores 1511 OK (5 skipped: 3 need the sumin store and pass with it, 24 OK; 2 are Abaqus-gated); without data stores 1502 OK (48 skipped); test_m6_4_transverse_screening 28 OK (24 OK, 1 class skipped without stores)",
+        "human_abaqus_manifest": "6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922",
+        "abaqus_solves": 0,
+        "abaqus_python_extractions": 0,
+        "status": "ACCEPTED",
+        "acceptance": "SUPERVISOR 2026-10-07: commit 403ff94 accepted (D-067)"
+      },
+      "M6.4b": {
+        "authorisation": "HUMAN Abaqus gate 2026-10-07 (D-067): manifest 6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922",
+        "execution": "16 successful solves, 16 successful extractions; 0 failures, 0 retries, 0 baseline solves",
+        "run_evidence": "docs/auto_id/screening/M6_4_run_evidence.json",
+        "result": "docs/auto_id/screening/M6_4_transverse_screening_result.json (0fb87ea753217e15ca0f182aff960f94d022020d32151edaebdbfb62e2f1cd9b)",
+        "classification": {
+          "E3": "NEGLIGIBLE_FOR_BUDGET",
+          "nu13": "NEGLIGIBLE_FOR_BUDGET",
+          "nu23": "NEGLIGIBLE_FOR_BUDGET",
+          "G13": "NEGLIGIBLE_FOR_BUDGET",
+          "G23": "NEGLIGIBLE_FOR_BUDGET"
+        },
+        "max_abs_relative_change_percent": {
+          "E3": 0.0005,
+          "nu13": 0.0001,
+          "nu23": 0.0007,
+          "G13": 0.0138,
+          "G23": 0.0353
+        },
+        "tracking": "all frozen rows tracked (min MAC 0.999999); no refusal; no order change",
+        "include_in_uncertainty_budget": [],
+        "tests_result": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1516 OK (2 Abaqus-gated skipped); without data stores 1507 OK (49 skipped); targeted M6.4 + M6 + M5 gate + M4 guard/gate + M3 gate 152 OK; result reproduction from the run store OK",
+        "abaqus_solves": 16,
+        "abaqus_python_extractions": 16,
+        "status": "ACCEPTED",
+        "acceptance": "SUPERVISOR 2026-10-08 (commit 345c06f; D-068)"
+      },
+      "status": "CLOSED"
+    },
+    "closure_record": {
+      "decision": "D-068",
+      "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059)",
+      "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059)",
+      "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059)",
+      "M6.4": "CLOSED; transverse constants fixed (all NEGLIGIBLE_FOR_BUDGET)",
+      "sigma_setup": "provisional 0.3 %, flagged",
+      "new_experiments": "none",
+      "gate": "PASS (SUPERVISOR 2026-10-08)",
+      "record": "docs/auto_id/M6_DECISION_RECORD.md §21"
+    },
+    "m7_entry_wiring": {
+      "decision": "D-068",
+      "sp02_active": "passport SP02.physical.specimen.json (bddc543721edacf47ca4bc7d72dbd93a76179b63689d0cbc5d1f6d69d6c65d0f) -> fixture SP02/bravo-1-physical (9b63f6c8...) -> forward SP02.physical.forward.json (f53226a05eabb2af1a49153880e67cba4a9a723e72f7fb32ea09f2537f7080af)",
+      "sp13_active": "passport SP13.physical.specimen.json (8366c163581a79796915ccbf913a9ac170180c079294f577984b1901ff870b77) -> fixture SP13/best-physical (2eeeaa86...) -> forward SP13.physical.forward.json (ec6f5ee2afd2aed60edcc90c5fa8ceb5b9afa75efd94a7020de59ff72da4d8b7)",
+      "historical_unchanged": "SP02/bravo-1 + SP13/best, legacy passports, SP02.forward.json (bc3d9b86...), SP13.forward.json (f5407900...), CARBON-4C baselines, M4 records; 54 content hashes compared, 0 changed",
+      "baseline_pack_reuse": "both chains render SP02_f3e592281bebce66 / SP13_a46d08b52995e078 byte-identically",
+      "m2_4": "SP13_registration_uncertainty.json regenerated: passport_sha256_lf only",
+      "tests_result": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); wiring + fixture + registration + catalog + forward + M3/M4/M5 gate + M6.4 tests included",
+      "abaqus_solves": 0,
+      "abaqus_python_extractions": 0,
+      "status": "ACCEPTED"
+    },
+    "stage_pr": "READY_FOR_STAGE_PR (auto-id/m6 -> main); not merged; HUMAN merge authorisation required",
+    "supervisor_acceptance": {
+      "date": "2026-10-08",
+      "decision": "M6 ACCEPTED; rescoped M6 gate PASS",
+      "scope": {
+        "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP (intentional; consequences in the verdict machinery)",
+        "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP (intentional)",
+        "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP (intentional)",
+        "M6.4": "ACCEPTED (M6.4a 403ff94 + M6.4b 345c06f): E3, nu13, nu23, G13, G23 NEGLIGIBLE_FOR_BUDGET; fixed",
+        "registration": "active SP02/bravo-1-physical and SP13/best-physical accepted; legacy registrations historical provenance only; M0-M5 frozen chains not rewritten",
+        "uncertainty": "Sigma_setup 0.3 % PROVISIONAL; Sigma_meas NOT_AVAILABLE (not invented)"
+      },
+      "not_a_claim_of": "real-material identification",
+      "qualifications": [
+        "M6.1-M6.3 NOT_AVAILABLE: no primary twill G12 (sandwich G12 BARE_PLATE_REQUIRED, D-046); no real-data Stage-A validation; no measured k_core prior",
+        "Sigma_setup provisional 0.3 %; Sigma_meas NOT_AVAILABLE",
+        "M6.4 classification local to the CARBON-4C reference point; interim literature screening envelope",
+        "real carbon results are model-calibrated effective constants, not externally validated (D-060); label not yet emitted by code",
+        "M4.3 classifier thresholds PROVISIONAL",
+        "face convention TOP by convention (SP-02, SP-13)"
+      ],
+      "stage_pr_verification": "no Abaqus artifacts / ODB / INP / UNV / NPZ vs main ab1dc60; M3 forward_builder additive (+87/-0); M4 archived_baseline additive re-registered path (accepted path unchanged); no M5 module changed; frozen M0-M5 records unchanged",
+      "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); M6 test modules 143 OK; M5 + M4 + M3 stage gates and M4 guard 34 OK"
+    }
+  },
+  "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated"
 }

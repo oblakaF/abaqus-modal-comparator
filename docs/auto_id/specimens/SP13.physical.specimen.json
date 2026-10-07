@@ -1,0 +1,92 @@
+{
+  "schema": "auto-id/specimen/v1.1",
+  "specimen_type": "sandwich",
+  "family_id": "CFRP-T300-plain-0.45-oldstock",
+  "design_id": "SP-13",
+  "physical_specimen_id": "SP-13",
+  "test_run_id": "SP13_a_500by500_Glue420_Auxetic_newSP01_260910",
+  "plan_mm": null,
+  "masses_g": null,
+  "face_thickness_mm": null,
+  "core_height_mm": null,
+  "materials": {
+    "face": "CFRP_Face",
+    "core": "PLA_Basic_Core"
+  },
+  "suspension_max_hz": null,
+  "geometry_calibration": {
+    "mode": "scan_to_panel_edges",
+    "coordinate_calibration": {
+      "mode": "camera_grid",
+      "abaqus_unit": "mm",
+      "experimental_unit": "m",
+      "scan_coverage": "partial",
+      "physical_width": 366.5126,
+      "physical_height": 496.2283,
+      "dimension_unit": "mm",
+      "manual_scale": null,
+      "provenance": "Physical scan window reconstructed from the stored PSV camera frame of SP13_a_500by500_Glue420_Auxetic_newSP01_260910.svd (registration_evidence/SP13_physical_registration_reconstruction.json, sha256 6b45fbfbacad0df939b0b12f8496edddff0525855e0de0312ff5f558c71bb0ae): PSV MeasPoints video coordinates validated against the UNV geometry, panel edges fitted in the frame, physical scale from the measured panel dimensions 510 x 520 mm (spec; steel ruler and calipers, no instrument uncertainty recorded). The UNV metric coordinates are anisotropic (x 1.195, y 0.889 of physical); this per-axis camera-grid scale replaces them. No modal data or MAC were used."
+    },
+    "measured_surface": {
+      "fe_instance": "CFRP_PLATE_TOP",
+      "side": "max_z",
+      "label": "labelled exterior face measured by the scanner (HUMAN H3); bound to FE TOP by convention: the face sign is not demonstrable from records (FE stack is through-thickness symmetric)"
+    },
+    "orientation": {
+      "experimental_axes_in_fe": [
+        "+X",
+        "+Y",
+        "+Z"
+      ],
+      "reference": "panel_edges",
+      "source": "panel edges fitted in the stored PSV frame (reconstruction record above); handwritten label at the physical top edge (HUMAN H2); lattice orientation as in the Abaqus model (HUMAN H4); the 510 mm side is horizontal (frame aspect). In-plane FE axis signs: HUMAN H7 (SUPERVISOR-accepted 2026-10-06) - the panel was scanned in the same in-plane orientation as the Abaqus model (auxetic-core directions correspond, label at the physical top, not flipped or rotated), so +x->+X, +y->+Y is physically established and the 180 deg alternative is excluded; MAC was not used. Remaining: the through-thickness face convention (TOP vs BOTTOM face, FE stack symmetric) is a mathematical symmetry of the model, bound to TOP by convention"
+    },
+    "uncertainty": {
+      "translation_mm": 5.72,
+      "scale_rel": 0.002,
+      "rotation_deg": 0.49
+    },
+    "panel_edges": {
+      "x_mm": 72.1528,
+      "y_mm": 9.8107
+    }
+  },
+  "fe_reference": {
+    "model_name": "SP13_mesh_local_v1_modal",
+    "geometry_identity": {
+      "schema_version": "fe-geometry-identity/2",
+      "sha256": "34d69d7920f5819c49ad5b2ab1aded824055aadbea3cb0244f405ab1a1595826",
+      "node_count": 1585637
+    },
+    "geometry_file": {
+      "role": "FE node coordinates (instance,node_label,x,y,z) extracted from the CARBON-4C reference ODB",
+      "file_name": "SP13_fe_geometry.csv",
+      "sha256": "78d197376f7a5cce644d7c0eeb218df3151d3c349284caffa48c333f3ff11d39",
+      "size_bytes": 108154972,
+      "location": {
+        "store": "carbon-project-archive",
+        "relative_path": "fe_geometry/SP13_fe_geometry.csv"
+      }
+    }
+  },
+  "acquisition": {
+    "session": "2026-09-10 repeat a acquisition",
+    "grid": {
+      "grid_id": "SP-13-scan-289pt",
+      "point_count": 289
+    },
+    "fixture_id": "SP13/best-physical",
+    "protocol_id": "SP-13-psv-installation-2026-09",
+    "remount_of": "SP13_500by500_Glue420_Auxetic_newSP01_260909",
+    "remount_kind": "re_suspension",
+    "remount_evidence": "HUMAN H6 (SUPERVISOR-accepted 2026-10-06): the panel was removed from the suspension after 260909 and re-suspended; laser/scanner and shaker installation not moved; SP-13 marking visible in both stored frames. Different grids (121 / 289 points): FREQUENCY_ONLY repeat evidence (SPEC 7, D-058)"
+  },
+  "identify": "default",
+  "unavailable": {
+    "plan_mm": "nominal 510 x 520 mm in the Snadwich store SP-13/spec.txt (100 cm steel ruler and two calipers, HUMAN H5); the dimension uncertainty is not recorded, so plan_mm with sd is not available",
+    "masses_g": "available in the Snadwich store SP-13/spec.txt (AVAILABLE_NOT_YET_GOVERNED); not imported by the registration gate",
+    "face_thickness_mm": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2)",
+    "core_height_mm": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2)",
+    "suspension_max_hz": "no physically measured suspension threshold is recorded (SPEC §19 item 5); never replaced by a default"
+  }
+}

@@ -204,3 +204,33 @@ the data and never modifies, reorders or deletes modes.
   refuses them. The provider `dataset` is never changed.
 - The historical SP02/SP13 fixtures have no accepted value, so their suspension QC is
   `NOT_AVAILABLE`.
+
+## Active and historical records; frozen frequency-only sets (D-065, 2026-10-07)
+
+- **`SP02/bravo-1-physical`** is the **active** SP-02 input.
+  - It has the same experimental source, modal set and FE as `SP02/bravo-1`, on the accepted physical
+    registration `docs/registrations/SP02_physical_registration.json`, with `physical_specimen_id`
+    "SP-02".
+  - The physical passport `docs/auto_id/specimens/SP02.physical.specimen.json` names it.
+- **`SP02/bravo-1`** stays in the manifest as the **historical** legacy-registration record. The archived
+  M0–M4 chain is bound to it (legacy passport, `SP02.forward.json`, CARBON-4C baseline). It is not the
+  active SP-02 input.
+- **`SP13_260909.frozen-modal-set.json`** (fixture `SP13/260909-bravo-1`) is a frozen external PolyMAX
+  selection (D-026, D-027) and a separate fixture per D-028.
+  - Use is **FREQUENCY_ONLY**.
+  - It pins the archive and member hashes, the Testlab project, set "Bravo (1)", the frozen frequencies
+    and damping, the grid identity, and the provenance audit.
+  - It is not in this manifest because the 121-point 260909 grid has no FrozenRegistration and no FE
+    pairing.
+  - Tests: `tests/test_sp13_260909_frozen_modal_set.py`. Its store-gated part needs `sumin` and
+    `snadwich`.
+
+## Active SP-13 input (D-068, 2026-10-08)
+
+- **`SP13/best-physical`** is the **active** SP-13 input.
+  - It has the same experimental source, modal set and FE as `SP13/best`, on the accepted physical
+    registration `docs/registrations/SP13_physical_registration.json`, with `physical_specimen_id` "SP-13".
+  - `test_run_id` stays unresolved, as in `SP13/best`.
+  - The physical passport `docs/auto_id/specimens/SP13.physical.specimen.json` names it.
+- **`SP13/best`** stays as the **historical** legacy-registration record. The archived M0–M5 chain is bound to
+  it (legacy passport, `SP13.forward.json`, CARBON-4C baseline).

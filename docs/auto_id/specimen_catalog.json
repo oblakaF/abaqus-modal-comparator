@@ -1,0 +1,4379 @@
+{
+ "schema": "auto-id/specimen-catalog/v1",
+ "status": "ACCEPTED",
+ "acceptance": "SUPERVISOR 2026-10-07 (D-065): commit bb62060 accepted as the canonical specimen inventory; updated for D-065",
+ "date": "2026-10-07",
+ "canonical_text": "docs/auto_id/SPECIMEN_CATALOG.md",
+ "runtime_dependency": false,
+ "sources": [
+  {
+   "store": "snadwich",
+   "root": "D:\\Snadwich",
+   "role": "curated specimen store (primary)"
+  },
+  {
+   "store": "sumin",
+   "root": "I:\\Sumin",
+   "role": "experiment hand-over: raw batch 260909, PolyMAX zip, LMS summaries, 260911 update"
+  },
+  {
+   "store": "temp-12-sampls",
+   "root": "C:\\temp\\12 sampls",
+   "role": "working FE/results folders SP01-SP15"
+  },
+  {
+   "store": "c-temp",
+   "root": "C:\\temp",
+   "role": "ungoverned Abaqus working directory"
+  },
+  {
+   "store": "sandwich-article",
+   "root": "D:\\work 2.0\\Статьи В работе\\Сендвич с индусом",
+   "role": "article project: Obsidian specimen vault, Politec+LMS copies, reports, photos"
+  },
+  {
+   "store": "carbon-project-archive",
+   "root": "D:\\carbon_project_archive",
+   "role": "archived CARBON research records"
+  }
+ ],
+ "polymax_zip": {
+  "store": "sumin",
+  "relative_path": "SPname_files_260909_polymax.zip",
+  "role": "Testlab PolyMAX exports of the 260909 file batch",
+  "size_bytes": 64090215
+ },
+ "lms_summaries": [
+  {
+   "store": "sumin",
+   "relative_path": "Updated_260911/Experiment_Freq_damping_LMS.xlsx",
+   "role": "LMS (Testlab) frequency/damping summary",
+   "size_bytes": 1092592,
+   "sha256": "ec77ca6588964125057dfade32f07d58fc255a4cdf606c5ce4e51767b2fbe384"
+  },
+  {
+   "store": "sumin",
+   "relative_path": "Updated_260911/Experiment_Freq_damping_LMS_sharing.xlsx",
+   "role": "LMS (Testlab) frequency/damping summary (sharing copy)",
+   "size_bytes": 5885825,
+   "sha256": "e5d59dde666cae9832afd2e5cc58517a99c4de4c0aa305a85f95651854de3b6b"
+  }
+ ],
+ "human_context": [
+  "label kept at the physical TOP of the panel; the scanner measured the labelled face; the shaker excited the opposite face; lattice/core orientation as in the Abaqus model",
+  "dimensions: 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm): readout resolutions, not calibrated accuracy",
+  "HUMAN context (old nominal ~0.45 mm stock): local values about 0.40-0.50 mm, most locations about 0.44-0.45 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+  "HUMAN context (new nominal ~0.25 mm stock): local values about 0.23-0.28 mm, most locations about 0.25 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+  "printed core geometry stable relative to the face-sheet variation",
+  "SP-02 honeycomb core; SP-13 auxetic core",
+  "SP-13 removed and re-suspended between 260909 and 260910; laser/scanner and shaker not moved; FREQUENCY_ONLY repeat evidence; Testlab currently NOT available"
+ ],
+ "specimens": [
+  {
+   "specimen_id": "SP-01",
+   "folder": "SP-01 -core mass less",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "500x500 mm ... (first line partly illegible) / Plain fiber / Auxetic / DP420",
+    "specimen_number_on_label": false,
+    "frame": "SP-01/SP01_500by500_Glue420_Auxetic_full_scan_260624.svd"
+   },
+   "identity": {
+    "confidence": "DERIVED",
+    "evidence": [
+     "store folder, file names, PSV header and Testlab project name all say SP01",
+     "spec experimental table equals the PolyMAX set 'Processing_nice' of SP01_polymax.unv (Testlab project SP01_..._260624) exactly",
+     "label text (no number; numbering began after 2026-08-03) matches the spec (plain, auxetic, DP420)",
+     "LMS summary column 'SP1 (old)'"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-01 -core mass less/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 5401,
+    "sha256": "c99792736e7f1b442ea7991ca0f166b4e2db3b04687495482d088457912dc7b1"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-01/SP-01.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 7628,
+    "sha256": "7f35b787c947e63935a62493c027132b7df1bb4edd86e7b64159e5073e080a5d"
+   },
+   "geometry": {
+    "plan_mm": [
+     502.13,
+     499.25
+    ],
+    "total_thickness_mm": 2.9,
+    "face_top_mm": 0.45,
+    "face_bottom_mm": 0.45,
+    "core_thickness_mm": 2.0,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "HUMAN context (old nominal ~0.45 mm stock): local values about 0.40-0.50 mm, most locations about 0.44-0.45 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior",
+    "core_plan_mm": [
+     502.132,
+     499.75
+    ],
+    "core_plan_source": "CARBON-5D archive (SP-01 CAE core sketch)"
+   },
+   "mass": {
+    "face_top_g": 177,
+    "face_bottom_g": 177,
+    "core_g": 145.3,
+    "without_adhesive_g": 499,
+    "adhesive_top_g": 48.9,
+    "adhesive_bottom_g": 41.79,
+    "adhesive_calculated_g": 90.69,
+    "finished_g": 588.4,
+    "arithmetic_notes": [
+     "faces + core = 499.3 g vs recorded 'without adhesive' 499 g"
+    ]
+   },
+   "face_material": {
+    "stock": "old",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.45,
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E1_MPa": 52000,
+      "E2_MPa": 52000,
+      "E3_MPa": 6700,
+      "nu12": 0.05,
+      "nu13": 0.3,
+      "nu23": 0.3,
+      "G12_MPa": 4500,
+      "G13_MPa": 2200,
+      "G23_MPa": 2200,
+      "density_t_per_mm3": 1.57e-09
+     },
+     "source": "spec section 2.1 (FE input template, not a measurement)"
+    }
+   },
+   "core": {
+    "topology": "auxetic",
+    "material": "PLA",
+    "grade": "PLA Light (DERIVED: archived CARBON-5D note citing an earlier HUMAN statement, CARBON-3A; not in any spec)",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 579.6,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E1_MPa": 2580,
+      "E2_MPa": 2580,
+      "E3_MPa": 2060,
+      "nu12": 0.33,
+      "nu13": 0.33,
+      "nu23": 0.33,
+      "G12_MPa": 970,
+      "G13_MPa": 850,
+      "G23_MPa": 850,
+      "density_t_per_mm3": 9.01e-10
+     },
+     "source": "spec section 2.2"
+    },
+    "note": "folder name 'core mass less': lighter core than SP-13 (145.3 g vs 179.13 g)"
+   },
+   "experiments": [
+    {
+     "session": "260624",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-01 -core mass less/SP01_500by500_Glue420_Auxetic_full_scan_260624.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 13142110,
+      "sha256": "0c2e9d3af1dbb01b48e201d8bc9928378a08d1c84b1153c52d25a3aebcc59136"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-01 -core mass less/SP01_500by500_Glue420_Auxetic_full_scan_260624.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 6045696,
+      "sha256": "42b2791659e2ab56937ccb57c0044488e157720d8c64f3a39d037da1df82760e"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "24-Jun-26 17:18:45"
+    },
+    {
+     "session": "260624",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP01_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 13758519,
+      "sha256": "6c3882afdced7c5d0fe32b8149445718ad7a5a0fc1ad34660fd23d48bc83e5e6"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Processing_nice",
+       "testlab_project": "SP01_500by500_Glue420_Auxetic_full_scan_260624",
+       "mode_count": 9,
+       "frequencies_hz": [
+        25.389,
+        75.991,
+        82.149,
+        91.485,
+        92.125,
+        145.878,
+        212.972,
+        215.688,
+        221.63
+       ]
+      },
+      {
+       "set": "Processing (1)",
+       "testlab_project": "SP01_500by500_Glue420_Auxetic_full_scan_260624",
+       "mode_count": 9,
+       "frequencies_hz": [
+        25.389,
+        75.991,
+        82.149,
+        91.485,
+        92.125,
+        145.878,
+        212.972,
+        215.688,
+        221.63
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP01_500by500_Glue420_Auxetic_full_scan_260624",
+       "mode_count": 21,
+       "frequencies_hz": [
+        25.389,
+        75.991,
+        82.149,
+        92.125,
+        145.878,
+        212.972,
+        215.688,
+        221.63,
+        227.676,
+        259.89,
+        268.459,
+        288.776,
+        298.099,
+        308.465,
+        365.617,
+        408.739,
+        411.134,
+        418.754,
+        428.797,
+        448.169,
+        452.941
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [
+     {
+      "store": "snadwich",
+      "relative_path": "SP-01 -core mass less/SP-01 A-core 500x500.cae",
+      "role": "CAE",
+      "size_bytes": 43028480,
+      "sha256": "89ed20210dbe8a343f215ae76c4e2a99e91cd53f0e958677ddf72d98d02a0864"
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-01 -core mass less/SP-01 A-core 500x500.jnl",
+      "role": "JNL",
+      "size_bytes": 135930,
+      "sha256": "81906712b3593e2c2187cef168e00d645a291578d8baa7828b5f24e274eb2f79"
+     }
+    ],
+    "elsewhere": [
+     {
+      "store": "c-temp",
+      "relative_path": "SP-01.inp",
+      "role": "INP (not governed)",
+      "size_bytes": 72817666
+     },
+     {
+      "store": "c-temp",
+      "relative_path": "SP-01.odb",
+      "role": "ODB (not governed)",
+      "size_bytes": 291369812
+     }
+    ],
+    "note": "C:\\temp\\SP-01.dat eigenfrequencies equal the spec Abaqus column (24.147 ... 221.13 Hz)",
+    "governed_forward_model": null,
+    "status": "FE exists, not governed"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated (the Polytec UNV anisotropy was found on SP-02 and SP-13)"
+   },
+   "family_id": "old-T300-plain-0.45",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "old-plain-0.45 family candidate after governance (core grade differs: PLA Light)"
+  },
+  {
+   "specimen_id": "SP-02",
+   "folder": "SP-02",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "500x500 / Plain fiber / honey comb / DP420",
+    "specimen_number_on_label": false,
+    "frame": "SP-02/SP02_500by500_Glue420_honeycomb_full_scan_retry_260803.svd"
+   },
+   "identity": {
+    "confidence": "DERIVED",
+    "verdict": "SP02_IDENTITY_RESOLVED_FROM_RECORDS",
+    "evidence": "see identity_resolutions.SP-02"
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-02/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4767,
+    "sha256": "39cadf32a102640a80a6030d89be943d98adf84b40afe3b8342f97ccb43e409a"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-02/SP-02.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 7799,
+    "sha256": "74736d20f9fe6e30b3f9bfbdec181f7493e3fb3e8b30bc736d13ae3f7299b35c"
+   },
+   "geometry": {
+    "plan_mm": [
+     515,
+     510
+    ],
+    "total_thickness_mm": 2.9,
+    "face_top_mm": 0.45,
+    "face_bottom_mm": 0.45,
+    "core_thickness_mm": 2.0,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "HUMAN context (old nominal ~0.45 mm stock): local values about 0.40-0.50 mm, most locations about 0.44-0.45 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior",
+    "fe_orientation": "horizontal 510 = FE X, vertical 515 = FE Y (frame aspect, SP-02 reconstruction record)"
+   },
+   "mass": {
+    "face_top_g": 175.6,
+    "face_bottom_g": 175.6,
+    "core_g": 144.58,
+    "without_adhesive_g": 495.78,
+    "adhesive_top_g": 44.58,
+    "adhesive_bottom_g": 45.77,
+    "adhesive_calculated_g": 90.35,
+    "adhesive_real_g": null,
+    "finished_g": 582.71,
+    "arithmetic_notes": []
+   },
+   "face_material": {
+    "stock": "old",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.45,
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E1_MPa": 52000,
+      "E2_MPa": 52000,
+      "E3_MPa": 6700,
+      "nu12": 0.05,
+      "nu13": 0.3,
+      "nu23": 0.3,
+      "G12_MPa": 4500,
+      "G13_MPa": 2200,
+      "G23_MPa": 2200,
+      "density_t_per_mm3": 1.57e-09
+     },
+     "source": "spec section 2.1 and SP02_Modal_V02.inp (identical; FE template)"
+    }
+   },
+   "core": {
+    "topology": "honeycomb",
+    "material": "PLA",
+    "grade": "non-Light PLA (DERIVED: archived CARBON-5D note citing CARBON-3A; not in any spec)",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 550.5,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E1_MPa": 2580,
+      "E2_MPa": 2580,
+      "E3_MPa": 2060,
+      "nu12": 0.33,
+      "nu13": 0.33,
+      "nu23": 0.33,
+      "G12_MPa": 970,
+      "G13_MPa": 850,
+      "G23_MPa": 850,
+      "density_t_per_mm3": 9.01e-10,
+      "density_t_per_mm3_fe": 1.0475e-09
+     },
+     "source": "spec 2.2 (density 9.01e-10 copied from SP-01) vs INP density 1.0475e-9"
+    }
+   },
+   "experiments": [
+    {
+     "session": "260803 retry",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_500by500_Glue420_honeycomb_full_scan_retry_260803.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 13145022,
+      "sha256": "6320dd44cb1847234f7103822620686eb9e5804b49541231885e20d7c6b8c045"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_500by500_Glue420_honeycomb_full_scan_retry_260803.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 6017024,
+      "sha256": "d974608c9dd4aa497edca69b760e917a2a746bcd99c2806f700bf9a4e1462425"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "registration geometry (physical reconstruction from the .svd)"
+     ],
+     "usable_after_governance": [
+      "frequency"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "03-Aug-26 13:40:35"
+    },
+    {
+     "session": "260803 retry (Testlab project SP02_..._260715)",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_polymax_retry_260803.unv",
+      "role": "governed fixture source",
+      "size_bytes": 13597269,
+      "sha256": "2671db01b6401a9a9bbec7d8c2aa2191b0b35b5ae791756b91c7ccd381a41785"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Bravo (1)",
+       "testlab_project": "SP02_500by500_Glue420_honeycomb_full_scan_260715",
+       "mode_count": 9,
+       "frequencies_hz": [
+        28.006,
+        74.376,
+        78.162,
+        90.575,
+        91.95,
+        144.763,
+        201.999,
+        208.216,
+        219.444
+       ]
+      },
+      {
+       "set": "Bravo",
+       "testlab_project": "SP02_500by500_Glue420_honeycomb_full_scan_260715",
+       "mode_count": 8,
+       "frequencies_hz": [
+        28.006,
+        74.376,
+        78.162,
+        90.575,
+        91.95,
+        144.763,
+        201.999,
+        208.216
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP02_500by500_Glue420_honeycomb_full_scan_260715",
+       "mode_count": 8,
+       "frequencies_hz": [
+        28.006,
+        74.376,
+        78.162,
+        90.575,
+        91.95,
+        144.763,
+        201.999,
+        208.216
+       ]
+      }
+     ],
+     "governed": true,
+     "governed_set": "Bravo (1) (active fixture SP02/bravo-1-physical)",
+     "usable_now": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "note": "byte-identical copy in the Sumin PolyMAX zip (SP02_polymax.unv)"
+    }
+   ],
+   "earlier_session_records": "Testlab project name SP02_500by500_Glue420_honeycomb_full_scan_260715: an SP-02 scan of 2026-07-15 that is not in any audited store; the spec experimental table (28.1903 ... 214.261 Hz) equals the LMS summary '500x500 honeycomb 420' column, a fit other than the governed Bravo (1)",
+   "fe_assets": {
+    "store": [
+     {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_Modal_V02.inp",
+      "role": "INP (governed M3 forward model)",
+      "size_bytes": 123452260
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_Modal_V02.odb",
+      "role": "ODB",
+      "size_bytes": 452069736
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_Modal_V01.inp",
+      "role": "INP (V01; identical eigenfrequencies)",
+      "size_bytes": 123452260
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_Modal_V01.odb",
+      "role": "ODB (V01)",
+      "size_bytes": 452069736
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_Honeycomb_V01_baseline.cae",
+      "role": "CAE",
+      "size_bytes": 87834624
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-02/SP02_Honeycomb_V01_baseline.jnl",
+      "role": "JNL",
+      "size_bytes": 34786,
+      "sha256": "dc658dae86eb5436337dd5c79c09a97efc74a3b280ac31000ceb54e7d02c93f8"
+     }
+    ],
+    "governed_forward_model": {
+     "path": "docs/auto_id/forward_models/SP02.forward.json",
+     "forward_model_id": "SP02_Modal_V02/carbon-property-set-v1",
+     "inp_sha256": "574ae78a897f5a666989716c54549969f13ca2919ad3af1f3ca658580a4ba8a5"
+    },
+    "status": "governed reproducible M3 forward model"
+   },
+   "registration": {
+    "legacy": {
+     "path": "docs/registrations/SP02_frozen_registration.json",
+     "registration_hash": "9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164",
+     "status": "historical provenance only (physically inconsistent: median 28.9 mm, max 54.1 mm)"
+    },
+    "physical": {
+     "path": "docs/registrations/SP02_physical_registration.json",
+     "registration_hash": "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c",
+     "passport": "docs/auto_id/specimens/SP02.physical.specimen.json",
+     "status": "ACCEPTED (SUPERVISOR 2026-10-07, D-065); ACTIVE through fixture SP02/bravo-1-physical; passport physical_specimen_id SP-02"
+    },
+    "physical_basis": "stored PSV camera frame + MeasPoints + panel edges + spec dimensions (D-062 method)",
+    "distortion": "UNV/physical x 1.0917, y 0.8178 (anisotropy 1.335)",
+    "registration_limited": false,
+    "unresolved": "through-thickness face convention (TOP by convention); the M3 forward-model manifest SP02.forward.json still pins the legacy passport and registration (historical CARBON-4C / M4.2 chain, unchanged); the active forward-model binding of the physical passport is SP02.physical.forward.json (D-068)"
+   },
+   "strict_pairs": {
+    "legacy": "NOT_FROZEN: (2,8) only",
+    "physical": "FROZEN: (2,8), (4,10), (7,13); validation holdout R3; 2 fit rows; cond 6.1"
+   },
+   "family_id": "old-T300-plain-0.45",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE"
+   ],
+   "m7_role": "best current M7 specimen with SP-13; identity and physical registration accepted and active (D-065); remaining: forward-model binding of the physical passport"
+  },
+  {
+   "specimen_id": "SP-03",
+   "folder": "SP-03",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "500x500 / Twill fiber / Auxetic core / DP420",
+    "specimen_number_on_label": false,
+    "frame": "SP-03/SP03_500by500_Glue420_Auxetic_Twill_full_scan_260803.svd"
+   },
+   "identity": {
+    "confidence": "DERIVED",
+    "evidence": [
+     "folder, file names, PSV header and Testlab project say SP03",
+     "only twill sandwich in the records; label says twill / auxetic / DP420 (no number, pre-numbering date)",
+     "LMS summary column 'SP3 TWILL' equals SP03_polymax 'Bravo_results' frequencies"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-03/spec twill.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4916,
+    "sha256": "79460818356a4154dcc1cf403373b815d0e30101832b8e881d3829f3ef59e1d5"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-03/SP-03.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 5201,
+    "sha256": "442d2fb967b2dd156071294780dc2475461975ac9e4af767fdf59dea0bf7e7cf"
+   },
+   "manufacturing_date": "25/07/2026 (spec)",
+   "geometry": {
+    "plan_mm": [
+     515,
+     510
+    ],
+    "total_thickness_mm": 2.9,
+    "face_top_mm": 0.45,
+    "face_bottom_mm": 0.45,
+    "core_thickness_mm": 2.0,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "HUMAN context (old nominal ~0.45 mm stock): local values about 0.40-0.50 mm, most locations about 0.44-0.45 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior"
+   },
+   "mass": {
+    "face_top_g": 165,
+    "face_bottom_g": 165.8,
+    "core_g": 178.6,
+    "without_adhesive_g": 509.4,
+    "adhesive_top_g": 44.1,
+    "adhesive_bottom_g": 43.89,
+    "adhesive_calculated_g": 87.99,
+    "adhesive_real_g": null,
+    "finished_g": 595.7,
+    "arithmetic_notes": []
+   },
+   "face_material": {
+    "stock": "old",
+    "weave": "twill",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.45,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.1 twill table is blank; no measured twill constants exist"
+    }
+   },
+   "core": {
+    "topology": "auxetic",
+    "material": "PLA",
+    "grade": "UNKNOWN",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 680.0,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E1_MPa": 2580,
+      "E2_MPa": 2580,
+      "E3_MPa": 2060,
+      "nu12": 0.33,
+      "nu13": 0.33,
+      "nu23": 0.33,
+      "G12_MPa": 970,
+      "G13_MPa": 850,
+      "G23_MPa": 850,
+      "density_t_per_mm3": 9.01e-10
+     },
+     "source": "spec section 2.2"
+    }
+   },
+   "experiments": [
+    {
+     "session": "260803",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-03/SP03_500by500_Glue420_Auxetic_Twill_full_scan_260803.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 13144294,
+      "sha256": "489d7bc6f384c97217fc7fd018a7a870fe1eb206a3bcc9794d23a8ca5debfef0"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-03/SP03_500by500_Glue420_Auxetic_Twill_full_scan_260803.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 6033408,
+      "sha256": "38a1f7ee5216c5bdc66868da3cfabb4fda309d38ece3e15d037fcab89665589b"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "03-Aug-26 14:49:14"
+    },
+    {
+     "session": "260803",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP03_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 13678478,
+      "sha256": "cc9d0a1d5ebe7245e2d7142659f203d91a896078d49d1616cff3bc259b2f5c09"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Bravo_results (1",
+       "testlab_project": "SP03_500by500_Glue420_Auxetic_Twill_full_scan_260803",
+       "mode_count": 9,
+       "frequencies_hz": [
+        28.165,
+        77.09,
+        80.416,
+        91.94,
+        94.538,
+        146.634,
+        209.06,
+        215.851,
+        218.984
+       ]
+      },
+      {
+       "set": "Bravo_results",
+       "testlab_project": "SP03_500by500_Glue420_Auxetic_Twill_full_scan_260803",
+       "mode_count": 11,
+       "frequencies_hz": [
+        28.165,
+        77.09,
+        80.416,
+        91.94,
+        94.538,
+        146.634,
+        209.06,
+        215.851,
+        218.984,
+        222.261,
+        227.693
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP03_500by500_Glue420_Auxetic_Twill_full_scan_260803",
+       "mode_count": 12,
+       "frequencies_hz": [
+        28.165,
+        77.09,
+        80.416,
+        91.94,
+        94.538,
+        146.634,
+        209.06,
+        215.851,
+        218.984,
+        222.261,
+        227.693,
+        239.909
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [],
+    "governed_forward_model": null,
+    "status": "no FE model found"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "old-T300-twill-0.45",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "twill family only (not old-plain); twill constants UNKNOWN"
+  },
+  {
+   "specimen_id": "SP-04",
+   "folder": "SP-04",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "310x310 / Honeycomb / TPU / DP420 / SP-04",
+    "specimen_number_on_label": true,
+    "frame": "SP-04/SP04_310by310_Glue420_Honeycomb_TPU_PlainFiber_260822.svd"
+   },
+   "identity": {
+    "confidence": "CONFIRMED",
+    "evidence": [
+     "label 'SP-04' visible in the stored frame",
+     "folder, file names, Testlab project SP04"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-04/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4717,
+    "sha256": "662814c95dfd815c3210c497e86351f6376d2f83c1909318d6c879a71a28bcf2"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-04/SP-04.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 5248,
+    "sha256": "371fb3bdd2606935b6bafe6dded8e1fc7ab3ea7314fd7ecb19d813fd520521a3"
+   },
+   "geometry": {
+    "plan_mm": [
+     302,
+     297.5
+    ],
+    "total_thickness_mm": 2.8,
+    "face_top_mm": 0.25,
+    "face_bottom_mm": 0.25,
+    "core_thickness_mm": 2.3,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "not stated: the HUMAN variation statements cover old ~0.45 and new ~0.25 stock; the old ~0.25 stock is not covered (UNKNOWN)",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior"
+   },
+   "mass": {
+    "face_top_g": 30.8,
+    "face_bottom_g": 30.75,
+    "core_g": 63.38,
+    "without_adhesive_g": 124.93,
+    "adhesive_top_g": 24.46,
+    "adhesive_bottom_g": 26.06,
+    "adhesive_calculated_g": 50.52,
+    "adhesive_real_g": null,
+    "finished_g": 174.03,
+    "arithmetic_notes": []
+   },
+   "face_material": {
+    "stock": "old",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.25,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.1 blank"
+    }
+   },
+   "core": {
+    "topology": "honeycomb",
+    "material": "TPU",
+    "grade": "UNKNOWN",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 705.4,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.2 blank"
+    }
+   },
+   "experiments": [
+    {
+     "session": "260822",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-04/SP04_310by310_Glue420_Honeycomb_TPU_PlainFiber_260822.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 26051244,
+      "sha256": "f7c46dadc329a637e4698355b3d6ba657301035f21d32a47255a93bf9adbd008"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-04/SP04_310by310_Glue420_Honeycomb_TPU_PlainFiber_260822.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 11505664,
+      "sha256": "6e28a2ff4845c51d578704c49a131a4615a37ae19ce43281950da69181b28a4f"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      1000.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "22-Aug-26 16:24:42"
+    },
+    {
+     "session": "260822",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP04_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 26917657,
+      "sha256": "2b64bba87bbae0349a5564af315743af71eb277122e9f4e31dda3d7871500225"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "nice (2)",
+       "testlab_project": "SP04_310by310_Glue420_Honeycomb_TPU_PlainFiber_260822",
+       "mode_count": 7,
+       "frequencies_hz": [
+        58.168,
+        143.413,
+        161.308,
+        170.433,
+        185.322,
+        274.474,
+        385.021
+       ]
+      },
+      {
+       "set": "nice (1)",
+       "testlab_project": "SP04_310by310_Glue420_Honeycomb_TPU_PlainFiber_260822",
+       "mode_count": 8,
+       "frequencies_hz": [
+        58.168,
+        143.413,
+        161.308,
+        170.433,
+        185.322,
+        274.474,
+        352.013,
+        385.021
+       ]
+      },
+      {
+       "set": "polymax",
+       "testlab_project": "SP04_310by310_Glue420_Honeycomb_TPU_PlainFiber_260822",
+       "mode_count": 19,
+       "frequencies_hz": [
+        58.168,
+        143.413,
+        161.308,
+        170.433,
+        185.322,
+        274.474,
+        352.013,
+        352.07,
+        364.213,
+        375.531,
+        384.986,
+        400.507,
+        408.153,
+        415.431,
+        453.487,
+        473.039,
+        498.597,
+        574.933,
+        578.065
+       ]
+      },
+      {
+       "set": "nice",
+       "testlab_project": "SP04_310by310_Glue420_Honeycomb_TPU_PlainFiber_260822",
+       "mode_count": 7,
+       "frequencies_hz": [
+        58.168,
+        143.413,
+        161.308,
+        170.433,
+        185.322,
+        274.474,
+        352.013
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP04_310by310_Glue420_Honeycomb_TPU_PlainFiber_260822",
+       "mode_count": 16,
+       "frequencies_hz": [
+        58.168,
+        143.413,
+        161.308,
+        170.433,
+        185.322,
+        194.069,
+        249.967,
+        263.002,
+        274.474,
+        282.315,
+        296.784,
+        329.911,
+        352.013,
+        363.671,
+        375.841,
+        384.564
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [
+     {
+      "store": "c-temp",
+      "relative_path": "HONEYCOMB_MODAL_302x297p5_NSM_172g_v01.inp",
+      "role": "INP (candidate by plan size/mass only)",
+      "size_bytes": 30892316
+     },
+     {
+      "store": "c-temp",
+      "relative_path": "MODAL_HONEYCOMB_302x297p5_NSM.inp",
+      "role": "INP (candidate by plan size only)",
+      "size_bytes": 33875488
+     }
+    ],
+    "note": "association with SP-04 is by file name (302 x 297.5 mm, 172 g) only: AMBIGUOUS",
+    "governed_forward_model": null,
+    "status": "candidate FE files, not governed"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "old-T300-plain-0.25",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "old-plain-0.25 TPU family (not named in SPEC section 13)"
+  },
+  {
+   "specimen_id": "SP-05",
+   "folder": "SP-05",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "300x300 / Plain Fiber / Auxetic core (TPU) / DP420",
+    "specimen_number_on_label": false,
+    "frame": "SP-05/SP05_300by300_Glue420_Auxetic_TPU_PlainFiber_260706a.svd"
+   },
+   "identity": {
+    "confidence": "DERIVED",
+    "evidence": [
+     "folder, file names, PSV header and Testlab project say SP05",
+     "spec experimental table equals SP05_polymax set 'Processing_nice' exactly; LMS column 'Auxetic TPU 420'",
+     "label text matches the spec (no number, pre-numbering date)"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-05/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 5358,
+    "sha256": "955dbbb0e63063b41c33faa42e27665c595897f39f31d92eb6383d08111cb1db"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-05/SP-05.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 6288,
+    "sha256": "bdec9862500c08f3088df4e17d827aaa06c40f979e85ee8f1a27e002b8c71f67"
+   },
+   "geometry": {
+    "plan_mm": [
+     301.14,
+     302
+    ],
+    "total_thickness_mm": 2.55,
+    "face_top_mm": 0.245,
+    "face_bottom_mm": 0.245,
+    "core_thickness_mm": 2.35,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "not stated: the HUMAN variation statements cover old ~0.45 and new ~0.25 stock; the old ~0.25 stock is not covered (UNKNOWN)",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior",
+    "total_thickness_before_glue_mm": 2.84
+   },
+   "mass": {
+    "face_top_g": 31.5,
+    "face_bottom_g": 31.4,
+    "core_g": 54,
+    "without_adhesive_g": 116.9,
+    "adhesive_top_g": 24.97,
+    "adhesive_bottom_g": 24.53,
+    "adhesive_calculated_g": 49.5,
+    "adhesive_real_g": null,
+    "total_calculated_g": 166.4,
+    "finished_g": 161.34,
+    "arithmetic_notes": [
+     "spec records both 'total mass calculated' 166.4 g and finished 161.34 g"
+    ]
+   },
+   "face_material": {
+    "stock": "old",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.25,
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E1_MPa": 52000,
+      "E2_MPa": 52000,
+      "E3_MPa": 6700,
+      "nu12": 0.05,
+      "nu13": 0.3,
+      "nu23": 0.3,
+      "G12_MPa": 4500,
+      "G13_MPa": 2200,
+      "G23_MPa": 2200,
+      "density_t_per_mm3": 1.416e-09
+     },
+     "source": "spec section 2.1 and SP05_modal.inp (FE template)"
+    }
+   },
+   "core": {
+    "topology": "auxetic",
+    "material": "TPU",
+    "grade": "UNKNOWN",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 593.8,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E_MPa": 85,
+      "nu": 0.45,
+      "density_t_per_mm3": 9.18e-10
+     },
+     "source": "spec 2.2 isotropic data and SP05_modal.inp (FE template)"
+    }
+   },
+   "experiments": [
+    {
+     "session": "260706a",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-05/SP05_300by300_Glue420_Auxetic_TPU_PlainFiber_260706a.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 26050880,
+      "sha256": "c1d928467e50cac5e8545c63da4356567aedea7340ce2a598fd7f45efcf79ef4"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-05/SP05_300by300_Glue420_Auxetic_TPU_PlainFiber_260706a.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 11513856,
+      "sha256": "6c692c122fb082e9b5e33ad1e6afea885318d706518d18f6c85b2cf88dcefe5f"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      1000.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "06-Jul-26 13:24:01"
+    },
+    {
+     "session": "260706a",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP05_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 26465377,
+      "sha256": "bbae824c8bee6f4a2f59b59bbc7c4c95d29823bfc118dc063ddaeaa914b4683e"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Processing_nice",
+       "testlab_project": "SP05_300by300_Glue420_Auxetic_TPU_PlainFiber_260706a",
+       "mode_count": 7,
+       "frequencies_hz": [
+        50.967,
+        134.241,
+        149.173,
+        163.476,
+        166.901,
+        259.456,
+        350.914
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP05_300by300_Glue420_Auxetic_TPU_PlainFiber_260706a",
+       "mode_count": 17,
+       "frequencies_hz": [
+        50.967,
+        134.241,
+        149.173,
+        163.476,
+        166.901,
+        259.456,
+        295.032,
+        350.914,
+        364.987,
+        380.27,
+        386.204,
+        400.542,
+        425.545,
+        443.282,
+        461.667,
+        468.135,
+        486.312
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [
+     {
+      "store": "snadwich",
+      "relative_path": "SP-05/SP05_modal.inp",
+      "role": "INP (not governed)",
+      "size_bytes": 41254474,
+      "sha256": "05baccc102a332704bb9ac97e3b1d1aec549a56cc40df0ed2a7c21f13b8a8e42"
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-05/SP05_modal.odb",
+      "role": "ODB",
+      "size_bytes": 175068752
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-05/SP-05 A-core  TPU 301.15x302x2.5.cae",
+      "role": "CAE",
+      "size_bytes": 18751488,
+      "sha256": "c7c97d51274dce824204ced55c3158ff36924718915fe3b96033ecc4cc033498"
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-05/SP-05 A-core 300x300.cae",
+      "role": "CAE",
+      "size_bytes": 6283264,
+      "sha256": "d1561e66394dbbee98b61a681a3f641b919952293b30683aae72b5a18c0417c0"
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-05/temp-301x302x2 A-core 2.0-new.sat",
+      "role": "SAT",
+      "size_bytes": 15856999,
+      "sha256": "4001f5a7af0cb4a7c3025ade0a015e5ee44a25a6d314adbbfae99a98854917f3"
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-05/temp-301x302x2 A-core 2.35-new.sat",
+      "role": "SAT",
+      "size_bytes": 16378610,
+      "sha256": "bd1a784fb52d2f1bf93626a3ab521352d18d72a02af13e3361e8615e945b6b4b"
+     }
+    ],
+    "note": "SP05_modal.dat eigenfrequencies equal the spec Abaqus column (47.747 ... 359.19 Hz)",
+    "governed_forward_model": null,
+    "status": "FE exists, not governed (no M3 forward-model manifest)"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "old-T300-plain-0.25",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "old-plain-0.25 TPU family"
+  },
+  {
+   "specimen_id": "SP-06",
+   "folder": "SP-06",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "SP-06 / 300x300 / Plain fiber / Auxetic core (TPU) / DP-190",
+    "specimen_number_on_label": true,
+    "frame": "sumin: SPname_files_260909/SP06_300by300_Glue190_Auxetic_TPU_PlainFiber_260824.svd"
+   },
+   "identity": {
+    "confidence": "CONFIRMED",
+    "evidence": [
+     "label 'SP-06' visible in the stored frame",
+     "file names and Testlab project SP06"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-06/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4838,
+    "sha256": "25cb0d00ea4b5cdf2a64fca8a1f8030aa188ecc8f3b8c523bc63603acb83d005"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-06/SP-06.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 4813,
+    "sha256": "ab48e0d4337ce1a0b52ac7c8e6594b8a217b9b7364fe3c1803d5fe4c2c03d963"
+   },
+   "geometry": {
+    "plan_mm": [
+     310,
+     314
+    ],
+    "total_thickness_mm": 2.75,
+    "face_top_mm": 0.25,
+    "face_bottom_mm": 0.235,
+    "core_thickness_mm": 2.33,
+    "face_asymmetry": "top 0.25 / bottom 0.235 mm",
+    "local_face_thickness_variation": "HUMAN context (new nominal ~0.25 mm stock): local values about 0.23-0.28 mm, most locations about 0.25 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior"
+   },
+   "mass": {
+    "face_top_g": 33.01,
+    "face_bottom_g": 32.15,
+    "core_g": 60.55,
+    "without_adhesive_g": 125.65,
+    "adhesive_top_g": 25.51,
+    "adhesive_bottom_g": 23.82,
+    "adhesive_calculated_g": 49.33,
+    "adhesive_real_g": 47.2,
+    "finished_g": 172.82,
+    "arithmetic_notes": [
+     "faces + core = 125.71 g vs recorded 'without adhesive' 125.65 g"
+    ]
+   },
+   "face_material": {
+    "stock": "new",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.25,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.1 blank"
+    }
+   },
+   "core": {
+    "topology": "auxetic",
+    "material": "TPU",
+    "grade": "UNKNOWN",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP190 (top grey, bottom translucent)",
+    "core_mass_per_panel_area_g_m2": 622.0,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.2 blank"
+    }
+   },
+   "experiments": [
+    {
+     "session": "260824",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909/SP06_300by300_Glue190_Auxetic_TPU_PlainFiber_260824.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 26050516,
+      "sha256": "4614d2e34195274992d71a80001c26f364e2263c46cf2e28d00ef91f4581fa5d"
+     },
+     "video_frame_source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909/SP06_300by300_Glue190_Auxetic_TPU_PlainFiber_260824.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 11489280,
+      "sha256": "d367ee3a8f7e919bfd8f277ef7138709454c3dff559438e749cf41c54601fa59"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      1000.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "24-Aug-26 11:51:37"
+    },
+    {
+     "session": "260824",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP06_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 26593474,
+      "sha256": "bbc89631e4403256119e2c6a5be549e0e7acd2020344b7e188d64fd5fcd666f0"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "polymax",
+       "testlab_project": "SP06_300by300_Glue190_Auxetic_TPU_PlainFiber_260824",
+       "mode_count": 8,
+       "frequencies_hz": [
+        50.199,
+        134.261,
+        156.129,
+        164.442,
+        168.808,
+        173.741,
+        367.269,
+        378.509
+       ]
+      },
+      {
+       "set": "soso",
+       "testlab_project": "SP06_300by300_Glue190_Auxetic_TPU_PlainFiber_260824",
+       "mode_count": 6,
+       "frequencies_hz": [
+        50.199,
+        134.261,
+        156.129,
+        164.442,
+        367.269,
+        378.509
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP06_300by300_Glue190_Auxetic_TPU_PlainFiber_260824",
+       "mode_count": 19,
+       "frequencies_hz": [
+        50.199,
+        134.261,
+        156.129,
+        164.442,
+        229.729,
+        237.47,
+        273.774,
+        277.611,
+        282.514,
+        292.772,
+        303.322,
+        339.081,
+        367.269,
+        378.509,
+        395.847,
+        430.283,
+        468.504,
+        470.957,
+        484.566
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "experiment_note": "the acquisition is NOT in D:\\Snadwich (spec only there); identical copies in I:\\Sumin, C:\\temp\\12 sampls\\results\\SP06 and the article folder",
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [],
+    "governed_forward_model": null,
+    "status": "no FE model found"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "new-T300-plain-0.25",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "new-plain-0.25 family (TPU core, DP190)"
+  },
+  {
+   "specimen_id": "SP-07",
+   "folder": "SP-07",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "SP-07 / 300x300 / Plain fiber / Honeycomb (TPU) / DP-190",
+    "specimen_number_on_label": true,
+    "frame": "SP-07/SP07_300by300_Glue190_honeycomb_TPU_PlainFiber_260824.svd"
+   },
+   "identity": {
+    "confidence": "CONFIRMED",
+    "evidence": [
+     "label 'SP-07' visible in the stored frame"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-07/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4861,
+    "sha256": "274ec7e09e2761b1605fa7caa215bfccf1ae0105a43f2cab14c02de62f766286"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-07/SP-07.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 4894,
+    "sha256": "6e5ea82a8ae61a731c7810cd4dcbf39c04dafdf139dcaba8244170bd66711841"
+   },
+   "geometry": {
+    "plan_mm": [
+     317,
+     310
+    ],
+    "total_thickness_mm": 2.7,
+    "face_top_mm": 0.235,
+    "face_bottom_mm": 0.235,
+    "core_thickness_mm": 2.3,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "HUMAN context (new nominal ~0.25 mm stock): local values about 0.23-0.28 mm, most locations about 0.25 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior"
+   },
+   "mass": {
+    "face_top_g": 32.39,
+    "face_bottom_g": 32.65,
+    "core_g": 50.65,
+    "without_adhesive_g": 115.69,
+    "adhesive_top_g": 23.83,
+    "adhesive_bottom_g": 24.67,
+    "adhesive_calculated_g": 48.5,
+    "finished_calculated_g": 164.19,
+    "finished_real_g": 160.79,
+    "arithmetic_notes": []
+   },
+   "face_material": {
+    "stock": "new",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.235,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.1 blank"
+    }
+   },
+   "core": {
+    "topology": "honeycomb",
+    "material": "TPU",
+    "grade": "UNKNOWN",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP190",
+    "core_mass_per_panel_area_g_m2": 515.4,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.2 blank"
+    }
+   },
+   "experiments": [
+    {
+     "session": "260824",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-07/SP07_300by300_Glue190_honeycomb_TPU_PlainFiber_260824.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 25284709,
+      "sha256": "1fb93e6540bacedf487d6b5cb40a36d984fba5bded256adb1b3910a941c492c8"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-07/SP07_300by300_Glue190_honeycomb_TPU_PlainFiber_260824.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 11177984,
+      "sha256": "4d2aab4b3bef8f188873841de8e6a8b9791e5a46c76664ca53741c63b5a9fb6d"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      30.0,
+      1000.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "24-Aug-26 15:19:39"
+    },
+    {
+     "session": "260824",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP07_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 25668685,
+      "sha256": "8a220848a2534b2cb7b7a1d29340b4d6e97da946f39f97a1be13d85391a42eb0"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "soso",
+       "testlab_project": "SP07_300by300_Glue190_honeycomb_TPU_PlainFiber_260824",
+       "mode_count": 8,
+       "frequencies_hz": [
+        53.424,
+        137.047,
+        155.752,
+        163.607,
+        171.523,
+        255.39,
+        344.489,
+        366.061
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP07_300by300_Glue190_honeycomb_TPU_PlainFiber_260824",
+       "mode_count": 14,
+       "frequencies_hz": [
+        53.424,
+        137.047,
+        155.752,
+        163.607,
+        171.523,
+        237.431,
+        249.42,
+        255.39,
+        265.31,
+        276.39,
+        291.117,
+        344.489,
+        354.234,
+        366.061
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [],
+    "governed_forward_model": null,
+    "status": "no FE model found"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "new-T300-plain-0.25",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "new-plain-0.25 family (TPU core, DP190)"
+  },
+  {
+   "specimen_id": "SP-08",
+   "folder": "SP-08",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "SP-08 / 500x500 / Plain fiber / Auxetic core (PLA) / DP-420",
+    "specimen_number_on_label": true,
+    "frame": "SP-08/SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828.svd"
+   },
+   "identity": {
+    "confidence": "CONFIRMED",
+    "evidence": [
+     "label 'SP-08' visible in the stored frame"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-08/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4829,
+    "sha256": "fa1a0835a20f502fae4cdb7ee8db9c46002c8d7714d2ae11672113839690b987"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-08/SP-08.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 4825,
+    "sha256": "368098d4727c4c907bd52415951b1cfdc332e84ec866bae88a001569115c0a28"
+   },
+   "geometry": {
+    "plan_mm": [
+     515,
+     520
+    ],
+    "total_thickness_mm": 2.5,
+    "face_top_mm": 0.25,
+    "face_bottom_mm": 0.24,
+    "core_thickness_mm": 2.0,
+    "face_asymmetry": "top 0.25 / bottom 0.24 mm",
+    "local_face_thickness_variation": "HUMAN context (new nominal ~0.25 mm stock): local values about 0.23-0.28 mm, most locations about 0.25 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior"
+   },
+   "mass": {
+    "face_top_g": 90.65,
+    "face_bottom_g": 89.65,
+    "core_g": 177.19,
+    "without_adhesive_g": 357.7,
+    "adhesive_top_g": 43.78,
+    "adhesive_bottom_g": 44.54,
+    "adhesive_calculated_g": 88.32,
+    "adhesive_real_g": 85.7,
+    "finished_real_g": 443.4,
+    "finished_g": 445.81,
+    "arithmetic_notes": [
+     "faces + core = 357.49 g vs recorded 'without adhesive' 357.7 g"
+    ]
+   },
+   "face_material": {
+    "stock": "new",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.25,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.1 blank"
+    }
+   },
+   "core": {
+    "topology": "auxetic",
+    "material": "PLA",
+    "grade": "UNKNOWN",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 661.7,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.2 blank"
+    },
+    "note": "file names say 'TPU'; spec and label say PLA (spec + label authoritative)"
+   },
+   "experiments": [
+    {
+     "session": "260828",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-08/SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 13143930,
+      "sha256": "f687286f7b86bb1e1f9eaa975be0d5f312f3f7bdd6688490de0e70cd69fd5360"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-08/SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 6012928,
+      "sha256": "f22237f7fb201bf0aaf5bfbb9e8d68cf217fa99a01669fc229f9128c8d6e1811"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "28-Aug-26 16:18:38"
+    },
+    {
+     "session": "260828",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP08_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 14477214,
+      "sha256": "72d9e52277657f05ea453cbb2b3f055305053f1f81c86dbfe79bdfff5acf851a"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Bravo",
+       "testlab_project": "SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828",
+       "mode_count": 10,
+       "frequencies_hz": [
+        21.921,
+        50.599,
+        57.53,
+        64.339,
+        64.966,
+        102.33,
+        145.493,
+        147.177,
+        148.57,
+        157.96
+       ]
+      },
+      {
+       "set": "Processing (4)",
+       "testlab_project": "SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828",
+       "mode_count": 11,
+       "frequencies_hz": [
+        21.921,
+        50.599,
+        57.53,
+        64.339,
+        64.966,
+        102.33,
+        145.493,
+        147.177,
+        148.57,
+        150.121,
+        157.96
+       ]
+      },
+      {
+       "set": "Processing (3)",
+       "testlab_project": "SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828",
+       "mode_count": 31,
+       "frequencies_hz": [
+        21.921,
+        50.599,
+        57.53,
+        64.339,
+        64.966,
+        102.33,
+        131.863,
+        133.307,
+        134.516,
+        135.795,
+        136.978,
+        137.197,
+        138.128,
+        138.467,
+        139.926,
+        140.783,
+        140.786,
+        145.499,
+        145.508,
+        147.177,
+        148.572,
+        148.602,
+        150.121,
+        157.96,
+        159.922,
+        159.948,
+        163.576,
+        184.422,
+        185.557,
+        194.225,
+        202.381
+       ]
+      },
+      {
+       "set": "Processing (2)",
+       "testlab_project": "SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828",
+       "mode_count": 16,
+       "frequencies_hz": [
+        21.921,
+        50.599,
+        57.53,
+        64.339,
+        64.966,
+        102.33,
+        137.197,
+        138.128,
+        140.786,
+        145.508,
+        148.572,
+        159.922,
+        184.422,
+        185.557,
+        194.225,
+        202.381
+       ]
+      },
+      {
+       "set": "Processing (1)",
+       "testlab_project": "SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828",
+       "mode_count": 14,
+       "frequencies_hz": [
+        21.921,
+        50.599,
+        57.53,
+        64.339,
+        64.966,
+        102.33,
+        140.184,
+        145.508,
+        148.572,
+        159.922,
+        184.422,
+        185.557,
+        194.225,
+        202.381
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828",
+       "mode_count": 13,
+       "frequencies_hz": [
+        21.921,
+        50.599,
+        57.53,
+        64.966,
+        102.33,
+        140.184,
+        145.508,
+        148.572,
+        159.922,
+        184.422,
+        185.557,
+        194.225,
+        202.381
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [],
+    "governed_forward_model": null,
+    "status": "no FE model found"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "new-T300-plain-0.25",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "new-plain-0.25 family (PLA core); SPEC section 13 names SP8"
+  },
+  {
+   "specimen_id": "SP-09",
+   "folder": "SP-09",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "SP-09 / 500x500 / Plain fiber / Honeycomb (PLA) / DP-420",
+    "specimen_number_on_label": true,
+    "frame": "SP-09/SP09_500by500_Glue420_Honeycomb_TPU_PlainFiber_260831.svd"
+   },
+   "identity": {
+    "confidence": "CONFIRMED",
+    "evidence": [
+     "label 'SP-09' visible in the stored frame"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-09/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4806,
+    "sha256": "58096444c90eee737daf87086baf0062b2f84108fa086162ed6171b368a27659"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-09/SP-09.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 4832,
+    "sha256": "4ce8427f393d8e9c6cc3f7739c856e2a803d2b6fa807dae2e57e8514fbcd6159"
+   },
+   "geometry": {
+    "plan_mm": [
+     520,
+     510
+    ],
+    "total_thickness_mm": 2.47,
+    "face_top_mm": 0.235,
+    "face_bottom_mm": 0.235,
+    "core_thickness_mm": 2.0,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "HUMAN context (new nominal ~0.25 mm stock): local values about 0.23-0.28 mm, most locations about 0.25 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior"
+   },
+   "mass": {
+    "face_top_g": 89.6,
+    "face_bottom_g": 90.3,
+    "core_g": 145.17,
+    "without_adhesive_g": 325,
+    "adhesive_top_g": 44.87,
+    "adhesive_bottom_g": 44.23,
+    "adhesive_calculated_g": 89.1,
+    "finished_real_g": 410.9,
+    "finished_calculated_g": 414.17,
+    "arithmetic_notes": [
+     "faces + core = 325.07 g vs recorded 'without adhesive' 325 g"
+    ]
+   },
+   "face_material": {
+    "stock": "new",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.235,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.1 blank"
+    }
+   },
+   "core": {
+    "topology": "honeycomb",
+    "material": "PLA",
+    "grade": "UNKNOWN",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 547.4,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.2 blank"
+    },
+    "note": "file names say 'TPU'; spec and label say PLA (spec + label authoritative)"
+   },
+   "experiments": [
+    {
+     "session": "260831",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-09/SP09_500by500_Glue420_Honeycomb_TPU_PlainFiber_260831.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 13144658,
+      "sha256": "887b2a4f27ed94a661f56ee697e528d24162c2285694be124a0f9cf49feb9504"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-09/SP09_500by500_Glue420_Honeycomb_TPU_PlainFiber_260831.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 6008832,
+      "sha256": "9db8751bb6d1f0483d479a033d6a1d78a69846edb4d7096df12daee17b5455bb"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "31-Aug-26 08:58:43"
+    },
+    {
+     "session": "260831",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP09_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 13759605,
+      "sha256": "6dcd43db40173553af892bec9d86c8c0803ac417a47b85ee626c93f9ac578729"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Processing (2)",
+       "testlab_project": "SP09_500by500_Glue420_Honeycomb_TPU_PlainFiber_260831",
+       "mode_count": 11,
+       "frequencies_hz": [
+        22.618,
+        51.217,
+        58.101,
+        63.866,
+        66.737,
+        103.006,
+        139.384,
+        141.669,
+        141.914,
+        148.337,
+        153.965
+       ]
+      },
+      {
+       "set": "Processing (1)",
+       "testlab_project": "SP09_500by500_Glue420_Honeycomb_TPU_PlainFiber_260831",
+       "mode_count": 19,
+       "frequencies_hz": [
+        22.618,
+        51.217,
+        58.101,
+        63.866,
+        66.737,
+        103.006,
+        126.903,
+        139.329,
+        141.669,
+        141.771,
+        146.888,
+        148.337,
+        148.439,
+        150.555,
+        153.701,
+        153.965,
+        161.0,
+        164.321,
+        165.836
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP09_500by500_Glue420_Honeycomb_TPU_PlainFiber_260831",
+       "mode_count": 9,
+       "frequencies_hz": [
+        22.618,
+        51.217,
+        58.101,
+        63.866,
+        66.737,
+        103.006,
+        141.669,
+        148.337,
+        153.965
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [],
+    "governed_forward_model": null,
+    "status": "no FE model found"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "new-T300-plain-0.25",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "new-plain-0.25 family (PLA core); SPEC section 13 names SP9"
+  },
+  {
+   "specimen_id": "SP-10",
+   "folder": "SP-10",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "SP-10 / 500x500 / Plain fiber / Honeycomb / DP-420",
+    "specimen_number_on_label": true,
+    "frame": "SP-10/SP10_500by500_Glue420_Honeycomb_PlainFiber_260831.svd"
+   },
+   "identity": {
+    "confidence": "CONFIRMED",
+    "evidence": [
+     "label 'SP-10' visible in both stored frames (260831; 260911 rotated)",
+     "the two sessions give the same spectrum (first six fitted modes within 1.5 %)",
+     "LMS summary column 'SP10 (new SP2)'"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-10/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4626,
+    "sha256": "b7256e96a8d5ec52c9bed3c0d8e16364064b604e29dff5c3541418159a0569c1"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-10/SP-10.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 4801,
+    "sha256": "8727a142cfba606643732337126f7b04b22daeeeb6f9e2af1480adb346e1982f"
+   },
+   "geometry": {
+    "plan_mm": [
+     520,
+     515
+    ],
+    "total_thickness_mm": 2.8,
+    "face_top_mm": 0.4,
+    "face_bottom_mm": 0.39,
+    "core_thickness_mm": 2.0,
+    "face_asymmetry": "top 0.4 / bottom 0.39 mm",
+    "local_face_thickness_variation": "HUMAN context (old nominal ~0.45 mm stock): local values about 0.40-0.50 mm, most locations about 0.44-0.45 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior",
+    "flag": "recorded faces 0.40/0.39 mm sit at the lower end of the HUMAN local range of the old ~0.45 stock; face masses 161.5/163 g vs 175.6 g (SP-02)"
+   },
+   "mass": {
+    "face_top_g": 161.5,
+    "face_bottom_g": 163,
+    "core_g": 145.84,
+    "without_adhesive_g": 470.34,
+    "adhesive_top_g": 43.2,
+    "adhesive_bottom_g": 41.52,
+    "adhesive_real_g": 84.72,
+    "finished_g": 555.23,
+    "arithmetic_notes": []
+   },
+   "face_material": {
+    "stock": "old",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.45,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.1 blank"
+    }
+   },
+   "core": {
+    "topology": "honeycomb",
+    "material": "PLA",
+    "grade": "UNKNOWN",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 544.6,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.2 blank"
+    }
+   },
+   "experiments": [
+    {
+     "session": "260831",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-10/SP10_500by500_Glue420_Honeycomb_PlainFiber_260831.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 13143202,
+      "sha256": "8b6eebd344e999bdbbd7dca94fc475321a1279a181877f52d0a9eb0f0d4381c6"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-10/SP10_500by500_Glue420_Honeycomb_PlainFiber_260831.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 5992448,
+      "sha256": "16833e048e7c3e40f3d17646a8227d64ec9ec16d258715175b29e41f2fed1c1f"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "31-Aug-26 09:59:02"
+    },
+    {
+     "session": "260831",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP10_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 13574268,
+      "sha256": "b20549e6d8a0d747b042157dd4e2fbd2c27820c840ca7625dc4540b9f7a503bb"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Bravo",
+       "testlab_project": "SP10_500by500_Glue420_Honeycomb_PlainFiber_260831",
+       "mode_count": 10,
+       "frequencies_hz": [
+        29.724,
+        76.789,
+        79.623,
+        92.672,
+        95.594,
+        146.655,
+        206.742,
+        214.197,
+        223.603,
+        229.465
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP10_500by500_Glue420_Honeycomb_PlainFiber_260831",
+       "mode_count": 15,
+       "frequencies_hz": [
+        29.724,
+        44.065,
+        76.789,
+        79.623,
+        92.672,
+        95.594,
+        134.757,
+        146.655,
+        162.427,
+        164.203,
+        206.742,
+        214.197,
+        218.518,
+        223.603,
+        229.465
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    },
+    {
+     "session": "260911 b_rotated",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-10/SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911_polytec.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 41794292,
+      "sha256": "4035657d790f1a5c629ae5e7615872302a358ca843a0ab4c398c8f887a42d48e"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-10/SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 30040064,
+      "sha256": "c1898e3a0eb2d752382ba930c2e2f067e7127170132ee15bdede841638ac8ca6"
+     },
+     "governed": false,
+     "remount_relation": "separate mounting from 260831 (rotated); remount details not recorded",
+     "orientation": "EXCEPTION: label at the lower right, written vertically; red 'b-top' mark at the top edge - panel rotated 90 deg in-plane for this session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "points": 323,
+     "frequency_range_hz": [
+      0.15625,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.15625,
+     "functions": [
+      "Coherence",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "11-Sep-26 12:21:25"
+    },
+    {
+     "session": "260911 b_rotated",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-10/SP10_b_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 45066086,
+      "sha256": "497c7a47a3addff99f2feb8efd13f85accb73ece9d3c4a954181e6d897d38697"
+     },
+     "points": 323,
+     "fitted_sets": [
+      {
+       "set": "Bestttt",
+       "testlab_project": "SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911",
+       "mode_count": 13,
+       "frequencies_hz": [
+        29.288,
+        76.816,
+        79.729,
+        92.865,
+        95.269,
+        146.014,
+        206.916,
+        213.572,
+        219.861,
+        224.854,
+        227.276,
+        261.563,
+        265.529
+       ]
+      },
+      {
+       "set": "Processing_polym",
+       "testlab_project": "SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911",
+       "mode_count": 37,
+       "frequencies_hz": [
+        29.288,
+        76.816,
+        79.729,
+        92.865,
+        95.269,
+        146.014,
+        206.916,
+        213.572,
+        219.861,
+        224.854,
+        227.276,
+        261.563,
+        265.529,
+        29.288,
+        76.816,
+        79.729,
+        92.865,
+        95.269,
+        146.014,
+        206.916,
+        206.916,
+        213.572,
+        213.599,
+        217.167,
+        219.33,
+        219.861,
+        220.35,
+        224.854,
+        227.167,
+        227.276,
+        232.942,
+        237.044,
+        247.012,
+        261.563,
+        261.568,
+        265.501,
+        265.529
+       ]
+      },
+      {
+       "set": "Nice (1)",
+       "testlab_project": "SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911",
+       "mode_count": 12,
+       "frequencies_hz": [
+        29.288,
+        76.816,
+        79.729,
+        92.865,
+        95.269,
+        146.014,
+        206.916,
+        213.572,
+        219.861,
+        227.276,
+        261.563,
+        265.529
+       ]
+      },
+      {
+       "set": "Nice",
+       "testlab_project": "SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911",
+       "mode_count": 14,
+       "frequencies_hz": [
+        29.288,
+        76.816,
+        79.729,
+        92.865,
+        95.269,
+        146.014,
+        206.916,
+        213.572,
+        219.861,
+        227.276,
+        232.314,
+        237.31,
+        261.563,
+        265.529
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911",
+       "mode_count": 15,
+       "frequencies_hz": [
+        29.288,
+        76.816,
+        79.729,
+        92.865,
+        95.269,
+        146.014,
+        154.441,
+        206.916,
+        213.572,
+        219.861,
+        227.276,
+        232.314,
+        237.31,
+        261.563,
+        265.529
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [],
+    "governed_forward_model": null,
+    "status": "no FE model found"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "old-T300-plain-0.45",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION"
+   ],
+   "m7_role": "SP2/SP10 reference specimen-to-specimen scatter pair (SPEC section 13); needs FE, registration and governance"
+  },
+  {
+   "specimen_id": "SP-11",
+   "folder": "SP-11",
+   "type": "bare_plate",
+   "physical_label": {
+    "text": "SP-11 / 350x347x0.45 / Twill",
+    "specimen_number_on_label": true,
+    "frame": "SP-11/SP11_Only_twill_260824.svd (same text in both 260826 frames)"
+   },
+   "identity": {
+    "confidence": "CONFIRMED",
+    "evidence": [
+     "label 'SP-11' visible in all three stored frames",
+     "D-049 / D-057"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-11/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 4006,
+    "sha256": "6d6f6d549a6b4ffe8aee080833e2404e3c41c6e1391b099efa5a88521b027bb7"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-11/SP-11.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 3953,
+    "sha256": "644a0c0071e23d93c5cbd4ab14b9bf3ab08bc09e09a2a17e2b8ba40f60c856c4"
+   },
+   "geometry": {
+    "plan_mm": [
+     350,
+     347
+    ],
+    "total_thickness_mm": 0.45,
+    "face_top_mm": 0.45,
+    "face_bottom_mm": null,
+    "core_thickness_mm": null,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "HUMAN context (old nominal ~0.45 mm stock): local values about 0.40-0.50 mm, most locations about 0.44-0.45 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy"
+   },
+   "mass": {
+    "plate_g": 79.59,
+    "arithmetic_notes": []
+   },
+   "face_material": {
+    "stock": "old",
+    "weave": "twill",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.45,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "spec 2.1 blank; the twill FE study ('TWILL carbon test') is an FE sensitivity study, not a measurement"
+    }
+   },
+   "core": null,
+   "experiments": [
+    {
+     "session": "260824",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-11/SP11_Only_twill_260824.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 6679960,
+      "sha256": "5a8c23c5795e19d224ae2672a2c33a60af4f2aed0f9463a1326f26ac27af3c18"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-11/SP11_Only_twill_260824.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 3223552,
+      "sha256": "bbf989995cc1c0f591f09ec7a8e21565827d23a20aab9d11ebe5f5210723f0e1"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "reconnaissance only (D-049, D-057)"
+     ],
+     "usable_after_governance": [
+      "none decided"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      250.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "24-Aug-26 18:10:43"
+    },
+    {
+     "session": "260826 a",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-11/SP11_a_Only_twill_260826.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 3425635,
+      "sha256": "d2e55cb25abacbc89343f09ca78b89322242f5b03127383fa88e244be1eba46d"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-11/SP11_a_Only_twill_260826.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 1839104,
+      "sha256": "a21619c6d371cc56d54fcf3252505edf2631e15fb9a75579f33c68cf6ec565f4"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "reconnaissance only (D-049, D-057)"
+     ],
+     "usable_after_governance": [
+      "none decided"
+     ],
+     "points": 120,
+     "frequency_range_hz": [
+      0.25,
+      100.0
+     ],
+     "frequency_resolution_hz": 0.25,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "26-Aug-26 15:09:44"
+    },
+    {
+     "session": "260826 a",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP11a_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 3976149,
+      "sha256": "1b1dd10f94f8faa602a9fc3a3c880774f0721e367e7092a224058321c9ce81fa"
+     },
+     "points": 120,
+     "fitted_sets": [
+      {
+       "set": "Processing (1)",
+       "testlab_project": "SP11_a_Only_twill_260826",
+       "mode_count": 24,
+       "frequencies_hz": [
+        4.31,
+        6.51,
+        8.402,
+        13.326,
+        14.066,
+        14.721,
+        14.741,
+        16.45,
+        16.541,
+        17.107,
+        17.817,
+        20.334,
+        20.359,
+        30.676,
+        31.04,
+        31.107,
+        32.438,
+        32.617,
+        36.433,
+        40.429,
+        49.657,
+        53.632,
+        59.324,
+        65.113
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP11_a_Only_twill_260826",
+       "mode_count": 11,
+       "frequencies_hz": [
+        14.721,
+        16.541,
+        20.334,
+        31.107,
+        32.438,
+        36.433,
+        40.429,
+        49.657,
+        53.632,
+        59.324,
+        65.113
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "none decided (sessions inconsistent, D-057)"
+     ]
+    },
+    {
+     "session": "260826 b_center",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-11/SP11_b_center_Only_twill_260826.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 3456650,
+      "sha256": "835422222ebe226d6bf7e02bb077107d6ad411e09ec94a8babee34c1ffe19f09"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-11/SP11_b_center_Only_twill_260826.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 1843200,
+      "sha256": "7e2a64cf10d2c69f1013b1849c58e54731c2788f7474f6a8234edf43bc76a62b"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "reconnaissance only (D-049, D-057)"
+     ],
+     "usable_after_governance": [
+      "none decided"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.25,
+      100.0
+     ],
+     "frequency_resolution_hz": 0.25,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "26-Aug-26 16:22:41"
+    }
+   ],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [
+     {
+      "store": "c-temp",
+      "relative_path": "CFRP_TWILL_FREEFREE_M60.inp",
+      "role": "INP (twill plate FE study; association by name)",
+      "size_bytes": 299057,
+      "sha256": "0222a108cdfb07c3c0e7bfd4722e8e969ad775c02178491830340f2641809a84"
+     }
+    ],
+    "note": "C:\\temp holds a twill free-free plate FE study (M40/M60/M80 meshes and +-10 % sensitivities); association with SP-11 by name only",
+    "governed_forward_model": null,
+    "status": "candidate FE files, not governed"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": "not evaluated"
+   },
+   "family_id": "old-T300-twill-0.45",
+   "auto_id_status": [
+    "NOT_APPLICABLE",
+    "OBSERVATION_INSUFFICIENT",
+    "NEEDS_GOVERNANCE"
+   ],
+   "m7_role": "not an M7 sandwich specimen; M6.1/M6.2 NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059)"
+  },
+  {
+   "specimen_id": "SP-12",
+   "folder": null,
+   "type": "bare_plate",
+   "physical_label": {
+    "text": null,
+    "specimen_number_on_label": null,
+    "frame": null
+   },
+   "identity": {
+    "confidence": "DERIVED",
+    "evidence": [
+     "Obsidian note SP-12 ('new CFRP plain Panel 300x300'; 310x310x0.245; face mass 30.1 g)",
+     "project dashboard row SP-12 (new CFRP, no core, production Completed, Abaqus Completed)",
+     "empty folder C:\\temp\\12 sampls\\results\\SP12; no D:\\Snadwich folder; no acquisition found"
+    ]
+   },
+   "spec": null,
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-12/SP-12.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 3753,
+    "sha256": "b06840d45705d1a967f8881d6ca7aeea3a4f496634168d0e64b71762e28a5b72"
+   },
+   "geometry": {
+    "plan_mm": [
+     310,
+     310
+    ],
+    "total_thickness_mm": 0.245,
+    "face_top_mm": 0.245,
+    "face_bottom_mm": null,
+    "core_thickness_mm": null,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "HUMAN context (new nominal ~0.25 mm stock): local values about 0.23-0.28 mm, most locations about 0.25 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "vault note only (no spec file in the store); dashboard says 500x500 (conflict)"
+   },
+   "mass": {
+    "plate_g": 30.1,
+    "arithmetic_notes": []
+   },
+   "face_material": {
+    "stock": "new",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.245,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": "note 2.1 blank"
+    }
+   },
+   "core": null,
+   "experiments": [],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [],
+    "governed_forward_model": null,
+    "status": "dashboard says 'Abaqus Completed'; no SP-12 FE file identified"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "distortion": null
+   },
+   "family_id": "new-T300-plain-0.25",
+   "auto_id_status": [
+    "OBSERVATION_INSUFFICIENT",
+    "NOT_APPLICABLE"
+   ],
+   "m7_role": "possible new-plain bare-plate (G12) specimen, but no experiment is recorded"
+  },
+  {
+   "specimen_id": "SP-13",
+   "folder": "SP-13",
+   "type": "sandwich",
+   "physical_label": {
+    "text": "SP-13 / 500x500 / Plain fiber / Auxetic core / DP-420",
+    "specimen_number_on_label": true,
+    "frame": "SP-13/SP13_a_500by500_Glue420_Auxetic_newSP01_260910.svd (same in 260909)"
+   },
+   "identity": {
+    "confidence": "CONFIRMED",
+    "evidence": [
+     "label 'SP-13' visible in both stored frames (D-063)",
+     "LMS summary column 'SP13 (new SP1)'"
+    ]
+   },
+   "spec": {
+    "store": "snadwich",
+    "relative_path": "SP-13/spec.txt",
+    "role": "specimen description (primary source for physical facts)",
+    "size_bytes": 6157,
+    "sha256": "cf18f58a4a89b25feea44bf1faf8b0ecff891152dbc75f3345c5a5ada7cc7619"
+   },
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-13/SP-13.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 5810,
+    "sha256": "bbb7f8f04593fe06d5e5cf4868a73cdc9058aaf2c9fbbf9be0c58ae843f66882"
+   },
+   "geometry": {
+    "plan_mm": [
+     510,
+     520
+    ],
+    "total_thickness_mm": 2.85,
+    "face_top_mm": 0.425,
+    "face_bottom_mm": 0.425,
+    "core_thickness_mm": 2.0,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "HUMAN context (old nominal ~0.45 mm stock): local values about 0.40-0.50 mm, most locations about 0.44-0.45 mm; physical local variation, not a calibrated thickness map and not a statistical prior",
+    "source": "spec file; measured with a 100 cm steel ruler (1 mm graduation) and two calipers (dial caliper 0.01 mm resolution) - HUMAN-confirmed readout resolutions, not calibrated accuracy",
+    "distinction": "total sandwich thickness is not face-sheet thickness; nominal face thickness is not a measured statistical prior",
+    "core_cad_plan_mm": [
+     514.19,
+     512
+    ],
+    "core_cad_source": "SP-13/A-core 514.19x512x2.SLDPRT (CAD, not measured)"
+   },
+   "mass": {
+    "face_top_g": 163.6,
+    "face_bottom_g": 158.5,
+    "core_g": 179.13,
+    "without_adhesive_g": 501.44,
+    "adhesive_top_g": 44.1,
+    "adhesive_bottom_g": 44.91,
+    "adhesive_calculated_g": 89.01,
+    "adhesive_real_g": 83.16,
+    "finished_real_g": 584.6,
+    "finished_calculated_g": 590.24,
+    "arithmetic_notes": [
+     "faces + core = 501.23 g vs recorded 'without adhesive' 501.44 g"
+    ]
+   },
+   "face_material": {
+    "stock": "old",
+    "weave": "plain",
+    "designation": "T300",
+    "nominal_thickness_mm": 0.45,
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E1_MPa": 52000,
+      "E2_MPa": 52000,
+      "E3_MPa": 6700,
+      "nu12": 0.05,
+      "nu13": 0.3,
+      "nu23": 0.3,
+      "G12_MPa": 4500,
+      "G13_MPa": 2200,
+      "G23_MPa": 2200,
+      "density_t_per_mm3": 1.429e-09
+     },
+     "source": "SP13_mesh_local_v1_modal.inp (FE template; spec table blank)"
+    }
+   },
+   "core": {
+    "topology": "auxetic",
+    "material": "PLA",
+    "grade": "non-Light PLA (DERIVED: archived CARBON-5D note citing CARBON-3A; not in any spec)",
+    "process": "UNKNOWN",
+    "adhesive": "3M DP420",
+    "core_mass_per_panel_area_g_m2": 675.5,
+    "core_mass_per_area_note": "DERIVED: core mass / spec panel plan area",
+    "constants": {
+     "status": "ASSUMED/TEMPLATE",
+     "values": {
+      "E1_MPa": 2580,
+      "E2_MPa": 2580,
+      "E3_MPa": 2060,
+      "nu12": 0.33,
+      "nu13": 0.33,
+      "nu23": 0.33,
+      "G12_MPa": 970,
+      "G13_MPa": 850,
+      "G23_MPa": 850,
+      "density_t_per_mm3_fe": 1.1212e-09
+     },
+     "source": "SP13_mesh_local_v1_modal.inp (FE template; spec table blank)"
+    },
+    "note": "'copy of SP-01' is a design copy: core 179.13 g vs SP-01 145.3 g; spectra differ"
+   },
+   "experiments": [
+    {
+     "session": "260909",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_500by500_Glue420_Auxetic_newSP01_260909.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 13141382,
+      "sha256": "6f1787dca7cf70948a76901abb7cf5fcc52d85a3c6cccec24dbcb18cbd39c754"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_500by500_Glue420_Auxetic_newSP01_260909.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 6000640,
+      "sha256": "fdd3f8a411821f6eabdb0930cd28c9b43eaf4ab3a934be511852264515cb713a"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "repeat uncertainty (FREQUENCY_ONLY, D-063) once modal preparation is accepted"
+     ],
+     "usable_after_governance": [
+      "frequency"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.3125,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.3125,
+     "functions": [
+      "Coherence",
+      "Cross Spectrum",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "09-Sep-26 09:00:10"
+    },
+    {
+     "session": "260909",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP13_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 13816938,
+      "sha256": "c036cdf36230c8deab413a5a2b4da8147cea68248c7d82ec3b0297c6705308c9"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Bravo (1)",
+       "testlab_project": "SP13_500by500_Glue420_Auxetic_newSP01_260909",
+       "mode_count": 9,
+       "frequencies_hz": [
+        31.64,
+        74.136,
+        80.816,
+        94.429,
+        96.55,
+        147.858,
+        206.15,
+        212.61,
+        228.752
+       ]
+      },
+      {
+       "set": "re",
+       "testlab_project": "SP13_500by500_Glue420_Auxetic_newSP01_260909",
+       "mode_count": 11,
+       "frequencies_hz": [
+        31.64,
+        74.136,
+        80.816,
+        94.429,
+        96.55,
+        147.858,
+        206.15,
+        212.61,
+        217.546,
+        225.648,
+        228.752
+       ]
+      },
+      {
+       "set": "Bravo",
+       "testlab_project": "SP13_500by500_Glue420_Auxetic_newSP01_260909",
+       "mode_count": 8,
+       "frequencies_hz": [
+        31.64,
+        74.136,
+        80.816,
+        94.429,
+        96.55,
+        147.858,
+        206.15,
+        217.546
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP13_500by500_Glue420_Auxetic_newSP01_260909",
+       "mode_count": 14,
+       "frequencies_hz": [
+        31.64,
+        74.136,
+        80.816,
+        94.429,
+        96.55,
+        125.662,
+        147.858,
+        156.59,
+        160.641,
+        206.15,
+        212.61,
+        217.546,
+        225.648,
+        228.752
+       ]
+      }
+     ],
+     "governed": true,
+     "governed_set": "Bravo (1) (frozen FREQUENCY_ONLY fixture SP13/260909-bravo-1, D-065)",
+     "usable_now": [
+      "frequency (FREQUENCY_ONLY repeat evidence; Sigma_setup still provisional)"
+     ],
+     "usable_after_governance": [
+      "frequency"
+     ],
+     "note": "provenance confirmed (fixtures/SP13_260909.frozen-modal-set.json)"
+    },
+    {
+     "session": "260910 a",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_a_500by500_Glue420_Auxetic_newSP01_260910_polytec.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 37387237,
+      "sha256": "72547f4de07fcd941414f007e24675e389a0a0e0204efcd76272e982649a9d26"
+     },
+     "video_frame_source": {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_a_500by500_Glue420_Auxetic_newSP01_260910.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 26923008,
+      "sha256": "41da4cc1d3a5daa038f558c571128793d44499f09605c7d79f0817b6744b0765"
+     },
+     "governed": false,
+     "remount_relation": "re-suspension of 260909 (HUMAN H6; D-063); laser/shaker not moved",
+     "orientation": "same in-plane orientation as the Abaqus model (HUMAN H7)",
+     "usable_now": [
+      "registration geometry (physical reconstruction, D-062)"
+     ],
+     "usable_after_governance": [
+      "frequency"
+     ],
+     "points": 289,
+     "frequency_range_hz": [
+      0.15625,
+      500.0
+     ],
+     "frequency_resolution_hz": 0.15625,
+     "functions": [
+      "Coherence",
+      "Transfer Function H1"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "10-Sep-26 17:38:17"
+    },
+    {
+     "session": "260910 a",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_a_polymax.unv",
+      "role": "governed fixture source",
+      "size_bytes": 38541973,
+      "sha256": "f268023583972f0a9c1660bc60631587e8f3330e4fb7495e52d8310906af39fe"
+     },
+     "points": 289,
+     "fitted_sets": [
+      {
+       "set": "Best",
+       "testlab_project": "SP13_a_500by500_Glue420_Auxetic_newSP01_260910",
+       "mode_count": 12,
+       "frequencies_hz": [
+        31.423,
+        74.159,
+        80.882,
+        94.399,
+        96.521,
+        147.504,
+        205.649,
+        212.664,
+        222.494,
+        228.607,
+        230.891,
+        261.835
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP13_a_500by500_Glue420_Auxetic_newSP01_260910",
+       "mode_count": 21,
+       "frequencies_hz": [
+        31.423,
+        44.842,
+        74.159,
+        80.882,
+        94.399,
+        96.521,
+        112.433,
+        126.007,
+        147.504,
+        152.465,
+        205.649,
+        212.664,
+        215.946,
+        222.494,
+        228.607,
+        230.891,
+        240.709,
+        258.776,
+        261.835,
+        263.952,
+        274.173
+       ]
+      }
+     ],
+     "governed": true,
+     "governed_set": "Best (active fixture SP13/best-physical; SP13/best historical; D-068)",
+     "usable_now": [
+      "frequency",
+      "shape",
+      "MAC"
+     ],
+     "usable_after_governance": [
+      "frequency",
+      "shape",
+      "MAC"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [
+     {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_mesh_local_v1_modal/SP13_mesh_local_v1_modal.inp",
+      "role": "INP (governed M3 forward model)",
+      "size_bytes": 115733227
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_mesh_local_v1_modal/SP13_mesh_local_v1_modal.odb",
+      "role": "ODB",
+      "size_bytes": 715614536
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_modal.inp",
+      "role": "INP (earlier mesh; same eigenfrequencies)",
+      "size_bytes": 113594360
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_modal.odb",
+      "role": "ODB",
+      "size_bytes": 703597800
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_mesh_local_v1.cae",
+      "role": "CAE",
+      "size_bytes": 126513152
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-13/SP13_core.x_t",
+      "role": "core CAD",
+      "size_bytes": 13930315,
+      "sha256": "58612da287b9b8f3faf3561a441328b056379603fb0779b4f1956d6b4ff628e7"
+     },
+     {
+      "store": "snadwich",
+      "relative_path": "SP-13/A-core 514.19x512x2.SLDPRT",
+      "role": "core CAD",
+      "size_bytes": 5768091,
+      "sha256": "3c23652f4d89289245eafd326c4455af6c3ea37144e76fed8b64e5a108ca1c46"
+     }
+    ],
+    "other": "interface-sensitivity variants (central, stiff: INP only; compliant: no eigenvalue output) and 4-part / 1-part CAE variants; SP-01 CAE copy (journal differs from the SP-01 folder copy)",
+    "governed_forward_model": {
+     "path": "docs/auto_id/forward_models/SP13.forward.json",
+     "forward_model_id": "SP13_mesh_local_v1_modal/carbon-property-set-v1",
+     "inp_sha256": "9d4105840e527354dbd0bb4d0d0012f7708125aa94619b0dcc486fd76dc70571"
+    },
+    "status": "governed reproducible M3 forward model"
+   },
+   "registration": {
+    "legacy": {
+     "path": "docs/registrations/SP13_frozen_registration.json",
+     "registration_hash": "a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4",
+     "status": "historical provenance only (D-062)"
+    },
+    "physical": {
+     "path": "docs/registrations/SP13_physical_registration.json",
+     "registration_hash": "2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823",
+     "passport": "docs/auto_id/specimens/SP13.physical.specimen.json",
+     "status": "production-ready (D-062; SP-13 gate accepted D-064)"
+    },
+    "physical_basis": "stored PSV camera frame + MeasPoints + panel edges + spec dimensions; H7 orientation",
+    "distortion": "UNV/physical x 1.195, y 0.889 (anisotropy 1.345)",
+    "registration_limited": false,
+    "unresolved": "through-thickness face convention (TOP by convention); active fixture SP13/best-physical and production input use the physical registration (D-068); SP13/best is historical"
+   },
+   "strict_pairs": {
+    "legacy": "historical",
+    "physical": "4<->10, 7<->13 (well conditioned); 1 fit row after the M4.3 holdout"
+   },
+   "family_id": "old-T300-plain-0.45",
+   "auto_id_status": [
+    "OBSERVATION_INSUFFICIENT",
+    "NEEDS_GOVERNANCE"
+   ],
+   "m7_role": "best current M7 specimen with SP-02; alone observation-insufficient after the governed holdout"
+  },
+  {
+   "specimen_id": "SP-15",
+   "folder": null,
+   "type": "bare_plate",
+   "physical_label": {
+    "text": null,
+    "specimen_number_on_label": false,
+    "frame": "sumin: SPname_files_260909/SP15_500by500.svd (no handwriting visible)"
+   },
+   "identity": {
+    "confidence": "AMBIGUOUS",
+    "evidence": [
+     "acquisition SP15_500by500 (PSV, 2026-09-01) and Testlab project 'SP15_500by500' exist",
+     "the same .svd is stored as C:\\temp\\12 sampls\\results\\SP15\\test\\SP15_500by500_bigSP14.svd",
+     "the Obsidian note SP-15 is a copy of the SP-12 note (title 'SP-12 ... 500x500', SP-12 values)",
+     "FE files CFRP_PLAIN_520_STAGEA (Stage-A bare plain plate) in the SP15 results folder",
+     "earlier repository docs call it 'SP15 bare CFRP'"
+    ]
+   },
+   "spec": null,
+   "vault_note": {
+    "store": "sandwich-article",
+    "relative_path": "obsidian/Sandwich plates/01_Speciment/SP-15/SP-15.md",
+    "role": "Obsidian specimen note (origin of the spec file)",
+    "size_bytes": 3753,
+    "sha256": "6b0e9e7b6c81fefd1ba2ce57b1e2df05dd8733765c0a11e0f6d8f59c43af2f4d"
+   },
+   "geometry": {
+    "plan_mm": null,
+    "total_thickness_mm": null,
+    "face_top_mm": null,
+    "face_bottom_mm": null,
+    "core_thickness_mm": null,
+    "face_asymmetry": null,
+    "local_face_thickness_variation": "UNKNOWN",
+    "source": "no specimen-specific record"
+   },
+   "mass": {
+    "arithmetic_notes": []
+   },
+   "face_material": {
+    "stock": "UNKNOWN",
+    "weave": "plain (FE file name only)",
+    "designation": "UNKNOWN",
+    "nominal_thickness_mm": null,
+    "constants": {
+     "status": "UNKNOWN",
+     "values": null,
+     "source": null
+    }
+   },
+   "core": null,
+   "experiments": [
+    {
+     "session": "260901",
+     "dataset": "raw FRF (dataset 58)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909/SP15_500by500.unv",
+      "role": "raw PSV FRF UNV",
+      "size_bytes": 2675093,
+      "sha256": "47d6f990552725e5a6db6f30a0dc00c61236ed16aecefa9b57466e4b64bbc8ec"
+     },
+     "video_frame_source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909/SP15_500by500.svd",
+      "role": "PSV .svd (camera frame, geometry)",
+      "size_bytes": 3215360,
+      "sha256": "1eccc9298611cef603946d1d4689c2a24fbb844339afb3167dbfe42d710db0ea"
+     },
+     "governed": false,
+     "remount_relation": null,
+     "orientation": "label at physical top (HUMAN general practice); not verified per session",
+     "usable_now": [
+      "none (raw FRF only: FRF-only input is refused, D-030; reconnaissance / modal-preparation source)"
+     ],
+     "usable_after_governance": [
+      "undecided (identity AMBIGUOUS)"
+     ],
+     "points": 121,
+     "frequency_range_hz": [
+      0.125,
+      100.0
+     ],
+     "frequency_resolution_hz": 0.125,
+     "functions": [
+      "Frequency Response Function FRF"
+     ],
+     "psv_header": "PSV Version 10.2.0.3",
+     "acquired": "01-Sep-26 14:30:28"
+    },
+    {
+     "session": "260901",
+     "dataset": "PolyMAX fitted modes (dataset 55)",
+     "source": {
+      "store": "sumin",
+      "relative_path": "SPname_files_260909_polymax.zip",
+      "zip_member": "SP15_polymax.unv",
+      "role": "Testlab PolyMAX export",
+      "size_bytes": 2881277,
+      "sha256": "1cc28ae109a9874fe2f3928d3b0eec44f9d05f4aea1af9ab110040f715268adc"
+     },
+     "points": 121,
+     "fitted_sets": [
+      {
+       "set": "Processing (1)",
+       "testlab_project": "SP15_500by500",
+       "mode_count": 8,
+       "frequencies_hz": [
+        13.32,
+        13.323,
+        21.103,
+        21.146,
+        30.045,
+        30.064,
+        69.894,
+        99.051
+       ]
+      },
+      {
+       "set": "Processing",
+       "testlab_project": "SP15_500by500",
+       "mode_count": 3,
+       "frequencies_hz": [
+        13.32,
+        21.103,
+        30.064
+       ]
+      }
+     ],
+     "governed": false,
+     "governed_set": null,
+     "usable_now": [
+      "none (not governed)"
+     ],
+     "usable_after_governance": [
+      "undecided (identity AMBIGUOUS)"
+     ]
+    }
+   ],
+   "fe_assets": {
+    "store": [],
+    "elsewhere": [
+     {
+      "store": "temp-12-sampls",
+      "relative_path": "results/SP15/test/CFRP_PLAIN_520_STAGEA_baseline.inp",
+      "role": "INP (Stage-A template run)",
+      "size_bytes": 220319,
+      "sha256": "219f5b70679a321aa3536d94f95f2b611fcc70bc9238e27c6eecc5d1463cb38e"
+     },
+     {
+      "store": "temp-12-sampls",
+      "relative_path": "results/SP15/test/CFRP_PLAIN_520_STAGEA_baseline.odb",
+      "role": "ODB",
+      "size_bytes": 2446084,
+      "sha256": "e00ca39e084477c53b0fe24ec2b3555a637cd23c1d2fe6b17aca20e438fce34f"
+     }
+    ],
+    "governed_forward_model": null,
+    "status": "FE exists, not governed"
+   },
+   "registration": {
+    "legacy": null,
+    "physical": null,
+    "status": "NONE",
+    "note": "a historical nominal-500 calibration diagnostic exists (ROADMAP_CURRENT_QA_ADDENDUM)"
+   },
+   "family_id": "unassigned",
+   "auto_id_status": [
+    "NEEDS_GOVERNANCE",
+    "NEEDS_FORWARD_MODEL",
+    "NEEDS_REGISTRATION",
+    "NOT_APPLICABLE"
+   ],
+   "m7_role": "not an M7 sandwich specimen; physical facts missing"
+  }
+ ],
+ "families": [
+  {
+   "family_id": "old-T300-plain-0.45",
+   "face_material": "old CFRP T300 plain weave",
+   "nominal_face_thickness_mm": 0.45,
+   "spec_name": "old plain 0.45 (SPEC section 13); passports CFRP-T300-plain-0.45-oldstock",
+   "members": [
+    "SP-01",
+    "SP-02",
+    "SP-10",
+    "SP-13"
+   ],
+   "cores": {
+    "SP-01": "PLA auxetic (PLA Light)",
+    "SP-02": "PLA honeycomb",
+    "SP-10": "PLA honeycomb",
+    "SP-13": "PLA auxetic"
+   },
+   "flags": [
+    "SP-10 recorded faces 0.40/0.39 mm (lower end of the HUMAN local range)",
+    "SP-13 recorded faces 0.425 mm",
+    "core topology differs within the family (honeycomb vs auxetic)"
+   ],
+   "g12": "BARE_PLATE_REQUIRED (D-046): no old-plain bare plate exists in the records"
+  },
+  {
+   "family_id": "old-T300-twill-0.45",
+   "face_material": "old CFRP T300 twill weave",
+   "nominal_face_thickness_mm": 0.45,
+   "spec_name": "twill 0.45 (SPEC section 13)",
+   "members": [
+    "SP-03",
+    "SP-11"
+   ],
+   "cores": {
+    "SP-03": "PLA auxetic",
+    "SP-11": "none (bare plate)"
+   },
+   "flags": [
+    "twill constants UNKNOWN",
+    "SP-11 Stage A NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059)"
+   ],
+   "g12": "BARE_PLATE_REQUIRED; SP-11 is the bare plate but its evidence is blocked (D-057, D-059)"
+  },
+  {
+   "family_id": "old-T300-plain-0.25",
+   "face_material": "old CFRP T300 plain weave",
+   "nominal_face_thickness_mm": 0.25,
+   "spec_name": "not named in SPEC section 13",
+   "members": [
+    "SP-04",
+    "SP-05"
+   ],
+   "cores": {
+    "SP-04": "TPU honeycomb",
+    "SP-05": "TPU auxetic"
+   },
+   "flags": [
+    "HUMAN local thickness statements do not cover this stock"
+   ],
+   "g12": "BARE_PLATE_REQUIRED; no bare plate of this stock is recorded"
+  },
+  {
+   "family_id": "new-T300-plain-0.25",
+   "face_material": "new CFRP T300 plain weave",
+   "nominal_face_thickness_mm": 0.25,
+   "spec_name": "new plain 0.25 (SPEC section 13: SP8, SP9, ...)",
+   "members": [
+    "SP-06",
+    "SP-07",
+    "SP-08",
+    "SP-09",
+    "SP-12"
+   ],
+   "cores": {
+    "SP-06": "TPU auxetic (DP190)",
+    "SP-07": "TPU honeycomb (DP190)",
+    "SP-08": "PLA auxetic",
+    "SP-09": "PLA honeycomb",
+    "SP-12": "none (bare plate)"
+   },
+   "flags": [
+    "core material (TPU/PLA) and adhesive (DP190/DP420) differ within the family",
+    "SP-12 has no recorded experiment"
+   ],
+   "g12": "BARE_PLATE_REQUIRED; SP-12 is a recorded new-plain bare plate without an experiment"
+  },
+  {
+   "family_id": "unassigned",
+   "face_material": "UNKNOWN",
+   "nominal_face_thickness_mm": null,
+   "spec_name": null,
+   "members": [
+    "SP-15"
+   ],
+   "cores": {
+    "SP-15": "none (bare plate per FE name)"
+   },
+   "flags": [
+    "physical facts not recorded"
+   ],
+   "g12": "n/a"
+  }
+ ],
+ "identity_resolutions": {
+  "SP-02": {
+   "verdict": "SP02_IDENTITY_RESOLVED_FROM_RECORDS",
+   "confidence": "DERIVED",
+   "question_answered": "Is the unnumbered panel of the 2026-08-03 frame the physical SP-02 of SP-02/spec.txt (515 x 510 x 2.9 mm, 582.71 g)?",
+   "evidence": [
+    {
+     "kind": "project result table",
+     "source": [
+      {
+       "store": "sumin",
+       "relative_path": "Updated_260911/Experiment_Freq_damping_LMS.xlsx",
+       "role": "LMS (Testlab) frequency/damping summary",
+       "size_bytes": 1092592,
+       "sha256": "ec77ca6588964125057dfade32f07d58fc255a4cdf606c5ce4e51767b2fbe384"
+      },
+      {
+       "store": "sumin",
+       "relative_path": "Updated_260911/Experiment_Freq_damping_LMS_sharing.xlsx",
+       "role": "LMS (Testlab) frequency/damping summary (sharing copy)",
+       "size_bytes": 5885825,
+       "sha256": "e5d59dde666cae9832afd2e5cc58517a99c4de4c0aa305a85f95651854de3b6b"
+      }
+     ],
+     "finding": "sheet 'SPname_files 260909' labels its columns 'SP2 (old)' and 'SP10 (new SP2)'. The 'SP2 (old)' column is exactly the governed fixture set Bravo (1) of the 260803 acquisition (28.0062, 74.376, 78.1616, 90.575, 91.9496, 144.763, 202, 208.216, 219.444 Hz); the 'SP10 (new SP2)' column is SP10_polymax 260831 'Bravo'."
+    },
+    {
+     "kind": "dynamics (records only, no MAC)",
+     "finding": "SP-10 (labelled) gives the same spectrum in 260831 and 260911 (first six fitted modes within 1.5 %, modes 2-6 within 0.5 %), while SP-10 is 1.3-6.1 % higher than the 260803 panel (mode 1 29.72 vs 28.01 Hz). The 260803 panel is therefore not the SP-10 panel. SP-09 (labelled, PLA honeycomb, new faces) is far lower (22.6, 51.2, 58.1 Hz).",
+     "averaged_h1_peaks_hz": {
+      "SP-02/SP02_500by500_Glue420_honeycomb_full_scan_retry_260803.unv": [
+       15.9375,
+       28.125,
+       74.375,
+       78.125,
+       90.625,
+       91.875,
+       144.6875,
+       201.875,
+       208.125
+      ],
+      "SP-10/SP10_500by500_Glue420_Honeycomb_PlainFiber_260831.unv": [
+       29.6875,
+       76.875,
+       79.6875,
+       92.8125,
+       95.625,
+       146.5625,
+       206.875,
+       214.375,
+       219.0625
+      ],
+      "SP-10/SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911_polytec.unv": [
+       29.2188,
+       76.875,
+       79.6875,
+       92.8125,
+       95.3125,
+       206.875,
+       213.5938,
+       219.5312,
+       227.3438
+      ],
+      "SP-09/SP09_500by500_Glue420_Honeycomb_TPU_PlainFiber_260831.unv": [
+       22.5,
+       51.25,
+       58.125,
+       63.75,
+       66.875,
+       103.125,
+       141.875,
+       148.4375,
+       150.9375
+      ],
+      "SP-01 -core mass less/SP01_500by500_Glue420_Auxetic_full_scan_260624.unv": [
+       25.3125,
+       75.9375,
+       82.1875,
+       92.1875,
+       145.9375,
+       213.125,
+       215.9375,
+       221.5625
+      ],
+      "SP-13/SP13_500by500_Glue420_Auxetic_newSP01_260909.unv": [
+       31.5625,
+       74.0625,
+       80.9375,
+       94.375,
+       96.5625,
+       147.8125,
+       206.25,
+       212.5,
+       217.5
+      ],
+      "SP-13/SP13_a_500by500_Glue420_Auxetic_newSP01_260910_polytec.unv": [
+       31.4062,
+       74.2188,
+       80.9375,
+       94.375,
+       96.4062,
+       205.625,
+       209.5312,
+       212.5,
+       215.0
+      ],
+      "SP-03/SP03_500by500_Glue420_Auxetic_Twill_full_scan_260803.unv": [
+       15.9375,
+       28.125,
+       77.1875,
+       80.3125,
+       91.875,
+       94.375,
+       146.5625,
+       209.0625,
+       215.9375
+      ],
+      "SP-08/SP08_500by500_Glue420_Auxetic_TPU_PlainFiber_260828.unv": [
+       21.875,
+       50.625,
+       57.5,
+       64.375,
+       102.1875,
+       145.625,
+       148.4375,
+       150.9375,
+       160.0
+      ]
+     }
+    },
+    {
+     "kind": "label chronology",
+     "finding": "frames up to 2026-08-03 carry no specimen number (SP-01 260624, SP-05 260706, SP-02 and SP-03 260803); every frame from 2026-08-22 on is numbered (SP-04, SP-06, SP-07, SP-08, SP-09, SP-10, SP-11, SP-13). The unnumbered 260803 label follows the convention of its date."
+    },
+    {
+     "kind": "remaining candidates",
+     "finding": "the 500-class PLA-honeycomb panels in the records are SP-02, SP-09 and SP-10; SP-09 and SP-10 are excluded above; the 300-class honeycomb panels (SP-04, SP-07) do not fit the 500x500 label."
+    },
+    {
+     "kind": "names and lineage",
+     "finding": "store folder SP-02, PSV file name and header SP02, Testlab project SP02_500by500_Glue420_honeycomb_full_scan_260715; the spec experimental table equals the LMS '500x500 honeycomb 420' column (an earlier fit within 0.7 % of Bravo (1) for modes 1-8)."
+    }
+   ],
+   "lms_sheet": "SPname_files 260909",
+   "lms_sp2_old_hz": [
+    28.0062,
+    74.376,
+    78.1616,
+    90.575,
+    91.9496,
+    144.763,
+    202,
+    208.216,
+    219.444
+   ],
+   "lms_sp10_new_sp2_hz": [
+    29.7244,
+    76.7885,
+    79.623,
+    92.6721,
+    95.5942,
+    146.655,
+    206.743,
+    214.197,
+    223.603
+   ],
+   "governed_set": {
+    "fixture": "SP02/bravo-1",
+    "set": "Bravo (1)",
+    "source": "snadwich SP-02/SP02_polymax_retry_260803.unv"
+   },
+   "limits": [
+    "the frame cannot discriminate SP-02 from SP-10 by plan size (the aspect ratios 515/510 and 520/515 are equal); the reconstruction used the SP-02 spec dimensions",
+    "the assignment rests on the project's own records, not on an independent physical mark; confidence DERIVED, not CONFIRMED",
+    "recording physical_specimen_id in the SP-02 passport needs SUPERVISOR acceptance (protected file)"
+   ]
+  }
+ },
+ "unnumbered_records": [
+  {
+   "record": "LMS summary 'Sheet1' (Experiment_Freq_damping_LMS.xlsx): seven 300X300 columns",
+   "source": {
+    "store": "sumin",
+    "relative_path": "Updated_260911/Experiment_Freq_damping_LMS.xlsx",
+    "role": "LMS (Testlab) frequency/damping summary",
+    "size_bytes": 1092592,
+    "sha256": "ec77ca6588964125057dfade32f07d58fc255a4cdf606c5ce4e51767b2fbe384"
+   },
+   "finding": "column 6 (Auxetic, TPU, glue 420) is SP-05 exactly. Columns 1-5 (Auxetic/420, Auxetic/190, Auxetic/2216, Honeycomb/420, Honeycomb/190) match none of the SP-04/SP-06/SP-07 PolyMAX sets; no spec uses 3M 2216 adhesive.",
+   "identity": "AMBIGUOUS: earlier unnumbered 300-class panels or other sessions; no raw data, spec or label found"
+  },
+  {
+   "record": "sandwich_calibration_report.docx (2026-06-15)",
+   "source": {
+    "store": "sandwich-article",
+    "relative_path": "сендвич с индусом/sandwich_calibration_report.docx",
+    "role": "FE calibration report",
+    "size_bytes": 13933,
+    "sha256": "a8426f9854ee44e1f3027ccb833f052b2d34fc0a9723d24733496c0579e4cad1"
+   },
+   "finding": "CFRP/DP190/PLA auxetic/DP190/CFRP panel, 287.000 x 288.364 mm, faces 0.235 mm, total mass 164 g; 'calibrated' E1=E2 50000 MPa and G12 3360 MPa are model-calibration values, not measurements",
+   "identity": "AMBIGUOUS: matches no SP spec (no SP has 287 x 288 mm); pre-numbering panel"
+  }
+ ],
+ "names_without_physical_record": [
+  {
+   "name": "SP-14",
+   "evidence": [
+    "Obsidian note SP-14 is byte-identical to the SP-12 note (template copy)",
+    "empty folder C:\\temp\\12 sampls\\results\\SP14",
+    "file-name fragment 'bigSP14' in SP15_500by500_bigSP14.svd (same file as SP15_500by500.svd)"
+   ],
+   "status": "AMBIGUOUS: no physical SP-14 record (no spec values, no acquisition, no label)"
+  }
+ ],
+ "contradictions": [
+  {
+   "id": "C1",
+   "class": "EXPECTED_HISTORICAL",
+   "specimens": [
+    "SP-13"
+   ],
+   "finding": "Testlab PolyMAX fit of SP-13 260909 exists (zip SP13_polymax.unv, set Bravo (1), 9 modes; LMS 'SP13 (new SP1)')",
+   "conflicts_with": "HUMAN H9 / D-063 / D-064: no PolyMAX fit of 260909",
+   "lms_sp13_260909_hz": [
+    31.6405,
+    74.1359,
+    80.8155,
+    94.4293,
+    96.5499,
+    147.858,
+    206.15,
+    212.61,
+    228.752
+   ],
+   "handling": "resolved by D-065: H9 means Testlab is unavailable now (no new fit or refit), not that no historical fit exists; provenance confirmed and the set frozen; Sigma_setup stays provisional 0.3 %"
+  },
+  {
+   "id": "C2",
+   "class": "REAL_CONFLICT",
+   "specimens": [
+    "SP-10"
+   ],
+   "finding": "260911 b_rotated: label rotated 90 deg, not at the physical top",
+   "conflicts_with": "HUMAN general practice: label at the physical TOP",
+   "handling": "recorded as a session exception; SP-10 not governed"
+  },
+  {
+   "id": "C3",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-06"
+   ],
+   "finding": "SP-06 acquisition and PolyMAX exist outside the store",
+   "conflicts_with": "SNADWICH_INVENTORY: SP-06 none / INSUFFICIENT"
+  },
+  {
+   "id": "C4",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-01",
+    "SP-03",
+    "SP-04",
+    "SP-05",
+    "SP-06",
+    "SP-07",
+    "SP-08",
+    "SP-09",
+    "SP-10",
+    "SP-11",
+    "SP-13",
+    "SP-15"
+   ],
+   "finding": "PolyMAX exports exist for these specimens (zip)",
+   "conflicts_with": "SNADWICH_INVENTORY: fitted modes only SP-02, SP-10, SP-13"
+  },
+  {
+   "id": "C5",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-11"
+   ],
+   "finding": "SP11a_polymax.unv exists",
+   "conflicts_with": "D-057 '(dataset 58 only; no dataset 55)'; inventory 'fitted SP-11 modes NOT_AVAILABLE'"
+  },
+  {
+   "id": "C6",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-12",
+    "SP-15"
+   ],
+   "finding": "SP-12 recorded; SP-15 acquired",
+   "conflicts_with": "SNADWICH_INVENTORY: 'There is no SP-12 folder' (store only)"
+  },
+  {
+   "id": "C7",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-01",
+    "SP-02",
+    "SP-13"
+   ],
+   "finding": "PLA grade recorded second-hand (CARBON-5D citing CARBON-3A)",
+   "conflicts_with": "SNADWICH_INVENTORY: PLA grade not recorded"
+  },
+  {
+   "id": "C8",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-07",
+    "SP-11"
+   ],
+   "finding": "SP-07 30-1000 Hz; SP-11 260826 sessions 0.25 Hz / 0-100 Hz, session a 120 points",
+   "conflicts_with": "SNADWICH_INVENTORY ranges and defaults"
+  },
+  {
+   "id": "C9",
+   "class": "EXPECTED_HISTORICAL",
+   "specimens": [
+    "SP-13"
+   ],
+   "finding": "remount documented (H6, D-063)",
+   "conflicts_with": "SNADWICH_INVENTORY NOT_AVAILABLE 'documented remounts'"
+  },
+  {
+   "id": "C10",
+   "class": "EXPECTED_HISTORICAL",
+   "specimens": [
+    "SP-02"
+   ],
+   "finding": "SP-02 identity resolved from records (SUPERVISOR-accepted, D-065)",
+   "conflicts_with": "EVIDENCE / M6_DECISION_RECORD 18 / STATUS: NEEDS_ONE_HUMAN_CONFIRMATION"
+  },
+  {
+   "id": "C11",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-02",
+    "SP-13"
+   ],
+   "finding": "spec files record plan, masses, face thickness",
+   "conflicts_with": "passport 'unavailable' texts (protected files, not edited)"
+  },
+  {
+   "id": "C12",
+   "class": "EXPECTED_HISTORICAL",
+   "specimens": [
+    "SP-13"
+   ],
+   "finding": "scale_rel 0.002 (H8)",
+   "conflicts_with": "D-062 scale_rel NOT_AVAILABLE (superseded by D-064)"
+  },
+  {
+   "id": "C13",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-01",
+    "SP-13"
+   ],
+   "finding": "SP-13 is auxetic",
+   "conflicts_with": "SP-01/spec.txt section 9 'SP-13 ... honeycomb core'"
+  },
+  {
+   "id": "C14",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-08",
+    "SP-09"
+   ],
+   "finding": "cores are PLA (spec + label)",
+   "conflicts_with": "file names '..._TPU_...'"
+  },
+  {
+   "id": "C15",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-15"
+   ],
+   "finding": "SP-14/SP-15 notes are SP-12 copies",
+   "conflicts_with": "vault notes as specimen records"
+  },
+  {
+   "id": "C16",
+   "class": "UNKNOWN",
+   "specimens": [
+    "SP-12"
+   ],
+   "finding": "SP-12 note 300x300 / 310x310x0.245",
+   "conflicts_with": "dashboard SP-12 500x500"
+  },
+  {
+   "id": "C17",
+   "class": "STALE_DOC",
+   "specimens": [
+    "SP-15"
+   ],
+   "finding": "14 specimens with records",
+   "conflicts_with": "dashboard 'Number of specimens 13'"
+  },
+  {
+   "id": "C18",
+   "class": "EXPECTED_HISTORICAL",
+   "specimens": [
+    "SP-02",
+    "SP-13"
+   ],
+   "finding": "spec PLA density 9.01e-10 copied from SP-01",
+   "conflicts_with": "INP 1.0475e-9 / 1.1212e-9"
+  },
+  {
+   "id": "C19",
+   "class": "EXPECTED_HISTORICAL",
+   "specimens": [
+    "SP-02"
+   ],
+   "finding": "SP-02 spec experimental table is an earlier fit",
+   "conflicts_with": "governed set Bravo (1)"
+  },
+  {
+   "id": "C20",
+   "class": "UNKNOWN",
+   "specimens": [
+    "SP-04",
+    "SP-05"
+   ],
+   "finding": "old ~0.25 stock exists",
+   "conflicts_with": "HUMAN thickness statements cover old ~0.45 and new ~0.25 only"
+  },
+  {
+   "id": "C21",
+   "class": "UNKNOWN",
+   "specimens": [],
+   "finding": "unnumbered 300x300 records",
+   "conflicts_with": "dashboard / spec set SP-01 ... SP-13"
+  }
+ ],
+ "open_questions": [
+  {
+   "id": "Q1",
+   "specimens": [
+    "SP-13"
+   ],
+   "m7_relevant": true,
+   "question": "Is SP13_polymax.unv (zip; Testlab PolyMAX of 260909, set 'Bravo (1)') a valid fit that may be governed for the FREQUENCY_ONLY Sigma_setup estimate, or does H9 stand?",
+   "answer": "D-065: provenance confirmed and set frozen; H9 clarified; Sigma_setup not recomputed (provisional 0.3 %)"
+  },
+  {
+   "id": "Q2",
+   "specimens": [
+    "SP-15"
+   ],
+   "m7_relevant": false,
+   "question": "What is SP-15 (stock, weave, thickness, plan size, mass)? Is it the 'SP-14 / bigSP14' panel?"
+  },
+  {
+   "id": "Q3",
+   "specimens": [
+    "SP-12"
+   ],
+   "m7_relevant": false,
+   "question": "Is SP-12 310 x 310 x 0.245 mm, 30.1 g (dashboard says 500x500)? Was SP-12 tested?"
+  },
+  {
+   "id": "Q4",
+   "specimens": [],
+   "m7_relevant": false,
+   "question": "Does a physical SP-14 exist?"
+  },
+  {
+   "id": "Q5",
+   "specimens": [],
+   "m7_relevant": false,
+   "question": "Are the five unnumbered 300x300 LMS 'Sheet1' panels and the June 287 x 288 mm calibration panel physical specimens outside the SP numbering?"
+  },
+  {
+   "id": "Q6",
+   "specimens": [
+    "SP-04",
+    "SP-05"
+   ],
+   "m7_relevant": false,
+   "question": "Does the local face-thickness statement for ~0.25 mm stock also apply to the old ~0.25 sheets?"
+  }
+ ],
+ "abaqus_solves": 0,
+ "abaqus_python_extractions": 0
+}
