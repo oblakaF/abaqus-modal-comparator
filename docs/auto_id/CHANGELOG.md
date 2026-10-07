@@ -3666,3 +3666,18 @@ first internal provider.
 - **Limitations kept:** see M6_DECISION_RECORD §22.
 - **Next gate:** HUMAN merge authorisation for the stage PR. After the merge, the `main` merge SHA is recorded.
   M7 `NOT_STARTED`.
+
+## 2026-10-08 — M6 — merged to `main` (PR #35)
+
+- **Stage:** M6
+- **Status:** ACCEPTED and merged. The merge was explicitly authorised by the HUMAN supervisor.
+- **Branch:** `auto-id/m6-closure` (from `main` `f1274ca`)
+- **Merge:** PR #35 `auto-id/m6` → `main`, merge commit `f1274cae80a6b3972cef04fd9c1bee0505920311`.
+  - Reviewed head: `e5f3fbc14cb71b2281c5a7bc1aaef88f08d9cfc6`.
+  - The merged tree equals the reviewed head.
+- **Recorded:** `STATUS.json`: `last_accepted_stage` M6, `main_merges` += M6 / PR #35, and the M6 `stage_pr`,
+  `merged_to_main`, `accepted_head` and `accepted_by` fields.
+- **CI:** Linux CI on the reviewed head e5f3fbc: 1510 OK (60 skipped); on main f1274ca: 1510 OK (60 skipped), success
+- **Limitations kept:** see M6_DECISION_RECORD §22.
+- **Abaqus run count:** 0. Docs only.
+- **Next:** M7 `NOT_STARTED`. No M7 branch and no M7 records; the next step needs SUPERVISOR instruction.

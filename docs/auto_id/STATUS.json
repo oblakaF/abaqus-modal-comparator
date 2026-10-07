@@ -4,11 +4,11 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M6",
-  "current_ministep": "M6 (stage closure)",
+  "current_ministep": "M6 (merged)",
   "status": "ACCEPTED",
-  "last_accepted_stage": "M5",
-  "last_accepted_ministep": "M5.9",
-  "last_accepted_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70",
+  "last_accepted_stage": "M6",
+  "last_accepted_ministep": "M6.4",
+  "last_accepted_commit": "f1274cae80a6b3972cef04fd9c1bee0505920311",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -68,6 +68,12 @@
       "stage": "M5",
       "pr": 33,
       "merge_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70",
+      "status": "ACCEPTED"
+    },
+    {
+      "stage": "M6",
+      "pr": 35,
+      "merge_commit": "f1274cae80a6b3972cef04fd9c1bee0505920311",
       "status": "ACCEPTED"
     }
   ],
@@ -537,7 +543,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "Stage PR auto-id/m6 -> main prepared; await HUMAN merge authorisation; after the merge record the main merge SHA; M7 NOT_STARTED (no M7 records, code or runs)",
+  "next_action": "M6 merged to main (PR #35); M7 NOT_STARTED; no M7 branch; await SUPERVISOR instruction before any M7 work",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -813,7 +819,7 @@
       "abaqus_python_extractions": 0,
       "status": "ACCEPTED"
     },
-    "stage_pr": "READY_FOR_STAGE_PR (auto-id/m6 -> main); not merged; HUMAN merge authorisation required",
+    "stage_pr": "MERGED: PR #35 (auto-id/m6 -> main), merge commit f1274cae80a6b3972cef04fd9c1bee0505920311",
     "supervisor_acceptance": {
       "date": "2026-10-08",
       "decision": "M6 ACCEPTED; rescoped M6 gate PASS",
@@ -836,7 +842,14 @@
       ],
       "stage_pr_verification": "no Abaqus artifacts / ODB / INP / UNV / NPZ vs main ab1dc60; M3 forward_builder additive (+87/-0); M4 archived_baseline additive re-registered path (accepted path unchanged); no M5 module changed; frozen M0-M5 records unchanged",
       "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); M6 test modules 143 OK; M5 + M4 + M3 stage gates and M4 guard 34 OK"
-    }
+    },
+    "merged_to_main": {
+      "pr": 35,
+      "merge_commit": "f1274cae80a6b3972cef04fd9c1bee0505920311"
+    },
+    "accepted_head": "e5f3fbc14cb71b2281c5a7bc1aaef88f08d9cfc6",
+    "accepted_by": "SUPERVISOR (M6 accepted, gate PASS, 2026-10-08); merge explicitly authorised by the HUMAN supervisor",
+    "merge_ci": "Linux CI on the reviewed head e5f3fbc: 1510 OK (60 skipped); on main f1274ca: 1510 OK (60 skipped), success"
   },
   "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated"
 }
