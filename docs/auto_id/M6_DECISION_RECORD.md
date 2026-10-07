@@ -22,7 +22,7 @@ D-060 supersedes D-015.
 | M6.1 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
 | M6.2 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
 | M6.3 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
-| M6.4 | `TODO` | NEEDS_SOURCE (variation ranges) |
+| M6.4 | `IN_PROGRESS` | D-066 envelope; M6.4a `REVIEW_READY`; M6.4b needs a HUMAN Abaqus gate (§19) |
 | M6 gate | `NOT_EVALUATED` | rescoped (SPEC §19 item 6, D-061) |
 | STEEL gate | `SUPERSEDED` | D-060 |
 | M7 | `NOT_STARTED` | — |
@@ -545,3 +545,65 @@ registration".
   - M6 must still pass its rescoped gate (M6.4 NEEDS_SOURCE) before M7 starts.
 - **Worker answer:** SP-02 + SP-13 give a plausible path to E_in without SP-10 (**YES**), with no
   rule weakened.
+
+## 19. M6.4 transverse-constant screening (SUPERVISOR, 2026-10-07; D-066)
+
+**Normative reading:**
+- SPEC §5: E3, ν13, ν23, G13 and G23 stay fixed if "reasonable variation changes frequencies by < 0.3 %";
+  otherwise they enter the uncertainty budget. D-055 keeps the criterion.
+- The SUPERVISOR accepted (D-066) the reading of the points the SPEC leaves open:
+  - the output is the frozen observation rows (fit and holdout), followed by FE-to-FE MAC tracking;
+  - both specimens of the M7 path are screened, at both endpoints;
+  - a non-negligible constant is recorded and budgeted, never re-tuned. Its M7 propagation is decided at
+    M7 entry.
+
+**Envelope** (`screening/M6_4_transverse_envelope.json`, envelope hash `d29e8485…`):
+- E3 5000–10000 MPa;
+- ν13 and ν23 0.2–0.4;
+- G13 and G23 2200–5000 MPa;
+- basis `LITERATURE_INTERIM_SCREENING_ENVELOPE`.
+
+**Minimum FE design:**
+
+| Constant | Baseline | Low | High | Solves per specimen |
+|---|---|---|---|---|
+| E3 | 6700 | 5000 | 10000 | 2 |
+| ν13 | 0.30 | 0.20 | 0.40 | 2 |
+| ν23 | 0.30 | 0.20 | 0.40 | 2 |
+| G13 | 2200 | 2200 = baseline (no solve) | 5000 | 1 |
+| G23 | 2200 | 2200 = baseline (no solve) | 5000 | 1 |
+
+- **Specimens:**
+  - SP-02: rows R1 FE 8, R2 FE 10, R3 FE 13 (holdout);
+  - SP-13: R1 FE 10, R2 FE 13 (holdout).
+- **Stiffness:** both faces are C3D8I solids with material axis 3 along global Z (read from the INPs).
+  All five constants therefore enter the stiffness, and none can be excluded without a solve.
+- **Baselines:** the archived CARBON-4C packs `SP02_f3e592281bebce66` and `SP13_a46d08b52995e078` are
+  reused. The reference candidate regenerates their INPs byte-identically (checked in code and tests).
+- **Totals:** 16 Abaqus solves, 16 extractions (pinned `extract_odb.py`, modes 7–30), 0 baseline solves.
+
+**M6.4a implementation (zero Abaqus), `REVIEW_READY`:**
+- `src/domain/transverse_screening.py`:
+  - the envelope schema, parsed strictly;
+  - the criterion is fixed at the SPEC 0.3 % and is not configurable;
+  - each baseline must equal the governed fixed constant;
+  - every endpoint state must be positive definite.
+- `forward_builder.render_screening_input` / `prepare_screening_job`:
+  - the candidate is the envelope's reference point;
+  - exactly one screened constant is set to one of the envelope's endpoints;
+  - the fitting post-check applies unchanged;
+  - the job schema is `auto-id/screening-forward-job/v1`.
+  - The fitting parameterisations are unchanged; a screening perturbation is not a parameterisation.
+- `src/services/transverse_screening.py`:
+  - the plan: the baseline regeneration check, then the HUMAN manifest;
+  - the HUMAN-gated run:
+    - the authorised manifest hash;
+    - a hash-chained journal;
+    - no automatic retry and no duplicate solve;
+  - the evaluation: M4.5 tracking of the frozen rows, then the per-constant classification;
+  - an informational all-mode diagnostic, never used for classification.
+- `tools/m6_4_transverse_screening.py`: `plan` / `run` / `evaluate`.
+
+**HUMAN Abaqus manifest:** hash `6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922`. The job list is in EVIDENCE.
+
+**Not done:** no Abaqus, no Abaqus Python, no result, no M6 acceptance, no M7.

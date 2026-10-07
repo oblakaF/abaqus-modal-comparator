@@ -1,0 +1,55 @@
+{
+  "schema": "auto-id/transverse-screening-envelope/v1",
+  "envelope_id": "M6.4/carbon-transverse-interim-v1",
+  "basis": "LITERATURE_INTERIM_SCREENING_ENVELOPE",
+  "basis_statement": "Conservative SUPERVISOR-approved interim screening envelope (2026-10-07). Not a measured property, not a material-specific prior and not a calibrated uncertainty distribution. Literature close-woven analogue: E3 about 5-10 GPa, nu13/nu23 about 0.2-0.4, G13/G23 about 3-5 GPa. The G13/G23 lower bound is extended to the governed baseline 2.2 GPa, which is not claimed as literature-supported. Face-sheet thickness scatter is not part of this envelope (later t_face nuisance).",
+  "decision": "D-066",
+  "parameterisation": "carbon-property-set/v1",
+  "reference_candidate": {"E_in_plane_mpa": 52000.0, "G12_mpa": 4500.0},
+  "criterion": {
+    "metric": "max_abs_relative_frequency_change",
+    "value": 0.003,
+    "comparison": "strictly_below",
+    "purpose": "SPEC §5 uncertainty-budget bookkeeping only: below the criterion the constant may stay fixed (NEGLIGIBLE_FOR_BUDGET); otherwise INCLUDE_IN_UNCERTAINTY_BUDGET. Not a model-fit target, not a failure and never a reason to re-tune the model. Real-data interpretation (M7) uses the practical engineering target (D-066)."
+  },
+  "constants": {
+    "E3": {"unit": "MPa", "baseline": 6700.0, "low": 5000.0, "high": 10000.0},
+    "nu13": {"unit": "1", "baseline": 0.3, "low": 0.2, "high": 0.4},
+    "nu23": {"unit": "1", "baseline": 0.3, "low": 0.2, "high": 0.4},
+    "G13": {"unit": "MPa", "baseline": 2200.0, "low": 2200.0, "high": 5000.0},
+    "G23": {"unit": "MPa", "baseline": 2200.0, "low": 2200.0, "high": 5000.0}
+  },
+  "extraction_modes": {"start": 7, "end": 30},
+  "specimens": [
+    {
+      "label": "SP02",
+      "forward_model": "docs/auto_id/forward_models/SP02.forward.json",
+      "solver_profile": "docs/auto_id/solver_profiles/SP02.json",
+      "baseline_shape_pack": "docs/auto_id/fe_shapes/SP02_f3e592281bebce66.shape-pack.json",
+      "observation_source": "docs/auto_id/registration_evidence/SP02_registration_reevaluation.json results.PHYSICAL (strict freeze accepted, D-065)",
+      "rows": [
+        {"row_id": "R1", "fe_mode": 8, "role": "FIT"},
+        {"row_id": "R2", "fe_mode": 10, "role": "FIT"},
+        {"row_id": "R3", "fe_mode": 13, "role": "HOLDOUT"}
+      ]
+    },
+    {
+      "label": "SP13",
+      "forward_model": "docs/auto_id/forward_models/SP13.forward.json",
+      "solver_profile": "docs/auto_id/solver_profiles/SP13.json",
+      "baseline_shape_pack": "docs/auto_id/fe_shapes/SP13_a46d08b52995e078.shape-pack.json",
+      "observation_source": "docs/auto_id/registration_evidence/SP13_registration_reevaluation.json results.PHYSICAL (strict freeze accepted, D-064)",
+      "rows": [
+        {"row_id": "R1", "fe_mode": 10, "role": "FIT"},
+        {"row_id": "R2", "fe_mode": 13, "role": "HOLDOUT"}
+      ]
+    }
+  ],
+  "provenance": [
+    "SUPERVISOR 2026-10-07: M6.4 interim screening envelope and frozen observation-mode set accepted (D-066)",
+    "SPEC §5 / §5.2 (0.3 % criterion, unchanged by D-055); SPEC §19 item 6 / D-061 (rescoped M6 gate)",
+    "governed baseline constants: carbon-property-set/v1 fixed values (forward_models/README.md)",
+    "baseline FE states: the archived CARBON-4C baseline shape packs (fe_shapes/README.md); no baseline solve",
+    "the forward models are used for the FE model only; FE-to-FE tracking does not depend on the registration"
+  ]
+}

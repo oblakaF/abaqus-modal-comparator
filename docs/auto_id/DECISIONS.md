@@ -902,3 +902,54 @@ Rationale / scope: records SUPERVISOR acceptances and the governed updates they 
 implementation (records, tests) is a worker result pending SUPERVISOR review (EVIDENCE).
 Supersedes: D-064 (in part: the H9 wording "there is no PolyMAX fit of 260909" is clarified as above;
 everything else in D-064 stands)
+
+## D-066 — M6.4 interim screening envelope, screening rule and observation set; practical accuracy target
+Date: 2026-10-07 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M6.4 FINAL SCREENING PLAN — SUPERVISOR RANGE DECISION" and "SUPERVISOR CLARIFICATION — PRACTICAL ACCURACY TARGET" (2026-10-07); SPEC §5, §5.2, §19 item 6; D-055, D-061, D-064, D-065
+Decision:
+- **Basis:** commit `8b4afff` and the D-065 governed updates are accepted as the basis of M6.4.
+- **Screening envelope (the M6.4 range source):**
+  - E3 5.0–10.0 GPa; ν13 0.20–0.40; ν23 0.20–0.40; G13 2.2–5.0 GPa; G23 2.2–5.0 GPa.
+  - Basis `LITERATURE_INTERIM_SCREENING_ENVELOPE`, not `MATERIAL_SPECIFIC`. It is not a measured
+    property, not a material-specific prior and not a calibrated uncertainty distribution. It is a
+    conservative envelope for deciding whether the fixed constants matter to the Auto-ID result.
+  - Literature close-woven analogue: E3 ≈ 5–10 GPa, ν13/ν23 ≈ 0.2–0.4, G13/G23 ≈ 3–5 GPa.
+  - The G13/G23 lower bound includes the governed baseline 2.2 GPa on purpose. That value is not claimed
+    as literature-supported.
+- **Screening rule (SPEC §5 criterion unchanged):**
+  - One constant at a time, both envelope endpoints, at the governed reference candidate (E_in 52 000 MPa,
+    G12 4 500 MPa; the CARBON-4C baseline). An endpoint equal to the baseline needs no solve (Δf ≡ 0).
+    E_in and G12 are not refitted.
+  - Output: the frequencies of the frozen observation rows (fit and holdout). Each row is followed from the
+    baseline by FE-to-FE MAC tracking (M4.5); it is never re-paired.
+  - max |Δf/f| < 0.3 % on every row, specimen and endpoint → `NEGLIGIBLE_FOR_BUDGET`; otherwise
+    `INCLUDE_IN_UNCERTAINTY_BUDGET`. A tracking refusal leaves the constant unclassified and is escalated.
+  - `INCLUDE_IN_UNCERTAINTY_BUDGET` is bookkeeping. It is not a failure and never a reason to re-tune the
+    model. The signed per-row effects are recorded. How they propagate into M7 is decided at M7 entry;
+    they are not placed in Σ.
+- **Observation set (accepted):**
+  - SP-02 physical strict freeze: R1 FE 8 and R2 FE 10 (fit), R3 FE 13 (holdout);
+  - SP-13 physical strict freeze: R1 FE 10 (fit), R2 FE 13 (holdout).
+  - The forward models `SP02.forward.json` and `SP13.forward.json` serve the FE model only. FE-to-FE
+    tracking does not depend on the registration.
+- **Practical accuracy target (M7 real-data interpretation):**
+  - Acceptance needs:
+    - correct physical mode identity and acceptable MAC;
+    - frequency agreement preferably within ~5 %. Up to ~10 % is acceptable for the intended engineering
+      use when the modal shape is correct and there is no systematic branch mismatch.
+  - The goal is useful effective material-property ranges, not metrology-grade constituent constants.
+  - Not done:
+    - properties are not optimised merely to reduce frequency error (for example from 4 % to 1 %);
+    - a useful E_in range is not rejected for lacking sub-percent agreement;
+    - identified constants are not reported with excessive numerical precision.
+  - The 0.3 % M6.4 criterion is not this target. How the target maps onto the M5 verdict (Σ, pattern test)
+    is an M7-entry decision. No M4 threshold or M5 rule is changed here.
+- **Thickness context:** face-sheet thickness scatter is physical geometry for the later t_face nuisance,
+  not an M6.4 range:
+  - old nominal ~0.45 mm: local ~0.40–0.50 mm, mostly ~0.44–0.45 mm;
+  - new nominal ~0.25 mm: local ~0.23–0.28 mm, mostly ~0.25 mm.
+- **Execution:** M6.4a (zero Abaqus: envelope record, guarded screening path, tests) is authorised. The
+  solves need a separate HUMAN Abaqus gate that names the exact manifest hash. M6 is not accepted; no M7.
+Rationale / scope: gives M6.4 its approved range source and fixes the screening reading. The SPEC
+criterion, geometry, registration, pairing, modal selection, M4 thresholds and M5 rules are unchanged.
+Supersedes: D-055 in part. The M6.4 item "NEEDS_DECISION, no M6.4 FE jobs yet" is resolved by this
+envelope. The 0.3 % criterion stands, and so do the t_face and interface items of D-055.

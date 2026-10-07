@@ -779,3 +779,57 @@ Possible remaining causes remain outside CARBON-5F scope:
   - The estimator is a later decision (D-053, D-058), and no governed cross-grid mode-correspondence rule
     exists. The LMS mode labels of the two sessions also disagree.
 - 0 Abaqus solves, 0 Abaqus Python extractions.
+
+## M6.4a: transverse-constant screening path and the HUMAN Abaqus manifest (zero Abaqus; no result yet)
+
+- **Status:** REVIEW_READY (worker, 2026-10-07; D-066). No screening result exists yet.
+- **Envelope record:** `screening/M6_4_transverse_envelope.json`, envelope hash `d29e848566afaadc1a73234d531f83383810e7ec2f7ac0471c0965aa6fd2036d`. Basis
+  `LITERATURE_INTERIM_SCREENING_ENVELOPE`. Reference candidate E_in 52 000, G12 4 500 MPa.
+- **FE model check** (read-only, the INPs in the `snadwich` store):
+  - `SP02_Modal_V02.inp` faces: `C3D8I`, `*Solid Section` with `Ori-1` (axes 1 and 2 = global X and Y;
+    axis 3 = Z).
+  - `SP13_mesh_local_v1_modal.inp` faces: `C3D8I`, `Ori-2` (same axes).
+  - All nine engineering constants therefore enter the face stiffness.
+- **Plan** (rendered without Abaqus):
+  - The reference candidate regenerates the archived baseline jobs byte-identically:
+    `SP02_f3e592281bebce66` and `SP13_a46d08b52995e078`. Their packs are reused.
+  - Changed lines per job equal the M3.5 anchors:
+    - SP02: 2077230 and 2077231 (record), 2077244 (15 → 30 eigenvalues, as in the baseline);
+    - SP13: 1957765 and 1957766.
+  - Every job differs from its baseline in exactly one constant. The other values keep their source text.
+- **HUMAN Abaqus manifest:** schema `auto-id/transverse-screening-manifest/v1`, hash `6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922`.
+  16 solves, 16 extractions, 0 baseline solves.
+
+| Specimen | Perturbation | Value | Job | Generated INP SHA-256 |
+|---|---|---|---|---|
+| SP02 | E3-low | 5000 | `SP02_7ecb36decc403fda` | `7ecb36decc403fda…` |
+| SP02 | E3-high | 10000 | `SP02_f3eed68a26571fba` | `f3eed68a26571fba…` |
+| SP02 | nu13-low | 0.2 | `SP02_4ef95a55171cc3d8` | `4ef95a55171cc3d8…` |
+| SP02 | nu13-high | 0.4 | `SP02_fe01394cc4ef1535` | `fe01394cc4ef1535…` |
+| SP02 | nu23-low | 0.2 | `SP02_6bf74401677e7e75` | `6bf74401677e7e75…` |
+| SP02 | nu23-high | 0.4 | `SP02_47b309d68e48a957` | `47b309d68e48a957…` |
+| SP02 | G13-high | 5000 | `SP02_5732bef18649d4bb` | `5732bef18649d4bb…` |
+| SP02 | G23-high | 5000 | `SP02_c93b3e3cb8ae511e` | `c93b3e3cb8ae511e…` |
+| SP13 | E3-low | 5000 | `SP13_81a5cedfe42b38d3` | `81a5cedfe42b38d3…` |
+| SP13 | E3-high | 10000 | `SP13_3fc1cad51076cfd2` | `3fc1cad51076cfd2…` |
+| SP13 | nu13-low | 0.2 | `SP13_7ac63eb2905930ec` | `7ac63eb2905930ec…` |
+| SP13 | nu13-high | 0.4 | `SP13_9771af6aa8d4373c` | `9771af6aa8d4373c…` |
+| SP13 | nu23-low | 0.2 | `SP13_eb9383c49c9e1f2d` | `eb9383c49c9e1f2d…` |
+| SP13 | nu23-high | 0.4 | `SP13_8f84df93ab40549c` | `8f84df93ab40549c…` |
+| SP13 | G13-high | 5000 | `SP13_b0af3095b6111c09` | `b0af3095b6111c09…` |
+| SP13 | G23-high | 5000 | `SP13_0fcc8454363f3fa4` | `0fcc8454363f3fa4…` |
+
+- **Solver profiles** (both unchanged):
+  - `SP02/abaqus-2024/v1`: 8 cpus, `abaqus-scratch` store;
+  - `SP13/abaqus-2024/v1`: 1 cpu.
+- **Extraction:** pinned `abaqus_scripts/extract_odb.py` (`039aa067…`), modes 7–30. The expectation is the
+  baseline pack's TOP node set (SP02 29 583 nodes, SP13 29 754).
+- **Tests:** `tests/test_m6_4_transverse_screening.py`. They cover:
+  - the envelope and the builder guard;
+  - a synthetic plan → gated run → evaluation with fake executors;
+  - the strict criterion, holdout rows and both endpoints;
+  - tracking refusal and frequency-order change;
+  - the architecture guards and the pinned real manifest.
+- **Mutation check:** 6 of 6 targeted mutants killed.
+- **Test results:** Windows with the snadwich and carbon-project-archive stores 1511 OK (5 skipped: 3 need the sumin store and pass with it, 24 OK; 2 are Abaqus-gated); without data stores 1502 OK (48 skipped); test_m6_4_transverse_screening 28 OK (24 OK, 1 class skipped without stores)
+- 0 Abaqus solves, 0 Abaqus Python extractions.

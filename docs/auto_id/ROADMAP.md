@@ -470,7 +470,7 @@ work.
 | M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
 | M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
 | M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
-| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `TODO` (NEEDS_SOURCE: variation ranges) |
+| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `IN_PROGRESS` (D-066): M6.4a `REVIEW_READY`; M6.4b `TODO` (HUMAN Abaqus gate) |
 
 Stage status: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
 decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; rescoped by SPEC §19 item 6; M6 gate
@@ -520,6 +520,19 @@ decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; resc
   - The SP-13 260909 PolyMAX set "Bravo (1)" is frozen as the FREQUENCY_ONLY fixture
     `SP13/260909-bravo-1` (provenance confirmed).
   - Σ_setup stays provisional 0.3 %. M6.4 remains the M6 blocker.
+  - SUPERVISOR-ACCEPTED 2026-10-07 as the M6.4 basis (D-066).
+- **M6.4 screening (D-066):**
+  - Envelope `LITERATURE_INTERIM_SCREENING_ENVELOPE` (not material-specific): E3 5–10 GPa, ν13/ν23
+    0.2–0.4, G13/G23 2.2–5 GPa.
+  - Rule: the SPEC §5 0.3 % on the frozen observation rows, one constant at a time, both endpoints,
+    FE-to-FE tracking. The criterion is bookkeeping, not a fit target.
+  - **M6.4a (zero Abaqus), `REVIEW_READY`:**
+    - the envelope record `screening/M6_4_transverse_envelope.json`;
+    - the guarded screening path: `forward_builder.prepare_screening_job`,
+      `services/transverse_screening.py`, `tools/m6_4_transverse_screening.py`;
+    - tests;
+    - HUMAN Abaqus manifest `6d34179c…`: 16 solves, 16 extractions; the baselines are reused.
+  - **M6.4b, `TODO`:** the 16 solves and extractions under a HUMAN Abaqus gate, then the result record.
 
 **M6 GATE (rescoped, SPEC §19 item 6, D-061):**
 

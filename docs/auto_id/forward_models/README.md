@@ -77,3 +77,16 @@ evaluation = prepare_forward_jobs([model, ...], carbon_candidate(E_in_plane, G12
 
 These values are the ones the accepted shared-carbon builder
 (`src/services/shared_carbon_forward.py` at `121ba1d`) hard-coded.
+
+## M6.4 screening jobs (D-066)
+
+`forward_builder.prepare_screening_job(model, envelope, perturbation, source, output_directory)` renders
+a transverse-constant screening job:
+- the candidate is the envelope's reference point;
+- exactly one of E3, ν13, ν23, G13 and G23 is set to one approved endpoint of
+  `screening/M6_4_transverse_envelope.json`;
+- the same post-check applies: only the material record and the eigenvalue line may change;
+- the provenance schema is `auto-id/screening-forward-job/v1`, with a `screening` block.
+
+A perturbation that is not one of the envelope's endpoint perturbations is refused. Screening
+perturbations are not parameterisations and are never fitted.

@@ -3536,3 +3536,43 @@ first internal provider.
   - new `tests/test_sp13_260909_frozen_modal_set.py`;
   - updated `test_experiment_fixture`, `test_sp02_physical_registration`, `test_specimen_catalog`.
 - Σ_setup provisional 0.3 %. M6 not accepted (M6.4). 0 Abaqus solves, 0 extractions.
+
+## 2026-10-07 — M6 — M6.4a: screening envelope and guarded screening path (zero Abaqus)
+
+- **Stage:** M6
+- **Mini-step:** M6.4a (M6.4 `IN_PROGRESS`)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m6`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M6.4a): transverse screening envelope, guarded screening path and HUMAN Abaqus manifest (zero Abaqus)`
+- **Files changed:**
+  - created:
+    - `src/domain/transverse_screening.py`, `src/services/transverse_screening.py`;
+    - `tools/m6_4_transverse_screening.py`;
+    - `tests/test_m6_4_transverse_screening.py`;
+    - `docs/auto_id/screening/M6_4_transverse_envelope.json`, `docs/auto_id/screening/README.md`.
+  - updated:
+    - `src/services/forward_builder.py` (additive screening path);
+    - `docs/auto_id/DECISIONS.md` (D-066), `docs/auto_id/M6_DECISION_RECORD.md` (§19);
+    - `docs/auto_id/EVIDENCE.md`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/STATUS.json`;
+    - `docs/auto_id/forward_models/README.md`.
+- **Scientific behaviour changed:** YES, additively: a new screening path. The fitting path,
+  parameterisations, thresholds, pairing and M5 rules are unchanged.
+- **Decision:** D-066:
+  - envelope `LITERATURE_INTERIM_SCREENING_ENVELOPE`;
+  - the SPEC §5 rule on the frozen rows;
+  - the practical 5–10 % target for M7 interpretation;
+  - the D-065 updates accepted as the basis.
+- **Tests run:**
+  - the full suite on Windows, with and without data stores;
+  - `test_m6_4_transverse_screening` (28);
+  - a targeted mutation check (6 of 6 killed).
+- **Test result:** Windows with the snadwich and carbon-project-archive stores 1511 OK (5 skipped: 3 need the sumin store and pass with it, 24 OK; 2 are Abaqus-gated); without data stores 1502 OK (48 skipped); test_m6_4_transverse_screening 28 OK (24 OK, 1 class skipped without stores)
+- **Abaqus run count:** 0 (0 Abaqus Python extractions).
+- **Evidence produced:** the HUMAN Abaqus manifest `6d34179c787c8b0e…` (EVIDENCE).
+- **Known limitations:**
+  - no screening result yet;
+  - the classification is local to the CARBON-4C reference point;
+  - the M7 propagation mechanism for a budgeted constant is not chosen.
+- **Next gate:** SUPERVISOR review of M6.4a. Then the HUMAN Abaqus gate for M6.4b: 16 solves and
+  16 extractions under manifest `6d34179c787c8b0e…`.

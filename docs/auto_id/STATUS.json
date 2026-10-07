@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the D-065 governed updates; M6 not accepted (M6.4 needs an approved range source); no M7, no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of M6.4a; then a HUMAN Abaqus gate for M6.4b (16 solves + 16 extractions, manifest 6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922); M6 not accepted; no M7",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -630,12 +630,12 @@
     "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
     "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
     "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
-    "M6.4": "TODO",
+    "M6.4": "IN_PROGRESS",
     "readiness": {
       "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no primary twill G12; no real-data Stage-A validation; M6-B adapter kept",
       "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): SPEC provisional Sigma_setup 0.3 % allowed and flagged",
       "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no measured k_core prior; later PROVISIONAL nuisance only",
-      "M6.4": "NEEDS_SOURCE (defensible E3/nu13/nu23/G13/G23 screening ranges; D-055); FE-only; not started"
+      "M6.4": "D-066 envelope LITERATURE_INTERIM_SCREENING_ENVELOPE; M6.4a REVIEW_READY (zero Abaqus); M6.4b TODO (HUMAN Abaqus gate: 16 solves, 16 extractions)"
     },
     "gate": "NOT_EVALUATED (rescoped gate SPEC §19 item 6 / D-061: unavailable evidence recorded, verdict consequences encoded, provisional inputs flagged, M6.4 budget closed)",
     "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-061)",
@@ -737,10 +737,33 @@
       "sp02_historical": "fixture SP02/bravo-1 + legacy passport + SP02.forward.json + CARBON-4C baseline unchanged (legacy registration 9bf736d3...)",
       "sp13_260909": "SP13_260909_POLYMAX_PROVENANCE_CONFIRMED; frozen FREQUENCY_ONLY fixture SP13/260909-bravo-1 (docs/auto_id/fixtures/SP13_260909.frozen-modal-set.json; member sha256 c036cdf36230c8deab413a5a2b4da8147cea68248c7d82ec3b0297c6705308c9)",
       "sigma_setup": "provisional 0.3 % flagged (not recomputed; estimator and cross-grid matching not invented; deferred, not a release/M7 blocker)",
-      "remaining_m6_blocker": "M6.4 (approved variation-range source)",
+      "remaining_m6_blocker": "M6.4 (range source approved by D-066; screening result pending)",
       "abaqus_solves": 0,
       "abaqus_python_extractions": 0,
-      "status": "REVIEW_READY"
+      "status": "ACCEPTED",
+      "acceptance": "SUPERVISOR 2026-10-07: commit 8b4afff accepted as the M6.4 basis (D-066)"
+    },
+    "m6_4": {
+      "decision": "D-066",
+      "envelope": "docs/auto_id/screening/M6_4_transverse_envelope.json (d29e848566afaadc1a73234d531f83383810e7ec2f7ac0471c0965aa6fd2036d)",
+      "basis": "LITERATURE_INTERIM_SCREENING_ENVELOPE (not MATERIAL_SPECIFIC)",
+      "ranges": "E3 5000-10000 MPa; nu13 0.2-0.4; nu23 0.2-0.4; G13 2200-5000 MPa; G23 2200-5000 MPa",
+      "rule": "SPEC §5: max |df/f| < 0.3 % on the frozen rows (fit + holdout), one constant at a time, both endpoints, FE-to-FE tracking -> NEGLIGIBLE_FOR_BUDGET, else INCLUDE_IN_UNCERTAINTY_BUDGET (bookkeeping; not a fit target)",
+      "observation_rows": "SP02 R1 FE8, R2 FE10 (fit), R3 FE13 (holdout); SP13 R1 FE10 (fit), R2 FE13 (holdout)",
+      "practical_target": "M7 real-data interpretation: correct mode identity / MAC; frequency preferably within ~5 %, up to ~10 % acceptable (D-066)",
+      "M6.4a": {
+        "scope": "envelope record; guarded screening path (forward_builder.prepare_screening_job, services/transverse_screening.py, tools/m6_4_transverse_screening.py); tests",
+        "tests": "tests/test_m6_4_transverse_screening.py (28; 4 store-gated)",
+        "tests_result": "Windows with the snadwich and carbon-project-archive stores 1511 OK (5 skipped: 3 need the sumin store and pass with it, 24 OK; 2 are Abaqus-gated); without data stores 1502 OK (48 skipped); test_m6_4_transverse_screening 28 OK (24 OK, 1 class skipped without stores)",
+        "human_abaqus_manifest": "6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922",
+        "abaqus_solves": 0,
+        "abaqus_python_extractions": 0,
+        "status": "REVIEW_READY"
+      },
+      "M6.4b": {
+        "scope": "16 Abaqus solves + 16 pinned extractions under a HUMAN gate naming the manifest hash; then the result record",
+        "status": "TODO"
+      }
     }
   },
   "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated"
