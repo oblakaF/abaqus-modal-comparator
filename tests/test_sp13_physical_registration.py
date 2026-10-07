@@ -42,6 +42,8 @@ REGISTRATION = ROOT / "docs/registrations/SP13_physical_registration.json"
 LEGACY_REGISTRATION = ROOT / "docs/registrations/SP13_frozen_registration.json"
 PHYSICAL_REGISTRATION_HASH = "2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823"
 LEGACY_REGISTRATION_HASH = "a8970e525d10173af3d3b030b1150ca24432b616e1b52f6e8cfeefe2946f58a4"
+ACTIVE_FIXTURE = "SP13/best-physical"  # D-068: active SP-13 input on the accepted physical registration
+HISTORICAL_FIXTURE = "SP13/best"  # legacy-registration record of the M0-M5 chain (unchanged)
 TRANSFORM_MODULES = ("src/services/psv_video_registration.py", "tools/reconstruct_psv_registration.py",
                      "tools/build_sp13_physical_registration.py", "tools/build_physical_registration.py")
 SCALE_REL_READOUT = 0.002  # HUMAN H8: 1 mm ruler graduation over the shorter 510 mm side (0.00196), rounded up
@@ -151,6 +153,24 @@ class GovernedFileTests(unittest.TestCase):
         self.assertEqual(gc.missing_uncertainty, ())  # H8 supplies the readout scale contribution
         self.assertEqual(str(manifest.physical_specimen_id), "SP-13")
         self.assertEqual(manifest.acquisition.remount_kind, "re_suspension")
+        self.assertEqual(manifest.acquisition.fixture_id, ACTIVE_FIXTURE)  # D-068
+
+    def test_active_fixture_uses_the_physical_registration_and_legacy_chain_is_historical(self):
+        from domain.experiment_fixture import load_experiment_fixture_manifest
+        from domain.forward_model_manifest import bind_forward_model, load_forward_model_manifest
+
+        fixtures = load_experiment_fixture_manifest(ROOT / "docs/auto_id/fixtures/real_experiment_fixtures.json")
+        active = fixtures.fixture(ACTIVE_FIXTURE)
+        self.assertEqual((active.registration.path, active.registration.registration_hash),
+                         ("docs/registrations/SP13_physical_registration.json", PHYSICAL_REGISTRATION_HASH))
+        self.assertEqual(active.physical_specimen_id, "SP-13")
+        historical = fixtures.fixture(HISTORICAL_FIXTURE)
+        self.assertEqual(historical.registration.registration_hash, LEGACY_REGISTRATION_HASH)
+        self.assertEqual(load_specimen_manifest(LEGACY_PASSPORT).acquisition.fixture_id, HISTORICAL_FIXTURE)
+        # The archived M0-M5 chain (forward model, legacy passport, legacy fixture) is unchanged and still binds.
+        forward = load_forward_model_manifest(ROOT / "docs/auto_id/forward_models/SP13.forward.json")
+        self.assertEqual(forward.registration_hash, LEGACY_REGISTRATION_HASH)
+        bind_forward_model(forward, load_specimen_manifest(LEGACY_PASSPORT), fixtures)
 
 
 class ReregisteredMacTests(unittest.TestCase):

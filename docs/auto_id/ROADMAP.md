@@ -470,7 +470,7 @@ work.
 | M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
 | M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
 | M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
-| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `REVIEW_READY` (D-066, D-067): M6.4a ACCEPTED; M6.4b all five `NEGLIGIBLE_FOR_BUDGET` |
+| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `ACCEPTED` (CLOSED; D-066–D-068): all five `NEGLIGIBLE_FOR_BUDGET`, kept fixed |
 
 Stage status: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
 decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; rescoped by SPEC §19 item 6; M6 gate
@@ -541,6 +541,14 @@ decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; resc
     - Every frozen row was tracked, with no refusal.
     - Result `screening/M6_4_transverse_screening_result.json`.
   - **M6 gate (rescoped): worker evaluation PASS**, pending SUPERVISOR (M6_DECISION_RECORD §20).
+  - M6.4b SUPERVISOR-ACCEPTED 2026-10-08 (D-068). M6.4 is CLOSED.
+- **M7-entry wiring and M6 closure record (D-068, zero Abaqus), `REVIEW_READY`:**
+  - The active inputs are on the physical registrations:
+    - SP-02: `SP02/bravo-1-physical` + `SP02.physical.forward.json`;
+    - SP-13: `SP13/best-physical` (new) + `SP13.physical.forward.json`.
+  - The historical M0–M5 chains are unchanged.
+  - M6 gate: **PASS candidate**, pending final SUPERVISOR acceptance.
+  - The remaining M7 prerequisites are listed in M6_DECISION_RECORD §21. M7 NOT_STARTED.
 
 **M6 GATE (rescoped, SPEC §19 item 6, D-061):**
 

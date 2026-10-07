@@ -109,7 +109,7 @@ Also inspected:
 | Specimen | Family | Spec | Raw FRF sessions | PolyMAX | INP | ODB | CAE | Phys reg | Governed FE (M3) | M7 usability |
 |---|---|---|---|---|---|---|---|---|---|---|
 | SP-01 | old plain 0.45 | yes | 260624 | U (zip) | U (C:\temp) | U (C:\temp) | yes | no | no | after governance + FE + reg |
-| SP-02 | old plain 0.45 | yes | 260803 retry | **G** `SP02/bravo-1-physical` (active; `SP02/bravo-1` historical) | yes | yes | yes | **yes (accepted, active; D-065)** | **yes** | **M7 path with SP-13** (forward binding of the physical passport pending) |
+| SP-02 | old plain 0.45 | yes | 260803 retry | **G** `SP02/bravo-1-physical` (active; `SP02/bravo-1` historical) | yes | yes | yes | **yes (accepted, active; D-065)** | **yes** | **M7 path with SP-13** (active forward binding `SP02.physical.forward.json`, D-068) |
 | SP-03 | old twill 0.45 | yes | 260803 | U (zip) | no | no | no | no | no | twill family only |
 | SP-04 | old plain 0.25 | yes | 260822 | U (zip) | candidate (C:\temp, name only) | candidate | no | no | no | after governance + FE + reg |
 | SP-05 | old plain 0.25 | yes | 260706a | U (zip) | yes (store) | yes (store) | yes | no | no | after governance + M3 + reg |
@@ -120,7 +120,7 @@ Also inspected:
 | SP-10 | old plain 0.45 | yes | 260831; 260911 b_rotated | U (zip 260831; store 260911) | no | no | no | no | no | SP2/SP10 scatter pair after FE + reg + governance |
 | SP-11 | old twill 0.45 (bare) | yes | 260824; 260826 a; 260826 b_center | U (zip, session a only) | candidate (C:\temp twill study) | candidate | no | no | no | not M7 (Stage A blocked, D-059) |
 | SP-12 | new plain 0.25 (bare) | vault note only | none found | none | none found | none found | none found | no | no | no experiment |
-| SP-13 | old plain 0.45 | yes | 260909; 260910 a | **G** `SP13/best` (260910); **G** `SP13/260909-bravo-1` (FREQUENCY_ONLY, D-065) | yes | yes | yes | **yes (production-ready)** | **yes** | **M7 path with SP-02; alone insufficient** |
+| SP-13 | old plain 0.45 | yes | 260909; 260910 a | **G** `SP13/best-physical` (260910, active; `SP13/best` historical; D-068); **G** `SP13/260909-bravo-1` (FREQUENCY_ONLY, D-065) | yes | yes | yes | **yes (production-ready)** | **yes** | **M7 path with SP-02; alone insufficient** |
 | SP-15 | unassigned (bare) | none (note is an SP-12 copy) | 260901 (**outside store**) | U (zip) | U (C:\temp\12 sampls) | U | U (`new_CFRP_PLAIN_520_STAGEA.cae`) | no | no | identity AMBIGUOUS |
 
 **PolyMAX fits exist for every specimen with an acquisition.** Governed are:
@@ -199,8 +199,8 @@ single force reference, unless stated otherwise.
   - Open items:
     - the face convention (TOP by convention);
     - the M3 forward manifest `SP02.forward.json` still pins the legacy passport and registration. This is
-      the unchanged historical CARBON-4C / M4.2 chain. A forward binding of the physical passport is
-      pending.
+      the unchanged historical CARBON-4C / M4.2 chain. The active forward binding of the physical passport
+      is `SP02.physical.forward.json` (D-068).
 - **Strict pairs:** physical FROZEN (2,8), (4,10), (7,13). Validation holdout R3; 2 fit rows; condition
   number 6.1.
 - **Status:** NEEDS_GOVERNANCE.
@@ -407,8 +407,8 @@ single force reference, unless stated otherwise.
   - Physical `2eeeaa86…` is **production-ready** (D-062, D-064).
   - Distortion x 1.195, y 0.889.
   - `registration_limited` False.
-  - Open items: face convention; the fixture `SP13/best` still references the legacy registration (wiring
-    not yet authorised).
+  - Open items: face convention. The active fixture is `SP13/best-physical`, on the physical registration
+    (D-068); `SP13/best` stays the historical legacy-registration record.
 - **Strict pairs:** 4↔10 and 7↔13 are well conditioned; 1 fit row after the M4.3 holdout.
 - **Status:** OBSERVATION_INSUFFICIENT (alone), NEEDS_GOVERNANCE.
 
@@ -556,7 +556,7 @@ questions, kept unresolved on purpose (SUPERVISOR 2026-10-07).
 ## 11. One-line summary per specimen
 
 - SP-01 — old T300 plain 0.45 / PLA (Light) auxetic, DP420 / 502.13×499.25×2.9 / 588.4 g / fitted experiment YES (ungoverned) / governed FE NO (INP/ODB in C:\temp) / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
-- SP-02 — old T300 plain 0.45 / PLA honeycomb, DP420 / 515×510×2.9 / 582.71 g / fitted experiment YES (governed, active `SP02/bravo-1-physical`) / governed FE YES / physical registration YES (accepted, active) / NEEDS_GOVERNANCE (forward binding of the physical passport) — M7 path with SP-13
+- SP-02 — old T300 plain 0.45 / PLA honeycomb, DP420 / 515×510×2.9 / 582.71 g / fitted experiment YES (governed, active `SP02/bravo-1-physical`) / governed FE YES / physical registration YES (accepted, active) / active forward binding `SP02.physical.forward.json` (D-068) — M7 path with SP-13
 - SP-03 — old T300 twill 0.45 / PLA auxetic, DP420 / 515×510×2.9 / 595.7 g / fitted experiment YES (ungoverned) / governed FE NO / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
 - SP-04 — old T300 plain 0.25 / TPU honeycomb, DP420 / 302×297.5×2.8 / 174.03 g / fitted experiment YES (ungoverned) / governed FE NO (candidate only) / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
 - SP-05 — old T300 plain 0.245 / TPU auxetic, DP420 / 301.14×302×2.55 / 161.34 g / fitted experiment YES (ungoverned) / governed FE NO (INP/ODB in store) / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
@@ -567,5 +567,5 @@ questions, kept unresolved on purpose (SUPERVISOR 2026-10-07).
 - SP-10 — old T300 plain (recorded 0.40/0.39) / PLA honeycomb, DP420 / 520×515×2.8 / 555.23 g / fitted experiment YES (ungoverned, two sessions) / governed FE NO / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
 - SP-11 — old T300 twill 0.45 bare plate / 350×347×0.45 / 79.59 g / fitted experiment YES (session a, ungoverned; sessions inconsistent) / governed FE NO / physical registration NO / NOT_APPLICABLE, OBSERVATION_INSUFFICIENT, NEEDS_GOVERNANCE
 - SP-12 — new T300 plain 0.245 bare plate / 310×310×0.245 (note) / 30.1 g / experiment NONE / governed FE NO / physical registration NO / OBSERVATION_INSUFFICIENT, NOT_APPLICABLE
-- SP-13 — old T300 plain 0.425 / PLA (non-Light) auxetic, DP420 / 510×520×2.85 / 584.6 g real / fitted experiment YES (governed `SP13/best`; FREQUENCY_ONLY `SP13/260909-bravo-1`) / governed FE YES / physical registration YES (production-ready) / OBSERVATION_INSUFFICIENT alone, NEEDS_GOVERNANCE — M7 path with SP-02
+- SP-13 — old T300 plain 0.425 / PLA (non-Light) auxetic, DP420 / 510×520×2.85 / 584.6 g real / fitted experiment YES (governed, active `SP13/best-physical`; FREQUENCY_ONLY `SP13/260909-bravo-1`) / governed FE YES / physical registration YES (production-ready) / OBSERVATION_INSUFFICIENT alone, NEEDS_GOVERNANCE — M7 path with SP-02
 - SP-15 — CFRP plain bare plate (stock/thickness/size not recorded) / fitted experiment YES (ungoverned, outside store) / governed FE NO / physical registration NO / identity AMBIGUOUS / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION, NOT_APPLICABLE

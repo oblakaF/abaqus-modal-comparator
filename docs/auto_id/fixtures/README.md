@@ -224,3 +224,13 @@ the data and never modifies, reorders or deletes modes.
     pairing.
   - Tests: `tests/test_sp13_260909_frozen_modal_set.py`. Its store-gated part needs `sumin` and
     `snadwich`.
+
+## Active SP-13 input (D-068, 2026-10-08)
+
+- **`SP13/best-physical`** is the **active** SP-13 input.
+  - It has the same experimental source, modal set and FE as `SP13/best`, on the accepted physical
+    registration `docs/registrations/SP13_physical_registration.json`, with `physical_specimen_id` "SP-13".
+  - `test_run_id` stays unresolved, as in `SP13/best`.
+  - The physical passport `docs/auto_id/specimens/SP13.physical.specimen.json` names it.
+- **`SP13/best`** stays as the **historical** legacy-registration record. The archived M0–M5 chain is bound to
+  it (legacy passport, `SP13.forward.json`, CARBON-4C baseline).

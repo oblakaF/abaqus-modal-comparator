@@ -75,7 +75,7 @@
       "grid_id": "SP-13-scan-289pt",
       "point_count": 289
     },
-    "fixture_id": "SP13/best",
+    "fixture_id": "SP13/best-physical",
     "protocol_id": "SP-13-psv-installation-2026-09",
     "remount_of": "SP13_500by500_Glue420_Auxetic_newSP01_260909",
     "remount_kind": "re_suspension",

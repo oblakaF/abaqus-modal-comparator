@@ -38,7 +38,7 @@ class RealFixtureManifestTests(unittest.TestCase):
 
         self.assertEqual(manifest.schema_version, EXPERIMENT_FIXTURE_MANIFEST_SCHEMA)
         self.assertEqual([item.fixture_id for item in manifest.fixtures],
-                         ["SP02/bravo-1", "SP02/bravo-1-physical", "SP13/best"])
+                         ["SP02/bravo-1", "SP02/bravo-1-physical", "SP13/best", "SP13/best-physical"])
 
         sp02 = manifest.fixture("SP02/bravo-1")
         self.assertEqual(sp02.experimental_source.file_name, "SP02_polymax_retry_260803.unv")
@@ -62,6 +62,16 @@ class RealFixtureManifestTests(unittest.TestCase):
         self.assertEqual(sp13.modal_set.measured_dofs, ("U3",))
         self.assertTrue(sp13.registration.registration_hash.startswith("a8970e52"))
         self.assertTrue(sp13.fe.geometry_identity.sha256.startswith("34d69d79"))
+
+        # D-068: the active SP-13 input is the same experiment, modal set and FE on the accepted physical registration;
+        # SP13/best stays the historical legacy-registration record of the M0-M5 chain.
+        active13 = manifest.fixture("SP13/best-physical")
+        self.assertEqual((active13.experimental_source, active13.modal_set, active13.fe),
+                         (sp13.experimental_source, sp13.modal_set, sp13.fe))
+        self.assertEqual(active13.physical_specimen_id, "SP-13")
+        self.assertIsNone(active13.test_run_id)  # still unresolved, as in SP13/best; no key is invented
+        self.assertEqual(active13.registration.path, "docs/registrations/SP13_physical_registration.json")
+        self.assertTrue(active13.registration.registration_hash.startswith("2eeeaa86"))
 
     def test_records_match_the_accepted_frozen_registrations(self):
         for fixture in load_experiment_fixture_manifest(MANIFEST_PATH).fixtures:

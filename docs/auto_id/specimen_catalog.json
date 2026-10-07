@@ -640,7 +640,7 @@
     "physical_basis": "stored PSV camera frame + MeasPoints + panel edges + spec dimensions (D-062 method)",
     "distortion": "UNV/physical x 1.0917, y 0.8178 (anisotropy 1.335)",
     "registration_limited": false,
-    "unresolved": "through-thickness face convention (TOP by convention); the M3 forward-model manifest SP02.forward.json still pins the legacy passport and registration (historical CARBON-4C / M4.2 chain, unchanged); a forward-model binding of the physical passport is pending"
+    "unresolved": "through-thickness face convention (TOP by convention); the M3 forward-model manifest SP02.forward.json still pins the legacy passport and registration (historical CARBON-4C / M4.2 chain, unchanged); the active forward-model binding of the physical passport is SP02.physical.forward.json (D-068)"
    },
    "strict_pairs": {
     "legacy": "NOT_FROZEN: (2,8) only",
@@ -3512,7 +3512,7 @@
       }
      ],
      "governed": true,
-     "governed_set": "Best (fixture SP13/best)",
+     "governed_set": "Best (active fixture SP13/best-physical; SP13/best historical; D-068)",
      "usable_now": [
       "frequency",
       "shape",
@@ -3595,7 +3595,7 @@
     "physical_basis": "stored PSV camera frame + MeasPoints + panel edges + spec dimensions; H7 orientation",
     "distortion": "UNV/physical x 1.195, y 0.889 (anisotropy 1.345)",
     "registration_limited": false,
-    "unresolved": "through-thickness face convention (TOP by convention); fixture and production input still reference the legacy registration (D-062 out of scope)"
+    "unresolved": "through-thickness face convention (TOP by convention); active fixture SP13/best-physical and production input use the physical registration (D-068); SP13/best is historical"
    },
    "strict_pairs": {
     "legacy": "historical",

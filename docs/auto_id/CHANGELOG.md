@@ -3609,3 +3609,35 @@ first internal provider.
   - the open items, which are not gate conditions, are listed in M6_DECISION_RECORD §20.
 - **Next gate:** SUPERVISOR review of M6.4b and of the M6 gate. Then the M6 stage PR. A merge needs explicit
   HUMAN authorisation. M7 NOT_STARTED.
+
+## 2026-10-08 — M6 — D-068: M7-entry wiring of the active SP-02 / SP-13 inputs; M6 closure record (zero Abaqus)
+
+- **Stage:** M6 (closure preparation)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m6`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M6): D-068 - active SP-02/SP-13 inputs on the physical registrations; M6 closure record (zero Abaqus)`
+- **Decision:** D-068:
+  - M6.4b accepted, M6.4 CLOSED;
+  - the M7-entry wiring of the active inputs only;
+  - the M6 closure record, with the M6 gate a PASS candidate.
+- **Files changed:**
+  - created:
+    - `docs/auto_id/forward_models/SP02.physical.forward.json`, `docs/auto_id/forward_models/SP13.physical.forward.json`;
+    - `tests/test_m7_entry_wiring.py`.
+  - updated:
+    - `docs/auto_id/fixtures/real_experiment_fixtures.json` (new fixture `SP13/best-physical`; insertion only);
+    - `docs/auto_id/specimens/SP13.physical.specimen.json` (`acquisition.fixture_id`);
+    - `docs/auto_id/registration_evidence/SP13_registration_uncertainty.json` (regenerated; passport hash only);
+    - `tests/test_experiment_fixture.py`, `tests/test_sp13_physical_registration.py`, `tests/test_specimen_catalog.py`;
+    - `docs/auto_id/SPECIMEN_CATALOG.md`, `docs/auto_id/specimen_catalog.json`;
+    - DECISIONS, M6_DECISION_RECORD (§21), EVIDENCE, ROADMAP, STATUS;
+    - the fixtures, forward-model and specimens READMEs.
+- **Scientific behaviour changed:** NO. These are new governed bindings. The frozen M0–M5 records, legacy chains
+  and rules are unchanged (54 content hashes compared, 0 changed).
+- **Tests run:** the full suite on Windows, with and without data stores; the wiring, fixture, registration,
+  catalog, forward, M3/M4/M5 gate and M6.4 tests.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); wiring + fixture + registration + catalog + forward + M3/M4/M5 gate + M6.4 tests included
+- **Abaqus run count:** 0 (no identification run).
+- **Next gate:** SUPERVISOR review of D-068 and final M6 acceptance. Then the M6 stage PR; a merge needs
+  explicit HUMAN authorisation. M7 NOT_STARTED.

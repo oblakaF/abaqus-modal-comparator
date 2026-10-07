@@ -22,8 +22,8 @@ D-060 supersedes D-015.
 | M6.1 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
 | M6.2 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
 | M6.3 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
-| M6.4 | `REVIEW_READY` | M6.4a ACCEPTED (D-067); M6.4b result REVIEW_READY: all five constants NEGLIGIBLE_FOR_BUDGET (§20) |
-| M6 gate | `PASS` (worker evaluation, pending SUPERVISOR) | rescoped (SPEC §19 item 6, D-061); §20 |
+| M6.4 | `ACCEPTED` (CLOSED) | M6.4a ACCEPTED (D-067); M6.4b ACCEPTED (D-068): all five constants NEGLIGIBLE_FOR_BUDGET (§20) |
+| M6 gate | `PASS_CANDIDATE` (pending final SUPERVISOR acceptance) | rescoped (SPEC §19 item 6, D-061); §20, §21 |
 | STEEL gate | `SUPERSEDED` | D-060 |
 | M7 | `NOT_STARTED` | — |
 
@@ -648,3 +648,52 @@ registration".
 - the k_core PROVISIONAL width; the M7 mapping of the practical 5–10 % target (D-066).
 
 M7 is NOT_STARTED.
+
+## 21. M6 closure record and M7-entry wiring (SUPERVISOR, 2026-10-08; D-068)
+
+**M6 closure record:**
+
+| Item | State |
+|---|---|
+| M6.1 bare-plate Stage A | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059). No primary twill G12; G12 follows §5 / §5.1 (D-046) |
+| M6.2 same-plate repeat | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059). Σ_setup provisional 0.3 %, flagged |
+| M6.3 core tile | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059). No measured k_core prior |
+| M6.4 transverse constants | **CLOSED** (D-067, D-068). E3, ν13, ν23, G13, G23 `NEGLIGIBLE_FOR_BUDGET` (max 0.0353 %); fixed |
+| New experiments | none |
+| STEEL gate | `SUPERSEDED` (D-060). Results are labelled not externally validated |
+| M6 gate (rescoped, D-061) | **PASS candidate.** All four conditions are met (§20); final SUPERVISOR acceptance is pending |
+
+**M7-entry wiring (active inputs only):**
+- SP-02: `SP02.physical.specimen.json` → `SP02/bravo-1-physical` (`9b63f6c8…`) → `SP02.physical.forward.json`.
+- SP-13: `SP13.physical.specimen.json` → `SP13/best-physical` (new; `2eeeaa86…`) → `SP13.physical.forward.json`.
+- Historical M0–M5 chains are unchanged and still bind: `SP02/bravo-1` / `SP13/best`, the legacy passports,
+  `SP02.forward.json` / `SP13.forward.json`, and the CARBON-4C baselines.
+- Both chains render the same FE jobs, so the archived baseline packs are reusable.
+
+**Exact remaining M7 prerequisites:**
+- **Process (CLAUDE.md, ROADMAP stage policy):**
+  1. SUPERVISOR final acceptance of M6 (gate PASS candidate → ACCEPTED) and of this D-068 checkpoint;
+  2. the M6 stage PR to `main`, merged only with explicit HUMAN authorisation;
+  3. the `main` merge SHA recorded in STATUS.json and CHANGELOG.md before M7 starts.
+- **SUPERVISOR M7 entry decisions (not decided here):**
+  4. the M7 specimen scope. ROADMAP M7.2 names SP-01, SP-02, SP-10 and SP-13, but only SP-02 and SP-13 have
+     governed fixtures, FE models and physical registrations (catalog);
+  5. the campaign-level reading of the mandatory M4.3 holdout (M6_DECISION_RECORD §18.1): per specimen
+     (3 fit rows, rank 2) or pooled;
+  6. the mapping of the practical target (D-066: correct mode identity / MAC, frequency preferably within
+     ~5 %, up to ~10 %) onto the M5 verdict (Σ, pattern test, Birge);
+  7. the nuisance set and priors:
+     - t_face: SPEC §5 needs a prior from 9+ thickness points per specimen; D-066 gives the local scatter;
+     - k_core: only a PROVISIONAL nuisance with a SUPERVISOR-approved width (D-059), or kept fixed;
+     - k_int: off by default, with the torsion holdout.
+- **Implementation before real-result reporting:**
+  8. the "not externally validated" label (D-060) must be emitted by the real-result report path. It is not
+     yet wired in code.
+- **Execution:**
+  9. every M7 Abaqus solve and extraction needs its own HUMAN gate.
+- **Already closed and not M7 blockers:**
+  - Σ_setup provisional 0.3 %, flagged (a measured value is deferred);
+  - the transverse constants are fixed (M6.4: all NEGLIGIBLE_FOR_BUDGET), so no propagation policy is needed;
+  - the active inputs are wired to the physical registrations (D-068).
+
+M7 is NOT_STARTED. No Abaqus, no identification run.

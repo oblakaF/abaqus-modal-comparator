@@ -156,7 +156,7 @@
   ],
   "pairs_source": "docs/auto_id/registration_evidence/SP13_registration_reevaluation.json",
   "passport": "docs/auto_id/specimens/SP13.physical.specimen.json",
-  "passport_sha256_lf": "a3fbfd1d7028657da7db6aae1bf74107861c1ec94ba9d3081df59baef3d55014",
+  "passport_sha256_lf": "8e46157d7ebf230508334c45d2e980dfb594c977918d8df0c337d9ba540e535c",
   "perturbations": [
     {
       "name": "+translation_x",

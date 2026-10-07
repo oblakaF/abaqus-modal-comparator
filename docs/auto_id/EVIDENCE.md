@@ -928,3 +928,40 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
 - **Limitation:** the classification is local to the CARBON-4C reference point (E_in 52 000, G12 4 500 MPa).
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1516 OK (2 Abaqus-gated skipped); without data stores 1507 OK (49 skipped); targeted M6.4 + M6 + M5 gate + M4 guard/gate + M3 gate 152 OK; result reproduction from the run store OK
 - 16 Abaqus solves and 16 Abaqus Python extractions, all under the D-067 HUMAN gate.
+
+## D-068 M7-entry wiring: active SP-02 / SP-13 inputs on the physical registrations (zero Abaqus)
+
+- **Status:** REVIEW_READY (worker, 2026-10-08; D-068).
+- **Active chains:**
+
+| Specimen | Physical passport | Fixture | Registration | Forward manifest |
+|---|---|---|---|---|
+| SP-02 | `SP02.physical.specimen.json` `bddc5437…` (unchanged) | `SP02/bravo-1-physical` (D-065) | `9b63f6c8…` | `SP02.physical.forward.json` `f53226a0…` (new) |
+| SP-13 | `SP13.physical.specimen.json` `8366c163…` (`fixture_id` changed) | `SP13/best-physical` (new) | `2eeeaa86…` | `SP13.physical.forward.json` `ec6f5ee2…` (new) |
+
+- **New fixture `SP13/best-physical`:**
+  - the experimental source, modal set (`best`, 12 modes, 289 points) and FE identity are those of `SP13/best`;
+  - `physical_specimen_id` "SP-13";
+  - `test_run_id` stays unresolved, as in `SP13/best`; no key is invented.
+- **New forward manifests:**
+  - The forward model ID, model input, material, parameterisation, eigenvalue request and job prefix equal the
+    legacy manifests, so the governed solver profiles apply unchanged.
+  - Only the passport and the registration differ.
+  - At the CARBON-4C point both render the archived baseline jobs `SP02_f3e592281bebce66` and
+    `SP13_a46d08b52995e078` byte-identically, so the validated baseline packs stay reusable.
+- **Active production input:**
+  - `load_production_modal_input("SP02/bravo-1-physical")`: 9 modes, `9b63f6c8…`;
+  - `load_production_modal_input("SP13/best-physical")`: 12 modes, `2eeeaa86…`.
+  - Both physical registrations rebuild from their passports to the same hash, with no readiness issue.
+- **Anti-tuning:** `registration_evidence/SP13_registration_uncertainty.json` was regenerated with the same tool
+  and inputs. Only `passport_sha256_lf` changed; every M2.4 value is identical.
+- **Unchanged (content hashes compared before and after; 54 records, 0 changed):**
+  - the legacy fixtures `SP02/bravo-1` and `SP13/best`, and `SP02/bravo-1-physical`;
+  - the legacy passports and the SP-02 physical passport;
+  - `SP02.forward.json` (`bc3d9b86…`), `SP13.forward.json` (`f5407900…`), `accepted_forward_jobs.json`;
+  - every registration, baseline, FE shape-pack record, twin and solver profile;
+  - the SP-02 M2.4 record, the reconstruction and re-evaluation records;
+  - the frozen SP-13 260909 set, and the M6.4 envelope, result and run evidence.
+  - The archived baselines still reference the legacy forward manifests and registrations.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); wiring + fixture + registration + catalog + forward + M3/M4/M5 gate + M6.4 tests included
+- 0 Abaqus solves, 0 Abaqus Python extractions, no identification run.

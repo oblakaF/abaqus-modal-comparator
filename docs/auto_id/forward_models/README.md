@@ -90,3 +90,17 @@ a transverse-constant screening job:
 
 A perturbation that is not one of the envelope's endpoint perturbations is refused. Screening
 perturbations are not parameterisations and are never fitted.
+
+## Active forward bindings (D-068)
+
+| File | Passport | Fixture | Registration | Role |
+|---|---|---|---|---|
+| `SP02.physical.forward.json` | `SP02.physical.specimen.json` | `SP02/bravo-1-physical` | `9b63f6c8…` (physical) | active |
+| `SP13.physical.forward.json` | `SP13.physical.specimen.json` | `SP13/best-physical` | `2eeeaa86…` (physical) | active |
+| `SP02.forward.json` | `SP02.specimen.json` | `SP02/bravo-1` | `9bf736d3…` (legacy) | historical (M0–M5; unchanged) |
+| `SP13.forward.json` | `SP13.specimen.json` | `SP13/best` | `a8970e52…` (legacy) | historical (M0–M5; unchanged) |
+
+- An active manifest has the same forward model ID, model input, material, parameterisation, eigenvalue
+  request and job prefix as its historical one. The governed solver profiles therefore apply unchanged.
+- Both manifests render the same FE jobs, so the archived CARBON-4C packs stay reusable.
+- Only the passport and the registration differ.

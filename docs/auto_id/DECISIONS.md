@@ -980,3 +980,28 @@ Decision:
 Rationale / scope: records the acceptance and the HUMAN Abaqus authorisation. The execution and the result
 are worker results pending SUPERVISOR review (EVIDENCE).
 Supersedes: none
+
+## D-068 — M6.4b accepted; M7-entry wiring of the active SP-02 / SP-13 inputs; M6 closure record
+Date: 2026-10-08 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M6 FINAL ACCEPTANCE PREPARATION + M7 ENTRY CLEANUP" (2026-10-08); D-062, D-064, D-065, D-066, D-067
+Decision:
+- **M6.4b:** the screening result (commit `345c06f`) is accepted. E3, ν13, ν23, G13 and G23 are
+  `NEGLIGIBLE_FOR_BUDGET`; they stay fixed. M6.4 is CLOSED.
+- **M7-entry wiring (active inputs only):**
+  - SP-02: the active forward binding uses the physical registration fixture `SP02/bravo-1-physical`
+    (new manifest `forward_models/SP02.physical.forward.json`, bound to the physical passport).
+  - SP-13: a new active fixture `SP13/best-physical` (same source, modal set and FE as `SP13/best`, on the
+    accepted physical registration `2eeeaa86…`). The physical passport names it, and the new manifest
+    `forward_models/SP13.physical.forward.json` binds it.
+  - **Kept:** all legacy registrations; the M0–M5 frozen baselines; historical provenance. `SP02/bravo-1`,
+    `SP13/best`, the legacy passports, `SP02.forward.json` and `SP13.forward.json` are unchanged and still
+    bind. Old M4 records are not rewritten.
+- **M6 closure record:**
+  - M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059);
+  - M6.4 is CLOSED and the transverse constants are fixed;
+  - Σ_setup stays provisional 0.3 %, flagged;
+  - no new experiments;
+  - the M6 gate is a PASS candidate pending final SUPERVISOR acceptance.
+- **Not started:** M7 fitting, identification runs, Abaqus.
+Rationale / scope: prepares the M7 inputs on the accepted physical registrations without touching the frozen
+M0–M5 evidence. The wiring is a worker result pending SUPERVISOR review (EVIDENCE).
+Supersedes: none

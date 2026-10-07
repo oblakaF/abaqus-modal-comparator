@@ -123,7 +123,7 @@ class CatalogStructureTests(unittest.TestCase):
                           if e["governed"])
         self.assertEqual(governed, [
             ("SP-02", "Bravo (1) (active fixture SP02/bravo-1-physical)"),
-            ("SP-13", "Best (fixture SP13/best)"),
+            ("SP-13", "Best (active fixture SP13/best-physical; SP13/best historical; D-068)"),
             ("SP-13", "Bravo (1) (frozen FREQUENCY_ONLY fixture SP13/260909-bravo-1, D-065)")])
         self.assertFalse(any("READY_FOR_M7" in s["auto_id_status"] for s in self.specimens))
 

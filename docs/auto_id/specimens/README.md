@@ -157,3 +157,12 @@ path reproduces the accepted registrations with full content equality: SP02
 
 The SP13 121-point / 289-point pair is **not** established as the same panel with an
 independent remount. It is therefore not eligible for Σ_setup (SPEC §7).
+
+## Active passports (D-068)
+
+The physical passports are the active ones:
+- `SP02.physical.specimen.json` → fixture `SP02/bravo-1-physical`;
+- `SP13.physical.specimen.json` → fixture `SP13/best-physical`.
+
+The legacy passports `SP02.specimen.json` and `SP13.specimen.json` are the unchanged historical records of
+the M0–M5 chain.
