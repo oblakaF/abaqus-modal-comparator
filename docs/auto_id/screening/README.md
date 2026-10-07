@@ -66,3 +66,19 @@ Stores are configured with `AUTO_ID_FIXTURE_ROOT_<STORE>`.
   - an informational all-mode diagnostic that is never used for classification.
 
 Run outputs (INPs, ODBs, packs, journal) are run-store data and are never committed.
+
+## Result (M6.4b, REVIEW_READY)
+
+- `M6_4_transverse_screening_result.json`: the unchanged `evaluate` output (result hash `0fb87ea753217e15…`).
+- `M6_4_run_evidence.json`: the 16 solves and extractions, pinned by content (no machine paths).
+
+| Parameter | Max effect SP02 | Max effect SP13 | Global max | Classification |
+|---|---|---|---|---|
+| E3 | 0.0003 % | 0.0005 % | 0.0005 % | `NEGLIGIBLE_FOR_BUDGET` |
+| ν13 | 0.0001 % | 0.0001 % | 0.0001 % | `NEGLIGIBLE_FOR_BUDGET` |
+| ν23 | 0.0007 % | 0.0007 % | 0.0007 % | `NEGLIGIBLE_FOR_BUDGET` |
+| G13 | 0.0125 % | 0.0138 % | 0.0138 % | `NEGLIGIBLE_FOR_BUDGET` |
+| G23 | 0.0271 % | 0.0353 % | 0.0353 % | `NEGLIGIBLE_FOR_BUDGET` |
+
+Every frozen row was tracked (FE-to-FE MAC ≥ 0.999999), with no refusal. None of the five constants
+enters the uncertainty budget.

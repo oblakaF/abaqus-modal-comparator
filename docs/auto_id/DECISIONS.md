@@ -953,3 +953,30 @@ Rationale / scope: gives M6.4 its approved range source and fixes the screening 
 criterion, geometry, registration, pairing, modal selection, M4 thresholds and M5 rules are unchanged.
 Supersedes: D-055 in part. The M6.4 item "NEEDS_DECISION, no M6.4 FE jobs yet" is resolved by this
 envelope. The 0.3 % criterion stands, and so do the t_face and interface items of D-055.
+
+## D-067 — M6.4a accepted; HUMAN Abaqus gate M6.4b authorised for manifest 6d34179c…
+Date: 2026-10-07 · Accepted by: SUPERVISOR / HUMAN · Source: SUPERVISOR "M6.4a — SUPERVISOR ACCEPT" with "HUMAN ABAQUS GATE — M6.4b" (2026-10-07); D-066
+Decision:
+- **M6.4a:** commit `403ff94` is accepted. The screening design, the guarded implementation, the frozen
+  observation-mode set and `LITERATURE_INTERIM_SCREENING_ENVELOPE` are accepted.
+- **HUMAN Abaqus gate M6.4b:** authorised for manifest `6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922` only.
+  - Scope: exactly 16 Abaqus solves and 16 Abaqus Python shape extractions (SP-02 and SP-13, 8 states each).
+  - The archived baseline packs are reused. There are no baseline solves and no extra perturbations.
+  - A retry that creates an additional scientific evaluation must be reported first.
+  - Only the authorised constant changes, at its authorised endpoint. E_in/E1/E2, G12, ν12, geometry,
+    thickness, core, registration, experimental data, pairing thresholds, modal-family rules, holdout rules
+    and the M5 verdict policy do not change.
+- **Tracking:** the existing FE-to-FE tracking (MAC ≥ 0.90, unique). No mode is identified by number
+  alone, and none is substituted manually. A refusal is recorded as `NOT_CLASSIFIED_TRACKING_REFUSED`.
+- **Interpretation (restated):**
+  - The 0.3 % criterion is only the fixed-constant budget screening rule. A result ≥ 0.3 % is not a failed
+    model; it means `INCLUDE_IN_UNCERTAINTY_BUDGET`.
+  - The envelope is not a probability distribution, and the effects are not placed in Σ.
+  - The real-data engineering target stays: correct mode identity / acceptable MAC; frequency preferably
+    within ~5 %, up to ~10 % acceptable. Properties are not tuned for sub-percent agreement.
+- **After the screening:** if every constant is classified, the evidence is complete and no tracking
+  refusal is unresolved, the rescoped M6 gate is evaluated. The M7 propagation policy is not decided here.
+  M7 stays NOT_STARTED. No merge to `main`.
+Rationale / scope: records the acceptance and the HUMAN Abaqus authorisation. The execution and the result
+are worker results pending SUPERVISOR review (EVIDENCE).
+Supersedes: none

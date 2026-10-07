@@ -470,7 +470,7 @@ work.
 | M6.1 | Bare carbon plate Stage A: identify D11, D66; derive E, G12 with propagated thickness uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
 | M6.2 | Repeat the same bare-plate experiment; measure true setup/retest uncertainty | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
 | M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
-| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `IN_PROGRESS` (D-066): M6.4a `REVIEW_READY`; M6.4b `TODO` (HUMAN Abaqus gate) |
+| M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `REVIEW_READY` (D-066, D-067): M6.4a ACCEPTED; M6.4b all five `NEGLIGIBLE_FOR_BUDGET` |
 
 Stage status: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
 decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; rescoped by SPEC §19 item 6; M6 gate
@@ -533,6 +533,14 @@ decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; resc
     - tests;
     - HUMAN Abaqus manifest `6d34179c…`: 16 solves, 16 extractions; the baselines are reused.
   - **M6.4b, `TODO`:** the 16 solves and extractions under a HUMAN Abaqus gate, then the result record.
+  - M6.4a SUPERVISOR-ACCEPTED 2026-10-07 (D-067). The HUMAN Abaqus gate was authorised for manifest
+    `6d34179c…`.
+  - **M6.4b (16 solves, 16 extractions, 0 failures), `REVIEW_READY`:**
+    - E3, ν13, ν23, G13 and G23 are all `NEGLIGIBLE_FOR_BUDGET`. The global max |Δf/f| is
+      0.0353 % (G23, SP-13 R2).
+    - Every frozen row was tracked, with no refusal.
+    - Result `screening/M6_4_transverse_screening_result.json`.
+  - **M6 gate (rescoped): worker evaluation PASS**, pending SUPERVISOR (M6_DECISION_RECORD §20).
 
 **M6 GATE (rescoped, SPEC §19 item 6, D-061):**
 

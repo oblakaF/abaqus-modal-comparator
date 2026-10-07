@@ -3576,3 +3576,36 @@ first internal provider.
   - the M7 propagation mechanism for a budgeted constant is not chosen.
 - **Next gate:** SUPERVISOR review of M6.4a. Then the HUMAN Abaqus gate for M6.4b: 16 solves and
   16 extractions under manifest `6d34179c787c8b0e…`.
+
+## 2026-10-08 — M6 — M6.4b: transverse-constant screening result; M6 gate evaluated (HUMAN Abaqus gate)
+
+- **Stage:** M6
+- **Mini-step:** M6.4b (M6.4 `REVIEW_READY`; M6.4a ACCEPTED, D-067)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m6`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M6.4b): transverse-constant screening result - all five NEGLIGIBLE_FOR_BUDGET; M6 gate evaluated`
+- **Files changed:**
+  - created:
+    - `docs/auto_id/screening/M6_4_transverse_screening_result.json`;
+    - `docs/auto_id/screening/M6_4_run_evidence.json`;
+    - `tests/test_m6_4_screening_result.py`.
+  - updated:
+    - `docs/auto_id/DECISIONS.md` (D-067), `docs/auto_id/M6_DECISION_RECORD.md` (§20);
+    - `docs/auto_id/EVIDENCE.md`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/STATUS.json`;
+    - `docs/auto_id/screening/README.md`.
+- **Scientific behaviour changed:** NO. The tool is unchanged from `403ff94`; this mini-step only records the
+  result.
+- **Tests run:**
+  - the M6.4 tests, the M6 tests, the M5 gate, the M4 guard and gates, the M3 gate;
+  - the full suite on Windows, with and without data stores;
+  - the result reproduction from the run store.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1516 OK (2 Abaqus-gated skipped); without data stores 1507 OK (49 skipped); targeted M6.4 + M6 + M5 gate + M4 guard/gate + M3 gate 152 OK; result reproduction from the run store OK
+- **Abaqus run count:** 16 solves and 16 Abaqus Python extractions (HUMAN gate D-067; 0 failures, 0 retries).
+- **Evidence produced:** EVIDENCE "M6.4b". All five constants are `NEGLIGIBLE_FOR_BUDGET` (max 0.0353 %);
+  the M6 gate worker evaluation is PASS.
+- **Known limitations:**
+  - the classification is local to the CARBON-4C reference point;
+  - the open items, which are not gate conditions, are listed in M6_DECISION_RECORD §20.
+- **Next gate:** SUPERVISOR review of M6.4b and of the M6 gate. Then the M6 stage PR. A merge needs explicit
+  HUMAN authorisation. M7 NOT_STARTED.

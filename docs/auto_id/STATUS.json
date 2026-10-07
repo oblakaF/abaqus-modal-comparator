@@ -5,7 +5,7 @@
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M6",
   "current_ministep": "M6.4",
-  "status": "IN_PROGRESS",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M5",
   "last_accepted_ministep": "M5.9",
   "last_accepted_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70",
@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of M6.4a; then a HUMAN Abaqus gate for M6.4b (16 solves + 16 extractions, manifest 6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922); M6 not accepted; no M7",
+  "next_action": "STOP: SUPERVISOR review of M6.4b and of the rescoped M6 gate (worker evaluation PASS); then the M6 stage PR (merge only with HUMAN authorisation); M7 NOT_STARTED",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -626,19 +626,19 @@
   "m6": {
     "branch": "auto-id/m6",
     "base": "ab1dc6071355fe536a3bec7f593ee804df92583f",
-    "status": "IN_PROGRESS",
+    "status": "REVIEW_READY",
     "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
     "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
     "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
-    "M6.4": "IN_PROGRESS",
+    "M6.4": "REVIEW_READY",
     "readiness": {
       "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no primary twill G12; no real-data Stage-A validation; M6-B adapter kept",
       "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): SPEC provisional Sigma_setup 0.3 % allowed and flagged",
       "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no measured k_core prior; later PROVISIONAL nuisance only",
-      "M6.4": "D-066 envelope LITERATURE_INTERIM_SCREENING_ENVELOPE; M6.4a REVIEW_READY (zero Abaqus); M6.4b TODO (HUMAN Abaqus gate: 16 solves, 16 extractions)"
+      "M6.4": "M6.4a ACCEPTED (D-067); M6.4b REVIEW_READY: E3, nu13, nu23, G13, G23 all NEGLIGIBLE_FOR_BUDGET (global max 0.0353 %); no tracking refusal"
     },
-    "gate": "NOT_EVALUATED (rescoped gate SPEC §19 item 6 / D-061: unavailable evidence recorded, verdict consequences encoded, provisional inputs flagged, M6.4 budget closed)",
-    "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-061)",
+    "gate": "PASS (worker evaluation 2026-10-08, pending SUPERVISOR; M6_DECISION_RECORD §20): unavailable evidence recorded, missing-prior consequences encoded, provisional inputs flagged, M6.4 budget closed",
+    "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-061, D-062..D-067)",
     "entry_authorisation": "SUPERVISOR 2026-10-06: M6 entry review accepted; checkpoints M6-A (governance, SP-11 checklist) and M6-B (Stage-A -> M5 adapter, synthetic tests) only; no Abaqus; no M6-C",
     "experiment_checklist": "docs/auto_id/M6_SP11_EXPERIMENT_CHECKLIST.md (reference requirements for a valid future SP-11 / bare-plate test; not an active HUMAN to-do list)",
     "M6-A": {
@@ -744,7 +744,7 @@
       "acceptance": "SUPERVISOR 2026-10-07: commit 8b4afff accepted as the M6.4 basis (D-066)"
     },
     "m6_4": {
-      "decision": "D-066",
+      "decision": "D-066, D-067",
       "envelope": "docs/auto_id/screening/M6_4_transverse_envelope.json (d29e848566afaadc1a73234d531f83383810e7ec2f7ac0471c0965aa6fd2036d)",
       "basis": "LITERATURE_INTERIM_SCREENING_ENVELOPE (not MATERIAL_SPECIFIC)",
       "ranges": "E3 5000-10000 MPa; nu13 0.2-0.4; nu23 0.2-0.4; G13 2200-5000 MPa; G23 2200-5000 MPa",
@@ -758,11 +758,34 @@
         "human_abaqus_manifest": "6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922",
         "abaqus_solves": 0,
         "abaqus_python_extractions": 0,
-        "status": "REVIEW_READY"
+        "status": "ACCEPTED",
+        "acceptance": "SUPERVISOR 2026-10-07: commit 403ff94 accepted (D-067)"
       },
       "M6.4b": {
-        "scope": "16 Abaqus solves + 16 pinned extractions under a HUMAN gate naming the manifest hash; then the result record",
-        "status": "TODO"
+        "authorisation": "HUMAN Abaqus gate 2026-10-07 (D-067): manifest 6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922",
+        "execution": "16 successful solves, 16 successful extractions; 0 failures, 0 retries, 0 baseline solves",
+        "run_evidence": "docs/auto_id/screening/M6_4_run_evidence.json",
+        "result": "docs/auto_id/screening/M6_4_transverse_screening_result.json (0fb87ea753217e15ca0f182aff960f94d022020d32151edaebdbfb62e2f1cd9b)",
+        "classification": {
+          "E3": "NEGLIGIBLE_FOR_BUDGET",
+          "nu13": "NEGLIGIBLE_FOR_BUDGET",
+          "nu23": "NEGLIGIBLE_FOR_BUDGET",
+          "G13": "NEGLIGIBLE_FOR_BUDGET",
+          "G23": "NEGLIGIBLE_FOR_BUDGET"
+        },
+        "max_abs_relative_change_percent": {
+          "E3": 0.0005,
+          "nu13": 0.0001,
+          "nu23": 0.0007,
+          "G13": 0.0138,
+          "G23": 0.0353
+        },
+        "tracking": "all frozen rows tracked (min MAC 0.999999); no refusal; no order change",
+        "include_in_uncertainty_budget": [],
+        "tests_result": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1516 OK (2 Abaqus-gated skipped); without data stores 1507 OK (49 skipped); targeted M6.4 + M6 + M5 gate + M4 guard/gate + M3 gate 152 OK; result reproduction from the run store OK",
+        "abaqus_solves": 16,
+        "abaqus_python_extractions": 16,
+        "status": "REVIEW_READY"
       }
     }
   },

@@ -833,3 +833,98 @@ Possible remaining causes remain outside CARBON-5F scope:
 - **Mutation check:** 6 of 6 targeted mutants killed.
 - **Test results:** Windows with the snadwich and carbon-project-archive stores 1511 OK (5 skipped: 3 need the sumin store and pass with it, 24 OK; 2 are Abaqus-gated); without data stores 1502 OK (48 skipped); test_m6_4_transverse_screening 28 OK (24 OK, 1 class skipped without stores)
 - 0 Abaqus solves, 0 Abaqus Python extractions.
+
+## M6.4b: transverse-constant screening result (HUMAN Abaqus gate, manifest 6d34179c…)
+
+- **Status:** REVIEW_READY (worker, 2026-10-08; D-066, D-067). Pending SUPERVISOR review.
+- **Authorisation:** HUMAN Abaqus gate for manifest `6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922` (D-067).
+- **Pre-run verification:**
+  - `plan` from the frozen tree `403ff94` gave exactly this hash.
+  - The job list equals the 16 authorised jobs.
+  - Each generated INP was re-read. It differs from the reference constants only in the authorised constant
+    at its authorised value.
+  - The extractor `abaqus_scripts/extract_odb.py` has SHA-256 `039aa067…`, unchanged.
+- **Execution:** `tools/m6_4_transverse_screening.py run` with the governed profiles `SP02/abaqus-2024/v1`
+  (8 cpus) and `SP13/abaqus-2024/v1` (1 cpu), Abaqus 2024.
+  - 16 successful solves and 16 successful, validated extractions.
+  - 0 failures, 0 retries, 0 baseline solves.
+  - Solve wall-clock: SP02 809–2169 s, SP13 581–718 s. The first SP02 solves ran slower because the
+    machine was loaded by other work; this changed the timing only.
+- **Run evidence:** `screening/M6_4_run_evidence.json` pins every job by content: generated INP, solve hash,
+  ODB SHA-256 and size, Abaqus version line, extraction ID, pack file and content hashes, and node set.
+  - Journal run hash `6def52361ef8ebed…`, 32 entries.
+  - The run-store data (ODBs, packs, journal) is not committed.
+- **Result record:** `screening/M6_4_transverse_screening_result.json`, the unchanged output of `evaluate`,
+  result hash `0fb87ea753217e15ca0f182aff960f94d022020d32151edaebdbfb62e2f1cd9b`.
+  - The result reproduces exactly from the journalled run packs through the frozen tool path (test
+    `test_m6_4_screening_result`, store-gated).
+- **Branch tracking:** every frozen row of every state was tracked by FE-to-FE MAC with a unique match
+  (minimum MAC 0.999999). Every row stayed on its baseline mode number, with no frequency-order
+  change. No refusal occurred.
+
+| Parameter | Max effect SP02 | Max effect SP13 | Global max | Classification |
+|---|---|---|---|---|
+| E3 | 0.0003 % | 0.0005 % | 0.0005 % | `NEGLIGIBLE_FOR_BUDGET` |
+| ν13 | 0.0001 % | 0.0001 % | 0.0001 % | `NEGLIGIBLE_FOR_BUDGET` |
+| ν23 | 0.0007 % | 0.0007 % | 0.0007 % | `NEGLIGIBLE_FOR_BUDGET` |
+| G13 | 0.0125 % | 0.0138 % | 0.0138 % | `NEGLIGIBLE_FOR_BUDGET` |
+| G23 | 0.0271 % | 0.0353 % | 0.0353 % | `NEGLIGIBLE_FOR_BUDGET` |
+
+Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-4C reference point:
+
+| Endpoint | Specimen | Row | Tracked mode | f (Hz) | Δf/f | Tracking MAC |
+|---|---|---|---|---|---|---|
+| E3 low (5000) | SP02 | R1 (fit) | FE 8 → 8 | 75.241 → 75.241 | -0.0001 % | 1.000000 |
+| E3 low (5000) | SP02 | R2 (fit) | FE 10 → 10 | 89.327 → 89.327 | -0.0001 % | 1.000000 |
+| E3 low (5000) | SP02 | R3 (holdout) | FE 13 → 13 | 207.427 → 207.427 | -0.0002 % | 1.000000 |
+| E3 high (10000) | SP02 | R1 (fit) | FE 8 → 8 | 75.241 → 75.241 | +0.0001 % | 1.000000 |
+| E3 high (10000) | SP02 | R2 (fit) | FE 10 → 10 | 89.327 → 89.327 | +0.0002 % | 1.000000 |
+| E3 high (10000) | SP02 | R3 (holdout) | FE 13 → 13 | 207.427 → 207.428 | +0.0003 % | 1.000000 |
+| E3 low (5000) | SP13 | R1 (fit) | FE 10 → 10 | 85.851 → 85.851 | -0.0002 % | 1.000000 |
+| E3 low (5000) | SP13 | R2 (holdout) | FE 13 → 13 | 199.977 → 199.976 | -0.0004 % | 1.000000 |
+| E3 high (10000) | SP13 | R1 (fit) | FE 10 → 10 | 85.851 → 85.852 | +0.0002 % | 1.000000 |
+| E3 high (10000) | SP13 | R2 (holdout) | FE 13 → 13 | 199.977 → 199.978 | +0.0005 % | 1.000000 |
+| ν13 low (0.2) | SP02 | R1 (fit) | FE 8 → 8 | 75.241 → 75.241 | -0.0001 % | 1.000000 |
+| ν13 low (0.2) | SP02 | R2 (fit) | FE 10 → 10 | 89.327 → 89.327 | -0.0001 % | 1.000000 |
+| ν13 low (0.2) | SP02 | R3 (holdout) | FE 13 → 13 | 207.427 → 207.427 | -0.0000 % | 1.000000 |
+| ν13 high (0.4) | SP02 | R1 (fit) | FE 8 → 8 | 75.241 → 75.241 | +0.0001 % | 1.000000 |
+| ν13 high (0.4) | SP02 | R2 (fit) | FE 10 → 10 | 89.327 → 89.327 | +0.0001 % | 1.000000 |
+| ν13 high (0.4) | SP02 | R3 (holdout) | FE 13 → 13 | 207.427 → 207.427 | +0.0000 % | 1.000000 |
+| ν13 low (0.2) | SP13 | R1 (fit) | FE 10 → 10 | 85.851 → 85.851 | -0.0001 % | 1.000000 |
+| ν13 low (0.2) | SP13 | R2 (holdout) | FE 13 → 13 | 199.977 → 199.977 | -0.0001 % | 1.000000 |
+| ν13 high (0.4) | SP13 | R1 (fit) | FE 10 → 10 | 85.851 → 85.852 | +0.0001 % | 1.000000 |
+| ν13 high (0.4) | SP13 | R2 (holdout) | FE 13 → 13 | 199.977 → 199.977 | +0.0001 % | 1.000000 |
+| ν23 low (0.2) | SP02 | R1 (fit) | FE 8 → 8 | 75.241 → 75.241 | -0.0001 % | 1.000000 |
+| ν23 low (0.2) | SP02 | R2 (fit) | FE 10 → 10 | 89.327 → 89.327 | -0.0002 % | 1.000000 |
+| ν23 low (0.2) | SP02 | R3 (holdout) | FE 13 → 13 | 207.427 → 207.426 | -0.0007 % | 1.000000 |
+| ν23 high (0.4) | SP02 | R1 (fit) | FE 8 → 8 | 75.241 → 75.241 | +0.0002 % | 1.000000 |
+| ν23 high (0.4) | SP02 | R2 (fit) | FE 10 → 10 | 89.327 → 89.327 | +0.0002 % | 1.000000 |
+| ν23 high (0.4) | SP02 | R3 (holdout) | FE 13 → 13 | 207.427 → 207.429 | +0.0007 % | 1.000000 |
+| ν23 low (0.2) | SP13 | R1 (fit) | FE 10 → 10 | 85.851 → 85.851 | -0.0002 % | 1.000000 |
+| ν23 low (0.2) | SP13 | R2 (holdout) | FE 13 → 13 | 199.977 → 199.976 | -0.0006 % | 1.000000 |
+| ν23 high (0.4) | SP13 | R1 (fit) | FE 10 → 10 | 85.851 → 85.852 | +0.0002 % | 1.000000 |
+| ν23 high (0.4) | SP13 | R2 (holdout) | FE 13 → 13 | 199.977 → 199.979 | +0.0007 % | 1.000000 |
+| G13 high (5000) | SP02 | R1 (fit) | FE 8 → 8 | 75.241 → 75.245 | +0.0056 % | 0.999999 |
+| G13 high (5000) | SP02 | R2 (fit) | FE 10 → 10 | 89.327 → 89.338 | +0.0125 % | 1.000000 |
+| G13 high (5000) | SP02 | R3 (holdout) | FE 13 → 13 | 207.427 → 207.452 | +0.0117 % | 1.000000 |
+| G13 high (5000) | SP13 | R1 (fit) | FE 10 → 10 | 85.851 → 85.861 | +0.0107 % | 1.000000 |
+| G13 high (5000) | SP13 | R2 (holdout) | FE 13 → 13 | 199.977 → 200.005 | +0.0138 % | 1.000000 |
+| G23 high (5000) | SP02 | R1 (fit) | FE 8 → 8 | 75.241 → 75.246 | +0.0067 % | 1.000000 |
+| G23 high (5000) | SP02 | R2 (fit) | FE 10 → 10 | 89.327 → 89.337 | +0.0115 % | 1.000000 |
+| G23 high (5000) | SP02 | R3 (holdout) | FE 13 → 13 | 207.427 → 207.483 | +0.0271 % | 1.000000 |
+| G23 high (5000) | SP13 | R1 (fit) | FE 10 → 10 | 85.851 → 85.863 | +0.0136 % | 1.000000 |
+| G23 high (5000) | SP13 | R2 (holdout) | FE 13 → 13 | 199.977 → 200.048 | +0.0353 % | 1.000000 |
+
+- **Reading:**
+  - E3, ν13 and ν23 move the observed frequencies by less than 0.001 %.
+  - G13 and G23 (2200 → 5000 MPa) raise them by at most 0.035 %, about 8.5× below the criterion.
+  - All five constants are `NEGLIGIBLE_FOR_BUDGET`. None enters the uncertainty budget, and they stay fixed
+    (SPEC §5.2).
+  - This screening says nothing about the practical 5–10 % real-data agreement target (D-066).
+- **Informational all-mode diagnostic** (never used for classification):
+  - the largest change over all extracted modes is about 0.12 % (G23-high, SP13);
+  - single-mode tracking could not follow SP02 G13-high: modes [29, 30]; SP02 G23-high: modes [29, 30]. These are near-degenerate high modes that are not
+    observation rows.
+- **Limitation:** the classification is local to the CARBON-4C reference point (E_in 52 000, G12 4 500 MPa).
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1516 OK (2 Abaqus-gated skipped); without data stores 1507 OK (49 skipped); targeted M6.4 + M6 + M5 gate + M4 guard/gate + M3 gate 152 OK; result reproduction from the run store OK
+- 16 Abaqus solves and 16 Abaqus Python extractions, all under the D-067 HUMAN gate.

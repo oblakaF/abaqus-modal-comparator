@@ -22,8 +22,8 @@ D-060 supersedes D-015.
 | M6.1 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
 | M6.2 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
 | M6.3 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
-| M6.4 | `IN_PROGRESS` | D-066 envelope; M6.4a `REVIEW_READY`; M6.4b needs a HUMAN Abaqus gate (§19) |
-| M6 gate | `NOT_EVALUATED` | rescoped (SPEC §19 item 6, D-061) |
+| M6.4 | `REVIEW_READY` | M6.4a ACCEPTED (D-067); M6.4b result REVIEW_READY: all five constants NEGLIGIBLE_FOR_BUDGET (§20) |
+| M6 gate | `PASS` (worker evaluation, pending SUPERVISOR) | rescoped (SPEC §19 item 6, D-061); §20 |
 | STEEL gate | `SUPERSEDED` | D-060 |
 | M7 | `NOT_STARTED` | — |
 
@@ -607,3 +607,44 @@ registration".
 **HUMAN Abaqus manifest:** hash `6d34179c787c8b0e1619864709290f2824e0435b98fb1ff2689e61d892da3922`. The job list is in EVIDENCE.
 
 **Not done:** no Abaqus, no Abaqus Python, no result, no M6 acceptance, no M7.
+
+## 20. M6.4b screening result and the rescoped M6 gate (worker evaluation, 2026-10-08)
+
+**Execution:** HUMAN Abaqus gate D-067, manifest `6d34179c787c8b0e…`.
+- 16 of 16 solves and 16 of 16 extractions succeeded.
+- 0 failures, 0 retries, 0 baseline solves.
+- The details are in EVIDENCE, "M6.4b".
+
+**Result** (`screening/M6_4_transverse_screening_result.json`, `0fb87ea753217e15…`):
+
+| Parameter | Max effect SP02 | Max effect SP13 | Global max | Classification |
+|---|---|---|---|---|
+| E3 | 0.0003 % | 0.0005 % | 0.0005 % | `NEGLIGIBLE_FOR_BUDGET` |
+| ν13 | 0.0001 % | 0.0001 % | 0.0001 % | `NEGLIGIBLE_FOR_BUDGET` |
+| ν23 | 0.0007 % | 0.0007 % | 0.0007 % | `NEGLIGIBLE_FOR_BUDGET` |
+| G13 | 0.0125 % | 0.0138 % | 0.0138 % | `NEGLIGIBLE_FOR_BUDGET` |
+| G23 | 0.0271 % | 0.0353 % | 0.0353 % | `NEGLIGIBLE_FOR_BUDGET` |
+
+- **Tracking:** every frozen row was tracked (MAC ≥ 0.999999), with no refusal and no order change.
+- **INCLUDE parameters:** none. The M7 propagation policy for a budgeted constant is therefore not needed
+  for these five constants. It was not decided.
+
+**Rescoped M6 gate (D-061):**
+
+| Condition | Evidence | State |
+|---|---|---|
+| All unavailable physical evidence is recorded | M6.1–M6.3 `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059, §16); SP-11 records (§15); specimen catalog (D-065) | met |
+| Every missing prior has its conservative verdict consequence encoded | G12: `BARE_PLATE_REQUIRED` / `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED` in `services/identification_verdict.py` (D-046, M5.9). k_core: no measured prior; later only a PROVISIONAL nuisance, and a PROVISIONAL prior keeps the verdict provisional (`identification_verdict.py`). No real-data Stage-A validation (recorded) | met |
+| Provisional inputs are explicitly flagged | Σ_setup 0.3 % provisional (SPEC §7, D-065; carried as `provisional` in `identification_uncertainty`); M4.3 classifier thresholds PROVISIONAL; the M6.4 envelope labelled interim | met |
+| The M6.4 transverse-constant budget is closed | M6.4b: all five constants classified `NEGLIGIBLE_FOR_BUDGET`; complete evidence; no tracking refusal | met (pending SUPERVISOR acceptance of M6.4b) |
+
+**Worker gate evaluation:** **PASS**, pending SUPERVISOR acceptance. M6 is not self-accepted.
+
+**Open items, not M6 gate conditions:**
+- the "not externally validated" label (D-060) must appear in real-result reports; it is not yet wired in
+  code (M7/M8 reporting);
+- the forward binding of the SP-02 physical passport; `SP13/best` still uses the legacy registration;
+- the campaign-level reading of the M4.3 holdout (§18.1);
+- the k_core PROVISIONAL width; the M7 mapping of the practical 5–10 % target (D-066).
+
+M7 is NOT_STARTED.
