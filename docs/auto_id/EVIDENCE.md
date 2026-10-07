@@ -965,3 +965,43 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
   - The archived baselines still reference the legacy forward manifests and registrations.
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); wiring + fixture + registration + catalog + forward + M3/M4/M5 gate + M6.4 tests included
 - 0 Abaqus solves, 0 Abaqus Python extractions, no identification run.
+
+## M6 stage acceptance (SUPERVISOR, 2026-10-08)
+
+- **Status:** ACCEPTED. M6 is accepted, and the rescoped M6 gate (D-061) is PASS.
+- **Evidence entries accepted with the stage** (each stays as written above):
+  - "SP-13 HUMAN evidence update (H7–H10) and SP-02 physical registration from stored PSV records";
+  - "Specimen catalog";
+  - "D-065 governed updates";
+  - "M6.4a" and "M6.4b" (the transverse-constant screening);
+  - "D-068 M7-entry wiring".
+- **Meaning:** M6 closes with honest NOT_AVAILABLE records for M6.1–M6.3, a closed M6.4 budget (all five
+  transverse constants `NEGLIGIBLE_FOR_BUDGET`, fixed) and the active physical-registration inputs. It is
+  **not** a real-material identification and makes no material claim.
+- **Limitations kept:**
+- M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059). This is intentional: the missing
+  experiments are recorded honestly and the verdict machinery carries their consequences.
+  - No primary twill G12; sandwich G12 follows §5 / §5.1 (`BARE_PLATE_REQUIRED`, D-046).
+  - No real-data Stage-A validation; the Stage-A software is validated on synthetic data only.
+  - No measured k_core prior; k_core may enter later only as a PROVISIONAL nuisance with a
+    SUPERVISOR-approved width.
+- Σ_setup = 0.3 %, PROVISIONAL and flagged. Σ_meas is NOT_AVAILABLE; no measurement uncertainty is invented.
+- The M6.4 classification is local to the CARBON-4C reference point. The envelope is an interim literature
+  screening envelope, not a material prior.
+- Real carbon results are model-calibrated effective constants, labelled not externally validated (D-060).
+  The label is not yet emitted by code.
+- The M4.3 classifier thresholds remain PROVISIONAL.
+- Face convention: TOP by convention for both specimens. Through the symmetric stack the face sign cannot be
+  shown from the records.
+- **Stage-PR verification:**
+  - Relative to `main` (`ab1dc60`), there are no Abaqus artifacts and no ODB / INP / UNV / NPZ additions.
+  - The M3 module `forward_builder.py` changed additively only: +87 / −0, the M6.4 screening path. The M3.5
+    anchors stay byte-identical.
+  - The M4 module `archived_baseline.py` gained an additive re-registered evidence path; the accepted path
+    keeps every check (173af43).
+  - No M5 module changed.
+  - No frozen M0–M5 record changed: baselines, FE shape packs, twins, solver profiles, legacy forward
+    manifests, legacy passports and legacy registrations.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); M6 test modules 143 OK; M5 + M4 + M3 stage gates and M4 guard 34 OK
+- 0 Abaqus solves and 0 Abaqus Python runs in this closure step. The only M6 Abaqus work was M6.4b under
+  D-067.

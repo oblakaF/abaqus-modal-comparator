@@ -3641,3 +3641,28 @@ first internal provider.
 - **Abaqus run count:** 0 (no identification run).
 - **Next gate:** SUPERVISOR review of D-068 and final M6 acceptance. Then the M6 stage PR; a merge needs
   explicit HUMAN authorisation. M7 NOT_STARTED.
+
+## 2026-10-08 — M6 — SUPERVISOR acceptance and stage closure; stage PR prepared
+
+- **Stage:** M6
+- **Status:** ACCEPTED (SUPERVISOR 2026-10-08). M6 gate PASS. Stage PR `auto-id/m6` → `main` prepared, not
+  merged.
+- **Branch:** `auto-id/m6`
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): M6 SUPERVISOR acceptance and stage closure`
+- **Accepted scope:**
+  - M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP` (intentional);
+  - M6.4 is `ACCEPTED` (M6.4a + M6.4b): E3, ν13, ν23, G13, G23 are `NEGLIGIBLE_FOR_BUDGET` and stay fixed;
+  - the active fixtures are `SP02/bravo-1-physical` and `SP13/best-physical`; the legacy registrations are
+    historical;
+  - Σ_setup 0.3 % PROVISIONAL, Σ_meas NOT_AVAILABLE.
+- **Files changed:** `docs/auto_id/STATUS.json`, `ROADMAP.md`, `CHANGELOG.md`, `M6_DECISION_RECORD.md` (§22) and
+  `EVIDENCE.md` (governance records only).
+- **Scientific behaviour changed:** NO (docs only).
+- **Verification before the PR:** no Abaqus artifacts; M3/M4 changes additive only; no M5 change; frozen M0–M5
+  records unchanged.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); M6 test modules 143 OK; M5 + M4 + M3 stage gates and M4 guard 34 OK
+- **Abaqus run count:** 0.
+- **Limitations kept:** see M6_DECISION_RECORD §22.
+- **Next gate:** HUMAN merge authorisation for the stage PR. After the merge, the `main` merge SHA is recorded.
+  M7 `NOT_STARTED`.

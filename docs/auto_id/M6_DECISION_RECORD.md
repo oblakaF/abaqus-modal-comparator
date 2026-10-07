@@ -23,7 +23,7 @@ D-060 supersedes D-015.
 | M6.2 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
 | M6.3 | `NOT_AVAILABLE_WITH_CURRENT_SETUP` | D-059, §16 |
 | M6.4 | `ACCEPTED` (CLOSED) | M6.4a ACCEPTED (D-067); M6.4b ACCEPTED (D-068): all five constants NEGLIGIBLE_FOR_BUDGET (§20) |
-| M6 gate | `PASS_CANDIDATE` (pending final SUPERVISOR acceptance) | rescoped (SPEC §19 item 6, D-061); §20, §21 |
+| M6 gate | `PASS` (SUPERVISOR 2026-10-08) | rescoped (SPEC §19 item 6, D-061); §20, §21, §22 |
 | STEEL gate | `SUPERSEDED` | D-060 |
 | M7 | `NOT_STARTED` | — |
 
@@ -697,3 +697,39 @@ M7 is NOT_STARTED.
   - the active inputs are wired to the physical registrations (D-068).
 
 M7 is NOT_STARTED. No Abaqus, no identification run.
+
+## 22. M6 SUPERVISOR acceptance and stage closure (2026-10-08)
+
+**SUPERVISOR decision:** M6 is **ACCEPTED**. The rescoped M6 gate (D-061) is **PASS**.
+
+**Accepted scope:**
+
+| Item | Final state |
+|---|---|
+| M6.1 bare-plate Stage A | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (intentional; consequences in the verdict machinery) |
+| M6.2 same-plate repeat | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (intentional) |
+| M6.3 core tile | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (intentional) |
+| M6.4 transverse-constant budget | `ACCEPTED`. Evidence M6.4a (`403ff94`) and M6.4b (`345c06f`). E3, ν13, ν23, G13, G23 are `NEGLIGIBLE_FOR_BUDGET` and remain fixed |
+| Registration | Active SP-02 fixture `SP02/bravo-1-physical` and active SP-13 fixture `SP13/best-physical`, both accepted. The legacy registrations are historical provenance only, and the M0–M5 frozen chains are not rewritten |
+| Uncertainty | Σ_setup = 0.3 %, `PROVISIONAL`; Σ_meas `NOT_AVAILABLE` |
+| STEEL gate | `SUPERSEDED` (D-060) |
+| M7 | `NOT_STARTED`; no M7 records |
+
+**Limitations that remain visible:**
+- M6.1, M6.2 and M6.3 are `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059). This is intentional: the missing
+  experiments are recorded honestly and the verdict machinery carries their consequences.
+  - No primary twill G12; sandwich G12 follows §5 / §5.1 (`BARE_PLATE_REQUIRED`, D-046).
+  - No real-data Stage-A validation; the Stage-A software is validated on synthetic data only.
+  - No measured k_core prior; k_core may enter later only as a PROVISIONAL nuisance with a
+    SUPERVISOR-approved width.
+- Σ_setup = 0.3 %, PROVISIONAL and flagged. Σ_meas is NOT_AVAILABLE; no measurement uncertainty is invented.
+- The M6.4 classification is local to the CARBON-4C reference point. The envelope is an interim literature
+  screening envelope, not a material prior.
+- Real carbon results are model-calibrated effective constants, labelled not externally validated (D-060).
+  The label is not yet emitted by code.
+- The M4.3 classifier thresholds remain PROVISIONAL.
+- Face convention: TOP by convention for both specimens. Through the symmetric stack the face sign cannot be
+  shown from the records.
+
+**Stage PR:** `auto-id/m6` → `main` is prepared, not merged. A merge needs explicit HUMAN authorisation; the
+`main` merge SHA is then recorded before M7 starts.

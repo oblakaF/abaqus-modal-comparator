@@ -472,7 +472,8 @@ work.
 | M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
 | M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `ACCEPTED` (CLOSED; D-066–D-068): all five `NEGLIGIBLE_FOR_BUDGET`, kept fixed |
 
-Stage status: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
+Stage status: **`ACCEPTED`** (SUPERVISOR 2026-10-08; M6 gate PASS; stage PR `auto-id/m6` → `main` prepared,
+not merged; M7 `NOT_STARTED`). History: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
 decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; rescoped by SPEC §19 item 6; M6 gate
 `NOT_EVALUATED`; M7 `NOT_STARTED`).
 - Checkpoint M6-A `REVIEW_READY`: entry decisions recorded; HUMAN SP-11 experiment checklist
@@ -550,7 +551,7 @@ decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; resc
   - M6 gate: **PASS candidate**, pending final SUPERVISOR acceptance.
   - The remaining M7 prerequisites are listed in M6_DECISION_RECORD §21. M7 NOT_STARTED.
 
-**M6 GATE (rescoped, SPEC §19 item 6, D-061):**
+**M6 GATE (rescoped, SPEC §19 item 6, D-061): PASS (SUPERVISOR 2026-10-08; M6_DECISION_RECORD §22)**
 
 - all unavailable physical evidence is explicitly recorded;
 - every missing prior has its conservative verdict consequence encoded;

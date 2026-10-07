@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M6",
-  "current_ministep": "M6.4",
-  "status": "REVIEW_READY",
+  "current_ministep": "M6 (stage closure)",
+  "status": "ACCEPTED",
   "last_accepted_stage": "M5",
   "last_accepted_ministep": "M5.9",
   "last_accepted_commit": "ab75315b5977082599e9af181c6c1c41c1d82a70",
@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of D-068 (M7-entry wiring, M6 closure record) and final M6 acceptance (gate PASS candidate); then the M6 stage PR (merge only with HUMAN authorisation); M7 NOT_STARTED",
+  "next_action": "Stage PR auto-id/m6 -> main prepared; await HUMAN merge authorisation; after the merge record the main merge SHA; M7 NOT_STARTED (no M7 records, code or runs)",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -626,7 +626,7 @@
   "m6": {
     "branch": "auto-id/m6",
     "base": "ab1dc6071355fe536a3bec7f593ee804df92583f",
-    "status": "REVIEW_READY",
+    "status": "ACCEPTED",
     "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
     "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
     "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP",
@@ -637,14 +637,14 @@
       "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP (D-059): no measured k_core prior; later PROVISIONAL nuisance only",
       "M6.4": "CLOSED (D-067, D-068): E3, nu13, nu23, G13, G23 NEGLIGIBLE_FOR_BUDGET (max 0.0353 %); transverse constants fixed"
     },
-    "gate": "PASS_CANDIDATE (pending final SUPERVISOR acceptance; M6_DECISION_RECORD §20, §21): unavailable evidence recorded, missing-prior consequences encoded, provisional inputs flagged, M6.4 budget closed",
+    "gate": "PASS (SUPERVISOR 2026-10-08; rescoped gate SPEC §19 item 6 / D-061: unavailable evidence recorded, missing-prior consequences encoded, provisional inputs flagged, M6.4 budget closed)",
     "decision_record": "docs/auto_id/M6_DECISION_RECORD.md (DECISIONS D-049..D-061, D-062..D-068)",
     "entry_authorisation": "SUPERVISOR 2026-10-06: M6 entry review accepted; checkpoints M6-A (governance, SP-11 checklist) and M6-B (Stage-A -> M5 adapter, synthetic tests) only; no Abaqus; no M6-C",
     "experiment_checklist": "docs/auto_id/M6_SP11_EXPERIMENT_CHECKLIST.md (reference requirements for a valid future SP-11 / bare-plate test; not an active HUMAN to-do list)",
     "M6-A": {
       "scope": "SUPERVISOR entry decisions recorded (D-049..D-056); SP-11 HUMAN experiment checklist",
       "abaqus_runs": 0,
-      "status": "REVIEW_READY",
+      "status": "ACCEPTED",
       "correction": "2026-10-06 corrective governance (M6_DECISION_RECORD §15): D-057 corrects D-049, D-058 corrects D-053; checklist re-labelled; inventory note; no SPEC/ROADMAP rescope"
     },
     "M6-B": {
@@ -654,7 +654,7 @@
       "tests_result": "M6-B 27 passed; M6-B + Stage-A + M5 + M4 guard 261 passed (2 Abaqus-gated skipped); M3/M4/M5 stage gates with stores 30 passed; Windows 1420 OK (27 skipped) without data stores; 1425 OK (2 skipped) with both stores",
       "abaqus_runs": 0,
       "abaqus_python_extractions": 0,
-      "status": "REVIEW_READY",
+      "status": "ACCEPTED",
       "open_items": [
         "affine-basis validation tolerance (needed before M6-D)",
         "real-run LM settings and D bounds",
@@ -694,7 +694,7 @@
       "sigma_setup": "provisional 0.3 % flagged (H9)",
       "abaqus_solves": 0,
       "abaqus_python_extractions": 0,
-      "status": "REVIEW_READY"
+      "status": "ACCEPTED"
     },
     "sp02_registration_gate": {
       "authorisation": "SUPERVISOR 2026-10-06: SP-02 zero-Abaqus physical registration gate (same method as SP-13)",
@@ -798,7 +798,7 @@
       "M6.4": "CLOSED; transverse constants fixed (all NEGLIGIBLE_FOR_BUDGET)",
       "sigma_setup": "provisional 0.3 %, flagged",
       "new_experiments": "none",
-      "gate": "PASS_CANDIDATE (pending final SUPERVISOR acceptance)",
+      "gate": "PASS (SUPERVISOR 2026-10-08)",
       "record": "docs/auto_id/M6_DECISION_RECORD.md §21"
     },
     "m7_entry_wiring": {
@@ -811,7 +811,31 @@
       "tests_result": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); wiring + fixture + registration + catalog + forward + M3/M4/M5 gate + M6.4 tests included",
       "abaqus_solves": 0,
       "abaqus_python_extractions": 0,
-      "status": "REVIEW_READY"
+      "status": "ACCEPTED"
+    },
+    "stage_pr": "READY_FOR_STAGE_PR (auto-id/m6 -> main); not merged; HUMAN merge authorisation required",
+    "supervisor_acceptance": {
+      "date": "2026-10-08",
+      "decision": "M6 ACCEPTED; rescoped M6 gate PASS",
+      "scope": {
+        "M6.1": "NOT_AVAILABLE_WITH_CURRENT_SETUP (intentional; consequences in the verdict machinery)",
+        "M6.2": "NOT_AVAILABLE_WITH_CURRENT_SETUP (intentional)",
+        "M6.3": "NOT_AVAILABLE_WITH_CURRENT_SETUP (intentional)",
+        "M6.4": "ACCEPTED (M6.4a 403ff94 + M6.4b 345c06f): E3, nu13, nu23, G13, G23 NEGLIGIBLE_FOR_BUDGET; fixed",
+        "registration": "active SP02/bravo-1-physical and SP13/best-physical accepted; legacy registrations historical provenance only; M0-M5 frozen chains not rewritten",
+        "uncertainty": "Sigma_setup 0.3 % PROVISIONAL; Sigma_meas NOT_AVAILABLE (not invented)"
+      },
+      "not_a_claim_of": "real-material identification",
+      "qualifications": [
+        "M6.1-M6.3 NOT_AVAILABLE: no primary twill G12 (sandwich G12 BARE_PLATE_REQUIRED, D-046); no real-data Stage-A validation; no measured k_core prior",
+        "Sigma_setup provisional 0.3 %; Sigma_meas NOT_AVAILABLE",
+        "M6.4 classification local to the CARBON-4C reference point; interim literature screening envelope",
+        "real carbon results are model-calibrated effective constants, not externally validated (D-060); label not yet emitted by code",
+        "M4.3 classifier thresholds PROVISIONAL",
+        "face convention TOP by convention (SP-02, SP-13)"
+      ],
+      "stage_pr_verification": "no Abaqus artifacts / ODB / INP / UNV / NPZ vs main ab1dc60; M3 forward_builder additive (+87/-0); M4 archived_baseline additive re-registered path (accepted path unchanged); no M5 module changed; frozen M0-M5 records unchanged",
+      "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); M6 test modules 143 OK; M5 + M4 + M3 stage gates and M4 guard 34 OK"
     }
   },
   "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated"
