@@ -78,6 +78,77 @@
       ]
     },
     {
+      "fixture_id": "SP02/bravo-1-physical",
+      "specimen_id": "SP02",
+      "physical_specimen_id": "SP-02",
+      "experiment_id": "SP02_500by500_Glue420_honeycomb_full_scan_retry_260803",
+      "test_run_id": "retry_260803",
+      "experimental_source": {
+        "role": "Simcenter PolyMAX fitted-mode UNV",
+        "file_name": "SP02_polymax_retry_260803.unv",
+        "sha256": "2671db01b6401a9a9bbec7d8c2aa2191b0b35b5ae791756b91c7ccd381a41785",
+        "size_bytes": 13597269,
+        "location": {
+          "store": "snadwich",
+          "relative_path": "SP-02/SP02_polymax_retry_260803.unv"
+        }
+      },
+      "modal_set": {
+        "name": "bravo-1",
+        "display_name": "Bravo (1)",
+        "source_type": "polymax-curve-fitted-dataset-55",
+        "mode_count": 9,
+        "measurement_point_count": 121,
+        "measured_dofs": ["U3"],
+        "measured_face": "TOP exterior face"
+      },
+      "registration": {
+        "path": "docs/registrations/SP02_physical_registration.json",
+        "schema_version": "frozen-registration/1",
+        "registration_hash": "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c",
+        "fe_geometry_sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d"
+      },
+      "fe": {
+        "model_name": "SP02_Modal_V02",
+        "geometry_identity": {
+          "schema_version": "fe-geometry-identity/2",
+          "sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d",
+          "node_count": 1663816
+        },
+        "model_input": {
+          "role": "accepted source Abaqus input",
+          "file_name": "SP02_Modal_V02.inp",
+          "sha256": "574ae78a897f5a666989716c54549969f13ca2919ad3af1f3ca658580a4ba8a5",
+          "size_bytes": 123452260,
+          "location": {
+            "store": "snadwich",
+            "relative_path": "SP-02/SP02_Modal_V02.inp"
+          }
+        },
+        "odb_reference": {
+          "role": "CARBON-4C baseline control ODB (reference result with this FE geometry identity)",
+          "file_name": "SP02_f3e592281bebce66.odb",
+          "sha256": "67f581afd57324bbe0445ae4ab83b67e3464f2ef1b91c26ec246f6aed6e61d78",
+          "size_bytes": 751590276,
+          "location": {
+            "store": "carbon-project-archive",
+            "relative_path": "carbon4c/run_sp02/SP02_f3e592281bebce66.odb"
+          }
+        }
+      },
+      "provenance": {
+        "created": "2026-10-07",
+        "source_of_truth": [
+          "docs/auto_id/DECISIONS.md D-065 (SUPERVISOR 2026-10-07: SP-02 identity and physical registration accepted; active SP-02 input bound to the physical registration)",
+          "docs/registrations/SP02_physical_registration.json (accepted physical registration, 09c05a0)",
+          "docs/auto_id/specimens/SP02.physical.specimen.json (physical passport, physical_specimen_id SP-02)",
+          "docs/auto_id/SPECIMEN_CATALOG.md section 7 (SP-02 identity resolved from records)",
+          "Experimental source, modal set and FE identity are those of the historical fixture SP02/bravo-1, which remains the legacy-registration record of the M0-M4 chain"
+        ]
+      },
+      "unresolved": []
+    },
+    {
       "fixture_id": "SP13/best",
       "specimen_id": "SP13",
       "physical_specimen_id": null,

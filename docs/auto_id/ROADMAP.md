@@ -513,6 +513,13 @@ decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; resc
   - 14 physical specimens with records: SP-01 … SP-13 and SP-15. SP-14 has no physical record.
   - SP-02 identity: SP02_IDENTITY_RESOLVED_FROM_RECORDS (DERIVED), pending SUPERVISOR.
   - REAL_CONFLICT C1: a PolyMAX fit of SP-13 260909 exists, against H9. Σ_setup stays provisional.
+  - SUPERVISOR-ACCEPTED 2026-10-07 (D-065).
+- **D-065 governed updates 2026-10-07 (zero Abaqus), `REVIEW_READY`:**
+  - SP-02 is active on the accepted physical registration (fixture `SP02/bravo-1-physical`). The
+    legacy chain is historical.
+  - The SP-13 260909 PolyMAX set "Bravo (1)" is frozen as the FREQUENCY_ONLY fixture
+    `SP13/260909-bravo-1` (provenance confirmed).
+  - Σ_setup stays provisional 0.3 %. M6.4 remains the M6 blocker.
 
 **M6 GATE (rescoped, SPEC §19 item 6, D-061):**
 

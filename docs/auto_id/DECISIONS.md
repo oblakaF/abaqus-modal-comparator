@@ -873,3 +873,32 @@ Rationale / scope: records the HUMAN facts and the SUPERVISOR acceptance. The de
 pending SUPERVISOR review (EVIDENCE; M6_DECISION_RECORD §18). The pairing policy, thresholds,
 holdout rule and modal data are unchanged.
 Supersedes: none (D-062 and D-063 stand; H7 resolves the in-plane sign alternative D-062 left open)
+
+## D-065 — Specimen catalog accepted; SP-02 identity and physical registration accepted and active; SP-13 260909 PolyMAX frozen; H9 clarified
+Date: 2026-10-07 · Accepted by: SUPERVISOR · Source: SUPERVISOR "Catalog acceptance + SP-02 acceptance + SP-13 260909 PolyMAX provenance gate" and its confirmation of 2026-10-07; SPEC §7; D-026, D-027, D-028, D-062, D-063, D-064
+Decision:
+- **Specimen catalog:** commit `bb62060` (`SPECIMEN_CATALOG.md`, `specimen_catalog.json`) is the canonical
+  specimen inventory. Catalog questions already answered there are not reopened. SP-12, SP-14, SP-15 and
+  the unnumbered 300×300 panels stay unresolved catalog entries; they are not M7 blockers.
+- **SP-02 identity:** the record-based resolution is accepted. "SP2 (old)" is the physical SP-02;
+  "SP10 (new SP2)" is the separate physical SP-10. No further HUMAN identity confirmation is required.
+- **SP-02 physical registration:** the result of `09c05a0` (`9b63f6c8…`) is accepted.
+  - The active SP-02 passport and fixture are bound to it.
+  - The legacy registration `9bf736d3…` is kept only as historical provenance.
+  - Anti-tuning evidence and the M4 pairing/holdout policies are unchanged.
+- **SP-13 260909 PolyMAX:**
+  - `SP13_polymax.unv` in `I:\Sumin\SPname_files_260909_polymax.zip` is accepted as the confirmed
+    external PolyMAX fit of the physical SP-13 260909 session.
+  - Its set "Bravo (1)" (31.64, 74.14, 80.82, 94.43, 96.55, 147.86, 206.15, 212.61, 228.75 Hz) is frozen through the D-026 / D-027 route, with no refit.
+  - Per D-028 it is a separate governed fixture, used FREQUENCY_ONLY.
+- **H9 clarified:** H9 means only that Simcenter Testlab is not available now, so no new fit or refit can
+  be made. It does not deny that a historical PolyMAX fit of 260909 exists. The confirmed historical fit
+  does not contradict HUMAN evidence.
+- **Σ_setup:** not recomputed. It stays at the SPEC provisional 0.3 %, flagged.
+  - No estimator and no cross-grid mode matching are invented.
+  - A measured Σ_setup is deferred to a separate decision and blocks neither release nor M7.
+- **M6:** not accepted. M6.4 remains the M6 blocker. No M7 fitting.
+Rationale / scope: records SUPERVISOR acceptances and the governed updates they authorise. The
+implementation (records, tests) is a worker result pending SUPERVISOR review (EVIDENCE).
+Supersedes: D-064 (in part: the H9 wording "there is no PolyMAX fit of 260909" is clarified as above;
+everything else in D-064 stands)

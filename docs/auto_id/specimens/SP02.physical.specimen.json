@@ -3,7 +3,7 @@
   "specimen_type": "sandwich",
   "family_id": "CFRP-T300-plain-0.45-oldstock",
   "design_id": "SP-02",
-  "physical_specimen_id": null,
+  "physical_specimen_id": "SP-02",
   "test_run_id": "SP02_500by500_Glue420_honeycomb_full_scan_retry_260803",
   "plan_mm": null,
   "masses_g": null,
@@ -75,13 +75,12 @@
       "grid_id": "SP-02-scan-121pt",
       "point_count": 121
     },
-    "fixture_id": "SP02/bravo-1",
+    "fixture_id": "SP02/bravo-1-physical",
     "protocol_id": null,
     "remount_of": null
   },
   "identify": "default",
   "unavailable": {
-    "physical_specimen_id": "NEEDS_ONE_HUMAN_CONFIRMATION: the panel in the 2026-08-03 frame carries no specimen number; run name, Testlab project and spec chronology say SP-02, and it is not the panel labelled SP_10 (260831 frame), but file names alone do not establish a run-independent panel identity",
     "plan_mm": "nominal 515 x 510 x 2.9 mm in the Snadwich store SP-02/spec.txt (100 cm steel ruler, 1 mm graduation, HUMAN H8); readout resolution only, no calibrated dimension uncertainty, so plan_mm with sd is not available",
     "masses_g": "available in the Snadwich store SP-02/spec.txt (AVAILABLE_NOT_YET_GOVERNED); not imported by the registration gate",
     "face_thickness_mm": "not recorded in accepted evidence (to be measured and entered in the specimen passport, M2)",

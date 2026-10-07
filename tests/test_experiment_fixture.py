@@ -37,7 +37,8 @@ class RealFixtureManifestTests(unittest.TestCase):
         manifest = load_experiment_fixture_manifest(MANIFEST_PATH)
 
         self.assertEqual(manifest.schema_version, EXPERIMENT_FIXTURE_MANIFEST_SCHEMA)
-        self.assertEqual([item.fixture_id for item in manifest.fixtures], ["SP02/bravo-1", "SP13/best"])
+        self.assertEqual([item.fixture_id for item in manifest.fixtures],
+                         ["SP02/bravo-1", "SP02/bravo-1-physical", "SP13/best"])
 
         sp02 = manifest.fixture("SP02/bravo-1")
         self.assertEqual(sp02.experimental_source.file_name, "SP02_polymax_retry_260803.unv")
@@ -45,6 +46,15 @@ class RealFixtureManifestTests(unittest.TestCase):
         self.assertEqual(sp02.modal_set.measured_dofs, ("U3",))
         self.assertTrue(sp02.registration.registration_hash.startswith("9bf736d3"))
         self.assertTrue(sp02.fe.geometry_identity.sha256.startswith("72e8597a"))
+
+        # D-065: the active SP-02 input is the same experiment, modal set and FE on the accepted physical registration;
+        # SP02/bravo-1 stays the historical legacy-registration record of the M0-M4 chain.
+        active = manifest.fixture("SP02/bravo-1-physical")
+        self.assertEqual((active.experimental_source, active.modal_set, active.fe),
+                         (sp02.experimental_source, sp02.modal_set, sp02.fe))
+        self.assertEqual(active.physical_specimen_id, "SP-02")
+        self.assertEqual(active.registration.path, "docs/registrations/SP02_physical_registration.json")
+        self.assertTrue(active.registration.registration_hash.startswith("9b63f6c8"))
 
         sp13 = manifest.fixture("SP13/best")
         self.assertEqual(sp13.experimental_source.file_name, "SP13_a_polymax.unv")

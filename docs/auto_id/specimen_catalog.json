@@ -1,7 +1,8 @@
 {
  "schema": "auto-id/specimen-catalog/v1",
- "status": "REVIEW_READY",
- "date": "2026-10-06",
+ "status": "ACCEPTED",
+ "acceptance": "SUPERVISOR 2026-10-07 (D-065): commit bb62060 accepted as the canonical specimen inventory; updated for D-065",
+ "date": "2026-10-07",
  "canonical_text": "docs/auto_id/SPECIMEN_CATALOG.md",
  "runtime_dependency": false,
  "sources": [
@@ -562,7 +563,7 @@
       }
      ],
      "governed": true,
-     "governed_set": "Bravo (1) (fixture SP02/bravo-1)",
+     "governed_set": "Bravo (1) (active fixture SP02/bravo-1-physical)",
      "usable_now": [
       "frequency",
       "shape",
@@ -634,12 +635,12 @@
      "path": "docs/registrations/SP02_physical_registration.json",
      "registration_hash": "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c",
      "passport": "docs/auto_id/specimens/SP02.physical.specimen.json",
-     "status": "REVIEW_READY (not yet SUPERVISOR-accepted); physical_specimen_id not yet recorded in the passport"
+     "status": "ACCEPTED (SUPERVISOR 2026-10-07, D-065); ACTIVE through fixture SP02/bravo-1-physical; passport physical_specimen_id SP-02"
     },
     "physical_basis": "stored PSV camera frame + MeasPoints + panel edges + spec dimensions (D-062 method)",
     "distortion": "UNV/physical x 1.0917, y 0.8178 (anisotropy 1.335)",
     "registration_limited": false,
-    "unresolved": "through-thickness face convention (TOP by convention); fixture and production input still reference the legacy registration"
+    "unresolved": "through-thickness face convention (TOP by convention); the M3 forward-model manifest SP02.forward.json still pins the legacy passport and registration (historical CARBON-4C / M4.2 chain, unchanged); a forward-model binding of the physical passport is pending"
    },
    "strict_pairs": {
     "legacy": "NOT_FROZEN: (2,8) only",
@@ -649,7 +650,7 @@
    "auto_id_status": [
     "NEEDS_GOVERNANCE"
    ],
-   "m7_role": "best current M7 specimen with SP-13 (pending SUPERVISOR acceptance of the physical registration and the identity, and production wiring)"
+   "m7_role": "best current M7 specimen with SP-13; identity and physical registration accepted and active (D-065); remaining: forward-model binding of the physical passport"
   },
   {
    "specimen_id": "SP-03",
@@ -3401,14 +3402,15 @@
        ]
       }
      ],
-     "governed": false,
-     "governed_set": null,
+     "governed": true,
+     "governed_set": "Bravo (1) (frozen FREQUENCY_ONLY fixture SP13/260909-bravo-1, D-065)",
      "usable_now": [
-      "none: conflicts with HUMAN H9 (see contradiction C1)"
+      "frequency (FREQUENCY_ONLY repeat evidence; Sigma_setup still provisional)"
      ],
      "usable_after_governance": [
-      "frequency (Sigma_setup, FREQUENCY_ONLY) if HUMAN/SUPERVISOR accept it"
-     ]
+      "frequency"
+     ],
+     "note": "provenance confirmed (fixtures/SP13_260909.frozen-modal-set.json)"
     },
     {
      "session": "260910 a",
@@ -4105,7 +4107,7 @@
  "contradictions": [
   {
    "id": "C1",
-   "class": "REAL_CONFLICT",
+   "class": "EXPECTED_HISTORICAL",
    "specimens": [
     "SP-13"
    ],
@@ -4122,7 +4124,7 @@
     212.61,
     228.752
    ],
-   "handling": "nothing changed; Sigma_setup stays provisional 0.3 %; question Q1"
+   "handling": "resolved by D-065: H9 means Testlab is unavailable now (no new fit or refit), not that no historical fit exists; provenance confirmed and the set frozen; Sigma_setup stays provisional 0.3 %"
   },
   {
    "id": "C2",
@@ -4218,7 +4220,7 @@
    "specimens": [
     "SP-02"
    ],
-   "finding": "SP-02 identity resolved from records",
+   "finding": "SP-02 identity resolved from records (SUPERVISOR-accepted, D-065)",
    "conflicts_with": "EVIDENCE / M6_DECISION_RECORD 18 / STATUS: NEEDS_ONE_HUMAN_CONFIRMATION"
   },
   {
@@ -4331,7 +4333,8 @@
     "SP-13"
    ],
    "m7_relevant": true,
-   "question": "Is SP13_polymax.unv (zip; Testlab PolyMAX of 260909, set 'Bravo (1)') a valid fit that may be governed for the FREQUENCY_ONLY Sigma_setup estimate, or does H9 stand?"
+   "question": "Is SP13_polymax.unv (zip; Testlab PolyMAX of 260909, set 'Bravo (1)') a valid fit that may be governed for the FREQUENCY_ONLY Sigma_setup estimate, or does H9 stand?",
+   "answer": "D-065: provenance confirmed and set frozen; H9 clarified; Sigma_setup not recomputed (provisional 0.3 %)"
   },
   {
    "id": "Q2",

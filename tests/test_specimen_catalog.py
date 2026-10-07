@@ -62,7 +62,7 @@ class CatalogStructureTests(unittest.TestCase):
 
     def test_status_and_scope(self):
         self.assertEqual(self.catalog["schema"], "auto-id/specimen-catalog/v1")
-        self.assertEqual(self.catalog["status"], "REVIEW_READY")
+        self.assertEqual(self.catalog["status"], "ACCEPTED")  # SUPERVISOR 2026-10-07 (D-065)
         self.assertFalse(self.catalog["runtime_dependency"])
         self.assertEqual((self.catalog["abaqus_solves"], self.catalog["abaqus_python_extractions"]), (0, 0))
 
@@ -118,10 +118,13 @@ class CatalogStructureTests(unittest.TestCase):
         self.assertEqual(self.by_id["SP-02"]["identity"]["confidence"], "DERIVED")
         self.assertEqual(len(resolution["lms_sp2_old_hz"]), 9)
 
-    def test_only_two_governed_fixtures(self):
+    def test_governed_fixtures(self):
         governed = sorted((s["specimen_id"], e["governed_set"]) for s in self.specimens for e in s["experiments"]
                           if e["governed"])
-        self.assertEqual(governed, [("SP-02", "Bravo (1) (fixture SP02/bravo-1)"), ("SP-13", "Best (fixture SP13/best)")])
+        self.assertEqual(governed, [
+            ("SP-02", "Bravo (1) (active fixture SP02/bravo-1-physical)"),
+            ("SP-13", "Best (fixture SP13/best)"),
+            ("SP-13", "Bravo (1) (frozen FREQUENCY_ONLY fixture SP13/260909-bravo-1, D-065)")])
         self.assertFalse(any("READY_FOR_M7" in s["auto_id_status"] for s in self.specimens))
 
 
@@ -150,9 +153,15 @@ class RepositoryAgreementTests(unittest.TestCase):
         fixtures = json.loads((ROOT / "docs/auto_id/fixtures/real_experiment_fixtures.json").read_text(encoding="utf-8"))
         sources = {f["experimental_source"]["location"]["relative_path"]: f["experimental_source"]["sha256"]
                    for f in fixtures["fixtures"]}
+        frozen = json.loads((ROOT / "docs/auto_id/fixtures/SP13_260909.frozen-modal-set.json").read_text(encoding="utf-8"))
         for s in self.by_id.values():
             for e in s["experiments"]:
-                if e["governed"]:
+                if not e["governed"]:
+                    continue
+                if "zip_member" in e["source"]:  # frozen FREQUENCY_ONLY record outside the M0.2 manifest (D-065)
+                    self.assertEqual((e["source"]["zip_member"], e["source"]["sha256"]),
+                                     (frozen["source"]["member"]["name"], frozen["source"]["member"]["sha256"]))
+                else:
                     self.assertEqual(sources[e["source"]["relative_path"]], e["source"]["sha256"], s["specimen_id"])
 
 

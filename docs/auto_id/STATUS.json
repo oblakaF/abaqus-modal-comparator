@@ -537,7 +537,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the SP-13 HUMAN update, the SP-02 registration gate and the specimen catalog (SP-02 identity from records; C1 vs H9); no M7, no Abaqus; M6.4 still needs an approved range source",
+  "next_action": "STOP: SUPERVISOR review of the D-065 governed updates; M6 not accepted (M6.4 needs an approved range source); no M7, no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -700,10 +700,10 @@
       "authorisation": "SUPERVISOR 2026-10-06: SP-02 zero-Abaqus physical registration gate (same method as SP-13)",
       "reconstruction_record": "docs/auto_id/registration_evidence/SP02_physical_registration_reconstruction.json (b9234f573b6ab98acad4944ff4a2786ac16baab2e29d41c061d55aec5900707e)",
       "physical_passport": "docs/auto_id/specimens/SP02.physical.specimen.json (manifest 83739ecd2d0803bba682a3540c44e1437178164a731b48f1921e64b248168159)",
-      "physical_registration": "docs/registrations/SP02_physical_registration.json (9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c); one readiness issue: physical_specimen_id not recorded",
+      "physical_registration": "docs/registrations/SP02_physical_registration.json (9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c); production-ready; ACTIVE through fixture SP02/bravo-1-physical (D-065)",
       "anisotropy": "UNV/physical x 1.0917, y 0.8178 (same Polytec distortion as SP-13); window 368.72 x 499.24 mm",
       "legacy_registration": "9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164: historical provenance only (vs physical median 28.9 mm, max 54.1 mm)",
-      "identity": "NEEDS_ONE_HUMAN_CONFIRMATION (unnumbered panel in the 260803 frame)",
+      "identity": "RESOLVED_FROM_RECORDS and SUPERVISOR-ACCEPTED (D-065): SP2 (old) = physical SP-02; SP10 (new SP2) = separate physical SP-10",
       "strict_pairs": {
         "legacy": "NOT_FROZEN: (2,8) MAC 0.958 only",
         "physical": "FROZEN: (2,8) MAC 0.918, (4,10) MAC 0.951, (7,13) MAC 0.975; validation holdout R3; fit R1, R2; cond 6.1"
@@ -714,7 +714,8 @@
       "sp10": "M6_DECISION_RECORD 18.2: not needed for observation sufficiency; SP2/SP10 reference scatter test NOT_AVAILABLE",
       "abaqus_solves": 0,
       "abaqus_python_extractions": 0,
-      "status": "REVIEW_READY"
+      "status": "ACCEPTED",
+      "acceptance": "SUPERVISOR 2026-10-07 (result at 09c05a0; D-065)"
     },
     "specimen_catalog": {
       "authorisation": "SUPERVISOR 2026-10-06: FULL SPECIMEN CATALOG - AUTHORITATIVE INVENTORY (documentation/governance checkpoint)",
@@ -725,6 +726,18 @@
       "real_conflicts": "C1: PolyMAX of SP-13 260909 exists (zip) vs H9 - nothing changed, Sigma_setup provisional; C2: SP-10 260911 rotated session",
       "governed_fixtures": "SP02/bravo-1, SP13/best only; READY_FOR_M7: none unconditionally; best M7 specimens SP-02 + SP-13",
       "human_questions": "6 (catalog section 10); only Q1 touches the M7 path (Sigma_setup)",
+      "abaqus_solves": 0,
+      "abaqus_python_extractions": 0,
+      "status": "ACCEPTED",
+      "acceptance": "SUPERVISOR 2026-10-07 (D-065): bb62060 is the canonical specimen inventory"
+    },
+    "d065_governed_updates": {
+      "authorisation": "SUPERVISOR 2026-10-07: catalog + SP-02 acceptance + SP-13 260909 PolyMAX provenance gate (D-065)",
+      "sp02_active": "fixture SP02/bravo-1-physical (physical registration 9b63f6c8...); passport SP02.physical.specimen.json physical_specimen_id SP-02",
+      "sp02_historical": "fixture SP02/bravo-1 + legacy passport + SP02.forward.json + CARBON-4C baseline unchanged (legacy registration 9bf736d3...)",
+      "sp13_260909": "SP13_260909_POLYMAX_PROVENANCE_CONFIRMED; frozen FREQUENCY_ONLY fixture SP13/260909-bravo-1 (docs/auto_id/fixtures/SP13_260909.frozen-modal-set.json; member sha256 c036cdf36230c8deab413a5a2b4da8147cea68248c7d82ec3b0297c6705308c9)",
+      "sigma_setup": "provisional 0.3 % flagged (not recomputed; estimator and cross-grid matching not invented; deferred, not a release/M7 blocker)",
+      "remaining_m6_blocker": "M6.4 (approved variation-range source)",
       "abaqus_solves": 0,
       "abaqus_python_extractions": 0,
       "status": "REVIEW_READY"

@@ -728,3 +728,54 @@ Possible remaining causes remain outside CARBON-5F scope:
   - **No measured material constants exist for any specimen.** The twill report is an FE sensitivity
     study; the June calibration report gives model-calibration values.
 - 0 Abaqus solves, 0 Abaqus Python extractions.
+
+## D-065 governed updates: SP-02 active binding and the frozen SP-13 260909 PolyMAX set (zero Abaqus)
+
+- **Status:** RECORDED (SUPERVISOR-authorised, 2026-10-07; D-065), pending SUPERVISOR review.
+- **SP-02 active binding:**
+  - New fixture `SP02/bravo-1-physical` in `fixtures/real_experiment_fixtures.json`. It has the same
+    experimental source, modal set and FE as `SP02/bravo-1`, with registration
+    `SP02_physical_registration.json` (`9b63f6c8…`) and `physical_specimen_id` "SP-02".
+  - `SP02.physical.specimen.json`: `physical_specimen_id` "SP-02"; `acquisition.fixture_id`
+    `SP02/bravo-1-physical`. The registration rebuilt from it has the same hash and no
+    production-readiness issue.
+  - `load_production_modal_input("SP02/bravo-1-physical")` returns the 9-mode set with the physical
+    registration.
+  - **Historical chain unchanged:** `SP02/bravo-1` (legacy registration `9bf736d3…`), the legacy
+    passport, `SP02.forward.json` and the archived CARBON-4C baseline. Its M0–M4 bindings
+    (`test_baseline_freeze`, `bind_forward_model`) still hold. Rebinding them in place would rewrite frozen
+    M4.2 evidence, which was not authorised.
+  - **Anti-tuning:**
+    - `registration_evidence/SP02_registration_uncertainty.json` was regenerated with the same tool and
+      inputs. Only `passport_sha256_lf` changed; every M2.4 value is identical.
+    - The registration and reconstruction records are unchanged.
+- **SP-13 260909 provenance audit** (read-only, before any use): **SP13_260909_POLYMAX_PROVENANCE_CONFIRMED**.
+  - **Source:** archive `I:\Sumin\SPname_files_260909_polymax.zip` (sha256 `c7f91f6f84cdb011e2c6ea18b733bd49ae0f62d4b1e251c38c6dab4bb3e1c336`), member
+    `SP13_polymax.unv` (sha256 `c036cdf36230c8deab413a5a2b4da8147cea68248c7d82ec3b0297c6705308c9`).
+  - **Contents:** datasets 55 (50 records), 82 (12) and 2411 (121 nodes). No dataset 151 (normal for a
+    Testlab export).
+  - **Embedded metadata:** Testlab project `SP13_500by500_Glue420_Auxetic_newSP01_260909`; export time
+    10-09-2026 12:10:58. That is after the 260909 acquisition (09-Sep-26 09:00:10) and before the 260910a
+    acquisition (10-Sep-26 17:38:17).
+  - **Geometry:** identical to the raw 260909 acquisition (same 121 ids; coordinates within 1e-16 m).
+    Every other 121-point acquisition differs by 3–430 mm, so each grid is unique.
+  - **Shapes:** each fitted shape reproduces the raw 260909 H1 at its frequency on the same grid. MAC is
+    0.95–0.99 for 8 of 9 modes. Calibration: the governed SP-02 fit against its own raw data gives
+    0.95–1.00.
+  - Mode 7 (206.15 Hz, MAC 0.38) is barely excited: mean |H1| 0.18 against 2.2 at 212.5 Hz (SPEC §15).
+  - **Band:** the fitted band 21.25–244.30 Hz lies inside the raw 0.3125–500 Hz (Δf 0.3125 Hz).
+  - **Other records:** the LMS summary column "SP13 (new SP1)", AUDIT §4.2 and D-028.
+  - **Relation to `SP13/best`:** a different grid (289 points), a re-suspension (H6, D-063). There is no
+    cross-grid shape or MAC claim, and the mode correspondence is NOT_ESTABLISHED.
+  - **Frequency agreement** was used only as supporting evidence, after provenance.
+- **Frozen record:** `fixtures/SP13_260909.frozen-modal-set.json`.
+  - Fixture `SP13/260909-bravo-1`, schema `auto-id/frozen-external-modal-set/v1`, FREQUENCY_ONLY.
+  - Registration NOT_AVAILABLE and FE NOT_APPLICABLE, both stated.
+  - Frozen modes are read with the production reader: 31.64, 74.14, 80.82, 94.43, 96.55, 147.86, 206.15, 212.61, 228.75 Hz.
+  - It sits outside the M0.2 fixture manifest because that schema requires a FrozenRegistration and an FE
+    model, which the 121-point grid does not have and frequency-only use does not need.
+- **Σ_setup:** provisional 0.3 %, flagged, as decided (D-065).
+  - SPEC §7 permits a frequency-only estimate from this re-suspension.
+  - The estimator is a later decision (D-053, D-058), and no governed cross-grid mode-correspondence rule
+    exists. The LMS mode labels of the two sessions also disagree.
+- 0 Abaqus solves, 0 Abaqus Python extractions.

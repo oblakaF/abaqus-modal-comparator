@@ -37,6 +37,8 @@ REGISTRATION = ROOT / "docs/registrations/SP02_physical_registration.json"
 LEGACY_REGISTRATION = ROOT / "docs/registrations/SP02_frozen_registration.json"
 PHYSICAL_REGISTRATION_HASH = "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c"
 LEGACY_REGISTRATION_HASH = "9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164"
+ACTIVE_FIXTURE = "SP02/bravo-1-physical"  # D-065: active SP-02 input on the accepted physical registration
+HISTORICAL_FIXTURE = "SP02/bravo-1"  # legacy-registration record of the archived M0-M4 chain
 SCALE_REL_READOUT = 0.002  # HUMAN H8: 1 mm ruler graduation over the shorter 510 mm side (0.00196), rounded up
 MODAL_WORDS = ("mac", "frequency", "frequencies", "hz", "mode", "modes", "pair", "pairs", "modal")
 
@@ -118,15 +120,34 @@ class GovernedFileTests(unittest.TestCase):
         status = load_specimen_manifest(LEGACY_PASSPORT).geometry_calibration.registration_basis_status
         self.assertIs(status, RegistrationBasisStatus.LEGACY_REPLAY)
 
-    def test_physical_passport_is_physical_but_identity_is_not_invented(self):
+    def test_physical_passport_records_the_accepted_identity(self):
+        """D-065: identity resolved from records (SPECIMEN_CATALOG section 7) and SUPERVISOR-accepted."""
         manifest = load_specimen_manifest(PASSPORT)
         gc = manifest.geometry_calibration
         self.assertIs(gc.registration_basis_status, RegistrationBasisStatus.PHYSICAL)
         self.assertEqual(gc.missing_physical_evidence, ())
         self.assertEqual(gc.missing_uncertainty, ())
-        self.assertIsNone(manifest.physical_specimen_id)  # NEEDS_ONE_HUMAN_CONFIRMATION
+        self.assertEqual(manifest.physical_specimen_id.value, "SP-02")
+        self.assertEqual(manifest.acquisition.fixture_id, ACTIVE_FIXTURE)
         raw = json.loads(PASSPORT.read_text(encoding="utf-8"))
-        self.assertIn("NEEDS_ONE_HUMAN_CONFIRMATION", raw["unavailable"]["physical_specimen_id"])
+        self.assertNotIn("physical_specimen_id", raw["unavailable"])
+
+    def test_active_fixture_uses_the_physical_registration_and_legacy_chain_is_historical(self):
+        from domain.experiment_fixture import load_experiment_fixture_manifest
+        from domain.forward_model_manifest import bind_forward_model, load_forward_model_manifest
+
+        fixtures = load_experiment_fixture_manifest(ROOT / "docs/auto_id/fixtures/real_experiment_fixtures.json")
+        active = fixtures.fixture(ACTIVE_FIXTURE)
+        self.assertEqual((active.registration.path, active.registration.registration_hash),
+                         ("docs/registrations/SP02_physical_registration.json", PHYSICAL_REGISTRATION_HASH))
+        self.assertEqual(active.physical_specimen_id, "SP-02")
+        historical = fixtures.fixture(HISTORICAL_FIXTURE)
+        self.assertEqual(historical.registration.registration_hash, LEGACY_REGISTRATION_HASH)
+        self.assertEqual(load_specimen_manifest(LEGACY_PASSPORT).acquisition.fixture_id, HISTORICAL_FIXTURE)
+        # The archived M0-M4 chain (forward model, legacy passport, legacy fixture) is unchanged and still binds.
+        forward = load_forward_model_manifest(ROOT / "docs/auto_id/forward_models/SP02.forward.json")
+        self.assertEqual(forward.registration_hash, LEGACY_REGISTRATION_HASH)
+        bind_forward_model(forward, load_specimen_manifest(LEGACY_PASSPORT), fixtures)
 
 
 class AlignmentParserTests(unittest.TestCase):
@@ -179,12 +200,19 @@ class StoreReproductionTests(unittest.TestCase):
         for key in ("physical_width_mm", "physical_height_mm", "panel_edges_x_mm", "panel_edges_y_mm"):
             self.assertAlmostEqual(rebuilt["m2_model"][key], record["m2_model"][key], places=9)
 
-    def test_registration_is_rebuilt_and_blocked_only_by_identity(self):
+    def test_registration_is_rebuilt_and_production_ready(self):
         from services.physical_registration import build_physical_registration
 
         result = build_physical_registration(load_specimen_manifest(PASSPORT))
         self.assertEqual(result.registration.registration_hash, PHYSICAL_REGISTRATION_HASH)
-        self.assertEqual(result.production_readiness_issues(), ("physical_specimen_id is not recorded",))
+        self.assertEqual(result.production_readiness_issues(), ())
+
+    def test_active_production_input_carries_the_physical_registration(self):
+        from services.production_modal_input import load_production_modal_input
+
+        loaded = load_production_modal_input(ACTIVE_FIXTURE)
+        self.assertEqual(loaded.registration.registration_hash, PHYSICAL_REGISTRATION_HASH)
+        self.assertEqual(len(loaded.dataset.sorted_modes()), 9)
 
     def test_strict_freeze_under_both_registrations(self):
         document = json.loads(REEVALUATION.read_text(encoding="utf-8"))

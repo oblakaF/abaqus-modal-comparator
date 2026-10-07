@@ -3515,3 +3515,24 @@ first internal provider.
 - `SNADWICH_INVENTORY.md`: pointer to the catalog and a list of superseded statements; history kept.
 - No governed passport, fixture, registration, forward model, baseline, rule or threshold changed.
   0 Abaqus solves, 0 extractions.
+
+## 2026-10-07 — D-065: catalog accepted; SP-02 active on the physical registration; SP-13 260909 PolyMAX frozen (zero Abaqus)
+
+- **DECISIONS:** D-065 records the SUPERVISOR acceptances, the H9 clarification and that Σ_setup stays
+  provisional.
+- **SP-02:**
+  - new active fixture `SP02/bravo-1-physical` (physical registration `9b63f6c8…`);
+  - `SP02.physical.specimen.json` takes `physical_specimen_id` "SP-02" and the new fixture;
+  - the legacy chain (`SP02/bravo-1`, legacy passport, forward manifest, archived baseline) is unchanged
+    as historical provenance;
+  - the M2.4 record was regenerated (only the passport hash changed).
+- **SP-13 260909:**
+  - provenance audit CONFIRMED;
+  - frozen FREQUENCY_ONLY record `fixtures/SP13_260909.frozen-modal-set.json` (fixture
+    `SP13/260909-bravo-1`, set "Bravo (1)", 9 modes); no refit.
+- **Catalog:** status ACCEPTED; C1 resolved (EXPECTED_HISTORICAL); Q1 answered; SP-02/SP-13 entries
+  updated.
+- **Tests:**
+  - new `tests/test_sp13_260909_frozen_modal_set.py`;
+  - updated `test_experiment_fixture`, `test_sp02_physical_registration`, `test_specimen_catalog`.
+- Σ_setup provisional 0.3 %. M6 not accepted (M6.4). 0 Abaqus solves, 0 extractions.

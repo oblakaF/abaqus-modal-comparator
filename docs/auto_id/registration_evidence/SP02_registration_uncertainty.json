@@ -215,7 +215,7 @@
   ],
   "pairs_source": "docs/auto_id/registration_evidence/SP02_registration_reevaluation.json",
   "passport": "docs/auto_id/specimens/SP02.physical.specimen.json",
-  "passport_sha256_lf": "30da6573505c6eed6a916b08dcec16faa7b0d4f5196508cbf15c56b52f22f057",
+  "passport_sha256_lf": "46d768ec2a38f1936f8788624c021093fbe82646dcad0ef871a0ec0cbdb4633a",
   "perturbations": [
     {
       "name": "+translation_x",

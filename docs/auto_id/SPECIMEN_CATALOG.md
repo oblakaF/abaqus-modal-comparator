@@ -1,6 +1,10 @@
 # Specimen catalog (canonical specimen reference)
 
-**Status:** `REVIEW_READY` (worker audit, 2026-10-06; not yet SUPERVISOR-accepted).
+**Status:** `ACCEPTED`. The SUPERVISOR accepted commit `bb62060` as the canonical specimen inventory on
+2026-10-07 (D-065). This version adds the D-065 updates:
+- the SP-02 identity and physical registration are accepted and active;
+- the SP-13 260909 PolyMAX set is frozen;
+- H9 is clarified.
 **Machine-readable twin:** `specimen_catalog.json`, one deterministic entry per physical specimen, with
 source paths, sizes and SHA-256 hashes. It is a governed project-information artifact, **not** a runtime
 dependency.
@@ -105,7 +109,7 @@ Also inspected:
 | Specimen | Family | Spec | Raw FRF sessions | PolyMAX | INP | ODB | CAE | Phys reg | Governed FE (M3) | M7 usability |
 |---|---|---|---|---|---|---|---|---|---|---|
 | SP-01 | old plain 0.45 | yes | 260624 | U (zip) | U (C:\temp) | U (C:\temp) | yes | no | no | after governance + FE + reg |
-| SP-02 | old plain 0.45 | yes | 260803 retry | **G** `SP02/bravo-1` | yes | yes | yes | **yes (REVIEW_READY)** | **yes** | **M7 path with SP-13 (governance pending)** |
+| SP-02 | old plain 0.45 | yes | 260803 retry | **G** `SP02/bravo-1-physical` (active; `SP02/bravo-1` historical) | yes | yes | yes | **yes (accepted, active; D-065)** | **yes** | **M7 path with SP-13** (forward binding of the physical passport pending) |
 | SP-03 | old twill 0.45 | yes | 260803 | U (zip) | no | no | no | no | no | twill family only |
 | SP-04 | old plain 0.25 | yes | 260822 | U (zip) | candidate (C:\temp, name only) | candidate | no | no | no | after governance + FE + reg |
 | SP-05 | old plain 0.25 | yes | 260706a | U (zip) | yes (store) | yes (store) | yes | no | no | after governance + M3 + reg |
@@ -116,11 +120,13 @@ Also inspected:
 | SP-10 | old plain 0.45 | yes | 260831; 260911 b_rotated | U (zip 260831; store 260911) | no | no | no | no | no | SP2/SP10 scatter pair after FE + reg + governance |
 | SP-11 | old twill 0.45 (bare) | yes | 260824; 260826 a; 260826 b_center | U (zip, session a only) | candidate (C:\temp twill study) | candidate | no | no | no | not M7 (Stage A blocked, D-059) |
 | SP-12 | new plain 0.25 (bare) | vault note only | none found | none | none found | none found | none found | no | no | no experiment |
-| SP-13 | old plain 0.45 | yes | 260909; 260910 a | **G** `SP13/best` (260910); U (zip, 260909) | yes | yes | yes | **yes (production-ready)** | **yes** | **M7 path with SP-02; alone insufficient** |
+| SP-13 | old plain 0.45 | yes | 260909; 260910 a | **G** `SP13/best` (260910); **G** `SP13/260909-bravo-1` (FREQUENCY_ONLY, D-065) | yes | yes | yes | **yes (production-ready)** | **yes** | **M7 path with SP-02; alone insufficient** |
 | SP-15 | unassigned (bare) | none (note is an SP-12 copy) | 260901 (**outside store**) | U (zip) | U (C:\temp\12 sampls) | U | U (`new_CFRP_PLAIN_520_STAGEA.cae`) | no | no | identity AMBIGUOUS |
 
-**PolyMAX exist for every specimen with an acquisition**, but only `SP02/bravo-1` and `SP13/best` are
-governed.
+**PolyMAX fits exist for every specimen with an acquisition.** Governed are:
+- `SP02/bravo-1-physical` (active) and `SP02/bravo-1` (historical);
+- `SP13/best`;
+- the FREQUENCY_ONLY record `SP13/260909-bravo-1` (D-065).
 
 ## 6. Specimen records
 
@@ -159,8 +165,8 @@ single force reference, unless stated otherwise.
 
 ### SP-02 — old T300 plain / PLA honeycomb (folder `SP-02`)
 
-- **Identity:** **DERIVED, resolved from records** (§7). The label reads "500x500 / Plain fiber / honey
-  comb / DP420" (no number).
+- **Identity:** **DERIVED, resolved from records** (§7) and **SUPERVISOR-accepted (D-065)**. The label reads
+  "500x500 / Plain fiber / honey comb / DP420" (no number).
 - **Geometry:**
   - 515 × 510 × 2.9; faces 0.45/0.45; core 2.0.
   - The FE orientation (horizontal 510 = X, vertical 515 = Y) is fixed from the frame aspect.
@@ -176,7 +182,8 @@ single force reference, unless stated otherwise.
 - **Experiment:**
   - Raw 260803 retry.
   - PolyMAX `SP02_polymax_retry_260803.unv` (Testlab project `SP02_…_260715`): **governed set `Bravo (1)`,
-    9 modes**, fixture `SP02/bravo-1`. A byte-identical copy is in the zip.
+    9 modes**. The **active** fixture is `SP02/bravo-1-physical`; `SP02/bravo-1` is the historical
+    legacy-registration record (D-065). A byte-identical copy is in the zip.
   - The spec experimental table (28.1903 … 214.261 Hz) is a different, earlier fit (the LMS
     "500x500 honeycomb 420" column).
 - **FE:**
@@ -185,11 +192,15 @@ single force reference, unless stated otherwise.
   - The spec Abaqus column equals V01/V02.
 - **Registration:**
   - Legacy `9bf736d3…` is historical only (physically inconsistent: median 28.9 mm, max 54.1 mm).
-  - Physical `9b63f6c8…` is REVIEW_READY.
+  - Physical `9b63f6c8…` is **accepted and active** (D-065).
+  - The passport `physical_specimen_id` is "SP-02".
   - UNV/physical distortion: x 1.0917, y 0.8178.
   - `registration_limited` False.
-  - Open items: the face convention (TOP by convention); the fixture still references the legacy
-    registration; the passport `physical_specimen_id` is null.
+  - Open items:
+    - the face convention (TOP by convention);
+    - the M3 forward manifest `SP02.forward.json` still pins the legacy passport and registration. This is
+      the unchanged historical CARBON-4C / M4.2 chain. A forward binding of the physical passport is
+      pending.
 - **Strict pairs:** physical FROZEN (2,8), (4,10), (7,13). Validation holdout R3; 2 fit rows; condition
   number 6.1.
 - **Status:** NEEDS_GOVERNANCE.
@@ -378,8 +389,12 @@ single force reference, unless stated otherwise.
   - "Copy of SP-01" is a design copy: the core is 179.13 g against 145.3 g, and the spectra differ.
 - **Experiment:**
   - Raw 260909.
-  - **PolyMAX of 260909 exists**: `SP13_polymax.unv` in the zip, Testlab project `SP13_…_260909`, sets
-    Bravo (1) 9, Bravo 8, re 11, Processing 14. **Conflicts with H9** (§9 C1); not used.
+  - **PolyMAX of 260909:** `SP13_polymax.unv` in the zip, Testlab project `SP13_…_260909`, sets Bravo (1)
+    9, Bravo 8, re 11, Processing 14.
+    - Provenance is confirmed.
+    - Set Bravo (1) is **frozen** as the FREQUENCY_ONLY fixture `SP13/260909-bravo-1`
+      (`fixtures/SP13_260909.frozen-modal-set.json`, D-065).
+    - Σ_setup is not recomputed (provisional 0.3 %).
   - Raw 260910 a: 289 points, Δf 0.156 Hz. It is a re-suspension of 260909 (H6, D-063) in the same
     orientation as the Abaqus model (H7).
   - PolyMAX `SP13_a_polymax.unv`: **governed set `Best`, 12 modes** (fixture `SP13/best`).
@@ -392,7 +407,8 @@ single force reference, unless stated otherwise.
   - Physical `2eeeaa86…` is **production-ready** (D-062, D-064).
   - Distortion x 1.195, y 0.889.
   - `registration_limited` False.
-  - Open items: face convention; the fixture still references the legacy registration.
+  - Open items: face convention; the fixture `SP13/best` still references the legacy registration (wiring
+    not yet authorised).
 - **Strict pairs:** 4↔10 and 7↔13 are well conditioned; 1 fit row after the M4.3 holdout.
 - **Status:** OBSERVATION_INSUFFICIENT (alone), NEEDS_GOVERNANCE.
 
@@ -416,7 +432,8 @@ single force reference, unless stated otherwise.
 
 **Question:** is the unnumbered panel of the 2026-08-03 frame the physical SP-02 of `SP-02/spec.txt`
 (515 × 510 × 2.9 mm, 582.71 g)?
-**Answer:** yes, from records alone. Confidence DERIVED (not CONFIRMED).
+**Answer:** yes, from records alone. Confidence DERIVED (not CONFIRMED). **SUPERVISOR-accepted on
+2026-10-07 (D-065):** SP2 (old) = physical SP-02, SP10 (new SP2) = separate physical SP-10.
 
 1. **The project's own result table assigns it.**
    - `I:\Sumin\Updated_260911\Experiment_Freq_damping_LMS.xlsx` and its sharing copy, sheet
@@ -451,8 +468,8 @@ single force reference, unless stated otherwise.
 - The frame cannot tell SP-02 from SP-10 by plan size, because the aspect ratios 515/510 and 520/515 are
   equal.
 - The assignment rests on the project's records, not on an independent physical mark.
-- Writing `physical_specimen_id` into `SP02.physical.specimen.json` is a protected-file change, so it
-  needs SUPERVISOR acceptance.
+- `physical_specimen_id` "SP-02" was written into `SP02.physical.specimen.json` after SUPERVISOR
+  acceptance (D-065).
 
 This supersedes the earlier NEEDS_ONE_HUMAN_CONFIRMATION (EVIDENCE, M6_DECISION_RECORD §18), which
 was based on the store-only audit; that record is kept as history.
@@ -474,7 +491,7 @@ vs auxetic). Within new-plain-0.25, the core material (PLA/TPU) and the adhesive
 
 | # | Catalog finding | Conflicting record | Class |
 |---|---|---|---|
-| C1 | A Testlab PolyMAX fit of SP-13 **260909** exists: `SP13_polymax.unv` in `I:\Sumin\SPname_files_260909_polymax.zip` (project `SP13_…_260909`, set Bravo (1), 9 modes; tabulated in the LMS sheet "SP13 (new SP1)") | HUMAN H9 / D-064 / D-063 / STATUS: "no PolyMAX fit of 260909" | **REAL_CONFLICT**: nothing changed; Σ_setup stays provisional 0.3 %; question Q1 |
+| C1 | A Testlab PolyMAX fit of SP-13 **260909** exists: `SP13_polymax.unv` in `I:\Sumin\SPname_files_260909_polymax.zip` (project `SP13_…_260909`, set Bravo (1), 9 modes; tabulated in the LMS sheet "SP13 (new SP1)") | HUMAN H9 / D-064 / D-063 / STATUS: "no PolyMAX fit of 260909" | EXPECTED_HISTORICAL: resolved by D-065 (H9 = Testlab unavailable now, no new fit or refit; it does not deny the historical fit). Provenance confirmed, set frozen; Σ_setup stays provisional 0.3 % |
 | C2 | SP-10 260911 "b_rotated": label rotated 90°, not at the physical top | HUMAN general practice "label at physical TOP" | **REAL_CONFLICT** (one session, explicitly named "rotated"; SP-10 is not governed) |
 | C3 | SP-06 has an acquisition and a PolyMAX export (outside the store) | SNADWICH_INVENTORY: "SP-06 none / INSUFFICIENT" | STALE_DOC |
 | C4 | PolyMAX exports exist for SP-01, 03–09, 10 (260831), 11a, 13 (260909) and 15 | SNADWICH_INVENTORY: fitted modes only SP-02, SP-10, SP-13 | STALE_DOC (store-only audit) |
@@ -483,7 +500,7 @@ vs auxetic). Within new-plain-0.25, the core material (PLA/TPU) and the adhesive
 | C7 | PLA grade recorded second-hand: SP-01 PLA Light, SP-02/SP-13 non-Light (CARBON-5D citing CARBON-3A) | SNADWICH_INVENTORY "PLA grade … not recorded" | STALE_DOC |
 | C8 | SP-07 raw 30–1000 Hz; SP-11 260826 sessions Δf 0.25 Hz, 0–100 Hz, session a 120 points | SNADWICH_INVENTORY "0–1000 Hz"; default 121 points / 0.3125 Hz | STALE_DOC |
 | C9 | SP-13 remount documented (H6, D-063) | SNADWICH_INVENTORY NOT_AVAILABLE "documented remounts" | EXPECTED_HISTORICAL |
-| C10 | SP-02 identity resolved from records (§7) | EVIDENCE / M6_DECISION_RECORD §18 / STATUS `sp02_registration_gate.identity`: NEEDS_ONE_HUMAN_CONFIRMATION | EXPECTED_HISTORICAL (store-only audit; pending SUPERVISOR) |
+| C10 | SP-02 identity resolved from records (§7); SUPERVISOR-accepted (D-065) | EVIDENCE / M6_DECISION_RECORD §18 / STATUS `sp02_registration_gate.identity`: NEEDS_ONE_HUMAN_CONFIRMATION | EXPECTED_HISTORICAL (store-only audit; pending SUPERVISOR) |
 | C11 | Spec files record plan, masses and face thickness | `SP02.specimen.json`, `SP13.specimen.json`: "not recorded in accepted evidence (to be measured…)"; `SP13.physical`: face thickness "not recorded" | STALE_DOC (protected passports, not edited; values AVAILABLE_NOT_YET_GOVERNED) |
 | C12 | `scale_rel` 0.002 from H8 | D-062: `scale_rel` NOT_AVAILABLE | EXPECTED_HISTORICAL (superseded by D-064) |
 | C13 | SP-13 is auxetic (own spec, label, HUMAN) | `SP-01/spec.txt` §9: "SP-13 — CFRP/PLA sandwich panel with honeycomb core" | STALE_DOC (template text in the source spec) |
@@ -496,9 +513,8 @@ vs auxetic). Within new-plain-0.25, the core material (PLA/TPU) and the adhesive
 | C20 | Old ~0.25 stock exists (SP-04, SP-05) | HUMAN thickness statements cover old ~0.45 and new ~0.25 only | UNKNOWN (question Q6) |
 | C21 | Unnumbered 300×300 records (LMS Sheet1 columns 1–5, 2216 adhesive; June calibration panel 287 × 288) | Dashboard / spec set SP-01 … SP-13 | UNKNOWN (question Q5) |
 
-**No REAL_CONFLICT makes this catalog misleading:**
-- C1 is reported with both sides, and nothing is chosen.
-- C2 is confined to one ungoverned session.
+**No REAL_CONFLICT makes this catalog misleading:** the only remaining one, C2, is confined to one
+ungoverned session. C1 was resolved by D-065.
 
 **Not contradictions:**
 - SPEC §13 family lists, ROADMAP M7.2 ("SP1, SP2, SP10, SP13") and the fixture/forward-model hashes all
@@ -508,7 +524,12 @@ vs auxetic). Within new-plain-0.25, the core material (PLA/TPU) and the adhesive
 
 Only facts that remain unresolved after the complete audit:
 
-1. **Q1 (M7-relevant, Σ_setup).**
+1. **Q1 (M7-relevant, Σ_setup) — ANSWERED (D-065):**
+   - provenance confirmed and set frozen;
+   - H9 clarified;
+   - Σ_setup not recomputed (provisional 0.3 %, flagged; measured value deferred to a separate decision).
+
+   The original question:
    - `I:\Sumin\SPname_files_260909_polymax.zip` contains `SP13_polymax.unv`: a Testlab PolyMAX fit of
      the SP-13 **260909** session.
    - Details: set "Bravo (1)", 9 modes, 31.64 … 206.15, 212.61, 228.75 Hz. The same values are in the
@@ -529,13 +550,13 @@ Only facts that remain unresolved after the complete audit:
 6. **Q6 (old ~0.25 stock).** Does the local face-thickness statement for the ~0.25 mm stock also apply
    to the old ~0.25 sheets of SP-04 and SP-05?
 
-None of these blocks the SP-02 + SP-13 path. Only Q1 touches it, through Σ_setup, which stays
-provisional until it is answered.
+None of these blocks the SP-02 + SP-13 path. Q1 is answered (D-065). Q2–Q6 are catalog-completeness
+questions, kept unresolved on purpose (SUPERVISOR 2026-10-07).
 
 ## 11. One-line summary per specimen
 
 - SP-01 — old T300 plain 0.45 / PLA (Light) auxetic, DP420 / 502.13×499.25×2.9 / 588.4 g / fitted experiment YES (ungoverned) / governed FE NO (INP/ODB in C:\temp) / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
-- SP-02 — old T300 plain 0.45 / PLA honeycomb, DP420 / 515×510×2.9 / 582.71 g / fitted experiment YES (governed `SP02/bravo-1`) / governed FE YES / physical registration YES (REVIEW_READY) / NEEDS_GOVERNANCE — M7 path with SP-13
+- SP-02 — old T300 plain 0.45 / PLA honeycomb, DP420 / 515×510×2.9 / 582.71 g / fitted experiment YES (governed, active `SP02/bravo-1-physical`) / governed FE YES / physical registration YES (accepted, active) / NEEDS_GOVERNANCE (forward binding of the physical passport) — M7 path with SP-13
 - SP-03 — old T300 twill 0.45 / PLA auxetic, DP420 / 515×510×2.9 / 595.7 g / fitted experiment YES (ungoverned) / governed FE NO / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
 - SP-04 — old T300 plain 0.25 / TPU honeycomb, DP420 / 302×297.5×2.8 / 174.03 g / fitted experiment YES (ungoverned) / governed FE NO (candidate only) / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
 - SP-05 — old T300 plain 0.245 / TPU auxetic, DP420 / 301.14×302×2.55 / 161.34 g / fitted experiment YES (ungoverned) / governed FE NO (INP/ODB in store) / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
@@ -546,5 +567,5 @@ provisional until it is answered.
 - SP-10 — old T300 plain (recorded 0.40/0.39) / PLA honeycomb, DP420 / 520×515×2.8 / 555.23 g / fitted experiment YES (ungoverned, two sessions) / governed FE NO / physical registration NO / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION
 - SP-11 — old T300 twill 0.45 bare plate / 350×347×0.45 / 79.59 g / fitted experiment YES (session a, ungoverned; sessions inconsistent) / governed FE NO / physical registration NO / NOT_APPLICABLE, OBSERVATION_INSUFFICIENT, NEEDS_GOVERNANCE
 - SP-12 — new T300 plain 0.245 bare plate / 310×310×0.245 (note) / 30.1 g / experiment NONE / governed FE NO / physical registration NO / OBSERVATION_INSUFFICIENT, NOT_APPLICABLE
-- SP-13 — old T300 plain 0.425 / PLA (non-Light) auxetic, DP420 / 510×520×2.85 / 584.6 g real / fitted experiment YES (governed `SP13/best`) / governed FE YES / physical registration YES (production-ready) / OBSERVATION_INSUFFICIENT alone, NEEDS_GOVERNANCE — M7 path with SP-02
+- SP-13 — old T300 plain 0.425 / PLA (non-Light) auxetic, DP420 / 510×520×2.85 / 584.6 g real / fitted experiment YES (governed `SP13/best`; FREQUENCY_ONLY `SP13/260909-bravo-1`) / governed FE YES / physical registration YES (production-ready) / OBSERVATION_INSUFFICIENT alone, NEEDS_GOVERNANCE — M7 path with SP-02
 - SP-15 — CFRP plain bare plate (stock/thickness/size not recorded) / fitted experiment YES (ungoverned, outside store) / governed FE NO / physical registration NO / identity AMBIGUOUS / NEEDS_GOVERNANCE, NEEDS_FORWARD_MODEL, NEEDS_REGISTRATION, NOT_APPLICABLE
