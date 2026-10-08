@@ -1283,3 +1283,20 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
 - **Journals:** campaign `fb5234116c6e9413…`, 9 entries, last `53fc367c980fe5f1…`. RUN_A journal unchanged (5 entries,
   last `f1d1e2a99c6411cb…`).
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1581 OK (2 Abaqus-gated skipped); without data stores 1567 OK (62 skipped); test_m7_run_b_result 7 OK (1 store-gated; the report rebuilds identically from the RUN_B journals)
+
+## M7 closure (D-075): RUN_B accepted; reporting correction; campaign complete
+
+- **Closure record:** `campaigns/M7_CLOSURE.json`, derived from the unchanged result records (bound by
+  SHA-256: RUN_A `23b0bfe76556ec09…`, RUN_B `2f90abc9a4f58586…`).
+- **Reporting correction:** `model_form_robustness_reporting` (campaign layer). RUN_A
+  `AVAILABLE_COMPLETE_LOO`, `MODEL_DEPENDENCE_DIAGNOSTIC` 50794.8–60348.4 MPa;
+  RUN_B `UNAVAILABLE_INCOMPLETE_LOO` (family (1,2) removal rank-deficient; one valid case), no number. Regression
+  test: the RUN_B system through the real M5 code still gives the M5 range 0.0, and the report shows no
+  number at all. The live report rebuilt from the RUN_A / RUN_B journals gives the same reporting.
+- **Release statement:** RUN_A E_in,eff = 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally
+  validated; M5 NOT_IDENTIFIABLE.
+- **Diagnostic statement:** RUN_B E_in 50.886 GPa, G12 6.872 GPa, both diagnostic; G12 not a material property.
+- **Integrity:** RUN_A and RUN_B journals unchanged; no frozen M0–M6 evidence changed on `auto-id/m7`
+  (only the accepted M4.7 additive objective field outside M7 code); no ODB / INP / NPZ / solver artefact in
+  git; no Abaqus execution after RUN_B.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK

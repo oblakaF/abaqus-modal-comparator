@@ -1184,3 +1184,39 @@ Decision:
 Rationale / scope: records the HUMAN Abaqus authorisation. The run and its result are worker results
 pending SUPERVISOR review (EVIDENCE).
 Supersedes: none
+
+## D-075 — RUN_B accepted; M7 scientific campaign complete
+Date: 2026-10-08 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M7 RUN B — SUPERVISOR ACCEPTANCE AND M7 CLOSURE PREPARATION." (2026-10-08); D-072, D-074
+Decision:
+- **RUN_B** (`535141e`) is ACCEPTED, diagnostic only. Conclusion C is accepted: freeing G12 causes strong
+  parameter compensation and materially shifts E_in (Δln E_in −0.0885, Δln G12 +0.4234). The improved absolute
+  residuals of RUN_B are not improved material identification.
+  - RUN_B G12 (6.8721 GPa) stays `COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY`, `BARE_PLATE_REQUIRED`,
+    `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`; it never enters a recommended-material-property table. RUN_B
+    E_in (50.8862 GPa) is diagnostic as well.
+  - The specimen-specific family discrepancy is not removed by freeing G12: family (1,2) SP-02 − SP-13
+    7.85 → 8.27 percentage points; family (0,3) holdouts
+    5.63 → 5.33. RUN_B mainly shifts family means and redistributes
+    residuals: MODEL_FORM / PARAMETER_COMPENSATION dependence.
+- **RUN_A remains the engineering release candidate:** E_in,eff = 55.593 GPa,
+  `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally validated; not `IDENTIFIED_MATERIAL_PROPERTY`; formal M5
+  NOT_IDENTIFIABLE. Practical engineering result: governed modal identities preserved; experimental-pair MAC
+  acceptable (min 0.918); all FIT + HOLDOUT errors < 10 % (max
+  6.79 %); E_in inside the engineering window; the intended
+  engineering-use criterion is met. The RUN_A leave-one-family-out range 50.8–60.3 GPa
+  may be reported only as `MODEL_DEPENDENCE_DIAGNOSTIC` (not a confidence interval, not a formal
+  material-property uncertainty).
+- **Reporting correction (M5 unchanged):** M5 takes model_form_robustness over the VALID leave-one-family-out
+  cases only, so an incomplete set can show 0.0. The campaign report adds `model_form_robustness.status`:
+  `AVAILABLE_COMPLETE_LOO` (every family case VALID, at least two; labelled `MODEL_DEPENDENCE_DIAGNOSTIC`),
+  `UNAVAILABLE_INCOMPLETE_LOO` (any refused case or fewer than two valid cases; no number, no replacement
+  value) or `NOT_EVALUATED`. RUN_A: `AVAILABLE_COMPLETE_LOO`; RUN_B: `UNAVAILABLE_INCOMPLETE_LOO`. M5 thresholds,
+  algorithms, verdicts and records are unchanged; the accepted RUN_A / RUN_B result records are unchanged.
+- **No further M7 FE work:** no further Abaqus execution in M7. The unused solve budgets (RUN_A 14 / 16,
+  RUN_B 18 / 24) are abandoned intentionally. The M7 scientific campaign is complete.
+- **Roadmap M7.2–M7.8** were not pursued as separate mini-steps; their questions are answered as far as M7
+  goes by RUN_A + RUN_B (M7 GATE: one shared carbon vector does not explain the family, so no global material
+  number is reported). Recorded as `NOT_PURSUED_IN_M7` for SUPERVISOR confirmation at stage acceptance.
+- M8 is not started. M7 is not merged without HUMAN authorisation.
+Rationale / scope: accepts RUN_B and closes the M7 campaign with its accepted interpretation.
+Supersedes: none

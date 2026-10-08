@@ -657,6 +657,13 @@ def campaign_m5_verdict(definition: CampaignDefinition, specimens: Sequence[Camp
                         evaluations: Sequence[Mapping], result: Mapping, final: Mapping) -> dict:
     """M5 evidence chain + verdict on the stacked campaign system at p̂ (PRODUCTION context; rules unchanged)."""
 
+    return _campaign_m5(definition, specimens, evaluations, result, final)[0]
+
+
+def _campaign_m5(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
+                 evaluations: Sequence[Mapping], result: Mapping, final: Mapping) -> tuple[dict, Optional[dict]]:
+    """The M5 verdict record and the M5 model_form_robustness record (None when M5 computed none)."""
+
     names = definition.fitted_parameters
     sigma = definition.sigma.setup_sd_ln
     usable = [e for e in evaluations if e.get("residuals") is not None]
@@ -701,7 +708,48 @@ def campaign_m5_verdict(definition: CampaignDefinition, specimens: Sequence[Camp
             "SPEC §5.1; D-046"),
         p_hat, {n: ParameterRole.GLOBAL for n in names})
     report = decide_verdicts(inputs)
-    return report.to_dict()
+    return report.to_dict(), None if chain.robustness is None else chain.robustness.to_dict()
+
+
+# How the campaign report reads M5 model_form_robustness (D-075).  M5 is unchanged: its numeric range is taken
+# over the VALID leave-one-family-out cases only, so an incomplete set can show 0.0.  The campaign report never
+# presents that number as model-form evidence and never substitutes another value.
+LOO_COMPLETE = "AVAILABLE_COMPLETE_LOO"
+LOO_INCOMPLETE = "UNAVAILABLE_INCOMPLETE_LOO"
+LOO_NOT_EVALUATED = "NOT_EVALUATED"
+MODEL_DEPENDENCE_DIAGNOSTIC = "MODEL_DEPENDENCE_DIAGNOSTIC"
+
+
+def model_form_robustness_reporting(robustness: Optional[Mapping]) -> dict:
+    """The campaign status of an M5 model_form_robustness record (its ``to_dict`` form).
+
+    The range is reported only when every family's leave-one-family-out case is VALID and there are at least
+    two of them; it is then a MODEL_DEPENDENCE_DIAGNOSTIC (not a confidence interval, not a material-property
+    uncertainty).  Otherwise the status is UNAVAILABLE_INCOMPLETE_LOO with no number at all.
+    """
+
+    if robustness is None:
+        return {"status": LOO_NOT_EVALUATED, "label": None, "parameters": None, "cases": [], "reasons": [
+            "no M5 model_form_robustness record (no converged campaign verdict)"]}
+    cases = [{"family": c["family"], "removed_term_ids": list(c["removed_term_ids"]), "status": c["status"],
+              "estimate": c["estimate"]} for c in robustness["cases"]]
+    valid = [c for c in cases if c["status"] == "VALID"]
+    reasons = []
+    if robustness["refused_families"] or len(valid) != len(cases):
+        reasons.append(f"leave-one-family-out refused for {list(robustness['refused_families'])}")
+    if len(valid) < 2:
+        reasons.append(f"{len(valid)} valid leave-one-family-out case(s): a range needs at least two")
+    if reasons or not robustness["supports_green"]:
+        return {"status": LOO_INCOMPLETE, "label": None, "parameters": None, "cases": cases, "reasons": reasons + [
+            "the M5 numeric model_form_robustness covers the valid cases only; it is not a model-form uncertainty "
+            "and not evidence of robustness (no replacement value)"]}
+    parameters = {name: {"p_hat": item["p_hat"], "min_estimate": item["min_estimate"],
+                         "max_estimate": item["max_estimate"],
+                         "half_range_ln": 0.5 * (item["max_shift_ln"] - item["min_shift_ln"])}
+                  for name, item in sorted(robustness["parameters"].items())}
+    return {"status": LOO_COMPLETE, "label": MODEL_DEPENDENCE_DIAGNOSTIC, "parameters": parameters, "cases": cases,
+            "reasons": ["range of the linearised leave-one-family-out estimates: a model-dependence diagnostic; "
+                        "not a confidence interval and not a formal material-property uncertainty"]}
 
 
 DESCRIPTIVE_LN_BANDS = (0.05, 0.08)  # D-045 bands, used only to describe stability (never an identification rule)
@@ -783,9 +831,9 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
     estimate = EFFECTIVE_ESTIMATE if not reasons else NO_EFFECTIVE_ESTIMATE
     if definition.run_type == RUN_B:
         estimate = RUN_B_LABEL if not reasons else f"{RUN_B_LABEL}_INCOMPLETE"
-    verdict = None
+    verdict = robustness = None
     if final is not None and status == LMStatus.CONVERGED.value and not refusals:
-        verdict = campaign_m5_verdict(definition, specimens, evaluations, result, final)
+        verdict, robustness = _campaign_m5(definition, specimens, evaluations, result, final)
     identified = bool(verdict) and all(v["verdict"] == Verdict.IDENTIFIED.value for v in verdict["verdicts"].values())
     return {
         "schema": CAMPAIGN_REPORT_SCHEMA, "campaign_id": definition.campaign_id, "run_type": definition.run_type,
@@ -796,6 +844,7 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
                         "engineering_plausibility": plausibility, "at_search_bound": at_bound,
                         "practical_target_note": "engineering criterion, separate from the formal M5 verdict"},
         "m5_verdict": verdict,
+        "model_form_robustness": model_form_robustness_reporting(robustness),
         "material_claim": IDENTIFIED_MATERIAL_PROPERTY if identified else NO_MATERIAL_CLAIM,
         "validation": NOT_EXTERNALLY_VALIDATED,
         "reporting": ("model-calibrated effective constant within this FE model (SPEC §5.2); "

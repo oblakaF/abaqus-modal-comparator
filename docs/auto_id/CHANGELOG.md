@@ -3836,3 +3836,24 @@ first internal provider.
   0.999834; M5 NOT_IDENTIFIABLE for both; G12 a compensation diagnostic; not externally validated.
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1581 OK (2 Abaqus-gated skipped); without data stores 1567 OK (62 skipped); test_m7_run_b_result 7 OK (1 store-gated; the report rebuilds identically from the RUN_B journals)
 - **Next gate:** SUPERVISOR review of RUN_B. No further fit; M7 not merged.
+
+## 2026-10-08 — M7 — RUN_B accepted; reporting correction; M7 closure prepared
+
+- **Stage:** M7
+- **Mini-step:** M7 closure
+- **Status:** REVIEW_READY (stage)
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): M7 closure - RUN_B accepted, model_form_robustness reporting status, campaign complete`
+- **Decision:** D-075.
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_CLOSURE.json`, `tests/test_m7_closure.py`;
+  - updated: `src/services/identification_campaign_run.py` (campaign-layer `model_form_robustness_reporting`;
+    report field `model_form_robustness`), `tests/test_m7_campaign.py`, `tests/test_m7_run_a_result.py`,
+    `tests/test_m7_run_b_result.py`, DECISIONS (D-075), EVIDENCE, M7_DECISION_RECORD (§9), ROADMAP, STATUS,
+    `campaigns/README.md`.
+- **Scientific behaviour changed:** reporting only (additive report field). M5 thresholds, algorithms,
+  verdicts and records unchanged; accepted result records unchanged.
+- **Abaqus run count:** 0.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK
+- **Next gate:** SUPERVISOR review of the M7 stage PR. Not merged; M8 not started.

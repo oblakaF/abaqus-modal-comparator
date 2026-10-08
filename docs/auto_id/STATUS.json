@@ -5,7 +5,7 @@
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M7",
   "current_ministep": "M7.1",
-  "status": "IN_PROGRESS",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M6",
   "last_accepted_ministep": "M6.4",
   "last_accepted_commit": "f1274cae80a6b3972cef04fd9c1bee0505920311",
@@ -543,7 +543,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the RUN_B result (D-074). No further fit; M7 not merged.",
+  "next_action": "STOP: SUPERVISOR review of the M7 stage PR (auto-id/m7 -> main); merge only with explicit HUMAN authorisation; M8 not started",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -855,17 +855,17 @@
   "m7": {
     "branch": "auto-id/m7",
     "base": "9f5f63a968759d6237facda00a4415cfe29c2257",
-    "status": "IN_PROGRESS",
-    "decision": "D-069, D-070, D-071, D-072, D-073, D-074",
+    "status": "REVIEW_READY",
+    "decision": "D-069, D-070, D-071, D-072, D-073, D-074, D-075",
     "decision_record": "docs/auto_id/M7_DECISION_RECORD.md",
     "M7.1": "ACCEPTED",
-    "M7.2": "TODO",
-    "M7.3": "TODO",
-    "M7.4": "TODO",
-    "M7.5": "TODO",
-    "M7.6": "TODO",
-    "M7.7": "TODO",
-    "M7.8": "TODO",
+    "M7.2": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.3": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.4": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.5": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.6": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.7": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.8": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
     "run_a": {
       "campaign": "docs/auto_id/campaigns/M7_RUN_A.campaign.json (0a21ad0567901034b521b822b52f0c29944e96394f3692e1a8ebcd7ccd8d2ccf)",
       "archive_reuse": "docs/auto_id/campaigns/M7_RUN_A.archive-reuse.json (91c8bc547c738a65ec5bdf4ff1e2d6f3d91e518fd5bdab4ebb547fc7b1a18b92)",
@@ -930,7 +930,8 @@
         "status": "ACCEPTED"
       },
       "status": "CLOSED",
-      "acceptance": "SUPERVISOR 2026-10-08 (D-072): E_in,eff 55.593 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, not externally validated; M5 NOT_IDENTIFIABLE; practical engineering target met, formal M5 identification gate not met; remaining budget not spent"
+      "acceptance": "SUPERVISOR 2026-10-08 (D-072): E_in,eff 55.593 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, not externally validated; M5 NOT_IDENTIFIABLE; practical engineering target met, formal M5 identification gate not met; remaining budget not spent",
+      "unused_budget": "14 / 16 abandoned intentionally (D-075)"
     },
     "run_b": {
       "label": "EFFECTIVE_MODEL_COMPENSATION_TEST (diagnostic only)",
@@ -944,7 +945,7 @@
       "archive_extractions": 2,
       "budgets": "24 new Abaqus solves (hard); 26 Abaqus Python extractions max; LM evaluations 17",
       "executed": true,
-      "status": "EXECUTED (REVIEW_READY)",
+      "status": "ACCEPTED (diagnostic only; D-075)",
       "archive_extraction": {
         "gate": "HUMAN gate 1 (D-073)",
         "record": "docs/auto_id/campaigns/M7_RUN_B.archive-extraction.json",
@@ -997,12 +998,28 @@
         "abaqus_python_extractions": 6,
         "failures": 0,
         "campaign_journal_last_entry": "53fc367c980fe5f12ad944568c01de6b680d3d5d4e7fc96e3665f5c06041dbcb",
-        "status": "REVIEW_READY"
+        "status": "ACCEPTED"
       },
-      "release_candidate": "unchanged: RUN_A model-calibrated effective E_in = 55.593 GPa, not externally validated"
+      "release_candidate": "unchanged: RUN_A model-calibrated effective E_in = 55.593 GPa, not externally validated",
+      "unused_budget": "18 / 24 abandoned intentionally (D-075)"
     },
     "M7.1_tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK",
     "abaqus_solves": 8,
-    "abaqus_python_extractions": 12
+    "abaqus_python_extractions": 12,
+    "closure": {
+      "decision": "D-075",
+      "record": "docs/auto_id/campaigns/M7_CLOSURE.json",
+      "release_candidate": "RUN_A model-calibrated effective E_in = 55.593 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, not externally validated; M5 NOT_IDENTIFIABLE",
+      "run_a_model_dependence_diagnostic_gpa": [
+        50.8,
+        60.3
+      ],
+      "run_b": "diagnostic only: E_in 50.886 GPa, G12 6.872 GPa (COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY)",
+      "conclusion": "freeing G12 improves aggregate residuals but does not remove the inter-specimen family discrepancy and materially shifts E_in: parameter compensation / model-form dependence",
+      "reporting_correction": "campaign report model_form_robustness.status (AVAILABLE_COMPLETE_LOO / UNAVAILABLE_INCOMPLETE_LOO / NOT_EVALUATED); M5 unchanged",
+      "further_fe_work": "none; no Abaqus after RUN_B",
+      "stage_pr": "auto-id/m7 -> main prepared, NOT merged",
+      "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK"
+    }
   }
 }

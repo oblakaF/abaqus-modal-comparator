@@ -162,3 +162,14 @@ SUPERVISOR gate.
 - **Conclusion C:** G12 absorbs model discrepancy and drags E_in with it; the specimen-specific family
   disagreement is unchanged. The release candidate remains RUN_A E_in,eff = 55.593 GPa.
 - **Next:** SUPERVISOR review. No further fit; M7 not merged.
+
+## 9. M7 closure (D-075), `REVIEW_READY`
+
+- **RUN_B:** ACCEPTED, diagnostic only; conclusion C accepted.
+- **Release candidate:** RUN_A E_in,eff = 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally
+  validated; M5 NOT_IDENTIFIABLE. The leave-one-family-out range 50.8–60.3 GPa is a
+  `MODEL_DEPENDENCE_DIAGNOSTIC` only.
+- **Reporting correction:** `model_form_robustness.status` in the campaign report; an incomplete
+  leave-one-family-out set is never read as zero model-form uncertainty. M5 unchanged.
+- **Budgets:** unused solves abandoned (RUN_A 14 / 16, RUN_B 18 / 24). No further M7 FE work.
+- **Next:** SUPERVISOR review of the M7 stage PR (`auto-id/m7` → `main`). Not merged; M8 not started.

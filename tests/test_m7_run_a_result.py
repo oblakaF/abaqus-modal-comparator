@@ -115,6 +115,9 @@ class RunStoreTests(unittest.TestCase):
         for key in ("engineering", "m5_verdict", "material_claim", "validation", "parameters", "lm_status"):
             with self.subTest(key=key):
                 self.assertEqual(json.loads(json.dumps(report[key])), committed[key])
+        closure = json.loads((CAMPAIGNS / "M7_CLOSURE.json").read_text(encoding="utf-8"))
+        self.assertEqual(json.loads(json.dumps(report["model_form_robustness"])),
+                         closure["run_a"]["model_form_robustness"])  # D-075 reporting from the live M5 chain
 
 
 if __name__ == "__main__":

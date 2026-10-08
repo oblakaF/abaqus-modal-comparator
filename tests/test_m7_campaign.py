@@ -416,6 +416,7 @@ class SyntheticCampaignTests(unittest.TestCase):
         report = build_campaign_report(self.definition, run.specimens, run.journal.records("evaluation"), result)
         self.assertEqual(report["engineering"]["estimate"], NO_EFFECTIVE_ESTIMATE)
         self.assertIsNone(report["m5_verdict"])
+        self.assertEqual(report["model_form_robustness"]["status"], "NOT_EVALUATED")
         self.assertEqual(report["validation"], NOT_EXTERNALLY_VALIDATED)
 
     def test_gates(self):
@@ -451,6 +452,12 @@ class SyntheticCampaignTests(unittest.TestCase):
         self.assertEqual(report["sigma"]["measurement"], {"status": "NOT_AVAILABLE",
                                                           "source": self.definition.sigma.measurement_source})
         self.assertNotIn("G12_mpa", verdict["verdicts"])
+        robustness = report["model_form_robustness"]  # D-075: a range only from a complete LOO set
+        self.assertIn(robustness["status"], ("AVAILABLE_COMPLETE_LOO", "UNAVAILABLE_INCOMPLETE_LOO"))
+        if robustness["status"] == "UNAVAILABLE_INCOMPLETE_LOO":
+            self.assertIsNone(robustness["parameters"])
+        else:
+            self.assertEqual(robustness["label"], "MODEL_DEPENDENCE_DIAGNOSTIC")
 
     def test_engineering_window_is_reported_not_rejected(self):
         narrow = parse_campaign_definition(synthetic_definition(

@@ -61,3 +61,10 @@ committed.
 - `M7_RUN_B.result.json`: the diagnostic `EFFECTIVE_MODEL_COMPENSATION_TEST` result, rebuilt from the journals
   of run `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0` (store-gated check: `AUTO_ID_FIXTURE_ROOT_M7_RUN_B`).
 - G12 is a compensation diagnostic, never a material property; RUN_B E_in is diagnostic as well.
+
+## M7 closure (D-075)
+
+- `M7_CLOSURE.json`: RUN_A release statement, RUN_B diagnostic statement, family discrepancy and the
+  `model_form_robustness` reporting of both runs, bound to the result records by SHA-256.
+- `model_form_robustness.status` in every campaign report: `AVAILABLE_COMPLETE_LOO` (labelled
+  `MODEL_DEPENDENCE_DIAGNOSTIC`), `UNAVAILABLE_INCOMPLETE_LOO` (no number) or `NOT_EVALUATED`.
