@@ -3896,3 +3896,13 @@ first internal provider.
   records, `M7_CLOSURE.json` and the run journals are unchanged.
 - **Abaqus run count:** 0. Docs only.
 - **Next:** M8 `NOT_STARTED`. No M8 branch; the next step needs SUPERVISOR instruction.
+
+## 2026-10-08 — M6 — ROADMAP stage-status line brought up to date
+
+- **Stage:** M6 (bookkeeping only; recorded with the M7 closure, PR #38)
+- **Branch:** `auto-id/m7-closure`
+- **Change:** `ROADMAP.md` M6 stage status no longer reads "stage PR … prepared, not merged; M7 `NOT_STARTED`".
+  It now records the factual state: M6 `ACCEPTED`, M6 gate PASS, merged to `main` by PR #35, merge commit
+  `f1274cae80a6b3972cef04fd9c1bee0505920311` (as already recorded in `STATUS.json` `main_merges` since PR #36).
+- **Scientific behaviour changed:** NO. No M6 result, evidence, decision or scientific text changed.
+- **Abaqus run count:** 0. Docs only.
