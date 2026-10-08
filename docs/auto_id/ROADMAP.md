@@ -593,7 +593,7 @@ its declared uncertainty.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M7.1 | `family.json` campaign | `TODO` |
+| M7.1 | `family.json` campaign | `REVIEW_READY` (D-069): RUN_A campaign architecture; execution needs the HUMAN gate |
 | M7.2 | Old plain 0.45 family where scientifically compatible: SP1, SP2, SP10, SP13 | `TODO` |
 | M7.3 | Shared vs separate fits | `TODO` |
 | M7.4 | Δχ² or bootstrap consistency test | `TODO` |
@@ -604,6 +604,15 @@ its declared uncertainty.
 
 **M7 GATE:** if one shared carbon vector cannot explain the family, NO global material
 number is reported.
+
+Stage status: `IN_PROGRESS` (D-069; branch `auto-id/m7` from `main` `9f5f63a`; decisions in
+[M7_DECISION_RECORD.md](M7_DECISION_RECORD.md)).
+- **M7.1 (zero Abaqus), `REVIEW_READY`:** the RUN_A campaign architecture.
+  - Specimens `SP02/bravo-1-physical` + `SP13/best-physical`. Only E_in is fitted; G12 is fixed at 4 500 MPa.
+  - FIT rows `SP02:R1`, `SP02:R2`, `SP13:R1`; HOLDOUT rows `SP02:R3`, `SP13:R2`.
+  - Σ_setup 0.3 % PROVISIONAL; Σ_meas NOT_AVAILABLE.
+  - Hard budget of 16 new solves.
+  - Proposed manifest `e4ba607f…` (not executed). RUN_B is diagnostic only and needs its own later gate.
 
 ---
 

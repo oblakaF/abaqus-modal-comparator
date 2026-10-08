@@ -1005,3 +1005,69 @@ Decision:
 Rationale / scope: prepares the M7 inputs on the accepted physical registrations without touching the frozen
 M0–M5 evidence. The wiring is a worker result pending SUPERVISOR review (EVIDENCE).
 Supersedes: none
+
+## D-069 — M7 opened: the accepted M7.1 design; RUN_A is the first executable campaign
+Date: 2026-10-08 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M7.1 DESIGN APPROVAL — HUMAN GATE PREPARATION" and "M7 START — RUN A CAMPAIGN ARCHITECTURE" (2026-10-08); SPEC §5, §7, §8, §12.3, §13; D-044, D-046, D-060, D-066, D-068
+Decision:
+- **Base:** M7 starts on branch `auto-id/m7` from `main` `9f5f63a` (M6 ACCEPTED, gate PASS).
+- **Initial campaign:** `SP02/bravo-1-physical` + `SP13/best-physical` only. SP-10 and SP-01 are later
+  extensions.
+- **RUN_A** (the first executable campaign):
+  - Fitted: E_in only (E1 = E2 = E_in); start 52 000 MPa.
+  - Fixed: G12 = 4 500 MPa; ν12 = 0.05; E3, ν13, ν23, G13, G23 as accepted after M6.4.
+  - Not fitted: t_face (nominal FE geometry; no 9-point prior), k_core (existing INP constants; no
+    independent prior), k_int (OFF). No other fitted or nuisance parameter.
+  - Numerical search bounds 26 000–104 000 MPa (solver only). Engineering plausibility 35–75 GPa (reporting
+    only; never a prior).
+- **Observations:**
+  - Frozen independently per specimen on the active physical chains, and they must reproduce exactly:
+    - SP-02: R1 (2 ↔ 8) FIT, R2 (4 ↔ 10) FIT, R3 (7 ↔ 13) HOLDOUT;
+    - SP-13: R1 (4 ↔ 10) FIT, R2 (7 ↔ 13) HOLDOUT.
+  - Otherwise STOP. Registration, pairing, thresholds and modal selection are not altered.
+  - The M4.3 holdout policy is unchanged, and holdouts stay at specimen level.
+  - Only the FIT residuals are combined across the campaign, after branch tracking. Modes are never mixed
+    between specimens.
+- **Σ:** Σ_setup = 0.3 %, PROVISIONAL; Σ_meas = NOT_AVAILABLE. NOT_AVAILABLE never becomes zero, and no
+  PolyMAX measurement uncertainty is invented.
+- **Reuse:**
+  - p0 uses the archived baseline packs. The SP-13 ±5 % E points reuse the governed shape packs.
+  - The SP-02 ±5 % E points reuse the archived CARBON-5A ODBs through extraction-only jobs, with every
+    identity checked. That extraction needs the HUMAN Abaqus-Python gate.
+- **Budget:** RUN_A has a hard limit of 16 new Abaqus solves and no automatic extension. On exhaustion the
+  status is `SOLVE_BUDGET`.
+- **Reporting:**
+  - RUN_A may give `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`. That is not automatically
+    `IDENTIFIED_MATERIAL_PROPERTY`.
+  - The M5 verdicts IDENTIFIED / WIDE / NOT_IDENTIFIABLE are unchanged. A useful effective estimate may
+    coexist with a formal M5 NOT_IDENTIFIABLE.
+  - Every real carbon result carries "not externally validated" (D-060).
+  - The engineering target is correct mode identity and acceptable MAC; frequency agreement preferably
+    ≤ ~5 %, up to ~10 % acceptable. It is kept separate from the M5 verdict. Properties are never tuned
+    merely to turn a useful 5 % mismatch into 1 %.
+- **RUN_B** (E_in + G12, `EFFECTIVE_MODEL_COMPENSATION_TEST`): diagnostic only. It needs its own later
+  SUPERVISOR gate after RUN_A, and its G12 is never reported as an identified material property.
+- **Implementation choices made in M7.1** (for SUPERVISOR review):
+- **Σ_meas NOT_AVAILABLE in M4.7.** `RowSigma(measurement_sd=None)` means NOT_AVAILABLE: it is excluded
+  from σ and recorded as null in run identities, never as 0.0. The change is additive; numeric σ
+  values and their hashes are unchanged.
+- **Family identity for the M5 pattern test and leave-one-family-out.** The M4.3 physical family key is
+  shared across the campaign: SP-02 R2 and SP-13 R1 are one family (1,2). Each row's term stays
+  specimen-qualified (`SP02:R2`).
+- **Fitting-pair MAC guard.** It uses the frozen physical strict-pair MACs (baseline). Mode identity at p̂
+  is FE-to-FE tracking with MAC ≥ 0.90.
+- **M5 system at p̂.** It uses the LM Jacobian reconstructed from the journal: central differences at the
+  start plus Broyden updates (`reconstruct_lm_jacobian`, as for the M4.9 twin). No extra solves.
+- **Family consistency.** SPEC §13 / ROADMAP M7.4 is not part of RUN_A, so it is `NOT_AVAILABLE`. By D-044
+  this blocks a green verdict, so the expected E_in verdict is NOT_IDENTIFIABLE.
+- **Effective-estimate rule** (the engineering criterion, separate from M5). `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`
+  is given only when all of these hold:
+  - LM `CONVERGED`;
+  - no tracking refusal;
+  - the estimate is not at a numerical bound;
+  - every row has tracking MAC ≥ 0.90 and baseline pair MAC ≥ 0.80;
+  - max |f_FE/f_EXP − 1| ≤ 10 %;
+  - the agreement is no worse than at the start.
+  A value outside the engineering window is reported, not rejected.
+Rationale / scope: opens M7 with a governed, resumable two-specimen campaign. It reuses the accepted M4.5
+tracker, the M4.6 pipeline and the M4.8 LM, and leaves M5 unweakened. No Abaqus has been run.
+Supersedes: none

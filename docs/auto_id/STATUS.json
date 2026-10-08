@@ -3,9 +3,9 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M6",
-  "current_ministep": "M6 (merged)",
-  "status": "ACCEPTED",
+  "current_stage": "M7",
+  "current_ministep": "M7.1",
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M6",
   "last_accepted_ministep": "M6.4",
   "last_accepted_commit": "f1274cae80a6b3972cef04fd9c1bee0505920311",
@@ -543,7 +543,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M6 merged to main (PR #35); M7 NOT_STARTED; no M7 branch; await SUPERVISOR instruction before any M7 work",
+  "next_action": "STOP: SUPERVISOR review of M7.1 (RUN_A campaign architecture); then the HUMAN gates (archive extraction, then the RUN_A run) for manifest e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6; RUN_B not executable",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -670,7 +670,7 @@
       ]
     },
     "specimen_inventory": "docs/auto_id/SNADWICH_INVENTORY.md (factual D:\\Snadwich inventory; no passports created)",
-    "m7": "NOT_STARTED",
+    "m7": "IN_PROGRESS (see m7)",
     "rescope": "2026-10-06 SUPERVISOR: SPEC §19 item 6; D-059 (M6.1-M6.3 NOT_AVAILABLE_WITH_CURRENT_SETUP), D-060 (STEEL removed, supersedes D-015), D-061 (rescoped M6 gate)",
     "sp13_registration_gate": {
       "authorisation": "SUPERVISOR 2026-10-06: zero-Abaqus SP-13 physical registration gate",
@@ -851,5 +851,45 @@
     "accepted_by": "SUPERVISOR (M6 accepted, gate PASS, 2026-10-08); merge explicitly authorised by the HUMAN supervisor",
     "merge_ci": "Linux CI on the reviewed head e5f3fbc: 1510 OK (60 skipped); on main f1274ca: 1510 OK (60 skipped), success"
   },
-  "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated"
+  "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated",
+  "m7": {
+    "branch": "auto-id/m7",
+    "base": "9f5f63a968759d6237facda00a4415cfe29c2257",
+    "status": "IN_PROGRESS",
+    "decision": "D-069",
+    "decision_record": "docs/auto_id/M7_DECISION_RECORD.md",
+    "M7.1": "REVIEW_READY",
+    "M7.2": "TODO",
+    "M7.3": "TODO",
+    "M7.4": "TODO",
+    "M7.5": "TODO",
+    "M7.6": "TODO",
+    "M7.7": "TODO",
+    "M7.8": "TODO",
+    "run_a": {
+      "campaign": "docs/auto_id/campaigns/M7_RUN_A.campaign.json (0a21ad0567901034b521b822b52f0c29944e96394f3692e1a8ebcd7ccd8d2ccf)",
+      "archive_reuse": "docs/auto_id/campaigns/M7_RUN_A.archive-reuse.json (91c8bc547c738a65ec5bdf4ff1e2d6f3d91e518fd5bdab4ebb547fc7b1a18b92)",
+      "specimens": "SP02/bravo-1-physical, SP13/best-physical",
+      "fitted": "E_in_plane_mpa (E1 = E2), start 52000 MPa; bounds 26000-104000 MPa (solver only)",
+      "fixed": "G12 4500 MPa; nu12 0.05; E3, nu13, nu23, G13, G23 (M6.4); t_face nominal; k_core INP; k_int OFF",
+      "engineering_window": "35-75 GPa (reporting only)",
+      "fit_rows": [
+        "SP02:R1",
+        "SP02:R2",
+        "SP13:R1"
+      ],
+      "holdout_rows": [
+        "SP02:R3",
+        "SP13:R2"
+      ],
+      "sigma": "Sigma_setup 0.3 % PROVISIONAL; Sigma_meas NOT_AVAILABLE (null, never zero)",
+      "proposed_manifest": "e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6",
+      "budgets": "16 new Abaqus solves (hard); 18 Abaqus Python extractions max (16 + 2 archive); LM evaluations 11",
+      "executed": false
+    },
+    "run_b": "diagnostic EFFECTIVE_MODEL_COMPENSATION_TEST; not executable without its own later SUPERVISOR gate",
+    "M7.1_tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK",
+    "abaqus_solves": 0,
+    "abaqus_python_extractions": 0
+  }
 }

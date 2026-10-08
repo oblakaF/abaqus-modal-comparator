@@ -1005,3 +1005,36 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); M6 test modules 143 OK; M5 + M4 + M3 stage gates and M4 guard 34 OK
 - 0 Abaqus solves and 0 Abaqus Python runs in this closure step. The only M6 Abaqus work was M6.4b under
   D-067.
+
+## M7.1: RUN_A campaign architecture and the proposed HUMAN execution manifest (zero Abaqus; no result)
+
+- **Status:** REVIEW_READY (worker, 2026-10-08; D-069). No campaign has been executed.
+- **Active chains:** on the real stores and without Abaqus, both reproduce exactly the accepted rows:
+  - SP-02: R1 (2 ↔ 8, MAC 0.918) FIT, R2 (4 ↔ 10, 0.951) FIT, R3 (7 ↔ 13, 0.975) HOLDOUT;
+  - SP-13: R1 (4 ↔ 10, 0.958) FIT, R2 (7 ↔ 13, 0.947) HOLDOUT.
+  - The M4.3 holdouts are unchanged, there are no cluster triggers, and `registration_limited` is False for
+    both.
+- **Archive reuse (read-only verification):**
+  - Both SP-02 CARBON-5A ODBs re-hash to their ARCHIVE_MANIFEST pins: E− `bae6a7c1…` (technical retry1),
+    E+ `ba38cb69…`.
+  - The `.sta` / `.dat` / `.msg` files are pinned, and the completion and Abaqus 2024 markers are present.
+  - The failed first E− attempt is excluded.
+  - The expected frequencies (modes 7–30) come from the accepted CARBON-5A table.
+- **Proposed manifest:**
+- **Manifest hash:** `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`.
+- **Baseline packs reused:** `SP02_f3e592281bebce66` and `SP13_a46d08b52995e078` (p0; 0 solves).
+- **±5 % E points reused:**
+  - SP-13: governed packs `SP13_0e861d03c333bb0b` (E 54 600) and `SP13_a9df66283a168786` (E 49 400);
+  - SP-02: extraction-only jobs `SP02_13363f977809dbff` (E 54 600, ODB `ba38cb69…`) and
+    `SP02_84753f636064e192` (E 49 400, ODB `bae6a7c1…`, the technical retry1). The failed first attempt is
+    excluded.
+- **Maximum new Abaqus solves:** 16, a hard cap with no extension.
+- **Maximum Abaqus Python extractions:** 18 (16 after new solves + 2 archive extractions).
+- **LM evaluation budget:** 11 (3 reused + at most 8 new; each new evaluation solves both specimens).
+- **Executor gate:** `tools/m7_campaign.py extract-archive` and then `run`, each with
+  `--authorised-manifest-hash e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`. RUN_B is not part of the manifest.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK
+- **Targeted mutation check:** 9 of 9 mutants killed. The mutants were: stacking order, Σ_meas becoming
+  zero, the solve cap, the HUMAN gate, the RUN_B gate, the observation STOP, G12 fixing, refusal
+  propagation, and the RowSigma None handling.
+- 0 Abaqus solves, 0 Abaqus Python extractions, no LM run, no estimate, no RUN_B.

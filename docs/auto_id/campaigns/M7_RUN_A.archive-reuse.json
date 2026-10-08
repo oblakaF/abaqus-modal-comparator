@@ -1,0 +1,212 @@
+{
+ "schema": "auto-id/campaign-archive-reuse/v1",
+ "packs": [
+  {
+   "specimen": "SP02",
+   "point": {
+    "E_in_plane_mpa": 52000.0,
+    "G12_mpa": 4500.0
+   },
+   "job_name": "SP02_f3e592281bebce66",
+   "generated_inp_sha256": "f3e592281bebce66b38839bfadf69f1d1f56e2937b77a378da2a125062388e97",
+   "shape_pack_record": "docs/auto_id/fe_shapes/SP02_f3e592281bebce66.shape-pack.json"
+  },
+  {
+   "specimen": "SP13",
+   "point": {
+    "E_in_plane_mpa": 52000.0,
+    "G12_mpa": 4500.0
+   },
+   "job_name": "SP13_a46d08b52995e078",
+   "generated_inp_sha256": "a46d08b52995e078213e78156c585c2b5a483c2c5954ace7cdc77e136b746253",
+   "shape_pack_record": "docs/auto_id/fe_shapes/SP13_a46d08b52995e078.shape-pack.json"
+  },
+  {
+   "specimen": "SP13",
+   "point": {
+    "E_in_plane_mpa": 49400.0,
+    "G12_mpa": 4500.0
+   },
+   "job_name": "SP13_a9df66283a168786",
+   "generated_inp_sha256": "a9df66283a168786910492f76d7b47b1f656f503e92d0abeff28dc65bc3f47f4",
+   "shape_pack_record": "docs/auto_id/fe_shapes/SP13_a9df66283a168786.shape-pack.json"
+  },
+  {
+   "specimen": "SP13",
+   "point": {
+    "E_in_plane_mpa": 54600.0,
+    "G12_mpa": 4500.0
+   },
+   "job_name": "SP13_0e861d03c333bb0b",
+   "generated_inp_sha256": "0e861d03c333bb0b01f6f572bfcf8a0664424a2a7a0d96c8ef6f7e0df7d6f8a0",
+   "shape_pack_record": "docs/auto_id/fe_shapes/SP13_0e861d03c333bb0b.shape-pack.json"
+  }
+ ],
+ "odbs": [
+  {
+   "specimen": "SP02",
+   "point": {
+    "E_in_plane_mpa": 49400.0,
+    "G12_mpa": 4500.0
+   },
+   "job_name": "SP02_84753f636064e192",
+   "generated_inp_sha256": "84753f636064e19240bb841b21bd2340d463bcdd1fa5f01d5269cb54f1ad00da",
+   "odb": {
+    "store": "carbon-project-archive",
+    "relative_path": "carbon5a/runs/E_MINUS_SP02_retry1/SP02_84753f636064e192.odb",
+    "sha256": "bae6a7c133a8eb4b3bc9eef77d25b45173cb32144875c5591ff2b61a79858e4c",
+    "size_bytes": 751590276,
+    "pin_source": "carbon-project-archive:ARCHIVE_MANIFEST.json odbs[] candidate 'CARBON-5A E_MINUS (technical retry1)' (manifest sha256 cecf7ac2363d3af69748cc73e0c679948c851913f82ab046f58eaa8f4254d166)"
+   },
+   "status_files": {
+    "carbon5a/runs/E_MINUS_SP02_retry1/SP02_84753f636064e192.sta": "08744255046afa5b3f15575632478a25fa3c86cf2cd83d43d852c820f773bc64",
+    "carbon5a/runs/E_MINUS_SP02_retry1/SP02_84753f636064e192.dat": "c905468e1d951d2b5e76825db7e57412e25368a8446133b306bf8143f77a8e46",
+    "carbon5a/runs/E_MINUS_SP02_retry1/SP02_84753f636064e192.msg": "5233a3c4c895aeccdd3381f7475f3b68f51b145c56745f096293005aa2de190c"
+   },
+   "expected_frequencies": {
+    "mode_numbers": [
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30
+    ],
+    "frequencies_hz": [
+     23.552932739257812,
+     73.36167907714844,
+     76.30072021484375,
+     87.69329833984375,
+     88.87686920166016,
+     142.0721435546875,
+     202.34226989746094,
+     205.678955078125,
+     211.6210174560547,
+     218.45748901367188,
+     256.75286865234375,
+     258.9898681640625,
+     354.4115295410156,
+     390.03631591796875,
+     396.20849609375,
+     399.94873046875,
+     405.39813232421875,
+     433.4053039550781,
+     442.8214111328125,
+     515.1076049804688,
+     517.7581787109375,
+     631.9727172851562,
+     639.1336059570312,
+     639.4033203125
+    ],
+    "source": "carbon-project-archive:carbon5a/frequencies.csv (sha256 014d099582ece2a0f8bb4bfde0699291ef63510eb5f1fc90cc1df3eba8d7a10a), specimen SP02 state E_MINUS"
+   },
+   "excluded_attempts": [
+    {
+     "relative_path": "carbon5a/runs/E_MINUS_SP02",
+     "reason": "first authorised attempt aborted (file system space exhausted; truncated ODB, not archived); never reused. FAILURE_NOTE: E_MINUS SP02 authorized solve #1 (2026-10-02T06:39:51Z-06:45:57Z) aborted by Abaqus/Standard: \"!!! EXCEPTION: File system space exhausted\" (SMASimUttOSFile::WriteAll), ERROR CATEGORY SOLVER. Cause: out-of-core solver scratch on C: (memory to minimize I/O 45,691 MB; ~48 GB free at start). No retry performed (would be a ninth solve)."
+    }
+   ]
+  },
+  {
+   "specimen": "SP02",
+   "point": {
+    "E_in_plane_mpa": 54600.0,
+    "G12_mpa": 4500.0
+   },
+   "job_name": "SP02_13363f977809dbff",
+   "generated_inp_sha256": "13363f977809dbff48181805664c13bacc059291d861a5f6f9608cd6ffa69fe4",
+   "odb": {
+    "store": "carbon-project-archive",
+    "relative_path": "carbon5a/runs/E_PLUS_SP02/SP02_13363f977809dbff.odb",
+    "sha256": "ba38cb698c5cb2dc3ed6fb4861e343ebf3f7250eabd2b1517cabdeb1378b74f5",
+    "size_bytes": 751590276,
+    "pin_source": "carbon-project-archive:ARCHIVE_MANIFEST.json odbs[] candidate 'CARBON-5A E_PLUS' (manifest sha256 cecf7ac2363d3af69748cc73e0c679948c851913f82ab046f58eaa8f4254d166)"
+   },
+   "status_files": {
+    "carbon5a/runs/E_PLUS_SP02/SP02_13363f977809dbff.sta": "18a609259452b2f0c25907b3e7637c0510dd925793f6de004d4020c278c0bb7d",
+    "carbon5a/runs/E_PLUS_SP02/SP02_13363f977809dbff.dat": "fd7723e8e0a24eee00c18d11ed291d9e0d6caf9f7fefd2bb03a4982743f11c09",
+    "carbon5a/runs/E_PLUS_SP02/SP02_13363f977809dbff.msg": "737b4a65c311eccfb2aa33085a0c09bb797eeec167a38105dcb24b5cf15d6c1d"
+   },
+   "expected_frequencies": {
+    "mode_numbers": [
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30
+    ],
+    "frequencies_hz": [
+     23.589815139770508,
+     77.0734634399414,
+     80.15070343017578,
+     90.92860412597656,
+     92.17786407470703,
+     146.24427795410156,
+     212.3788604736328,
+     215.83316040039062,
+     221.11463928222656,
+     228.2083740234375,
+     266.0052490234375,
+     268.32666015625,
+     366.3175964355469,
+     408.8222961425781,
+     415.12646484375,
+     418.33447265625,
+     423.8638610839844,
+     451.03167724609375,
+     460.640625,
+     533.6446533203125,
+     536.2960205078125,
+     661.3046875,
+     668.2120971679688,
+     668.3599853515625
+    ],
+    "source": "carbon-project-archive:carbon5a/frequencies.csv (sha256 014d099582ece2a0f8bb4bfde0699291ef63510eb5f1fc90cc1df3eba8d7a10a), specimen SP02 state E_PLUS"
+   },
+   "excluded_attempts": []
+  }
+ ],
+ "provenance": [
+  "D-069: Run A reuses governed archived FE results; equivalent validated baseline points are never recomputed",
+  "packs: validated M4 shape-pack records (fe_shapes/README.md; extraction gate HUMAN-authorised 2026-10-04)",
+  "odbs: accepted CARBON-5A SP-02 ±5 % E solves (accepted_forward_jobs.json anchors); ODB content pinned by ARCHIVE_MANIFEST.json; the extraction-only jobs need a HUMAN Abaqus-Python gate",
+  "expected frequencies: accepted CARBON-5A single-precision frequency table; an extracted pack must equal it"
+ ]
+}

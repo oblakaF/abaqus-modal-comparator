@@ -3681,3 +3681,44 @@ first internal provider.
 - **Limitations kept:** see M6_DECISION_RECORD §22.
 - **Abaqus run count:** 0. Docs only.
 - **Next:** M7 `NOT_STARTED`. No M7 branch and no M7 records; the next step needs SUPERVISOR instruction.
+
+## 2026-10-08 — M7 — M7.1: RUN_A campaign architecture (zero Abaqus)
+
+- **Stage:** M7 (opened by D-069)
+- **Mini-step:** M7.1
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7` (from `main` `9f5f63a968759d6237facda00a4415cfe29c2257`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_A campaign architecture - two-specimen shared E_in on the active physical chains (zero Abaqus)`
+- **Decision:** D-069 (the accepted M7.1 design; RUN_A first; RUN_B gated).
+- **Files changed:**
+  - created:
+    - `src/domain/campaign_definition.py`, `src/services/identification_campaign_run.py`;
+    - `tools/m7_campaign.py`;
+    - `tests/test_m7_campaign.py`;
+    - `docs/auto_id/campaigns/M7_RUN_A.campaign.json`, `docs/auto_id/campaigns/M7_RUN_A.archive-reuse.json`,
+      `docs/auto_id/campaigns/README.md`;
+    - `docs/auto_id/M7_DECISION_RECORD.md`.
+  - updated:
+    - `src/services/identification_objective.py` (additive: `RowSigma(measurement_sd=None)` =
+      NOT_AVAILABLE);
+    - DECISIONS (D-069), EVIDENCE, ROADMAP, STATUS.
+- **Scientific behaviour changed:** YES, additively:
+  - a new campaign path;
+  - the M4.7 NOT_AVAILABLE Σ_meas representation.
+  The M4/M5 rules, thresholds and existing hashes are unchanged.
+- **Tests run:**
+  - `test_m7_campaign`;
+  - the M6 regression and gate tests;
+  - the M5 gate, the M4 gate and guard, the M3 gate;
+  - the full suite on Windows, with and without data stores;
+  - a targeted mutation check (9 of 9 killed).
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK
+- **Abaqus run count:** 0 (0 Abaqus Python extractions, no LM run).
+- **Evidence produced:** the proposed RUN_A manifest `e4ba607f06a69311…` (EVIDENCE).
+- **Known limitations:**
+  - family consistency (SPEC §13 / M7.4) is NOT_AVAILABLE, so no green M5 verdict is possible;
+  - the M4.3 thresholds are PROVISIONAL;
+  - Σ_setup is provisional;
+  - "not externally validated" applies.
+- **Next gate:** SUPERVISOR review of M7.1. Then the HUMAN gates: archive extraction, then the RUN_A run.
