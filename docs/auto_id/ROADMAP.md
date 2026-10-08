@@ -655,6 +655,17 @@ from `main` `9f5f63a`; decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.m
   - SPEC v1.2 / SPECIMEN_ENGINEERING_CALIBRATION / τ_mf: not implemented (HUMAN decisions).
   - Full audit disposition (K1–K3, V1–V8, J1–J5); `uncertainty_basis` reporting (J5).
 
+- **M7 closure merged:** PR #40 (`auto-id/m7b-closure` → `main`), merge commit `9bff6c7`.
+
+### Policy track — SPEC v1.2 (PROPOSED, not normative)
+
+Before any new FE work (SP10, t_face sensitivity, a re-run of M7), the model-form policy is frozen in advance
+(audit V4). Draft `SPEC_V1_2_DRAFT.md`, review `SPEC_V1_2_POLICY_REVIEW.md`, options `SPEC_V1_2_POLICY_OPTIONS.json`
+on branch `auto-id/spec-v1.2-policy` from `main` `9bff6c7`. Recommendation: τ_mf = 0.02 as a specification maximum,
+outside Σ, the objective and §13; a drafted (not implemented) SPECIMEN_ENGINEERING_CALIBRATION class. SPEC v1.1 stays
+normative; no production behaviour changed; historical results are not reinterpreted. Status: awaiting SUPERVISOR
+decision.
+
 ---
 
 ## M8 — GUI Auto-ID

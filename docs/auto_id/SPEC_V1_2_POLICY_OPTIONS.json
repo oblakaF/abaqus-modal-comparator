@@ -1,0 +1,99 @@
+{
+  "schema": "auto-id/spec-v1.2-policy-options/v1",
+  "status": "PROPOSED_NOT_NORMATIVE",
+  "normative_specification": "docs/auto_id/SPEC_V1_1.md (unchanged)",
+  "draft": "docs/auto_id/SPEC_V1_2_DRAFT.md",
+  "review": "docs/auto_id/SPEC_V1_2_POLICY_REVIEW.md",
+  "freeze": {
+    "declared_before_new_fe_results": true,
+    "selected_from_historical_runs": false,
+    "evaluated_on_historical_runs": false,
+    "note": "no candidate value was chosen from or evaluated on RUN_A / RUN_B residuals"
+  },
+  "threshold_arithmetic_reference": {
+    "sigma_setup_ln": 0.003,
+    "sigma_setup_status": "PROVISIONAL",
+    "sigma_meas": "NOT_AVAILABLE",
+    "note": "reference Σ for the threshold arithmetic only; Σ itself is unchanged and τ_mf never enters it"
+  },
+  "rules": {
+    "holdout_pass": "|delta ln f| <= max(3 * sigma, tau_mf)",
+    "family_pattern_systematic": "family size >= 2, all same sign, and every |delta ln f| > max(2 * sigma, tau_mf)"
+  },
+  "v1_1_bounds_ln": {
+    "holdout": 0.009,
+    "family_pattern": 0.006
+  },
+  "parameter_scale_reference": {
+    "max_frequency_sensitivity_s_e": 0.5,
+    "basis": "f ∝ sqrt(stiffness): d ln f / d ln E <= 0.5 for a stiffness-proportional parameter (generic physics, not a fitted value)",
+    "note": "a frequency tolerance tau maps to at least tau / 0.5 in ln E"
+  },
+  "options": [
+    {
+      "id": "A",
+      "tau_mf": 0.02,
+      "holdout_bound_ln": 0.02,
+      "family_pattern_bound_ln": 0.02,
+      "implied_min_parameter_scale_ln_e": 0.04,
+      "recommended": true,
+      "summary": "fixed by the specification; campaigns may declare a smaller value only"
+    },
+    {
+      "id": "B",
+      "tau_mf": 0.03,
+      "holdout_bound_ln": 0.03,
+      "family_pattern_bound_ln": 0.03,
+      "implied_min_parameter_scale_ln_e": 0.06,
+      "recommended": false,
+      "summary": "implied parameter scale exceeds the 5 % IDENTIFIED threshold"
+    },
+    {
+      "id": "C",
+      "tau_mf": "per family / per parameter",
+      "holdout_bound_ln": null,
+      "family_pattern_bound_ln": null,
+      "implied_min_parameter_scale_ln_e": null,
+      "recommended": false,
+      "summary": "rejected for v1.2: more tuning freedom and post-hoc selection risk"
+    }
+  ],
+  "tau_mf_properties": {
+    "in_sigma": false,
+    "in_objective": false,
+    "in_whitening": false,
+    "inflates_uncertainty": false,
+    "used_by_family_consistency": false,
+    "per_mode_or_family": false,
+    "declared_before_execution": true,
+    "identity_bound": true,
+    "specification_maximum": 0.02,
+    "campaign_may_declare_smaller": true
+  },
+  "family_consistency": {
+    "uses_tau_mf": false,
+    "alpha": 0.01,
+    "tau_mf_can_convert_fail_to_pass": false,
+    "not_evaluable_produces_family_value": false
+  },
+  "specimen_engineering_calibration": {
+    "implemented": false,
+    "label": "SPECIMEN_ENGINEERING_CALIBRATION",
+    "qualifiers": ["NOT_A_MATERIAL_PROPERTY", "NOT_TRANSFERABLE_WITHOUT_VALIDATION"],
+    "replaces_or_softens_a_refusal": false,
+    "minimum_observability": {
+      "fit_families": "k + 1",
+      "holdout_families": 1,
+      "leave_one_family_out_complete": true,
+      "one_parameter_minimum": "2 FIT families + 1 HOLDOUT family"
+    },
+    "non_degradation_rule": "A: per specimen, max |delta ln f| (FIT + HOLDOUT) at the candidate <= at the governed baseline; every row within 10 %",
+    "conservative_uncertainty_ceiling": 0.08,
+    "engineering_constants_block": "never as an ordinary material block; separate calibration record"
+  },
+  "historical_results": {
+    "run_a_family": "NO_GLOBAL_PARAMETER_VALUE (v1.1; unchanged)",
+    "run_b": "diagnostic only (unchanged)",
+    "re_analysis_under_v1_2": "separate HUMAN decision"
+  }
+}

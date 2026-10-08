@@ -3987,3 +3987,25 @@ first internal provider.
 - **Abaqus run count:** 0. Docs only.
 - **Next:** M8 `NOT_STARTED`; `auto-id/m8` parked (`PARKED_PENDING_POST_M7_DECISION`); SPEC v1.2 / τ_mf /
   SPECIMEN_ENGINEERING_CALIBRATION are future SUPERVISOR decisions.
+
+## 2026-10-09 — Policy — SPEC v1.2 policy freeze draft (PROPOSED; M7 closure merged)
+
+- **M7 closure merge:** PR #40 `auto-id/m7b-closure` → `main`, merge commit `9bff6c79ee149e9309c3e3697cb96fff4e937c68` (reviewed head `f4c1ba4`,
+  merged tree identical; HUMAN-authorised). Linux CI on main 9bff6c7: 1600 OK (68 skipped), success (run 37828742325).
+- **Stage:** policy track (no roadmap stage started; M8 NOT_STARTED)
+- **Status:** REVIEW_READY (proposal; not normative)
+- **Branch:** `auto-id/spec-v1.2-policy` (from `main` `9bff6c7`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): SPEC v1.2 policy freeze draft - tau_mf, specimen calibration class (proposed, not normative)`
+- **Files:** created `docs/auto_id/SPEC_V1_2_DRAFT.md`, `docs/auto_id/SPEC_V1_2_POLICY_REVIEW.md`,
+  `docs/auto_id/SPEC_V1_2_POLICY_OPTIONS.json`, `tests/test_spec_v1_2_policy_draft.py`; updated STATUS, ROADMAP,
+  CHANGELOG.
+- **Content:** τ_mf options A (2 %, recommended as specification maximum), B (3 %), C (per family, rejected); holdout
+  and pattern bounds max(3σ, τ_mf) / max(2σ, τ_mf); §13 explicitly τ_mf-free; drafted SPECIMEN_ENGINEERING_CALIBRATION
+  class (conditions, minimum observability k + 1 FIT families + 1 holdout, non-degradation rule A); S8 output
+  separation; mandatory uncertainty-basis wording. Declared before any new FE result; no historical data used.
+- **Scientific behaviour changed:** NO. SPEC v1.1 unchanged; M5, M7 records and the family-consistency implementation
+  unchanged.
+- **Tests:** test_spec_v1_2_policy_draft 6 OK; test_m7b_corrective + M5 gate + policy 39 OK; full suite without data stores 1609 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR decision on the draft.
