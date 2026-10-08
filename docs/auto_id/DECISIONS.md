@@ -1263,3 +1263,31 @@ Decision:
 Rationale / scope: corrects the scientific interpretation and the missing SPEC §13 analysis from frozen evidence
 without Abaqus; superseding governance, not a rewrite of D-069–D-075.
 Supersedes: the release interpretation of D-069, D-072 and D-075 (their text stays as history)
+
+## D-077 — M7 corrective closure: M7 ACCEPTED, stage gate PASS by scientific refusal
+Date: 2026-10-09 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M7b CORRECTION — SUPERVISOR ACCEPTANCE, MERGE PR #39, THEN D-077 CLOSURE." (2026-10-09); D-076; PR #39 (merge `b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c`)
+Decision:
+- **The M7b corrective implementation is accepted** (PR #39, reviewed head `42d8f2f`, merged to `main` as
+  `b9db2c1`). External audit iteration 2 findings K1–K3 are resolved; the V1–V8 and J1–J5 dispositions are
+  accepted as recorded in `audit_corrections/AUDIT_ITERATION2_DISPOSITION.md`.
+- **Scientific results (unchanged):**
+  - RUN_A family consistency (SPEC §13): **FAIL** — Δχ² ≈ 746.27, Δdof 1, p_χ² ≈ 2.6e-164, bootstrap p = 1/4001;
+  - RUN_B family consistency: **NOT_EVALUABLE_RANK_DEFICIENT**;
+  - formal SP-02 / SP-13 family output under SPEC v1.1: **NO_GLOBAL_PARAMETER_VALUE**.
+- **55.593 GPa remains historical optimiser evidence only** (HISTORICAL_RUN_A_OPTIMIZER_CANDIDATE): not a release
+  parameter, not an identified material property, not a recommended common family E, not an approved engineering
+  family constant. D-076 supersedes the release interpretation of D-075; D-075 and D-076 stay as history.
+- **No new material-property number is issued.**
+- **M7 = ACCEPTED; M7 stage gate = PASS, semantics PASS_BY_REFUSAL.** The family-consistency test itself stays
+  FAIL. The M7 GATE ("if one shared carbon vector cannot explain the family, NO global material number is
+  reported") is satisfied because the program withholds the global value; this is a successful scientific refusal
+  (SPEC §1), not a green material identification.
+- **Merges:** PR #37 (`0f15db9`) and PR #38 (`7a34ee6`) stay historical facts; PR #39 is the M7 corrective merge, not
+  a new stage.
+- **SPEC v1.1 is unchanged.** SPEC v1.2, τ_mf and SPECIMEN_ENGINEERING_CALIBRATION remain unresolved future
+  scientific-policy decisions.
+- **No Abaqus was run in M7b** (0 solves, 0 Abaqus Python extractions).
+- **M8 stays NOT_STARTED.** The M8.1 work on `auto-id/m8` (`193db8d`) was not part of M7b and is
+  `PARKED_PENDING_POST_M7_DECISION` (not rebased, not merged, M8.2 not started).
+Rationale / scope: closes M7 with the corrected interpretation; no scientific result or code changes.
+Supersedes: the interim REWORK / gate-pending state of D-076

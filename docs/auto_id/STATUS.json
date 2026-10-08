@@ -4,11 +4,11 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M7",
-  "current_ministep": "M7b-DIAG (audit iteration 2 corrective, D-076)",
-  "status": "REWORK",
-  "last_accepted_stage": "M6",
-  "last_accepted_ministep": "M6.4",
-  "last_accepted_commit": "f1274cae80a6b3972cef04fd9c1bee0505920311",
+  "current_ministep": "M7 (M7b corrective merged; closed by D-077)",
+  "status": "ACCEPTED",
+  "last_accepted_stage": "M7",
+  "last_accepted_ministep": "M7.1 + M7b corrective",
+  "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
   "carbon5f": {
     "status": "ACCEPTED",
     "scientific_result": "Scalar k_core sensitivity too small to explain SP13 common deficit; scope limited to proportional scaling of current core stiffness constants",
@@ -81,6 +81,13 @@
       "pr": 37,
       "merge_commit": "0f15db9acf29b7d3a7b20350982440015e177e94",
       "status": "MERGED; acceptance SUPERSEDED by D-076 (REWORK)"
+    },
+    {
+      "stage": "M7",
+      "kind": "M7b corrective (external audit iteration 2; not a new stage)",
+      "pr": 39,
+      "merge_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
+      "status": "ACCEPTED (D-077)"
     }
   ],
   "m1": {
@@ -549,7 +556,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the M7b corrective PR (auto-id/m7b-diag -> main, not merged); M7 REWORK; family consistency FAIL -> NO_GLOBAL_PARAMETER_VALUE; stage-gate closure (expected PASS_BY_REFUSAL) is a separate SUPERVISOR decision; M8 on hold (auto-id/m8 parked); no Abaqus",
+  "next_action": "M7 closed (D-077); M8 NOT_STARTED; auto-id/m8 parked (PARKED_PENDING_POST_M7_DECISION); next: SUPERVISOR scientific-policy decision (SPEC v1.2 / tau_mf / SPECIMEN_ENGINEERING_CALIBRATION) and the M8.1 reuse decision; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -861,8 +868,8 @@
   "m7": {
     "branch": "auto-id/m7",
     "base": "9f5f63a968759d6237facda00a4415cfe29c2257",
-    "status": "REWORK",
-    "decision": "D-069, D-070, D-071, D-072, D-073, D-074, D-075, D-076",
+    "status": "ACCEPTED",
+    "decision": "D-069, D-070, D-071, D-072, D-073, D-074, D-075, D-076, D-077",
     "decision_record": "docs/auto_id/M7_DECISION_RECORD.md",
     "M7.1": "ACCEPTED",
     "M7.2": "NOT_PURSUED_IN_M7 (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance; deliberately not pursued as a separate task; not DONE",
@@ -1028,7 +1035,7 @@
       "stage_pr": "MERGED: PR #37 (auto-id/m7 -> main), merge commit 0f15db9acf29b7d3a7b20350982440015e177e94",
       "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK"
     },
-    "gate": "PENDING_SUPERVISOR_CLOSURE",
+    "gate": "PASS",
     "merged_to_main": {
       "pr": 37,
       "merge_commit": "0f15db9acf29b7d3a7b20350982440015e177e94"
@@ -1036,12 +1043,12 @@
     "accepted_head": "87c05da051abb272a8f52eb579bcca0ce180f12b",
     "accepted_by": "SUPERVISOR (M7 accepted, gate PASS, 2026-10-08; M7.2-M7.8 disposition NOT_PURSUED_IN_M7 confirmed); merge explicitly authorised by the HUMAN supervisor",
     "merge_ci": "Linux CI on the reviewed head 87c05da: 1575 OK (66 skipped), success (run 37783691289); on main 0f15db9: 1575 OK (66 skipped), success (run 37784347770)",
-    "gate_history": "PASS (SUPERVISOR 2026-10-08, D-075) superseded by D-076 (2026-10-09)",
+    "gate_history": "PASS (SUPERVISOR 2026-10-08, D-075) superseded by D-076 (2026-10-09); PENDING_SUPERVISOR_CLOSURE (D-076 review) -> PASS / PASS_BY_REFUSAL (D-077, 2026-10-09)",
     "corrective": {
       "decision": "D-076",
       "branch": "auto-id/m7b-diag",
       "base": "7a34ee65f8a036866961c10dbd685a44ec957671",
-      "status": "REVIEW_READY",
+      "status": "ACCEPTED (D-077)",
       "audit": "Audit_AutoID_0f15db9_iteration2.docx: K1-K3 CONFIRMED (SUPERVISOR accepted); V1-V8 and J1-J5 dispositioned in AUDIT_ITERATION2_DISPOSITION.md",
       "records": [
         "docs/auto_id/audit_corrections/AUDIT_ITERATION2_DISPOSITION.md",
@@ -1067,21 +1074,38 @@
       "abaqus_solves": 0,
       "abaqus_python_extractions": 0,
       "not_implemented": "SPEC v1.2, SPECIMEN_ENGINEERING_CALIBRATION, tau_mf (HUMAN decisions)",
-      "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1617 OK (2 Abaqus-gated skipped); without data stores 1603 OK (64 skipped); M7 and corrective modules with stores 95 OK (incl. test_m7b_corrective 24 OK; RUN_A / RUN_B rebuilt from the journals); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK"
+      "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1617 OK (2 Abaqus-gated skipped); without data stores 1603 OK (64 skipped); M7 and corrective modules with stores 95 OK (incl. test_m7b_corrective 24 OK; RUN_A / RUN_B rebuilt from the journals); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK",
+      "merged_to_main": {
+        "pr": 39,
+        "merge_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c"
+      },
+      "accepted_head": "42d8f2ff7b98b12e6f5cde99cdd22f1d82ff3f7d",
+      "merge_ci": "Linux CI on the reviewed head 42d8f2f: 1600 OK (68 skipped), success (run 37821433187); on main b9db2c1: 1600 OK (68 skipped), success (run 37825521366)"
     },
     "family_consistency": "FAIL",
     "formal_output": "NO_GLOBAL_PARAMETER_VALUE",
-    "gate_expected_after_acceptance": "PASS_BY_REFUSAL: SPEC §13 family consistency FAIL; the M7 gate is satisfied by withholding the global parameter as required (separate SUPERVISOR decision, expected D-077)"
+    "gate_semantics": "PASS_BY_REFUSAL: the shared SP02/SP13 parameter set fails SPEC §13, and the program correctly withholds the global value as required by SPEC v1.1; a successful scientific refusal, not a green material identification",
+    "closure_d077": {
+      "decision": "D-077",
+      "family_consistency_run_a": "FAIL",
+      "family_consistency_run_b": "NOT_EVALUABLE_RANK_DEFICIENT",
+      "formal_output": "NO_GLOBAL_PARAMETER_VALUE",
+      "historical_run_a_optimizer_candidate_gpa": 55.593,
+      "material_property_issued": false,
+      "spec": "SPEC v1.1 unchanged; SPEC v1.2 / tau_mf / SPECIMEN_ENGINEERING_CALIBRATION undecided",
+      "abaqus_in_m7b": 0,
+      "tests": "docs-only closure: Windows M7, corrective, M5 / M4 / M3 gate modules with stores 125 OK (family consistency still FAIL; formal output NO_GLOBAL_PARAMETER_VALUE; RUN_A / RUN_B rebuilt from the journals); full suite without data stores 1603 OK (64 skipped); governance check 12/12 PASS"
+    }
   },
   "m8": {
     "status": "NOT_STARTED",
-    "hold": "ON_HOLD_FOR_M7_CORRECTIVE (D-076)",
+    "hold": "PENDING_POST_M7_DECISION (D-077)",
     "parked_branch": {
       "branch": "auto-id/m8",
       "commit": "193db8dd4dd31c88ea1eae0a905f372e8a00c31d",
-      "status": "PARKED_PENDING_M7_AUDIT_CORRECTION",
-      "note": "M8.1 wizard code exists on the parked branch; not reviewed, not accepted, not merged; reuse decided after M7b"
+      "status": "PARKED_PENDING_POST_M7_DECISION",
+      "note": "M8.1 wizard code on the parked branch was not part of M7b; not reviewed, not accepted, not merged, not rebased; M8.2 not started"
     }
   },
-  "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK"
+  "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL"
 }

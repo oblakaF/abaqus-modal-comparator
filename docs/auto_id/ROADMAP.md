@@ -605,10 +605,11 @@ its declared uncertainty.
 **M7 GATE:** if one shared carbon vector cannot explain the family, NO global material
 number is reported.
 
-Stage status: `REWORK` (D-076, external audit iteration 2, under SUPERVISOR review). SPEC §13 family consistency
-**FAIL** for the SP-02 / SP-13 shared model → formal output **NO_GLOBAL_PARAMETER_VALUE**, as the M7 GATE requires; the
-stage-gate closure (expected `PASS_BY_REFUSAL`) is pending a SUPERVISOR decision. The acceptance of 2026-10-08 (D-075)
-and its release rationale are superseded. Historical:
+Stage status: **`ACCEPTED`** (D-077, 2026-10-09; **M7 GATE: `PASS` — `PASS_BY_REFUSAL`**). SPEC §13 family consistency
+**FAIL** for the SP-02 / SP-13 shared model → formal output **NO_GLOBAL_PARAMETER_VALUE**; the program withholds the
+global value as the M7 GATE requires — a successful scientific refusal, not a green material identification. M7b
+corrective merged by PR #39 (merge commit `b9db2c1`). The D-075 acceptance and its release rationale were
+superseded by D-076. Historical:
 merged to `main` by PR #37, merge commit `0f15db9`, with HUMAN authorisation; opened D-069 on branch `auto-id/m7`
 from `main` `9f5f63a`; decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.md).
 - **M7.1 (zero Abaqus), `REVIEW_READY`:** the RUN_A campaign architecture.
@@ -645,7 +646,7 @@ from `main` `9f5f63a`; decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.m
   - Scientific results unchanged: RUN_A E_in,eff = 55.593 GPa (`EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally
     validated, M5 NOT_IDENTIFIABLE; 50.8–60.3 GPa only as `MODEL_DEPENDENCE_DIAGNOSTIC`); RUN_B diagnostic only.
   - No Abaqus after RUN_B. M8 `NOT_STARTED`.
-- **M7b-DIAG corrective diagnostics (D-076, zero Abaqus), `REVIEW_READY`:** external audit iteration 2 (K1–K3
+- **M7b-DIAG corrective diagnostics (D-076, zero Abaqus), `ACCEPTED` (D-077; PR #39):** external audit iteration 2 (K1–K3
   CONFIRMED). Branch `auto-id/m7b-diag` from `main` `7a34ee6`.
   - K1: 55.593 GPa is HISTORICAL_RUN_A_OPTIMIZER_CANDIDATE only; **no global E_in for SP-02 / SP-13 under SPEC v1.1**.
   - K2: SPEC §13 implemented and wired into the M5 guard; RUN_A family consistency FAIL (Δχ² 746.27, Δdof 1, p_χ² 2.6e-164, bootstrap p 0.00025 (4000 samples, seed 20261009)); RUN_B NOT_EVALUABLE_RANK_DEFICIENT.
@@ -673,5 +674,6 @@ from `main` `9f5f63a`; decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.m
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `NOT_STARTED` — `ON_HOLD_FOR_M7_CORRECTIVE` (D-076). M8.1 work exists on the parked branch
-`auto-id/m8` (`193db8d`, `PARKED_PENDING_M7_AUDIT_CORRECTION`): not reviewed, not accepted, not merged.
+Stage status: `NOT_STARTED` (D-077). M8.1 work exists on the parked branch `auto-id/m8` (`193db8d`,
+`PARKED_PENDING_POST_M7_DECISION`): not part of M7b; not reviewed, not accepted, not merged; reuse is decided after the
+next scientific-policy decision.

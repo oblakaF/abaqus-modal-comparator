@@ -3966,3 +3966,24 @@ first internal provider.
   same (RUN_A FAIL, Δχ² 746.27).
 - **Tests:** Windows M7 and corrective modules with stores 95 OK; full suite without data stores 1603 OK (64 skipped).
 - **Abaqus run count:** 0.
+
+## 2026-10-09 — M7 — M7b corrective merged (PR #39); M7 closed by D-077
+
+- **Stage:** M7
+- **Status:** ACCEPTED (D-077); M7 stage gate PASS (PASS_BY_REFUSAL). The PR #39 merge was explicitly authorised by
+  the HUMAN supervisor.
+- **Branch:** `auto-id/m7b-closure` (from `main` `b9db2c1`)
+- **Merge:** PR #39 `auto-id/m7b-diag` → `main`, merge commit `b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c`.
+  - Reviewed head: `42d8f2ff7b98b12e6f5cde99cdd22f1d82ff3f7d`; the merged tree equals the reviewed head.
+- **Recorded:** D-077; `STATUS.json`: `status` ACCEPTED, `last_accepted_stage` M7 (`last_accepted_commit` `b9db2c1`),
+  `main_merges` += M7 corrective / PR #39, M7 `gate` PASS with `gate_semantics` PASS_BY_REFUSAL, `family_consistency`
+  FAIL, `formal_output` NO_GLOBAL_PARAMETER_VALUE, `m8` parked status; ROADMAP M7 / M8 stage status;
+  M7_DECISION_RECORD §11.
+- **Scientific results unchanged:** RUN_A family consistency FAIL (Δχ² ≈ 746.27, Δdof 1); RUN_B
+  NOT_EVALUABLE_RANK_DEFICIENT; formal output NO_GLOBAL_PARAMETER_VALUE; 55.593 GPa historical optimiser evidence only;
+  no new material property.
+- **CI:** Linux CI on the reviewed head 42d8f2f: 1600 OK (68 skipped), success (run 37821433187); on main b9db2c1: 1600 OK (68 skipped), success (run 37825521366)
+- **Tests:** docs-only closure: Windows M7, corrective, M5 / M4 / M3 gate modules with stores 125 OK (family consistency still FAIL; formal output NO_GLOBAL_PARAMETER_VALUE; RUN_A / RUN_B rebuilt from the journals); full suite without data stores 1603 OK (64 skipped); governance check 12/12 PASS
+- **Abaqus run count:** 0. Docs only.
+- **Next:** M8 `NOT_STARTED`; `auto-id/m8` parked (`PARKED_PENDING_POST_M7_DECISION`); SPEC v1.2 / τ_mf /
+  SPECIMEN_ENGINEERING_CALIBRATION are future SUPERVISOR decisions.
