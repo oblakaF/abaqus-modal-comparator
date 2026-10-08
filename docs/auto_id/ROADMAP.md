@@ -649,7 +649,7 @@ decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.md)).
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M8.1 | Specimen / family wizard | `TODO` |
+| M8.1 | Specimen / family wizard | `REVIEW_READY` |
 | M8.2 | Readiness screen | `TODO` |
 | M8.3 | One Auto-ID button calling the same backend as the CLI | `TODO` |
 | M8.4 | Progress / resume | `TODO` |
@@ -662,4 +662,23 @@ decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.md)).
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `NOT_STARTED` (no M8 branch; next step needs SUPERVISOR instruction).
+Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-08: start M8, implement M8.1 only; branch `auto-id/m8`
+from `main` `7a34ee6`; M8.2–M8.8 `TODO`).
+- **M8.1 specimen / family wizard (zero Abaqus), `REVIEW_READY`:** page "0. Auto-ID Setup" in the existing
+  Effective Material Identification tab (`ui_policy.MATERIAL_IDENTIFICATION_STEP_LABELS`; no new `install_*`
+  layer). Service `services/auto_id_wizard.py`; Tk rendering `auto_id_wizard_ui.py`.
+  - **Sources:** a specimen folder (its `specimen.json`, or exactly one `*.specimen.json`; several are refused,
+    never chosen) or a family / campaign definition (`*.campaign.json`).
+  - **The wizard owns:** locating the governed records; loading them through the backend parsers
+    (`load_specimen_manifest`, `load_experiment_fixture_manifest`, `load_campaign_definition`,
+    `load_bound_forward_model`); factual checks (schema, identity agreement between passport and fixture,
+    presence and size of pinned files in the configured stores via `resolve_external_file`); a row view of what
+    is present and exactly what is missing, with the passport's own reasons.
+  - **The backend owns (unchanged, not duplicated):** passport and campaign rules, registration basis and
+    production readiness (`services.physical_registration`), the experimental input chain and source policy,
+    freezing, pairing, thresholds, optimisation, verdicts. The wizard's output is the same domain objects
+    (`SpecimenManifest`, `CampaignDefinition`) the CLI and backend use.
+  - **The wizard does not decide:** scientific validity, production readiness, modes, registration, MAC or
+    frequency use, thresholds, uncertainty, default values for missing evidence, substitution of local files
+    for pinned ones; it never edits a record and never starts Abaqus or an identification.
+  - **Not in M8.1:** the readiness verdict (M8.2), any run button (M8.3), editing or writing passports.

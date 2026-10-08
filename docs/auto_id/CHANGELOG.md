@@ -3906,3 +3906,24 @@ first internal provider.
   `f1274cae80a6b3972cef04fd9c1bee0505920311` (as already recorded in `STATUS.json` `main_merges` since PR #36).
 - **Scientific behaviour changed:** NO. No M6 result, evidence, decision or scientific text changed.
 - **Abaqus run count:** 0. Docs only.
+
+## 2026-10-08 — M8 — M8.1 specimen / family wizard
+
+- **Stage:** M8 (started; SUPERVISOR authorisation 2026-10-08 after the M7 closure, PR #38)
+- **Mini-step:** M8.1
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m8` (from `main` `7a34ee65f8a036866961c10dbd685a44ec957671`; Linux CI on that commit: 1575 OK, 66 skipped, run 37798898110)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M8.1): specimen / family wizard - governed records in, facts and gaps out (zero Abaqus)`
+- **Files changed:**
+  - created: `src/services/auto_id_wizard.py`, `src/auto_id_wizard_ui.py`, `tests/test_m8_auto_id_wizard.py`;
+  - updated: `src/ui_policy.py` (page label "0. Auto-ID Setup"), `src/material_identification_ui.py` (builds the
+    page), `tests/test_material_identification_ui.py` (page count 8 → 9; the fake-widget harness stubs the new
+    Tk page), ROADMAP, STATUS, CHANGELOG.
+- **Scientific behaviour changed:** NO. The wizard only loads records through the existing parsers and reports;
+  no threshold, pairing, registration, objective or verdict code changed.
+- **Boundary:** the wizard owns locating / loading / factual checks / the row view; the backend owns every
+  scientific rule; the wizard decides nothing scientific, edits no record and starts no process (ROADMAP M8.1).
+- **Tests:** Windows: test_m8_auto_id_wizard 15 OK (1 store-gated: the wizard definition freezes through prepare_campaign_specimens; 1 Tk page test); GUI and backend regressions with stores (test_m8_auto_id_wizard, test_material_identification_ui, test_ui_workflow, test_polymax_ui, test_m7_campaign, test_m7_closure, M1-M5 stage gates, test_specimen_manifest, test_experiment_fixture) 211 OK; full suite without data stores 1593 OK (63 skipped)
+- **Abaqus run count:** 0 solves, 0 Abaqus Python extractions.
+- **Next gate:** SUPERVISOR review of M8.1. M8.2–M8.8 `TODO`.

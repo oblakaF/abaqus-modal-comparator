@@ -3,9 +3,9 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M7",
-  "current_ministep": "M7 (merged)",
-  "status": "ACCEPTED",
+  "current_stage": "M8",
+  "current_ministep": "M8.1",
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1",
   "last_accepted_commit": "0f15db9acf29b7d3a7b20350982440015e177e94",
@@ -549,7 +549,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M7 merged to main (PR #37); M8 NOT_STARTED; no M8 branch; await SUPERVISOR instruction before any M8 work",
+  "next_action": "STOP: SUPERVISOR review of M8.1 (specimen / family wizard) on auto-id/m8; M8.2-M8.8 TODO; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1037,6 +1037,28 @@
     "merge_ci": "Linux CI on the reviewed head 87c05da: 1575 OK (66 skipped), success (run 37783691289); on main 0f15db9: 1575 OK (66 skipped), success (run 37784347770)"
   },
   "m8": {
-    "status": "NOT_STARTED"
+    "branch": "auto-id/m8",
+    "base": "7a34ee65f8a036866961c10dbd685a44ec957671",
+    "status": "IN_PROGRESS",
+    "authorisation": "SUPERVISOR 2026-10-08: M7 closed; start M8; implement M8.1 only; no Abaqus",
+    "M8.1": "REVIEW_READY",
+    "M8.2": "TODO",
+    "M8.3": "TODO",
+    "M8.4": "TODO",
+    "M8.5": "TODO",
+    "M8.6": "TODO",
+    "M8.7": "TODO",
+    "M8.8": "TODO",
+    "M8.1_scope": {
+      "gui": "page '0. Auto-ID Setup' in the existing Effective Material Identification tab (no new install_* layer)",
+      "service": "src/services/auto_id_wizard.py (headless; governed parsers only)",
+      "view": "src/auto_id_wizard_ui.py (Tk rendering only)",
+      "wizard_owns": "locating and loading governed records; schema / identity / file-presence checks; row view of present and missing items",
+      "backend_owns": "passport and campaign rules, registration basis and production readiness, experimental input chain, freezing, pairing, thresholds, optimisation, verdicts",
+      "wizard_does_not_decide": "scientific validity, production readiness, modes, registration, thresholds, uncertainty, defaults for missing evidence, local-file substitution; no record editing; no Abaqus or identification"
+    },
+    "abaqus_solves": 0,
+    "abaqus_python_extractions": 0,
+    "M8.1_tests": "Windows: test_m8_auto_id_wizard 15 OK (1 store-gated: the wizard definition freezes through prepare_campaign_specimens; 1 Tk page test); GUI and backend regressions with stores (test_m8_auto_id_wizard, test_material_identification_ui, test_ui_workflow, test_polymax_ui, test_m7_campaign, test_m7_closure, M1-M5 stage gates, test_specimen_manifest, test_experiment_fixture) 211 OK; full suite without data stores 1593 OK (63 skipped)"
   }
 }

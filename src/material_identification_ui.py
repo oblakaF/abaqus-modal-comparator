@@ -21,6 +21,7 @@ from pathlib import Path, PureWindowsPath
 import textwrap
 from tkinter import filedialog, messagebox, ttk
 
+from auto_id_wizard_ui import build_auto_id_setup_page
 from domain.identification_model import IdentificationModelDefinition
 from domain.material_identification_session import MaterialIdentificationSession
 from material_identification_evidence_view import (
@@ -2094,7 +2095,9 @@ def install_material_identification_ui(app_module) -> None:
             page = ttk.Frame(self.material_identification_notebook, padding=16)
             self.material_identification_notebook.add(page, text=step_label)
             self.material_identification_pages[step_label] = page
-            if step_label == "1. Project Evidence":
+            if step_label == "0. Auto-ID Setup":
+                build_auto_id_setup_page(self, page)
+            elif step_label == "1. Project Evidence":
                 _build_project_evidence_page(self, page)
             elif step_label == "2. Data Readiness Check":
                 _build_data_readiness_page(self, page)
