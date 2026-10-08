@@ -1313,3 +1313,28 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
   `test_registration_factory.UnambiguousGeometryTests.test_no_full_model_contamination`: the forbidden token
   `d11` occurred by chance inside a random registration hash (`…ed1138…`, from a temporary path and mtime).
   Not changed here (outside M7).
+
+## M7b corrective diagnostics (D-076; external audit iteration 2; zero Abaqus)
+
+- **Records:** `audit_corrections/AUDIT_ITERATION2_DISPOSITION.md`, `CARBON_5G_INP_AUDIT.md`,
+  `M7_FAMILY_CONSISTENCY_CORRECTION.json`, `M7_PER_SPECIMEN_DIAGNOSTICS.json`; `specimens/SP0x.physical-measurements.json`.
+- **SPEC §13, RUN_A (frozen journal, linearised at p̂, Σ_setup 0.3 % PROVISIONAL, Σ_meas NOT_AVAILABLE not in the
+  whitening):** Δχ² 746.27, Δdof 1, p_χ² 2.6e-164, bootstrap p 0.00025 (4000 samples, seed 20261009); path χ²; **FAIL**. Separate fits: SP-02 51.91 GPa
+  (χ² 36.12), SP-13 67.32 GPa
+  (exactly determined). Audit: 748.9 / 1 / ~7e-165 — +0.35 % difference, same conclusion (local-model spread
+  745.8–747.3; ln-ratio residuals as in M4.7). **RUN_B:** NOT_EVALUABLE_RANK_DEFICIENT.
+- **Per-specimen RUN_A estimates (DIAGNOSTIC_ONLY):** SP-02 FIT 51.90 GPa; SP-02 all
+  strict 50.85 GPa; SP-13 FIT (mode 4) 67.42 GPa;
+  SP-13 both rows 59.28 GPa (rows alone: 67.42 GPa and
+  55.10 GPa; χ² 384 with 1 dof).
+- **Per-specimen agreement, baseline → RUN_A candidate:** SP-02 2.69 % →
+  6.06 % (WORSENED); SP-13 9.05 % →
+  6.79 % (IMPROVED).
+- **Excluded-mode diagnostics (MAC ≥ 0.80, never fitted):** torsional mode 1, FE mode 7 (Px:O|Py:O|nx:1|ny:1):
+  SP-02 MAC 0.897, -15.8 %; SP-13 MAC
+  0.987, -28.4 %; both excluded by the frequency gate.
+- **CARBON-5G:** SP-02 INP faces 0.45 mm, SP-13 INP faces 0.425 mm (the SP-13 value is represented); SP-02 face mass
+  +5.7 % vs measured with 24 g less adhesive mass (total matched); SP-13 core smaller than its faces (face-only
+  overhang strips, 12 mm along y).
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1616 OK (2 Abaqus-gated skipped); without data stores 1602 OK (64 skipped); test_m7b_corrective 23 OK (store-gated: spec.txt source lines, live excluded-mode diagnostics); M7 modules with stores 94 OK (RUN_A / RUN_B rebuilt from the journals: unchanged except the D-076 family-consistency and release fields); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK
+- 0 Abaqus solves, 0 Abaqus Python extractions. RUN_A / RUN_B result records unchanged.

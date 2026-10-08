@@ -1,0 +1,330 @@
+{
+ "schema": "auto-id/m7-per-specimen-diagnostics/v1",
+ "decision": "D-076",
+ "labels": [
+  "DIAGNOSTIC_ONLY",
+  "NOT_A_MATERIAL_PROPERTY",
+  "NOT_A_RELEASE_VALUE"
+ ],
+ "source_records": [
+  {
+   "path": "docs/auto_id/campaigns/M7_RUN_A.result.json",
+   "canonical_content_sha256": "82501b35c4effc0fd829d40d6e3aaef105d5a70cc8e8a3b0ba306b9caa66c5c2"
+  },
+  {
+   "path": "docs/auto_id/campaigns/M7_RUN_B.result.json",
+   "canonical_content_sha256": "8a9264eca72827889042fb5430ed057f9d44ebb9305d0b10db9c28d433a2b2de"
+  }
+ ],
+ "run_a_per_specimen_estimates": {
+  "method": "linearised about the historical RUN_A candidate (55 593 MPa): whitened residuals of the final journalled evaluation (FIT and holdout rows) and central differences from the archived E ±5 % evaluations (all five rows); weighted least squares in ln E. No Abaqus.",
+  "limitations": [
+   "linearised over shifts up to about ±20 % in E: an approximation, not an FE optimum",
+   "the sensitivity of each row is taken at E 52 000 MPa (±5 % points), not at each estimate",
+   "Σ_setup 0.3 % PROVISIONAL; Σ_meas NOT_AVAILABLE (not in the whitening)",
+   "single-row estimates are exactly determined and have no residual check"
+  ],
+  "cases": {
+   "SP02 FIT rows (R1, R2)": {
+    "rows": [
+     "SP02:R1",
+     "SP02:R2"
+    ],
+    "estimate_mpa": 51895.364701589766,
+    "chi2": 35.46345806617884,
+    "dof": 1,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP02:R1": 14.839408533950344,
+     "SP02:R2": 3.50520161536938
+    },
+    "jacobian_whitened_dlnE": {
+     "SP02:R1": 164.3872107935873,
+     "SP02:R2": 120.66312235067917
+    },
+    "audit_reference_mpa": 51900.0,
+    "difference_from_audit_percent": -0.008931210809703938,
+    "labels": [
+     "DIAGNOSTIC_ONLY",
+     "NOT_A_MATERIAL_PROPERTY",
+     "NOT_A_RELEASE_VALUE"
+    ]
+   },
+   "SP02 all strict rows (R1, R2, R3)": {
+    "rows": [
+     "SP02:R1",
+     "SP02:R2",
+     "SP02:R3"
+    ],
+    "estimate_mpa": 50852.562788684365,
+    "chi2": 80.003864224832,
+    "dof": 2,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP02:R1": 14.839408533950344,
+     "SP02:R2": 3.50520161536938,
+     "SP02:R3": 19.60672081334251
+    },
+    "jacobian_whitened_dlnE": {
+     "SP02:R1": 164.3872107935873,
+     "SP02:R2": 120.66312235067917,
+     "SP02:R3": 161.23573000494014
+    },
+    "audit_reference_mpa": 50900.0,
+    "difference_from_audit_percent": -0.09319687881264027,
+    "labels": [
+     "DIAGNOSTIC_ONLY",
+     "NOT_A_MATERIAL_PROPERTY",
+     "NOT_A_RELEASE_VALUE"
+    ]
+   },
+   "SP13 FIT row (R1 = experimental mode 4)": {
+    "rows": [
+     "SP13:R1"
+    ],
+    "estimate_mpa": 67424.75847134551,
+    "chi2": 1.262177448353619e-29,
+    "dof": 0,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP13:R1": -23.449982672061925
+    },
+    "jacobian_whitened_dlnE": {
+     "SP13:R1": 121.53550579054088
+    },
+    "audit_reference_mpa": 67000.0,
+    "difference_from_audit_percent": 0.6339678676798632,
+    "labels": [
+     "DIAGNOSTIC_ONLY",
+     "NOT_A_MATERIAL_PROPERTY",
+     "NOT_A_RELEASE_VALUE"
+    ]
+   },
+   "SP13 both strict rows (R1, R2)": {
+    "rows": [
+     "SP13:R1",
+     "SP13:R2"
+    ],
+    "estimate_mpa": 59283.6195419826,
+    "chi2": 383.7184817785047,
+    "dof": 1,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP13:R1": -23.449982672061925,
+     "SP13:R2": 1.4396771934128694
+    },
+    "jacobian_whitened_dlnE": {
+     "SP13:R1": 121.53550579054088,
+     "SP13:R2": 161.13629747410616
+    },
+    "audit_reference_mpa": 59000.0,
+    "difference_from_audit_percent": 0.4807110881061005,
+    "labels": [
+     "DIAGNOSTIC_ONLY",
+     "NOT_A_MATERIAL_PROPERTY",
+     "NOT_A_RELEASE_VALUE"
+    ]
+   }
+  },
+  "single_row_estimates": {
+   "SP02:R1": {
+    "rows": [
+     "SP02:R1"
+    ],
+    "estimate_mpa": 50794.78208267532,
+    "chi2": 0.0,
+    "dof": 0,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP02:R1": 14.839408533950344
+    },
+    "jacobian_whitened_dlnE": {
+     "SP02:R1": 164.3872107935873
+    }
+   },
+   "SP02:R2": {
+    "rows": [
+     "SP02:R2"
+    ],
+    "estimate_mpa": 54001.683047224404,
+    "chi2": 1.9721522630525295e-31,
+    "dof": 0,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP02:R2": 3.50520161536938
+    },
+    "jacobian_whitened_dlnE": {
+     "SP02:R2": 120.66312235067917
+    }
+   },
+   "SP02:R3": {
+    "rows": [
+     "SP02:R3"
+    ],
+    "estimate_mpa": 49227.9657033946,
+    "chi2": 0.0,
+    "dof": 0,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP02:R3": 19.60672081334251
+    },
+    "jacobian_whitened_dlnE": {
+     "SP02:R3": 161.23573000494014
+    }
+   },
+   "SP13:R1": {
+    "rows": [
+     "SP13:R1"
+    ],
+    "estimate_mpa": 67424.75847134551,
+    "chi2": 1.262177448353619e-29,
+    "dof": 0,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP13:R1": -23.449982672061925
+    },
+    "jacobian_whitened_dlnE": {
+     "SP13:R1": 121.53550579054088
+    }
+   },
+   "SP13:R2": {
+    "rows": [
+     "SP13:R2"
+    ],
+    "estimate_mpa": 55098.92292768043,
+    "chi2": 4.930380657631324e-32,
+    "dof": 0,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP13:R2": 1.4396771934128694
+    },
+    "jacobian_whitened_dlnE": {
+     "SP13:R2": 161.13629747410616
+    }
+   }
+  },
+  "cross_check_with_M5_jacobian": {
+   "SP02 FIT rows, M5 Jacobian": {
+    "rows": [
+     "SP02:R1",
+     "SP02:R2"
+    ],
+    "estimate_mpa": 51911.66667627945,
+    "chi2": 36.12164660508638,
+    "dof": 1,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP02:R1": 14.839408533950344,
+     "SP02:R2": 3.50520161536938
+    },
+    "jacobian_whitened_dlnE": {
+     "SP02:R1": 164.38875747942163,
+     "SP02:R2": 121.65926754498614
+    }
+   },
+   "SP13 FIT row, M5 Jacobian": {
+    "rows": [
+     "SP13:R1"
+    ],
+    "estimate_mpa": 67319.34918299473,
+    "chi2": 0.0,
+    "dof": 0,
+    "rank": 1,
+    "residuals_at_historical_candidate": {
+     "SP13:R1": -23.449982672061925
+    },
+    "jacobian_whitened_dlnE": {
+     "SP13:R1": 122.52907698384065
+    }
+   }
+  },
+  "sp13_rows_disagree": {
+   "R1 (experimental mode 4, family Px:O|Py:E|nx:1|ny:2)": 67424.75847134551,
+   "R2 (experimental mode 7, family Px:E|Py:O|nx:0|ny:3)": 55098.92292768043,
+   "both rows chi2 (1 dof)": 383.7184817785047,
+   "note": "the two governed SP13 rows ask for different E: no single E explains both"
+  }
+ },
+ "run_a_per_specimen_agreement": {
+  "specimens": {
+   "SP02": {
+    "baseline_max_abs_error": 0.026870558293706104,
+    "candidate_max_abs_error": 0.06058449066171345,
+    "delta": 0.03371393236800735,
+    "change": "WORSENED"
+   },
+   "SP13": {
+    "baseline_max_abs_error": 0.09054748027603976,
+    "candidate_max_abs_error": 0.06793241237613246,
+    "delta": -0.022615067899907304,
+    "change": "IMPROVED"
+   }
+  },
+  "note": "diagnostic only; no acceptance threshold (SPEC v1.2 not decided)"
+ },
+ "excluded_mode_diagnostics": {
+  "minimum_mac": 0.8,
+  "specimens": {
+   "SP02": [
+    {
+     "experimental_mode": 1,
+     "experimental_hz": 28.00617702599464,
+     "best_fe_mode": 7,
+     "fe_hz": 23.572078704833984,
+     "mac": 0.8966870468799395,
+     "signed_frequency_error": -0.15832572639403922,
+     "exclusion_reason": "no FE mode within the frequency gate",
+     "role": "DIAGNOSTIC_ONLY_NOT_FITTED",
+     "state": "governed baseline E 52 000 / G12 4 500 MPa, PHYSICAL registration 9b63f6c891331ba5…",
+     "source": "docs/auto_id/registration_evidence/SP02_registration_reevaluation.json (results.PHYSICAL)",
+     "fe_family": "Px:O|Py:O|nx:1|ny:1",
+     "fe_family_source": "M4.3 classifier on the governed baseline pack, live backend path (prepare_campaign_specimens; store-gated test re-verifies)",
+     "torsion_dominated": true
+    }
+   ],
+   "SP13": [
+    {
+     "experimental_mode": 1,
+     "experimental_hz": 31.423392809120724,
+     "best_fe_mode": 7,
+     "fe_hz": 22.489444732666016,
+     "mac": 0.9873168414928508,
+     "signed_frequency_error": -0.284308831026725,
+     "exclusion_reason": "no FE mode within the frequency gate",
+     "role": "DIAGNOSTIC_ONLY_NOT_FITTED",
+     "state": "governed baseline E 52 000 / G12 4 500 MPa, PHYSICAL registration 2eeeaa8698851baf…",
+     "source": "docs/auto_id/registration_evidence/SP13_registration_reevaluation.json (results.PHYSICAL)",
+     "fe_family": "Px:O|Py:O|nx:1|ny:1",
+     "fe_family_source": "M4.3 classifier on the governed baseline pack, live backend path (prepare_campaign_specimens; store-gated test re-verifies)",
+     "torsion_dominated": true
+    }
+   ]
+  },
+  "note": "reporting only; never added to the objective; strict pairing and the 0.80 MAC unchanged"
+ },
+ "run_b_per_specimen": {
+  "SP02": {
+   "rows": [
+    "SP02:R1",
+    "SP02:R2"
+   ],
+   "rank": 2,
+   "dof": 0,
+   "estimate_mpa": {
+    "E_in_plane_mpa": 50790.18972243313,
+    "G12_mpa": 5405.754749347851
+   },
+   "note": "exactly determined (2 rows, 2 parameters): no residual degree of freedom; diagnostic only"
+  },
+  "SP13": {
+   "rows": [
+    "SP13:R1"
+   ],
+   "rank": 1,
+   "status": "NOT_EVALUABLE_RANK_DEFICIENT",
+   "note": "one FIT row cannot identify E_in and G12"
+  }
+ },
+ "abaqus_solves": 0,
+ "abaqus_python_extractions": 0
+}

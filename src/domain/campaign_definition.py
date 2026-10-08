@@ -167,6 +167,25 @@ class CampaignSpecimen:
 
 
 @dataclass(frozen=True)
+class FamilyConsistencyPolicy:
+    """SPEC §13 bootstrap settings, identity-bound when a campaign definition declares them (D-076).
+
+    The rejection level is SPEC §13's p < 0.01 and is not configurable.
+    """
+
+    bootstrap_samples: int
+    bootstrap_seed: int
+
+    def to_dict(self) -> dict:
+        return {"bootstrap_samples": self.bootstrap_samples, "bootstrap_seed": self.bootstrap_seed}
+
+
+# D-076 corrective analysis of frozen historical campaigns whose definitions predate the policy field.  It is
+# recorded with every result and is never part of those campaigns' historical identities.
+CORRECTIVE_FAMILY_CONSISTENCY_POLICY = FamilyConsistencyPolicy(bootstrap_samples=4000, bootstrap_seed=20261009)
+
+
+@dataclass(frozen=True)
 class LMConfiguration:
     mu_initial: float
     mu_decrease: float
@@ -200,6 +219,7 @@ class CampaignDefinition:
     run_b_gate: Optional[str]
     provenance: tuple[str, ...]
     canonical: Mapping[str, Any]
+    family_consistency_policy: Optional[FamilyConsistencyPolicy] = None  # None: not declared (pre-D-076)
 
     @property
     def campaign_hash(self) -> str:
@@ -260,8 +280,20 @@ def _rows(value: object, field: str) -> tuple[CampaignRow, ...]:
     return tuple(rows)
 
 
+def _family_consistency_policy(value: object) -> FamilyConsistencyPolicy:
+    value = _mapping(value, "family_consistency", {"bootstrap_samples", "bootstrap_seed"})
+    samples = _count(value["bootstrap_samples"], "family_consistency.bootstrap_samples")
+    if samples < 2000:
+        _fail("family_consistency.bootstrap_samples", "SPEC §13 needs at least 2000 bootstrap samples.")
+    seed = value["bootstrap_seed"]
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        _fail("family_consistency.bootstrap_seed", "must be a non-negative integer.")
+    return FamilyConsistencyPolicy(samples, seed)
+
+
 def parse_campaign_definition(data: object) -> CampaignDefinition:
-    data = _mapping(data, "campaign", _TOP_KEYS)
+    optional = {"family_consistency"} & set(data) if isinstance(data, Mapping) else set()
+    data = _mapping(data, "campaign", _TOP_KEYS | optional)
     if data["schema"] != CAMPAIGN_SCHEMA:
         _fail("schema", f"must be {CAMPAIGN_SCHEMA!r}.")
     campaign_id = _text(data["campaign_id"], "campaign_id")
@@ -385,9 +417,13 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
                                  "role": r.role} for r in s.rows]} for s in specimens],
         "archive_reuse": archive_reuse, "run_b_gate": run_b_gate, "provenance": list(provenance),
     }
+    policy = None
+    if "family_consistency" in data:  # identity-bound only when declared: older definitions keep their hash
+        policy = _family_consistency_policy(data["family_consistency"])
+        canonical["family_consistency"] = policy.to_dict()
     return CampaignDefinition(campaign_id, run_type, decision, parameterisation_id, fitted, fixed, start, bounds,
                               plausibility, preferred, acceptable, sigma_state, lm_config, solve_budget, not_fitted,
-                              tuple(specimens), archive_reuse, run_b_gate, provenance, canonical)
+                              tuple(specimens), archive_reuse, run_b_gate, provenance, canonical, policy)
 
 
 def load_campaign_definition(path) -> CampaignDefinition:

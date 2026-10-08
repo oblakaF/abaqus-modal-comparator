@@ -1220,3 +1220,37 @@ Decision:
 - M8 is not started. M7 is not merged without HUMAN authorisation.
 Rationale / scope: accepts RUN_B and closes the M7 campaign with its accepted interpretation.
 Supersedes: none
+
+## D-076 — External audit iteration 2: M7 scientific release withdrawn; M7 REWORK
+Date: 2026-10-09 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M7b-DIAG — AUDIT CORRECTIVE ITERATION, NO ABAQUS." and "AUDIT ITERATION 2 — M7b CORRECTIVE WORK. M8.1 IS PARKED, NOT REJECTED." (2026-10-09); external audit `Audit_AutoID_0f15db9_iteration2.docx`; supersedes the scientific release interpretation of D-069, D-072 and D-075
+Decision:
+- **Audit iteration 2 is accepted as corrective evidence** (K1–K3 CONFIRMED; disposition in
+  `audit_corrections/AUDIT_ITERATION2_DISPOSITION.md`).
+- **K1:** 55.593 GPa is withdrawn as a released common SP-02 / SP-13 parameter under SPEC v1.1 (§1 upper rule:
+  M5 is NOT_IDENTIFIABLE). It remains, unchanged in the frozen records, as **HISTORICAL_RUN_A_OPTIMIZER_CANDIDATE**
+  (diagnostic). It is not a release candidate, a recommended common family E, an identified material property or
+  an approved common engineering parameter. No replacement number is authorised.
+- **K2:** the SPEC §13 family-consistency test is required and is now implemented
+  (`services/family_consistency.py`; χ² path when every SPEC §13 condition holds, parametric bootstrap on the
+  linearised model, explicit `NOT_EVALUABLE_RANK_DEFICIENT` refusal). RUN_A fails it: Δχ² 746.27, Δdof 1, p_χ² 2.6e-164, bootstrap p 0.00025 (4000 samples, seed 20261009). RUN_B is
+  `NOT_EVALUABLE_RANK_DEFICIENT`. Campaign verdicts use the computed result instead of the hard-coded
+  NOT_AVAILABLE; a FAIL blocks IDENTIFIED, WIDE and every shared released value. M5 thresholds unchanged.
+- **Corrected interpretation:** NO GLOBAL E_in VALUE IS RELEASED FOR THE SP-02 / SP-13 FAMILY UNDER SPEC v1.1.
+- **The previous M7 GATE PASS (D-075) is superseded:** M7 = `REWORK`, M7 gate = `FAIL`. The historical merge facts
+  (PR #37, `0f15db9`; PR #38, `7a34ee6`) stand unchanged.
+- **RUN_A and RUN_B frozen numerical records remain historical evidence** of what was computed; they are not
+  rewritten. Corrective evidence is additive (`docs/auto_id/audit_corrections/`).
+- **No new material property is claimed.** Per-specimen estimates are DIAGNOSTIC_ONLY / NOT_A_MATERIAL_PROPERTY /
+  NOT_A_RELEASE_VALUE.
+- **K3:** the CARBON-5G read-only INP audit is complete; known physical facts are recorded in additive governed
+  measurement records beside the unchanged passports, with uncertainty NOT_AVAILABLE.
+- **Reporting:** campaign report v2 separates `optimizer_candidate` from `formal_output`, and adds
+  `family_consistency`, `excluded_mode_diagnostics` (best MAC ≥ 0.80, never fitted) and `per_specimen_agreement`
+  (no threshold).
+- **M8 is ON HOLD** pending corrective review: M8 `NOT_STARTED` / `ON_HOLD_FOR_M7_CORRECTIVE`. The M8.1 work on
+  branch `auto-id/m8` (`193db8d`) is `PARKED_PENDING_M7_AUDIT_CORRECTION` — not rejected, not accepted, not merged.
+- **SPEC v1.2, SPECIMEN_ENGINEERING_CALIBRATION and τ_mf remain HUMAN decisions;** none is implemented. SPEC v1.1 is
+  unchanged.
+Rationale / scope: corrects the scientific interpretation and the missing SPEC §13 analysis from frozen evidence
+without Abaqus; superseding governance, not a rewrite of D-069–D-075.
+Supersedes: the release interpretation of D-069, D-072 and D-075 (their text stays as history)

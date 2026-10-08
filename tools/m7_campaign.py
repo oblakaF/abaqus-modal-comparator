@@ -122,7 +122,8 @@ def main(argv=None) -> int:
                                      label)
     document["manifest_hash"] = manifest_hash
     args.result.write_text(json.dumps(document, indent=1), encoding="utf-8")
-    print(json.dumps({k: document[k] for k in ("lm_status", "parameters", "material_claim", "validation")}, indent=1))
+    summary_keys = ("lm_status", "optimizer_candidate", "formal_output", "material_claim", "validation")
+    print(json.dumps({k: document[k] for k in summary_keys}, indent=1))
     return 0
 
 

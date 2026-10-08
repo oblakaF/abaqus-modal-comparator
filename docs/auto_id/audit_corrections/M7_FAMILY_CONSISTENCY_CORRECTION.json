@@ -1,0 +1,243 @@
+{
+ "schema": "auto-id/m7-family-consistency-correction/v1",
+ "decision": "D-076",
+ "basis": "external audit iteration 2, finding K2: SPEC §13 family consistency was never evaluated in M7",
+ "method": "SPEC §13 on the linearised FIT system at p̂: whitened FIT residuals of the final journalled evaluation and the reconstructed LM Jacobian (the M5 system); χ²_shared − Σ χ²_separate, Δdof = k(N−1); χ²(Δdof) path when every SPEC §13 condition holds, plus a parametric bootstrap on the linearised model; rejection at p < 0.01. No Abaqus, no FE evaluation.",
+ "policy": {
+  "bootstrap_samples": 4000,
+  "bootstrap_seed": 20261009,
+  "note": "post-hoc corrective analysis of frozen historical evidence; the seed is not part of the historical RUN_A / RUN_B identities"
+ },
+ "run_a": {
+  "result_record": {
+   "path": "docs/auto_id/campaigns/M7_RUN_A.result.json",
+   "canonical_content_sha256": "82501b35c4effc0fd829d40d6e3aaef105d5a70cc8e8a3b0ba306b9caa66c5c2"
+  },
+  "campaign_hash": "0a21ad0567901034b521b822b52f0c29944e96394f3692e1a8ebcd7ccd8d2ccf",
+  "run_hash": "8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2",
+  "fit_terms": [
+   "SP02:R1",
+   "SP02:R2",
+   "SP13:R1"
+  ],
+  "family_consistency": {
+   "schema": "auto-id/family-consistency/v1",
+   "status": "FAIL",
+   "path": "CHI2",
+   "alpha": 0.01,
+   "delta_chi2": 746.2735527853167,
+   "delta_dof": 1,
+   "p_chi2": 2.5921972138712272e-164,
+   "log10_p_chi2": -163.5863319605029,
+   "bootstrap_p": 0.00024993751562109475,
+   "bootstrap_samples": 4000,
+   "bootstrap_seed": 20261009,
+   "shared_model": {
+    "terms": [
+     "SP02:R1",
+     "SP02:R2",
+     "SP13:R1"
+    ],
+    "rank": 1,
+    "parameters": [
+     "E_in_plane_mpa"
+    ],
+    "chi2": 782.3951993904031,
+    "chi2_at_p_hat": 782.396171321871,
+    "estimate": {
+     "E_in_plane_mpa": 55600.68193048364
+    }
+   },
+   "separate_model": {
+    "specimens": {
+     "SP02": {
+      "terms": [
+       "SP02:R1",
+       "SP02:R2"
+      ],
+      "rank": 1,
+      "fit_rows": 2,
+      "chi2": 36.12164660508638,
+      "estimate": {
+       "E_in_plane_mpa": 51911.66667627945
+      }
+     },
+     "SP13": {
+      "terms": [
+       "SP13:R1"
+      ],
+      "rank": 1,
+      "fit_rows": 1,
+      "chi2": 0.0,
+      "estimate": {
+       "E_in_plane_mpa": 67319.34918299473
+      }
+     }
+    },
+    "chi2_sum": 36.12164660508638
+   },
+   "chi2_conditions": {
+    "sigma_fixed": true,
+    "interior_optimum": true,
+    "observation_model_comparable": true,
+    "practical_identifiability_adequate": true,
+    "no_influential_priors_or_bounds": true
+   },
+   "sigma": {
+    "setup": {
+     "sd_ln": 0.003,
+     "status": "PROVISIONAL",
+     "in_whitening": true
+    },
+    "measurement": {
+     "status": "NOT_AVAILABLE",
+     "in_whitening": false,
+     "note": "NOT_AVAILABLE: no component; never taken as zero"
+    }
+   },
+   "reasons": [
+    "one carbon material vector does not explain the family (SPEC §13): no global material value; each specimen is shown separately"
+   ],
+   "policy_source": "D-076 corrective default; not part of this campaign's historical identity",
+   "linearisation": "reconstructed LM Jacobian (the M5 system) at p̂; whitened FIT residuals at p̂"
+  },
+  "verdict": "FAIL",
+  "audit_reference": {
+   "delta_chi2": 748.9,
+   "delta_dof": 1,
+   "p": 7e-165,
+   "sigma": "0.3 %",
+   "source": "Audit_AutoID_0f15db9_iteration2.docx (K2), as quoted by the SUPERVISOR"
+  },
+  "agreement_with_audit": {
+   "delta_chi2_difference": -2.626447214683253,
+   "relative_difference": -0.0035070733271240773,
+   "same_dof": true,
+   "same_conclusion": true,
+   "explanation": "every local model built from the RUN_A journal gives Δχ² 745.8–747.3 (sensitivity below); the residual definition matters far more (716 / 747 / 774 for relative, ln and inverse-ratio errors), and the audit's 748.9 is consistent with the accepted ln-ratio objective. The remaining +0.35 % is attributed to the audit's linearisation or rounding of the reported frequencies; the implementation was not tuned to it.",
+   "local_model_sensitivity": {
+    "M5 reconstructed Jacobian (implemented)": 746.2735527853167,
+    "central differences at E±5 % (archived evaluations)": 746.9300058339967,
+    "secant from E+5 % to p̂": 745.8068725466138,
+    "linear regression through the 4 evaluations": 747.3415863467926,
+    "quadratic in ln E through the 4 evaluations (nonlinear minima)": 746.2769133441391
+   },
+   "residual_definition_sensitivity": {
+    "ln(f_FE/f_exp) / σ (accepted M4.7 objective)": 746.9300058339967,
+    "(f_FE/f_exp − 1) / σ": 716.2690823125372,
+    "(1 − f_exp/f_FE) / σ": 774.1402238730171
+   }
+  }
+ },
+ "run_b": {
+  "result_record": {
+   "path": "docs/auto_id/campaigns/M7_RUN_B.result.json",
+   "canonical_content_sha256": "8a9264eca72827889042fb5430ed057f9d44ebb9305d0b10db9c28d433a2b2de"
+  },
+  "campaign_hash": "7c1f5db24fa9c4f4e90c82ca802c6dae22cbe5c7ec9e2989e63e439f678540e5",
+  "run_hash": "fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
+  "fit_terms": [
+   "SP02:R1",
+   "SP02:R2",
+   "SP13:R1"
+  ],
+  "family_consistency": {
+   "schema": "auto-id/family-consistency/v1",
+   "status": "NOT_EVALUABLE_RANK_DEFICIENT",
+   "path": null,
+   "alpha": 0.01,
+   "delta_chi2": null,
+   "delta_dof": null,
+   "p_chi2": null,
+   "log10_p_chi2": null,
+   "bootstrap_p": null,
+   "bootstrap_samples": 4000,
+   "bootstrap_seed": 20261009,
+   "shared_model": {
+    "terms": [
+     "SP02:R1",
+     "SP02:R2",
+     "SP13:R1"
+    ],
+    "rank": 2,
+    "parameters": [
+     "E_in_plane_mpa",
+     "G12_mpa"
+    ],
+    "chi2": 380.5376345065098,
+    "chi2_at_p_hat": 380.53772861942605,
+    "estimate": {
+     "E_in_plane_mpa": 50886.98246381644,
+     "G12_mpa": 6872.6627742242235
+    }
+   },
+   "separate_model": {
+    "specimens": {
+     "SP02": {
+      "terms": [
+       "SP02:R1",
+       "SP02:R2"
+      ],
+      "rank": 2,
+      "fit_rows": 2,
+      "chi2": 1.2772767391176148e-29,
+      "estimate": {
+       "E_in_plane_mpa": 50790.18972243313,
+       "G12_mpa": 5405.754749347851
+      }
+     },
+     "SP13": {
+      "terms": [
+       "SP13:R1"
+      ],
+      "rank": 1,
+      "fit_rows": 1
+     }
+    }
+   },
+   "chi2_conditions": {
+    "sigma_fixed": true,
+    "interior_optimum": true,
+    "observation_model_comparable": true,
+    "practical_identifiability_adequate": true,
+    "no_influential_priors_or_bounds": true
+   },
+   "sigma": {
+    "setup": {
+     "sd_ln": 0.003,
+     "status": "PROVISIONAL",
+     "in_whitening": true
+    },
+    "measurement": {
+     "status": "NOT_AVAILABLE",
+     "in_whitening": false,
+     "note": "NOT_AVAILABLE: no component; never taken as zero"
+    }
+   },
+   "reasons": [
+    "specimen SP13: 1 FIT row(s), rank 1 < 2 parameters (E_in_plane_mpa, G12_mpa): the separate model is not identifiable"
+   ],
+   "policy_source": "D-076 corrective default; not part of this campaign's historical identity",
+   "linearisation": "reconstructed LM Jacobian (the M5 system) at p̂; whitened FIT residuals at p̂"
+  },
+  "verdict": "NOT_EVALUABLE_RANK_DEFICIENT",
+  "note": "no PASS or FAIL is produced: SP13 has one FIT row for two parameters (E_in, G12)"
+ },
+ "corrected_interpretation": {
+  "historical_run_a_optimizer_candidate_mpa": 55593.41166800223,
+  "label": "HISTORICAL_RUN_A_OPTIMIZER_CANDIDATE",
+  "is_not": [
+   "release candidate",
+   "recommended common family E",
+   "identified material property",
+   "approved common engineering parameter"
+  ],
+  "formal_output": "NO GLOBAL PARAMETER VALUE for the SP02 / SP13 family under SPEC v1.1",
+  "reasons": [
+   "FAMILY_CONSISTENCY_FAIL (SPEC §13)",
+   "M5 NOT_IDENTIFIABLE (SPEC §1 upper rule)"
+  ]
+ },
+ "abaqus_solves": 0,
+ "abaqus_python_extractions": 0
+}

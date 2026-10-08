@@ -32,6 +32,7 @@ import uuid
 import numpy as np
 
 from domain.campaign_definition import (
+    CORRECTIVE_FAMILY_CONSISTENCY_POLICY,
     EFFECTIVE_ESTIMATE,
     IDENTIFIED_MATERIAL_PROPERTY,
     NO_EFFECTIVE_ESTIMATE,
@@ -57,6 +58,8 @@ from services import experimental_qc as qc
 from .archived_baseline import load_archived_baseline, reregistered_shape_pack_evidence
 from .baseline_freeze import freeze_baseline
 from .branch_tracker import BranchTrackingRefusal, RefusalKind
+from .campaign_diagnostics import excluded_mode_diagnostics, per_specimen_agreement
+from .family_consistency import FamilyConsistencyStatus, family_consistency
 from .fe_shape_pack import ShapePackRecord, load_shape_pack, load_shape_pack_record, parse_shape_pack_record
 from .forward_builder import load_bound_forward_model
 from .forward_solver import SolveExecutor, sha256_file
@@ -92,7 +95,11 @@ from .shape_extraction import ExtractionExecutor, ExtractionExpectation, extract
 
 CAMPAIGN_RUN_SCHEMA = "auto-id/identification-campaign-run/v1"
 CAMPAIGN_MANIFEST_SCHEMA = "auto-id/identification-campaign-manifest/v1"
-CAMPAIGN_REPORT_SCHEMA = "auto-id/identification-campaign-report/v1"
+CAMPAIGN_REPORT_SCHEMA = "auto-id/identification-campaign-report/v2"  # v2 (D-076): optimizer candidate vs formal output
+DIAGNOSTIC_CANDIDATE = "DIAGNOSTIC_OPTIMIZER_CANDIDATE_NOT_RELEASED"
+OPTIMIZER_CANDIDATE_ROLE = "OPTIMIZER_CANDIDATE_DIAGNOSTIC_ONLY_NOT_A_RELEASED_VALUE"
+NO_GLOBAL_VALUE = "NO_GLOBAL_PARAMETER_VALUE"
+FAMILY_CONSISTENCY_FAIL = "FAMILY_CONSISTENCY_FAIL"
 ARCHIVE_EXTRACTION_SCHEMA = "auto-id/campaign-archive-extraction/v1"
 SURFACE_TOLERANCE = 1.0e-4  # model units (mm): the extraction gate's measured-surface tolerance
 ARCHIVE_RUN_STORE = "auto-id-run"  # store name the extraction records use for their packs
@@ -139,6 +146,7 @@ class CampaignSpecimenInput:
     baseline_record: ShapePackRecord
     registration_limited: bool
     registration_evidence_source: str
+    excluded_diagnostics: tuple = ()  # D-076: excluded modes with best MAC ≥ 0.80, reporting only (never fitted)
 
     @property
     def label(self) -> str:
@@ -216,10 +224,12 @@ def prepare_campaign_specimen(definition: CampaignDefinition, spec: CampaignSpec
     expectation = ExtractionExpectation(surface.fe_instance, surface.side, SURFACE_TOLERANCE, identity.sha256,
                                         identity.node_count, baseline_record.node_set_sha256,
                                         baseline_record.node_set_count, baseline_record.mode_numbers)
+    excluded = excluded_mode_diagnostics(evidence, frozen, STRICT_IDENTIFICATION_PAIRING.minimum_mac,
+                                         {mode: family.key for mode, family in families.items()})
     return CampaignSpecimenInput(spec, model, profile, frozen, tuple(holdouts.holdout_row_ids),
                                  {r.row_id: families[r.fe_mode].key for r in frozen.rows}, expectation,
                                  baseline_record, bool(evidence_document["registration_limited"]),
-                                 spec.registration_evidence)
+                                 spec.registration_evidence, excluded)
 
 
 def prepare_campaign_specimens(definition: CampaignDefinition, repo_root: Path, fixtures: ExperimentFixtureManifest,
@@ -660,9 +670,56 @@ def campaign_m5_verdict(definition: CampaignDefinition, specimens: Sequence[Camp
     return _campaign_m5(definition, specimens, evaluations, result, final)[0]
 
 
+def campaign_family_consistency(definition: CampaignDefinition, whitened_jacobian, final: Mapping, result: Mapping,
+                                full_rank: bool) -> dict:
+    """SPEC §13 on the campaign's linearised FIT system at p̂ (D-076).
+
+    Pure: the final evaluation's whitened FIT residuals and the reconstructed whitened Jacobian (both journalled
+    or recorded), no stores, no Abaqus.
+    """
+
+    names = definition.fitted_parameters
+    terms = definition.fit_term_ids()
+    specimen_of = {s.term_id(row): s.label for s in definition.specimens for row in s.fit_rows}
+    policy = definition.family_consistency_policy
+    policy_source = "campaign definition (identity-bound)"
+    if policy is None:
+        policy, policy_source = CORRECTIVE_FAMILY_CONSISTENCY_POLICY, ("D-076 corrective default; not part of this "
+                                                                       "campaign's historical identity")
+    at_bound = any(math.isclose(float(result["parameters"][n]), bound, rel_tol=1e-12)
+                   for n in names for bound in definition.bounds[n])
+    sigma = {"setup": {"sd_ln": definition.sigma.setup_sd_ln, "status": definition.sigma.setup_status,
+                       "in_whitening": True},
+             "measurement": {"status": definition.sigma.measurement_status, "in_whitening": False,
+                             "note": "NOT_AVAILABLE: no component; never taken as zero"}}
+    outcome = family_consistency(
+        terms, specimen_of, final["residuals"], whitened_jacobian, names,
+        {n: float(result["parameters"][n]) for n in names},
+        chi2_conditions={"sigma_fixed": True, "interior_optimum": not at_bound,
+                         "observation_model_comparable": True, "practical_identifiability_adequate": bool(full_rank),
+                         "no_influential_priors_or_bounds": not at_bound},
+        sigma=sigma, bootstrap_samples=policy.bootstrap_samples, bootstrap_seed=policy.bootstrap_seed)
+    document = outcome.to_dict()
+    document["policy_source"] = policy_source
+    document["linearisation"] = "reconstructed LM Jacobian (the M5 system) at p̂; whitened FIT residuals at p̂"
+    return document
+
+
+def _family_guard(document: Mapping, source: str) -> GuardEvidence:
+    state = {FamilyConsistencyStatus.PASS.value: EvidenceState.PASS,
+             FamilyConsistencyStatus.FAIL.value: EvidenceState.FAIL}.get(document["status"], EvidenceState.NOT_AVAILABLE)
+    detail = (f"SPEC §13 {document['status']}" + (f" ({document['path']}: Δχ² {document['delta_chi2']:.4g}, "
+                                                    f"Δdof {document['delta_dof']}, p_χ² {document['p_chi2']:.3g}, "
+                                                    f"bootstrap p {document['bootstrap_p']:.3g})"
+                                                    if document["delta_chi2"] is not None else
+                                                    f": {'; '.join(document['reasons'])}"))
+    return GuardEvidence("family_consistency", state, source, detail)
+
+
 def _campaign_m5(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
-                 evaluations: Sequence[Mapping], result: Mapping, final: Mapping) -> tuple[dict, Optional[dict]]:
-    """The M5 verdict record and the M5 model_form_robustness record (None when M5 computed none)."""
+                 evaluations: Sequence[Mapping], result: Mapping, final: Mapping) -> tuple[dict, Optional[dict], dict]:
+    """The M5 verdict record, the M5 model_form_robustness record (None when M5 computed none) and the SPEC §13
+    family-consistency record."""
 
     names = definition.fitted_parameters
     sigma = definition.sigma.setup_sd_ln
@@ -684,6 +741,7 @@ def _campaign_m5(definition: CampaignDefinition, specimens: Sequence[CampaignSpe
     p_hat = {n: float(result["parameters"][n]) for n in names}
     label = f"{definition.campaign_id} ({definition.run_type}): real-data campaign"
     chain = compute_evidence_chain(system, fit, held, p_hat, label)
+    consistency = campaign_family_consistency(definition, whitened, final, result, chain.analysis.full_rank)
     macs = {}
     for item in specimens:
         macs.update(item.fit_pair_macs())
@@ -701,14 +759,13 @@ def _campaign_m5(definition: CampaignDefinition, specimens: Sequence[CampaignSpe
                       "no peak-derived modes"),
         GuardEvidence("tracking", EvidenceState.FAIL if refusals else EvidenceState.PASS, source,
                       f"{len(refusals)} refused campaign evaluation(s)"),
-        GuardEvidence("family_consistency", EvidenceState.NOT_AVAILABLE, source,
-                      "SPEC §13 campaign consistency test (ROADMAP M7.4) not part of RUN_A"),
+        _family_guard(consistency, source),
         SandwichG12Evidence("G12_mpa" in names, EvidenceState.NOT_AVAILABLE, ("k_core",), {"k_core": NuisanceConstraint(
             "k_core", False, True, False, "no independent k_core prior (M6.3 NOT_AVAILABLE, D-059)")},
             "SPEC §5.1; D-046"),
         p_hat, {n: ParameterRole.GLOBAL for n in names})
     report = decide_verdicts(inputs)
-    return report.to_dict(), None if chain.robustness is None else chain.robustness.to_dict()
+    return report.to_dict(), None if chain.robustness is None else chain.robustness.to_dict(), consistency
 
 
 # How the campaign report reads M5 model_form_robustness (D-075).  M5 is unchanged: its numeric range is taken
@@ -828,16 +885,47 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
         reasons.append("frequency agreement worse than at the start")
     if final is None:
         reasons.append("no accepted final evaluation")
-    estimate = EFFECTIVE_ESTIMATE if not reasons else NO_EFFECTIVE_ESTIMATE
+    verdict = robustness = consistency = None
+    if final is not None and status == LMStatus.CONVERGED.value and not refusals:
+        verdict, robustness, consistency = _campaign_m5(definition, specimens, evaluations, result, final)
+    identified = bool(verdict) and all(v["verdict"] == Verdict.IDENTIFIED.value for v in verdict["verdicts"].values())
+    # D-076 (SPEC §1 upper rule): a value is released only where M5 gives IDENTIFIED or WIDE.  Otherwise the
+    # optimiser output stays visible as a diagnostic candidate and nothing is presented as a released parameter.
+    released = {name: v["reported_value"] for name, v in (verdict or {}).get("verdicts", {}).items()
+                if v["verdict"] in (Verdict.IDENTIFIED.value, Verdict.WIDE.value) and v["reported_value"] is not None}
+    all_released = bool(verdict) and set(released) == set(definition.fitted_parameters)
+    if reasons:
+        estimate = NO_EFFECTIVE_ESTIMATE
+    elif all_released:
+        estimate = EFFECTIVE_ESTIMATE
+    else:
+        estimate = DIAGNOSTIC_CANDIDATE
     if definition.run_type == RUN_B:
         estimate = RUN_B_LABEL if not reasons else f"{RUN_B_LABEL}_INCOMPLETE"
-    verdict = robustness = None
-    if final is not None and status == LMStatus.CONVERGED.value and not refusals:
-        verdict, robustness = _campaign_m5(definition, specimens, evaluations, result, final)
-    identified = bool(verdict) and all(v["verdict"] == Verdict.IDENTIFIED.value for v in verdict["verdicts"].values())
+    blockers = []
+    if consistency is not None and consistency["status"] == FamilyConsistencyStatus.FAIL.value:
+        blockers.append(FAMILY_CONSISTENCY_FAIL)
+    for name, v in (verdict or {}).get("verdicts", {}).items():
+        if name not in released:
+            blockers.extend(f"{name}: {reason}" for reason in v["reasons"])
+    if verdict is None:
+        blockers.append("no formal M5 verdict (no converged, refusal-free campaign result)")
+    formal_output = {
+        "status": "VALUES_RELEASED" if all_released else (
+            "PARTIAL_VALUES_RELEASED" if released else NO_GLOBAL_VALUE),
+        "released_values": released,
+        "blockers": blockers,
+        "rule": "SPEC v1.1 §1 upper rule and §13: only M5 IDENTIFIED / WIDE values are output; a family-consistency "
+                "FAIL blocks every shared value (D-076)",
+    }
     return {
         "schema": CAMPAIGN_REPORT_SCHEMA, "campaign_id": definition.campaign_id, "run_type": definition.run_type,
-        "campaign_hash": definition.campaign_hash, "lm_status": status, "parameters": parameters,
+        "campaign_hash": definition.campaign_hash, "lm_status": status,
+        "optimizer_candidate": {"values": parameters, "role": OPTIMIZER_CANDIDATE_ROLE},
+        "formal_output": formal_output,
+        "family_consistency": consistency,
+        "per_specimen_agreement": per_specimen_agreement(rows, baseline_rows) if rows and baseline_rows else None,
+        "excluded_mode_diagnostics": {item.label: list(item.excluded_diagnostics) for item in specimens},
         "engineering": {"estimate": estimate, "reasons": reasons, "rows": rows, "baseline_rows": baseline_rows,
                         "max_abs_relative_error": max_final, "baseline_max_abs_relative_error": max_baseline,
                         "practical_target": practical, "improved_or_consistent": improved,
@@ -847,8 +935,9 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
         "model_form_robustness": model_form_robustness_reporting(robustness),
         "material_claim": IDENTIFIED_MATERIAL_PROPERTY if identified else NO_MATERIAL_CLAIM,
         "validation": NOT_EXTERNALLY_VALIDATED,
-        "reporting": ("model-calibrated effective constant within this FE model (SPEC §5.2); "
-                      f"{NOT_EXTERNALLY_VALIDATED} (D-060)"),
+        "reporting": ("released values are model-calibrated effective constants within this FE model (SPEC §5.2); "
+                      f"{NOT_EXTERNALLY_VALIDATED} (D-060); an optimizer candidate is diagnostic evidence only "
+                      "(D-076)"),
         "sigma": definition.sigma.to_dict(), "not_fitted": dict(definition.not_fitted),
         "fixed_parameters": dict(definition.fixed_parameters),
         "abaqus_solves_used": result.get("abaqus_solves_used"),

@@ -435,18 +435,21 @@ class SyntheticCampaignTests(unittest.TestCase):
         result = run.run()
         report = build_campaign_report(self.definition, run.specimens, run.journal.records("evaluation"), result)
         engineering = report["engineering"]
-        self.assertEqual(engineering["estimate"], EFFECTIVE_ESTIMATE)
         self.assertEqual(engineering["practical_target"], "WITHIN_PREFERRED_TARGET")
         self.assertTrue(engineering["improved_or_consistent"])
         self.assertEqual([r["term_id"] for r in engineering["rows"]], ["A:R1", "A:R2", "A:R3", "B:R1", "B:R2"])
         self.assertEqual([r["role"] for r in engineering["rows"]], ["FIT", "FIT", "HOLDOUT", "FIT", "HOLDOUT"])
         verdict = report["m5_verdict"]
         self.assertEqual(verdict["context"], "PRODUCTION")
-        self.assertEqual(verdict["guards"]["family_consistency"], "NOT_AVAILABLE")
+        # D-076: SPEC §13 is evaluated from the journal; both synthetic specimens share one truth, so it passes.
+        self.assertEqual((report["family_consistency"]["status"], verdict["guards"]["family_consistency"]),
+                         ("PASS", "PASS"))
         e_in = verdict["verdicts"]["E_in_plane_mpa"]
-        self.assertNotEqual(e_in["verdict"], "IDENTIFIED")  # D-044: no family consistency, no green verdict
-        self.assertIsNone(e_in["reported_value"])
-        self.assertEqual(report["material_claim"], NO_MATERIAL_CLAIM)
+        self.assertEqual(e_in["verdict"], "IDENTIFIED")
+        self.assertEqual(report["formal_output"]["released_values"], {"E_in_plane_mpa": e_in["reported_value"]})
+        self.assertEqual(engineering["estimate"], EFFECTIVE_ESTIMATE)  # released by M5, so the label may be used
+        self.assertEqual(report["optimizer_candidate"]["values"], result["parameters"])
+        self.assertEqual(report["material_claim"], "IDENTIFIED_MATERIAL_PROPERTY")
         self.assertEqual(report["validation"], NOT_EXTERNALLY_VALIDATED)
         self.assertIn(NOT_EXTERNALLY_VALIDATED, report["reporting"])
         self.assertEqual(report["sigma"]["measurement"], {"status": "NOT_AVAILABLE",
@@ -458,6 +461,31 @@ class SyntheticCampaignTests(unittest.TestCase):
             self.assertIsNone(robustness["parameters"])
         else:
             self.assertEqual(robustness["label"], "MODEL_DEPENDENCE_DIAGNOSTIC")
+
+    def test_inconsistent_specimens_fail_section_13_and_release_no_global_value(self):
+        # D-076: specimen A behaves like E 48 000 MPa, specimen B like 56 000 MPa.  No shared value is released;
+        # the optimiser output stays visible as a diagnostic candidate.
+        item_a, store = synthetic_specimen(self.definition, "A", self.tmp, 48000.0)
+        item_b, _ = synthetic_specimen(self.definition, "B", self.tmp, 56000.0)
+        self.solver = FakeSolver()
+        config = CampaignRunConfig(self.tmp / "split", {"synthetic": store}, "abq2024.bat", self.solver,
+                                   FakeExtractor(), {}, "m" * 64)
+        run = CampaignRun(self.definition, [item_a, item_b], "m" * 64, config)
+        result = run.run()
+        report = build_campaign_report(self.definition, run.specimens, run.journal.records("evaluation"), result)
+        self.assertEqual(report["family_consistency"]["status"], "FAIL")
+        self.assertEqual(report["m5_verdict"]["guards"]["family_consistency"], "FAIL")
+        self.assertEqual(report["m5_verdict"]["verdicts"]["E_in_plane_mpa"]["verdict"], "NOT_IDENTIFIABLE")
+        self.assertIsNone(report["m5_verdict"]["verdicts"]["E_in_plane_mpa"]["reported_value"])
+        self.assertEqual(report["formal_output"]["status"], "NO_GLOBAL_PARAMETER_VALUE")
+        self.assertEqual(report["formal_output"]["released_values"], {})
+        self.assertIn("FAMILY_CONSISTENCY_FAIL", report["formal_output"]["blockers"])
+        self.assertNotEqual(report["engineering"]["estimate"], EFFECTIVE_ESTIMATE)
+        self.assertEqual(report["optimizer_candidate"]["values"], result["parameters"])  # still visible
+        self.assertIn("DIAGNOSTIC_ONLY", report["optimizer_candidate"]["role"])
+        self.assertEqual(report["material_claim"], NO_MATERIAL_CLAIM)
+        separate = report["family_consistency"]["separate_model"]["specimens"]
+        self.assertLess(separate["A"]["estimate"]["E_in_plane_mpa"], separate["B"]["estimate"]["E_in_plane_mpa"])
 
     def test_engineering_window_is_reported_not_rejected(self):
         narrow = parse_campaign_definition(synthetic_definition(
