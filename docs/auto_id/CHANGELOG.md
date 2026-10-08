@@ -3857,3 +3857,20 @@ first internal provider.
 - **Abaqus run count:** 0.
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK
 - **Next gate:** SUPERVISOR review of the M7 stage PR. Not merged; M8 not started.
+
+## 2026-10-08 — M7 — closure: result-record binding made platform-independent
+
+- **Stage:** M7
+- **Mini-step:** M7 closure (correction)
+- **Status:** REVIEW_READY (stage)
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): M7 closure - bind result records by canonical content hash`
+- **Decision:** D-075.
+- **Files changed:** `docs/auto_id/campaigns/M7_CLOSURE.json` (`canonical_content_sha256` instead of the
+  checkout-dependent byte SHA-256), `tests/test_m7_closure.py`, EVIDENCE.
+- **Reason:** Linux CI on `5ed6cf0`: byte hashes of CRLF working copies differ from the LF blobs.
+- **Scientific behaviour changed:** NO.
+- **Abaqus run count:** 0.
+- **Tests:** test_m7_closure 11 OK; full suites in the stage PR report.
+- **Known limitation:** pre-existing flaky `test_registration_factory` token check (unrelated; not changed).

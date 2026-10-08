@@ -9,7 +9,6 @@ MODEL_DEPENDENCE_DIAGNOSTIC.  M5 itself is unchanged.
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
 from pathlib import Path
 import sys
@@ -19,6 +18,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from domain.identification_run import canonical_hash
 from services.identification_campaign_run import (
     LOO_COMPLETE,
     LOO_INCOMPLETE,
@@ -128,10 +128,9 @@ class ClosureRecordTests(unittest.TestCase):
         self.b = _load("M7_RUN_B.result.json")
 
     def test_binds_the_accepted_result_records(self):
-        for key, name in (("run_a", "M7_RUN_A.result.json"), ("run_b", "M7_RUN_B.result.json")):
-            with self.subTest(run=key):
-                digest = hashlib.sha256((CAMPAIGNS / name).read_bytes()).hexdigest()
-                self.assertEqual(self.closure[key]["result_record"]["sha256"], digest)
+        for key, record in (("run_a", self.a), ("run_b", self.b)):
+            with self.subTest(run=key):  # parsed content, so the binding does not depend on checkout line endings
+                self.assertEqual(self.closure[key]["result_record"]["canonical_content_sha256"], canonical_hash(record))
         self.assertEqual(self.closure["decision"].split()[0], "D-075")
         self.assertEqual(self.closure["abaqus_after_run_b"], 0)
 

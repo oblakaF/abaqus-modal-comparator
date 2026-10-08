@@ -1300,3 +1300,16 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
   (only the accepted M4.7 additive objective field outside M7 code); no ODB / INP / NPZ / solver artefact in
   git; no Abaqus execution after RUN_B.
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK
+
+## M7 closure: result-record binding correction (D-075)
+
+- Linux CI on `5ed6cf0` failed the closure binding test: the byte SHA-256 values in the closure entry above
+  (`23b0bfe7…`, `2f90abc9…`) are those of the Windows CRLF working copies; the committed blobs are LF
+  (`* text=auto`), so the bytes differ by platform.
+- `M7_CLOSURE.json` now binds each result record by `canonical_content_sha256` (the canonical hash of the
+  parsed JSON): RUN_A `82501b35c4effc0fd829d40d6e3aaef105d5a70cc8e8a3b0ba306b9caa66c5c2`, RUN_B `8a9264eca72827889042fb5430ed057f9d44ebb9305d0b10db9c28d433a2b2de`, identical for the LF blob and the CRLF working copy. The result
+  records themselves are unchanged.
+- The same CI run also showed a pre-existing, unrelated flaky test,
+  `test_registration_factory.UnambiguousGeometryTests.test_no_full_model_contamination`: the forbidden token
+  `d11` occurred by chance inside a random registration hash (`…ed1138…`, from a temporary path and mtime).
+  Not changed here (outside M7).

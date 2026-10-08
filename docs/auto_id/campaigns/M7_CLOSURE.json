@@ -6,7 +6,7 @@
  "run_a": {
   "result_record": {
    "path": "docs/auto_id/campaigns/M7_RUN_A.result.json",
-   "sha256": "23b0bfe76556ec094fc954ef0cb83fd12db4ee407a9661f2f92f07be6f81c62f"
+   "canonical_content_sha256": "82501b35c4effc0fd829d40d6e3aaef105d5a70cc8e8a3b0ba306b9caa66c5c2"
   },
   "run_hash": "8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2",
   "status": "ACCEPTED_RELEASE_CANDIDATE",
@@ -73,7 +73,7 @@
  "run_b": {
   "result_record": {
    "path": "docs/auto_id/campaigns/M7_RUN_B.result.json",
-   "sha256": "2f90abc9a4f58586c4c8fd9ab77efb17c97ac74fd4766773360bbbb2bf1c6ee4"
+   "canonical_content_sha256": "8a9264eca72827889042fb5430ed057f9d44ebb9305d0b10db9c28d433a2b2de"
   },
   "run_hash": "fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
   "status": "ACCEPTED_DIAGNOSTIC_ONLY",
