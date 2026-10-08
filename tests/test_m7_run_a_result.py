@@ -16,6 +16,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "tests"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from domain.campaign_definition import (
@@ -25,6 +26,7 @@ from domain.campaign_definition import (
     load_campaign_definition,
 )
 from domain.experiment_fixture import fixture_roots_from_environment
+from m7b_support import assert_records_close
 
 
 CAMPAIGNS = ROOT / "docs" / "auto_id" / "campaigns"
@@ -139,7 +141,7 @@ class RunStoreTests(unittest.TestCase):
         self.assertIn("FAMILY_CONSISTENCY_FAIL", report["formal_output"]["blockers"])
         correction = json.loads((ROOT / "docs/auto_id/audit_corrections/M7_FAMILY_CONSISTENCY_CORRECTION.json")
                                 .read_text(encoding="utf-8"))
-        self.assertEqual(report["family_consistency"], correction["run_a"]["family_consistency"])
+        assert_records_close(self, report["family_consistency"], correction["run_a"]["family_consistency"])
         closure = json.loads((CAMPAIGNS / "M7_CLOSURE.json").read_text(encoding="utf-8"))
         self.assertEqual(json.loads(json.dumps(report["model_form_robustness"])),
                          closure["run_a"]["model_form_robustness"])  # D-075 reporting from the live M5 chain

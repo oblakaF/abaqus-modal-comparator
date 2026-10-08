@@ -3953,3 +3953,16 @@ first internal provider.
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1617 OK (2 Abaqus-gated skipped); without data stores 1603 OK (64 skipped); M7 and corrective modules with stores 95 OK (incl. test_m7b_corrective 24 OK; RUN_A / RUN_B rebuilt from the journals); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of the M7b PR; stage-gate closure as a separate decision.
+
+## 2026-10-09 — M7 — M7b: cross-platform tolerance in the corrective record tests
+
+- **Branch:** `auto-id/m7b-diag`
+- **Commit SHA:** the commit that introduces this entry, message
+  `test(M7b): compare corrective family-consistency records within floating-point tolerance`
+- **Reason:** Linux CI on `59fef94`: the family-consistency Δχ² differs from the Windows-generated record in the last
+  digit (`…853167` vs `…853168`; numpy / BLAS builds). The test compared floats exactly.
+- **Change:** `tests/m7b_support.assert_records_close` (structure and text exact, floats rel 1e-9), used in
+  `test_m7b_corrective`, `test_m7_run_a_result`, `test_m7_run_b_result`. No code or record changed; the result is the
+  same (RUN_A FAIL, Δχ² 746.27).
+- **Tests:** Windows M7 and corrective modules with stores 95 OK; full suite without data stores 1603 OK (64 skipped).
+- **Abaqus run count:** 0.

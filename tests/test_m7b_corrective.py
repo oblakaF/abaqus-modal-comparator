@@ -22,6 +22,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "tests"))
 
 from domain.campaign_definition import (
     CORRECTIVE_FAMILY_CONSISTENCY_POLICY,
@@ -30,6 +31,7 @@ from domain.campaign_definition import (
     parse_campaign_definition,
 )
 from domain.experiment_fixture import fixture_roots_from_environment
+from m7b_support import assert_records_close
 from domain.identification_run import canonical_hash
 from domain.physical_measurements import (
     PhysicalMeasurementsError,
@@ -161,7 +163,7 @@ class RunAFrozenEvidenceTests(unittest.TestCase):
 
     def test_corrective_record_states_this_result(self):
         correction = _load(CORRECTIONS / "M7_FAMILY_CONSISTENCY_CORRECTION.json")
-        self.assertEqual(correction["run_a"]["family_consistency"], json.loads(json.dumps(self.result)))
+        assert_records_close(self, json.loads(json.dumps(self.result)), correction["run_a"]["family_consistency"])
         self.assertEqual(correction["run_a"]["verdict"], "FAIL")
         self.assertTrue(correction["run_a"]["result_record"]["canonical_content_sha256"].startswith(RUN_A_HISTORICAL_SHA))
         self.assertEqual(correction["run_a"]["result_record"]["canonical_content_sha256"], canonical_hash(self.record))
@@ -180,7 +182,7 @@ class RunAFrozenEvidenceTests(unittest.TestCase):
         self.assertEqual(result["status"], "NOT_EVALUABLE_RANK_DEFICIENT")
         self.assertIsNone(result["p_chi2"])
         correction = _load(CORRECTIONS / "M7_FAMILY_CONSISTENCY_CORRECTION.json")
-        self.assertEqual(correction["run_b"]["family_consistency"], json.loads(json.dumps(result)))
+        assert_records_close(self, json.loads(json.dumps(result)), correction["run_b"]["family_consistency"])
 
 
 class PerSpecimenDiagnosticsTests(unittest.TestCase):
