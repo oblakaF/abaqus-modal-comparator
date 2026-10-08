@@ -626,6 +626,9 @@ Stage status: `IN_PROGRESS` (D-069; branch `auto-id/m7` from `main` `9f5f63a`; d
   - Not executed.
 - **RUN_B HUMAN gate 1 (D-073), `REVIEW_READY`:** the 2 SP-02 G12± archive extractions (0 solves) validate;
   manifest unchanged; RUN_B run identity `fb5234116c6e9413…`; budget 24 / 24. The RUN_B LM is not started.
+- **RUN_B result (HUMAN solve gate, D-074), `REVIEW_READY`:** CONVERGED with 6 solves; E_in 50.89 GPa
+  (-8.5 % vs RUN_A), G12 6.87 GPa (+52.7 %), diagnostic only;
+  max |error| 4.17 %; M5 NOT_IDENTIFIABLE. Conclusion C (compensation / model-form dependence).
 
 ---
 

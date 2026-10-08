@@ -3815,3 +3815,24 @@ first internal provider.
 - **Manifest:** `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` (unchanged). RUN_B run identity `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`.
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1574 OK (2 Abaqus-gated skipped); without data stores 1560 OK (61 skipped); test_m7_run_b_archive_extraction 4 OK (1 store-gated; packs re-verified and re-tracked from the RUN_B run store)
 - **Next gate:** HUMAN RUN_B solve gate (not started).
+
+## 2026-10-08 — M7 — RUN_B result: EFFECTIVE_MODEL_COMPENSATION_TEST (diagnostic)
+
+- **Stage:** M7
+- **Mini-step:** RUN_B (M7.1 campaign)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_B result - compensation test, G12 +52.7 %, E_in -8.5 %, M5 NOT_IDENTIFIABLE`
+- **Decision:** D-074 (gate 1 accepted; RUN_B authorised for manifest `5fd0946a0c3f4e20…`, run `fb5234116c6e9413…`).
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_RUN_B.result.json`, `tests/test_m7_run_b_result.py`;
+  - updated: DECISIONS (D-074), EVIDENCE, M7_DECISION_RECORD (§8), ROADMAP, STATUS, `campaigns/README.md`.
+- **Scientific behaviour changed:** NO. No code changed; the result is recorded.
+- **Abaqus run count:** 6 solves and 6 extractions (budget 24; 0 failures). With gate 1, the RUN_B totals are
+  6 solves and 8 Abaqus Python extractions.
+- **Result (diagnostic):** CONVERGED; E_in = 50886.2 MPa (-8.47 % vs RUN_A),
+  G12 = 6872.1 MPa (+52.71 %); max |error| 4.17 %; minimum tracking MAC
+  0.999834; M5 NOT_IDENTIFIABLE for both; G12 a compensation diagnostic; not externally validated.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1581 OK (2 Abaqus-gated skipped); without data stores 1567 OK (62 skipped); test_m7_run_b_result 7 OK (1 store-gated; the report rebuilds identically from the RUN_B journals)
+- **Next gate:** SUPERVISOR review of RUN_B. No further fit; M7 not merged.

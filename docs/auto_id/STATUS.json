@@ -543,7 +543,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: review of RUN_B gate 1 (D-073); RUN_B solve execution only after a second explicit HUMAN authorisation for manifest 5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1 and run identity fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
+  "next_action": "STOP: SUPERVISOR review of the RUN_B result (D-074). No further fit; M7 not merged.",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -856,7 +856,7 @@
     "branch": "auto-id/m7",
     "base": "9f5f63a968759d6237facda00a4415cfe29c2257",
     "status": "IN_PROGRESS",
-    "decision": "D-069, D-070, D-071, D-072, D-073",
+    "decision": "D-069, D-070, D-071, D-072, D-073, D-074",
     "decision_record": "docs/auto_id/M7_DECISION_RECORD.md",
     "M7.1": "ACCEPTED",
     "M7.2": "TODO",
@@ -943,8 +943,8 @@
       "initial_evaluations_zero_solve": 5,
       "archive_extractions": 2,
       "budgets": "24 new Abaqus solves (hard); 26 Abaqus Python extractions max; LM evaluations 17",
-      "executed": false,
-      "status": "GATE_1_EXTRACTED (REVIEW_READY)",
+      "executed": true,
+      "status": "EXECUTED (REVIEW_READY)",
       "archive_extraction": {
         "gate": "HUMAN gate 1 (D-073)",
         "record": "docs/auto_id/campaigns/M7_RUN_B.archive-extraction.json",
@@ -963,12 +963,46 @@
         "initial_set": "5 campaign evaluations = 10 FE states, 0 new solves",
         "abaqus_solves": 0,
         "abaqus_python_extractions": 2,
+        "status": "ACCEPTED"
+      },
+      "solve_budget_remaining": 18,
+      "result": {
+        "gate": "HUMAN solve gate (D-074)",
+        "record": "docs/auto_id/campaigns/M7_RUN_B.result.json",
+        "lm_status": "CONVERGED",
+        "E_in_plane_mpa": 50886.241471158406,
+        "G12_mpa": 6872.052773289999,
+        "delta_ln_vs_run_a": {
+          "E_in_plane_mpa": -0.08847211712343572,
+          "G12_mpa": 0.42338546734214155
+        },
+        "delta_percent_vs_run_a": {
+          "E_in_plane_mpa": -8.46713676245402,
+          "G12_mpa": 52.71228385088882
+        },
+        "max_abs_relative_error": 0.04167301767924658,
+        "all_within_5_percent": true,
+        "all_within_10_percent": true,
+        "min_tracking_mac": 0.9998343182982068,
+        "engineering_label": "EFFECTIVE_MODEL_COMPENSATION_TEST",
+        "g12_role": "COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY",
+        "m5_verdict": {
+          "E_in_plane_mpa": "NOT_IDENTIFIABLE",
+          "G12_mpa": "NOT_IDENTIFIABLE"
+        },
+        "material_claim": "NO_MATERIAL_PROPERTY_CLAIM",
+        "validation": "not externally validated",
+        "conclusion": "C: G12 moves strongly and E_in shifts materially (parameter compensation / model-form dependence); specimen-specific family disagreement unchanged",
+        "abaqus_solves": 6,
+        "abaqus_python_extractions": 6,
+        "failures": 0,
+        "campaign_journal_last_entry": "53fc367c980fe5f12ad944568c01de6b680d3d5d4e7fc96e3665f5c06041dbcb",
         "status": "REVIEW_READY"
       },
-      "solve_budget_remaining": 24
+      "release_candidate": "unchanged: RUN_A model-calibrated effective E_in = 55.593 GPa, not externally validated"
     },
     "M7.1_tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK",
-    "abaqus_solves": 2,
-    "abaqus_python_extractions": 6
+    "abaqus_solves": 8,
+    "abaqus_python_extractions": 12
   }
 }

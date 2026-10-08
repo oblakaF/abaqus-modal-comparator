@@ -1164,3 +1164,23 @@ Decision:
 Rationale / scope: records the HUMAN Abaqus-Python authorisation. The extraction result is a worker result
 pending review (EVIDENCE).
 Supersedes: none
+
+## D-074 — RUN_B HUMAN solve gate (diagnostic only)
+Date: 2026-10-08 · Accepted by: HUMAN · Source: HUMAN "M7 RUN B — HUMAN SOLVE GATE AUTHORISED." (2026-10-08); D-072, D-073
+Decision:
+- Gate 1 / D-073 (`4cc20cc`) is accepted.
+- **Authorised:** execution of RUN_B only, for manifest `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` and run identity `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`.
+  - Label `EFFECTIVE_MODEL_COMPENSATION_TEST`; fit exactly E_in and G12 from 52 000 / 4 500 MPa (not from the
+    RUN_A optimum); bounds 26 000–104 000 / 2 250–9 000 MPa.
+  - Fixed inputs, observations, Σ, tracking thresholds and the M4.8/M4.9 LM unchanged; the five governed
+    initial evaluations reused (0 solves).
+  - At most 24 new solves (12 new campaign evaluations) and 24 new extractions; no extension, no automatic
+    scientific retry, no repeat of the gate-1 extractions.
+- **Claims:** RUN_B G12 is `COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY` (`BARE_PLATE_REQUIRED`,
+  `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`); RUN_B E_in is diagnostic as well. The release candidate remains
+  the model-calibrated effective E_in = 55.593 GPa, not externally validated, until the SUPERVISOR changes it.
+- **Not authorised:** reopening RUN_A, another fit, adding t_face / k_core / k_int, spending unused budget
+  after convergence, merging M7.
+Rationale / scope: records the HUMAN Abaqus authorisation. The run and its result are worker results
+pending SUPERVISOR review (EVIDENCE).
+Supersedes: none

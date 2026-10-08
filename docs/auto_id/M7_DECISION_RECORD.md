@@ -151,3 +151,14 @@ SUPERVISOR gate.
   extracted pack content hashes.
 - **Budget remaining:** 24 of 24 new solves. Initial set: 5 evaluations = 10 FE states, 0 solves.
 - **Next:** the HUMAN RUN_B solve gate for this exact manifest and identity. Not started.
+
+## 8. RUN_B result (HUMAN solve gate, D-074), `REVIEW_READY`
+
+- **LM:** CONVERGED with 6 new solves (budget 24). E_in = 50886 MPa, G12 = 6872 MPa (diagnostic only).
+- **Against RUN_A:** Δln E_in -0.0885 (-8.47 %);
+  Δln G12 +0.4234 (+52.71 %).
+- **Agreement:** max |error| 4.17 % (all rows ≤ 5 %); minimum tracking MAC 0.999834.
+- **M5:** both parameters NOT_IDENTIFIABLE; G12 `COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY`.
+- **Conclusion C:** G12 absorbs model discrepancy and drags E_in with it; the specimen-specific family
+  disagreement is unchanged. The release candidate remains RUN_A E_in,eff = 55.593 GPa.
+- **Next:** SUPERVISOR review. No further fit; M7 not merged.

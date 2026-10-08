@@ -1207,3 +1207,79 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
 - **Budget:** 24 / 24 new solves remain.
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1574 OK (2 Abaqus-gated skipped); without data stores 1560 OK (61 skipped); test_m7_run_b_archive_extraction 4 OK (1 store-gated; packs re-verified and re-tracked from the RUN_B run store)
 - Not done: RUN_B LM, any solve, any fit. RUN_A unchanged.
+
+## M7 RUN_B result: EFFECTIVE_MODEL_COMPENSATION_TEST (D-074; diagnostic only)
+
+- **Record:** `campaigns/M7_RUN_B.result.json` (deterministic: regenerated from the journals byte-identically).
+- **Pre-check (18/18 PASS):** manifest and run identity = authorised; RUN_B / D-072, E_in + G12; start
+  52 000 / 4 500; bounds; fixed inputs, not-fitted t_face / k_core / k_int, rows, specimens, Σ and LM settings
+  equal RUN_A (only the evaluation budget differs); 10 reused FE states with verified pins; gate-1 extractions
+  not repeated; fresh run; clean worktree at `4cc20cc`.
+- **LM:** `CONVERGED` after 4 iterations (3 accepted; the 4th step fell below stop_fraction·sd). Objective
+  (½χ²) 518.587 at p0 → 190.269. Broyden Jacobian (3 updates after the reused central
+  differences).
+
+| Iteration | μ | objective before | trial objective | accepted | note |
+|---|---|---|---|---|---|
+| 1 | 1e-03 | 518.587 | 205.105 | yes | accepted |
+| 2 | 1e-04 | 205.105 | 190.517 | yes | accepted |
+| 3 | 1e-05 | 190.517 | 190.269 | yes | accepted |
+| 4 | 1e-06 | 190.269 | — | no | step below stop_fraction·sd |
+
+| # | E_in (MPa) | G12 (MPa) | FE source |
+|---|---|---|---|
+| 1 | 52000.0 | 4500.0 | reused |
+| 2 | 54600.0 | 4500.0 | reused |
+| 3 | 49400.0 | 4500.0 | reused |
+| 4 | 52000.0 | 4725.0 | reused |
+| 5 | 52000.0 | 4275.0 | reused |
+| 6 | 50905.0 | 7355.7 | new (2 solves) |
+| 7 | 50890.7 | 6809.7 | new (2 solves) |
+| 8 | 50886.2 | 6872.1 | new (2 solves) |
+
+- **Counts:** 8 campaign evaluations = 5 reused + 3 new; 6 Abaqus solves, 6 extractions (3 per specimen),
+  0 failures; budget used 6 / 24 (18 unused; not spent after convergence).
+- **Estimate (diagnostic):** E_in = 50886.2 MPa, G12 = 6872.1 MPa. Distance to bounds: E_in Δln +0.671
+  from the lower / 0.715 from the upper; G12 Δln 1.117 / 0.270. Not at a bound;
+  E_in inside the 35–75 GPa window.
+- **Against RUN_A** (E_in 55 593.4, G12 4 500 fixed): Δln E_in = -0.0885
+  (-8.47 %, BEYOND_0.08_LN); Δln G12 =
+  +0.4234 (+52.71 %, BEYOND_0.08_LN).
+  D-045 bands descriptive only.
+
+| Row | Role | Exp (Hz) | FE (Hz) | Error | r | Tracking MAC | RUN_A error | RUN_A r |
+|---|---|---|---|---|---|---|---|---|
+| `SP02:R1` | FIT | 74.376 | 74.449 | +0.10 % | +0.33 | 0.999997 | +4.55 % | +14.84 |
+| `SP02:R2` | FIT | 90.575 | 94.349 | +4.17 % | +13.61 | 0.999834 | +1.06 % | +3.51 |
+| `SP02:R3` | HOLDOUT | 201.999 | 205.311 | +1.64 % | +5.42 | 0.999954 | +6.06 % | +19.61 |
+| `SP13:R1` | FIT | 94.399 | 90.524 | -4.10 % | -13.97 | 0.999841 | -6.79 % | -23.45 |
+| `SP13:R2` | HOLDOUT | 205.649 | 198.068 | -3.69 % | -12.52 | 0.999979 | +0.43 % | +1.44 |
+
+- **Engineering:** max |error| 4.17 % (all five rows ≤ 5 % and ≤ 10 %; RUN_A 6.79 %); minimum
+  tracking MAC 0.999834; every row on its own mode. FIT χ² 782.4 → 380.5.
+- **Formal M5 (unchanged rules):** E_in and G12 NOT_IDENTIFIABLE, no reported value. Blockers: family
+  consistency NOT_AVAILABLE; holdout failures `SP02:R3` (|r| 5.42) and `SP13:R2` (|r| 12.5); Birge
+  BLOCKED_PATTERN (χ² 380.5, dof 1, s_B 19.5); model-form
+  robustness refused (family (1,2) removal rank-deficient). G12 additionally `BARE_PLATE_REQUIRED` and
+  `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED` (k_core). Statistical sd_ln (Σ_setup only, not a model-form
+  uncertainty): E_in 0.0061, G12
+  0.0185; correlation -0.721.
+- **Leave-one-family-out:** removing family (1,2) (`SP02:R2`, `SP13:R1`) is REFUSED_RANK_DEFICIENT (one row for
+  two parameters). Removing family (0,2) (`SP02:R1`) is formally VALID but its linearised shift (Δln E_in
+  +7.01, Δln G12 -15.38) is far outside the
+  linear range: the two remaining (1,2) rows are nearly collinear in (E_in, G12) and pull in opposite
+  directions. The reported model_form_robustness range 0.0 therefore comes from a single degenerate case and
+  is not a robustness statement (observation for the SUPERVISOR; M5 unchanged).
+- **Interpretation (conclusion C):** G12 moves strongly (+52.7 %) and E_in shifts materially (−8.5 %, beyond the
+  0.08 ln band): parameter compensation / model-form dependence.
+  - E_in is now set almost alone by `SP02:R1` (G12 sensitivity ≈ 0; error +0.10 %); G12 then centres the
+    (1,2) family between the specimens.
+  - The specimen-to-specimen disagreement inside each family is unchanged: (1,2) `SP02:R2` − `SP13:R1`
+    7.85 → 8.27 percentage points; (0,3) `SP02:R3` − `SP13:R2` 5.63 → 5.33 points. A shared (E_in, G12) moves the
+    family means but cannot remove the specimen-specific discrepancy.
+  - Holdouts: `SP02:R3` improves (+6.06 → +1.64 %), `SP13:R2` worsens (+0.43 → −3.69 %).
+  - The smaller percentages are therefore not improved identification. The release candidate stays RUN_A
+    E_in,eff = 55.593 GPa, not externally validated.
+- **Journals:** campaign `fb5234116c6e9413…`, 9 entries, last `53fc367c980fe5f1…`. RUN_A journal unchanged (5 entries,
+  last `f1d1e2a99c6411cb…`).
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1581 OK (2 Abaqus-gated skipped); without data stores 1567 OK (62 skipped); test_m7_run_b_result 7 OK (1 store-gated; the report rebuilds identically from the RUN_B journals)

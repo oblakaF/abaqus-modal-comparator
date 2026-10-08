@@ -55,3 +55,9 @@ committed.
 - `M7_RUN_B.archive-extraction.json` records the 2 SP-02 G12± archive extractions (0 solves) and the final
   RUN_B run identity `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`.
 - The store-gated re-verification uses `AUTO_ID_FIXTURE_ROOT_M7_RUN_B` (the RUN_B run root).
+
+### RUN_B result (D-074)
+
+- `M7_RUN_B.result.json`: the diagnostic `EFFECTIVE_MODEL_COMPENSATION_TEST` result, rebuilt from the journals
+  of run `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0` (store-gated check: `AUTO_ID_FIXTURE_ROOT_M7_RUN_B`).
+- G12 is a compensation diagnostic, never a material property; RUN_B E_in is diagnostic as well.
