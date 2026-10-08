@@ -117,3 +117,16 @@ SUPERVISOR gate.
   `8ed03be3be86aa83…` binds the extracted pack content hashes.
 - **Budget remaining:** 16 of 16 new solves.
 - **Next:** HUMAN gate 2 (the RUN_A solves) for this exact manifest.
+
+## 5. RUN_A result (HUMAN gate 2, D-071), `REVIEW_READY`
+
+- **LM:** CONVERGED with 2 new solves (budget 16). Ê_in = 55593 MPa (35–75 GPa window:
+  inside).
+- **Agreement:**
+  - max |error| 6.79 %; all rows within 10 %, not all within 5 %;
+  - minimum tracking MAC 0.999997.
+- **Labels:** `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`. M5: NOT_IDENTIFIABLE (family consistency NOT_AVAILABLE;
+  holdout `SP02:R3`; Birge blocked). No material claim; not externally validated.
+- **Visible model discrepancy:** opposite-sign residuals of the shared (1,2) family across SP-02 and SP-13;
+  leave-one-family-out 50.8–60.3 GPa.
+- **Not started:** RUN_B (it needs its own SUPERVISOR gate).

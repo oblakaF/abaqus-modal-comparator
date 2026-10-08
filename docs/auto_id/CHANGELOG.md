@@ -3745,3 +3745,26 @@ first internal provider.
   - the solve budget remaining is 16 of 16.
 - **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1554 OK (2 Abaqus-gated skipped); without data stores 1541 OK (58 skipped); test_m7_archive_extraction 4 OK (1 store-gated) + test_m7_campaign 28 OK
 - **Next gate:** HUMAN gate 2 (RUN_A solves). RUN_A and RUN_B are not started.
+
+## 2026-10-08 — M7 — RUN_A executed (HUMAN gate 2): shared E_in for SP-02 + SP-13
+
+- **Stage:** M7
+- **Mini-step:** RUN_A (M7.1 campaign)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_A result - shared E_in 55.6 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, M5 NOT_IDENTIFIABLE`
+- **Decision:** D-071 (gate 1 accepted; RUN_A authorised for manifest `e4ba607f06a69311…`, run `8ed03be3be86aa83…`).
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_RUN_A.result.json`, `tests/test_m7_run_a_result.py`;
+  - updated: DECISIONS (D-071), EVIDENCE, M7_DECISION_RECORD (§5), ROADMAP, STATUS.
+- **Scientific behaviour changed:** NO. No code changed; the result is recorded.
+- **Abaqus run count:** 2 solves and 2 extractions (gate 2). With gate 1, the RUN_A totals
+  are 2 solves and 4 Abaqus Python extractions.
+- **Result:**
+  - CONVERGED; Ê_in = 55593 MPa; max |error| 6.79 % (all within 10 %, not all
+    within 5 %); minimum tracking MAC 0.999997.
+  - `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`; M5 NOT_IDENTIFIABLE (family consistency NOT_AVAILABLE; holdout
+    `SP02:R3`; Birge blocked); not externally validated.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1559 OK (2 Abaqus-gated skipped); without data stores 1546 OK (59 skipped); test_m7_run_a_result 5 OK (1 store-gated; the report rebuilds identically from the run journals)
+- **Next gate:** SUPERVISOR review of RUN_A. RUN_B only under its own later gate.

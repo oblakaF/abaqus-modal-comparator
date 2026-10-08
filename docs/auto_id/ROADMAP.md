@@ -613,6 +613,12 @@ Stage status: `IN_PROGRESS` (D-069; branch `auto-id/m7` from `main` `9f5f63a`; d
   - Σ_setup 0.3 % PROVISIONAL; Σ_meas NOT_AVAILABLE.
   - Hard budget of 16 new solves.
   - Proposed manifest `e4ba607f…` (not executed). RUN_B is diagnostic only and needs its own later gate.
+  - M7.1 ACCEPTED (D-070). Gate 1 (archived SP-02 extraction) was accepted at `0837921`.
+- **RUN_A (HUMAN gate 2, D-071), `REVIEW_READY`:**
+  - CONVERGED, 2 new solves; Ê_in = 55593 MPa; max |error| 6.79 %
+    (all rows within 10 %).
+  - `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`; M5 NOT_IDENTIFIABLE; not externally validated.
+  - RUN_B not started.
 
 ---
 

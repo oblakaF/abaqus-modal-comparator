@@ -1074,3 +1074,66 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
   The packs themselves are run-store data, pinned by content.
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1554 OK (2 Abaqus-gated skipped); without data stores 1541 OK (58 skipped); test_m7_archive_extraction 4 OK (1 store-gated) + test_m7_campaign 28 OK
 - 0 Abaqus solves, 2 Abaqus Python extractions. RUN_A and RUN_B are not started.
+
+## M7 RUN_A result: shared E_in for SP-02 + SP-13 (HUMAN gate 2; 2 solves)
+
+- **Status:** REVIEW_READY (worker, 2026-10-08; D-071). Pending SUPERVISOR review.
+- **Pre-execution check:** 9 of 9 PASS. The manifest is `e4ba607f06a69311…` and the run identity `8ed03be3be86aa83…`. The
+  definition, budgets and rows are unchanged; every initial point is reused; the `abaqus-scratch` store is
+  configured; the journal was fresh.
+- **Execution:** `tools/m7_campaign.py run`.
+  - LM `CONVERGED` after 4 campaign evaluations and
+    2 iterations.
+  - New Abaqus solves: 2 (SP-02 1, SP-13 1) of 16. Extractions: 2. Failures: 0.
+    Retries: 0.
+  - p0 and E± were reused: 3 evaluations, 0 solves.
+- **LM history:** iteration 1: E 52000.0 → 55593.4, Φ 518.59 → 391.20 (accepted); iteration 2: E 55593.4 → 55600.7, Φ 391.20 → — (step below stop_fraction·sd).
+- **Estimate:** Ê_in = **55593 MPa** (55.6 GPa; +6.9 % from the start). It is
+  inside the engineering window 35–75 GPa and not at a search bound. G12 stayed fixed at 4 500 MPa.
+
+| Row | Role | Pair | f_EXP (Hz) | f_FE (Hz) | Error at Ê | Error at start | Tracking MAC | Pair MAC |
+|---|---|---|---|---|---|---|---|---|
+| `SP02:R1` | FIT | 2 ↔ FE 8 | 74.376 | 77.762 | +4.55 % | +1.16 % | 1.000000 | 0.918 |
+| `SP02:R2` | FIT | 4 ↔ FE 10 | 90.575 | 91.532 | +1.06 % | -1.38 % | 0.999997 | 0.951 |
+| `SP02:R3` | HOLDOUT | 7 ↔ FE 13 | 201.999 | 214.237 | +6.06 % | +2.69 % | 0.999998 | 0.975 |
+| `SP13:R1` | FIT | 4 ↔ FE 10 | 94.399 | 87.986 | -6.79 % | -9.05 % | 0.999997 | 0.958 |
+| `SP13:R2` | HOLDOUT | 7 ↔ FE 13 | 205.649 | 206.539 | +0.43 % | -2.76 % | 0.999999 | 0.947 |
+
+- **Max |f_FE / f_EXP − 1|:** 6.79 % (`SP13:R1`), against
+  9.05 % at the start.
+  - All rows within 5 %: **no** (`SP02:R3` +6.06 %, `SP13:R1` −6.79 %).
+  - All rows within 10 %: **yes**.
+- **Mode identity:** every row is tracked on its own baseline mode; the minimum tracking MAC is
+  0.999997; the baseline pair MACs are 0.918–0.975.
+- **Engineering label:** `EFFECTIVE_MODEL_PARAMETER_ESTIMATE` (`WITHIN_ACCEPTABLE_TARGET`; better than the start).
+- **Formal M5 verdict** (PRODUCTION; rules unchanged): E_in **NOT_IDENTIFIABLE**. Reasons:
+  - `FAMILY_CONSISTENCY` NOT_AVAILABLE (D-044);
+  - `HOLDOUT_FAILURE` on `SP02:R3` (|r| 19.6 > 3);
+  - `BIRGE_UNAVAILABLE` (pattern blocked).
+  - Reported value: none. Material claim: `NO_MATERIAL_PROPERTY_CLAIM`.
+- **Uncertainty diagnostics:**
+  - `statistical_sd` ln E 0.0042 (0.42 %);
+  - Birge: χ² 782.4, dof 2, χ²/dof 391.2, s_B
+    19.78; status `BLOCKED_PATTERN`;
+  - `model_form_robustness` (leave-one-family-out): without (0,2) 60348 MPa;
+    without (1,2) 50795 MPa; range 17.2 % of Ê
+    (half 8.6 %).
+  - The M5 Jacobian is the reconstructed LM Jacobian (1 Broyden update).
+- **Engineering interpretation:**
+  - One shared effective E_in ≈ 55.6 GPa reproduces both specimens with correct mode identity, inside the
+    practical ~10 % target.
+  - A specimen-level model discrepancy stays visible. In the same modal family (1,2), SP-02 R2 is FE +1.1 %
+    while SP-13 R1 is FE −6.8 %. The fixed G12, nominal t_face and INP core constants cannot absorb this.
+  - The SP-02 holdout R3 (+6.1 %) and the leave-one-family-out spread (50.8–60.3 GPa) show the same
+    discrepancy.
+  - This is an effective model-calibrated estimate, **not externally validated**, and not an identified
+    material property.
+- **Hashes:**
+  - campaign journal: run `8ed03be3be86aa83…`, 5 entries, last entry
+    `f1d1e2a99c6411cb…`;
+  - SP-02 pipeline: run `223e013f4aae9792…`, last entry `0d4196411672bc86…`;
+  - SP-13 pipeline: run `7e992dee8c9bee27…`, last entry `fee3dbacc8b28c08…`.
+- **Record:** `campaigns/M7_RUN_A.result.json`. It rebuilds identically from the run journals (store-gated
+  test).
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1559 OK (2 Abaqus-gated skipped); without data stores 1546 OK (59 skipped); test_m7_run_a_result 5 OK (1 store-gated; the report rebuilds identically from the run journals)
+- RUN_B is not started.

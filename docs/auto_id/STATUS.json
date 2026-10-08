@@ -543,7 +543,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of RUN_A gate 1 (archive extraction); then HUMAN gate 2 (RUN_A solves) for manifest e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6; RUN_B not executable",
+  "next_action": "STOP: SUPERVISOR review of the RUN_A result (EFFECTIVE_MODEL_PARAMETER_ESTIMATE; M5 NOT_IDENTIFIABLE); RUN_B only under its own later SUPERVISOR gate",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -856,7 +856,7 @@
     "branch": "auto-id/m7",
     "base": "9f5f63a968759d6237facda00a4415cfe29c2257",
     "status": "IN_PROGRESS",
-    "decision": "D-069, D-070",
+    "decision": "D-069, D-070, D-071",
     "decision_record": "docs/auto_id/M7_DECISION_RECORD.md",
     "M7.1": "ACCEPTED",
     "M7.2": "TODO",
@@ -885,7 +885,7 @@
       "sigma": "Sigma_setup 0.3 % PROVISIONAL; Sigma_meas NOT_AVAILABLE (null, never zero)",
       "proposed_manifest": "e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6",
       "budgets": "16 new Abaqus solves (hard); 18 Abaqus Python extractions max (16 + 2 archive); LM evaluations 11",
-      "executed": false,
+      "executed": true,
       "archive_extraction": {
         "gate": "HUMAN gate 1 (D-070)",
         "record": "docs/auto_id/campaigns/M7_RUN_A.archive-extraction.json",
@@ -903,13 +903,36 @@
         "run_identity_hash": "8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2",
         "abaqus_solves": 0,
         "abaqus_python_extractions": 2,
-        "status": "REVIEW_READY"
+        "status": "ACCEPTED"
       },
-      "solve_budget_remaining": 16
+      "solve_budget_remaining": 14,
+      "result": {
+        "gate": "HUMAN gate 2 (D-071)",
+        "record": "docs/auto_id/campaigns/M7_RUN_A.result.json",
+        "lm_status": "CONVERGED",
+        "E_in_plane_mpa": 55593.41166800223,
+        "max_abs_relative_error": 0.06793241237613246,
+        "all_within_5_percent": false,
+        "all_within_10_percent": true,
+        "min_tracking_mac": 0.9999968120972186,
+        "engineering_label": "EFFECTIVE_MODEL_PARAMETER_ESTIMATE",
+        "m5_verdict": "NOT_IDENTIFIABLE",
+        "m5_reasons": [
+          "FAMILY_CONSISTENCY: required family consistency NOT_AVAILABLE (blocks IDENTIFIED for production; D-044)",
+          "HOLDOUT_FAILURE: ['SP02:R3'] |r| > 3",
+          "BIRGE_UNAVAILABLE: birge_adjusted_sd not available (BLOCKED_PATTERN); model form"
+        ],
+        "material_claim": "NO_MATERIAL_PROPERTY_CLAIM",
+        "validation": "not externally validated",
+        "abaqus_solves": 2,
+        "abaqus_python_extractions": 2,
+        "campaign_journal_last_entry": "f1d1e2a99c6411cb664ba38d4ca035489f1ef62cb5994d7dce354c8ea3549ea3",
+        "status": "REVIEW_READY"
+      }
     },
     "run_b": "diagnostic EFFECTIVE_MODEL_COMPENSATION_TEST; not executable without its own later SUPERVISOR gate",
     "M7.1_tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK",
-    "abaqus_solves": 0,
-    "abaqus_python_extractions": 2
+    "abaqus_solves": 2,
+    "abaqus_python_extractions": 4
   }
 }

@@ -1095,3 +1095,25 @@ Decision:
 Rationale / scope: records the acceptance and the HUMAN authorisation. The execution is a worker result
 pending SUPERVISOR review (EVIDENCE).
 Supersedes: none
+
+## D-071 — HUMAN gate 2: RUN_A authorised
+Date: 2026-10-08 · Accepted by: SUPERVISOR / HUMAN · Source: SUPERVISOR "M7 RUN A — HUMAN ABAQUS GATE AUTHORISED" (2026-10-08); D-069, D-070
+Decision:
+- **Gate 1:** commit `0837921` (archived SP-02 extraction) is accepted.
+- **RUN_A:** authorised for manifest `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6` and run identity `8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2`, RUN_A only.
+  - Fit E_in only; G12 is fixed at 4 500 MPa.
+  - Specimens `SP02/bravo-1-physical` and `SP13/best-physical`, with the accepted FIT / HOLDOUT rows
+    unchanged.
+  - At most 16 new Abaqus solves and 16 new extractions. No budget extension and no automatic scientific
+    retry.
+  - The archived baseline and ±5 % points are reused, not recomputed.
+- **Not authorised:** RUN_B, G12 fitting, and any change to registration, pairing or holdouts.
+- **Reporting:**
+  - `EFFECTIVE_MODEL_PARAMETER_ESTIMATE` is allowed if supported;
+  - `IDENTIFIED_MATERIAL_PROPERTY` only if M5 permits it;
+  - every carbon result is "not externally validated";
+  - the engineering interpretation keeps its targets: correct mode identity and acceptable MAC; preferably
+    ~5 %, up to ~10 %; no tuning for appearance.
+Rationale / scope: records the HUMAN Abaqus authorisation. The run and its result are worker results
+pending SUPERVISOR review (EVIDENCE).
+Supersedes: none
