@@ -4009,3 +4009,28 @@ first internal provider.
 - **Tests:** test_spec_v1_2_policy_draft 6 OK; test_m7b_corrective + M5 gate + policy 39 OK; full suite without data stores 1609 OK (64 skipped)
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR decision on the draft.
+
+## 2026-10-09 — Policy — SPEC v1.2 policy draft revised after SUPERVISOR policy decision (PROPOSED)
+
+- **Stage:** policy track (no roadmap stage started; M8 NOT_STARTED)
+- **Status:** REVIEW_READY (revised proposal; not normative; no decision number assigned)
+- **Branch:** `auto-id/spec-v1.2-policy` (previous commit `72524ae`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): SPEC v1.2 policy revision - amended upper rule, no fallback, tau_mf frequency-only, max+RMS non-degradation (proposed)`
+- **Files:** updated `docs/auto_id/SPEC_V1_2_DRAFT.md`, `docs/auto_id/SPEC_V1_2_POLICY_REVIEW.md`,
+  `docs/auto_id/SPEC_V1_2_POLICY_OPTIONS.json` (schema v2), `tests/test_spec_v1_2_policy_draft.py`; STATUS, ROADMAP,
+  CHANGELOG.
+- **Content:** §1 amended (A material identification / B specimen-FE-model calibration, pre-declared and
+  identity-bound; no automatic fallback; material verdict always computed and shown separately). τ_mf Option A
+  (0.02 specification maximum, one campaign-level predeclared identity-bound value); the "2 % ⇒ ~4 % in E" argument and
+  `implied_min_parameter_scale_ln_e` withdrawn — τ_mf is a frequency-space model-form tolerance only and passing it does
+  not establish parameter precision. §13 unchanged and τ_mf-free. Calibration labels, identities, gates (no override,
+  no post-hoc mode substitution, no lowered MAC) and uncertainty reporting (τ_mf as ACCEPTANCE_TOLERANCE;
+  UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE). Non-degradation: max AND RMS not worse AND every row ≤ 8 %.
+  Observability: k + 1 FIT families, full rank, complete leave-one-FIT-family-out, ≥ 1 HOLDOUT (k = 1: 2 FIT + 1
+  HOLDOUT). Historical RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; a new v1.2 identity is needed
+  for an accepted calibration.
+- **Scientific behaviour changed:** NO. SPEC v1.1 unchanged; no production source changed.
+- **Tests:** test_spec_v1_2_policy_draft 10 OK; test_m7b_corrective + test_m5_stage_gate + policy 43 OK (2 skipped without data stores); full suite without data stores 1613 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** final SUPERVISOR acceptance of the revised draft.

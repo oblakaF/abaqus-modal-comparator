@@ -556,7 +556,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR decision on the SPEC v1.2 policy draft (auto-id/spec-v1.2-policy); no FE work, no SP10, no t_face, no M7 re-run before the policy is decided; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
+  "next_action": "STOP: final SUPERVISOR acceptance of the revised SPEC v1.2 policy draft (auto-id/spec-v1.2-policy); no FE work, no SP10, no t_face, no M7 re-run before acceptance; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1115,17 +1115,25 @@
   },
   "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL",
   "spec_v1_2_policy": {
-    "status": "PROPOSED (REVIEW_READY); not normative; awaiting SUPERVISOR decision",
+    "status": "PROPOSED (REVIEW_READY, revised after SUPERVISOR policy decision); not normative; awaiting final SUPERVISOR acceptance; no decision number",
     "branch": "auto-id/spec-v1.2-policy",
     "base": "9bff6c79ee149e9309c3e3697cb96fff4e937c68",
     "draft": "docs/auto_id/SPEC_V1_2_DRAFT.md",
     "review": "docs/auto_id/SPEC_V1_2_POLICY_REVIEW.md",
     "options": "docs/auto_id/SPEC_V1_2_POLICY_OPTIONS.json",
-    "recommendation": "tau_mf = 0.02 (specification maximum, declared per campaign before execution, identity-bound); never in Sigma / objective / SPEC 13",
     "normative_spec": "SPEC v1.1 (unchanged)",
     "production_behaviour_changed": false,
     "historical_results_reinterpreted": false,
     "abaqus": 0,
-    "tests": "test_spec_v1_2_policy_draft 6 OK; test_m7b_corrective + M5 gate + policy 39 OK; full suite without data stores 1609 OK (64 skipped)"
+    "tests": "test_spec_v1_2_policy_draft 10 OK; test_m7b_corrective + test_m5_stage_gate + policy 43 OK (2 skipped without data stores); full suite without data stores 1613 OK (64 skipped)",
+    "policy_direction": "accepted by the SUPERVISOR 2026-10-09 subject to corrections (incorporated in the revision)",
+    "revision": {
+      "upper_rule": "SPEC 1 amended: A material identification / B specimen-FE-model calibration, declared before execution and identity-bound; no automatic fallback; material verdict always shown separately",
+      "tau_mf": "Option A: 0.02 specification maximum; one campaign-level value, predeclared, identity-bound; frequency-space model-form acceptance tolerance only; no conversion to parameter uncertainty; never in Sigma / Phi / whitening / covariance / SPEC 13",
+      "holdout_and_pattern": "holdout |d ln f| <= max(3 sigma, tau_mf); pattern magnitude max(2 sigma, tau_mf)",
+      "non_degradation": "max not worse AND RMS not worse than baseline AND every governed row <= 8 %",
+      "observability": "k + 1 FIT families, full rank, complete leave-one-FIT-family-out, >= 1 HOLDOUT family; k = 1: 2 FIT + 1 HOLDOUT; a cluster counts once",
+      "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity"
+    }
   }
 }

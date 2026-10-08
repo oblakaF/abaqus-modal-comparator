@@ -2,202 +2,207 @@
 
 | | |
 |---|---|
-| **Status** | **PROPOSED — NOT NORMATIVE — AWAITING SUPERVISOR ACCEPTANCE** |
-| **Normative specification** | `SPEC_V1_1.md` (unchanged). Until a SUPERVISOR decision accepts this draft, every rule below is a proposal only and no code applies it |
+| **Status** | **PROPOSED — NOT NORMATIVE — AWAITING FINAL SUPERVISOR ACCEPTANCE** |
+| **Normative specification** | `SPEC_V1_1.md` (unchanged). Until a final SUPERVISOR decision accepts this draft, every rule below is a proposal only and no code applies it. No decision number is assigned yet |
+| **Policy direction** | Accepted by the SUPERVISOR (2026-10-09) subject to the corrections incorporated in this revision |
 | **Origin** | External audit iteration 2, finding V4 (a SPEC v1.1 policy gap), and the related V1 / V3 / V5 / V6 / J1 / J3 / J5 dispositions (D-076, D-077) |
 | **Branch** | `auto-id/spec-v1.2-policy` from `main` `9bff6c79ee149e9309c3e3697cb96fff4e937c68` |
-| **Review record** | `SPEC_V1_2_POLICY_REVIEW.md`; machine-readable options in `SPEC_V1_2_POLICY_OPTIONS.json` |
+| **Review record** | `SPEC_V1_2_POLICY_REVIEW.md`; machine-readable policy in `SPEC_V1_2_POLICY_OPTIONS.json` |
 
-**Freeze rule.** The model-form tolerance and the specimen-calibration rules are declared here **before** any new
-FE calculation (SP10, t_face sensitivity or a re-run of M7). No candidate value was chosen from, or evaluated on,
-the historical RUN_A / RUN_B residuals.
-
-**No retroactive reinterpretation.** If v1.2 is accepted, it does not automatically apply to historical results. Under
-v1.1 the SP-02 / SP-13 family stays at NO_GLOBAL_PARAMETER_VALUE and RUN_B stays diagnostic only. Whether historical
-data may be re-analysed under v1.2 is a separate HUMAN decision.
+**Freeze rule.** τ_mf and the specimen-calibration rules are declared here **before** any new FE calculation (SP10,
+t_face sensitivity or a re-run of M7). No value was chosen from, or evaluated on, the historical RUN_A / RUN_B
+residuals.
 
 ---
 
-## 0. Principles kept unchanged from v1.1
+## 1. Amended §1 — Upper rule (v1.2 replaces the v1.1 wording)
 
-1. Refusal to issue a value is a valid and successful scientific result (§1, upper rule).
-2. No GUI option, operating mode, parameter or override may turn a scientific refusal into a number.
+v1.1 §1 says that no parameter, threshold, override, GUI option or operating mode may turn a scientific refusal into a
+numerical result. v1.2 keeps that protection and **amends** the rule, because it adds a second, separately declared
+question. The amended rule:
+
+> **§1 Upper rule (v1.2).** Auto-ID answers two separate questions, and a run declares before execution which one it
+> asks.
+>
+> **A. Material identification.** Auto-ID outputs a material-property value only when the material-identification
+> evidence supports that parameter at the declared precision. Refusal to output a number is a valid and successful
+> scientific result. No parameter, threshold, hidden override, GUI option or operating mode may turn a
+> material-identification refusal into a number.
+>
+> **B. Specimen / FE-model calibration.** A separately declared `SPECIMEN_ENGINEERING_CALIBRATION` may output a
+> model-specific calibration parameter only when that calibration question was selected before execution, is part of
+> the run / campaign identity, and every calibration-specific gate passes. A calibration result is never a material
+> property.
+>
+> **No automatic fallback.** A material-property refusal must never be relabelled or automatically converted into a
+> calibration result. A run started as MATERIAL_IDENTIFICATION that ends NOT_IDENTIFIABLE (or NO_GLOBAL_PARAMETER_VALUE)
+> emits no calibration number. When a calibration run is executed, its material verdict is still computed and shown
+> separately, first, and unchanged.
+>
+> Every other clause of this specification is subordinate to this rule.
+
+## 2. Principles kept unchanged from v1.1
+
+1. Refusal of a material-property value remains a valid scientific result (§1 A).
+2. No GUI option, mode or override may bypass a refusal, of either question.
 3. MAC stays out of the optimisation objective; it is used only for mode and branch identity (§8, §12).
 4. Model-form discrepancy stays **out of Σ** (§7, §14).
 5. Σ_meas NOT_AVAILABLE never becomes zero and is never invented.
 6. Family consistency (§13) remains mandatory for any shared / global parameter.
 7. M5 practical-rank and identifiability refusals remain hard blocks without override (§10).
-8. The G12 material-property rules remain unchanged (§5.1; bare plate or a complete sandwich path required).
+8. The G12 material-property rules remain unchanged (§5.1).
 
-## 1. New §9a — Model-form tolerance τ_mf
+## 3. New §9a — Model-form tolerance τ_mf
 
-**Definition.** τ_mf is a declared **acceptance tolerance on |Δ ln f|** for model-versus-experiment residual
-*diagnostics* (holdouts and the family pattern test). It expresses how much frequency disagreement the governed FE
-model is allowed to show as model form without that alone blocking a result.
+**Definition.** τ_mf is a model-form **acceptance tolerance in frequency space only**, on |Δ ln f|, for
+model-versus-experiment residual diagnostics (holdouts and the family-pattern magnitude).
 
-**τ_mf is not:**
+**Rule.**
 
-- a measurement uncertainty, and not a component of Σ;
-- a term in the objective Φ (§8) or in the whitening of r;
-- an inflation of statistical_sd, birge_adjusted_sd or the conservative envelope (§9);
-- an input to the family-consistency test (§13) — see §4 below;
-- a per-mode, per-family or per-parameter knob.
+- τ_mf ≤ **0.02** (2 % in |Δ ln f|) is the v1.2 specification maximum.
+- One campaign-level value, declared **before execution** and bound into the campaign / run identity hash.
+- A campaign may declare a smaller value; a larger one needs a new specification revision.
+- Not per mode, not per family, not per parameter, and never selected after seeing a fit result.
+- A campaign that declares no τ_mf is evaluated with the v1.1 σ-only rules.
 
-**Declaration.** Every future campaign definition declares τ_mf **before execution**. The value is part of the
-campaign identity / hash. A campaign that does not declare it is evaluated with the v1.1 rules (σ-only).
+**τ_mf is not:** a measurement uncertainty; a component of Σ or of any covariance matrix; a term of Φ; a whitening
+scale; an inflation of statistical_sd, birge_adjusted_sd or the conservative envelope; an input to §13; a parameter
+uncertainty or a calibration uncertainty.
 
-**Value.** The proposed v1.2 rule is **τ_mf = 0.02 (2 % in ln f), fixed by the specification** (Option A in the
-policy review). A campaign may declare a smaller τ_mf (stricter) but not a larger one without a specification change.
-Options B (0.03) and C (family-specific) are analysed and not recommended (`SPEC_V1_2_POLICY_REVIEW.md` §2).
+**Rationale.**
 
-**Rationale for Option A.** The project's engineering target is agreement preferably within ~5 % and up to ~10 %
-(D-066, D-069); IDENTIFIED needs a conservative uncertainty ≤ 5 % (§3). Because d ln f / d ln E ≤ 0.5 for any
-stiffness-proportional parameter (f ∝ √stiffness), a frequency tolerance τ corresponds to at least 2τ in ln E: 2 % gives
-≥ 4 %, inside the IDENTIFIED threshold, whereas 3 % gives ≥ 6 %, beyond it. 2 % is also well inside half of the
-preferred engineering target, a common realism scale for calibrated sandwich FE models on their bending families,
-simpler than any family-specific scheme, and the smallest freedom that still lifts the σ-only bounds of V4.
+- τ_mf is a model-form acceptance tolerance in frequency space only;
+- 2 % is deliberately conservative relative to the project's desired few-percent model agreement (preferably within
+  ~5 %, up to ~10 %; D-066, D-069);
+- it is fixed before any new FE result;
+- it is stricter than the 3 % alternative;
+- a single campaign-level value avoids family-specific tuning freedom.
 
-## 2. Amended §12.3 — Holdout acceptance
+**No conversion to parameter uncertainty.** Parameter uncertainty remains governed separately by M5 (§9, §10). No
+mathematical conversion from τ_mf to a parameter uncertainty is made or used: a frequency discrepancy of τ can
+correspond to a parameter change of at least about 2τ for a stiffness parameter (|d ln f / d ln E| ≤ 0.5), and much more
+when the sensitivity is lower, so it cannot bound a parameter.
 
-v1.1: a holdout fails when |r| > 3, i.e. |Δ ln f| > 3σ (σ = the holdout row's own Σ standard deviation).
+## 4. Amended §12.3 / S7 — Holdout and family-pattern magnitude
 
-v1.2 (proposed): a holdout passes when
+- **Holdout:** passes when `|Δ ln f_holdout| ≤ max(3σ, τ_mf)` (σ = the row's Σ standard deviation).
+- **Family pattern:** a family is *systematic* when it has at least two members, all of the same sign, and every
+  member has `|Δ ln f| > max(2σ, τ_mf)`.
 
-```
-|Δ ln f_holdout| ≤ max(3σ, τ_mf)
-```
+τ_mf is never put into Σ, never into Φ, never used to whiten, never added to statistical_sd or to a covariance matrix.
 
-With Σ_setup 0.3 % and Σ_meas NOT_AVAILABLE, 3σ = 0.9 %, so the τ_mf = 2 % bound applies. Holdout selection by
-physical modal family (§12.3) is unchanged. Holdouts are never fitted.
+**Passing a τ_mf residual gate does not itself establish parameter precision.** A parameter verdict still requires
+every M5 uncertainty, rank and model-form-robustness requirement. Holdout selection by physical family is unchanged;
+holdouts are never fitted. Birge scaling applies only when the pattern test passes.
 
-## 3. Amended §9 / S7 — Residual family-pattern test
+## 5. §13 — Family consistency, unchanged and τ_mf-free
 
-v1.1: a modal family is *systematic* when it has at least two members, all of the same sign, each with |r| > 2
-(|Δ ln f| > 2σ).
+SPEC §13 is unchanged and completely independent of τ_mf. τ_mf does not enter the Σ used by §13, Δχ², the bootstrap,
+the p-values or the shared / separate comparison.
 
-v1.2 (proposed): a family is *systematic* when it has at least two members, all of the same sign, and each with
+**τ_mf can never convert family_consistency FAIL into PASS.** A family that fails §13 gives
+NO_GLOBAL_PARAMETER_VALUE, whatever τ_mf is. §13 not evaluable (rank-deficient separate fits) gives no family value
+either. Implementation must guard this with tests.
 
-```
-|Δ ln f| > max(2σ, τ_mf)
-```
+## 6. New §3a — SPECIMEN_ENGINEERING_CALIBRATION (draft; not implemented)
 
-Birge scaling (§9) still applies only when the pattern test passes. The single-system pattern test keeps its
-v1.1 semantics otherwise (same-sign rule within one system). Cross-specimen splits are the job of §13, not of this
-test (§4).
+**Purpose.** A model-specific calibration value for **one physical specimen**, answering question B of §1: which
+effective constant makes this governed FE model of this specimen reproduce this specimen's governed modes.
 
-## 4. §13 — Family consistency stays separate (explicit)
+**Declaration.** The calibration intent is declared before execution in the campaign / run definition and is part of
+its identity, together with τ_mf. There is no automatic fallback from a material-identification refusal (§1).
 
-- Family consistency remains based on the **declared statistical observation model** (Σ only), the χ²(Δdof) path
-  when its conditions hold and the parametric bootstrap on the linearised model otherwise; rejection at p < 0.01.
-- **τ_mf does not enter §13.** It is not added to Σ, not used to rescale Δχ² and not used to accept a family whose
-  specimens demand different shared values.
-- **τ_mf can never convert family_consistency FAIL into PASS.** If the specimens of a family demand significantly
-  different shared parameter values, the shared family value is refused (NO_GLOBAL_PARAMETER_VALUE), whatever τ_mf is.
-- §13 not evaluable (rank-deficient separate fits) produces no family value either.
+**Mandatory labels:** `SPECIMEN_ENGINEERING_CALIBRATION`, `NOT_A_MATERIAL_PROPERTY`,
+`NOT_TRANSFERABLE_WITHOUT_VALIDATION`.
 
-## 5. New §3a — Output class SPECIMEN_ENGINEERING_CALIBRATION (draft; not implemented)
+**Mandatory identities:** physical specimen; test run; forward model (manifest hash); INP SHA-256; registration;
+campaign / run identity; the τ_mf used.
 
-**Purpose.** A model-specific calibration value for **one physical specimen** when a global material-property claim
-is scientifically refused. It answers "which effective constant makes *this* governed FE model of *this* specimen
-reproduce *this* specimen's governed modes", nothing more.
+**Never** in a material-property result field, table or block.
 
-**Relation to the upper rule (§1) — the critical point of this class.** Audit finding K1 was exactly a refusal
-turned into a released number. A specimen calibration must therefore never *replace* or *soften* a refusal. The
-material-property verdict (IDENTIFIED / WIDE / NOT_IDENTIFIABLE, and NO_GLOBAL_PARAMETER_VALUE for a family) is
-computed and shown unchanged, first; the calibration answers a different, narrower question in a separate output
-with its own refusal conditions. It never appears in a material-property field, table or block. If this separation
-cannot be guaranteed in an interface, the class is not offered there. Whether this narrower question is acceptable
-at all under §1 is the central SUPERVISOR decision on this draft.
+**Gates (all required; no manual override, no post-hoc mode substitution, no lowered MAC):**
 
-**It is not** IDENTIFIED, WIDE, a material property, a family property or a transferable lamina constant. Every
-output carries:
+1. one physical specimen; frozen governed observations only;
+2. preserved pair identities (strict baseline pairs MAC ≥ 0.80) and FE-to-FE branch tracking (MAC ≥ 0.90); no branch
+   or pairing loss;
+3. no active parameter bound;
+4. adequate practical rank (M5 full rank);
+5. minimum observability (§8);
+6. holdouts within `max(3σ, τ_mf)` and no systematic family (§4);
+7. non-degradation (§7);
+8. registration not limited, no peak-derived input, birge_adjusted_sd available (pattern passed);
+9. complete reporting: full FIT and HOLDOUT residual table, excluded high-MAC diagnostic modes, uncertainty basis.
 
-- label `SPECIMEN_ENGINEERING_CALIBRATION`;
-- qualifiers `NOT_A_MATERIAL_PROPERTY` and `NOT_TRANSFERABLE_WITHOUT_VALIDATION`;
-- the exact governed FE model identity (forward manifest, INP SHA-256, passport hash) and specimen / test-run identity.
+**Uncertainty reporting.** The calibration record reports, separately: the statistical uncertainty with its covariance
+basis; the Birge-adjusted uncertainty only when valid; the model-form robustness; the missing Σ components; and τ_mf as
+an **acceptance tolerance** (never as uncertainty). With Σ_meas NOT_AVAILABLE it states
+`UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE` and never calls the result complete experimental uncertainty. A
+calibration that passes every gate is a model-calibration output; it must not masquerade as a statistically complete
+material-property estimate.
 
-**Conditions (all required):**
+## 7. New rule — Per-specimen non-degradation (draft)
 
-1. one specimen only; the fit uses only that specimen's governed rows;
-2. mode identities preserved (strict baseline pairs MAC ≥ 0.80; FE-to-FE tracking MAC ≥ 0.90), no branch or pairing
-   loss, no manual substitution;
-3. no parameter at a numerical search bound;
-4. practical identifiability adequate for that specimen and model. Only two things differ from a material-property
-   verdict: family consistency (§13) does not apply to one specimen, and holdouts / pattern use the v1.2 τ_mf bounds.
-   Every other M5 refusal still blocks the calibration: rank deficiency, branch or pairing loss, registration-limited,
-   peak-derived input, a systematic pattern under the v1.2 rule, a holdout outside max(3σ, τ_mf), and an unavailable
-   birge_adjusted_sd (pattern failed);
-5. minimum observability (§7 below);
-6. τ_mf declared and fixed before the fit (campaign identity);
-7. every holdout within max(3σ, τ_mf) (§2); no systematic family under the v1.2 pattern rule (§3);
-8. non-degradation (§6 below);
-9. conservative uncertainty ≤ 8 % (the WIDE ceiling of §3), reported with its basis (§9);
-10. the full residual table (FIT and HOLDOUT), the excluded high-MAC diagnostic modes (§10 below) and the
-    uncertainty basis with its unavailable covariance components are part of the output;
-11. no claim outside the exact governed FE model and specimen.
+For the same governed FIT + HOLDOUT rows of **one** specimen, comparing the candidate with the governed baseline FE
+state:
 
-A specimen calibration never feeds a family value; a family value still needs §13.
+1. `max_i |Δ ln f_i(candidate)| ≤ max_i |Δ ln f_i(baseline)|`, **and**
+2. `RMS_i Δ ln f_i(candidate) ≤ RMS_i Δ ln f_i(baseline)`, **and**
+3. every governed FIT / HOLDOUT row satisfies `|relative frequency error| ≤ 8 %` (the hard practical ceiling of this
+   calibration class).
 
-## 6. New rule — Per-specimen non-degradation (draft)
+The max condition prevents sacrificing the worst mode; the RMS condition prevents worsening many modes to improve the
+worst one; the 8 % ceiling is separate from the τ_mf holdout / model-form gates. Individual rows are not required to
+improve versus the baseline (that would make a multi-mode optimum unnecessarily brittle). Campaign-global maxima are
+never used for this decision.
 
-Evaluated per specimen on its governed FIT + HOLDOUT rows, comparing the calibrated candidate with the governed
-baseline FE state (the campaign start point):
+## 8. New rule — Minimum observability for a specimen calibration (draft)
 
-**Proposed rule (A):**
+For k fitted parameters:
 
-```
-max_i |Δ ln f_i(candidate)| ≤ max_i |Δ ln f_i(baseline)|
-```
+- at least **k + 1 distinct FIT modal families** (M4.3 family keys);
+- a full-rank system at the M5 RCOND;
+- complete leave-one-FIT-family-out validity (every M5.7 case VALID — reporting status AVAILABLE_COMPLETE_LOO);
+- at least **one HOLDOUT family** distinct from every FIT family.
 
-plus every row within the declared practical acceptable limit (10 %, D-066).
+For **k = 1** the minimum is **2 independent FIT families + 1 independent HOLDOUT family**. A single
+torsion-sensitive mixed mode is never sufficient by itself. A confirmed cluster counts as **one** governed family
+observation, not several. The rule names no specimen.
 
-Rule (B) — RMS no worse **and** max within the acceptable limit — is analysed in the policy review and not
-recommended: it lets one row worsen while others improve. Rule (A) is simple, deterministic and cannot hide a
-worsening specimen behind another specimen's improvement, because it is applied per specimen. Campaign-level global
-maxima are never used for this decision.
+## 9. Amended S8 — Engineering Constants output
 
-## 7. New rule — Minimum observability for a specimen calibration (draft)
-
-For k fitted parameters on one specimen:
-
-- **FIT:** at least **k + 1 distinct modal families** (M4.3 family keys; a confirmed cluster counts once);
-- **leave-one-family-out complete:** removing any one FIT family must leave the system at full rank (the existing
-  M5.7 cases all VALID — reporting status AVAILABLE_COMPLETE_LOO). No single mode or family may be decisive;
-- **HOLDOUT:** at least **one** governed holdout family distinct from every FIT family;
-- **rank:** k at the M5 RCOND; parameter count k ≤ number of FIT families − 1.
-
-For a one-parameter E fit this makes **2 independent FIT families + 1 holdout family the minimum acceptable
-structure**. One torsion-sensitive mixed mode is never sufficient on its own: it is a single family and would make
-the leave-one-family-out case rank-deficient. This rule is generic (no specimen named).
-
-## 8. Amended S8 — Engineering Constants output
-
-| Output | `*Elastic, type=ENGINEERING CONSTANTS` block |
+| Output | `*Elastic, type=ENGINEERING CONSTANTS` |
 |---|---|
-| IDENTIFIED / WIDE | allowed, under the existing material-property rules (§5, §5.1, S8) |
-| NOT_IDENTIFIABLE | none |
-| NO_GLOBAL_PARAMETER_VALUE (family) | none |
-| SPECIMEN_ENGINEERING_CALIBRATION (if ever authorised) | **never as an ordinary material block.** A separate calibration record (JSON) and, optionally, an INP fragment that: uses a distinct material name `<material>__CALIBRATION_<specimen>_<model hash[:8]>`; starts with comment lines stating `SPECIMEN_ENGINEERING_CALIBRATION`, `NOT_A_MATERIAL_PROPERTY`, `NOT_TRANSFERABLE_WITHOUT_VALIDATION`, the specimen / test run and the FE model identity; and is never written by the material-property writer |
+| IDENTIFIED / WIDE material property | existing output rules (§5, §5.1, S8) |
+| NOT_IDENTIFIABLE | no material-property block |
+| NO_GLOBAL_PARAMETER_VALUE | no material-property block |
+| SPECIMEN_ENGINEERING_CALIBRATION | **never** through the ordinary material-property writer. Optional separate calibration INP fragment only with a distinct material name, explicit comment warnings, the specimen and FE model named, `NOT_A_MATERIAL_PROPERTY` and `NOT_TRANSFERABLE_WITHOUT_VALIDATION` stated |
 
-## 9. Amended §9 — Uncertainty wording (mandatory)
+## 10. Amended §9 — Uncertainty wording (mandatory)
 
 Every reported statistical_sd / birge_adjusted_sd states its covariance basis. While any Σ component is
-NOT_AVAILABLE or PROVISIONAL, the report says `CONDITIONAL_ON_AVAILABLE_COVARIANCE` and names the components
-(implemented for campaign reports in D-076 as `uncertainty_basis`). A complete-uncertainty wording requires every
-component measured. No value is enlarged and Σ_meas is never invented.
+NOT_AVAILABLE or PROVISIONAL, the report says `UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE` (campaign reports
+already carry `uncertainty_basis` = `CONDITIONAL_ON_AVAILABLE_COVARIANCE`, D-076) and names the components. No value
+is enlarged and Σ_meas is never invented.
 
-## 10. Diagnostics and data-quality conclusions
+## 11. Historical data (no retroactive reinterpretation)
 
-- **Scan coverage (V2)** is data quality / experiment design, not a numerical tolerance: it is recorded per specimen and
-  improved by experiment (full-edge, denser, symmetric scans), never compensated by τ_mf.
-- **High-MAC modes excluded by the frequency gate (V3)** stay visible as diagnostic rows (best MAC ≥ 0.80, exclusion
-  reason, signed error); they are never fitted and never re-paired by a tolerance.
-- **Cross-specimen splits (V5)** are handled by §13 family consistency.
-- **Cluster discovery (J3)** should eventually inspect the full experimental / FE neighbourhood (not only frozen rows);
-  accepted clusters still obey the frozen governed rules. Not part of this policy draft's implementation.
+- The historical v1.1 records stay unchanged: RUN_A family = NO_GLOBAL_PARAMETER_VALUE; RUN_B = diagnostic only.
+- After v1.2 is accepted, historical evidence may be used only as `RETROSPECTIVE_DIAGNOSTIC_ONLY`; it is never
+  silently upgraded into an accepted v1.2 calibration.
+- An accepted v1.2 calibration needs a **new v1.2 campaign / run identity** with the calibration question and τ_mf
+  declared before that run or re-analysis starts. It may reuse content-addressed archived FE states where
+  scientifically and provenance-wise valid; the historical RUN_A / RUN_B records themselves stay unchanged.
 
-## 11. What changes in code if accepted (not done here)
+## 12. Diagnostics and data-quality conclusions
 
-Campaign definition: a required `tau_mf` field for new campaigns (identity-bound). M5 holdout and pattern rules: the
-max(kσ, τ_mf) bounds, only when the campaign declares τ_mf. A new output class and its separate record writer. No
-change to Σ, to the objective, to §13 or to the rank rules.
+- **Scan coverage (V2):** data quality / experiment design, never a numerical tolerance; fixed experimentally.
+- **High-MAC modes excluded by the frequency gate (V3):** stay visible as diagnostic rows; never fitted.
+- **Cross-specimen splits (V5):** handled by §13.
+- **Cluster discovery (J3):** should later inspect the full experimental / FE neighbourhood; accepted clusters still
+  obey the frozen governed rules.
+
+## 13. What changes in code if finally accepted (not done here)
+
+Campaign definition: declared question (material identification or specimen calibration) and τ_mf, both
+identity-bound. M5 holdout and pattern magnitude bounds max(kσ, τ_mf) only when τ_mf is declared. A calibration gate
+and a separate calibration record / fragment writer. No change to Σ, Φ, §13 or the rank rules.
