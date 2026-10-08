@@ -3874,3 +3874,25 @@ first internal provider.
 - **Abaqus run count:** 0.
 - **Tests:** test_m7_closure 11 OK; full suites in the stage PR report.
 - **Known limitation:** pre-existing flaky `test_registration_factory` token check (unrelated; not changed).
+
+## 2026-10-08 — M7 — merged to `main` (PR #37)
+
+- **Stage:** M7
+- **Status:** ACCEPTED, M7 gate PASS (SUPERVISOR 2026-10-08). The merge was explicitly authorised by the HUMAN
+  supervisor.
+- **Branch:** `auto-id/m7-closure` (from `main` `0f15db9`)
+- **Merge:** PR #37 `auto-id/m7` → `main`, merge commit `0f15db9acf29b7d3a7b20350982440015e177e94`.
+  - Reviewed head: `87c05da051abb272a8f52eb579bcca0ce180f12b`.
+  - The merged tree equals the reviewed head.
+- **Recorded:** `STATUS.json`: `status` ACCEPTED, `last_accepted_stage` M7, `main_merges` += M7 / PR #37, the M7
+  `status`, `gate`, `merged_to_main`, `accepted_head`, `accepted_by`, `merge_ci` fields, M7.2–M7.8, and
+  `m8.status` NOT_STARTED. `ROADMAP.md`: M7 stage status ACCEPTED / gate PASS with PR #37 and the merge SHA;
+  M8 stage status NOT_STARTED.
+- **M7.2–M7.8:** `NOT_PURSUED_IN_M7` (D-075), confirmed by the SUPERVISOR: superseded by the D-075 M7 stage conclusion and not required for M7 acceptance. Not DONE.
+- **CI:** Linux CI on the reviewed head 87c05da: 1575 OK (66 skipped), success (run 37783691289); on main 0f15db9: 1575 OK (66 skipped), success (run 37784347770)
+- **Scientific results unchanged:** RUN_A E_in,eff = 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not
+  externally validated, M5 NOT_IDENTIFIABLE (50.8–60.3 GPa only as `MODEL_DEPENDENCE_DIAGNOSTIC`); RUN_B
+  diagnostic only (E_in 50.886 GPa, G12 6.872 GPa as `COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY`). Result
+  records, `M7_CLOSURE.json` and the run journals are unchanged.
+- **Abaqus run count:** 0. Docs only.
+- **Next:** M8 `NOT_STARTED`. No M8 branch; the next step needs SUPERVISOR instruction.
