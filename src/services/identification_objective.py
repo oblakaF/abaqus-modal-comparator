@@ -10,6 +10,8 @@
 - σ is explicit per row: σ_i² = σ_meas,i² + σ_setup² (SPEC §7).  The SPEC's provisional
   σ_setup (0.3 %) is available as a named constant, must be passed explicitly, and is
   flagged in every evaluation that uses it.  Missing σ is refused, never defaulted.
+- A Σ_meas that does not exist (real PolyMAX data give none) is ``measurement_sd=None``:
+  NOT_AVAILABLE, excluded from σ and recorded as null — never as a zero value (M7, D-069).
 
 Notation (SPEC §8): r is the residual vector, Φ the objective; the Jacobian of r lives
 in the step module and never shares a symbol with Φ.
@@ -19,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Mapping, Sequence
+from typing import Mapping, Optional, Sequence
 
 import numpy as np
 
@@ -38,22 +40,33 @@ class ObjectiveInputError(ValueError):
 
 @dataclass(frozen=True)
 class RowSigma:
-    """σ of one row in ln-frequency units (relative): measurement and setup parts."""
+    """σ of one row in ln-frequency units (relative): measurement and setup parts.
 
-    measurement_sd: float
+    ``measurement_sd=None`` means Σ_meas is NOT_AVAILABLE: it is excluded from σ, not taken as zero.
+    """
+
+    measurement_sd: Optional[float]
     setup_sd: float
     setup_provisional: bool
 
     def __post_init__(self) -> None:
         for name in ("measurement_sd", "setup_sd"):
             value = getattr(self, name)
+            if name == "measurement_sd" and value is None:
+                continue
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
                 raise ObjectiveInputError(f"{name} must be finite and non-negative.")
         if self.sigma <= 0.0:
             raise ObjectiveInputError("σ must be positive.")
 
     @property
+    def measurement_available(self) -> bool:
+        return self.measurement_sd is not None
+
+    @property
     def sigma(self) -> float:
+        if self.measurement_sd is None:  # NOT_AVAILABLE: only the parts that exist enter σ
+            return float(self.setup_sd)
         return math.hypot(self.measurement_sd, self.setup_sd)
 
 

@@ -3681,3 +3681,196 @@ first internal provider.
 - **Limitations kept:** see M6_DECISION_RECORD §22.
 - **Abaqus run count:** 0. Docs only.
 - **Next:** M7 `NOT_STARTED`. No M7 branch and no M7 records; the next step needs SUPERVISOR instruction.
+
+## 2026-10-08 — M7 — M7.1: RUN_A campaign architecture (zero Abaqus)
+
+- **Stage:** M7 (opened by D-069)
+- **Mini-step:** M7.1
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7` (from `main` `9f5f63a968759d6237facda00a4415cfe29c2257`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_A campaign architecture - two-specimen shared E_in on the active physical chains (zero Abaqus)`
+- **Decision:** D-069 (the accepted M7.1 design; RUN_A first; RUN_B gated).
+- **Files changed:**
+  - created:
+    - `src/domain/campaign_definition.py`, `src/services/identification_campaign_run.py`;
+    - `tools/m7_campaign.py`;
+    - `tests/test_m7_campaign.py`;
+    - `docs/auto_id/campaigns/M7_RUN_A.campaign.json`, `docs/auto_id/campaigns/M7_RUN_A.archive-reuse.json`,
+      `docs/auto_id/campaigns/README.md`;
+    - `docs/auto_id/M7_DECISION_RECORD.md`.
+  - updated:
+    - `src/services/identification_objective.py` (additive: `RowSigma(measurement_sd=None)` =
+      NOT_AVAILABLE);
+    - DECISIONS (D-069), EVIDENCE, ROADMAP, STATUS.
+- **Scientific behaviour changed:** YES, additively:
+  - a new campaign path;
+  - the M4.7 NOT_AVAILABLE Σ_meas representation.
+  The M4/M5 rules, thresholds and existing hashes are unchanged.
+- **Tests run:**
+  - `test_m7_campaign`;
+  - the M6 regression and gate tests;
+  - the M5 gate, the M4 gate and guard, the M3 gate;
+  - the full suite on Windows, with and without data stores;
+  - a targeted mutation check (9 of 9 killed).
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK
+- **Abaqus run count:** 0 (0 Abaqus Python extractions, no LM run).
+- **Evidence produced:** the proposed RUN_A manifest `e4ba607f06a69311…` (EVIDENCE).
+- **Known limitations:**
+  - family consistency (SPEC §13 / M7.4) is NOT_AVAILABLE, so no green M5 verdict is possible;
+  - the M4.3 thresholds are PROVISIONAL;
+  - Σ_setup is provisional;
+  - "not externally validated" applies.
+- **Next gate:** SUPERVISOR review of M7.1. Then the HUMAN gates: archive extraction, then the RUN_A run.
+
+## 2026-10-08 — M7 — RUN_A HUMAN gate 1: archived SP-02 CARBON-5A extraction
+
+- **Stage:** M7
+- **Mini-step:** M7.1 (ACCEPTED, D-070); RUN_A gate 1
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_A gate 1 - archived SP-02 CARBON-5A extraction (2 Abaqus Python, 0 solves)`
+- **Decision:** D-070 (M7.1 accepted; gate 1 authorised for manifest `e4ba607f06a69311…`).
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_RUN_A.archive-extraction.json`,
+    `docs/auto_id/campaigns/archive_extraction/SP02_13363f977809dbff.shape-pack.json` and
+    `SP02_84753f636064e192.shape-pack.json`, `tests/test_m7_archive_extraction.py`;
+  - updated: DECISIONS (D-070), EVIDENCE, M7_DECISION_RECORD (§4), STATUS.
+- **Scientific behaviour changed:** NO. No code changed; the governed result is recorded.
+- **Abaqus run count:** 0 solves, 2 Abaqus Python extractions (gate 1).
+- **Result:**
+  - both packs validate; their frequencies equal CARBON-5A exactly; tracking MAC ≥ 0.999998;
+  - the manifest is unchanged (`e4ba607f06a69311…`); the run identity is `8ed03be3be86aa83…`;
+  - the solve budget remaining is 16 of 16.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1554 OK (2 Abaqus-gated skipped); without data stores 1541 OK (58 skipped); test_m7_archive_extraction 4 OK (1 store-gated) + test_m7_campaign 28 OK
+- **Next gate:** HUMAN gate 2 (RUN_A solves). RUN_A and RUN_B are not started.
+
+## 2026-10-08 — M7 — RUN_A executed (HUMAN gate 2): shared E_in for SP-02 + SP-13
+
+- **Stage:** M7
+- **Mini-step:** RUN_A (M7.1 campaign)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_A result - shared E_in 55.6 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, M5 NOT_IDENTIFIABLE`
+- **Decision:** D-071 (gate 1 accepted; RUN_A authorised for manifest `e4ba607f06a69311…`, run `8ed03be3be86aa83…`).
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_RUN_A.result.json`, `tests/test_m7_run_a_result.py`;
+  - updated: DECISIONS (D-071), EVIDENCE, M7_DECISION_RECORD (§5), ROADMAP, STATUS.
+- **Scientific behaviour changed:** NO. No code changed; the result is recorded.
+- **Abaqus run count:** 2 solves and 2 extractions (gate 2). With gate 1, the RUN_A totals
+  are 2 solves and 4 Abaqus Python extractions.
+- **Result:**
+  - CONVERGED; Ê_in = 55593 MPa; max |error| 6.79 % (all within 10 %, not all
+    within 5 %); minimum tracking MAC 0.999997.
+  - `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`; M5 NOT_IDENTIFIABLE (family consistency NOT_AVAILABLE; holdout
+    `SP02:R3`; Birge blocked); not externally validated.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1559 OK (2 Abaqus-gated skipped); without data stores 1546 OK (59 skipped); test_m7_run_a_result 5 OK (1 store-gated; the report rebuilds identically from the run journals)
+- **Next gate:** SUPERVISOR review of RUN_A. RUN_B only under its own later gate.
+
+## 2026-10-08 — M7 — RUN_A closed; RUN_B prepared (archive reuse only, zero Abaqus)
+
+- **Stage:** M7
+- **Status:** REVIEW_READY (RUN_B preparation); RUN_A ACCEPTED and CLOSED
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_A closed; RUN_B prepared - EFFECTIVE_MODEL_COMPENSATION_TEST manifest (zero Abaqus)`
+- **Decision:** D-072.
+- **Files changed:**
+  - created:
+    - `docs/auto_id/campaigns/M7_RUN_B.campaign.json` (`7c1f5db24fa9c4f4…`);
+    - `docs/auto_id/campaigns/M7_RUN_B.archive-reuse.json` (`fa19cfbb4f818c66…`);
+    - `tests/test_m7_run_b_preparation.py`.
+  - updated:
+    - `src/domain/campaign_definition.py` (optional `pack_store` on a reused pack);
+    - `src/services/identification_campaign_run.py` (store override with unchanged pins; RUN_B report label,
+      G12 compensation role, Δ ln comparison with descriptive D-045 bands);
+    - `tools/m7_campaign.py` (`--campaign run-a | run-b`);
+    - DECISIONS (D-072), EVIDENCE, M7_DECISION_RECORD (§6), ROADMAP, STATUS, `campaigns/README.md`.
+- **Scientific behaviour changed:** YES, additively: RUN_B report semantics and the store override. The RUN_A
+  records and hashes are unchanged.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive) 1570 OK (2 Abaqus-gated skipped); without data stores 1556 OK (60 skipped); test_m7_run_b_preparation 12 OK (1 store-gated class) and the M7 suites 48 OK
+- **Abaqus run count:** 0.
+- **Proposed RUN_B manifest:** `5fd0946a0c3f4e20…`.
+- **Next gate:** HUMAN gate for the 2 SP-02 G12± archive extractions, then the HUMAN RUN_B solve gate.
+
+## 2026-10-08 — M7 — RUN_B HUMAN gate 1: archived SP-02 G12± extraction (0 solves)
+
+- **Stage:** M7
+- **Mini-step:** RUN_B gate 1 (M7.1 campaign)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_B gate 1 - archived SP-02 G12 extraction (2 Abaqus Python, 0 solves)`
+- **Decision:** D-073.
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_RUN_B.archive-extraction.json`,
+    `docs/auto_id/campaigns/archive_extraction/SP02_05239a3b56508244.shape-pack.json`,
+    `docs/auto_id/campaigns/archive_extraction/SP02_ade5dffa2fde3903.shape-pack.json`,
+    `tests/test_m7_run_b_archive_extraction.py`;
+  - updated: DECISIONS (D-073), EVIDENCE, M7_DECISION_RECORD (§7), ROADMAP, STATUS, `campaigns/README.md`.
+- **Scientific behaviour changed:** NO. No code changed; the extraction is recorded.
+- **Abaqus run count:** 0 solves, 2 Abaqus Python extractions.
+- **Manifest:** `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` (unchanged). RUN_B run identity `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1574 OK (2 Abaqus-gated skipped); without data stores 1560 OK (61 skipped); test_m7_run_b_archive_extraction 4 OK (1 store-gated; packs re-verified and re-tracked from the RUN_B run store)
+- **Next gate:** HUMAN RUN_B solve gate (not started).
+
+## 2026-10-08 — M7 — RUN_B result: EFFECTIVE_MODEL_COMPENSATION_TEST (diagnostic)
+
+- **Stage:** M7
+- **Mini-step:** RUN_B (M7.1 campaign)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_B result - compensation test, G12 +52.7 %, E_in -8.5 %, M5 NOT_IDENTIFIABLE`
+- **Decision:** D-074 (gate 1 accepted; RUN_B authorised for manifest `5fd0946a0c3f4e20…`, run `fb5234116c6e9413…`).
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_RUN_B.result.json`, `tests/test_m7_run_b_result.py`;
+  - updated: DECISIONS (D-074), EVIDENCE, M7_DECISION_RECORD (§8), ROADMAP, STATUS, `campaigns/README.md`.
+- **Scientific behaviour changed:** NO. No code changed; the result is recorded.
+- **Abaqus run count:** 6 solves and 6 extractions (budget 24; 0 failures). With gate 1, the RUN_B totals are
+  6 solves and 8 Abaqus Python extractions.
+- **Result (diagnostic):** CONVERGED; E_in = 50886.2 MPa (-8.47 % vs RUN_A),
+  G12 = 6872.1 MPa (+52.71 %); max |error| 4.17 %; minimum tracking MAC
+  0.999834; M5 NOT_IDENTIFIABLE for both; G12 a compensation diagnostic; not externally validated.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1581 OK (2 Abaqus-gated skipped); without data stores 1567 OK (62 skipped); test_m7_run_b_result 7 OK (1 store-gated; the report rebuilds identically from the RUN_B journals)
+- **Next gate:** SUPERVISOR review of RUN_B. No further fit; M7 not merged.
+
+## 2026-10-08 — M7 — RUN_B accepted; reporting correction; M7 closure prepared
+
+- **Stage:** M7
+- **Mini-step:** M7 closure
+- **Status:** REVIEW_READY (stage)
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): M7 closure - RUN_B accepted, model_form_robustness reporting status, campaign complete`
+- **Decision:** D-075.
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_CLOSURE.json`, `tests/test_m7_closure.py`;
+  - updated: `src/services/identification_campaign_run.py` (campaign-layer `model_form_robustness_reporting`;
+    report field `model_form_robustness`), `tests/test_m7_campaign.py`, `tests/test_m7_run_a_result.py`,
+    `tests/test_m7_run_b_result.py`, DECISIONS (D-075), EVIDENCE, M7_DECISION_RECORD (§9), ROADMAP, STATUS,
+    `campaigns/README.md`.
+- **Scientific behaviour changed:** reporting only (additive report field). M5 thresholds, algorithms,
+  verdicts and records unchanged; accepted result records unchanged.
+- **Abaqus run count:** 0.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK
+- **Next gate:** SUPERVISOR review of the M7 stage PR. Not merged; M8 not started.
+
+## 2026-10-08 — M7 — closure: result-record binding made platform-independent
+
+- **Stage:** M7
+- **Mini-step:** M7 closure (correction)
+- **Status:** REVIEW_READY (stage)
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): M7 closure - bind result records by canonical content hash`
+- **Decision:** D-075.
+- **Files changed:** `docs/auto_id/campaigns/M7_CLOSURE.json` (`canonical_content_sha256` instead of the
+  checkout-dependent byte SHA-256), `tests/test_m7_closure.py`, EVIDENCE.
+- **Reason:** Linux CI on `5ed6cf0`: byte hashes of CRLF working copies differ from the LF blobs.
+- **Scientific behaviour changed:** NO.
+- **Abaqus run count:** 0.
+- **Tests:** test_m7_closure 11 OK; full suites in the stage PR report.
+- **Known limitation:** pre-existing flaky `test_registration_factory` token check (unrelated; not changed).

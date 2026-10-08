@@ -593,17 +593,47 @@ its declared uncertainty.
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M7.1 | `family.json` campaign | `TODO` |
-| M7.2 | Old plain 0.45 family where scientifically compatible: SP1, SP2, SP10, SP13 | `TODO` |
-| M7.3 | Shared vs separate fits | `TODO` |
-| M7.4 | Δχ² or bootstrap consistency test | `TODO` |
-| M7.5 | Global E_in | `TODO` |
-| M7.6 | Conditional secondary G12 evidence | `TODO` |
-| M7.7 | Specimen-specific nuisance results | `TODO` |
-| M7.8 | Holdout / model-form diagnostics | `TODO` |
+| M7.1 | `family.json` campaign | `ACCEPTED` (D-070): RUN_A + RUN_B campaigns; RUN_A release candidate, RUN_B diagnostic (D-075) |
+| M7.2 | Old plain 0.45 family where scientifically compatible: SP1, SP2, SP10, SP13 | `NOT_PURSUED_IN_M7` (D-075) |
+| M7.3 | Shared vs separate fits | `NOT_PURSUED_IN_M7` (D-075) |
+| M7.4 | Δχ² or bootstrap consistency test | `NOT_PURSUED_IN_M7` (D-075) |
+| M7.5 | Global E_in | `NOT_PURSUED_IN_M7` (D-075) |
+| M7.6 | Conditional secondary G12 evidence | `NOT_PURSUED_IN_M7` (D-075) |
+| M7.7 | Specimen-specific nuisance results | `NOT_PURSUED_IN_M7` (D-075) |
+| M7.8 | Holdout / model-form diagnostics | `NOT_PURSUED_IN_M7` (D-075) |
 
 **M7 GATE:** if one shared carbon vector cannot explain the family, NO global material
 number is reported.
+
+Stage status: `REVIEW_READY` (D-075; opened D-069; branch `auto-id/m7` from `main` `9f5f63a`; decisions in
+[M7_DECISION_RECORD.md](M7_DECISION_RECORD.md)).
+- **M7.1 (zero Abaqus), `REVIEW_READY`:** the RUN_A campaign architecture.
+  - Specimens `SP02/bravo-1-physical` + `SP13/best-physical`. Only E_in is fitted; G12 is fixed at 4 500 MPa.
+  - FIT rows `SP02:R1`, `SP02:R2`, `SP13:R1`; HOLDOUT rows `SP02:R3`, `SP13:R2`.
+  - Σ_setup 0.3 % PROVISIONAL; Σ_meas NOT_AVAILABLE.
+  - Hard budget of 16 new solves.
+  - Proposed manifest `e4ba607f…` (not executed). RUN_B is diagnostic only and needs its own later gate.
+  - M7.1 ACCEPTED (D-070). Gate 1 (archived SP-02 extraction) was accepted at `0837921`.
+- **RUN_A (HUMAN gate 2, D-071), `REVIEW_READY`:**
+  - CONVERGED, 2 new solves; Ê_in = 55593 MPa; max |error| 6.79 %
+    (all rows within 10 %).
+  - `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`; M5 NOT_IDENTIFIABLE; not externally validated.
+  - RUN_B not started.
+  - RUN_A ACCEPTED and CLOSED (D-072).
+- **RUN_B preparation (D-072, zero Abaqus), `REVIEW_READY`:**
+  - The diagnostic `EFFECTIVE_MODEL_COMPENSATION_TEST`: E_in + G12 from the governed start.
+  - Proposed manifest `5fd0946a…`: 2 SP-02 G12± archive extractions, then at most 24 new solves.
+  - Not executed.
+- **RUN_B HUMAN gate 1 (D-073), `REVIEW_READY`:** the 2 SP-02 G12± archive extractions (0 solves) validate;
+  manifest unchanged; RUN_B run identity `fb5234116c6e9413…`; budget 24 / 24. The RUN_B LM is not started.
+- **RUN_B result (HUMAN solve gate, D-074), `REVIEW_READY`:** CONVERGED with 6 solves; E_in 50.89 GPa
+  (-8.5 % vs RUN_A), G12 6.87 GPa (+52.7 %), diagnostic only;
+  max |error| 4.17 %; M5 NOT_IDENTIFIABLE. Conclusion C (compensation / model-form dependence).
+- **M7 closure (D-075), stage `REVIEW_READY`:** RUN_B ACCEPTED (diagnostic only); RUN_A E_in,eff = 55.593 GPa
+  remains the release candidate (`EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally validated, M5
+  NOT_IDENTIFIABLE). Campaign report gains `model_form_robustness.status` (an incomplete leave-one-family-out set
+  is never zero model-form uncertainty). Unused budgets abandoned; no further M7 FE work. M7.2–M7.8 not pursued
+  as separate mini-steps (SUPERVISOR confirmation at stage acceptance). Stage PR prepared, not merged.
 
 ---
 

@@ -3,9 +3,9 @@
   "governing_spec": "docs/auto_id/SPEC_V1_1.md",
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
-  "current_stage": "M6",
-  "current_ministep": "M6 (merged)",
-  "status": "ACCEPTED",
+  "current_stage": "M7",
+  "current_ministep": "M7.1",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M6",
   "last_accepted_ministep": "M6.4",
   "last_accepted_commit": "f1274cae80a6b3972cef04fd9c1bee0505920311",
@@ -543,7 +543,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M6 merged to main (PR #35); M7 NOT_STARTED; no M7 branch; await SUPERVISOR instruction before any M7 work",
+  "next_action": "STOP: SUPERVISOR review of the M7 stage PR (auto-id/m7 -> main); merge only with explicit HUMAN authorisation; M8 not started",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -670,7 +670,7 @@
       ]
     },
     "specimen_inventory": "docs/auto_id/SNADWICH_INVENTORY.md (factual D:\\Snadwich inventory; no passports created)",
-    "m7": "NOT_STARTED",
+    "m7": "IN_PROGRESS (see m7)",
     "rescope": "2026-10-06 SUPERVISOR: SPEC §19 item 6; D-059 (M6.1-M6.3 NOT_AVAILABLE_WITH_CURRENT_SETUP), D-060 (STEEL removed, supersedes D-015), D-061 (rescoped M6 gate)",
     "sp13_registration_gate": {
       "authorisation": "SUPERVISOR 2026-10-06: zero-Abaqus SP-13 physical registration gate",
@@ -851,5 +851,175 @@
     "accepted_by": "SUPERVISOR (M6 accepted, gate PASS, 2026-10-08); merge explicitly authorised by the HUMAN supervisor",
     "merge_ci": "Linux CI on the reviewed head e5f3fbc: 1510 OK (60 skipped); on main f1274ca: 1510 OK (60 skipped), success"
   },
-  "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated"
+  "steel_gate": "SUPERSEDED (D-060): no external validation in the release path; results labelled not externally validated",
+  "m7": {
+    "branch": "auto-id/m7",
+    "base": "9f5f63a968759d6237facda00a4415cfe29c2257",
+    "status": "REVIEW_READY",
+    "decision": "D-069, D-070, D-071, D-072, D-073, D-074, D-075",
+    "decision_record": "docs/auto_id/M7_DECISION_RECORD.md",
+    "M7.1": "ACCEPTED",
+    "M7.2": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.3": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.4": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.5": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.6": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.7": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "M7.8": "NOT_PURSUED_IN_M7 (D-075; for SUPERVISOR confirmation at stage acceptance)",
+    "run_a": {
+      "campaign": "docs/auto_id/campaigns/M7_RUN_A.campaign.json (0a21ad0567901034b521b822b52f0c29944e96394f3692e1a8ebcd7ccd8d2ccf)",
+      "archive_reuse": "docs/auto_id/campaigns/M7_RUN_A.archive-reuse.json (91c8bc547c738a65ec5bdf4ff1e2d6f3d91e518fd5bdab4ebb547fc7b1a18b92)",
+      "specimens": "SP02/bravo-1-physical, SP13/best-physical",
+      "fitted": "E_in_plane_mpa (E1 = E2), start 52000 MPa; bounds 26000-104000 MPa (solver only)",
+      "fixed": "G12 4500 MPa; nu12 0.05; E3, nu13, nu23, G13, G23 (M6.4); t_face nominal; k_core INP; k_int OFF",
+      "engineering_window": "35-75 GPa (reporting only)",
+      "fit_rows": [
+        "SP02:R1",
+        "SP02:R2",
+        "SP13:R1"
+      ],
+      "holdout_rows": [
+        "SP02:R3",
+        "SP13:R2"
+      ],
+      "sigma": "Sigma_setup 0.3 % PROVISIONAL; Sigma_meas NOT_AVAILABLE (null, never zero)",
+      "proposed_manifest": "e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6",
+      "budgets": "16 new Abaqus solves (hard); 18 Abaqus Python extractions max (16 + 2 archive); LM evaluations 11",
+      "executed": true,
+      "archive_extraction": {
+        "gate": "HUMAN gate 1 (D-070)",
+        "record": "docs/auto_id/campaigns/M7_RUN_A.archive-extraction.json",
+        "packs": {
+          "SP02_84753f636064e192": "81a5a8ccdc1c846a4a79ec8ef87721b25ac82f0d0f6270cc791d16e4e2080751",
+          "SP02_13363f977809dbff": "7ac24b6b2c5738c5ea8501779eaa34461e718e5628fd5fac6bd861b262cf7792"
+        },
+        "odbs": {
+          "SP02_84753f636064e192": "bae6a7c133a8eb4b3bc9eef77d25b45173cb32144875c5591ff2b61a79858e4c",
+          "SP02_13363f977809dbff": "ba38cb698c5cb2dc3ed6fb4861e343ebf3f7250eabd2b1517cabdeb1378b74f5"
+        },
+        "frequencies_match_carbon5a": true,
+        "tracking": "every SP-02 row on its own mode; MAC >= 0.999998; S_E equal to the accepted CARBON-5A values",
+        "manifest_after_extraction": "e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6",
+        "run_identity_hash": "8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2",
+        "abaqus_solves": 0,
+        "abaqus_python_extractions": 2,
+        "status": "ACCEPTED"
+      },
+      "solve_budget_remaining": 14,
+      "result": {
+        "gate": "HUMAN gate 2 (D-071)",
+        "record": "docs/auto_id/campaigns/M7_RUN_A.result.json",
+        "lm_status": "CONVERGED",
+        "E_in_plane_mpa": 55593.41166800223,
+        "max_abs_relative_error": 0.06793241237613246,
+        "all_within_5_percent": false,
+        "all_within_10_percent": true,
+        "min_tracking_mac": 0.9999968120972186,
+        "engineering_label": "EFFECTIVE_MODEL_PARAMETER_ESTIMATE",
+        "m5_verdict": "NOT_IDENTIFIABLE",
+        "m5_reasons": [
+          "FAMILY_CONSISTENCY: required family consistency NOT_AVAILABLE (blocks IDENTIFIED for production; D-044)",
+          "HOLDOUT_FAILURE: ['SP02:R3'] |r| > 3",
+          "BIRGE_UNAVAILABLE: birge_adjusted_sd not available (BLOCKED_PATTERN); model form"
+        ],
+        "material_claim": "NO_MATERIAL_PROPERTY_CLAIM",
+        "validation": "not externally validated",
+        "abaqus_solves": 2,
+        "abaqus_python_extractions": 2,
+        "campaign_journal_last_entry": "f1d1e2a99c6411cb664ba38d4ca035489f1ef62cb5994d7dce354c8ea3549ea3",
+        "status": "ACCEPTED"
+      },
+      "status": "CLOSED",
+      "acceptance": "SUPERVISOR 2026-10-08 (D-072): E_in,eff 55.593 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, not externally validated; M5 NOT_IDENTIFIABLE; practical engineering target met, formal M5 identification gate not met; remaining budget not spent",
+      "unused_budget": "14 / 16 abandoned intentionally (D-075)"
+    },
+    "run_b": {
+      "label": "EFFECTIVE_MODEL_COMPENSATION_TEST (diagnostic only)",
+      "decision": "D-072",
+      "campaign": "docs/auto_id/campaigns/M7_RUN_B.campaign.json (7c1f5db24fa9c4f4e90c82ca802c6dae22cbe5c7ec9e2989e63e439f678540e5)",
+      "archive_reuse": "docs/auto_id/campaigns/M7_RUN_B.archive-reuse.json (fa19cfbb4f818c66ab0f58479fbce97e9fc767f3dd17909d8f0ffa48e545173e)",
+      "fitted": "E_in_plane_mpa, G12_mpa from 52000 / 4500 MPa; bounds 26000-104000 / 2250-9000 MPa (solver only)",
+      "g12_role": "compensation diagnostic; never an identified material property (BARE_PLATE_REQUIRED / NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED)",
+      "proposed_manifest": "5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1",
+      "initial_evaluations_zero_solve": 5,
+      "archive_extractions": 2,
+      "budgets": "24 new Abaqus solves (hard); 26 Abaqus Python extractions max; LM evaluations 17",
+      "executed": true,
+      "status": "ACCEPTED (diagnostic only; D-075)",
+      "archive_extraction": {
+        "gate": "HUMAN gate 1 (D-073)",
+        "record": "docs/auto_id/campaigns/M7_RUN_B.archive-extraction.json",
+        "packs": {
+          "SP02_05239a3b56508244": "f7271ea4674966604b696a6807972bcbe974f6a4955d0e3c1d6ea8304a297c3b",
+          "SP02_ade5dffa2fde3903": "45660e24a50ec77d5b6e634b50fbcafd3348c4860f144dcdd182e1ce9e7249ce"
+        },
+        "odbs": {
+          "SP02_05239a3b56508244": "d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a",
+          "SP02_ade5dffa2fde3903": "52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49"
+        },
+        "frequencies_match_carbon5a": true,
+        "tracking": "R1->8, R2->10, R3->13 for both packs; MAC >= 0.999998; S_G12 equal to the accepted CARBON-5A values",
+        "manifest_after_extraction": "5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1",
+        "run_identity_hash": "fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
+        "initial_set": "5 campaign evaluations = 10 FE states, 0 new solves",
+        "abaqus_solves": 0,
+        "abaqus_python_extractions": 2,
+        "status": "ACCEPTED"
+      },
+      "solve_budget_remaining": 18,
+      "result": {
+        "gate": "HUMAN solve gate (D-074)",
+        "record": "docs/auto_id/campaigns/M7_RUN_B.result.json",
+        "lm_status": "CONVERGED",
+        "E_in_plane_mpa": 50886.241471158406,
+        "G12_mpa": 6872.052773289999,
+        "delta_ln_vs_run_a": {
+          "E_in_plane_mpa": -0.08847211712343572,
+          "G12_mpa": 0.42338546734214155
+        },
+        "delta_percent_vs_run_a": {
+          "E_in_plane_mpa": -8.46713676245402,
+          "G12_mpa": 52.71228385088882
+        },
+        "max_abs_relative_error": 0.04167301767924658,
+        "all_within_5_percent": true,
+        "all_within_10_percent": true,
+        "min_tracking_mac": 0.9998343182982068,
+        "engineering_label": "EFFECTIVE_MODEL_COMPENSATION_TEST",
+        "g12_role": "COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY",
+        "m5_verdict": {
+          "E_in_plane_mpa": "NOT_IDENTIFIABLE",
+          "G12_mpa": "NOT_IDENTIFIABLE"
+        },
+        "material_claim": "NO_MATERIAL_PROPERTY_CLAIM",
+        "validation": "not externally validated",
+        "conclusion": "C: G12 moves strongly and E_in shifts materially (parameter compensation / model-form dependence); specimen-specific family disagreement unchanged",
+        "abaqus_solves": 6,
+        "abaqus_python_extractions": 6,
+        "failures": 0,
+        "campaign_journal_last_entry": "53fc367c980fe5f12ad944568c01de6b680d3d5d4e7fc96e3665f5c06041dbcb",
+        "status": "ACCEPTED"
+      },
+      "release_candidate": "unchanged: RUN_A model-calibrated effective E_in = 55.593 GPa, not externally validated",
+      "unused_budget": "18 / 24 abandoned intentionally (D-075)"
+    },
+    "M7.1_tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK",
+    "abaqus_solves": 8,
+    "abaqus_python_extractions": 12,
+    "closure": {
+      "decision": "D-075",
+      "record": "docs/auto_id/campaigns/M7_CLOSURE.json",
+      "release_candidate": "RUN_A model-calibrated effective E_in = 55.593 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, not externally validated; M5 NOT_IDENTIFIABLE",
+      "run_a_model_dependence_diagnostic_gpa": [
+        50.8,
+        60.3
+      ],
+      "run_b": "diagnostic only: E_in 50.886 GPa, G12 6.872 GPa (COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY)",
+      "conclusion": "freeing G12 improves aggregate residuals but does not remove the inter-specimen family discrepancy and materially shifts E_in: parameter compensation / model-form dependence",
+      "reporting_correction": "campaign report model_form_robustness.status (AVAILABLE_COMPLETE_LOO / UNAVAILABLE_INCOMPLETE_LOO / NOT_EVALUATED); M5 unchanged",
+      "further_fe_work": "none; no Abaqus after RUN_B",
+      "stage_pr": "auto-id/m7 -> main prepared, NOT merged",
+      "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK"
+    }
+  }
 }

@@ -1,0 +1,126 @@
+{
+ "schema": "auto-id/identification-campaign/v1",
+ "campaign_id": "M7.1/RUN_B/SP02+SP13",
+ "run_type": "RUN_B",
+ "decision": "D-072",
+ "parameterisation": "carbon-property-set/v1",
+ "fitted_parameters": [
+  "E_in_plane_mpa",
+  "G12_mpa"
+ ],
+ "fixed_parameters": {},
+ "start": {
+  "E_in_plane_mpa": 52000.0,
+  "G12_mpa": 4500.0
+ },
+ "bounds": {
+  "E_in_plane_mpa": [
+   26000.0,
+   104000.0
+  ],
+  "G12_mpa": [
+   2250.0,
+   9000.0
+  ]
+ },
+ "engineering_plausibility": {
+  "E_in_plane_mpa": [
+   35000.0,
+   75000.0
+  ]
+ },
+ "practical_target": {
+  "preferred_max_abs_relative_error": 0.05,
+  "acceptable_max_abs_relative_error": 0.1,
+  "note": "Engineering target (D-066, D-069): correct mode identity and acceptable MAC; frequency agreement preferably within ~5 %, up to ~10 % acceptable when the mode is correct and there is no branch mismatch. Separate from the formal M5 verdict; properties are never tuned merely to turn a useful 5 % mismatch into 1 %."
+ },
+ "sigma": {
+  "setup": {
+   "sd_ln": 0.003,
+   "status": "PROVISIONAL",
+   "source": "SPEC §7 provisional Σ_setup 0.3 % (D-059, D-065); no measured same-panel remount estimate"
+  },
+  "measurement": {
+   "status": "NOT_AVAILABLE",
+   "source": "the PolyMAX modal sources carry no modal uncertainty (M1 QC UNCERTAINTY_NOT_AVAILABLE; M5_DECISION_RECORD §6); never invented, never zero"
+  }
+ },
+ "lm": {
+  "mu_initial": 0.001,
+  "mu_decrease": 10.0,
+  "max_step_attempts": 3,
+  "evaluation_budget": 17,
+  "max_iterations": 5,
+  "stop_fraction": 0.2,
+  "mu_increase": 10.0,
+  "finite_difference_step": 0.05
+ },
+ "abaqus_solve_budget": 24,
+ "not_fitted": {
+  "t_face": "NOT_FITTED: nominal FE geometry; the SPEC §5 prior needs 9+ thickness points per specimen, which are not recorded",
+  "k_core": "NOT_FITTED: the existing INP core constants; no independent k_core prior (M6.3 NOT_AVAILABLE, D-059)",
+  "k_int": "OFF: disabled by default (SPEC §5); the torsion holdout rule is kept"
+ },
+ "specimens": [
+  {
+   "label": "SP02",
+   "fixture_id": "SP02/bravo-1-physical",
+   "forward_model": "docs/auto_id/forward_models/SP02.physical.forward.json",
+   "solver_profile": "docs/auto_id/solver_profiles/SP02.json",
+   "baseline_shape_pack": "docs/auto_id/fe_shapes/SP02_f3e592281bebce66.shape-pack.json",
+   "archived_baseline": "docs/auto_id/baselines/SP02.carbon4c-baseline.json",
+   "registration_evidence": "docs/auto_id/registration_evidence/SP02_registration_uncertainty.json",
+   "rows": [
+    {
+     "row_id": "R1",
+     "experimental_mode": 2,
+     "fe_mode": 8,
+     "role": "FIT"
+    },
+    {
+     "row_id": "R2",
+     "experimental_mode": 4,
+     "fe_mode": 10,
+     "role": "FIT"
+    },
+    {
+     "row_id": "R3",
+     "experimental_mode": 7,
+     "fe_mode": 13,
+     "role": "HOLDOUT"
+    }
+   ]
+  },
+  {
+   "label": "SP13",
+   "fixture_id": "SP13/best-physical",
+   "forward_model": "docs/auto_id/forward_models/SP13.physical.forward.json",
+   "solver_profile": "docs/auto_id/solver_profiles/SP13.json",
+   "baseline_shape_pack": "docs/auto_id/fe_shapes/SP13_a46d08b52995e078.shape-pack.json",
+   "archived_baseline": "docs/auto_id/baselines/SP13.carbon4c-baseline.json",
+   "registration_evidence": "docs/auto_id/registration_evidence/SP13_registration_uncertainty.json",
+   "rows": [
+    {
+     "row_id": "R1",
+     "experimental_mode": 4,
+     "fe_mode": 10,
+     "role": "FIT"
+    },
+    {
+     "row_id": "R2",
+     "experimental_mode": 7,
+     "fe_mode": 13,
+     "role": "HOLDOUT"
+    }
+   ]
+  }
+ ],
+ "archive_reuse": "docs/auto_id/campaigns/M7_RUN_B.archive-reuse.json",
+ "run_b_gate": "D-072",
+ "provenance": [
+  "D-072: RUN_A (60a83fa) accepted and closed; RUN_B prepared as the diagnostic EFFECTIVE_MODEL_COMPENSATION_TEST (SUPERVISOR 2026-10-08); its execution still needs the HUMAN Abaqus gates",
+  "RUN_B fits E_in and G12 from the original governed start (52000 / 4500 MPa); G12 is a compensation diagnostic, never an identified material property (BARE_PLATE_REQUIRED / NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED, D-046)",
+  "same frozen physical observations, holdouts, Σ and LM settings as RUN_A (D-069); bounds are numerical solver bounds only; G12 has no engineering window (diagnostic only)",
+  "LM: evaluation budget 17 = 5 reused (p0 and the ±5 % E and G12 central differences) + at most 12 new; hard Abaqus budget 24 new solves"
+ ]
+}

@@ -1,0 +1,112 @@
+{
+ "schema": "auto-id/fe-shape-pack-record/v1",
+ "job_name": "SP02_ade5dffa2fde3903",
+ "specimen": "SP02",
+ "state": "CANDIDATE",
+ "generated_inp_sha256": "ade5dffa2fde390323749f85f959d05cc3fc68778a3163b5d1487bbfc4cca955",
+ "odb": {
+  "role": "candidate ODB",
+  "file_name": "SP02_ade5dffa2fde3903.odb",
+  "sha256": "52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49",
+  "size_bytes": 751590276,
+  "location": {
+   "store": "auto-id-run",
+   "relative_path": "solves/SP02_ade5dffa2fde3903/SP02_ade5dffa2fde3903.odb"
+  }
+ },
+ "pack": {
+  "role": "FE shape pack (auto-id/fe-shape-pack/v1)",
+  "file_name": "SP02_ade5dffa2fde3903.npz",
+  "sha256": "0e3715502765fe84ce813c084c056bbab3f79ff0ade9033bda113747db5a3718",
+  "size_bytes": 14319758,
+  "location": {
+   "store": "auto-id-run",
+   "relative_path": "packs/SP02_ade5dffa2fde3903.npz"
+  }
+ },
+ "content_sha256": "45660e24a50ec77d5b6e634b50fbcafd3348c4860f144dcdd182e1ce9e7249ce",
+ "node_set": {
+  "definition": "CFRP_FACESHEET-TOP, max_z, tolerance 0.0001 model units",
+  "node_count": 29583,
+  "sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b"
+ },
+ "fe_geometry_sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d",
+ "mode_numbers": [
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27,
+  28,
+  29,
+  30
+ ],
+ "frequencies_hz": [
+  23.012094497680664,
+  75.2401123046875,
+  78.24763488769531,
+  88.75702667236328,
+  89.97750091552734,
+  142.7620086669922,
+  207.42172241210938,
+  210.7991180419922,
+  215.94264221191406,
+  222.8822479248047,
+  259.7832946777344,
+  262.0557556152344,
+  357.8253479003906,
+  399.53594970703125,
+  405.71148681640625,
+  408.8280029296875,
+  414.245849609375,
+  440.7712707519531,
+  450.1838073730469,
+  521.5416259765625,
+  524.1453247070312,
+  646.8134765625,
+  653.5648803710938,
+  653.7369384765625
+ ],
+ "extraction": {
+  "script": "abaqus_scripts/extract_odb.py",
+  "script_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+  "abaqus": "Abaqus 2024",
+  "extraction_id": "7cc7debc594184ef2cac0a7f8db7610c03147bdf16ef5d5f5ca3ef6656b42479",
+  "format_version": 2
+ },
+ "validation": {
+  "format_version_2": true,
+  "surface_instance_present": true,
+  "modes_complete": true,
+  "history_complete": true,
+  "mode_rows_match_geometry": true,
+  "finite": true,
+  "imaginary_zero": true,
+  "fe_geometry_identity": true,
+  "node_set": true,
+  "deterministic_content": true
+ },
+ "provenance_record": {
+  "role": "identification run journal (hash-chained; this pack's extraction entry)",
+  "location": {
+   "store": "auto-id-run",
+   "relative_path": "journal.json"
+  }
+ }
+}

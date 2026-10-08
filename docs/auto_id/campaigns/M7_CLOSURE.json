@@ -1,0 +1,155 @@
+{
+ "schema": "auto-id/campaign-closure/v1",
+ "stage": "M7",
+ "decision": "D-075 (SUPERVISOR, 2026-10-08)",
+ "abaqus_after_run_b": 0,
+ "run_a": {
+  "result_record": {
+   "path": "docs/auto_id/campaigns/M7_RUN_A.result.json",
+   "canonical_content_sha256": "82501b35c4effc0fd829d40d6e3aaef105d5a70cc8e8a3b0ba306b9caa66c5c2"
+  },
+  "run_hash": "8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2",
+  "status": "ACCEPTED_RELEASE_CANDIDATE",
+  "E_in_plane_mpa": 55593.41166800223,
+  "label": "EFFECTIVE_MODEL_PARAMETER_ESTIMATE",
+  "qualifier": "not externally validated",
+  "not": "IDENTIFIED_MATERIAL_PROPERTY",
+  "m5_verdict": {
+   "E_in_plane_mpa": "NOT_IDENTIFIABLE"
+  },
+  "engineering_use": {
+   "mode_identity_preserved": true,
+   "min_tracking_mac": 0.9999968120972186,
+   "min_experimental_pair_mac": 0.9175971747599743,
+   "max_abs_relative_error": 0.06793241237613246,
+   "all_fit_and_holdout_within_10_percent": true,
+   "engineering_window": {
+    "E_in_plane_mpa": "INSIDE"
+   },
+   "criterion": "MET (intended engineering use; separate from the formal M5 verdict)"
+  },
+  "model_form_robustness": {
+   "status": "AVAILABLE_COMPLETE_LOO",
+   "label": "MODEL_DEPENDENCE_DIAGNOSTIC",
+   "parameters": {
+    "E_in_plane_mpa": {
+     "p_hat": 55593.411668,
+     "min_estimate": 50794.8252244,
+     "max_estimate": 60348.4171294,
+     "half_range_ln": 0.08617011764315
+    }
+   },
+   "cases": [
+    {
+     "family": "Px:E|Py:E|nx:0|ny:2",
+     "removed_term_ids": [
+      "SP02:R1"
+     ],
+     "status": "VALID",
+     "estimate": {
+      "E_in_plane_mpa": 60348.4171294
+     }
+    },
+    {
+     "family": "Px:O|Py:E|nx:1|ny:2",
+     "removed_term_ids": [
+      "SP02:R2",
+      "SP13:R1"
+     ],
+     "status": "VALID",
+     "estimate": {
+      "E_in_plane_mpa": 50794.8252244
+     }
+    }
+   ],
+   "reasons": [
+    "range of the linearised leave-one-family-out estimates: a model-dependence diagnostic; not a confidence interval and not a formal material-property uncertainty"
+   ]
+  },
+  "abaqus_solves_used": 2,
+  "solve_budget": 16,
+  "unused_budget": "abandoned intentionally (D-075)"
+ },
+ "run_b": {
+  "result_record": {
+   "path": "docs/auto_id/campaigns/M7_RUN_B.result.json",
+   "canonical_content_sha256": "8a9264eca72827889042fb5430ed057f9d44ebb9305d0b10db9c28d433a2b2de"
+  },
+  "run_hash": "fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
+  "status": "ACCEPTED_DIAGNOSTIC_ONLY",
+  "label": "EFFECTIVE_MODEL_COMPENSATION_TEST",
+  "parameters": {
+   "E_in_plane_mpa": 50886.241471158406,
+   "G12_mpa": 6872.052773289999
+  },
+  "parameter_roles": {
+   "E_in_plane_mpa": "EFFECTIVE_MODEL_PARAMETER",
+   "G12_mpa": "COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY"
+  },
+  "g12_constraints": [
+   "BARE_PLATE_REQUIRED",
+   "NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED"
+  ],
+  "delta_ln_vs_run_a": {
+   "E_in_plane_mpa": -0.08847211712343572,
+   "G12_mpa": 0.42338546734214155
+  },
+  "m5_verdict": {
+   "E_in_plane_mpa": "NOT_IDENTIFIABLE",
+   "G12_mpa": "NOT_IDENTIFIABLE"
+  },
+  "model_form_robustness": {
+   "status": "UNAVAILABLE_INCOMPLETE_LOO",
+   "label": null,
+   "parameters": null,
+   "cases": [
+    {
+     "family": "Px:E|Py:E|nx:0|ny:2",
+     "removed_term_ids": [
+      "SP02:R1"
+     ],
+     "status": "VALID",
+     "estimate": {
+      "E_in_plane_mpa": 56524379.1911,
+      "G12_mpa": 0.00143666894012
+     }
+    },
+    {
+     "family": "Px:O|Py:E|nx:1|ny:2",
+     "removed_term_ids": [
+      "SP02:R2",
+      "SP13:R1"
+     ],
+     "status": "REFUSED_RANK_DEFICIENT",
+     "estimate": null
+    }
+   ],
+   "reasons": [
+    "leave-one-family-out refused for ['Px:O|Py:E|nx:1|ny:2']",
+    "1 valid leave-one-family-out case(s): a range needs at least two",
+    "the M5 numeric model_form_robustness covers the valid cases only; it is not a model-form uncertainty and not evidence of robustness (no replacement value)"
+   ]
+  },
+  "abaqus_solves_used": 6,
+  "solve_budget": 24,
+  "unused_budget": "abandoned intentionally (D-075)",
+  "not_for_material_property_tables": true
+ },
+ "family_discrepancy_percentage_points": {
+  "RUN_A": {
+   "Px:O|Py:E|nx:1|ny:2 (SP02:R2 - SP13:R1)": 7.850350050442834,
+   "Px:E|Py:O|nx:0|ny:3 (SP02:R3 - SP13:R2)": 5.625611862217439
+  },
+  "RUN_B": {
+   "Px:O|Py:E|nx:1|ny:2 (SP02:R2 - SP13:R1)": 8.272254780642152,
+   "Px:E|Py:O|nx:0|ny:3 (SP02:R3 - SP13:R2)": 5.325335761102801
+  }
+ },
+ "conclusion": {
+  "id": "C",
+  "statement": "freeing G12 improves aggregate residuals but does not remove the inter-specimen family discrepancy and materially shifts E_in: parameter compensation / model-form dependence",
+  "improved_residuals_are_not_improved_identification": true
+ },
+ "release_candidate": "RUN_A model-calibrated effective E_in = 55.593 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, not externally validated; M5 NOT_IDENTIFIABLE",
+ "further_m7_fe_work": "none required"
+}

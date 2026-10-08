@@ -1005,3 +1005,311 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1522 OK (2 Abaqus-gated skipped); without data stores 1513 OK (56 skipped); M6 test modules 143 OK; M5 + M4 + M3 stage gates and M4 guard 34 OK
 - 0 Abaqus solves and 0 Abaqus Python runs in this closure step. The only M6 Abaqus work was M6.4b under
   D-067.
+
+## M7.1: RUN_A campaign architecture and the proposed HUMAN execution manifest (zero Abaqus; no result)
+
+- **Status:** REVIEW_READY (worker, 2026-10-08; D-069). No campaign has been executed.
+- **Active chains:** on the real stores and without Abaqus, both reproduce exactly the accepted rows:
+  - SP-02: R1 (2 ↔ 8, MAC 0.918) FIT, R2 (4 ↔ 10, 0.951) FIT, R3 (7 ↔ 13, 0.975) HOLDOUT;
+  - SP-13: R1 (4 ↔ 10, 0.958) FIT, R2 (7 ↔ 13, 0.947) HOLDOUT.
+  - The M4.3 holdouts are unchanged, there are no cluster triggers, and `registration_limited` is False for
+    both.
+- **Archive reuse (read-only verification):**
+  - Both SP-02 CARBON-5A ODBs re-hash to their ARCHIVE_MANIFEST pins: E− `bae6a7c1…` (technical retry1),
+    E+ `ba38cb69…`.
+  - The `.sta` / `.dat` / `.msg` files are pinned, and the completion and Abaqus 2024 markers are present.
+  - The failed first E− attempt is excluded.
+  - The expected frequencies (modes 7–30) come from the accepted CARBON-5A table.
+- **Proposed manifest:**
+- **Manifest hash:** `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`.
+- **Baseline packs reused:** `SP02_f3e592281bebce66` and `SP13_a46d08b52995e078` (p0; 0 solves).
+- **±5 % E points reused:**
+  - SP-13: governed packs `SP13_0e861d03c333bb0b` (E 54 600) and `SP13_a9df66283a168786` (E 49 400);
+  - SP-02: extraction-only jobs `SP02_13363f977809dbff` (E 54 600, ODB `ba38cb69…`) and
+    `SP02_84753f636064e192` (E 49 400, ODB `bae6a7c1…`, the technical retry1). The failed first attempt is
+    excluded.
+- **Maximum new Abaqus solves:** 16, a hard cap with no extension.
+- **Maximum Abaqus Python extractions:** 18 (16 after new solves + 2 archive extractions).
+- **LM evaluation budget:** 11 (3 reused + at most 8 new; each new evaluation solves both specimens).
+- **Executor gate:** `tools/m7_campaign.py extract-archive` and then `run`, each with
+  `--authorised-manifest-hash e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`. RUN_B is not part of the manifest.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK
+- **Targeted mutation check:** 9 of 9 mutants killed. The mutants were: stacking order, Σ_meas becoming
+  zero, the solve cap, the HUMAN gate, the RUN_B gate, the observation STOP, G12 fixing, refusal
+  propagation, and the RowSigma None handling.
+- 0 Abaqus solves, 0 Abaqus Python extractions, no LM run, no estimate, no RUN_B.
+
+## M7 RUN_A HUMAN gate 1: archived SP-02 CARBON-5A extraction (2 Abaqus Python runs, 0 solves)
+
+- **Status:** REVIEW_READY (worker, 2026-10-08; D-070).
+- **Pre-execution check:** 18 of 18 items PASS:
+  - the manifest hash equals the authorised `e4ba607f06a69311…`;
+  - both ODBs re-hash to their pins;
+  - the SP-02 physical forward lineage renders both jobs;
+  - the parameters are exactly 54 600 and 49 400 MPa with G12 4 500;
+  - Abaqus 2024 and the completion markers are present;
+  - the failed attempt is not selected;
+  - the extractor is unchanged.
+- **Execution:** `tools/m7_campaign.py extract-archive`, on SHA-verified run-store copies with the pinned
+  `extract_odb.py`. The copies were deleted after validation, and the archived originals were never opened
+  by Abaqus. 2 extractions, 0 solves.
+
+| Job | E (MPa) | ODB SHA-256 | Pack content SHA-256 | R1 FE 8 | R2 FE 10 | R3 FE 13 |
+|---|---|---|---|---|---|---|
+| `SP02_13363f977809dbff` | 54600 | `ba38cb698c5cb2dc…` | `7ac24b6b2c5738c5…` | → 8, MAC 1.000000, 77.0735 Hz | → 10, MAC 0.999998, 90.9286 Hz | → 13, MAC 0.999999, 212.3789 Hz |
+| `SP02_84753f636064e192` | 49400 | `bae6a7c133a8eb4b…` | `81a5a8ccdc1c846a…` | → 8, MAC 1.000000, 73.3617 Hz | → 10, MAC 0.999998, 87.6933 Hz | → 13, MAC 0.999999, 202.3423 Hz |
+
+- **Independent post-extraction validation:** 22 of 22 PASS:
+  - the node set, coordinates and FE geometry equal the governed SP-02 baseline;
+  - the frequencies (modes 7–30) equal the accepted CARBON-5A table exactly;
+  - the content and file hashes are deterministic on reload;
+  - FE-to-FE tracking from the baseline is repeatable (every row on its own mode, MAC ≥ 0.999998, no order
+    change; no mode-number substitution);
+  - the derived S_E (R1 0.493162, R2 0.361989, R3 0.483707) equals the accepted CARBON-5A sensitivities.
+- **Executable RUN_A manifest after extraction:** unchanged, `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`. The manifest pins the inputs (ODB pins,
+  expected frequencies). The extracted pack content hashes enter the RUN_A run identity
+  `8ed03be3be86aa83…`, which binds exactly these packs.
+- **RUN_A solve budget remaining:** 16 of 16.
+- **Record:** `campaigns/M7_RUN_A.archive-extraction.json` and `campaigns/archive_extraction/*.shape-pack.json`.
+  The packs themselves are run-store data, pinned by content.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1554 OK (2 Abaqus-gated skipped); without data stores 1541 OK (58 skipped); test_m7_archive_extraction 4 OK (1 store-gated) + test_m7_campaign 28 OK
+- 0 Abaqus solves, 2 Abaqus Python extractions. RUN_A and RUN_B are not started.
+
+## M7 RUN_A result: shared E_in for SP-02 + SP-13 (HUMAN gate 2; 2 solves)
+
+- **Status:** REVIEW_READY (worker, 2026-10-08; D-071). Pending SUPERVISOR review.
+- **Pre-execution check:** 9 of 9 PASS. The manifest is `e4ba607f06a69311…` and the run identity `8ed03be3be86aa83…`. The
+  definition, budgets and rows are unchanged; every initial point is reused; the `abaqus-scratch` store is
+  configured; the journal was fresh.
+- **Execution:** `tools/m7_campaign.py run`.
+  - LM `CONVERGED` after 4 campaign evaluations and
+    2 iterations.
+  - New Abaqus solves: 2 (SP-02 1, SP-13 1) of 16. Extractions: 2. Failures: 0.
+    Retries: 0.
+  - p0 and E± were reused: 3 evaluations, 0 solves.
+- **LM history:** iteration 1: E 52000.0 → 55593.4, Φ 518.59 → 391.20 (accepted); iteration 2: E 55593.4 → 55600.7, Φ 391.20 → — (step below stop_fraction·sd).
+- **Estimate:** Ê_in = **55593 MPa** (55.6 GPa; +6.9 % from the start). It is
+  inside the engineering window 35–75 GPa and not at a search bound. G12 stayed fixed at 4 500 MPa.
+
+| Row | Role | Pair | f_EXP (Hz) | f_FE (Hz) | Error at Ê | Error at start | Tracking MAC | Pair MAC |
+|---|---|---|---|---|---|---|---|---|
+| `SP02:R1` | FIT | 2 ↔ FE 8 | 74.376 | 77.762 | +4.55 % | +1.16 % | 1.000000 | 0.918 |
+| `SP02:R2` | FIT | 4 ↔ FE 10 | 90.575 | 91.532 | +1.06 % | -1.38 % | 0.999997 | 0.951 |
+| `SP02:R3` | HOLDOUT | 7 ↔ FE 13 | 201.999 | 214.237 | +6.06 % | +2.69 % | 0.999998 | 0.975 |
+| `SP13:R1` | FIT | 4 ↔ FE 10 | 94.399 | 87.986 | -6.79 % | -9.05 % | 0.999997 | 0.958 |
+| `SP13:R2` | HOLDOUT | 7 ↔ FE 13 | 205.649 | 206.539 | +0.43 % | -2.76 % | 0.999999 | 0.947 |
+
+- **Max |f_FE / f_EXP − 1|:** 6.79 % (`SP13:R1`), against
+  9.05 % at the start.
+  - All rows within 5 %: **no** (`SP02:R3` +6.06 %, `SP13:R1` −6.79 %).
+  - All rows within 10 %: **yes**.
+- **Mode identity:** every row is tracked on its own baseline mode; the minimum tracking MAC is
+  0.999997; the baseline pair MACs are 0.918–0.975.
+- **Engineering label:** `EFFECTIVE_MODEL_PARAMETER_ESTIMATE` (`WITHIN_ACCEPTABLE_TARGET`; better than the start).
+- **Formal M5 verdict** (PRODUCTION; rules unchanged): E_in **NOT_IDENTIFIABLE**. Reasons:
+  - `FAMILY_CONSISTENCY` NOT_AVAILABLE (D-044);
+  - `HOLDOUT_FAILURE` on `SP02:R3` (|r| 19.6 > 3);
+  - `BIRGE_UNAVAILABLE` (pattern blocked).
+  - Reported value: none. Material claim: `NO_MATERIAL_PROPERTY_CLAIM`.
+- **Uncertainty diagnostics:**
+  - `statistical_sd` ln E 0.0042 (0.42 %);
+  - Birge: χ² 782.4, dof 2, χ²/dof 391.2, s_B
+    19.78; status `BLOCKED_PATTERN`;
+  - `model_form_robustness` (leave-one-family-out): without (0,2) 60348 MPa;
+    without (1,2) 50795 MPa; range 17.2 % of Ê
+    (half 8.6 %).
+  - The M5 Jacobian is the reconstructed LM Jacobian (1 Broyden update).
+- **Engineering interpretation:**
+  - One shared effective E_in ≈ 55.6 GPa reproduces both specimens with correct mode identity, inside the
+    practical ~10 % target.
+  - A specimen-level model discrepancy stays visible. In the same modal family (1,2), SP-02 R2 is FE +1.1 %
+    while SP-13 R1 is FE −6.8 %. The fixed G12, nominal t_face and INP core constants cannot absorb this.
+  - The SP-02 holdout R3 (+6.1 %) and the leave-one-family-out spread (50.8–60.3 GPa) show the same
+    discrepancy.
+  - This is an effective model-calibrated estimate, **not externally validated**, and not an identified
+    material property.
+- **Hashes:**
+  - campaign journal: run `8ed03be3be86aa83…`, 5 entries, last entry
+    `f1d1e2a99c6411cb…`;
+  - SP-02 pipeline: run `223e013f4aae9792…`, last entry `0d4196411672bc86…`;
+  - SP-13 pipeline: run `7e992dee8c9bee27…`, last entry `fee3dbacc8b28c08…`.
+- **Record:** `campaigns/M7_RUN_A.result.json`. It rebuilds identically from the run journals (store-gated
+  test).
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1559 OK (2 Abaqus-gated skipped); without data stores 1546 OK (59 skipped); test_m7_run_a_result 5 OK (1 store-gated; the report rebuilds identically from the run journals)
+- RUN_B is not started.
+
+## M7 RUN_A accepted and closed; RUN_B archive-reuse preparation (zero Abaqus)
+
+- **RUN_A** (D-072):
+  - ACCEPTED and CLOSED. E_in,eff = 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally
+    validated. M5 NOT_IDENTIFIABLE (unchanged).
+  - The practical engineering target is met (max |error| 6.79 %, all < 10 %, correct mode identity); the
+    formal M5 identification gate is not.
+- **RUN_B preparation (read-only inventory; no Abaqus):**
+  - Accepted CARBON-5A G12 ±5 % states for both specimens: exact G12 4 725 / 4 275 MPa with E_in 52 000 MPa
+    (= the LM's central-difference points; 4 500·(1 ± 0.05) is exact).
+  - All four ODBs re-hash to their ARCHIVE_MANIFEST pins. Completion and Abaqus 2024 markers are present.
+  - The CARBON-5A run manifest shows `solve_ok` and no technical retry; the only CARBON-5A guard stop was
+    SP-02 E_MINUS.
+  - SP-13 G12± packs: validated M4 packs whose frequencies equal CARBON-5A exactly.
+  - The active SP-02 / SP-13 chains reproduce the accepted rows exactly; all 8 reused packs load with full
+    pin verification.
+- **Proposed RUN_B execution manifest** (`campaigns/M7_RUN_B.campaign.json` `7c1f5db24fa9c4f4…`,
+  `campaigns/M7_RUN_B.archive-reuse.json` `fa19cfbb4f818c66…`; not executed):
+
+| # | Item | RUN_B |
+|---|---|---|
+| 1 | SP-13 G12± reused packs | G12+ (52 000 / 4 725): `SP13_4c0f189b9727feaf`, content `1febd801…`; G12− (52 000 / 4 275): `SP13_0328066b74b6fd78`, content `b30263d2…`. Validated M4 packs, CARBON-5A ODBs `f5631941…` / `c39911aa…`, frequencies equal CARBON-5A |
+| 2 | SP-02 G12± archived ODB candidates | G12+ `SP02_05239a3b56508244` (`carbon5a/runs/G_PLUS_SP02/`, ODB `d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a`); G12− `SP02_ade5dffa2fde3903` (`carbon5a/runs/G_MINUS_SP02/`, ODB `52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49`) |
+| 3 | Content / provenance identities | Both ODBs are 751 590 276 bytes. They re-hash to their ARCHIVE_MANIFEST pins and match the accepted_forward_jobs anchors. The `.sta` / `.dat` / `.msg` files are pinned; completion and Abaqus 2024 markers are present. The CARBON-5A run manifest shows `solve_ok` and no technical retry. Expected frequencies (modes 7–30) come from the CARBON-5A table |
+| 4 | SP-02 archive extractions | Exactly 2 (G12+ and G12−) |
+| 5 | p0 reuse | `SP02_f3e592281bebce66`, `SP13_a46d08b52995e078` |
+| 6 | E ±5 % reuse | SP-02: the RUN_A gate-1 packs `SP02_13363f977809dbff` / `SP02_84753f636064e192` (store `m7-run-a-archive`, pins unchanged). SP-13: `SP13_0e861d03c333bb0b` / `SP13_a9df66283a168786` |
+| 7 | RUN_A final point | Not included. (55 593.4…, 4 500) is not one of RUN_B's deterministic initial points, and the LM would reach it only by exact coincidence. Reusing it adds no provenance value |
+| 8 | Zero-solve initial evaluations | 5 (p0, E+, E−, G12+, G12−): 10 FE states, 0 solves |
+| 9 | Maximum new solves | 24 (hard; no extension) |
+| 10 | Maximum extractions | 26 (24 after new solves + 2 archive) |
+| 11 | RUN_B identity | Fixed after archive extraction: the run identity binds the content hashes of the two SP-02 G12± packs. It is reported for the solve gate, as for RUN_A (identity known after gate 1). Campaign hash `7c1f5db24fa9c4f4…` |
+| 12 | Authorised-manifest hash | `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` |
+| 13 | LM evaluation accounting | Budget 17 evaluations = 5 reused + ≤ 12 new. Each new evaluation = 2 solves. A rejected step after a Broyden update refreshes the central differences (4 evaluations = 8 solves). Expected: 3–5 accepted trials (6–10 solves), up to about 18 with one refresh |
+
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive) 1570 OK (2 Abaqus-gated skipped); without data stores 1556 OK (60 skipped); test_m7_run_b_preparation 12 OK (1 store-gated class) and the M7 suites 48 OK
+- 0 Abaqus solves, 0 Abaqus Python extractions, no RUN_B LM.
+
+## M7 RUN_B HUMAN gate 1: archived SP-02 G12± extraction (D-073; 2 Abaqus Python, 0 solves)
+
+- **Record:** `campaigns/M7_RUN_B.archive-extraction.json`; pack records in `campaigns/archive_extraction/`.
+- **Pre-check (22/22 PASS):** manifest = authorised; exactly the 2 authorised jobs; full ODB re-hash; E_in /
+  G12 exact; SP-02 physical forward lineage; Abaqus 2024 provenance; status files and completion markers;
+  ARCHIVE_MANIFEST membership; single successful attempt (no failed / truncated / superseded state); pinned
+  `extract_odb.py` unchanged; no prior RUN_B extraction.
+- **Extraction:** rc 0; the journal holds exactly 2 `archive_extraction` entries.
+
+| Job | Point (E_in / G12 MPa) | ODB SHA-256 | Pack content SHA-256 | Pack file SHA-256 | min MAC |
+|---|---|---|---|---|---|
+| `SP02_05239a3b56508244` | 52 000 / 4 725 | `d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a` | `f7271ea4674966604b696a6807972bcbe974f6a4955d0e3c1d6ea8304a297c3b` | `da82a59be08d09522d86b72f4c404dae16a18456f42eb460c2e6a164f1e51579` | 0.999998 |
+| `SP02_ade5dffa2fde3903` | 52 000 / 4 275 | `52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49` | `45660e24a50ec77d5b6e634b50fbcafd3348c4860f144dcdd182e1ce9e7249ce` | `0e3715502765fe84ce813c084c056bbab3f79ff0ade9033bda113747db5a3718` | 0.999998 |
+
+- **Post-extraction validation (22/22 PASS):**
+  - node set (29583 nodes, `664f4d46fe7fb530…`), coordinates and FE geometry
+    equal the governed SP-02 baseline;
+  - modes 7–30, frequencies equal CARBON-5A exactly;
+  - tracking R1→8, R2→10, R3→13 for both packs; unique correspondence; no order change or branch exchange;
+    no manual substitution;
+  - S_G12 from the packs equals the accepted CARBON-5A values (rel 1e-9): R1 0.000247208, R2 0.126868,
+    R3 0.000521856;
+  - content SHA deterministic; file SHA recorded; a second read gives identical content.
+- **Initial set:** 5 campaign evaluations = 10 FE states, all reused with 0 new solves.
+- **Manifest after extraction:** `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` (unchanged).
+- **Final RUN_B run identity:** `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`. It binds the fixtures, registrations, forward manifests, rows,
+  parameterisation E_in + G12, fixed parameters, Σ, bounds, LM settings, the p0 / E± / G12± packs (by
+  content hash), archive provenance, run_type RUN_B and the label `EFFECTIVE_MODEL_COMPENSATION_TEST`.
+- **Budget:** 24 / 24 new solves remain.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1574 OK (2 Abaqus-gated skipped); without data stores 1560 OK (61 skipped); test_m7_run_b_archive_extraction 4 OK (1 store-gated; packs re-verified and re-tracked from the RUN_B run store)
+- Not done: RUN_B LM, any solve, any fit. RUN_A unchanged.
+
+## M7 RUN_B result: EFFECTIVE_MODEL_COMPENSATION_TEST (D-074; diagnostic only)
+
+- **Record:** `campaigns/M7_RUN_B.result.json` (deterministic: regenerated from the journals byte-identically).
+- **Pre-check (18/18 PASS):** manifest and run identity = authorised; RUN_B / D-072, E_in + G12; start
+  52 000 / 4 500; bounds; fixed inputs, not-fitted t_face / k_core / k_int, rows, specimens, Σ and LM settings
+  equal RUN_A (only the evaluation budget differs); 10 reused FE states with verified pins; gate-1 extractions
+  not repeated; fresh run; clean worktree at `4cc20cc`.
+- **LM:** `CONVERGED` after 4 iterations (3 accepted; the 4th step fell below stop_fraction·sd). Objective
+  (½χ²) 518.587 at p0 → 190.269. Broyden Jacobian (3 updates after the reused central
+  differences).
+
+| Iteration | μ | objective before | trial objective | accepted | note |
+|---|---|---|---|---|---|
+| 1 | 1e-03 | 518.587 | 205.105 | yes | accepted |
+| 2 | 1e-04 | 205.105 | 190.517 | yes | accepted |
+| 3 | 1e-05 | 190.517 | 190.269 | yes | accepted |
+| 4 | 1e-06 | 190.269 | — | no | step below stop_fraction·sd |
+
+| # | E_in (MPa) | G12 (MPa) | FE source |
+|---|---|---|---|
+| 1 | 52000.0 | 4500.0 | reused |
+| 2 | 54600.0 | 4500.0 | reused |
+| 3 | 49400.0 | 4500.0 | reused |
+| 4 | 52000.0 | 4725.0 | reused |
+| 5 | 52000.0 | 4275.0 | reused |
+| 6 | 50905.0 | 7355.7 | new (2 solves) |
+| 7 | 50890.7 | 6809.7 | new (2 solves) |
+| 8 | 50886.2 | 6872.1 | new (2 solves) |
+
+- **Counts:** 8 campaign evaluations = 5 reused + 3 new; 6 Abaqus solves, 6 extractions (3 per specimen),
+  0 failures; budget used 6 / 24 (18 unused; not spent after convergence).
+- **Estimate (diagnostic):** E_in = 50886.2 MPa, G12 = 6872.1 MPa. Distance to bounds: E_in Δln +0.671
+  from the lower / 0.715 from the upper; G12 Δln 1.117 / 0.270. Not at a bound;
+  E_in inside the 35–75 GPa window.
+- **Against RUN_A** (E_in 55 593.4, G12 4 500 fixed): Δln E_in = -0.0885
+  (-8.47 %, BEYOND_0.08_LN); Δln G12 =
+  +0.4234 (+52.71 %, BEYOND_0.08_LN).
+  D-045 bands descriptive only.
+
+| Row | Role | Exp (Hz) | FE (Hz) | Error | r | Tracking MAC | RUN_A error | RUN_A r |
+|---|---|---|---|---|---|---|---|---|
+| `SP02:R1` | FIT | 74.376 | 74.449 | +0.10 % | +0.33 | 0.999997 | +4.55 % | +14.84 |
+| `SP02:R2` | FIT | 90.575 | 94.349 | +4.17 % | +13.61 | 0.999834 | +1.06 % | +3.51 |
+| `SP02:R3` | HOLDOUT | 201.999 | 205.311 | +1.64 % | +5.42 | 0.999954 | +6.06 % | +19.61 |
+| `SP13:R1` | FIT | 94.399 | 90.524 | -4.10 % | -13.97 | 0.999841 | -6.79 % | -23.45 |
+| `SP13:R2` | HOLDOUT | 205.649 | 198.068 | -3.69 % | -12.52 | 0.999979 | +0.43 % | +1.44 |
+
+- **Engineering:** max |error| 4.17 % (all five rows ≤ 5 % and ≤ 10 %; RUN_A 6.79 %); minimum
+  tracking MAC 0.999834; every row on its own mode. FIT χ² 782.4 → 380.5.
+- **Formal M5 (unchanged rules):** E_in and G12 NOT_IDENTIFIABLE, no reported value. Blockers: family
+  consistency NOT_AVAILABLE; holdout failures `SP02:R3` (|r| 5.42) and `SP13:R2` (|r| 12.5); Birge
+  BLOCKED_PATTERN (χ² 380.5, dof 1, s_B 19.5); model-form
+  robustness refused (family (1,2) removal rank-deficient). G12 additionally `BARE_PLATE_REQUIRED` and
+  `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED` (k_core). Statistical sd_ln (Σ_setup only, not a model-form
+  uncertainty): E_in 0.0061, G12
+  0.0185; correlation -0.721.
+- **Leave-one-family-out:** removing family (1,2) (`SP02:R2`, `SP13:R1`) is REFUSED_RANK_DEFICIENT (one row for
+  two parameters). Removing family (0,2) (`SP02:R1`) is formally VALID but its linearised shift (Δln E_in
+  +7.01, Δln G12 -15.38) is far outside the
+  linear range: the two remaining (1,2) rows are nearly collinear in (E_in, G12) and pull in opposite
+  directions. The reported model_form_robustness range 0.0 therefore comes from a single degenerate case and
+  is not a robustness statement (observation for the SUPERVISOR; M5 unchanged).
+- **Interpretation (conclusion C):** G12 moves strongly (+52.7 %) and E_in shifts materially (−8.5 %, beyond the
+  0.08 ln band): parameter compensation / model-form dependence.
+  - E_in is now set almost alone by `SP02:R1` (G12 sensitivity ≈ 0; error +0.10 %); G12 then centres the
+    (1,2) family between the specimens.
+  - The specimen-to-specimen disagreement inside each family is unchanged: (1,2) `SP02:R2` − `SP13:R1`
+    7.85 → 8.27 percentage points; (0,3) `SP02:R3` − `SP13:R2` 5.63 → 5.33 points. A shared (E_in, G12) moves the
+    family means but cannot remove the specimen-specific discrepancy.
+  - Holdouts: `SP02:R3` improves (+6.06 → +1.64 %), `SP13:R2` worsens (+0.43 → −3.69 %).
+  - The smaller percentages are therefore not improved identification. The release candidate stays RUN_A
+    E_in,eff = 55.593 GPa, not externally validated.
+- **Journals:** campaign `fb5234116c6e9413…`, 9 entries, last `53fc367c980fe5f1…`. RUN_A journal unchanged (5 entries,
+  last `f1d1e2a99c6411cb…`).
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1581 OK (2 Abaqus-gated skipped); without data stores 1567 OK (62 skipped); test_m7_run_b_result 7 OK (1 store-gated; the report rebuilds identically from the RUN_B journals)
+
+## M7 closure (D-075): RUN_B accepted; reporting correction; campaign complete
+
+- **Closure record:** `campaigns/M7_CLOSURE.json`, derived from the unchanged result records (bound by
+  SHA-256: RUN_A `23b0bfe76556ec09…`, RUN_B `2f90abc9a4f58586…`).
+- **Reporting correction:** `model_form_robustness_reporting` (campaign layer). RUN_A
+  `AVAILABLE_COMPLETE_LOO`, `MODEL_DEPENDENCE_DIAGNOSTIC` 50794.8–60348.4 MPa;
+  RUN_B `UNAVAILABLE_INCOMPLETE_LOO` (family (1,2) removal rank-deficient; one valid case), no number. Regression
+  test: the RUN_B system through the real M5 code still gives the M5 range 0.0, and the report shows no
+  number at all. The live report rebuilt from the RUN_A / RUN_B journals gives the same reporting.
+- **Release statement:** RUN_A E_in,eff = 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally
+  validated; M5 NOT_IDENTIFIABLE.
+- **Diagnostic statement:** RUN_B E_in 50.886 GPa, G12 6.872 GPa, both diagnostic; G12 not a material property.
+- **Integrity:** RUN_A and RUN_B journals unchanged; no frozen M0–M6 evidence changed on `auto-id/m7`
+  (only the accepted M4.7 additive objective field outside M7 code); no ODB / INP / NPZ / solver artefact in
+  git; no Abaqus execution after RUN_B.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK
+
+## M7 closure: result-record binding correction (D-075)
+
+- Linux CI on `5ed6cf0` failed the closure binding test: the byte SHA-256 values in the closure entry above
+  (`23b0bfe7…`, `2f90abc9…`) are those of the Windows CRLF working copies; the committed blobs are LF
+  (`* text=auto`), so the bytes differ by platform.
+- `M7_CLOSURE.json` now binds each result record by `canonical_content_sha256` (the canonical hash of the
+  parsed JSON): RUN_A `82501b35c4effc0fd829d40d6e3aaef105d5a70cc8e8a3b0ba306b9caa66c5c2`, RUN_B `8a9264eca72827889042fb5430ed057f9d44ebb9305d0b10db9c28d433a2b2de`, identical for the LF blob and the CRLF working copy. The result
+  records themselves are unchanged.
+- The same CI run also showed a pre-existing, unrelated flaky test,
+  `test_registration_factory.UnambiguousGeometryTests.test_no_full_model_contamination`: the forbidden token
+  `d11` occurred by chance inside a random registration hash (`…ed1138…`, from a temporary path and mtime).
+  Not changed here (outside M7).

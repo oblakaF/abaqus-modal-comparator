@@ -1,0 +1,891 @@
+{
+ "schema": "auto-id/identification-campaign-report/v1",
+ "campaign_id": "M7.1/RUN_B/SP02+SP13",
+ "run_type": "RUN_B",
+ "campaign_hash": "7c1f5db24fa9c4f4e90c82ca802c6dae22cbe5c7ec9e2989e63e439f678540e5",
+ "lm_status": "CONVERGED",
+ "parameters": {
+  "E_in_plane_mpa": 50886.241471158406,
+  "G12_mpa": 6872.052773289999
+ },
+ "engineering": {
+  "estimate": "EFFECTIVE_MODEL_COMPENSATION_TEST",
+  "reasons": [],
+  "rows": [
+   {
+    "term_id": "SP02:R1",
+    "specimen": "SP02",
+    "row_id": "R1",
+    "role": "FIT",
+    "family": "Px:E|Py:E|nx:0|ny:2",
+    "experimental_mode": 2,
+    "experimental_hz": 74.37596969581834,
+    "baseline_fe_mode": 8,
+    "tracked_fe_mode": 8,
+    "tracking_mac": 0.9999967505545252,
+    "fe_hz": 74.44917297363287,
+    "relative_error": 0.000984232919771122,
+    "whitened_residual": 0.3279162933766955,
+    "baseline_pair_mac": 0.9175971747599743
+   },
+   {
+    "term_id": "SP02:R2",
+    "specimen": "SP02",
+    "row_id": "R2",
+    "role": "FIT",
+    "family": "Px:O|Py:E|nx:1|ny:2",
+    "experimental_mode": 4,
+    "experimental_hz": 90.57491895865455,
+    "baseline_fe_mode": 10,
+    "tracked_fe_mode": 10,
+    "tracking_mac": 0.9998343182982068,
+    "fe_hz": 94.34944915771489,
+    "relative_error": 0.04167301767924658,
+    "whitened_residual": 13.609363824581777,
+    "baseline_pair_mac": 0.9507510851875456
+   },
+   {
+    "term_id": "SP02:R3",
+    "specimen": "SP02",
+    "row_id": "R3",
+    "role": "HOLDOUT",
+    "family": "Px:E|Py:O|nx:0|ny:3",
+    "experimental_mode": 7,
+    "experimental_hz": 201.99945377223358,
+    "baseline_fe_mode": 13,
+    "tracked_fe_mode": 13,
+    "tracking_mac": 0.9999538279327576,
+    "fe_hz": 205.31065368652335,
+    "relative_error": 0.016392123109517653,
+    "whitened_residual": 5.419740879993047,
+    "baseline_pair_mac": 0.975446706932764
+   },
+   {
+    "term_id": "SP13:R1",
+    "specimen": "SP13",
+    "row_id": "R1",
+    "role": "FIT",
+    "family": "Px:O|Py:E|nx:1|ny:2",
+    "experimental_mode": 4,
+    "experimental_hz": 94.3990939312666,
+    "baseline_fe_mode": 10,
+    "tracked_fe_mode": 10,
+    "tracking_mac": 0.9998412429815372,
+    "fe_hz": 90.52405548095706,
+    "relative_error": -0.04104953012717494,
+    "whitened_residual": -13.971951038209696,
+    "baseline_pair_mac": 0.9584584247911996
+   },
+   {
+    "term_id": "SP13:R2",
+    "specimen": "SP13",
+    "row_id": "R2",
+    "role": "HOLDOUT",
+    "family": "Px:E|Py:O|nx:0|ny:3",
+    "experimental_mode": 7,
+    "experimental_hz": 205.64887661733076,
+    "baseline_fe_mode": 13,
+    "tracked_fe_mode": 13,
+    "tracking_mac": 0.9999791217933673,
+    "fe_hz": 198.06840515136716,
+    "relative_error": -0.036861234501510354,
+    "whitened_residual": -12.519260158049642,
+    "baseline_pair_mac": 0.9469043137223597
+   }
+  ],
+  "baseline_rows": [
+   {
+    "term_id": "SP02:R1",
+    "specimen": "SP02",
+    "row_id": "R1",
+    "role": "FIT",
+    "family": "Px:E|Py:E|nx:0|ny:2",
+    "experimental_mode": 2,
+    "experimental_hz": 74.37596969581834,
+    "baseline_fe_mode": 8,
+    "tracked_fe_mode": 8,
+    "tracking_mac": 0.9999999999999668,
+    "fe_hz": 75.24107360839848,
+    "relative_error": 0.011631497594158713,
+    "whitened_residual": 3.8547905802423323,
+    "baseline_pair_mac": 0.9175971747599743
+   },
+   {
+    "term_id": "SP02:R2",
+    "specimen": "SP02",
+    "row_id": "R2",
+    "role": "FIT",
+    "family": "Px:O|Py:E|nx:1|ny:2",
+    "experimental_mode": 4,
+    "experimental_hz": 90.57491895865455,
+    "baseline_fe_mode": 10,
+    "tracked_fe_mode": 10,
+    "tracking_mac": 0.9999999999999689,
+    "fe_hz": 89.32708740234375,
+    "relative_error": -0.013776789100748865,
+    "whitened_residual": -4.624189925757823,
+    "baseline_pair_mac": 0.9507510851875456
+   },
+   {
+    "term_id": "SP02:R3",
+    "specimen": "SP02",
+    "row_id": "R3",
+    "role": "HOLDOUT",
+    "family": "Px:E|Py:O|nx:0|ny:3",
+    "experimental_mode": 7,
+    "experimental_hz": 201.99945377223358,
+    "baseline_fe_mode": 13,
+    "tracked_fe_mode": 13,
+    "tracking_mac": 0.999999999999948,
+    "fe_hz": 207.42729187011716,
+    "relative_error": 0.026870558293706104,
+    "whitened_residual": 8.838628113490898,
+    "baseline_pair_mac": 0.975446706932764
+   },
+   {
+    "term_id": "SP13:R1",
+    "specimen": "SP13",
+    "row_id": "R1",
+    "role": "FIT",
+    "family": "Px:O|Py:E|nx:1|ny:2",
+    "experimental_mode": 4,
+    "experimental_hz": 94.3990939312666,
+    "baseline_fe_mode": 10,
+    "tracked_fe_mode": 10,
+    "tracking_mac": 0.9999999999999655,
+    "fe_hz": 85.85149383544922,
+    "relative_error": -0.09054748027603976,
+    "whitened_residual": -31.637495732719085,
+    "baseline_pair_mac": 0.9584584247911996
+   },
+   {
+    "term_id": "SP13:R2",
+    "specimen": "SP13",
+    "row_id": "R2",
+    "role": "HOLDOUT",
+    "family": "Px:E|Py:O|nx:0|ny:3",
+    "experimental_mode": 7,
+    "experimental_hz": 205.64887661733076,
+    "baseline_fe_mode": 13,
+    "tracked_fe_mode": 13,
+    "tracking_mac": 0.9999999999999573,
+    "fe_hz": 199.9770965576172,
+    "relative_error": -0.02757992240467022,
+    "whitened_residual": -9.322463095983538,
+    "baseline_pair_mac": 0.9469043137223597
+   }
+  ],
+  "max_abs_relative_error": 0.04167301767924658,
+  "baseline_max_abs_relative_error": 0.09054748027603976,
+  "practical_target": "WITHIN_PREFERRED_TARGET",
+  "improved_or_consistent": true,
+  "engineering_plausibility": {
+   "E_in_plane_mpa": "INSIDE"
+  },
+  "at_search_bound": {
+   "E_in_plane_mpa": false,
+   "G12_mpa": false
+  },
+  "practical_target_note": "engineering criterion, separate from the formal M5 verdict"
+ },
+ "m5_verdict": {
+  "schema": "auto-id/identification-verdict/v1",
+  "context": "PRODUCTION",
+  "case_label": "M7.1/RUN_B/SP02+SP13 (RUN_B): real-data campaign",
+  "note": "statistical_sd, birge_adjusted_sd and model_form_robustness are kept separately; conservative_ln is only the verdict envelope (SPEC §9, D-012)",
+  "verdicts": {
+   "E_in_plane_mpa": {
+    "parameter_id": "E_in_plane_mpa",
+    "verdict": "NOT_IDENTIFIABLE",
+    "reasons": [
+     "FAMILY_CONSISTENCY: required family consistency NOT_AVAILABLE (blocks IDENTIFIED for production; D-044)",
+     "HOLDOUT_FAILURE: ['SP02:R3', 'SP13:R2'] |r| > 3",
+     "BIRGE_UNAVAILABLE: birge_adjusted_sd not available (BLOCKED_PATTERN); model form",
+     "MODEL_FORM_ROBUSTNESS_REFUSED: refused families ['Px:O|Py:E|nx:1|ny:2']"
+    ],
+    "fitted_estimate": 50886.2414712,
+    "reported_value": null,
+    "statistical_sd_ln": 0.00608818376686,
+    "birge_adjusted_sd_ln": null,
+    "model_form_robustness": {
+     "half_range_ln": 0.0,
+     "half_range_percent_of_p_hat": 0.0,
+     "range_ln": 0.0,
+     "range_percent_of_p_hat": 0.0
+    },
+    "conservative_ln": null
+   },
+   "G12_mpa": {
+    "parameter_id": "G12_mpa",
+    "verdict": "NOT_IDENTIFIABLE",
+    "reasons": [
+     "FAMILY_CONSISTENCY: required family consistency NOT_AVAILABLE (blocks IDENTIFIED for production; D-044)",
+     "HOLDOUT_FAILURE: ['SP02:R3', 'SP13:R2'] |r| > 3",
+     "BIRGE_UNAVAILABLE: birge_adjusted_sd not available (BLOCKED_PATTERN); model form",
+     "MODEL_FORM_ROBUSTNESS_REFUSED: refused families ['Px:O|Py:E|nx:1|ny:2']",
+     "BARE_PLATE_REQUIRED: sandwich G12 without bare-plate support and without a complete SPEC §5.1 sandwich path",
+     "NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED: ['k_core']"
+    ],
+    "fitted_estimate": 6872.05277329,
+    "reported_value": null,
+    "statistical_sd_ln": 0.0185339001427,
+    "birge_adjusted_sd_ln": null,
+    "model_form_robustness": {
+     "half_range_ln": 0.0,
+     "half_range_percent_of_p_hat": 0.0,
+     "range_ln": 0.0,
+     "range_percent_of_p_hat": 0.0
+    },
+    "conservative_ln": null
+   }
+  },
+  "guards": {
+   "family_consistency": "NOT_AVAILABLE",
+   "fitting_pair_mac": "PASS",
+   "holdout_validation": "FAIL",
+   "peak_derived_input": "PASS",
+   "registration": "PASS",
+   "residual_pattern": "PASS",
+   "tracking": "PASS"
+  },
+  "q_g": 0.692836288191,
+  "evidence_hashes": {
+   "analysis": "b60afc5827b8da091f76cbfa53c81128c5e5f3b35d80ccea81528478adf20fdb",
+   "birge": "3ea1cc9165bdd1f798620b8cf93802cb05dacaee5cb9aca0471e371607fd27f5",
+   "model_form_robustness": "e840e95073d35ee75cf41344e2ae886e039fcec1b7bd4d5f35607eae4a124442",
+   "pattern": "cac6a2df74fccff323c92bdf059644edb0c682c3baeea377db265b3a9832cf27",
+   "statistical_sd": "f7307d5bb267ec3297dd1079f5d05e095b92c0109968c6ef84fe51bf8df242b0",
+   "system": "b30a8c2739d658ac2f6b0cb66492e8ac7cf7af816016b362bbef4fc5fa424edc"
+  },
+  "sandwich_g12": {
+   "applies": true,
+   "bare_plate": "NOT_AVAILABLE",
+   "required_nuisance_ids": [
+    "k_core"
+   ],
+   "constraints": {
+    "k_core": {
+     "parameter_id": "k_core",
+     "independent_source": false,
+     "provisional": true,
+     "synthetic_definition": false,
+     "provenance": "no independent k_core prior (M6.3 NOT_AVAILABLE, D-059)"
+    }
+   },
+   "provenance": "SPEC §5.1; D-046"
+  },
+  "upstream_refusals": []
+ },
+ "material_claim": "NO_MATERIAL_PROPERTY_CLAIM",
+ "validation": "not externally validated",
+ "reporting": "model-calibrated effective constant within this FE model (SPEC §5.2); not externally validated (D-060)",
+ "sigma": {
+  "setup": {
+   "sd_ln": 0.003,
+   "status": "PROVISIONAL",
+   "source": "SPEC §7 provisional Σ_setup 0.3 % (D-059, D-065); no measured same-panel remount estimate"
+  },
+  "measurement": {
+   "status": "NOT_AVAILABLE",
+   "source": "the PolyMAX modal sources carry no modal uncertainty (M1 QC UNCERTAINTY_NOT_AVAILABLE; M5_DECISION_RECORD §6); never invented, never zero"
+  }
+ },
+ "not_fitted": {
+  "k_core": "NOT_FITTED: the existing INP core constants; no independent k_core prior (M6.3 NOT_AVAILABLE, D-059)",
+  "k_int": "OFF: disabled by default (SPEC §5); the torsion holdout rule is kept",
+  "t_face": "NOT_FITTED: nominal FE geometry; the SPEC §5 prior needs 9+ thickness points per specimen, which are not recorded"
+ },
+ "fixed_parameters": {},
+ "abaqus_solves_used": 6,
+ "parameter_roles": {
+  "E_in_plane_mpa": "EFFECTIVE_MODEL_PARAMETER",
+  "G12_mpa": "COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY"
+ },
+ "comparison": {
+  "reference": "RUN_A 8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2",
+  "shifts": {
+   "E_in_plane_mpa": {
+    "reference": 55593.41166800223,
+    "value": 50886.241471158406,
+    "delta_ln": -0.08847211712343572,
+    "delta_percent": -8.46713676245402,
+    "description": "BEYOND_0.08_LN"
+   },
+   "G12_mpa": {
+    "reference": 4500.0,
+    "value": 6872.052773289999,
+    "delta_ln": 0.42338546734214155,
+    "delta_percent": 52.71228385088882,
+    "description": "BEYOND_0.08_LN"
+   }
+  },
+  "note": "descriptive stability only (D-045 ln bands); not a material-identification criterion"
+ },
+ "manifest_hash": "5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1",
+ "run_hash": "fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
+ "m5_diagnostics": {
+  "jacobian": {
+   "provenance": "Broyden-updated LM Jacobian reconstructed from the journal (3 update(s) after central differences at ±0.05); not a fresh finite-difference Jacobian at p̂",
+   "updates": 3,
+   "whitened": [
+    [
+     164.38747945854274,
+     0.07220405844363749
+    ],
+    [
+     120.34974558076631,
+     55.758531023324956
+    ],
+    [
+     121.22780141105301,
+     54.36563412373858
+    ]
+   ],
+   "sensitivity_S": {
+    "SP02:R1": {
+     "E_in_plane_mpa": 0.49316243837562823,
+     "G12_mpa": 0.00021661217533091247
+    },
+    "SP02:R2": {
+     "E_in_plane_mpa": 0.36104923674229894,
+     "G12_mpa": 0.16727559306997486
+    },
+    "SP13:R1": {
+     "E_in_plane_mpa": 0.36368340423315904,
+     "G12_mpa": 0.16309690237121574
+    }
+   }
+  },
+  "analysis": {
+   "schema": "auto-id/practical-identifiability/v1",
+   "system_hash": "dfbf10e713ab6e6bf4fefc6c96095ed4434c04fb909f498fc4206ca991a27248",
+   "status": "FULL_RANK",
+   "rcond": 0.001,
+   "rank": 2,
+   "parameter_ids": [
+    "E_in_plane_mpa",
+    "G12_mpa"
+   ],
+   "singular_values": [
+    243.965441829,
+    52.4308006901
+   ],
+   "covariance_ln": [
+    3.7065981579e-05,
+    -8.1366756682e-05,
+    -8.1366756682e-05,
+    0.000343505454498
+   ],
+   "sd_ln": {
+    "E_in_plane_mpa": 0.00608818376686,
+    "G12_mpa": 0.0185339001427
+   },
+   "exceeds_sd_fit_limit": {
+    "E_in_plane_mpa": false,
+    "G12_mpa": false
+   },
+   "correlation": [
+    1.0,
+    -0.72109491592,
+    -0.72109491592,
+    1.0
+   ],
+   "condition_number": 4.65309395658,
+   "pairwise_cosines": {
+    "E_in_plane_mpa|G12_mpa": 0.72109491592
+   },
+   "projections": {
+    "E_in_plane_mpa": {
+     "q": 0.692836288191,
+     "residual_norm": 164.252597867,
+     "projected_sd_ln": 0.00608818376686
+    },
+    "G12_mpa": {
+     "q": 0.692836288191,
+     "residual_norm": 53.9551844082,
+     "projected_sd_ln": 0.0185339001427
+    }
+   },
+   "provisional_inputs": [
+    "Σ:sigma_setup"
+   ],
+   "refusal_reasons": []
+  },
+  "statistical": {
+   "schema": "auto-id/identification-uncertainty/v1",
+   "quantity": "statistical_sd",
+   "context": "RUN_B",
+   "source": "full M5 system: C = (AᵀA)⁻¹ of [Σ^(−1/2)·S ; C_prior^(−1/2)·E_nuis] (SPEC §10)",
+   "system_hash": "dfbf10e713ab6e6bf4fefc6c96095ed4434c04fb909f498fc4206ca991a27248",
+   "analysis_hash": "243e503937ac85137d51d383f11f6126e766af2aa7c01b9faee70d7417b57e38",
+   "status": "AVAILABLE",
+   "parameter_ids": [
+    "E_in_plane_mpa",
+    "G12_mpa"
+   ],
+   "statistical_sd_ln": {
+    "E_in_plane_mpa": 0.00608818376686,
+    "G12_mpa": 0.0185339001427
+   },
+   "statistical_sd_percent_first_order": {
+    "E_in_plane_mpa": 0.608818376686,
+    "G12_mpa": 1.85339001427
+   },
+   "sigma_components": [
+    {
+     "name": "sigma_setup",
+     "provenance": "provisional",
+     "provisional": true
+    }
+   ],
+   "priors": [],
+   "provisional_inputs": [
+    "Σ:sigma_setup"
+   ],
+   "refusal_reasons": []
+  },
+  "pattern": {
+   "schema": "auto-id/identification-uncertainty/v1",
+   "quantity": "residual_pattern_test",
+   "status": "FAIL",
+   "systematic_families": [],
+   "holdout_failures": [
+    "SP02:R3",
+    "SP13:R2"
+   ],
+   "families": [
+    {
+     "family": "Px:E|Py:E|nx:0|ny:2",
+     "term_ids": [
+      "SP02:R1"
+     ],
+     "values": [
+      0.327916293377
+     ],
+     "eligible": false,
+     "systematic": false
+    },
+    {
+     "family": "Px:O|Py:E|nx:1|ny:2",
+     "term_ids": [
+      "SP02:R2",
+      "SP13:R1"
+     ],
+     "values": [
+      13.6093638246,
+      -13.9719510382
+     ],
+     "eligible": true,
+     "systematic": false
+    }
+   ],
+   "holdouts": {
+    "SP02:R3": 5.41974087999,
+    "SP13:R2": -12.519260158
+   },
+   "reasons": [
+    "holdout SP02:R3: |r| = 5.42 > 3",
+    "holdout SP13:R2: |r| = 12.5 > 3"
+   ],
+   "rules": {
+    "family_sigma": 2.0,
+    "holdout_sigma": 3.0,
+    "minimum_family_size": 2,
+    "inequalities": "strict"
+   }
+  },
+  "birge": {
+   "schema": "auto-id/identification-uncertainty/v1",
+   "quantity": "birge_adjusted_sd",
+   "status": "BLOCKED_PATTERN",
+   "statistical_record_hash": "5070a7fd11932835242e96c813aa39599f1e57843d257fa451197170946adf07",
+   "pattern_record_hash": "cac6a2df74fccff323c92bdf059644edb0c682c3baeea377db265b3a9832cf27",
+   "chi2": 380.537728619,
+   "n_fit_terms": 3,
+   "n_fitted_parameters": 2,
+   "dof": 1,
+   "chi2_per_dof": 380.537728619,
+   "birge_factor": 19.5073762618,
+   "statistical_sd_ln": {
+    "E_in_plane_mpa": 0.00608818376686,
+    "G12_mpa": 0.0185339001427
+   },
+   "birge_adjusted_sd_ln": null,
+   "reasons": [
+    "residual-pattern test failed: birge_adjusted_sd is NOT_AVAILABLE (SPEC §9)",
+    "holdout SP02:R3: |r| = 5.42 > 3",
+    "holdout SP13:R2: |r| = 12.5 > 3"
+   ]
+  },
+  "robustness": {
+   "schema": "auto-id/model-form-robustness/v1",
+   "quantity": "model_form_robustness",
+   "note": "range of linearised leave-one-family-out estimates at p̂ (SPEC §9/§14, D-042); not statistical_sd, not birge_adjusted_sd, not part of Σ, not 1 sigma",
+   "system_hash": "dfbf10e713ab6e6bf4fefc6c96095ed4434c04fb909f498fc4206ca991a27248",
+   "family_mapping_hash": "738410cac626907e823dce6a587a1dcd204b4cd741f0edcc68bfdc3252610a8e",
+   "p_hat": {
+    "E_in_plane_mpa": 50886.2414712,
+    "G12_mpa": 6872.05277329
+   },
+   "p_hat_hash": "a21331287dd8d838cd1fca4c1908e9c6f2d379b1dc59f4be69b1688ab007f3c1",
+   "sigma_hash": "f75b3ab2fc318cf61d1d8f4c705992573e1821839ba8e2b85acb940a3bed7f46",
+   "prior_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "rcond": 0.001,
+   "cases": [
+    {
+     "family": "Px:E|Py:E|nx:0|ny:2",
+     "removed_term_ids": [
+      "SP02:R1"
+     ],
+     "status": "VALID",
+     "shift_ln": {
+      "E_in_plane_mpa": 7.01283473224,
+      "G12_mpa": -15.3806462242
+     },
+     "estimate": {
+      "E_in_plane_mpa": 56524379.1911,
+      "G12_mpa": 0.00143666894012
+     },
+     "reasons": []
+    },
+    {
+     "family": "Px:O|Py:E|nx:1|ny:2",
+     "removed_term_ids": [
+      "SP02:R2",
+      "SP13:R1"
+     ],
+     "status": "REFUSED_RANK_DEFICIENT",
+     "shift_ln": null,
+     "estimate": null,
+     "reasons": [
+      "rank 1 < 2 parameters at rcond 0.001 (smallest/largest singular value 0); SPEC §10 hard block, no override"
+     ]
+    }
+   ],
+   "parameters": {
+    "E_in_plane_mpa": {
+     "parameter_id": "E_in_plane_mpa",
+     "p_hat": 50886.2414712,
+     "min_estimate": 56524379.1911,
+     "max_estimate": 56524379.1911,
+     "range": 0.0,
+     "half_range": 0.0,
+     "range_percent_of_p_hat": 0.0,
+     "half_range_percent_of_p_hat": 0.0,
+     "min_shift_ln": 7.01283473224,
+     "max_shift_ln": 7.01283473224
+    },
+    "G12_mpa": {
+     "parameter_id": "G12_mpa",
+     "p_hat": 6872.05277329,
+     "min_estimate": 0.00143666894012,
+     "max_estimate": 0.00143666894012,
+     "range": 0.0,
+     "half_range": 0.0,
+     "range_percent_of_p_hat": 0.0,
+     "half_range_percent_of_p_hat": 0.0,
+     "min_shift_ln": -15.3806462242,
+     "max_shift_ln": -15.3806462242
+    }
+   },
+   "refused_families": [
+    "Px:O|Py:E|nx:1|ny:2"
+   ],
+   "supports_green": false,
+   "reasons": [
+    "leave-one-family-out refused for ['Px:O|Py:E|nx:1|ny:2']: model_form_robustness cannot support a green verdict"
+   ]
+  }
+ },
+ "journals": {
+  "campaign": {
+   "path": "campaign/<run_hash>/journal.json",
+   "run_hash": "fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
+   "entries": 9,
+   "last_entry_hash": "53fc367c980fe5f12ad944568c01de6b680d3d5d4e7fc96e3665f5c06041dbcb"
+  },
+  "specimens": {
+   "SP02": {
+    "run_hash": "a128385da7f0d978e07cf79721df6cbd541fbbd503792b2119b81bde2b74cecb",
+    "last_entry_hash": "a3921efbf2df1392d7f10d699576b29b4703459062ce7f098e5ad6ce4d3d7565",
+    "evaluations": 8,
+    "solves": 3,
+    "solve_failures": 0,
+    "extractions": 3,
+    "fe_sources": [
+     "archived-validated-pack",
+     "archived-validated-pack",
+     "archived-validated-pack",
+     "archived-validated-pack",
+     "archived-validated-pack",
+     "new-solve",
+     "new-solve",
+     "new-solve"
+    ]
+   },
+   "SP13": {
+    "run_hash": "a134f7dcd121e18880ff35b484635611b853088c6082cab7c7a9613ad620464b",
+    "last_entry_hash": "439c6573f28e5351e1a2eb408036a17acabe9c97786d9d2ba14d93dc6a2d0f98",
+    "evaluations": 8,
+    "solves": 3,
+    "solve_failures": 0,
+    "extractions": 3,
+    "fe_sources": [
+     "archived-validated-pack",
+     "archived-validated-pack",
+     "archived-validated-pack",
+     "archived-validated-pack",
+     "archived-validated-pack",
+     "new-solve",
+     "new-solve",
+     "new-solve"
+    ]
+   }
+  }
+ },
+ "lm_history": [
+  {
+   "iteration": 1,
+   "mu": 0.001,
+   "x": [
+    10.858998997563564,
+    8.411832675758411
+   ],
+   "trial_x": [
+    10.837716895779154,
+    8.903234291652728
+   ],
+   "objective_before": 518.5868395624118,
+   "trial_objective": 205.10535509795784,
+   "accepted": true,
+   "note": "accepted"
+  },
+  {
+   "iteration": 2,
+   "mu": 0.0001,
+   "x": [
+    10.837716895779154,
+    8.903234291652728
+   ],
+   "trial_x": [
+    10.837435189179136,
+    8.826104027334939
+   ],
+   "objective_before": 205.10535509795784,
+   "trial_objective": 190.5168670001836,
+   "accepted": true,
+   "note": "accepted"
+  },
+  {
+   "iteration": 3,
+   "mu": 1e-05,
+   "x": [
+    10.837435189179136,
+    8.826104027334939
+   ],
+   "trial_x": [
+    10.837347860914313,
+    8.835218143100553
+   ],
+   "objective_before": 190.5168670001836,
+   "trial_objective": 190.26886430971302,
+   "accepted": true,
+   "note": "accepted"
+  },
+  {
+   "iteration": 4,
+   "mu": 1.0000000000000002e-06,
+   "x": [
+    10.837347860914313,
+    8.835218143100553
+   ],
+   "trial_x": [
+    10.837362422570408,
+    8.835306904504073
+   ],
+   "objective_before": 190.26886430971302,
+   "trial_objective": null,
+   "accepted": false,
+   "note": "step below stop_fraction·sd"
+  }
+ ],
+ "lm_result": {
+  "status": "CONVERGED",
+  "parameters": {
+   "E_in_plane_mpa": 50886.241471158406,
+   "G12_mpa": 6872.052773289999
+  },
+  "objective": 190.26886430971302,
+  "lm_evaluations": 8,
+  "iterations": 4,
+  "local_sd": [
+   0.006088183766857891,
+   0.018533900142661125
+  ],
+  "refusal": null,
+  "stop": null,
+  "abaqus_solves_used": 6
+ },
+ "campaign_evaluations": [
+  {
+   "parameters": {
+    "E_in_plane_mpa": 52000.0,
+    "G12_mpa": 4500.0
+   },
+   "refusal": null,
+   "residuals": [
+    3.8547905802423323,
+    -4.624189925757823,
+    -31.637495732719085
+   ],
+   "holdout_residuals": {
+    "SP02:R3": 8.838628113490898,
+    "SP13:R2": -9.322463095983538
+   },
+   "fe_sources": {
+    "SP02": "archived-validated-pack",
+    "SP13": "archived-validated-pack"
+   }
+  },
+  {
+   "parameters": {
+    "E_in_plane_mpa": 54600.0,
+    "G12_mpa": 4500.0
+   },
+   "refusal": null,
+   "residuals": [
+    11.875378652792238,
+    1.2990954995745578,
+    -25.67171248198097
+   ],
+   "holdout_residuals": {
+    "SP02:R3": 16.702254718218217,
+    "SP13:R2": -1.4633246420417596
+   },
+   "fe_sources": {
+    "SP02": "archived-validated-pack",
+    "SP13": "archived-validated-pack"
+   }
+  },
+  {
+   "parameters": {
+    "E_in_plane_mpa": 49400.0,
+    "G12_mpa": 4500.0
+   },
+   "refusal": null,
+   "residuals": [
+    -4.57706194596567,
+    -10.777287105565728,
+    -37.83540623897045
+   ],
+   "holdout_residuals": {
+    "SP02:R3": 0.5652252163640034,
+    "SP13:R2": -17.590402592317034
+   },
+   "fe_sources": {
+    "SP02": "archived-validated-pack",
+    "SP13": "archived-validated-pack"
+   }
+  },
+  {
+   "parameters": {
+    "E_in_plane_mpa": 52000.0,
+    "G12_mpa": 4725.0
+   },
+   "refusal": null,
+   "residuals": [
+    3.858778930069621,
+    -2.5257743298977196,
+    -29.596931979176823
+   ],
+   "holdout_residuals": {
+    "SP02:R3": 8.847087648683841,
+    "SP13:R2": -9.28390703663832
+   },
+   "fe_sources": {
+    "SP02": "archived-validated-pack",
+    "SP13": "archived-validated-pack"
+   }
+  },
+  {
+   "parameters": {
+    "E_in_plane_mpa": 52000.0,
+    "G12_mpa": 4275.0
+   },
+   "refusal": null,
+   "residuals": [
+    3.850531781132223,
+    -6.758247681068437,
+    -33.71223783386471
+   ],
+   "holdout_residuals": {
+    "SP02:R3": 8.82967793673354,
+    "SP13:R2": -9.364254151824033
+   },
+   "fe_sources": {
+    "SP02": "archived-validated-pack",
+    "SP13": "archived-validated-pack"
+   }
+  },
+  {
+   "parameters": {
+    "E_in_plane_mpa": 50905.02373384371,
+    "G12_mpa": 7355.72566992564
+   },
+   "refusal": null,
+   "residuals": [
+    0.3933932370188131,
+    17.51670006578543,
+    -10.15978202336528
+   ],
+   "holdout_residuals": {
+    "SP02:R3": 5.4908580050770555,
+    "SP13:R2": -12.419998666912827
+   },
+   "fe_sources": {
+    "SP02": "new-solve",
+    "SP13": "new-solve"
+   }
+  },
+  {
+   "parameters": {
+    "E_in_plane_mpa": 50890.68547237004,
+    "G12_mpa": 6809.704644388402
+   },
+   "refusal": null,
+   "residuals": [
+    0.3416138905688963,
+    13.111684052367956,
+    -14.456859107739046
+   ],
+   "holdout_residuals": {
+    "SP02:R3": 5.43227603416548,
+    "SP13:R2": -12.510632016394277
+   },
+   "fe_sources": {
+    "SP02": "new-solve",
+    "SP13": "new-solve"
+   }
+  },
+  {
+   "parameters": {
+    "E_in_plane_mpa": 50886.241471158406,
+    "G12_mpa": 6872.052773289999
+   },
+   "refusal": null,
+   "residuals": [
+    0.3279162933766955,
+    13.609363824581777,
+    -13.971951038209696
+   ],
+   "holdout_residuals": {
+    "SP02:R3": 5.419740879993047,
+    "SP13:R2": -12.519260158049642
+   },
+   "fe_sources": {
+    "SP02": "new-solve",
+    "SP13": "new-solve"
+   }
+  }
+ ]
+}

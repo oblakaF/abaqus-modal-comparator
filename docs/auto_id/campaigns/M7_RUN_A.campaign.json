@@ -1,0 +1,76 @@
+{
+ "schema": "auto-id/identification-campaign/v1",
+ "campaign_id": "M7.1/RUN_A/SP02+SP13",
+ "run_type": "RUN_A",
+ "decision": "D-069",
+ "parameterisation": "carbon-property-set/v1",
+ "fitted_parameters": ["E_in_plane_mpa"],
+ "fixed_parameters": {"G12_mpa": 4500.0},
+ "start": {"E_in_plane_mpa": 52000.0},
+ "bounds": {"E_in_plane_mpa": [26000.0, 104000.0]},
+ "engineering_plausibility": {"E_in_plane_mpa": [35000.0, 75000.0]},
+ "practical_target": {
+  "preferred_max_abs_relative_error": 0.05,
+  "acceptable_max_abs_relative_error": 0.10,
+  "note": "Engineering target (D-066, D-069): correct mode identity and acceptable MAC; frequency agreement preferably within ~5 %, up to ~10 % acceptable when the mode is correct and there is no branch mismatch. Separate from the formal M5 verdict; properties are never tuned merely to turn a useful 5 % mismatch into 1 %."
+ },
+ "sigma": {
+  "setup": {"sd_ln": 0.003, "status": "PROVISIONAL", "source": "SPEC §7 provisional Σ_setup 0.3 % (D-059, D-065); no measured same-panel remount estimate"},
+  "measurement": {"status": "NOT_AVAILABLE", "source": "the PolyMAX modal sources carry no modal uncertainty (M1 QC UNCERTAINTY_NOT_AVAILABLE; M5_DECISION_RECORD §6); never invented, never zero"}
+ },
+ "lm": {
+  "mu_initial": 0.001,
+  "mu_decrease": 10.0,
+  "max_step_attempts": 3,
+  "evaluation_budget": 11,
+  "max_iterations": 5,
+  "stop_fraction": 0.2,
+  "mu_increase": 10.0,
+  "finite_difference_step": 0.05
+ },
+ "abaqus_solve_budget": 16,
+ "not_fitted": {
+  "t_face": "NOT_FITTED: nominal FE geometry; the SPEC §5 prior needs 9+ thickness points per specimen, which are not recorded",
+  "k_core": "NOT_FITTED: the existing INP core constants; no independent k_core prior (M6.3 NOT_AVAILABLE, D-059)",
+  "k_int": "OFF: disabled by default (SPEC §5); the torsion holdout rule is kept"
+ },
+ "specimens": [
+  {
+   "label": "SP02",
+   "fixture_id": "SP02/bravo-1-physical",
+   "forward_model": "docs/auto_id/forward_models/SP02.physical.forward.json",
+   "solver_profile": "docs/auto_id/solver_profiles/SP02.json",
+   "baseline_shape_pack": "docs/auto_id/fe_shapes/SP02_f3e592281bebce66.shape-pack.json",
+   "archived_baseline": "docs/auto_id/baselines/SP02.carbon4c-baseline.json",
+   "registration_evidence": "docs/auto_id/registration_evidence/SP02_registration_uncertainty.json",
+   "rows": [
+    {"row_id": "R1", "experimental_mode": 2, "fe_mode": 8, "role": "FIT"},
+    {"row_id": "R2", "experimental_mode": 4, "fe_mode": 10, "role": "FIT"},
+    {"row_id": "R3", "experimental_mode": 7, "fe_mode": 13, "role": "HOLDOUT"}
+   ]
+  },
+  {
+   "label": "SP13",
+   "fixture_id": "SP13/best-physical",
+   "forward_model": "docs/auto_id/forward_models/SP13.physical.forward.json",
+   "solver_profile": "docs/auto_id/solver_profiles/SP13.json",
+   "baseline_shape_pack": "docs/auto_id/fe_shapes/SP13_a46d08b52995e078.shape-pack.json",
+   "archived_baseline": "docs/auto_id/baselines/SP13.carbon4c-baseline.json",
+   "registration_evidence": "docs/auto_id/registration_evidence/SP13_registration_uncertainty.json",
+   "rows": [
+    {"row_id": "R1", "experimental_mode": 4, "fe_mode": 10, "role": "FIT"},
+    {"row_id": "R2", "experimental_mode": 7, "fe_mode": 13, "role": "HOLDOUT"}
+   ]
+  }
+ ],
+ "archive_reuse": "docs/auto_id/campaigns/M7_RUN_A.archive-reuse.json",
+ "run_b_gate": null,
+ "provenance": [
+  "D-069: the accepted M7.1 design (SUPERVISOR 2026-10-08); RUN_A is the first executable campaign",
+  "active physical chains: D-065 (SP-02) and D-068 (SP-13); legacy chains are historical only",
+  "frozen rows: the accepted physical strict freezes (registration_evidence/*_registration_reevaluation.json, PHYSICAL); M4.3 holdout rule unchanged",
+  "fixed constants: carbon-property-set/v1 (nu12 0.05; E3, nu13, nu23, G13, G23 NEGLIGIBLE_FOR_BUDGET after M6.4); G12 fixed at 4500 MPa for RUN_A",
+  "bounds are numerical solver bounds only; the engineering window is reporting context, never a prior",
+  "LM: the accepted M4.8/M4.9 settings; evaluation budget 11 = 3 reused (p0 and the ±5 % E Jacobian) + 8 new, hard Abaqus budget 16 new solves"
+ ]
+}

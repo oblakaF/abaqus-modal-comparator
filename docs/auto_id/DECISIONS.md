@@ -1005,3 +1005,218 @@ Decision:
 Rationale / scope: prepares the M7 inputs on the accepted physical registrations without touching the frozen
 M0–M5 evidence. The wiring is a worker result pending SUPERVISOR review (EVIDENCE).
 Supersedes: none
+
+## D-069 — M7 opened: the accepted M7.1 design; RUN_A is the first executable campaign
+Date: 2026-10-08 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M7.1 DESIGN APPROVAL — HUMAN GATE PREPARATION" and "M7 START — RUN A CAMPAIGN ARCHITECTURE" (2026-10-08); SPEC §5, §7, §8, §12.3, §13; D-044, D-046, D-060, D-066, D-068
+Decision:
+- **Base:** M7 starts on branch `auto-id/m7` from `main` `9f5f63a` (M6 ACCEPTED, gate PASS).
+- **Initial campaign:** `SP02/bravo-1-physical` + `SP13/best-physical` only. SP-10 and SP-01 are later
+  extensions.
+- **RUN_A** (the first executable campaign):
+  - Fitted: E_in only (E1 = E2 = E_in); start 52 000 MPa.
+  - Fixed: G12 = 4 500 MPa; ν12 = 0.05; E3, ν13, ν23, G13, G23 as accepted after M6.4.
+  - Not fitted: t_face (nominal FE geometry; no 9-point prior), k_core (existing INP constants; no
+    independent prior), k_int (OFF). No other fitted or nuisance parameter.
+  - Numerical search bounds 26 000–104 000 MPa (solver only). Engineering plausibility 35–75 GPa (reporting
+    only; never a prior).
+- **Observations:**
+  - Frozen independently per specimen on the active physical chains, and they must reproduce exactly:
+    - SP-02: R1 (2 ↔ 8) FIT, R2 (4 ↔ 10) FIT, R3 (7 ↔ 13) HOLDOUT;
+    - SP-13: R1 (4 ↔ 10) FIT, R2 (7 ↔ 13) HOLDOUT.
+  - Otherwise STOP. Registration, pairing, thresholds and modal selection are not altered.
+  - The M4.3 holdout policy is unchanged, and holdouts stay at specimen level.
+  - Only the FIT residuals are combined across the campaign, after branch tracking. Modes are never mixed
+    between specimens.
+- **Σ:** Σ_setup = 0.3 %, PROVISIONAL; Σ_meas = NOT_AVAILABLE. NOT_AVAILABLE never becomes zero, and no
+  PolyMAX measurement uncertainty is invented.
+- **Reuse:**
+  - p0 uses the archived baseline packs. The SP-13 ±5 % E points reuse the governed shape packs.
+  - The SP-02 ±5 % E points reuse the archived CARBON-5A ODBs through extraction-only jobs, with every
+    identity checked. That extraction needs the HUMAN Abaqus-Python gate.
+- **Budget:** RUN_A has a hard limit of 16 new Abaqus solves and no automatic extension. On exhaustion the
+  status is `SOLVE_BUDGET`.
+- **Reporting:**
+  - RUN_A may give `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`. That is not automatically
+    `IDENTIFIED_MATERIAL_PROPERTY`.
+  - The M5 verdicts IDENTIFIED / WIDE / NOT_IDENTIFIABLE are unchanged. A useful effective estimate may
+    coexist with a formal M5 NOT_IDENTIFIABLE.
+  - Every real carbon result carries "not externally validated" (D-060).
+  - The engineering target is correct mode identity and acceptable MAC; frequency agreement preferably
+    ≤ ~5 %, up to ~10 % acceptable. It is kept separate from the M5 verdict. Properties are never tuned
+    merely to turn a useful 5 % mismatch into 1 %.
+- **RUN_B** (E_in + G12, `EFFECTIVE_MODEL_COMPENSATION_TEST`): diagnostic only. It needs its own later
+  SUPERVISOR gate after RUN_A, and its G12 is never reported as an identified material property.
+- **Implementation choices made in M7.1** (for SUPERVISOR review):
+- **Σ_meas NOT_AVAILABLE in M4.7.** `RowSigma(measurement_sd=None)` means NOT_AVAILABLE: it is excluded
+  from σ and recorded as null in run identities, never as 0.0. The change is additive; numeric σ
+  values and their hashes are unchanged.
+- **Family identity for the M5 pattern test and leave-one-family-out.** The M4.3 physical family key is
+  shared across the campaign: SP-02 R2 and SP-13 R1 are one family (1,2). Each row's term stays
+  specimen-qualified (`SP02:R2`).
+- **Fitting-pair MAC guard.** It uses the frozen physical strict-pair MACs (baseline). Mode identity at p̂
+  is FE-to-FE tracking with MAC ≥ 0.90.
+- **M5 system at p̂.** It uses the LM Jacobian reconstructed from the journal: central differences at the
+  start plus Broyden updates (`reconstruct_lm_jacobian`, as for the M4.9 twin). No extra solves.
+- **Family consistency.** SPEC §13 / ROADMAP M7.4 is not part of RUN_A, so it is `NOT_AVAILABLE`. By D-044
+  this blocks a green verdict, so the expected E_in verdict is NOT_IDENTIFIABLE.
+- **Effective-estimate rule** (the engineering criterion, separate from M5). `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`
+  is given only when all of these hold:
+  - LM `CONVERGED`;
+  - no tracking refusal;
+  - the estimate is not at a numerical bound;
+  - every row has tracking MAC ≥ 0.90 and baseline pair MAC ≥ 0.80;
+  - max |f_FE/f_EXP − 1| ≤ 10 %;
+  - the agreement is no worse than at the start.
+  A value outside the engineering window is reported, not rejected.
+Rationale / scope: opens M7 with a governed, resumable two-specimen campaign. It reuses the accepted M4.5
+tracker, the M4.6 pipeline and the M4.8 LM, and leaves M5 unweakened. No Abaqus has been run.
+Supersedes: none
+
+## D-070 — M7.1 accepted; HUMAN gate 1 (archived SP-02 extraction) authorised
+Date: 2026-10-08 · Accepted by: SUPERVISOR / HUMAN · Source: SUPERVISOR "M7.1 ARCHITECTURE — SUPERVISOR ACCEPT. HUMAN GATE 1 ONLY: ARCHIVED SP-02 EXTRACTION" (2026-10-08); D-069
+Decision:
+- **M7.1:** commit `9c16324` is accepted as the RUN_A architecture basis.
+- **D-069 implementation choices accepted:**
+  - `RowSigma(measurement_sd=None)` means Σ_meas = NOT_AVAILABLE and never silently becomes zero;
+  - identical physical modal families across specimens share one campaign family identity where
+    appropriate;
+  - the baseline MAC and accepted-observation guards stay mandatory;
+  - M5 may use the reconstructed LM Jacobian without redundant FE evaluations;
+  - family consistency may stay NOT_AVAILABLE at this first RUN_A checkpoint, so a green M5 verdict is not
+    required for the engineering pipeline test.
+- **Unchanged:** the formal M5 verdict semantics and the engineering target (correct mode identity /
+  acceptable MAC; preferably ~5 %, up to ~10 %; no tuning toward sub-percent agreement for appearance).
+- **HUMAN gate 1:** authorised for manifest `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`, archive-extraction step only.
+  - Exactly 2 Abaqus Python extractions: `SP02_13363f977809dbff` (E 54 600 MPa, ODB `ba38cb69…`) and
+    `SP02_84753f636064e192` (E 49 400 MPa, ODB `bae6a7c1…`, technical retry1 only).
+  - The failed E_MINUS attempt stays excluded.
+  - Not authorised: Abaqus solves, the LM RUN_A, RUN_B, any use of the 16-solve allowance, and automatic
+    continuation into `run`.
+Rationale / scope: records the acceptance and the HUMAN authorisation. The execution is a worker result
+pending SUPERVISOR review (EVIDENCE).
+Supersedes: none
+
+## D-071 — HUMAN gate 2: RUN_A authorised
+Date: 2026-10-08 · Accepted by: SUPERVISOR / HUMAN · Source: SUPERVISOR "M7 RUN A — HUMAN ABAQUS GATE AUTHORISED" (2026-10-08); D-069, D-070
+Decision:
+- **Gate 1:** commit `0837921` (archived SP-02 extraction) is accepted.
+- **RUN_A:** authorised for manifest `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6` and run identity `8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2`, RUN_A only.
+  - Fit E_in only; G12 is fixed at 4 500 MPa.
+  - Specimens `SP02/bravo-1-physical` and `SP13/best-physical`, with the accepted FIT / HOLDOUT rows
+    unchanged.
+  - At most 16 new Abaqus solves and 16 new extractions. No budget extension and no automatic scientific
+    retry.
+  - The archived baseline and ±5 % points are reused, not recomputed.
+- **Not authorised:** RUN_B, G12 fitting, and any change to registration, pairing or holdouts.
+- **Reporting:**
+  - `EFFECTIVE_MODEL_PARAMETER_ESTIMATE` is allowed if supported;
+  - `IDENTIFIED_MATERIAL_PROPERTY` only if M5 permits it;
+  - every carbon result is "not externally validated";
+  - the engineering interpretation keeps its targets: correct mode identity and acceptable MAC; preferably
+    ~5 %, up to ~10 %; no tuning for appearance.
+Rationale / scope: records the HUMAN Abaqus authorisation. The run and its result are worker results
+pending SUPERVISOR review (EVIDENCE).
+Supersedes: none
+
+## D-072 — RUN_A accepted and closed; RUN_B prepared (archive reuse only)
+Date: 2026-10-08 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M7 RUN A — SUPERVISOR ACCEPTANCE. PREPARE RUN B, ARCHIVE REUSE ONLY." (2026-10-08); D-046, D-069, D-071
+Decision:
+- **RUN_A** (`60a83fa`) is accepted and CLOSED.
+  - E_in,eff = 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally validated. The formal M5
+    verdict stays NOT_IDENTIFIABLE.
+  - 55.593 GPa is not an identified intrinsic material property.
+  - RUN_A met the practical engineering target (correct mode identities; acceptable pair MAC; all governed
+    FIT + HOLDOUT errors < 10 %; max 6.79 %) but not the formal M5 identification gate.
+  - The remaining RUN_A solve budget is not spent.
+- **RUN_B** (`EFFECTIVE_MODEL_COMPENSATION_TEST`) is prepared, not executed.
+  - Fit E_in and G12 from the original governed start (52 000 / 4 500 MPa). Search bounds: E_in
+    26 000–104 000, G12 2 250–9 000 MPa (solver only). E_in reference 35–75 GPa; G12 is diagnostic only.
+  - Same frozen observations, holdouts, registration, pairing, family classification, thresholds, Σ_setup
+    0.3 % PROVISIONAL and Σ_meas NOT_AVAILABLE (never zero).
+  - G12 is never an identified material property (`BARE_PLATE_REQUIRED` / `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`).
+  - The report gives Δ ln E_in and Δ ln G12 against RUN_A. The D-045 ln bands are descriptive only. Strong
+    G12 movement together with a material E_in shift is recorded as parameter freedom absorbing model
+    discrepancy, not as improved identification.
+  - Hard ceiling of 24 new solves (not yet authorised). Every scientifically identical existing evaluation is
+    reused.
+  - This decision is the SUPERVISOR RUN_B gate in the campaign definition (`run_b_gate` D-072). Execution
+    still needs the HUMAN Abaqus-Python gate (2 archive extractions) and then the HUMAN solve gate.
+- **Implementation:** reuse entries may name a `pack_store` for a governed pack whose file lives in another
+  run store; the size, SHA-256 and content pins are unchanged. The RUN_B report labels G12 a compensation
+  diagnostic.
+- **Not done:** no Abaqus, no Abaqus Python, no RUN_B LM, no RUN_B estimate.
+Rationale / scope: closes RUN_A with its accepted interpretation and prepares the diagnostic without
+executing it.
+Supersedes: none
+
+## D-073 — RUN_B HUMAN gate 1: archived SP-02 G12± extraction only
+Date: 2026-10-08 · Accepted by: HUMAN · Source: HUMAN "M7 RUN B — HUMAN GATE 1 AUTHORISED. ARCHIVED SP-02 G12 EXTRACTION ONLY." (2026-10-08); D-072
+Decision:
+- The RUN_B preparation (D-072) is accepted as the basis for this gate.
+- **Authorised:** exactly 2 Abaqus Python extractions of archived CARBON-5A ODBs for manifest
+  `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1`:
+  - `SP02_05239a3b56508244` (E_in 52 000, G12 4 725 MPa; ODB `d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a`);
+  - `SP02_ade5dffa2fde3903` (E_in 52 000, G12 4 275 MPa; ODB `52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49`).
+- **Not authorised:** any Abaqus solve, the RUN_B LM, fitting E_in or G12, reusing the RUN_A final point as a
+  governed initial point, changes to M5 or scientific policy, automatic continuation into the solve gate.
+- RUN_A stays CLOSED; its records, journals and provenance are unchanged.
+- RUN_B solve execution requires a second explicit HUMAN authorisation.
+Rationale / scope: records the HUMAN Abaqus-Python authorisation. The extraction result is a worker result
+pending review (EVIDENCE).
+Supersedes: none
+
+## D-074 — RUN_B HUMAN solve gate (diagnostic only)
+Date: 2026-10-08 · Accepted by: HUMAN · Source: HUMAN "M7 RUN B — HUMAN SOLVE GATE AUTHORISED." (2026-10-08); D-072, D-073
+Decision:
+- Gate 1 / D-073 (`4cc20cc`) is accepted.
+- **Authorised:** execution of RUN_B only, for manifest `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` and run identity `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`.
+  - Label `EFFECTIVE_MODEL_COMPENSATION_TEST`; fit exactly E_in and G12 from 52 000 / 4 500 MPa (not from the
+    RUN_A optimum); bounds 26 000–104 000 / 2 250–9 000 MPa.
+  - Fixed inputs, observations, Σ, tracking thresholds and the M4.8/M4.9 LM unchanged; the five governed
+    initial evaluations reused (0 solves).
+  - At most 24 new solves (12 new campaign evaluations) and 24 new extractions; no extension, no automatic
+    scientific retry, no repeat of the gate-1 extractions.
+- **Claims:** RUN_B G12 is `COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY` (`BARE_PLATE_REQUIRED`,
+  `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`); RUN_B E_in is diagnostic as well. The release candidate remains
+  the model-calibrated effective E_in = 55.593 GPa, not externally validated, until the SUPERVISOR changes it.
+- **Not authorised:** reopening RUN_A, another fit, adding t_face / k_core / k_int, spending unused budget
+  after convergence, merging M7.
+Rationale / scope: records the HUMAN Abaqus authorisation. The run and its result are worker results
+pending SUPERVISOR review (EVIDENCE).
+Supersedes: none
+
+## D-075 — RUN_B accepted; M7 scientific campaign complete
+Date: 2026-10-08 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M7 RUN B — SUPERVISOR ACCEPTANCE AND M7 CLOSURE PREPARATION." (2026-10-08); D-072, D-074
+Decision:
+- **RUN_B** (`535141e`) is ACCEPTED, diagnostic only. Conclusion C is accepted: freeing G12 causes strong
+  parameter compensation and materially shifts E_in (Δln E_in −0.0885, Δln G12 +0.4234). The improved absolute
+  residuals of RUN_B are not improved material identification.
+  - RUN_B G12 (6.8721 GPa) stays `COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY`, `BARE_PLATE_REQUIRED`,
+    `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`; it never enters a recommended-material-property table. RUN_B
+    E_in (50.8862 GPa) is diagnostic as well.
+  - The specimen-specific family discrepancy is not removed by freeing G12: family (1,2) SP-02 − SP-13
+    7.85 → 8.27 percentage points; family (0,3) holdouts
+    5.63 → 5.33. RUN_B mainly shifts family means and redistributes
+    residuals: MODEL_FORM / PARAMETER_COMPENSATION dependence.
+- **RUN_A remains the engineering release candidate:** E_in,eff = 55.593 GPa,
+  `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally validated; not `IDENTIFIED_MATERIAL_PROPERTY`; formal M5
+  NOT_IDENTIFIABLE. Practical engineering result: governed modal identities preserved; experimental-pair MAC
+  acceptable (min 0.918); all FIT + HOLDOUT errors < 10 % (max
+  6.79 %); E_in inside the engineering window; the intended
+  engineering-use criterion is met. The RUN_A leave-one-family-out range 50.8–60.3 GPa
+  may be reported only as `MODEL_DEPENDENCE_DIAGNOSTIC` (not a confidence interval, not a formal
+  material-property uncertainty).
+- **Reporting correction (M5 unchanged):** M5 takes model_form_robustness over the VALID leave-one-family-out
+  cases only, so an incomplete set can show 0.0. The campaign report adds `model_form_robustness.status`:
+  `AVAILABLE_COMPLETE_LOO` (every family case VALID, at least two; labelled `MODEL_DEPENDENCE_DIAGNOSTIC`),
+  `UNAVAILABLE_INCOMPLETE_LOO` (any refused case or fewer than two valid cases; no number, no replacement
+  value) or `NOT_EVALUATED`. RUN_A: `AVAILABLE_COMPLETE_LOO`; RUN_B: `UNAVAILABLE_INCOMPLETE_LOO`. M5 thresholds,
+  algorithms, verdicts and records are unchanged; the accepted RUN_A / RUN_B result records are unchanged.
+- **No further M7 FE work:** no further Abaqus execution in M7. The unused solve budgets (RUN_A 14 / 16,
+  RUN_B 18 / 24) are abandoned intentionally. The M7 scientific campaign is complete.
+- **Roadmap M7.2–M7.8** were not pursued as separate mini-steps; their questions are answered as far as M7
+  goes by RUN_A + RUN_B (M7 GATE: one shared carbon vector does not explain the family, so no global material
+  number is reported). Recorded as `NOT_PURSUED_IN_M7` for SUPERVISOR confirmation at stage acceptance.
+- M8 is not started. M7 is not merged without HUMAN authorisation.
+Rationale / scope: accepts RUN_B and closes the M7 campaign with its accepted interpretation.
+Supersedes: none
