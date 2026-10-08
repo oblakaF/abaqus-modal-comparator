@@ -185,3 +185,12 @@ SUPERVISOR gate.
   NO_GLOBAL_PARAMETER_VALUE — a correct refusal, not a failed stage gate; stage-gate closure (expected
   PASS_BY_REFUSAL) pending a SUPERVISOR decision. M8 on hold; M8.1 parked on `auto-id/m8`.
 - **Not decided here:** SPEC v1.2, SPECIMEN_ENGINEERING_CALIBRATION, τ_mf (HUMAN decisions).
+
+## 11. M7 corrective closure (D-077), `ACCEPTED`
+
+- **M7b accepted** (PR #39, merge `b9db2c1`); audit iteration 2 K1–K3 resolved; V1–V8 / J1–J5 dispositions accepted.
+- **Results:** RUN_A family consistency FAIL (Δχ² ≈ 746.27, Δdof 1); RUN_B NOT_EVALUABLE_RANK_DEFICIENT; formal output
+  NO_GLOBAL_PARAMETER_VALUE; 55.593 GPa historical optimiser evidence only; no new material property.
+- **Stage:** M7 ACCEPTED; stage gate PASS (PASS_BY_REFUSAL) — the global value is withheld as SPEC v1.1 requires.
+- **Open policy questions:** SPEC v1.2, τ_mf, SPECIMEN_ENGINEERING_CALIBRATION (not decided).
+- **M8:** NOT_STARTED; M8.1 parked on `auto-id/m8` (`PARKED_PENDING_POST_M7_DECISION`).
