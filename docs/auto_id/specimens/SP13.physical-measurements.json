@@ -1,0 +1,314 @@
+{
+  "schema": "auto-id/specimen-physical-measurements/v1",
+  "specimen_passport": {
+    "path": "docs/auto_id/specimens/SP13.physical.specimen.json",
+    "manifest_hash": "8366c163581a79796915ccbf913a9ac170180c079294f577984b1901ff870b77"
+  },
+  "physical_specimen_id": "SP-13",
+  "sources": {
+    "spec_txt": {
+      "role": "specimen source record (spec.txt)",
+      "file_name": "spec.txt",
+      "sha256": "cf18f58a4a89b25feea44bf1faf8b0ecff891152dbc75f3345c5a5ada7cc7619",
+      "size_bytes": 6157,
+      "location": {
+        "store": "snadwich",
+        "relative_path": "SP-13/spec.txt"
+      }
+    }
+  },
+  "measurements": [
+    {
+      "quantity": "plan_mm",
+      "component": "panel",
+      "values": [
+        510.0,
+        520.0
+      ],
+      "unit": "mm",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Dimensions                        | 510x520x2.85        |",
+      "method": "100 cm steel ruler and two calipers (HUMAN H5, recorded in the passport)",
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "readout resolution only; no calibrated dimension uncertainty recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written in the source; mm as in the passport's HUMAN H5 statement; FE model 510 x 520"
+    },
+    {
+      "quantity": "total_thickness_mm",
+      "component": "panel",
+      "values": [
+        2.85
+      ],
+      "unit": "mm",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Dimensions                        | 510x520x2.85        |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the source gives one value without method or uncertainty"
+      },
+      "spec_requirement": null,
+      "remarks": "third value of the dimensions line"
+    },
+    {
+      "quantity": "face_thickness_mm",
+      "component": "top_face",
+      "values": [
+        0.425
+      ],
+      "unit": "mm",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Top face sheet thickness          | 0.425               |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "measurement method, point count and uncertainty are not recorded"
+      },
+      "spec_requirement": "SPEC §15 needs at least 9 points per sheet: NOT MET (one value per sheet)",
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "face_thickness_mm",
+      "component": "bottom_face",
+      "values": [
+        0.425
+      ],
+      "unit": "mm",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Bottom face sheet thickness       | 0.425               |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "measurement method, point count and uncertainty are not recorded"
+      },
+      "spec_requirement": "SPEC §15 needs at least 9 points per sheet: NOT MET (one value per sheet)",
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "core_height_mm",
+      "component": "core",
+      "values": [
+        2.0
+      ],
+      "unit": "mm",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Core thickness                    | 2                   |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the source gives one value without method or uncertainty"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "top_face",
+      "values": [
+        163.6
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Top face sheet mass               | 163.60              |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "bottom_face",
+      "values": [
+        158.5
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Bottom face sheet mass            | 158.50              |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "core",
+      "values": [
+        179.13
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Core mass                         | 179.13              |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "specimen_without_adhesive",
+      "values": [
+        501.44
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Sample mass without adhesive      | 501.44              |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "adhesive_top",
+      "values": [
+        44.1
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Adhesive mass top                 | 44.1                |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "adhesive_bottom",
+      "values": [
+        44.91
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Adhesive mass bottom              | 44.91               |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "adhesive_total_calculated",
+      "values": [
+        89.01
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Total adhesive mass calculated    | 89.01               |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "calculated in the source"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "adhesive_total_real",
+      "values": [
+        83.16
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Total adhesive mass real          | 83.16               |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "finished_specimen",
+      "values": [
+        584.6
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Finished specimen real mass       | 584.6               |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "unit not written"
+    },
+    {
+      "quantity": "masses_g",
+      "component": "finished_specimen_calculated",
+      "values": [
+        590.24
+      ],
+      "unit": "g",
+      "unit_stated_in_source": false,
+      "source": "spec_txt",
+      "source_text": "| Finished specimen calculated mass | 590.24              |",
+      "method": null,
+      "uncertainty": {
+        "status": "NOT_AVAILABLE",
+        "sd": null,
+        "basis": "the scale and its uncertainty are not recorded"
+      },
+      "spec_requirement": null,
+      "remarks": "calculated in the source"
+    }
+  ],
+  "not_available": {
+    "face_thickness_points": "no 9+ point thickness map per sheet (SPEC §15)",
+    "uncertainty": "no calibrated uncertainty for any value (resolution is not an uncertainty)",
+    "units": "the SP-13 source table writes no units; mm and g are recorded with unit_stated_in_source false"
+  },
+  "note": "additive governed record (D-076, audit iteration 2 K3): the passport, its manifest hash, the registrations, fixtures, freezes and mode pairs are unchanged; no value here enters any FE model or fit without a separate decision"
+}

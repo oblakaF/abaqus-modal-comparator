@@ -3906,3 +3906,63 @@ first internal provider.
   `f1274cae80a6b3972cef04fd9c1bee0505920311` (as already recorded in `STATUS.json` `main_merges` since PR #36).
 - **Scientific behaviour changed:** NO. No M6 result, evidence, decision or scientific text changed.
 - **Abaqus run count:** 0. Docs only.
+
+## 2026-10-09 — M7 — M7b-DIAG: external audit iteration 2 corrective diagnostics (D-076)
+
+- **Stage:** M7 (REWORK)
+- **Mini-step:** M7b-DIAG (audit corrective)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7b-diag` (from `main` `7a34ee65f8a036866961c10dbd685a44ec957671`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7b): audit iteration 2 corrective - SPEC 13 family consistency FAIL, no global E released, CARBON-5G`
+- **Decision:** D-076 (supersedes the release interpretation of D-069 / D-072 / D-075; M7 gate FAIL).
+- **Files changed:**
+  - created: `src/services/family_consistency.py`, `src/services/campaign_diagnostics.py`,
+    `src/domain/physical_measurements.py`, `tests/test_m7b_corrective.py`,
+    `docs/auto_id/audit_corrections/` (4 records), `docs/auto_id/specimens/SP0x.physical-measurements.json`;
+  - updated: `src/services/identification_campaign_run.py` (SPEC §13 guard; report v2), `src/domain/campaign_definition.py`
+    (optional identity-bound `family_consistency` policy), `tools/m7_campaign.py`, `tests/test_m7_campaign.py`,
+    `tests/test_m7_run_a_result.py`, `tests/test_m7_run_b_result.py`, DECISIONS (D-076), EVIDENCE,
+    M7_DECISION_RECORD (§10), ROADMAP, STATUS.
+- **Scientific behaviour changed:** YES. The campaign verdict now evaluates SPEC §13 instead of a hard-coded
+  NOT_AVAILABLE; the report no longer presents an unreleased optimiser output as an effective estimate. M5
+  thresholds unchanged; no gate weakened.
+- **Result:** RUN_A family consistency FAIL (Δχ² 746.27, Δdof 1, p_χ² 2.6e-164, bootstrap p 0.00025 (4000 samples, seed 20261009)); RUN_B NOT_EVALUABLE_RANK_DEFICIENT; no global E_in released.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1616 OK (2 Abaqus-gated skipped); without data stores 1602 OK (64 skipped); test_m7b_corrective 23 OK (store-gated: spec.txt source lines, live excluded-mode diagnostics); M7 modules with stores 94 OK (RUN_A / RUN_B rebuilt from the journals: unchanged except the D-076 family-consistency and release fields); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK
+- **Abaqus run count:** 0 solves, 0 Abaqus Python extractions.
+- **Unchanged:** RUN_A / RUN_B result records and journals; passports, registrations, fixtures, freezes, mode pairs;
+  SPEC v1.1; branch `auto-id/m8` (parked).
+- **Next gate:** SUPERVISOR review of the corrective diagnostics; SPEC v1.2 / τ_mf are HUMAN decisions.
+
+## 2026-10-09 — M7 — M7b: SUPERVISOR review corrections before PR (D-076)
+
+- **Stage:** M7 (REWORK)
+- **Mini-step:** M7b-DIAG (review corrections)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7b-diag`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7b): review corrections - refusal is not a failed gate, full audit disposition, J5 uncertainty basis`
+- **Changes:**
+  - gate semantics: family consistency FAIL / NO_GLOBAL_PARAMETER_VALUE kept apart from the stage gate; STATUS
+    `m7.gate` = `PENDING_SUPERVISOR_CLOSURE` (expected `PASS_BY_REFUSAL`); the "M7 gate FAIL" wording of the previous
+    M7b entry is superseded; D-076 (unmerged, under review) clarified accordingly;
+  - `AUDIT_ITERATION2_DISPOSITION.md`: K3 hypothesis narrowed (SP-13 0.425 mm is in its INP); V1–V8 and J1–J5
+    dispositioned from the supplied audit text;
+  - J5: campaign report `uncertainty_basis` (reporting only) with a regression test.
+- **Scientific behaviour changed:** reporting only (`uncertainty_basis`). Family-consistency numbers unchanged.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1617 OK (2 Abaqus-gated skipped); without data stores 1603 OK (64 skipped); M7 and corrective modules with stores 95 OK (incl. test_m7b_corrective 24 OK; RUN_A / RUN_B rebuilt from the journals); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of the M7b PR; stage-gate closure as a separate decision.
+
+## 2026-10-09 — M7 — M7b: cross-platform tolerance in the corrective record tests
+
+- **Branch:** `auto-id/m7b-diag`
+- **Commit SHA:** the commit that introduces this entry, message
+  `test(M7b): compare corrective family-consistency records within floating-point tolerance`
+- **Reason:** Linux CI on `59fef94`: the family-consistency Δχ² differs from the Windows-generated record in the last
+  digit (`…853167` vs `…853168`; numpy / BLAS builds). The test compared floats exactly.
+- **Change:** `tests/m7b_support.assert_records_close` (structure and text exact, floats rel 1e-9), used in
+  `test_m7b_corrective`, `test_m7_run_a_result`, `test_m7_run_b_result`. No code or record changed; the result is the
+  same (RUN_A FAIL, Δχ² 746.27).
+- **Tests:** Windows M7 and corrective modules with stores 95 OK; full suite without data stores 1603 OK (64 skipped).
+- **Abaqus run count:** 0.

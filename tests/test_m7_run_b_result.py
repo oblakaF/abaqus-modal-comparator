@@ -17,6 +17,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "tests"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from domain.campaign_definition import (
@@ -26,6 +27,7 @@ from domain.campaign_definition import (
     load_campaign_definition,
 )
 from domain.experiment_fixture import fixture_roots_from_environment
+from m7b_support import assert_records_close
 
 
 CAMPAIGNS = ROOT / "docs" / "auto_id" / "campaigns"
@@ -135,11 +137,21 @@ class RunStoreTests(unittest.TestCase):
                                        journal.records("result")[-1],
                                        {**run_a["parameters"], **run_a["fixed_parameters"]},
                                        f"RUN_A {run_a['run_hash']}")
-        committed = json.loads(RESULT.read_text(encoding="utf-8"))
-        for key in ("engineering", "m5_verdict", "material_claim", "validation", "parameters", "lm_status",
-                    "parameter_roles", "comparison"):
+        committed = json.loads(RESULT.read_text(encoding="utf-8"))  # historical v1 record (frozen, unchanged)
+        report = json.loads(json.dumps(report))
+        for key in ("engineering", "m5_verdict", "material_claim", "validation", "lm_status", "parameter_roles",
+                    "comparison"):
             with self.subTest(key=key):
-                self.assertEqual(json.loads(json.dumps(report[key])), committed[key])
+                self.assertEqual(report[key], committed[key])
+        self.assertEqual(report["optimizer_candidate"]["values"], committed["parameters"])
+        # D-076: SPEC §13 is not evaluable for RUN_B (SP13 has one FIT row for two parameters): no PASS or FAIL
+        # is invented, the guard stays NOT_AVAILABLE, and nothing is released.
+        self.assertEqual(report["family_consistency"]["status"], "NOT_EVALUABLE_RANK_DEFICIENT")
+        self.assertIsNone(report["family_consistency"]["p_chi2"])
+        self.assertEqual(report["formal_output"]["status"], "NO_GLOBAL_PARAMETER_VALUE")
+        correction = json.loads((ROOT / "docs/auto_id/audit_corrections/M7_FAMILY_CONSISTENCY_CORRECTION.json")
+                                .read_text(encoding="utf-8"))
+        assert_records_close(self, report["family_consistency"], correction["run_b"]["family_consistency"])
         closure = json.loads((CAMPAIGNS / "M7_CLOSURE.json").read_text(encoding="utf-8"))
         self.assertEqual(json.loads(json.dumps(report["model_form_robustness"])),
                          closure["run_b"]["model_form_robustness"])  # D-075 reporting from the live M5 chain

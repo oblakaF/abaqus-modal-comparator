@@ -173,3 +173,15 @@ SUPERVISOR gate.
   leave-one-family-out set is never read as zero model-form uncertainty. M5 unchanged.
 - **Budgets:** unused solves abandoned (RUN_A 14 / 16, RUN_B 18 / 24). No further M7 FE work.
 - **Next:** SUPERVISOR review of the M7 stage PR (`auto-id/m7` → `main`). Not merged; M8 not started.
+
+## 10. External audit iteration 2: corrective state (D-076), `REWORK`
+
+- **K1:** 55.593 GPa withdrawn as a released value; it is HISTORICAL_RUN_A_OPTIMIZER_CANDIDATE (diagnostic).
+- **K2:** SPEC §13 implemented; RUN_A FAIL (Δχ² 746.27, Δdof 1, p_χ² 2.6e-164, bootstrap p 0.00025 (4000 samples, seed 20261009)); RUN_B NOT_EVALUABLE_RANK_DEFICIENT.
+- **K3:** CARBON-5G INP audit; additive physical-measurement records.
+- **Current interpretation:** no global E_in for the SP-02 / SP-13 family under SPEC v1.1; each specimen shown
+  separately (diagnostic only).
+- **State:** M7 REWORK under corrective review (supersedes §9's acceptance). Family consistency FAIL; formal output
+  NO_GLOBAL_PARAMETER_VALUE — a correct refusal, not a failed stage gate; stage-gate closure (expected
+  PASS_BY_REFUSAL) pending a SUPERVISOR decision. M8 on hold; M8.1 parked on `auto-id/m8`.
+- **Not decided here:** SPEC v1.2, SPECIMEN_ENGINEERING_CALIBRATION, τ_mf (HUMAN decisions).
