@@ -1038,3 +1038,39 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
   zero, the solve cap, the HUMAN gate, the RUN_B gate, the observation STOP, G12 fixing, refusal
   propagation, and the RowSigma None handling.
 - 0 Abaqus solves, 0 Abaqus Python extractions, no LM run, no estimate, no RUN_B.
+
+## M7 RUN_A HUMAN gate 1: archived SP-02 CARBON-5A extraction (2 Abaqus Python runs, 0 solves)
+
+- **Status:** REVIEW_READY (worker, 2026-10-08; D-070).
+- **Pre-execution check:** 18 of 18 items PASS:
+  - the manifest hash equals the authorised `e4ba607f06a69311…`;
+  - both ODBs re-hash to their pins;
+  - the SP-02 physical forward lineage renders both jobs;
+  - the parameters are exactly 54 600 and 49 400 MPa with G12 4 500;
+  - Abaqus 2024 and the completion markers are present;
+  - the failed attempt is not selected;
+  - the extractor is unchanged.
+- **Execution:** `tools/m7_campaign.py extract-archive`, on SHA-verified run-store copies with the pinned
+  `extract_odb.py`. The copies were deleted after validation, and the archived originals were never opened
+  by Abaqus. 2 extractions, 0 solves.
+
+| Job | E (MPa) | ODB SHA-256 | Pack content SHA-256 | R1 FE 8 | R2 FE 10 | R3 FE 13 |
+|---|---|---|---|---|---|---|
+| `SP02_13363f977809dbff` | 54600 | `ba38cb698c5cb2dc…` | `7ac24b6b2c5738c5…` | → 8, MAC 1.000000, 77.0735 Hz | → 10, MAC 0.999998, 90.9286 Hz | → 13, MAC 0.999999, 212.3789 Hz |
+| `SP02_84753f636064e192` | 49400 | `bae6a7c133a8eb4b…` | `81a5a8ccdc1c846a…` | → 8, MAC 1.000000, 73.3617 Hz | → 10, MAC 0.999998, 87.6933 Hz | → 13, MAC 0.999999, 202.3423 Hz |
+
+- **Independent post-extraction validation:** 22 of 22 PASS:
+  - the node set, coordinates and FE geometry equal the governed SP-02 baseline;
+  - the frequencies (modes 7–30) equal the accepted CARBON-5A table exactly;
+  - the content and file hashes are deterministic on reload;
+  - FE-to-FE tracking from the baseline is repeatable (every row on its own mode, MAC ≥ 0.999998, no order
+    change; no mode-number substitution);
+  - the derived S_E (R1 0.493162, R2 0.361989, R3 0.483707) equals the accepted CARBON-5A sensitivities.
+- **Executable RUN_A manifest after extraction:** unchanged, `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`. The manifest pins the inputs (ODB pins,
+  expected frequencies). The extracted pack content hashes enter the RUN_A run identity
+  `8ed03be3be86aa83…`, which binds exactly these packs.
+- **RUN_A solve budget remaining:** 16 of 16.
+- **Record:** `campaigns/M7_RUN_A.archive-extraction.json` and `campaigns/archive_extraction/*.shape-pack.json`.
+  The packs themselves are run-store data, pinned by content.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1554 OK (2 Abaqus-gated skipped); without data stores 1541 OK (58 skipped); test_m7_archive_extraction 4 OK (1 store-gated) + test_m7_campaign 28 OK
+- 0 Abaqus solves, 2 Abaqus Python extractions. RUN_A and RUN_B are not started.

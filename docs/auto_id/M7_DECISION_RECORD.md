@@ -107,3 +107,13 @@ SUPERVISOR gate.
   `--authorised-manifest-hash e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`. RUN_B is not part of the manifest.
 
 **Not done:** no Abaqus, no Abaqus Python, no real LM, no real estimate, no RUN_B.
+
+## 4. HUMAN gate 1: archived SP-02 extraction (D-070), `REVIEW_READY`
+
+- M7.1 (`9c16324`) is ACCEPTED. Gate 1 covered only the 2 archive extractions.
+- **Result:** both packs validate, and their frequencies equal CARBON-5A exactly. Tracking from the SP-02
+  baseline gives MAC ≥ 0.999998.
+- **Manifest:** the executable RUN_A manifest is unchanged (`e4ba607f06a69311…`). The run identity
+  `8ed03be3be86aa83…` binds the extracted pack content hashes.
+- **Budget remaining:** 16 of 16 new solves.
+- **Next:** HUMAN gate 2 (the RUN_A solves) for this exact manifest.

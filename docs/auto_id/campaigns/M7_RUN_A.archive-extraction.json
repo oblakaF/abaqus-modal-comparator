@@ -1,0 +1,141 @@
+{
+ "schema": "auto-id/campaign-archive-extraction-record/v1",
+ "decision": "D-069 (HUMAN gate 1, 2026-10-08)",
+ "authorised_manifest_hash": "e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6",
+ "manifest_hash_after_extraction": "e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6",
+ "run_identity_hash": "8ed03be3be86aa83877367ab505cf2d66ae711c6c9a2a7a4dc47ab6c499923a2",
+ "abaqus_solves": 0,
+ "abaqus_python_extractions": 2,
+ "store": "auto-id-run (run store; not committed; packs pinned by content)",
+ "extractions": {
+  "SP02_84753f636064e192": {
+   "point": {
+    "E_in_plane_mpa": 49400.0,
+    "G12_mpa": 4500.0
+   },
+   "archived_odb": {
+    "relative_path": "carbon5a/runs/E_MINUS_SP02_retry1/SP02_84753f636064e192.odb",
+    "sha256": "bae6a7c133a8eb4b3bc9eef77d25b45173cb32144875c5591ff2b61a79858e4c",
+    "size_bytes": 751590276
+   },
+   "pack": {
+    "file_name": "SP02_84753f636064e192.npz",
+    "file_sha256": "b45443d50ee0af6053b1deff1befe2de563f1280c398902eac8f336bd7b24430",
+    "content_sha256": "81a5a8ccdc1c846a4a79ec8ef87721b25ac82f0d0f6270cc791d16e4e2080751",
+    "size_bytes": 14319758
+   },
+   "node_set": {
+    "sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+    "count": 29583
+   },
+   "fe_geometry_sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d",
+   "frequencies_match_carbon5a": true,
+   "tracking": {
+    "R1": {
+     "baseline_fe_mode": 8,
+     "tracked_fe_mode": 8,
+     "mac": 0.9999999844715834,
+     "baseline_hz": 75.24107360839844,
+     "tracked_hz": 73.36167907714844
+    },
+    "R2": {
+     "baseline_fe_mode": 10,
+     "tracked_fe_mode": 10,
+     "mac": 0.9999980306948835,
+     "baseline_hz": 89.32708740234375,
+     "tracked_hz": 87.69329833984375
+    },
+    "R3": {
+     "baseline_fe_mode": 13,
+     "tracked_fe_mode": 13,
+     "mac": 0.9999991711286464,
+     "baseline_hz": 207.4272918701172,
+     "tracked_hz": 202.34226989746094
+    }
+   },
+   "extraction_id": "357ce42229e9fca953966e89b402579d82cb270ed4b90eb44500df58918bc876"
+  },
+  "SP02_13363f977809dbff": {
+   "point": {
+    "E_in_plane_mpa": 54600.0,
+    "G12_mpa": 4500.0
+   },
+   "archived_odb": {
+    "relative_path": "carbon5a/runs/E_PLUS_SP02/SP02_13363f977809dbff.odb",
+    "sha256": "ba38cb698c5cb2dc3ed6fb4861e343ebf3f7250eabd2b1517cabdeb1378b74f5",
+    "size_bytes": 751590276
+   },
+   "pack": {
+    "file_name": "SP02_13363f977809dbff.npz",
+    "file_sha256": "9630606ff08cda5b2c4dece82d85fa345effd12e10370b3334f855ce425e6339",
+    "content_sha256": "7ac24b6b2c5738c5ea8501779eaa34461e718e5628fd5fac6bd861b262cf7792",
+    "size_bytes": 14319758
+   },
+   "node_set": {
+    "sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+    "count": 29583
+   },
+   "fe_geometry_sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d",
+   "frequencies_match_carbon5a": true,
+   "tracking": {
+    "R1": {
+     "baseline_fe_mode": 8,
+     "tracked_fe_mode": 8,
+     "mac": 0.9999999852857248,
+     "baseline_hz": 75.24107360839844,
+     "tracked_hz": 77.0734634399414
+    },
+    "R2": {
+     "baseline_fe_mode": 10,
+     "tracked_fe_mode": 10,
+     "mac": 0.9999982878039503,
+     "baseline_hz": 89.32708740234375,
+     "tracked_hz": 90.92860412597656
+    },
+    "R3": {
+     "baseline_fe_mode": 13,
+     "tracked_fe_mode": 13,
+     "mac": 0.999999200891496,
+     "baseline_hz": 207.4272918701172,
+     "tracked_hz": 212.3788604736328
+    }
+   },
+   "extraction_id": "5758ed0d7629baa72a8a17eacd59fcbcb483c8cf72e323ab50a614a7a21e7fa9"
+  }
+ },
+ "s_e_from_extracted_packs": {
+  "R1": 0.4931616323807618,
+  "R2": 0.36198936705203755,
+  "R3": 0.4837071900148203
+ },
+ "excluded_attempts": [
+  {
+   "relative_path": "carbon5a/runs/E_MINUS_SP02",
+   "reason": "first authorised attempt aborted (file system space exhausted; truncated ODB, not archived); never reused. FAILURE_NOTE: E_MINUS SP02 authorized solve #1 (2026-10-02T06:39:51Z-06:45:57Z) aborted by Abaqus/Standard: \"!!! EXCEPTION: File system space exhausted\" (SMASimUttOSFile::WriteAll), ERROR CATEGORY SOLVER. Cause: out-of-core solver scratch on C: (memory to minimize I/O 45,691 MB; ~48 GB free at start). No retry performed (would be a ninth solve)."
+  }
+ ],
+ "validation": {
+  "journal: exactly 2 archive extractions, nothing else": true,
+  "SP02_84753f636064e192: node set = governed baseline": true,
+  "SP02_84753f636064e192: FE geometry = governed baseline": true,
+  "SP02_84753f636064e192: modes 7-30, frequencies = accepted CARBON-5A exactly": true,
+  "SP02_84753f636064e192: content hash deterministic on reload": true,
+  "SP02_84753f636064e192: pack file hash = record": true,
+  "SP02_84753f636064e192: extraction checks all PASS": true,
+  "SP02_84753f636064e192: FE-to-FE tracking repeatable": true,
+  "SP02_84753f636064e192: every row tracked, MAC >= 0.90, no order change": true,
+  "SP02_13363f977809dbff: node set = governed baseline": true,
+  "SP02_13363f977809dbff: FE geometry = governed baseline": true,
+  "SP02_13363f977809dbff: modes 7-30, frequencies = accepted CARBON-5A exactly": true,
+  "SP02_13363f977809dbff: content hash deterministic on reload": true,
+  "SP02_13363f977809dbff: pack file hash = record": true,
+  "SP02_13363f977809dbff: extraction checks all PASS": true,
+  "SP02_13363f977809dbff: FE-to-FE tracking repeatable": true,
+  "SP02_13363f977809dbff: every row tracked, MAC >= 0.90, no order change": true,
+  "S_E R1 = accepted CARBON-5A sensitivity": true,
+  "S_E R2 = accepted CARBON-5A sensitivity": true,
+  "S_E R3 = accepted CARBON-5A sensitivity": true,
+  "failed E_MINUS attempt not used": true,
+  "executable manifest hash unchanged": true
+ }
+}

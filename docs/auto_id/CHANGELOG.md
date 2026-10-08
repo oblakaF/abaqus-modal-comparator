@@ -3722,3 +3722,26 @@ first internal provider.
   - Σ_setup is provisional;
   - "not externally validated" applies.
 - **Next gate:** SUPERVISOR review of M7.1. Then the HUMAN gates: archive extraction, then the RUN_A run.
+
+## 2026-10-08 — M7 — RUN_A HUMAN gate 1: archived SP-02 CARBON-5A extraction
+
+- **Stage:** M7
+- **Mini-step:** M7.1 (ACCEPTED, D-070); RUN_A gate 1
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_A gate 1 - archived SP-02 CARBON-5A extraction (2 Abaqus Python, 0 solves)`
+- **Decision:** D-070 (M7.1 accepted; gate 1 authorised for manifest `e4ba607f06a69311…`).
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_RUN_A.archive-extraction.json`,
+    `docs/auto_id/campaigns/archive_extraction/SP02_13363f977809dbff.shape-pack.json` and
+    `SP02_84753f636064e192.shape-pack.json`, `tests/test_m7_archive_extraction.py`;
+  - updated: DECISIONS (D-070), EVIDENCE, M7_DECISION_RECORD (§4), STATUS.
+- **Scientific behaviour changed:** NO. No code changed; the governed result is recorded.
+- **Abaqus run count:** 0 solves, 2 Abaqus Python extractions (gate 1).
+- **Result:**
+  - both packs validate; their frequencies equal CARBON-5A exactly; tracking MAC ≥ 0.999998;
+  - the manifest is unchanged (`e4ba607f06a69311…`); the run identity is `8ed03be3be86aa83…`;
+  - the solve budget remaining is 16 of 16.
+- **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1554 OK (2 Abaqus-gated skipped); without data stores 1541 OK (58 skipped); test_m7_archive_extraction 4 OK (1 store-gated) + test_m7_campaign 28 OK
+- **Next gate:** HUMAN gate 2 (RUN_A solves). RUN_A and RUN_B are not started.

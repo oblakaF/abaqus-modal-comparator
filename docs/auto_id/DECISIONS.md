@@ -1071,3 +1071,27 @@ Decision:
 Rationale / scope: opens M7 with a governed, resumable two-specimen campaign. It reuses the accepted M4.5
 tracker, the M4.6 pipeline and the M4.8 LM, and leaves M5 unweakened. No Abaqus has been run.
 Supersedes: none
+
+## D-070 — M7.1 accepted; HUMAN gate 1 (archived SP-02 extraction) authorised
+Date: 2026-10-08 · Accepted by: SUPERVISOR / HUMAN · Source: SUPERVISOR "M7.1 ARCHITECTURE — SUPERVISOR ACCEPT. HUMAN GATE 1 ONLY: ARCHIVED SP-02 EXTRACTION" (2026-10-08); D-069
+Decision:
+- **M7.1:** commit `9c16324` is accepted as the RUN_A architecture basis.
+- **D-069 implementation choices accepted:**
+  - `RowSigma(measurement_sd=None)` means Σ_meas = NOT_AVAILABLE and never silently becomes zero;
+  - identical physical modal families across specimens share one campaign family identity where
+    appropriate;
+  - the baseline MAC and accepted-observation guards stay mandatory;
+  - M5 may use the reconstructed LM Jacobian without redundant FE evaluations;
+  - family consistency may stay NOT_AVAILABLE at this first RUN_A checkpoint, so a green M5 verdict is not
+    required for the engineering pipeline test.
+- **Unchanged:** the formal M5 verdict semantics and the engineering target (correct mode identity /
+  acceptable MAC; preferably ~5 %, up to ~10 %; no tuning toward sub-percent agreement for appearance).
+- **HUMAN gate 1:** authorised for manifest `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`, archive-extraction step only.
+  - Exactly 2 Abaqus Python extractions: `SP02_13363f977809dbff` (E 54 600 MPa, ODB `ba38cb69…`) and
+    `SP02_84753f636064e192` (E 49 400 MPa, ODB `bae6a7c1…`, technical retry1 only).
+  - The failed E_MINUS attempt stays excluded.
+  - Not authorised: Abaqus solves, the LM RUN_A, RUN_B, any use of the 16-solve allowance, and automatic
+    continuation into `run`.
+Rationale / scope: records the acceptance and the HUMAN authorisation. The execution is a worker result
+pending SUPERVISOR review (EVIDENCE).
+Supersedes: none
