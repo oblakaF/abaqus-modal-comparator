@@ -472,8 +472,8 @@ work.
 | M6.3 | Printed core-tile free-free experiment; obtain an independent effective k_core prior for the defined topology/process | `NOT_AVAILABLE_WITH_CURRENT_SETUP` (D-059) |
 | M6.4 | Sensitivity budget for fixed transverse carbon constants E3, ν13, ν23, G13, G23; include them if their uncertainty is not negligible | `ACCEPTED` (CLOSED; D-066–D-068): all five `NEGLIGIBLE_FOR_BUDGET`, kept fixed |
 
-Stage status: **`ACCEPTED`** (SUPERVISOR 2026-10-08; M6 gate PASS; stage PR `auto-id/m6` → `main` prepared,
-not merged; M7 `NOT_STARTED`). History: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
+Stage status: **`ACCEPTED`** (SUPERVISOR 2026-10-08; M6 gate PASS; merged to `main` by PR #35, merge commit
+`f1274cae80a6b3972cef04fd9c1bee0505920311`, with HUMAN authorisation). History: `IN_PROGRESS` (SUPERVISOR entry decisions 2026-10-06; branch `auto-id/m6` from `main` `ab1dc60`;
 decisions in [M6_DECISION_RECORD.md](M6_DECISION_RECORD.md), D-049–D-061; rescoped by SPEC §19 item 6; M6 gate
 `NOT_EVALUATED`; M7 `NOT_STARTED`).
 - Checkpoint M6-A `REVIEW_READY`: entry decisions recorded; HUMAN SP-11 experiment checklist
@@ -594,19 +594,20 @@ its declared uncertainty.
 | Id | Mini-step | Status |
 |---|---|---|
 | M7.1 | `family.json` campaign | `ACCEPTED` (D-070): RUN_A + RUN_B campaigns; RUN_A release candidate, RUN_B diagnostic (D-075) |
-| M7.2 | Old plain 0.45 family where scientifically compatible: SP1, SP2, SP10, SP13 | `NOT_PURSUED_IN_M7` (D-075) |
-| M7.3 | Shared vs separate fits | `NOT_PURSUED_IN_M7` (D-075) |
-| M7.4 | Δχ² or bootstrap consistency test | `NOT_PURSUED_IN_M7` (D-075) |
-| M7.5 | Global E_in | `NOT_PURSUED_IN_M7` (D-075) |
-| M7.6 | Conditional secondary G12 evidence | `NOT_PURSUED_IN_M7` (D-075) |
-| M7.7 | Specimen-specific nuisance results | `NOT_PURSUED_IN_M7` (D-075) |
-| M7.8 | Holdout / model-form diagnostics | `NOT_PURSUED_IN_M7` (D-075) |
+| M7.2 | Old plain 0.45 family where scientifically compatible: SP1, SP2, SP10, SP13 | `NOT_PURSUED_IN_M7` (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance; not DONE |
+| M7.3 | Shared vs separate fits | `NOT_PURSUED_IN_M7` (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance; not DONE |
+| M7.4 | Δχ² or bootstrap consistency test | `NOT_PURSUED_IN_M7` (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance; not DONE |
+| M7.5 | Global E_in | `NOT_PURSUED_IN_M7` (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance; not DONE |
+| M7.6 | Conditional secondary G12 evidence | `NOT_PURSUED_IN_M7` (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance; not DONE |
+| M7.7 | Specimen-specific nuisance results | `NOT_PURSUED_IN_M7` (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance; not DONE |
+| M7.8 | Holdout / model-form diagnostics | `NOT_PURSUED_IN_M7` (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance; not DONE |
 
 **M7 GATE:** if one shared carbon vector cannot explain the family, NO global material
 number is reported.
 
-Stage status: `REVIEW_READY` (D-075; opened D-069; branch `auto-id/m7` from `main` `9f5f63a`; decisions in
-[M7_DECISION_RECORD.md](M7_DECISION_RECORD.md)).
+Stage status: `ACCEPTED` (SUPERVISOR 2026-10-08; **M7 GATE: `PASS`**; merged to `main` by PR #37, merge commit
+`0f15db9`, with HUMAN authorisation; opened D-069 on branch `auto-id/m7` from `main` `9f5f63a`; closed D-075;
+decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.md)).
 - **M7.1 (zero Abaqus), `REVIEW_READY`:** the RUN_A campaign architecture.
   - Specimens `SP02/bravo-1-physical` + `SP13/best-physical`. Only E_in is fitted; G12 is fixed at 4 500 MPa.
   - FIT rows `SP02:R1`, `SP02:R2`, `SP13:R1`; HOLDOUT rows `SP02:R3`, `SP13:R2`.
@@ -633,7 +634,14 @@ Stage status: `REVIEW_READY` (D-075; opened D-069; branch `auto-id/m7` from `mai
   remains the release candidate (`EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally validated, M5
   NOT_IDENTIFIABLE). Campaign report gains `model_form_robustness.status` (an incomplete leave-one-family-out set
   is never zero model-form uncertainty). Unused budgets abandoned; no further M7 FE work. M7.2–M7.8 not pursued
-  as separate mini-steps (SUPERVISOR confirmation at stage acceptance). Stage PR prepared, not merged.
+  as separate mini-steps. Stage PR #37 prepared.
+- **M7 ACCEPTED, M7 GATE `PASS`** (SUPERVISOR 2026-10-08). Merged to `main` by PR #37 (`auto-id/m7` → `main`),
+  merge commit `0f15db9acf29b7d3a7b20350982440015e177e94`; reviewed head `87c05da`, merged tree identical.
+  - M7.2–M7.8 stay `NOT_PURSUED_IN_M7` (D-075): superseded by the D-075 M7 stage conclusion and not required for M7 acceptance. They were deliberately not pursued as separate
+    tasks and are **not** DONE.
+  - Scientific results unchanged: RUN_A E_in,eff = 55.593 GPa (`EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally
+    validated, M5 NOT_IDENTIFIABLE; 50.8–60.3 GPa only as `MODEL_DEPENDENCE_DIAGNOSTIC`); RUN_B diagnostic only.
+  - No Abaqus after RUN_B. M8 `NOT_STARTED`.
 
 ---
 
@@ -653,3 +661,5 @@ Stage status: `REVIEW_READY` (D-075; opened D-069; branch `auto-id/m7` from `mai
 **M8 GATE:** the user goes from a specimen/family folder to a scientifically guarded
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
+
+Stage status: `NOT_STARTED` (no M8 branch; next step needs SUPERVISOR instruction).
