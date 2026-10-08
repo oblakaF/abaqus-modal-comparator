@@ -1117,3 +1117,34 @@ Decision:
 Rationale / scope: records the HUMAN Abaqus authorisation. The run and its result are worker results
 pending SUPERVISOR review (EVIDENCE).
 Supersedes: none
+
+## D-072 — RUN_A accepted and closed; RUN_B prepared (archive reuse only)
+Date: 2026-10-08 · Accepted by: SUPERVISOR · Source: SUPERVISOR "M7 RUN A — SUPERVISOR ACCEPTANCE. PREPARE RUN B, ARCHIVE REUSE ONLY." (2026-10-08); D-046, D-069, D-071
+Decision:
+- **RUN_A** (`60a83fa`) is accepted and CLOSED.
+  - E_in,eff = 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally validated. The formal M5
+    verdict stays NOT_IDENTIFIABLE.
+  - 55.593 GPa is not an identified intrinsic material property.
+  - RUN_A met the practical engineering target (correct mode identities; acceptable pair MAC; all governed
+    FIT + HOLDOUT errors < 10 %; max 6.79 %) but not the formal M5 identification gate.
+  - The remaining RUN_A solve budget is not spent.
+- **RUN_B** (`EFFECTIVE_MODEL_COMPENSATION_TEST`) is prepared, not executed.
+  - Fit E_in and G12 from the original governed start (52 000 / 4 500 MPa). Search bounds: E_in
+    26 000–104 000, G12 2 250–9 000 MPa (solver only). E_in reference 35–75 GPa; G12 is diagnostic only.
+  - Same frozen observations, holdouts, registration, pairing, family classification, thresholds, Σ_setup
+    0.3 % PROVISIONAL and Σ_meas NOT_AVAILABLE (never zero).
+  - G12 is never an identified material property (`BARE_PLATE_REQUIRED` / `NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED`).
+  - The report gives Δ ln E_in and Δ ln G12 against RUN_A. The D-045 ln bands are descriptive only. Strong
+    G12 movement together with a material E_in shift is recorded as parameter freedom absorbing model
+    discrepancy, not as improved identification.
+  - Hard ceiling of 24 new solves (not yet authorised). Every scientifically identical existing evaluation is
+    reused.
+  - This decision is the SUPERVISOR RUN_B gate in the campaign definition (`run_b_gate` D-072). Execution
+    still needs the HUMAN Abaqus-Python gate (2 archive extractions) and then the HUMAN solve gate.
+- **Implementation:** reuse entries may name a `pack_store` for a governed pack whose file lives in another
+  run store; the size, SHA-256 and content pins are unchanged. The RUN_B report labels G12 a compensation
+  diagnostic.
+- **Not done:** no Abaqus, no Abaqus Python, no RUN_B LM, no RUN_B estimate.
+Rationale / scope: closes RUN_A with its accepted interpretation and prepares the diagnostic without
+executing it.
+Supersedes: none

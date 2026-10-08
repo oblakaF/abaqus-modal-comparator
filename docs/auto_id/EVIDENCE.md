@@ -1137,3 +1137,41 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
   test).
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1559 OK (2 Abaqus-gated skipped); without data stores 1546 OK (59 skipped); test_m7_run_a_result 5 OK (1 store-gated; the report rebuilds identically from the run journals)
 - RUN_B is not started.
+
+## M7 RUN_A accepted and closed; RUN_B archive-reuse preparation (zero Abaqus)
+
+- **RUN_A** (D-072):
+  - ACCEPTED and CLOSED. E_in,eff = 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally
+    validated. M5 NOT_IDENTIFIABLE (unchanged).
+  - The practical engineering target is met (max |error| 6.79 %, all < 10 %, correct mode identity); the
+    formal M5 identification gate is not.
+- **RUN_B preparation (read-only inventory; no Abaqus):**
+  - Accepted CARBON-5A G12 ±5 % states for both specimens: exact G12 4 725 / 4 275 MPa with E_in 52 000 MPa
+    (= the LM's central-difference points; 4 500·(1 ± 0.05) is exact).
+  - All four ODBs re-hash to their ARCHIVE_MANIFEST pins. Completion and Abaqus 2024 markers are present.
+  - The CARBON-5A run manifest shows `solve_ok` and no technical retry; the only CARBON-5A guard stop was
+    SP-02 E_MINUS.
+  - SP-13 G12± packs: validated M4 packs whose frequencies equal CARBON-5A exactly.
+  - The active SP-02 / SP-13 chains reproduce the accepted rows exactly; all 8 reused packs load with full
+    pin verification.
+- **Proposed RUN_B execution manifest** (`campaigns/M7_RUN_B.campaign.json` `7c1f5db24fa9c4f4…`,
+  `campaigns/M7_RUN_B.archive-reuse.json` `fa19cfbb4f818c66…`; not executed):
+
+| # | Item | RUN_B |
+|---|---|---|
+| 1 | SP-13 G12± reused packs | G12+ (52 000 / 4 725): `SP13_4c0f189b9727feaf`, content `1febd801…`; G12− (52 000 / 4 275): `SP13_0328066b74b6fd78`, content `b30263d2…`. Validated M4 packs, CARBON-5A ODBs `f5631941…` / `c39911aa…`, frequencies equal CARBON-5A |
+| 2 | SP-02 G12± archived ODB candidates | G12+ `SP02_05239a3b56508244` (`carbon5a/runs/G_PLUS_SP02/`, ODB `d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a`); G12− `SP02_ade5dffa2fde3903` (`carbon5a/runs/G_MINUS_SP02/`, ODB `52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49`) |
+| 3 | Content / provenance identities | Both ODBs are 751 590 276 bytes. They re-hash to their ARCHIVE_MANIFEST pins and match the accepted_forward_jobs anchors. The `.sta` / `.dat` / `.msg` files are pinned; completion and Abaqus 2024 markers are present. The CARBON-5A run manifest shows `solve_ok` and no technical retry. Expected frequencies (modes 7–30) come from the CARBON-5A table |
+| 4 | SP-02 archive extractions | Exactly 2 (G12+ and G12−) |
+| 5 | p0 reuse | `SP02_f3e592281bebce66`, `SP13_a46d08b52995e078` |
+| 6 | E ±5 % reuse | SP-02: the RUN_A gate-1 packs `SP02_13363f977809dbff` / `SP02_84753f636064e192` (store `m7-run-a-archive`, pins unchanged). SP-13: `SP13_0e861d03c333bb0b` / `SP13_a9df66283a168786` |
+| 7 | RUN_A final point | Not included. (55 593.4…, 4 500) is not one of RUN_B's deterministic initial points, and the LM would reach it only by exact coincidence. Reusing it adds no provenance value |
+| 8 | Zero-solve initial evaluations | 5 (p0, E+, E−, G12+, G12−): 10 FE states, 0 solves |
+| 9 | Maximum new solves | 24 (hard; no extension) |
+| 10 | Maximum extractions | 26 (24 after new solves + 2 archive) |
+| 11 | RUN_B identity | Fixed after archive extraction: the run identity binds the content hashes of the two SP-02 G12± packs. It is reported for the solve gate, as for RUN_A (identity known after gate 1). Campaign hash `7c1f5db24fa9c4f4…` |
+| 12 | Authorised-manifest hash | `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` |
+| 13 | LM evaluation accounting | Budget 17 evaluations = 5 reused + ≤ 12 new. Each new evaluation = 2 solves. A rejected step after a Broyden update refreshes the central differences (4 evaluations = 8 solves). Expected: 3–5 accepted trials (6–10 solves), up to about 18 with one refresh |
+
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive) 1570 OK (2 Abaqus-gated skipped); without data stores 1556 OK (60 skipped); test_m7_run_b_preparation 12 OK (1 store-gated class) and the M7 suites 48 OK
+- 0 Abaqus solves, 0 Abaqus Python extractions, no RUN_B LM.

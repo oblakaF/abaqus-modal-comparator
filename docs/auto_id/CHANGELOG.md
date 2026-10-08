@@ -3768,3 +3768,29 @@ first internal provider.
     `SP02:R3`; Birge blocked); not externally validated.
 - **Test result:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a) 1559 OK (2 Abaqus-gated skipped); without data stores 1546 OK (59 skipped); test_m7_run_a_result 5 OK (1 store-gated; the report rebuilds identically from the run journals)
 - **Next gate:** SUPERVISOR review of RUN_A. RUN_B only under its own later gate.
+
+## 2026-10-08 — M7 — RUN_A closed; RUN_B prepared (archive reuse only, zero Abaqus)
+
+- **Stage:** M7
+- **Status:** REVIEW_READY (RUN_B preparation); RUN_A ACCEPTED and CLOSED
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_A closed; RUN_B prepared - EFFECTIVE_MODEL_COMPENSATION_TEST manifest (zero Abaqus)`
+- **Decision:** D-072.
+- **Files changed:**
+  - created:
+    - `docs/auto_id/campaigns/M7_RUN_B.campaign.json` (`7c1f5db24fa9c4f4…`);
+    - `docs/auto_id/campaigns/M7_RUN_B.archive-reuse.json` (`fa19cfbb4f818c66…`);
+    - `tests/test_m7_run_b_preparation.py`.
+  - updated:
+    - `src/domain/campaign_definition.py` (optional `pack_store` on a reused pack);
+    - `src/services/identification_campaign_run.py` (store override with unchanged pins; RUN_B report label,
+      G12 compensation role, Δ ln comparison with descriptive D-045 bands);
+    - `tools/m7_campaign.py` (`--campaign run-a | run-b`);
+    - DECISIONS (D-072), EVIDENCE, M7_DECISION_RECORD (§6), ROADMAP, STATUS, `campaigns/README.md`.
+- **Scientific behaviour changed:** YES, additively: RUN_B report semantics and the store override. The RUN_A
+  records and hashes are unchanged.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive) 1570 OK (2 Abaqus-gated skipped); without data stores 1556 OK (60 skipped); test_m7_run_b_preparation 12 OK (1 store-gated class) and the M7 suites 48 OK
+- **Abaqus run count:** 0.
+- **Proposed RUN_B manifest:** `5fd0946a0c3f4e20…`.
+- **Next gate:** HUMAN gate for the 2 SP-02 G12± archive extractions, then the HUMAN RUN_B solve gate.

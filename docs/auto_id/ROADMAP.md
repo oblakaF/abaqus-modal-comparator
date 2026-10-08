@@ -619,6 +619,11 @@ Stage status: `IN_PROGRESS` (D-069; branch `auto-id/m7` from `main` `9f5f63a`; d
     (all rows within 10 %).
   - `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`; M5 NOT_IDENTIFIABLE; not externally validated.
   - RUN_B not started.
+  - RUN_A ACCEPTED and CLOSED (D-072).
+- **RUN_B preparation (D-072, zero Abaqus), `REVIEW_READY`:**
+  - The diagnostic `EFFECTIVE_MODEL_COMPENSATION_TEST`: E_in + G12 from the governed start.
+  - Proposed manifest `5fd0946a…`: 2 SP-02 G12± archive extractions, then at most 24 new solves.
+  - Not executed.
 
 ---
 

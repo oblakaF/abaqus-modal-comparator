@@ -130,3 +130,14 @@ SUPERVISOR gate.
 - **Visible model discrepancy:** opposite-sign residuals of the shared (1,2) family across SP-02 and SP-13;
   leave-one-family-out 50.8–60.3 GPa.
 - **Not started:** RUN_B (it needs its own SUPERVISOR gate).
+
+## 6. RUN_A closure and RUN_B preparation (D-072)
+
+- **RUN_A:** ACCEPTED and CLOSED. E_in,eff 55.593 GPa, `EFFECTIVE_MODEL_PARAMETER_ESTIMATE`, not externally
+  validated; M5 NOT_IDENTIFIABLE. The practical target is met; the formal identification gate is not.
+- **RUN_B:**
+  - E_in + G12 from 52 000 / 4 500 MPa, with the same observations, holdouts and Σ.
+  - Diagnostic only; G12 is never a material property.
+  - Proposed manifest `5fd0946a0c3f4e20…`: 5 zero-solve initial evaluations (10 FE states); exactly 2 SP-02 G12±
+    archive extractions; at most 24 new solves and 26 extractions; LM evaluation budget 17.
+- **Next:** the HUMAN Abaqus-Python gate (2 extractions), then the HUMAN solve gate.

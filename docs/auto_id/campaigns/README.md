@@ -34,3 +34,18 @@ value outside it is reported, never rejected and never a prior.
 
 The proposed RUN_A manifest hash is `e4ba607f06a69311b4d7adab089b5b8fdbbf98aae9d2da0837849e6c5da5bde6`. Run-store data (INPs, ODBs, packs, journals) is never
 committed.
+
+## RUN_B (D-072)
+
+- **Files:** `M7_RUN_B.campaign.json` and `M7_RUN_B.archive-reuse.json`.
+- **Purpose:** the diagnostic `EFFECTIVE_MODEL_COMPENSATION_TEST`: E_in + G12 from the governed start, with
+  the same observations, holdouts and Σ as RUN_A.
+- **Tool:** `--campaign run-b` on every command.
+- **Reports:**
+  - the label `EFFECTIVE_MODEL_COMPENSATION_TEST`;
+  - G12 as `COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY`;
+  - Δ ln E_in and Δ ln G12 against RUN_A, with the D-045 bands used descriptively only.
+- **`pack_store`:** a reused pack may name the store that holds its file (for example `m7-run-a-archive`, the
+  RUN_A extraction store). The file size, SHA-256 and content hash pins are unchanged.
+- **Proposed manifest:** `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` (not executed).
+

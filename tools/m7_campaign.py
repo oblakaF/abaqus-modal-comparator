@@ -1,5 +1,7 @@
 """M7 identification campaign (D-069): plan (no Abaqus), gated archive extraction, gated run, report (no Abaqus).
 
+    All commands take --campaign run-a (default) or run-b.
+
     python tools/m7_campaign.py plan --run-root <dir>
         Freezes every specimen on its active physical chain (exact accepted rows or STOP), renders the initial
         points, verifies every archived reuse and writes <dir>/run_manifest.json (the HUMAN execution manifest).
@@ -44,12 +46,14 @@ from services.identification_campaign_run import (  # noqa: E402
 )
 
 
-CAMPAIGN = ROOT / "docs" / "auto_id" / "campaigns" / "M7_RUN_A.campaign.json"
+CAMPAIGNS = {"run-a": ROOT / "docs" / "auto_id" / "campaigns" / "M7_RUN_A.campaign.json",
+             "run-b": ROOT / "docs" / "auto_id" / "campaigns" / "M7_RUN_B.campaign.json"}
+RUN_A_RESULT = ROOT / "docs" / "auto_id" / "campaigns" / "M7_RUN_A.result.json"
 FIXTURES = ROOT / "docs" / "auto_id" / "fixtures" / "real_experiment_fixtures.json"
 
 
-def build(run_root: Path, roots):
-    definition = load_campaign_definition(CAMPAIGN)
+def build(run_root: Path, roots, campaign: str = "run-a"):
+    definition = load_campaign_definition(CAMPAIGNS[campaign])
     definition.require_executable()
     reuse = load_archive_reuse(ROOT / definition.archive_reuse, definition.parameterisation_id)
     specimens = prepare_campaign_specimens(definition, ROOT, load_experiment_fixture_manifest(FIXTURES), roots)
@@ -66,6 +70,7 @@ def main(argv=None) -> int:
     report = commands.add_parser("report")
     for item in (plan, extract, run, report):
         item.add_argument("--run-root", type=Path, required=True)
+        item.add_argument("--campaign", choices=sorted(CAMPAIGNS), default="run-a")
     for item in (extract, run):
         item.add_argument("--abaqus", required=True, help="Abaqus command (machine-specific)")
         item.add_argument("--authorised-manifest-hash", required=True)
@@ -76,7 +81,7 @@ def main(argv=None) -> int:
     run_root = args.run_root.resolve()
     roots = dict(fixture_roots_from_environment())
     roots[ARCHIVE_RUN_STORE] = run_root / "archive_reuse"
-    definition, reuse, specimens, manifest, manifest_hash = build(run_root, roots)
+    definition, reuse, specimens, manifest, manifest_hash = build(run_root, roots, args.campaign)
     if args.command == "plan":
         (run_root / "run_manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
         print(json.dumps({"manifest_hash": manifest_hash, **manifest["budgets"]}, indent=1))
@@ -108,7 +113,13 @@ def main(argv=None) -> int:
     results = journal.records("result")
     if not results:
         raise SystemExit("no campaign result is journalled yet.")
-    document = build_campaign_report(definition, specimens, journal.records("evaluation"), results[-1])
+    reference, label = None, ""
+    if definition.run_type == "RUN_B":  # the diagnostic is reported against the accepted RUN_A result
+        run_a = json.loads(RUN_A_RESULT.read_text(encoding="utf-8"))
+        reference = {**run_a["parameters"], **run_a["fixed_parameters"]}
+        label = f"RUN_A {run_a['run_hash']}"
+    document = build_campaign_report(definition, specimens, journal.records("evaluation"), results[-1], reference,
+                                     label)
     document["manifest_hash"] = manifest_hash
     args.result.write_text(json.dumps(document, indent=1), encoding="utf-8")
     print(json.dumps({k: document[k] for k in ("lm_status", "parameters", "material_claim", "validation")}, indent=1))

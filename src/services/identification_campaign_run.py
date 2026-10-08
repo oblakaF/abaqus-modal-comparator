@@ -20,7 +20,7 @@ its own later SUPERVISOR gate exists (``CampaignDefinition.require_executable``)
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 import math
@@ -38,6 +38,8 @@ from domain.campaign_definition import (
     NO_MATERIAL_CLAIM,
     NOT_AVAILABLE,
     NOT_EXTERNALLY_VALIDATED,
+    RUN_B,
+    RUN_B_LABEL,
     ArchiveReusePlan,
     ArchivedOdbReuse,
     CampaignDefinition,
@@ -512,6 +514,9 @@ def reused_pack_records(reuse: ArchiveReusePlan, repo_root: Path, extracted: Map
         record = load_shape_pack_record(_repo_file(repo_root, entry.shape_pack_record))
         if (record.job_name, record.generated_inp_sha256) != (entry.job_name, entry.generated_inp_sha256):
             raise ArchiveReuseRefusal(f"{entry.job_name}: the governed pack record does not match the reuse plan.")
+        if entry.pack_store is not None:  # same file pins (size, SHA-256, content hash); only the store root differs
+            record = replace(record, pack=replace(record.pack, location=replace(record.pack.location,
+                                                                                store=entry.pack_store)))
         out[entry.specimen][entry.job_name] = record
     for entry in reuse.odbs:
         if entry.job_name in extracted:
@@ -699,9 +704,39 @@ def campaign_m5_verdict(definition: CampaignDefinition, specimens: Sequence[Camp
     return report.to_dict()
 
 
+DESCRIPTIVE_LN_BANDS = (0.05, 0.08)  # D-045 bands, used only to describe stability (never an identification rule)
+
+
+def _describe_shift(delta_ln: float) -> str:
+    size = abs(delta_ln)
+    if size <= DESCRIPTIVE_LN_BANDS[0]:
+        return "WITHIN_0.05_LN"
+    if size <= DESCRIPTIVE_LN_BANDS[1]:
+        return "WITHIN_0.08_LN"
+    return "BEYOND_0.08_LN"
+
+
+def compare_to_reference(parameters: Mapping[str, float], reference: Mapping[str, float], label: str) -> dict:
+    """Δ ln p against a reference run (for RUN_B: RUN_A), described with the D-045 ln bands (descriptive only)."""
+    shifts = {}
+    for name, value in reference.items():
+        if name in parameters:
+            delta = math.log(float(parameters[name])) - math.log(float(value))
+            shifts[name] = {"reference": float(value), "value": float(parameters[name]), "delta_ln": delta,
+                            "delta_percent": (math.exp(delta) - 1.0) * 100.0, "description": _describe_shift(delta)}
+    return {"reference": label, "shifts": shifts,
+            "note": "descriptive stability only (D-045 ln bands); not a material-identification criterion"}
+
+
 def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
-                          evaluations: Sequence[Mapping], result: Mapping) -> dict:
-    """The RUN_A report: engineering estimate and the formal M5 verdict, kept separate (D-069)."""
+                          evaluations: Sequence[Mapping], result: Mapping,
+                          reference: Optional[Mapping[str, float]] = None, reference_label: str = "") -> dict:
+    """The campaign report: engineering estimate and the formal M5 verdict, kept separate (D-069).
+
+    RUN_B is the diagnostic ``EFFECTIVE_MODEL_COMPENSATION_TEST``: its label replaces the engineering
+    estimate label, its G12 is a compensation diagnostic (never a material property), and its shifts
+    against RUN_A are reported in ln p with the descriptive D-045 bands.
+    """
 
     status = result["status"]
     parameters = result.get("parameters")
@@ -746,6 +781,8 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
     if final is None:
         reasons.append("no accepted final evaluation")
     estimate = EFFECTIVE_ESTIMATE if not reasons else NO_EFFECTIVE_ESTIMATE
+    if definition.run_type == RUN_B:
+        estimate = RUN_B_LABEL if not reasons else f"{RUN_B_LABEL}_INCOMPLETE"
     verdict = None
     if final is not None and status == LMStatus.CONVERGED.value and not refusals:
         verdict = campaign_m5_verdict(definition, specimens, evaluations, result, final)
@@ -766,4 +803,9 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
         "sigma": definition.sigma.to_dict(), "not_fitted": dict(definition.not_fitted),
         "fixed_parameters": dict(definition.fixed_parameters),
         "abaqus_solves_used": result.get("abaqus_solves_used"),
+        "parameter_roles": {name: ("COMPENSATION_DIAGNOSTIC_NOT_MATERIAL_PROPERTY"
+                                   if definition.run_type == RUN_B and name == "G12_mpa" else "EFFECTIVE_MODEL_PARAMETER")
+                            for name in definition.fitted_parameters},
+        "comparison": (compare_to_reference(parameters, reference, reference_label)
+                       if reference is not None and parameters is not None else None),
     }

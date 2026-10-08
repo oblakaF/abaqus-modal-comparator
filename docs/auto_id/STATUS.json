@@ -543,7 +543,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the RUN_A result (EFFECTIVE_MODEL_PARAMETER_ESTIMATE; M5 NOT_IDENTIFIABLE); RUN_B only under its own later SUPERVISOR gate",
+  "next_action": "STOP: SUPERVISOR review of the RUN_B preparation; then the HUMAN gate for the 2 SP-02 G12+/- archive extractions (manifest 5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1), then the HUMAN RUN_B solve gate",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -856,7 +856,7 @@
     "branch": "auto-id/m7",
     "base": "9f5f63a968759d6237facda00a4415cfe29c2257",
     "status": "IN_PROGRESS",
-    "decision": "D-069, D-070, D-071",
+    "decision": "D-069, D-070, D-071, D-072",
     "decision_record": "docs/auto_id/M7_DECISION_RECORD.md",
     "M7.1": "ACCEPTED",
     "M7.2": "TODO",
@@ -927,10 +927,25 @@
         "abaqus_solves": 2,
         "abaqus_python_extractions": 2,
         "campaign_journal_last_entry": "f1d1e2a99c6411cb664ba38d4ca035489f1ef62cb5994d7dce354c8ea3549ea3",
-        "status": "REVIEW_READY"
-      }
+        "status": "ACCEPTED"
+      },
+      "status": "CLOSED",
+      "acceptance": "SUPERVISOR 2026-10-08 (D-072): E_in,eff 55.593 GPa, EFFECTIVE_MODEL_PARAMETER_ESTIMATE, not externally validated; M5 NOT_IDENTIFIABLE; practical engineering target met, formal M5 identification gate not met; remaining budget not spent"
     },
-    "run_b": "diagnostic EFFECTIVE_MODEL_COMPENSATION_TEST; not executable without its own later SUPERVISOR gate",
+    "run_b": {
+      "label": "EFFECTIVE_MODEL_COMPENSATION_TEST (diagnostic only)",
+      "decision": "D-072",
+      "campaign": "docs/auto_id/campaigns/M7_RUN_B.campaign.json (7c1f5db24fa9c4f4e90c82ca802c6dae22cbe5c7ec9e2989e63e439f678540e5)",
+      "archive_reuse": "docs/auto_id/campaigns/M7_RUN_B.archive-reuse.json (fa19cfbb4f818c66ab0f58479fbce97e9fc767f3dd17909d8f0ffa48e545173e)",
+      "fitted": "E_in_plane_mpa, G12_mpa from 52000 / 4500 MPa; bounds 26000-104000 / 2250-9000 MPa (solver only)",
+      "g12_role": "compensation diagnostic; never an identified material property (BARE_PLATE_REQUIRED / NUISANCE_NOT_INDEPENDENTLY_CONSTRAINED)",
+      "proposed_manifest": "5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1",
+      "initial_evaluations_zero_solve": 5,
+      "archive_extractions": 2,
+      "budgets": "24 new Abaqus solves (hard); 26 Abaqus Python extractions max; LM evaluations 17",
+      "executed": false,
+      "status": "PREPARED (REVIEW_READY)"
+    },
     "M7.1_tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK",
     "abaqus_solves": 2,
     "abaqus_python_extractions": 4

@@ -406,6 +406,7 @@ class ArchivedPackReuse:
     job_name: str
     generated_inp_sha256: str
     shape_pack_record: str  # repository path
+    pack_store: Optional[str] = None  # store holding the pack file when it is not the record's own (same pins)
 
 
 @dataclass(frozen=True)
@@ -461,11 +462,15 @@ def parse_archive_reuse(data: object, parameterisation_id: str) -> ArchiveReuseP
     packs = []
     for index, item in enumerate(data["packs"]):
         field = f"packs[{index}]"
-        entry = _mapping(item, field, {"specimen", "point", "job_name", "generated_inp_sha256", "shape_pack_record"})
+        keys = {"specimen", "point", "job_name", "generated_inp_sha256", "shape_pack_record"}
+        entry = _mapping(item, field, keys | ({"pack_store"} if isinstance(item, Mapping) and "pack_store" in item
+                                              else set()))
         name, sha = _job(entry, field)
         packs.append(ArchivedPackReuse(_text(entry["specimen"], f"{field}.specimen"),
                                        _point(entry["point"], f"{field}.point", parameterisation_id), name, sha,
-                                       _repo_path(entry["shape_pack_record"], f"{field}.shape_pack_record")))
+                                       _repo_path(entry["shape_pack_record"], f"{field}.shape_pack_record"),
+                                       _text(entry["pack_store"], f"{field}.pack_store") if "pack_store" in entry
+                                       else None))
     odbs = []
     keys = {"specimen", "point", "job_name", "generated_inp_sha256", "odb", "status_files", "expected_frequencies",
             "excluded_attempts"}
