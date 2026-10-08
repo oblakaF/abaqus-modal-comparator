@@ -1,0 +1,149 @@
+{
+ "schema": "auto-id/campaign-archive-extraction-record/v1",
+ "run_type": "RUN_B",
+ "label": "EFFECTIVE_MODEL_COMPENSATION_TEST",
+ "decision": "D-073 (RUN_B HUMAN gate 1, 2026-10-08)",
+ "authorised_manifest_hash": "5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1",
+ "manifest_hash_after_extraction": "5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1",
+ "run_identity_hash": "fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
+ "abaqus_solves": 0,
+ "abaqus_python_extractions": 2,
+ "store": "auto-id-run (RUN_B run store; not committed; packs pinned by content)",
+ "extractions": {
+  "SP02_05239a3b56508244": {
+   "point": {
+    "E_in_plane_mpa": 52000.0,
+    "G12_mpa": 4725.0
+   },
+   "archived_odb": {
+    "relative_path": "carbon5a/runs/G_PLUS_SP02/SP02_05239a3b56508244.odb",
+    "sha256": "d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a",
+    "size_bytes": 751590276
+   },
+   "pack": {
+    "file_name": "SP02_05239a3b56508244.npz",
+    "file_sha256": "da82a59be08d09522d86b72f4c404dae16a18456f42eb460c2e6a164f1e51579",
+    "content_sha256": "f7271ea4674966604b696a6807972bcbe974f6a4955d0e3c1d6ea8304a297c3b",
+    "size_bytes": 14319758
+   },
+   "node_set": {
+    "sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+    "count": 29583
+   },
+   "fe_geometry_sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d",
+   "frequencies_match_carbon5a": true,
+   "tracking": {
+    "R1": {
+     "baseline_fe_mode": 8,
+     "tracked_fe_mode": 8,
+     "mac": 0.9999999415828779,
+     "baseline_hz": 75.24107360839844,
+     "tracked_hz": 75.24197387695312
+    },
+    "R2": {
+     "baseline_fe_mode": 10,
+     "tracked_fe_mode": 10,
+     "mac": 0.999998261723365,
+     "baseline_hz": 89.32708740234375,
+     "tracked_hz": 89.89119720458984
+    },
+    "R3": {
+     "baseline_fe_mode": 13,
+     "tracked_fe_mode": 13,
+     "mac": 0.9999992917887023,
+     "baseline_hz": 207.4272918701172,
+     "tracked_hz": 207.43255615234375
+    }
+   },
+   "extraction_id": "e61256fb3ad6b2a822f0ebc34278f5297b179d0e029af5b53d654b4be2dfe0e3"
+  },
+  "SP02_ade5dffa2fde3903": {
+   "point": {
+    "E_in_plane_mpa": 52000.0,
+    "G12_mpa": 4275.0
+   },
+   "archived_odb": {
+    "relative_path": "carbon5a/runs/G_MINUS_SP02/SP02_ade5dffa2fde3903.odb",
+    "sha256": "52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49",
+    "size_bytes": 751590276
+   },
+   "pack": {
+    "file_name": "SP02_ade5dffa2fde3903.npz",
+    "file_sha256": "0e3715502765fe84ce813c084c056bbab3f79ff0ade9033bda113747db5a3718",
+    "content_sha256": "45660e24a50ec77d5b6e634b50fbcafd3348c4860f144dcdd182e1ce9e7249ce",
+    "size_bytes": 14319758
+   },
+   "node_set": {
+    "sha256": "664f4d46fe7fb5308860fb90ae9616592662d9a2c294600160db151656e18b7b",
+    "count": 29583
+   },
+   "fe_geometry_sha256": "72e8597a042f08f72ef2b87037f9a09c64539ba5e5a04254c95cb54f8e2d4e6d",
+   "frequencies_match_carbon5a": true,
+   "tracking": {
+    "R1": {
+     "baseline_fe_mode": 8,
+     "tracked_fe_mode": 8,
+     "mac": 0.9999999303148699,
+     "baseline_hz": 75.24107360839844,
+     "tracked_hz": 75.2401123046875
+    },
+    "R2": {
+     "baseline_fe_mode": 10,
+     "tracked_fe_mode": 10,
+     "mac": 0.999998152332262,
+     "baseline_hz": 89.32708740234375,
+     "tracked_hz": 88.75702667236328
+    },
+    "R3": {
+     "baseline_fe_mode": 13,
+     "tracked_fe_mode": 13,
+     "mac": 0.999999168349801,
+     "baseline_hz": 207.4272918701172,
+     "tracked_hz": 207.42172241210938
+    }
+   },
+   "extraction_id": "7cc7debc594184ef2cac0a7f8db7610c03147bdf16ef5d5f5ca3ef6656b42479"
+  }
+ },
+ "s_g12_from_extracted_packs": {
+  "R1": 0.00024720815176572516,
+  "R2": 0.1268683180675946,
+  "R3": 0.0005218558251677952
+ },
+ "initial_set_zero_solve": {
+  "SP02:p0": "SP02_f3e592281bebce66",
+  "SP02:E_in_plane_mpa+": "SP02_13363f977809dbff",
+  "SP02:E_in_plane_mpa-": "SP02_84753f636064e192",
+  "SP02:G12_mpa+": "SP02_05239a3b56508244",
+  "SP02:G12_mpa-": "SP02_ade5dffa2fde3903",
+  "SP13:p0": "SP13_a46d08b52995e078",
+  "SP13:E_in_plane_mpa+": "SP13_0e861d03c333bb0b",
+  "SP13:E_in_plane_mpa-": "SP13_a9df66283a168786",
+  "SP13:G12_mpa+": "SP13_4c0f189b9727feaf",
+  "SP13:G12_mpa-": "SP13_0328066b74b6fd78"
+ },
+ "validation": {
+  "journal: exactly 2 archive extractions, nothing else": true,
+  "SP02_05239a3b56508244: node set, coordinates, FE geometry = governed SP-02 baseline": true,
+  "SP02_05239a3b56508244: modes 7-30, frequencies = accepted CARBON-5A exactly": true,
+  "SP02_05239a3b56508244: content SHA-256 deterministic": true,
+  "SP02_05239a3b56508244: file SHA-256 recorded": true,
+  "SP02_05239a3b56508244: second read = same scientific content": true,
+  "SP02_05239a3b56508244: extraction checks all PASS": true,
+  "SP02_05239a3b56508244: R1->8, R2->10, R3->13, unique, MAC >= 0.90, no exchange / order change, repeatable": true,
+  "SP02_ade5dffa2fde3903: node set, coordinates, FE geometry = governed SP-02 baseline": true,
+  "SP02_ade5dffa2fde3903: modes 7-30, frequencies = accepted CARBON-5A exactly": true,
+  "SP02_ade5dffa2fde3903: content SHA-256 deterministic": true,
+  "SP02_ade5dffa2fde3903: file SHA-256 recorded": true,
+  "SP02_ade5dffa2fde3903: second read = same scientific content": true,
+  "SP02_ade5dffa2fde3903: extraction checks all PASS": true,
+  "SP02_ade5dffa2fde3903: R1->8, R2->10, R3->13, unique, MAC >= 0.90, no exchange / order change, repeatable": true,
+  "S_G12 R1 = accepted CARBON-5A sensitivity": true,
+  "S_G12 R2 = accepted CARBON-5A sensitivity": true,
+  "S_G12 R3 = accepted CARBON-5A sensitivity": true,
+  "no failed / superseded archive state used": true,
+  "initial set: 5 campaign evaluations = 10 FE states, all reusable with 0 solves": true,
+  "execution manifest hash unchanged after extraction": true,
+  "identity binds RUN_B, E_in + G12, both extracted G12 packs": true
+ }
+}

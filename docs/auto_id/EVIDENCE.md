@@ -1175,3 +1175,35 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
 
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive) 1570 OK (2 Abaqus-gated skipped); without data stores 1556 OK (60 skipped); test_m7_run_b_preparation 12 OK (1 store-gated class) and the M7 suites 48 OK
 - 0 Abaqus solves, 0 Abaqus Python extractions, no RUN_B LM.
+
+## M7 RUN_B HUMAN gate 1: archived SP-02 G12± extraction (D-073; 2 Abaqus Python, 0 solves)
+
+- **Record:** `campaigns/M7_RUN_B.archive-extraction.json`; pack records in `campaigns/archive_extraction/`.
+- **Pre-check (22/22 PASS):** manifest = authorised; exactly the 2 authorised jobs; full ODB re-hash; E_in /
+  G12 exact; SP-02 physical forward lineage; Abaqus 2024 provenance; status files and completion markers;
+  ARCHIVE_MANIFEST membership; single successful attempt (no failed / truncated / superseded state); pinned
+  `extract_odb.py` unchanged; no prior RUN_B extraction.
+- **Extraction:** rc 0; the journal holds exactly 2 `archive_extraction` entries.
+
+| Job | Point (E_in / G12 MPa) | ODB SHA-256 | Pack content SHA-256 | Pack file SHA-256 | min MAC |
+|---|---|---|---|---|---|
+| `SP02_05239a3b56508244` | 52 000 / 4 725 | `d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a` | `f7271ea4674966604b696a6807972bcbe974f6a4955d0e3c1d6ea8304a297c3b` | `da82a59be08d09522d86b72f4c404dae16a18456f42eb460c2e6a164f1e51579` | 0.999998 |
+| `SP02_ade5dffa2fde3903` | 52 000 / 4 275 | `52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49` | `45660e24a50ec77d5b6e634b50fbcafd3348c4860f144dcdd182e1ce9e7249ce` | `0e3715502765fe84ce813c084c056bbab3f79ff0ade9033bda113747db5a3718` | 0.999998 |
+
+- **Post-extraction validation (22/22 PASS):**
+  - node set (29583 nodes, `664f4d46fe7fb530…`), coordinates and FE geometry
+    equal the governed SP-02 baseline;
+  - modes 7–30, frequencies equal CARBON-5A exactly;
+  - tracking R1→8, R2→10, R3→13 for both packs; unique correspondence; no order change or branch exchange;
+    no manual substitution;
+  - S_G12 from the packs equals the accepted CARBON-5A values (rel 1e-9): R1 0.000247208, R2 0.126868,
+    R3 0.000521856;
+  - content SHA deterministic; file SHA recorded; a second read gives identical content.
+- **Initial set:** 5 campaign evaluations = 10 FE states, all reused with 0 new solves.
+- **Manifest after extraction:** `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` (unchanged).
+- **Final RUN_B run identity:** `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`. It binds the fixtures, registrations, forward manifests, rows,
+  parameterisation E_in + G12, fixed parameters, Σ, bounds, LM settings, the p0 / E± / G12± packs (by
+  content hash), archive provenance, run_type RUN_B and the label `EFFECTIVE_MODEL_COMPENSATION_TEST`.
+- **Budget:** 24 / 24 new solves remain.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1574 OK (2 Abaqus-gated skipped); without data stores 1560 OK (61 skipped); test_m7_run_b_archive_extraction 4 OK (1 store-gated; packs re-verified and re-tracked from the RUN_B run store)
+- Not done: RUN_B LM, any solve, any fit. RUN_A unchanged.

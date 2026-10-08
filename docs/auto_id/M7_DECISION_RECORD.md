@@ -141,3 +141,13 @@ SUPERVISOR gate.
   - Proposed manifest `5fd0946a0c3f4e20…`: 5 zero-solve initial evaluations (10 FE states); exactly 2 SP-02 G12±
     archive extractions; at most 24 new solves and 26 extractions; LM evaluation budget 17.
 - **Next:** the HUMAN Abaqus-Python gate (2 extractions), then the HUMAN solve gate.
+
+## 7. RUN_B HUMAN gate 1: archived SP-02 G12± extraction (D-073), `REVIEW_READY`
+
+- **Scope:** exactly 2 Abaqus Python extractions, 0 solves.
+- **Result:** both packs validate; frequencies equal CARBON-5A exactly; tracking R1→8, R2→10, R3→13 with
+  MAC ≥ 0.999998; S_G12 equals the accepted CARBON-5A values.
+- **Manifest:** unchanged (`5fd0946a0c3f4e20…`). The final RUN_B run identity `fb5234116c6e9413…` binds the
+  extracted pack content hashes.
+- **Budget remaining:** 24 of 24 new solves. Initial set: 5 evaluations = 10 FE states, 0 solves.
+- **Next:** the HUMAN RUN_B solve gate for this exact manifest and identity. Not started.

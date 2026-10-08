@@ -1148,3 +1148,19 @@ Decision:
 Rationale / scope: closes RUN_A with its accepted interpretation and prepares the diagnostic without
 executing it.
 Supersedes: none
+
+## D-073 — RUN_B HUMAN gate 1: archived SP-02 G12± extraction only
+Date: 2026-10-08 · Accepted by: HUMAN · Source: HUMAN "M7 RUN B — HUMAN GATE 1 AUTHORISED. ARCHIVED SP-02 G12 EXTRACTION ONLY." (2026-10-08); D-072
+Decision:
+- The RUN_B preparation (D-072) is accepted as the basis for this gate.
+- **Authorised:** exactly 2 Abaqus Python extractions of archived CARBON-5A ODBs for manifest
+  `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1`:
+  - `SP02_05239a3b56508244` (E_in 52 000, G12 4 725 MPa; ODB `d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a`);
+  - `SP02_ade5dffa2fde3903` (E_in 52 000, G12 4 275 MPa; ODB `52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49`).
+- **Not authorised:** any Abaqus solve, the RUN_B LM, fitting E_in or G12, reusing the RUN_A final point as a
+  governed initial point, changes to M5 or scientific policy, automatic continuation into the solve gate.
+- RUN_A stays CLOSED; its records, journals and provenance are unchanged.
+- RUN_B solve execution requires a second explicit HUMAN authorisation.
+Rationale / scope: records the HUMAN Abaqus-Python authorisation. The extraction result is a worker result
+pending review (EVIDENCE).
+Supersedes: none

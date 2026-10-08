@@ -543,7 +543,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the RUN_B preparation; then the HUMAN gate for the 2 SP-02 G12+/- archive extractions (manifest 5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1), then the HUMAN RUN_B solve gate",
+  "next_action": "STOP: review of RUN_B gate 1 (D-073); RUN_B solve execution only after a second explicit HUMAN authorisation for manifest 5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1 and run identity fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -856,7 +856,7 @@
     "branch": "auto-id/m7",
     "base": "9f5f63a968759d6237facda00a4415cfe29c2257",
     "status": "IN_PROGRESS",
-    "decision": "D-069, D-070, D-071, D-072",
+    "decision": "D-069, D-070, D-071, D-072, D-073",
     "decision_record": "docs/auto_id/M7_DECISION_RECORD.md",
     "M7.1": "ACCEPTED",
     "M7.2": "TODO",
@@ -944,10 +944,31 @@
       "archive_extractions": 2,
       "budgets": "24 new Abaqus solves (hard); 26 Abaqus Python extractions max; LM evaluations 17",
       "executed": false,
-      "status": "PREPARED (REVIEW_READY)"
+      "status": "GATE_1_EXTRACTED (REVIEW_READY)",
+      "archive_extraction": {
+        "gate": "HUMAN gate 1 (D-073)",
+        "record": "docs/auto_id/campaigns/M7_RUN_B.archive-extraction.json",
+        "packs": {
+          "SP02_05239a3b56508244": "f7271ea4674966604b696a6807972bcbe974f6a4955d0e3c1d6ea8304a297c3b",
+          "SP02_ade5dffa2fde3903": "45660e24a50ec77d5b6e634b50fbcafd3348c4860f144dcdd182e1ce9e7249ce"
+        },
+        "odbs": {
+          "SP02_05239a3b56508244": "d3b49b047517d155db88567c57dfb7dab4b83a81f09e7725886c646e2fa7de1a",
+          "SP02_ade5dffa2fde3903": "52f7b740d8b3fe736f6255d8ea1e14dd687e0b76b112bbd4c50f31dca52cba49"
+        },
+        "frequencies_match_carbon5a": true,
+        "tracking": "R1->8, R2->10, R3->13 for both packs; MAC >= 0.999998; S_G12 equal to the accepted CARBON-5A values",
+        "manifest_after_extraction": "5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1",
+        "run_identity_hash": "fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0",
+        "initial_set": "5 campaign evaluations = 10 FE states, 0 new solves",
+        "abaqus_solves": 0,
+        "abaqus_python_extractions": 2,
+        "status": "REVIEW_READY"
+      },
+      "solve_budget_remaining": 24
     },
     "M7.1_tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run) 1550 OK (2 Abaqus-gated skipped); without data stores 1537 OK (57 skipped); test_m7_campaign 28 OK (4 store-gated); M6 regression and gate modules 143 OK; M5 / M4 / M3 stage gates, M4 guard, M4.7 objective and M4.6 pipeline 62 OK",
     "abaqus_solves": 2,
-    "abaqus_python_extractions": 4
+    "abaqus_python_extractions": 6
   }
 }

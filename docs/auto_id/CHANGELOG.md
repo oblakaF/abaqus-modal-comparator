@@ -3794,3 +3794,24 @@ first internal provider.
 - **Abaqus run count:** 0.
 - **Proposed RUN_B manifest:** `5fd0946a0c3f4e20…`.
 - **Next gate:** HUMAN gate for the 2 SP-02 G12± archive extractions, then the HUMAN RUN_B solve gate.
+
+## 2026-10-08 — M7 — RUN_B HUMAN gate 1: archived SP-02 G12± extraction (0 solves)
+
+- **Stage:** M7
+- **Mini-step:** RUN_B gate 1 (M7.1 campaign)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7.1): RUN_B gate 1 - archived SP-02 G12 extraction (2 Abaqus Python, 0 solves)`
+- **Decision:** D-073.
+- **Files changed:**
+  - created: `docs/auto_id/campaigns/M7_RUN_B.archive-extraction.json`,
+    `docs/auto_id/campaigns/archive_extraction/SP02_05239a3b56508244.shape-pack.json`,
+    `docs/auto_id/campaigns/archive_extraction/SP02_ade5dffa2fde3903.shape-pack.json`,
+    `tests/test_m7_run_b_archive_extraction.py`;
+  - updated: DECISIONS (D-073), EVIDENCE, M7_DECISION_RECORD (§7), ROADMAP, STATUS, `campaigns/README.md`.
+- **Scientific behaviour changed:** NO. No code changed; the extraction is recorded.
+- **Abaqus run count:** 0 solves, 2 Abaqus Python extractions.
+- **Manifest:** `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` (unchanged). RUN_B run identity `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1574 OK (2 Abaqus-gated skipped); without data stores 1560 OK (61 skipped); test_m7_run_b_archive_extraction 4 OK (1 store-gated; packs re-verified and re-tracked from the RUN_B run store)
+- **Next gate:** HUMAN RUN_B solve gate (not started).

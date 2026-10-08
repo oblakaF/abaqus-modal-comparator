@@ -49,3 +49,9 @@ committed.
   RUN_A extraction store). The file size, SHA-256 and content hash pins are unchanged.
 - **Proposed manifest:** `5fd0946a0c3f4e20562ba97068cdb5b94bf6d10ba789a3b2df20b457882034a1` (not executed).
 
+
+### RUN_B gate 1 (D-073)
+
+- `M7_RUN_B.archive-extraction.json` records the 2 SP-02 G12± archive extractions (0 solves) and the final
+  RUN_B run identity `fb5234116c6e9413e4b070e901f97b8c6e210d535daefe15f0cdb5b9f8ad87f0`.
+- The store-gated re-verification uses `AUTO_ID_FIXTURE_ROOT_M7_RUN_B` (the RUN_B run root).

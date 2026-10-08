@@ -624,6 +624,8 @@ Stage status: `IN_PROGRESS` (D-069; branch `auto-id/m7` from `main` `9f5f63a`; d
   - The diagnostic `EFFECTIVE_MODEL_COMPENSATION_TEST`: E_in + G12 from the governed start.
   - Proposed manifest `5fd0946a…`: 2 SP-02 G12± archive extractions, then at most 24 new solves.
   - Not executed.
+- **RUN_B HUMAN gate 1 (D-073), `REVIEW_READY`:** the 2 SP-02 G12± archive extractions (0 solves) validate;
+  manifest unchanged; RUN_B run identity `fb5234116c6e9413…`; budget 24 / 24. The RUN_B LM is not started.
 
 ---
 
