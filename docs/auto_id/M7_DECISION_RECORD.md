@@ -181,5 +181,7 @@ SUPERVISOR gate.
 - **K3:** CARBON-5G INP audit; additive physical-measurement records.
 - **Current interpretation:** no global E_in for the SP-02 / SP-13 family under SPEC v1.1; each specimen shown
   separately (diagnostic only).
-- **State:** M7 REWORK, gate FAIL (supersedes §9's acceptance). M8 on hold; M8.1 parked on `auto-id/m8`.
+- **State:** M7 REWORK under corrective review (supersedes §9's acceptance). Family consistency FAIL; formal output
+  NO_GLOBAL_PARAMETER_VALUE — a correct refusal, not a failed stage gate; stage-gate closure (expected
+  PASS_BY_REFUSAL) pending a SUPERVISOR decision. M8 on hold; M8.1 parked on `auto-id/m8`.
 - **Not decided here:** SPEC v1.2, SPECIMEN_ENGINEERING_CALIBRATION, τ_mf (HUMAN decisions).

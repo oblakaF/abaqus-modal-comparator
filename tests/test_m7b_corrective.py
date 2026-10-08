@@ -234,6 +234,26 @@ class PerSpecimenDiagnosticsTests(unittest.TestCase):
                 self.assertNotIn(1, [r.experimental_mode for r in spec.rows])  # not in the objective
 
 
+class UncertaintyBasisTests(unittest.TestCase):
+    """Audit J5: statistical_sd is conditional on the available covariance and must not look complete."""
+
+    def test_sd_is_reported_as_conditional_while_sigma_meas_is_not_available(self):
+        from dataclasses import replace
+        from services.identification_campaign_run import uncertainty_basis
+
+        for name in ("M7_RUN_A.campaign.json", "M7_RUN_B.campaign.json"):
+            definition = load_campaign_definition(CAMPAIGNS / name)
+            basis = uncertainty_basis(definition)
+            with self.subTest(campaign=name):
+                self.assertEqual(basis["statistical_sd_status"], "CONDITIONAL_ON_AVAILABLE_COVARIANCE")
+                self.assertEqual(basis["covariance_components"], {"sigma_setup": "PROVISIONAL",
+                                                                  "sigma_meas": "NOT_AVAILABLE"})
+                self.assertIn("not a complete measured uncertainty", basis["statement"])
+        measured = replace(definition, sigma=replace(definition.sigma, setup_status="MEASURED",
+                                                     measurement_status="MEASURED"))
+        self.assertEqual(uncertainty_basis(measured)["statistical_sd_status"], "COMPLETE_MEASURED_COVARIANCE")
+
+
 class CampaignPolicyTests(unittest.TestCase):
     def test_policy_is_identity_bound_only_when_declared(self):
         data = _load(CAMPAIGNS / "M7_RUN_A.campaign.json")

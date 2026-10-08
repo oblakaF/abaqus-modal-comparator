@@ -454,6 +454,8 @@ class SyntheticCampaignTests(unittest.TestCase):
         self.assertIn(NOT_EXTERNALLY_VALIDATED, report["reporting"])
         self.assertEqual(report["sigma"]["measurement"], {"status": "NOT_AVAILABLE",
                                                           "source": self.definition.sigma.measurement_source})
+        # Audit J5: even an IDENTIFIED value's sd is reported as conditional while Σ_meas is NOT_AVAILABLE.
+        self.assertEqual(report["uncertainty_basis"]["statistical_sd_status"], "CONDITIONAL_ON_AVAILABLE_COVARIANCE")
         self.assertNotIn("G12_mpa", verdict["verdicts"])
         robustness = report["model_form_robustness"]  # D-075: a range only from a complete LOO set
         self.assertIn(robustness["status"], ("AVAILABLE_COMPLETE_LOO", "UNAVAILABLE_INCOMPLETE_LOO"))

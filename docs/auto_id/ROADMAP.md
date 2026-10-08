@@ -605,8 +605,10 @@ its declared uncertainty.
 **M7 GATE:** if one shared carbon vector cannot explain the family, NO global material
 number is reported.
 
-Stage status: `REWORK` (D-076, external audit iteration 2; **M7 GATE: `FAIL`** — SPEC §13 family consistency fails
-for the SP-02 / SP-13 shared model; the acceptance and gate `PASS` of 2026-10-08 (D-075) are superseded). Historical:
+Stage status: `REWORK` (D-076, external audit iteration 2, under SUPERVISOR review). SPEC §13 family consistency
+**FAIL** for the SP-02 / SP-13 shared model → formal output **NO_GLOBAL_PARAMETER_VALUE**, as the M7 GATE requires; the
+stage-gate closure (expected `PASS_BY_REFUSAL`) is pending a SUPERVISOR decision. The acceptance of 2026-10-08 (D-075)
+and its release rationale are superseded. Historical:
 merged to `main` by PR #37, merge commit `0f15db9`, with HUMAN authorisation; opened D-069 on branch `auto-id/m7`
 from `main` `9f5f63a`; decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.md).
 - **M7.1 (zero Abaqus), `REVIEW_READY`:** the RUN_A campaign architecture.
@@ -646,10 +648,11 @@ from `main` `9f5f63a`; decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.m
 - **M7b-DIAG corrective diagnostics (D-076, zero Abaqus), `REVIEW_READY`:** external audit iteration 2 (K1–K3
   CONFIRMED). Branch `auto-id/m7b-diag` from `main` `7a34ee6`.
   - K1: 55.593 GPa is HISTORICAL_RUN_A_OPTIMIZER_CANDIDATE only; **no global E_in for SP-02 / SP-13 under SPEC v1.1**.
-  - K2: SPEC §13 implemented and wired into the M5 guard; RUN_A FAIL (Δχ² 746.27, Δdof 1, p_χ² 2.6e-164, bootstrap p 0.00025 (4000 samples, seed 20261009)); RUN_B NOT_EVALUABLE_RANK_DEFICIENT.
+  - K2: SPEC §13 implemented and wired into the M5 guard; RUN_A family consistency FAIL (Δχ² 746.27, Δdof 1, p_χ² 2.6e-164, bootstrap p 0.00025 (4000 samples, seed 20261009)); RUN_B NOT_EVALUABLE_RANK_DEFICIENT.
   - K3: CARBON-5G INP audit; additive physical-measurement records (passports unchanged).
   - Campaign report v2: optimizer candidate vs formal output; excluded-mode and per-specimen diagnostics.
   - SPEC v1.2 / SPECIMEN_ENGINEERING_CALIBRATION / τ_mf: not implemented (HUMAN decisions).
+  - Full audit disposition (K1–K3, V1–V8, J1–J5); `uncertainty_basis` reporting (J5).
 
 ---
 

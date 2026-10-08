@@ -3933,3 +3933,23 @@ first internal provider.
 - **Unchanged:** RUN_A / RUN_B result records and journals; passports, registrations, fixtures, freezes, mode pairs;
   SPEC v1.1; branch `auto-id/m8` (parked).
 - **Next gate:** SUPERVISOR review of the corrective diagnostics; SPEC v1.2 / τ_mf are HUMAN decisions.
+
+## 2026-10-09 — M7 — M7b: SUPERVISOR review corrections before PR (D-076)
+
+- **Stage:** M7 (REWORK)
+- **Mini-step:** M7b-DIAG (review corrections)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m7b-diag`
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(M7b): review corrections - refusal is not a failed gate, full audit disposition, J5 uncertainty basis`
+- **Changes:**
+  - gate semantics: family consistency FAIL / NO_GLOBAL_PARAMETER_VALUE kept apart from the stage gate; STATUS
+    `m7.gate` = `PENDING_SUPERVISOR_CLOSURE` (expected `PASS_BY_REFUSAL`); the "M7 gate FAIL" wording of the previous
+    M7b entry is superseded; D-076 (unmerged, under review) clarified accordingly;
+  - `AUDIT_ITERATION2_DISPOSITION.md`: K3 hypothesis narrowed (SP-13 0.425 mm is in its INP); V1–V8 and J1–J5
+    dispositioned from the supplied audit text;
+  - J5: campaign report `uncertainty_basis` (reporting only) with a regression test.
+- **Scientific behaviour changed:** reporting only (`uncertainty_basis`). Family-consistency numbers unchanged.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1617 OK (2 Abaqus-gated skipped); without data stores 1603 OK (64 skipped); M7 and corrective modules with stores 95 OK (incl. test_m7b_corrective 24 OK; RUN_A / RUN_B rebuilt from the journals); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of the M7b PR; stage-gate closure as a separate decision.

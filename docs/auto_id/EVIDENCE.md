@@ -1338,3 +1338,16 @@ Per row, signed Δf/f = (f_perturbed − f_baseline) / f_baseline at the CARBON-
   overhang strips, 12 mm along y).
 - **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1616 OK (2 Abaqus-gated skipped); without data stores 1602 OK (64 skipped); test_m7b_corrective 23 OK (store-gated: spec.txt source lines, live excluded-mode diagnostics); M7 modules with stores 94 OK (RUN_A / RUN_B rebuilt from the journals: unchanged except the D-076 family-consistency and release fields); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK
 - 0 Abaqus solves, 0 Abaqus Python extractions. RUN_A / RUN_B result records unchanged.
+
+## M7b SUPERVISOR review corrections (D-076, 2026-10-09)
+
+- **Semantics:** SPEC §13 family consistency **FAIL** (RUN_A) and formal output **NO_GLOBAL_PARAMETER_VALUE** are a
+  correct scientific refusal, not a failed stage gate. M7 `REWORK` during review; stage-gate closure (expected
+  `PASS_BY_REFUSAL`) pending a SUPERVISOR decision. The "M7 gate FAIL" wording of the previous M7b entry is superseded.
+- **Disposition completed:** K1–K3 (accepted), V1–V8 and J1–J5 in `audit_corrections/AUDIT_ITERATION2_DISPOSITION.md`;
+  V2 scan coverage from the governed reconstructions: SP-02 72.3 % of the width (strips 80.7 / 60.6 mm), SP-13 71.9 %
+  (72.2 / 71.3 mm); J2 / J3 verified in code (common-σ row conversion; cluster trigger on frozen rows only).
+- **J5:** campaign report `uncertainty_basis` = `CONDITIONAL_ON_AVAILABLE_COVARIANCE` while Σ_meas is NOT_AVAILABLE.
+- **Family consistency unchanged:** RUN_A Δχ² 746.27, Δdof 1, p_χ² 2.6e-164, bootstrap p 1/4001; RUN_B
+  NOT_EVALUABLE_RANK_DEFICIENT.
+- **Tests:** Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1617 OK (2 Abaqus-gated skipped); without data stores 1603 OK (64 skipped); M7 and corrective modules with stores 95 OK (incl. test_m7b_corrective 24 OK; RUN_A / RUN_B rebuilt from the journals); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK

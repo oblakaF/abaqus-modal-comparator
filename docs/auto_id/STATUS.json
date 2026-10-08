@@ -549,7 +549,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the M7b corrective diagnostics (D-076) on auto-id/m7b-diag; M7 REWORK, gate FAIL; M8 on hold (auto-id/m8 parked); SPEC v1.2 / tau_mf are HUMAN decisions; no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of the M7b corrective PR (auto-id/m7b-diag -> main, not merged); M7 REWORK; family consistency FAIL -> NO_GLOBAL_PARAMETER_VALUE; stage-gate closure (expected PASS_BY_REFUSAL) is a separate SUPERVISOR decision; M8 on hold (auto-id/m8 parked); no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1028,7 +1028,7 @@
       "stage_pr": "MERGED: PR #37 (auto-id/m7 -> main), merge commit 0f15db9acf29b7d3a7b20350982440015e177e94",
       "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1592 OK (2 Abaqus-gated skipped); without data stores 1578 OK (62 skipped); all M7 modules 70 OK with stores (RUN_A and RUN_B reports rebuilt from the journals; archive-extraction evidence re-verified); test_m7_closure 11 OK; M6 regression and gate modules 210 OK (2 Abaqus-gated skipped); M5 gate, verdict, robustness, uncertainty and identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin and SP13 readiness 102 OK; M3 gate 2 OK"
     },
-    "gate": "FAIL (D-076: SPEC §13 family consistency FAIL for the SP02/SP13 shared model)",
+    "gate": "PENDING_SUPERVISOR_CLOSURE",
     "merged_to_main": {
       "pr": 37,
       "merge_commit": "0f15db9acf29b7d3a7b20350982440015e177e94"
@@ -1042,7 +1042,7 @@
       "branch": "auto-id/m7b-diag",
       "base": "7a34ee65f8a036866961c10dbd685a44ec957671",
       "status": "REVIEW_READY",
-      "audit": "Audit_AutoID_0f15db9_iteration2.docx (K1-K3 CONFIRMED; V/J pending the document text)",
+      "audit": "Audit_AutoID_0f15db9_iteration2.docx: K1-K3 CONFIRMED (SUPERVISOR accepted); V1-V8 and J1-J5 dispositioned in AUDIT_ITERATION2_DISPOSITION.md",
       "records": [
         "docs/auto_id/audit_corrections/AUDIT_ITERATION2_DISPOSITION.md",
         "docs/auto_id/audit_corrections/CARBON_5G_INP_AUDIT.md",
@@ -1067,8 +1067,11 @@
       "abaqus_solves": 0,
       "abaqus_python_extractions": 0,
       "not_implemented": "SPEC v1.2, SPECIMEN_ENGINEERING_CALIBRATION, tau_mf (HUMAN decisions)",
-      "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1616 OK (2 Abaqus-gated skipped); without data stores 1602 OK (64 skipped); test_m7b_corrective 23 OK (store-gated: spec.txt source lines, live excluded-mode diagnostics); M7 modules with stores 94 OK (RUN_A / RUN_B rebuilt from the journals: unchanged except the D-076 family-consistency and release fields); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK"
-    }
+      "tests": "Windows with all stores (snadwich, carbon-project-archive, sumin, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1617 OK (2 Abaqus-gated skipped); without data stores 1603 OK (64 skipped); M7 and corrective modules with stores 95 OK (incl. test_m7b_corrective 24 OK; RUN_A / RUN_B rebuilt from the journals); M5 gate, verdict, robustness, uncertainty, identifiability 68 OK; M4 gate, guard, step, objective, pipeline, twin, SP13 readiness 102 OK; M3 gate 2 OK"
+    },
+    "family_consistency": "FAIL",
+    "formal_output": "NO_GLOBAL_PARAMETER_VALUE",
+    "gate_expected_after_acceptance": "PASS_BY_REFUSAL: SPEC §13 family consistency FAIL; the M7 gate is satisfied by withholding the global parameter as required (separate SUPERVISOR decision, expected D-077)"
   },
   "m8": {
     "status": "NOT_STARTED",

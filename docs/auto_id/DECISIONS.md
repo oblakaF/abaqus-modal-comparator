@@ -1236,8 +1236,17 @@ Decision:
   `NOT_EVALUABLE_RANK_DEFICIENT`. Campaign verdicts use the computed result instead of the hard-coded
   NOT_AVAILABLE; a FAIL blocks IDENTIFIED, WIDE and every shared released value. M5 thresholds unchanged.
 - **Corrected interpretation:** NO GLOBAL E_in VALUE IS RELEASED FOR THE SP-02 / SP-13 FAMILY UNDER SPEC v1.1.
-- **The previous M7 GATE PASS (D-075) is superseded:** M7 = `REWORK`, M7 gate = `FAIL`. The historical merge facts
-  (PR #37, `0f15db9`; PR #38, `7a34ee6`) stand unchanged.
+- **Two distinct results (SUPERVISOR review 2026-10-09).** The SPEC §13 family-consistency result is **FAIL** and the
+  formal output is **NO_GLOBAL_PARAMETER_VALUE**. That refusal is a valid scientific result (SPEC §1) and is what the
+  M7 GATE requires ("if one shared carbon vector cannot explain the family, NO global material number is
+  reported"); it is not a failed stage gate. The D-075 acceptance and its release rationale are superseded. M7 is
+  `REWORK` while this correction is under SUPERVISOR review; the stage-gate closure (expected `PASS_BY_REFUSAL`) is a
+  separate SUPERVISOR decision (expected D-077). The historical merge facts (PR #37, `0f15db9`; PR #38, `7a34ee6`)
+  stand unchanged.
+- **Audit dispositions:** K1–K3, V1–V8 and J1–J5 in `audit_corrections/AUDIT_ITERATION2_DISPOSITION.md`. V4 and the
+  SPECIMEN_ENGINEERING_CALIBRATION class are SPEC v1.2 policy questions (deferred); V7 (SP10) needs a new FE model and
+  a HUMAN Abaqus gate (deferred); J1 is deferred to M8.6; J2 / J3 / J4 are recorded technical debt or limitations;
+  J5 is addressed by the `uncertainty_basis` reporting.
 - **RUN_A and RUN_B frozen numerical records remain historical evidence** of what was computed; they are not
   rewritten. Corrective evidence is additive (`docs/auto_id/audit_corrections/`).
 - **No new material property is claimed.** Per-specimen estimates are DIAGNOSTIC_ONLY / NOT_A_MATERIAL_PROPERTY /

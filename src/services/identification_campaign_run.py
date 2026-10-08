@@ -833,6 +833,24 @@ def compare_to_reference(parameters: Mapping[str, float], reference: Mapping[str
             "note": "descriptive stability only (D-045 ln bands); not a material-identification criterion"}
 
 
+def uncertainty_basis(definition: CampaignDefinition) -> dict:
+    """What the reported statistical_sd / birge_adjusted_sd are conditional on (D-076; audit J5).
+
+    Reporting only: M5 mathematics and values are unchanged, nothing is enlarged and Σ_meas is never invented.
+    """
+
+    sigma = definition.sigma
+    complete = sigma.measurement_available and not sigma.setup_provisional
+    statement = ("statistical_sd and birge_adjusted_sd are complete measured uncertainties" if complete else
+                 "statistical_sd and birge_adjusted_sd are conditional on the available covariance components "
+                 f"(Σ_setup {sigma.setup_status}; Σ_meas {sigma.measurement_status}); they are not a complete "
+                 "measured uncertainty")
+    return {"statistical_sd_status": "COMPLETE_MEASURED_COVARIANCE" if complete else
+            "CONDITIONAL_ON_AVAILABLE_COVARIANCE",
+            "covariance_components": {"sigma_setup": sigma.setup_status, "sigma_meas": sigma.measurement_status},
+            "statement": statement}
+
+
 def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
                           evaluations: Sequence[Mapping], result: Mapping,
                           reference: Optional[Mapping[str, float]] = None, reference_label: str = "") -> dict:
@@ -932,6 +950,7 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
                         "engineering_plausibility": plausibility, "at_search_bound": at_bound,
                         "practical_target_note": "engineering criterion, separate from the formal M5 verdict"},
         "m5_verdict": verdict,
+        "uncertainty_basis": uncertainty_basis(definition),
         "model_form_robustness": model_form_robustness_reporting(robustness),
         "material_claim": IDENTIFIED_MATERIAL_PROPERTY if identified else NO_MATERIAL_CLAIM,
         "validation": NOT_EXTERNALLY_VALIDATED,
