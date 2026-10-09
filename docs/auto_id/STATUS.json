@@ -109,6 +109,13 @@
       "pr": 43,
       "merge_commit": "4e3a1ebaf7c435e8f6101cc9a4b8a36f14503655",
       "status": "ACCEPTED"
+    },
+    {
+      "stage": "SPEC v1.2 implementation V12-I2",
+      "kind": "implementation track (not a roadmap stage)",
+      "pr": 44,
+      "merge_commit": "e70295920c94dbf295bc9e481bb305b6bac57c5a",
+      "status": "ACCEPTED"
     }
   ],
   "m1": {
@@ -577,7 +584,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of V12-I2 (auto-id/v12-i2, PR not merged). V12-I3 ... V12-I6 not started; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of V12-I3 (auto-id/v12-i3, PR not merged). V12-I4 ... V12-I6 not started; no calibration output record or INP fragment; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1157,7 +1164,7 @@
       "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity",
       "calibration_precision_gate": "conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness)) <= 0.08 (ln p, as M5); birge_adjusted_sd and AVAILABLE_COMPLETE_LOO required, else REFUSED; > 0.08 REFUSED; no value released, optimiser candidate only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE; never IDENTIFIED / WIDE; tau_mf not in the envelope; UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE kept"
     },
-    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1 ACCEPTED (merged PR #43); V12-I2 REVIEW_READY on branch auto-id/v12-i2; production v1.2 IMPLEMENTATION_INCOMPLETE",
+    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1 and V12-I2 ACCEPTED (merged PR #43, #44); V12-I3 REVIEW_READY on branch auto-id/v12-i3; production v1.2 IMPLEMENTATION_INCOMPLETE (calibration execution and output not integrated)",
     "merged_to_main": {
       "pr": 41,
       "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423",
@@ -1204,15 +1211,27 @@
       },
       "V12-I2": {
         "title": "Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/v12-i2",
         "base": "4e3a1ebaf7c435e8f6101cc9a4b8a36f14503655",
         "scope": "tau_mf-aware residual-pattern and holdout evaluation (SPEC v1.2 §4) for v1.2 campaigns that declare tau_mf: family systematic iff >= 2 FIT terms, same sign, every |d ln f| > max(2 sigma_term, tau_mf); holdout fails iff |d ln f| > max(3 sigma_term, tau_mf); equality passes; each term carries its own governed sigma (cluster: the objective's sigma_C); v1.2 record schema auto-id/identification-uncertainty/v1.2-residual-pattern with physical per-term evidence; v1.1 rules, records and hashes unchanged; tau_mf never in Sigma, objective, whitening, statistical_sd, Birge, model_form_robustness or SPEC 13; calibration execution still refused",
-        "tests": "test_v12_i2_tau_mf_pattern 14 OK; focused (V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, identification_uncertainty, identification_verdict, model_form_robustness, identification_objective, identification_clusters) 193 OK (3 skipped without data stores); with data stores (M7 campaign, M7b, M7 closure, V12-I1, V12-I2, M5 gate, uncertainty, robustness, 5 test_m4* modules) 181 OK (0 skipped, no Abaqus); full suite without data stores 1658 OK (64 skipped)"
+        "tests": "test_v12_i2_tau_mf_pattern 14 OK; focused (V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, identification_uncertainty, identification_verdict, model_form_robustness, identification_objective, identification_clusters) 193 OK (3 skipped without data stores); with data stores (M7 campaign, M7b, M7 closure, V12-I1, V12-I2, M5 gate, uncertainty, robustness, 5 test_m4* modules) 181 OK (0 skipped, no Abaqus); full suite without data stores 1658 OK (64 skipped)",
+        "merged_to_main": {
+          "pr": 44,
+          "merge_commit": "e70295920c94dbf295bc9e481bb305b6bac57c5a",
+          "reviewed_head": "6ea44cf48ae81744b4c0bce281a7ef46041faee6",
+          "tree": "618c1140270006d4e26502b14d18127cb89ad71d",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main e702959: 1655 OK (68 skipped), success (run 37889717832)"
+        }
       },
       "V12-I3": {
         "title": "Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback",
-        "status": "TODO"
+        "status": "REVIEW_READY",
+        "branch": "auto-id/v12-i3",
+        "base": "e70295920c94dbf295bc9e481bb305b6bac57c5a",
+        "scope": "pure SPECIMEN_ENGINEERING_CALIBRATION scientific gate (src/services/specimen_calibration_gate.py): question / tau_mf / one specimen; observability (k + 1 FIT family keys, full rank at RCOND 1e-3, complete leave-one-FIT-family-out, >= 1 disjoint HOLDOUT family); strict pair MAC >= 0.80, tracking MAC >= 0.90, no branch / pairing loss; no active search bound; registration / peak guards; V12-I2 tau_mf pattern consumed (no systematic family, no holdout failure); non-degradation (same term set, max and RMS not worse, every |expm1(d ln f)| <= 0.08); precision max(birge_adjusted_sd, half LOO range) <= 0.08 per parameter; reporting completeness; deterministic record, PASS / REFUSED with machine-readable reasons; no value released; production calibration execution still refused (V12-I4)",
+        "tests": "test_v12_i3_calibration_gate 30 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 239 OK (3 skipped without data stores); full suite without data stores 1688 OK (64 skipped); full suite with all data stores (snadwich, carbon-project-archive, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1702 OK (5 skipped), no Abaqus"
       },
       "V12-I4": {
         "title": "Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer)",

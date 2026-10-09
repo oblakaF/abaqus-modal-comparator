@@ -3,7 +3,7 @@
 A v1.2 campaign definition (``auto-id/identification-campaign/v1.2``) must declare its scientific question and τ_mf
 explicitly; both are identity-bound.  A calibration campaign has exactly one physical specimen, a material campaign at
 least two.  Historical v1 definitions keep their exact identities and acquire neither field.
-τ_mf has no numerical effect yet (V12-I2), and calibration execution is refused until V12-I3 exists.
+τ_mf reaches only the pattern / holdout test (V12-I2), and calibration execution is refused until V12-I4.
 """
 
 from __future__ import annotations
@@ -57,7 +57,8 @@ SYNTHETIC_V1_CAMPAIGN_HASH = "d869796d51a84d4d2fa0b90ab68c480acb8202c4a23086bf4e
 SYNTHETIC_V1_RUN_HASH = "698228cebd5b3de81bde2a78c8ef61450db358076a9309a7464ae6aa2f1b0ab5"
 # The only production modules that may mention τ_mf: the schema (V12-I1) and the pattern / holdout test (V12-I2).
 TAU_MF_MODULES = ("domain/campaign_definition.py", "services/identification_uncertainty.py",
-                  "services/identification_verdict.py", "services/identification_campaign_run.py")
+                  "services/identification_verdict.py", "services/identification_campaign_run.py",
+                  "services/specimen_calibration_gate.py")  # + the pure calibration gate (V12-I3)
 
 
 def v12_definition(question=MATERIAL_IDENTIFICATION, tau_mf=0.02, **changes) -> dict:
@@ -264,7 +265,7 @@ class CalibrationRefusalTests(_Campaigns):
         with self.assertRaises(CalibrationNotImplementedRefusal) as refused:
             self.calibration.require_executable()
         self.assertEqual(refused.exception.state, CALIBRATION_NOT_IMPLEMENTED)
-        self.assertIn("V12-I3", str(refused.exception))
+        self.assertIn("V12-I4", str(refused.exception))  # the I3 gate exists; execution / output are I4
         self.assertFalse(isinstance(refused.exception, ValueError))  # generic fallback handlers never swallow it
         items, roots = self.specimens(self.calibration, "calibration")
         self.assertEqual([item.label for item in items], ["A"])  # one physical specimen
@@ -299,10 +300,14 @@ class CalibrationRefusalTests(_Campaigns):
         campaign, result = self.execute(material, "material")
         report = build_campaign_report(material, campaign.specimens, campaign.journal.records("evaluation"), result)
         self.assertNotIn(SPECIMEN_ENGINEERING_CALIBRATION, json.dumps(report, default=str))
-        # The question constant appears nowhere in production code except the schema module.
+        # The question constant appears only in the schema module and the pure V12-I3 gate, which no execution
+        # path imports yet (production calibration is integrated in V12-I4).
         users = [p.relative_to(ROOT / "src").as_posix() for p in (ROOT / "src").rglob("*.py")
                  if SPECIMEN_ENGINEERING_CALIBRATION in p.read_text(encoding="utf-8")]
-        self.assertEqual(users, ["domain/campaign_definition.py"])
+        self.assertEqual(sorted(users), ["domain/campaign_definition.py", "services/specimen_calibration_gate.py"])
+        importers = [p.name for p in (ROOT / "src").rglob("*.py") if p.name != "specimen_calibration_gate.py"
+                     and "specimen_calibration_gate" in p.read_text(encoding="utf-8")]
+        self.assertEqual(importers, [])
 
 
 class TauMfHasNoNumericalEffectTests(_Campaigns):

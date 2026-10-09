@@ -684,8 +684,8 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
 | Id | Step | Status |
 |---|---|---|
 | V12-I1 | Campaign / run question (MATERIAL_IDENTIFICATION or SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf schema, both declared before execution and bound into the campaign / run identity | `ACCEPTED` |
-| V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `REVIEW_READY` |
-| V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `TODO` |
+| V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `ACCEPTED` |
+| V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `REVIEW_READY` |
 | V12-I4 | Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer) | `TODO` |
 | V12-I5 | Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable) | `TODO` |
 | V12-I6 | Integration into GUI / backend readiness (the same backend services; no install_* layer) | `TODO` |
@@ -705,6 +705,14 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
   every |Δ ln f| > max(2σ_term, τ_mf); a holdout fails when |Δ ln f| > max(3σ_term, τ_mf); equality passes. Clusters
   use the objective's σ_C. v1.1 rules, records and hashes unchanged; τ_mf stays out of Σ, Φ, whitening, every
   uncertainty and §13. Production v1.2 implementation remains incomplete.
+
+- **V12-I2 accepted and merged:** PR #44 (`auto-id/v12-i2` → `main`), merge commit `e702959`.
+- **V12-I3 (REVIEW_READY, branch `auto-id/v12-i3` from `e702959`):** pure specimen-calibration scientific gate
+  `services/specimen_calibration_gate.py` (`evaluate_calibration_gate`): question / τ_mf / one specimen, observability
+  (k + 1 FIT family keys, full rank, complete leave-one-FIT-family-out, disjoint HOLDOUT family), pairing / tracking,
+  no active bound, registration / peak, the V12-I2 pattern record, non-degradation (max, RMS, 8 % rows), precision
+  (conservative_uncertainty ≤ 0.08 per parameter) and reporting completeness. PASS / REFUSED with reasons; no value is
+  released; production calibration execution stays refused until V12-I4.
 
 **V12 GATE:** production code enforces the D-078 rules with negative tests (no fallback, τ_mf outside Σ / uncertainty /
 §13, refusals without released values) before any SP10, t_face or other new FE calculation.

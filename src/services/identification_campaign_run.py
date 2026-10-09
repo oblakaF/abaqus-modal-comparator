@@ -16,7 +16,7 @@ bounded LM (``run_bounded_lm``); no second optimiser exists.  Σ is explicit: Σ
 Execution needs the HUMAN gate: the authorised manifest hash must equal the planned one, and the hard
 Abaqus solve budget stops the run (``SOLVE_BUDGET``) without extension.  RUN_B is refused here unless
 its own later SUPERVISOR gate exists (``CampaignDefinition.require_executable``).  A SPEC v1.2
-specimen-calibration campaign is refused here and in the report until V12-I3 (no fallback).
+specimen-calibration campaign is refused here and in the report until V12-I4 (no fallback).
 """
 
 from __future__ import annotations
@@ -46,6 +46,7 @@ from domain.campaign_definition import (
     ArchivedOdbReuse,
     CampaignDefinition,
     CampaignSpecimen,
+    at_search_bound,
 )
 from domain.experiment_fixture import ExperimentFixtureManifest
 from domain.forward_model_manifest import BoundForwardModel
@@ -334,7 +335,7 @@ def campaign_run_identity(definition: CampaignDefinition, specimens: Sequence[Ca
 class CampaignRun:
     def __init__(self, definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
                  manifest_hash: str, config: CampaignRunConfig) -> None:
-        definition.require_executable()  # RUN_B needs its own later SUPERVISOR gate; calibration refused (V12-I3)
+        definition.require_executable()  # RUN_B needs its own later SUPERVISOR gate; calibration refused (V12-I4)
         if config.authorised_manifest_hash != manifest_hash:
             raise CampaignGateRefusal("the HUMAN gate authorised another manifest; nothing is executed.")
         if [item.label for item in specimens] != [s.label for s in definition.specimens]:
@@ -687,8 +688,7 @@ def campaign_family_consistency(definition: CampaignDefinition, whitened_jacobia
     if policy is None:
         policy, policy_source = CORRECTIVE_FAMILY_CONSISTENCY_POLICY, ("D-076 corrective default; not part of this "
                                                                        "campaign's historical identity")
-    at_bound = any(math.isclose(float(result["parameters"][n]), bound, rel_tol=1e-12)
-                   for n in names for bound in definition.bounds[n])
+    at_bound = any(at_search_bound(float(result["parameters"][n]), *definition.bounds[n]) for n in names)
     sigma = {"setup": {"sd_ln": definition.sigma.setup_sd_ln, "status": definition.sigma.setup_status,
                        "in_whitening": True},
              "measurement": {"status": definition.sigma.measurement_status, "in_whitening": False,
@@ -867,7 +867,7 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
     against RUN_A are reported in ln p with the descriptive D-045 bands.
     """
 
-    definition.require_question_supported()  # no effective-estimate report for a calibration campaign (V12-I3)
+    definition.require_question_supported()  # no effective-estimate report for a calibration campaign (V12-I4)
     status = result["status"]
     parameters = result.get("parameters")
     final = start = None
@@ -890,8 +890,7 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
     if parameters is not None:
         for name in definition.fitted_parameters:
             low, high = definition.bounds[name]
-            at_bound[name] = math.isclose(parameters[name], low, rel_tol=1e-12) or math.isclose(parameters[name], high,
-                                                                                               rel_tol=1e-12)
+            at_bound[name] = at_search_bound(parameters[name], low, high)
             if name in definition.engineering_plausibility:
                 lo, hi = definition.engineering_plausibility[name]
                 plausibility[name] = "INSIDE" if lo <= parameters[name] <= hi else "OUTSIDE_REPORTED_NOT_REJECTED"
