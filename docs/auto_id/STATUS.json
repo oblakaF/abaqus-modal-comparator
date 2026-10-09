@@ -598,7 +598,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "NEXT: V12-I5 negative/regression closure TODO, from a green main with normal SUPERVISOR gate. V12-I1-I4 ACCEPTED (PR #46 merged, main 90e2378 CI success). V12-I6 TODO. Production calibration orchestration BLOCKED; unknown/ambiguous Abaqus material options require fail-closed I5 verification; no SP10, t_face, new FE work; M8 NOT_STARTED, auto-id/m8 parked; Abaqus requires HUMAN authorisation",
+  "next_action": "STOP: SUPERVISOR review of V12-I5 (PR #47, not merged; F1 / F2 closed; cluster-member evidence decision open). V12-I6 TODO; production calibration orchestration BLOCKED; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1178,7 +1178,7 @@
       "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity",
       "calibration_precision_gate": "conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness)) <= 0.08 (ln p, as M5); birge_adjusted_sd and AVAILABLE_COMPLETE_LOO required, else REFUSED; > 0.08 REFUSED; no value released, optimiser candidate only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE; never IDENTIFIED / WIDE; tau_mf not in the envelope; UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE kept"
     },
-    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1, V12-I2, V12-I3, V12-I4 ACCEPTED (merged PR #43, #44, #45, #46); V12-I5 and V12-I6 TODO; production v1.2 IMPLEMENTATION_INCOMPLETE (production calibration orchestration blocked pending V12-I5 / V12-I6)",
+    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1, V12-I2, V12-I3, V12-I4 ACCEPTED (merged PR #43, #44, #45, #46); V12-I5 REVIEW_READY on branch auto-id/v12-i5 (PR #47; binding findings F1 / F2 closed); V12-I6 TODO; production v1.2 IMPLEMENTATION_INCOMPLETE (production calibration orchestration blocked)",
     "merged_to_main": {
       "pr": 41,
       "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423",
@@ -1281,7 +1281,42 @@
       },
       "V12-I5": {
         "title": "Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable; fail-closed unknown or ambiguous Abaqus material options)",
-        "status": "TODO"
+        "status": "REVIEW_READY",
+        "branch": "auto-id/v12-i5",
+        "pr": 47,
+        "base": "90e237849f72e55c58359245ddb9d3b2956bc3bc",
+        "synchronised_with_main": {
+          "main": "c96e385d01b1da18a48f04d235bb476630c4c6f0",
+          "via": "merge of main after PR #48 (docs-only ROADMAP / STATUS sync)"
+        },
+        "scope": "tests/test_v12_i5_contract_closure.py: finite end-to-end negative / regression acceptance matrix over I1-I4 (questions and no fallback; tau_mf boundaries and exclusion from Sigma / uncertainty / SPEC 13; tau-rescued pattern with SPEC 13 FAIL or NOT_EVALUABLE -> NO_GLOBAL_PARAMETER_VALUE; gate refusal matrix as REFUSED outputs; anti-mixing; cluster member rows; fail-closed material fragment; historical v1.1 records pinned; production calibration refused with zero side effects)",
+        "production_code_change": "src/services/specimen_calibration_output.py: fail-closed material clone (block must end at *Material, *Step or end of input); governed frozen baseline binding (F2); required candidate-evaluation evidence (F1). src/services/candidate_evaluation_evidence.py (new, F1). src/domain/identification_run.py: pure verify_journal_chain shared by RunJournal (behaviour unchanged). forward_builder unchanged",
+        "rework": {
+          "reviewed_head": "00e210ccbbd5d6bd8574ba75356f940ec0ea6504",
+          "supervisor_decision": "regression matrix and fail-closed fragment accepted in principle; close F1 (authoritative candidate-evaluation binding of p_hat, residuals, robustness and FE identity) and F2 (baseline Delta ln f bound to the frozen baseline pairing, SPEC v1.1 6 S3) before acceptance",
+          "closed_by": [
+            "e759bf4dfe4378a2b13c3871eefcea40acfb1360",
+            "32933904e291f6bb12e72a0410b682603fb2f945"
+          ]
+        },
+        "open_findings": [],
+        "tests": "test_v12_i5_contract_closure 56 OK (0 expected failures); focused (V12-I1..I5, SPEC v1.2 normative + policy, M5 gate, verdict, uncertainty, model_form_robustness, M7 campaign / RUN_A / RUN_B / entry wiring, M7b, M7 closure, forward builder / generic / manifest, shared carbon, M3/M4 stage gates, clusters, objective, pipeline, family residual) 464 OK with all data stores; full suite without data stores 1769 OK (68 skipped); full suite with all data stores 1783 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus",
+        "closed_findings": [
+          {
+            "id": "V12-I5-F2",
+            "commit": "e759bf4dfe4378a2b13c3871eefcea40acfb1360",
+            "closure": "the SPEC v1.2 section 7 baseline is the frozen FE reference state at p0 (SPEC v1.1 section 6 S3): governed_baseline_rows derives ln(f_FE / f_EXP) per governed physical row from the specimen's frozen observation set; build_calibration_output requires the gate's baseline rows to be exactly those rows, roles and values (rel 1e-12); otherwise an input inconsistency. Science unchanged"
+          },
+          {
+            "id": "V12-I5-F1",
+            "commit": "32933904e291f6bb12e72a0410b682603fb2f945",
+            "closure": "services/candidate_evaluation_evidence.py: CandidateEvaluationEvidence (specimen pipeline journal, evaluation hash, candidate and baseline FE packs, pinned source INP, M5 system) verified by verify_candidate_evaluation, which re-derives p_hat (journalled parameters), residuals / holdouts / tracking (branch tracking and objective recomputed from the content-addressed packs), the pattern, analysis, statistical_sd, Birge and model_form_robustness (recomputed from the system with the verified FIT terms at p_hat) and the FE identity (job re-rendered from the pinned INP, pack content hashes recomputed, bound to the frozen baseline job and the journalled run); required by build_calibration_output. Confirmed clusters refused as unverified (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE)"
+          }
+        ],
+        "limitations": [
+          "confirmed clusters cannot be released: M4 tracks a cluster as a two-mode subspace and judges the pairing-independent mean, so the per-member candidate frequencies and tracking MACs the gate judges row by row are not in the evaluation (needs a SUPERVISOR decision on a member-assignment / member-tracking rule)",
+          "the M5 system (Jacobian) is bound to its records by hash and recomputation, not yet to the journalled LM history (V12-I6 orchestration)"
+        ]
       },
       "V12-I6": {
         "title": "Integration into GUI / backend readiness (the same backend services; no install_* layer)",

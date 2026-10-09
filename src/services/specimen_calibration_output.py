@@ -14,8 +14,11 @@ builds one deterministic record:
 Both carry the bound identity (specimen, test run, forward model, INP SHA-256, registration, campaign, run,
 τ_mf, gate record hash), the I3 precision and uncertainty basis unchanged, τ_mf only as an
 ACCEPTANCE_TOLERANCE, the full governed physical-row table (cluster members row by row) and the excluded
-high-MAC diagnostic records (DIAGNOSTIC_ONLY). An inconsistent identity or evidence bundle is an input
-error, never a record.
+high-MAC diagnostic records (DIAGNOSTIC_ONLY). The §7 baseline is the governed frozen baseline: every
+baseline row must equal ln(f_FE / f_EXP) of the specimen's frozen observation set (SPEC v1.1 §6 S3; V12-I5), and
+p̂, the residual evidence, the M5 records and the FE identity must be the verified evaluation of one candidate in the
+specimen's pipeline journal (``candidate_evaluation_evidence``; V12-I5).
+An inconsistent identity or evidence bundle is an input error, never a record.
 
 ``render_calibration_inp_fragment`` is a separate pure renderer: it accepts only a RELEASED record, the
 complete nine governed Engineering Constants (checked against the forward model's parameterisation) and the
@@ -49,9 +52,10 @@ from .forward_builder import (
     rewrite_engineering_constants,
     split_inp_lines,
 )
+from .candidate_evaluation_evidence import CandidateEvaluationEvidence, verify_candidate_evaluation
 from .identification_campaign_run import CampaignSpecimenInput
 from .practical_identifiability import PracticalIdentifiabilityInputError
-from .specimen_calibration_gate import CalibrationGateInputs, evaluate_calibration_gate
+from .specimen_calibration_gate import CalibrationGateInputs, GovernedRow, evaluate_calibration_gate
 
 
 SCHEMA = "auto-id/specimen-engineering-calibration/v1"
@@ -219,12 +223,54 @@ def _identity(inputs: CalibrationGateInputs, specimen: CampaignSpecimenInput, ru
             "run_hash": canonical_hash(dict(run_identity))}
 
 
+# Numerical consistency of a supplied baseline with the governed frozen baseline (the same ln f ratios, signed).
+_BASELINE_TOLERANCE = {"rel_tol": 1e-12, "abs_tol": 1e-15}
+
+
+def governed_baseline_rows(specimen: CampaignSpecimenInput) -> tuple[GovernedRow, ...]:
+    """The governed baseline of SPEC v1.2 §7 for every governed physical row (V12-I5, finding F2).
+
+    The baseline is the FE reference state at p0 at which the modal pairs were frozen (SPEC v1.1 §6 S3): for each
+    frozen row, Δ ln f = ln(f_FE / f_EXP) of the frozen observation set, with the row's FIT / HOLDOUT role.  It is
+    derived here from the frozen set and never supplied independently or replaced by a start-point estimate.
+    """
+    roles = {row.row_id: row.role for row in specimen.spec.rows}
+    rows = []
+    for row in specimen.frozen.rows:
+        if row.row_id not in roles:
+            _fail(f"frozen row {row.row_id} has no FIT / HOLDOUT role in the campaign definition.")
+        for name, value in (("FE", row.fe_hz), ("experimental", row.experimental_hz)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)                     or value <= 0.0:
+                _fail(f"frozen row {row.row_id}: the {name} baseline frequency must be finite and positive.")
+        rows.append(GovernedRow(row.row_id, roles[row.row_id], math.log(row.fe_hz / row.experimental_hz)))
+    return tuple(rows)
+
+
+def _bind_baseline(inputs: CalibrationGateInputs, specimen: CampaignSpecimenInput) -> dict[str, float]:
+    """The gate's baseline rows must be exactly the governed frozen baseline (an input inconsistency otherwise)."""
+    governed = {(r.row_id, r.role): r.delta_ln_f for r in governed_baseline_rows(specimen)}
+    supplied = {}
+    for row in inputs.baseline_rows:
+        key = (row.row_id, row.role)
+        if key in supplied:
+            _fail(f"baseline row {row.row_id} is given twice.")
+        supplied[key] = row.delta_ln_f
+    if set(supplied) != set(governed):
+        _fail(f"the baseline rows {sorted(supplied)} are not the governed frozen rows and roles {sorted(governed)}.")
+    for key, value in supplied.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)                 or not math.isclose(value, governed[key], **_BASELINE_TOLERANCE):
+            _fail(f"baseline row {key[0]}: Δ ln f {value!r} is not the governed frozen baseline "
+                  f"ln(f_FE / f_EXP) = {governed[key]!r} of observation set {specimen.frozen.observation_hash[:12]}.")
+    return {row_id: value for (row_id, _), value in governed.items()}
+
+
 def _family_of(rows: Sequence[str], families: Mapping[str, str]) -> str:
     keys = sorted({families[r] for r in rows})
     return keys[0] if len(keys) == 1 else "+".join(keys)  # the M5.8 rule of residual_terms
 
 
-def _rows(inputs: CalibrationGateInputs, specimen: CampaignSpecimenInput) -> tuple[list[dict], list[dict]]:
+def _rows(inputs: CalibrationGateInputs, specimen: CampaignSpecimenInput,
+          baseline: Mapping[str, float]) -> tuple[list[dict], list[dict]]:
     """The governed physical-row table and the term table, bound to the specimen's frozen rows and roles."""
     frozen = {row.row_id: row for row in specimen.frozen.rows}
     roles = {row.row_id: row.role for row in specimen.spec.rows}
@@ -242,7 +288,6 @@ def _rows(inputs: CalibrationGateInputs, specimen: CampaignSpecimenInput) -> tup
         if mac != frozen[row].mac:
             _fail(f"row {row}: the baseline pair MAC differs from the frozen pairing.")
     candidate = {r.row_id: float(r.delta_ln_f) for r in inputs.candidate_rows}
-    baseline = {r.row_id: float(r.delta_ln_f) for r in inputs.baseline_rows}
     table = []
     for row_id in [r.row_id for r in specimen.frozen.rows]:
         term = term_of[row_id]
@@ -294,9 +339,13 @@ def _reporting(gate, table: Sequence[Mapping], excluded: Mapping) -> None:
 
 
 def build_calibration_output(inputs: CalibrationGateInputs, specimen: CampaignSpecimenInput, run_identity: Mapping,
-                             excluded: ExcludedDiagnosticsEvidence,
+                             excluded: ExcludedDiagnosticsEvidence, evaluation: CandidateEvaluationEvidence,
                              expected_gate_record_hash: Optional[str] = None) -> CalibrationOutputRecord:
-    """V12-I4: evaluate the I3 gate on ``inputs`` and build the calibration output record. Pure; writes nothing."""
+    """V12-I4: evaluate the I3 gate on ``inputs`` and build the calibration output record. Pure; writes nothing.
+
+    V12-I5: the bundle must be the verified evaluation of one candidate (``evaluation``, finding F1) and its baseline
+    the governed frozen baseline (finding F2); otherwise an input error, never a record.
+    """
 
     if not isinstance(inputs, CalibrationGateInputs) or not isinstance(specimen, CampaignSpecimenInput):
         raise TypeError("the output builder consumes CalibrationGateInputs and the CampaignSpecimenInput it describes.")
@@ -316,7 +365,10 @@ def build_calibration_output(inputs: CalibrationGateInputs, specimen: CampaignSp
            for name, record in (("analysis", inputs.analysis), ("statistical_sd", inputs.statistical),
                                 ("pattern", inputs.pattern), ("birge", inputs.birge),
                                 ("model_form_robustness", inputs.robustness))}}
-    table, terms = _rows(inputs, specimen)
+    baseline = _bind_baseline(inputs, specimen)  # F2: the frozen baseline (SPEC v1.1 §6 S3)
+    verified = verify_candidate_evaluation(evaluation, inputs, specimen, run_identity)  # F1: one evaluated candidate
+    identity["evidence_binding"]["candidate_evaluation"] = verified.to_dict()
+    table, terms = _rows(inputs, specimen, baseline)
     excluded_record = _excluded(excluded, specimen)
     _reporting(gate, table, excluded_record)
     fixed = {name: {"value": float(value), "unit": PARAMETER_UNITS.get(name), "role": "FIXED_BY_CAMPAIGN_DEFINITION",
@@ -368,14 +420,13 @@ class CalibrationInpFragment:
         return hashlib.sha256(self.content.encode("latin-1")).hexdigest()
 
 
-# Abaqus material options outside the supported set: a material block that ends on one of them would be cloned
-# incompletely, so no fragment is produced (the supported set is the forward builder's).
-_UNSUPPORTED_MATERIAL_OPTIONS = frozenset({
-    "plastic", "hyperelastic", "hyperfoam", "viscoelastic", "user material", "depvar", "creep", "damage initiation",
-    "damage evolution", "permeability", "piezoelectric", "dielectric", "electrical conductivity", "latent heat",
-    "joule heat fraction", "swelling", "moisture swelling", "hysteresis", "mullins effect", "viscous",
-    "anisotropic hyperelastic", "concrete damaged plasticity", "brittle cracking", "porous bulk moduli",
-    "user defined field", "regularize", "low density foam"})
+# Keywords that may end a governed material block (V12-I5, fail-closed).  The forward builder's block runs until the
+# first keyword outside its supported material options; that keyword is accepted as the end of the material only when it
+# is a recognised structural boundary of the governed INP format (Abaqus/CAE writes the MATERIALS section as
+# consecutive *Material blocks followed by the *Step: the pinned SP02 / SP13 inputs) or the end of the input.  Any
+# other keyword (an Abaqus material option outside the supported set such as *Plastic or *Mohr Coulomb, a sub-option
+# such as *Fail Stress, or an unexpected keyword) is ambiguous: no fragment, because the clone could be incomplete.
+_MATERIAL_BLOCK_BOUNDARIES = frozenset({"material", "step"})
 _NAME = re.compile(r"(?i)(\bname\s*=\s*)(\"?)([^,\"\r\n]+)(\"?)")
 
 
@@ -434,9 +485,11 @@ def _clone_material(record: CalibrationOutputRecord, source_inp_bytes: bytes, ma
         located = locate_engineering_constants(lines, production)
     except ForwardBuildError as exc:
         raise CalibrationFragmentRefusal(f"the governed source material cannot be cloned: {exc}") from exc
-    if end < len(lines) and inp_keyword(lines[end]) in _UNSUPPORTED_MATERIAL_OPTIONS:
-        raise CalibrationFragmentRefusal(f"material {production!r} carries the unsupported option "
-                                         f"*{inp_keyword(lines[end])}; a complete clone is not possible.")
+    if end < len(lines) and inp_keyword(lines[end]) not in _MATERIAL_BLOCK_BOUNDARIES:
+        raise CalibrationFragmentRefusal(
+            f"material {production!r} is followed by *{inp_keyword(lines[end])}, which is not a recognised "
+            "material-block boundary (*Material, *Step or the end of the input); it may be an unsupported option "
+            "of the material, so a complete clone is not possible.")
     while end > start + 1 and (lines[end - 1].startswith("**") or not lines[end - 1].strip()):
         end -= 1  # trailing comments belong to what follows, not to the material
     block_sha256 = hashlib.sha256("".join(lines[start:end]).encode("latin-1")).hexdigest()

@@ -4254,3 +4254,81 @@ first internal provider.
 - **Verification:** reviewed PR #46 merge/tree and green post-merge CI; machine-readable status parsed and checked against roadmap; changelog append-only. No Abaqus run.
 - **Abaqus run count:** 0.
 - **Next gate:** V12-I5 only, from green main; V12-I6 and M8 not started.
+
+## 2026-10-09 — V12-I5 — SPEC v1.2 negative / regression contract closure (V12-I4 merged)
+
+- **V12-I4 merge:** recorded once in the "SPEC v1.2 roadmap/status sync after accepted V12-I4" entry above (PR #46 merge `90e2378`).
+- **Stage:** SPEC v1.2 implementation track, step V12-I5 (no roadmap M-stage; M8 NOT_STARTED)
+- **Status:** REVIEW_READY (checkpoint at `00e210c`)
+- **Branch:** `auto-id/v12-i5` (from `main` `90e2378`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I5): SPEC v1.2 negative / regression contract closure`
+- **Files:** `tests/test_v12_i5_contract_closure.py` (new), `src/services/specimen_calibration_output.py` (one safety
+  correction); STATUS, ROADMAP, CHANGELOG.
+- **Acceptance matrix (end to end, reusing the I1–I4 fixtures):** two predeclared questions with distinct identities
+  and no fallback; τ_mf equality / σ- and τ-dominated thresholds, per-term and cluster σ, invalid / missing / changed
+  τ_mf, τ_mf absent from Σ, objective, statistical_sd, Birge, LOO, precision and §13; controlled two-specimen v1.2
+  evidence where the pattern passes only because of τ_mf = 0.02 while SPEC §13 FAILs (Δχ² ≈ 96, identical for v1.1,
+  τ 0.02 and τ 0.005) → NO_GLOBAL_PARAMETER_VALUE, a counterfactual §13 PASS releases, §13 NOT_EVALUABLE releases
+  nothing; 22 calibration-gate refusals plus wrong question / specimen count → REFUSED output, no value, no fragment,
+  no override; evidence anti-mixing (p̂ / robustness, pattern / residuals, baseline row set, gate / values, run /
+  campaign, specimen / forward manifest, registration, pinned INP); RELEASED / REFUSED output contract; cluster member
+  rows (MAC, tracking, max, RMS, 8 %) never averaged away; fail-closed material fragment and pinned-source regression
+  (store-gated read-only layout check of the SP02 / SP13 pinned inputs); historical v1.1 records pinned by canonical
+  hash (32 records), v1.1 pattern records recomputed unchanged, RUN_A NO_GLOBAL_PARAMETER_VALUE and RUN_B
+  DIAGNOSTIC_ONLY / NOT_IDENTIFIABLE unchanged, archived journals, manifests and journalled pack records (store-gated: 22 files, hash chains);
+  production calibration execution refused with zero optimisation, solver / process calls and files.
+- **Safety correction:** the calibration material clone ended the governed block at the first keyword outside the
+  supported options and refused only a listed set of unsupported options, so an unlisted genuine material option
+  (e.g. `*Mohr Coulomb` after `*Elastic`) was silently dropped and a fragment rendered. Now the block must end at a
+  recognised structural boundary (`*Material`, `*Step`, end of input — the pinned SP02 / SP13 layout); anything else
+  refuses the fragment. `forward_builder` unchanged.
+- **Open findings (SUPERVISOR decision; reproduced as expected failures, not fixed):** V12-I5-F1 — p̂ and
+  model_form_robustness are not bound to the residuals they belong to (B's p̂ + robustness with A's pattern / rows /
+  Birge: gate PASS, RELEASED at B's value); V12-I5-F2 — the baseline Δ ln f is not bound to the frozen baseline pairing
+  (SPEC §7 "governed baseline FE state" undefined between frozen pairing and start-point evaluation). Production
+  calibration execution is refused, so neither is reachable in production today.
+- **Tests:** test_v12_i5_contract_closure 41 OK + 2 expected failures (open findings V12-I5-F1 / F2); focused (V12-I1..I5, SPEC v1.2 normative + policy, M5 gate, verdict, uncertainty, model_form_robustness, M7 campaign / RUN_A / RUN_B / entry wiring, M7b, M7 closure, forward builder / generic / manifest, shared carbon, M3/M4 clusters and objective, family residual) 408 OK (2 expected failures) with all data stores; full suite without data stores 1756 OK (67 skipped, 2 expected failures); full suite with all data stores 1770 OK (5 skipped, 2 expected failures), no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of the V12-I5 PR and decision on V12-I5-F1 / F2.
+
+## 2026-10-09 — V12-I5 — REWORK: documentation synchronised with main (PR #48)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I5 (SUPERVISOR decision on PR #47 head `00e210c`)
+- **Status:** REWORK
+- **PR #48 merge:** docs-only `auto-id/v12-roadmap-sync-20261009` → `main`, reviewed head `3df09f6`, merge commit
+  `c96e385d01b1da18a48f04d235bb476630c4c6f0` (tree identical to the reviewed head); main Linux CI success (run 37911861105). SUPERVISOR-authorised.
+- **Branch:** `auto-id/v12-i5` merges `main` `c96e385` (no force push). ROADMAP / STATUS take main's corrected wording;
+  the V12-I5 checkpoint is re-applied on top; the earlier I5 entry no longer repeats the PR #46 acceptance.
+- **Decision recorded:** regression matrix and fail-closed material fragment accepted in principle; V12-I5 stays REWORK
+  until the binding findings F1 (candidate evaluation) and F2 (frozen baseline) are closed. V12-I6 TODO.
+- **Abaqus run count:** 0.
+- **Next gate:** F2 and F1 corrections on `auto-id/v12-i5`, then SUPERVISOR review of PR #47.
+
+## 2026-10-09 — V12-I5 — evidence-binding findings F1 / F2 closed (REVIEW_READY)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I5 (SUPERVISOR REWORK of PR #47 head `00e210c`)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i5` (PR #47; main `c96e385` merged in)
+- **Commits:** `e759bf4` F2 frozen-baseline binding; `3293390` F1 candidate-evaluation binding; this
+  governance commit.
+- **F2:** the SPEC v1.2 §7 baseline is the FE reference state at p0 where the pairs were frozen (SPEC v1.1 §6 S3).
+  `governed_baseline_rows` derives Δ ln f = ln(f_FE / f_EXP) per governed physical row from the frozen observation
+  set; `build_calibration_output` requires the gate's baseline rows to be exactly those rows, roles and values (signed,
+  rel 1e-12), otherwise an input inconsistency. Max / RMS / 8 % science unchanged; synthetic fixtures now carry a
+  consistent frozen baseline.
+- **F1:** new `services/candidate_evaluation_evidence.py` (V12 companion evidence; no historical record changed).
+  `CandidateEvaluationEvidence` = specimen pipeline journal + judged evaluation hash + candidate and frozen-baseline
+  FE packs + pinned source INP + M5 system. `verify_candidate_evaluation` re-derives and compares: p̂ (journalled
+  parameters, candidate hash); residuals, holdouts and tracking (branch tracking and objective recomputed from the
+  content-addressed packs); candidate terms, physical rows and tracking MACs; the pattern (declared τ_mf); analysis,
+  statistical_sd, Birge and model_form_robustness (recomputed from the system with the verified FIT terms at p̂); the
+  forward job (re-rendered from the pinned INP), pack content hashes, FE geometry / node set / modes, the frozen
+  baseline job, and the run (hash chain, calibration run hash, specimen, forward model, frozen set, solver profile,
+  pairing policy, start). `build_calibration_output` requires it. Confirmed clusters are refused as unverified
+  (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE).
+- **Tests:** test_v12_i5_contract_closure 56 OK (0 expected failures); focused (V12-I1..I5, SPEC v1.2 normative + policy, M5 gate, verdict, uncertainty, model_form_robustness, M7 campaign / RUN_A / RUN_B / entry wiring, M7b, M7 closure, forward builder / generic / manifest, shared carbon, M3/M4 stage gates, clusters, objective, pipeline, family residual) 464 OK with all data stores; full suite without data stores 1769 OK (68 skipped); full suite with all data stores 1783 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Open decision:** release of a calibration with a confirmed cluster needs a member-assignment / member-tracking
+  rule (not invented here); the M5 system ↔ journalled LM history binding belongs to V12-I6 orchestration.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #47.

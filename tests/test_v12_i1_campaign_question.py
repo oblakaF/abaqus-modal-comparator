@@ -59,7 +59,8 @@ SYNTHETIC_V1_RUN_HASH = "698228cebd5b3de81bde2a78c8ef61450db358076a9309a7464ae6a
 TAU_MF_MODULES = ("domain/campaign_definition.py", "services/identification_uncertainty.py",
                   "services/identification_verdict.py", "services/identification_campaign_run.py",
                   "services/specimen_calibration_gate.py",  # + the pure calibration gate (V12-I3)
-                  "services/specimen_calibration_output.py")  # + the calibration output service (V12-I4)
+                  "services/specimen_calibration_output.py",  # + the calibration output service (V12-I4)
+                  "services/candidate_evaluation_evidence.py")  # + the candidate-evaluation evidence (V12-I5)
 
 
 def v12_definition(question=MATERIAL_IDENTIFICATION, tau_mf=0.02, **changes) -> dict:
