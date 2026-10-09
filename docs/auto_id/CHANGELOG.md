@@ -4240,3 +4240,17 @@ first internal provider.
 - **Tests:** test_v12_i4_calibration_output 17 OK; focused (V12-I1..I4, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, 10 forward-builder / M3 / M4 / shared-carbon modules) 319 OK (10 skipped without data stores); full suite without data stores 1713 OK (64 skipped); full suite with all data stores 1727 OK (5 skipped), no Abaqus
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #46.
+
+## 2026-10-09 — SPEC v1.2 roadmap/status sync after accepted V12-I4
+
+- **Stage:** governance/documentation only; no new scientific mini-step.
+- **Status:** V12-I1/I2/I3/I4 ACCEPTED; V12-I5 TODO (next gate); V12-I6 TODO. M8 remains NOT_STARTED and parked.
+- **PR #46 accepted and merged:** reviewed head `1fcabc47d32560816dc67dfb4c1a6d6b2d2d2f6c`; merge `90e237849f72e55c58359245ddb9d3b2956bc3bc`; identical tree `508aaf8704a4d7496ef22d59ec08b01bd12f6937`; main Linux CI success (run `37904375035`).
+- **Files:** `docs/auto_id/ROADMAP.md`, `docs/auto_id/STATUS.json`, `docs/auto_id/CHANGELOG.md`; the docs-only commit is recorded in Git history.
+- **Change:** replace stale v1.1/not-started/current-I4 wording; document pinned-source-INP complete-material cloning and corrected physical-row non-degradation; add merge provenance and explicit I5/I6 gates. Original `REVIEW_READY` checkpoints are historical.
+- **Scientific/runtime behaviour changed:** NO. No material verdict, campaign identity, historical record, I3/I4 service, or SPEC changed.
+- **I5 mandatory safety test:** unknown/ambiguous Abaqus material options must fail closed during optional CAL_* cloning; pending test, not an implemented-fix claim.
+- **Known limitations:** production calibration orchestration remains `SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED` until I5/I6 closure; `auto-id/m8` remains parked; SP10, t_face and new FE work not authorised.
+- **Verification:** reviewed PR #46 merge/tree and green post-merge CI; machine-readable status parsed and checked against roadmap; changelog append-only. No Abaqus run.
+- **Abaqus run count:** 0.
+- **Next gate:** V12-I5 only, from green main; V12-I6 and M8 not started.
