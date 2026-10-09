@@ -37,6 +37,21 @@ def _keys(node) -> set:
     return set()
 
 
+def _precision_gate(gate: dict, birge_adjusted_sd, model_form_status: str, model_form_width, tau_mf=None) -> dict:
+    """Test-local reading of the drafted precision gate (policy check only; no production implementation).
+
+    ``tau_mf`` is accepted only to prove that it has no influence on the envelope.
+    """
+    if birge_adjusted_sd is None or gate["required_birge_adjusted_sd"] != "AVAILABLE":
+        return {"status": gate["on_missing_component"], "conservative_uncertainty": None}
+    if model_form_status != gate["required_model_form_robustness"] or model_form_width is None:
+        return {"status": gate["on_missing_component"], "conservative_uncertainty": None}
+    conservative = max(birge_adjusted_sd, 0.5 * model_form_width)
+    if conservative > gate["ceiling"]:
+        return {"status": gate["on_ceiling_exceeded"], "conservative_uncertainty": conservative}
+    return {"status": gate["output_class_on_pass"], "conservative_uncertainty": conservative}
+
+
 class PolicyDraftTests(unittest.TestCase):
     def setUp(self):
         self.policy = json.loads(_text("SPEC_V1_2_POLICY_OPTIONS.json"))
@@ -150,10 +165,84 @@ class PolicyDraftTests(unittest.TestCase):
                 self.assertEqual(canonical_hash(record), closure[key]["result_record"]["canonical_content_sha256"])
                 self.assertNotIn("SPECIMEN_ENGINEERING_CALIBRATION", json.dumps(record))
 
+    def test_calibration_precision_gate_ceiling_and_envelope(self):
+        gate = self.policy["specimen_engineering_calibration"]["precision_gate"]
+        self.assertTrue(gate["mandatory"])
+        self.assertEqual(gate["ceiling"], 0.08)
+        self.assertEqual(gate["envelope"], "max(birge_adjusted_sd, 0.5 * width(model_form_robustness))")
+        self.assertEqual(gate["envelope_components"], ["birge_adjusted_sd", "0.5 * model_form_robustness_width"])
+        self.assertIn("calibration precision gate: conservative_uncertainty <= 0.08",
+                      self.policy["specimen_engineering_calibration"]["gates"])
+        self.assertIn("conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness))",
+                      self.draft)
+        self.assertIn("calibration precision gate: conservative_uncertainty ≤ 0.08", self.draft)
+        # the larger of the two components decides; the ceiling is inclusive
+        for birge, width, expected in ((0.03, 0.10, 0.05), (0.06, 0.04, 0.06)):
+            result = _precision_gate(gate, birge, "AVAILABLE_COMPLETE_LOO", width)
+            self.assertAlmostEqual(result["conservative_uncertainty"], expected)
+        self.assertEqual(_precision_gate(gate, 0.08, "AVAILABLE_COMPLETE_LOO", 0.16)["status"],
+                         "SPECIMEN_ENGINEERING_CALIBRATION")
+        self.assertFalse(gate["labelled_identified_or_wide"])
+        self.assertTrue(gate["distinct_from_non_degradation_row_ceiling"])
+
+    def test_missing_birge_or_incomplete_model_form_robustness_refuses_calibration(self):
+        gate = self.policy["specimen_engineering_calibration"]["precision_gate"]
+        self.assertEqual((gate["on_missing_component"], gate["required_model_form_robustness"]),
+                         ("REFUSED", "AVAILABLE_COMPLETE_LOO"))
+        self.assertEqual(_precision_gate(gate, None, "AVAILABLE_COMPLETE_LOO", 0.02)["status"], "REFUSED")
+        for status in ("AVAILABLE_PARTIAL_LOO", "NOT_AVAILABLE", "REFUSED"):
+            with self.subTest(model_form_robustness=status):
+                self.assertEqual(_precision_gate(gate, 0.01, status, 0.02)["status"], "REFUSED")
+        self.assertIn("`birge_adjusted_sd` must be available (the pattern test passed); otherwise the calibration is "
+                      "**REFUSED**", self.draft)
+        self.assertIn("`model_form_robustness` must be `AVAILABLE_COMPLETE_LOO`; otherwise the calibration is "
+                      "**REFUSED**", self.draft)
+
+    def test_conservative_uncertainty_above_8_percent_refuses_calibration(self):
+        gate = self.policy["specimen_engineering_calibration"]["precision_gate"]
+        self.assertEqual(gate["on_ceiling_exceeded"], "REFUSED")
+        self.assertEqual(_precision_gate(gate, 0.0801, "AVAILABLE_COMPLETE_LOO", 0.02)["status"], "REFUSED")
+        self.assertEqual(_precision_gate(gate, 0.01, "AVAILABLE_COMPLETE_LOO", 0.17)["status"], "REFUSED")
+        self.assertIn("`conservative_uncertainty > 0.08` → the calibration is **REFUSED**", self.draft)
+
+    def test_tau_mf_is_not_part_of_the_uncertainty_envelope(self):
+        gate = self.policy["specimen_engineering_calibration"]["precision_gate"]
+        self.assertFalse(gate["tau_mf_in_envelope"])
+        props = self.policy["tau_mf_properties"]
+        self.assertFalse(props["in_statistical_sd_birge_model_form_or_conservative_uncertainty"])
+        self.assertNotIn("tau", " ".join(gate["envelope_components"]) + gate["envelope"])
+        for tau in (None, 0.0, 0.02):
+            with self.subTest(tau_mf=tau):
+                self.assertEqual(_precision_gate(gate, 0.07, "AVAILABLE_COMPLETE_LOO", 0.1, tau),
+                                 {"status": "SPECIMEN_ENGINEERING_CALIBRATION", "conservative_uncertainty": 0.07})
+        self.assertIn("τ_mf is **not** a component of the envelope", self.draft)
+
+    def test_incomplete_covariance_keeps_the_conditional_wording(self):
+        gate = self.policy["specimen_engineering_calibration"]["precision_gate"]
+        self.assertEqual(gate["conditional_wording_when_covariance_incomplete"],
+                         "UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE")
+        self.assertFalse(gate["makes_incomplete_covariance_complete"] or gate["uncertainty_inflated_or_shrunk"])
+        self.assertEqual(self.policy["threshold_arithmetic_reference"]["sigma_meas"], "NOT_AVAILABLE")
+        self.assertIn("**The precision gate does not make incomplete covariance complete.** "
+                      "While Σ_meas is NOT_AVAILABLE", self.draft)
+        self.assertIn("the record keeps `UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE` and states that the ≤ 0.08 "
+                      "result is conditional on the available covariance components", self.draft)
+
+    def test_refused_calibration_exposes_only_a_diagnostic_optimizer_candidate(self):
+        refusal = self.policy["specimen_engineering_calibration"]["refusal"]
+        self.assertFalse(refusal["calibration_value_released"] or refusal["fallback"])
+        self.assertEqual(refusal["optimizer_candidate_labels"],
+                         ["DIAGNOSTIC_OPTIMIZER_CANDIDATE", "NOT_A_RELEASE_VALUE"])
+        self.assertFalse(refusal["optimizer_candidate_in_calibration_or_material_field"]
+                         or refusal["optimizer_candidate_written_to_fragment"])
+        self.assertIn("**no SPECIMEN_ENGINEERING_CALIBRATION value is released**", self.draft)
+        self.assertIn("labelled `DIAGNOSTIC_OPTIMIZER_CANDIDATE` and `NOT_A_RELEASE_VALUE`", self.draft)
+
     def test_review_covers_every_required_topic(self):
         review = _text("SPEC_V1_2_POLICY_REVIEW.md")
         for topic in ("**Upper rule (§1)**", "**τ_mf**", "**Holdout**", "**Pattern test**", "**Family consistency**",
-                      "**Specimen calibration class**", "**Per-specimen non-degradation**", "**Minimum observability**",
+                      "**Specimen calibration class**", "**Calibration precision gate**",
+                      "**Per-specimen non-degradation**", "**Minimum observability**",
                       "**S8 output**", "**Uncertainty wording**", "**Scan / excluded-mode diagnostics**",
                       "**Historical data**"):
             self.assertIn(f"| {topic} |", review)

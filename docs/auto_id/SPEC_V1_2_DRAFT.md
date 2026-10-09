@@ -130,15 +130,46 @@ campaign / run identity; the τ_mf used.
 5. minimum observability (§8);
 6. holdouts within `max(3σ, τ_mf)` and no systematic family (§4);
 7. non-degradation (§7);
-8. registration not limited, no peak-derived input, birge_adjusted_sd available (pattern passed);
-9. complete reporting: full FIT and HOLDOUT residual table, excluded high-MAC diagnostic modes, uncertainty basis.
+8. registration not limited, no peak-derived input;
+9. **calibration precision gate:** `conservative_uncertainty ≤ 0.08` (below);
+10. complete reporting: full FIT and HOLDOUT residual table, excluded high-MAC diagnostic modes, uncertainty basis.
+
+**Calibration precision gate (mandatory).** A specimen calibration is a numerical scientific output under §1 B, so the
+evidence must support it at a declared precision. Using the M5 conservative-envelope concept, per calibrated parameter
+in ln p (as M5):
+
+    conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness))
+    calibration precision gate: conservative_uncertainty ≤ 0.08
+
+where width(model_form_robustness) = max_shift_ln − min_shift_ln over the complete leave-one-FIT-family-out cases.
+
+- `birge_adjusted_sd` must be available (the pattern test passed); otherwise the calibration is **REFUSED**;
+- `model_form_robustness` must be `AVAILABLE_COMPLETE_LOO`; otherwise the calibration is **REFUSED**;
+- `conservative_uncertainty > 0.08` → the calibration is **REFUSED**;
+- 0.08 is the hard maximum precision envelope of this calibration class. It is a different quantity from the 8 %
+  per-row frequency ceiling of the non-degradation rule (§7);
+- a calibration that passes is **never** labelled IDENTIFIED or WIDE; its output class stays
+  `SPECIMEN_ENGINEERING_CALIBRATION`;
+- τ_mf is **not** a component of the envelope; it is never added to `statistical_sd`, `birge_adjusted_sd`,
+  `model_form_robustness` or `conservative_uncertainty`.
+
+**The precision gate does not make incomplete covariance complete.** While Σ_meas is NOT_AVAILABLE or any covariance
+component is PROVISIONAL, the record keeps `UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE` and states that the
+≤ 0.08 result is conditional on the available covariance components. Σ_meas is never invented, no uncertainty is
+inflated or shrunk, τ_mf is never added to an uncertainty, and the calibration uncertainty is never called a complete
+experimental uncertainty.
+
+**Refused calibration.** If any gate fails — in particular if `conservative_uncertainty` is undefined or exceeds
+0.08 — **no SPECIMEN_ENGINEERING_CALIBRATION value is released**. An optimiser candidate may remain visible only as
+diagnostic evidence, labelled `DIAGNOSTIC_OPTIMIZER_CANDIDATE` and `NOT_A_RELEASE_VALUE`, never in a calibration-value
+or material-property field and never written to a calibration fragment. There is no fallback (§1).
 
 **Uncertainty reporting.** The calibration record reports, separately: the statistical uncertainty with its covariance
-basis; the Birge-adjusted uncertainty only when valid; the model-form robustness; the missing Σ components; and τ_mf as
-an **acceptance tolerance** (never as uncertainty). With Σ_meas NOT_AVAILABLE it states
-`UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE` and never calls the result complete experimental uncertainty. A
-calibration that passes every gate is a model-calibration output; it must not masquerade as a statistically complete
-material-property estimate.
+basis; the Birge-adjusted uncertainty only when valid; the model-form robustness; the conservative_uncertainty of the
+precision gate; the missing Σ components; and τ_mf as an **acceptance tolerance** (never as uncertainty). With Σ_meas
+NOT_AVAILABLE it states `UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE` and never calls the result complete
+experimental uncertainty. A calibration that passes every gate is a model-calibration output; it must not masquerade as
+a statistically complete material-property estimate.
 
 ## 7. New rule — Per-specimen non-degradation (draft)
 
@@ -205,4 +236,4 @@ is enlarged and Σ_meas is never invented.
 
 Campaign definition: declared question (material identification or specimen calibration) and τ_mf, both
 identity-bound. M5 holdout and pattern magnitude bounds max(kσ, τ_mf) only when τ_mf is declared. A calibration gate
-and a separate calibration record / fragment writer. No change to Σ, Φ, §13 or the rank rules.
+(including the conservative_uncertainty ≤ 0.08 precision gate) and a separate calibration record / fragment writer. No change to Σ, Φ, §13 or the rank rules.
