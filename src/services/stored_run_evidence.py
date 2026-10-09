@@ -115,24 +115,34 @@ def campaign_specimens(definition: CampaignDefinition, repo_root: Path,
     return prepare_campaign_specimens(definition, Path(repo_root), fixtures, roots)
 
 
+def governed_pipeline_directory(definition: CampaignDefinition, item: CampaignSpecimenInput, run: StoredRun) -> Path:
+    """The run directory of the specimen's governed pipeline in this campaign run (``IdentificationPipeline`` layout).
+
+    ``ValueError`` when the run identity lists no archived packs for the specimen or no governed identity can be formed.
+    """
+    entries = {e.get("label"): e for e in run.campaign_journal["run_identity"]["specimens"] if isinstance(e, Mapping)}
+    archived = (entries.get(item.label) or {}).get("archived_packs")
+    if not isinstance(archived, Mapping):
+        raise ValueError("the run identity lists no archived packs for this specimen")
+    try:
+        pipeline_hash = canonical_hash(governed_pipeline_identity(definition, item, run.run_hash, archived))
+    except Exception as error:  # the governed pipeline cannot be formed: never located otherwise
+        raise ValueError(f"no governed pipeline identity ({error})") from error
+    passport = item.model.passport
+    return run.run_root / "specimens" / str(passport.family_id) / str(passport.design_id) / pipeline_hash
+
+
 def load_run_evidence(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput], run: StoredRun,
                       roots: Mapping[str, Path]) -> tuple[CampaignRunEvidence, tuple[str, ...]]:
     """Genuine ``CampaignRunEvidence`` of the selected run (missing parts are left missing and noted)."""
 
     notes, pipelines, packs, sources = [], {}, {}, {}
-    entries = {e.get("label"): e for e in run.campaign_journal["run_identity"]["specimens"] if isinstance(e, Mapping)}
     for item in specimens:
-        archived = (entries.get(item.label) or {}).get("archived_packs")
-        if not isinstance(archived, Mapping):
-            notes.append(f"{item.label}: the run identity lists no archived packs for this specimen")
-            continue
         try:
-            pipeline_hash = canonical_hash(governed_pipeline_identity(definition, item, run.run_hash, archived))
-        except Exception as error:  # the governed pipeline cannot be formed: the backend refuses the run
-            notes.append(f"{item.label}: no governed pipeline identity ({error})")
+            directory = governed_pipeline_directory(definition, item, run)
+        except ValueError as error:  # the backend refuses a run without its governed pipelines
+            notes.append(f"{item.label}: {error}")
             continue
-        passport = item.model.passport
-        directory = run.run_root / "specimens" / str(passport.family_id) / str(passport.design_id) / pipeline_hash
         try:
             document = json.loads((directory / "journal.json").read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:

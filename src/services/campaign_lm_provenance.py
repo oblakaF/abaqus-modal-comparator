@@ -156,6 +156,11 @@ def _bind_run_identity(definition, specimens: Sequence[CampaignSpecimenInput], i
         _refuse(LM_HISTORY_UNRELATED, f"the campaign run belongs to another {', '.join(wrong)}.")
 
 
+def verify_campaign_run_identity(definition, specimens: Sequence[CampaignSpecimenInput], identity: Mapping) -> None:
+    """The campaign run identity is the governed one, field by field (LM_HISTORY_UNRELATED otherwise)."""
+    _bind_run_identity(definition, tuple(specimens), identity)
+
+
 def governed_pipeline_identity(definition, item: CampaignSpecimenInput, campaign_run_hash: str,
                                archived_packs: Mapping[str, str]) -> dict:
     """The run identity of the specimen's governed M4.6 pipeline in this campaign run.
