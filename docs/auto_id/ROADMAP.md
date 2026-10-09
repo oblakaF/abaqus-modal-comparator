@@ -685,8 +685,8 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
 |---|---|---|
 | V12-I1 | Campaign / run question (MATERIAL_IDENTIFICATION or SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf schema, both declared before execution and bound into the campaign / run identity | `ACCEPTED` |
 | V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `ACCEPTED` |
-| V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `REVIEW_READY` |
-| V12-I4 | Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer) | `TODO` |
+| V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `ACCEPTED` |
+| V12-I4 | Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer) | `REVIEW_READY` |
 | V12-I5 | Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable) | `TODO` |
 | V12-I6 | Integration into GUI / backend readiness (the same backend services; no install_* layer) | `TODO` |
 
@@ -713,6 +713,16 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
   no active bound, registration / peak, the V12-I2 pattern record, non-degradation (max, RMS, 8 % rows), precision
   (conservative_uncertainty ≤ 0.08 per parameter) and reporting completeness. PASS / REFUSED with reasons; no value is
   released; production calibration execution stays refused until V12-I4.
+
+- **V12-I3 accepted and merged:** PR #45 (`auto-id/v12-i3` → `main`), merge commit `3218663`.
+- **V12-I4 (REVIEW_READY, branch `auto-id/v12-i4` from `3218663`):** `services/specimen_calibration_output.py` —
+  `build_calibration_output` evaluates the I3 gate on the same evidence bundle and builds the deterministic
+  calibration record (RELEASED: exactly the judged p̂ as MODEL_CALIBRATION_PARAMETER with SPECIMEN_ENGINEERING_CALIBRATION,
+  NOT_A_MATERIAL_PROPERTY, NOT_TRANSFERABLE_WITHOUT_VALIDATION; REFUSED: diagnostic optimiser candidate only), bound to
+  specimen, test run, forward model, INP, registration, campaign, run, τ_mf and the gate; full physical-row table,
+  excluded diagnostics, I3 precision / uncertainty basis / non-degradation. `render_calibration_inp_fragment` renders a
+  distinct calibration material from a RELEASED record and the nine governed Engineering Constants only (separate from
+  the forward builder; nothing written). Production calibration orchestration stays blocked (V12-I5 / V12-I6).
 
 **V12 GATE:** production code enforces the D-078 rules with negative tests (no fallback, τ_mf outside Σ / uncertainty /
 §13, refusals without released values) before any SP10, t_face or other new FE calculation.

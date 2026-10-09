@@ -18,8 +18,9 @@ SPEC v1.2 (D-078, V12-I1) adds schema ``auto-id/identification-campaign/v1.2``, 
 (0 < τ_mf ≤ 0.02) explicitly; both are part of the campaign identity.  A calibration campaign has exactly one
 physical specimen; a material-identification campaign keeps at least two.  Neither field is inferred, and a ``v1``
 definition carries neither, so historical identities are unchanged.  τ_mf is declared only: nothing uses it
-numerically yet (V12-I2).  Calibration execution is refused until it is integrated with its output record (the
-scientific gate is V12-I3, execution and output V12-I4); there is no fallback to material identification.
+numerically yet (V12-I2).  Calibration execution is refused: the scientific gate (V12-I3) and the output service
+(V12-I4) exist, production execution is blocked pending V12-I5 / V12-I6; there is no fallback to material
+identification.
 
 Nothing here runs a solve.
 """
@@ -87,7 +88,7 @@ class RunGateRefusal(Exception):
 
 
 class CalibrationNotImplementedRefusal(Exception):
-    """A SPECIMEN_ENGINEERING_CALIBRATION campaign cannot execute: execution and output are not integrated (V12-I4).
+    """A SPECIMEN_ENGINEERING_CALIBRATION campaign cannot execute: production execution is blocked (V12-I5 / I6).
 
     Not a ValueError, so generic fallback handlers never swallow it; never rerouted to material identification.
     """
@@ -276,9 +277,10 @@ class CampaignDefinition:
     def require_question_supported(self) -> "CampaignDefinition":
         if self.scientific_question == SPECIMEN_ENGINEERING_CALIBRATION:
             raise CalibrationNotImplementedRefusal(
-                f"{CALIBRATION_NOT_IMPLEMENTED}: the specimen-calibration scientific gate exists (V12-I3), but "
-                "production calibration execution and its output record are not integrated until V12-I4; no "
-                "calibration value is produced and the campaign is not run as material identification (no fallback).")
+                f"{CALIBRATION_NOT_IMPLEMENTED}: the specimen-calibration scientific gate (V12-I3) and its output "
+                "service (V12-I4) exist, but production calibration execution is intentionally blocked pending "
+                "V12-I5 / V12-I6; no calibration value is produced and the campaign is not run as material "
+                "identification (no fallback).")
         return self
 
     def require_executable(self) -> "CampaignDefinition":

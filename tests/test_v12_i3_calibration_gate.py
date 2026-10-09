@@ -511,8 +511,8 @@ class ProductionStillBlockedTests(unittest.TestCase):
                                        "m" * 64)
             with self.assertRaises(CalibrationNotImplementedRefusal) as refused:
                 CampaignRun(calibration, [item], "m" * 64, config)
-            self.assertIn("scientific gate exists (V12-I3)", str(refused.exception))
-            self.assertIn("V12-I4", str(refused.exception))
+            self.assertIn("scientific gate (V12-I3)", str(refused.exception))
+            self.assertIn("blocked pending V12-I5", str(refused.exception))
             self.assertEqual(solver.commands, [])
             self.assertFalse((tmp / "runs").exists())
 

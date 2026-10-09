@@ -4193,3 +4193,50 @@ first internal provider.
 - **Tests:** test_v12_i3_calibration_gate 38 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 247 OK (3 skipped without data stores); full suite without data stores 1696 OK (64 skipped); full suite with all data stores 1710 OK (5 skipped), no Abaqus
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #45.
+
+## 2026-10-09 — V12-I4 — specimen-calibration output record and separate INP fragment (V12-I3 merged)
+
+- **V12-I3 merge:** PR #45 `auto-id/v12-i3` → `main`, merge commit `3218663d34aeadb6650ca8cb6af2a9a95a6d3d11` (reviewed head `0dfccaa`, merged tree
+  `6ef5fd6` identical; SUPERVISOR-authorised). Linux CI on main 3218663: 1693 OK (68 skipped), success (run 37898091376). V12-I3 ACCEPTED.
+- **Stage:** SPEC v1.2 implementation track, step V12-I4 (no roadmap M-stage; M8 NOT_STARTED)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i4` (from `main` `3218663`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I4): specimen-calibration output record and separate INP fragment`
+- **Files:** created `src/services/specimen_calibration_output.py` and `tests/test_v12_i4_calibration_output.py`;
+  `src/domain/campaign_definition.py` and `src/services/identification_campaign_run.py` (refusal message / comments:
+  gate and output exist, production execution blocked pending V12-I5 / V12-I6); V12 source-scope guards and refusal
+  messages in `tests/test_v12_i1_campaign_question.py`, `tests/test_v12_i3_calibration_gate.py`,
+  `tests/test_spec_v1_2_normative.py`, `tests/test_spec_v1_2_policy_draft.py`; STATUS, ROADMAP, CHANGELOG.
+- **Behaviour:** the output builder evaluates the I3 gate on the same `CalibrationGateInputs` (no external gate record,
+  no separate value map); RELEASED values are exactly the judged p̂; REFUSED records carry only the diagnostic
+  optimiser candidate. Identity and evidence are bound (input errors on any mismatch). The INP fragment renderer is
+  separate from the forward builder, accepts only a RELEASED record and the nine governed Engineering Constants
+  (carbon-property-set/v1 targets and fixed constants, campaign fixed parameters), and returns text only. I3 science,
+  historical records and hashes unchanged; production calibration execution still refused.
+- **Tests:** test_v12_i4_calibration_output 15 OK; focused (V12-I4, V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability, forward_builder_generic, m4_generic_guard) 273 OK (3 skipped without data stores); full suite without data stores 1711 OK (64 skipped); full suite with all data stores 1725 OK (5 skipped), no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of V12-I4.
+
+## 2026-10-09 — V12-I4 — calibration INP fragment clones the complete governed material block
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I4 (SUPERVISOR engineering-safety correction before merging
+  PR #46)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i4` (previous head `1ca5299`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I4): clone the complete governed material block for the calibration fragment`
+- **Files:** `src/services/specimen_calibration_output.py`, `src/services/forward_builder.py` (pure helper
+  `material_block_bounds` and public `inp_keyword`, shared by `locate_engineering_constants`; behaviour unchanged),
+  `tests/test_v12_i4_calibration_output.py`; STATUS, CHANGELOG.
+- **Behaviour:** `render_calibration_inp_fragment(record, constants, source_inp_bytes)` requires the exact pinned source
+  INP bytes (SHA-256 equal to the record's `inp_sha256`), locates the unique production material with the forward
+  builder's parsing semantics, clones its complete block (density, damping, expansion and every other supported option
+  unchanged, trailing comments excluded), renames it to the CAL_* material and sets only the Engineering Constants with
+  the forward builder's record writer (fixed constants must equal the source). No fragment when the bytes differ, the
+  material is missing or duplicated, the block ends on an unsupported material option, or the source constants are not
+  the governed set. The fragment carries the source INP SHA-256, source material name and block SHA-256, gate and
+  record hashes; the misleading "only *Elastic" header is replaced. The calibration record semantics are unchanged.
+- **Tests:** test_v12_i4_calibration_output 17 OK; focused (V12-I1..I4, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, 10 forward-builder / M3 / M4 / shared-carbon modules) 319 OK (10 skipped without data stores); full suite without data stores 1713 OK (64 skipped); full suite with all data stores 1727 OK (5 skipped), no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #46.
