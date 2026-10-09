@@ -15,7 +15,9 @@ Both carry the bound identity (specimen, test run, forward model, INP SHA-256, r
 τ_mf, gate record hash), the I3 precision and uncertainty basis unchanged, τ_mf only as an
 ACCEPTANCE_TOLERANCE, the full governed physical-row table (cluster members row by row) and the excluded
 high-MAC diagnostic records (DIAGNOSTIC_ONLY). The §7 baseline is the governed frozen baseline: every
-baseline row must equal ln(f_FE / f_EXP) of the specimen's frozen observation set (SPEC v1.1 §6 S3; V12-I5).
+baseline row must equal ln(f_FE / f_EXP) of the specimen's frozen observation set (SPEC v1.1 §6 S3; V12-I5), and
+p̂, the residual evidence, the M5 records and the FE identity must be the verified evaluation of one candidate in the
+specimen's pipeline journal (``candidate_evaluation_evidence``; V12-I5).
 An inconsistent identity or evidence bundle is an input error, never a record.
 
 ``render_calibration_inp_fragment`` is a separate pure renderer: it accepts only a RELEASED record, the
@@ -50,6 +52,7 @@ from .forward_builder import (
     rewrite_engineering_constants,
     split_inp_lines,
 )
+from .candidate_evaluation_evidence import CandidateEvaluationEvidence, verify_candidate_evaluation
 from .identification_campaign_run import CampaignSpecimenInput
 from .practical_identifiability import PracticalIdentifiabilityInputError
 from .specimen_calibration_gate import CalibrationGateInputs, GovernedRow, evaluate_calibration_gate
@@ -336,9 +339,13 @@ def _reporting(gate, table: Sequence[Mapping], excluded: Mapping) -> None:
 
 
 def build_calibration_output(inputs: CalibrationGateInputs, specimen: CampaignSpecimenInput, run_identity: Mapping,
-                             excluded: ExcludedDiagnosticsEvidence,
+                             excluded: ExcludedDiagnosticsEvidence, evaluation: CandidateEvaluationEvidence,
                              expected_gate_record_hash: Optional[str] = None) -> CalibrationOutputRecord:
-    """V12-I4: evaluate the I3 gate on ``inputs`` and build the calibration output record. Pure; writes nothing."""
+    """V12-I4: evaluate the I3 gate on ``inputs`` and build the calibration output record. Pure; writes nothing.
+
+    V12-I5: the bundle must be the verified evaluation of one candidate (``evaluation``, finding F1) and its baseline
+    the governed frozen baseline (finding F2); otherwise an input error, never a record.
+    """
 
     if not isinstance(inputs, CalibrationGateInputs) or not isinstance(specimen, CampaignSpecimenInput):
         raise TypeError("the output builder consumes CalibrationGateInputs and the CampaignSpecimenInput it describes.")
@@ -358,7 +365,10 @@ def build_calibration_output(inputs: CalibrationGateInputs, specimen: CampaignSp
            for name, record in (("analysis", inputs.analysis), ("statistical_sd", inputs.statistical),
                                 ("pattern", inputs.pattern), ("birge", inputs.birge),
                                 ("model_form_robustness", inputs.robustness))}}
-    table, terms = _rows(inputs, specimen, _bind_baseline(inputs, specimen))
+    baseline = _bind_baseline(inputs, specimen)  # F2: the frozen baseline (SPEC v1.1 §6 S3)
+    verified = verify_candidate_evaluation(evaluation, inputs, specimen, run_identity)  # F1: one evaluated candidate
+    identity["evidence_binding"]["candidate_evaluation"] = verified.to_dict()
+    table, terms = _rows(inputs, specimen, baseline)
     excluded_record = _excluded(excluded, specimen)
     _reporting(gate, table, excluded_record)
     fixed = {name: {"value": float(value), "unit": PARAMETER_UNITS.get(name), "role": "FIXED_BY_CAMPAIGN_DEFINITION",

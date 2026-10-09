@@ -99,6 +99,16 @@ def load_solver_profile(path: Path) -> SolverProfile:
         return parse_solver_profile(json.load(handle))
 
 
+def verify_journal_chain(run_hash: str, entries: list) -> None:
+    """Pure check of a journal's hash chain (shared by ``RunJournal`` and read-only verifiers)."""
+    previous = run_hash
+    for index, entry in enumerate(entries):
+        body = {k: entry[k] for k in ("sequence", "kind", "record", "previous_hash")}
+        if entry["sequence"] != index or entry["previous_hash"] != previous or entry["entry_hash"] != canonical_hash(body):
+            raise RunIdentityError(f"journal entry {index} breaks the hash chain; the journal is refused.")
+        previous = entry["entry_hash"]
+
+
 class RunJournal:
     """Append-only, hash-chained journal of one identification run (single JSON file, atomic writes)."""
 
@@ -119,12 +129,7 @@ class RunJournal:
             self._write()
 
     def _verify_chain(self) -> None:
-        previous = self.run_hash
-        for index, entry in enumerate(self.entries):
-            body = {k: entry[k] for k in ("sequence", "kind", "record", "previous_hash")}
-            if entry["sequence"] != index or entry["previous_hash"] != previous or entry["entry_hash"] != canonical_hash(body):
-                raise RunIdentityError(f"journal entry {index} breaks the hash chain; the journal is refused.")
-            previous = entry["entry_hash"]
+        verify_journal_chain(self.run_hash, self.entries)
 
     def _write(self) -> None:
         document = {"schema": JOURNAL_SCHEMA, "run_hash": self.run_hash, "run_identity": self.run_identity,

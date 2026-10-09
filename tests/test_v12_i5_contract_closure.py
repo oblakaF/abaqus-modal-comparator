@@ -48,13 +48,14 @@ from domain.campaign_definition import (
 )
 from domain.experiment_fixture import fixture_roots_from_environment, load_experiment_fixture_manifest
 from domain.forward_model_manifest import PARAMETERISATIONS, bind_forward_model, load_forward_model_manifest
-from domain.frozen_observations import ObservationRow
-from domain.identification_run import canonical_hash
+from domain.identification_run import canonical_hash, verify_journal_chain
 from domain.specimen_manifest import load_specimen_manifest
 from m4_6_support import FakeExtractor, FakeSolver
 from services import forward_builder
 from services import identification_campaign_run as campaign_module
 from services import specimen_calibration_output as output_module
+from services import candidate_evaluation_evidence as evidence_module
+from services.shape_extraction import load_run_pack
 from services.family_consistency import CHI2_CONDITIONS, FamilyConsistencyStatus, family_consistency
 from services.identification_campaign_run import (
     NO_GLOBAL_VALUE,
@@ -66,10 +67,21 @@ from services.identification_campaign_run import (
     prepare_run_manifest,
     row_sigma,
 )
-from services.identification_uncertainty import PatternStatus, ResidualTerm, residual_pattern_test
+from services.identification_uncertainty import (
+    PatternStatus,
+    ResidualTerm,
+    birge_adjustment,
+    residual_pattern_test,
+    residual_terms,
+    statistical_sd,
+)
+from services.model_form_robustness import linearised_model_form_robustness
 from services.identification_verdict import EvidenceState, GuardEvidence
-from services.model_form_robustness import CaseStatus
-from services.practical_identifiability import PracticalIdentifiabilityInputError, RankStatus
+from services.practical_identifiability import (
+    PracticalIdentifiabilityInputError,
+    RankStatus,
+    analyse_practical_identifiability,
+)
 from services.specimen_calibration_gate import CalibrationGateStatus, GovernedRow, evaluate_calibration_gate
 from services.specimen_calibration_output import (
     CANDIDATE_LABELS,
@@ -83,8 +95,10 @@ from services.specimen_calibration_output import (
 )
 from test_m7_campaign import TRUTH_E, synthetic_definition, synthetic_specimen
 from test_v12_i1_campaign_question import calibration_definition, v12_definition
-from test_v12_i3_calibration_gate import E_FAMILIES, SIGMA, SIGMA_C, build
+from test_v12_i3_calibration_gate import E_FAMILIES, E_ROWS, P_HAT, SIGMA, SIGMA_C, build
+from test_identification_uncertainty import E, system
 from test_v12_i4_calibration_output import BASELINE_RATIO, NONE_EXCLUDED, _Case, material_block
+from v12_evidence_support import designed_frozen_rows, evaluated_bundle
 
 
 DOCS = ROOT / "docs" / "auto_id"
@@ -194,6 +208,8 @@ OBSERVATION_HASHES = {"SP02": "b5da4f5f8098962fdbf947b7ad22fec70bc8a2dbc759482a4
 FOUR_ROWS = (("R1", 1, 7, "FIT"), ("R2", 2, 8, "FIT"), ("R3", 3, 9, "FIT"), ("R4", 4, 10, "FIT"),
              ("H1", 5, 11, "HOLDOUT"))
 FOUR_FAMILIES = dict(E_FAMILIES, H1="T")
+FIT_ROWS = ("R1", "R2", "R3", "R4")
+FOUR_FIT = [0.5, -0.4, 0.3, -0.2]  # whitened FIT residuals of the reference bundle (Δ ln f = r · 0.003)
 CLUSTER_ID = "C(R3+R4)"
 FAIL = GuardEvidence("guard", EvidenceState.FAIL, "explicit synthetic evidence", "failed")
 
@@ -227,29 +243,61 @@ def _load(path: Path) -> dict:
 class _Bundles(_Case):
     """Synthetic calibration evidence bound to a synthetic specimen (``_Case.simple`` / ``_Case.cluster`` from I4)."""
 
-    def specimen(self, families=FOUR_FAMILIES, tau=0.02, tag="four"):
+    def bundle(self, families=FOUR_FAMILIES, tau=0.02, fit=FOUR_FIT, holdout=None, p_hat=None, baseline=None,
+               macs=None, sensitivities=E_ROWS):
+        """A calibration specimen whose frozen set is designed so that the genuine M4 evaluation of p̂ (fake solver)
+        has the whitened FIT residuals ``fit`` and HOLDOUT residual ``holdout``; the frozen baseline Δ ln f is
+        ``baseline`` (default +0.03 on every row).  The bundle is built from that journalled evaluation."""
+        p_hat = dict(p_hat or P_HAT)
+        holdout = holdout or (("H1", families["H1"], 0.6),)
         data = calibration_definition(tau)
         data["specimens"][0]["rows"] = [{"row_id": r, "experimental_mode": e, "fe_mode": f, "role": role}
                                         for r, e, f, role in FOUR_ROWS]
         definition = parse_campaign_definition(data)
-        item, store = synthetic_specimen(definition, "A", self.tmp / f"{tag}-{tau}")
+        base = self.tmp / f"b{len(self._specimens)}"
+        item, store = synthetic_specimen(definition, "A", base)
         self.source_inp = (store / "models" / "SYA.inp").read_bytes()
-        rows = tuple(ObservationRow(r, e, 100.0 + 10 * e, f, (100.0 + 10 * e) * BASELINE_RATIO, 0.98, BASELINE_RATIO - 1)
-                     for r, e, f, _ in FOUR_ROWS)  # frozen baseline Δ ln f = +0.03 on every row
-        item = replace(item, frozen=replace(item.frozen, rows=rows), holdout_rows=("H1",), families=dict(families))
-        return definition, item
+        item = replace(item, holdout_rows=("H1",), families=dict(families))
+        deltas = {**{r: v * SIGMA for r, v in zip(FIT_ROWS, fit)}, **{h: v * SIGMA for h, _, v in holdout}}
+        frozen = designed_frozen_rows(item.spec.rows, p_hat, deltas, baseline or {r: 0.03 for r in deltas}, macs)
+        inputs, item, _, evidence = evaluated_bundle(definition, item, store, base / "runs", p_hat, sensitivities,
+                                                     frozen)
+        self._specimens[item.frozen.observation_hash] = (definition, store, base, sensitivities)
+        self.register(inputs, evidence)
+        return inputs, item
 
-    def bundle(self, families=FOUR_FAMILIES, tau=0.02, **changes):
-        definition, item = self.specimen(families, tau)
-        changes.setdefault("holdout", (("H1", families["H1"], 0.6),))
-        inputs = build(definition=definition, families={r: f for r, f in families.items() if r != "H1"}, **changes)
-        return replace(inputs, baseline_pair_macs={r: 0.98 for r in inputs.baseline_pair_macs},
-                       baseline_rows=governed_baseline_rows(item)), item
+    def candidate(self, item, p_hat):
+        """Another candidate p̂ evaluated by the same specimen pipeline run (same journal): its own bundle."""
+        definition, store, base, sensitivities = self._specimens[item.frozen.observation_hash]
+        inputs, _, _, evidence = evaluated_bundle(definition, item, store, base / "runs", p_hat, sensitivities)
+        self.register(inputs, evidence)
+        return inputs, evidence
 
-    @staticmethod
-    def output(inputs, item, **kwargs):
+    def setUp(self):
+        super().setUp()
+        self._specimens = {}
+
+    def output(self, inputs, item, evidence=None, **kwargs):
         run = campaign_run_identity(inputs.definition, [item], "m" * 64, {})
-        return build_calibration_output(inputs, item, run, NONE_EXCLUDED, **kwargs)
+        return build_calibration_output(inputs, item, run, NONE_EXCLUDED, evidence or self.evidence(inputs, item),
+                                        **kwargs)
+
+    def with_system(self, inputs, item, sensitivities):
+        """The same verified evaluation judged on another M5 system: its M5 records recomputed (no robustness when
+        the system is rank deficient: M5.7 needs a full system).  Returns (inputs, item, evidence)."""
+        evidence = self.evidence(inputs, item)
+        record = next(e["record"] for e in evidence.pipeline_journal["entries"]
+                      if e["kind"] == "evaluation" and e["record"]["evaluation_hash"] == evidence.evaluation_hash)
+        fit = residual_terms(list(FIT_ROWS), [], record["residuals"], item.families, {r: SIGMA for r in FIT_ROWS})
+        s = system({r: sensitivities[r] for r in FIT_ROWS}, (E,), sd=SIGMA)
+        statistical = statistical_sd(s, inputs.statistical.context)
+        try:
+            robustness = linearised_model_form_robustness(s, fit, inputs.p_hat)
+        except PracticalIdentifiabilityInputError:
+            robustness = None
+        changed = replace(inputs, analysis=analyse_practical_identifiability(s), statistical=statistical,
+                          birge=birge_adjustment(s, statistical, inputs.pattern, fit), robustness=robustness)
+        return changed, item, replace(evidence, system=s)
 
     def assert_refused_output(self, record, code):
         self.assertIs(record.status, CalibrationOutputStatus.REFUSED)
@@ -299,7 +347,7 @@ class QuestionContractTests(_Bundles):
         as_material = replace(inputs, definition=material)  # material evidence never becomes a calibration
         self.assertEqual(evaluate_calibration_gate(as_material).refusal_codes, ("WRONG_SCHEMA_OR_QUESTION",))
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "SPECIMEN_ENGINEERING_CALIBRATION"):
-            build_calibration_output(as_material, item, {}, NONE_EXCLUDED)
+            build_calibration_output(as_material, item, {}, NONE_EXCLUDED, self.evidence(inputs, item))
 
     def test_a_not_identifiable_material_result_cannot_become_a_released_calibration(self):
         # A material campaign whose formal output releases nothing (SPEC §13 FAIL) ...
@@ -310,7 +358,8 @@ class QuestionContractTests(_Bundles):
         # needs its own separately declared campaign and run identity.
         inputs, item = self.bundle()
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "another campaign"):
-            build_calibration_output(inputs, item, material_campaign.identity, NONE_EXCLUDED)
+            build_calibration_output(inputs, item, material_campaign.identity, NONE_EXCLUDED,
+                                     self.evidence(inputs, item))
         record = self.output(inputs, item)  # the separately declared calibration run
         self.assertTrue(record.released, record.refusal_reasons)
         self.assertNotEqual(record.identity["campaign_hash"], material_campaign.definition.campaign_hash)
@@ -393,10 +442,13 @@ class TauMfRegressionTests(_Bundles):
         for bad in (0.0, -0.01, 0.0200001, math.nan, math.inf, True, "0.02"):
             with self.subTest(pattern_tau=bad), self.assertRaises(PracticalIdentifiabilityInputError):
                 residual_pattern_test([_term("R1", "F1", 1.0, 0.003)], [], bad)
-        inputs, item = self.bundle(pattern_tau=None)  # v1.1 pattern evidence in a v1.2 calibration
-        self.assert_refused_output(self.output(inputs, item), "PATTERN_EVIDENCE_NOT_V1_2")
-        inputs, item = self.bundle(pattern_tau=0.01)  # τ_mf of another declaration
-        self.assert_refused_output(self.output(inputs, item), "TAU_MF_MISMATCH")
+        inputs, item = self.bundle()
+        for pattern_tau, code in ((None, "PATTERN_EVIDENCE_NOT_V1_2"), (0.01, "TAU_MF_MISMATCH")):
+            with self.subTest(pattern_tau=pattern_tau):  # v1.1 pattern evidence / τ_mf of another declaration
+                changed = with_pattern(inputs, self.evidence(inputs, item), pattern_tau)
+                self.assertIn(code, evaluate_calibration_gate(changed).refusal_codes)  # the I3 gate refuses ...
+                with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "residual-pattern record"):
+                    self.output(changed, item)  # ... and it is not the pattern of the verified evaluation
 
     def test_changed_tau_changes_identity_and_nothing_numerical(self):
         records = {}
@@ -430,6 +482,16 @@ class TauMfRegressionTests(_Bundles):
         for function in (identification_uncertainty.statistical_sd, identification_uncertainty.birge_adjustment,
                          campaign_family_consistency, row_sigma):
             self.assertNotIn("tau", inspect.getsource(function), function.__name__)
+
+
+def with_pattern(inputs, evidence, tau_mf):
+    """The bundle's terms judged by another pattern rule (v1.1 or another τ_mf), Birge consistently re-bound."""
+    def terms(role):
+        return [ResidualTerm(t.term_id, (t.term_id,), {**inputs.fit_families, **inputs.holdout_families}[t.term_id],
+                             t.delta_ln_f / SIGMA, SIGMA) for t in inputs.candidate_terms if t.role == role]
+    fit = terms("FIT")
+    pattern = residual_pattern_test(fit, terms("HOLDOUT"), tau_mf)
+    return replace(inputs, pattern=pattern, birge=birge_adjustment(evidence.system, inputs.statistical, pattern, fit))
 
 
 def calibration_name(record) -> str:
@@ -552,24 +614,18 @@ class CalibrationNegativeMatrixTests(_Bundles):
         overlap = dict(FOUR_FAMILIES, H1="F1")
         cases = {}
 
-        def case(name, code, inputs, item):
-            cases[name] = (code, inputs, item)
+        def case(name, code, inputs, item, evidence=None):  # the evidence of the bundle, resolved now
+            cases[name] = (code, inputs, item, evidence or self.evidence(inputs, item))
 
         inputs, item = self.bundle()
         failing = GuardEvidence("guard", EvidenceState.FAIL, "x", "failed")
         case("fewer than k+1 FIT families", "INSUFFICIENT_FIT_FAMILIES", *self.bundle(one_family))
         case("HOLDOUT / FIT family overlap", "HOLDOUT_FAMILY_OVERLAPS_FIT", *self.bundle(overlap))
-        case("rank deficiency", "RANK_DEFICIENT",
-             replace(inputs, analysis=replace(inputs.analysis, status=RankStatus.RANK_DEFICIENT)), item)
-        loo = list(inputs.robustness.cases)
-        loo[1] = replace(loo[1], status=CaseStatus.REFUSED_RANK_DEFICIENT, shift_ln=None, estimate=None)
-        case("incomplete LOO", "LOO_INCOMPLETE", replace(inputs, robustness=replace(
-            inputs.robustness, cases=tuple(loo), refused_families=(loo[1].family,), supports_green=False)), item)
-        case("insufficient baseline MAC", "BASELINE_PAIR_MAC",
-             replace(inputs, baseline_pair_macs=dict(inputs.baseline_pair_macs, R2=0.7999)),
-             _frozen_mac(item, "R2", 0.7999))
-        case("insufficient tracking MAC", "TRACKING_MAC",
-             replace(inputs, tracking_macs=dict(inputs.tracking_macs, H1=0.8999)), item)
+        case("rank deficiency", "RANK_DEFICIENT",  # a rank-deficient M5 system (no M5.7 robustness exists)
+             *self.with_system(inputs, item, {r: (0.0,) for r in FIT_ROWS}))
+        case("incomplete LOO", "LOO_INCOMPLETE",  # without F1 the remaining family F2 observes nothing
+             *self.bundle(sensitivities={"R1": (0.5,), "R2": (0.45,), "R3": (0.0,), "R4": (0.0,)}))
+        case("insufficient baseline MAC", "BASELINE_PAIR_MAC", *self.bundle(macs={"R2": 0.7999}))
         case("branch / pair loss", "BRANCH_OR_PAIRING_LOSS", replace(inputs, branch_pairing=failing), item)
         case("active bound", "ACTIVE_PARAMETER_BOUND", *self.bundle(p_hat={"E_in_plane_mpa": 26000.0}))
         case("limited registration", "REGISTRATION_LIMITED", replace(inputs, registration=failing), item)
@@ -583,17 +639,17 @@ class CalibrationNegativeMatrixTests(_Bundles):
         case("incorrect row membership", "ROW_SET_MISMATCH",
              replace(inputs, candidate_rows=[r for r in inputs.candidate_rows if r.row_id != "R2"]), item)
         case("max degradation", "MAX_DEGRADED",  # the frozen baseline itself (SPEC v1.1 §6 S3)
-             *frozen_baseline(inputs, item, {r: 0.0017 for r in ("R1", "R2", "R3", "R4", "H1")}))
+             *self.bundle(baseline={r: 0.0017 for r in ("R1", "R2", "R3", "R4", "H1")}))
         case("RMS degradation", "RMS_DEGRADED",
-             *frozen_baseline(inputs, item, {"R1": 0.0, "R2": 0.0, "R3": 0.0, "R4": 0.0, "H1": 0.0018}))
-        above, above_item = self.bundle(fit=[math.log1p(0.0800001) / SIGMA, -25.0, 0.3, -0.2])
+             *self.bundle(baseline={"R1": 0.0, "R2": 0.0, "R3": 0.0, "R4": 0.0, "H1": 0.0018}))
         case("physical row above 8 %", "ROW_RELATIVE_ERROR_ABOVE_CEILING",
-             *frozen_baseline(above, above_item, {r: 0.1 for r in ("R1", "R2", "R3", "R4", "H1")}))
-        case("Birge unavailable", "BIRGE_UNAVAILABLE", replace(inputs, birge=replace(
-            inputs.birge, status=type(inputs.birge.status).REFUSED_DOF, birge_adjusted_sd_ln=None)), item)
+             *self.bundle(fit=[math.log1p(0.0800001) / SIGMA, -25.0, 0.3, -0.2],
+                          baseline={r: 0.1 for r in ("R1", "R2", "R3", "R4", "H1")}))
+        case("Birge unavailable", "BIRGE_UNAVAILABLE",  # blocked by the systematic pattern (SPEC §9)
+             *self.bundle(fit=[8.0, 9.0, 0.3, -0.2]))
         case("incomplete robustness", "LOO_INCOMPLETE", replace(inputs, robustness=None), item)
-        case("conservative uncertainty > 0.08", "CONSERVATIVE_ABOVE_CEILING", replace(inputs, birge=replace(
-            inputs.birge, birge_adjusted_sd_ln={"E_in_plane_mpa": 0.0800001})), item)
+        case("conservative uncertainty > 0.08", "CONSERVATIVE_ABOVE_CEILING",  # weakly observed E
+             *self.bundle(sensitivities={r: (0.01,) for r in FIT_ROWS}))
         case("incomplete reporting", "REPORTING_INCOMPLETE",
              replace(inputs, reporting=replace(inputs.reporting, uncertainty_basis=False)), item)
         return cases
@@ -606,17 +662,26 @@ class CalibrationNegativeMatrixTests(_Bundles):
 
     def test_every_scientific_refusal_stays_refused(self):
         cases = self.cases()
-        self.assertEqual(len(cases), 22)
-        for name, (code, inputs, item) in cases.items():
+        self.assertEqual(len(cases), 21)  # TRACKING_MAC: see test_tracking_mac_below_090_is_never_journalled
+        for name, (code, inputs, item, evidence) in cases.items():
             with self.subTest(case=name):
                 gate = evaluate_calibration_gate(inputs)
                 self.assertIs(gate.status, CalibrationGateStatus.REFUSED)
                 self.assertIn(code, gate.refusal_codes)
-                record = self.output(inputs, item)
+                record = self.output(inputs, item, evidence)
                 self.assert_refused_output(record, code)
                 self.assertEqual(record.gate_record_hash, gate.record_hash)
                 self.assertEqual(record.diagnostic_optimizer_candidate["parameters"]["E_in_plane_mpa"]["value"],
                                  inputs.p_hat["E_in_plane_mpa"])  # the judged candidate, diagnostic only
+
+    def test_tracking_mac_below_090_is_never_journalled(self):
+        # The I3 gate refuses TRACKING_MAC (test_v12_i3 test_09); a verified evaluation cannot carry it, because the
+        # M4 branch tracker itself refuses MAC < 0.90 (no evaluation is journalled), and a forged one is no evidence.
+        inputs, item = self.bundle()
+        forged = replace(inputs, tracking_macs=dict(inputs.tracking_macs, H1=0.8999))
+        self.assertIn("TRACKING_MAC", evaluate_calibration_gate(forged).refusal_codes)
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "tracking MAC of H1"):
+            self.output(forged, item)
 
     def test_wrong_question_and_specimen_count_produce_no_record(self):
         inputs, item = self.bundle()
@@ -629,11 +694,13 @@ class CalibrationNegativeMatrixTests(_Bundles):
                 self.assertIn(code, evaluate_calibration_gate(changed).refusal_codes)
                 with self.assertRaises(PracticalIdentifiabilityInputError):
                     build_calibration_output(changed, item, campaign_run_identity(inputs.definition, [item],
-                                                                                  "m" * 64, {}), NONE_EXCLUDED)
+                                                                                  "m" * 64, {}), NONE_EXCLUDED,
+                                             self.evidence(inputs, item))
 
     def test_no_manual_override(self):
         parameters = list(inspect.signature(build_calibration_output).parameters)
-        self.assertEqual(parameters, ["inputs", "specimen", "run_identity", "excluded", "expected_gate_record_hash"])
+        self.assertEqual(parameters, ["inputs", "specimen", "run_identity", "excluded", "evaluation",
+                                      "expected_gate_record_hash"])
         record = self.output(*self.bundle(holdout=(("H1", "T", 7.0),)))
         with self.assertRaises(FrozenInstanceError):
             record.status = CalibrationOutputStatus.RELEASED
@@ -653,9 +720,8 @@ class CalibrationNegativeMatrixTests(_Bundles):
 class AntiMixingTests(_Bundles):
     def setUp(self):
         super().setUp()
-        self.a, self.item = self.bundle()
-        self.b = build(definition=self.a.definition, fit=[0.4, -0.3, 0.2, -0.1], p_hat={"E_in_plane_mpa": 51000.0})
-        self.b = replace(self.b, baseline_pair_macs=dict(self.a.baseline_pair_macs), baseline_rows=self.a.baseline_rows)
+        self.a, self.item = self.bundle()  # candidate A: p̂ = 50000 MPa, evaluated by the specimen pipeline
+        self.b, self.evidence_b = self.candidate(self.item, {"E_in_plane_mpa": 51000.0})  # candidate B, same run
 
     def never_passes(self, inputs, item=None, **kwargs):
         try:
@@ -666,17 +732,20 @@ class AntiMixingTests(_Bundles):
 
     def test_candidates_cannot_be_mixed(self):
         self.assertTrue(self.output(self.a, self.item).released)
-        self.assertTrue(self.output(self.b, self.item).released)
+        self.assertTrue(self.output(self.b, self.item, self.evidence_b).released)
         mixes = {
             "A p̂ with B robustness": replace(self.a, robustness=self.b.robustness),
             "A pattern with B residuals": replace(self.a, candidate_terms=self.b.candidate_terms,
                                                   candidate_rows=self.b.candidate_rows),
             "B pattern with A residuals": replace(self.a, pattern=self.b.pattern),
             "A Birge with B pattern": replace(self.a, pattern=self.b.pattern, statistical=self.b.statistical),
+            "B p̂ + robustness with A residuals (F1)": replace(self.a, p_hat=self.b.p_hat, robustness=self.b.robustness),
         }
         for name, inputs in mixes.items():
-            with self.subTest(mix=name), self.assertRaises(PracticalIdentifiabilityInputError):
-                self.output(inputs, self.item)
+            for evidence in (self.evidence(self.a, self.item), self.evidence_b):
+                with self.subTest(mix=name, evidence=evidence.evaluation_hash[:8]), \
+                        self.assertRaises(PracticalIdentifiabilityInputError):
+                    self.output(inputs, self.item, evidence)
 
     def test_baseline_of_another_row_set(self):
         other, _, _ = self.simple()  # rows R1, R2, R3 of another evidence bundle
@@ -689,17 +758,19 @@ class AntiMixingTests(_Bundles):
     def test_gate_and_values_of_different_candidates(self):
         gate_a = evaluate_calibration_gate(self.a).record_hash
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "not the gate"):
-            self.output(self.b, self.item, expected_gate_record_hash=gate_a)
+            self.output(self.b, self.item, self.evidence_b, expected_gate_record_hash=gate_a)
         record = self.output(self.a, self.item, expected_gate_record_hash=gate_a)
         self.assertEqual(record.calibration_parameters["E_in_plane_mpa"]["value"], 50000.0)  # A's judged p̂ only
         self.assertEqual(record.identity["evidence_binding"]["p_hat_hash"],
                          canonical_hash({"E_in_plane_mpa": 50000.0}))
+        self.assertEqual(record.identity["evidence_binding"]["candidate_evaluation"]["candidate_parameters"],
+                         {"E_in_plane_mpa": 50000.0})
 
     def test_run_campaign_specimen_registration_and_inp(self):
         other = parse_campaign_definition(calibration_definition(0.01))  # another campaign (τ_mf identity)
         run_other = campaign_run_identity(other, [self.item], "m" * 64, {})
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "another campaign"):
-            build_calibration_output(self.a, self.item, run_other, NONE_EXCLUDED)
+            build_calibration_output(self.a, self.item, run_other, NONE_EXCLUDED, self.evidence(self.a, self.item))
         material = parse_campaign_definition(v12_definition(MATERIAL_IDENTIFICATION))
         item_b, store_b = synthetic_specimen(material, "B", self.tmp / "other-specimen")
         with self.assertRaises(PracticalIdentifiabilityInputError):  # A's rows with B's forward manifest
@@ -714,27 +785,164 @@ class AntiMixingTests(_Bundles):
         render_calibration_inp_fragment(record, governed_engineering_constants(record), self.source_inp)
 
 
-class OpenBindingFindingsTests(_Bundles):
-    """OPEN FINDINGS of V12-I5 for SUPERVISOR decision — reproduced, deliberately NOT fixed here.
+class CandidateEvaluationBindingTests(_Bundles):
+    """F1 closed: p̂, the governed residual evidence, the M5 records and the FE identity must be the verified evaluation
+    of ONE candidate in the specimen's pipeline journal (``candidate_evaluation_evidence``)."""
 
-    Closing them needs new binding evidence or a baseline definition (an I3 / I4 design decision; no policy is
-    invented in I5).  Each test asserts the desired behaviour and is marked expectedFailure: it documents the gap
-    and turns into an unexpected success (a failing run) as soon as the gap is closed.  Production calibration
-    execution stays blocked (V12-I6), so no production path can assemble such a bundle today.
-    """
+    def setUp(self):
+        super().setUp()
+        self.a, self.item = self.bundle()
+        self.evidence_a = self.evidence(self.a, self.item)
+        self.b, self.evidence_b = self.candidate(self.item, {"E_in_plane_mpa": 51000.0})
 
-    @unittest.expectedFailure
-    def test_finding_1_p_hat_and_robustness_are_not_bound_to_the_judged_residuals(self):
-        # p̂ is bound only to model_form_robustness (p_hat_hash); neither records the residuals they belong to.
-        a, item = self.bundle()
-        b = build(definition=a.definition, fit=[0.4, -0.3, 0.2, -0.1], p_hat={"E_in_plane_mpa": 51000.0})
-        mixed = replace(a, p_hat=b.p_hat, robustness=b.robustness)  # B's p̂ + LOO with A's pattern, rows, Birge
-        try:
-            record = self.output(mixed, item)
-        except PracticalIdentifiabilityInputError:
-            return
-        self.assertIsNot(record.status, CalibrationOutputStatus.RELEASED)  # today: RELEASED at 51000 MPa
+    def unverified(self, inputs, evidence=None, text=""):
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, text):
+            self.output(inputs, self.item, evidence or self.evidence_a)
 
+    def test_finding_1_p_hat_and_robustness_are_bound_to_the_judged_residuals(self):
+        mixed = replace(self.a, p_hat=self.b.p_hat, robustness=self.b.robustness)  # was RELEASED at 51000 MPa
+        self.assertIs(evaluate_calibration_gate(mixed).status, CalibrationGateStatus.PASS)  # the pure gate cannot see it
+        self.unverified(mixed, self.evidence_a, "not p̂")
+        self.unverified(mixed, self.evidence_b, "candidate terms")
+
+    def test_p_hat_and_residuals_varied_independently(self):
+        # only p̂ (with a consistently recomputed robustness at that p̂ from A's residuals)
+        fit = [ResidualTerm(t.term_id, (t.term_id,), self.a.fit_families[t.term_id], t.delta_ln_f / SIGMA, SIGMA)
+               for t in self.a.candidate_terms if t.role == "FIT"]
+        robustness = linearised_model_form_robustness(self.evidence_a.system, fit, self.b.p_hat)
+        self.unverified(replace(self.a, p_hat=self.b.p_hat, robustness=robustness), text="not p̂")
+        # only the residuals (B's terms, rows, pattern, Birge and tracking) with A's p̂ and robustness
+        residuals = replace(self.a, candidate_terms=self.b.candidate_terms, candidate_rows=self.b.candidate_rows,
+                            pattern=self.b.pattern, birge=self.b.birge, tracking_macs=self.b.tracking_macs)
+        self.unverified(residuals, text="candidate terms")
+        # only robustness: computed at A's p̂ but from B's residuals (the exact F1 gap: same p_hat_hash)
+        fit_b = [ResidualTerm(t.term_id, (t.term_id,), self.a.fit_families[t.term_id], t.delta_ln_f / SIGMA, SIGMA)
+                 for t in self.b.candidate_terms if t.role == "FIT"]
+        foreign = linearised_model_form_robustness(self.evidence_a.system, fit_b, self.a.p_hat)
+        self.assertEqual(foreign.p_hat_hash, self.a.robustness.p_hat_hash)
+        self.assertIs(evaluate_calibration_gate(replace(self.a, robustness=foreign)).status, CalibrationGateStatus.PASS)
+        self.unverified(replace(self.a, robustness=foreign), text="model_form_robustness")
+
+    def test_holdout_rows_are_bound(self):
+        # a HOLDOUT term and row of another evaluation (FIT terms, p̂ and robustness unchanged)
+        held_b = {t.term_id: t for t in self.b.candidate_terms if t.role == "HOLDOUT"}
+        terms = [held_b.get(t.term_id, t) if t.role == "HOLDOUT" else t for t in self.a.candidate_terms]
+        rows = [next(r for r in self.b.candidate_rows if r.row_id == "H1") if r.row_id == "H1" else r
+                for r in self.a.candidate_rows]
+        changed = with_pattern(replace(self.a, candidate_terms=terms, candidate_rows=rows), self.evidence_a,
+                               self.a.definition.tau_mf)
+        self.unverified(changed, text="candidate terms")
+        row_only = [GovernedRow(r.row_id, r.role, r.delta_ln_f * 1.01) if r.row_id == "H1" else r
+                    for r in self.a.candidate_rows]
+        self.unverified(replace(self.a, candidate_rows=row_only), text="H1")
+        self.unverified(replace(self.a, tracking_macs=dict(self.a.tracking_macs, H1=0.95)), text="tracking MAC of H1")
+
+    def test_forged_m5_records_are_not_evidence(self):
+        forged = {
+            "analysis": replace(self.a, analysis=replace(self.a.analysis, status=RankStatus.RANK_DEFICIENT)),
+            "birge (smaller sd)": replace(self.a, birge=replace(self.a.birge, birge_adjusted_sd_ln={
+                "E_in_plane_mpa": 0.001})),
+            "robustness": replace(self.a, robustness=replace(self.a.robustness, supports_green=False)),
+        }
+        for name, inputs in forged.items():
+            with self.subTest(record=name):
+                self.unverified(inputs, text="not computed from the verified")
+
+    def test_evidence_components_are_verified(self):
+        evidence = self.evidence_a
+        record = self.output(self.a, self.item)
+        verified = record.identity["evidence_binding"]["candidate_evaluation"]
+        self.assertEqual(verified["verification"], "VERIFIED_AGAINST_SPECIMEN_PIPELINE_JOURNAL")
+        self.assertEqual((verified["solver_profile_id"], verified["fe_source"]),  # synthetic evidence stays visible
+                         (self.item.profile.profile_id, "new-solve"))
+        self.assertTrue(verified["solver_profile_id"].endswith("/fake"))
+        journal = evidence.pipeline_journal
+        entries = [dict(e) for e in journal["entries"]]
+        tampered = dict(entries[-1], record=dict(entries[-1]["record"], objective=0.0))
+        cases = {
+            "journal entry tampered": (replace(evidence, pipeline_journal=dict(
+                journal, entries=entries[:-1] + [tampered])), "hash chain"),
+            "evaluation of another candidate": (replace(evidence, pipeline_journal=self.evidence_b.pipeline_journal,
+                                                        evaluation_hash=self.evidence_b.evaluation_hash), "not p̂"),
+            "unknown evaluation": (replace(evidence, evaluation_hash="0" * 64), "0 journalled evaluations"),
+            "candidate pack of another evaluation": (replace(evidence, candidate_pack=self.evidence_b.candidate_pack),
+                                                     "candidate FE pack"),
+            "baseline pack swapped": (replace(evidence, baseline_pack=evidence.candidate_pack), "baseline FE pack"),
+            "another source INP": (replace(evidence, source_inp=evidence.source_inp + b"\n"), "re-rendered"),
+            "another M5 system": (replace(evidence, system=system({r: (0.3,) for r in FIT_ROWS}, (E,), sd=SIGMA)),
+                                  "another M5 system"),
+            "no evidence": (None, "required"),
+        }
+        for name, (changed, text) in cases.items():
+            with self.subTest(evidence=name), self.assertRaisesRegex(PracticalIdentifiabilityInputError, text):
+                run = campaign_run_identity(self.a.definition, [self.item], "m" * 64, {})
+                build_calibration_output(self.a, self.item, run, NONE_EXCLUDED, changed)
+
+    def test_a_self_consistent_fabricated_journal_is_not_evidence(self):
+        # Re-hashing an edited evaluation (evaluation hash and hash chain recomputed) is not proof: the job is
+        # re-rendered from the pinned INP and the residuals re-derived from the content-addressed FE packs.
+        def fabricated(change):
+            document = self.evidence_a.pipeline_journal
+            entries, previous, target = [], document["run_hash"], None
+            for entry in document["entries"]:
+                record = dict(entry["record"])
+                if entry["kind"] == "evaluation" and record["evaluation_hash"] == self.evidence_a.evaluation_hash:
+                    record = change(record)
+                    record["evaluation_hash"] = target = canonical_hash({k: v for k, v in record.items()
+                                                                         if k != "evaluation_hash"})
+                body = {"sequence": entry["sequence"], "kind": entry["kind"], "record": record,
+                        "previous_hash": previous}
+                entries.append(dict(body, entry_hash=canonical_hash(body)))
+                previous = entries[-1]["entry_hash"]
+            return replace(self.evidence_a, pipeline_journal=dict(document, entries=entries), evaluation_hash=target)
+
+        cases = {
+            "job hash": (lambda r: dict(r, job_hash="0" * 64), "not the forward job"),
+            "residuals": (lambda r: dict(r, residuals=[v * 1.5 for v in r["residuals"]]), "not those of the FE packs"),
+            "holdout residuals": (lambda r: dict(r, holdout_residuals={k: -v for k, v in r["holdout_residuals"].items()}),
+                                  "not those of the FE packs"),
+            "evaluated parameters": (lambda r: dict(r, parameters=dict(r["parameters"], E_in_plane_mpa=51000.0)),
+                                     "not p̂"),
+        }
+        for name, (change, text) in cases.items():
+            with self.subTest(fabricated=name):
+                self.unverified(self.a, fabricated(change), text)
+        self.assertTrue(self.output(self.a, self.item, fabricated(lambda r: r)).released)  # control: unchanged
+
+    def test_evidence_of_another_run_or_specimen(self):
+        other_inputs, other_item = self.bundle(fit=[0.45, -0.35, 0.25, -0.15])  # another specimen's frozen set
+        self.unverified(self.a, self.evidence(other_inputs, other_item), "another frozen observation set")
+        regrouped_inputs, regrouped_item = self.bundle(families=dict(FOUR_FAMILIES, R2="F2", R3="F1"))
+        self.assertEqual(regrouped_item.frozen.observation_hash, self.item.frozen.observation_hash)  # same frozen set
+        self.unverified(self.a, self.evidence(regrouped_inputs, regrouped_item), "another calibration run")
+
+    def test_real_pipeline_journals_and_packs_fit_the_evidence_contract(self):
+        """READ-ONLY (store-gated): the archived M7 specimen journals verify and every journalled FE pack's content
+        hash is reproduced by the contract's recomputation (no calibration, nothing written)."""
+        roots = fixture_roots_from_environment()
+        checked = 0
+        for store in ("m7-run-a", "m7-run-b"):
+            if store not in roots:
+                continue
+            for path in sorted(Path(roots[store]).glob("specimens/*/*/*/journal.json")):
+                document = _load(path)
+                verify_journal_chain(document["run_hash"], document["entries"])
+                self.assertEqual(canonical_hash(document["run_identity"]), document["run_hash"])
+                for entry in document["entries"]:
+                    if entry["kind"] == "extraction":
+                        record = entry["record"]
+                        pack = load_run_pack(path.parent / "packs", record["job_name"], record["pack_content_sha256"])
+                        self.assertEqual(evidence_module._pack_content_sha256(pack), record["pack_content_sha256"])
+                        checked += 1
+        if not checked:
+            self.skipTest("data stores m7-run-a / m7-run-b not configured")
+        self.assertEqual(checked, 8)
+
+    def test_clusters_are_refused_as_unverified(self):
+        inputs, item, run = self.cluster()
+        self.assertTrue(evaluate_calibration_gate(inputs).passed)
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE"):
+            build_calibration_output(inputs, item, run, NONE_EXCLUDED, self.evidence(inputs, item))
 
 
 class FrozenBaselineBindingTests(_Bundles):
@@ -796,12 +1004,15 @@ class FrozenBaselineBindingTests(_Bundles):
         self.raises(replace(inputs, baseline_rows=shifted_inputs.baseline_rows), item)  # its baseline, our frozen set
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "observation_hash"):  # its frozen set, our run
             build_calibration_output(shifted_inputs, shifted_item,
-                                     campaign_run_identity(inputs.definition, [item], "m" * 64, {}), NONE_EXCLUDED)
-        self.assertTrue(self.output(shifted_inputs, shifted_item).released)  # consistent: its own run identity
+                                     campaign_run_identity(inputs.definition, [item], "m" * 64, {}), NONE_EXCLUDED,
+                                     self.evidence(inputs, item))
+        own_inputs, own_item = self.bundle(baseline={"R1": 0.031, "R2": 0.03, "R3": 0.03, "R4": 0.03, "H1": 0.03})
+        self.assertTrue(self.output(own_inputs, own_item).released)  # a genuine bundle on that frozen baseline
 
     def test_cluster_member_rows_are_bound_separately(self):
         inputs, item, _ = self.cluster()
-        self.output(inputs, item)  # the governed baseline of every member row
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "CLUSTER_MEMBER"):  # the baseline binds,
+            self.output(inputs, item)  # then the cluster is refused as unverified (F1)
         members = [GovernedRow(r.row_id, r.role, r.delta_ln_f + (0.001 if r.row_id == "R3" else
                                                                   -0.001 if r.row_id == "R4" else 0.0))
                    for r in inputs.baseline_rows]  # same cluster mean, different member rows
@@ -845,6 +1056,16 @@ class OutputContractTests(_Bundles):
         for name in ("prepare_forward_job", "render_forward_input", "join_inp_lines", "write_text", "write_bytes",
                      "open(", "mkdir", "os.replace"):
             self.assertNotIn(name, source)
+        # the F1 verifier re-renders the candidate job in memory only (pure render, never a job or a file)
+        from services import candidate_evaluation_evidence as evidence_module
+        tree = ast.parse(Path(evidence_module.__file__).read_text(encoding="utf-8"))
+        imported = {alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+                    and node.module == "forward_builder" for alias in node.names}
+        self.assertEqual(imported, {"ForwardBuildError", "forward_job_provenance", "render_forward_input"})
+        source = Path(evidence_module.__file__).read_text(encoding="utf-8")
+        for name in ("prepare_forward_job", "write_text", "write_bytes", "open(", "mkdir", "os.replace", "subprocess",
+                     "run_bounded_lm", "IdentificationPipeline"):
+            self.assertNotIn(name, source)
 
 
 # ----------------------------------------------------------------------------- §9 clusters
@@ -863,13 +1084,14 @@ class ClusterSafetyTests(_Bundles):
         self.assertTrue(gate.passed, gate.refusal_reasons)
         self.assertEqual(sum(1 for t in inputs.pattern.terms if t["term_id"] == CLUSTER_ID), 1)
         self.assertEqual(gate.observability["fit_family_keys"], ["F1", "F2"])
-        record = self.output(inputs, item)
-        rows = {r["row_id"]: r for r in record.governed_rows}
-        term = next(t for t in record.governed_terms if t["term_id"] == CLUSTER_ID)
-        self.assertEqual((rows["R3"]["cluster_members"], rows["R4"]["cluster_members"]), (["R3", "R4"], ["R3", "R4"]))
-        self.assertNotAlmostEqual(rows["R3"]["candidate_delta_ln_f"], rows["R4"]["candidate_delta_ln_f"], places=6)
-        self.assertAlmostEqual((rows["R3"]["candidate_delta_ln_f"] + rows["R4"]["candidate_delta_ln_f"]) / 2,
-                               term["candidate_delta_ln_f"], places=15)
+        self.assertEqual(gate.non_degradation["rows"], 5)  # R3 and R4 judged as two physical rows
+        rows = {r.row_id: r.delta_ln_f for r in inputs.candidate_rows}
+        term = next(t.delta_ln_f for t in inputs.candidate_terms if t.term_id == CLUSTER_ID)
+        self.assertNotAlmostEqual(rows["R3"], rows["R4"], places=6)
+        self.assertAlmostEqual((rows["R3"] + rows["R4"]) / 2, term, places=15)
+        # V12-I5 (F1): the M4 evaluation has no per-member evidence for a cluster, so nothing is released
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE"):
+            self.output(inputs, item)
 
     def test_a_bad_member_row_is_never_averaged_away(self):
         base, item = self.cluster_case()
@@ -897,7 +1119,8 @@ class ClusterSafetyTests(_Bundles):
                 gate = evaluate_calibration_gate(inputs)
                 self.assertIs(gate.status, CalibrationGateStatus.REFUSED)
                 self.assertIn(code, gate.refusal_codes)
-                self.assert_refused_output(self.output(inputs, case_item), code)
+                with self.assertRaises(PracticalIdentifiabilityInputError):  # and never a released record
+                    self.output(inputs, case_item)
 
 
 # ----------------------------------------------------------------------------- §10–11 calibration material fragment
@@ -905,7 +1128,7 @@ class ClusterSafetyTests(_Bundles):
 class MaterialFragmentSafetyTests(_Bundles):
     def setUp(self):
         super().setUp()
-        self.specimen()  # the pinned synthetic source INP
+        self.bundle()  # the pinned synthetic source INP
 
     def released(self):
         inputs, item = self.bundle()

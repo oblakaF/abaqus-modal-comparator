@@ -39,7 +39,8 @@ SUPERSEDED = "> **SUPERSEDED_BY_NORMATIVE_SPEC_V1_2**"
 V12_MODULES = ("domain/campaign_definition.py", "services/identification_uncertainty.py",
                "services/identification_verdict.py", "services/identification_campaign_run.py",
                "services/specimen_calibration_gate.py",  # + the pure calibration gate (V12-I3)
-               "services/specimen_calibration_output.py")  # + the calibration output service (V12-I4)
+               "services/specimen_calibration_output.py",  # + the calibration output service (V12-I4)
+               "services/candidate_evaluation_evidence.py")  # + the candidate-evaluation evidence (V12-I5)
 
 
 def _text(name: str) -> str:

@@ -51,12 +51,12 @@ from services.specimen_calibration_output import (
 )
 from test_m7_campaign import synthetic_definition, synthetic_specimen
 from test_v12_i1_campaign_question import calibration_definition
-from test_v12_i3_calibration_gate import build
+from test_v12_i3_calibration_gate import P_HAT, build
+from v12_evidence_support import evaluate_candidate, evaluated_bundle
 
 
 NONE_EXCLUDED = ExcludedDiagnosticsEvidence((), "synthetic D-076 evaluation: no excluded mode reaches MAC 0.80", True)
-SIMPLE = dict(rows={"R1": (0.50,), "R2": (0.45,)}, families={"R1": "FAM-A1", "R2": "FAM-12"}, fit=[0.5, -0.4],
-              holdout=(("R3", "FAM-03", 0.6),))
+SIMPLE_SENSITIVITIES = {"R1": (0.50,), "R2": (0.45,)}  # the synthetic M5 system of specimen A
 CLUSTER_ROWS = [("R1", 1, 7, "FIT"), ("R2", 2, 8, "FIT"), ("R3", 3, 9, "FIT"), ("R4", 4, 10, "FIT"),
                 ("H1", 5, 11, "HOLDOUT")]
 CLUSTER_FAMILIES = {"R1": "F1", "R2": "F1", "R3": "F2", "R4": "F2", "H1": "T"}
@@ -72,33 +72,63 @@ def keys(node) -> set:
 
 
 class _Case(unittest.TestCase):
+    """Bundles built from a genuine journalled evaluation of p̂ (``v12_evidence_support``); the evidence of each bundle
+    is registered by campaign and p̂ and passed to ``build_calibration_output`` (``self.evidence``)."""
+
     def setUp(self):
         self._directory = tempfile.TemporaryDirectory()
         self.tmp = Path(self._directory.name)
+        self._evidence, self._last_evidence = {}, None
 
     def tearDown(self):
         self._directory.cleanup()
 
-    def simple(self, tau=0.02, p_hat=50000.0, **changes):
-        """One specimen A (frozen rows R1, R2 FIT; R3 HOLDOUT) and its consistent gate evidence."""
+    @staticmethod
+    def _key(inputs, run_hash=None, system_hash=None) -> tuple:
+        return (inputs.definition.campaign_hash,
+                canonical_hash({k: float(v) for k, v in sorted(inputs.p_hat.items())}), run_hash, system_hash)
+
+    def register(self, inputs, evidence):
+        run_hash = evidence.pipeline_journal["run_identity"]["extra"]["campaign_hash"]
+        self._evidence[self._key(inputs)] = evidence
+        self._evidence[self._key(inputs, run_hash, evidence.system.system_hash)] = evidence
+        self._last_evidence = evidence
+        return evidence
+
+    def evidence(self, inputs, item=None):
+        """The evaluation evidence of this p̂, calibration run (specimen, frozen set, families) and M5 system; a
+        mixed bundle is checked against real evidence: the closest registered one, else the last."""
+        if item is not None:
+            run_hash = canonical_hash(campaign_run_identity(inputs.definition, [item], "m" * 64, {}))
+            system_hash = None if inputs.analysis is None else inputs.analysis.system_hash
+            if self._key(inputs, run_hash, system_hash) in self._evidence:
+                return self._evidence[self._key(inputs, run_hash, system_hash)]
+        return self._evidence.get(self._key(inputs), self._last_evidence)
+
+    def output(self, inputs, item, run, excluded=NONE_EXCLUDED, *rest):
+        return build_calibration_output(inputs, item, run, excluded, self.evidence(inputs, item), *rest)
+
+    def simple(self, tau=0.02, p_hat=50000.0):
+        """One specimen A (frozen rows R1, R2 FIT; R3 HOLDOUT) and the bundle of its journalled evaluation at p̂."""
         definition = parse_campaign_definition(calibration_definition(tau))
-        item, store = synthetic_specimen(definition, "A", self.tmp / f"s{tau}{p_hat}")
+        base = self.tmp / f"s{tau}{p_hat}"
+        item, store = synthetic_specimen(definition, "A", base)
         self.source_inp = (store / "models" / "SYA.inp").read_bytes()  # the pinned INP (read by the test only)
-        arguments = dict(SIMPLE, definition=definition, p_hat={"E_in_plane_mpa": p_hat})
-        arguments.update(changes)
-        inputs = build(**arguments)
-        inputs = replace(inputs, baseline_pair_macs={r.row_id: r.mac for r in item.frozen.rows
-                                                     if r.row_id in inputs.baseline_pair_macs},
-                         baseline_rows=governed_baseline_rows(item))  # the frozen baseline (SPEC v1.1 §6 S3)
-        return inputs, item, campaign_run_identity(definition, [item], "m" * 64, {})
+        inputs, item, run, evidence = evaluated_bundle(definition, item, store, base / "runs",
+                                                       {"E_in_plane_mpa": p_hat}, SIMPLE_SENSITIVITIES)
+        self.register(inputs, evidence)
+        return inputs, item, run
 
     def cluster(self, **changes):
-        """A specimen with rows R1, R2 (F1), the confirmed cluster C(R3+R4) (F2) and the holdout H1 (T)."""
+        """A specimen with rows R1, R2 (F1), the confirmed cluster C(R3+R4) (F2) and the holdout H1 (T).
+
+        The gate bundle is the I3 synthetic one; the registered evidence is the specimen's genuine (cluster-free) M4
+        evaluation, so a cluster bundle reaches the output only to be refused as unverified."""
         data = calibration_definition()
         data["specimens"][0]["rows"] = [{"row_id": r, "experimental_mode": e, "fe_mode": f, "role": role}
                                         for r, e, f, role in CLUSTER_ROWS]
         definition = parse_campaign_definition(data)
-        item, _ = synthetic_specimen(definition, "A", self.tmp / "cluster")
+        item, store = synthetic_specimen(definition, "A", self.tmp / "cluster")
         rows = tuple(ObservationRow(r, e, 100.0 + 10 * e, f, (100.0 + 10 * e) * BASELINE_RATIO, 0.98, BASELINE_RATIO - 1)
                      for r, e, f, _ in CLUSTER_ROWS)  # frozen baseline Δ ln f = +0.03 on every row
         item = replace(item, frozen=replace(item.frozen, rows=rows), holdout_rows=("H1",),
@@ -108,13 +138,16 @@ class _Case(unittest.TestCase):
         arguments.update(changes)
         inputs = replace(build(**arguments), baseline_pair_macs={r: 0.98 for r in ("R1", "R2", "R3", "R4")},
                          baseline_rows=governed_baseline_rows(item))
-        return inputs, item, campaign_run_identity(definition, [item], "m" * 64, {})
+        evaluation = evaluate_candidate(definition, item, store, self.tmp / "cluster" / "runs", P_HAT,
+                                        {r: (0.5,) for r in ("R1", "R2", "R3", "R4")})
+        self.register(inputs, evaluation.evidence)
+        return inputs, item, evaluation.run_identity
 
 
 class ReleasedTests(_Case):
     def test_a_passing_bundle_releases_exactly_the_judged_candidate(self):
         inputs, item, run = self.simple()
-        record = build_calibration_output(inputs, item, run, NONE_EXCLUDED)
+        record = self.output(inputs, item, run, NONE_EXCLUDED)
         self.assertIs(record.status, CalibrationOutputStatus.RELEASED)
         data = record.to_dict()
         self.assertEqual((data["output_class"], data["labels"]), ("SPECIMEN_ENGINEERING_CALIBRATION", list(LABELS)))
@@ -133,7 +166,7 @@ class ReleasedTests(_Case):
 
     def test_identity_uncertainty_and_rows(self):
         inputs, item, run = self.simple()
-        data = build_calibration_output(inputs, item, run, NONE_EXCLUDED).to_dict()
+        data = self.output(inputs, item, run, NONE_EXCLUDED).to_dict()
         identity = data["identity"]
         manifest = item.model.manifest
         self.assertEqual((identity["campaign_hash"], identity["run_hash"]),
@@ -167,22 +200,18 @@ class ReleasedTests(_Case):
         self.assertTrue(data["excluded_diagnostics"]["complete"])
         self.assertTrue(data["excluded_diagnostics"]["provenance"])
 
-    def test_cluster_members_are_reported_row_by_row(self):
+    def test_cluster_members_cannot_be_released_without_member_evidence(self):
+        # V12-I5 (F1): M4 tracks a confirmed cluster as a subspace and judges its pairing-independent mean; the
+        # per-member candidate frequencies and tracking MACs the gate needs are not part of the evaluation.
         inputs, item, run = self.cluster()
-        record = build_calibration_output(inputs, item, run, NONE_EXCLUDED)
-        self.assertTrue(record.released, record.refusal_reasons)
-        rows = {r["row_id"]: r for r in record.to_dict()["governed_rows"]}
-        self.assertEqual(sorted(rows), ["H1", "R1", "R2", "R3", "R4"])
-        for member in ("R3", "R4"):
-            self.assertEqual((rows[member]["term_id"], rows[member]["cluster_members"]), ("C(R3+R4)", ["R3", "R4"]))
-        self.assertNotEqual(rows["R3"]["candidate_delta_ln_f"], rows["R4"]["candidate_delta_ln_f"])  # not averaged
-        terms = {t["term_id"]: t for t in record.to_dict()["governed_terms"]}
-        self.assertEqual(terms["C(R3+R4)"]["rows"], ["R3", "R4"])  # term-level diagnostic evidence
+        self.assertTrue(evaluate_calibration_gate(inputs).passed)  # the gate science alone would pass ...
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE"):
+            self.output(inputs, item, run)  # ... but nothing is released without verified member evidence
 
     def test_record_is_deterministic(self):
         inputs, item, run = self.simple()
-        first = build_calibration_output(inputs, item, run, NONE_EXCLUDED)
-        second = build_calibration_output(inputs, item, run, NONE_EXCLUDED)
+        first = self.output(inputs, item, run, NONE_EXCLUDED)
+        second = self.output(inputs, item, run, NONE_EXCLUDED)
         self.assertEqual(first.record_hash, second.record_hash)
         json.dumps(first.to_dict(), allow_nan=False)
 
@@ -190,7 +219,7 @@ class ReleasedTests(_Case):
         inputs, item, run = self.simple()
         diagnostic = ExcludedModeDiagnostic(20, 410.0, 31, 402.0, 0.86, 402.0 / 410.0 - 1.0, "TORSION",
                                             "frequency gate (strict pairing)")
-        record = build_calibration_output(inputs, item, run, ExcludedDiagnosticsEvidence(
+        record = self.output(inputs, item, run, ExcludedDiagnosticsEvidence(
             (diagnostic,), "synthetic D-076 evaluation", True))
         entry = record.to_dict()["excluded_diagnostics"]["records"][0]
         self.assertEqual((entry["role"], entry["experimental_mode"], entry["mac"]), ("DIAGNOSTIC_ONLY", 20, 0.86))
@@ -202,14 +231,14 @@ class ReleasedTests(_Case):
         self.assertEqual(built.records[0].best_fe_mode, 31)
         governed = ExcludedModeDiagnostic(1, 100.0, 9, 101.0, 0.9, 0.01, None, "x")  # R1's experimental mode
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "never enter the fit"):
-            build_calibration_output(inputs, item, run, ExcludedDiagnosticsEvidence((governed,), "x", True))
+            self.output(inputs, item, run, ExcludedDiagnosticsEvidence((governed,), "x", True))
 
 
 class RefusedTests(_Case):
     def test_a_refused_gate_releases_nothing(self):
         inputs, item, run = self.simple()
         inputs = replace(inputs, registration=GuardEvidence("registration", EvidenceState.FAIL, "x", "limited"))
-        record = build_calibration_output(inputs, item, run, NONE_EXCLUDED)
+        record = self.output(inputs, item, run, NONE_EXCLUDED)
         self.assertIs(record.status, CalibrationOutputStatus.REFUSED)
         data = record.to_dict()
         self.assertNotIn("calibration_parameters", data)
@@ -229,32 +258,33 @@ class RefusedTests(_Case):
         inputs, item, run = self.simple()
         refused = replace(inputs, registration=GuardEvidence("registration", EvidenceState.FAIL, "x", "limited"))
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "claims excluded_high_mac_modes"):
-            build_calibration_output(refused, item, run, ExcludedDiagnosticsEvidence((), "not evaluated", False))
+            self.output(refused, item, run, ExcludedDiagnosticsEvidence((), "not evaluated", False))
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "excluded_high_mac_modes"):
-            build_calibration_output(inputs, item, run, ExcludedDiagnosticsEvidence((), "not evaluated", False))
+            self.output(inputs, item, run, ExcludedDiagnosticsEvidence((), "not evaluated", False))
         with self.assertRaises(PracticalIdentifiabilityInputError):
-            build_calibration_output(inputs, item, run, ExcludedDiagnosticsEvidence((), "   ", True))
+            self.output(inputs, item, run, ExcludedDiagnosticsEvidence((), "   ", True))
 
 
 class BindingTests(_Case):
     def raises(self, *args, text=""):
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, text):
-            build_calibration_output(*args)
+            self.output(*args)
 
     def test_anti_mixing(self):
         names = set(inspect.signature(build_calibration_output).parameters)
-        self.assertEqual(names, {"inputs", "specimen", "run_identity", "excluded", "expected_gate_record_hash"})
+        self.assertEqual(names, {"inputs", "specimen", "run_identity", "excluded", "evaluation",
+                                 "expected_gate_record_hash"})
         inputs, item, run = self.simple()
         gate_a = evaluate_calibration_gate(inputs).record_hash
         other = replace(inputs, p_hat={"E_in_plane_mpa": 51000.0})  # candidate B with A's evidence
         with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "another p̂"):
-            build_calibration_output(other, item, run, NONE_EXCLUDED)
-        record_a = build_calibration_output(inputs, item, run, NONE_EXCLUDED, gate_a)
+            self.output(other, item, run, NONE_EXCLUDED)
+        record_a = self.output(inputs, item, run, NONE_EXCLUDED, gate_a)
         self.assertEqual(record_a.gate_record_hash, gate_a)
         # A consistent candidate B has its own evidence: the gate record carries no value by design, so the output
         # binds the judged candidate and evidence by hash and B's record can never carry A's binding.
         b_inputs, b_item, b_run = self.simple(p_hat=51000.0)
-        record_b = build_calibration_output(b_inputs, b_item, b_run, NONE_EXCLUDED)
+        record_b = self.output(b_inputs, b_item, b_run, NONE_EXCLUDED)
         binding_a, binding_b = record_a.identity["evidence_binding"], record_b.identity["evidence_binding"]
         self.assertNotEqual(binding_a["p_hat_hash"], binding_b["p_hat_hash"])
         self.assertNotEqual(binding_a["model_form_robustness_record_hash"],
@@ -315,7 +345,7 @@ def material_block(text: str, name: str) -> list[str]:
 class FragmentTests(_Case):
     def released(self, p_hat=50000.0):
         inputs, item, run = self.simple(p_hat=p_hat)
-        record = build_calibration_output(inputs, item, run, NONE_EXCLUDED)
+        record = self.output(inputs, item, run, NONE_EXCLUDED)
         self.assertTrue(record.released, record.refusal_reasons)
         return record
 
