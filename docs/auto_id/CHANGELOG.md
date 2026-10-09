@@ -4449,3 +4449,26 @@ first internal provider.
   `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #51.
+
+## 2026-10-09 — M8.1 ACCEPTED and merged (PR #51); M8.2 — selection-aware Data Readiness Check (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS); M8.1 ACCEPTED; mini-step M8.2 only
+- **M8.1 merge:** PR #51 `auto-id/m8-1` → `main`, reviewed head `7f91dfdae39dd8f8e9a58a936bc13a24e99825ba`, merge commit `27a587f7aa8f229285d1529bb5b449b4719ef090`
+  (tree `47a2465a660e7afa2c1781965d1c5be60c64f377`, identical to the reviewed head). Linux CI on main 27a587f: success (run 37943295401). SUPERVISOR-authorised.
+- **M8.2 status:** REVIEW_READY — branch `auto-id/m8-2` from `27a587f` (PR #52), exclusive worktree.
+- **Commits:** `ff98631` selection binding; this governance commit.
+- **Gap closed:** a selection made in the M8.1 setup page no longer inherits the scientific readiness record of
+  another campaign. `services/auto_id_wizard.readiness_selection` binds the stored V12-I6 record to the selection by
+  governed identity only: exact campaign hash, run type, specimen labels in order, declared scientific question and
+  τ_mf (both undeclared for v1), run hash when a run is selected. Names, folders, labels and files never match.
+- **Presentation states (not backend verdicts):** NO_SELECTION (the stored record is shown for its own campaign
+  identity, as in V12-I6), NOT_EVALUATED_FOR_SELECTION (no stored record of the selected source, another campaign's
+  record, a specimen folder without a governed campaign, or an invalid selection), MATCHED_STORED_RECORD (presented
+  through `readiness_presentation`; a match is not proof of authenticity). The readiness page follows a selection change
+  at once; one selection-context line is added. The stored record is never changed; no threshold, PASS, RELEASED, MAC,
+  LM or material value is computed by the GUI.
+- **Tests:** test_m8_2_readiness_selection 19 tests (1 store-gated; real-Tk test); M8.1 tests retained; focused M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 386 OK; full suite without data stores 1872 OK (74 skipped); full suite with all data stores 1886 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at
+  `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #52.

@@ -612,7 +612,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of M8.1 (PR #51, not merged). M8.2..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of M8.2 (PR #52, not merged). M8.3..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1168,21 +1168,37 @@
       "status": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
       "note": "historical M8.1 prototype; untouched (not merged, not rebased, not cherry-picked as a whole); selected code reused on auto-id/m8-1"
     },
-    "authorisation": "SUPERVISOR 2026-10-09: start M8.1 only (specimen / family setup wizard); M8.2..M8.8 not started",
+    "authorisation": "SUPERVISOR 2026-10-09: M8.1 ACCEPTED; start M8.2 only (selection-aware Data Readiness Check); M8.3..M8.8 not started",
     "steps": {
       "M8.1": {
         "title": "Specimen / family setup wizard",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/m8-1",
         "base": "196503e029e97d5b1afac6faf9830bbeb8a6adff",
         "pr": 51,
         "commit": "418acb1c23186e5ab3204caccd8437a7d60a8bf8",
         "scope": "page \"0. Auto-ID Setup\" in the existing Effective Material Identification tab (no install_* layer): services/auto_id_wizard.py loads one specimen folder's passport or a family / campaign definition through the governed parsers and lists identity, physical measurements, passport and fixture, modal-data source, forward model, INP / ODB references, physical registration, the declared scientific question and tau_mf (shown NOT_DECLARED when a v1 definition declares none; never inferred), FIT / HOLDOUT row declarations, gaps and provenance. Pinned files found with their size only are PRESENT_SHA256_NOT_VERIFIED; nothing is shown as scientifically READY. Factual loading only: no mode, family or registration choice, no LM, Abaqus, MAC, freezing, threshold change, material property, calibration result or file write; readiness stays with the V12-I6 backend (Data Readiness Check page unchanged)",
         "reuse": "selectively reused from the parked prototype 193db8d: the wizard service (extended for SPEC v1.2) and its tests (adapted); the Tk-variable page module was rejected and rebuilt inside material_identification_ui with the existing read-only table helpers",
-        "tests": "test_m8_1_auto_id_setup 27 tests (1 store-gated; real-Tk page test); focused M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 367 OK (0 skipped); full suite without data stores 1853 OK (73 skipped); full suite with all data stores 1867 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
+        "tests": "test_m8_1_auto_id_setup 27 tests (1 store-gated; real-Tk page test); focused M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 367 OK (0 skipped); full suite without data stores 1853 OK (73 skipped); full suite with all data stores 1867 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus",
+        "merged_to_main": {
+          "pr": 51,
+          "merge_commit": "27a587f7aa8f229285d1529bb5b449b4719ef090",
+          "reviewed_head": "7f91dfdae39dd8f8e9a58a936bc13a24e99825ba",
+          "tree": "47a2465a660e7afa2c1781965d1c5be60c64f377",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 27a587f: success (run 37943295401)",
+          "acceptance": "SUPERVISOR 2026-10-09: ACCEPTED"
+        }
       },
       "M8.2": {
-        "status": "TODO"
+        "title": "Selection-aware Data Readiness Check",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-2",
+        "base": "27a587f7aa8f229285d1529bb5b449b4719ef090",
+        "pr": 52,
+        "commit": "ff986318312e1e68e3841d9799fcab3171a2ccc7",
+        "scope": "closes the stale-readiness presentation gap: the stored V12-I6 readiness record is presented only under its own governed selection. services/auto_id_wizard.readiness_selection binds the record to the M8.1 selection by governed identity only (exact campaign hash, run type, specimen labels in order, declared scientific question and tau_mf, run hash when a run is selected; never by names, folders, labels or files). Presentation states NO_SELECTION / NOT_EVALUATED_FOR_SELECTION / MATCHED_STORED_RECORD (not backend verdicts); a specimen folder without a governed campaign is NOT_EVALUATED_FOR_SELECTION (no question inferred, no result attached); an invalid selection after a valid one clears the shown result. Matching records are presented through the backend's readiness_presentation; the record is never changed and a match is not proof of authenticity. The readiness page follows a selection change at once; one selection-context line is added (no duplicate scientific table)",
+        "tests": "test_m8_2_readiness_selection 19 tests (1 store-gated; real-Tk test); M8.1 tests retained; focused M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 386 OK; full suite without data stores 1872 OK (74 skipped); full suite with all data stores 1886 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
       },
       "M8.3": {
         "status": "TODO"
