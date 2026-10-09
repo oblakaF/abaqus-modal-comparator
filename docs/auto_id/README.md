@@ -1,4 +1,4 @@
-# Auto-ID v1.1 — Canonical Project Record
+# Auto-ID — Canonical Project Record
 
 This directory is the durable record of the Auto-ID (automatic material
 identification) work. **GitHub, not chat memory, is the project record.** Every
@@ -10,7 +10,9 @@ Audited baseline: `121ba1d06b7c268b3051f1407a3ea26a9027dca3`.
 
 | File | Role |
 |---|---|
-| [SPEC_V1_1.md](SPEC_V1_1.md) | Governing scientific contract (normative) |
+| [SPEC_V1_2.md](SPEC_V1_2.md) | Governing scientific contract (normative, D-078): SPEC v1.1 as amended by v1.2 |
+| [SPEC_V1_1.md](SPEC_V1_1.md) | Normative predecessor (archived, immutable); clauses not amended by v1.2 remain in force through v1.2 |
+| [SPEC_V1_2_DRAFT.md](SPEC_V1_2_DRAFT.md), [SPEC_V1_2_POLICY_REVIEW.md](SPEC_V1_2_POLICY_REVIEW.md), [SPEC_V1_2_POLICY_OPTIONS.json](SPEC_V1_2_POLICY_OPTIONS.json) | SPEC v1.2 policy-development history (SUPERSEDED_BY_NORMATIVE_SPEC_V1_2) |
 | [DECISIONS.md](DECISIONS.md) | Append-only log of accepted design decisions |
 | [ROADMAP.md](ROADMAP.md) | Canonical execution roadmap: PRE-M0, M0–M8, steel gate |
 | [STATUS.json](STATUS.json) | Machine-readable current state |
@@ -26,14 +28,14 @@ Git diffs. The DOCX files are archival evidence of what was accepted.
 
 When documents disagree, the higher item wins:
 
-1. [docs/auto_id/SPEC_V1_1.md](SPEC_V1_1.md)
+1. [docs/auto_id/SPEC_V1_2.md](SPEC_V1_2.md) (with the unamended clauses of [SPEC_V1_1.md](SPEC_V1_1.md))
 2. [docs/auto_id/DECISIONS.md](DECISIONS.md)
 3. [docs/auto_id/ROADMAP.md](ROADMAP.md)
 4. [docs/auto_id/STATUS.json](STATUS.json)
 5. accepted entries in [docs/auto_id/EVIDENCE.md](EVIDENCE.md)
 6. older roadmap / design / history documents
 
-**If an older document conflicts with SPEC v1.1, SPEC v1.1 wins.** Historical
+**If an older document conflicts with SPEC v1.2, SPEC v1.2 wins.** Historical
 documents stay useful for rationale and previous work, but they cannot silently
 override the current accepted scientific contract. Historical documents include:
 

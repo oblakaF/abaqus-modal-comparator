@@ -4055,3 +4055,23 @@ first internal provider.
 - **Tests:** test_spec_v1_2_policy_draft 16 OK; test_m7b_corrective + test_m5_stage_gate + policy 49 OK (2 skipped without data stores); full suite without data stores 1619 OK (64 skipped)
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR normative acceptance of the policy PR (not merged).
+
+## 2026-10-09 — Policy — SPEC v1.2 accepted as normative (D-078; policy PR #41 merged)
+
+- **Policy merge:** PR #41 `auto-id/spec-v1.2-policy` → `main`, merge commit `edb3070d2ed5b385f7152b3041ca3e297bdc8423` (reviewed head `62903ef`,
+  merged tree `8230824` identical; SUPERVISOR-authorised). Linux CI on main edb3070: 1616 OK (68 skipped), success (run 37877422055).
+- **Stage:** policy track (no roadmap stage started; M8 NOT_STARTED)
+- **Status:** REVIEW_READY (normative promotion; acceptance PR open, not merged)
+- **Branch:** `auto-id/spec-v1.2-acceptance` (from `main` `edb3070`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): accept SPEC v1.2 as normative scientific contract (D-078)`
+- **Files:** created `docs/auto_id/SPEC_V1_2.md` (normative; section bodies identical to the reviewed final policy)
+  and `tests/test_spec_v1_2_normative.py`; marked `SPEC_V1_2_DRAFT.md`, `SPEC_V1_2_POLICY_REVIEW.md`,
+  `SPEC_V1_2_POLICY_OPTIONS.json` SUPERSEDED_BY_NORMATIVE_SPEC_V1_2 (content kept); updated
+  `tests/test_spec_v1_2_policy_draft.py` (history checks), DECISIONS (D-078), STATUS, ROADMAP (V12-I1 … V12-I6 track),
+  README, CLAUDE.md / AGENTS.md (governing-spec pointer).
+- **Scientific behaviour changed:** NO. Production source unchanged; implementation status POLICY_ACCEPTED,
+  IMPLEMENTATION_NOT_STARTED. SPEC v1.1 unchanged; historical RUN_A / RUN_B records unchanged.
+- **Tests:** test_spec_v1_2_normative 6 OK + test_spec_v1_2_policy_draft 16 OK; with test_m7b_corrective + test_m5_stage_gate 55 OK (2 skipped without data stores); full suite without data stores 1625 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of the normative acceptance PR; then V12-I1 only after explicit authorisation.

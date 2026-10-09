@@ -7,7 +7,8 @@ Permanent project instructions for any coding agent. The same rules are in
 
 Read, in this order:
 
-1. `docs/auto_id/SPEC_V1_1.md`: governing scientific contract
+1. `docs/auto_id/SPEC_V1_2.md`: governing scientific contract (D-078; SPEC v1.1 as amended, with
+   `docs/auto_id/SPEC_V1_1.md` as the archived normative predecessor)
 2. `docs/auto_id/ROADMAP.md`: execution order and git protocol
 3. `docs/auto_id/STATUS.json`: current stage, mini-step and status
 4. `docs/auto_id/DECISIONS.md`: accepted decisions (append-only)

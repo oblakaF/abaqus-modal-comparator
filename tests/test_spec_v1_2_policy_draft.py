@@ -57,12 +57,15 @@ class PolicyDraftTests(unittest.TestCase):
         self.policy = json.loads(_text("SPEC_V1_2_POLICY_OPTIONS.json"))
         self.draft = " ".join(_text("SPEC_V1_2_DRAFT.md").split())  # phrases may wrap across lines
 
-    def test_draft_is_a_proposal_and_v1_1_is_unchanged(self):
+    def test_draft_is_superseded_history_and_v1_1_is_unchanged(self):
+        # D-078: the reviewed draft is kept as history; its review-time status line stays unchanged
+        self.assertTrue(self.draft.startswith("> **SUPERSEDED_BY_NORMATIVE_SPEC_V1_2**"))
         self.assertIn("PROPOSED — NOT NORMATIVE — AWAITING FINAL SUPERVISOR ACCEPTANCE", self.draft)
+        self.assertEqual(self.policy["historical_status"], "SUPERSEDED_BY_NORMATIVE_SPEC_V1_2")
         self.assertEqual(self.policy["status"], "PROPOSED_NOT_NORMATIVE")
         content = (DOCS / "SPEC_V1_1.md").read_bytes().replace(b"\r\n", b"\n")
         self.assertEqual(hashlib.sha256(content).hexdigest(), SPEC_V1_1_CONTENT_SHA256)
-        self.assertFalse((DOCS / "SPEC_V1_2.md").exists())  # no normative v1.2
+        self.assertTrue((DOCS / "SPEC_V1_2.md").exists())  # the normative v1.2 (D-078)
 
     def test_upper_rule_is_amended_with_two_predeclared_questions_and_no_fallback(self):
         self.assertIn("## 1. Amended §1 — Upper rule", self.draft)

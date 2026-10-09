@@ -1,7 +1,8 @@
 # Auto-ID v1.1 Roadmap
 
-Governing specification:
-[docs/auto_id/SPEC_V1_1.md](SPEC_V1_1.md)
+Governing specification (D-078):
+[docs/auto_id/SPEC_V1_2.md](SPEC_V1_2.md) — SPEC v1.1 as amended by v1.2;
+normative predecessor [docs/auto_id/SPEC_V1_1.md](SPEC_V1_1.md) (archived, immutable)
 
 Scientific audit:
 [docs/auto_id/AUDIT_121ba1d_V1_1.md](AUDIT_121ba1d_V1_1.md)
@@ -657,7 +658,7 @@ from `main` `9f5f63a`; decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.m
 
 - **M7 closure merged:** PR #40 (`auto-id/m7b-closure` → `main`), merge commit `9bff6c7`.
 
-### Policy track — SPEC v1.2 (PROPOSED, not normative)
+### Policy track — SPEC v1.2 (ACCEPTED as normative, D-078)
 
 Before any new FE work (SP10, t_face sensitivity, a re-run of M7), the model-form policy is frozen in advance
 (audit V4). Draft `SPEC_V1_2_DRAFT.md`, review `SPEC_V1_2_POLICY_REVIEW.md`, options `SPEC_V1_2_POLICY_OPTIONS.json`
@@ -668,6 +669,29 @@ a frequency-space model-form tolerance only, outside Σ, the objective and §13;
 in concept (not implemented) with max + RMS non-degradation, an 8 % row ceiling and k + 1 FIT + 1 HOLDOUT families.
 SPEC v1.1 stays normative; no production behaviour changed; historical results are not reinterpreted. Status: awaiting
 final SUPERVISOR acceptance.
+
+- **Policy PR merged:** PR #41 (`auto-id/spec-v1.2-policy` → `main`), reviewed head `62903ef`, merge commit
+  `edb3070` (tree identical). The final review added the calibration precision gate
+  (conservative_uncertainty ≤ 0.08).
+- **Normative acceptance (D-078):** `SPEC_V1_2.md` is the governing scientific contract; SPEC v1.1 is archived and
+  immutable. Implementation status: POLICY_ACCEPTED, IMPLEMENTATION_NOT_STARTED.
+
+### Implementation track — SPEC v1.2 (before any SP10 / new FE work)
+
+Not started. Each step needs explicit SUPERVISOR authorisation; the same rules as the M-stages apply (one step at a
+time, reproducing tests, no `install_*` layer, the CLI and GUI call the same services).
+
+| Id | Step | Status |
+|---|---|---|
+| V12-I1 | Campaign / run question (MATERIAL_IDENTIFICATION | SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf schema, both declared before execution and bound into the campaign / run identity | `TODO` |
+| V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `TODO` |
+| V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `TODO` |
+| V12-I4 | Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer) | `TODO` |
+| V12-I5 | Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable) | `TODO` |
+| V12-I6 | Integration into GUI / backend readiness (the same backend services; no install_* layer) | `TODO` |
+
+**V12 GATE:** production code enforces the D-078 rules with negative tests (no fallback, τ_mf outside Σ / uncertainty /
+§13, refusals without released values) before any SP10, t_face or other new FE calculation.
 
 ---
 

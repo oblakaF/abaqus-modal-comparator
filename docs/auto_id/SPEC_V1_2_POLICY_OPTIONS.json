@@ -1,4 +1,8 @@
 {
+  "historical_status": "SUPERSEDED_BY_NORMATIVE_SPEC_V1_2",
+  "superseded_by": {"spec": "docs/auto_id/SPEC_V1_2.md", "decision": "D-078", "pr": 41,
+                    "reviewed_head": "62903ef899122de9a3585d6cf6551d03442b97e5", "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423"},
+  "historical_note": "reviewed final policy content kept unchanged below; the status field records the state at review time",
   "schema": "auto-id/spec-v1.2-policy-options/v2",
   "status": "PROPOSED_NOT_NORMATIVE",
   "awaiting": "final SUPERVISOR acceptance (no decision number assigned)",
