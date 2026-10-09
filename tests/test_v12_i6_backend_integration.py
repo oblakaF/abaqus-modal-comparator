@@ -39,9 +39,11 @@ from domain.experiment_fixture import fixture_roots_from_environment, load_exper
 from domain.frozen_observations import ObservationRow
 from domain.identification_run import canonical_hash
 from m4_6_support import FakeExtractor, FakeSolver, fake_frequencies
+from services import campaign_lm_provenance as lm_module
 from services import campaign_scientific_backend as backend_module
 from services.campaign_lm_provenance import (
     JACOBIAN_INCONSISTENT,
+    LM_HISTORY_UNRELATED,
     LMProvenanceRefusal,
     verify_lm_history,
 )
@@ -106,6 +108,63 @@ def rechain(document: dict, edit=None, drop=None, identity=None) -> dict:
 
 def evaluation_hash(record: dict) -> str:
     return canonical_hash({k: v for k, v in record.items() if k != "evaluation_hash"})
+
+
+def _first_sigma(identity: dict) -> dict:
+    return next(iter(identity["objective_design"]["sigmas"].values()))
+
+
+# One governed pipeline identity field changed at a time (identification_pipeline.run_identity of the campaign's
+# specimen_pipeline_config); every evaluation record of the pipeline journal is kept unchanged.
+PIPELINE_IDENTITY_MUTATIONS = {
+    "forward model": lambda i: i["forward_model"].update(forward_model_id="ANOTHER_FORWARD_MODEL"),
+    "forward-model manifest": lambda i: i["forward_model"].update(manifest_hash="f" * 64),
+    "specimen passport": lambda i: i["forward_model"].update(passport_manifest_hash="p" * 64),
+    "solver profile": lambda i: i.update(solver_profile_hash="s" * 64),
+    "frozen observations": lambda i: i.update(observation_hash="o" * 64),
+    "pairing policy": lambda i: i.update(pairing_policy_hash="q" * 64),
+    "FIT rows": lambda i: i["objective_design"]["fit_rows"].pop(),
+    "HOLDOUT rows": lambda i: i["objective_design"]["holdout_rows"].append("R9"),
+    "FIT cluster": lambda i: i["objective_design"]["fit_clusters"].append(list(i["objective_design"]["fit_rows"][:2])),
+    "HOLDOUT cluster": lambda i: i["objective_design"]["holdout_clusters"].append(["R8", "R9"]),
+    "governed sigma": lambda i: _first_sigma(i).update(setup_sd=_first_sigma(i)["setup_sd"] * 2.0),
+    "LM settings": lambda i: i["lm_settings"].update(mu_initial=i["lm_settings"]["mu_initial"] * 10.0),
+    "bounds": lambda i: i["bounds"]["lower"].__setitem__(0, i["bounds"]["lower"][0] * 0.9),
+    "start": lambda i: i["start"].update({name: value * 1.01 for name, value in list(i["start"].items())[:1]}),
+    "extraction expectation": lambda i: i["extraction_expectation"].update(surface_tolerance=1.0e-3),
+    "archived packs": lambda i: i["archived_packs"].update(FORGED_JOB="a" * 64),
+    "campaign run": lambda i: i["extra"].update(campaign_hash="c" * 64),
+    "specimen": lambda i: i["extra"].update(specimen="Z"),
+    "run type": lambda i: i["extra"].update(run_type="RUN_A" if i["extra"]["run_type"] == "RUN_B" else "RUN_B"),
+}
+
+
+def archived_run(test: unittest.TestCase, run: str):
+    """READ-ONLY (store-gated): the archived M7 RUN_A / RUN_B journals as genuine evidence; skips without stores."""
+    roots = fixture_roots_from_environment()
+    if not {"m7-run-a", "m7-run-b", "snadwich", "carbon-project-archive"} <= set(roots):
+        test.skipTest("data stores m7-run-a / m7-run-b / snadwich / carbon-project-archive not configured")
+    definition = load_campaign_definition(CAMPAIGNS / f"M7_RUN_{run}.campaign.json")
+    specimens = campaign_module.prepare_campaign_specimens(definition, ROOT, load_experiment_fixture_manifest(FIXTURES),
+                                                           roots)
+    store = Path(roots[f"m7-run-{run.lower()}"])
+    campaign = _load(next(store.glob("campaign/*/journal.json")))
+    pipelines = {doc["run_identity"]["extra"]["specimen"]: doc for doc in
+                 (_load(p) for p in store.glob("specimens/*/*/*/journal.json"))}
+    verified = verify_lm_history(definition, specimens, campaign, pipelines)  # the genuine journals verify
+    test.assertEqual(verified.run_hash, _load(CAMPAIGNS / f"M7_RUN_{run}.result.json")["run_hash"])
+    return definition, specimens, CampaignRunEvidence(campaign, pipelines, {}, {})
+
+
+def mutated_pipelines(evidence, label: str, mutate) -> dict:
+    """The pipeline journals with ``label``'s run identity changed (run hash and hash chain recomputed)."""
+    pipeline = evidence.pipeline_journals[label]
+    identity = copy.deepcopy(pipeline["run_identity"])
+    mutate(identity)
+    forged = rechain(pipeline, identity=identity)
+    assert forged["run_hash"] != pipeline["run_hash"]
+    assert [e["record"] for e in forged["entries"]] == [e["record"] for e in pipeline["entries"]]
+    return dict(evidence.pipeline_journals, **{label: forged})
 
 
 def shifted(item, row_id: str, delta: float):
@@ -351,6 +410,71 @@ class LMProvenanceTests(_Runs):
                 with self.assertRaises(LMProvenanceRefusal) as refused:
                     verify_lm_history(definition, specimens, forged, pipelines)
                 self.assertEqual(refused.exception.code, JACOBIAN_INCONSISTENT)
+
+
+# ----------------------------------------------------------------------------- pipeline run identity
+
+class PipelineIdentityTests(_Runs):
+    """Each specimen's pipeline run is the governed pipeline of its campaign run: the ``run_identity`` of the
+    campaign's ``specimen_pipeline_config``.  One changed identity field, with the pipeline run hash and hash chain
+    recomputed and every evaluation record kept, is another pipeline run (LM_HISTORY_UNRELATED)."""
+
+    def test_the_genuine_pipeline_run_is_the_governed_pipeline(self):
+        run = self.base
+        entry = run.evidence.campaign_journal["run_identity"]["specimens"][0]
+        governed = lm_module.governed_pipeline_identity(run.definition, run.item, run.campaign.run_hash,
+                                                        entry["archived_packs"])
+        self.assertEqual(canonical_hash(governed), run.evidence.pipeline_journals["A"]["run_hash"])
+        self.assertEqual(governed, run.evidence.pipeline_journals["A"]["run_identity"])
+
+    def test_a_changed_pipeline_identity_releases_no_calibration(self):
+        run = self.base
+        for name, mutate in PIPELINE_IDENTITY_MUTATIONS.items():
+            with self.subTest(field=name):
+                journals = mutated_pipelines(run.evidence, "A", mutate)
+                with self.assertRaises(LMProvenanceRefusal) as refused:
+                    verify_lm_history(run.definition, [run.item], run.evidence.campaign_journal, journals)
+                self.assertEqual(refused.exception.code, LM_HISTORY_UNRELATED)
+                readiness = self.assert_nothing_released(
+                    self.judge(evidence=with_journal(run.evidence, pipeline_journals=journals)),
+                    ReadinessRefusal.LM_HISTORY_UNRELATED)
+                self.assertIs(readiness.status, ReadinessStatus.NOT_READY)
+                self.assertIsNone(readiness.calibration_record)
+                self.assertIsNone(readiness.diagnostic_candidate)
+
+    def test_a_changed_pipeline_identity_releases_no_material_value(self):
+        material = MaterialPathTests.material_run(self, (0.02, 1.0))
+        genuine = judge_campaign_run(material.definition, material.specimens, material.evidence)
+        self.assertIs(genuine.status, ReadinessStatus.MATERIAL_VALUES_RELEASED)  # the genuine journals release
+        for label in ("A", "B"):
+            for name, mutate in PIPELINE_IDENTITY_MUTATIONS.items():
+                with self.subTest(specimen=label, field=name):
+                    journals = mutated_pipelines(material.evidence, label, mutate)
+                    readiness = judge_campaign_run(material.definition, material.specimens,
+                                                   with_journal(material.evidence, pipeline_journals=journals))
+                    self.assertIs(readiness.status, ReadinessStatus.NOT_READY)
+                    self.assertEqual(readiness.refusal_codes, (ReadinessRefusal.LM_HISTORY_UNRELATED.value,))
+                    record = readiness.to_dict()
+                    for key in ("material_formal_output", "material_family_consistency", "material_claim",
+                                "released_calibration_parameters", "diagnostic_candidate", "calibration"):
+                        self.assertIsNone(record[key], key)
+
+    def test_archived_real_journals_refuse_a_changed_pipeline_identity(self):
+        """READ-ONLY (store-gated): the archived RUN_A / RUN_B pipeline journals with one identity field changed."""
+        for run in ("A", "B"):
+            definition, specimens, evidence = archived_run(self, run)
+            for item in specimens:
+                for name, mutate in PIPELINE_IDENTITY_MUTATIONS.items():
+                    with self.subTest(run=run, specimen=item.label, field=name):
+                        journals = mutated_pipelines(evidence, item.label, mutate)
+                        with self.assertRaises(LMProvenanceRefusal) as refused:
+                            verify_lm_history(definition, specimens, evidence.campaign_journal, journals)
+                        self.assertEqual(refused.exception.code, LM_HISTORY_UNRELATED)
+                        readiness = judge_campaign_run(definition, specimens,
+                                                       with_journal(evidence, pipeline_journals=journals))
+                        self.assertIs(readiness.status, ReadinessStatus.NOT_READY)
+                        self.assertEqual(readiness.refusal_codes, (ReadinessRefusal.LM_HISTORY_UNRELATED.value,))
+                        self.assertIsNone(readiness.to_dict()["material_formal_output"])
 
 
 # ----------------------------------------------------------------------------- the end-to-end negative matrix
@@ -700,15 +824,37 @@ class NegativeMatrixTests(_Runs):
 # ----------------------------------------------------------------------------- confirmed clusters
 
 class ClusterReadinessTests(_Runs):
-    def journal_declared_cluster(self):
-        """The genuine run whose pipeline objective design declares a confirmed cluster C(R1+R2)."""
+    def journal_declared_cluster(self, governed: bool = True):
+        """The genuine run whose pipeline objective design declares a confirmed cluster C(R1+R2).
+
+        The campaign governance has no cluster terms (the production path stops at a cluster trigger), so such a
+        pipeline run is not the governed pipeline (LM_HISTORY_UNRELATED).  ``governed=True`` judges it under a
+        governance whose specimen pipeline declares the same cluster, which reaches the backend's cluster refusal.
+        """
         run = self.base
         pipeline = run.evidence.pipeline_journals["A"]
         identity = copy.deepcopy(pipeline["run_identity"])
         identity["objective_design"]["fit_clusters"] = [["R1", "R2"]]
         declared = rechain(pipeline, identity=identity)
-        return judge_campaign_run(run.definition, [run.item], with_journal(run.evidence,
-                                                                            pipeline_journals={"A": declared}))
+        evidence = with_journal(run.evidence, pipeline_journals={"A": declared})
+        if not governed:
+            return judge_campaign_run(run.definition, [run.item], evidence)
+        governance = lm_module.governed_pipeline_identity
+
+        def declaring(*args):
+            expected = governance(*args)
+            expected["objective_design"]["fit_clusters"] = [["R1", "R2"]]
+            return expected
+
+        with mock.patch.object(lm_module, "governed_pipeline_identity", declaring):
+            return judge_campaign_run(run.definition, [run.item], evidence)
+
+    def test_an_ungoverned_cluster_declaration_is_an_unrelated_pipeline_run(self):
+        readiness = self.journal_declared_cluster(governed=False)
+        self.assertIs(readiness.status, ReadinessStatus.NOT_READY)
+        self.assertEqual(readiness.refusal_codes, (ReadinessRefusal.LM_HISTORY_UNRELATED.value,))
+        self.assertIsNone(readiness.calibration_record)
+        self.assertIsNone(readiness.to_dict()["released_calibration_parameters"])
 
     def test_a_confirmed_cluster_is_a_readiness_refusal_without_member_matching(self):
         readiness = self.journal_declared_cluster()

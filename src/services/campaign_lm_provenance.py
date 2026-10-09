@@ -10,7 +10,9 @@ evidence.  ``verify_lm_history`` accepts the reconstruction only when the journa
 2. exactly one journalled LM result, of this run, with the accepted status CONVERGED and no refusal;
 3. every journalled campaign evaluation is the evaluation of its own candidate (candidate hash, full parameters,
    FIT term order) and, per specimen, the identical record of that specimen's hash-chained pipeline journal, whose run
-   belongs to this campaign run, specimen and run type (the stacked residuals are the specimens' FIT residuals);
+   identity is exactly the governed pipeline of this campaign run and specimen (``governed_pipeline_identity``: the
+   ``run_identity`` of the campaign's ``specimen_pipeline_config``, field by field; the stacked residuals are the
+   specimens' FIT residuals);
 4. the LM history follows the journalled evaluations: it starts at the start point, every objective it recorded is
    ½‖r‖² of the journalled residuals at that point, and it ends with the stop step at p̂;
 5. p̂ is the final journalled evaluation, the reconstructed Jacobian is evaluated at p̂, it has the FIT terms ×
@@ -26,6 +28,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import math
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -36,9 +39,11 @@ from .identification_campaign_run import (
     CAMPAIGN_RUN_SCHEMA,
     CampaignRun,
     CampaignSpecimenInput,
+    ObservationSetMismatch,
     campaign_bounds,
+    specimen_pipeline_config,
 )
-from .identification_pipeline import forward_candidate
+from .identification_pipeline import forward_candidate, run_identity
 from .identification_step import LMStatus, StepError, local_sd, lm_step, objective
 from .practical_identifiability import (
     PracticalIdentifiabilityInputError,
@@ -148,17 +153,36 @@ def _bind_run_identity(definition, specimens: Sequence[CampaignSpecimenInput], i
         _refuse(LM_HISTORY_UNRELATED, f"the campaign run belongs to another {', '.join(wrong)}.")
 
 
+def governed_pipeline_identity(definition, item: CampaignSpecimenInput, campaign_run_hash: str,
+                               archived_packs: Mapping[str, str]) -> dict:
+    """The run identity of the specimen's governed M4.6 pipeline in this campaign run.
+
+    ``identification_pipeline.run_identity`` of the campaign's own ``specimen_pipeline_config``; the run root, stores,
+    Abaqus command and executors are machine-specific and not part of a run identity.  ``archived_packs`` are the
+    campaign run identity's pack content hashes of this specimen (job name → content hash).
+    """
+    config = specimen_pipeline_config(definition, item, Path(), {}, "", None, None, {}, campaign_run_hash)
+    return dict(run_identity(config), archived_packs=dict(archived_packs))
+
+
 def _bind_pipelines(definition, specimens: Sequence[CampaignSpecimenInput], identity: Mapping, run_hash: str,
                     pipeline_journals: Mapping[str, Mapping]) -> tuple[dict, dict]:
     records, run_hashes = {}, {}
     for item, entry in zip(specimens, identity["specimens"]):
         document = pipeline_journals.get(item.label) if isinstance(pipeline_journals, Mapping) else None
         pipeline, pipeline_hash, entries = journal_document(document, f"{item.label} pipeline")
-        extra = {"campaign_hash": run_hash, "specimen": item.label, "run_type": definition.run_type}
-        if pipeline.get("extra") != extra:
-            _refuse(LM_HISTORY_UNRELATED, f"the {item.label} pipeline run belongs to another campaign run.")
-        if dict(pipeline.get("archived_packs") or {}) != dict(entry.get("archived_packs") or {}):
-            _refuse(LM_HISTORY_UNRELATED, f"the {item.label} pipeline run uses other archived packs than the campaign.")
+        archived = entry.get("archived_packs")
+        if not isinstance(archived, Mapping):
+            _refuse(LM_HISTORY_UNRELATED, f"the campaign run identity has no archived packs for {item.label}.")
+        try:
+            governed = governed_pipeline_identity(definition, item, run_hash, archived)
+        except ObservationSetMismatch as exc:
+            _refuse(LM_HISTORY_UNRELATED, f"the {item.label} specimen has no governed pipeline ({exc}).")
+        wrong = sorted(key for key in set(governed) | set(pipeline)
+                       if canonical_hash(pipeline.get(key)) != canonical_hash(governed.get(key)))
+        if wrong:
+            _refuse(LM_HISTORY_UNRELATED, f"the {item.label} pipeline run is not the governed pipeline of this "
+                                          f"campaign run and specimen ({', '.join(wrong)}).")
         records[item.label] = {r.get("evaluation_hash"): r for r in _records(entries, "evaluation")}
         run_hashes[item.label] = pipeline_hash
     return records, run_hashes
