@@ -684,7 +684,7 @@ This does **not** authorise real calibration execution. Separate states:
 | Scientific / readiness implementation | `ACCEPTED` |
 | Production calibration execution | `BLOCKED / NOT_AUTHORISED` |
 | HUMAN-authorised real calibration run | `NOT YET AVAILABLE` |
-| M8 | `NOT_STARTED / PARKED` |
+| M8 | `IN_PROGRESS` (new M8 track; historical branch `auto-id/m8` `PARKED`) |
 
 A synthetic (fake-solver) RELEASED record proves the adapter only; it is never an accepted physical calibration.
 No new FE work is authorised. Each step requires explicit SUPERVISOR authorisation, one at a time,
@@ -803,8 +803,8 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 |---|---|---|
 | M8.1 | Specimen / family wizard | `ACCEPTED` |
 | M8.2 | Readiness screen | `ACCEPTED` |
-| M8.3 | One Auto-ID button calling the same backend as the CLI | `REVIEW_READY` |
-| M8.4 | Progress / resume | `TODO` |
+| M8.3 | One Auto-ID button calling the same backend as the CLI | `ACCEPTED` |
+| M8.4 | Progress / resume | `REVIEW_READY` |
 | M8.5 | Verdict presentation | `TODO` |
 | M8.6 | Abaqus Engineering Constants block | `TODO` |
 | M8.7 | Uncertainty / source breakdown | `TODO` |
@@ -814,7 +814,7 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-09: M8.1 and M8.2 accepted; M8.3 only). **M8.1 `ACCEPTED`** (PR #51, branch
+Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1, M8.2 and M8.3 accepted; M8.4 only). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
 `auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
 specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
 measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
@@ -831,7 +831,7 @@ without a governed campaign is never given a campaign result or an inferred ques
 shown result. Matching records are presented through `readiness_presentation`, unchanged; a match is not proof of
 authenticity. M8.2 merged: merge commit `3bf5067` (tree identical to reviewed head `1208562`), post-merge main CI
 success (run `37948118759`).
-**M8.3 `REVIEW_READY`** (PR #53, branch `auto-id/m8-3` from `3bf5067`): one read-only Auto-ID action,
+**M8.3 `ACCEPTED`** (PR #53, branch `auto-id/m8-3` from `3bf5067`): one read-only Auto-ID action,
 "Auto-ID — Evaluate Stored Run". It requires a governed campaign (M8.1) and an explicitly selected journal of an existing
 run; `services/stored_run_evidence.py` reads that run in the accepted journal layout (campaign hash must be the selected
 campaign's; pipeline journals located by governed pipeline identity; FE packs and pinned INP loaded with verification;
@@ -839,6 +839,15 @@ missing parts left missing), calls `judge_campaign_run` and stores the backend r
 run-bound on the Data Readiness Check. No run, LM, planning, extraction, solver process or write. UI freshness
 correction: a result is presented as current only for the exact journal and run of its latest successful evaluation;
 any new selection or evaluation attempt invalidates it first, and a failed attempt shows
-`NOT_EVALUATED_FOR_SELECTION` (a genuine backend NOT_READY / REFUSED is shown as returned). M8.4–M8.8 `TODO`. The parked prototype branch
+`NOT_EVALUATED_FOR_SELECTION` (a genuine backend NOT_READY / REFUSED is shown as returned). M8.3 merged: merge
+commit `6db9a15` (tree identical to reviewed head `3b2693c`), post-merge main CI success (run `37964686863`).
+**M8.4 `REVIEW_READY`** (PR #54, branch `auto-id/m8-4` from `6db9a15`): read-only progress / resume *inspection*
+of the explicitly selected stored run. `services/run_progress.py` verifies the campaign journal (format, directory = run
+hash, hash chain, governed run identity) and each governed pipeline journal, then reports only journalled facts:
+evaluations and refusals, LM result status / iterations / evaluations, Abaqus solves recorded and the run identity's
+budgets, recorded refusal / stop, missing evidence. No percentage, remaining time, live state or completion; unverified
+evidence shows no counts; a CONVERGED LM result is not a release. GUI: Refresh run progress (fresh from disk; a changed
+journal makes an earlier evaluation non-current) and Reopen selected run (re-verified; evaluation not current); a new
+selection clears progress. Computational resume is not enabled (HUMAN execution gate). M8.5–M8.8 `TODO`. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.
