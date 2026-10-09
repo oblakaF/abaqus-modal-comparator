@@ -4498,7 +4498,7 @@ first internal provider.
   missing pinned INP → the backend's typed NOT_READY; confirmed cluster → CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE.
 - **Not called:** CampaignRun.run / evaluate, run_bounded_lm, prepare_run_manifest, extraction, Abaqus, solver
   processes; no file written; `require_executable` unchanged.
-- **Tests:** test_m8_3_evaluate_stored_run 23 tests (3 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1 / M8.2 tests retained; focused M8.3 / M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 406 OK; full suite without data stores 1892 OK (77 skipped); full suite with all data stores 1906 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Tests:** test_m8_3_evaluate_stored_run 20 tests (3 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1 / M8.2 tests retained; focused M8.3 / M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 406 OK; full suite without data stores 1892 OK (77 skipped); full suite with all data stores 1906 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
 - **Unchanged:** V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at
   `193db8d`.
 - **Abaqus run count:** 0.
