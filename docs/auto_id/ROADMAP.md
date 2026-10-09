@@ -1,4 +1,4 @@
-# Auto-ID v1.1 Roadmap
+# Auto-ID — Roadmap (SPEC v1.2 governing)
 
 Governing specification (D-078):
 [docs/auto_id/SPEC_V1_2.md](SPEC_V1_2.md) — SPEC v1.1 as amended by v1.2;
@@ -660,38 +660,41 @@ from `main` `9f5f63a`; decisions in [M7_DECISION_RECORD.md](M7_DECISION_RECORD.m
 
 ### Policy track — SPEC v1.2 (ACCEPTED as normative, D-078)
 
-Before any new FE work (SP10, t_face sensitivity, a re-run of M7), the model-form policy is frozen in advance
-(audit V4). Draft `SPEC_V1_2_DRAFT.md`, review `SPEC_V1_2_POLICY_REVIEW.md`, options `SPEC_V1_2_POLICY_OPTIONS.json`
-on branch `auto-id/spec-v1.2-policy` from `main` `9bff6c7`. Policy direction accepted by the SUPERVISOR (2026-10-09)
-with corrections, incorporated in the revised draft: §1 amended into two pre-declared questions (material
-identification; specimen / FE-model calibration) with no automatic fallback; τ_mf = 0.02 as the specification maximum,
-a frequency-space model-form tolerance only, outside Σ, the objective and §13; SPECIMEN_ENGINEERING_CALIBRATION accepted
-in concept (not implemented) with max + RMS non-degradation, an 8 % row ceiling and k + 1 FIT + 1 HOLDOUT families.
-SPEC v1.1 stays normative; no production behaviour changed; historical results are not reinterpreted. Status: awaiting
-final SUPERVISOR acceptance.
+**Current governing state (D-078, accepted 2026-10-09):** [SPEC_V1_2.md](SPEC_V1_2.md) is normative,
+with unamended SPEC v1.1 clauses remaining in force. The two scientific questions and τ_mf rules were
+accepted **before** further FE work; historical RUN_A/RUN_B records remain immutable and do not become
+v1.2 calibrations. Policy-development documents `SPEC_V1_2_DRAFT.md`,
+`SPEC_V1_2_POLICY_REVIEW.md`, and `SPEC_V1_2_POLICY_OPTIONS.json` are superseded historical records.
+The policy was developed on `auto-id/spec-v1.2-policy` from `9bff6c7` and accepted via PRs #41/#42.
+No SP10, t_face or additional FE solves are authorised by policy acceptance.
 
 - **Policy PR merged:** PR #41 (`auto-id/spec-v1.2-policy` → `main`), reviewed head `62903ef`, merge commit
   `edb3070` (tree identical). The final review added the calibration precision gate
   (conservative_uncertainty ≤ 0.08).
 - **Normative acceptance (D-078):** `SPEC_V1_2.md` is the governing scientific contract; SPEC v1.1 is archived and
-  immutable. Implementation status: POLICY_ACCEPTED, IMPLEMENTATION_NOT_STARTED.
+  immutable. Implementation is tracked below: V12-I1–I4 ACCEPTED and merged; V12-I5 REWORK; V12-I6 TODO. Production calibration remains blocked.
 
 ### Implementation track — SPEC v1.2 (before any SP10 / new FE work)
 
-Not started. Each step needs explicit SUPERVISOR authorisation; the same rules as the M-stages apply (one step at a
-time, reproducing tests, no `install_*` layer, the CLI and GUI call the same services).
+Implementation in progress: **V12-I1–I4 ACCEPTED and merged**, **V12-I5 REWORK (PR #47)**,
+**V12-I6 TODO**. Production calibration orchestration remains **BLOCKED** pending I5/I6;
+no new FE work is authorised. Each step requires explicit SUPERVISOR authorisation, one at a time,
+tests and review. No `install_*` layer: CLI and GUI must use the same scientific backend services.
 
 | Id | Step | Status |
 |---|---|---|
 | V12-I1 | Campaign / run question (MATERIAL_IDENTIFICATION or SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf schema, both declared before execution and bound into the campaign / run identity | `ACCEPTED` |
 | V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `ACCEPTED` |
 | V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `ACCEPTED` |
-| V12-I4 | Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer) | `ACCEPTED` |
-| V12-I5 | Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable) | `REVIEW_READY` |
-| V12-I6 | Integration into GUI / backend readiness (the same backend services; no install_* layer) | `TODO` |
+| V12-I4 | Calibration reporting / output record: released/refused labels, bound identities, diagnostics and uncertainty; optional CAL_* material cloned from pinned source INP with Density and other supported options retained | `ACCEPTED` |
+| V12-I5 | Negative/regression closure: no fallback; τ_mf cannot rescue §13 FAIL; historical records immutable; calibration material cloning must fail closed on unknown/ambiguous Abaqus options | `REWORK` |
+| V12-I6 | SPEC v1.2 backend/GUI readiness with the same scientific services (no `install_*`); separate M8 remains parked until authorised | `TODO` |
 
 - **Normative acceptance merged:** PR #42 (`auto-id/spec-v1.2-acceptance` → `main`), merge commit `61b5016`.
-- **V12-I1 (REVIEW_READY, branch `auto-id/v12-i1` from `61b5016`):** campaign schema
+
+**Historical checkpoint note:** the `REVIEW_READY` descriptions below reflect the stage when each PR was prepared,
+not today's acceptance status. The table above and `STATUS.json` define the current states.
+- **V12-I1 (historical REVIEW_READY checkpoint, branch `auto-id/v12-i1` from `61b5016`):** campaign schema
   `auto-id/identification-campaign/v1.2` with mandatory `scientific_question` and `tau_mf` (0 < τ_mf ≤ 0.02), both in
   the campaign identity; specimen cardinality by question (v1 and v1.2 MATERIAL_IDENTIFICATION ≥ 2, v1.2
   SPECIMEN_ENGINEERING_CALIBRATION exactly 1); v1 definitions and the M7 identities unchanged; calibration
@@ -700,14 +703,14 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
   Production v1.2 implementation remains incomplete.
 
 - **V12-I1 accepted and merged:** PR #43 (`auto-id/v12-i1` → `main`), merge commit `4e3a1eb`.
-- **V12-I2 (REVIEW_READY, branch `auto-id/v12-i2` from `4e3a1eb`):** for a v1.2 campaign with declared τ_mf, each
+- **V12-I2 (historical REVIEW_READY checkpoint, branch `auto-id/v12-i2` from `4e3a1eb`):** for a v1.2 campaign with declared τ_mf, each
   governed term is judged with its own σ_term in ln f: a family is systematic when it has ≥ 2 FIT terms of one sign and
   every |Δ ln f| > max(2σ_term, τ_mf); a holdout fails when |Δ ln f| > max(3σ_term, τ_mf); equality passes. Clusters
   use the objective's σ_C. v1.1 rules, records and hashes unchanged; τ_mf stays out of Σ, Φ, whitening, every
   uncertainty and §13. Production v1.2 implementation remains incomplete.
 
 - **V12-I2 accepted and merged:** PR #44 (`auto-id/v12-i2` → `main`), merge commit `e702959`.
-- **V12-I3 (REVIEW_READY, branch `auto-id/v12-i3` from `e702959`):** pure specimen-calibration scientific gate
+- **V12-I3 (historical REVIEW_READY checkpoint, branch `auto-id/v12-i3` from `e702959`):** pure specimen-calibration scientific gate
   `services/specimen_calibration_gate.py` (`evaluate_calibration_gate`): question / τ_mf / one specimen, observability
   (k + 1 FIT family keys, full rank, complete leave-one-FIT-family-out, disjoint HOLDOUT family), pairing / tracking,
   no active bound, registration / peak, the V12-I2 pattern record, non-degradation (max, RMS, 8 % rows), precision
@@ -715,27 +718,36 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
   released; production calibration execution stays refused until V12-I4.
 
 - **V12-I3 accepted and merged:** PR #45 (`auto-id/v12-i3` → `main`), merge commit `3218663`.
-- **V12-I4 (REVIEW_READY, branch `auto-id/v12-i4` from `3218663`):** `services/specimen_calibration_output.py` —
+- **V12-I4 (historical REVIEW_READY checkpoint, branch `auto-id/v12-i4` from `3218663`):** `services/specimen_calibration_output.py` —
   `build_calibration_output` evaluates the I3 gate on the same evidence bundle and builds the deterministic
   calibration record (RELEASED: exactly the judged p̂ as MODEL_CALIBRATION_PARAMETER with SPECIMEN_ENGINEERING_CALIBRATION,
   NOT_A_MATERIAL_PROPERTY, NOT_TRANSFERABLE_WITHOUT_VALIDATION; REFUSED: diagnostic optimiser candidate only), bound to
   specimen, test run, forward model, INP, registration, campaign, run, τ_mf and the gate; full physical-row table,
   excluded diagnostics, I3 precision / uncertainty basis / non-degradation. `render_calibration_inp_fragment` renders a
-  distinct calibration material from a RELEASED record and the nine governed Engineering Constants only (separate from
-  the forward builder; nothing written). Production calibration orchestration stays blocked (V12-I5 / V12-I6).
+  distinct CAL_* material only from a RELEASED record, governed Engineering Constants, and the **exact pinned
+  source INP bytes** (model-input SHA-256 verified). It clones the complete **supported** production material block,
+  preserving `*Density` and other source material options; only its name and governed elastic constants change.
+  It reuses pure forward-builder parsing/rewrite helpers, writes no files and calls no solver.
+  Production calibration orchestration stays blocked pending V12-I5 / V12-I6.
 
-- **V12-I4 accepted and merged:** PR #46 (`auto-id/v12-i4` → `main`), merge commit `90e2378`.
-- **V12-I5 (REVIEW_READY, branch `auto-id/v12-i5` from `90e2378`):** `tests/test_v12_i5_contract_closure.py` — the
-  negative / regression acceptance matrix of SPEC v1.2 over I1–I4, end to end: questions and no fallback; τ_mf
-  boundaries and exclusion from Σ, objective, statistical_sd, Birge, LOO, precision and §13; a τ_mf-rescued pattern with
-  §13 FAIL (and NOT_EVALUABLE) releases no global value; every calibration-gate refusal is a REFUSED output without
-  value or fragment; anti-mixing; cluster member rows; historical v1.1 records pinned; production calibration refused
-  with zero side effects. One safety correction: the calibration material clone is fail-closed (unknown keyword after
-  the block → no fragment). Two open binding findings (p̂ ↔ residuals; baseline Δ ln f ↔ frozen pairing) are
-  reproduced as expected failures for SUPERVISOR decision. Production calibration execution stays blocked (V12-I6).
+- **V12-I4 accepted and merged:** PR #46 (`auto-id/v12-i4` → `main`), final reviewed head
+  `1fcabc47d32560816dc67dfb4c1a6d6b2d2d2f6c`, merge commit `90e237849f72e55c58359245ddb9d3b2956bc3bc`
+  (tree `508aaf8704a4d7496ef22d59ec08b01bd12f6937`, identical to reviewed head).
+  Post-merge main Linux CI **success** (run `37904375035`). Historical records and I3 science unchanged.
+- **V12-I5 (REWORK, PR #47, branch `auto-id/v12-i5` from `90e2378`, synchronised with `main` `c96e385`):**
+  `tests/test_v12_i5_contract_closure.py` — end-to-end negative / regression matrix (no fallback, τ_mf boundaries and
+  exclusion from Σ / uncertainty / §13, §13 FAIL not rescued by τ_mf, refusals without released values, anti-mixing,
+  cluster member rows, historical records pinned, production calibration refused). The calibration material clone is
+  **fail-closed**: the governed block must end at `*Material`, `*Step` or end of input; any other keyword (e.g.
+  `*Mohr Coulomb`) refuses the fragment. SUPERVISOR review (head `00e210c`): matrix and fragment fix accepted in
+  principle; REWORK to close the evidence-binding findings F1 (authoritative candidate evaluation binding p̂, residuals,
+  robustness and FE identity) and F2 (baseline Δ ln f = ln(f_FE / f_EXP) of the frozen baseline pairing, SPEC v1.1 §6
+  S3).
+- **LATER — V12-I6 (`TODO`):** integrate and qualify the v1.2 backend/GUI paths, with no scientific refusal bypass.
 
-**V12 GATE:** production code enforces the D-078 rules with negative tests (no fallback, τ_mf outside Σ / uncertainty /
-§13, refusals without released values) before any SP10, t_face or other new FE calculation.
+**V12 PRODUCTION GATE — NOT YET SATISFIED:** complete I5/I6 and prove negative regression gates
+(no fallback, τ_mf outside Σ/uncertainty/§13, refusals without released values) before enabling calibration execution
+or considering SP10, t_face, or other FE work. Abaqus requires separate HUMAN authorisation.
 
 ---
 
@@ -756,6 +768,6 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `NOT_STARTED` (D-077). M8.1 work exists on the parked branch `auto-id/m8` (`193db8d`,
-`PARKED_PENDING_POST_M7_DECISION`): not part of M7b; not reviewed, not accepted, not merged; reuse is decided after the
-next scientific-policy decision.
+Stage status: `NOT_STARTED` (D-077). M8.1 work exists only on parked branch `auto-id/m8` (`193db8d`),
+not reviewed, accepted, merged or rebased. V12-I6 readiness does **not** automatically resume M8; reuse requires
+separate SUPERVISOR authorisation after the SPEC v1.2 production gates.

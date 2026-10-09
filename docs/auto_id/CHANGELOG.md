@@ -4241,12 +4241,25 @@ first internal provider.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #46.
 
+## 2026-10-09 — SPEC v1.2 roadmap/status sync after accepted V12-I4
+
+- **Stage:** governance/documentation only; no new scientific mini-step.
+- **Status:** V12-I1/I2/I3/I4 ACCEPTED; V12-I5 TODO (next gate); V12-I6 TODO. M8 remains NOT_STARTED and parked.
+- **PR #46 accepted and merged:** reviewed head `1fcabc47d32560816dc67dfb4c1a6d6b2d2d2f6c`; merge `90e237849f72e55c58359245ddb9d3b2956bc3bc`; identical tree `508aaf8704a4d7496ef22d59ec08b01bd12f6937`; main Linux CI success (run `37904375035`).
+- **Files:** `docs/auto_id/ROADMAP.md`, `docs/auto_id/STATUS.json`, `docs/auto_id/CHANGELOG.md`; the docs-only commit is recorded in Git history.
+- **Change:** replace stale v1.1/not-started/current-I4 wording; document pinned-source-INP complete-material cloning and corrected physical-row non-degradation; add merge provenance and explicit I5/I6 gates. Original `REVIEW_READY` checkpoints are historical.
+- **Scientific/runtime behaviour changed:** NO. No material verdict, campaign identity, historical record, I3/I4 service, or SPEC changed.
+- **I5 mandatory safety test:** unknown/ambiguous Abaqus material options must fail closed during optional CAL_* cloning; pending test, not an implemented-fix claim.
+- **Known limitations:** production calibration orchestration remains `SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED` until I5/I6 closure; `auto-id/m8` remains parked; SP10, t_face and new FE work not authorised.
+- **Verification:** reviewed PR #46 merge/tree and green post-merge CI; machine-readable status parsed and checked against roadmap; changelog append-only. No Abaqus run.
+- **Abaqus run count:** 0.
+- **Next gate:** V12-I5 only, from green main; V12-I6 and M8 not started.
+
 ## 2026-10-09 — V12-I5 — SPEC v1.2 negative / regression contract closure (V12-I4 merged)
 
-- **V12-I4 merge:** PR #46 `auto-id/v12-i4` → `main`, merge commit `90e237849f72e55c58359245ddb9d3b2956bc3bc` (reviewed head `1fcabc4`, merged tree
-  `508aaf8` identical; SUPERVISOR-authorised). Linux CI on main 90e2378: 1710 OK (68 skipped), success (run 37904375035). V12-I4 ACCEPTED.
+- **V12-I4 merge:** recorded once in the "SPEC v1.2 roadmap/status sync after accepted V12-I4" entry above (PR #46 merge `90e2378`).
 - **Stage:** SPEC v1.2 implementation track, step V12-I5 (no roadmap M-stage; M8 NOT_STARTED)
-- **Status:** REVIEW_READY
+- **Status:** REVIEW_READY (checkpoint at `00e210c`)
 - **Branch:** `auto-id/v12-i5` (from `main` `90e2378`)
 - **Commit SHA:** the commit that introduces this entry, message
   `auto-id(V12-I5): SPEC v1.2 negative / regression contract closure`
@@ -4278,3 +4291,16 @@ first internal provider.
 - **Tests:** test_v12_i5_contract_closure 41 OK + 2 expected failures (open findings V12-I5-F1 / F2); focused (V12-I1..I5, SPEC v1.2 normative + policy, M5 gate, verdict, uncertainty, model_form_robustness, M7 campaign / RUN_A / RUN_B / entry wiring, M7b, M7 closure, forward builder / generic / manifest, shared carbon, M3/M4 clusters and objective, family residual) 408 OK (2 expected failures) with all data stores; full suite without data stores 1756 OK (67 skipped, 2 expected failures); full suite with all data stores 1770 OK (5 skipped, 2 expected failures), no Abaqus
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of the V12-I5 PR and decision on V12-I5-F1 / F2.
+
+## 2026-10-09 — V12-I5 — REWORK: documentation synchronised with main (PR #48)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I5 (SUPERVISOR decision on PR #47 head `00e210c`)
+- **Status:** REWORK
+- **PR #48 merge:** docs-only `auto-id/v12-roadmap-sync-20261009` → `main`, reviewed head `3df09f6`, merge commit
+  `c96e385d01b1da18a48f04d235bb476630c4c6f0` (tree identical to the reviewed head); main Linux CI success (run 37911861105). SUPERVISOR-authorised.
+- **Branch:** `auto-id/v12-i5` merges `main` `c96e385` (no force push). ROADMAP / STATUS take main's corrected wording;
+  the V12-I5 checkpoint is re-applied on top; the earlier I5 entry no longer repeats the PR #46 acceptance.
+- **Decision recorded:** regression matrix and fail-closed material fragment accepted in principle; V12-I5 stays REWORK
+  until the binding findings F1 (candidate evaluation) and F2 (frozen baseline) are closed. V12-I6 TODO.
+- **Abaqus run count:** 0.
+- **Next gate:** F2 and F1 corrections on `auto-id/v12-i5`, then SUPERVISOR review of PR #47.
