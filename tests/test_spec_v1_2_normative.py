@@ -113,19 +113,27 @@ class NormativeSpecTests(unittest.TestCase):
                        "No Abaqus was run"):
             self.assertIn(phrase, " ".join(d078.split()))
 
-    def test_governance_points_to_spec_v1_2_without_claiming_implementation(self):
+    def test_governance_points_to_spec_v1_2_without_authorising_execution(self):
         status = json.loads(_text("STATUS.json"))
         self.assertEqual(status["governing_spec"], "docs/auto_id/SPEC_V1_2.md")
-        self.assertIn("IMPLEMENTATION_INCOMPLETE", status["spec_v1_2_policy"]["implementation_status"])
         track = status["spec_v1_2_implementation"]
-        self.assertEqual(track["status"], "IN_PROGRESS")
         self.assertEqual(sorted(track["steps"]), [f"V12-I{i}" for i in range(1, 7)])
-        # Roadmap order: an ACCEPTED prefix, then at most one step under work (never self-ACCEPTED), the rest TODO.
         states = [track["steps"][f"V12-I{i}"]["status"] for i in range(1, 7)]
-        accepted = len(states) - len(list(itertools.dropwhile(lambda s: s == "ACCEPTED", states)))
-        rest = states[accepted:]
-        self.assertTrue(rest and all(s == "TODO" for s in rest[1:]), states)
-        self.assertIn(rest[0], ("TODO", "IN_PROGRESS", "REVIEW_READY", "REWORK"))
+        if track["status"] == "ACCEPTED":  # SUPERVISOR acceptance of the whole track (2026-10-09)
+            self.assertEqual(states, ["ACCEPTED"] * 6)
+            completion = track["completion"]
+            self.assertTrue(completion["scientific_readiness_implementation"].startswith("ACCEPTED"))
+            self.assertEqual(completion["production_calibration_execution"], "BLOCKED / NOT_AUTHORISED")
+            self.assertTrue(completion["human_authorised_real_calibration_run"].startswith("NOT YET AVAILABLE"))
+            self.assertIn("production calibration execution BLOCKED / NOT_AUTHORISED",
+                          status["spec_v1_2_policy"]["implementation_status"])
+        else:  # Roadmap order: an ACCEPTED prefix, then at most one step under work (never self-ACCEPTED), the rest TODO.
+            self.assertEqual(track["status"], "IN_PROGRESS")
+            self.assertIn("IMPLEMENTATION_INCOMPLETE", status["spec_v1_2_policy"]["implementation_status"])
+            accepted = len(states) - len(list(itertools.dropwhile(lambda s: s == "ACCEPTED", states)))
+            rest = states[accepted:]
+            self.assertTrue(rest and all(s == "TODO" for s in rest[1:]), states)
+            self.assertIn(rest[0], ("TODO", "IN_PROGRESS", "REVIEW_READY", "REWORK"))
         self.assertEqual((status["m8"]["status"], status["m8"]["parked_branch"]["commit"]),
                          ("NOT_STARTED", "193db8dd4dd31c88ea1eae0a905f372e8a00c31d"))
         self.assertIn("| [SPEC_V1_2.md](SPEC_V1_2.md) | Governing scientific contract (normative, D-078)",
