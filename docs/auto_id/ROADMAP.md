@@ -836,6 +836,9 @@ success (run `37948118759`).
 run; `services/stored_run_evidence.py` reads that run in the accepted journal layout (campaign hash must be the selected
 campaign's; pipeline journals located by governed pipeline identity; FE packs and pinned INP loaded with verification;
 missing parts left missing), calls `judge_campaign_run` and stores the backend record unchanged, shown selection- and
-run-bound on the Data Readiness Check. No run, LM, planning, extraction, solver process or write. M8.4–M8.8 `TODO`. The parked prototype branch
+run-bound on the Data Readiness Check. No run, LM, planning, extraction, solver process or write. UI freshness
+correction: a result is presented as current only for the exact journal and run of its latest successful evaluation;
+any new selection or evaluation attempt invalidates it first, and a failed attempt shows
+`NOT_EVALUATED_FOR_SELECTION` (a genuine backend NOT_READY / REFUSED is shown as returned). M8.4–M8.8 `TODO`. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.

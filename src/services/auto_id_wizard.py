@@ -521,7 +521,8 @@ class ReadinessSelection:
 
 
 def readiness_selection(selected: bool, preparation, record, run_hash: Optional[str] = None,
-                        evaluated_run_hash: Optional[str] = None) -> ReadinessSelection:
+                        evaluated_run_hash: Optional[str] = None,
+                        evaluation_current: Optional[bool] = None) -> ReadinessSelection:
     """Bind a stored backend readiness record to the current selection, by governed identity only.
 
     A record is presented for a selected family / campaign only when its campaign identity is the governed
@@ -530,7 +531,9 @@ def readiness_selection(selected: bool, preparation, record, run_hash: Optional[
     run is selected.  Names, folders, labels or file names alone never match.  ``evaluated_run_hash`` is given only for
     the record the GUI itself obtained by evaluating that run (M8.3): a backend refusal that came before the run identity
     could be verified carries no run hash and is then bound to the run that was evaluated; such a record is shown only
-    while exactly that run is selected.  A specimen folder declares no governed
+    while exactly that run is selected.  ``evaluation_current`` is given (True / False) only for such a GUI-evaluated
+    record: False — the evaluation is not the current successful evaluation of the exact selected journal (a new run
+    selection, a new evaluation attempt or a failed one) — never presents it, with no fallback to a campaign-only match.  A specimen folder declares no governed
     campaign, so no campaign result is attached to it and no question is inferred.  Presentation only: the record is
     neither changed nor re-judged, and a match is not proof that a stored record is authentic.
     """
@@ -543,6 +546,10 @@ def readiness_selection(selected: bool, preparation, record, run_hash: Optional[
 
     def not_evaluated(reason: str) -> ReadinessSelection:
         return ReadinessSelection(SelectionState.NOT_EVALUATED_FOR_SELECTION, reason, False)
+
+    if evaluation_current is False:
+        return not_evaluated("no current evaluation of the selected run: the earlier result is not presented for this "
+                             "selection (press Auto-ID — Evaluate Stored Run)")
 
     if isinstance(preparation, SpecimenPreparation):
         return not_evaluated("a specimen folder declares no governed campaign: no scientific question is inferred and "

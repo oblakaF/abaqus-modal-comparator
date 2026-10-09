@@ -4503,3 +4503,20 @@ first internal provider.
   `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #53.
+
+## 2026-10-10 — M8.3 — UI freshness correction (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID, mini-step M8.3 (SUPERVISOR final GUI state correction of PR #53 at `42f830e`)
+- **Status:** REVIEW_READY (PR #53 not merged); M8.1, M8.2 ACCEPTED; M8.4..M8.8 TODO
+- **Finding:** after a successful evaluation, a failed re-evaluation of the same (now unreadable) journal, a re-selection
+  of the same run, or another journal path with the same run hash still showed the earlier result as current.
+- **Closure:** presentation validity: the GUI keeps the active evaluation (journal path, run hash, record object), invalidated on every run or campaign selection and before every evaluation attempt; only a result returned by evaluate_stored_run becomes current. A record this GUI evaluated is presented only while it is the active evaluation of exactly the selected journal path and run hash (auto_id_wizard.readiness_selection evaluation_current=False -> NOT_EVALUATED_FOR_SELECTION, no fallback to a campaign-only match); a failed attempt (unreadable journal, adapter error, no campaign or run) shows NOT_EVALUATED_FOR_SELECTION; a genuine backend NOT_READY / REFUSED is displayed as returned; external stored V12-I6 records keep the M8.2 behaviour. Stored records are never changed or deleted; adapter and backend unchanged.
+- **Red-probe:** tests A (failed re-evaluation), B (re-selection), C (same run hash at another path) and F (campaign /
+  run switching ending on the same run) failed before the correction and pass now; D (genuine NOT_READY shown as
+  returned), E (successful re-evaluation shown as a new record) and G (external V12-I6 records, M8.2 behaviour) pass.
+- **Tests:** test_m8_3_evaluate_stored_run 27 tests (3 store-gated archived RUN_A / RUN_B; real-Tk test incl. freshness); freshness tests A-G (+ exact-path validity); M8.1 / M8.2 tests retained; focused M8.3 / M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 413 OK; full suite without data stores 1899 OK (77 skipped); full suite with all data stores 1913 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** SPEC v1.1 / v1.2, V12-I1..I6, LM / Jacobian logic, `ScientificReadiness`, `judge_campaign_run`,
+  `stored_run_evidence`, RUN_A / RUN_B, cluster policy; production calibration execution BLOCKED / NOT_AUTHORISED;
+  `auto-id/m8` at `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #53.

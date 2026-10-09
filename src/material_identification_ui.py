@@ -1021,11 +1021,17 @@ def scientific_readiness_view(app) -> dict[str, object]:
     from services.campaign_scientific_backend import readiness_presentation
 
     record = getattr(app, "scientific_readiness_record", None)
-    evaluated = getattr(app, "auto_id_evaluated_run_hash", None) \
-        if record is not None and getattr(app, "auto_id_evaluated_record", None) is record else None
+    evaluated, current = None, None
+    if record is not None and getattr(app, "auto_id_evaluated_record", None) is record:
+        # M8.3: a record this GUI evaluated is current only for the exact journal and run of its successful evaluation
+        active = getattr(app, "auto_id_active_evaluation", None)
+        current = active is not None and active[2] is record \
+            and active[0] == getattr(app, "auto_id_selected_run_path", None) \
+            and active[1] == getattr(app, "auto_id_selected_run_hash", None)
+        evaluated = active[1] if current else None
     selection = readiness_selection(getattr(app, "auto_id_source", None) is not None,
                                     getattr(app, "auto_id_preparation", None), record,
-                                    getattr(app, "auto_id_selected_run_hash", None), evaluated)
+                                    getattr(app, "auto_id_selected_run_hash", None), evaluated, current)
     rows = readiness_presentation(record) if selection.show_record and isinstance(record, Mapping) else ()
     if rows:
         status = dict(rows).get("Readiness") or "NOT AVAILABLE"
@@ -1081,6 +1087,7 @@ AUTO_ID_NO_RUN = "No stored run selected."
 
 
 def _clear_auto_id_run(app) -> None:
+    app.auto_id_active_evaluation = None  # no earlier evaluation is current for a new selection
     app.auto_id_selected_run_path = None
     app.auto_id_selected_run_hash = None
     app.auto_id_run_message = AUTO_ID_NO_RUN
@@ -1115,6 +1122,7 @@ def evaluate_auto_id_run(app) -> None:
     from services.auto_id_wizard import FamilyPreparation
     from services.stored_run_evidence import StoredRunRefusal, evaluate_stored_run
 
+    app.auto_id_active_evaluation = None  # invalidated before any attempt; only a returned result becomes current
     preparation = getattr(app, "auto_id_preparation", None)
     definition = preparation.definition if isinstance(preparation, FamilyPreparation) else None
     run_path = getattr(app, "auto_id_selected_run_path", None)
@@ -1136,6 +1144,7 @@ def evaluate_auto_id_run(app) -> None:
             app.scientific_readiness_record = record
             app.auto_id_evaluated_record = record
             app.auto_id_evaluated_run_hash = evaluation.run.run_hash
+            app.auto_id_active_evaluation = (run_path, evaluation.run.run_hash, record)
             notes = f" Loading notes: {'; '.join(evaluation.notes)}." if evaluation.notes else ""
             app.auto_id_run_message = (f"Evaluated stored run {evaluation.run.run_hash[:12]} with the shared backend: "
                                        f"{record['status']} (see Data Readiness Check).{notes}")

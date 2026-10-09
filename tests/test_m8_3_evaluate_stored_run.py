@@ -356,7 +356,7 @@ class EvaluateButtonTests(_Gui):
         ui.select_auto_id_run(application, str(second))  # not evaluated yet: the first run's result is not its
         self.assertEqual(self.status(application), NOT_EVALUATED)
         self.assertEqual(self.rows(application), {})
-        self.assertIn("not the currently selected run",
+        self.assertIn("no current evaluation of the selected run",
                       application.material_scientific_readiness_selection_label.kwargs["text"])
         self.evaluate_run(application, second)
         self.assertEqual(self.status(application), "RELEASED")
@@ -451,6 +451,130 @@ class EvaluateButtonTests(_Gui):
         self.assertIsNone(record["released_calibration_parameters"])
 
 
+# ----------------------------------------------------------------------------- presentation freshness (M8.3 correction)
+
+class FreshnessTests(_Gui):
+    """A scientific result is presented as current only for the exact selection whose evaluation just succeeded."""
+
+    def evaluated(self, journal=None):
+        application = self.application()
+        self.select(application, "family", self.definition_file())
+        self.evaluate_run(application, journal or _journal(self.run_root()))
+        self.assertEqual(self.status(application), "RELEASED")
+        return application
+
+    def assert_not_current(self, application, record, snapshot):
+        self.assertEqual(self.status(application), NOT_EVALUATED)
+        self.assertEqual(self.rows(application), {})
+        text = json.dumps(tuple(application.material_scientific_readiness_table.items.values())) + self.status(application)
+        for stale in ("RELEASED", "E_in_plane_mpa", "SYA/fake"):
+            self.assertNotIn(stale, text)
+        self.assertIs(application.scientific_readiness_record, record)  # the stored record is kept ...
+        self.assertEqual(json.dumps(record, sort_keys=True), snapshot)  # ... unchanged
+
+    def test_a_failed_re_evaluation_of_the_same_journal_shows_no_stale_result(self):
+        import material_identification_ui as ui
+
+        root = self.copy_run()
+        journal = _journal(root)
+        original = journal.read_bytes()
+        application = self.evaluated(journal)
+        record = application.scientific_readiness_record
+        snapshot = json.dumps(record, sort_keys=True)
+        journal.write_text("{unreadable", encoding="utf-8")
+        with mock.patch.object(adapter, "campaign_specimens", return_value=(self.item,)),                 mock.patch("domain.experiment_fixture.fixture_roots_from_environment", return_value=self.roots()):
+            ui.evaluate_auto_id_run(application)  # the same selected journal, pressed again
+        self.assertIn("No evaluation", self.message(application))
+        self.assert_not_current(application, record, snapshot)
+        self.assertIn("no current evaluation", application.material_scientific_readiness_selection_label.kwargs["text"])
+        # E: a successful re-evaluation is displayed again, as a new backend record
+        journal.write_bytes(original)
+        with mock.patch.object(adapter, "campaign_specimens", return_value=(self.item,)),                 mock.patch("domain.experiment_fixture.fixture_roots_from_environment", return_value=self.roots()):
+            ui.evaluate_auto_id_run(application)
+        self.assertEqual(self.status(application), "RELEASED")
+        self.assertIn("E_in_plane_mpa = ", self.rows(application)["Released calibration"])
+        self.assertIsNot(application.scientific_readiness_record, record)
+        self.assertEqual(json.dumps(record, sort_keys=True), snapshot)
+
+    def test_b_reselecting_the_same_run_is_not_a_fresh_evaluation(self):
+        import material_identification_ui as ui
+
+        application = self.evaluated()
+        record = application.scientific_readiness_record
+        snapshot = json.dumps(record, sort_keys=True)
+        ui.select_auto_id_run(application, str(_journal(self.run_root())))
+        self.assert_not_current(application, record, snapshot)
+        self.assertIn("not evaluated yet", self.message(application))
+
+    def test_c_another_journal_path_with_the_same_run_hash_inherits_nothing(self):
+        import material_identification_ui as ui
+
+        application = self.evaluated()
+        record = application.scientific_readiness_record
+        snapshot = json.dumps(record, sort_keys=True)
+        copy_journal = _journal(self.copy_run())
+        self.assertEqual(copy_journal.parent.name, _journal(self.run_root()).parent.name)  # the same run hash
+        ui.select_auto_id_run(application, str(copy_journal))
+        self.assertEqual(application.auto_id_selected_run_hash, record["campaign"]["run_hash"])
+        self.assert_not_current(application, record, snapshot)
+
+    def test_c2_validity_requires_the_exact_evaluated_journal_path(self):
+        # Defence in depth: even if the selected path changed without a new selection, the same run hash at another
+        # path is not the evaluated journal.
+        import material_identification_ui as ui
+
+        application = self.evaluated()
+        record = application.scientific_readiness_record
+        snapshot = json.dumps(record, sort_keys=True)
+        application.auto_id_selected_run_path = str(_journal(self.copy_run()))
+        ui._refresh_data_readiness_page(application)
+        self.assert_not_current(application, record, snapshot)
+
+    def test_d_a_genuine_backend_not_ready_is_displayed_as_returned(self):
+        root = self.copy_run()
+        for journal in root.glob("specimens/*/*/*/journal.json"):
+            journal.unlink()
+        application = self.application()
+        self.select(application, "family", self.definition_file())
+        self.evaluate_run(application, _journal(root))
+        self.assertEqual(self.status(application), "NOT_READY")
+        self.assertIn("LM_HISTORY_MISSING", self.rows(application)["Refusal reasons"])
+        self.assertNotEqual(self.status(application), NOT_EVALUATED)
+
+    def test_f_switching_campaigns_or_runs_leaks_nothing(self):
+        import material_identification_ui as ui
+
+        application = self.evaluated()
+        record = application.scientific_readiness_record
+        snapshot = json.dumps(record, sort_keys=True)
+        ui.select_auto_id_run(application, str(_journal(self.run_root("second"))))
+        self.assert_not_current(application, record, snapshot)
+        self.select(application, "family", RUN_A)
+        self.assert_not_current(application, record, snapshot)
+        self.select(application, "family", self.definition_file())  # the original campaign again: no run, no result
+        self.assertIsNone(application.auto_id_selected_run_hash)
+        self.assert_not_current(application, record, snapshot)
+        ui.select_auto_id_run(application, str(_journal(self.run_root())))  # its run again, not re-evaluated
+        self.assert_not_current(application, record, snapshot)
+
+    def test_g_external_stored_records_keep_the_m8_2_behaviour(self):
+        import material_identification_ui as ui
+
+        external = adapter.judge_campaign_run(self.definition, [self.item], self.runs["first"].evidence).to_dict()
+        application = self.application()
+        application.scientific_readiness_record = external  # a stored V12-I6 record, not evaluated by this GUI
+        application._refresh_material_identification_pages()
+        self.assertEqual(self.status(application), "RELEASED")  # no selection: shown for its own identity
+        self.select(application, "family", self.definition_file())
+        self.assertEqual(self.status(application), "RELEASED")  # its governed campaign selected
+        ui.select_auto_id_run(application, str(_journal(self.run_root())))
+        self.assertEqual(self.status(application), "RELEASED")  # its own run selected
+        ui.select_auto_id_run(application, str(_journal(self.run_root("second"))))
+        self.assertEqual(self.status(application), NOT_EVALUATED)  # another run
+        self.select(application, "family", RUN_A)
+        self.assertEqual(self.status(application), NOT_EVALUATED)  # another campaign
+
+
 # ----------------------------------------------------------------------------- archived RUN_A / RUN_B (store-gated)
 
 class ArchivedRunTests(unittest.TestCase):
@@ -534,6 +658,10 @@ class RealTkEvaluateTests(_Synthetic):
         self.assertEqual(application.material_scientific_readiness_status_label.cget("text"), "RELEASED")
         self.assertTrue(application.material_scientific_readiness_table.get_children())
         self.assertIn("Evaluated stored run", application.material_auto_id_run_label.cget("text"))
+        ui.select_auto_id_run(application, str(_journal(self.run_root())))  # reselected, not re-evaluated
+        root.update_idletasks()
+        self.assertEqual(application.material_scientific_readiness_status_label.cget("text"), NOT_EVALUATED)
+        self.assertEqual(application.material_scientific_readiness_table.get_children(), ())
 
 
 if __name__ == "__main__":
