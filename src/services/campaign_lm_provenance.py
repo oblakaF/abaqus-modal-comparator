@@ -14,7 +14,10 @@ evidence.  ``verify_lm_history`` accepts the reconstruction only when the journa
    ``run_identity`` of the campaign's ``specimen_pipeline_config``, field by field; the stacked residuals are the
    specimens' FIT residuals);
 4. the LM history follows the journalled evaluations: it starts at the start point, every objective it recorded is
-   ½‖r‖² of the journalled residuals at that point, and it ends with the stop step at p̂;
+   ½‖r‖² of the journalled residuals at that point, every step before the stop records the LM's own strict decision
+   on those residuals (accepted ⇔ ½‖r_trial‖² < ½‖r‖², note "accepted" / "rejected") and the next entry follows it
+   (an accepted trial: its point, μ / mu_decrease, the next iteration; a rejected one: the same point,
+   μ · mu_increase, the same iteration), and it ends with the stop step at p̂;
 5. p̂ is the final journalled evaluation, the reconstructed Jacobian is evaluated at p̂, it has the FIT terms ×
    fitted parameters in definition order, and it is the Jacobian the LM actually stopped with: the journalled
    ``local_sd`` and the journalled final trial step are reproduced from it (``local_sd`` / ``lm_step``).
@@ -285,6 +288,28 @@ def verify_lm_history(definition, specimens: Sequence[CampaignSpecimenInput], ca
                 and not _close(entry["trial_objective"], objective(residuals_at(entry["trial_x"])), _REPLAY)):
             _refuse(JACOBIAN_INCONSISTENT, f"LM iteration {entry.get('iteration')} recorded an objective that is not "
                                            "½‖r‖² of the journalled residuals.")
+    for entry, following in zip(history, history[1:]):  # every step before the stop: identification_step.run_bounded_lm
+        iteration = entry.get("iteration")
+        if entry.get("trial_objective") is None:
+            _refuse(JACOBIAN_INCONSISTENT, f"LM iteration {iteration} has no trial step before the stop step.")
+        accepted = bool(objective(residuals_at(entry["trial_x"])) < objective(residuals_at(entry["x"])))
+        if entry.get("accepted") is not accepted or entry.get("note") != ("accepted" if accepted else "rejected"):
+            _refuse(JACOBIAN_INCONSISTENT, f"LM iteration {iteration} records accepted={entry.get('accepted')!r}, "
+                                           f"note={entry.get('note')!r}, but the LM's strict objective comparison of "
+                                           f"its journalled residuals {'accepts' if accepted else 'rejects'} the trial.")
+        try:
+            point, mu, step_iteration = (
+                (entry["trial_x"], float(entry["mu"]) / definition.lm.mu_decrease, iteration + 1) if accepted
+                else (entry["x"], float(entry["mu"]) * definition.lm.mu_increase, iteration))
+            follows = len(following["x"]) == len(point) and all(
+                _close(a, b, _POINT) for a, b in zip(following["x"], point)) \
+                and _close(following.get("mu"), mu, _REPLAY) and following.get("iteration") == step_iteration
+        except (KeyError, TypeError, ValueError):
+            follows = False
+        if not follows:
+            _refuse(JACOBIAN_INCONSISTENT, f"the LM history entry after iteration {iteration} does not follow its "
+                                           f"{'accepted' if accepted else 'rejected'} trial (point, damping μ, "
+                                           "iteration).")
     last = history[-1]
     if last.get("note") != STOP_NOTE or last.get("accepted") or last.get("trial_objective") is not None \
             or not all(_close(math.exp(x), p_hat[n], _POINT) for x, n in zip(last["x"], names)):

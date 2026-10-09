@@ -69,7 +69,7 @@ from services.identification_campaign_run import (
     campaign_m5_system,
     check_observation_set,
 )
-from services.identification_step import local_sd
+from services.identification_step import local_sd, objective
 from services.practical_identifiability import reconstruct_lm_jacobian
 from services.specimen_calibration_gate import COMPLETE_COVARIANCE, CONDITIONAL_COVARIANCE
 from services.specimen_calibration_output import CalibrationFragmentRefusal
@@ -165,6 +165,19 @@ def mutated_pipelines(evidence, label: str, mutate) -> dict:
     assert forged["run_hash"] != pipeline["run_hash"]
     assert [e["record"] for e in forged["entries"]] == [e["record"] for e in pipeline["entries"]]
     return dict(evidence.pipeline_journals, **{label: forged})
+
+
+def with_history(document: dict, change) -> dict:
+    """The campaign journal with its LM result history changed (hash chain recomputed; evaluations unchanged)."""
+    return rechain(document, edit=lambda kind, r: dict(r, history=change(copy.deepcopy(r["history"])))
+                   if kind == "result" else r)
+
+
+def entry_changed(index: int, **fields):
+    def change(history):
+        history[index].update(fields)
+        return history
+    return change
 
 
 def shifted(item, row_id: str, delta: float):
@@ -475,6 +488,116 @@ class PipelineIdentityTests(_Runs):
                         self.assertIs(readiness.status, ReadinessStatus.NOT_READY)
                         self.assertEqual(readiness.refusal_codes, (ReadinessRefusal.LM_HISTORY_UNRELATED.value,))
                         self.assertIsNone(readiness.to_dict()["material_formal_output"])
+
+
+# ----------------------------------------------------------------------------- LM acceptance decisions
+
+class LMDecisionTests(_Runs):
+    """Every nonterminal LM history entry records the LM's own strict decision on its journalled residuals
+    (accepted ⇔ ½‖r_trial‖² < ½‖r‖², note "accepted" / "rejected"), and the next entry follows that decision."""
+
+    def refused(self, definition, specimens, campaign, pipelines) -> LMProvenanceRefusal:
+        with self.assertRaises(LMProvenanceRefusal) as refused:
+            verify_lm_history(definition, specimens, campaign, pipelines)
+        self.assertEqual(refused.exception.code, JACOBIAN_INCONSISTENT)
+        return refused.exception
+
+    def history(self, evidence) -> list:
+        return next(e["record"] for e in evidence.campaign_journal["entries"] if e["kind"] == "result")["history"]
+
+    def worse_trial(self, run, accepted: bool) -> dict:
+        """A trial of the first iteration at a genuinely journalled point with a larger objective than the start."""
+        first = self.history(run.evidence)[0]
+        evaluations = [e["record"] for e in run.evidence.campaign_journal["entries"]
+                       if e["kind"] == "evaluation" and e["record"]["refusal"] is None]
+        worse = max(evaluations, key=lambda e: objective(np.asarray(e["residuals"])))
+        trial_objective = objective(np.asarray(worse["residuals"]))
+        self.assertGreater(trial_objective, first["objective_before"])
+        return dict(first, trial_x=[math.log(worse["parameters"][n]) for n in run.definition.fitted_parameters],
+                    trial_objective=trial_objective, accepted=accepted, note="accepted" if accepted else "rejected")
+
+    def test_red_probe_an_accepted_step_noted_rejected_is_refused(self):
+        run = self.base
+        genuine = self.history(run.evidence)
+        self.assertEqual((genuine[0]["accepted"], genuine[0]["note"]), (True, "accepted"))
+        forged = with_history(run.evidence.campaign_journal, entry_changed(0, note="rejected"))
+        # The Jacobian reconstruction follows the accepted flag alone: the relabelled history replays identically.
+        names = run.definition.fitted_parameters
+        evaluations = [e for e in run.campaign.journal.records("evaluation") if e["residuals"] is not None]
+        self.assertEqual(reconstruct_lm_jacobian(evaluations, self.history(with_journal(
+            run.evidence, campaign_journal=forged)), run.definition.start, names,
+            run.definition.lm.finite_difference_step), reconstruct_lm_jacobian(
+            evaluations, genuine, run.definition.start, names, run.definition.lm.finite_difference_step))
+        self.refused(run.definition, [run.item], forged, run.evidence.pipeline_journals)
+        self.assert_nothing_released(self.judge(evidence=with_journal(run.evidence, campaign_journal=forged)),
+                                     ReadinessRefusal.JACOBIAN_INCONSISTENT)
+
+    def test_a_decision_contradicting_the_genuine_residuals_is_refused(self):
+        run = self.base
+        cases = {
+            "accepted step recorded as rejected": entry_changed(0, accepted=False, note="rejected"),
+            "accepted=False noted accepted": entry_changed(0, accepted=False),
+            "non-boolean acceptance": entry_changed(0, accepted=1),
+            "another note": entry_changed(0, note="Accepted"),
+            "no trial objective before the stop step": entry_changed(0, trial_objective=None),
+            "a worse journalled point accepted": lambda h: [self.worse_trial(run, True)] + h,
+        }
+        for name, change in cases.items():
+            with self.subTest(case=name):
+                forged = with_history(run.evidence.campaign_journal, change)
+                self.refused(run.definition, [run.item], forged, run.evidence.pipeline_journals)
+                self.assert_nothing_released(self.judge(evidence=with_journal(run.evidence, campaign_journal=forged)),
+                                             ReadinessRefusal.JACOBIAN_INCONSISTENT)
+
+    def test_the_next_entry_follows_the_decision(self):
+        run = self.base
+        genuine = self.history(run.evidence)
+        increased = genuine[0]["mu"] * run.definition.lm.mu_increase
+        cases = {
+            # a consistent rejection of a genuinely worse point, then the next attempt without the increased damping
+            "rejection without increased damping": lambda h: [self.worse_trial(run, False)] + h,
+            # ... or from another (journalled) point than the rejected trial's
+            "rejection that moves the point": lambda h: [self.worse_trial(run, False), dict(
+                h[0], mu=increased, x=h[0]["trial_x"], objective_before=h[1]["objective_before"])] + h[1:],
+            "acceptance without the next iteration": entry_changed(len(genuine) - 1,
+                                                                   iteration=genuine[0]["iteration"]),
+            "acceptance without decreased damping": entry_changed(len(genuine) - 1, mu=genuine[0]["mu"]),
+            "acceptance without moving to the trial point": entry_changed(
+                len(genuine) - 1, x=genuine[0]["x"], objective_before=genuine[0]["objective_before"]),
+        }
+        for name, change in cases.items():
+            with self.subTest(case=name):
+                forged = with_history(run.evidence.campaign_journal, change)
+                refusal = self.refused(run.definition, [run.item], forged, run.evidence.pipeline_journals)
+                self.assertIn("does not follow", str(refusal))
+
+    def test_material_identification_refuses_an_inconsistent_decision(self):
+        material = MaterialPathTests.material_run(self, (0.02, 1.0))
+        history = self.history(material.evidence)
+        self.assertEqual((history[0]["accepted"], history[0]["note"]), (True, "accepted"))
+        for name, change in (("noted rejected", entry_changed(0, note="rejected")),
+                             ("recorded as rejected", entry_changed(0, accepted=False, note="rejected"))):
+            with self.subTest(case=name):
+                forged = with_history(material.evidence.campaign_journal, change)
+                self.refused(material.definition, material.specimens, forged, material.evidence.pipeline_journals)
+                readiness = judge_campaign_run(material.definition, material.specimens,
+                                               with_journal(material.evidence, campaign_journal=forged))
+                self.assertIs(readiness.status, ReadinessStatus.NOT_READY)
+                self.assertEqual(readiness.refusal_codes, (ReadinessRefusal.JACOBIAN_INCONSISTENT.value,))
+                self.assertIsNone(readiness.to_dict()["material_formal_output"])
+
+    def test_archived_real_journals_refuse_an_inconsistent_decision(self):
+        """READ-ONLY (store-gated): the archived RUN_A / RUN_B campaign journals with one LM decision changed."""
+        for run in ("A", "B"):
+            definition, specimens, evidence = archived_run(self, run)
+            for name, change in (("noted rejected", entry_changed(0, note="rejected")),
+                                 ("recorded as rejected", entry_changed(0, accepted=False, note="rejected"))):
+                with self.subTest(run=run, case=name):
+                    forged = with_history(evidence.campaign_journal, change)
+                    self.refused(definition, specimens, forged, evidence.pipeline_journals)
+                    readiness = judge_campaign_run(definition, specimens, with_journal(evidence, campaign_journal=forged))
+                    self.assertIs(readiness.status, ReadinessStatus.NOT_READY)
+                    self.assertIsNone(readiness.to_dict()["material_formal_output"])
 
 
 # ----------------------------------------------------------------------------- the end-to-end negative matrix
