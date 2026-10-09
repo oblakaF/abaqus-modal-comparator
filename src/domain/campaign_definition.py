@@ -13,6 +13,14 @@ The definition is data (schema ``auto-id/identification-campaign/v1``), parsed s
 - numerical search bounds (solver only) and an engineering plausibility window (reporting only);
 - an LM evaluation budget and a hard Abaqus solve budget.
 
+SPEC v1.2 (D-078, V12-I1) adds schema ``auto-id/identification-campaign/v1.2``, which must declare its
+``scientific_question`` (MATERIAL_IDENTIFICATION or SPECIMEN_ENGINEERING_CALIBRATION) and ``tau_mf``
+(0 < τ_mf ≤ 0.02) explicitly; both are part of the campaign identity.  A calibration campaign has exactly one
+physical specimen; a material-identification campaign keeps at least two.  Neither field is inferred, and a ``v1``
+definition carries neither, so historical identities are unchanged.  τ_mf is declared only: nothing uses it
+numerically yet (V12-I2).  Calibration execution is refused until its gate exists (V12-I3); there is no fallback
+to material identification.
+
 Nothing here runs a solve.
 """
 
@@ -28,6 +36,13 @@ from .forward_model_manifest import PARAMETERISATIONS, canonical_hash
 
 
 CAMPAIGN_SCHEMA = "auto-id/identification-campaign/v1"
+CAMPAIGN_SCHEMA_V1_2 = "auto-id/identification-campaign/v1.2"  # SPEC v1.2 (D-078): question and τ_mf declared
+CAMPAIGN_SCHEMAS = (CAMPAIGN_SCHEMA, CAMPAIGN_SCHEMA_V1_2)
+MATERIAL_IDENTIFICATION = "MATERIAL_IDENTIFICATION"
+SPECIMEN_ENGINEERING_CALIBRATION = "SPECIMEN_ENGINEERING_CALIBRATION"
+SCIENTIFIC_QUESTIONS = (MATERIAL_IDENTIFICATION, SPECIMEN_ENGINEERING_CALIBRATION)
+TAU_MF_MAXIMUM = 0.02  # SPEC v1.2 §3: specification maximum of τ_mf in |Δ ln f|
+CALIBRATION_NOT_IMPLEMENTED = "SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED"
 ARCHIVE_REUSE_SCHEMA = "auto-id/campaign-archive-reuse/v1"
 RUN_A = "RUN_A"
 RUN_B = "RUN_B"
@@ -62,6 +77,15 @@ class RunGateRefusal(Exception):
 
     Not a ValueError, so generic fallback handlers never swallow it.
     """
+
+
+class CalibrationNotImplementedRefusal(Exception):
+    """A SPECIMEN_ENGINEERING_CALIBRATION campaign cannot execute: its gate is not implemented (V12-I3).
+
+    Not a ValueError, so generic fallback handlers never swallow it; never rerouted to material identification.
+    """
+
+    state = CALIBRATION_NOT_IMPLEMENTED
 
 
 def _fail(field: str, message: str):
@@ -220,6 +244,9 @@ class CampaignDefinition:
     provenance: tuple[str, ...]
     canonical: Mapping[str, Any]
     family_consistency_policy: Optional[FamilyConsistencyPolicy] = None  # None: not declared (pre-D-076)
+    schema: str = CAMPAIGN_SCHEMA
+    scientific_question: Optional[str] = None  # v1.2 only; None for v1 (no implicit question)
+    tau_mf: Optional[float] = None  # v1.2 only; declared, identity-bound, not yet used (V12-I2)
 
     @property
     def campaign_hash(self) -> str:
@@ -239,7 +266,16 @@ class CampaignDefinition:
     def holdout_term_ids(self) -> tuple[str, ...]:
         return tuple(s.term_id(r) for s in self.specimens for r in s.holdout_rows)
 
+    def require_question_supported(self) -> "CampaignDefinition":
+        if self.scientific_question == SPECIMEN_ENGINEERING_CALIBRATION:
+            raise CalibrationNotImplementedRefusal(
+                f"{CALIBRATION_NOT_IMPLEMENTED}: the specimen-calibration gate (SPEC v1.2 §6) is not implemented "
+                "before V12-I3; no calibration value is produced and the campaign is not run as material "
+                "identification (no fallback).")
+        return self
+
     def require_executable(self) -> "CampaignDefinition":
+        self.require_question_supported()
         if self.run_type == RUN_B and not self.run_b_gate:
             raise RunGateRefusal(f"{RUN_B} ({RUN_B_LABEL}) is diagnostic only and needs its own later SUPERVISOR "
                                  "gate after RUN_A; it is not executable.")
@@ -291,11 +327,29 @@ def _family_consistency_policy(value: object) -> FamilyConsistencyPolicy:
     return FamilyConsistencyPolicy(samples, seed)
 
 
+def _scientific_question(value: object) -> str:
+    if not isinstance(value, str) or value not in SCIENTIFIC_QUESTIONS:
+        _fail("scientific_question", f"must be one of {SCIENTIFIC_QUESTIONS}, declared explicitly.")
+    return value
+
+
+def _tau_mf(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) \
+            or not 0.0 < float(value) <= TAU_MF_MAXIMUM:
+        _fail("tau_mf", f"must be a finite number with 0 < tau_mf <= {TAU_MF_MAXIMUM} (SPEC v1.2 §3), declared "
+                        "explicitly.")
+    return float(value)
+
+
 def parse_campaign_definition(data: object) -> CampaignDefinition:
+    if isinstance(data, Mapping) and data.get("schema") not in CAMPAIGN_SCHEMAS:
+        _fail("schema", f"must be one of {CAMPAIGN_SCHEMAS}.")
+    schema = data.get("schema") if isinstance(data, Mapping) else None
     optional = {"family_consistency"} & set(data) if isinstance(data, Mapping) else set()
-    data = _mapping(data, "campaign", _TOP_KEYS | optional)
-    if data["schema"] != CAMPAIGN_SCHEMA:
-        _fail("schema", f"must be {CAMPAIGN_SCHEMA!r}.")
+    declared = {"scientific_question", "tau_mf"} if schema == CAMPAIGN_SCHEMA_V1_2 else set()  # v1.2: mandatory
+    data = _mapping(data, "campaign", _TOP_KEYS | optional | declared)
+    question = _scientific_question(data["scientific_question"]) if declared else None
+    tau_mf = _tau_mf(data["tau_mf"]) if declared else None
     campaign_id = _text(data["campaign_id"], "campaign_id")
     if not _IDENTIFIER.match(campaign_id):
         _fail("campaign_id", "must use letters, digits, '.', '_', '-', '+' or '/'.")
@@ -372,7 +426,11 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
         _fail("not_fitted", "must state t_face, k_core and k_int explicitly.")
     not_fitted = {k: _text(v, f"not_fitted.{k}") for k, v in sorted(not_fitted.items())}
 
-    if not isinstance(data["specimens"], list) or len(data["specimens"]) < 2:
+    if question == SPECIMEN_ENGINEERING_CALIBRATION:  # SPEC v1.2 §6: one physical specimen
+        if not isinstance(data["specimens"], list) or len(data["specimens"]) != 1:
+            _fail("specimens", f"{SPECIMEN_ENGINEERING_CALIBRATION} requires exactly one physical specimen under "
+                               "SPEC v1.2 / D-078.")
+    elif not isinstance(data["specimens"], list) or len(data["specimens"]) < 2:  # v1 and v1.2 material campaigns
         _fail("specimens", "a campaign needs at least two specimens.")
     specimens = []
     for index, item in enumerate(data["specimens"]):
@@ -401,7 +459,7 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
     provenance = tuple(_text(p, "provenance[]") for p in provenance)
 
     canonical = {
-        "schema": CAMPAIGN_SCHEMA, "campaign_id": campaign_id, "run_type": run_type, "decision": decision,
+        "schema": schema, "campaign_id": campaign_id, "run_type": run_type, "decision": decision,
         "parameterisation": parameterisation_id, "fitted_parameters": list(fitted), "fixed_parameters": fixed,
         "start": start, "bounds": {k: list(v) for k, v in bounds.items()},
         "engineering_plausibility": {k: list(v) for k, v in plausibility.items()},
@@ -421,9 +479,13 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
     if "family_consistency" in data:  # identity-bound only when declared: older definitions keep their hash
         policy = _family_consistency_policy(data["family_consistency"])
         canonical["family_consistency"] = policy.to_dict()
+    if declared:  # v1.2 identity: the question and τ_mf (a v1 canonical form is unchanged)
+        canonical["scientific_question"] = question
+        canonical["tau_mf"] = tau_mf
     return CampaignDefinition(campaign_id, run_type, decision, parameterisation_id, fitted, fixed, start, bounds,
                               plausibility, preferred, acceptable, sigma_state, lm_config, solve_budget, not_fitted,
-                              tuple(specimens), archive_reuse, run_b_gate, provenance, canonical, policy)
+                              tuple(specimens), archive_reuse, run_b_gate, provenance, canonical, policy, schema,
+                              question, tau_mf)
 
 
 def load_campaign_definition(path) -> CampaignDefinition:

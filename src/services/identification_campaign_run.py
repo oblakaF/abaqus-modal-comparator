@@ -15,7 +15,8 @@ bounded LM (``run_bounded_lm``); no second optimiser exists.  Σ is explicit: Σ
 
 Execution needs the HUMAN gate: the authorised manifest hash must equal the planned one, and the hard
 Abaqus solve budget stops the run (``SOLVE_BUDGET``) without extension.  RUN_B is refused here unless
-its own later SUPERVISOR gate exists (``CampaignDefinition.require_executable``).
+its own later SUPERVISOR gate exists (``CampaignDefinition.require_executable``).  A SPEC v1.2
+specimen-calibration campaign is refused here and in the report until V12-I3 (no fallback).
 """
 
 from __future__ import annotations
@@ -333,7 +334,7 @@ def campaign_run_identity(definition: CampaignDefinition, specimens: Sequence[Ca
 class CampaignRun:
     def __init__(self, definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
                  manifest_hash: str, config: CampaignRunConfig) -> None:
-        definition.require_executable()  # RUN_B needs its own later SUPERVISOR gate
+        definition.require_executable()  # RUN_B needs its own later SUPERVISOR gate; calibration refused (V12-I3)
         if config.authorised_manifest_hash != manifest_hash:
             raise CampaignGateRefusal("the HUMAN gate authorised another manifest; nothing is executed.")
         if [item.label for item in specimens] != [s.label for s in definition.specimens]:
@@ -861,6 +862,7 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
     against RUN_A are reported in ln p with the descriptive D-045 bands.
     """
 
+    definition.require_question_supported()  # no effective-estimate report for a calibration campaign (V12-I3)
     status = result["status"]
     parameters = result.get("parameters")
     final = start = None

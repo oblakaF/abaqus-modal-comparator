@@ -683,12 +683,21 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
 
 | Id | Step | Status |
 |---|---|---|
-| V12-I1 | Campaign / run question (MATERIAL_IDENTIFICATION | SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf schema, both declared before execution and bound into the campaign / run identity | `TODO` |
+| V12-I1 | Campaign / run question (MATERIAL_IDENTIFICATION or SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf schema, both declared before execution and bound into the campaign / run identity | `REVIEW_READY` |
 | V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `TODO` |
 | V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `TODO` |
 | V12-I4 | Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer) | `TODO` |
 | V12-I5 | Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable) | `TODO` |
 | V12-I6 | Integration into GUI / backend readiness (the same backend services; no install_* layer) | `TODO` |
+
+- **Normative acceptance merged:** PR #42 (`auto-id/spec-v1.2-acceptance` → `main`), merge commit `61b5016`.
+- **V12-I1 (REVIEW_READY, branch `auto-id/v12-i1` from `61b5016`):** campaign schema
+  `auto-id/identification-campaign/v1.2` with mandatory `scientific_question` and `tau_mf` (0 < τ_mf ≤ 0.02), both in
+  the campaign identity; specimen cardinality by question (v1 and v1.2 MATERIAL_IDENTIFICATION ≥ 2, v1.2
+  SPECIMEN_ENGINEERING_CALIBRATION exactly 1); v1 definitions and the M7 identities unchanged; calibration
+  execution refused with
+  `SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED` until V12-I3; τ_mf has no numerical effect until V12-I2.
+  Production v1.2 implementation remains incomplete.
 
 **V12 GATE:** production code enforces the D-078 rules with negative tests (no fallback, τ_mf outside Σ / uncertainty /
 §13, refusals without released values) before any SP10, t_face or other new FE calculation.
