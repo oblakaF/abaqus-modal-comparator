@@ -87,6 +87,8 @@ from .practical_identifiability import (
     ObservationCovariance,
     ParameterDefinition,
     ParameterRole,
+    PracticalSystem,
+    ReconstructedJacobian,
     assemble_system,
     build_sensitivity_matrix,
     diagonal_component,
@@ -717,25 +719,53 @@ def _family_guard(document: Mapping, source: str) -> GuardEvidence:
     return GuardEvidence("family_consistency", state, source, detail)
 
 
-def _campaign_m5(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
-                 evaluations: Sequence[Mapping], result: Mapping, final: Mapping) -> tuple[dict, Optional[dict], dict]:
-    """The M5 verdict record, the M5 model_form_robustness record (None when M5 computed none) and the SPEC §13
-    family-consistency record."""
+def campaign_m5_system(definition: CampaignDefinition, jacobian: ReconstructedJacobian,
+                       term_ids: Sequence[str]) -> PracticalSystem:
+    """The M5 system at p̂: the reconstructed whitened LM Jacobian (rows ``term_ids``, columns the fitted parameters,
+    in definition order) with the governed Σ_setup; Σ_meas NOT_AVAILABLE has no component (never zero)."""
 
     names = definition.fitted_parameters
     sigma = definition.sigma.setup_sd_ln
-    usable = [e for e in evaluations if e.get("residuals") is not None]
-    jacobian = reconstruct_lm_jacobian(usable, result["history"], definition.start, names,
-                                       definition.lm.finite_difference_step)
     whitened = np.array(jacobian.whitened)
-    terms = definition.fit_term_ids()
+    terms = tuple(term_ids)
+    if tuple(jacobian.parameter_ids) != tuple(names) or whitened.shape != (len(terms), len(names)):
+        raise CampaignError("the reconstructed Jacobian does not have the campaign's FIT terms × fitted parameters.")
     data = {term: {n: float(whitened[i, j]) * sigma for j, n in enumerate(names)} for i, term in enumerate(terms)}
     parameters = tuple(ParameterDefinition(n, ParameterRole.GLOBAL) for n in names)
     matrix = build_sensitivity_matrix(data, terms, [], parameters, {n: jacobian.provenance for n in names})
     covariance = ObservationCovariance(matrix.term_ids, (diagonal_component(
         "sigma_setup", matrix.term_ids, {t: sigma for t in matrix.term_ids}, definition.sigma.setup_provisional,
         f"{definition.sigma.setup_source}; Σ_meas {NOT_AVAILABLE}: no component (never zero)"),))
-    system = assemble_system(matrix, covariance, ())
+    return assemble_system(matrix, covariance, ())
+
+
+def campaign_guards(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
+                    evaluations: Sequence[Mapping]) -> tuple[GuardEvidence, GuardEvidence, GuardEvidence]:
+    """The registration, peak-derived-input and tracking guards of a campaign journal (M7; unchanged)."""
+
+    refusals = [e for e in evaluations if e.get("refusal") is not None]
+    source = f"campaign journal {definition.campaign_id}"
+    return (GuardEvidence("registration", EvidenceState.FAIL if any(i.registration_limited for i in specimens)
+                          else EvidenceState.PASS, "; ".join(i.registration_evidence_source for i in specimens),
+                          "M2.4 registration_limited per specimen"),
+            GuardEvidence("peak_derived_input", EvidenceState.PASS,
+                          "fixtures: PolyMAX curve-fitted dataset-55 modal sets", "no peak-derived modes"),
+            GuardEvidence("tracking", EvidenceState.FAIL if refusals else EvidenceState.PASS, source,
+                          f"{len(refusals)} refused campaign evaluation(s)"))
+
+
+def _campaign_m5(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
+                 evaluations: Sequence[Mapping], result: Mapping, final: Mapping) -> tuple[dict, Optional[dict], dict]:
+    """The M5 verdict record, the M5 model_form_robustness record (None when M5 computed none) and the SPEC §13
+    family-consistency record."""
+
+    names = definition.fitted_parameters
+    usable = [e for e in evaluations if e.get("residuals") is not None]
+    jacobian = reconstruct_lm_jacobian(usable, result["history"], definition.start, names,
+                                       definition.lm.finite_difference_step)
+    whitened = np.array(jacobian.whitened)
+    terms = definition.fit_term_ids()
+    system = campaign_m5_system(definition, jacobian, terms)
     families = {item.spec.term_id(row): family for item in specimens for row, family in item.families.items()}
     # Each term's governed σ is the σ its specimen objective whitened with (specimen_pipeline_config: row_sigma per
     # frozen row); the campaign has no cluster terms.  Δ ln f = r·σ_term (SPEC v1.2 §4).
@@ -751,20 +781,13 @@ def _campaign_m5(definition: CampaignDefinition, specimens: Sequence[CampaignSpe
     macs = {}
     for item in specimens:
         macs.update(item.fit_pair_macs())
-    refusals = [e for e in evaluations if e.get("refusal") is not None]
     source = f"campaign journal {definition.campaign_id}"
     inputs = VerdictInputs(
         VerdictContext.PRODUCTION, label, chain.analysis, chain.statistical, chain.pattern, chain.birge,
         chain.robustness,
         fitting_pair_mac_evidence(macs, "frozen physical strict pairs (baseline MAC); identity at p̂ by FE-to-FE "
                                         "tracking MAC ≥ 0.90"),
-        GuardEvidence("registration", EvidenceState.FAIL if any(i.registration_limited for i in specimens)
-                      else EvidenceState.PASS, "; ".join(i.registration_evidence_source for i in specimens),
-                      "M2.4 registration_limited per specimen"),
-        GuardEvidence("peak_derived_input", EvidenceState.PASS, "fixtures: PolyMAX curve-fitted dataset-55 modal sets",
-                      "no peak-derived modes"),
-        GuardEvidence("tracking", EvidenceState.FAIL if refusals else EvidenceState.PASS, source,
-                      f"{len(refusals)} refused campaign evaluation(s)"),
+        *campaign_guards(definition, specimens, evaluations),
         _family_guard(consistency, source),
         SandwichG12Evidence("G12_mpa" in names, EvidenceState.NOT_AVAILABLE, ("k_core",), {"k_core": NuisanceConstraint(
             "k_core", False, True, False, "no independent k_core prior (M6.3 NOT_AVAILABLE, D-059)")},

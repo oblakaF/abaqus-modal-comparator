@@ -60,7 +60,8 @@ TAU_MF_MODULES = ("domain/campaign_definition.py", "services/identification_unce
                   "services/identification_verdict.py", "services/identification_campaign_run.py",
                   "services/specimen_calibration_gate.py",  # + the pure calibration gate (V12-I3)
                   "services/specimen_calibration_output.py",  # + the calibration output service (V12-I4)
-                  "services/candidate_evaluation_evidence.py")  # + the candidate-evaluation evidence (V12-I5)
+                  "services/candidate_evaluation_evidence.py",  # + the candidate-evaluation evidence (V12-I5)
+                  "services/campaign_scientific_backend.py")  # + the one read-only backend path (V12-I6)
 
 
 def v12_definition(question=MATERIAL_IDENTIFICATION, tau_mf=0.02, **changes) -> dict:
@@ -302,15 +303,18 @@ class CalibrationRefusalTests(_Campaigns):
         campaign, result = self.execute(material, "material")
         report = build_campaign_report(material, campaign.specimens, campaign.journal.records("evaluation"), result)
         self.assertNotIn(SPECIMEN_ENGINEERING_CALIBRATION, json.dumps(report, default=str))
-        # The question constant appears only in the schema module, the pure V12-I3 gate and the V12-I4 output
-        # service; no execution path imports them (production calibration execution stays blocked).
+        # The question constant appears only in the schema module, the pure V12-I3 gate, the V12-I4 output service
+        # and the read-only V12-I6 backend that judges journalled runs; no execution path imports them (production
+        # calibration execution stays blocked).
         users = [p.relative_to(ROOT / "src").as_posix() for p in (ROOT / "src").rglob("*.py")
                  if SPECIMEN_ENGINEERING_CALIBRATION in p.read_text(encoding="utf-8")]
-        self.assertEqual(sorted(users), ["domain/campaign_definition.py", "services/specimen_calibration_gate.py",
+        self.assertEqual(sorted(users), ["domain/campaign_definition.py", "services/campaign_scientific_backend.py",
+                                         "services/specimen_calibration_gate.py",
                                          "services/specimen_calibration_output.py"])
+        backend = "campaign_scientific_backend.py"
         for module, allowed in (("specimen_calibration_gate", {"specimen_calibration_gate.py",
-                                                               "specimen_calibration_output.py"}),
-                                ("specimen_calibration_output", {"specimen_calibration_output.py"})):
+                                                               "specimen_calibration_output.py", backend}),
+                                ("specimen_calibration_output", {"specimen_calibration_output.py", backend})):
             importers = [p.name for p in (ROOT / "src").rglob("*.py") if p.name not in allowed
                          and module in p.read_text(encoding="utf-8")]
             self.assertEqual(importers, [], module)

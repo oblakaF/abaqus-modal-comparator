@@ -1402,7 +1402,9 @@ class ProductionRefusalTests(unittest.TestCase):
             users = sorted(p.relative_to(ROOT).as_posix() for folder in ("src", "tools") for p in
                            (ROOT / folder).rglob("*.py") if module in p.read_text(encoding="utf-8")
                            and p.stem not in ("specimen_calibration_gate", "specimen_calibration_output"))
-            self.assertEqual(users, [], module)  # only the pure I3 / I4 services; no CLI, GUI or run wiring
+            # only the pure I3 / I4 services and the read-only V12-I6 backend (it judges journalled runs and executes
+            # nothing: test_v12_i6_backend_integration.ExecutionSafetyTests); no run wiring
+            self.assertEqual(users, ["src/services/campaign_scientific_backend.py"], module)
 
 
 def tearDownModule():

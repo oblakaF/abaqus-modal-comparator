@@ -1007,6 +1007,24 @@ def data_readiness_view(app) -> dict[str, object]:
     }
 
 
+def scientific_readiness_view(app) -> dict[str, object]:
+    """Present a stored SPEC v1.2 scientific readiness record (V12-I6) without judging anything.
+
+    The record is produced by the shared backend (``services.campaign_scientific_backend``); its display rows come
+    from the same backend, so the GUI never evaluates, converts or fills in a scientific state.
+    """
+
+    from services.campaign_scientific_backend import readiness_presentation
+
+    record = getattr(app, "scientific_readiness_record", None)
+    rows = readiness_presentation(record) if isinstance(record, Mapping) else ()
+    return {
+        "available": bool(rows),
+        "status": dict(rows).get("Readiness") or "NOT AVAILABLE",
+        "rows": rows,
+    }
+
+
 def _build_project_evidence_page(app, page) -> None:
     section = ttk.LabelFrame(page, text="1. Project Evidence", padding=16)
     section.pack(fill="both", expand=True)
@@ -1194,6 +1212,23 @@ def _build_data_readiness_page(app, page) -> None:
         (220, 100, 350),
         height=5,
     )
+    scientific = ttk.LabelFrame(
+        page, text="Scientific readiness (SPEC v1.2, read-only)", padding=8
+    )
+    scientific.pack(fill="both", expand=True, pady=(8, 0))
+    app.material_scientific_readiness_status_label = ttk.Label(
+        scientific,
+        text="NOT AVAILABLE",
+        style="MetricValue.TLabel",
+    )
+    app.material_scientific_readiness_status_label.pack(anchor="w", pady=(0, 4))
+    app.material_scientific_readiness_table = _build_read_only_table(
+        scientific,
+        ("item", "state"),
+        ("Item", "Stored backend record"),
+        (220, 820),
+        height=13,
+    )
     ttk.Label(
         page,
         text=(
@@ -1222,6 +1257,12 @@ def _refresh_data_readiness_page(app) -> None:
     app.material_readiness_empty_label.configure(
         text="" if view["available"] else "No data-readiness evidence available."
     )
+    if hasattr(app, "material_scientific_readiness_table"):
+        scientific = scientific_readiness_view(app)
+        _replace_table_rows(app.material_scientific_readiness_table, scientific["rows"])
+        app.material_scientific_readiness_status_label.configure(
+            text=scientific["status"]
+        )
 
 
 def _build_modal_correspondence_page(app, page) -> None:
