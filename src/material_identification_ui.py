@@ -1021,9 +1021,17 @@ def scientific_readiness_view(app) -> dict[str, object]:
     from services.campaign_scientific_backend import readiness_presentation
 
     record = getattr(app, "scientific_readiness_record", None)
+    evaluated, current = None, None
+    if record is not None and getattr(app, "auto_id_evaluated_record", None) is record:
+        # M8.3: a record this GUI evaluated is current only for the exact journal and run of its successful evaluation
+        active = getattr(app, "auto_id_active_evaluation", None)
+        current = active is not None and active[2] is record \
+            and active[0] == getattr(app, "auto_id_selected_run_path", None) \
+            and active[1] == getattr(app, "auto_id_selected_run_hash", None)
+        evaluated = active[1] if current else None
     selection = readiness_selection(getattr(app, "auto_id_source", None) is not None,
                                     getattr(app, "auto_id_preparation", None), record,
-                                    getattr(app, "auto_id_selected_run_hash", None))
+                                    getattr(app, "auto_id_selected_run_hash", None), evaluated, current)
     rows = readiness_presentation(record) if selection.show_record and isinstance(record, Mapping) else ()
     if rows:
         status = dict(rows).get("Readiness") or "NOT AVAILABLE"
@@ -1058,6 +1066,7 @@ def load_auto_id_source(app, kind: str, path: str) -> None:
     from services.auto_id_wizard import prepare_family, prepare_specimen_folder, wizard_summary
 
     app.auto_id_source = (kind, str(path))
+    _clear_auto_id_run(app)  # M8.3: a run belongs to one campaign selection; a new selection resets it
     try:
         roots = fixture_roots_from_environment()
         if kind == "family":
@@ -1071,6 +1080,85 @@ def load_auto_id_source(app, kind: str, path: str) -> None:
     app.auto_id_summary = summary
     _refresh_auto_id_setup_page(app)
     _refresh_data_readiness_page(app)  # M8.2: the readiness shown follows the new selection at once
+
+
+AUTO_ID_EVALUATE_LABEL = "Auto-ID — Evaluate Stored Run"
+AUTO_ID_NO_RUN = "No stored run selected."
+
+
+def _clear_auto_id_run(app) -> None:
+    app.auto_id_active_evaluation = None  # no earlier evaluation is current for a new selection
+    app.auto_id_selected_run_path = None
+    app.auto_id_selected_run_hash = None
+    app.auto_id_run_message = AUTO_ID_NO_RUN
+
+
+def select_auto_id_run(app, journal_path) -> None:
+    """Select an existing journalled campaign run explicitly (read-only; nothing is evaluated yet)."""
+
+    from services.stored_run_evidence import StoredRunRefusal, select_stored_run
+
+    _clear_auto_id_run(app)
+    try:
+        run = select_stored_run(journal_path)
+    except StoredRunRefusal as refusal:
+        app.auto_id_run_message = f"Run not selected: {refusal}"
+    except Exception as error:  # never a GUI crash
+        app.auto_id_run_message = f"Run not selected: {error}"
+    else:
+        app.auto_id_selected_run_path = str(run.journal_path)
+        app.auto_id_selected_run_hash = run.run_hash
+        app.auto_id_run_message = f"Selected run {run.run_hash[:12]} ({run.journal_path}); not evaluated yet."
+    _refresh_auto_id_setup_page(app)
+    _refresh_data_readiness_page(app)
+
+
+def evaluate_auto_id_run(app) -> None:
+    """"Auto-ID — Evaluate Stored Run": judge the selected journalled run of the selected governed campaign with the
+    shared backend (read-only). The backend's readiness record is stored unchanged and shown, selection-bound, on the
+    Data Readiness Check page; nothing is solved, executed or written."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+    from services.auto_id_wizard import FamilyPreparation
+    from services.stored_run_evidence import StoredRunRefusal, evaluate_stored_run
+
+    app.auto_id_active_evaluation = None  # invalidated before any attempt; only a returned result becomes current
+    preparation = getattr(app, "auto_id_preparation", None)
+    definition = preparation.definition if isinstance(preparation, FamilyPreparation) else None
+    run_path = getattr(app, "auto_id_selected_run_path", None)
+    if definition is None:
+        app.auto_id_run_message = ("No evaluation: select a governed family / campaign definition (a specimen folder "
+                                   "declares no campaign).")
+    elif run_path is None:
+        app.auto_id_run_message = "No evaluation: select the journal of an existing run of this campaign."
+    else:
+        try:
+            evaluation = evaluate_stored_run(definition, run_path, AUTO_ID_REPO_ROOT,
+                                             fixture_roots_from_environment())
+        except StoredRunRefusal as refusal:
+            app.auto_id_run_message = f"No evaluation: {refusal}"
+        except Exception as error:  # an unexpected evidence problem is reported, never a GUI crash
+            app.auto_id_run_message = f"No evaluation: the stored run could not be evaluated ({error})"
+        else:
+            record = evaluation.readiness.to_dict()
+            app.scientific_readiness_record = record
+            app.auto_id_evaluated_record = record
+            app.auto_id_evaluated_run_hash = evaluation.run.run_hash
+            app.auto_id_active_evaluation = (run_path, evaluation.run.run_hash, record)
+            notes = f" Loading notes: {'; '.join(evaluation.notes)}." if evaluation.notes else ""
+            app.auto_id_run_message = (f"Evaluated stored run {evaluation.run.run_hash[:12]} with the shared backend: "
+                                       f"{record['status']} (see Data Readiness Check).{notes}")
+    _refresh_auto_id_setup_page(app)
+    _refresh_data_readiness_page(app)
+
+
+def _choose_auto_id_run(app) -> None:
+    path = filedialog.askopenfilename(
+        title="Stored campaign run journal (campaign/<run hash>/journal.json)",
+        filetypes=(("Run journal", "journal.json"), ("JSON", "*.json")),
+    )
+    if path:
+        select_auto_id_run(app, path)
 
 
 def _choose_auto_id_source(app, kind: str) -> None:
@@ -1115,6 +1203,20 @@ def _build_auto_id_setup_page(app, page) -> None:
         text="Select family / campaign definition...",
         command=lambda: _choose_auto_id_source(app, "family"),
     ).pack(side="left", padx=(8, 0))
+    run_buttons = ttk.Frame(page)
+    run_buttons.pack(anchor="w", pady=(0, 8))
+    ttk.Button(
+        run_buttons,
+        text="Select stored run journal...",
+        command=lambda: _choose_auto_id_run(app),
+    ).pack(side="left")
+    ttk.Button(
+        run_buttons,
+        text=AUTO_ID_EVALUATE_LABEL,
+        command=lambda: evaluate_auto_id_run(app),
+    ).pack(side="left", padx=(8, 0))
+    app.material_auto_id_run_label = ttk.Label(page, text=AUTO_ID_NO_RUN, justify="left", wraplength=1100)
+    app.material_auto_id_run_label.pack(anchor="nw", fill="x", pady=(0, 4))
     app.material_auto_id_source_label = ttk.Label(page, text="", justify="left", wraplength=1100)
     app.material_auto_id_source_label.pack(anchor="nw", fill="x")
     app.material_auto_id_summary_label = ttk.Label(
@@ -1148,6 +1250,8 @@ def _refresh_auto_id_setup_page(app) -> None:
     _replace_table_rows(app.material_auto_id_table, view["rows"])
     app.material_auto_id_summary_label.configure(text=view["summary"])
     app.material_auto_id_source_label.configure(text=view["source"])
+    if hasattr(app, "material_auto_id_run_label"):
+        app.material_auto_id_run_label.configure(text=getattr(app, "auto_id_run_message", None) or AUTO_ID_NO_RUN)
 
 
 def _build_project_evidence_page(app, page) -> None:

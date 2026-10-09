@@ -4472,3 +4472,51 @@ first internal provider.
   `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #52.
+
+## 2026-10-09 — M8.2 ACCEPTED and merged (PR #52); M8.3 — one Auto-ID action: Evaluate Stored Run (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS); M8.1, M8.2 ACCEPTED; mini-step M8.3 only
+- **M8.2 merge:** PR #52 `auto-id/m8-2` → `main`, reviewed head `1208562984bc654c1247959b189f72628f8b1d2a`, merge commit `3bf50677bed13a2222c110eb5312329b51e44975`
+  (tree `36e482b14ad94686f961fab2d4ac78f16648312b`, identical to the reviewed head). Linux CI on main 3bf5067: success (run 37948118759). SUPERVISOR-authorised.
+- **M8.3 status:** REVIEW_READY — branch `auto-id/m8-3` from `3bf5067` (PR #53), exclusive worktree.
+- **Commits:** `1970791` evaluate-stored-run action; this governance commit.
+- **Action:** "Auto-ID — Evaluate Stored Run" (with "Select stored run journal...") on the Auto-ID Setup page. It needs
+  a governed campaign selected through M8.1 and an explicitly selected `<run root>/campaign/<run hash>/journal.json`;
+  no newest run, first directory or matching file name is chosen.
+- **Adapter:** `services/stored_run_evidence.py` — read-only over the accepted journal layout; no new evidence schema.
+  Journal format, directory = run hash and campaign hash = the selected campaign's (otherwise no evaluation); governed
+  specimen inputs from `prepare_campaign_specimens` (no Abaqus); pipeline journals located by the hash of their governed
+  pipeline identity; journalled FE packs via the verifying `load_run_pack`; pinned source INP read with SHA-256
+  verified; missing parts left missing and noted. `CampaignRunEvidence` → `judge_campaign_run` (the only judgement).
+- **GUI:** the backend's `ScientificReadiness` record is stored unchanged and shown through the M8.2 selection-aware
+  Data Readiness Check, bound to the evaluated run: shown only while that run is selected; a new campaign selection
+  resets the selected run; another run never shows it.
+- **Outcomes (archived, read-only):** RUN_A REFUSED — NO_GLOBAL_PARAMETER_VALUE with SPEC §13 FAIL; RUN_B REFUSED —
+  NO_GLOBAL_PARAMETER_VALUE, diagnostic-only candidate, no released value.
+- **Fail-closed:** no campaign, specimen folder only, no run, run of another campaign, unreadable or non-campaign journal
+  → no evaluation; corrupted hash chain, run of other specimen inputs, missing pipeline journal, missing FE pack or
+  missing pinned INP → the backend's typed NOT_READY; confirmed cluster → CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE.
+- **Not called:** CampaignRun.run / evaluate, run_bounded_lm, prepare_run_manifest, extraction, Abaqus, solver
+  processes; no file written; `require_executable` unchanged.
+- **Tests:** test_m8_3_evaluate_stored_run 20 tests (3 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1 / M8.2 tests retained; focused M8.3 / M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 406 OK; full suite without data stores 1892 OK (77 skipped); full suite with all data stores 1906 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at
+  `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #53.
+
+## 2026-10-10 — M8.3 — UI freshness correction (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID, mini-step M8.3 (SUPERVISOR final GUI state correction of PR #53 at `42f830e`)
+- **Status:** REVIEW_READY (PR #53 not merged); M8.1, M8.2 ACCEPTED; M8.4..M8.8 TODO
+- **Finding:** after a successful evaluation, a failed re-evaluation of the same (now unreadable) journal, a re-selection
+  of the same run, or another journal path with the same run hash still showed the earlier result as current.
+- **Closure:** presentation validity: the GUI keeps the active evaluation (journal path, run hash, record object), invalidated on every run or campaign selection and before every evaluation attempt; only a result returned by evaluate_stored_run becomes current. A record this GUI evaluated is presented only while it is the active evaluation of exactly the selected journal path and run hash (auto_id_wizard.readiness_selection evaluation_current=False -> NOT_EVALUATED_FOR_SELECTION, no fallback to a campaign-only match); a failed attempt (unreadable journal, adapter error, no campaign or run) shows NOT_EVALUATED_FOR_SELECTION; a genuine backend NOT_READY / REFUSED is displayed as returned; external stored V12-I6 records keep the M8.2 behaviour. Stored records are never changed or deleted; adapter and backend unchanged.
+- **Red-probe:** tests A (failed re-evaluation), B (re-selection), C (same run hash at another path) and F (campaign /
+  run switching ending on the same run) failed before the correction and pass now; D (genuine NOT_READY shown as
+  returned), E (successful re-evaluation shown as a new record) and G (external V12-I6 records, M8.2 behaviour) pass.
+- **Tests:** test_m8_3_evaluate_stored_run 27 tests (3 store-gated archived RUN_A / RUN_B; real-Tk test incl. freshness); freshness tests A-G (+ exact-path validity); M8.1 / M8.2 tests retained; focused M8.3 / M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 413 OK; full suite without data stores 1899 OK (77 skipped); full suite with all data stores 1913 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** SPEC v1.1 / v1.2, V12-I1..I6, LM / Jacobian logic, `ScientificReadiness`, `judge_campaign_run`,
+  `stored_run_evidence`, RUN_A / RUN_B, cluster policy; production calibration execution BLOCKED / NOT_AUTHORISED;
+  `auto-id/m8` at `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #53.

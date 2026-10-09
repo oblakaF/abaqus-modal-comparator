@@ -57,7 +57,7 @@ def run_evidence(campaign: CampaignRun, source_inps: dict) -> CampaignRunEvidenc
 
 
 def calibration_run(tmp: Path, experimental_e: float = TRUTH_E, tau_mf: float = 0.02, definition=None, item=None,
-                    extractor=None, **changes) -> SyntheticRun:
+                    extractor=None, manifest_hash: str = "m" * 64, **changes) -> SyntheticRun:
     definition = definition or parse_campaign_definition(calibration_definition(tau_mf, **changes))
     if item is None:
         item, store = synthetic_specimen(definition, "A", tmp / "data", experimental_e)
@@ -65,9 +65,9 @@ def calibration_run(tmp: Path, experimental_e: float = TRUTH_E, tau_mf: float = 
         store = tmp / "data" / "store"
     solver = FakeSolver()
     config = CampaignRunConfig(tmp / "runs", {"synthetic": store}, "abq2024.bat", solver, extractor or FakeExtractor(),
-                               {}, "m" * 64)
+                               {}, manifest_hash)
     with mock.patch.object(CampaignDefinition, "require_executable", lambda self: self):  # synthetic only (docstring)
-        campaign = CampaignRun(definition, [item], "m" * 64, config)
+        campaign = CampaignRun(definition, [item], manifest_hash, config)
         summary = campaign.run()
     evidence = run_evidence(campaign, {item.label: (store / "models" / "SYA.inp").read_bytes()})
     return SyntheticRun(definition, item, evidence, summary, campaign, solver)
