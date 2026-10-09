@@ -123,6 +123,13 @@
       "pr": 45,
       "merge_commit": "3218663d34aeadb6650ca8cb6af2a9a95a6d3d11",
       "status": "ACCEPTED"
+    },
+    {
+      "stage": "SPEC v1.2 implementation V12-I4",
+      "kind": "implementation track (not a roadmap stage)",
+      "pr": 46,
+      "merge_commit": "90e237849f72e55c58359245ddb9d3b2956bc3bc",
+      "status": "ACCEPTED"
     }
   ],
   "m1": {
@@ -591,7 +598,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of V12-I4 (auto-id/v12-i4, PR not merged). V12-I5 / V12-I6 not started; production calibration orchestration blocked; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
+  "next_action": "NEXT: V12-I5 negative/regression closure TODO, from a green main with normal SUPERVISOR gate. V12-I1-I4 ACCEPTED (PR #46 merged, main 90e2378 CI success). V12-I6 TODO. Production calibration orchestration BLOCKED; unknown/ambiguous Abaqus material options require fail-closed I5 verification; no SP10, t_face, new FE work; M8 NOT_STARTED, auto-id/m8 parked; Abaqus requires HUMAN authorisation",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1140,11 +1147,11 @@
   },
   "m8": {
     "status": "NOT_STARTED",
-    "hold": "PENDING_POST_M7_DECISION (D-077)",
+    "hold": "PARKED_PENDING_SPEC_V1_2_I5_I6_AND_EXPLICIT_SUPERVISOR_DECISION",
     "parked_branch": {
       "branch": "auto-id/m8",
       "commit": "193db8dd4dd31c88ea1eae0a905f372e8a00c31d",
-      "status": "PARKED_PENDING_POST_M7_DECISION",
+      "status": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
       "note": "M8.1 wizard code on the parked branch was not part of M7b; not reviewed, not accepted, not merged, not rebased; M8.2 not started"
     }
   },
@@ -1171,7 +1178,7 @@
       "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity",
       "calibration_precision_gate": "conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness)) <= 0.08 (ln p, as M5); birge_adjusted_sd and AVAILABLE_COMPLETE_LOO required, else REFUSED; > 0.08 REFUSED; no value released, optimiser candidate only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE; never IDENTIFIED / WIDE; tau_mf not in the envelope; UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE kept"
     },
-    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1, V12-I2, V12-I3 ACCEPTED (merged PR #43, #44, #45); V12-I4 REVIEW_READY on branch auto-id/v12-i4; production v1.2 IMPLEMENTATION_INCOMPLETE (production calibration orchestration blocked pending V12-I5 / V12-I6)",
+    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1, V12-I2, V12-I3, V12-I4 ACCEPTED (merged PR #43, #44, #45, #46); V12-I5 and V12-I6 TODO; production v1.2 IMPLEMENTATION_INCOMPLETE (production calibration orchestration blocked pending V12-I5 / V12-I6)",
     "merged_to_main": {
       "pr": 41,
       "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423",
@@ -1237,7 +1244,7 @@
         "status": "ACCEPTED",
         "branch": "auto-id/v12-i3",
         "base": "e70295920c94dbf295bc9e481bb305b6bac57c5a",
-        "scope": "pure SPECIMEN_ENGINEERING_CALIBRATION scientific gate (src/services/specimen_calibration_gate.py): question / tau_mf / one specimen; observability (k + 1 FIT family keys, full rank at RCOND 1e-3, complete leave-one-FIT-family-out, >= 1 disjoint HOLDOUT family); strict pair MAC >= 0.80, tracking MAC >= 0.90, no branch / pairing loss; no active search bound; registration / peak guards; V12-I2 tau_mf pattern consumed (no systematic family, no holdout failure); non-degradation (same term set, max and RMS not worse, every |expm1(d ln f)| <= 0.08); precision max(birge_adjusted_sd, half LOO range) <= 0.08 per parameter; reporting completeness; deterministic record, PASS / REFUSED with machine-readable reasons; no value released; production calibration execution still refused (V12-I4)",
+        "scope": "pure SPECIMEN_ENGINEERING_CALIBRATION scientific gate (src/services/specimen_calibration_gate.py): question / tau_mf / one specimen; observability (k + 1 FIT family keys, full rank at RCOND 1e-3, complete leave-one-FIT-family-out, >= 1 disjoint HOLDOUT family); strict pair MAC >= 0.80, tracking MAC >= 0.90, no branch / pairing loss; no active search bound; registration / peak guards; V12-I2 tau_mf pattern consumed (no systematic family, no holdout failure); non-degradation (same governed physical ROW set, max and RMS not worse, every physical row |expm1(d ln f)| <= 0.08); precision max(birge_adjusted_sd, half LOO range) <= 0.08 per parameter; reporting completeness; deterministic record, PASS / REFUSED with machine-readable reasons; no value released; production calibration execution still refused (V12-I4)",
         "tests": "test_v12_i3_calibration_gate 38 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 247 OK (3 skipped without data stores); full suite without data stores 1696 OK (64 skipped); full suite with all data stores 1710 OK (5 skipped), no Abaqus",
         "rework": {
           "reviewed_head": "0946993d920567a74ea93b8211300b5bafa6b2dd",
@@ -1254,18 +1261,26 @@
       },
       "V12-I4": {
         "title": "Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer)",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/v12-i4",
         "base": "3218663d34aeadb6650ca8cb6af2a9a95a6d3d11",
-        "scope": "src/services/specimen_calibration_output.py: build_calibration_output evaluates the I3 gate on the same CalibrationGateInputs and builds a deterministic auto-id/specimen-engineering-calibration/v1 record (RELEASED: exactly the judged p_hat as MODEL_CALIBRATION_PARAMETER with the three labels; REFUSED: only a diagnostic optimiser candidate); identity bound to specimen, test run, forward-model manifest, INP SHA-256, registration, campaign hash, run hash, tau_mf, gate record hash and an evidence binding (p_hat hash, M5 / pattern / Birge / LOO record hashes); I3 precision, uncertainty basis and non-degradation copied; full physical-row table; excluded high-MAC diagnostics (DIAGNOSTIC_ONLY); reporting-completeness claims backed. render_calibration_inp_fragment: separate pure renderer (not the forward builder), RELEASED record + the nine governed Engineering Constants only, distinct CAL_<specimen>_<hash> material with warning comments; no file write. Production calibration execution still refused",
+        "scope": "src/services/specimen_calibration_output.py: build_calibration_output evaluates the I3 gate on the same CalibrationGateInputs and builds a deterministic auto-id/specimen-engineering-calibration/v1 record (RELEASED: exactly the judged p_hat as MODEL_CALIBRATION_PARAMETER with the three labels; REFUSED: only a diagnostic optimiser candidate); identity bound to specimen, test run, forward-model manifest, INP SHA-256, registration, campaign hash, run hash, tau_mf, gate record hash and an evidence binding (p_hat hash, M5 / pattern / Birge / LOO record hashes); I3 precision, uncertainty basis and non-degradation copied; full physical-row table; excluded high-MAC diagnostics (DIAGNOSTIC_ONLY); reporting-completeness claims backed. render_calibration_inp_fragment: pure renderer of distinct CAL_<specimen>_<hash> material from RELEASED record, nine governed Engineering Constants and exact pinned source INP bytes (SHA-256 checked); clones complete supported production material block with *Density and other supported options, changing only material name and governed elastic constants; explicit content/provenance hashes and warnings; refuses partial or unsafe source material; no file write. Production calibration execution still refused pending V12-I5/V12-I6",
         "tests": "test_v12_i4_calibration_output 17 OK; focused (V12-I1..I4, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, 10 forward-builder / M3 / M4 / shared-carbon modules) 319 OK (10 skipped without data stores); full suite without data stores 1713 OK (64 skipped); full suite with all data stores 1727 OK (5 skipped), no Abaqus",
         "rework": {
           "reviewed_head": "1ca5299d6fad92cfa47180b7042506a9266cb34b",
           "supervisor_correction": "the calibration INP fragment clones the complete governed production material block from the exact pinned source INP bytes (SHA-256 checked against the record): density, damping and every other supported option unchanged; only the material name and the Engineering Constants change; no fragment when the block cannot be cloned completely"
+        },
+        "merged_to_main": {
+          "pr": 46,
+          "merge_commit": "90e237849f72e55c58359245ddb9d3b2956bc3bc",
+          "reviewed_head": "1fcabc47d32560816dc67dfb4c1a6d6b2d2d2f6c",
+          "tree": "508aaf8704a4d7496ef22d59ec08b01bd12f6937",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 90e2378: success (run 37904375035)"
         }
       },
       "V12-I5": {
-        "title": "Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable)",
+        "title": "Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable; fail-closed unknown or ambiguous Abaqus material options)",
         "status": "TODO"
       },
       "V12-I6": {
