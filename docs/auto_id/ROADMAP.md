@@ -801,7 +801,7 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 
 | Id | Mini-step | Status |
 |---|---|---|
-| M8.1 | Specimen / family wizard | `TODO` |
+| M8.1 | Specimen / family wizard | `REVIEW_READY` |
 | M8.2 | Readiness screen | `TODO` |
 | M8.3 | One Auto-ID button calling the same backend as the CLI | `TODO` |
 | M8.4 | Progress / resume | `TODO` |
@@ -814,6 +814,13 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `NOT_STARTED` (D-077). M8.1 work exists only on parked branch `auto-id/m8` (`193db8d`),
-not reviewed, accepted, merged or rebased. V12-I6 readiness does **not** automatically resume M8; reuse requires
-separate SUPERVISOR authorisation after the SPEC v1.2 production gates.
+Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-09: M8.1 only). **M8.1 `REVIEW_READY`** (PR #51, branch
+`auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
+specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
+measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
+declared scientific question and τ_mf (NOT_DECLARED when not declared; never inferred), FIT / HOLDOUT rows, gaps and
+provenance. Size-only file checks are `PRESENT_SHA256_NOT_VERIFIED`; nothing is shown as scientifically READY. Factual
+loading only (no mode / family / registration choice, no LM, Abaqus, MAC, freezing or writes); scientific readiness
+stays with the V12-I6 backend on the Data Readiness Check page. M8.2–M8.8 `TODO`. The parked prototype branch
+`auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
+`BLOCKED / NOT_AUTHORISED`.

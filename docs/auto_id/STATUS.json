@@ -612,7 +612,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SPEC v1.2 scientific / readiness implementation track ACCEPTED. Production calibration execution BLOCKED / NOT_AUTHORISED (a governed production calibration campaign and any real Abaqus run need separate HUMAN authorisation); confirmed clusters CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked",
+  "next_action": "STOP: SUPERVISOR review of M8.1 (PR #51, not merged). M8.2..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1160,13 +1160,48 @@
     }
   },
   "m8": {
-    "status": "NOT_STARTED",
-    "hold": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
+    "status": "IN_PROGRESS",
+    "hold": null,
     "parked_branch": {
       "branch": "auto-id/m8",
       "commit": "193db8dd4dd31c88ea1eae0a905f372e8a00c31d",
       "status": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
-      "note": "M8.1 wizard code on the parked branch was not part of M7b; not reviewed, not accepted, not merged, not rebased; M8.2 not started"
+      "note": "historical M8.1 prototype; untouched (not merged, not rebased, not cherry-picked as a whole); selected code reused on auto-id/m8-1"
+    },
+    "authorisation": "SUPERVISOR 2026-10-09: start M8.1 only (specimen / family setup wizard); M8.2..M8.8 not started",
+    "steps": {
+      "M8.1": {
+        "title": "Specimen / family setup wizard",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-1",
+        "base": "196503e029e97d5b1afac6faf9830bbeb8a6adff",
+        "pr": 51,
+        "commit": "418acb1c23186e5ab3204caccd8437a7d60a8bf8",
+        "scope": "page \"0. Auto-ID Setup\" in the existing Effective Material Identification tab (no install_* layer): services/auto_id_wizard.py loads one specimen folder's passport or a family / campaign definition through the governed parsers and lists identity, physical measurements, passport and fixture, modal-data source, forward model, INP / ODB references, physical registration, the declared scientific question and tau_mf (shown NOT_DECLARED when a v1 definition declares none; never inferred), FIT / HOLDOUT row declarations, gaps and provenance. Pinned files found with their size only are PRESENT_SHA256_NOT_VERIFIED; nothing is shown as scientifically READY. Factual loading only: no mode, family or registration choice, no LM, Abaqus, MAC, freezing, threshold change, material property, calibration result or file write; readiness stays with the V12-I6 backend (Data Readiness Check page unchanged)",
+        "reuse": "selectively reused from the parked prototype 193db8d: the wizard service (extended for SPEC v1.2) and its tests (adapted); the Tk-variable page module was rejected and rebuilt inside material_identification_ui with the existing read-only table helpers",
+        "tests": "test_m8_1_auto_id_setup 27 tests (1 store-gated; real-Tk page test); focused M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 367 OK (0 skipped); full suite without data stores 1853 OK (73 skipped); full suite with all data stores 1867 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
+      },
+      "M8.2": {
+        "status": "TODO"
+      },
+      "M8.3": {
+        "status": "TODO"
+      },
+      "M8.4": {
+        "status": "TODO"
+      },
+      "M8.5": {
+        "status": "TODO"
+      },
+      "M8.6": {
+        "status": "TODO"
+      },
+      "M8.7": {
+        "status": "TODO"
+      },
+      "M8.8": {
+        "status": "TODO"
+      }
     }
   },
   "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL",
