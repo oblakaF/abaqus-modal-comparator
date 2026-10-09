@@ -4401,3 +4401,24 @@ first internal provider.
 - **Tests:** test_v12_i6_backend_integration 57 tests (4 store-gated); focused V12-I1..I6, SPEC v1.2, M5, M7 / M7b, GUI with all data stores 390 OK (0 skipped); full suite without data stores 1826 OK (72 skipped); full suite with all data stores 1840 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #49.
+
+## 2026-10-09 — V12-I6 ACCEPTED and merged (PR #49); SPEC v1.2 implementation track ACCEPTED
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I6 and track closure
+- **Status:** V12-I6 ACCEPTED (SUPERVISOR); V12-I1..I6 all ACCEPTED; scientific / readiness implementation track ACCEPTED
+- **Merge:** PR #49 `auto-id/v12-i6` → `main`, reviewed head `23516fd781a266d13bd80151daba8cea8d3a8c8b`, merge commit `29e010e778d718a5cafa501fb925b6e9d437db85`
+  (tree `15c7922f98acd4bd5021541a182f976dd1f68612`, identical to the reviewed head). Linux CI on main 29e010e: success (run 37930220912). SUPERVISOR-authorised.
+- **Accepted:** verified LM / Jacobian provenance (governed M4 pipeline run identity; strict LM acceptance decisions and
+  step transitions), the shared scientific backend, I3 / I4 / I5 integration, read-only GUI readiness, real RUN_A /
+  RUN_B regression, cluster fail-closed policy, production execution safety.
+- **Separate states:** scientific / readiness implementation ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED;
+  HUMAN-authorised real calibration run NOT YET AVAILABLE (no governed production calibration campaign authorised; real Abaqus needs separate HUMAN approval); M8 NOT_STARTED / PARKED. A synthetic RELEASED record is not an
+  accepted physical calibration.
+- **Limitations retained:** confirmed-cluster calibration not releasable without per-member evidence
+  (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE); production execution gate in place; no governed production calibration
+  campaign authorised; real Abaqus needs separate HUMAN approval; M8 parked pending a separate decision. No fallback;
+  no scientific gate relaxed.
+- **Governance test:** `tests/test_spec_v1_2_normative.py` governance assertion updated from "track IN_PROGRESS /
+  IMPLEMENTATION_INCOMPLETE" to the accepted track with execution explicitly NOT_AUTHORISED and M8 parked.
+- **Abaqus run count:** 0.
+- **Next gate:** none in this track; any production calibration run, SP10, t_face or M8 work needs a separate decision.

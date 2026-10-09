@@ -672,13 +672,22 @@ No SP10, t_face or additional FE solves are authorised by policy acceptance.
   `edb3070` (tree identical). The final review added the calibration precision gate
   (conservative_uncertainty ≤ 0.08).
 - **Normative acceptance (D-078):** `SPEC_V1_2.md` is the governing scientific contract; SPEC v1.1 is archived and
-  immutable. Implementation is tracked below: V12-I1–I5 ACCEPTED and merged; V12-I6 REVIEW_READY. Production calibration remains blocked.
+  immutable. Implementation is tracked below: V12-I1–I6 ACCEPTED and merged (scientific / readiness implementation track ACCEPTED). Production calibration execution remains blocked / not authorised.
 
 ### Implementation track — SPEC v1.2 (before any SP10 / new FE work)
 
-Implementation in progress: **V12-I1–I5 ACCEPTED and merged**, **V12-I6 REVIEW_READY (PR #49)**.
-Production calibration execution remains **BLOCKED** pending a separate explicit HUMAN authorisation;
-no new FE work is authorised. Each step requires explicit SUPERVISOR authorisation, one at a time,
+**Scientific / readiness implementation track: ACCEPTED** — V12-I1–I6 ACCEPTED and merged (final step PR #49).
+This does **not** authorise real calibration execution. Separate states:
+
+| State | Value |
+|---|---|
+| Scientific / readiness implementation | `ACCEPTED` |
+| Production calibration execution | `BLOCKED / NOT_AUTHORISED` |
+| HUMAN-authorised real calibration run | `NOT YET AVAILABLE` |
+| M8 | `NOT_STARTED / PARKED` |
+
+A synthetic (fake-solver) RELEASED record proves the adapter only; it is never an accepted physical calibration.
+No new FE work is authorised. Each step requires explicit SUPERVISOR authorisation, one at a time,
 tests and review. No `install_*` layer: CLI and GUI must use the same scientific backend services.
 
 | Id | Step | Status |
@@ -688,7 +697,7 @@ tests and review. No `install_*` layer: CLI and GUI must use the same scientific
 | V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `ACCEPTED` |
 | V12-I4 | Calibration reporting / output record: released/refused labels, bound identities, diagnostics and uncertainty; optional CAL_* material cloned from pinned source INP with Density and other supported options retained | `ACCEPTED` |
 | V12-I5 | Negative/regression closure: no fallback; τ_mf cannot rescue §13 FAIL; historical records immutable; calibration material cloning must fail closed on unknown/ambiguous Abaqus options | `ACCEPTED` |
-| V12-I6 | SPEC v1.2 backend/GUI readiness with the same scientific services (no `install_*`); separate M8 remains parked until authorised | `REVIEW_READY` |
+| V12-I6 | SPEC v1.2 backend/GUI readiness with the same scientific services (no `install_*`); separate M8 remains parked until authorised | `ACCEPTED` |
 
 - **Normative acceptance merged:** PR #42 (`auto-id/spec-v1.2-acceptance` → `main`), merge commit `61b5016`.
 
@@ -773,9 +782,18 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   stored record read-only. The calibration execution gate is unchanged: readiness only, no HUMAN-authorised production
   calibration run.
 
-**V12 PRODUCTION GATE — NOT YET SATISFIED:** V12-I6 (backend readiness) is under SUPERVISOR review; calibration
-execution stays refused by the unchanged execution gate. Enabling a production calibration run, SP10, t_face or other FE
-work requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN authorisation.
+- **V12-I6 accepted and merged:** PR #49 (`auto-id/v12-i6` → `main`), reviewed head `23516fd781a266d13bd80151daba8cea8d3a8c8b`, merge commit
+  `29e010e778d718a5cafa501fb925b6e9d437db85` (tree `15c7922f98acd4bd5021541a182f976dd1f68612`, identical to reviewed head). Post-merge main Linux CI **success** (run `37930220912`).
+  Both final provenance findings closed (governed M4 pipeline run identity; strict LM acceptance decisions and step
+  transitions).
+- **Retained limitations:** a confirmed-cluster calibration cannot be released without per-member evidence
+  (`CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE`, no fallback); the production execution gate remains in place; no governed
+  production calibration campaign has been authorised; real Abaqus execution needs separate HUMAN approval; M8 remains
+  parked pending a separate decision. No scientific gate is relaxed.
+
+**V12 PRODUCTION GATE — EXECUTION NOT AUTHORISED:** the scientific / readiness implementation is accepted, but calibration
+execution stays refused by the unchanged execution gate. A production calibration run, SP10, t_face or other FE work
+requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN authorisation.
 
 ---
 

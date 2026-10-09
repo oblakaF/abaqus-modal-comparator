@@ -137,6 +137,13 @@
       "pr": 47,
       "merge_commit": "248d7eb5c66fa5568e70d34c0550fddf4dbad4cb",
       "status": "ACCEPTED"
+    },
+    {
+      "stage": "SPEC v1.2 implementation V12-I6",
+      "kind": "implementation track (not a roadmap stage)",
+      "pr": 49,
+      "merge_commit": "29e010e778d718a5cafa501fb925b6e9d437db85",
+      "status": "ACCEPTED"
     }
   ],
   "m1": {
@@ -605,7 +612,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of V12-I6 (PR #49, not merged; LM-provenance findings pipeline identity and LM acceptance decision closed). Production calibration execution BLOCKED (separate HUMAN authorisation required); confirmed clusters CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
+  "next_action": "STOP: SPEC v1.2 scientific / readiness implementation track ACCEPTED. Production calibration execution BLOCKED / NOT_AUTHORISED (a governed production calibration campaign and any real Abaqus run need separate HUMAN authorisation); confirmed clusters CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1154,7 +1161,7 @@
   },
   "m8": {
     "status": "NOT_STARTED",
-    "hold": "PARKED_PENDING_SPEC_V1_2_I5_I6_AND_EXPLICIT_SUPERVISOR_DECISION",
+    "hold": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
     "parked_branch": {
       "branch": "auto-id/m8",
       "commit": "193db8dd4dd31c88ea1eae0a905f372e8a00c31d",
@@ -1185,7 +1192,7 @@
       "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity",
       "calibration_precision_gate": "conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness)) <= 0.08 (ln p, as M5); birge_adjusted_sd and AVAILABLE_COMPLETE_LOO required, else REFUSED; > 0.08 REFUSED; no value released, optimiser candidate only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE; never IDENTIFIED / WIDE; tau_mf not in the envelope; UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE kept"
     },
-    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1, V12-I2, V12-I3, V12-I4, V12-I5 ACCEPTED (merged PR #43, #44, #45, #46, #47); V12-I6 REVIEW_READY on branch auto-id/v12-i6 (PR #49); production v1.2 IMPLEMENTATION_INCOMPLETE until V12-I6 is accepted; production calibration execution BLOCKED pending a separate explicit HUMAN authorisation",
+    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; scientific / readiness implementation ACCEPTED: V12-I1..I6 ACCEPTED (merged PR #43, #44, #45, #46, #47, #49); production calibration execution BLOCKED / NOT_AUTHORISED; HUMAN-authorised real calibration run NOT YET AVAILABLE",
     "merged_to_main": {
       "pr": 41,
       "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423",
@@ -1207,7 +1214,7 @@
   },
   "governing_spec_predecessor": "docs/auto_id/SPEC_V1_1.md (archived, immutable; unamended clauses in force via v1.2)",
   "spec_v1_2_implementation": {
-    "status": "IN_PROGRESS",
+    "status": "ACCEPTED",
     "precedes": "any SP10 / new FE work",
     "steps": {
       "V12-I1": {
@@ -1336,7 +1343,7 @@
       },
       "V12-I6": {
         "title": "Integration into GUI / backend readiness (the same backend services; no install_* layer)",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/v12-i6",
         "pr": 49,
         "base": "248d7eb5c66fa5568e70d34c0550fddf4dbad4cb",
@@ -1373,9 +1380,32 @@
           "confirmed clusters: CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE (SUPERVISOR cluster policy); never released",
           "no HUMAN-authorised production calibration run exists: calibration execution stays refused by the unchanged gate; synthetic fake-solver runs (solver profile .../fake) prove the adapter only; real archived evidence verified read-only is RUN_A / RUN_B (material identification)",
           "the M7 CLI registers RUN_A / RUN_B only; no calibration campaign definition exists (a new one is a scientific decision)"
-        ]
+        ],
+        "merged_to_main": {
+          "pr": 49,
+          "merge_commit": "29e010e778d718a5cafa501fb925b6e9d437db85",
+          "reviewed_head": "23516fd781a266d13bd80151daba8cea8d3a8c8b",
+          "tree": "15c7922f98acd4bd5021541a182f976dd1f68612",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 29e010e: success (run 37930220912)",
+          "acceptance": "SUPERVISOR 2026-10-09: ACCEPTED (both final provenance findings closed)"
+        }
       }
     },
-    "cluster_policy": "SUPERVISOR decision 2026-10-09 (current implementation): a confirmed cluster keeps CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE and such a calibration cannot be RELEASED. M4's confirmed-cluster mean does not prove per-member frequency errors or tracking MACs. No per-member pairing rule is invented; no fallback to a cluster-average 8 % comparison, an average tracking MAC, arbitrary member ordering, highest-MAC member mapping, independent reassignment of experimental modes or dropping difficult members. The valid cluster mathematics for objective terms, pattern and observability is preserved. Documented implementation limitation; SPEC and M4 unchanged; no cluster-pairing algorithm in V12-I6"
+    "cluster_policy": "SUPERVISOR decision 2026-10-09 (current implementation): a confirmed cluster keeps CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE and such a calibration cannot be RELEASED. M4's confirmed-cluster mean does not prove per-member frequency errors or tracking MACs. No per-member pairing rule is invented; no fallback to a cluster-average 8 % comparison, an average tracking MAC, arbitrary member ordering, highest-MAC member mapping, independent reassignment of experimental modes or dropping difficult members. The valid cluster mathematics for objective terms, pattern and observability is preserved. Documented implementation limitation; SPEC and M4 unchanged; no cluster-pairing algorithm in V12-I6",
+    "completion": {
+      "scientific_readiness_implementation": "ACCEPTED (all six planned steps V12-I1..I6 accepted and merged)",
+      "production_calibration_execution": "BLOCKED / NOT_AUTHORISED",
+      "human_authorised_real_calibration_run": "NOT YET AVAILABLE (no governed production calibration campaign authorised; real Abaqus needs separate HUMAN approval)",
+      "m8": "NOT_STARTED / PARKED",
+      "meaning": "the six planned implementation steps are accepted; this does NOT authorise real calibration execution. Synthetic fake-solver RELEASED records prove the adapter only and are never an accepted physical calibration",
+      "limitations": [
+        "a confirmed-cluster calibration cannot be released without per-member evidence (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; SUPERVISOR cluster policy; no fallback)",
+        "the production calibration execution gate (CampaignDefinition.require_executable) remains in place",
+        "no governed production calibration campaign has been authorised",
+        "real Abaqus execution needs separate HUMAN approval",
+        "M8 remains parked pending a separate SUPERVISOR decision"
+      ]
+    }
   }
 }
