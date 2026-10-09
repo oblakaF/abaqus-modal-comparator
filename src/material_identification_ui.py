@@ -1017,7 +1017,7 @@ def scientific_readiness_view(app) -> dict[str, object]:
     source never inherits it.  The record itself is never changed.
     """
 
-    from services.auto_id_wizard import SelectionState, readiness_selection
+    from services.auto_id_wizard import SelectionState, readiness_selection, verdict_summary
     from services.campaign_scientific_backend import readiness_presentation
 
     record = getattr(app, "scientific_readiness_record", None)
@@ -1035,14 +1035,19 @@ def scientific_readiness_view(app) -> dict[str, object]:
     rows = readiness_presentation(record) if selection.show_record and isinstance(record, Mapping) else ()
     if rows:
         status = dict(rows).get("Readiness") or "NOT AVAILABLE"
+        summary = verdict_summary(record)  # M8.5: only for the record shown under this selection
     elif selection.state is SelectionState.NOT_EVALUATED_FOR_SELECTION:
         status = selection.state.value
+        summary = ("NOT_EVALUATED_FOR_SELECTION is a GUI presentation state, not a backend scientific verdict: no "
+                   "current verdict, released value or candidate exists for this selection.",)
     else:
         status = "NOT AVAILABLE"
+        summary = ("No scientific verdict available.",)
     return {
         "available": bool(rows),
         "status": status,
         "rows": rows,
+        "summary": summary,
         "selection_state": selection.state.value,
         "selection": selection.detail,
     }
@@ -1551,6 +1556,20 @@ def _build_data_readiness_page(app, page) -> None:
         scientific, text="", style="Secondary.TLabel", justify="left", wraplength=1040
     )
     app.material_scientific_readiness_selection_label.pack(anchor="w", pady=(0, 4))
+    app.material_scientific_readiness_summary_label = ttk.Label(
+        scientific, text="No scientific verdict available.", justify="left", wraplength=1040
+    )
+    app.material_scientific_readiness_summary_label.pack(anchor="w", pady=(0, 6))
+    ttk.Label(
+        scientific,
+        text=(
+            "Verdict summary of the shared backend's record only. Project data readiness above and an LM "
+            "CONVERGED result are not scientific release verdicts."
+        ),
+        style="Secondary.TLabel",
+        justify="left",
+        wraplength=1040,
+    ).pack(anchor="w", pady=(0, 4))
     app.material_scientific_readiness_table = _build_read_only_table(
         scientific,
         ("item", "state"),
@@ -1595,6 +1614,10 @@ def _refresh_data_readiness_page(app) -> None:
         if hasattr(app, "material_scientific_readiness_selection_label"):
             app.material_scientific_readiness_selection_label.configure(
                 text=f"Selection: {scientific['selection']}"
+            )
+        if hasattr(app, "material_scientific_readiness_summary_label"):
+            app.material_scientific_readiness_summary_label.configure(
+                text="\n".join(scientific["summary"])
             )
 
 

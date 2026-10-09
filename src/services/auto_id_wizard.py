@@ -584,6 +584,80 @@ def readiness_selection(selected: bool, preparation, record, run_hash: Optional[
                               "that the record is authentic or verified production evidence", True)
 
 
+# ----------------------------------------------------------------------------------------------- verdict summary (M8.5)
+
+def _values(parameters, suffix: str = "") -> str:
+    items = []
+    for name, item in sorted((parameters or {}).items()):
+        value = item.get("value") if isinstance(item, Mapping) else item
+        unit = item.get("unit") if isinstance(item, Mapping) else None
+        items.append(f"{name} = {float(value):.6g}{'' if not unit else ' ' + unit}")
+    return ", ".join(items) + (f" ({suffix})" if suffix and items else "")
+
+
+def verdict_summary(record) -> tuple[str, ...]:
+    """A concise read-only summary of a stored backend readiness record (``ScientificReadiness.to_dict``).
+
+    Presentation only: every statement is read from the record — no value, threshold, uncertainty or decision is
+    computed, inferred or relabelled.  A value is named as released only from the record's released fields (the
+    specimen calibration with the record's own labels; material identification only from its formal output when the
+    status is MATERIAL_VALUES_RELEASED); a refused record's candidate stays diagnostic only.
+    """
+
+    if not isinstance(record, Mapping) or record.get("schema") != READINESS_RECORD_SCHEMA:
+        return ()
+    status = str(record.get("status"))
+    question = record.get("scientific_question")
+    tau = record.get("tau_mf")
+    campaign = record.get("campaign") if isinstance(record.get("campaign"), Mapping) else {}
+    evidence = record.get("evidence") if isinstance(record.get("evidence"), Mapping) else {}
+    formal = record.get("material_formal_output") if isinstance(record.get("material_formal_output"), Mapping) else {}
+    calibration = record.get("calibration") if isinstance(record.get("calibration"), Mapping) else {}
+    reasons = [r for r in record.get("refusal_reasons") or () if isinstance(r, Mapping)]
+    lines = [f"Evaluated: {campaign.get('campaign_id')} ({campaign.get('run_type')}); campaign "
+             f"{str(campaign.get('campaign_hash'))[:12]}; run {str(campaign.get('run_hash') or 'not verified')[:12]}",
+             f"Scientific question: {question or 'not declared (historical v1 definition; none inferred)'}; τ_mf "
+             f"{'not declared' if tau is None else f'{tau:g} (acceptance tolerance only)'}",
+             f"Backend status: {status}"]
+    released = record.get("released_calibration_parameters")
+    if status == "RELEASED" and released:
+        labels = ", ".join(calibration.get("labels") or ())
+        lines.append(f"Released: {_values(released)} — {labels}")
+        lines.append("Result type: specimen-specific engineering calibration of one physical specimen and one FE "
+                     "model; not a material property")
+    elif status == "MATERIAL_VALUES_RELEASED" and formal.get("released_values"):
+        lines.append(f"Released (formal output {formal.get('status')}): "
+                     f"{_values(formal.get('released_values'), 'effective material-model values')}")
+        lines.append(f"Result type: material identification; material claim {record.get('material_claim')}")
+    else:
+        lines.append("Released: no value released")
+        if reasons:
+            shown = "; ".join(f"{r.get('code')}: {r.get('detail')}" for r in reasons[:4])
+            more = f" (+{len(reasons) - 4} more)" if len(reasons) > 4 else ""
+            lines.append(f"{'Not ready — missing or invalid evidence' if status == 'NOT_READY' else 'Refused'}: "
+                         f"{shown}{more}")
+        if formal:
+            family = record.get("material_family_consistency")
+            lines.append(f"Material formal output: {formal.get('status')}"
+                         + (f"; SPEC §13 family consistency {family}" if family else ""))
+        if question == "SPECIMEN_ENGINEERING_CALIBRATION":
+            lines.append("Result type: specimen engineering calibration (not a material property); none released")
+        else:
+            lines.append("Result type: material identification; no global material property released")
+    candidate = record.get("diagnostic_candidate") if isinstance(record.get("diagnostic_candidate"), Mapping) else {}
+    if candidate.get("parameters"):
+        lines.append(f"Diagnostic only (not released): {_values(candidate.get('parameters'))} "
+                     f"[{', '.join(candidate.get('labels') or ())}]")
+    profiles = evidence.get("solver_profiles") if isinstance(evidence.get("solver_profiles"), Mapping) else {}
+    if profiles:
+        lines.append("Evidence solver profiles: " + "; ".join(f"{label}: {item.get('profile_id')}" for label, item
+                                                             in sorted(profiles.items()) if isinstance(item, Mapping)))
+    if record.get("production_calibration"):
+        lines.append(f"Physical calibration status: {record.get('production_calibration')}")
+    lines.append(f"Production execution: {record.get('production_execution')}")
+    return tuple(lines)
+
+
 # ----------------------------------------------------------------------------------------------- view model
 
 def wizard_rows(items: tuple[WizardItem, ...]) -> tuple[tuple[str, str, str, str], ...]:
