@@ -4422,3 +4422,30 @@ first internal provider.
   IMPLEMENTATION_INCOMPLETE" to the accepted track with execution explicitly NOT_AUTHORISED and M8 parked.
 - **Abaqus run count:** 0.
 - **Next gate:** none in this track; any production calibration run, SP10, t_face or M8 work needs a separate decision.
+
+## 2026-10-09 — M8.1 — specimen / family setup wizard (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID, mini-step M8.1 only (SUPERVISOR authorisation; M8 IN_PROGRESS)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/m8-1` from `main` `196503e` (PR #51); exclusive worktree
+- **Commits:** `418acb1` wizard and setup page; this governance commit.
+- **Wizard:** `services/auto_id_wizard.py` (reused selectively from the parked prototype `193db8d`, extended for SPEC
+  v1.2): one specimen folder (passport `specimen.json` or exactly one `*.specimen.json`; several are refused, never
+  chosen) or a family / campaign definition, loaded through the governed parsers. Shows identity, physical measurements
+  (declared-unavailable values with the passport's reason), passport / fixture identity and mismatches, modal-data
+  source, forward model and pinned INP, INP / ODB references, physical registration, the declared scientific question
+  and τ_mf (NOT_DECLARED for v1 definitions; never inferred), FIT / HOLDOUT rows, gaps and provenance. Size-only
+  presence is `PRESENT_SHA256_NOT_VERIFIED`; nothing is shown as scientifically READY.
+- **GUI:** page "0. Auto-ID Setup" in the existing Effective Material Identification tab through
+  `material_identification_ui` (no `install_*` layer); invalid folders, missing or ambiguous passports, invalid JSON and
+  unconfigured stores are shown, never a crash. The V12-I6 scientific readiness on the Data Readiness Check page is
+  unchanged.
+- **Not done by the wizard:** no LM, Abaqus, MAC, freezing, mode / family / registration choice, threshold change,
+  material property, calibration result, evidence write or production-gate bypass; no material → calibration fallback.
+- **Tests:** test_m8_1_auto_id_setup 27 tests (1 store-gated; real-Tk page test); focused M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 367 OK (0 skipped); full suite without data stores 1853 OK (73 skipped); full suite with all data stores 1867 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Governance test:** `tests/test_spec_v1_2_normative.py` now accepts M8 IN_PROGRESS with the parked branch commit
+  unchanged.
+- **Unchanged:** V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at
+  `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #51.

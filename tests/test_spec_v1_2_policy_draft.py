@@ -31,7 +31,8 @@ V12_MODULES = ("domain/campaign_definition.py", "services/identification_uncerta
                "services/specimen_calibration_gate.py",  # + the pure calibration gate (V12-I3)
                "services/specimen_calibration_output.py",  # + the calibration output service (V12-I4)
                "services/candidate_evaluation_evidence.py",  # + the candidate-evaluation evidence (V12-I5)
-               "services/campaign_scientific_backend.py")  # + the one read-only backend path (V12-I6)
+               "services/campaign_scientific_backend.py",  # + the one read-only backend path (V12-I6)
+               "services/auto_id_wizard.py")  # + the M8.1 setup wizard (displays the declared question / τ_mf only)
 
 
 def _text(name: str) -> str:

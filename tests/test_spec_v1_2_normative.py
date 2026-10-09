@@ -41,7 +41,8 @@ V12_MODULES = ("domain/campaign_definition.py", "services/identification_uncerta
                "services/specimen_calibration_gate.py",  # + the pure calibration gate (V12-I3)
                "services/specimen_calibration_output.py",  # + the calibration output service (V12-I4)
                "services/candidate_evaluation_evidence.py",  # + the candidate-evaluation evidence (V12-I5)
-               "services/campaign_scientific_backend.py")  # + the one read-only backend path (V12-I6)
+               "services/campaign_scientific_backend.py",  # + the one read-only backend path (V12-I6)
+               "services/auto_id_wizard.py")  # + the M8.1 setup wizard (displays the declared question / τ_mf only)
 
 
 def _text(name: str) -> str:
@@ -134,8 +135,8 @@ class NormativeSpecTests(unittest.TestCase):
             rest = states[accepted:]
             self.assertTrue(rest and all(s == "TODO" for s in rest[1:]), states)
             self.assertIn(rest[0], ("TODO", "IN_PROGRESS", "REVIEW_READY", "REWORK"))
-        self.assertEqual((status["m8"]["status"], status["m8"]["parked_branch"]["commit"]),
-                         ("NOT_STARTED", "193db8dd4dd31c88ea1eae0a905f372e8a00c31d"))
+        self.assertIn(status["m8"]["status"], ("NOT_STARTED", "IN_PROGRESS"))  # M8.1 authorised 2026-10-09
+        self.assertEqual(status["m8"]["parked_branch"]["commit"], "193db8dd4dd31c88ea1eae0a905f372e8a00c31d")
         self.assertIn("| [SPEC_V1_2.md](SPEC_V1_2.md) | Governing scientific contract (normative, D-078)",
                       _text("README.md"))
         for agent_doc in ("CLAUDE.md", "AGENTS.md"):
