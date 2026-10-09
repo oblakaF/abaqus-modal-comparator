@@ -23,11 +23,13 @@ from domain.identification_run import canonical_hash
 
 DOCS = ROOT / "docs" / "auto_id"
 SPEC_V1_1_CONTENT_SHA256 = "62f206176a73c224f6f8fea0b2aed84c8154b9eb30bee87240d2c0b808ebb665"  # at main 9bff6c7
-# Implemented V12 steps: schema (I1), τ_mf-aware pattern / holdout test (I2), pure calibration gate (I3);
+# Implemented V12 steps: schema (I1), τ_mf-aware pattern / holdout test (I2), pure calibration gate (I3),
+# calibration output record and fragment (I4);
 # confined there by the I1 tests.
 V12_MODULES = ("domain/campaign_definition.py", "services/identification_uncertainty.py",
                "services/identification_verdict.py", "services/identification_campaign_run.py",
-               "services/specimen_calibration_gate.py")  # + the pure calibration gate (V12-I3)
+               "services/specimen_calibration_gate.py",  # + the pure calibration gate (V12-I3)
+               "services/specimen_calibration_output.py")  # + the calibration output service (V12-I4)
 
 
 def _text(name: str) -> str:

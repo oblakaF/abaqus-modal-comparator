@@ -116,6 +116,13 @@
       "pr": 44,
       "merge_commit": "e70295920c94dbf295bc9e481bb305b6bac57c5a",
       "status": "ACCEPTED"
+    },
+    {
+      "stage": "SPEC v1.2 implementation V12-I3",
+      "kind": "implementation track (not a roadmap stage)",
+      "pr": 45,
+      "merge_commit": "3218663d34aeadb6650ca8cb6af2a9a95a6d3d11",
+      "status": "ACCEPTED"
     }
   ],
   "m1": {
@@ -584,7 +591,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of V12-I3 (auto-id/v12-i3, PR not merged). V12-I4 ... V12-I6 not started; no calibration output record or INP fragment; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of V12-I4 (auto-id/v12-i4, PR not merged). V12-I5 / V12-I6 not started; production calibration orchestration blocked; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1164,7 +1171,7 @@
       "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity",
       "calibration_precision_gate": "conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness)) <= 0.08 (ln p, as M5); birge_adjusted_sd and AVAILABLE_COMPLETE_LOO required, else REFUSED; > 0.08 REFUSED; no value released, optimiser candidate only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE; never IDENTIFIED / WIDE; tau_mf not in the envelope; UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE kept"
     },
-    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1 and V12-I2 ACCEPTED (merged PR #43, #44); V12-I3 REVIEW_READY on branch auto-id/v12-i3; production v1.2 IMPLEMENTATION_INCOMPLETE (calibration execution and output not integrated)",
+    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1, V12-I2, V12-I3 ACCEPTED (merged PR #43, #44, #45); V12-I4 REVIEW_READY on branch auto-id/v12-i4; production v1.2 IMPLEMENTATION_INCOMPLETE (production calibration orchestration blocked pending V12-I5 / V12-I6)",
     "merged_to_main": {
       "pr": 41,
       "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423",
@@ -1227,7 +1234,7 @@
       },
       "V12-I3": {
         "title": "Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/v12-i3",
         "base": "e70295920c94dbf295bc9e481bb305b6bac57c5a",
         "scope": "pure SPECIMEN_ENGINEERING_CALIBRATION scientific gate (src/services/specimen_calibration_gate.py): question / tau_mf / one specimen; observability (k + 1 FIT family keys, full rank at RCOND 1e-3, complete leave-one-FIT-family-out, >= 1 disjoint HOLDOUT family); strict pair MAC >= 0.80, tracking MAC >= 0.90, no branch / pairing loss; no active search bound; registration / peak guards; V12-I2 tau_mf pattern consumed (no systematic family, no holdout failure); non-degradation (same term set, max and RMS not worse, every |expm1(d ln f)| <= 0.08); precision max(birge_adjusted_sd, half LOO range) <= 0.08 per parameter; reporting completeness; deterministic record, PASS / REFUSED with machine-readable reasons; no value released; production calibration execution still refused (V12-I4)",
@@ -1235,11 +1242,23 @@
         "rework": {
           "reviewed_head": "0946993d920567a74ea93b8211300b5bafa6b2dd",
           "supervisor_correction": "row-level non-degradation and pair / tracking MAC (a cluster is one term but two physical rows); explicit term_rows membership; numeric binding pattern r*sigma_term = candidate term d ln f (signed) = mean of its candidate rows; model_form_robustness bound to the evaluated p_hat; p_hat validation; exact MAC key sets"
+        },
+        "merged_to_main": {
+          "pr": 45,
+          "merge_commit": "3218663d34aeadb6650ca8cb6af2a9a95a6d3d11",
+          "reviewed_head": "0dfccaabf2ff5c9266f1754774a0cda4a542c04a",
+          "tree": "6ef5fd66fdd7ba5404e26e1210d7feaae6028277",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 3218663: 1693 OK (68 skipped), success (run 37898091376)"
         }
       },
       "V12-I4": {
         "title": "Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer)",
-        "status": "TODO"
+        "status": "REVIEW_READY",
+        "branch": "auto-id/v12-i4",
+        "base": "3218663d34aeadb6650ca8cb6af2a9a95a6d3d11",
+        "scope": "src/services/specimen_calibration_output.py: build_calibration_output evaluates the I3 gate on the same CalibrationGateInputs and builds a deterministic auto-id/specimen-engineering-calibration/v1 record (RELEASED: exactly the judged p_hat as MODEL_CALIBRATION_PARAMETER with the three labels; REFUSED: only a diagnostic optimiser candidate); identity bound to specimen, test run, forward-model manifest, INP SHA-256, registration, campaign hash, run hash, tau_mf, gate record hash and an evidence binding (p_hat hash, M5 / pattern / Birge / LOO record hashes); I3 precision, uncertainty basis and non-degradation copied; full physical-row table; excluded high-MAC diagnostics (DIAGNOSTIC_ONLY); reporting-completeness claims backed. render_calibration_inp_fragment: separate pure renderer (not the forward builder), RELEASED record + the nine governed Engineering Constants only, distinct CAL_<specimen>_<hash> material with warning comments; no file write. Production calibration execution still refused",
+        "tests": "test_v12_i4_calibration_output 15 OK; focused (V12-I4, V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability, forward_builder_generic, m4_generic_guard) 273 OK (3 skipped without data stores); full suite without data stores 1711 OK (64 skipped); full suite with all data stores 1725 OK (5 skipped), no Abaqus"
       },
       "V12-I5": {
         "title": "Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable)",
