@@ -4101,3 +4101,24 @@ first internal provider.
 - **Tests:** test_v12_i1_campaign_question 15 OK; with test_spec_v1_2_normative + test_spec_v1_2_policy_draft + test_m7_campaign + test_m7b_corrective + test_m5_stage_gate 95 OK (3 skipped without data stores); with data stores test_m7_campaign + test_m7b_corrective + V12-I1 + 5 test_m4* modules 109 OK (0 skipped, no Abaqus); full suite without data stores 1640 OK (64 skipped)
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of V12-I1.
+
+## 2026-10-09 — V12-I1 — schema correction: specimen cardinality by scientific question
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I1 (SUPERVISOR correction before merging PR #43)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i1` (previous head `3d32181`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I1): specimen cardinality by scientific question (calibration = one specimen)`
+- **Files:** `src/domain/campaign_definition.py`, `tests/test_v12_i1_campaign_question.py`; STATUS, ROADMAP,
+  CHANGELOG.
+- **Behaviour:** v1 definitions keep `specimens ≥ 2` with the unchanged message and hashes; v1.2
+  MATERIAL_IDENTIFICATION keeps `≥ 2` (campaign path); v1.2 SPECIMEN_ENGINEERING_CALIBRATION requires exactly one
+  specimen ("SPECIMEN_ENGINEERING_CALIBRATION requires exactly one physical specimen under SPEC v1.2 / D-078"). A
+  one-specimen calibration parses and hashes; execution, manifest and report stay refused with
+  SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED before any process, solver call, run directory or journal.
+  Identity tests: question and τ_mf in the parsed canonical form; changing only the canonical question changes the
+  hash; τ_mf changes campaign and run identity.
+- **Scientific behaviour changed:** NO for existing campaigns; τ_mf still has no numerical effect.
+- **Tests:** test_v12_i1_campaign_question 19 OK; with test_spec_v1_2_normative + test_spec_v1_2_policy_draft + test_m7_campaign + test_m7b_corrective + test_m5_stage_gate 99 OK (3 skipped without data stores); with data stores test_m7_campaign + test_m7b_corrective + V12-I1 + test_m5_stage_gate + 5 test_m4* modules 122 OK (0 skipped, no Abaqus); full suite without data stores 1644 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #43.

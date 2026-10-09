@@ -1,7 +1,8 @@
 """V12-I1 — SPEC v1.2 campaign question and τ_mf: schema, identity and refusals only (D-078; no Abaqus).
 
 A v1.2 campaign definition (``auto-id/identification-campaign/v1.2``) must declare its scientific question and τ_mf
-explicitly; both are identity-bound.  Historical v1 definitions keep their exact identities and acquire neither field.
+explicitly; both are identity-bound.  A calibration campaign has exactly one physical specimen, a material campaign at
+least two.  Historical v1 definitions keep their exact identities and acquire neither field.
 τ_mf has no numerical effect yet (V12-I2), and calibration execution is refused until V12-I3 exists.
 """
 
@@ -63,6 +64,14 @@ def v12_definition(question=MATERIAL_IDENTIFICATION, tau_mf=0.02, **changes) -> 
     return data
 
 
+def calibration_definition(tau_mf=0.02, **changes) -> dict:
+    """A one-specimen v1.2 calibration definition (SPEC v1.2 §6: exactly one physical specimen)."""
+    data = v12_definition(SPECIMEN_ENGINEERING_CALIBRATION, tau_mf)
+    data["specimens"] = data["specimens"][:1]
+    data.update(changes)
+    return data
+
+
 def without(data: dict, key: str) -> dict:
     data = dict(data)
     del data[key]
@@ -79,7 +88,7 @@ class _Campaigns(unittest.TestCase):
 
     def specimens(self, definition, tag: str):
         items, roots = [], {}
-        for label in ("A", "B"):
+        for label in (s.label for s in definition.specimens):
             item, store = synthetic_specimen(definition, label, self.tmp / tag)
             items.append(item)
             roots["synthetic"] = store
@@ -109,6 +118,12 @@ class HistoricalV11Tests(_Campaigns):
         load_campaign_definition(CAMPAIGNS / "M7_RUN_A.campaign.json").require_executable()
         load_campaign_definition(CAMPAIGNS / "M7_RUN_B.campaign.json").require_executable()  # D-072 gate
 
+    def test_a_one_specimen_v1_definition_is_rejected_as_before(self):
+        for specimens in (synthetic_definition()["specimens"][:1], []):
+            with self.subTest(count=len(specimens)), self.assertRaisesRegex(
+                    CampaignDefinitionError, r"^specimens: a campaign needs at least two specimens\.$"):
+                parse_campaign_definition(synthetic_definition(specimens=specimens))
+
     def test_a_v1_definition_cannot_carry_v1_2_fields(self):
         for key, value in (("scientific_question", MATERIAL_IDENTIFICATION), ("tau_mf", 0.02)):
             with self.subTest(key=key), self.assertRaisesRegex(CampaignDefinitionError, "unknown"):
@@ -131,14 +146,28 @@ class HistoricalV11Tests(_Campaigns):
 
 class V12SchemaTests(unittest.TestCase):
     def test_valid_v1_2_definitions_parse(self):
-        for question in (MATERIAL_IDENTIFICATION, SPECIMEN_ENGINEERING_CALIBRATION):
-            definition = parse_campaign_definition(v12_definition(question))
+        for question, data, count in ((MATERIAL_IDENTIFICATION, v12_definition(), 2),
+                                      (SPECIMEN_ENGINEERING_CALIBRATION, calibration_definition(), 1)):
+            definition = parse_campaign_definition(data)
             with self.subTest(question=question):
                 self.assertEqual((definition.schema, definition.scientific_question, definition.tau_mf),
                                  (CAMPAIGN_SCHEMA_V1_2, question, 0.02))
+                self.assertEqual(len(definition.specimens), count)
                 self.assertEqual((definition.canonical["scientific_question"], definition.canonical["tau_mf"]),
                                  (question, 0.02))
                 self.assertEqual(definition.canonical["schema"], CAMPAIGN_SCHEMA_V1_2)
+                self.assertEqual(len(definition.canonical["specimens"]), count)
+
+    def test_specimen_cardinality_by_question(self):
+        one = v12_definition()["specimens"][:1]
+        with self.assertRaisesRegex(CampaignDefinitionError, r"^specimens: a campaign needs at least two specimens"):
+            parse_campaign_definition(v12_definition(MATERIAL_IDENTIFICATION, specimens=one))  # campaign path
+        two = v12_definition()["specimens"]
+        for specimens in ([], two, "A"):
+            with self.subTest(specimens=specimens), self.assertRaisesRegex(
+                    CampaignDefinitionError, "SPECIMEN_ENGINEERING_CALIBRATION requires exactly one physical "
+                                             "specimen under SPEC v1.2 / D-078"):
+                parse_campaign_definition(calibration_definition(specimens=specimens))
 
     def test_tau_mf_range(self):
         self.assertEqual(TAU_MF_MAXIMUM, 0.02)
@@ -184,28 +213,48 @@ class V12SchemaTests(unittest.TestCase):
 
 
 class V12IdentityTests(_Campaigns):
-    def test_question_and_tau_mf_each_change_campaign_and_run_identity(self):
+    """Identity binding in two layers: the parsed canonical form, then the canonical hash itself."""
+
+    def test_parsed_canonical_identity_carries_question_and_tau_mf(self):
+        for question, data in ((MATERIAL_IDENTIFICATION, v12_definition()),
+                               (SPECIMEN_ENGINEERING_CALIBRATION, calibration_definition())):
+            definition = parse_campaign_definition(data)
+            with self.subTest(question=question):
+                self.assertEqual(definition.canonical["scientific_question"], question)
+                self.assertEqual(definition.canonical["tau_mf"], 0.02)
+                self.assertEqual(canonical_hash(definition.canonical), definition.campaign_hash)
+
+    def test_changing_only_the_canonical_question_changes_the_hash(self):
+        # Identity level: the flipped payload is not claimed to be a scientifically valid campaign document.
+        for data, other in ((v12_definition(), SPECIMEN_ENGINEERING_CALIBRATION),
+                            (calibration_definition(), MATERIAL_IDENTIFICATION)):
+            canonical = dict(parse_campaign_definition(data).canonical)
+            flipped = dict(canonical, scientific_question=other)
+            with self.subTest(to=other):
+                self.assertEqual(set(flipped) ^ set(canonical), set())
+                self.assertNotEqual(canonical_hash(flipped), canonical_hash(canonical))
+
+    def test_changing_tau_mf_changes_campaign_and_run_identity(self):
         base = parse_campaign_definition(v12_definition(MATERIAL_IDENTIFICATION, 0.02))
-        variants = {"question": parse_campaign_definition(v12_definition(SPECIMEN_ENGINEERING_CALIBRATION, 0.02)),
-                    "tau_mf": parse_campaign_definition(v12_definition(MATERIAL_IDENTIFICATION, 0.015))}
+        other = parse_campaign_definition(v12_definition(MATERIAL_IDENTIFICATION, 0.015))
+        self.assertNotEqual(other.campaign_hash, base.campaign_hash)
+        self.assertNotEqual(parse_campaign_definition(calibration_definition(0.015)).campaign_hash,
+                            parse_campaign_definition(calibration_definition(0.02)).campaign_hash)
         items, _ = self.specimens(base, "identity")
 
-        def run_hash(definition):  # the run identity binds the campaign hash (identity only; nothing executes)
-            return canonical_hash(campaign_run_identity(definition, items, "m" * 64, {}))
+        def run_identity(definition):  # identity only; nothing executes
+            return campaign_run_identity(definition, items, "m" * 64, {})
 
-        for name, other in variants.items():
-            with self.subTest(changed=name):
-                self.assertNotEqual(other.campaign_hash, base.campaign_hash)
-                self.assertNotEqual(run_hash(other), run_hash(base))
-                self.assertEqual(campaign_run_identity(other, items, "m" * 64, {})["campaign_hash"],
-                                 other.campaign_hash)
+        # The run identity binds campaign_hash, so any campaign-hash change (question or τ_mf) changes the run hash.
+        self.assertEqual(run_identity(other)["campaign_hash"], other.campaign_hash)
+        self.assertNotEqual(canonical_hash(run_identity(other)), canonical_hash(run_identity(base)))
         self.assertEqual(parse_campaign_definition(v12_definition()).campaign_hash, base.campaign_hash)
 
 
 class CalibrationRefusalTests(_Campaigns):
     def setUp(self):
         super().setUp()
-        self.calibration = parse_campaign_definition(v12_definition(SPECIMEN_ENGINEERING_CALIBRATION))
+        self.calibration = parse_campaign_definition(calibration_definition())
 
     def test_calibration_execution_is_refused_until_v12_i3(self):
         self.assertEqual(CALIBRATION_NOT_IMPLEMENTED, "SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED")
@@ -215,21 +264,28 @@ class CalibrationRefusalTests(_Campaigns):
         self.assertIn("V12-I3", str(refused.exception))
         self.assertFalse(isinstance(refused.exception, ValueError))  # generic fallback handlers never swallow it
         items, roots = self.specimens(self.calibration, "calibration")
-        solver = FakeSolver()
-        config = CampaignRunConfig(self.tmp / "runs", roots, "abq2024.bat", solver, FakeExtractor(), {}, "m" * 64)
-        with self.assertRaises(CalibrationNotImplementedRefusal):
-            CampaignRun(self.calibration, items, "m" * 64, config)
-        self.assertEqual(solver.commands, [])
-        self.assertFalse((self.tmp / "runs").exists())  # no run directory, no journal
-        with self.assertRaises(CalibrationNotImplementedRefusal):
-            prepare_run_manifest(self.calibration, None, items, roots, ROOT, self.tmp / "jobs")
-        with self.assertRaises(CalibrationNotImplementedRefusal):  # no effective-estimate report either
-            build_campaign_report(self.calibration, items, [], {"status": "CONVERGED", "parameters": None})
+        self.assertEqual([item.label for item in items], ["A"])  # one physical specimen
+        solver, extractor = FakeSolver(), FakeExtractor()
+        config = CampaignRunConfig(self.tmp / "runs", roots, "abq2024.bat", solver, extractor, {}, "m" * 64)
+        forbidden = mock.Mock(side_effect=AssertionError("a process was launched"))
+        with mock.patch.object(subprocess, "Popen", forbidden), mock.patch.object(subprocess, "run", forbidden), \
+                mock.patch("os.system", forbidden):
+            with self.assertRaises(CalibrationNotImplementedRefusal):
+                CampaignRun(self.calibration, items, "m" * 64, config)
+            with self.assertRaises(CalibrationNotImplementedRefusal):
+                prepare_run_manifest(self.calibration, None, items, roots, ROOT, self.tmp / "jobs")
+            with self.assertRaises(CalibrationNotImplementedRefusal):  # no effective-estimate report either
+                build_campaign_report(self.calibration, items, [], {"status": "CONVERGED", "parameters": None})
+        forbidden.assert_not_called()
+        self.assertEqual(solver.commands, [])  # no solver call, no optimiser evaluation
+        self.assertFalse((self.tmp / "runs").exists())  # no run directory
+        self.assertFalse((self.tmp / "jobs").exists())  # no planned jobs
+        self.assertEqual(list(self.tmp.rglob("journal.json")), [])  # no journal
 
     def test_no_automatic_fallback(self):
         # A calibration definition is refused whatever its run type or RUN_B gate; it is never run as material ID.
-        gated = parse_campaign_definition(v12_definition(
-            SPECIMEN_ENGINEERING_CALIBRATION, run_type="RUN_B", fitted_parameters=["E_in_plane_mpa", "G12_mpa"],
+        gated = parse_campaign_definition(calibration_definition(
+            run_type="RUN_B", fitted_parameters=["E_in_plane_mpa", "G12_mpa"],
             fixed_parameters={}, start={"E_in_plane_mpa": 52000.0, "G12_mpa": 4500.0},
             bounds={"E_in_plane_mpa": [26000.0, 104000.0], "G12_mpa": [2250.0, 9000.0]},
             engineering_plausibility={}, run_b_gate="D-999"))
@@ -285,7 +341,7 @@ class NoProcessTests(unittest.TestCase):
     def test_opening_a_v1_2_campaign_launches_no_process(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "campaign.json"
-            path.write_text(json.dumps(v12_definition(SPECIMEN_ENGINEERING_CALIBRATION)), encoding="utf-8")
+            path.write_text(json.dumps(calibration_definition()), encoding="utf-8")
             forbidden = mock.Mock(side_effect=AssertionError("a process was launched"))
             with mock.patch.object(subprocess, "Popen", forbidden), mock.patch.object(subprocess, "run", forbidden), \
                     mock.patch("os.system", forbidden):

@@ -693,7 +693,9 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
 - **Normative acceptance merged:** PR #42 (`auto-id/spec-v1.2-acceptance` → `main`), merge commit `61b5016`.
 - **V12-I1 (REVIEW_READY, branch `auto-id/v12-i1` from `61b5016`):** campaign schema
   `auto-id/identification-campaign/v1.2` with mandatory `scientific_question` and `tau_mf` (0 < τ_mf ≤ 0.02), both in
-  the campaign identity; v1 definitions and the M7 identities unchanged; calibration execution refused with
+  the campaign identity; specimen cardinality by question (v1 and v1.2 MATERIAL_IDENTIFICATION ≥ 2, v1.2
+  SPECIMEN_ENGINEERING_CALIBRATION exactly 1); v1 definitions and the M7 identities unchanged; calibration
+  execution refused with
   `SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED` until V12-I3; τ_mf has no numerical effect until V12-I2.
   Production v1.2 implementation remains incomplete.
 

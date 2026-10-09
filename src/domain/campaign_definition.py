@@ -15,7 +15,8 @@ The definition is data (schema ``auto-id/identification-campaign/v1``), parsed s
 
 SPEC v1.2 (D-078, V12-I1) adds schema ``auto-id/identification-campaign/v1.2``, which must declare its
 ``scientific_question`` (MATERIAL_IDENTIFICATION or SPECIMEN_ENGINEERING_CALIBRATION) and ``tau_mf``
-(0 < τ_mf ≤ 0.02) explicitly; both are part of the campaign identity.  Neither is ever inferred, and a ``v1``
+(0 < τ_mf ≤ 0.02) explicitly; both are part of the campaign identity.  A calibration campaign has exactly one
+physical specimen; a material-identification campaign keeps at least two.  Neither field is inferred, and a ``v1``
 definition carries neither, so historical identities are unchanged.  τ_mf is declared only: nothing uses it
 numerically yet (V12-I2).  Calibration execution is refused until its gate exists (V12-I3); there is no fallback
 to material identification.
@@ -425,7 +426,11 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
         _fail("not_fitted", "must state t_face, k_core and k_int explicitly.")
     not_fitted = {k: _text(v, f"not_fitted.{k}") for k, v in sorted(not_fitted.items())}
 
-    if not isinstance(data["specimens"], list) or len(data["specimens"]) < 2:
+    if question == SPECIMEN_ENGINEERING_CALIBRATION:  # SPEC v1.2 §6: one physical specimen
+        if not isinstance(data["specimens"], list) or len(data["specimens"]) != 1:
+            _fail("specimens", f"{SPECIMEN_ENGINEERING_CALIBRATION} requires exactly one physical specimen under "
+                               "SPEC v1.2 / D-078.")
+    elif not isinstance(data["specimens"], list) or len(data["specimens"]) < 2:  # v1 and v1.2 material campaigns
         _fail("specimens", "a campaign needs at least two specimens.")
     specimens = []
     for index, item in enumerate(data["specimens"]):
