@@ -4371,3 +4371,33 @@ first internal provider.
 - **Tests:** test_v12_i6_backend_integration 47 tests (2 store-gated); full suite without data stores 1816 OK (70 skipped); full suite with all data stores 1830 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #49.
+
+## 2026-10-09 — V12-I6 — LM-provenance findings closed: pipeline identity, LM acceptance decision (REVIEW_READY)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I6 (SUPERVISOR final provenance correction of PR #49 at
+  `cc0ff39`; architecture, I3 / I4 / I5 integration, GUI and tests accepted in principle; no redesign)
+- **Status:** REVIEW_READY (PR #49 not merged)
+- **Commits:** `b4b5baf`, `6da9fd1`; this governance commit.
+- **Pipeline run identity (`b4b5baf`):** `verify_lm_history` requires each specimen's pipeline run identity to be,
+  field by field, `governed_pipeline_identity` = `identification_pipeline.run_identity` of the campaign's own
+  `specimen_pipeline_config` (forward model and manifest, specimen passport, solver profile, frozen observations,
+  pairing policy, objective design with FIT / HOLDOUT rows, clusters and governed σ, LM settings, bounds, start,
+  extraction expectation, campaign / specimen / run-type extra) with the campaign run identity's archived packs;
+  otherwise LM_HISTORY_UNRELATED. No new identity format. Each field changed alone (run hash and hash chain
+  recomputed, evaluations kept) releases no calibration and no material value, on both scientific questions and on
+  the archived RUN_A / RUN_B journals, whose pipeline identities are exactly the governed ones. The campaign governance
+  has no cluster terms, so an ungoverned cluster declaration is an unrelated pipeline run (NOT_READY); the backend
+  cluster refusal stays covered under a governance that declares the cluster.
+- **LM acceptance decision (`6da9fd1`):** every history entry before the stop step records the LM's own strict
+  decision on the journalled residuals (accepted ⇔ objective(r_trial) < objective(r); note exactly "accepted" /
+  "rejected"; a trial objective exists) and the next entry follows it (accepted: the trial point, μ / mu_decrease, the
+  next iteration; rejected: the same point, μ · mu_increase, the same iteration); otherwise JACOBIAN_INCONSISTENT.
+  Red-probe: a genuine accepted entry relabelled note="rejected" with accepted=True rebuilt the identical Jacobian and
+  verified; it is now refused (synthetic calibration and material runs, archived RUN_A / RUN_B). The Jacobian
+  reconstruction and tolerances are unchanged.
+- **Unchanged:** SPEC v1.2, historical data and M5 system hashes (RUN_A `a5ea2de7…` reproduced), I5 F1 / F2, §13 FAIL
+  → no global material value, confirmed cluster NOT_READY, synthetic provenance visible, production calibration
+  execution blocked, GUI presentation only.
+- **Tests:** test_v12_i6_backend_integration 57 tests (4 store-gated); focused V12-I1..I6, SPEC v1.2, M5, M7 / M7b, GUI with all data stores 390 OK (0 skipped); full suite without data stores 1826 OK (72 skipped); full suite with all data stores 1840 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #49.

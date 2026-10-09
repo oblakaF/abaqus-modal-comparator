@@ -605,7 +605,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of V12-I6 (PR #49, not merged). Production calibration execution BLOCKED (separate HUMAN authorisation required); confirmed clusters CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of V12-I6 (PR #49, not merged; LM-provenance findings pipeline identity and LM acceptance decision closed). Production calibration execution BLOCKED (separate HUMAN authorisation required); confirmed clusters CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1340,13 +1340,35 @@
         "branch": "auto-id/v12-i6",
         "pr": 49,
         "base": "248d7eb5c66fa5568e70d34c0550fddf4dbad4cb",
-        "scope": "One read-only backend scientific path for a journalled campaign run (no install_* layer, no second engine): services/campaign_lm_provenance.py verify_lm_history proves the M5 Jacobian from the journals — campaign journal intact and its run identity the governed one; exactly one journalled LM result of this run, CONVERGED, no refusal; every campaign evaluation is its own candidate's and, per specimen, the identical record of that specimen's hash-chained pipeline journal of this run; the LM history starts at the start point, every recorded objective is 1/2|r|^2 of the journalled residuals and it ends with the stop step at p_hat; the accepted reconstruct_lm_jacobian at p_hat (FIT terms x fitted parameters) reproduces the journalled local_sd and stop step. services/campaign_scientific_backend.py judge_campaign_run dispatches on the declared question: MATERIAL_IDENTIFICATION = the accepted build_campaign_report unchanged (after LM provenance); SPECIMEN_ENGINEERING_CALIBRATION = one specimen and declared tau_mf, every journalled evaluation the Jacobian uses re-derived from its content-addressed FE pack (job re-rendered from the pinned INP, pack content hash, branch tracking and objective recomputed against the frozen baseline pack), the accepted campaign_m5_system on the specimen's FIT rows, the M5 evidence chain on it, the I3 gate inputs assembled from that verified evidence only, and build_calibration_output (I3 gate + I5 verifier) on the same system and evaluation; confirmed clusters a readiness refusal; the INP fragment only for RELEASED. Typed readiness record (RELEASED / REFUSED / NOT_READY / MATERIAL_VALUES_RELEASED) with refusal reasons, conditional uncertainty, diagnostic-only candidate, solver profiles and FE sources as journalled, production execution NOT_AUTHORISED and no HUMAN-authorised production calibration run. GUI: the existing Data Readiness Check page shows the stored record through the backend's readiness_presentation (read-only)",
+        "scope": "One read-only backend scientific path for a journalled campaign run (no install_* layer, no second engine): services/campaign_lm_provenance.py verify_lm_history proves the M5 Jacobian from the journals — campaign journal intact and its run identity the governed one; exactly one journalled LM result of this run, CONVERGED, no refusal; every campaign evaluation is its own candidate's and, per specimen, the identical record of that specimen's hash-chained pipeline journal, whose run identity is exactly the governed pipeline of this campaign run and specimen (run_identity of specimen_pipeline_config); the LM history starts at the start point, every recorded objective is 1/2|r|^2 of the journalled residuals, every step before the stop records the LM's strict acceptance decision and the next entry follows it, and it ends with the stop step at p_hat; the accepted reconstruct_lm_jacobian at p_hat (FIT terms x fitted parameters) reproduces the journalled local_sd and stop step. services/campaign_scientific_backend.py judge_campaign_run dispatches on the declared question: MATERIAL_IDENTIFICATION = the accepted build_campaign_report unchanged (after LM provenance); SPECIMEN_ENGINEERING_CALIBRATION = one specimen and declared tau_mf, every journalled evaluation the Jacobian uses re-derived from its content-addressed FE pack (job re-rendered from the pinned INP, pack content hash, branch tracking and objective recomputed against the frozen baseline pack), the accepted campaign_m5_system on the specimen's FIT rows, the M5 evidence chain on it, the I3 gate inputs assembled from that verified evidence only, and build_calibration_output (I3 gate + I5 verifier) on the same system and evaluation; confirmed clusters a readiness refusal; the INP fragment only for RELEASED. Typed readiness record (RELEASED / REFUSED / NOT_READY / MATERIAL_VALUES_RELEASED) with refusal reasons, conditional uncertainty, diagnostic-only candidate, solver profiles and FE sources as journalled, production execution NOT_AUTHORISED and no HUMAN-authorised production calibration run. GUI: the existing Data Readiness Check page shows the stored record through the backend's readiness_presentation (read-only)",
         "production_code_change": "src/services/campaign_lm_provenance.py (new); src/services/campaign_scientific_backend.py (new); src/services/identification_campaign_run.py: campaign_m5_system and campaign_guards extracted from _campaign_m5 (same construction; RUN_A / RUN_B system hashes reproduced); src/material_identification_ui.py: read-only scientific readiness section on the Data Readiness Check page. Calibration execution gate (CampaignDefinition.require_executable) unchanged; SPEC, I2 rules, I3 thresholds, I4 semantics and I5 science unchanged",
         "commits": [
           "52f656a8",
-          "7955ebf5"
+          "7955ebf5",
+          "b4b5bafe",
+          "6da9fd1e"
         ],
-        "tests": "test_v12_i6_backend_integration 47 tests (2 store-gated); full suite without data stores 1816 OK (70 skipped); full suite with all data stores 1830 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus",
+        "provenance_correction": {
+          "reviewed_head": "cc0ff397008e4ecde57faa33b288ef66abd0c8fb",
+          "supervisor_decision": "architecture, I3 / I4 / I5 integration, read-only GUI and test coverage accepted in principle; close two LM-provenance findings (pipeline run identity; LM acceptance-decision consistency) without redesigning I6; PR #49 not merged",
+          "closed_by": [
+            "b4b5bafe42352fd470658ab26f50df2d906908cb",
+            "6da9fd1e1a3daea3271740c7e5120ce942910914"
+          ]
+        },
+        "closed_findings": [
+          {
+            "id": "V12-I6-PIPELINE-IDENTITY",
+            "commit": "b4b5bafe42352fd470658ab26f50df2d906908cb",
+            "closure": "verify_lm_history requires each specimen's pipeline run identity to be, field by field, governed_pipeline_identity = identification_pipeline.run_identity of the campaign's specimen_pipeline_config (forward model and manifest, specimen passport, solver profile, frozen observations, pairing policy, objective design with FIT / HOLDOUT rows, clusters and governed sigmas, LM settings, bounds, start, extraction expectation, campaign / specimen / run-type extra) with the campaign run identity's archived packs; otherwise LM_HISTORY_UNRELATED (nothing released, no material value). The campaign governance has no cluster terms: an ungoverned cluster declaration is an unrelated pipeline run (NOT_READY); the backend cluster refusal stays covered under a governance that declares the cluster. The archived RUN_A / RUN_B pipeline identities are exactly the governed ones"
+          },
+          {
+            "id": "V12-I6-LM-DECISION",
+            "commit": "6da9fd1e1a3daea3271740c7e5120ce942910914",
+            "closure": "every LM history entry before the stop step records the LM's own strict decision on the journalled residuals (accepted is True exactly when objective(r_trial) < objective(r), as identification_step.run_bounded_lm; note exactly accepted / rejected; a trial objective exists) and the next entry follows it (accepted: the trial point, mu / mu_decrease, the next iteration; rejected: the same point, mu * mu_increase, the same iteration); otherwise JACOBIAN_INCONSISTENT. Red-probe (accepted=True relabelled note=rejected, identical Jacobian reconstruction) refused; reconstruct_lm_jacobian unchanged; no other tolerance"
+          }
+        ],
+        "tests": "test_v12_i6_backend_integration 57 tests (4 store-gated); focused V12-I1..I6, SPEC v1.2, M5, M7 / M7b, GUI with all data stores 390 OK (0 skipped); full suite without data stores 1826 OK (72 skipped); full suite with all data stores 1840 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus",
         "limitations": [
           "confirmed clusters: CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE (SUPERVISOR cluster policy); never released",
           "no HUMAN-authorised production calibration run exists: calibration execution stays refused by the unchanged gate; synthetic fake-solver runs (solver profile .../fake) prove the adapter only; real archived evidence verified read-only is RUN_A / RUN_B (material identification)",

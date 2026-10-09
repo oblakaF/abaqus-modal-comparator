@@ -761,8 +761,10 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
 - **V12-I6 (REVIEW_READY, PR #49, branch `auto-id/v12-i6` from `248d7eb`):** one read-only backend scientific path for a
   journalled run. `services/campaign_lm_provenance.py` proves the M5 Jacobian from the journals (governed run
   identity; one CONVERGED result of this run; every evaluation its candidate's and the identical record of the
-  specimen's hash-chained pipeline journal; the LM history's objectives and stop step at p̂ replayed; the accepted
-  `reconstruct_lm_jacobian` reproduces the journalled local sd and stop step). `services/campaign_scientific_backend.py`
+  specimen's hash-chained pipeline journal, whose run identity is exactly the governed pipeline (`run_identity` of
+  `specimen_pipeline_config`); the LM history's objectives, every step's strict acceptance decision and its
+  successor, and the stop step at p̂ replayed; the accepted `reconstruct_lm_jacobian` reproduces the journalled local
+  sd and stop step; LM-provenance corrections `b4b5baf`, `6da9fd1`). `services/campaign_scientific_backend.py`
   dispatches on the declared question: MATERIAL_IDENTIFICATION = the accepted campaign report unchanged;
   SPECIMEN_ENGINEERING_CALIBRATION = one specimen, declared τ_mf, every Jacobian evaluation re-derived from its
   content-addressed FE pack, the accepted M5 system on the specimen's FIT rows, I3 gate inputs from verified evidence
