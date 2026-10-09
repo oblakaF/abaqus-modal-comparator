@@ -4122,3 +4122,31 @@ first internal provider.
 - **Tests:** test_v12_i1_campaign_question 19 OK; with test_spec_v1_2_normative + test_spec_v1_2_policy_draft + test_m7_campaign + test_m7b_corrective + test_m5_stage_gate 99 OK (3 skipped without data stores); with data stores test_m7_campaign + test_m7b_corrective + V12-I1 + test_m5_stage_gate + 5 test_m4* modules 122 OK (0 skipped, no Abaqus); full suite without data stores 1644 OK (64 skipped)
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #43.
+
+## 2026-10-09 — V12-I2 — τ_mf-aware holdout and residual-family pattern (V12-I1 merged)
+
+- **V12-I1 merge:** PR #43 `auto-id/v12-i1` → `main`, merge commit `4e3a1ebaf7c435e8f6101cc9a4b8a36f14503655` (reviewed head `d32bd7c`, merged tree
+  `4b58f37` identical; SUPERVISOR-authorised). Linux CI on main 4e3a1eb: 1641 OK (68 skipped), success (run 37886464267). V12-I1 ACCEPTED.
+- **Stage:** SPEC v1.2 implementation track, step V12-I2 (no roadmap M-stage; M8 NOT_STARTED)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i2` (from `main` `4e3a1eb`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I2): tau_mf-aware holdout and residual-family pattern`
+- **Files:** `src/services/identification_uncertainty.py` (ResidualTerm σ, term σ binding, v1.2 pattern rules and
+  record), `src/services/identification_verdict.py` (τ_mf passed to the pattern test only; v1.2 holdout reason),
+  `src/services/identification_campaign_run.py` (per-term σ and the campaign τ_mf into the evidence chain); created
+  `tests/test_v12_i2_tau_mf_pattern.py`; updated the V12 source-scope guards in
+  `tests/test_v12_i1_campaign_question.py`, `tests/test_spec_v1_2_normative.py`, `tests/test_spec_v1_2_policy_draft.py`;
+  STATUS, ROADMAP, CHANGELOG.
+- **Behaviour:** v1.2 (declared τ_mf): family systematic iff ≥ 2 FIT terms, same sign, every
+  |Δ ln f| > max(2σ_term, τ_mf) (whitened |r| > max(2, τ_mf/σ_term)); holdout fails iff
+  |Δ ln f| > max(3σ_term, τ_mf); equality passes; each term with its own σ (cluster: σ_C of the objective); record
+  schema `auto-id/identification-uncertainty/v1.2-residual-pattern` with |Δ ln f|, σ_term, kσ_term, τ_mf and the
+  effective threshold per term. v1.1 (no τ_mf): rules, serialisation and record hashes unchanged. Birge formula
+  unchanged (gated by the pattern only); τ_mf never in Σ, Φ, whitening, statistical_sd, birge_adjusted_sd,
+  model_form_robustness, conservative uncertainty or §13. Calibration execution still refused.
+- **Scientific behaviour changed:** only for v1.2 campaigns that declare τ_mf (SPEC v1.2 §4); historical v1.1
+  campaigns, RUN_A / RUN_B records and hashes unchanged.
+- **Tests:** test_v12_i2_tau_mf_pattern 14 OK; focused (V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, identification_uncertainty, identification_verdict, model_form_robustness, identification_objective, identification_clusters) 193 OK (3 skipped without data stores); with data stores (M7 campaign, M7b, M7 closure, V12-I1, V12-I2, M5 gate, uncertainty, robustness, 5 test_m4* modules) 181 OK (0 skipped, no Abaqus); full suite without data stores 1658 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of V12-I2.

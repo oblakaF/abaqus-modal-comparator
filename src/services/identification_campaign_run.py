@@ -737,11 +737,16 @@ def _campaign_m5(definition: CampaignDefinition, specimens: Sequence[CampaignSpe
         f"{definition.sigma.setup_source}; Σ_meas {NOT_AVAILABLE}: no component (never zero)"),))
     system = assemble_system(matrix, covariance, ())
     families = {item.spec.term_id(row): family for item in specimens for row, family in item.families.items()}
-    fit = residual_terms(list(terms), [], final["residuals"], families)
-    held = [ResidualTerm(term, (term,), families[term], value) for term, value in final["holdout_residuals"].items()]
+    # Each term's governed σ is the σ its specimen objective whitened with (specimen_pipeline_config: row_sigma per
+    # frozen row); the campaign has no cluster terms.  Δ ln f = r·σ_term (SPEC v1.2 §4).
+    term_sigmas = {item.spec.term_id(row.row_id): row_sigma(definition).sigma
+                   for item in specimens for row in item.frozen.rows}
+    fit = residual_terms(list(terms), [], final["residuals"], families, term_sigmas)
+    held = [ResidualTerm(term, (term,), families[term], value, term_sigmas[term])
+            for term, value in final["holdout_residuals"].items()]
     p_hat = {n: float(result["parameters"][n]) for n in names}
     label = f"{definition.campaign_id} ({definition.run_type}): real-data campaign"
-    chain = compute_evidence_chain(system, fit, held, p_hat, label)
+    chain = compute_evidence_chain(system, fit, held, p_hat, label, definition.tau_mf)  # None for v1 definitions
     consistency = campaign_family_consistency(definition, whitened, final, result, chain.analysis.full_rank)
     macs = {}
     for item in specimens:

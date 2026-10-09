@@ -9,6 +9,7 @@ DECISIONS history and the M7 records must stay unchanged; and no v1.2 implementa
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 from pathlib import Path
 import re
@@ -32,6 +33,9 @@ REVIEWED_OPTIONS_CANONICAL_SHA256 = "4ea4dc92ce0e24f9e22625d44b7380ddb2ace2c52d0
 DECISIONS_BEFORE_D078_SHA256 = "257b84a83e156211fe00e5d0f2d69428e0acadc11bc3dfd817536151c574ba10"
 SPEC_V1_1_CONTENT_SHA256 = "62f206176a73c224f6f8fea0b2aed84c8154b9eb30bee87240d2c0b808ebb665"
 SUPERSEDED = "> **SUPERSEDED_BY_NORMATIVE_SPEC_V1_2**"
+# Implemented V12 steps: schema (I1) and τ_mf-aware pattern / holdout test (I2); confined there by the I1 tests.
+V12_MODULES = ("domain/campaign_definition.py", "services/identification_uncertainty.py",
+               "services/identification_verdict.py", "services/identification_campaign_run.py")
 
 
 def _text(name: str) -> str:
@@ -110,8 +114,12 @@ class NormativeSpecTests(unittest.TestCase):
         track = status["spec_v1_2_implementation"]
         self.assertEqual(track["status"], "IN_PROGRESS")
         self.assertEqual(sorted(track["steps"]), [f"V12-I{i}" for i in range(1, 7)])
-        self.assertEqual(track["steps"]["V12-I1"]["status"], "REVIEW_READY")  # never self-ACCEPTED
-        self.assertTrue(all(track["steps"][f"V12-I{i}"]["status"] == "TODO" for i in range(2, 7)))
+        # Roadmap order: an ACCEPTED prefix, then at most one step under work (never self-ACCEPTED), the rest TODO.
+        states = [track["steps"][f"V12-I{i}"]["status"] for i in range(1, 7)]
+        accepted = len(states) - len(list(itertools.dropwhile(lambda s: s == "ACCEPTED", states)))
+        rest = states[accepted:]
+        self.assertTrue(rest and all(s == "TODO" for s in rest[1:]), states)
+        self.assertIn(rest[0], ("TODO", "IN_PROGRESS", "REVIEW_READY", "REWORK"))
         self.assertEqual((status["m8"]["status"], status["m8"]["parked_branch"]["commit"]),
                          ("NOT_STARTED", "193db8dd4dd31c88ea1eae0a905f372e8a00c31d"))
         self.assertIn("| [SPEC_V1_2.md](SPEC_V1_2.md) | Governing scientific contract (normative, D-078)",
@@ -123,8 +131,8 @@ class NormativeSpecTests(unittest.TestCase):
 
     def test_no_v1_2_implementation_in_src_and_m7_records_unchanged(self):
         for path in (ROOT / "src").rglob("*.py"):
-            if path.relative_to(ROOT / "src").as_posix() == "domain/campaign_definition.py":
-                continue  # V12-I1 schema only (tests/test_v12_i1_campaign_question.py confines it there)
+            if path.relative_to(ROOT / "src").as_posix() in V12_MODULES:
+                continue  # V12-I1 schema / V12-I2 pattern test (tests/test_v12_i1_campaign_question.py)
             text = path.read_text(encoding="utf-8")
             with self.subTest(module=path.name):
                 # (the M7b label DIAGNOSTIC_OPTIMIZER_CANDIDATE_NOT_RELEASED predates v1.2 and is not a marker)

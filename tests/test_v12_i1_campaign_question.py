@@ -55,6 +55,9 @@ RUN_B_CAMPAIGN_HASH = "7c1f5db24fa9c4f4e90c82ca802c6dae22cbe5c7ec9e2989e63e439f6
 # The v1.1 synthetic campaign as computed before V12-I1 (main 61b5016): identity must not move.
 SYNTHETIC_V1_CAMPAIGN_HASH = "d869796d51a84d4d2fa0b90ab68c480acb8202c4a23086bf4e2f5a1ea4a0461e"
 SYNTHETIC_V1_RUN_HASH = "698228cebd5b3de81bde2a78c8ef61450db358076a9309a7464ae6aa2f1b0ab5"
+# The only production modules that may mention τ_mf: the schema (V12-I1) and the pattern / holdout test (V12-I2).
+TAU_MF_MODULES = ("domain/campaign_definition.py", "services/identification_uncertainty.py",
+                  "services/identification_verdict.py", "services/identification_campaign_run.py")
 
 
 def v12_definition(question=MATERIAL_IDENTIFICATION, tau_mf=0.02, **changes) -> dict:
@@ -304,6 +307,8 @@ class CalibrationRefusalTests(_Campaigns):
 
 class TauMfHasNoNumericalEffectTests(_Campaigns):
     def test_tau_mf_does_not_enter_sigma_objective_whitening_m5_or_family_consistency(self):
+        # From V12-I2 τ_mf reaches the residual-pattern / holdout evaluation only (its record and hash, and through
+        # them the verdict's evidence hashes); everything numerical below stays identical to v1.1.
         reference = parse_campaign_definition(synthetic_definition())
         runs = {"v1": self.execute(reference, "v1")}
         for tau in (0.02, 0.005):
@@ -325,16 +330,22 @@ class TauMfHasNoNumericalEffectTests(_Campaigns):
                                  [e["residuals"] for e in base_campaign.journal.records("evaluation")])
                 self.assertEqual({k: result[k] for k in ("status", "parameters", "objective", "local_sd")},
                                  {k: base_result[k] for k in ("status", "parameters", "objective", "local_sd")})
-                for key in ("m5_verdict", "family_consistency", "sigma", "uncertainty_basis", "formal_output",
+                for key in ("family_consistency", "sigma", "uncertainty_basis", "formal_output",
                             "model_form_robustness", "per_specimen_agreement", "excluded_mode_diagnostics"):
                     self.assertEqual(report[key], base_report[key], key)
-                self.assertEqual({k: v for k, v in report.items() if k != "campaign_hash"},
-                                 {k: v for k, v in base_report.items() if k != "campaign_hash"})
+                self.assertEqual(report["m5_verdict"]["evidence_hashes"]["statistical_sd"],
+                                 base_report["m5_verdict"]["evidence_hashes"]["statistical_sd"])
+                self.assertEqual(report["m5_verdict"]["verdicts"], base_report["m5_verdict"]["verdicts"])
+                self.assertEqual({k: v for k, v in report.items() if k not in ("campaign_hash", "m5_verdict")},
+                                 {k: v for k, v in base_report.items() if k not in ("campaign_hash", "m5_verdict")})
 
-    def test_tau_mf_is_confined_to_the_schema_module(self):
+    def test_tau_mf_is_confined_to_the_schema_and_pattern_modules(self):
         users = [p.relative_to(ROOT / "src").as_posix() for p in (ROOT / "src").rglob("*.py")
                  if "tau_mf" in p.read_text(encoding="utf-8")]
-        self.assertEqual(users, ["domain/campaign_definition.py"])
+        self.assertEqual(sorted(users), sorted(TAU_MF_MODULES))  # schema (V12-I1) and the pattern test (V12-I2)
+        for module in ("identification_objective.py", "practical_identifiability.py", "family_consistency.py",
+                       "model_form_robustness.py", "identification_pipeline.py"):  # Σ, Φ, whitening, §13, LOO
+            self.assertNotIn("tau_mf", (ROOT / "src" / "services" / module).read_text(encoding="utf-8"))
 
 
 class NoProcessTests(unittest.TestCase):

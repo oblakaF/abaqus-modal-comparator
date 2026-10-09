@@ -15,7 +15,8 @@ any of the following:
 - practical rank deficiency;
 - `statistical_sd` sd_ln > 0.08 (SPEC §10, not fitted; the estimate is preserved for provenance,
   with no refit);
-- the systematic residual pattern or a holdout with |r| > 3;
+- the systematic residual pattern or a holdout with |r| > 3 (with a declared SPEC v1.2 τ_mf:
+  per term |Δ ln f| > max(2σ_term, τ_mf) / max(3σ_term, τ_mf));
 - `birge_adjusted_sd` unavailable;
 - a refused or missing `model_form_robustness`;
 - a fitting-pair MAC violation;
@@ -297,8 +298,11 @@ def decide_verdicts(inputs: VerdictInputs) -> VerdictReport:
         if inputs.pattern.systematic_families:
             common.append(f"{Reason.SYSTEMATIC_PATTERN.value}: families {list(inputs.pattern.systematic_families)} "
                           "(probable model-form error)")
-        if inputs.pattern.holdout_failures:
+        if inputs.pattern.holdout_failures and inputs.pattern.tau_mf is None:
             common.append(f"{Reason.HOLDOUT_FAILURE.value}: {list(inputs.pattern.holdout_failures)} |r| > 3")
+        elif inputs.pattern.holdout_failures:  # SPEC v1.2 §4: per-term ln-frequency bound
+            common.append(f"{Reason.HOLDOUT_FAILURE.value}: {list(inputs.pattern.holdout_failures)} "
+                          f"|Δ ln f| > max(3σ_term, τ_mf = {inputs.pattern.tau_mf:g})")
     if inputs.birge is None or inputs.birge.status is not BirgeStatus.AVAILABLE:
         status = "missing" if inputs.birge is None else inputs.birge.status.value
         common.append(f"{Reason.BIRGE_UNAVAILABLE.value}: birge_adjusted_sd not available ({status}); model form")
@@ -393,11 +397,14 @@ class EvidenceChain:
 
 def compute_evidence_chain(system: PracticalSystem, fit_terms: Sequence[ResidualTerm],
                            holdout_terms: Sequence[ResidualTerm], p_hat: Mapping[str, float],
-                           context_label: str) -> EvidenceChain:
-    """M5.3 → M5.5 → M5.8 → M5.6 → M5.7 on one accepted system at p̂ (pure; no refit, no Abaqus)."""
+                           context_label: str, tau_mf: Optional[float] = None) -> EvidenceChain:
+    """M5.3 → M5.5 → M5.8 → M5.6 → M5.7 on one accepted system at p̂ (pure; no refit, no Abaqus).
+
+    A declared SPEC v1.2 τ_mf reaches the residual-pattern test (M5.8) only.
+    """
     analysis = analyse_practical_identifiability(system)
     statistical = statistical_sd(system, context_label)
-    pattern = residual_pattern_test(fit_terms, holdout_terms)
+    pattern = residual_pattern_test(fit_terms, holdout_terms, tau_mf)
     birge = birge_adjustment(system, statistical, pattern, fit_terms)
     robustness = linearised_model_form_robustness(system, fit_terms, p_hat) if analysis.full_rank else None
     return EvidenceChain(analysis, statistical, pattern, birge, robustness)
