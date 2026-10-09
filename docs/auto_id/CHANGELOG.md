@@ -4150,3 +4150,46 @@ first internal provider.
 - **Tests:** test_v12_i2_tau_mf_pattern 14 OK; focused (V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, identification_uncertainty, identification_verdict, model_form_robustness, identification_objective, identification_clusters) 193 OK (3 skipped without data stores); with data stores (M7 campaign, M7b, M7 closure, V12-I1, V12-I2, M5 gate, uncertainty, robustness, 5 test_m4* modules) 181 OK (0 skipped, no Abaqus); full suite without data stores 1658 OK (64 skipped)
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of V12-I2.
+
+## 2026-10-09 — V12-I3 — pure specimen-calibration scientific gate (V12-I2 merged)
+
+- **V12-I2 merge:** PR #44 `auto-id/v12-i2` → `main`, merge commit `e70295920c94dbf295bc9e481bb305b6bac57c5a` (reviewed head `6ea44cf`, merged tree
+  `618c114` identical; SUPERVISOR-authorised). Linux CI on main e702959: 1655 OK (68 skipped), success (run 37889717832). V12-I2 ACCEPTED.
+- **Stage:** SPEC v1.2 implementation track, step V12-I3 (no roadmap M-stage; M8 NOT_STARTED)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i3` (from `main` `e702959`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I3): pure specimen-calibration scientific gate`
+- **Files:** created `src/services/specimen_calibration_gate.py` and `tests/test_v12_i3_calibration_gate.py`;
+  `src/domain/campaign_definition.py` (shared `at_search_bound` helper — the existing `rel_tol=1e-12` bound semantics —
+  and the calibration refusal message: the gate exists, execution / output are V12-I4);
+  `src/services/identification_campaign_run.py` (uses `at_search_bound`; comments); V12 source-scope guards in
+  `tests/test_v12_i1_campaign_question.py`, `tests/test_spec_v1_2_normative.py`, `tests/test_spec_v1_2_policy_draft.py`;
+  STATUS, ROADMAP, CHANGELOG.
+- **Behaviour:** `evaluate_calibration_gate(CalibrationGateInputs)` returns a deterministic PASS / REFUSED record
+  (schema `auto-id/specimen-calibration-gate/v1`) with machine-readable reasons; it emits no calibration value and no
+  material property, and no execution path calls it yet. Calibration campaigns stay refused with
+  SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED. Existing campaigns, records and hashes unchanged.
+- **Tests:** test_v12_i3_calibration_gate 30 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 239 OK (3 skipped without data stores); full suite without data stores 1688 OK (64 skipped); full suite with all data stores (snadwich, carbon-project-archive, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1702 OK (5 skipped), no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of V12-I3.
+
+## 2026-10-09 — V12-I3 — evidence-binding correction (rows vs terms)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I3 (SUPERVISOR correction before merging PR #45)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i3` (previous head `0946993`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I3): row-level non-degradation and numeric evidence binding`
+- **Files:** `src/services/specimen_calibration_gate.py`, `tests/test_v12_i3_calibration_gate.py`; STATUS, CHANGELOG.
+- **Behaviour:** terms and rows are separated. A confirmed cluster stays one governed TERM for the pattern, holdout
+  rule, observability, families, Birge and model_form_robustness, but its physical ROWS are checked individually:
+  non-degradation (same FIT + HOLDOUT rows; max and RMS not worse; every row |expm1(Δ ln f)| ≤ 0.08) and strict pair /
+  tracking MAC per row (no aggregate cluster MAC). `term_rows` gives explicit membership. The bundle is bound
+  numerically, as input errors (never PASS / REFUSED): each v1.2 pattern term r·σ_term equals the signed candidate
+  term Δ ln f, each candidate term equals the mean of its candidate rows, model_form_robustness was computed at the
+  evaluated p̂ (its p̂ hash), p̂ is the exact fitted set of finite positive numbers, and the MAC maps carry no rows
+  outside the governed set. Science, thresholds, statuses and the blocked production execution are unchanged.
+- **Tests:** test_v12_i3_calibration_gate 38 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 247 OK (3 skipped without data stores); full suite without data stores 1696 OK (64 skipped); full suite with all data stores 1710 OK (5 skipped), no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #45.

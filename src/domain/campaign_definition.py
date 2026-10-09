@@ -18,8 +18,8 @@ SPEC v1.2 (D-078, V12-I1) adds schema ``auto-id/identification-campaign/v1.2``, 
 (0 < τ_mf ≤ 0.02) explicitly; both are part of the campaign identity.  A calibration campaign has exactly one
 physical specimen; a material-identification campaign keeps at least two.  Neither field is inferred, and a ``v1``
 definition carries neither, so historical identities are unchanged.  τ_mf is declared only: nothing uses it
-numerically yet (V12-I2).  Calibration execution is refused until its gate exists (V12-I3); there is no fallback
-to material identification.
+numerically yet (V12-I2).  Calibration execution is refused until it is integrated with its output record (the
+scientific gate is V12-I3, execution and output V12-I4); there is no fallback to material identification.
 
 Nothing here runs a solve.
 """
@@ -56,6 +56,13 @@ NO_EFFECTIVE_ESTIMATE = "NO_EFFECTIVE_ESTIMATE"
 IDENTIFIED_MATERIAL_PROPERTY = "IDENTIFIED_MATERIAL_PROPERTY"
 NO_MATERIAL_CLAIM = "NO_MATERIAL_PROPERTY_CLAIM"
 NOT_EXTERNALLY_VALIDATED = "not externally validated"  # D-060: on every real carbon result
+SEARCH_BOUND_REL_TOL = 1e-12  # an estimate this close to a numerical search bound is at that bound (M7 report)
+
+
+def at_search_bound(value: float, lower: float, upper: float) -> bool:
+    """Whether an estimate sits at a numerical search bound (the campaign report and SPEC §13 semantics)."""
+    return (math.isclose(value, lower, rel_tol=SEARCH_BOUND_REL_TOL)
+            or math.isclose(value, upper, rel_tol=SEARCH_BOUND_REL_TOL))
 
 _TOP_KEYS = {"schema", "campaign_id", "run_type", "decision", "parameterisation", "fitted_parameters",
              "fixed_parameters", "start", "bounds", "engineering_plausibility", "practical_target", "sigma", "lm",
@@ -80,7 +87,7 @@ class RunGateRefusal(Exception):
 
 
 class CalibrationNotImplementedRefusal(Exception):
-    """A SPECIMEN_ENGINEERING_CALIBRATION campaign cannot execute: its gate is not implemented (V12-I3).
+    """A SPECIMEN_ENGINEERING_CALIBRATION campaign cannot execute: execution and output are not integrated (V12-I4).
 
     Not a ValueError, so generic fallback handlers never swallow it; never rerouted to material identification.
     """
@@ -269,9 +276,9 @@ class CampaignDefinition:
     def require_question_supported(self) -> "CampaignDefinition":
         if self.scientific_question == SPECIMEN_ENGINEERING_CALIBRATION:
             raise CalibrationNotImplementedRefusal(
-                f"{CALIBRATION_NOT_IMPLEMENTED}: the specimen-calibration gate (SPEC v1.2 §6) is not implemented "
-                "before V12-I3; no calibration value is produced and the campaign is not run as material "
-                "identification (no fallback).")
+                f"{CALIBRATION_NOT_IMPLEMENTED}: the specimen-calibration scientific gate exists (V12-I3), but "
+                "production calibration execution and its output record are not integrated until V12-I4; no "
+                "calibration value is produced and the campaign is not run as material identification (no fallback).")
         return self
 
     def require_executable(self) -> "CampaignDefinition":

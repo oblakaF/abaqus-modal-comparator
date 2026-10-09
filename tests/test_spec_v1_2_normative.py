@@ -33,9 +33,11 @@ REVIEWED_OPTIONS_CANONICAL_SHA256 = "4ea4dc92ce0e24f9e22625d44b7380ddb2ace2c52d0
 DECISIONS_BEFORE_D078_SHA256 = "257b84a83e156211fe00e5d0f2d69428e0acadc11bc3dfd817536151c574ba10"
 SPEC_V1_1_CONTENT_SHA256 = "62f206176a73c224f6f8fea0b2aed84c8154b9eb30bee87240d2c0b808ebb665"
 SUPERSEDED = "> **SUPERSEDED_BY_NORMATIVE_SPEC_V1_2**"
-# Implemented V12 steps: schema (I1) and τ_mf-aware pattern / holdout test (I2); confined there by the I1 tests.
+# Implemented V12 steps: schema (I1), τ_mf-aware pattern / holdout test (I2), pure calibration gate (I3);
+# confined there by the I1 tests.
 V12_MODULES = ("domain/campaign_definition.py", "services/identification_uncertainty.py",
-               "services/identification_verdict.py", "services/identification_campaign_run.py")
+               "services/identification_verdict.py", "services/identification_campaign_run.py",
+               "services/specimen_calibration_gate.py")  # + the pure calibration gate (V12-I3)
 
 
 def _text(name: str) -> str:
