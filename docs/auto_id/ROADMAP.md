@@ -848,6 +848,8 @@ evaluations and refusals, LM result status / iterations / evaluations, Abaqus so
 budgets, recorded refusal / stop, missing evidence. No percentage, remaining time, live state or completion; unverified
 evidence shows no counts; a CONVERGED LM result is not a release. GUI: Refresh run progress (fresh from disk; a changed
 journal makes an earlier evaluation non-current) and Reopen selected run (re-verified; evaluation not current); a new
-selection clears progress. Computational resume is not enabled (HUMAN execution gate). M8.5–M8.8 `TODO`. The parked prototype branch
+selection clears progress. Journal freshness covers the campaign journal and every governed pipeline journal; a
+missing or unverified journal never compares equal, so an earlier evaluation is not kept current. Computational resume is
+not enabled (HUMAN execution gate). M8.5–M8.8 `TODO`. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.

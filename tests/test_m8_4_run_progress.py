@@ -77,6 +77,9 @@ class _Runs(unittest.TestCase):
         data = calibration_definition()
         data["lm"]["evaluation_budget"] = 3
         _Runs.budget, _ = run("budget", data)
+        data = calibration_definition()
+        data["sigma"]["setup"]["sd_ln"] = 0.2
+        _Runs.imprecise, _Runs.imprecise_store = run("imprecise", data)
         _Runs.tmp = tmp
 
     def copy_run(self, run) -> Path:
@@ -401,6 +404,143 @@ class GuiProgressTests(_Gui):
             self.assertNotIn(name, source)
 
 
+class PipelineFreshnessTests(_Gui):
+    """The freshness identity covers the campaign journal and every governed pipeline journal (M8.4 correction)."""
+
+    def evaluated_copy(self, run=None):
+        import material_identification_ui as ui
+
+        run = run or self.base
+        root = self.copy_run(run)
+        application = self.application()
+        ui.load_auto_id_source(application, "family", str(self.definition_file(run.definition)))
+        roots = {"synthetic": self.imprecise_store if run is self.imprecise else self.store}
+        with mock.patch.object(adapter, "campaign_specimens", return_value=(run.item,)), \
+                mock.patch("domain.experiment_fixture.fixture_roots_from_environment", return_value=roots):
+            ui.select_auto_id_run(application, str(_journal(root)))
+            ui.evaluate_auto_id_run(application)
+        return application, root, roots
+
+    def refresh(self, application, run=None, roots=None):
+        import material_identification_ui as ui
+
+        with mock.patch.object(adapter, "campaign_specimens", return_value=((run or self.base).item,)), \
+                mock.patch("domain.experiment_fixture.fixture_roots_from_environment",
+                           return_value=roots or {"synthetic": self.store}):
+            ui.refresh_auto_id_progress(application)
+
+    def assert_invalidated(self, application, record, snapshot):
+        self.assertEqual(self.readiness(application), NOT_EVALUATED)
+        scientific = json.dumps(tuple(application.material_scientific_readiness_table.items.values()))
+        for stale in ("RELEASED", "E_in_plane_mpa", "SYA/fake"):
+            self.assertNotIn(stale, scientific)
+        self.assertIs(application.scientific_readiness_record, record)
+        self.assertEqual(json.dumps(record, sort_keys=True), snapshot)
+
+    @staticmethod
+    def pipeline_journal(root: Path) -> Path:
+        found = list(root.glob("specimens/*/*/*/journal.json"))
+        assert len(found) == 1, found
+        return found[0]
+
+    def released(self):
+        application, root, _ = self.evaluated_copy()
+        self.assertEqual(self.readiness(application), "RELEASED")
+        record = application.scientific_readiness_record
+        return application, root, record, json.dumps(record, sort_keys=True)
+
+    @staticmethod
+    def appended(journal: Path) -> None:
+        document = _load(journal)
+        _write(journal, rechain(dict(document, entries=document["entries"] + [copy.deepcopy(document["entries"][-1])])))
+
+    def test_a_deleted_pipeline_journal_invalidates_the_evaluation(self):
+        application, root, record, snapshot = self.released()
+        self.pipeline_journal(root).unlink()  # the campaign journal is unchanged
+        self.refresh(application)
+        self.assertIn("pipeline journal NOT VERIFIED", self.progress_rows(application)["Specimen A"])
+        self.assert_invalidated(application, record, snapshot)
+
+    def test_b_a_broken_pipeline_hash_chain_invalidates_the_evaluation(self):
+        application, root, record, snapshot = self.released()
+        journal = self.pipeline_journal(root)
+        document = _load(journal)
+        document["entries"][1]["record"]["job_name"] = "TAMPERED"
+        _write(journal, document)
+        self.refresh(application)
+        self.assertIn("pipeline journal NOT VERIFIED", self.progress_rows(application)["Specimen A"])
+        self.assert_invalidated(application, record, snapshot)
+
+    def test_c_a_genuine_pipeline_append_makes_the_evaluation_non_current(self):
+        application, root, record, snapshot = self.released()
+        self.appended(self.pipeline_journal(root))  # valid chain, same governed identity; campaign unchanged
+        self.refresh(application)
+        self.assertEqual(self.progress_state(application), "RESULT_RECORDED")  # still verified evidence ...
+        self.assertNotIn("NOT VERIFIED", self.progress_rows(application)["Specimen A"])
+        self.assert_invalidated(application, record, snapshot)  # ... but not the evidence that was evaluated
+
+    def test_d_unchanged_journals_keep_the_evaluation_current(self):
+        application, root, record, _ = self.released()
+        self.refresh(application)
+        self.refresh(application)
+        self.assertEqual(self.readiness(application), "RELEASED")
+        self.assertIs(application.scientific_readiness_record, record)
+
+    def test_e_genuine_refused_and_not_ready_results_remain_displayable(self):
+        import material_identification_ui as ui
+
+        application, root, roots = self.evaluated_copy(self.imprecise)
+        self.assertEqual(self.readiness(application), "REFUSED")
+        self.refresh(application, self.imprecise, roots)  # unchanged verified evidence: still current
+        self.assertEqual(self.readiness(application), "REFUSED")
+        root = self.copy_run(self.base)
+        self.pipeline_journal(root).unlink()
+        application = self.application()
+        ui.load_auto_id_source(application, "family", str(self.definition_file(self.base.definition)))
+        self.call(ui.select_auto_id_run, application, str(_journal(root)))
+        self.call(ui.evaluate_auto_id_run, application)
+        self.assertEqual(self.readiness(application), "NOT_READY")  # the genuine backend refusal is shown
+        self.assertIn("LM_HISTORY_MISSING",
+                      dict(application.material_scientific_readiness_table.items.values())["Refusal reasons"])
+        self.refresh(application)  # incomplete evidence never compares equal: a refresh does not keep it current
+        self.assertEqual(self.readiness(application), NOT_EVALUATED)
+
+    def test_f_a_new_explicit_evaluation_returns_the_current_backend_result(self):
+        import material_identification_ui as ui
+
+        application, root, record, _ = self.released()
+        journal = self.pipeline_journal(root)
+        self.appended(journal)
+        self.refresh(application)
+        self.assertEqual(self.readiness(application), NOT_EVALUATED)
+        self.call(ui.evaluate_auto_id_run, application)
+        # The genuine current backend answer on the changed evidence (here a refusal: the appended copy duplicates a
+        # journalled evaluation), exactly as the backend returns it for the same files
+        direct = adapter.evaluate_stored_run(self.base.definition, _journal(root), ROOT, {"synthetic": self.store},
+                                             [self.base.item]).readiness.to_dict()
+        self.assertEqual(application.scientific_readiness_record, direct)
+        self.assertIsNot(application.scientific_readiness_record, record)
+        self.assertEqual(self.readiness(application), direct["status"])
+        self.assertEqual(direct["status"], "NOT_READY")
+        self.refresh(application)  # recorded with the same freshness semantics: still current
+        self.assertEqual(self.readiness(application), direct["status"])
+        journal.unlink()
+        self.call(ui.evaluate_auto_id_run, application)
+        self.assertEqual(self.readiness(application), "NOT_READY")
+        self.assertIn("LM_HISTORY_MISSING",
+                      dict(application.material_scientific_readiness_table.items.values())["Refusal reasons"])
+
+    def test_h_reopen_and_switching_still_reset(self):
+        import material_identification_ui as ui
+
+        application, root, record, snapshot = self.released()
+        self.call(ui.reopen_auto_id_run, application)
+        self.assert_invalidated(application, record, snapshot)
+        ui.load_auto_id_source(application, "family", str(RUN_A))
+        self.assertEqual(self.progress_state(application), "NOT_SELECTED")
+        self.assert_invalidated(application, record, snapshot)
+
+
 class RealTkProgressTests(_Gui):
     def test_real_gui_progress(self):
         try:
@@ -465,6 +605,14 @@ class ArchivedProgressTests(unittest.TestCase):
                 self.assertTrue(all("pipeline " in rows[k] and "NOT VERIFIED" not in rows[k] for k in specimens))
                 self.assertIn("a converged LM result is not a release", rows["Scientific evaluation"])
                 self.assertEqual(application.material_scientific_readiness_status_label.kwargs["text"], NOT_EVALUATED)
+                from services.run_progress import run_evidence_fingerprint
+
+                specimens = application.auto_id_specimens[1]  # the governed inputs prepared for this selection
+                fingerprint = run_evidence_fingerprint(application.auto_id_preparation.definition, journal, specimens)
+                self.assertIsNotNone(fingerprint)  # campaign + both governed pipeline journals verified
+                self.assertEqual(fingerprint, application.auto_id_progress.fingerprint)
+                self.assertEqual(run_evidence_fingerprint(application.auto_id_preparation.definition, journal,
+                                                          specimens), fingerprint)  # stable on unchanged evidence
                 self.assertEqual(_tree(Path(self.roots[store])), before)  # read-only
 
 

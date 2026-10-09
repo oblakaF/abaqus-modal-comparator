@@ -15,6 +15,12 @@ Every value comes from the accepted journals, after verification:
 - counts are the journals' own records (campaign ``evaluation`` / ``result``; pipeline ``evaluation`` / ``solve`` /
   ``solve_failure`` / ``extraction``, as ``IdentificationPipeline.counts``), the budgets are the run identity's.
 
+The freshness identity (``RunProgress.fingerprint`` / ``run_evidence_fingerprint``) covers the verified campaign
+journal (run hash, entry chain) and, in definition order, every specimen's governed pipeline journal (label, governed
+pipeline run hash, entry chain).  It is ``None`` — equal to nothing — whenever any part is missing or unverified or the
+governed specimen inputs are unavailable, so an earlier scientific evaluation is never kept current on incomplete
+evidence.
+
 Nothing is inferred: no percentage, remaining time, live solver activity or completion.  A journal without a result
 record has no verified LM result — it is not shown as running.  A journalled CONVERGED result is not a scientific
 release; the scientific verdict is the shared backend's (Evaluate Stored Run).  Invalid evidence yields no counts.
@@ -50,9 +56,8 @@ EXECUTION = ("NOT_AUTHORISED in the GUI: no computation is resumed or started he
              "HUMAN execution gate; production calibration execution BLOCKED / NOT_AUTHORISED")
 
 
-def journal_fingerprint(run_hash: str, entries: Sequence) -> str:
-    """Identity of a verified campaign journal's current content (it changes whenever an entry is appended)."""
-    return canonical_hash([run_hash, [e.get("entry_hash") for e in entries if isinstance(e, Mapping)]])
+def _chain(entries: Sequence) -> list:
+    return [e.get("entry_hash") for e in entries if isinstance(e, Mapping)]
 
 
 @dataclass(frozen=True)
@@ -60,7 +65,7 @@ class RunProgress:
     state: ProgressState
     journal_path: Optional[str]
     run_hash: Optional[str]
-    fingerprint: Optional[str]  # hash of the verified campaign journal's entry chain (changes when it grows)
+    fingerprint: Optional[str]  # campaign + every governed pipeline journal; None when any part is not verified
     rows: tuple[tuple[str, str], ...]
     problems: tuple[str, ...] = field(default_factory=tuple)
 
@@ -80,8 +85,8 @@ def _not_verified(path, reason: str, run_hash: Optional[str] = None) -> RunProgr
                         ("Progress", "not shown: unverified evidence is never presented as progress")), (reason,))
 
 
-def _pipeline_rows(definition, specimens, run) -> tuple[list[tuple[str, str]], list[str]]:
-    rows, problems = [], []
+def _pipeline_rows(definition, specimens, run) -> tuple[list[tuple[str, str]], list[str], list]:
+    rows, problems, parts = [], [], []
     for item in specimens:
         label = f"Specimen {item.label}"
         try:
@@ -96,6 +101,7 @@ def _pipeline_rows(definition, specimens, run) -> tuple[list[tuple[str, str]], l
             rows.append((label, "pipeline journal NOT VERIFIED (it is not the governed pipeline run)"))
             problems.append(f"{item.label}: pipeline journal not the governed run")
             continue
+        parts.append([item.label, pipeline_hash, _chain(entries)])
         evaluations = _records(entries, "evaluation")
         solves = sum(bool(s.get("executed")) for s in _records(entries, "solve"))
         failures = len(_records(entries, "solve_failure"))
@@ -104,7 +110,13 @@ def _pipeline_rows(definition, specimens, run) -> tuple[list[tuple[str, str]], l
                             f"{sum(e.get('fe_source') == 'archived-validated-pack' for e in evaluations)} from "
                             f"archived packs); Abaqus solves recorded {solves + failures} ({failures} failed); "
                             f"{len(_records(entries, 'extraction'))} extraction(s)"))
-    return rows, problems
+    return rows, problems, parts
+
+
+def run_evidence_fingerprint(definition: Optional[CampaignDefinition], journal_path,
+                             specimens: Optional[Sequence[CampaignSpecimenInput]]) -> Optional[str]:
+    """The freshness identity of the selected run's journals (``None`` unless every part is verified)."""
+    return inspect_run_progress(definition, journal_path, specimens).fingerprint
 
 
 def inspect_run_progress(definition: Optional[CampaignDefinition], journal_path,
@@ -161,10 +173,13 @@ def inspect_run_progress(definition: Optional[CampaignDefinition], journal_path,
                      f"{last.get('lm_evaluations')}; Abaqus solves used {last.get('abaqus_solves_used')}"))
         if last.get("refusal") or last.get("stop"):
             rows.append(("Recorded refusal / stop", str(last.get("refusal") or last.get("stop"))))
+    fingerprint = None
     if specimens is not None:
-        pipeline_rows, pipeline_problems = _pipeline_rows(definition, specimens, run)
+        pipeline_rows, pipeline_problems, parts = _pipeline_rows(definition, specimens, run)
         rows += pipeline_rows
         problems += pipeline_problems
+        if not pipeline_problems and len(parts) == len(tuple(specimens)):
+            fingerprint = canonical_hash([run_hash, _chain(entries), parts])
     else:
         rows.append(("Specimen pipelines", f"not inspected: governed specimen inputs unavailable ({specimens_problem})"))
         problems.append("specimen pipelines not inspected")
@@ -174,5 +189,4 @@ def inspect_run_progress(definition: Optional[CampaignDefinition], journal_path,
                  if converged else "the shared backend would refuse it: no single CONVERGED LM result is journalled"))
     rows.append(("Incomplete or missing evidence", "; ".join(problems) if problems else "none found by this inspection"))
     rows.append(("Execution", EXECUTION))
-    fingerprint = journal_fingerprint(run_hash, entries)
     return RunProgress(state, str(run.journal_path), run_hash, fingerprint, tuple(rows), tuple(problems))

@@ -1242,7 +1242,12 @@
         "commit": "013e3b013be4c53540c290522edb882d20c84def",
         "scope": "services/run_progress.py inspect_run_progress: verified, read-only progress of the explicitly selected stored run of the selected governed campaign — campaign journal (accepted format, directory = run hash, hash chain, campaign hash; governed run identity field by field when the governed specimen inputs are available), each pipeline journal at its governed path (verified the same way); counts from the journals' own records (campaign evaluations / refusals, LM result status, iterations, LM evaluations, Abaqus solves used; pipeline evaluations, solves, failed solves, extractions) and budgets from the run identity. States NOT_SELECTED / JOURNAL_NOT_VERIFIED / NO_RESULT_RECORDED / RESULT_RECORDED / MULTIPLE_RESULTS_RECORDED (presentation, never a verdict or a live process state); unverified evidence shows no counts; no percentage, remaining time or completion is inferred; a CONVERGED LM result is not a release. GUI: progress section with Refresh run progress (fresh from disk; an active evaluation stops being current when the journal changed) and Reopen selected run (re-selects and re-verifies; the earlier evaluation is not current); a new run or campaign selection clears progress. 'Resume' means resume of inspection: computational resume (CampaignRun journal replay) stays behind its HUMAN execution gate and is not offered",
         "boundary": "computational resume is not enabled: CampaignRun.run / evaluate, run_bounded_lm, prepare_run_manifest, extract_archived_odbs, Abaqus and solver processes are never called from the GUI; execution is shown NOT_AUTHORISED; production calibration BLOCKED / NOT_AUTHORISED",
-        "tests": "test_m8_4_run_progress 18 tests (1 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.3 tests retained; focused M8.1-M8.4 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 431 OK; full suite without data stores 1917 OK (78 skipped); full suite with all data stores 1931 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
+        "tests": "test_m8_4_run_progress 25 tests (7 pipeline-freshness tests A-H; 1 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.3 tests retained; focused M8.1-M8.4 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 438 OK; full suite without data stores 1924 OK (78 skipped); full suite with all data stores 1938 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus",
+        "journal_freshness_correction": {
+          "reviewed_head": "6a02817e757cf5d998a4c8e59134db8f9ab96e85",
+          "supervisor_decision": "M8.4 accepted in principle; the freshness identity must cover the governed pipeline journals of every specimen; PR #54 not merged",
+          "closure": "freshness identity = canonical hash of [campaign run hash, the verified campaign journal entry-hash chain, and for every campaign specimen in definition order: label, governed pipeline run hash (= its governed directory), the verified pipeline journal entry-hash chain]; None (equal to nothing) when the campaign journal or any governed pipeline journal is missing, unreadable, unrelated or hash-chain-invalid, or the governed specimen inputs are unavailable. Refresh run progress and the fingerprint recorded after Evaluate Stored Run use the same function (run_progress.run_evidence_fingerprint); a None or different identity makes the active evaluation non-current. Stored records unchanged; no science recomputed on refresh"
+        }
       },
       "M8.5": {
         "status": "TODO"
@@ -1494,7 +1499,7 @@
         "the production calibration execution gate (CampaignDefinition.require_executable) remains in place",
         "no governed production calibration campaign has been authorised",
         "real Abaqus execution needs separate HUMAN approval",
-        "M8 remains parked pending a separate SUPERVISOR decision"
+        "M8 (current state): the new M8 implementation track is IN_PROGRESS (M8.1-M8.3 ACCEPTED, M8.4 REVIEW_READY, M8.5-M8.8 TODO); the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
       ]
     }
   }

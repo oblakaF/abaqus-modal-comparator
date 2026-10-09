@@ -1132,13 +1132,15 @@ def _inspect_auto_id_progress(app, journal_path):
 
 def refresh_auto_id_progress(app) -> None:
     """"Refresh run progress": re-read and re-verify the selected run's journals; no evaluation is started. An active
-    scientific evaluation stops being current when the journal content changed since it was evaluated."""
+    scientific evaluation stops being current when the campaign or any governed pipeline journal changed since it was
+    evaluated, or when any of them is missing or not verified (an unverified identity never compares equal)."""
 
     path = getattr(app, "auto_id_selected_run_path", None)
     _inspect_auto_id_progress(app, path)
     progress = app.auto_id_progress
+    evaluated = getattr(app, "auto_id_evaluated_fingerprint", None)
     if getattr(app, "auto_id_active_evaluation", None) is not None \
-            and (not progress.verified or progress.fingerprint != getattr(app, "auto_id_evaluated_fingerprint", None)):
+            and (progress.fingerprint is None or evaluated is None or progress.fingerprint != evaluated):
         app.auto_id_active_evaluation = None
         app.auto_id_run_message = ("The selected run's journal changed or is no longer verified since its evaluation: "
                                    "the earlier result is not current (evaluate it again).")
@@ -1210,10 +1212,11 @@ def evaluate_auto_id_run(app) -> None:
             app.auto_id_evaluated_record = record
             app.auto_id_evaluated_run_hash = evaluation.run.run_hash
             app.auto_id_active_evaluation = (run_path, evaluation.run.run_hash, record)
-            from services.run_progress import journal_fingerprint
+            from services.run_progress import run_evidence_fingerprint
 
-            app.auto_id_evaluated_fingerprint = journal_fingerprint(evaluation.run.run_hash,
-                                                                    evaluation.run.campaign_journal.get("entries") or ())
+            # the same freshness identity as Refresh run progress (campaign + every governed pipeline journal)
+            specimens, _ = _auto_id_specimens(app, definition)
+            app.auto_id_evaluated_fingerprint = run_evidence_fingerprint(definition, run_path, specimens)
             notes = f" Loading notes: {'; '.join(evaluation.notes)}." if evaluation.notes else ""
             app.auto_id_run_message = (f"Evaluated stored run {evaluation.run.run_hash[:12]} with the shared backend: "
                                        f"{record['status']} (see Data Readiness Check).{notes}")

@@ -4552,3 +4552,22 @@ first internal provider.
   `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #54.
+
+## 2026-10-10 — M8.4 — journal freshness correction (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID, mini-step M8.4 (SUPERVISOR final journal-freshness correction of PR #54 at `6a02817`)
+- **Status:** REVIEW_READY (PR #54 not merged); M8.1-M8.3 ACCEPTED; M8.5..M8.8 TODO
+- **Finding:** the freshness identity covered only the campaign journal; a deleted, tampered or extended specimen
+  pipeline journal left an earlier RELEASED evaluation current after Refresh run progress.
+- **Closure:** freshness identity = canonical hash of [campaign run hash, the verified campaign journal entry-hash chain, and for every campaign specimen in definition order: label, governed pipeline run hash (= its governed directory), the verified pipeline journal entry-hash chain]; None (equal to nothing) when the campaign journal or any governed pipeline journal is missing, unreadable, unrelated or hash-chain-invalid, or the governed specimen inputs are unavailable. Refresh run progress and the fingerprint recorded after Evaluate Stored Run use the same function (run_progress.run_evidence_fingerprint); a None or different identity makes the active evaluation non-current. Stored records unchanged; no science recomputed on refresh.
+- **Red-probe:** tests A (pipeline journal deleted), B (broken pipeline hash chain), C (genuine valid pipeline append),
+  E (NOT_READY on incomplete evidence kept current by a refresh) and F (new evaluation after a change) failed before;
+  D (unchanged journals stay current), G (RUN_A / RUN_B) and H (reopen / switching) pass.
+- **Governance:** the STATUS V12 completion limitation now states the current M8 state (new track IN_PROGRESS; the
+  historical `auto-id/m8` prototype PARKED at `193db8d`). Historical checkpoints unchanged.
+- **Tests:** test_m8_4_run_progress 25 tests (7 pipeline-freshness tests A-H; 1 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.3 tests retained; focused M8.1-M8.4 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 438 OK; full suite without data stores 1924 OK (78 skipped); full suite with all data stores 1938 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** scientific thresholds, SPEC v1.1 / v1.2, LM / Jacobian mathematics, M5 / M7 results, campaign
+  definitions, accepted records, production execution gates; production calibration BLOCKED / NOT_AUTHORISED; no
+  computational resume.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #54.
