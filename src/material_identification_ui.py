@@ -1067,6 +1067,7 @@ def load_auto_id_source(app, kind: str, path: str) -> None:
 
     app.auto_id_source = (kind, str(path))
     _clear_auto_id_run(app)  # M8.3: a run belongs to one campaign selection; a new selection resets it
+    app.auto_id_specimens = None  # M8.4: governed specimen inputs belong to one campaign selection
     try:
         roots = fixture_roots_from_environment()
         if kind == "family":
@@ -1091,6 +1092,71 @@ def _clear_auto_id_run(app) -> None:
     app.auto_id_selected_run_path = None
     app.auto_id_selected_run_hash = None
     app.auto_id_run_message = AUTO_ID_NO_RUN
+    app.auto_id_progress = None  # M8.4: no progress of another selection stays visible
+
+
+def _auto_id_specimens(app, definition):
+    """The selected campaign's governed specimen inputs (read-only preparation), cached for this campaign selection."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+    from services.stored_run_evidence import campaign_specimens
+
+    cached = getattr(app, "auto_id_specimens", None)
+    if cached is not None and cached[0] == definition.campaign_hash:
+        return cached[1], cached[2]
+    try:
+        specimens, problem = campaign_specimens(definition, AUTO_ID_REPO_ROOT, fixture_roots_from_environment()), None
+    except Exception as error:  # stores unavailable or the chain refused: shown, never a crash
+        specimens, problem = None, str(error)
+    app.auto_id_specimens = (definition.campaign_hash, specimens, problem)
+    return specimens, problem
+
+
+def _inspect_auto_id_progress(app, journal_path):
+    """M8.4: verified, read-only progress of the selected stored run (fresh from disk; nothing is executed)."""
+
+    from services.auto_id_wizard import FamilyPreparation
+    from services.run_progress import inspect_run_progress
+
+    preparation = getattr(app, "auto_id_preparation", None)
+    definition = preparation.definition if isinstance(preparation, FamilyPreparation) else None
+    specimens, problem = (None, None) if definition is None or journal_path is None \
+        else _auto_id_specimens(app, definition)
+    try:
+        app.auto_id_progress = inspect_run_progress(definition, journal_path, specimens, problem)
+    except Exception as error:  # never a GUI crash; never presented as progress
+        from services.run_progress import _not_verified
+
+        app.auto_id_progress = _not_verified(journal_path, f"inspection failed ({error})")
+
+
+def refresh_auto_id_progress(app) -> None:
+    """"Refresh run progress": re-read and re-verify the selected run's journals; no evaluation is started. An active
+    scientific evaluation stops being current when the campaign or any governed pipeline journal changed since it was
+    evaluated, or when any of them is missing or not verified (an unverified identity never compares equal)."""
+
+    path = getattr(app, "auto_id_selected_run_path", None)
+    _inspect_auto_id_progress(app, path)
+    progress = app.auto_id_progress
+    evaluated = getattr(app, "auto_id_evaluated_fingerprint", None)
+    if getattr(app, "auto_id_active_evaluation", None) is not None \
+            and (progress.fingerprint is None or evaluated is None or progress.fingerprint != evaluated):
+        app.auto_id_active_evaluation = None
+        app.auto_id_run_message = ("The selected run's journal changed or is no longer verified since its evaluation: "
+                                   "the earlier result is not current (evaluate it again).")
+    _refresh_auto_id_setup_page(app)
+    _refresh_data_readiness_page(app)
+
+
+def reopen_auto_id_run(app) -> None:
+    """"Reopen selected run": select the same journal again (identity re-verified, earlier evaluation not current)."""
+
+    path = getattr(app, "auto_id_selected_run_path", None)
+    if path is None:
+        app.auto_id_run_message = "Nothing to reopen: select the journal of an existing run of this campaign."
+        _refresh_auto_id_setup_page(app)
+        return
+    select_auto_id_run(app, path)
 
 
 def select_auto_id_run(app, journal_path) -> None:
@@ -1109,6 +1175,7 @@ def select_auto_id_run(app, journal_path) -> None:
         app.auto_id_selected_run_path = str(run.journal_path)
         app.auto_id_selected_run_hash = run.run_hash
         app.auto_id_run_message = f"Selected run {run.run_hash[:12]} ({run.journal_path}); not evaluated yet."
+    _inspect_auto_id_progress(app, journal_path)  # M8.4: the new selection is verified before anything is shown
     _refresh_auto_id_setup_page(app)
     _refresh_data_readiness_page(app)
 
@@ -1145,6 +1212,11 @@ def evaluate_auto_id_run(app) -> None:
             app.auto_id_evaluated_record = record
             app.auto_id_evaluated_run_hash = evaluation.run.run_hash
             app.auto_id_active_evaluation = (run_path, evaluation.run.run_hash, record)
+            from services.run_progress import run_evidence_fingerprint
+
+            # the same freshness identity as Refresh run progress (campaign + every governed pipeline journal)
+            specimens, _ = _auto_id_specimens(app, definition)
+            app.auto_id_evaluated_fingerprint = run_evidence_fingerprint(definition, run_path, specimens)
             notes = f" Loading notes: {'; '.join(evaluation.notes)}." if evaluation.notes else ""
             app.auto_id_run_message = (f"Evaluated stored run {evaluation.run.run_hash[:12]} with the shared backend: "
                                        f"{record['status']} (see Data Readiness Check).{notes}")
@@ -1217,6 +1289,25 @@ def _build_auto_id_setup_page(app, page) -> None:
     ).pack(side="left", padx=(8, 0))
     app.material_auto_id_run_label = ttk.Label(page, text=AUTO_ID_NO_RUN, justify="left", wraplength=1100)
     app.material_auto_id_run_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    progress = ttk.LabelFrame(page, text="Selected run progress (read-only; nothing is resumed or executed)", padding=8)
+    progress.pack(fill="x", pady=(0, 8))
+    progress_buttons = ttk.Frame(progress)
+    progress_buttons.pack(anchor="w", pady=(0, 4))
+    ttk.Button(
+        progress_buttons,
+        text="Refresh run progress",
+        command=lambda: refresh_auto_id_progress(app),
+    ).pack(side="left")
+    ttk.Button(
+        progress_buttons,
+        text="Reopen selected run",
+        command=lambda: reopen_auto_id_run(app),
+    ).pack(side="left", padx=(8, 0))
+    app.material_auto_id_progress_label = ttk.Label(progress, text="NOT_SELECTED", style="MetricValue.TLabel")
+    app.material_auto_id_progress_label.pack(anchor="w", pady=(0, 4))
+    app.material_auto_id_progress_table = _build_read_only_table(
+        progress, ("item", "value"), ("Item", "Recorded in the verified journals"), (240, 900), height=8
+    )
     app.material_auto_id_source_label = ttk.Label(page, text="", justify="left", wraplength=1100)
     app.material_auto_id_source_label.pack(anchor="nw", fill="x")
     app.material_auto_id_summary_label = ttk.Label(
@@ -1252,6 +1343,11 @@ def _refresh_auto_id_setup_page(app) -> None:
     app.material_auto_id_source_label.configure(text=view["source"])
     if hasattr(app, "material_auto_id_run_label"):
         app.material_auto_id_run_label.configure(text=getattr(app, "auto_id_run_message", None) or AUTO_ID_NO_RUN)
+    if hasattr(app, "material_auto_id_progress_table"):
+        progress = getattr(app, "auto_id_progress", None)
+        _replace_table_rows(app.material_auto_id_progress_table, () if progress is None else progress.rows)
+        app.material_auto_id_progress_label.configure(text="NOT_SELECTED" if progress is None
+                                                      else progress.state.value)
 
 
 def _build_project_evidence_page(app, page) -> None:
