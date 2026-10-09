@@ -520,13 +520,17 @@ class ReadinessSelection:
     show_record: bool  # whether the stored record may be presented under this selection
 
 
-def readiness_selection(selected: bool, preparation, record, run_hash: Optional[str] = None) -> ReadinessSelection:
+def readiness_selection(selected: bool, preparation, record, run_hash: Optional[str] = None,
+                        evaluated_run_hash: Optional[str] = None) -> ReadinessSelection:
     """Bind a stored backend readiness record to the current selection, by governed identity only.
 
     A record is presented for a selected family / campaign only when its campaign identity is the governed
     ``CampaignDefinition``'s: the exact campaign hash, the same run type, the same specimen labels in definition order,
     the same declared scientific question and τ_mf (both undeclared for a v1 definition), and the same run hash when a
-    run is selected.  Names, folders, labels or file names alone never match.  A specimen folder declares no governed
+    run is selected.  Names, folders, labels or file names alone never match.  ``evaluated_run_hash`` is given only for
+    the record the GUI itself obtained by evaluating that run (M8.3): a backend refusal that came before the run identity
+    could be verified carries no run hash and is then bound to the run that was evaluated; such a record is shown only
+    while exactly that run is selected.  A specimen folder declares no governed
     campaign, so no campaign result is attached to it and no question is inferred.  Presentation only: the record is
     neither changed nor re-judged, and a match is not proof that a stored record is authentic.
     """
@@ -548,6 +552,9 @@ def readiness_selection(selected: bool, preparation, record, run_hash: Optional[
     definition = preparation.definition
     if not is_record:
         return not_evaluated(f"no stored backend readiness record for campaign {definition.campaign_id}")
+    if evaluated_run_hash is not None and run_hash != evaluated_run_hash:
+        return not_evaluated(f"the stored record is the evaluation of run {evaluated_run_hash[:12]}, which is not the "
+                             "currently selected run")
     campaign = record.get("campaign") if isinstance(record.get("campaign"), Mapping) else {}
     expected = {"campaign hash": (campaign.get("campaign_hash"), definition.campaign_hash),
                 "run type": (campaign.get("run_type"), definition.run_type),
@@ -555,7 +562,10 @@ def readiness_selection(selected: bool, preparation, record, run_hash: Optional[
                 "scientific question": (record.get("scientific_question"), definition.scientific_question),
                 "τ_mf": (record.get("tau_mf"), definition.tau_mf)}
     if run_hash is not None:
-        expected["run hash"] = (campaign.get("run_hash"), run_hash)
+        stored_run = campaign.get("run_hash")
+        if stored_run is None and evaluated_run_hash is not None:
+            stored_run = evaluated_run_hash
+        expected["run hash"] = (stored_run, run_hash)
     differing = [name for name, (stored, governed) in expected.items() if stored != governed]
     if differing:
         return not_evaluated(f"the stored record belongs to another campaign or run ({', '.join(differing)} differ: "

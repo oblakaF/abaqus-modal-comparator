@@ -483,7 +483,8 @@ class SetupPageTests(_Tmp):
                 collect(child)
 
         collect(page)
-        self.assertEqual(sorted(buttons), ["Select family / campaign definition...", "Select specimen folder..."])
+        self.assertEqual(sorted(buttons), ["Auto-ID — Evaluate Stored Run", "Select family / campaign definition...",
+                                           "Select specimen folder...", "Select stored run journal..."])  # + M8.3
         with mock.patch.object(ui.filedialog, "askopenfilename", return_value=str(RUN_B)):
             buttons["Select family / campaign definition..."]()
         self.assertIn("RUN_B", application.material_auto_id_summary_label.kwargs["text"])
