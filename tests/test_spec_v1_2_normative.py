@@ -32,6 +32,9 @@ REVIEWED_OPTIONS_CANONICAL_SHA256 = "4ea4dc92ce0e24f9e22625d44b7380ddb2ace2c52d0
 DECISIONS_BEFORE_D078_SHA256 = "257b84a83e156211fe00e5d0f2d69428e0acadc11bc3dfd817536151c574ba10"
 SPEC_V1_1_CONTENT_SHA256 = "62f206176a73c224f6f8fea0b2aed84c8154b9eb30bee87240d2c0b808ebb665"
 SUPERSEDED = "> **SUPERSEDED_BY_NORMATIVE_SPEC_V1_2**"
+# Implemented V12 steps: schema (I1) and τ_mf-aware pattern / holdout test (I2); confined there by the I1 tests.
+V12_MODULES = ("domain/campaign_definition.py", "services/identification_uncertainty.py",
+               "services/identification_verdict.py", "services/identification_campaign_run.py")
 
 
 def _text(name: str) -> str:
@@ -123,8 +126,8 @@ class NormativeSpecTests(unittest.TestCase):
 
     def test_no_v1_2_implementation_in_src_and_m7_records_unchanged(self):
         for path in (ROOT / "src").rglob("*.py"):
-            if path.relative_to(ROOT / "src").as_posix() == "domain/campaign_definition.py":
-                continue  # V12-I1 schema only (tests/test_v12_i1_campaign_question.py confines it there)
+            if path.relative_to(ROOT / "src").as_posix() in V12_MODULES:
+                continue  # V12-I1 schema / V12-I2 pattern test (tests/test_v12_i1_campaign_question.py)
             text = path.read_text(encoding="utf-8")
             with self.subTest(module=path.name):
                 # (the M7b label DIAGNOSTIC_OPTIMIZER_CANDIDATE_NOT_RELEASED predates v1.2 and is not a marker)

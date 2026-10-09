@@ -14,6 +14,13 @@
   - any holdout term with |r| > 3 fails the check;
   - both inequalities are strict;
   - a confirmed cluster is one term.
+- **SPEC v1.2 §4 (D-078, V12-I2), only when a campaign declares τ_mf:** each term is judged in
+  log-frequency space with its own governed σ_term (Δ ln f = r·σ_term):
+  - a family is systematic when it has ≥ 2 fit terms, all of the same sign, and every
+    |Δ ln f| > max(2·σ_term, τ_mf), i.e. |r| > max(2, τ_mf/σ_term);
+  - a holdout fails when |Δ ln f| > max(3·σ_term, τ_mf), i.e. |r| > max(3, τ_mf/σ_term);
+  - equality passes. τ_mf never enters Σ, χ², statistical_sd or Birge; without τ_mf the v1.1 rules and
+    records above are unchanged.
 - **M5.6 Birge (D-041):**
   - χ² = Σ r² over fit terms only (no prior rows, no holdouts);
   - dof = n_fit_terms − n_fitted_parameters (global and nuisance); dof ≤ 0 is refused;
@@ -32,6 +39,7 @@ from enum import Enum
 import math
 from typing import Mapping, Optional, Sequence
 
+from domain.campaign_definition import TAU_MF_MAXIMUM
 from domain.identification_run import canonical_hash
 
 from .practical_identifiability import (
@@ -46,6 +54,7 @@ SCHEMA = "auto-id/identification-uncertainty/v1"
 FAMILY_PATTERN_SIGMA = 2.0  # SPEC §6 S7 (strict: |r| > 2)
 HOLDOUT_SIGMA = 3.0  # SPEC §6 S7 (strict: |r| > 3)
 MINIMUM_PATTERN_FAMILY_SIZE = 2  # D-043: a singleton family cannot establish a family-wide pattern
+PATTERN_SCHEMA_V1_2 = "auto-id/identification-uncertainty/v1.2-residual-pattern"  # τ_mf-aware record (V12-I2)
 _DIGITS = 12
 
 
@@ -129,12 +138,18 @@ def statistical_sd(system: PracticalSystem, context: str) -> StatisticalSDResult
 
 @dataclass(frozen=True)
 class ResidualTerm:
-    """One whitened residual term with its modal family; a confirmed cluster is one term."""
+    """One whitened residual term with its modal family; a confirmed cluster is one term.
+
+    ``sigma`` is the term's governed σ in ln-frequency units, exactly as the objective whitened it
+    (σ_C for a cluster), so Δ ln f = value·sigma. It is needed only for the SPEC v1.2 τ_mf rules and
+    is never serialised in a v1.1 record.
+    """
 
     term_id: str
     row_ids: tuple[str, ...]
     family: str
     value: float
+    sigma: Optional[float] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.term_id, str) or not self.term_id or not self.row_ids:
@@ -142,26 +157,41 @@ class ResidualTerm:
         if not isinstance(self.family, str) or not self.family:
             raise PracticalIdentifiabilityInputError(f"{self.term_id}: family identity required.")
         object.__setattr__(self, "value", _finite(self.value, f"{self.term_id} residual"))
+        if self.sigma is not None:
+            sigma = _finite(self.sigma, f"{self.term_id} σ")
+            if sigma <= 0.0:
+                raise PracticalIdentifiabilityInputError(f"{self.term_id}: σ must be positive.")
+            object.__setattr__(self, "sigma", sigma)
 
 
 def residual_terms(fit_rows: Sequence[str], fit_clusters: Sequence[Sequence[str]], residuals: Sequence[float],
-                   row_families: Mapping[str, str]) -> tuple[ResidualTerm, ...]:
+                   row_families: Mapping[str, str],
+                   term_sigmas: Optional[Mapping[str, float]] = None) -> tuple[ResidualTerm, ...]:
     """Bind an M4.7 residual vector (fit rows first, then confirmed clusters) to M4.3 family identities.
 
     A cluster term belongs to its members' family when they share one. Otherwise it gets the
     composite key of its members' families: it is never merged into an unrelated family.
+    ``term_sigmas`` (term id → the objective's governed σ, σ_C for a cluster) attaches each term's σ.
     """
     residuals = list(residuals)
     if len(residuals) != len(fit_rows) + len(fit_clusters):
         raise PracticalIdentifiabilityInputError("residual count differs from the fit terms.")
+    ids = [str(row) for row in fit_rows] + ["C(" + "+".join(str(m) for m in members) + ")" for members in fit_clusters]
+    if term_sigmas is not None and set(ids) - set(term_sigmas):
+        raise PracticalIdentifiabilityInputError(f"σ missing for terms {sorted(set(ids) - set(term_sigmas))}.")
+
+    def sigma(term_id: str) -> Optional[float]:
+        return None if term_sigmas is None else term_sigmas[term_id]
+
     terms = []
     for row, value in zip(fit_rows, residuals):
-        terms.append(ResidualTerm(str(row), (str(row),), row_families[row], value))
+        terms.append(ResidualTerm(str(row), (str(row),), row_families[row], value, sigma(str(row))))
     for members, value in zip(fit_clusters, residuals[len(fit_rows):]):
         members = tuple(str(m) for m in members)
         families = sorted({row_families[m] for m in members})
-        terms.append(ResidualTerm("C(" + "+".join(members) + ")", members, families[0] if len(families) == 1
-                                  else "+".join(families), value))
+        term_id = "C(" + "+".join(members) + ")"
+        terms.append(ResidualTerm(term_id, members, families[0] if len(families) == 1 else "+".join(families), value,
+                                  sigma(term_id)))
     return tuple(terms)
 
 
@@ -187,30 +217,95 @@ class PatternTestResult:
     families: tuple[FamilyPatternEvidence, ...]
     holdouts: Mapping[str, float]
     reasons: tuple[str, ...]
+    tau_mf: Optional[float] = None  # SPEC v1.2 τ_mf; None: the v1.1 rules and record
+    terms: tuple[Mapping[str, object], ...] = ()  # v1.2 per-term evidence in ln-frequency units
 
     @property
     def passed(self) -> bool:
         return self.status is PatternStatus.PASS
 
     def to_dict(self) -> dict:
-        return {"schema": SCHEMA, "quantity": "residual_pattern_test", "status": self.status.value,
-                "systematic_families": list(self.systematic_families), "holdout_failures": list(self.holdout_failures),
-                "families": [{"family": f.family, "term_ids": list(f.term_ids), "values": [_r(v) for v in f.values],
-                              "eligible": f.eligible, "systematic": f.systematic} for f in self.families],
-                "holdouts": {k: _r(v) for k, v in sorted(self.holdouts.items())}, "reasons": list(self.reasons),
-                "rules": {"family_sigma": FAMILY_PATTERN_SIGMA, "holdout_sigma": HOLDOUT_SIGMA,
-                          "minimum_family_size": MINIMUM_PATTERN_FAMILY_SIZE, "inequalities": "strict"}}
+        record = {"schema": SCHEMA, "quantity": "residual_pattern_test", "status": self.status.value,
+                  "systematic_families": list(self.systematic_families),
+                  "holdout_failures": list(self.holdout_failures),
+                  "families": [{"family": f.family, "term_ids": list(f.term_ids), "values": [_r(v) for v in f.values],
+                                "eligible": f.eligible, "systematic": f.systematic} for f in self.families],
+                  "holdouts": {k: _r(v) for k, v in sorted(self.holdouts.items())}, "reasons": list(self.reasons),
+                  "rules": {"family_sigma": FAMILY_PATTERN_SIGMA, "holdout_sigma": HOLDOUT_SIGMA,
+                            "minimum_family_size": MINIMUM_PATTERN_FAMILY_SIZE, "inequalities": "strict"}}
+        if self.tau_mf is None:  # v1.1: the historical record, unchanged
+            return record
+        record["schema"] = PATTERN_SCHEMA_V1_2
+        record["rules"].update({"tau_mf": self.tau_mf, "space": "ln f per governed term",
+                                "family": "|Δ ln f| > max(2σ_term, τ_mf)", "holdout": "|Δ ln f| > max(3σ_term, τ_mf)"})
+        record["terms"] = [{k: _r(v) if isinstance(v, float) else v for k, v in t.items()} for t in self.terms]
+        return record
 
     @property
     def record_hash(self) -> str:
         return canonical_hash(self.to_dict())
 
 
-def residual_pattern_test(fit_terms: Sequence[ResidualTerm], holdout_terms: Sequence[ResidualTerm]) -> PatternTestResult:
-    """SPEC §6 S7 with D-043: family systematic pattern (≥ 2 terms) and holdout > 3σ."""
+def _tau_limit(term: ResidualTerm, multiple: float, tau_mf: float, role: str) -> dict:
+    """SPEC v1.2 §4 for one governed term: |Δ ln f| > max(k·σ_term, τ_mf) ⇔ |r| > max(k, τ_mf/σ_term)."""
+    if term.sigma is None:
+        raise PracticalIdentifiabilityInputError(f"{term.term_id}: the governed σ of the term is required with τ_mf.")
+    limit = max(multiple, tau_mf / term.sigma)  # whitened form of the same rule (equality passes)
+    return {"term_id": term.term_id, "role": role, "family": term.family, "r": term.value, "sigma_term": term.sigma,
+            "abs_delta_ln_f": abs(term.value) * term.sigma, "sigma_threshold_ln": multiple * term.sigma,
+            "tau_mf": tau_mf, "effective_threshold_ln": max(multiple * term.sigma, tau_mf),
+            "exceeds": abs(term.value) > limit}
+
+
+def _tau_detail(evidence: Mapping[str, object], multiple: int) -> str:
+    return (f"{evidence['term_id']}: |Δ ln f| = {evidence['abs_delta_ln_f']:.4g} > max({multiple}σ_term, τ_mf) = "
+            f"max({evidence['sigma_threshold_ln']:.4g}, {evidence['tau_mf']:g}) = "
+            f"{evidence['effective_threshold_ln']:.4g} (σ_term = {evidence['sigma_term']:.4g})")
+
+
+def _tau_pattern_test(fit_terms: Sequence[ResidualTerm], holdout_terms: Sequence[ResidualTerm],
+                      tau_mf: float) -> PatternTestResult:
+    if isinstance(tau_mf, bool) or not isinstance(tau_mf, (int, float)) or not math.isfinite(float(tau_mf)) \
+            or not 0.0 < float(tau_mf) <= TAU_MF_MAXIMUM:
+        raise PracticalIdentifiabilityInputError(f"tau_mf must satisfy 0 < tau_mf <= {TAU_MF_MAXIMUM}.")
+    tau_mf = float(tau_mf)
+    fit_evidence = {t.term_id: _tau_limit(t, FAMILY_PATTERN_SIGMA, tau_mf, "FIT") for t in fit_terms}
+    held_evidence = {t.term_id: _tau_limit(t, HOLDOUT_SIGMA, tau_mf, "HOLDOUT") for t in holdout_terms}
+    groups: dict[str, list[ResidualTerm]] = {}
+    for term in fit_terms:
+        groups.setdefault(term.family, []).append(term)
+    evidence, systematic = [], []
+    for family in sorted(groups):
+        members = groups[family]
+        values = tuple(t.value for t in members)
+        eligible = len(members) >= MINIMUM_PATTERN_FAMILY_SIZE
+        same_sign = all(v > 0 for v in values) or all(v < 0 for v in values)
+        flagged = eligible and same_sign and all(fit_evidence[t.term_id]["exceeds"] for t in members)
+        evidence.append(FamilyPatternEvidence(family, tuple(t.term_id for t in members), values, eligible, flagged))
+        if flagged:
+            systematic.append(family)
+    holdouts = {t.term_id: t.value for t in holdout_terms}
+    failures = sorted(k for k in holdouts if held_evidence[k]["exceeds"])
+    reasons = [f"systematic pattern - probable model-form error: family {f}, all fit residuals same sign and every "
+               f"|Δ ln f| > max(2σ_term, τ_mf) (" + "; ".join(_tau_detail(fit_evidence[t.term_id], 2)
+                                                         for t in groups[f]) + ")" for f in systematic]
+    reasons += [f"holdout {_tau_detail(held_evidence[k], 3)}" for k in failures]
+    status = PatternStatus.FAIL if systematic or failures else PatternStatus.PASS
+    return PatternTestResult(status, tuple(systematic), tuple(failures), tuple(evidence), holdouts, tuple(reasons),
+                             tau_mf, tuple(fit_evidence.values()) + tuple(held_evidence.values()))
+
+
+def residual_pattern_test(fit_terms: Sequence[ResidualTerm], holdout_terms: Sequence[ResidualTerm],
+                          tau_mf: Optional[float] = None) -> PatternTestResult:
+    """SPEC §6 S7 with D-043: family systematic pattern (≥ 2 terms) and holdout > 3σ.
+
+    With a declared τ_mf (SPEC v1.2 §4) each term is judged by max(kσ_term, τ_mf) in ln f instead.
+    """
     ids = [t.term_id for t in fit_terms] + [t.term_id for t in holdout_terms]
     if len(set(ids)) != len(ids):
         raise PracticalIdentifiabilityInputError("term ids must be unique across fit and holdout terms.")
+    if tau_mf is not None:
+        return _tau_pattern_test(fit_terms, holdout_terms, tau_mf)
     groups: dict[str, list[ResidualTerm]] = {}
     for term in fit_terms:
         groups.setdefault(term.family, []).append(term)
