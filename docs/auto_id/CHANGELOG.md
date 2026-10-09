@@ -4547,7 +4547,7 @@ first internal provider.
   solves); RUN_B 8 campaign evaluations, CONVERGED; both pipelines per run verified.
 - **Metadata synchronised:** STATUS current stage M8 / M8.4 REVIEW_READY and the V12 completion field for M8 (new M8
   track IN_PROGRESS; historical `auto-id/m8` PARKED); ROADMAP state table. Historical checkpoints unchanged.
-- **Tests:** test_m8_4_run_progress 19 tests (1 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.3 tests retained; focused M8.1-M8.4 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 431 OK; full suite without data stores 1917 OK (78 skipped); full suite with all data stores 1931 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Tests:** test_m8_4_run_progress 18 tests (1 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.3 tests retained; focused M8.1-M8.4 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 431 OK; full suite without data stores 1917 OK (78 skipped); full suite with all data stores 1931 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
 - **Unchanged:** V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at
   `193db8d`.
 - **Abaqus run count:** 0.
