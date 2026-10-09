@@ -12,18 +12,26 @@ Gates (all required; every failure is a machine-readable refusal reason):
    exactly one physical specimen;
 2. observability (§8): ≥ k + 1 distinct FIT family keys, full practical rank at the M5 RCOND, every
    leave-one-FIT-family-out case VALID, ≥ 1 HOLDOUT family, HOLDOUT families disjoint from FIT families;
-3. pairing / tracking: strict baseline FIT pair MAC ≥ 0.80, FE-to-FE tracking MAC ≥ 0.90, no branch or
-   pairing loss (the strict pairing policy; no lowered MAC);
+3. pairing / tracking, per governed physical row (cluster members included): strict baseline FIT pair
+   MAC ≥ 0.80, FE-to-FE tracking MAC ≥ 0.90, no branch or pairing loss (the strict pairing policy; no
+   lowered MAC, no aggregate cluster MAC);
 4. no active parameter bound (the repository's search-bound semantics);
 5. registration not limited, no peak-derived input;
 6. pattern / holdout: the V12-I2 τ_mf-aware pattern record for the declared τ_mf, no systematic family, no
    holdout failure (consumed, never recomputed);
-7. non-degradation (§7): the same governed FIT + HOLDOUT terms; max |Δ ln f| and RMS Δ ln f not worse than
-   the baseline; every term |expm1(Δ ln f)| ≤ 0.08;
+7. non-degradation (§7), per governed physical ROW: the same FIT + HOLDOUT rows; max |Δ ln f| and
+   RMS Δ ln f not worse than the baseline; every row |expm1(Δ ln f)| ≤ 0.08 (a cluster mean never hides a row);
 8. precision (§6): per calibrated parameter, conservative_uncertainty = max(birge_adjusted_sd,
    0.5·(max_shift_ln − min_shift_ln)) ≤ 0.08 in ln p over the complete leave-one-FIT-family-out set;
 9. complete reporting evidence (FIT and HOLDOUT residuals, excluded high-MAC diagnostic modes, uncertainty
    basis) — the record itself is V12-I4.
+
+Terms and rows are kept apart: a confirmed cluster is one governed TERM (pattern, holdout rule,
+observability, families, Birge, model_form_robustness) made of its physical ROWS (pairing, tracking,
+non-degradation). ``term_rows`` maps every term to its rows. The bundle is bound numerically: each v1.2
+pattern term's r·σ_term equals the candidate term Δ ln f, each candidate term equals the mean of its
+candidate rows, and model_form_robustness was computed at the evaluated p̂; any inconsistency is an input
+error, never a scientific result.
 
 τ_mf is an acceptance tolerance only: it never enters statistical_sd, birge_adjusted_sd,
 model_form_robustness or conservative_uncertainty. While Σ_meas is NOT_AVAILABLE or a covariance component
@@ -59,6 +67,7 @@ ROW_RELATIVE_ERROR_CEILING = 0.08  # SPEC v1.2 §7: every governed row |relative
 PRECISION_CEILING_LN = 0.08  # SPEC v1.2 §6: conservative_uncertainty ≤ 0.08 in ln p
 CONDITIONAL_COVARIANCE = "UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE"
 COMPLETE_COVARIANCE = "COVARIANCE_COMPONENTS_COMPLETE_AND_MEASURED"
+_TOLERANCE = {"rel_tol": 1e-9, "abs_tol": 1e-12}  # numerical binding of evidence describing the same candidate
 _DIGITS = 12
 
 
@@ -90,7 +99,7 @@ class CalibrationRefusal(str, Enum):
     TAU_MF_MISMATCH = "TAU_MF_MISMATCH"
     SYSTEMATIC_PATTERN = "SYSTEMATIC_PATTERN"
     HOLDOUT_FAILURE = "HOLDOUT_FAILURE"
-    TERM_SET_MISMATCH = "TERM_SET_MISMATCH"
+    ROW_SET_MISMATCH = "ROW_SET_MISMATCH"
     MAX_DEGRADED = "MAX_DEGRADED"
     RMS_DEGRADED = "RMS_DEGRADED"
     ROW_RELATIVE_ERROR_ABOVE_CEILING = "ROW_RELATIVE_ERROR_ABOVE_CEILING"
@@ -100,9 +109,15 @@ class CalibrationRefusal(str, Enum):
     MISSING_EVIDENCE = "MISSING_EVIDENCE"
 
 
+def _finite(value: object, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        raise PracticalIdentifiabilityInputError(f"{name} must be a finite number.")
+    return float(value)
+
+
 @dataclass(frozen=True)
 class GovernedTerm:
-    """One governed FIT or HOLDOUT term of the specimen, unwhitened: Δ ln f = ln(f_FE / f_EXP)."""
+    """One governed FIT or HOLDOUT objective term (a confirmed cluster is one term): Δ ln f = r·σ_term."""
 
     term_id: str
     role: str  # FIT | HOLDOUT
@@ -111,9 +126,21 @@ class GovernedTerm:
     def __post_init__(self) -> None:
         if not isinstance(self.term_id, str) or not self.term_id or self.role not in ("FIT", "HOLDOUT"):
             raise PracticalIdentifiabilityInputError("a governed term needs an id and the role FIT or HOLDOUT.")
-        if isinstance(self.delta_ln_f, bool) or not isinstance(self.delta_ln_f, (int, float)) \
-                or not math.isfinite(float(self.delta_ln_f)):
-            raise PracticalIdentifiabilityInputError(f"{self.term_id}: Δ ln f must be finite.")
+        _finite(self.delta_ln_f, f"{self.term_id} Δ ln f")
+
+
+@dataclass(frozen=True)
+class GovernedRow:
+    """One governed physical FIT or HOLDOUT row (one experimental / FE pair): Δ ln f = ln(f_FE / f_EXP)."""
+
+    row_id: str
+    role: str  # FIT | HOLDOUT
+    delta_ln_f: float
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.row_id, str) or not self.row_id or self.role not in ("FIT", "HOLDOUT"):
+            raise PracticalIdentifiabilityInputError("a governed row needs an id and the role FIT or HOLDOUT.")
+        _finite(self.delta_ln_f, f"{self.row_id} Δ ln f")
 
 
 @dataclass(frozen=True)
@@ -136,18 +163,20 @@ class CalibrationGateInputs:
     p_hat: Mapping[str, float]  # the candidate calibration parameters (evidence only; never released here)
     fit_families: Mapping[str, str]  # FIT term id → M4.3 family key (a confirmed cluster is one term)
     holdout_families: Mapping[str, str]  # HOLDOUT term id → family key
+    term_rows: Mapping[str, tuple[str, ...]]  # every governed term id → its physical row ids (a cluster: its members)
     analysis: Optional[PracticalIdentifiabilityResult]
     robustness: Optional[ModelFormRobustnessResult]
     pattern: Optional[PatternTestResult]
     statistical: Optional[StatisticalSDResult]
     birge: Optional[BirgeResult]
-    baseline_pair_macs: Mapping[str, float]  # FIT term id → strict baseline pair MAC
-    tracking_macs: Mapping[str, float]  # governed term id → FE-to-FE tracking MAC at the candidate
+    baseline_pair_macs: Mapping[str, float]  # governed FIT row id → strict baseline pair MAC
+    tracking_macs: Mapping[str, float]  # governed FIT + HOLDOUT row id → FE-to-FE tracking MAC at the candidate
     branch_pairing: GuardEvidence  # PASS = no branch or pairing loss
     registration: GuardEvidence  # PASS = not registration-limited
     peak_derived_input: GuardEvidence  # PASS = no peak-derived modal input
-    baseline_terms: Sequence[GovernedTerm]  # the governed baseline FE state
-    candidate_terms: Sequence[GovernedTerm]
+    candidate_terms: Sequence[GovernedTerm]  # the candidate's objective terms (bound to the pattern record)
+    baseline_rows: Sequence[GovernedRow]  # the governed baseline FE state, per physical row
+    candidate_rows: Sequence[GovernedRow]  # the candidate, per physical row
     reporting: Optional[ReportingCompleteness]
 
 
@@ -204,8 +233,78 @@ class _Refusals:
         self.items.append({"code": code.value, "detail": detail})
 
 
+def _governed_rows(inputs: CalibrationGateInputs) -> dict[str, str]:
+    """row id → role, from the explicit term membership (validated by ``_bind``)."""
+    roles = {**{t: "FIT" for t in inputs.fit_families}, **{t: "HOLDOUT" for t in inputs.holdout_families}}
+    return {row: roles[term] for term, rows in inputs.term_rows.items() for row in rows}
+
+
+def _bind_p_hat(inputs: CalibrationGateInputs) -> dict[str, float]:
+    if set(inputs.p_hat) != set(inputs.definition.fitted_parameters):
+        raise PracticalIdentifiabilityInputError("p̂ must give exactly the fitted calibration parameters.")
+    p_hat = {}
+    for name, value in inputs.p_hat.items():
+        p_hat[name] = _finite(value, f"p̂[{name}]")
+        if p_hat[name] <= 0.0:
+            raise PracticalIdentifiabilityInputError(f"p̂[{name}] must be positive.")
+    if inputs.robustness is not None and inputs.robustness.p_hat_hash != canonical_hash(
+            {k: v for k, v in sorted(p_hat.items())}):
+        raise PracticalIdentifiabilityInputError("model_form_robustness was computed at another p̂.")
+    return p_hat
+
+
+def _bind_structure(inputs: CalibrationGateInputs) -> None:
+    fit, held = set(inputs.fit_families), set(inputs.holdout_families)
+    if fit & held:
+        raise PracticalIdentifiabilityInputError(f"terms {sorted(fit & held)} are both FIT and HOLDOUT.")
+    if set(inputs.term_rows) != fit | held:
+        raise PracticalIdentifiabilityInputError("term_rows must map exactly the governed FIT and HOLDOUT terms.")
+    rows = [row for members in inputs.term_rows.values() for row in members]
+    if any(not isinstance(m, tuple) or not m for m in inputs.term_rows.values()) \
+            or any(not isinstance(r, str) or not r for r in rows) or len(set(rows)) != len(rows):
+        raise PracticalIdentifiabilityInputError("every term needs its own non-empty tuple of distinct row ids.")
+    governed = _governed_rows(inputs)
+    for name, macs, expected in (("baseline_pair_macs", inputs.baseline_pair_macs,
+                                  {r for r, role in governed.items() if role == "FIT"}),
+                                 ("tracking_macs", inputs.tracking_macs, set(governed))):
+        extra = sorted(set(macs) - expected)
+        if extra:
+            raise PracticalIdentifiabilityInputError(f"{name} carries rows outside the governed set: {extra}.")
+        for row, value in macs.items():
+            _finite(value, f"{name}[{row}]")
+    terms = [(t.term_id, t.role) for t in inputs.candidate_terms]
+    expected_terms = {(t, "FIT") for t in fit} | {(t, "HOLDOUT") for t in held}
+    if len(set(terms)) != len(terms) or set(terms) != expected_terms:
+        raise PracticalIdentifiabilityInputError("candidate_terms must be exactly the governed terms with their roles.")
+
+
+def _bind_candidate(inputs: CalibrationGateInputs) -> None:
+    """The pattern record, the candidate terms and the candidate rows describe one candidate (signed, per term σ)."""
+    deltas = {t.term_id: float(t.delta_ln_f) for t in inputs.candidate_terms}
+    if inputs.pattern is not None:
+        for evidence in inputs.pattern.terms:  # v1.2 records carry r and σ_term per term (V12-I2)
+            judged = float(evidence["r"]) * float(evidence["sigma_term"])
+            if not math.isclose(judged, deltas[evidence["term_id"]], **_TOLERANCE):
+                raise PracticalIdentifiabilityInputError(
+                    f"pattern term {evidence['term_id']}: r·σ_term = {judged:.12g} ≠ candidate Δ ln f "
+                    f"{deltas[evidence['term_id']]:.12g}; the pattern judged another candidate.")
+    roles = _governed_rows(inputs)
+    rows: dict[str, list[float]] = {}
+    for row in inputs.candidate_rows:
+        if roles.get(row.row_id) == row.role:
+            rows.setdefault(row.row_id, []).append(float(row.delta_ln_f))
+    for term, members in inputs.term_rows.items():
+        if all(len(rows.get(m, ())) == 1 for m in members):  # an incomplete row set is refused as ROW_SET_MISMATCH
+            mean = sum(rows[m][0] for m in members) / len(members)
+            if not math.isclose(mean, deltas[term], **_TOLERANCE):
+                raise PracticalIdentifiabilityInputError(
+                    f"term {term}: mean row Δ ln f {mean:.12g} ≠ candidate term Δ ln f {deltas[term]:.12g}.")
+
+
 def _bind(inputs: CalibrationGateInputs) -> None:
     """Evidence must belong together; an inconsistent bundle is an input error, never a PASS or a refusal."""
+    _bind_p_hat(inputs)
+    _bind_structure(inputs)
     analysis = inputs.analysis
     if analysis is not None:
         if set(analysis.parameter_ids) != set(inputs.definition.fitted_parameters):
@@ -225,8 +324,7 @@ def _bind(inputs: CalibrationGateInputs) -> None:
         fit_ids = {t for f in inputs.pattern.families for t in f.term_ids}
         if fit_ids != set(inputs.fit_families) or set(inputs.pattern.holdouts) != set(inputs.holdout_families):
             raise PracticalIdentifiabilityInputError("the pattern record judged other FIT / HOLDOUT terms.")
-    if set(inputs.p_hat) != set(inputs.definition.fitted_parameters):
-        raise PracticalIdentifiabilityInputError("p̂ must give exactly the fitted calibration parameters.")
+    _bind_candidate(inputs)
 
 
 def _observability(inputs: CalibrationGateInputs, k: int, refusals: _Refusals) -> dict:
@@ -271,20 +369,22 @@ def _loo_status(robustness: Optional[ModelFormRobustnessResult], fit_keys: Seque
 def _pairing_tracking(inputs: CalibrationGateInputs, refusals: _Refusals) -> dict:
     pair_minimum = STRICT_IDENTIFICATION_PAIRING.minimum_mac
     tracking_minimum = STRICT_IDENTIFICATION_PAIRING.tracking_minimum_mac
-    governed = set(inputs.fit_families) | set(inputs.holdout_families)
-    missing_pairs = sorted(set(inputs.fit_families) - set(inputs.baseline_pair_macs))
-    missing_tracking = sorted(governed - set(inputs.tracking_macs))
+    governed = _governed_rows(inputs)
+    fit_rows = {r for r, role in governed.items() if role == "FIT"}
+    missing_pairs = sorted(fit_rows - set(inputs.baseline_pair_macs))
+    missing_tracking = sorted(set(governed) - set(inputs.tracking_macs))
     low_pairs = sorted(k for k, v in inputs.baseline_pair_macs.items() if not v >= pair_minimum)
     low_tracking = sorted(k for k, v in inputs.tracking_macs.items() if not v >= tracking_minimum)
     if missing_pairs or missing_tracking:
         refusals.add(CalibrationRefusal.MISSING_EVIDENCE,
-                     f"pair MAC missing for {missing_pairs}; tracking MAC missing for {missing_tracking}")
+                     f"pair MAC missing for rows {missing_pairs}; tracking MAC missing for rows {missing_tracking}")
     if low_pairs:
         refusals.add(CalibrationRefusal.BASELINE_PAIR_MAC, f"strict baseline pair MAC < {pair_minimum}: {low_pairs}")
     if low_tracking:
         refusals.add(CalibrationRefusal.TRACKING_MAC, f"FE-to-FE tracking MAC < {tracking_minimum}: {low_tracking}")
     _guard(inputs.branch_pairing, CalibrationRefusal.BRANCH_OR_PAIRING_LOSS, refusals)
-    return {"baseline_pair_minimum_mac": pair_minimum, "tracking_minimum_mac": tracking_minimum,
+    return {"evidence_level": "governed physical row", "baseline_pair_minimum_mac": pair_minimum,
+            "tracking_minimum_mac": tracking_minimum,
             "min_baseline_pair_mac": _r(min(inputs.baseline_pair_macs.values(), default=None)),
             "min_tracking_mac": _r(min(inputs.tracking_macs.values(), default=None)),
             "low_baseline_pairs": low_pairs, "low_tracking": low_tracking, "missing_pairs": missing_pairs,
@@ -329,17 +429,17 @@ def _pattern(inputs: CalibrationGateInputs, refusals: _Refusals) -> dict:
 
 
 def _non_degradation(inputs: CalibrationGateInputs, refusals: _Refusals) -> dict:
-    governed = ({(t, "FIT") for t in inputs.fit_families} | {(t, "HOLDOUT") for t in inputs.holdout_families})
-    baseline = {(t.term_id, t.role): float(t.delta_ln_f) for t in inputs.baseline_terms}
-    candidate = {(t.term_id, t.role): float(t.delta_ln_f) for t in inputs.candidate_terms}
-    duplicated = len(baseline) != len(inputs.baseline_terms) or len(candidate) != len(inputs.candidate_terms)
+    governed = {(row, role) for row, role in _governed_rows(inputs).items()}
+    baseline = {(r.row_id, r.role): float(r.delta_ln_f) for r in inputs.baseline_rows}
+    candidate = {(r.row_id, r.role): float(r.delta_ln_f) for r in inputs.candidate_rows}
+    duplicated = len(baseline) != len(inputs.baseline_rows) or len(candidate) != len(inputs.candidate_rows)
     same = not duplicated and set(baseline) == set(candidate) == governed
     if not same:
-        refusals.add(CalibrationRefusal.TERM_SET_MISMATCH,
-                     "baseline and candidate must carry exactly the governed FIT + HOLDOUT terms with their roles "
+        refusals.add(CalibrationRefusal.ROW_SET_MISMATCH,
+                     "baseline and candidate must carry exactly the governed FIT + HOLDOUT rows with their roles "
                      f"(missing {sorted(governed - set(candidate))}, extra {sorted(set(candidate) - governed)}, "
                      f"baseline differs {sorted(set(baseline) ^ governed)}, duplicated {duplicated})")
-        return {"same_term_set": False}
+        return {"evidence_level": "governed physical row", "same_row_set": False}
 
     def rms(values):
         return math.sqrt(sum(v * v for v in values) / len(values))
@@ -358,10 +458,10 @@ def _non_degradation(inputs: CalibrationGateInputs, refusals: _Refusals) -> dict
     if above:
         refusals.add(CalibrationRefusal.ROW_RELATIVE_ERROR_ABOVE_CEILING,
                      f"|relative frequency error| > {ROW_RELATIVE_ERROR_CEILING} for {above}")
-    return {"same_term_set": True, "terms": len(candidate),
+    return {"evidence_level": "governed physical row", "same_row_set": True, "rows": len(candidate),
             "baseline_max_abs_delta_ln_f": _r(base_max), "candidate_max_abs_delta_ln_f": _r(cand_max),
             "baseline_rms_delta_ln_f": _r(base_rms), "candidate_rms_delta_ln_f": _r(cand_rms),
-            "candidate_max_abs_relative_error": _r(abs(relative[worst])), "controlling_term": worst,
+            "candidate_max_abs_relative_error": _r(abs(relative[worst])), "controlling_row": worst,
             "row_relative_error_ceiling": ROW_RELATIVE_ERROR_CEILING, "relative_error": "expm1(Δ ln f)",
             "max_not_worse": cand_max <= base_max, "rms_not_worse": cand_rms <= base_rms,
             "rows_above_ceiling": above}

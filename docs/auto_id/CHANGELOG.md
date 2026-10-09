@@ -4173,3 +4173,23 @@ first internal provider.
 - **Tests:** test_v12_i3_calibration_gate 30 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 239 OK (3 skipped without data stores); full suite without data stores 1688 OK (64 skipped); full suite with all data stores (snadwich, carbon-project-archive, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1702 OK (5 skipped), no Abaqus
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of V12-I3.
+
+## 2026-10-09 — V12-I3 — evidence-binding correction (rows vs terms)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I3 (SUPERVISOR correction before merging PR #45)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i3` (previous head `0946993`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I3): row-level non-degradation and numeric evidence binding`
+- **Files:** `src/services/specimen_calibration_gate.py`, `tests/test_v12_i3_calibration_gate.py`; STATUS, CHANGELOG.
+- **Behaviour:** terms and rows are separated. A confirmed cluster stays one governed TERM for the pattern, holdout
+  rule, observability, families, Birge and model_form_robustness, but its physical ROWS are checked individually:
+  non-degradation (same FIT + HOLDOUT rows; max and RMS not worse; every row |expm1(Δ ln f)| ≤ 0.08) and strict pair /
+  tracking MAC per row (no aggregate cluster MAC). `term_rows` gives explicit membership. The bundle is bound
+  numerically, as input errors (never PASS / REFUSED): each v1.2 pattern term r·σ_term equals the signed candidate
+  term Δ ln f, each candidate term equals the mean of its candidate rows, model_form_robustness was computed at the
+  evaluated p̂ (its p̂ hash), p̂ is the exact fitted set of finite positive numbers, and the MAC maps carry no rows
+  outside the governed set. Science, thresholds, statuses and the blocked production execution are unchanged.
+- **Tests:** test_v12_i3_calibration_gate 38 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 247 OK (3 skipped without data stores); full suite without data stores 1696 OK (64 skipped); full suite with all data stores 1710 OK (5 skipped), no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #45.

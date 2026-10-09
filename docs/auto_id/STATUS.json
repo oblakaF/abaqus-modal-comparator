@@ -1231,7 +1231,11 @@
         "branch": "auto-id/v12-i3",
         "base": "e70295920c94dbf295bc9e481bb305b6bac57c5a",
         "scope": "pure SPECIMEN_ENGINEERING_CALIBRATION scientific gate (src/services/specimen_calibration_gate.py): question / tau_mf / one specimen; observability (k + 1 FIT family keys, full rank at RCOND 1e-3, complete leave-one-FIT-family-out, >= 1 disjoint HOLDOUT family); strict pair MAC >= 0.80, tracking MAC >= 0.90, no branch / pairing loss; no active search bound; registration / peak guards; V12-I2 tau_mf pattern consumed (no systematic family, no holdout failure); non-degradation (same term set, max and RMS not worse, every |expm1(d ln f)| <= 0.08); precision max(birge_adjusted_sd, half LOO range) <= 0.08 per parameter; reporting completeness; deterministic record, PASS / REFUSED with machine-readable reasons; no value released; production calibration execution still refused (V12-I4)",
-        "tests": "test_v12_i3_calibration_gate 30 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 239 OK (3 skipped without data stores); full suite without data stores 1688 OK (64 skipped); full suite with all data stores (snadwich, carbon-project-archive, m6-4-screening-run, m7-run-a, m7-run-a-archive, m7-run-b) 1702 OK (5 skipped), no Abaqus"
+        "tests": "test_v12_i3_calibration_gate 38 OK; focused (V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability) 247 OK (3 skipped without data stores); full suite without data stores 1696 OK (64 skipped); full suite with all data stores 1710 OK (5 skipped), no Abaqus",
+        "rework": {
+          "reviewed_head": "0946993d920567a74ea93b8211300b5bafa6b2dd",
+          "supervisor_correction": "row-level non-degradation and pair / tracking MAC (a cluster is one term but two physical rows); explicit term_rows membership; numeric binding pattern r*sigma_term = candidate term d ln f (signed) = mean of its candidate rows; model_form_robustness bound to the evaluated p_hat; p_hat validation; exact MAC key sets"
+        }
       },
       "V12-I4": {
         "title": "Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer)",
