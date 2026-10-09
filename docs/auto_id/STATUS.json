@@ -556,7 +556,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M7 closed (D-077); M8 NOT_STARTED; auto-id/m8 parked (PARKED_PENDING_POST_M7_DECISION); next: SUPERVISOR scientific-policy decision (SPEC v1.2 / tau_mf / SPECIMEN_ENGINEERING_CALIBRATION) and the M8.1 reuse decision; no Abaqus",
+  "next_action": "STOP: SUPERVISOR normative acceptance of the SPEC v1.2 policy PR (auto-id/spec-v1.2-policy -> main, not merged); no FE work, no SP10, no t_face, no M7 re-run before acceptance; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1094,7 +1094,13 @@
       "material_property_issued": false,
       "spec": "SPEC v1.1 unchanged; SPEC v1.2 / tau_mf / SPECIMEN_ENGINEERING_CALIBRATION undecided",
       "abaqus_in_m7b": 0,
-      "tests": "docs-only closure: Windows M7, corrective, M5 / M4 / M3 gate modules with stores 125 OK (family consistency still FAIL; formal output NO_GLOBAL_PARAMETER_VALUE; RUN_A / RUN_B rebuilt from the journals); full suite without data stores 1603 OK (64 skipped); governance check 12/12 PASS"
+      "tests": "docs-only closure: Windows M7, corrective, M5 / M4 / M3 gate modules with stores 125 OK (family consistency still FAIL; formal output NO_GLOBAL_PARAMETER_VALUE; RUN_A / RUN_B rebuilt from the journals); full suite without data stores 1603 OK (64 skipped); governance check 12/12 PASS",
+      "merged_to_main": {
+        "pr": 40,
+        "merge_commit": "9bff6c79ee149e9309c3e3697cb96fff4e937c68",
+        "reviewed_head": "f4c1ba458bf2d7119a01f672412d9f0d8c16cd14",
+        "merge_ci": "Linux CI on main 9bff6c7: 1600 OK (68 skipped), success (run 37828742325)"
+      }
     }
   },
   "m8": {
@@ -1107,5 +1113,28 @@
       "note": "M8.1 wizard code on the parked branch was not part of M7b; not reviewed, not accepted, not merged, not rebased; M8.2 not started"
     }
   },
-  "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL"
+  "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL",
+  "spec_v1_2_policy": {
+    "status": "PROPOSED (REVIEW_READY; final correction applied; policy PR to main open, not merged); not normative until SUPERVISOR merge acceptance; no decision number",
+    "branch": "auto-id/spec-v1.2-policy",
+    "base": "9bff6c79ee149e9309c3e3697cb96fff4e937c68",
+    "draft": "docs/auto_id/SPEC_V1_2_DRAFT.md",
+    "review": "docs/auto_id/SPEC_V1_2_POLICY_REVIEW.md",
+    "options": "docs/auto_id/SPEC_V1_2_POLICY_OPTIONS.json",
+    "normative_spec": "SPEC v1.1 (unchanged)",
+    "production_behaviour_changed": false,
+    "historical_results_reinterpreted": false,
+    "abaqus": 0,
+    "tests": "test_spec_v1_2_policy_draft 16 OK; test_m7b_corrective + test_m5_stage_gate + policy 49 OK (2 skipped without data stores); full suite without data stores 1619 OK (64 skipped)",
+    "policy_direction": "accepted by the SUPERVISOR 2026-10-09 subject to corrections (incorporated in the revision)",
+    "revision": {
+      "upper_rule": "SPEC 1 amended: A material identification / B specimen-FE-model calibration, declared before execution and identity-bound; no automatic fallback; material verdict always shown separately",
+      "tau_mf": "Option A: 0.02 specification maximum; one campaign-level value, predeclared, identity-bound; frequency-space model-form acceptance tolerance only; no conversion to parameter uncertainty; never in Sigma / Phi / whitening / covariance / SPEC 13",
+      "holdout_and_pattern": "holdout |d ln f| <= max(3 sigma, tau_mf); pattern magnitude max(2 sigma, tau_mf)",
+      "non_degradation": "max not worse AND RMS not worse than baseline AND every governed row <= 8 %",
+      "observability": "k + 1 FIT families, full rank, complete leave-one-FIT-family-out, >= 1 HOLDOUT family; k = 1: 2 FIT + 1 HOLDOUT; a cluster counts once",
+      "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity",
+      "calibration_precision_gate": "conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness)) <= 0.08 (ln p, as M5); birge_adjusted_sd and AVAILABLE_COMPLETE_LOO required, else REFUSED; > 0.08 REFUSED; no value released, optimiser candidate only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE; never IDENTIFIED / WIDE; tau_mf not in the envelope; UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE kept"
+    }
+  }
 }

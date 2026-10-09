@@ -3987,3 +3987,71 @@ first internal provider.
 - **Abaqus run count:** 0. Docs only.
 - **Next:** M8 `NOT_STARTED`; `auto-id/m8` parked (`PARKED_PENDING_POST_M7_DECISION`); SPEC v1.2 / τ_mf /
   SPECIMEN_ENGINEERING_CALIBRATION are future SUPERVISOR decisions.
+
+## 2026-10-09 — Policy — SPEC v1.2 policy freeze draft (PROPOSED; M7 closure merged)
+
+- **M7 closure merge:** PR #40 `auto-id/m7b-closure` → `main`, merge commit `9bff6c79ee149e9309c3e3697cb96fff4e937c68` (reviewed head `f4c1ba4`,
+  merged tree identical; HUMAN-authorised). Linux CI on main 9bff6c7: 1600 OK (68 skipped), success (run 37828742325).
+- **Stage:** policy track (no roadmap stage started; M8 NOT_STARTED)
+- **Status:** REVIEW_READY (proposal; not normative)
+- **Branch:** `auto-id/spec-v1.2-policy` (from `main` `9bff6c7`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): SPEC v1.2 policy freeze draft - tau_mf, specimen calibration class (proposed, not normative)`
+- **Files:** created `docs/auto_id/SPEC_V1_2_DRAFT.md`, `docs/auto_id/SPEC_V1_2_POLICY_REVIEW.md`,
+  `docs/auto_id/SPEC_V1_2_POLICY_OPTIONS.json`, `tests/test_spec_v1_2_policy_draft.py`; updated STATUS, ROADMAP,
+  CHANGELOG.
+- **Content:** τ_mf options A (2 %, recommended as specification maximum), B (3 %), C (per family, rejected); holdout
+  and pattern bounds max(3σ, τ_mf) / max(2σ, τ_mf); §13 explicitly τ_mf-free; drafted SPECIMEN_ENGINEERING_CALIBRATION
+  class (conditions, minimum observability k + 1 FIT families + 1 holdout, non-degradation rule A); S8 output
+  separation; mandatory uncertainty-basis wording. Declared before any new FE result; no historical data used.
+- **Scientific behaviour changed:** NO. SPEC v1.1 unchanged; M5, M7 records and the family-consistency implementation
+  unchanged.
+- **Tests:** test_spec_v1_2_policy_draft 6 OK; test_m7b_corrective + M5 gate + policy 39 OK; full suite without data stores 1609 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR decision on the draft.
+
+## 2026-10-09 — Policy — SPEC v1.2 policy draft revised after SUPERVISOR policy decision (PROPOSED)
+
+- **Stage:** policy track (no roadmap stage started; M8 NOT_STARTED)
+- **Status:** REVIEW_READY (revised proposal; not normative; no decision number assigned)
+- **Branch:** `auto-id/spec-v1.2-policy` (previous commit `72524ae`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): SPEC v1.2 policy revision - amended upper rule, no fallback, tau_mf frequency-only, max+RMS non-degradation (proposed)`
+- **Files:** updated `docs/auto_id/SPEC_V1_2_DRAFT.md`, `docs/auto_id/SPEC_V1_2_POLICY_REVIEW.md`,
+  `docs/auto_id/SPEC_V1_2_POLICY_OPTIONS.json` (schema v2), `tests/test_spec_v1_2_policy_draft.py`; STATUS, ROADMAP,
+  CHANGELOG.
+- **Content:** §1 amended (A material identification / B specimen-FE-model calibration, pre-declared and
+  identity-bound; no automatic fallback; material verdict always computed and shown separately). τ_mf Option A
+  (0.02 specification maximum, one campaign-level predeclared identity-bound value); the "2 % ⇒ ~4 % in E" argument and
+  `implied_min_parameter_scale_ln_e` withdrawn — τ_mf is a frequency-space model-form tolerance only and passing it does
+  not establish parameter precision. §13 unchanged and τ_mf-free. Calibration labels, identities, gates (no override,
+  no post-hoc mode substitution, no lowered MAC) and uncertainty reporting (τ_mf as ACCEPTANCE_TOLERANCE;
+  UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE). Non-degradation: max AND RMS not worse AND every row ≤ 8 %.
+  Observability: k + 1 FIT families, full rank, complete leave-one-FIT-family-out, ≥ 1 HOLDOUT (k = 1: 2 FIT + 1
+  HOLDOUT). Historical RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; a new v1.2 identity is needed
+  for an accepted calibration.
+- **Scientific behaviour changed:** NO. SPEC v1.1 unchanged; no production source changed.
+- **Tests:** test_spec_v1_2_policy_draft 10 OK; test_m7b_corrective + test_m5_stage_gate + policy 43 OK (2 skipped without data stores); full suite without data stores 1613 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** final SUPERVISOR acceptance of the revised draft.
+
+## 2026-10-09 — Policy — SPEC v1.2 final correction: calibration precision gate (PROPOSED; policy PR)
+
+- **Stage:** policy track (no roadmap stage started; M8 NOT_STARTED)
+- **Status:** REVIEW_READY (proposal; normative only after SUPERVISOR merge acceptance; no decision number assigned)
+- **Branch:** `auto-id/spec-v1.2-policy` (previous commit `06a6162`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `docs(auto-id): SPEC v1.2 calibration precision gate - conservative uncertainty <= 0.08 (proposed)`
+- **Files:** updated `docs/auto_id/SPEC_V1_2_DRAFT.md`, `docs/auto_id/SPEC_V1_2_POLICY_REVIEW.md`,
+  `docs/auto_id/SPEC_V1_2_POLICY_OPTIONS.json`, `tests/test_spec_v1_2_policy_draft.py`; STATUS, CHANGELOG.
+- **Content:** mandatory calibration gate `conservative_uncertainty = max(birge_adjusted_sd,
+  0.5 * width(model_form_robustness)) ≤ 0.08` (ln p, the M5 envelope concept). birge_adjusted_sd must be available and
+  model_form_robustness AVAILABLE_COMPLETE_LOO, otherwise REFUSED; > 0.08 REFUSED. A refused calibration releases no
+  value; an optimiser candidate may stay visible only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE. Never
+  labelled IDENTIFIED / WIDE. τ_mf is not part of the envelope. With incomplete covariance the ≤ 0.08 result stays
+  UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE. Nothing else redesigned.
+- **Scientific behaviour changed:** NO. SPEC v1.1, DECISIONS, production source, M5, M7 records and the
+  family-consistency implementation unchanged.
+- **Tests:** test_spec_v1_2_policy_draft 16 OK; test_m7b_corrective + test_m5_stage_gate + policy 49 OK (2 skipped without data stores); full suite without data stores 1619 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR normative acceptance of the policy PR (not merged).
