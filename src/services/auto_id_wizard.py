@@ -500,6 +500,73 @@ def _with_forward_model(preparation: SpecimenPreparation, spec, model, roots) ->
                                preparation.fixture, preparation.folder_files, preparation.items + tuple(items))
 
 
+# ----------------------------------------------------------------------------------------------- selection ↔ readiness (M8.2)
+
+READINESS_RECORD_SCHEMA = "auto-id/v12-scientific-readiness/v1"  # services.campaign_scientific_backend.SCHEMA
+
+
+class SelectionState(str, Enum):
+    """Presentation states of a stored readiness record against the GUI selection (never a scientific verdict)."""
+
+    NO_SELECTION = "NO_SELECTION"  # nothing selected: a stored record is shown for its own campaign identity only
+    NOT_EVALUATED_FOR_SELECTION = "NOT_EVALUATED_FOR_SELECTION"  # no stored record of the selected source
+    MATCHED_STORED_RECORD = "MATCHED_STORED_RECORD"  # the stored record's governed identity is the selection's
+
+
+@dataclass(frozen=True)
+class ReadinessSelection:
+    state: SelectionState
+    detail: str
+    show_record: bool  # whether the stored record may be presented under this selection
+
+
+def readiness_selection(selected: bool, preparation, record, run_hash: Optional[str] = None) -> ReadinessSelection:
+    """Bind a stored backend readiness record to the current selection, by governed identity only.
+
+    A record is presented for a selected family / campaign only when its campaign identity is the governed
+    ``CampaignDefinition``'s: the exact campaign hash, the same run type, the same specimen labels in definition order,
+    the same declared scientific question and τ_mf (both undeclared for a v1 definition), and the same run hash when a
+    run is selected.  Names, folders, labels or file names alone never match.  A specimen folder declares no governed
+    campaign, so no campaign result is attached to it and no question is inferred.  Presentation only: the record is
+    neither changed nor re-judged, and a match is not proof that a stored record is authentic.
+    """
+
+    is_record = isinstance(record, Mapping) and record.get("schema") == READINESS_RECORD_SCHEMA
+    if not selected:
+        return ReadinessSelection(SelectionState.NO_SELECTION,
+                                  "no source selected: a stored record is shown for its own campaign identity, not "
+                                  "for a selection" if is_record else "no source selected", is_record)
+
+    def not_evaluated(reason: str) -> ReadinessSelection:
+        return ReadinessSelection(SelectionState.NOT_EVALUATED_FOR_SELECTION, reason, False)
+
+    if isinstance(preparation, SpecimenPreparation):
+        return not_evaluated("a specimen folder declares no governed campaign: no scientific question is inferred and "
+                             "no campaign readiness result is attached")
+    if not isinstance(preparation, FamilyPreparation) or preparation.definition is None:
+        return not_evaluated("the selected source could not be loaded as a governed campaign definition")
+    definition = preparation.definition
+    if not is_record:
+        return not_evaluated(f"no stored backend readiness record for campaign {definition.campaign_id}")
+    campaign = record.get("campaign") if isinstance(record.get("campaign"), Mapping) else {}
+    expected = {"campaign hash": (campaign.get("campaign_hash"), definition.campaign_hash),
+                "run type": (campaign.get("run_type"), definition.run_type),
+                "specimens": (list(campaign.get("specimens") or ()), [s.label for s in definition.specimens]),
+                "scientific question": (record.get("scientific_question"), definition.scientific_question),
+                "τ_mf": (record.get("tau_mf"), definition.tau_mf)}
+    if run_hash is not None:
+        expected["run hash"] = (campaign.get("run_hash"), run_hash)
+    differing = [name for name, (stored, governed) in expected.items() if stored != governed]
+    if differing:
+        return not_evaluated(f"the stored record belongs to another campaign or run ({', '.join(differing)} differ: "
+                             f"record campaign {campaign.get('campaign_id')!r}); it is not shown for "
+                             f"{definition.campaign_id}")
+    return ReadinessSelection(SelectionState.MATCHED_STORED_RECORD,
+                              f"stored backend record of campaign {definition.campaign_id} (campaign hash "
+                              f"{definition.campaign_hash[:12]}) shown as stored; a matching identity is not proof "
+                              "that the record is authentic or verified production evidence", True)
+
+
 # ----------------------------------------------------------------------------------------------- view model
 
 def wizard_rows(items: tuple[WizardItem, ...]) -> tuple[tuple[str, str, str, str], ...]:

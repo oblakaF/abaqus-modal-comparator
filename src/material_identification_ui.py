@@ -1012,16 +1012,31 @@ def scientific_readiness_view(app) -> dict[str, object]:
 
     The record is produced by the shared backend (``services.campaign_scientific_backend``); its display rows come
     from the same backend, so the GUI never evaluates, converts or fills in a scientific state.
+
+    M8.2: the stored record is presented only under its own governed selection (``readiness_selection``); another
+    source never inherits it.  The record itself is never changed.
     """
 
+    from services.auto_id_wizard import SelectionState, readiness_selection
     from services.campaign_scientific_backend import readiness_presentation
 
     record = getattr(app, "scientific_readiness_record", None)
-    rows = readiness_presentation(record) if isinstance(record, Mapping) else ()
+    selection = readiness_selection(getattr(app, "auto_id_source", None) is not None,
+                                    getattr(app, "auto_id_preparation", None), record,
+                                    getattr(app, "auto_id_selected_run_hash", None))
+    rows = readiness_presentation(record) if selection.show_record and isinstance(record, Mapping) else ()
+    if rows:
+        status = dict(rows).get("Readiness") or "NOT AVAILABLE"
+    elif selection.state is SelectionState.NOT_EVALUATED_FOR_SELECTION:
+        status = selection.state.value
+    else:
+        status = "NOT AVAILABLE"
     return {
         "available": bool(rows),
-        "status": dict(rows).get("Readiness") or "NOT AVAILABLE",
+        "status": status,
         "rows": rows,
+        "selection_state": selection.state.value,
+        "selection": selection.detail,
     }
 
 
@@ -1055,6 +1070,7 @@ def load_auto_id_source(app, kind: str, path: str) -> None:
     app.auto_id_preparation = preparation
     app.auto_id_summary = summary
     _refresh_auto_id_setup_page(app)
+    _refresh_data_readiness_page(app)  # M8.2: the readiness shown follows the new selection at once
 
 
 def _choose_auto_id_source(app, kind: str) -> None:
@@ -1331,6 +1347,10 @@ def _build_data_readiness_page(app, page) -> None:
         style="MetricValue.TLabel",
     )
     app.material_scientific_readiness_status_label.pack(anchor="w", pady=(0, 4))
+    app.material_scientific_readiness_selection_label = ttk.Label(
+        scientific, text="", style="Secondary.TLabel", justify="left", wraplength=1040
+    )
+    app.material_scientific_readiness_selection_label.pack(anchor="w", pady=(0, 4))
     app.material_scientific_readiness_table = _build_read_only_table(
         scientific,
         ("item", "state"),
@@ -1372,6 +1392,10 @@ def _refresh_data_readiness_page(app) -> None:
         app.material_scientific_readiness_status_label.configure(
             text=scientific["status"]
         )
+        if hasattr(app, "material_scientific_readiness_selection_label"):
+            app.material_scientific_readiness_selection_label.configure(
+                text=f"Selection: {scientific['selection']}"
+            )
 
 
 def _build_modal_correspondence_page(app, page) -> None:

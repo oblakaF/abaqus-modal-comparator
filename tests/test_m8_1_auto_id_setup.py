@@ -503,13 +503,17 @@ class SetupPageTests(_Tmp):
                   "material_family_consistency": None, "material_claim": None, "inp_fragment_available": False,
                   "production_execution": "NOT_AUTHORISED", "production_calibration": None}
         application.scientific_readiness_record = record
-        ui.load_auto_id_source(application, "family", str(RUN_A))
-        self.assertIs(application.scientific_readiness_record, record)  # the wizard never sets readiness
-        application._refresh_material_identification_pages()
+        application._refresh_material_identification_pages()  # no selection: the I6 presentation is unchanged
         scientific = dict(application.material_scientific_readiness_table.items.values())
         self.assertEqual(scientific["Readiness"], "NOT_READY")
         self.assertIn("LM_HISTORY_MISSING", scientific["Refusal reasons"])
         self.assertEqual(application.material_scientific_readiness_status_label.kwargs["text"], "NOT_READY")
+        ui.load_auto_id_source(application, "family", str(RUN_A))
+        self.assertIs(application.scientific_readiness_record, record)  # the wizard never sets or changes readiness
+        # M8.2: campaign "X"'s record is never presented as RUN_A's readiness
+        self.assertEqual(application.material_scientific_readiness_table.items, {})
+        self.assertEqual(application.material_scientific_readiness_status_label.kwargs["text"],
+                         "NOT_EVALUATED_FOR_SELECTION")
         source = (ROOT / "src" / "material_identification_ui.py").read_text(encoding="utf-8")
         self.assertNotIn("judge_campaign_run", source)  # the GUI judges nothing; readiness stays in the backend
 
