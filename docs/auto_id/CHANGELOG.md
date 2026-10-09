@@ -4332,3 +4332,42 @@ first internal provider.
   rule (not invented here); the M5 system ↔ journalled LM history binding belongs to V12-I6 orchestration.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #47.
+
+## 2026-10-09 — V12-I5 ACCEPTED and merged (PR #47)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I5
+- **Status:** ACCEPTED (SUPERVISOR, with documented limitations)
+- **Merge:** PR #47 `auto-id/v12-i5` → `main`, reviewed head `c897b478cc0039aa39460409c06f069b2bb36da8`, merge commit
+  `248d7eb5c66fa5568e70d34c0550fddf4dbad4cb` (tree `b14750cf7e5e8736dacd2b83d85a99fa31481db0`, identical to the reviewed head); PR #48 (`c96e385`) was merged before and its
+  documentation changes are part of the merged branch. Linux CI on main 248d7eb: success (run 37919318508). SUPERVISOR-authorised.
+- **Accepted:** F1 candidate evaluation verified against M4 evaluation evidence; F2 frozen baseline at p0; former
+  expectedFailure tests pass normally; no material / calibration fallback; τ_mf cannot rescue a SPEC §13 FAIL;
+  historical records and hashes unchanged; calibration INP material cloning fail-closed; production calibration blocked.
+- **Cluster policy (SUPERVISOR decision):** confirmed clusters keep CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE and cannot be
+  RELEASED; no per-member pairing rule and no fallback; recorded in ROADMAP / STATUS (no SPEC or M4 change).
+- **Abaqus run count:** 0.
+
+## 2026-10-09 — V12-I6 — backend / GUI readiness on one scientific path (REVIEW_READY)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I6
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i6` from `main` `248d7eb` (PR #49)
+- **Commits:** `52f656a`, `7955ebf`; this governance commit.
+- **LM / Jacobian provenance:** `services/campaign_lm_provenance.py` `verify_lm_history`: governed run identity, one
+  CONVERGED LM result of this run, every campaign evaluation bound to its candidate and to the identical record of the
+  specimen's hash-chained pipeline journal, the LM history's recorded objectives and stop step replayed on the journalled
+  residuals, and the accepted `reconstruct_lm_jacobian` at p̂ reproducing the journalled local sd and stop step. The
+  archived RUN_A / RUN_B journals verify and rebuild their accepted M5 systems (`a5ea2de7…`, `b30a8c27…`).
+- **Backend:** `services/campaign_scientific_backend.py` `judge_campaign_run` (declared question; no fallback):
+  material identification = the accepted campaign report unchanged; specimen calibration = LM provenance, every
+  Jacobian evaluation re-derived from its FE pack, `campaign_m5_system` (extracted from `_campaign_m5`, same
+  construction) on the specimen's FIT rows, I3 inputs from verified evidence only, `build_calibration_output` (I3 + I5)
+  on the same system and evaluation; clusters → CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; INP fragment only for RELEASED.
+- **GUI:** the existing Data Readiness Check page shows the stored readiness record (`readiness_presentation`); the GUI
+  judges nothing. No wizard, no progress system, no new writer; M8 parked.
+- **Safety:** calibration execution gate unchanged (the synthetic fixture lifts it only in tests, with the fake solver);
+  the backend imports no executor, writes nothing and calls no solver. Synthetic evidence stays labelled by its solver
+  profile; the readiness record states that no HUMAN-authorised production calibration run exists.
+- **Tests:** test_v12_i6_backend_integration 47 tests (2 store-gated); full suite without data stores 1816 OK (70 skipped); full suite with all data stores 1830 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #49.

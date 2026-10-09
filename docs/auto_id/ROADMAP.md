@@ -672,12 +672,12 @@ No SP10, t_face or additional FE solves are authorised by policy acceptance.
   `edb3070` (tree identical). The final review added the calibration precision gate
   (conservative_uncertainty ≤ 0.08).
 - **Normative acceptance (D-078):** `SPEC_V1_2.md` is the governing scientific contract; SPEC v1.1 is archived and
-  immutable. Implementation is tracked below: V12-I1–I4 ACCEPTED and merged; V12-I5 REVIEW_READY; V12-I6 TODO. Production calibration remains blocked.
+  immutable. Implementation is tracked below: V12-I1–I5 ACCEPTED and merged; V12-I6 REVIEW_READY. Production calibration remains blocked.
 
 ### Implementation track — SPEC v1.2 (before any SP10 / new FE work)
 
-Implementation in progress: **V12-I1–I4 ACCEPTED and merged**, **V12-I5 REVIEW_READY (PR #47)**,
-**V12-I6 TODO**. Production calibration orchestration remains **BLOCKED** pending I5/I6;
+Implementation in progress: **V12-I1–I5 ACCEPTED and merged**, **V12-I6 REVIEW_READY (PR #49)**.
+Production calibration execution remains **BLOCKED** pending a separate explicit HUMAN authorisation;
 no new FE work is authorised. Each step requires explicit SUPERVISOR authorisation, one at a time,
 tests and review. No `install_*` layer: CLI and GUI must use the same scientific backend services.
 
@@ -687,8 +687,8 @@ tests and review. No `install_*` layer: CLI and GUI must use the same scientific
 | V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `ACCEPTED` |
 | V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `ACCEPTED` |
 | V12-I4 | Calibration reporting / output record: released/refused labels, bound identities, diagnostics and uncertainty; optional CAL_* material cloned from pinned source INP with Density and other supported options retained | `ACCEPTED` |
-| V12-I5 | Negative/regression closure: no fallback; τ_mf cannot rescue §13 FAIL; historical records immutable; calibration material cloning must fail closed on unknown/ambiguous Abaqus options | `REVIEW_READY` |
-| V12-I6 | SPEC v1.2 backend/GUI readiness with the same scientific services (no `install_*`); separate M8 remains parked until authorised | `TODO` |
+| V12-I5 | Negative/regression closure: no fallback; τ_mf cannot rescue §13 FAIL; historical records immutable; calibration material cloning must fail closed on unknown/ambiguous Abaqus options | `ACCEPTED` |
+| V12-I6 | SPEC v1.2 backend/GUI readiness with the same scientific services (no `install_*`); separate M8 remains parked until authorised | `REVIEW_READY` |
 
 - **Normative acceptance merged:** PR #42 (`auto-id/spec-v1.2-acceptance` → `main`), merge commit `61b5016`.
 
@@ -734,7 +734,7 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   `1fcabc47d32560816dc67dfb4c1a6d6b2d2d2f6c`, merge commit `90e237849f72e55c58359245ddb9d3b2956bc3bc`
   (tree `508aaf8704a4d7496ef22d59ec08b01bd12f6937`, identical to reviewed head).
   Post-merge main Linux CI **success** (run `37904375035`). Historical records and I3 science unchanged.
-- **V12-I5 (REVIEW_READY after REWORK, PR #47, branch `auto-id/v12-i5` from `90e2378`, synchronised with `main` `c96e385`):**
+- **V12-I5 (historical REVIEW_READY checkpoint after REWORK, PR #47, branch `auto-id/v12-i5` from `90e2378`, synchronised with `main` `c96e385`):**
   `tests/test_v12_i5_contract_closure.py` — end-to-end negative / regression matrix (no fallback, τ_mf boundaries and
   exclusion from Σ / uncertainty / §13, §13 FAIL not rescued by τ_mf, refusals without released values, anti-mixing,
   cluster member rows, historical records pinned, production calibration refused). The calibration material clone is
@@ -748,12 +748,32 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   input inconsistency. F1 — `services/candidate_evaluation_evidence.py`: the calibration bundle must be the verified
   evaluation of one candidate in the specimen's M4 pipeline journal; p̂, residuals, tracking, pattern, M5 records and
   the FE / job / pack identity are re-derived from the journal, the pinned INP and the content-addressed packs and
-  compared. Confirmed clusters are refused as unverified (no per-member evidence in M4; decision open).
-- **LATER — V12-I6 (`TODO`):** integrate and qualify the v1.2 backend/GUI paths, with no scientific refusal bypass.
+  compared. Confirmed clusters are refused as unverified (no per-member evidence in M4).
+- **V12-I5 accepted and merged:** PR #47 (`auto-id/v12-i5` → `main`), reviewed head `c897b478cc0039aa39460409c06f069b2bb36da8`, merge commit
+  `248d7eb5c66fa5568e70d34c0550fddf4dbad4cb` (tree `b14750cf7e5e8736dacd2b83d85a99fa31481db0`, identical to reviewed head). Post-merge main Linux CI **success** (run `37919318508`).
+  Accepted with documented limitations.
+- **Confirmed-cluster policy (SUPERVISOR decision, 2026-10-09):** a confirmed cluster keeps
+  `CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE`; such a calibration cannot be RELEASED. M4's confirmed-cluster mean does not
+  prove per-member frequency errors or tracking MACs; no per-member pairing rule is invented and there is no fallback
+  (cluster-average 8 % comparison, average tracking MAC, arbitrary or highest-MAC member mapping, reassigned
+  experimental modes, dropped members). Valid cluster mathematics for objective terms, pattern and observability is
+  preserved. Implementation limitation only: SPEC and M4 unchanged.
+- **V12-I6 (REVIEW_READY, PR #49, branch `auto-id/v12-i6` from `248d7eb`):** one read-only backend scientific path for a
+  journalled run. `services/campaign_lm_provenance.py` proves the M5 Jacobian from the journals (governed run
+  identity; one CONVERGED result of this run; every evaluation its candidate's and the identical record of the
+  specimen's hash-chained pipeline journal; the LM history's objectives and stop step at p̂ replayed; the accepted
+  `reconstruct_lm_jacobian` reproduces the journalled local sd and stop step). `services/campaign_scientific_backend.py`
+  dispatches on the declared question: MATERIAL_IDENTIFICATION = the accepted campaign report unchanged;
+  SPECIMEN_ENGINEERING_CALIBRATION = one specimen, declared τ_mf, every Jacobian evaluation re-derived from its
+  content-addressed FE pack, the accepted M5 system on the specimen's FIT rows, I3 gate inputs from verified evidence
+  only, and the I4 output (I3 gate + I5 verifier) on the same system and evaluation; clusters a readiness refusal; the
+  INP fragment only for RELEASED. Typed readiness states with reasons; the existing Data Readiness Check page shows the
+  stored record read-only. The calibration execution gate is unchanged: readiness only, no HUMAN-authorised production
+  calibration run.
 
-**V12 PRODUCTION GATE — NOT YET SATISFIED:** complete I5/I6 and prove negative regression gates
-(no fallback, τ_mf outside Σ/uncertainty/§13, refusals without released values) before enabling calibration execution
-or considering SP10, t_face, or other FE work. Abaqus requires separate HUMAN authorisation.
+**V12 PRODUCTION GATE — NOT YET SATISFIED:** V12-I6 (backend readiness) is under SUPERVISOR review; calibration
+execution stays refused by the unchanged execution gate. Enabling a production calibration run, SP10, t_face or other FE
+work requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN authorisation.
 
 ---
 

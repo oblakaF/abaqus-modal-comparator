@@ -130,6 +130,13 @@
       "pr": 46,
       "merge_commit": "90e237849f72e55c58359245ddb9d3b2956bc3bc",
       "status": "ACCEPTED"
+    },
+    {
+      "stage": "SPEC v1.2 implementation V12-I5",
+      "kind": "implementation track (not a roadmap stage)",
+      "pr": 47,
+      "merge_commit": "248d7eb5c66fa5568e70d34c0550fddf4dbad4cb",
+      "status": "ACCEPTED"
     }
   ],
   "m1": {
@@ -598,7 +605,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of V12-I5 (PR #47, not merged; F1 / F2 closed; cluster-member evidence decision open). V12-I6 TODO; production calibration orchestration BLOCKED; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of V12-I6 (PR #49, not merged). Production calibration execution BLOCKED (separate HUMAN authorisation required); confirmed clusters CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1178,7 +1185,7 @@
       "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity",
       "calibration_precision_gate": "conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness)) <= 0.08 (ln p, as M5); birge_adjusted_sd and AVAILABLE_COMPLETE_LOO required, else REFUSED; > 0.08 REFUSED; no value released, optimiser candidate only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE; never IDENTIFIED / WIDE; tau_mf not in the envelope; UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE kept"
     },
-    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1, V12-I2, V12-I3, V12-I4 ACCEPTED (merged PR #43, #44, #45, #46); V12-I5 REVIEW_READY on branch auto-id/v12-i5 (PR #47; binding findings F1 / F2 closed); V12-I6 TODO; production v1.2 IMPLEMENTATION_INCOMPLETE (production calibration orchestration blocked)",
+    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1, V12-I2, V12-I3, V12-I4, V12-I5 ACCEPTED (merged PR #43, #44, #45, #46, #47); V12-I6 REVIEW_READY on branch auto-id/v12-i6 (PR #49); production v1.2 IMPLEMENTATION_INCOMPLETE until V12-I6 is accepted; production calibration execution BLOCKED pending a separate explicit HUMAN authorisation",
     "merged_to_main": {
       "pr": 41,
       "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423",
@@ -1281,7 +1288,7 @@
       },
       "V12-I5": {
         "title": "Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable; fail-closed unknown or ambiguous Abaqus material options)",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/v12-i5",
         "pr": 47,
         "base": "90e237849f72e55c58359245ddb9d3b2956bc3bc",
@@ -1314,14 +1321,39 @@
           }
         ],
         "limitations": [
-          "confirmed clusters cannot be released: M4 tracks a cluster as a two-mode subspace and judges the pairing-independent mean, so the per-member candidate frequencies and tracking MACs the gate judges row by row are not in the evaluation (needs a SUPERVISOR decision on a member-assignment / member-tracking rule)",
-          "the M5 system (Jacobian) is bound to its records by hash and recomputation, not yet to the journalled LM history (V12-I6 orchestration)"
-        ]
+          "confirmed clusters cannot be released (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE): SUPERVISOR decision 2026-10-09 (current implementation): a confirmed cluster keeps CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE and such a calibration cannot be RELEASED. M4's confirmed-cluster mean does not prove per-member frequency errors or tracking MACs. No per-member pairing rule is invented; no fallback to a cluster-average 8 % comparison, an average tracking MAC, arbitrary member ordering, highest-MAC member mapping, independent reassignment of experimental modes or dropping difficult members. The valid cluster mathematics for objective terms, pattern and observability is preserved. Documented implementation limitation; SPEC and M4 unchanged; no cluster-pairing algorithm in V12-I6",
+          "the M5 system (Jacobian) ↔ journalled LM history binding was left to V12-I6 (addressed there, REVIEW_READY)"
+        ],
+        "merged_to_main": {
+          "pr": 47,
+          "merge_commit": "248d7eb5c66fa5568e70d34c0550fddf4dbad4cb",
+          "reviewed_head": "c897b478cc0039aa39460409c06f069b2bb36da8",
+          "tree": "b14750cf7e5e8736dacd2b83d85a99fa31481db0",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 248d7eb: success (run 37919318508)",
+          "acceptance": "SUPERVISOR 2026-10-09: ACCEPTED with documented limitations"
+        }
       },
       "V12-I6": {
         "title": "Integration into GUI / backend readiness (the same backend services; no install_* layer)",
-        "status": "TODO"
+        "status": "REVIEW_READY",
+        "branch": "auto-id/v12-i6",
+        "pr": 49,
+        "base": "248d7eb5c66fa5568e70d34c0550fddf4dbad4cb",
+        "scope": "One read-only backend scientific path for a journalled campaign run (no install_* layer, no second engine): services/campaign_lm_provenance.py verify_lm_history proves the M5 Jacobian from the journals — campaign journal intact and its run identity the governed one; exactly one journalled LM result of this run, CONVERGED, no refusal; every campaign evaluation is its own candidate's and, per specimen, the identical record of that specimen's hash-chained pipeline journal of this run; the LM history starts at the start point, every recorded objective is 1/2|r|^2 of the journalled residuals and it ends with the stop step at p_hat; the accepted reconstruct_lm_jacobian at p_hat (FIT terms x fitted parameters) reproduces the journalled local_sd and stop step. services/campaign_scientific_backend.py judge_campaign_run dispatches on the declared question: MATERIAL_IDENTIFICATION = the accepted build_campaign_report unchanged (after LM provenance); SPECIMEN_ENGINEERING_CALIBRATION = one specimen and declared tau_mf, every journalled evaluation the Jacobian uses re-derived from its content-addressed FE pack (job re-rendered from the pinned INP, pack content hash, branch tracking and objective recomputed against the frozen baseline pack), the accepted campaign_m5_system on the specimen's FIT rows, the M5 evidence chain on it, the I3 gate inputs assembled from that verified evidence only, and build_calibration_output (I3 gate + I5 verifier) on the same system and evaluation; confirmed clusters a readiness refusal; the INP fragment only for RELEASED. Typed readiness record (RELEASED / REFUSED / NOT_READY / MATERIAL_VALUES_RELEASED) with refusal reasons, conditional uncertainty, diagnostic-only candidate, solver profiles and FE sources as journalled, production execution NOT_AUTHORISED and no HUMAN-authorised production calibration run. GUI: the existing Data Readiness Check page shows the stored record through the backend's readiness_presentation (read-only)",
+        "production_code_change": "src/services/campaign_lm_provenance.py (new); src/services/campaign_scientific_backend.py (new); src/services/identification_campaign_run.py: campaign_m5_system and campaign_guards extracted from _campaign_m5 (same construction; RUN_A / RUN_B system hashes reproduced); src/material_identification_ui.py: read-only scientific readiness section on the Data Readiness Check page. Calibration execution gate (CampaignDefinition.require_executable) unchanged; SPEC, I2 rules, I3 thresholds, I4 semantics and I5 science unchanged",
+        "commits": [
+          "52f656a8",
+          "7955ebf5"
+        ],
+        "tests": "test_v12_i6_backend_integration 47 tests (2 store-gated); full suite without data stores 1816 OK (70 skipped); full suite with all data stores 1830 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus",
+        "limitations": [
+          "confirmed clusters: CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE (SUPERVISOR cluster policy); never released",
+          "no HUMAN-authorised production calibration run exists: calibration execution stays refused by the unchanged gate; synthetic fake-solver runs (solver profile .../fake) prove the adapter only; real archived evidence verified read-only is RUN_A / RUN_B (material identification)",
+          "the M7 CLI registers RUN_A / RUN_B only; no calibration campaign definition exists (a new one is a scientific decision)"
+        ]
       }
-    }
+    },
+    "cluster_policy": "SUPERVISOR decision 2026-10-09 (current implementation): a confirmed cluster keeps CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE and such a calibration cannot be RELEASED. M4's confirmed-cluster mean does not prove per-member frequency errors or tracking MACs. No per-member pairing rule is invented; no fallback to a cluster-average 8 % comparison, an average tracking MAC, arbitrary member ordering, highest-MAC member mapping, independent reassignment of experimental modes or dropping difficult members. The valid cluster mathematics for objective terms, pattern and observability is preserved. Documented implementation limitation; SPEC and M4 unchanged; no cluster-pairing algorithm in V12-I6"
   }
 }
