@@ -1,4 +1,4 @@
-# Auto-ID v1.1 — Canonical Project Record
+# Auto-ID — Canonical Project Record
 
 This directory is the durable record of the Auto-ID (automatic material
 identification) work. **GitHub, not chat memory, is the project record.** Every
