@@ -804,8 +804,8 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 | M8.1 | Specimen / family wizard | `ACCEPTED` |
 | M8.2 | Readiness screen | `ACCEPTED` |
 | M8.3 | One Auto-ID button calling the same backend as the CLI | `ACCEPTED` |
-| M8.4 | Progress / resume | `REVIEW_READY` |
-| M8.5 | Verdict presentation | `TODO` |
+| M8.4 | Progress / resume | `ACCEPTED` |
+| M8.5 | Verdict presentation | `REVIEW_READY` |
 | M8.6 | Abaqus Engineering Constants block | `TODO` |
 | M8.7 | Uncertainty / source breakdown | `TODO` |
 | M8.8 | Evidence / provenance export | `TODO` |
@@ -814,7 +814,7 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1, M8.2 and M8.3 accepted; M8.4 only). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
+Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1–M8.4 accepted; M8.5 only). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
 `auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
 specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
 measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
@@ -841,7 +841,7 @@ correction: a result is presented as current only for the exact journal and run 
 any new selection or evaluation attempt invalidates it first, and a failed attempt shows
 `NOT_EVALUATED_FOR_SELECTION` (a genuine backend NOT_READY / REFUSED is shown as returned). M8.3 merged: merge
 commit `6db9a15` (tree identical to reviewed head `3b2693c`), post-merge main CI success (run `37964686863`).
-**M8.4 `REVIEW_READY`** (PR #54, branch `auto-id/m8-4` from `6db9a15`): read-only progress / resume *inspection*
+**M8.4 `ACCEPTED`** (PR #54, branch `auto-id/m8-4` from `6db9a15`): read-only progress / resume *inspection*
 of the explicitly selected stored run. `services/run_progress.py` verifies the campaign journal (format, directory = run
 hash, hash chain, governed run identity) and each governed pipeline journal, then reports only journalled facts:
 evaluations and refusals, LM result status / iterations / evaluations, Abaqus solves recorded and the run identity's
@@ -850,6 +850,13 @@ evidence shows no counts; a CONVERGED LM result is not a release. GUI: Refresh r
 journal makes an earlier evaluation non-current) and Reopen selected run (re-verified; evaluation not current); a new
 selection clears progress. Journal freshness covers the campaign journal and every governed pipeline journal; a
 missing or unverified journal never compares equal, so an earlier evaluation is not kept current. Computational resume is
-not enabled (HUMAN execution gate). M8.5–M8.8 `TODO`. The parked prototype branch
+not enabled (HUMAN execution gate). M8.4 merged: merge commit `43ffb89` (tree identical to reviewed head
+`79cf8ab`), post-merge main CI success (run `37974175785`).
+**M8.5 `REVIEW_READY`** (PR #55, branch `auto-id/m8-5` from `43ffb89`): a concise read-only verdict summary on the
+Data Readiness Check, read only from the backend record shown under the current selection (`verdict_summary`): evaluated
+campaign / run, declared question and τ_mf (not declared for v1), exact backend status, released values only from the
+record's released fields (specimen calibration with its own labels; material values only for MATERIAL_VALUES_RELEASED),
+refusal / not-ready reasons, diagnostic-only candidates, result type, solver profiles and production status.
+NOT_EVALUATED_FOR_SELECTION is a GUI presentation state with no value or candidate. M8.6–M8.8 `TODO`. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.
