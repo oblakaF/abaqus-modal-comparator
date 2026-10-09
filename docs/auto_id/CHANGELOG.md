@@ -4304,3 +4304,31 @@ first internal provider.
   until the binding findings F1 (candidate evaluation) and F2 (frozen baseline) are closed. V12-I6 TODO.
 - **Abaqus run count:** 0.
 - **Next gate:** F2 and F1 corrections on `auto-id/v12-i5`, then SUPERVISOR review of PR #47.
+
+## 2026-10-09 — V12-I5 — evidence-binding findings F1 / F2 closed (REVIEW_READY)
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I5 (SUPERVISOR REWORK of PR #47 head `00e210c`)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i5` (PR #47; main `c96e385` merged in)
+- **Commits:** `e759bf4` F2 frozen-baseline binding; `3293390` F1 candidate-evaluation binding; this
+  governance commit.
+- **F2:** the SPEC v1.2 §7 baseline is the FE reference state at p0 where the pairs were frozen (SPEC v1.1 §6 S3).
+  `governed_baseline_rows` derives Δ ln f = ln(f_FE / f_EXP) per governed physical row from the frozen observation
+  set; `build_calibration_output` requires the gate's baseline rows to be exactly those rows, roles and values (signed,
+  rel 1e-12), otherwise an input inconsistency. Max / RMS / 8 % science unchanged; synthetic fixtures now carry a
+  consistent frozen baseline.
+- **F1:** new `services/candidate_evaluation_evidence.py` (V12 companion evidence; no historical record changed).
+  `CandidateEvaluationEvidence` = specimen pipeline journal + judged evaluation hash + candidate and frozen-baseline
+  FE packs + pinned source INP + M5 system. `verify_candidate_evaluation` re-derives and compares: p̂ (journalled
+  parameters, candidate hash); residuals, holdouts and tracking (branch tracking and objective recomputed from the
+  content-addressed packs); candidate terms, physical rows and tracking MACs; the pattern (declared τ_mf); analysis,
+  statistical_sd, Birge and model_form_robustness (recomputed from the system with the verified FIT terms at p̂); the
+  forward job (re-rendered from the pinned INP), pack content hashes, FE geometry / node set / modes, the frozen
+  baseline job, and the run (hash chain, calibration run hash, specimen, forward model, frozen set, solver profile,
+  pairing policy, start). `build_calibration_output` requires it. Confirmed clusters are refused as unverified
+  (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE).
+- **Tests:** test_v12_i5_contract_closure 56 OK (0 expected failures); focused (V12-I1..I5, SPEC v1.2 normative + policy, M5 gate, verdict, uncertainty, model_form_robustness, M7 campaign / RUN_A / RUN_B / entry wiring, M7b, M7 closure, forward builder / generic / manifest, shared carbon, M3/M4 stage gates, clusters, objective, pipeline, family residual) 464 OK with all data stores; full suite without data stores 1769 OK (68 skipped); full suite with all data stores 1783 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Open decision:** release of a calibration with a confirmed cluster needs a member-assignment / member-tracking
+  rule (not invented here); the M5 system ↔ journalled LM history binding belongs to V12-I6 orchestration.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #47.

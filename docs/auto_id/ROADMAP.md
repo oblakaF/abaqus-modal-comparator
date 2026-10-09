@@ -672,11 +672,11 @@ No SP10, t_face or additional FE solves are authorised by policy acceptance.
   `edb3070` (tree identical). The final review added the calibration precision gate
   (conservative_uncertainty ≤ 0.08).
 - **Normative acceptance (D-078):** `SPEC_V1_2.md` is the governing scientific contract; SPEC v1.1 is archived and
-  immutable. Implementation is tracked below: V12-I1–I4 ACCEPTED and merged; V12-I5 REWORK; V12-I6 TODO. Production calibration remains blocked.
+  immutable. Implementation is tracked below: V12-I1–I4 ACCEPTED and merged; V12-I5 REVIEW_READY; V12-I6 TODO. Production calibration remains blocked.
 
 ### Implementation track — SPEC v1.2 (before any SP10 / new FE work)
 
-Implementation in progress: **V12-I1–I4 ACCEPTED and merged**, **V12-I5 REWORK (PR #47)**,
+Implementation in progress: **V12-I1–I4 ACCEPTED and merged**, **V12-I5 REVIEW_READY (PR #47)**,
 **V12-I6 TODO**. Production calibration orchestration remains **BLOCKED** pending I5/I6;
 no new FE work is authorised. Each step requires explicit SUPERVISOR authorisation, one at a time,
 tests and review. No `install_*` layer: CLI and GUI must use the same scientific backend services.
@@ -687,7 +687,7 @@ tests and review. No `install_*` layer: CLI and GUI must use the same scientific
 | V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `ACCEPTED` |
 | V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `ACCEPTED` |
 | V12-I4 | Calibration reporting / output record: released/refused labels, bound identities, diagnostics and uncertainty; optional CAL_* material cloned from pinned source INP with Density and other supported options retained | `ACCEPTED` |
-| V12-I5 | Negative/regression closure: no fallback; τ_mf cannot rescue §13 FAIL; historical records immutable; calibration material cloning must fail closed on unknown/ambiguous Abaqus options | `REWORK` |
+| V12-I5 | Negative/regression closure: no fallback; τ_mf cannot rescue §13 FAIL; historical records immutable; calibration material cloning must fail closed on unknown/ambiguous Abaqus options | `REVIEW_READY` |
 | V12-I6 | SPEC v1.2 backend/GUI readiness with the same scientific services (no `install_*`); separate M8 remains parked until authorised | `TODO` |
 
 - **Normative acceptance merged:** PR #42 (`auto-id/spec-v1.2-acceptance` → `main`), merge commit `61b5016`.
@@ -734,7 +734,7 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   `1fcabc47d32560816dc67dfb4c1a6d6b2d2d2f6c`, merge commit `90e237849f72e55c58359245ddb9d3b2956bc3bc`
   (tree `508aaf8704a4d7496ef22d59ec08b01bd12f6937`, identical to reviewed head).
   Post-merge main Linux CI **success** (run `37904375035`). Historical records and I3 science unchanged.
-- **V12-I5 (REWORK, PR #47, branch `auto-id/v12-i5` from `90e2378`, synchronised with `main` `c96e385`):**
+- **V12-I5 (REVIEW_READY after REWORK, PR #47, branch `auto-id/v12-i5` from `90e2378`, synchronised with `main` `c96e385`):**
   `tests/test_v12_i5_contract_closure.py` — end-to-end negative / regression matrix (no fallback, τ_mf boundaries and
   exclusion from Σ / uncertainty / §13, §13 FAIL not rescued by τ_mf, refusals without released values, anti-mixing,
   cluster member rows, historical records pinned, production calibration refused). The calibration material clone is
@@ -743,6 +743,12 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   principle; REWORK to close the evidence-binding findings F1 (authoritative candidate evaluation binding p̂, residuals,
   robustness and FE identity) and F2 (baseline Δ ln f = ln(f_FE / f_EXP) of the frozen baseline pairing, SPEC v1.1 §6
   S3).
+- **V12-I5 binding closure:** F2 — the §7 baseline is the frozen FE reference state at p0: per governed physical
+  row Δ ln f = ln(f_FE / f_EXP) of the frozen observation set (`governed_baseline_rows`), any other baseline is an
+  input inconsistency. F1 — `services/candidate_evaluation_evidence.py`: the calibration bundle must be the verified
+  evaluation of one candidate in the specimen's M4 pipeline journal; p̂, residuals, tracking, pattern, M5 records and
+  the FE / job / pack identity are re-derived from the journal, the pinned INP and the content-addressed packs and
+  compared. Confirmed clusters are refused as unverified (no per-member evidence in M4; decision open).
 - **LATER — V12-I6 (`TODO`):** integrate and qualify the v1.2 backend/GUI paths, with no scientific refusal bypass.
 
 **V12 PRODUCTION GATE — NOT YET SATISFIED:** complete I5/I6 and prove negative regression gates
