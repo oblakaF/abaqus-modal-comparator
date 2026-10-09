@@ -9,6 +9,7 @@ DECISIONS history and the M7 records must stay unchanged; and no v1.2 implementa
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 from pathlib import Path
 import re
@@ -113,8 +114,12 @@ class NormativeSpecTests(unittest.TestCase):
         track = status["spec_v1_2_implementation"]
         self.assertEqual(track["status"], "IN_PROGRESS")
         self.assertEqual(sorted(track["steps"]), [f"V12-I{i}" for i in range(1, 7)])
-        self.assertEqual(track["steps"]["V12-I1"]["status"], "REVIEW_READY")  # never self-ACCEPTED
-        self.assertTrue(all(track["steps"][f"V12-I{i}"]["status"] == "TODO" for i in range(2, 7)))
+        # Roadmap order: an ACCEPTED prefix, then at most one step under work (never self-ACCEPTED), the rest TODO.
+        states = [track["steps"][f"V12-I{i}"]["status"] for i in range(1, 7)]
+        accepted = len(states) - len(list(itertools.dropwhile(lambda s: s == "ACCEPTED", states)))
+        rest = states[accepted:]
+        self.assertTrue(rest and all(s == "TODO" for s in rest[1:]), states)
+        self.assertIn(rest[0], ("TODO", "IN_PROGRESS", "REVIEW_READY", "REWORK"))
         self.assertEqual((status["m8"]["status"], status["m8"]["parked_branch"]["commit"]),
                          ("NOT_STARTED", "193db8dd4dd31c88ea1eae0a905f372e8a00c31d"))
         self.assertIn("| [SPEC_V1_2.md](SPEC_V1_2.md) | Governing scientific contract (normative, D-078)",
