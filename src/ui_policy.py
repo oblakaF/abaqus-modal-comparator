@@ -57,6 +57,7 @@ COMPACT_TAB_LABELS = (
 )
 
 MATERIAL_IDENTIFICATION_STEP_LABELS = (
+    "0. Auto-ID Setup",
     "1. Project Evidence",
     "2. Data Readiness Check",
     "3. Task Definition",

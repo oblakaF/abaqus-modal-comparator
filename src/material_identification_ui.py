@@ -1025,6 +1025,115 @@ def scientific_readiness_view(app) -> dict[str, object]:
     }
 
 
+AUTO_ID_REPO_ROOT = Path(__file__).resolve().parents[1]
+AUTO_ID_SETUP_SCOPE = (
+    "Select one specimen folder (with its specimen passport) or a family / campaign definition. The governed "
+    "records are loaded read-only and shown with exactly what is present, missing or not verified. Nothing is "
+    "chosen, judged or computed here: no experimental or FE modes, modal families or registration are selected, "
+    "no material property or calibration is produced, nothing is written and Abaqus is never started. A file "
+    "found locally is not a governed or scientifically accepted file."
+)
+AUTO_ID_NOTHING_SELECTED = "Nothing selected."
+
+
+def load_auto_id_source(app, kind: str, path: str) -> None:
+    """Load a specimen folder or a family / campaign definition through the M8.1 wizard service (read-only)."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+    from services.auto_id_wizard import prepare_family, prepare_specimen_folder, wizard_summary
+
+    app.auto_id_source = (kind, str(path))
+    try:
+        roots = fixture_roots_from_environment()
+        if kind == "family":
+            preparation = prepare_family(Path(path), AUTO_ID_REPO_ROOT, roots)
+        else:
+            preparation = prepare_specimen_folder(Path(path), AUTO_ID_REPO_ROOT, roots)
+        summary = wizard_summary(preparation)
+    except Exception as error:  # an unexpected record problem is reported, never a GUI crash
+        preparation, summary = None, f"The selection could not be loaded: {error}"
+    app.auto_id_preparation = preparation
+    app.auto_id_summary = summary
+    _refresh_auto_id_setup_page(app)
+
+
+def _choose_auto_id_source(app, kind: str) -> None:
+    if kind == "family":
+        path = filedialog.askopenfilename(
+            title="Family / campaign definition",
+            filetypes=(("Campaign definition", "*.campaign.json"), ("JSON", "*.json")),
+        )
+    else:
+        path = filedialog.askdirectory(title="Specimen folder")
+    if path:
+        load_auto_id_source(app, kind, path)
+
+
+def auto_id_setup_view(app) -> dict[str, object]:
+    """Rows of the loaded selection (presentation only)."""
+
+    from services.auto_id_wizard import preparation_rows
+
+    preparation = getattr(app, "auto_id_preparation", None)
+    source = getattr(app, "auto_id_source", None)
+    return {
+        "source": "" if source is None else f"{source[0]}: {source[1]}",
+        "summary": getattr(app, "auto_id_summary", None) or AUTO_ID_NOTHING_SELECTED,
+        "rows": preparation_rows(preparation),
+    }
+
+
+def _build_auto_id_setup_page(app, page) -> None:
+    ttk.Label(page, text=AUTO_ID_SETUP_SCOPE, justify="left", wraplength=1100).pack(
+        anchor="nw", fill="x", pady=(0, 8)
+    )
+    buttons = ttk.Frame(page)
+    buttons.pack(anchor="w", pady=(0, 8))
+    ttk.Button(
+        buttons,
+        text="Select specimen folder...",
+        command=lambda: _choose_auto_id_source(app, "specimen"),
+    ).pack(side="left")
+    ttk.Button(
+        buttons,
+        text="Select family / campaign definition...",
+        command=lambda: _choose_auto_id_source(app, "family"),
+    ).pack(side="left", padx=(8, 0))
+    app.material_auto_id_source_label = ttk.Label(page, text="", justify="left", wraplength=1100)
+    app.material_auto_id_source_label.pack(anchor="nw", fill="x")
+    app.material_auto_id_summary_label = ttk.Label(
+        page, text=AUTO_ID_NOTHING_SELECTED, justify="left", wraplength=1100
+    )
+    app.material_auto_id_summary_label.pack(anchor="nw", fill="x", pady=(4, 8))
+    app.material_auto_id_table = _build_read_only_table(
+        page,
+        ("section", "item", "value", "status", "provenance"),
+        ("Section", "Item", "Value", "Status", "Provenance"),
+        (190, 230, 300, 210, 420),
+        height=18,
+    )
+    ttk.Label(
+        page,
+        text=(
+            "PRESENT_SHA256_NOT_VERIFIED: a pinned file was found with its pinned size only; its SHA-256 is "
+            "verified by the backend when the file is used. Scientific readiness is judged on the Data "
+            "Readiness Check page by the shared backend, never here."
+        ),
+        style="Secondary.TLabel",
+        justify="left",
+        wraplength=1100,
+    ).pack(anchor="nw", fill="x", pady=(8, 0))
+
+
+def _refresh_auto_id_setup_page(app) -> None:
+    if not hasattr(app, "material_auto_id_table"):
+        return
+    view = auto_id_setup_view(app)
+    _replace_table_rows(app.material_auto_id_table, view["rows"])
+    app.material_auto_id_summary_label.configure(text=view["summary"])
+    app.material_auto_id_source_label.configure(text=view["source"])
+
+
 def _build_project_evidence_page(app, page) -> None:
     section = ttk.LabelFrame(page, text="1. Project Evidence", padding=16)
     section.pack(fill="both", expand=True)
@@ -2029,6 +2138,7 @@ def install_material_identification_ui(app_module) -> None:
             if label is not None:
                 label.configure(text=value)
         _refresh_model_texts(self)
+        _refresh_auto_id_setup_page(self)
         _refresh_data_readiness_page(self)
         _refresh_modal_correspondence_page(self)
         _refresh_sensitivity_page(self)
@@ -2135,7 +2245,9 @@ def install_material_identification_ui(app_module) -> None:
             page = ttk.Frame(self.material_identification_notebook, padding=16)
             self.material_identification_notebook.add(page, text=step_label)
             self.material_identification_pages[step_label] = page
-            if step_label == "1. Project Evidence":
+            if step_label == "0. Auto-ID Setup":
+                _build_auto_id_setup_page(self, page)
+            elif step_label == "1. Project Evidence":
                 _build_project_evidence_page(self, page)
             elif step_label == "2. Data Readiness Check":
                 _build_data_readiness_page(self, page)

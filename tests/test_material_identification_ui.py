@@ -505,7 +505,7 @@ class MaterialIdentificationInstallerTests(_ApplicationHarness, unittest.TestCas
 
     def test_project_startup_builds_shell_without_backend(self):
         application = self._application()
-        self.assertEqual(len(application.material_identification_pages), 8)
+        self.assertEqual(len(application.material_identification_pages), 9)  # M8.1: "0. Auto-ID Setup"
         self.assertFalse(hasattr(application, "material_identification_solver"))
 
     def test_variable_trace_callback_accepts_tk_arguments(self):
@@ -1592,7 +1592,7 @@ class MaterialIdentificationGuiShellTests(unittest.TestCase):
         application = self.application
         self.assertIsNone(application.result)
         self.assertFalse(application.running)
-        self.assertEqual(len(application.material_identification_pages), 8)
+        self.assertEqual(len(application.material_identification_pages), 9)  # M8.1: "0. Auto-ID Setup"
 
 
 if __name__ == "__main__":
