@@ -1,3 +1,5 @@
+> **SUPERSEDED_BY_NORMATIVE_SPEC_V1_2** — historical policy-development evidence. Superseded by the normative [SPEC_V1_2.md](SPEC_V1_2.md) (D-078, SUPERVISOR, 2026-10-09; PR #41 merged as `edb3070`). The content below is the reviewed final state (PR #41 head `62903ef`) and is kept unchanged, including its status line at review time.
+
 # SPEC v1.2 policy review — revised after SUPERVISOR policy decision
 
 | | |

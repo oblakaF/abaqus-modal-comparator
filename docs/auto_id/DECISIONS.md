@@ -1291,3 +1291,43 @@ Decision:
   `PARKED_PENDING_POST_M7_DECISION` (not rebased, not merged, M8.2 not started).
 Rationale / scope: closes M7 with the corrected interpretation; no scientific result or code changes.
 Supersedes: the interim REWORK / gate-pending state of D-076
+
+## D-078 — SPEC v1.2 accepted as the normative Auto-ID scientific contract
+Date: 2026-10-09 · Accepted by: SUPERVISOR · Source: SUPERVISOR "SPEC v1.2 — NORMATIVE ACCEPTANCE AND CLOSURE." (2026-10-09); PR #41 (reviewed head `62903ef899122de9a3585d6cf6551d03442b97e5`, merge `edb3070d2ed5b385f7152b3041ca3e297bdc8423`)
+Decision:
+- **SPEC v1.2 is accepted as normative.** The accepted policy is the PR #41 reviewed head `62903ef`, merged to `main`
+  as `edb3070` (merged tree identical to the reviewed head). `SPEC_V1_2.md` is now the governing Auto-ID scientific
+  contract: SPEC v1.1 as amended by SPEC v1.2; unamended v1.1 clauses remain in force.
+- **SPEC v1.1 remains archived and immutable** (`SPEC_V1_1.md`, unchanged). The policy draft, review and options stay
+  as historical evidence, marked SUPERSEDED_BY_NORMATIVE_SPEC_V1_2.
+- **Two-question upper rule accepted:** MATERIAL_IDENTIFICATION and SPECIMEN_ENGINEERING_CALIBRATION, selected before
+  execution and part of the campaign / run identity. **No automatic fallback:** a MATERIAL_IDENTIFICATION run that
+  ends NOT_IDENTIFIABLE or NO_GLOBAL_PARAMETER_VALUE emits no calibration number.
+- **τ_mf maximum 0.02** in |Δ ln f| accepted: one campaign-level value, declared before execution, identity / hash
+  bound; smaller allowed, larger only by a future specification revision; never per mode, family or parameter; never
+  selected after fit results. Holdout |Δ ln f| ≤ max(3σ, τ_mf); residual-family magnitude max(2σ, τ_mf). τ_mf never
+  enters Σ, covariance, Φ, whitening, statistical_sd, birge_adjusted_sd, model_form_robustness,
+  conservative_uncertainty or §13. Passing a τ_mf gate does not establish parameter precision.
+- **§13 remains unchanged and τ_mf-free:** FAIL → NO_GLOBAL_PARAMETER_VALUE; NOT_EVALUABLE → no global family value;
+  τ_mf cannot rescue a FAIL.
+- **Specimen calibration class accepted:** SPECIMEN_ENGINEERING_CALIBRATION with NOT_A_MATERIAL_PROPERTY and
+  NOT_TRANSFERABLE_WITHOUT_VALIDATION; bound to physical specimen, test run, forward model, INP SHA-256,
+  registration, campaign / run and declared τ_mf; never in a material-property field; never written through the
+  material-property writer (optional separate fragment only, with a distinct material name and warnings).
+- **Calibration gates accepted:** observability (≥ k + 1 FIT families, full rank at the M5 RCOND, complete
+  leave-one-FIT-family-out, ≥ 1 HOLDOUT family; k = 1: 2 FIT + 1 HOLDOUT; a cluster counts once); non-degradation
+  (max and RMS not worse than the baseline, every governed row ≤ 8 %); precision (conservative_uncertainty =
+  max(birge_adjusted_sd, 0.5 · width(model_form_robustness)) ≤ 0.08 in ln p, birge_adjusted_sd available and
+  model_form_robustness AVAILABLE_COMPLETE_LOO, otherwise REFUSED with no calibration value; an optimiser candidate only
+  as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE). With incomplete covariance,
+  UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE remains visible.
+- **Historical RUN_A / RUN_B are not reinterpreted:** RUN_A stays NO_GLOBAL_PARAMETER_VALUE, RUN_B diagnostic only;
+  the v1.1 records are immutable and may later be used only as RETROSPECTIVE_DIAGNOSTIC_ONLY. An accepted v1.2
+  calibration needs a new v1.2 campaign / run identity with question B and τ_mf declared before that re-analysis.
+- **Production implementation is NOT part of D-078.** Implementation status: POLICY_ACCEPTED,
+  IMPLEMENTATION_NOT_STARTED; production code does not yet enforce the v1.2 additions. Implementation track
+  V12-I1 … V12-I6 (ROADMAP) precedes any SP10 / new FE work; it is not started.
+- **No Abaqus was run** for the SPEC v1.2 policy work. M8 stays NOT_STARTED; `auto-id/m8` (`193db8d`) stays parked.
+Rationale / scope: closes external audit finding V4 at the policy level (model-form tolerance and specimen calibration
+frozen before any new FE result); no scientific result, record or code changes.
+Supersedes: none (amends SPEC v1.1 by SPEC v1.2; D-077's "SPEC v1.2 unresolved" note is resolved)

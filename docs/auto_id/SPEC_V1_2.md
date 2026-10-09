@@ -1,15 +1,21 @@
-> **SUPERSEDED_BY_NORMATIVE_SPEC_V1_2** — historical policy-development evidence. Superseded by the normative [SPEC_V1_2.md](SPEC_V1_2.md) (D-078, SUPERVISOR, 2026-10-09; PR #41 merged as `edb3070`). The content below is the reviewed final state (PR #41 head `62903ef`) and is kept unchanged, including its status line at review time.
+# Auto-ID specification v1.2 — Governing Scientific Specification
 
-# Auto-ID specification v1.2 — DRAFT (amendments to v1.1)
-
-| | |
+| Item | Value |
 |---|---|
-| **Status** | **PROPOSED — NOT NORMATIVE — AWAITING FINAL SUPERVISOR ACCEPTANCE** |
-| **Normative specification** | `SPEC_V1_1.md` (unchanged). Until a final SUPERVISOR decision accepts this draft, every rule below is a proposal only and no code applies it. No decision number is assigned yet |
-| **Policy direction** | Accepted by the SUPERVISOR (2026-10-09) subject to the corrections incorporated in this revision |
-| **Origin** | External audit iteration 2, finding V4 (a SPEC v1.1 policy gap), and the related V1 / V3 / V5 / V6 / J1 / J3 / J5 dispositions (D-076, D-077) |
-| **Branch** | `auto-id/spec-v1.2-policy` from `main` `9bff6c79ee149e9309c3e3697cb96fff4e937c68` |
-| **Review record** | `SPEC_V1_2_POLICY_REVIEW.md`; machine-readable policy in `SPEC_V1_2_POLICY_OPTIONS.json` |
+| Version | 1.2 |
+| Status | **NORMATIVE.** This Markdown file is the canonical Auto-ID scientific contract for implementation. |
+| Accepted | SUPERVISOR, 2026-10-09 |
+| Decision | D-078 |
+| Normative predecessor | [SPEC_V1_1.md](SPEC_V1_1.md) (archived and immutable) |
+| Scientific origin | External audit iteration 2 (finding V4 and the related V1 / V3 / V5 / V6 / J1 / J3 / J5 dispositions), D-076, D-077 and the accepted SPEC v1.2 policy freeze (PR #41, reviewed head `62903ef899122de9a3585d6cf6551d03442b97e5`, merged to `main` as `edb3070d2ed5b385f7152b3041ca3e297bdc8423`) |
+| Review record | [SPEC_V1_2_POLICY_REVIEW.md](SPEC_V1_2_POLICY_REVIEW.md); machine-readable policy [SPEC_V1_2_POLICY_OPTIONS.json](SPEC_V1_2_POLICY_OPTIONS.json) |
+| Implementation status | POLICY_ACCEPTED, IMPLEMENTATION_NOT_STARTED (production code does not yet enforce the v1.2 additions; track V12-I1 … V12-I6 in [ROADMAP.md](ROADMAP.md)) |
+
+**Scope.** SPEC v1.2 is SPEC v1.1 as amended by this document. Where a section below amends, replaces or adds a
+clause, this document governs. Every SPEC v1.1 clause that is not amended here remains in force unchanged as part of
+v1.2. SPEC_V1_1.md itself is kept archived and immutable.
+
+Normative keywords: **MUST**, **MUST NOT**, **MAY**.
 
 **Freeze rule.** τ_mf and the specimen-calibration rules are declared here **before** any new FE calculation (SP10,
 t_face sensitivity or a re-run of M7). No value was chosen from, or evaluated on, the historical RUN_A / RUN_B
@@ -106,7 +112,7 @@ the p-values or the shared / separate comparison.
 NO_GLOBAL_PARAMETER_VALUE, whatever τ_mf is. §13 not evaluable (rank-deficient separate fits) gives no family value
 either. Implementation must guard this with tests.
 
-## 6. New §3a — SPECIMEN_ENGINEERING_CALIBRATION (draft; not implemented)
+## 6. New §3a — SPECIMEN_ENGINEERING_CALIBRATION
 
 **Purpose.** A model-specific calibration value for **one physical specimen**, answering question B of §1: which
 effective constant makes this governed FE model of this specimen reproduce this specimen's governed modes.
@@ -173,7 +179,7 @@ NOT_AVAILABLE it states `UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE` and ne
 experimental uncertainty. A calibration that passes every gate is a model-calibration output; it must not masquerade as
 a statistically complete material-property estimate.
 
-## 7. New rule — Per-specimen non-degradation (draft)
+## 7. New rule — Per-specimen non-degradation
 
 For the same governed FIT + HOLDOUT rows of **one** specimen, comparing the candidate with the governed baseline FE
 state:
@@ -188,7 +194,7 @@ worst one; the 8 % ceiling is separate from the τ_mf holdout / model-form gates
 improve versus the baseline (that would make a multi-mode optimum unnecessarily brittle). Campaign-global maxima are
 never used for this decision.
 
-## 8. New rule — Minimum observability for a specimen calibration (draft)
+## 8. New rule — Minimum observability for a specimen calibration
 
 For k fitted parameters:
 
@@ -234,7 +240,7 @@ is enlarged and Σ_meas is never invented.
 - **Cluster discovery (J3):** should later inspect the full experimental / FE neighbourhood; accepted clusters still
   obey the frozen governed rules.
 
-## 13. What changes in code if finally accepted (not done here)
+## 13. Implementation scope (implementation track V12-I1 … V12-I6; not yet implemented)
 
 Campaign definition: declared question (material identification or specimen calibration) and τ_mf, both
 identity-bound. M5 holdout and pattern magnitude bounds max(kσ, τ_mf) only when τ_mf is declared. A calibration gate
