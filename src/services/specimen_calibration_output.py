@@ -368,14 +368,13 @@ class CalibrationInpFragment:
         return hashlib.sha256(self.content.encode("latin-1")).hexdigest()
 
 
-# Abaqus material options outside the supported set: a material block that ends on one of them would be cloned
-# incompletely, so no fragment is produced (the supported set is the forward builder's).
-_UNSUPPORTED_MATERIAL_OPTIONS = frozenset({
-    "plastic", "hyperelastic", "hyperfoam", "viscoelastic", "user material", "depvar", "creep", "damage initiation",
-    "damage evolution", "permeability", "piezoelectric", "dielectric", "electrical conductivity", "latent heat",
-    "joule heat fraction", "swelling", "moisture swelling", "hysteresis", "mullins effect", "viscous",
-    "anisotropic hyperelastic", "concrete damaged plasticity", "brittle cracking", "porous bulk moduli",
-    "user defined field", "regularize", "low density foam"})
+# Keywords that may end a governed material block (V12-I5, fail-closed).  The forward builder's block runs until the
+# first keyword outside its supported material options; that keyword is accepted as the end of the material only when it
+# is a recognised structural boundary of the governed INP format (Abaqus/CAE writes the MATERIALS section as
+# consecutive *Material blocks followed by the *Step: the pinned SP02 / SP13 inputs) or the end of the input.  Any
+# other keyword (an Abaqus material option outside the supported set such as *Plastic or *Mohr Coulomb, a sub-option
+# such as *Fail Stress, or an unexpected keyword) is ambiguous: no fragment, because the clone could be incomplete.
+_MATERIAL_BLOCK_BOUNDARIES = frozenset({"material", "step"})
 _NAME = re.compile(r"(?i)(\bname\s*=\s*)(\"?)([^,\"\r\n]+)(\"?)")
 
 
@@ -434,9 +433,11 @@ def _clone_material(record: CalibrationOutputRecord, source_inp_bytes: bytes, ma
         located = locate_engineering_constants(lines, production)
     except ForwardBuildError as exc:
         raise CalibrationFragmentRefusal(f"the governed source material cannot be cloned: {exc}") from exc
-    if end < len(lines) and inp_keyword(lines[end]) in _UNSUPPORTED_MATERIAL_OPTIONS:
-        raise CalibrationFragmentRefusal(f"material {production!r} carries the unsupported option "
-                                         f"*{inp_keyword(lines[end])}; a complete clone is not possible.")
+    if end < len(lines) and inp_keyword(lines[end]) not in _MATERIAL_BLOCK_BOUNDARIES:
+        raise CalibrationFragmentRefusal(
+            f"material {production!r} is followed by *{inp_keyword(lines[end])}, which is not a recognised "
+            "material-block boundary (*Material, *Step or the end of the input); it may be an unsupported option "
+            "of the material, so a complete clone is not possible.")
     while end > start + 1 and (lines[end - 1].startswith("**") or not lines[end - 1].strip()):
         end -= 1  # trailing comments belong to what follows, not to the material
     block_sha256 = hashlib.sha256("".join(lines[start:end]).encode("latin-1")).hexdigest()

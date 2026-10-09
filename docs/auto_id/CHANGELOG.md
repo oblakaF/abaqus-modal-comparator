@@ -4240,3 +4240,41 @@ first internal provider.
 - **Tests:** test_v12_i4_calibration_output 17 OK; focused (V12-I1..I4, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, 10 forward-builder / M3 / M4 / shared-carbon modules) 319 OK (10 skipped without data stores); full suite without data stores 1713 OK (64 skipped); full suite with all data stores 1727 OK (5 skipped), no Abaqus
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #46.
+
+## 2026-10-09 — V12-I5 — SPEC v1.2 negative / regression contract closure (V12-I4 merged)
+
+- **V12-I4 merge:** PR #46 `auto-id/v12-i4` → `main`, merge commit `90e237849f72e55c58359245ddb9d3b2956bc3bc` (reviewed head `1fcabc4`, merged tree
+  `508aaf8` identical; SUPERVISOR-authorised). Linux CI on main 90e2378: 1710 OK (68 skipped), success (run 37904375035). V12-I4 ACCEPTED.
+- **Stage:** SPEC v1.2 implementation track, step V12-I5 (no roadmap M-stage; M8 NOT_STARTED)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i5` (from `main` `90e2378`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I5): SPEC v1.2 negative / regression contract closure`
+- **Files:** `tests/test_v12_i5_contract_closure.py` (new), `src/services/specimen_calibration_output.py` (one safety
+  correction); STATUS, ROADMAP, CHANGELOG.
+- **Acceptance matrix (end to end, reusing the I1–I4 fixtures):** two predeclared questions with distinct identities
+  and no fallback; τ_mf equality / σ- and τ-dominated thresholds, per-term and cluster σ, invalid / missing / changed
+  τ_mf, τ_mf absent from Σ, objective, statistical_sd, Birge, LOO, precision and §13; controlled two-specimen v1.2
+  evidence where the pattern passes only because of τ_mf = 0.02 while SPEC §13 FAILs (Δχ² ≈ 96, identical for v1.1,
+  τ 0.02 and τ 0.005) → NO_GLOBAL_PARAMETER_VALUE, a counterfactual §13 PASS releases, §13 NOT_EVALUABLE releases
+  nothing; 22 calibration-gate refusals plus wrong question / specimen count → REFUSED output, no value, no fragment,
+  no override; evidence anti-mixing (p̂ / robustness, pattern / residuals, baseline row set, gate / values, run /
+  campaign, specimen / forward manifest, registration, pinned INP); RELEASED / REFUSED output contract; cluster member
+  rows (MAC, tracking, max, RMS, 8 %) never averaged away; fail-closed material fragment and pinned-source regression
+  (store-gated read-only layout check of the SP02 / SP13 pinned inputs); historical v1.1 records pinned by canonical
+  hash (32 records), v1.1 pattern records recomputed unchanged, RUN_A NO_GLOBAL_PARAMETER_VALUE and RUN_B
+  DIAGNOSTIC_ONLY / NOT_IDENTIFIABLE unchanged, archived journals, manifests and journalled pack records (store-gated: 22 files, hash chains);
+  production calibration execution refused with zero optimisation, solver / process calls and files.
+- **Safety correction:** the calibration material clone ended the governed block at the first keyword outside the
+  supported options and refused only a listed set of unsupported options, so an unlisted genuine material option
+  (e.g. `*Mohr Coulomb` after `*Elastic`) was silently dropped and a fragment rendered. Now the block must end at a
+  recognised structural boundary (`*Material`, `*Step`, end of input — the pinned SP02 / SP13 layout); anything else
+  refuses the fragment. `forward_builder` unchanged.
+- **Open findings (SUPERVISOR decision; reproduced as expected failures, not fixed):** V12-I5-F1 — p̂ and
+  model_form_robustness are not bound to the residuals they belong to (B's p̂ + robustness with A's pattern / rows /
+  Birge: gate PASS, RELEASED at B's value); V12-I5-F2 — the baseline Δ ln f is not bound to the frozen baseline pairing
+  (SPEC §7 "governed baseline FE state" undefined between frozen pairing and start-point evaluation). Production
+  calibration execution is refused, so neither is reachable in production today.
+- **Tests:** test_v12_i5_contract_closure 41 OK + 2 expected failures (open findings V12-I5-F1 / F2); focused (V12-I1..I5, SPEC v1.2 normative + policy, M5 gate, verdict, uncertainty, model_form_robustness, M7 campaign / RUN_A / RUN_B / entry wiring, M7b, M7 closure, forward builder / generic / manifest, shared carbon, M3/M4 clusters and objective, family residual) 408 OK (2 expected failures) with all data stores; full suite without data stores 1756 OK (67 skipped, 2 expected failures); full suite with all data stores 1770 OK (5 skipped, 2 expected failures), no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of the V12-I5 PR and decision on V12-I5-F1 / F2.

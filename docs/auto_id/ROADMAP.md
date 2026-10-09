@@ -686,8 +686,8 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
 | V12-I1 | Campaign / run question (MATERIAL_IDENTIFICATION or SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf schema, both declared before execution and bound into the campaign / run identity | `ACCEPTED` |
 | V12-I2 | Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13 | `ACCEPTED` |
 | V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `ACCEPTED` |
-| V12-I4 | Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer) | `REVIEW_READY` |
-| V12-I5 | Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable) | `TODO` |
+| V12-I4 | Calibration reporting / output record: labels, identities, uncertainty basis, diagnostic optimiser candidate on refusal, separate calibration fragment (never the material writer) | `ACCEPTED` |
+| V12-I5 | Regression and negative tests (no fallback, τ_mf cannot rescue §13 FAIL, historical records immutable) | `REVIEW_READY` |
 | V12-I6 | Integration into GUI / backend readiness (the same backend services; no install_* layer) | `TODO` |
 
 - **Normative acceptance merged:** PR #42 (`auto-id/spec-v1.2-acceptance` → `main`), merge commit `61b5016`.
@@ -723,6 +723,16 @@ time, reproducing tests, no `install_*` layer, the CLI and GUI call the same ser
   excluded diagnostics, I3 precision / uncertainty basis / non-degradation. `render_calibration_inp_fragment` renders a
   distinct calibration material from a RELEASED record and the nine governed Engineering Constants only (separate from
   the forward builder; nothing written). Production calibration orchestration stays blocked (V12-I5 / V12-I6).
+
+- **V12-I4 accepted and merged:** PR #46 (`auto-id/v12-i4` → `main`), merge commit `90e2378`.
+- **V12-I5 (REVIEW_READY, branch `auto-id/v12-i5` from `90e2378`):** `tests/test_v12_i5_contract_closure.py` — the
+  negative / regression acceptance matrix of SPEC v1.2 over I1–I4, end to end: questions and no fallback; τ_mf
+  boundaries and exclusion from Σ, objective, statistical_sd, Birge, LOO, precision and §13; a τ_mf-rescued pattern with
+  §13 FAIL (and NOT_EVALUABLE) releases no global value; every calibration-gate refusal is a REFUSED output without
+  value or fragment; anti-mixing; cluster member rows; historical v1.1 records pinned; production calibration refused
+  with zero side effects. One safety correction: the calibration material clone is fail-closed (unknown keyword after
+  the block → no fragment). Two open binding findings (p̂ ↔ residuals; baseline Δ ln f ↔ frozen pairing) are
+  reproduced as expected failures for SUPERVISOR decision. Production calibration execution stays blocked (V12-I6).
 
 **V12 GATE:** production code enforces the D-078 rules with negative tests (no fallback, τ_mf outside Σ / uncertainty /
 §13, refusals without released values) before any SP10, t_face or other new FE calculation.
