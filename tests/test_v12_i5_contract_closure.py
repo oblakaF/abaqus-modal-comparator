@@ -70,20 +70,21 @@ from services.identification_uncertainty import PatternStatus, ResidualTerm, res
 from services.identification_verdict import EvidenceState, GuardEvidence
 from services.model_form_robustness import CaseStatus
 from services.practical_identifiability import PracticalIdentifiabilityInputError, RankStatus
-from services.specimen_calibration_gate import CalibrationGateStatus, evaluate_calibration_gate
+from services.specimen_calibration_gate import CalibrationGateStatus, GovernedRow, evaluate_calibration_gate
 from services.specimen_calibration_output import (
     CANDIDATE_LABELS,
     LABELS,
     CalibrationFragmentRefusal,
     CalibrationOutputStatus,
     build_calibration_output,
+    governed_baseline_rows,
     governed_engineering_constants,
     render_calibration_inp_fragment,
 )
 from test_m7_campaign import TRUTH_E, synthetic_definition, synthetic_specimen
 from test_v12_i1_campaign_question import calibration_definition, v12_definition
-from test_v12_i3_calibration_gate import E_FAMILIES, SIGMA, SIGMA_C, build, with_baseline
-from test_v12_i4_calibration_output import NONE_EXCLUDED, _Case, material_block
+from test_v12_i3_calibration_gate import E_FAMILIES, SIGMA, SIGMA_C, build
+from test_v12_i4_calibration_output import BASELINE_RATIO, NONE_EXCLUDED, _Case, material_block
 
 
 DOCS = ROOT / "docs" / "auto_id"
@@ -202,6 +203,15 @@ def _frozen_mac(item, row_id: str, mac: float):
     return replace(item, frozen=replace(item.frozen, rows=rows))
 
 
+def frozen_baseline(inputs, item, values):
+    """Frozen baseline FE frequencies with ln(f_FE / f_EXP) = ``values[row]``; the bundle takes the governed rows."""
+    rows = tuple(replace(r, fe_hz=r.experimental_hz * math.exp(values[r.row_id]),
+                         relative_frequency_error=math.exp(values[r.row_id]) - 1) if r.row_id in values else r
+                 for r in item.frozen.rows)
+    item = replace(item, frozen=replace(item.frozen, rows=rows))
+    return replace(inputs, baseline_rows=governed_baseline_rows(item)), item
+
+
 def _keys(node) -> set:
     if isinstance(node, dict):
         return set(node) | {k for v in node.values() for k in _keys(v)}
@@ -224,7 +234,8 @@ class _Bundles(_Case):
         definition = parse_campaign_definition(data)
         item, store = synthetic_specimen(definition, "A", self.tmp / f"{tag}-{tau}")
         self.source_inp = (store / "models" / "SYA.inp").read_bytes()
-        rows = tuple(ObservationRow(r, e, 100.0 + 10 * e, f, 100.0 + 10 * e, 0.98, 0.0) for r, e, f, _ in FOUR_ROWS)
+        rows = tuple(ObservationRow(r, e, 100.0 + 10 * e, f, (100.0 + 10 * e) * BASELINE_RATIO, 0.98, BASELINE_RATIO - 1)
+                     for r, e, f, _ in FOUR_ROWS)  # frozen baseline Δ ln f = +0.03 on every row
         item = replace(item, frozen=replace(item.frozen, rows=rows), holdout_rows=("H1",), families=dict(families))
         return definition, item
 
@@ -232,7 +243,8 @@ class _Bundles(_Case):
         definition, item = self.specimen(families, tau)
         changes.setdefault("holdout", (("H1", families["H1"], 0.6),))
         inputs = build(definition=definition, families={r: f for r, f in families.items() if r != "H1"}, **changes)
-        return replace(inputs, baseline_pair_macs={r: 0.98 for r in inputs.baseline_pair_macs}), item
+        return replace(inputs, baseline_pair_macs={r: 0.98 for r in inputs.baseline_pair_macs},
+                       baseline_rows=governed_baseline_rows(item)), item
 
     @staticmethod
     def output(inputs, item, **kwargs):
@@ -570,13 +582,13 @@ class CalibrationNegativeMatrixTests(_Bundles):
              replace(inputs, registration=GuardEvidence("registration", EvidenceState.NOT_AVAILABLE, "x")), item)
         case("incorrect row membership", "ROW_SET_MISMATCH",
              replace(inputs, candidate_rows=[r for r in inputs.candidate_rows if r.row_id != "R2"]), item)
-        case("max degradation", "MAX_DEGRADED",
-             with_baseline(inputs, {r: 0.0017 for r in ("R1", "R2", "R3", "R4", "H1")}), item)
+        case("max degradation", "MAX_DEGRADED",  # the frozen baseline itself (SPEC v1.1 §6 S3)
+             *frozen_baseline(inputs, item, {r: 0.0017 for r in ("R1", "R2", "R3", "R4", "H1")}))
         case("RMS degradation", "RMS_DEGRADED",
-             with_baseline(inputs, {"R1": 0.0, "R2": 0.0, "R3": 0.0, "R4": 0.0, "H1": 0.0018}), item)
+             *frozen_baseline(inputs, item, {"R1": 0.0, "R2": 0.0, "R3": 0.0, "R4": 0.0, "H1": 0.0018}))
         above, above_item = self.bundle(fit=[math.log1p(0.0800001) / SIGMA, -25.0, 0.3, -0.2])
         case("physical row above 8 %", "ROW_RELATIVE_ERROR_ABOVE_CEILING",
-             with_baseline(above, {r: 0.1 for r in ("R1", "R2", "R3", "R4", "H1")}), above_item)
+             *frozen_baseline(above, above_item, {r: 0.1 for r in ("R1", "R2", "R3", "R4", "H1")}))
         case("Birge unavailable", "BIRGE_UNAVAILABLE", replace(inputs, birge=replace(
             inputs.birge, status=type(inputs.birge.status).REFUSED_DOF, birge_adjusted_sd_ln=None)), item)
         case("incomplete robustness", "LOO_INCOMPLETE", replace(inputs, robustness=None), item)
@@ -643,7 +655,7 @@ class AntiMixingTests(_Bundles):
         super().setUp()
         self.a, self.item = self.bundle()
         self.b = build(definition=self.a.definition, fit=[0.4, -0.3, 0.2, -0.1], p_hat={"E_in_plane_mpa": 51000.0})
-        self.b = replace(self.b, baseline_pair_macs=dict(self.a.baseline_pair_macs))
+        self.b = replace(self.b, baseline_pair_macs=dict(self.a.baseline_pair_macs), baseline_rows=self.a.baseline_rows)
 
     def never_passes(self, inputs, item=None, **kwargs):
         try:
@@ -723,16 +735,77 @@ class OpenBindingFindingsTests(_Bundles):
             return
         self.assertIsNot(record.status, CalibrationOutputStatus.RELEASED)  # today: RELEASED at 51000 MPa
 
-    @unittest.expectedFailure
-    def test_finding_2_baseline_delta_ln_f_is_not_bound_to_the_frozen_baseline_pairing(self):
-        # The output binds the baseline pair MACs to the frozen pairing but not the baseline Δ ln f: the record's
-        # own row table can carry a baseline FE frequency and a different baseline Δ ln f (SPEC §7 "governed
-        # baseline FE state": frozen pairing at production constants, or the start-point evaluation?).
+
+
+class FrozenBaselineBindingTests(_Bundles):
+    """F2 closed: the SPEC v1.2 §7 baseline is the frozen FE reference state at p0 (SPEC v1.1 §6 S3), per governed
+    physical row Δ ln f = ln(f_FE / f_EXP) of the frozen observation set; anything else is an input inconsistency."""
+
+    def raises(self, inputs, item, text="baseline"):
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, text):
+            self.output(inputs, item)
+
+    def test_valid_frozen_baseline_passes_and_is_reported(self):
         inputs, item = self.bundle()
         record = self.output(inputs, item)
-        for row in record.governed_rows:
-            self.assertAlmostEqual(row["baseline_delta_ln_f"],
-                                   math.log(row["baseline_fe_hz"] / row["experimental_hz"]), places=12)
+        self.assertTrue(record.released, record.refusal_reasons)
+        for row in record.governed_rows:  # the table shows exactly what the frozen frequencies imply
+            frozen = item.frozen.row(row["row_id"])
+            self.assertEqual(row["baseline_delta_ln_f"], math.log(frozen.fe_hz / frozen.experimental_hz))
+            self.assertEqual(row["baseline_delta_ln_f"],
+                             math.log(row["baseline_fe_hz"] / row["experimental_hz"]))
+        self.assertAlmostEqual(record.non_degradation["baseline_max_abs_delta_ln_f"], math.log(BASELINE_RATIO),
+                               places=12)  # §7 is judged against the frozen baseline
+
+    def test_finding_2_baseline_delta_ln_f_is_bound_to_the_frozen_baseline_pairing(self):
+        inputs, item = self.bundle()
+        rows = list(inputs.baseline_rows)
+        for name, changed in (("incorrect Δ ln f", 1e-6), ("sign flipped", None)):
+            with self.subTest(case=name):
+                altered = [GovernedRow(r.row_id, r.role, (-r.delta_ln_f if changed is None else r.delta_ln_f + changed)
+                                       if r.row_id == "R2" else r.delta_ln_f) for r in rows]
+                self.raises(replace(inputs, baseline_rows=altered), item)
+        holdout = [GovernedRow(r.row_id, r.role, r.delta_ln_f * 0.5 if r.role == "HOLDOUT" else r.delta_ln_f)
+                   for r in rows]
+        self.raises(replace(inputs, baseline_rows=holdout), item)  # a HOLDOUT row too
+        role = [GovernedRow(r.row_id, "FIT", r.delta_ln_f) for r in rows]
+        self.raises(replace(inputs, baseline_rows=role), item)  # exact FIT / HOLDOUT role
+        self.raises(replace(inputs, baseline_rows=rows[:-1]), item)
+        self.raises(replace(inputs, baseline_rows=rows + [rows[0]]), item, "twice")
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "finite"):
+            GovernedRow("R1", "FIT", math.nan)  # a non-finite baseline cannot even be stated
+
+    def test_wrong_frozen_frequencies_are_inconsistent(self):
+        inputs, item = self.bundle()
+        for field in ("fe_hz", "experimental_hz"):
+            with self.subTest(frequency=field):  # the supplied baseline no longer matches the frozen pairing
+                frozen_rows = tuple(replace(r, **{field: getattr(r, field) * 1.001}) if r.row_id == "R1" else r
+                                    for r in item.frozen.rows)
+                self.raises(inputs, replace(item, frozen=replace(item.frozen, rows=frozen_rows)))
+        for bad in (0.0, -1.0):  # non-finite values cannot enter an observation identity at all
+            with self.subTest(fe_hz=bad):
+                frozen_rows = tuple(replace(r, fe_hz=bad) if r.row_id == "R1" else r for r in item.frozen.rows)
+                self.raises(inputs, replace(item, frozen=replace(item.frozen, rows=frozen_rows)), "finite and positive")
+
+    def test_baseline_of_another_specimen_or_frozen_set(self):
+        inputs, item = self.bundle()
+        other_inputs, other_item, _ = self.simple()  # another specimen's frozen set (rows R1, R2, R3)
+        self.raises(replace(inputs, baseline_rows=governed_baseline_rows(other_item)), item)
+        shifted_inputs, shifted_item = frozen_baseline(inputs, item, {"R1": 0.031})  # another frozen observation set
+        self.assertNotEqual(shifted_item.frozen.observation_hash, item.frozen.observation_hash)
+        self.raises(replace(inputs, baseline_rows=shifted_inputs.baseline_rows), item)  # its baseline, our frozen set
+        with self.assertRaisesRegex(PracticalIdentifiabilityInputError, "observation_hash"):  # its frozen set, our run
+            build_calibration_output(shifted_inputs, shifted_item,
+                                     campaign_run_identity(inputs.definition, [item], "m" * 64, {}), NONE_EXCLUDED)
+        self.assertTrue(self.output(shifted_inputs, shifted_item).released)  # consistent: its own run identity
+
+    def test_cluster_member_rows_are_bound_separately(self):
+        inputs, item, _ = self.cluster()
+        self.output(inputs, item)  # the governed baseline of every member row
+        members = [GovernedRow(r.row_id, r.role, r.delta_ln_f + (0.001 if r.row_id == "R3" else
+                                                                  -0.001 if r.row_id == "R4" else 0.0))
+                   for r in inputs.baseline_rows]  # same cluster mean, different member rows
+        self.raises(replace(inputs, baseline_rows=members), item)
 
 
 # ----------------------------------------------------------------------------- §8 RELEASED / REFUSED output
@@ -779,10 +852,10 @@ class OutputContractTests(_Bundles):
 class ClusterSafetyTests(_Bundles):
     """A confirmed cluster is ONE governed term; its member rows are checked one by one (averaging hides nothing)."""
 
-    def cluster_case(self, **changes):
+    def cluster_case(self, baseline=None, **changes):
         inputs, item, _ = self.cluster(**changes)
         self.source_inp = (self.tmp / "cluster" / "store" / "models" / "SYA.inp").read_bytes()
-        return inputs, item
+        return frozen_baseline(inputs, item, baseline) if baseline else (inputs, item)
 
     def test_one_term_two_rows(self):
         inputs, item = self.cluster_case(cluster_offsets={CLUSTER_ID: 0.004})

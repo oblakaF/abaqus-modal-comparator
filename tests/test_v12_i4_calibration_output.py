@@ -45,6 +45,7 @@ from services.specimen_calibration_output import (
     GovernedConstant,
     build_calibration_output,
     calibration_material_name,
+    governed_baseline_rows,
     governed_engineering_constants,
     render_calibration_inp_fragment,
 )
@@ -59,6 +60,7 @@ SIMPLE = dict(rows={"R1": (0.50,), "R2": (0.45,)}, families={"R1": "FAM-A1", "R2
 CLUSTER_ROWS = [("R1", 1, 7, "FIT"), ("R2", 2, 8, "FIT"), ("R3", 3, 9, "FIT"), ("R4", 4, 10, "FIT"),
                 ("H1", 5, 11, "HOLDOUT")]
 CLUSTER_FAMILIES = {"R1": "F1", "R2": "F1", "R3": "F2", "R4": "F2", "H1": "T"}
+BASELINE_RATIO = math.exp(0.03)  # synthetic frozen baseline f_FE / f_EXP
 
 
 def keys(node) -> set:
@@ -86,7 +88,8 @@ class _Case(unittest.TestCase):
         arguments.update(changes)
         inputs = build(**arguments)
         inputs = replace(inputs, baseline_pair_macs={r.row_id: r.mac for r in item.frozen.rows
-                                                     if r.row_id in inputs.baseline_pair_macs})
+                                                     if r.row_id in inputs.baseline_pair_macs},
+                         baseline_rows=governed_baseline_rows(item))  # the frozen baseline (SPEC v1.1 §6 S3)
         return inputs, item, campaign_run_identity(definition, [item], "m" * 64, {})
 
     def cluster(self, **changes):
@@ -96,13 +99,15 @@ class _Case(unittest.TestCase):
                                         for r, e, f, role in CLUSTER_ROWS]
         definition = parse_campaign_definition(data)
         item, _ = synthetic_specimen(definition, "A", self.tmp / "cluster")
-        rows = tuple(ObservationRow(r, e, 100.0 + 10 * e, f, 100.0 + 10 * e, 0.98, 0.0) for r, e, f, _ in CLUSTER_ROWS)
+        rows = tuple(ObservationRow(r, e, 100.0 + 10 * e, f, (100.0 + 10 * e) * BASELINE_RATIO, 0.98, BASELINE_RATIO - 1)
+                     for r, e, f, _ in CLUSTER_ROWS)  # frozen baseline Δ ln f = +0.03 on every row
         item = replace(item, frozen=replace(item.frozen, rows=rows), holdout_rows=("H1",),
                        families=dict(CLUSTER_FAMILIES))
         arguments = dict(definition=definition, fit=[0.5, -0.4, 0.3], clusters=(("R3", "R4"),),
                          cluster_offsets={"C(R3+R4)": 0.004})
         arguments.update(changes)
-        inputs = replace(build(**arguments), baseline_pair_macs={r: 0.98 for r in ("R1", "R2", "R3", "R4")})
+        inputs = replace(build(**arguments), baseline_pair_macs={r: 0.98 for r in ("R1", "R2", "R3", "R4")},
+                         baseline_rows=governed_baseline_rows(item))
         return inputs, item, campaign_run_identity(definition, [item], "m" * 64, {})
 
 
