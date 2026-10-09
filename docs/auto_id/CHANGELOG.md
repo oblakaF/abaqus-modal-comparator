@@ -4217,3 +4217,26 @@ first internal provider.
 - **Tests:** test_v12_i4_calibration_output 15 OK; focused (V12-I4, V12-I3, V12-I2, V12-I1, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, objective, clusters, practical_identifiability, forward_builder_generic, m4_generic_guard) 273 OK (3 skipped without data stores); full suite without data stores 1711 OK (64 skipped); full suite with all data stores 1725 OK (5 skipped), no Abaqus
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of V12-I4.
+
+## 2026-10-09 — V12-I4 — calibration INP fragment clones the complete governed material block
+
+- **Stage:** SPEC v1.2 implementation track, step V12-I4 (SUPERVISOR engineering-safety correction before merging
+  PR #46)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i4` (previous head `1ca5299`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I4): clone the complete governed material block for the calibration fragment`
+- **Files:** `src/services/specimen_calibration_output.py`, `src/services/forward_builder.py` (pure helper
+  `material_block_bounds` and public `inp_keyword`, shared by `locate_engineering_constants`; behaviour unchanged),
+  `tests/test_v12_i4_calibration_output.py`; STATUS, CHANGELOG.
+- **Behaviour:** `render_calibration_inp_fragment(record, constants, source_inp_bytes)` requires the exact pinned source
+  INP bytes (SHA-256 equal to the record's `inp_sha256`), locates the unique production material with the forward
+  builder's parsing semantics, clones its complete block (density, damping, expansion and every other supported option
+  unchanged, trailing comments excluded), renames it to the CAL_* material and sets only the Engineering Constants with
+  the forward builder's record writer (fixed constants must equal the source). No fragment when the bytes differ, the
+  material is missing or duplicated, the block ends on an unsupported material option, or the source constants are not
+  the governed set. The fragment carries the source INP SHA-256, source material name and block SHA-256, gate and
+  record hashes; the misleading "only *Elastic" header is replaced. The calibration record semantics are unchanged.
+- **Tests:** test_v12_i4_calibration_output 17 OK; focused (V12-I1..I4, SPEC v1.2 normative + policy, M7 campaign, M7b, M7 closure, M5 gate, uncertainty, verdict, model_form_robustness, 10 forward-builder / M3 / M4 / shared-carbon modules) 319 OK (10 skipped without data stores); full suite without data stores 1713 OK (64 skipped); full suite with all data stores 1727 OK (5 skipped), no Abaqus
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #46.

@@ -17,15 +17,17 @@ ACCEPTANCE_TOLERANCE, the full governed physical-row table (cluster members row 
 high-MAC diagnostic records (DIAGNOSTIC_ONLY). An inconsistent identity or evidence bundle is an input
 error, never a record.
 
-``render_calibration_inp_fragment`` is a separate pure renderer (not the forward builder that rewrites the
-production material): it accepts only a RELEASED record and the complete nine governed Engineering
-Constants, checked against the forward model's parameterisation, and returns the text of a distinct
-calibration material with warning comments. Nothing is written to disk; nothing is executed.
+``render_calibration_inp_fragment`` is a separate pure renderer: it accepts only a RELEASED record, the
+complete nine governed Engineering Constants (checked against the forward model's parameterisation) and the
+exact pinned source INP bytes (SHA-256 checked against the record). It clones the complete governed production
+material block (density, damping and every other supported option unchanged, with the forward builder's
+parsing semantics) under a distinct CAL_* name and changes only the Engineering Constants. It never builds or
+renders a forward job; nothing is read from or written to disk; nothing is executed.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 import hashlib
 import math
@@ -34,12 +36,19 @@ from typing import Mapping, Optional, Sequence
 
 from domain.campaign_definition import SPECIMEN_ENGINEERING_CALIBRATION
 from domain.forward_model_manifest import (
-    ENGINEERING_CONSTANTS_TYPE,
     PARAMETERISATIONS,
     EngineeringConstants,
 )
 from domain.identification_run import canonical_hash
 
+from .forward_builder import (
+    ForwardBuildError,
+    inp_keyword,
+    locate_engineering_constants,
+    material_block_bounds,
+    rewrite_engineering_constants,
+    split_inp_lines,
+)
 from .identification_campaign_run import CampaignSpecimenInput
 from .practical_identifiability import PracticalIdentifiabilityInputError
 from .specimen_calibration_gate import CalibrationGateInputs, evaluate_calibration_gate
@@ -344,13 +353,30 @@ class GovernedConstant:
 
 @dataclass(frozen=True)
 class CalibrationInpFragment:
+    """A complete calibration material cloned from the pinned source INP; text only (nothing is written)."""
+
     material_name: str
     source_calibration_record_hash: str
+    gate_record_hash: str
+    source_inp_sha256: str
+    source_material_name: str
+    source_material_block_sha256: str
     content: str
 
     @property
     def content_sha256(self) -> str:
-        return hashlib.sha256(self.content.encode("ascii")).hexdigest()
+        return hashlib.sha256(self.content.encode("latin-1")).hexdigest()
+
+
+# Abaqus material options outside the supported set: a material block that ends on one of them would be cloned
+# incompletely, so no fragment is produced (the supported set is the forward builder's).
+_UNSUPPORTED_MATERIAL_OPTIONS = frozenset({
+    "plastic", "hyperelastic", "hyperfoam", "viscoelastic", "user material", "depvar", "creep", "damage initiation",
+    "damage evolution", "permeability", "piezoelectric", "dielectric", "electrical conductivity", "latent heat",
+    "joule heat fraction", "swelling", "moisture swelling", "hysteresis", "mullins effect", "viscous",
+    "anisotropic hyperelastic", "concrete damaged plasticity", "brittle cracking", "porous bulk moduli",
+    "user defined field", "regularize", "low density foam"})
+_NAME = re.compile(r"(?i)(\bname\s*=\s*)(\"?)([^,\"\r\n]+)(\"?)")
 
 
 def governed_engineering_constants(record: CalibrationOutputRecord) -> dict[str, GovernedConstant]:
@@ -392,13 +418,53 @@ def _comment(text: object) -> str:
     return re.sub(r"[^\x20-\x7e]", "?", str(text))  # ASCII comment text only
 
 
-def render_calibration_inp_fragment(record: CalibrationOutputRecord,
-                                    constants: Mapping[str, GovernedConstant]) -> CalibrationInpFragment:
-    """A distinct calibration material (*Material + *Elastic, type=ENGINEERING CONSTANTS) for a RELEASED record.
+def _clone_material(record: CalibrationOutputRecord, source_inp_bytes: bytes, material: str,
+                    calibrated: EngineeringConstants) -> tuple[list[str], str]:
+    """The complete governed production material block of the pinned source INP, renamed, with only its Engineering
+    Constants set to the calibration constants (the forward builder's parsing and record-writing semantics)."""
+    if not isinstance(source_inp_bytes, (bytes, bytearray)):
+        raise CalibrationFragmentRefusal("the exact pinned source INP bytes are required.")
+    source = bytes(source_inp_bytes)
+    if hashlib.sha256(source).hexdigest() != record.identity["inp_sha256"]:
+        raise CalibrationFragmentRefusal("the source INP is not the pinned INP of the calibration (SHA-256 differs).")
+    production = str(record.identity["forward_model"]["production_material_name"])
+    lines = split_inp_lines(source)
+    try:
+        start, end = material_block_bounds(lines, production)
+        located = locate_engineering_constants(lines, production)
+    except ForwardBuildError as exc:
+        raise CalibrationFragmentRefusal(f"the governed source material cannot be cloned: {exc}") from exc
+    if end < len(lines) and inp_keyword(lines[end]) in _UNSUPPORTED_MATERIAL_OPTIONS:
+        raise CalibrationFragmentRefusal(f"material {production!r} carries the unsupported option "
+                                         f"*{inp_keyword(lines[end])}; a complete clone is not possible.")
+    while end > start + 1 and (lines[end - 1].startswith("**") or not lines[end - 1].strip()):
+        end -= 1  # trailing comments belong to what follows, not to the material
+    block_sha256 = hashlib.sha256("".join(lines[start:end]).encode("latin-1")).hexdigest()
+    block = list(lines[start:end])
+    names = list(_NAME.finditer(block[0]))
+    if len(names) != 1 or names[0].group(3).strip().lower() != production.lower():
+        raise CalibrationFragmentRefusal(f"the *Material line of {production!r} cannot be renamed unambiguously.")
+    match = names[0]
+    block[0] = block[0][:match.start(3)] + material + block[0][match.end(3):]
+    relocated = replace(located, material_line=0, elastic_line=located.elastic_line - start,
+                        data_lines=tuple(i - start for i in located.data_lines))
+    try:  # fixed constants must equal the source; only the parameterisation's variable constants are written
+        rewrite_engineering_constants(block, relocated, calibrated,
+                                      PARAMETERISATIONS[record.parameterisation_id].variable_constants)
+    except ForwardBuildError as exc:
+        raise CalibrationFragmentRefusal(f"the source Engineering Constants are not the governed set: {exc}") from exc
+    return [line.rstrip("\r\n") for line in block], block_sha256
 
-    Abaqus Keywords Reference, *ELASTIC, TYPE=ENGINEERING CONSTANTS: first data line E1, E2, E3, ν12, ν13, ν23,
-    G12, G13; second data line G23 (at most eight values per data line). The constants must be exactly the
-    governed nine of ``governed_engineering_constants(record)``; nothing is guessed.
+
+def render_calibration_inp_fragment(record: CalibrationOutputRecord, constants: Mapping[str, GovernedConstant],
+                                    source_inp_bytes: bytes) -> CalibrationInpFragment:
+    """A distinct calibration material for a RELEASED record: the complete governed production material block of the
+    pinned source INP (density, damping and every other supported option unchanged) under a CAL_* name, with only
+    the nine Engineering Constants set to the governed calibration constants.
+
+    Abaqus Keywords Reference, *ELASTIC, TYPE=ENGINEERING CONSTANTS: E1, E2, E3, ν12, ν13, ν23, G12, G13 on the first
+    data line, G23 on the second; the source record layout is kept. Pure: the caller supplies the exact source INP
+    bytes (verified against the record's INP SHA-256); nothing is read, written or executed.
     """
     if not isinstance(record, CalibrationOutputRecord) or not record.released:
         raise CalibrationFragmentRefusal("a calibration INP fragment needs a RELEASED calibration record.")
@@ -417,7 +483,9 @@ def render_calibration_inp_fragment(record: CalibrationOutputRecord,
                 f"{name} = {item.value!r} is not the governed value {governed[name].value!r}.")
     material = calibration_material_name(record)
     identity = record.identity
-    values = [repr(float(constants[name].value)) for name in names]
+    calibrated = EngineeringConstants(**{name: float(constants[name].value) for name in names})
+    block, block_sha256 = _clone_material(record, source_inp_bytes, material, calibrated)
+    production = _comment(identity["forward_model"]["production_material_name"])
     lines = [
         "** " + "-" * 76,
         "** SPECIMEN_ENGINEERING_CALIBRATION",
@@ -434,14 +502,14 @@ def render_calibration_inp_fragment(record: CalibrationOutputRecord,
         f"** run hash: {identity['run_hash']}",
         f"** gate record hash: {record.gate_record_hash}",
         f"** calibration record hash: {record.record_hash}",
-        f"** separate material; the production material "
-        f"{_comment(identity['forward_model']['production_material_name'])} is not changed.",
-        "** Only the *Elastic record is given; density and every other material record must come from the",
-        "** governed model (not provided here).",
+        f"** calibration material: {material}",
+        f"** Complete governed source material block of {production} cloned from the pinned source INP",
+        f"** (source material block sha256: {block_sha256}).",
+        "** Only the material name and the governed Engineering Constants were changed; the production",
+        f"** material {production} is not changed (this is a separate material).",
         "** " + "-" * 76,
-        f"*Material, name={material}",
-        f"*Elastic, type={ENGINEERING_CONSTANTS_TYPE}",
-        ", ".join(values[:8]),
-        values[8],
+        *block,
     ]
-    return CalibrationInpFragment(material, record.record_hash, "\n".join(lines) + "\n")
+    return CalibrationInpFragment(material, record.record_hash, record.gate_record_hash, identity["inp_sha256"],
+                                  str(identity["forward_model"]["production_material_name"]), block_sha256,
+                                  "\n".join(lines) + "\n")

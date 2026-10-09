@@ -57,11 +57,14 @@ class ForwardBuildError(ValueError):
 
 # ----------------------------------------------------------------------------- INP reading
 
-def _keyword(line: str) -> Optional[str]:
+def inp_keyword(line: str) -> Optional[str]:
     """Lower-case keyword of a keyword line, or None for data and comment lines."""
     if not line.startswith("*") or line.startswith("**"):
         return None
     return line[1:].split(",", 1)[0].strip().lower()
+
+
+_keyword = inp_keyword
 
 
 def _parameters(line: str) -> dict[str, str]:
@@ -124,6 +127,25 @@ class EngineeringConstantsRecord:
     values: EngineeringConstants
 
 
+def material_block_bounds(lines: list[str], material_name: str) -> tuple[int, int]:
+    """(``*Material`` line, end) of the unique named material: the block runs until the first keyword that is not
+    one of the supported material options (comment lines are part of the block). Refuses a missing or duplicate
+    material. Pure; shared by the forward builder and the V12-I4 calibration fragment."""
+
+    target = material_name.lower()
+    blocks = [i for i, line in enumerate(lines)
+              if _keyword(line) == "material" and _parameters(line).get("name", "").lower() == target]
+    if len(blocks) != 1:
+        raise ForwardBuildError(f"Expected exactly one *Material named {material_name!r}; found {len(blocks)}.")
+    index = blocks[0] + 1
+    while index < len(lines):
+        keyword = _keyword(lines[index])
+        if keyword is not None and keyword not in _MATERIAL_OPTIONS:
+            break
+        index += 1
+    return blocks[0], index
+
+
 def locate_engineering_constants(lines: list[str], material_name: str) -> EngineeringConstantsRecord:
     """Locate the unique ``*Elastic, type=ENGINEERING CONSTANTS`` record of the named material.
 
@@ -131,21 +153,9 @@ def locate_engineering_constants(lines: list[str], material_name: str) -> Engine
     other elastic type, and anything but one temperature-independent nine-value record.
     """
 
-    target = material_name.lower()
-    blocks = [i for i, line in enumerate(lines)
-              if _keyword(line) == "material" and _parameters(line).get("name", "").lower() == target]
-    if len(blocks) != 1:
-        raise ForwardBuildError(f"Expected exactly one *Material named {material_name!r}; found {len(blocks)}.")
-    elastic = []
-    index = blocks[0] + 1
-    while index < len(lines):
-        keyword = _keyword(lines[index])
-        if keyword is not None:
-            if keyword not in _MATERIAL_OPTIONS:
-                break
-            if keyword == "elastic":
-                elastic.append(index)
-        index += 1
+    start, end = material_block_bounds(lines, material_name)
+    blocks = [start]
+    elastic = [i for i in range(start + 1, end) if _keyword(lines[i]) == "elastic"]
     if len(elastic) != 1:
         raise ForwardBuildError(
             f"Material {material_name!r} must contain exactly one *Elastic record; found {len(elastic)}.")
