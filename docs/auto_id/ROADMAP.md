@@ -802,8 +802,8 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 | Id | Mini-step | Status |
 |---|---|---|
 | M8.1 | Specimen / family wizard | `ACCEPTED` |
-| M8.2 | Readiness screen | `REVIEW_READY` |
-| M8.3 | One Auto-ID button calling the same backend as the CLI | `TODO` |
+| M8.2 | Readiness screen | `ACCEPTED` |
+| M8.3 | One Auto-ID button calling the same backend as the CLI | `REVIEW_READY` |
 | M8.4 | Progress / resume | `TODO` |
 | M8.5 | Verdict presentation | `TODO` |
 | M8.6 | Abaqus Engineering Constants block | `TODO` |
@@ -814,7 +814,7 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-09: M8.1 accepted; M8.2 only). **M8.1 `ACCEPTED`** (PR #51, branch
+Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-09: M8.1 and M8.2 accepted; M8.3 only). **M8.1 `ACCEPTED`** (PR #51, branch
 `auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
 specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
 measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
@@ -823,12 +823,19 @@ provenance. Size-only file checks are `PRESENT_SHA256_NOT_VERIFIED`; nothing is 
 loading only (no mode / family / registration choice, no LM, Abaqus, MAC, freezing or writes); scientific readiness
 stays with the V12-I6 backend on the Data Readiness Check page. M8.1 merged: merge commit `27a587f` (tree
 identical to reviewed head `7f91dfd`), post-merge main CI success (run `37943295401`).
-**M8.2 `REVIEW_READY`** (PR #52, branch `auto-id/m8-2` from `27a587f`): selection-aware Data Readiness Check. The
+**M8.2 `ACCEPTED`** (PR #52, branch `auto-id/m8-2` from `27a587f`): selection-aware Data Readiness Check. The
 stored V12-I6 readiness record is shown only under its own governed selection — exact campaign hash, run type,
 specimen labels, declared question and τ_mf, and run hash when a run is selected; never by names, folders, labels or
 files. Otherwise `NOT_EVALUATED_FOR_SELECTION` (a presentation state, not a backend verdict); a specimen folder
 without a governed campaign is never given a campaign result or an inferred question; an invalid selection clears the
 shown result. Matching records are presented through `readiness_presentation`, unchanged; a match is not proof of
-authenticity. M8.3–M8.8 `TODO`. The parked prototype branch
+authenticity. M8.2 merged: merge commit `3bf5067` (tree identical to reviewed head `1208562`), post-merge main CI
+success (run `37948118759`).
+**M8.3 `REVIEW_READY`** (PR #53, branch `auto-id/m8-3` from `3bf5067`): one read-only Auto-ID action,
+"Auto-ID — Evaluate Stored Run". It requires a governed campaign (M8.1) and an explicitly selected journal of an existing
+run; `services/stored_run_evidence.py` reads that run in the accepted journal layout (campaign hash must be the selected
+campaign's; pipeline journals located by governed pipeline identity; FE packs and pinned INP loaded with verification;
+missing parts left missing), calls `judge_campaign_run` and stores the backend record unchanged, shown selection- and
+run-bound on the Data Readiness Check. No run, LM, planning, extraction, solver process or write. M8.4–M8.8 `TODO`. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.

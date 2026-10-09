@@ -612,7 +612,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of M8.2 (PR #52, not merged). M8.3..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of M8.3 (PR #53, not merged). M8.4..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1168,7 +1168,7 @@
       "status": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
       "note": "historical M8.1 prototype; untouched (not merged, not rebased, not cherry-picked as a whole); selected code reused on auto-id/m8-1"
     },
-    "authorisation": "SUPERVISOR 2026-10-09: M8.1 ACCEPTED; start M8.2 only (selection-aware Data Readiness Check); M8.3..M8.8 not started",
+    "authorisation": "SUPERVISOR 2026-10-09: M8.2 ACCEPTED; start M8.3 only (one read-only Auto-ID action over already journalled evidence); M8.4..M8.8 not started",
     "steps": {
       "M8.1": {
         "title": "Specimen / family setup wizard",
@@ -1192,16 +1192,32 @@
       },
       "M8.2": {
         "title": "Selection-aware Data Readiness Check",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/m8-2",
         "base": "27a587f7aa8f229285d1529bb5b449b4719ef090",
         "pr": 52,
         "commit": "ff986318312e1e68e3841d9799fcab3171a2ccc7",
         "scope": "closes the stale-readiness presentation gap: the stored V12-I6 readiness record is presented only under its own governed selection. services/auto_id_wizard.readiness_selection binds the record to the M8.1 selection by governed identity only (exact campaign hash, run type, specimen labels in order, declared scientific question and tau_mf, run hash when a run is selected; never by names, folders, labels or files). Presentation states NO_SELECTION / NOT_EVALUATED_FOR_SELECTION / MATCHED_STORED_RECORD (not backend verdicts); a specimen folder without a governed campaign is NOT_EVALUATED_FOR_SELECTION (no question inferred, no result attached); an invalid selection after a valid one clears the shown result. Matching records are presented through the backend's readiness_presentation; the record is never changed and a match is not proof of authenticity. The readiness page follows a selection change at once; one selection-context line is added (no duplicate scientific table)",
-        "tests": "test_m8_2_readiness_selection 19 tests (1 store-gated; real-Tk test); M8.1 tests retained; focused M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 386 OK; full suite without data stores 1872 OK (74 skipped); full suite with all data stores 1886 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
+        "tests": "test_m8_2_readiness_selection 19 tests (1 store-gated; real-Tk test); M8.1 tests retained; focused M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 386 OK; full suite without data stores 1872 OK (74 skipped); full suite with all data stores 1886 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus",
+        "merged_to_main": {
+          "pr": 52,
+          "merge_commit": "3bf50677bed13a2222c110eb5312329b51e44975",
+          "reviewed_head": "1208562984bc654c1247959b189f72628f8b1d2a",
+          "tree": "36e482b14ad94686f961fab2d4ac78f16648312b",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 3bf5067: success (run 37948118759)",
+          "acceptance": "SUPERVISOR 2026-10-09: ACCEPTED"
+        }
       },
       "M8.3": {
-        "status": "TODO"
+        "title": "One Auto-ID action: Evaluate Stored Run (read-only)",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-3",
+        "base": "3bf50677bed13a2222c110eb5312329b51e44975",
+        "pr": 53,
+        "commit": "1970791141d93941082d290db0220c2cc96bfa9b",
+        "scope": "button \"Auto-ID — Evaluate Stored Run\" on the Auto-ID Setup page (with \"Select stored run journal...\"): requires a governed campaign selected through M8.1 and an explicitly selected journal of an existing run (<run root>/campaign/<run hash>/journal.json; never the newest run, first directory or a matching name). services/stored_run_evidence.py (read-only adapter over the accepted journal layout; no new evidence schema) checks the journal format, its directory = run hash and its campaign hash = the selected campaign's (otherwise no evaluation), prepares the governed specimen inputs with prepare_campaign_specimens (no Abaqus), locates each pipeline journal by the hash of its governed pipeline identity, loads journalled FE packs with the verifying load_run_pack and the pinned source INP with its SHA-256 verified (missing parts left missing and noted), assembles CampaignRunEvidence and calls campaign_scientific_backend.judge_campaign_run. The returned ScientificReadiness record is stored unchanged and shown through the M8.2 selection-aware Data Readiness Check, bound to the evaluated run (selected run hash; a new campaign selection resets the run). No CampaignRun.run / evaluate, run_bounded_lm, prepare_run_manifest, extraction, solver process or file write",
+        "tests": "test_m8_3_evaluate_stored_run 23 tests (3 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1 / M8.2 tests retained; focused M8.3 / M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 406 OK; full suite without data stores 1892 OK (77 skipped); full suite with all data stores 1906 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
       },
       "M8.4": {
         "status": "TODO"

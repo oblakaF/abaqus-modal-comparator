@@ -4472,3 +4472,34 @@ first internal provider.
   `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #52.
+
+## 2026-10-09 — M8.2 ACCEPTED and merged (PR #52); M8.3 — one Auto-ID action: Evaluate Stored Run (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS); M8.1, M8.2 ACCEPTED; mini-step M8.3 only
+- **M8.2 merge:** PR #52 `auto-id/m8-2` → `main`, reviewed head `1208562984bc654c1247959b189f72628f8b1d2a`, merge commit `3bf50677bed13a2222c110eb5312329b51e44975`
+  (tree `36e482b14ad94686f961fab2d4ac78f16648312b`, identical to the reviewed head). Linux CI on main 3bf5067: success (run 37948118759). SUPERVISOR-authorised.
+- **M8.3 status:** REVIEW_READY — branch `auto-id/m8-3` from `3bf5067` (PR #53), exclusive worktree.
+- **Commits:** `1970791` evaluate-stored-run action; this governance commit.
+- **Action:** "Auto-ID — Evaluate Stored Run" (with "Select stored run journal...") on the Auto-ID Setup page. It needs
+  a governed campaign selected through M8.1 and an explicitly selected `<run root>/campaign/<run hash>/journal.json`;
+  no newest run, first directory or matching file name is chosen.
+- **Adapter:** `services/stored_run_evidence.py` — read-only over the accepted journal layout; no new evidence schema.
+  Journal format, directory = run hash and campaign hash = the selected campaign's (otherwise no evaluation); governed
+  specimen inputs from `prepare_campaign_specimens` (no Abaqus); pipeline journals located by the hash of their governed
+  pipeline identity; journalled FE packs via the verifying `load_run_pack`; pinned source INP read with SHA-256
+  verified; missing parts left missing and noted. `CampaignRunEvidence` → `judge_campaign_run` (the only judgement).
+- **GUI:** the backend's `ScientificReadiness` record is stored unchanged and shown through the M8.2 selection-aware
+  Data Readiness Check, bound to the evaluated run: shown only while that run is selected; a new campaign selection
+  resets the selected run; another run never shows it.
+- **Outcomes (archived, read-only):** RUN_A REFUSED — NO_GLOBAL_PARAMETER_VALUE with SPEC §13 FAIL; RUN_B REFUSED —
+  NO_GLOBAL_PARAMETER_VALUE, diagnostic-only candidate, no released value.
+- **Fail-closed:** no campaign, specimen folder only, no run, run of another campaign, unreadable or non-campaign journal
+  → no evaluation; corrupted hash chain, run of other specimen inputs, missing pipeline journal, missing FE pack or
+  missing pinned INP → the backend's typed NOT_READY; confirmed cluster → CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE.
+- **Not called:** CampaignRun.run / evaluate, run_bounded_lm, prepare_run_manifest, extraction, Abaqus, solver
+  processes; no file written; `require_executable` unchanged.
+- **Tests:** test_m8_3_evaluate_stored_run 23 tests (3 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1 / M8.2 tests retained; focused M8.3 / M8.2 / M8.1 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 406 OK; full suite without data stores 1892 OK (77 skipped); full suite with all data stores 1906 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at
+  `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #53.
