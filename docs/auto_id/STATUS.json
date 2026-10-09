@@ -95,6 +95,13 @@
       "pr": 41,
       "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423",
       "status": "ACCEPTED (D-078)"
+    },
+    {
+      "stage": "SPEC v1.2 normative acceptance",
+      "kind": "policy track (not a roadmap stage)",
+      "pr": 42,
+      "merge_commit": "61b5016131d7ec855b2308ae3731aebecedc2f85",
+      "status": "ACCEPTED (D-078)"
     }
   ],
   "m1": {
@@ -563,7 +570,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of the SPEC v1.2 normative acceptance PR (auto-id/spec-v1.2-acceptance -> main, not merged). Then the V12-I1 ... V12-I6 implementation track only after explicit authorisation; no SP10, no t_face, no new FE work before it; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
+  "next_action": "STOP: SUPERVISOR review of V12-I1 (auto-id/v12-i1, not merged). V12-I2 ... V12-I6 not started; no SP10, no t_face, no new FE work; M8 NOT_STARTED, auto-id/m8 parked; no Abaqus",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1143,7 +1150,7 @@
       "historical_data": "RUN_A / RUN_B unchanged; RETROSPECTIVE_DIAGNOSTIC_ONLY after v1.2; accepted v1.2 calibration requires a new v1.2 campaign / run identity",
       "calibration_precision_gate": "conservative_uncertainty = max(birge_adjusted_sd, 0.5 * width(model_form_robustness)) <= 0.08 (ln p, as M5); birge_adjusted_sd and AVAILABLE_COMPLETE_LOO required, else REFUSED; > 0.08 REFUSED; no value released, optimiser candidate only as DIAGNOSTIC_OPTIMIZER_CANDIDATE / NOT_A_RELEASE_VALUE; never IDENTIFIED / WIDE; tau_mf not in the envelope; UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE kept"
     },
-    "implementation_status": "POLICY_ACCEPTED; IMPLEMENTATION_NOT_STARTED",
+    "implementation_status": "POLICY_ACCEPTED; SPEC v1.2 normative; V12-I1 implemented on branch auto-id/v12-i1 (REVIEW_READY); production v1.2 IMPLEMENTATION_INCOMPLETE",
     "merged_to_main": {
       "pr": 41,
       "merge_commit": "edb3070d2ed5b385f7152b3041ca3e297bdc8423",
@@ -1153,16 +1160,28 @@
       "merge_ci": "Linux CI on main edb3070: 1616 OK (68 skipped), success (run 37877422055)"
     },
     "history_documents": "SPEC_V1_2_DRAFT.md, SPEC_V1_2_POLICY_REVIEW.md, SPEC_V1_2_POLICY_OPTIONS.json: SUPERSEDED_BY_NORMATIVE_SPEC_V1_2 (content kept)",
-    "acceptance_branch": "auto-id/spec-v1.2-acceptance (from main edb3070)"
+    "acceptance_branch": "auto-id/spec-v1.2-acceptance (from main edb3070)",
+    "acceptance_merged_to_main": {
+      "pr": 42,
+      "merge_commit": "61b5016131d7ec855b2308ae3731aebecedc2f85",
+      "reviewed_head": "dd6660318243a94d26a6bc3d6c874365a67c86ad",
+      "tree": "2243c120861f828c1a089fbcb8302d6f0548785c",
+      "merged_tree_identical_to_reviewed_head": true,
+      "merge_ci": "Linux CI on main 61b5016: 1622 OK (68 skipped), success (run 37879353020)"
+    }
   },
   "governing_spec_predecessor": "docs/auto_id/SPEC_V1_1.md (archived, immutable; unamended clauses in force via v1.2)",
   "spec_v1_2_implementation": {
-    "status": "NOT_STARTED",
+    "status": "IN_PROGRESS",
     "precedes": "any SP10 / new FE work",
     "steps": {
       "V12-I1": {
         "title": "Campaign / run question (MATERIAL_IDENTIFICATION | SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf schema, both declared before execution and bound into the campaign / run identity",
-        "status": "TODO"
+        "status": "REVIEW_READY",
+        "branch": "auto-id/v12-i1",
+        "base": "61b5016131d7ec855b2308ae3731aebecedc2f85",
+        "scope": "campaign schema auto-id/identification-campaign/v1.2 with mandatory scientific_question and tau_mf (0 < tau_mf <= 0.02), both in the canonical campaign identity (the run identity binds campaign_hash); v1 definitions unchanged (no implicit question / tau_mf; historical hashes preserved); SPECIMEN_ENGINEERING_CALIBRATION execution and report refused with SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED (no fallback); tau_mf declared only, no numerical use",
+        "tests": "test_v12_i1_campaign_question 15 OK; with test_spec_v1_2_normative + test_spec_v1_2_policy_draft + test_m7_campaign + test_m7b_corrective + test_m5_stage_gate 95 OK (3 skipped without data stores); with data stores test_m7_campaign + test_m7b_corrective + V12-I1 + 5 test_m4* modules 109 OK (0 skipped, no Abaqus); full suite without data stores 1640 OK (64 skipped)"
       },
       "V12-I2": {
         "title": "Holdout and residual-family magnitude bounds max(3σ, τ_mf) / max(2σ, τ_mf); τ_mf kept out of Σ, Φ, whitening, every uncertainty and §13",

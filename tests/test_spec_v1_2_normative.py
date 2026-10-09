@@ -106,12 +106,12 @@ class NormativeSpecTests(unittest.TestCase):
     def test_governance_points_to_spec_v1_2_without_claiming_implementation(self):
         status = json.loads(_text("STATUS.json"))
         self.assertEqual(status["governing_spec"], "docs/auto_id/SPEC_V1_2.md")
-        self.assertEqual(status["spec_v1_2_policy"]["implementation_status"],
-                         "POLICY_ACCEPTED; IMPLEMENTATION_NOT_STARTED")
+        self.assertIn("IMPLEMENTATION_INCOMPLETE", status["spec_v1_2_policy"]["implementation_status"])
         track = status["spec_v1_2_implementation"]
-        self.assertEqual(track["status"], "NOT_STARTED")
+        self.assertEqual(track["status"], "IN_PROGRESS")
         self.assertEqual(sorted(track["steps"]), [f"V12-I{i}" for i in range(1, 7)])
-        self.assertTrue(all(step["status"] == "TODO" for step in track["steps"].values()))
+        self.assertEqual(track["steps"]["V12-I1"]["status"], "REVIEW_READY")  # never self-ACCEPTED
+        self.assertTrue(all(track["steps"][f"V12-I{i}"]["status"] == "TODO" for i in range(2, 7)))
         self.assertEqual((status["m8"]["status"], status["m8"]["parked_branch"]["commit"]),
                          ("NOT_STARTED", "193db8dd4dd31c88ea1eae0a905f372e8a00c31d"))
         self.assertIn("| [SPEC_V1_2.md](SPEC_V1_2.md) | Governing scientific contract (normative, D-078)",
@@ -123,6 +123,8 @@ class NormativeSpecTests(unittest.TestCase):
 
     def test_no_v1_2_implementation_in_src_and_m7_records_unchanged(self):
         for path in (ROOT / "src").rglob("*.py"):
+            if path.relative_to(ROOT / "src").as_posix() == "domain/campaign_definition.py":
+                continue  # V12-I1 schema only (tests/test_v12_i1_campaign_question.py confines it there)
             text = path.read_text(encoding="utf-8")
             with self.subTest(module=path.name):
                 # (the M7b label DIAGNOSTIC_OPTIMIZER_CANDIDATE_NOT_RELEASED predates v1.2 and is not a marker)

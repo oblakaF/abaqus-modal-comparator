@@ -135,6 +135,8 @@ class PolicyDraftTests(unittest.TestCase):
         self.assertEqual(calibration["uncertainty_reporting"]["conditional_wording"],
                          "UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE")
         for path in (ROOT / "src").rglob("*.py"):
+            if path.relative_to(ROOT / "src").as_posix() == "domain/campaign_definition.py":
+                continue  # V12-I1 schema only (question and τ_mf declared; tests/test_v12_i1_campaign_question.py)
             text = path.read_text(encoding="utf-8")
             with self.subTest(module=path.name):
                 self.assertNotIn("tau_mf", text)

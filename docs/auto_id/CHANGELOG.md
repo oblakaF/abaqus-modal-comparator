@@ -4075,3 +4075,29 @@ first internal provider.
 - **Tests:** test_spec_v1_2_normative 6 OK + test_spec_v1_2_policy_draft 16 OK; with test_m7b_corrective + test_m5_stage_gate 55 OK (2 skipped without data stores); full suite without data stores 1625 OK (64 skipped)
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of the normative acceptance PR; then V12-I1 only after explicit authorisation.
+
+## 2026-10-09 — V12-I1 — campaign scientific question and τ_mf: schema and identity (SPEC v1.2 normative merged)
+
+- **Normative merge:** PR #42 `auto-id/spec-v1.2-acceptance` → `main`, merge commit `61b5016131d7ec855b2308ae3731aebecedc2f85` (reviewed head
+  `dd66603` after the README heading microfix; merged tree `2243c12` identical; SUPERVISOR-authorised). Linux CI on main 61b5016: 1622 OK (68 skipped), success (run 37879353020).
+  SPEC_V1_2.md is the normative contract (D-078).
+- **Stage:** SPEC v1.2 implementation track, step V12-I1 (no roadmap M-stage; M8 NOT_STARTED)
+- **Status:** REVIEW_READY
+- **Branch:** `auto-id/v12-i1` (from `main` `61b5016`)
+- **Commit SHA:** the commit that introduces this entry, message
+  `auto-id(V12-I1): campaign scientific question and tau_mf - schema and identity`
+- **Files:** `src/domain/campaign_definition.py` (v1.2 schema, question / τ_mf parsing and identity, calibration
+  refusal), `src/services/identification_campaign_run.py` (calibration refused in the report; comments);
+  created `tests/test_v12_i1_campaign_question.py`; scoped the v1.2 source scans in
+  `tests/test_spec_v1_2_normative.py` and `tests/test_spec_v1_2_policy_draft.py` to the I1 schema module;
+  STATUS, ROADMAP, CHANGELOG.
+- **Behaviour:** a v1.2 campaign must declare `scientific_question` and `tau_mf` (0 < τ_mf ≤ 0.02, finite, not a
+  boolean); both enter the canonical campaign identity, and through `campaign_hash` the run identity and manifest.
+  v1 definitions parse unchanged, keep their hashes (RUN_A `0a21ad05…`, RUN_B `7c1f5db2…`) and acquire neither field.
+  SPECIMEN_ENGINEERING_CALIBRATION campaigns parse and hash, but execution, manifest and report are refused with
+  `SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED` (no fallback to material identification). τ_mf has no numerical
+  effect (Σ, objective, whitening, M5, §13, report identical to v1).
+- **Scientific behaviour changed:** NO for every existing campaign; a calibration campaign is refused.
+- **Tests:** test_v12_i1_campaign_question 15 OK; with test_spec_v1_2_normative + test_spec_v1_2_policy_draft + test_m7_campaign + test_m7b_corrective + test_m5_stage_gate 95 OK (3 skipped without data stores); with data stores test_m7_campaign + test_m7b_corrective + V12-I1 + 5 test_m4* modules 109 OK (0 skipped, no Abaqus); full suite without data stores 1640 OK (64 skipped)
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of V12-I1.
