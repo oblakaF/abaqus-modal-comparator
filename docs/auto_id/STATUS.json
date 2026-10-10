@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8 final integration review (read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS)",
-  "status": "ACCEPTED",
+  "current_ministep": "Release checkpoint governance cleanup (docs only)",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
   "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
@@ -144,6 +144,12 @@
       "pr": 49,
       "merge_commit": "29e010e778d718a5cafa501fb925b6e9d437db85",
       "status": "ACCEPTED"
+    },
+    {
+      "stage": "M8 read-only closeout (M8.1-M8.8; original gate NOT_MET)",
+      "pr": 59,
+      "merge_commit": "149debc3172cb4adb3ba6fcc48635b770340783e",
+      "status": "ACCEPTED scope READ_ONLY_EXISTING_JOURNALLED_RUNS (D-079); M8 stage IN_PROGRESS; original M8 GATE NOT_MET"
     }
   ],
   "m1": {
@@ -612,7 +618,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: M8 stays IN_PROGRESS — original M8 GATE NOT_MET (new specimen folder -> governed campaign -> new journalled run -> new result); any further work toward it requires separate explicit SUPERVISOR / HUMAN authorisation. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no Abaqus, no new FE solves, no LM execution, no computational resume, no SP10, no t_face; auto-id/m8 parked",
+  "next_action": "STOP: SUPERVISOR review of the release-checkpoint governance cleanup (docs-only PR, not merged). M8 stage IN_PROGRESS — accepted scope READ_ONLY_EXISTING_JOURNALLED_RUNS, original M8 GATE NOT_MET (D-079); further work toward the gate requires separate explicit authorisation. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no Abaqus, no new FE solves, no LM execution, no SP10, no t_face; auto-id/m8 parked",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1385,7 +1391,21 @@
       "remaining_gap": "NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path",
       "gap_handling": "acknowledged; not silently waived; not marked PASS",
       "overall_m8_stage": "IN_PROGRESS — original gate still open",
-      "execution": "no authorisation for real Abaqus execution, new FE solves, LM execution, computational resume, production calibration, SP10 or t_face; production BLOCKED / NOT_AUTHORISED; further work toward the original M8 GATE requires separate explicit authorisation"
+      "execution": "no authorisation for real Abaqus execution, new FE solves, LM execution, computational resume, production calibration, SP10 or t_face; production BLOCKED / NOT_AUTHORISED; further work toward the original M8 GATE requires separate explicit authorisation",
+      "decision_record": "D-079"
+    },
+    "accepted_scope": "READ_ONLY_EXISTING_JOURNALLED_RUNS",
+    "original_gate": "NOT_MET",
+    "decision_record": "D-079",
+    "closeout": {
+      "pr": 59,
+      "merge_commit": "149debc3172cb4adb3ba6fcc48635b770340783e",
+      "reviewed_head": "f31510d87b1bf7d7c774ddba0f0ae074d88be27f",
+      "tree": "f5aca5286474abb283b9e5b083a354ee0bb923b0",
+      "merged_tree_identical_to_reviewed_head": true,
+      "merge_ci": "Linux CI on main 149debc: success (run 38047072811)",
+      "content": "M8 read-only closeout: M8.8 ACCEPTED, final integration review ACCEPTED, SUPERVISOR final scope decision (READ_ONLY_EXISTING_JOURNALLED_RUNS; original M8 GATE NOT_MET)",
+      "acceptance": "SUPERVISOR 2026-10-10 (D-079); merged as authorised"
     }
   },
   "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL",
@@ -1626,5 +1646,35 @@
         "M8 (current state): M8.1-M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS; the original M8 GATE is NOT_MET (NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path); the stage stays IN_PROGRESS with the original gate open; the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
       ]
     }
+  },
+  "release_test_checkpoint": {
+    "commit": "149debc3172cb4adb3ba6fcc48635b770340783e",
+    "date": "2026-10-10",
+    "command": "python -m unittest discover -s tests",
+    "without_data_stores": {
+      "ran": 2022,
+      "ok": 2022,
+      "skipped": 84,
+      "failures": 0,
+      "errors": 0
+    },
+    "with_all_data_stores": {
+      "ran": 2036,
+      "ok": 2036,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0
+    },
+    "expected_failures": 0,
+    "unexpected_successes": 0,
+    "main_ci": "Linux CI on main 149debc: success (run 38047072811)",
+    "known_flaky": "test_registration_factory.test_no_full_model_contamination (substring check against JSON that contains a random temporary path; intermittent; passed in both runs; not modified)",
+    "note": "release checkpoint audit (no Abaqus, no FE, no LM); the historical audit_test_baseline / ci_baseline are unchanged"
+  },
+  "stage_status": {
+    "M8": "IN_PROGRESS",
+    "M8_accepted_scope": "READ_ONLY_EXISTING_JOURNALLED_RUNS",
+    "M8_original_gate": "NOT_MET",
+    "note": "the top-level status refers to current_ministep; the M8 stage is not ACCEPTED"
   }
 }

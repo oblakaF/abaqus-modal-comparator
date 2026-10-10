@@ -1331,3 +1331,24 @@ Decision:
 Rationale / scope: closes external audit finding V4 at the policy level (model-form tolerance and specimen calibration
 frozen before any new FE result); no scientific result, record or code changes.
 Supersedes: none (amends SPEC v1.1 by SPEC v1.2; D-077's "SPEC v1.2 unresolved" note is resolved)
+
+## D-079 — M8 Read-Only Scope Acceptance
+Date: 2026-10-10 · Accepted by: SUPERVISOR · Source: SUPERVISOR "FINAL M8 SCOPE DECISION." (2026-10-10) and "RELEASE CHECKPOINT GOVERNANCE CLEANUP"; PR #59 (reviewed head `f31510d87b1bf7d7c774ddba0f0ae074d88be27f`, merge `149debc3172cb4adb3ba6fcc48635b770340783e`)
+Decision:
+- **M8.1–M8.8 are ACCEPTED** (PRs #51–#58, each merged with SUPERVISOR authorisation), and the final M8 integration
+  review is ACCEPTED (PR #59).
+- **Accepted scope: `READ_ONLY_EXISTING_JOURNALLED_RUNS`** — campaign preparation, explicit stored-run selection, verified progress, evaluation
+  with the shared SPEC v1.2 backend, scientific verdict, recorded uncertainty, governed Engineering Constants preview
+  and safe verified JSON export of an existing journalled run.
+- **Original M8 GATE: NOT_MET.** The path NEW specimen folder → governed campaign → new journalled scientific run →
+  new result cannot be completed in the GUI. The limitation is acknowledged; it is not waived and not marked PASS.
+- **M8 stage status: IN_PROGRESS** (original gate still open). M8 is not ACCEPTED as a whole.
+- **Production execution: NOT_AUTHORISED.** Production calibration execution stays BLOCKED / NOT_AUTHORISED
+  (`CampaignDefinition.require_executable` unchanged); no authorisation for real Abaqus execution, new FE solves, LM
+  execution, computational resume, SP10 or t_face. Further work toward the original M8 GATE requires separate explicit
+  authorisation.
+- `auto-id/m8` (`193db8d`) stays PARKED (historical prototype, untouched).
+Rationale / scope: records the SUPERVISOR scope decision as a decision entry; no scientific result, record, threshold,
+SPEC or code changes.
+Supersedes: the "M8 stays NOT_STARTED" / "M8 ON HOLD" / "`auto-id/m8` parked pending a decision" statements of D-076,
+D-077 and D-078 as the current M8 state (those entries remain unchanged as history).

@@ -4772,3 +4772,24 @@ first internal provider.
   production calibration, SP10 or t_face. Production calibration execution BLOCKED / NOT_AUTHORISED. Further work
   toward the original M8 GATE requires separate explicit authorisation; none is started.
 - **Files:** docs only (ROADMAP, STATUS, CHANGELOG). **Abaqus run count:** 0.
+
+## 2026-10-10 — Release-checkpoint governance cleanup (docs only; D-079)
+
+- **M8 read-only closeout merged:** PR #59 `auto-id/m8-integration-review` → `main`, reviewed head `f31510d87b1bf7d7c774ddba0f0ae074d88be27f`, merge
+  commit `149debc3172cb4adb3ba6fcc48635b770340783e` (tree `f5aca5286474abb283b9e5b083a354ee0bb923b0`, identical to the reviewed head). Linux CI on main `149debc`: success (run
+  `38047072811`). SUPERVISOR-authorised.
+- **D-079 — M8 Read-Only Scope Acceptance:** M8.1–M8.8 ACCEPTED; scope `READ_ONLY_EXISTING_JOURNALLED_RUNS`; original M8 GATE NOT_MET;
+  production execution NOT_AUTHORISED.
+- **Separate states recorded:** M8 stage IN_PROGRESS; accepted scope `READ_ONLY_EXISTING_JOURNALLED_RUNS`; original gate NOT_MET (STATUS `m8`,
+  `stage_status`, `main_merges`; ROADMAP V12 state table and M8 section). M8 is not ACCEPTED as a whole.
+- **Stale wording corrected:** M8.8 export-safety correction no longer "still REVIEW_READY"; V12-I6 marked ACCEPTED in
+  its section heading; "M8 remains parked" statements in the V12 table / limitations replaced by the current M8 state.
+  Dated historical narrative and checkpoints are unchanged.
+- **Release test checkpoint** on `149debc`: without data stores 2022 OK (84 skipped); with all data stores 2036 OK
+  (5 skipped); 0 failures, 0 errors; known intermittent `test_registration_factory.test_no_full_model_contamination`
+  passed (recorded, not modified).
+- **Governance test adjusted (SUPERVISOR-approved, one assertion):** `test_spec_v1_2_normative` required D-078 to be
+  the last DECISIONS entry. It now still pins the history before D-078 and the D-078 wording, and accepts only later
+  appended entries numbered consecutively from D-079 (a skipped number or an edited D-078 still fails).
+- **Unchanged:** SPEC v1.1 / v1.2, D-078 and all earlier decisions, `src`, campaigns, RUN_A / RUN_B records, historical
+  checkpoints. Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
