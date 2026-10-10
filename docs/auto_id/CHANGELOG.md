@@ -4856,3 +4856,21 @@ first internal provider.
 - **Unchanged:** SPEC v1.2, D-078, D-080, `src/domain`, production gate, M5 / M7 mathematics (the split report is
   byte-identical), readiness schema `v1`, material records and RUN_A / RUN_B record and backend record hashes.
   Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
+
+## 2026-10-11 — Governance sync after the V12-I7.1 merge (docs only)
+
+- **Merges recorded** (each on explicit SUPERVISOR authorisation; main Linux CI success):
+  - PR #61 (`auto-id/v12-audit-v1-v2`, audit corrections V1 / V2): merge `8dc69550d28c8ac8b296e3ef08225095af76a5e4`, CI run `38078385546`;
+  - PR #62 (`auto-id/d080-companion-material-verdict`, D-080 governance): merge `f5cbc2197834b3114c4d301107545b7e8ebadeb7`, CI run `38074570838`;
+  - PR #63 (`auto-id/v12-i7-companion`, V12-I7.1): merge `7502424c5b44842d24f75ab2daab78a26478f11a`, CI run `38084763361`.
+- **V12-I7:** core companion material verdict implemented; **V12-I7.1 `ACCEPTED`** (SUPERVISOR review: aligned with
+  D-080; merged); **V12-I7.2 `NOT_STARTED`** (separate SUPERVISOR command). V12-I7 as a whole is **not** `ACCEPTED`;
+  closing the D-080 non-conformance needs SUPERVISOR acceptance.
+- **Current state:** a calibration readiness record evaluated on `7502424` or later carries
+  `companion_material_verdict`, shown first; a stored record without the field still shows
+  `MATERIAL_VERDICT_NOT_COMPUTED`.
+- **Superseded statements** (in STATUS / ROADMAP; the earlier CHANGELOG entries are kept as written): "PR #61 open, not
+  merged"; "companion material verdict: implementation pending"; "V12-I7 `TODO`"; "V12-I7.1 `REVIEW_READY`".
+- **Unchanged:** `src`, `tests`, SPEC v1.1 / v1.2, DECISIONS (D-078, D-079, D-080), production gate, M5 / M7, RUN_A /
+  RUN_B records. Production calibration execution BLOCKED / NOT_AUTHORISED. Files: STATUS, ROADMAP, CHANGELOG.
+  **Abaqus run count:** 0.

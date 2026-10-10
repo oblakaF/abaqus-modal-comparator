@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "Release checkpoint governance cleanup (docs only)",
+  "current_ministep": "Governance sync after the V12-I7.1 merge (docs only)",
   "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
@@ -1647,38 +1647,53 @@
       ]
     },
     "companion_material_verdict": {
-      "status": "ACCEPTED — architecture decision (D-080); implementation pending",
+      "status": "ACCEPTED — architecture decision (D-080); core implemented (V12-I7.1 ACCEPTED, merged PR #63); V12-I7 as a whole not ACCEPTED (V12-I7.2 not started)",
       "decision": "D-080",
       "spec": "SPEC v1.2 §1 (\"its material verdict is still computed and shown separately, first, and unchanged\")",
-      "current_state": "MATERIAL_VERDICT_NOT_COMPUTED — temporary non-conformance by omission (no number produced, no fallback); PR #61 (audit V1) shows it as not computed",
+      "current_state": "a SPECIMEN_ENGINEERING_CALIBRATION readiness record evaluated on main 7502424 or later carries companion_material_verdict (schema auto-id/companion-material-verdict/v1, own record hash, provenance = the run's existing journalled evidence; read-only, no Abaqus / FE / LM); the GUI shows it first, then the calibration verdict; a stored record without the field (evaluated before V12-I7.1) still shows MATERIAL_VERDICT_NOT_COMPUTED; closing the D-080 non-conformance needs SUPERVISOR acceptance of V12-I7",
       "target": "read-only companion material verdict: existing material path on the calibration run's existing journals; no Abaqus, no FE, no LM, no new optimisation; own field and record hash; shown first and unchanged; never an input to the calibration gate or release",
       "not": "not a second scientific question; not a fallback; no influence on the calibration gate",
       "implementation": {
         "step": "V12-I7",
-        "status": "IN_PROGRESS — V12-I7.1 core REVIEW_READY (PR #63)",
+        "status": "IN_PROGRESS — V12-I7.1 core ACCEPTED and merged (PR #63, 7502424); V12-I7.2 NOT_STARTED",
         "scope": "read-only companion material verdict in the calibration readiness output",
         "authorisation": "separate explicit SUPERVISOR authorisation required",
         "V12-I7.1": {
-          "status": "REVIEW_READY",
+          "status": "ACCEPTED",
           "branch": "auto-id/v12-i7-companion",
           "base": "8dc69550d28c8ac8b296e3ef08225095af76a5e4",
           "pr": 63,
           "scope": "ScientificReadiness.companion_material_verdict (key only for SPECIMEN_ENGINEERING_CALIBRATION records; schema auto-id/companion-material-verdict/v1; schema, role, labels, question, status, formal_output, reasons, provenance (source = existing journalled evidence, campaign_hash, run_hash, material_report_hash, final candidate, pipeline run hashes; 0 solves / LM / journal entries), own record_hash). Judged read-only by identification_campaign_run.campaign_report_unchecked (the body of build_campaign_report; the public guard is unchanged and still refuses a calibration definition) on the run's existing journals, after the calibration verdict; isolated (a failure gives NOT_AVAILABLE); never an input to the calibration gate, output or release. NOT_READY before verified evidence gives NOT_AVAILABLE. The GUI shows it first; a record without the field keeps MATERIAL_VERDICT_NOT_COMPUTED",
-          "unchanged": "SPEC v1.2, D-078, D-080, src/domain (require_executable, require_question_supported), production gate, M5 / M7 mathematics, readiness schema v1, material and RUN_A / RUN_B records and hashes"
+          "unchanged": "SPEC v1.2, D-078, D-080, src/domain (require_executable, require_question_supported), production gate, M5 / M7 mathematics, readiness schema v1, material and RUN_A / RUN_B records and hashes",
+          "acceptance": "SUPERVISOR: PR #63 reviewed (aligned with D-080) and merged on explicit SUPERVISOR authorisation",
+          "merge_commit": "7502424c5b44842d24f75ab2daab78a26478f11a",
+          "main_ci": "Linux CI on main 7502424: success (run 38084763361)"
+        },
+        "V12-I7.2": {
+          "status": "NOT_STARTED",
+          "authorisation": "separate explicit SUPERVISOR command required"
         }
       },
       "production_calibration_execution": "BLOCKED / NOT_AUTHORISED",
-      "pr_61_v1_gap": "PR #61 (audit V1 / V2, open, not merged) shows the material verdict of a calibration run as not computed; this gap stays open until V12-I7 is implemented and accepted (relabelling it MATERIAL_VERDICT_NOT_COMPUTED also needs a separate authorisation)"
+      "pr_61_v1_gap": "PR #61 merged (8dc6955): its V1 MATERIAL_VERDICT_NOT_COMPUTED display is superseded for calibration records evaluated since V12-I7.1 (PR #63, 7502424), which carry the companion material verdict; it remains only for stored records without the field",
+      "governance_merge": {
+        "pr": 62,
+        "merge_commit": "f5cbc2197834b3114c4d301107545b7e8ebadeb7",
+        "main_ci": "Linux CI on main f5cbc21: success (run 38074570838)"
+      }
     },
     "audit_corrections_v1_v2": {
-      "status": "REVIEW_READY",
+      "status": "MERGED — PR #61 (merge 8dc6955) on explicit SUPERVISOR authorisation",
       "branch": "auto-id/v12-audit-v1-v2",
       "base": "e022e76133a543a93ed8429008fcebd05649cc28 (main f5cbc21 with D-080 merged into the branch)",
-      "V1": "material verdict first: auto_id_wizard.material_verdict (presentation; used by the backend readiness_presentation; read from the stored readiness record only) is the first block of readiness_presentation and of the M8.5 verdict summary — material question, formal output and status (refusal reasons for NO_GLOBAL_PARAMETER_VALUE / NOT_IDENTIFIABLE) — followed by the calibration verdict; for a calibration run the block shows MATERIAL_VERDICT_NOT_COMPUTED — known temporary SPEC v1.2 §1 non-conformance (D-080); companion material verdict pending V12-I7",
+      "V1": "material verdict first: auto_id_wizard.material_verdict (presentation; used by the backend readiness_presentation; read from the stored readiness record only) is the first block of readiness_presentation and of the M8.5 verdict summary — material question, formal output and status (refusal reasons for NO_GLOBAL_PARAMETER_VALUE / NOT_IDENTIFIABLE) — followed by the calibration verdict; for a calibration record without the companion field the block shows MATERIAL_VERDICT_NOT_COMPUTED (D-080); since V12-I7.1 (PR #63) a calibration record carries the companion material verdict, which the block shows first (the wording of the NOT_COMPUTED label in src is not changed by this docs-only sync)",
       "V2": "specimen calibration output record (schema auto-id/specimen-engineering-calibration/v2) gains statistical_sd (status, statistical_sd_ln per fitted parameter, record hash, reasons; copied from the bound M5 statistical_sd record) and model_form_robustness (leave-one-FIT-family-out status, reasons, cases, record hash; copied from the gate observability); missing values stay NOT_AVAILABLE / null; no range is derived; the M8.7 breakdown reads these fields",
       "unchanged": "SPEC, thresholds, M5 / M7, RUN_A / RUN_B records and backend record hashes, gates and decisions; production calibration execution BLOCKED / NOT_AUTHORISED; Abaqus runs 0",
-      "material_verdict_of_calibration_run": "decided by D-080; implementation V12-I7 TODO",
-      "schema_v2_effect": "schema v2 changes the calibration record_hash and the derived CAL_* material names; this is acceptable because no production calibration records exist (production calibration execution BLOCKED / NOT_AUTHORISED)"
+      "material_verdict_of_calibration_run": "decided by D-080; core implemented by V12-I7.1 (ACCEPTED, PR #63, 7502424); V12-I7.2 NOT_STARTED; V12-I7 not ACCEPTED as a whole",
+      "schema_v2_effect": "schema v2 changes the calibration record_hash and the derived CAL_* material names; this is acceptable because no production calibration records exist (production calibration execution BLOCKED / NOT_AUTHORISED)",
+      "pr": 61,
+      "merge_commit": "8dc69550d28c8ac8b296e3ef08225095af76a5e4",
+      "main_ci": "Linux CI on main 8dc6955: success (run 38078385546)"
     }
   },
   "release_test_checkpoint": {
