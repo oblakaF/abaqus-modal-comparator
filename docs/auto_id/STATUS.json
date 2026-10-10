@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8.8 (Governed evidence / provenance export)",
+  "current_ministep": "M8 final integration review",
   "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
@@ -612,7 +612,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of M8.8 (PR #58, not merged); M8 stays IN_PROGRESS until a separate final SUPERVISOR integration acceptance. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus; auto-id/m8 parked",
+  "next_action": "STOP: SUPERVISOR decision on the final M8 scope (governance PR #59, not merged; the original M8 GATE is not met in full). V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus; auto-id/m8 parked",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1168,7 +1168,7 @@
       "status": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
       "note": "historical M8.1 prototype; untouched (not merged, not rebased, not cherry-picked as a whole); selected code reused on auto-id/m8-1"
     },
-    "authorisation": "SUPERVISOR 2026-10-10: M8.7 ACCEPTED; start M8.8 only (governed evidence / provenance export); the complete M8 track is not accepted until a separate final SUPERVISOR integration acceptance",
+    "authorisation": "SUPERVISOR 2026-10-10: M8.8 ACCEPTED; final M8 integration review only; the complete M8 track is not accepted until the final SUPERVISOR decision",
     "steps": {
       "M8.1": {
         "title": "Specimen / family setup wizard",
@@ -1318,7 +1318,7 @@
       },
       "M8.8": {
         "title": "Governed evidence / provenance export (deterministic JSON export snapshot)",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/m8-8",
         "base": "f523c38edb59d6d9e67bd8d0cf86fa66d22f0011",
         "pr": 58,
@@ -1329,10 +1329,41 @@
           "reviewed_head": "12fefb4289d668b2b3d91f3e9814d3a170d9a171",
           "scope": "SUPERVISOR 2026-10-10 final export-safety correction (reviewed head 12fefb4): (1) the governed journals are re-verified after the Save As dialog, immediately before writing (a journal may change while the dialog is open); a change refuses (EVIDENCE_CHANGED_SINCE_EVALUATION) and invalidates the active presentation; (2) tempfile.mkstemp runs inside the write handler (typed WRITE_FAILED, nothing left); (3) undeterminable data-store roots refuse (DESTINATION_REFUSED) and an undetermined protected root is never ignored. The snapshot builder and its deterministic JSON are unchanged",
           "tests": "test_m8_8_evidence_export 33 tests (30 + 3 red-probes: Save As freshness race, mkstemp failure, undeterminable protected roots — all three failed on 12fefb4 and pass after the fix; reverting each fix is caught, 4 of 4); M8.1-M8.7 and V12-I1..I6 tests retained; full suite without data stores 2022 OK (84 skipped); full suite with all data stores 2033+3 = 2036 OK (5 skipped, RUN_A / RUN_B store-gated included); 0 expected failures, 0 unexpected successes; no Abaqus"
+        },
+        "merged_to_main": {
+          "pr": 58,
+          "merge_commit": "1e88e9b8dd6a779fb95b789be86324964c11c528",
+          "reviewed_head": "7f7408fce549d12758c876a0352f81c45554a192",
+          "tree": "2fd18df63aad3853d2d43021068e6dc1368a56ae",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 1e88e9b: success (run 38044596355)",
+          "acceptance": "SUPERVISOR 2026-10-10: ACCEPTED (incl. the final export-safety correction); merged as authorised"
         }
       }
     },
-    "track": "IN_PROGRESS — new M8 implementation track (M8.1..M8.7 ACCEPTED; M8.8 REVIEW_READY); the stage stays IN_PROGRESS until a separate final SUPERVISOR integration acceptance; the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched"
+    "track": "IN_PROGRESS — M8.1..M8.8 ACCEPTED; final integration review complete for the implemented read-only scope; the original M8 GATE is NOT met in full (a new specimen folder alone cannot reach a new scientific result: a governed campaign definition and a previously journalled, HUMAN-gated run are prerequisites); the stage awaits the final SUPERVISOR scope decision; the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
+    "final_integration_review": {
+      "status": "REVIEW_READY",
+      "base": "1e88e9b8dd6a779fb95b789be86324964c11c528",
+      "pr": 59,
+      "workflow_audit": "real Tk application (ModalComparatorApp), the accepted GUI code paths, 33 of 33 checks: start; governed campaign definition; specimen / passport preparation rows; explicit stored run; verified progress; Evaluate Stored Run with the shared backend; RELEASED verdict with the calibration labels; uncertainty / source breakdown; nine governed constants and the CAL_* fragment only for the RELEASED calibration (none for REFUSED); deterministic verified JSON export (two exports byte-identical; cancel writes nothing); Reopen and campaign / run switch clear every selection-bound result; Refresh detects a changed pipeline journal; a journal changed during Save As refuses with no file; genuine NOT_READY stays visible and is not exported; incomplete LOO has no interval; confirmed cluster refusal preserved; RUN_A / RUN_B evaluated and exported with their archived stores unchanged (tree hash); no solver, LM or extraction call; only explicit exports written",
+      "scenarios": {
+        "RUN_A": "REFUSED; SPEC §13 FAIL; NO_GLOBAL_PARAMETER_VALUE; no released value",
+        "RUN_B": "REFUSED; diagnostic candidate only (E_in_plane_mpa 50886.2, G12_mpa 6872.05); no released material property",
+        "synthetic_calibration": "RELEASED (all gates pass); nine governed constants; CAL_A_* fragment preview; SYNTHETIC / TEST EVIDENCE; NOT AUTHORISED FOR PRODUCTION"
+      },
+      "original_m8_gate": {
+        "gate_text": "the user goes from a specimen/family folder to a scientifically guarded result without manually entering optimisation numbers other than specimen/passport measurements; no separate GUI scientific implementation; no new install_* layers",
+        "met": [
+          "no optimisation number is entered in the GUI (start, bounds, Σ_setup, τ_mf and the question come from the governed campaign definition)",
+          "no separate GUI scientific implementation (every verdict, constant, uncertainty and export comes from the shared backend and accepted services; GUI guard tests)",
+          "no new install_* layer (src/main.py and src/runtime_contracts.py unchanged since the M8 start 196503e)"
+        ],
+        "not_met": "from a NEW specimen folder the GUI shows the governed facts only ('a specimen folder declares no campaign'); a scientific result requires (1) a governed campaign definition for that specimen, authored outside the GUI with its optimisation settings, and (2) a previously journalled campaign run produced behind the HUMAN execution gate (CampaignRun; production calibration execution BLOCKED by require_executable). The implemented M8 workflow is read-only evaluation, presentation and export of such existing runs; it starts no solve, LM or extraction",
+        "decision": "SUPERVISOR decision required on the final M8 scope; no new scientific execution was enabled"
+      },
+      "tests": "real-Tk integration audit 33 of 33 (scratch script, not committed); focused M8.1-M8.8 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 561 OK (0 skipped: real-Tk tests ran); full suite on main without data stores 2022 OK (84 skipped); full suite on main with all data stores 2036 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
+    }
   },
   "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL",
   "spec_v1_2_policy": {
@@ -1562,14 +1593,14 @@
       "scientific_readiness_implementation": "ACCEPTED (all six planned steps V12-I1..I6 accepted and merged)",
       "production_calibration_execution": "BLOCKED / NOT_AUTHORISED",
       "human_authorised_real_calibration_run": "NOT YET AVAILABLE (no governed production calibration campaign authorised; real Abaqus needs separate HUMAN approval)",
-      "m8": "IN_PROGRESS — new M8 implementation track (M8.1..M8.7 ACCEPTED; M8.8 REVIEW_READY); the stage stays IN_PROGRESS until a separate final SUPERVISOR integration acceptance; the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
+      "m8": "IN_PROGRESS — M8.1..M8.8 ACCEPTED; final integration review complete for the implemented read-only scope; the original M8 GATE is NOT met in full (a new specimen folder alone cannot reach a new scientific result: a governed campaign definition and a previously journalled, HUMAN-gated run are prerequisites); the stage awaits the final SUPERVISOR scope decision; the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
       "meaning": "the six planned implementation steps are accepted; this does NOT authorise real calibration execution. Synthetic fake-solver RELEASED records prove the adapter only and are never an accepted physical calibration",
       "limitations": [
         "a confirmed-cluster calibration cannot be released without per-member evidence (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; SUPERVISOR cluster policy; no fallback)",
         "the production calibration execution gate (CampaignDefinition.require_executable) remains in place",
         "no governed production calibration campaign has been authorised",
         "real Abaqus execution needs separate HUMAN approval",
-        "M8 (current state): the new M8 implementation track is IN_PROGRESS (M8.1-M8.7 ACCEPTED, M8.8 REVIEW_READY; final SUPERVISOR integration acceptance pending); the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
+        "M8 (current state): M8.1-M8.8 ACCEPTED; the stage stays IN_PROGRESS pending the final SUPERVISOR scope decision (the original M8 GATE is not met in full: a governed campaign definition and a previously journalled HUMAN-gated run are prerequisites of a scientific result); the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
       ]
     }
   }

@@ -808,13 +808,13 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 | M8.5 | Verdict presentation | `ACCEPTED` |
 | M8.6 | Abaqus Engineering Constants block | `ACCEPTED` |
 | M8.7 | Uncertainty / source breakdown | `ACCEPTED` |
-| M8.8 | Evidence / provenance export | `REVIEW_READY` |
+| M8.8 | Evidence / provenance export | `ACCEPTED` |
 
 **M8 GATE:** the user goes from a specimen/family folder to a scientifically guarded
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1–M8.7 accepted; M8.8 only; the stage stays `IN_PROGRESS` until a separate final SUPERVISOR integration acceptance). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
+Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1–M8.8 accepted; final integration review done; the stage stays `IN_PROGRESS` pending the final SUPERVISOR scope decision). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
 `auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
 specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
 measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
@@ -880,7 +880,7 @@ acceptance tolerance, question-specific evidence and the evidence sources (hashe
 sources, LM provenance, production status). Nothing is computed; a missing quantity is NOT_AVAILABLE with its recorded
 reason. M8.7 merged: merge commit `f523c38` (tree identical to reviewed head `0d9a03f`), post-merge main
 CI success (run `38040194804`).
-**M8.8 `REVIEW_READY`** (PR #58, branch `auto-id/m8-8` from `f523c38`): "Export Auto-ID Evidence..." on the Data
+**M8.8 `ACCEPTED`** (PR #58, branch `auto-id/m8-8` from `f523c38`): "Export Auto-ID Evidence..." on the Data
 Readiness Check writes a deterministic, report-only JSON export snapshot (`auto-id/evidence-export-snapshot/v1`, kind
 EXPORT_SNAPSHOT — not a scientific verdict and not an accepted evidence record) of the current typed evaluation: the
 exact backend record with its hash, the backend material report (material identification), the M8.6 constants and
@@ -890,6 +890,17 @@ journal are re-verified from disk immediately before export; a change since the 
 active presentation, an unverifiable fingerprint refuses, and the run is never evaluated again. Written only after Save
 As, atomically, outside the repository, the data stores and the selected run, never over a non-export file; no INP file. Final export-safety
 correction (still `REVIEW_READY`): the journals are re-verified again after the Save As dialog, immediately before
-writing; temporary-file creation failures are a typed WRITE_FAILED refusal; undeterminable data-store roots refuse. The parked prototype branch
+writing; temporary-file creation failures are a typed WRITE_FAILED refusal; undeterminable data-store roots refuse.
+M8.8 merged: merge commit `1e88e9b` (tree identical to reviewed head `7f7408f`), post-merge main CI success (run
+`38044596355`).
+**Final M8 integration review** (governance PR #59, from `1e88e9b`): the complete M8.1–M8.8 workflow passes in the
+real Tk application for the implemented read-only scope (governed definition → preparation → stored run → verified
+progress → Evaluate Stored Run → verdict → breakdown → constants only under the release gate → verified deterministic JSON
+export; Reopen / switch / Refresh / Save As freshness; RUN_A, RUN_B, synthetic calibration, NOT_READY, cluster, incomplete
+LOO). **The original M8 GATE is not met in full:** no optimisation number is entered in the GUI, there is no separate GUI
+scientific implementation and no new `install_*` layer, but a NEW specimen folder alone cannot reach a new scientific
+result — a governed campaign definition (authored outside the GUI) and a previously journalled campaign run (produced
+behind the HUMAN execution gate; production calibration execution BLOCKED) are prerequisites. The stage stays
+`IN_PROGRESS` for the SUPERVISOR decision on the final M8 scope; no new scientific execution was enabled. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.
