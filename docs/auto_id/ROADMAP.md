@@ -791,21 +791,24 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   production calibration campaign has been authorised; real Abaqus execution needs separate HUMAN approval; the M8 GUI track
   followed separately (read-only scope `ACCEPTED`, original M8 GATE `NOT_MET`; D-079). No scientific gate is relaxed.
 
-**Companion material verdict (D-080, architecture decision `ACCEPTED`):** SPEC v1.2 §1 requires the material verdict of a calibration run to be
-computed and shown first. Current state: `MATERIAL_VERDICT_NOT_COMPUTED` (temporary non-conformance by omission). Target:
-a read-only companion material verdict from the run's existing journals (no Abaqus, FE, LM or new optimisation), with its
-own record hash, shown first, never an input to the calibration gate or release; it is not a second scientific question
-and not a fallback. Implementation step **V12-I7 `IN_PROGRESS`**: **V12-I7.1 core `REVIEW_READY`** (PR #63,
-branch `auto-id/v12-i7-companion`) — `ScientificReadiness.companion_material_verdict` (calibration records only; own
-schema and record hash; provenance = the run's existing journalled evidence), judged read-only by the accepted M7 report
-body after the calibration verdict and never an input to it; the public `build_campaign_report` guard is unchanged. The PR #61 V1 gap
-(material verdict of a calibration run shown as not computed) stays open until V12-I7 is accepted.
+**Companion material verdict (D-080, architecture decision `ACCEPTED`; governance PR #62, merge `f5cbc21`):** SPEC v1.2
+§1 requires the material verdict of a calibration run to be computed and shown first: a read-only companion material
+verdict from the run's existing journals (no Abaqus, FE, LM or new optimisation), with its own record hash, shown first,
+never an input to the calibration gate or release; it is not a second scientific question and not a fallback.
+Implementation step **V12-I7 `IN_PROGRESS`**: **V12-I7.1 core `ACCEPTED`** — PR #63 merged (`7502424`, main Linux CI
+success, run `38084763361`): `ScientificReadiness.companion_material_verdict` (calibration records only; own schema and
+record hash; provenance = the run's existing journalled evidence), judged read-only by the accepted M7 report body after
+the calibration verdict and never an input to it; the public `build_campaign_report` guard is unchanged. Current state: a
+calibration record evaluated on `7502424` or later carries the companion and the GUI shows it first; a stored record
+without the field still shows `MATERIAL_VERDICT_NOT_COMPUTED`. **V12-I7.2 `NOT_STARTED`** (separate SUPERVISOR command).
+V12-I7 as a whole is not `ACCEPTED`; closing the D-080 non-conformance needs SUPERVISOR acceptance.
 Production calibration execution stays `BLOCKED / NOT_AUTHORISED`.
 
-**External audit corrections V1 / V2 (`REVIEW_READY`, branch `auto-id/v12-audit-v1-v2`, reporting only):** V1 — the
-material verdict (question, formal output, status / refusal) is shown first, read from the stored record, then the
-calibration verdict; for a calibration run it shows `MATERIAL_VERDICT_NOT_COMPUTED` — a known temporary SPEC v1.2 §1
-non-conformance, decided by D-080; the companion material verdict is implementation V12-I7 `TODO`. V2 — the calibration
+**External audit corrections V1 / V2 (merged: PR #61, merge `8dc6955`, main Linux CI success, run `38078385546`;
+reporting only):** V1 — the material verdict (question, formal output, status / refusal) is shown first, read from the
+stored record, then the calibration verdict; for a calibration record without the companion field it shows
+`MATERIAL_VERDICT_NOT_COMPUTED` (D-080); since V12-I7.1 (PR #63) a calibration record carries the companion material
+verdict, which is shown first. V2 — the calibration
 output record (schema v2) carries the recorded `statistical_sd` and leave-one-FIT-family-out status; missing values stay
 `NOT_AVAILABLE`; schema v2 changes the calibration `record_hash` and the derived `CAL_*` names (acceptable: no production
 calibration records exist). No SPEC, threshold, M5 / M7 or RUN_A / RUN_B change; no Abaqus.
