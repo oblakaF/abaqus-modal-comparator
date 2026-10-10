@@ -58,7 +58,7 @@ from .practical_identifiability import PracticalIdentifiabilityInputError
 from .specimen_calibration_gate import CalibrationGateInputs, GovernedRow, evaluate_calibration_gate
 
 
-SCHEMA = "auto-id/specimen-engineering-calibration/v1"
+SCHEMA = "auto-id/specimen-engineering-calibration/v2"  # v2: + statistical_sd and model_form_robustness reporting
 QUANTITY = "specimen_engineering_calibration"
 LABELS = ("SPECIMEN_ENGINEERING_CALIBRATION", "NOT_A_MATERIAL_PROPERTY", "NOT_TRANSFERABLE_WITHOUT_VALIDATION")
 CANDIDATE_LABELS = ("DIAGNOSTIC_OPTIMIZER_CANDIDATE", "NOT_A_RELEASE_VALUE")
@@ -134,6 +134,9 @@ class CalibrationOutputRecord:
     non_degradation: Mapping[str, object]
     excluded_diagnostics: Mapping[str, object]
     refusal_reasons: tuple[Mapping[str, str], ...]
+    # audit V2 (reporting only, copied from the evidence the gate judged; never recomputed, never filled in)
+    statistical_sd: Mapping[str, object]
+    model_form_robustness: Mapping[str, object]
 
     @property
     def released(self) -> bool:
@@ -150,6 +153,8 @@ class CalibrationOutputRecord:
                   "governed_rows": [dict(r) for r in self.governed_rows],
                   "governed_terms": [dict(t) for t in self.governed_terms],
                   "non_degradation": self.non_degradation, "excluded_diagnostics": self.excluded_diagnostics,
+                  "statistical_sd": dict(self.statistical_sd),
+                  "model_form_robustness": dict(self.model_form_robustness),
                   "refusal_reasons": [dict(r) for r in self.refusal_reasons]}
         if self.released:
             record["output_class"] = SPECIMEN_ENGINEERING_CALIBRATION
@@ -338,6 +343,31 @@ def _reporting(gate, table: Sequence[Mapping], excluded: Mapping) -> None:
         _fail(f"a calibration cannot be released with incomplete reporting {absent}.")
 
 
+NOT_AVAILABLE = "NOT_AVAILABLE"
+
+
+def _statistical_report(statistical, parameters: Sequence[str]) -> dict:
+    """The M5 statistical_sd record the gate judged, as recorded (its own rounded values); NOT_AVAILABLE when absent."""
+    if statistical is None:
+        return {"status": NOT_AVAILABLE, "statistical_sd_ln": {name: None for name in parameters},
+                "record_hash": None, "reasons": ["statistical_sd evidence not available"]}
+    recorded = statistical.to_dict()
+    values = recorded.get("statistical_sd_ln") or {}
+    return {"status": recorded["status"], "statistical_sd_ln": {name: values.get(name) for name in parameters},
+            "record_hash": statistical.record_hash, "reasons": list(recorded.get("refusal_reasons") or ())}
+
+
+def _robustness_report(gate, robustness) -> dict:
+    """The leave-one-FIT-family-out status the gate judged (gate observability), as recorded; never a range."""
+    loo = (gate.observability or {}).get("leave_one_fit_family_out") if gate.observability else None
+    if not loo:
+        return {"status": NOT_AVAILABLE, "reasons": ["leave-one-FIT-family-out status not recorded by the gate"],
+                "cases": [], "record_hash": None if robustness is None else robustness.record_hash}
+    return {"status": loo["status"], "reasons": list(loo.get("reasons") or ()),
+            "cases": [dict(case) for case in loo.get("cases") or ()],
+            "record_hash": None if robustness is None else robustness.record_hash}
+
+
 def build_calibration_output(inputs: CalibrationGateInputs, specimen: CampaignSpecimenInput, run_identity: Mapping,
                              excluded: ExcludedDiagnosticsEvidence, evaluation: CandidateEvaluationEvidence,
                              expected_gate_record_hash: Optional[str] = None) -> CalibrationOutputRecord:
@@ -382,7 +412,9 @@ def build_calibration_output(inputs: CalibrationGateInputs, specimen: CampaignSp
                   parameterisation_id=definition.parameterisation_id, fixed_parameters=fixed,
                   precision=gate.precision, uncertainty_basis=gate.uncertainty_basis, governed_rows=tuple(table),
                   governed_terms=tuple(terms), non_degradation=gate.non_degradation,
-                  excluded_diagnostics=excluded_record, refusal_reasons=gate.refusal_reasons)
+                  excluded_diagnostics=excluded_record, refusal_reasons=gate.refusal_reasons,
+                  statistical_sd=_statistical_report(inputs.statistical, definition.fitted_parameters),
+                  model_form_robustness=_robustness_report(gate, inputs.robustness))
     if gate.passed:
         parameters = {name: {"value": value, "unit": PARAMETER_UNITS[name], "role": PARAMETER_ROLE}
                       for name, value in candidate.items()}

@@ -791,6 +791,13 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   production calibration campaign has been authorised; real Abaqus execution needs separate HUMAN approval; the M8 GUI track
   followed separately (read-only scope `ACCEPTED`, original M8 GATE `NOT_MET`; D-079). No scientific gate is relaxed.
 
+**External audit corrections V1 / V2 (`REVIEW_READY`, branch `auto-id/v12-audit-v1-v2`, reporting only):** V1 — the
+material verdict (question, formal output, status / refusal) is shown first, read from the stored record, then the
+calibration verdict; a calibration run records no material verdict and shows it as `NOT_EVALUATED` (open point: SPEC
+v1.2 §1 "still computed" for calibration runs needs a separate SUPERVISOR decision). V2 — the calibration output record
+(schema v2) carries the recorded `statistical_sd` and leave-one-FIT-family-out status; missing values stay
+`NOT_AVAILABLE`. No SPEC, threshold, M5 / M7 or RUN_A / RUN_B change; no Abaqus.
+
 **V12 PRODUCTION GATE — EXECUTION NOT AUTHORISED:** the scientific / readiness implementation is accepted, but calibration
 execution stays refused by the unchanged execution gate. A production calibration run, SP10, t_face or other FE work
 requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN authorisation.

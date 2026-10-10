@@ -595,6 +595,52 @@ def _values(parameters, suffix: str = "") -> str:
     return ", ".join(items) + (f" ({suffix})" if suffix and items else "")
 
 
+MATERIAL_NOT_EVALUATED = ("not evaluated in this run: the campaign declares SPECIMEN_ENGINEERING_CALIBRATION and "
+                          "the backend records no material-identification verdict for it (the material path refuses "
+                          "a calibration definition: no automatic fallback, D-078)")
+
+
+def material_verdict(record) -> tuple[tuple[str, str], ...]:
+    """The material verdict of a stored readiness record, shown first and unchanged (SPEC v1.2 §1; audit V1).
+
+    Presentation only: read from the record (``ScientificReadiness.to_dict``); nothing is judged, recomputed or
+    inferred. A calibration record carries no material verdict, so none is shown as computed.
+    """
+
+    if not isinstance(record, Mapping) or record.get("schema") != READINESS_RECORD_SCHEMA:
+        return ()
+    question = record.get("scientific_question")
+    status = str(record.get("status", ""))
+    reasons = "; ".join(f"{r.get('code')}: {r.get('detail')}" for r in record.get("refusal_reasons") or ()
+                        if isinstance(r, Mapping))
+    if question == "SPECIMEN_ENGINEERING_CALIBRATION":
+        return (("Material verdict — question", f"MATERIAL_IDENTIFICATION {MATERIAL_NOT_EVALUATED}"),
+                ("Material verdict — formal output", "NOT_AVAILABLE (no material verdict is recorded for this run)"),
+                ("Material verdict — status", "NOT_EVALUATED: no material property; a calibration result never "
+                                              "replaces a material verdict"),
+                ("Calibration verdict", f"{status} (SPECIMEN_ENGINEERING_CALIBRATION; never a material property)"))
+    formal = record.get("material_formal_output") if isinstance(record.get("material_formal_output"), Mapping) else {}
+    family = record.get("material_family_consistency")
+    asked = ("MATERIAL_IDENTIFICATION" if question == "MATERIAL_IDENTIFICATION" else
+             "MATERIAL_IDENTIFICATION (historical v1 definition; question not declared)" if question is None else
+             f"{question} (not a recognised question)")
+    if status == "MATERIAL_VALUES_RELEASED" and formal.get("released_values"):
+        verdict = (f"MATERIAL_VALUES_RELEASED: {_values(formal['released_values'], 'effective model parameters')}; "
+                   f"material claim {record.get('material_claim')}")
+    elif formal:
+        verdict = (f"REFUSED: {formal.get('status')}"
+                   + (f"; SPEC §13 family consistency {family}" if family else "")
+                   + f"; no global material property; material claim {record.get('material_claim')}"
+                   + (f" — {reasons}" if reasons else ""))
+    else:
+        verdict = f"{status}: no material verdict was judged" + (f" — {reasons}" if reasons else "")
+    return (("Material verdict — question", asked),
+            ("Material verdict — formal output", str(formal.get("status")) if formal else "NOT_AVAILABLE (not judged)"),
+            ("Material verdict — status", verdict),
+            ("Calibration verdict", "not applicable: a material-identification campaign never produces a calibration "
+                                    "(no automatic fallback)"))
+
+
 def verdict_summary(record) -> tuple[str, ...]:
     """A concise read-only summary of a stored backend readiness record (``ScientificReadiness.to_dict``).
 
@@ -617,8 +663,9 @@ def verdict_summary(record) -> tuple[str, ...]:
     lines = [f"Evaluated: {campaign.get('campaign_id')} ({campaign.get('run_type')}); campaign "
              f"{str(campaign.get('campaign_hash'))[:12]}; run {str(campaign.get('run_hash') or 'not verified')[:12]}",
              f"Scientific question: {question or 'not declared (historical v1 definition; none inferred)'}; τ_mf "
-             f"{'not declared' if tau is None else f'{tau:g} (acceptance tolerance only)'}",
-             f"Backend status: {status}"]
+             f"{'not declared' if tau is None else f'{tau:g} (acceptance tolerance only)'}"]
+    lines += [f"{label}: {value}" for label, value in material_verdict(record)]  # audit V1: material verdict first
+    lines.append(f"Backend status: {status}")
     released = record.get("released_calibration_parameters")
     if status == "RELEASED" and released:
         labels = ", ".join(calibration.get("labels") or ())
@@ -785,10 +832,17 @@ def uncertainty_breakdown(record, material_report=None) -> tuple[tuple[str, str,
         qualifier += "; supporting / diagnostic evidence only (REFUSED)"
     if calibration_question:
         names = sorted(parameters) or ["fitted parameters"]
+        recorded = _mapping(calibration.get("statistical_sd"))
+        why = f"{recorded.get('status')}: " + ("; ".join(recorded.get("reasons") or ()) or "no value recorded")
         for name in names:
-            add(section, f"statistical_sd · {name}", _missing(
-                "not a field of the specimen calibration output record (its precision records birge_adjusted_sd_ln)"
-                if calibration else "no calibration output record (not evaluated)"))
+            if not calibration:
+                add(section, f"statistical_sd · {name}", _missing("no calibration output record (not evaluated)"))
+            elif not recorded:
+                add(section, f"statistical_sd · {name}", _missing(
+                    "not recorded in this calibration output record (schema before audit V2)"))
+            else:
+                add(section, f"statistical_sd · {name}", _recorded(
+                    _mapping(recorded.get("statistical_sd_ln")).get(name), why, qualifier))
     elif verdicts:
         for name, verdict in sorted(verdicts.items()):
             verdict = _mapping(verdict)
@@ -820,10 +874,19 @@ def uncertainty_breakdown(record, material_report=None) -> tuple[tuple[str, str,
     section = "D · Model-form robustness"
     if calibration_question:
         incomplete = "; ".join(_gate_details(calibration, "LOO_INCOMPLETE"))
+        robustness = _mapping(calibration.get("model_form_robustness"))
+        if robustness:
+            incomplete = incomplete or ("" if robustness.get("status") == "AVAILABLE_COMPLETE_LOO" else
+                                        "; ".join(robustness.get("reasons") or ()) or str(robustness.get("status")))
+            add(section, "Leave-one-FIT-family-out status", str(robustness.get("status"))
+                + (f" — {'; '.join(robustness.get('reasons'))}" if robustness.get("reasons") else ""))
+            for case in robustness.get("cases") or ():
+                case = _mapping(case)
+                add(section, f"Case {case.get('family')}", case.get("status"))
         add(section, "Leave-one-FIT-family-out", ("INCOMPLETE (recorded refusal LOO_INCOMPLETE): " + incomplete)
-            if incomplete else ("no LOO_INCOMPLETE refusal recorded (the complete / incomplete status itself is not a "
-                                "field of the calibration output record)" if calibration else
-                                _missing("no calibration output record (not evaluated)")))
+            if incomplete else ("COMPLETE (recorded AVAILABLE_COMPLETE_LOO)" if robustness else
+                                "no LOO_INCOMPLETE refusal recorded (schema before audit V2: no LOO status field)"
+                                if calibration else _missing("no calibration output record (not evaluated)")))
         for name, item in sorted(parameters.items()):
             add(section, f"model_form_half_range · {name}", _recorded(
                 _mapping(item).get("model_form_half_range_ln"),

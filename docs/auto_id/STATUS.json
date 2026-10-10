@@ -1645,6 +1645,15 @@
         "real Abaqus execution needs separate HUMAN approval",
         "M8 (current state): M8.1-M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS; the original M8 GATE is NOT_MET (NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path); the stage stays IN_PROGRESS with the original gate open; the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
       ]
+    },
+    "audit_corrections_v1_v2": {
+      "status": "REVIEW_READY",
+      "branch": "auto-id/v12-audit-v1-v2",
+      "base": "e022e76133a543a93ed8429008fcebd05649cc28",
+      "V1": "material verdict first: auto_id_wizard.material_verdict (presentation; used by the backend readiness_presentation; read from the stored readiness record only) is the first block of readiness_presentation and of the M8.5 verdict summary — material question, formal output and status (refusal reasons for NO_GLOBAL_PARAMETER_VALUE / NOT_IDENTIFIABLE) — followed by the calibration verdict",
+      "V2": "specimen calibration output record (schema auto-id/specimen-engineering-calibration/v2) gains statistical_sd (status, statistical_sd_ln per fitted parameter, record hash, reasons; copied from the bound M5 statistical_sd record) and model_form_robustness (leave-one-FIT-family-out status, reasons, cases, record hash; copied from the gate observability); missing values stay NOT_AVAILABLE / null; no range is derived; the M8.7 breakdown reads these fields",
+      "open_point": "SPEC v1.2 §1 asks that a calibration run's material verdict be 'still computed and shown separately, first, and unchanged'; the backend records no material verdict for a calibration run (the material path refuses a calibration definition: no automatic fallback, D-078), so V1 shows it as NOT_EVALUATED first and never replaces it by the calibration result. Computing it would be new scientific work and needs a separate SUPERVISOR decision",
+      "unchanged": "SPEC, thresholds, M5 / M7, RUN_A / RUN_B records and backend record hashes, gates and decisions; production calibration execution BLOCKED / NOT_AUTHORISED; Abaqus runs 0"
     }
   },
   "release_test_checkpoint": {
