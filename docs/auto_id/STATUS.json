@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8.5 (Verdict presentation, read-only summary)",
+  "current_ministep": "M8.6 (Abaqus Engineering Constants block, read-only preview)",
   "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
@@ -612,7 +612,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of M8.5 (PR #55, not merged). M8.6..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus; auto-id/m8 parked",
+  "next_action": "STOP: SUPERVISOR review of M8.6 (PR #56, not merged). M8.7..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus; auto-id/m8 parked",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1168,7 +1168,7 @@
       "status": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
       "note": "historical M8.1 prototype; untouched (not merged, not rebased, not cherry-picked as a whole); selected code reused on auto-id/m8-1"
     },
-    "authorisation": "SUPERVISOR 2026-10-10: M8.4 ACCEPTED; start M8.5 only (verdict presentation); M8.6..M8.8 not started",
+    "authorisation": "SUPERVISOR 2026-10-10: M8.5 ACCEPTED; start M8.6 only (read-only Engineering Constants and calibration material preview); M8.7..M8.8 not started",
     "steps": {
       "M8.1": {
         "title": "Specimen / family setup wizard",
@@ -1260,16 +1260,33 @@
       },
       "M8.5": {
         "title": "Verdict presentation (read-only summary)",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/m8-5",
         "base": "43ffb8965573c42673239af00dfe1feb5a9dbaa7",
         "pr": 55,
         "commit": "f0f89722f4323f0935b384ddbe4e458e8d6c41e1",
         "scope": "services/auto_id_wizard.verdict_summary: a concise read-only summary of the stored backend readiness record shown under the current selection, on the existing Data Readiness Check (one summary label above the existing table; no new table, engine or install_* layer). It states the evaluated campaign / run, the declared question and tau_mf (not declared for v1; never inferred), the exact backend status, the released values only from the record's released fields (specimen calibration with the record's own labels SPECIMEN_ENGINEERING_CALIBRATION / NOT_A_MATERIAL_PROPERTY / NOT_TRANSFERABLE_WITHOUT_VALIDATION; material values only for MATERIAL_VALUES_RELEASED from the formal output), refusal / not-ready reasons, diagnostic-only candidates, the result type, the evidence solver profiles and the production status. NOT_EVALUATED_FOR_SELECTION is shown as a GUI presentation state with no candidate or value; the summary follows the M8.2 selection binding, the M8.3 active-evaluation validity and the M8.4 journal freshness",
-        "tests": "test_m8_5_verdict_summary 17 tests (2 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.4 tests retained; focused M8.1-M8.5 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 455 OK; full suite without data stores 1941 OK (80 skipped); full suite with all data stores 1955 OK (5 skipped) on rerun (an earlier run hit the intermittent, unrelated and unchanged test_registration_factory.test_no_full_model_contamination substring check); 0 expected failures, 0 unexpected successes; no Abaqus"
+        "tests": "test_m8_5_verdict_summary 17 tests (2 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.4 tests retained; focused M8.1-M8.5 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 455 OK; full suite without data stores 1941 OK (80 skipped); full suite with all data stores 1955 OK (5 skipped) on rerun (an earlier run hit the intermittent, unrelated and unchanged test_registration_factory.test_no_full_model_contamination substring check); 0 expected failures, 0 unexpected successes; no Abaqus",
+        "merged_to_main": {
+          "pr": 55,
+          "merge_commit": "3b77c19b0c45ab94afb317ebe0fee9f17516e4e5",
+          "reviewed_head": "95a1ae893e77f520fecf56bca27b17baf21ab41c",
+          "tree": "28e2e3d0953be5a9ff27a7610335d51e0c69cbd5",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 3b77c19: success (run 38033800330)",
+          "merged_by": "HUMAN (oblakaF), 2026-10-10T07:15:24Z",
+          "acceptance": "SUPERVISOR 2026-10-10: ACCEPTED"
+        }
       },
       "M8.6": {
-        "status": "TODO"
+        "title": "Abaqus Engineering Constants block (read-only constants and calibration material preview)",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-6",
+        "base": "3b77c19b0c45ab94afb317ebe0fee9f17516e4e5",
+        "pr": 56,
+        "commit": "7c923bbd8eeeca91f1b04021cb1ad95972bc6bab",
+        "scope": "services/calibration_material_preview: for a RELEASED specimen engineering calibration of the current evaluation only, the nine governed Engineering Constants E1, E2, E3, nu12, nu13, nu23, G12, G13, G23 (exact values from the accepted governed_engineering_constants via the new backend accessor campaign_scientific_backend.released_engineering_constants; units MPa / 1; provenance verbatim and classified as released calibration parameter, fixed campaign parameter or parameterisation-fixed constant) and the accepted I4/I5 calibration material fragment (released_inp_fragment: exact pinned source INP bytes, SHA-256 verified; complete source material block under a distinct CAL_* name; production material never overwritten; in memory only, no INP written, never attached). Typed binding: stored_run_evidence.StoredRunEvaluation carries the verified source INP bytes of the same evaluation; the GUI keeps the exact typed backend evaluation bound to its active evaluation object (never rebuilt from the display dict; the dict presentation is unchanged). REFUSED, NOT_READY, MATERIAL_VALUES_RELEASED, cluster, external / display-only records, selection change, journal change and Reopen give NOT_AVAILABLE_FOR_SELECTION with no constants and no fragment. A RELEASED preview is labelled with the record's labels, NOT AUTHORISED FOR PRODUCTION and SYNTHETIC / TEST EVIDENCE",
+        "tests": "test_m8_6_calibration_preview 21 tests (cases 1-21; real-Tk test); mutation checks 8 of 8 killed; M8.1-M8.5 and V12-I1..I6 tests retained; full suite without data stores 1962 OK (80 skipped); full suite with all data stores 1976 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
       },
       "M8.7": {
         "status": "TODO"
@@ -1278,7 +1295,7 @@
         "status": "TODO"
       }
     },
-    "track": "IN_PROGRESS — new M8 implementation track (M8.1, M8.2, M8.3, M8.4 ACCEPTED; M8.5 REVIEW_READY; M8.6..M8.8 TODO); the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched"
+    "track": "IN_PROGRESS — new M8 implementation track (M8.1, M8.2, M8.3, M8.4, M8.5 ACCEPTED; M8.6 REVIEW_READY; M8.7..M8.8 TODO); the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched"
   },
   "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL",
   "spec_v1_2_policy": {
@@ -1508,14 +1525,14 @@
       "scientific_readiness_implementation": "ACCEPTED (all six planned steps V12-I1..I6 accepted and merged)",
       "production_calibration_execution": "BLOCKED / NOT_AUTHORISED",
       "human_authorised_real_calibration_run": "NOT YET AVAILABLE (no governed production calibration campaign authorised; real Abaqus needs separate HUMAN approval)",
-      "m8": "IN_PROGRESS — new M8 implementation track (M8.1, M8.2, M8.3, M8.4 ACCEPTED; M8.5 REVIEW_READY; M8.6..M8.8 TODO); the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
+      "m8": "IN_PROGRESS — new M8 implementation track (M8.1, M8.2, M8.3, M8.4, M8.5 ACCEPTED; M8.6 REVIEW_READY; M8.7..M8.8 TODO); the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
       "meaning": "the six planned implementation steps are accepted; this does NOT authorise real calibration execution. Synthetic fake-solver RELEASED records prove the adapter only and are never an accepted physical calibration",
       "limitations": [
         "a confirmed-cluster calibration cannot be released without per-member evidence (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; SUPERVISOR cluster policy; no fallback)",
         "the production calibration execution gate (CampaignDefinition.require_executable) remains in place",
         "no governed production calibration campaign has been authorised",
         "real Abaqus execution needs separate HUMAN approval",
-        "M8 (current state): the new M8 implementation track is IN_PROGRESS (M8.1-M8.4 ACCEPTED, M8.5 REVIEW_READY, M8.6-M8.8 TODO); the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
+        "M8 (current state): the new M8 implementation track is IN_PROGRESS (M8.1-M8.5 ACCEPTED, M8.6 REVIEW_READY, M8.7-M8.8 TODO); the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
       ]
     }
   }

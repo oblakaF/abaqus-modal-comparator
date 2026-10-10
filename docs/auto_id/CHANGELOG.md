@@ -4597,3 +4597,35 @@ first internal provider.
   BLOCKED / NOT_AUTHORISED; `auto-id/m8` at `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #55.
+
+## 2026-10-10 — M8.5 ACCEPTED and merged (PR #55); M8.6 — Engineering Constants and calibration material preview (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS); M8.1–M8.5 ACCEPTED; mini-step M8.6 only
+- **M8.5 merge:** PR #55 `auto-id/m8-5` → `main`, reviewed head `95a1ae893e77f520fecf56bca27b17baf21ab41c`, merge commit `3b77c19b0c45ab94afb317ebe0fee9f17516e4e5`
+  (tree `28e2e3d0953be5a9ff27a7610335d51e0c69cbd5`, identical to the reviewed head), merged by HUMAN (oblakaF). Linux CI on main 3b77c19: success (run 38033800330). SUPERVISOR-authorised.
+- **M8.6 status:** REVIEW_READY — branch `auto-id/m8-6` from `3b77c19` (PR #56), exclusive worktree.
+- **Commits:** `7c923bb` constants and material preview; this governance commit.
+- **Backend binding (minimal):** `campaign_scientific_backend.released_engineering_constants(readiness)` (RELEASED only;
+  the accepted `governed_engineering_constants`, nothing new computed); `stored_run_evidence.StoredRunEvaluation` also
+  carries the SHA-256-verified source INP bytes of the same evaluation (the evidence the backend judged). The GUI keeps
+  the exact typed evaluation bound to its active evaluation object (`auto_id_active_typed`); it is never rebuilt from the
+  display dict, whose presentation is unchanged. No new serialization schema; no LM re-run.
+- **Preview (`services/calibration_material_preview`):** the nine constants E1, E2, E3, ν12, ν13, ν23, G12, G13, G23 with
+  exact governed value, unit (MPa / 1) and verbatim provenance, classified as released calibration parameter, fixed
+  campaign parameter or parameterisation-fixed constant (unknown provenance, incomplete set or unit mismatch refuses);
+  the accepted I4/I5 fragment (`released_inp_fragment`) from the exact pinned source INP (SHA-256 verified; mismatch or
+  an unsupported material option refuses), complete source material options under a distinct CAL_* name, production
+  material unchanged, source and fragment provenance and the record's labels; in memory only — no INP written, never
+  attached to a production model.
+- **Release gate:** REFUSED, NOT_READY, MATERIAL_VALUES_RELEASED (never turned into a calibration), cluster refusal,
+  external / display-only records → NOT_AVAILABLE_FOR_SELECTION, no constants, no fragment. A synthetic RELEASED preview
+  is labelled SYNTHETIC / TEST EVIDENCE, NOT_A_MATERIAL_PROPERTY, NOT_TRANSFERABLE_WITHOUT_VALIDATION and NOT AUTHORISED
+  FOR PRODUCTION; never presented as accepted physical evidence.
+- **Freshness:** the preview requires the current, selection-matched active evaluation (M8.2–M8.4) and the typed result
+  bound to it; campaign / run / journal change, Reopen and fingerprint invalidation hide it.
+- **Tests:** test_m8_6_calibration_preview 21 tests (cases 1-21; real-Tk test); mutation checks 8 of 8 killed; M8.1-M8.5 and V12-I1..I6 tests retained; full suite without data stores 1962 OK (80 skipped); full suite with all data stores 1976 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** V12-I1..I6 ACCEPTED; SPEC v1.1 / v1.2, D-078, scientific services, thresholds, LM / Jacobian math and
+  historical records; `require_executable`; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at
+  `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #56.
