@@ -23,7 +23,7 @@ a process or writes a file.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import json
 from pathlib import Path, PurePosixPath
@@ -79,6 +79,9 @@ class StoredRunEvaluation:
     run: StoredRun
     readiness: ScientificReadiness  # exactly as returned by the backend
     notes: tuple[str, ...]  # loading facts (missing pipeline journals, packs or INP), never a verdict
+    # M8.6: the SHA-256-verified pinned source INP bytes of this same evaluation (exactly the evidence the backend
+    # judged); used only for the read-only calibration material preview, never written or re-read
+    source_inps: Mapping[str, bytes] = field(default_factory=dict)
 
 
 def _refuse(code: StoredRunRefusalCode, message: str):
@@ -189,4 +192,5 @@ def evaluate_stored_run(definition: Optional[CampaignDefinition], journal_path, 
             _refuse(StoredRunRefusalCode.SPECIMENS_UNAVAILABLE,
                     f"the campaign's governed specimen inputs cannot be prepared ({error}).")
     evidence, notes = load_run_evidence(definition, specimens, run, roots)
-    return StoredRunEvaluation(run, judge_campaign_run(definition, specimens, evidence), notes)
+    return StoredRunEvaluation(run, judge_campaign_run(definition, specimens, evidence), notes,
+                               dict(evidence.source_inps))

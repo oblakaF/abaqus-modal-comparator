@@ -805,8 +805,8 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 | M8.2 | Readiness screen | `ACCEPTED` |
 | M8.3 | One Auto-ID button calling the same backend as the CLI | `ACCEPTED` |
 | M8.4 | Progress / resume | `ACCEPTED` |
-| M8.5 | Verdict presentation | `REVIEW_READY` |
-| M8.6 | Abaqus Engineering Constants block | `TODO` |
+| M8.5 | Verdict presentation | `ACCEPTED` |
+| M8.6 | Abaqus Engineering Constants block | `REVIEW_READY` |
 | M8.7 | Uncertainty / source breakdown | `TODO` |
 | M8.8 | Evidence / provenance export | `TODO` |
 
@@ -814,7 +814,7 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1–M8.4 accepted; M8.5 only). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
+Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1–M8.5 accepted; M8.6 only). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
 `auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
 specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
 measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
@@ -852,11 +852,22 @@ selection clears progress. Journal freshness covers the campaign journal and eve
 missing or unverified journal never compares equal, so an earlier evaluation is not kept current. Computational resume is
 not enabled (HUMAN execution gate). M8.4 merged: merge commit `43ffb89` (tree identical to reviewed head
 `79cf8ab`), post-merge main CI success (run `37974175785`).
-**M8.5 `REVIEW_READY`** (PR #55, branch `auto-id/m8-5` from `43ffb89`): a concise read-only verdict summary on the
+**M8.5 `ACCEPTED`** (PR #55, branch `auto-id/m8-5` from `43ffb89`): a concise read-only verdict summary on the
 Data Readiness Check, read only from the backend record shown under the current selection (`verdict_summary`): evaluated
 campaign / run, declared question and τ_mf (not declared for v1), exact backend status, released values only from the
 record's released fields (specimen calibration with its own labels; material values only for MATERIAL_VALUES_RELEASED),
 refusal / not-ready reasons, diagnostic-only candidates, result type, solver profiles and production status.
-NOT_EVALUATED_FOR_SELECTION is a GUI presentation state with no value or candidate. M8.6–M8.8 `TODO`. The parked prototype branch
+NOT_EVALUATED_FOR_SELECTION is a GUI presentation state with no value or candidate. M8.5 merged (by HUMAN): merge
+commit `3b77c19` (tree identical to reviewed head `95a1ae8`), post-merge main CI success (run `38033800330`).
+**M8.6 `REVIEW_READY`** (PR #56, branch `auto-id/m8-6` from `3b77c19`): read-only Engineering Constants and
+calibration material preview on the Data Readiness Check, only for a RELEASED specimen calibration of the current
+evaluation. The nine constants (E1, E2, E3, ν12, ν13, ν23, G12, G13, G23) are the accepted governed constants with exact
+values, units and provenance (released calibration parameter / fixed campaign parameter / parameterisation-fixed
+constant); the material block is the accepted I4/I5 fragment from the exact SHA-256-verified pinned source INP (distinct
+CAL_* material, production material never overwritten, in memory only, no INP written, never attached). The GUI keeps
+the exact typed backend evaluation and its verified source INP bytes bound to the active evaluation; a display-only
+record, REFUSED / NOT_READY / MATERIAL_VALUES_RELEASED, a cluster, a selection or journal change and Reopen give
+NOT_AVAILABLE_FOR_SELECTION. A synthetic RELEASED preview is labelled SYNTHETIC / TEST EVIDENCE and NOT AUTHORISED FOR
+PRODUCTION. M8.7–M8.8 `TODO`. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.
