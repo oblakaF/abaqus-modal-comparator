@@ -1665,11 +1665,12 @@
     "audit_corrections_v1_v2": {
       "status": "REVIEW_READY",
       "branch": "auto-id/v12-audit-v1-v2",
-      "base": "e022e76133a543a93ed8429008fcebd05649cc28",
-      "V1": "material verdict first: auto_id_wizard.material_verdict (presentation; used by the backend readiness_presentation; read from the stored readiness record only) is the first block of readiness_presentation and of the M8.5 verdict summary — material question, formal output and status (refusal reasons for NO_GLOBAL_PARAMETER_VALUE / NOT_IDENTIFIABLE) — followed by the calibration verdict",
+      "base": "e022e76133a543a93ed8429008fcebd05649cc28 (main f5cbc21 with D-080 merged into the branch)",
+      "V1": "material verdict first: auto_id_wizard.material_verdict (presentation; used by the backend readiness_presentation; read from the stored readiness record only) is the first block of readiness_presentation and of the M8.5 verdict summary — material question, formal output and status (refusal reasons for NO_GLOBAL_PARAMETER_VALUE / NOT_IDENTIFIABLE) — followed by the calibration verdict; for a calibration run the block shows MATERIAL_VERDICT_NOT_COMPUTED — known temporary SPEC v1.2 §1 non-conformance (D-080); companion material verdict pending V12-I7",
       "V2": "specimen calibration output record (schema auto-id/specimen-engineering-calibration/v2) gains statistical_sd (status, statistical_sd_ln per fitted parameter, record hash, reasons; copied from the bound M5 statistical_sd record) and model_form_robustness (leave-one-FIT-family-out status, reasons, cases, record hash; copied from the gate observability); missing values stay NOT_AVAILABLE / null; no range is derived; the M8.7 breakdown reads these fields",
-      "open_point": "SPEC v1.2 §1 asks that a calibration run's material verdict be 'still computed and shown separately, first, and unchanged'; the backend records no material verdict for a calibration run (the material path refuses a calibration definition: no automatic fallback, D-078), so V1 shows it as NOT_EVALUATED first and never replaces it by the calibration result. Computing it would be new scientific work and needs a separate SUPERVISOR decision",
-      "unchanged": "SPEC, thresholds, M5 / M7, RUN_A / RUN_B records and backend record hashes, gates and decisions; production calibration execution BLOCKED / NOT_AUTHORISED; Abaqus runs 0"
+      "unchanged": "SPEC, thresholds, M5 / M7, RUN_A / RUN_B records and backend record hashes, gates and decisions; production calibration execution BLOCKED / NOT_AUTHORISED; Abaqus runs 0",
+      "material_verdict_of_calibration_run": "decided by D-080; implementation V12-I7 TODO",
+      "schema_v2_effect": "schema v2 changes the calibration record_hash and the derived CAL_* material names; this is acceptable because no production calibration records exist (production calibration execution BLOCKED / NOT_AUTHORISED)"
     }
   },
   "release_test_checkpoint": {

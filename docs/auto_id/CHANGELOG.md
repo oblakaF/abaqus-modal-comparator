@@ -4811,17 +4811,19 @@ first internal provider.
 
 ## 2026-10-11 — SPEC v1.2 external audit corrections V1 / V2 (REVIEW_READY; reporting only)
 
-- **Branch:** `auto-id/v12-audit-v1-v2` from `main` `e022e76`.
+- **Branch:** `auto-id/v12-audit-v1-v2` from `main` `e022e76`; `main` `f5cbc21` (D-080) merged into the branch (no rebase).
 - **V1 — material verdict first:** `auto_id_wizard.material_verdict` (presentation; used by the backend `readiness_presentation`) reads the stored readiness record
   and is the first block of `readiness_presentation` (Data Readiness Check table) and of the M8.5 verdict summary:
   material question, formal output and status — for NO_GLOBAL_PARAMETER_VALUE / NOT_IDENTIFIABLE the refusal with its
   recorded reasons — followed by the calibration verdict. Nothing is judged, recomputed or inferred.
-- **Open point (not changed):** SPEC v1.2 §1 asks that a calibration run's material verdict be 'still computed and shown separately, first, and unchanged'; the backend records no material verdict for a calibration run (the material path refuses a calibration definition: no automatic fallback, D-078), so V1 shows it as NOT_EVALUATED first and never replaces it by the calibration result. Computing it would be new scientific work and needs a separate SUPERVISOR decision.
+- **Calibration run (decided by D-080):** the material verdict block shows `MATERIAL_VERDICT_NOT_COMPUTED` — known temporary SPEC v1.2 §1 non-conformance (D-080);
+  companion material verdict pending V12-I7 (implementation `TODO`). Scientific behaviour unchanged.
 - **V2 — calibration uncertainty record:** the specimen calibration output record (schema
   `auto-id/specimen-engineering-calibration/v2`) gains `statistical_sd` (status, `statistical_sd_ln` per fitted
   parameter, record hash, reasons — copied from the bound M5 statistical_sd record) and `model_form_robustness`
   (leave-one-FIT-family-out status, reasons, cases, record hash — copied from the gate observability). Missing values
   stay NOT_AVAILABLE / null; no range is derived. The M8.7 breakdown reads these fields (older records: NOT_AVAILABLE).
+- **Schema v2 effect:** changes the calibration record_hash and the derived CAL_* material names; this is acceptable because no production calibration records exist (production calibration execution BLOCKED / NOT_AUTHORISED).
 - **Tests:** `tests/test_v12_audit_v1_v2.py` (material verdict cannot be hidden by a calibration result;
   NO_GLOBAL_PARAMETER_VALUE never becomes a calibration release; missing statistical_sd stays NOT_AVAILABLE; incomplete
   LOO gives no range; RUN_A / RUN_B record and backend record hashes unchanged); M8.5 / M8.7 tests updated for the

@@ -1,7 +1,8 @@
 """SPEC v1.2 external audit corrections V1 / V2 (reporting only; no new scientific computation).
 
 V1: the material verdict is shown first and unchanged, then the calibration verdict (SPEC v1.2 §1). It is read from
-the stored backend record only; a calibration run records no material verdict, which is shown as NOT_EVALUATED and is
+the stored backend record only; a calibration run's companion material verdict is not yet computed (D-080, V12-I7):
+it is shown as MATERIAL_VERDICT_NOT_COMPUTED and is
 never replaced by the calibration result.
 V2: the specimen calibration output record carries the statistical_sd and the leave-one-FIT-family-out status that the
 gate judged, copied from the bound M5 evidence; anything missing stays NOT_AVAILABLE.
@@ -69,10 +70,13 @@ class MaterialVerdictFirstTests(_Runs):
             rows = readiness_presentation(record)
             self.assertEqual(tuple(label for label, _ in rows[:4]), MATERIAL_ROWS + ("Calibration verdict",))
             values = dict(rows)
-            self.assertTrue(values["Material verdict — status"].startswith("NOT_EVALUATED: no material property"))
-            self.assertIn("not evaluated in this run", values["Material verdict — question"])
+            self.assertTrue(values["Material verdict — status"].startswith(
+                "MATERIAL_VERDICT_NOT_COMPUTED — known temporary SPEC v1.2 §1 non-conformance (D-080); companion "
+                "material verdict pending V12-I7; no material property"))
+            self.assertIn("companion material verdict", values["Material verdict — question"])
+            self.assertNotIn("D-078", " ".join(values[label] for label in MATERIAL_ROWS))
             self.assertEqual(values["Material verdict — formal output"],
-                             "NOT_AVAILABLE (no material verdict is recorded for this run)")
+                             "NOT_AVAILABLE (MATERIAL_VERDICT_NOT_COMPUTED)")
             self.assertTrue(values["Calibration verdict"].startswith(expected))
             lines = verdict_summary(record)
             first = next(i for i, line in enumerate(lines) if line.startswith("Material verdict — question"))
@@ -83,7 +87,8 @@ class MaterialVerdictFirstTests(_Runs):
         # a forged record cannot present a material release under the calibration question
         forged = dict(self.judged("base").to_dict(), material_formal_output={"status": "VALUES_RELEASED",
                                                                             "released_values": {"E_in_plane_mpa": 1.0}})
-        self.assertTrue(dict(material_verdict(forged))["Material verdict — status"].startswith("NOT_EVALUATED"))
+        self.assertTrue(dict(material_verdict(forged))["Material verdict — status"].startswith(
+            "MATERIAL_VERDICT_NOT_COMPUTED"))
 
     def test_the_material_path_is_not_run_for_a_calibration_definition(self):
         # V1 shows what the backend recorded; it never re-runs the material question on a calibration campaign

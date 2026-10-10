@@ -595,16 +595,16 @@ def _values(parameters, suffix: str = "") -> str:
     return ", ".join(items) + (f" ({suffix})" if suffix and items else "")
 
 
-MATERIAL_NOT_EVALUATED = ("not evaluated in this run: the campaign declares SPECIMEN_ENGINEERING_CALIBRATION and "
-                          "the backend records no material-identification verdict for it (the material path refuses "
-                          "a calibration definition: no automatic fallback, D-078)")
+MATERIAL_VERDICT_NOT_COMPUTED = ("MATERIAL_VERDICT_NOT_COMPUTED — known temporary SPEC v1.2 §1 non-conformance "
+                                 "(D-080); companion material verdict pending V12-I7")
 
 
 def material_verdict(record) -> tuple[tuple[str, str], ...]:
     """The material verdict of a stored readiness record, shown first and unchanged (SPEC v1.2 §1; audit V1).
 
     Presentation only: read from the record (``ScientificReadiness.to_dict``); nothing is judged, recomputed or
-    inferred. A calibration record carries no material verdict, so none is shown as computed.
+    inferred. A calibration record does not yet carry its companion material verdict (D-080; V12-I7), so it is
+    shown as MATERIAL_VERDICT_NOT_COMPUTED, never as computed.
     """
 
     if not isinstance(record, Mapping) or record.get("schema") != READINESS_RECORD_SCHEMA:
@@ -614,10 +614,11 @@ def material_verdict(record) -> tuple[tuple[str, str], ...]:
     reasons = "; ".join(f"{r.get('code')}: {r.get('detail')}" for r in record.get("refusal_reasons") or ()
                         if isinstance(r, Mapping))
     if question == "SPECIMEN_ENGINEERING_CALIBRATION":
-        return (("Material verdict — question", f"MATERIAL_IDENTIFICATION {MATERIAL_NOT_EVALUATED}"),
-                ("Material verdict — formal output", "NOT_AVAILABLE (no material verdict is recorded for this run)"),
-                ("Material verdict — status", "NOT_EVALUATED: no material property; a calibration result never "
-                                              "replaces a material verdict"),
+        return (("Material verdict — question", "MATERIAL_IDENTIFICATION (companion material verdict of this "
+                                                "calibration run; SPEC v1.2 §1, D-080)"),
+                ("Material verdict — formal output", "NOT_AVAILABLE (MATERIAL_VERDICT_NOT_COMPUTED)"),
+                ("Material verdict — status", f"{MATERIAL_VERDICT_NOT_COMPUTED}; no material property; a calibration "
+                                              "result never replaces a material verdict"),
                 ("Calibration verdict", f"{status} (SPECIMEN_ENGINEERING_CALIBRATION; never a material property)"))
     formal = record.get("material_formal_output") if isinstance(record.get("material_formal_output"), Mapping) else {}
     family = record.get("material_family_consistency")
