@@ -1053,6 +1053,47 @@ def scientific_readiness_view(app) -> dict[str, object]:
     }
 
 
+def _current_typed_evaluation(app, view):
+    """The typed backend evaluation (M8.6) of the record shown, or None.
+
+    Only the current, selection-matched active evaluation of this GUI counts, and only when the typed result bound to
+    that evaluation object is exactly the record shown; a stored, external or changed record never yields one.
+    """
+
+    record = getattr(app, "scientific_readiness_record", None)
+    active = getattr(app, "auto_id_active_evaluation", None)
+    typed = getattr(app, "auto_id_active_typed", None)
+    evaluation = typed[1] if isinstance(typed, tuple) and len(typed) == 2 and typed[0] is active else None
+    current = view["available"] and view["selection_state"] == "MATCHED_STORED_RECORD" and active is not None \
+        and evaluation is not None and active[2] is record \
+        and getattr(app, "auto_id_evaluated_record", None) is record \
+        and active[0] == getattr(app, "auto_id_selected_run_path", None) \
+        and active[1] == getattr(app, "auto_id_selected_run_hash", None) \
+        and getattr(getattr(evaluation, "run", None), "run_hash", None) == active[1]
+    readiness = getattr(evaluation, "readiness", None) if current else None
+    if readiness is None or readiness.to_dict() != record:
+        return None
+    return evaluation
+
+
+def uncertainty_breakdown_view(app) -> tuple[tuple[str, str, str], ...]:
+    """M8.7: read-only uncertainty and evidence-source breakdown of the record shown under the current selection.
+
+    The rows follow the M8.5 verdict summary exactly (same displayed record, same M8.2-M8.4 protections); the formal
+    material-identification evidence of the backend report is added only from the current typed evaluation (M8.6
+    binding). Nothing is computed here.
+    """
+
+    from services.auto_id_wizard import uncertainty_breakdown
+
+    view = scientific_readiness_view(app)
+    if not view["available"]:
+        return ()
+    evaluation = _current_typed_evaluation(app, view)
+    report = getattr(getattr(evaluation, "readiness", None), "material_report", None)
+    return uncertainty_breakdown(getattr(app, "scientific_readiness_record", None), report)
+
+
 def calibration_preview_view(app) -> dict[str, object]:
     """M8.6: read-only Engineering Constants and calibration material preview of the current evaluation only.
 
@@ -1069,19 +1110,9 @@ def calibration_preview_view(app) -> dict[str, object]:
         preview_lines,
     )
 
-    view = scientific_readiness_view(app)
-    record = getattr(app, "scientific_readiness_record", None)
-    active = getattr(app, "auto_id_active_evaluation", None)
-    typed = getattr(app, "auto_id_active_typed", None)
-    evaluation = typed[1] if isinstance(typed, tuple) and len(typed) == 2 and typed[0] is active else None
-    current = view["available"] and view["selection_state"] == "MATCHED_STORED_RECORD" and active is not None \
-        and evaluation is not None and active[2] is record \
-        and getattr(app, "auto_id_evaluated_record", None) is record \
-        and active[0] == getattr(app, "auto_id_selected_run_path", None) \
-        and active[1] == getattr(app, "auto_id_selected_run_hash", None) \
-        and getattr(getattr(evaluation, "run", None), "run_hash", None) == active[1]
-    readiness = getattr(evaluation, "readiness", None) if current else None
-    if readiness is None or readiness.to_dict() != record:
+    evaluation = _current_typed_evaluation(app, scientific_readiness_view(app))
+    readiness = getattr(evaluation, "readiness", None)
+    if readiness is None:
         preview = not_available("no current typed evaluation of the selected run (evaluate the selected stored run; "
                                 "a stored, external or changed record never produces constants or a fragment).")
     else:
@@ -1627,6 +1658,28 @@ def _build_data_readiness_page(app, page) -> None:
         (220, 820),
         height=13,
     )
+    breakdown = ttk.LabelFrame(
+        page, text="Uncertainty and evidence sources (read-only, recorded evidence only)", padding=8
+    )
+    breakdown.pack(fill="both", expand=True, pady=(8, 0))
+    ttk.Label(
+        breakdown,
+        text=(
+            "Recorded covariance basis, statistical / Birge / model-form evidence, conservative precision, "
+            "τ_mf (an acceptance tolerance only) and evidence sources of the record shown above. Nothing is "
+            "computed; NOT_AVAILABLE is never zero."
+        ),
+        style="Secondary.TLabel",
+        justify="left",
+        wraplength=1040,
+    ).pack(anchor="w", pady=(0, 4))
+    app.material_uncertainty_breakdown_table = _build_read_only_table(
+        breakdown,
+        ("section", "item", "recorded"),
+        ("Section", "Item", "Recorded evidence"),
+        (230, 260, 560),
+        height=12,
+    )
     calibration = ttk.LabelFrame(
         page,
         text="Engineering Constants and calibration material preview (read-only)",
@@ -1703,6 +1756,8 @@ def _refresh_data_readiness_page(app) -> None:
             app.material_scientific_readiness_summary_label.configure(
                 text="\n".join(scientific["summary"])
             )
+    if hasattr(app, "material_uncertainty_breakdown_table"):
+        _replace_table_rows(app.material_uncertainty_breakdown_table, uncertainty_breakdown_view(app))  # M8.7
     if hasattr(app, "material_calibration_preview_label"):
         preview = calibration_preview_view(app)  # M8.6: current typed evaluation only
         app.material_calibration_preview_label.configure(text="\n".join(preview["summary"]))

@@ -658,6 +658,321 @@ def verdict_summary(record) -> tuple[str, ...]:
     return tuple(lines)
 
 
+# ----------------------------------------------------------------------------------------------- M8.7 breakdown
+
+NOT_AVAILABLE_TEXT = "NOT_AVAILABLE"
+_COMPLETE_BASES = ("COVARIANCE_COMPONENTS_COMPLETE_AND_MEASURED", "COMPLETE_MEASURED_COVARIANCE")
+_CONDITIONAL_BASES = ("UNCERTAINTY_CONDITIONAL_ON_AVAILABLE_COVARIANCE", "CONDITIONAL_ON_AVAILABLE_COVARIANCE")
+_TYPED_ONLY = ("the formal M5 evidence is held only by the current typed evaluation of the selected run; this stored "
+               "record does not contain it")
+
+
+def _mapping(value) -> Mapping:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _number(value) -> Optional[str]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return repr(float(value))  # exactly as recorded, never rounded
+
+
+def _missing(reason: str) -> str:
+    return f"{NOT_AVAILABLE_TEXT} — {reason}"
+
+
+def _recorded(value, reason: str, suffix: str = "") -> str:
+    number = _number(value)
+    return _missing(reason) if number is None else number + suffix
+
+
+def _exact(parameters) -> str:
+    items = []
+    for name, item in sorted(_mapping(parameters).items()):
+        value = item.get("value") if isinstance(item, Mapping) else item
+        unit = item.get("unit") if isinstance(item, Mapping) else None
+        items.append(f"{name} = {_number(value) or _missing('not recorded')}{'' if not unit else ' ' + unit}")
+    return ", ".join(items)
+
+
+def _gate_details(calibration: Mapping, code: str) -> list[str]:
+    return [str(r.get("detail")) for r in calibration.get("refusal_reasons") or ()
+            if isinstance(r, Mapping) and r.get("code") == code]
+
+
+def uncertainty_breakdown(record, material_report=None) -> tuple[tuple[str, str, str], ...]:
+    """Read-only uncertainty and evidence-source breakdown of a stored backend readiness record (M8.7).
+
+    Rows (section, item, recorded value).  Every value is read from the record (``ScientificReadiness.to_dict``) or,
+    for material identification only, from the backend's formal campaign report of the *current typed evaluation*
+    (``material_report``; never rebuilt from a dictionary of another origin).  Nothing is computed: no covariance,
+    statistical_sd, Birge adjustment, model-form range, precision envelope or decision.  A missing quantity is
+    NOT_AVAILABLE with its recorded reason, never zero or a replacement; a conditional covariance basis is never called
+    a complete measured uncertainty; τ_mf is shown only as an acceptance tolerance on |Δ ln f|.
+    """
+
+    if not isinstance(record, Mapping) or record.get("schema") != READINESS_RECORD_SCHEMA:
+        return ()
+    rows: list[tuple[str, str, str]] = []
+
+    def add(section: str, item: str, value) -> None:
+        rows.append((section, item, str(value)))
+
+    status = str(record.get("status"))
+    question = record.get("scientific_question")
+    calibration_question = question == "SPECIMEN_ENGINEERING_CALIBRATION"
+    calibration = _mapping(record.get("calibration"))
+    report = material_report if isinstance(material_report, Mapping) and not calibration_question else None
+    reasons = [r for r in record.get("refusal_reasons") or () if isinstance(r, Mapping)]
+    precision = _mapping(calibration.get("precision"))
+    parameters = _mapping(precision.get("parameters"))
+    verdicts = _mapping(_mapping(report.get("m5_verdict")).get("verdicts")) if report else {}
+    not_ready = status == "NOT_READY"
+
+    # ------------------------------------------------------------------ status and evidence role
+    section = "Status"
+    add(section, "Backend status", status)
+    add(section, "Evidence role", {
+        "RELEASED": "released specimen calibration record — readiness evidence only, NOT AUTHORISED FOR PRODUCTION",
+        "MATERIAL_VALUES_RELEASED": "formal M5 evidence behind the formally released material values",
+        "REFUSED": "REFUSED — every quantity below is supporting / diagnostic evidence only, never a release",
+        "NOT_READY": "NOT_READY — no scientific judgement was made; quantities that need the missing evidence are "
+                     "NOT_AVAILABLE",
+    }.get(status, f"{status} (as recorded)"))
+    for r in reasons:
+        add(section, "Missing / invalid evidence" if not_ready else "Refusal", f"{r.get('code')}: {r.get('detail')}")
+
+    # ------------------------------------------------------------------ A covariance basis
+    section = "A · Covariance basis"
+    basis = _mapping(record.get("uncertainty_basis"))
+    components = _mapping(basis.get("covariance_components"))
+    if not basis:
+        add(section, "Covariance basis", _missing("no uncertainty basis in this record"
+                                                  + (" (NOT_READY: not evaluated)" if not_ready else "")))
+    else:
+        add(section, "Σ_setup status", components.get("sigma_setup") or _missing("not recorded"))
+        add(section, "Σ_meas status", components.get("sigma_meas") or _missing("not recorded"))
+        kind = basis.get("basis") or basis.get("statistical_sd_status")
+        add(section, "Recorded basis", kind or _missing("not recorded"))
+        if basis.get("conditional_on_available_covariance") is True or kind in _CONDITIONAL_BASES:
+            extent = "CONDITIONAL on the available covariance components — not a complete measured uncertainty"
+        elif kind in _COMPLETE_BASES and basis.get("conditional_on_available_covariance") is not True:
+            extent = "COMPLETE (as recorded: all covariance components measured)"
+        else:
+            extent = _missing("the record states no recognised basis; never presented as complete")
+        add(section, "Complete / conditional", extent)
+        provisional = sorted(k for k, v in components.items() if v == "PROVISIONAL")
+        missing = sorted(k for k, v in components.items() if v == NOT_AVAILABLE_TEXT)
+        add(section, "Provisional components", ", ".join(provisional) or "none recorded")
+        add(section, "Missing components", ", ".join(f"{k} (NOT_AVAILABLE, never zero)" for k in missing)
+            or "none recorded")
+        if basis.get("note") or basis.get("statement"):
+            add(section, "Recorded statement", basis.get("note") or basis.get("statement"))
+    if report:
+        sigma = _mapping(report.get("sigma"))
+        setup, measurement = _mapping(sigma.get("setup")), _mapping(sigma.get("measurement"))
+        if setup:
+            add(section, "Σ_setup (campaign report)", f"sd_ln {_recorded(setup.get('sd_ln'), 'not recorded')} "
+                                                      f"{setup.get('status')}; source: {setup.get('source')}")
+        if measurement:
+            add(section, "Σ_meas (campaign report)", f"{measurement.get('status')}; source: {measurement.get('source')}")
+
+    # ------------------------------------------------------------------ B statistical uncertainty
+    section = "B · Statistical uncertainty"
+    qualifier = " ln p (conditional on the available covariance)" if components.get("sigma_meas") == NOT_AVAILABLE_TEXT \
+        or components.get("sigma_setup") == "PROVISIONAL" else " ln p"
+    if status == "REFUSED":
+        qualifier += "; supporting / diagnostic evidence only (REFUSED)"
+    if calibration_question:
+        names = sorted(parameters) or ["fitted parameters"]
+        for name in names:
+            add(section, f"statistical_sd · {name}", _missing(
+                "not a field of the specimen calibration output record (its precision records birge_adjusted_sd_ln)"
+                if calibration else "no calibration output record (not evaluated)"))
+    elif verdicts:
+        for name, verdict in sorted(verdicts.items()):
+            verdict = _mapping(verdict)
+            add(section, f"statistical_sd · {name}", _recorded(verdict.get("statistical_sd_ln"), "; ".join(
+                verdict.get("reasons") or ()) or "not recorded", qualifier))
+    else:
+        add(section, "statistical_sd", _missing("not evaluated (NOT_READY)" if not_ready else _TYPED_ONLY))
+
+    # ------------------------------------------------------------------ C Birge adjustment
+    section = "C · Birge adjustment"
+    if calibration_question:
+        unavailable = "; ".join(_gate_details(calibration, "BIRGE_UNAVAILABLE"))
+        if not parameters:
+            add(section, "birge_adjusted_sd", _missing("no calibration output record (not evaluated)"))
+        for name, item in sorted(parameters.items()):
+            value = _mapping(item).get("birge_adjusted_sd_ln")
+            add(section, f"birge_adjusted_sd · {name}", _recorded(value, unavailable or "reason not recorded",
+                                                                   qualifier + "; AVAILABLE"))
+    elif verdicts:
+        for name, verdict in sorted(verdicts.items()):
+            verdict = _mapping(verdict)
+            why = "; ".join(r for r in verdict.get("reasons") or () if "BIRGE" in str(r)) or "reason not recorded"
+            add(section, f"birge_adjusted_sd · {name}", _recorded(verdict.get("birge_adjusted_sd_ln"), why,
+                                                                   qualifier + "; AVAILABLE"))
+    else:
+        add(section, "birge_adjusted_sd", _missing("not evaluated (NOT_READY)" if not_ready else _TYPED_ONLY))
+
+    # ------------------------------------------------------------------ D model-form robustness
+    section = "D · Model-form robustness"
+    if calibration_question:
+        incomplete = "; ".join(_gate_details(calibration, "LOO_INCOMPLETE"))
+        add(section, "Leave-one-FIT-family-out", ("INCOMPLETE (recorded refusal LOO_INCOMPLETE): " + incomplete)
+            if incomplete else ("no LOO_INCOMPLETE refusal recorded (the complete / incomplete status itself is not a "
+                                "field of the calibration output record)" if calibration else
+                                _missing("no calibration output record (not evaluated)")))
+        for name, item in sorted(parameters.items()):
+            add(section, f"model_form_half_range · {name}", _recorded(
+                _mapping(item).get("model_form_half_range_ln"),
+                "incomplete leave-one-FIT-family-out: no model-form interval" if incomplete else "not recorded",
+                " ln p (half-range of the leave-one-FIT-family-out shifts; model-dependence diagnostic, not a "
+                "confidence interval)"))
+    elif report:
+        robustness = _mapping(report.get("model_form_robustness"))
+        add(section, "Leave-one-family-out status", robustness.get("status") or _missing("not recorded"))
+        add(section, "Label", robustness.get("label") or _missing("not recorded"))
+        for case in robustness.get("cases") or ():
+            case = _mapping(case)
+            add(section, f"Case {case.get('family')}", case.get("status"))
+        complete = robustness.get("status") == "AVAILABLE_COMPLETE_LOO"
+        for name in sorted(verdicts) or sorted(_mapping(robustness.get("parameters"))):
+            item = _mapping(_mapping(robustness.get("parameters")).get(name))
+            add(section, f"half_range · {name} (campaign report)", _recorded(
+                item.get("half_range_ln") if complete else None,
+                "incomplete leave-one-family-out: no model-form interval" if not complete else "not recorded",
+                " ln p (MODEL_DEPENDENCE_DIAGNOSTIC)"))
+            model = _mapping(_mapping(verdicts.get(name)).get("model_form_robustness"))
+            # with an incomplete set the M5 number covers the valid cases only (recorded interpretation): never shown
+            add(section, f"half_range · {name} (M5 verdict)", _recorded(
+                model.get("half_range_ln") if complete else None,
+                "incomplete leave-one-family-out: the M5 number covers the valid cases only; not a model-form "
+                "interval" if not complete else "not recorded", " ln p"))
+        for reason in robustness.get("reasons") or ():
+            add(section, "Interpretation (recorded)", reason)
+    else:
+        add(section, "Leave-one-family-out", _missing("not evaluated (NOT_READY)" if not_ready else _TYPED_ONLY))
+
+    # ------------------------------------------------------------------ E conservative calibration uncertainty
+    section = "E · Conservative calibration uncertainty"
+    if calibration_question and precision:
+        add(section, "Recorded envelope", f"{precision.get('envelope')} in {precision.get('space')}")
+        add(section, "SPEC v1.2 precision ceiling (recorded)", f"{_recorded(precision.get('ceiling_ln'), 'not recorded')}"
+                                                               " in ln p")
+        missing = "; ".join(_gate_details(calibration, "MISSING_EVIDENCE")) or "not recorded"
+        for name, item in sorted(parameters.items()):
+            item = _mapping(item)
+            value = _recorded(item.get("conservative_uncertainty_ln"), missing, " ln p")
+            decision = "PASS" if item.get("pass") is True else "REFUSED"
+            add(section, f"conservative_uncertainty · {name}", f"{value}; recorded decision {decision}")
+        add(section, "τ_mf in the envelope (recorded)", precision.get("tau_mf_in_envelope"))
+    elif calibration_question:
+        add(section, "conservative_uncertainty", _missing("no calibration output record (not evaluated)"))
+    else:
+        add(section, "Calibration precision gate", "not applicable: the SPEC v1.2 precision gate belongs to a specimen "
+                                                   "engineering calibration, not to material identification")
+        for name, verdict in sorted(verdicts.items()):
+            why = "; ".join(r for r in _mapping(verdict).get("reasons") or ()
+                            if "BIRGE" in str(r) or "MODEL_FORM" in str(r)) or "not recorded"
+            add(section, f"M5 verdict envelope · {name}", _recorded(
+                _mapping(verdict).get("conservative_ln"), why,
+                " ln p (SPEC §9 verdict envelope; not a calibration precision)"))
+
+    # ------------------------------------------------------------------ F τ_mf
+    section = "F · τ_mf"
+    tau = record.get("tau_mf")
+    declared = _mapping(calibration.get("tau_mf"))
+    if tau is None:
+        add(section, "τ_mf", "not declared (none inferred)")
+    else:
+        add(section, "τ_mf", f"{_recorded(tau, 'not recorded')} — acceptance tolerance on |Δ ln f| only")
+        if declared:
+            add(section, "Recorded role", f"{declared.get('role')}: {declared.get('note')}")
+        add(section, "Separation", "never a statistical uncertainty, never part of Σ (Σ_setup + Σ_meas only) and never "
+                                   "converted into a parameter uncertainty")
+
+    # ------------------------------------------------------------------ question-specific evidence
+    if calibration_question:
+        section = "Calibration parameters"
+        released = record.get("released_calibration_parameters")
+        if status == "RELEASED" and released:
+            add(section, "Fitted (released)", f"{_exact(released)} (MODEL_CALIBRATION_PARAMETER)")
+        candidate = _mapping(record.get("diagnostic_candidate"))
+        if candidate.get("parameters"):
+            add(section, "Fitted (diagnostic only, not released)",
+                f"{_exact(candidate.get('parameters'))} [{', '.join(candidate.get('labels') or ())}]")
+        for name, item in sorted(_mapping(calibration.get("fixed_parameters")).items()):
+            item = _mapping(item)
+            add(section, f"Fixed · {name}", f"{_recorded(item.get('value'), 'not recorded')} {item.get('unit') or ''}"
+                                             f" ({item.get('role')}; {item.get('provenance')}); fixed: no fitted "
+                                             "uncertainty")
+    else:
+        section = "Material identification"
+        formal = _mapping(record.get("material_formal_output"))
+        add(section, "Formal output", formal.get("status") or _missing("not judged"))
+        if status == "MATERIAL_VALUES_RELEASED" and formal.get("released_values"):
+            add(section, "Formally released", f"{_exact(formal.get('released_values'))} (effective material-model "
+                                              "values)")
+        family = record.get("material_family_consistency")
+        add(section, "SPEC §13 family consistency", (f"{family} — decisive: no global material property" if family ==
+                                                     "FAIL" else family) or _missing("not recorded"))
+        if record.get("material_claim"):
+            add(section, "Material claim", record.get("material_claim"))
+        for name, verdict in sorted(verdicts.items()):
+            verdict = _mapping(verdict)
+            add(section, f"M5 verdict · {name}", f"{verdict.get('verdict')}"
+                + (f" ({'; '.join(verdict.get('reasons'))})" if verdict.get("reasons") else ""))
+        candidate = _mapping(record.get("diagnostic_candidate"))
+        if candidate.get("parameters"):
+            add(section, "Optimizer candidate (diagnostic only, not released)",
+                f"{_exact(candidate.get('parameters'))} [{', '.join(candidate.get('labels') or ())}]")
+
+    # ------------------------------------------------------------------ sources / provenance
+    section = "Sources / provenance"
+    campaign = _mapping(record.get("campaign"))
+    evidence = _mapping(record.get("evidence"))
+    add(section, "Campaign", f"{campaign.get('campaign_id')} ({campaign.get('run_type')}); campaign hash "
+                             f"{campaign.get('campaign_hash')}")
+    add(section, "Run hash", campaign.get("run_hash") or _missing("not verified"))
+    add(section, "Specimens", ", ".join(str(s) for s in campaign.get("specimens") or ()) or _missing("not recorded"))
+    for label, item in sorted(_mapping(evidence.get("solver_profiles")).items()):
+        item = _mapping(item)
+        add(section, f"Solver profile · {label}", f"{item.get('profile_id')} (hash {item.get('profile_hash')}; declared "
+                                                  f"{item.get('abaqus_release')}) — as journalled; not a claim of a "
+                                                  "physical Abaqus solve")
+    sources = _mapping(evidence.get("fe_sources"))
+    for label, values in sorted(sources.items()):
+        add(section, f"FE sources · {label}", ", ".join(str(v) for v in values)
+            + " (as journalled; an archived-validated-pack is a reused archived pack, never a new solve)")
+    if not sources:
+        add(section, "FE sources", _missing("not verified (no verified LM history)" if not_ready else "not recorded"))
+    lm = _mapping(evidence.get("lm_provenance"))
+    if lm:
+        add(section, "LM provenance", f"{lm.get('verification')}; LM {lm.get('status')}; final candidate "
+                                      f"{lm.get('final_candidate_hash')}")
+        for label, value in sorted(_mapping(lm.get("pipeline_run_hashes")).items()):
+            add(section, f"Pipeline run · {label}", value)
+        jacobian = _mapping(lm.get("jacobian"))
+        if jacobian:
+            add(section, "Jacobian", f"{jacobian.get('provenance')}; whitened hash {jacobian.get('whitened_hash')}")
+    else:
+        add(section, "LM provenance", _missing("not verified"))
+    identity = _mapping(calibration.get("identity"))
+    if calibration.get("gate_record_hash"):
+        add(section, "Calibration gate record hash", calibration.get("gate_record_hash"))
+    if identity.get("inp_sha256"):
+        add(section, "Pinned source INP SHA-256", identity.get("inp_sha256"))
+    for name, value in sorted(_mapping(_mapping(report.get("m5_verdict")).get("evidence_hashes")).items()
+                              if report else ()):
+        add(section, f"M5 evidence hash · {name}", value or _missing("not recorded"))
+    add(section, "Production execution", record.get("production_execution"))
+    if record.get("production_calibration"):
+        add(section, "Physical calibration status", record.get("production_calibration"))
+    return tuple(rows)
+
+
 # ----------------------------------------------------------------------------------------------- view model
 
 def wizard_rows(items: tuple[WizardItem, ...]) -> tuple[tuple[str, str, str, str], ...]:
