@@ -4571,3 +4571,29 @@ first internal provider.
   computational resume.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #54.
+
+## 2026-10-10 — M8.4 ACCEPTED and merged (PR #54); M8.5 — verdict presentation (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS); M8.1–M8.4 ACCEPTED; mini-step M8.5 only
+- **M8.4 merge:** PR #54 `auto-id/m8-4` → `main`, reviewed head `79cf8ab100fe9a926e3bcc821f6d461eb5b4e079`, merge commit `43ffb8965573c42673239af00dfe1feb5a9dbaa7`
+  (tree `326762474e36e423f76951cb116d5a45e2d28719`, identical to the reviewed head). Linux CI on main 43ffb89: success (run 37974175785). SUPERVISOR-authorised.
+- **M8.5 status:** REVIEW_READY — branch `auto-id/m8-5` from `43ffb89` (PR #55), exclusive worktree.
+- **Commits:** `f0f8972` verdict summary; this governance commit.
+- **Summary:** `services/auto_id_wizard.verdict_summary` reads the stored backend `ScientificReadiness` record shown under
+  the current selection and lists: evaluated campaign / run; declared question and τ_mf (not declared for v1, never
+  inferred); exact backend status; released values only from the record's released fields — RELEASED specimen
+  calibration with the record's own labels (SPECIMEN_ENGINEERING_CALIBRATION, NOT_A_MATERIAL_PROPERTY,
+  NOT_TRANSFERABLE_WITHOUT_VALIDATION), MATERIAL_VALUES_RELEASED material values from the formal output; REFUSED /
+  NOT_READY reasons with no released value (a PARTIAL formal output under a REFUSED status releases nothing);
+  diagnostic-only candidates; result type; solver profiles (e.g. SYA/fake) and the record's production status.
+- **GUI:** one summary label above the existing scientific table on the Data Readiness Check, with a note that project
+  data readiness and an LM CONVERGED result are not release verdicts. NOT_EVALUATED_FOR_SELECTION shows only that it is
+  a GUI presentation state; no old candidate or value. The summary follows M8.2 selection binding, M8.3 active-evaluation
+  validity and M8.4 journal freshness.
+- **Archived evidence (read-only):** RUN_A REFUSED, NO_GLOBAL_PARAMETER_VALUE, SPEC §13 FAIL; RUN_B REFUSED, diagnostic
+  only (E_in_plane_mpa 50886.2, G12_mpa 6872.05), no released value; question and τ_mf not declared.
+- **Tests:** test_m8_5_verdict_summary 17 tests (2 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.4 tests retained; focused M8.1-M8.5 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 455 OK; full suite without data stores 1941 OK (80 skipped); full suite with all data stores 1955 OK (5 skipped) on rerun (an earlier run hit the intermittent, unrelated and unchanged test_registration_factory.test_no_full_model_contamination substring check); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** V12-I1..I6 ACCEPTED; scientific services, thresholds and records; production calibration execution
+  BLOCKED / NOT_AUTHORISED; `auto-id/m8` at `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #55.

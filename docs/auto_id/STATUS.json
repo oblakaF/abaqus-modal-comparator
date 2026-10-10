@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8.4 (Progress / resume inspection, read-only)",
+  "current_ministep": "M8.5 (Verdict presentation, read-only summary)",
   "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
@@ -612,7 +612,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of M8.4 (PR #54, not merged). M8.5..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; computational resume not enabled; no SP10, no t_face, no new FE work; no Abaqus; auto-id/m8 parked",
+  "next_action": "STOP: SUPERVISOR review of M8.5 (PR #55, not merged). M8.6..M8.8 TODO. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus; auto-id/m8 parked",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1168,7 +1168,7 @@
       "status": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
       "note": "historical M8.1 prototype; untouched (not merged, not rebased, not cherry-picked as a whole); selected code reused on auto-id/m8-1"
     },
-    "authorisation": "SUPERVISOR 2026-10-10: M8.3 ACCEPTED; start M8.4 only (read-only progress / resume inspection); M8.5..M8.8 not started",
+    "authorisation": "SUPERVISOR 2026-10-10: M8.4 ACCEPTED; start M8.5 only (verdict presentation); M8.6..M8.8 not started",
     "steps": {
       "M8.1": {
         "title": "Specimen / family setup wizard",
@@ -1235,7 +1235,7 @@
       },
       "M8.4": {
         "title": "Progress / resume inspection (read-only)",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/m8-4",
         "base": "6db9a1595f5bcb98049fa44e0b94a9dd334ee031",
         "pr": 54,
@@ -1247,10 +1247,26 @@
           "reviewed_head": "6a02817e757cf5d998a4c8e59134db8f9ab96e85",
           "supervisor_decision": "M8.4 accepted in principle; the freshness identity must cover the governed pipeline journals of every specimen; PR #54 not merged",
           "closure": "freshness identity = canonical hash of [campaign run hash, the verified campaign journal entry-hash chain, and for every campaign specimen in definition order: label, governed pipeline run hash (= its governed directory), the verified pipeline journal entry-hash chain]; None (equal to nothing) when the campaign journal or any governed pipeline journal is missing, unreadable, unrelated or hash-chain-invalid, or the governed specimen inputs are unavailable. Refresh run progress and the fingerprint recorded after Evaluate Stored Run use the same function (run_progress.run_evidence_fingerprint); a None or different identity makes the active evaluation non-current. Stored records unchanged; no science recomputed on refresh"
+        },
+        "merged_to_main": {
+          "pr": 54,
+          "merge_commit": "43ffb8965573c42673239af00dfe1feb5a9dbaa7",
+          "reviewed_head": "79cf8ab100fe9a926e3bcc821f6d461eb5b4e079",
+          "tree": "326762474e36e423f76951cb116d5a45e2d28719",
+          "merged_tree_identical_to_reviewed_head": true,
+          "merge_ci": "Linux CI on main 43ffb89: success (run 37974175785)",
+          "acceptance": "SUPERVISOR 2026-10-10: ACCEPTED (journal freshness covers every governed pipeline journal)"
         }
       },
       "M8.5": {
-        "status": "TODO"
+        "title": "Verdict presentation (read-only summary)",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-5",
+        "base": "43ffb8965573c42673239af00dfe1feb5a9dbaa7",
+        "pr": 55,
+        "commit": "f0f89722f4323f0935b384ddbe4e458e8d6c41e1",
+        "scope": "services/auto_id_wizard.verdict_summary: a concise read-only summary of the stored backend readiness record shown under the current selection, on the existing Data Readiness Check (one summary label above the existing table; no new table, engine or install_* layer). It states the evaluated campaign / run, the declared question and tau_mf (not declared for v1; never inferred), the exact backend status, the released values only from the record's released fields (specimen calibration with the record's own labels SPECIMEN_ENGINEERING_CALIBRATION / NOT_A_MATERIAL_PROPERTY / NOT_TRANSFERABLE_WITHOUT_VALIDATION; material values only for MATERIAL_VALUES_RELEASED from the formal output), refusal / not-ready reasons, diagnostic-only candidates, the result type, the evidence solver profiles and the production status. NOT_EVALUATED_FOR_SELECTION is shown as a GUI presentation state with no candidate or value; the summary follows the M8.2 selection binding, the M8.3 active-evaluation validity and the M8.4 journal freshness",
+        "tests": "test_m8_5_verdict_summary 17 tests (2 store-gated archived RUN_A / RUN_B; real-Tk test); M8.1-M8.4 tests retained; focused M8.1-M8.5 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 455 OK; full suite without data stores 1941 OK (80 skipped); full suite with all data stores 1955 OK (5 skipped) on rerun (an earlier run hit the intermittent, unrelated and unchanged test_registration_factory.test_no_full_model_contamination substring check); 0 expected failures, 0 unexpected successes; no Abaqus"
       },
       "M8.6": {
         "status": "TODO"
@@ -1262,7 +1278,7 @@
         "status": "TODO"
       }
     },
-    "track": "IN_PROGRESS — new M8 implementation track (M8.1, M8.2, M8.3 ACCEPTED; M8.4 REVIEW_READY; M8.5..M8.8 TODO); the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched"
+    "track": "IN_PROGRESS — new M8 implementation track (M8.1, M8.2, M8.3, M8.4 ACCEPTED; M8.5 REVIEW_READY; M8.6..M8.8 TODO); the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched"
   },
   "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL",
   "spec_v1_2_policy": {
@@ -1492,14 +1508,14 @@
       "scientific_readiness_implementation": "ACCEPTED (all six planned steps V12-I1..I6 accepted and merged)",
       "production_calibration_execution": "BLOCKED / NOT_AUTHORISED",
       "human_authorised_real_calibration_run": "NOT YET AVAILABLE (no governed production calibration campaign authorised; real Abaqus needs separate HUMAN approval)",
-      "m8": "IN_PROGRESS — new M8 implementation track (M8.1, M8.2, M8.3 ACCEPTED; M8.4 REVIEW_READY; M8.5..M8.8 TODO); the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
+      "m8": "IN_PROGRESS — new M8 implementation track (M8.1, M8.2, M8.3, M8.4 ACCEPTED; M8.5 REVIEW_READY; M8.6..M8.8 TODO); the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
       "meaning": "the six planned implementation steps are accepted; this does NOT authorise real calibration execution. Synthetic fake-solver RELEASED records prove the adapter only and are never an accepted physical calibration",
       "limitations": [
         "a confirmed-cluster calibration cannot be released without per-member evidence (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; SUPERVISOR cluster policy; no fallback)",
         "the production calibration execution gate (CampaignDefinition.require_executable) remains in place",
         "no governed production calibration campaign has been authorised",
         "real Abaqus execution needs separate HUMAN approval",
-        "M8 (current state): the new M8 implementation track is IN_PROGRESS (M8.1-M8.3 ACCEPTED, M8.4 REVIEW_READY, M8.5-M8.8 TODO); the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
+        "M8 (current state): the new M8 implementation track is IN_PROGRESS (M8.1-M8.4 ACCEPTED, M8.5 REVIEW_READY, M8.6-M8.8 TODO); the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
       ]
     }
   }
