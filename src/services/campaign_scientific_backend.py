@@ -68,6 +68,7 @@ from .specimen_calibration_output import (
     CalibrationInpFragment,
     CalibrationOutputRecord,
     ExcludedDiagnosticsEvidence,
+    GovernedConstant,
     build_calibration_output,
     governed_baseline_rows,
     governed_engineering_constants,
@@ -437,6 +438,15 @@ def judge_specimen_calibration(definition, specimens: Sequence[CampaignSpecimenI
                           f"{SPECIMEN_ENGINEERING_CALIBRATION}; a material campaign is never turned into a "
                           "calibration (no fallback)")
     return judge_campaign_run(definition, specimens, evidence)
+
+
+def released_engineering_constants(readiness: ScientificReadiness) -> dict[str, GovernedConstant]:
+    """The nine governed Engineering Constants (V12-I4) — only for a RELEASED readiness record; nothing is computed
+    here beyond the accepted ``governed_engineering_constants`` (M8.6 read-only preview)."""
+
+    if not isinstance(readiness, ScientificReadiness) or not readiness.released:
+        raise CalibrationFragmentRefusal("Engineering Constants are available only for a RELEASED specimen calibration.")
+    return governed_engineering_constants(readiness.calibration_record)
 
 
 def released_inp_fragment(readiness: ScientificReadiness, source_inp_bytes: bytes) -> CalibrationInpFragment:

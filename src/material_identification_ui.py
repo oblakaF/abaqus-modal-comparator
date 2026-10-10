@@ -1053,6 +1053,49 @@ def scientific_readiness_view(app) -> dict[str, object]:
     }
 
 
+def calibration_preview_view(app) -> dict[str, object]:
+    """M8.6: read-only Engineering Constants and calibration material preview of the current evaluation only.
+
+    Available only when the record shown is the current, selection-matched active evaluation of this GUI and the typed
+    backend result bound to that evaluation is exactly the record shown; the preview itself comes from
+    ``services.calibration_material_preview`` (accepted constants and fragment services). A stored or display-only
+    record, a changed selection, a reopened run or changed evidence gives NOT_AVAILABLE_FOR_SELECTION.
+    """
+
+    from services.calibration_material_preview import (
+        PreviewState,
+        calibration_material_preview,
+        not_available,
+        preview_lines,
+    )
+
+    view = scientific_readiness_view(app)
+    record = getattr(app, "scientific_readiness_record", None)
+    active = getattr(app, "auto_id_active_evaluation", None)
+    typed = getattr(app, "auto_id_active_typed", None)
+    evaluation = typed[1] if isinstance(typed, tuple) and len(typed) == 2 and typed[0] is active else None
+    current = view["available"] and view["selection_state"] == "MATCHED_STORED_RECORD" and active is not None \
+        and evaluation is not None and active[2] is record \
+        and getattr(app, "auto_id_evaluated_record", None) is record \
+        and active[0] == getattr(app, "auto_id_selected_run_path", None) \
+        and active[1] == getattr(app, "auto_id_selected_run_hash", None) \
+        and getattr(getattr(evaluation, "run", None), "run_hash", None) == active[1]
+    readiness = getattr(evaluation, "readiness", None) if current else None
+    if readiness is None or readiness.to_dict() != record:
+        preview = not_available("no current typed evaluation of the selected run (evaluate the selected stored run; "
+                                "a stored, external or changed record never produces constants or a fragment).")
+    else:
+        preview = calibration_material_preview(readiness, getattr(evaluation, "source_inps", None) or {})
+    available = preview.state is PreviewState.AVAILABLE
+    return {
+        "state": preview.state.value,
+        "summary": preview_lines(preview),
+        "constants": tuple((row.name, repr(row.value), row.unit, row.origin.value, row.provenance)
+                           for row in preview.constants) if available else (),
+        "fragment": preview.fragment.content if available else "",
+    }
+
+
 AUTO_ID_REPO_ROOT = Path(__file__).resolve().parents[1]
 AUTO_ID_SETUP_SCOPE = (
     "Select one specimen folder (with its specimen passport) or a family / campaign definition. The governed "
@@ -1094,6 +1137,7 @@ AUTO_ID_NO_RUN = "No stored run selected."
 
 def _clear_auto_id_run(app) -> None:
     app.auto_id_active_evaluation = None  # no earlier evaluation is current for a new selection
+    app.auto_id_active_typed = None  # M8.6: nor its typed backend result
     app.auto_id_selected_run_path = None
     app.auto_id_selected_run_hash = None
     app.auto_id_run_message = AUTO_ID_NO_RUN
@@ -1147,6 +1191,7 @@ def refresh_auto_id_progress(app) -> None:
     if getattr(app, "auto_id_active_evaluation", None) is not None \
             and (progress.fingerprint is None or evaluated is None or progress.fingerprint != evaluated):
         app.auto_id_active_evaluation = None
+        app.auto_id_active_typed = None
         app.auto_id_run_message = ("The selected run's journal changed or is no longer verified since its evaluation: "
                                    "the earlier result is not current (evaluate it again).")
     _refresh_auto_id_setup_page(app)
@@ -1195,6 +1240,7 @@ def evaluate_auto_id_run(app) -> None:
     from services.stored_run_evidence import StoredRunRefusal, evaluate_stored_run
 
     app.auto_id_active_evaluation = None  # invalidated before any attempt; only a returned result becomes current
+    app.auto_id_active_typed = None
     preparation = getattr(app, "auto_id_preparation", None)
     definition = preparation.definition if isinstance(preparation, FamilyPreparation) else None
     run_path = getattr(app, "auto_id_selected_run_path", None)
@@ -1217,6 +1263,10 @@ def evaluate_auto_id_run(app) -> None:
             app.auto_id_evaluated_record = record
             app.auto_id_evaluated_run_hash = evaluation.run.run_hash
             app.auto_id_active_evaluation = (run_path, evaluation.run.run_hash, record)
+            # M8.6: the exact typed backend result and verified source INP bytes of this same evaluation, bound to
+            # this active evaluation object (any later reset or re-evaluation breaks the binding); never rebuilt
+            # from the display dict
+            app.auto_id_active_typed = (app.auto_id_active_evaluation, evaluation)
             from services.run_progress import run_evidence_fingerprint
 
             # the same freshness identity as Refresh run progress (campaign + every governed pipeline journal)
@@ -1577,6 +1627,40 @@ def _build_data_readiness_page(app, page) -> None:
         (220, 820),
         height=13,
     )
+    calibration = ttk.LabelFrame(
+        page,
+        text="Engineering Constants and calibration material preview (read-only)",
+        padding=8,
+    )
+    calibration.pack(fill="both", expand=True, pady=(8, 0))
+    app.material_calibration_preview_label = ttk.Label(
+        calibration, text="NOT_AVAILABLE_FOR_SELECTION", justify="left", wraplength=1040
+    )
+    app.material_calibration_preview_label.pack(anchor="w", pady=(0, 4))
+    ttk.Label(
+        calibration,
+        text=(
+            "Only for a RELEASED specimen calibration of the current evaluation. The calibration material "
+            "exists in memory only: no INP file is written and it is never attached to a production model."
+        ),
+        style="Secondary.TLabel",
+        justify="left",
+        wraplength=1040,
+    ).pack(anchor="w", pady=(0, 4))
+    app.material_calibration_constants_table = _build_read_only_table(
+        calibration,
+        ("constant", "value", "unit", "origin", "provenance"),
+        ("Constant", "Governed value", "Unit", "Origin", "Provenance"),
+        (90, 170, 60, 260, 460),
+        height=9,
+    )
+    app.material_calibration_fragment_table = _build_read_only_table(
+        calibration,
+        ("line",),
+        ("Calibration material fragment (preview only)",),
+        (1040,),
+        height=8,
+    )
     ttk.Label(
         page,
         text=(
@@ -1619,6 +1703,14 @@ def _refresh_data_readiness_page(app) -> None:
             app.material_scientific_readiness_summary_label.configure(
                 text="\n".join(scientific["summary"])
             )
+    if hasattr(app, "material_calibration_preview_label"):
+        preview = calibration_preview_view(app)  # M8.6: current typed evaluation only
+        app.material_calibration_preview_label.configure(text="\n".join(preview["summary"]))
+        _replace_table_rows(app.material_calibration_constants_table, preview["constants"])
+        _replace_table_rows(
+            app.material_calibration_fragment_table,
+            ((line,) for line in preview["fragment"].splitlines()),
+        )
 
 
 def _build_modal_correspondence_page(app, page) -> None:
