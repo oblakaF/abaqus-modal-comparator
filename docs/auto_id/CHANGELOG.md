@@ -4669,3 +4669,59 @@ first internal provider.
   production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #57.
+
+## 2026-10-10 — M8.7 ACCEPTED and merged (PR #57); M8.8 — governed evidence / provenance export (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS until a separate final SUPERVISOR integration acceptance); M8.1–M8.7
+  ACCEPTED; mini-step M8.8 only
+- **M8.7 merge:** PR #57 `auto-id/m8-7` → `main`, reviewed head `0d9a03fbae08953e5376809e884af4e4e776052b`, merge commit `f523c38edb59d6d9e67bd8d0cf86fa66d22f0011`
+  (tree `5c958d4c96403c078acaba51592276b9acfd4716`, identical to the reviewed head). Linux CI on main f523c38: success (run 38040194804). SUPERVISOR-authorised.
+- **M8.8 status:** REVIEW_READY — branch `auto-id/m8-8` from `f523c38` (PR #58), exclusive worktree.
+- **Commits:** `4845b46` evidence export; this governance commit.
+- **Audit:** the legacy project report (`report_evidence_snapshot`, `export_material_identification_json/csv/pdf`) is a
+  separate project report written without atomic replacement; it is unchanged and not used for Auto-ID evidence. Its
+  Save As / message pattern is reused.
+- **Export snapshot (`services/auto_id_evidence_export`):** schema `auto-id/evidence-export-snapshot/v1`, kind
+  EXPORT_SNAPSHOT, explicitly a report-only wrapper (not a scientific verdict, not a normative evidence schema, not an
+  accepted evidence record). Sections: `export` (metadata), `verified_identities` (campaign id / hash, run type, run hash,
+  evidence fingerprint, per specimen the recorded governed run identity, governed pipeline run hash and journal),
+  `scientific_evidence` (exact `ScientificReadiness.to_dict` + `record_hash`; backend material report + canonical hash;
+  for a RELEASED calibration the M8.6 governed Engineering Constants and fragment labelled
+  GOVERNED_NON_PRODUCTION_PREVIEW / NOT_AN_INP_FILE / NEVER_ATTACHED_TO_A_PRODUCTION_MODEL), `presentation` (M8.5 verdict
+  summary, M8.7 breakdown, loading notes), `production`, and a `content_hash`. Deterministic: sorted keys, no
+  timestamps or random identifiers.
+- **Freshness at export:** requires a governed campaign, an explicitly selected run, the current typed evaluation bound
+  to the displayed record, matching run / campaign / journal path and governed specimen inputs; the campaign journal and
+  every governed pipeline journal are re-verified from disk (`inspect_run_progress`) immediately before the snapshot is
+  built. A fingerprint different from the evaluation's refuses (EVIDENCE_CHANGED_SINCE_EVALUATION) and invalidates the
+  active presentation; a fingerprint that is None refuses (EVIDENCE_NOT_VERIFIED_AT_EXPORT) and a genuine NOT_READY stays
+  visible with its reasons. The run is never evaluated again.
+- **Write safety:** only on the explicit action and Save As (cancel writes nothing); `.json` only; never inside the
+  repository, a configured data store, the selected run or the selected definition / specimen folder; never over a file
+  that is not an earlier Auto-ID export; atomic (temporary file in the destination folder, `os.replace`), nothing left on
+  failure; no INP file is written and nothing is attached to an FE model.
+- **Tests:** test_m8_8_evidence_export 30 tests (cases 1-30; 2 store-gated RUN_A / RUN_B; real-Tk test); mutation checks 12 of 12 killed; M8.1-M8.7 and V12-I1..I6 tests retained; full suite without data stores 2019 OK (84 skipped); full suite with all data stores 2033 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** V12-I1..I6 ACCEPTED; SPEC v1.1 / v1.2, D-078, thresholds, LM / Jacobian, historical records,
+  `require_executable`; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #58; then a separate final M8 integration acceptance.
+
+## 2026-10-10 — M8.8 final export-safety correction (still REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS); M8.8 REVIEW_READY on PR #58 (reviewed head `12fefb4`); no final M8
+  acceptance.
+- **Save As freshness race (red-probe):** a governed pipeline journal changed while the Save As dialog was open and the
+  earlier snapshot was still written. Fix: the snapshot is rebuilt from journals re-verified from disk after the dialog
+  returns, immediately before writing; a change refuses (EVIDENCE_CHANGED_SINCE_EVALUATION) and invalidates the active
+  presentation; the run is never evaluated again.
+- **Temporary-file creation (red-probe):** `tempfile.mkstemp` failed outside the write handler (raw OSError). Fix: it runs
+  inside the handler — a typed WRITE_FAILED refusal; no file left; an earlier export and the scientific record unchanged.
+- **Protected roots (red-probe):** an unreadable data-store configuration added an ignored `None` root and the export was
+  written. Fix: undeterminable configured roots refuse (DESTINATION_REFUSED) and `check_destination` refuses any
+  undetermined root; an unconfigured optional store is still not an error.
+- **Unchanged:** the snapshot builder, exact backend record and hash, governed identities, deterministic JSON,
+  material / calibration distinction, REFUSED / NOT_READY, synthetic labels, RUN_A / RUN_B outcomes, atomic writing and
+  the overwrite restrictions; SPEC, thresholds and provenance.
+- **Tests:** test_m8_8_evidence_export 33 tests (30 + 3 red-probes: Save As freshness race, mkstemp failure, undeterminable protected roots — all three failed on 12fefb4 and pass after the fix; reverting each fix is caught, 4 of 4); M8.1-M8.7 and V12-I1..I6 tests retained; full suite without data stores 2022 OK (84 skipped); full suite with all data stores 2033+3 = 2036 OK (5 skipped, RUN_A / RUN_B store-gated included); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Production calibration execution:** BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #58.
