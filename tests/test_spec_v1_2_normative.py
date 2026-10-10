@@ -108,7 +108,9 @@ class NormativeSpecTests(unittest.TestCase):
         decisions = _text("DECISIONS.md")
         before, d078 = decisions.split("\n## D-078", 1)
         self.assertEqual(_sha256(before), DECISIONS_BEFORE_D078_SHA256)
-        self.assertNotIn("\n## D-", d078)  # D-078 is the last entry
+        d078, *later = d078.split("\n## D-", 1)  # append-only: only later entries, numbered from D-079, follow D-078
+        numbers = [int(n) for n in re.findall(r"\n## D-(\d+)", "\n## D-" + later[0])] if later else []
+        self.assertEqual(numbers, list(range(79, 79 + len(numbers))))
         for phrase in ("SPEC v1.2 is accepted as normative", "SPEC v1.1 remains archived and immutable",
                        "No automatic fallback", "τ_mf maximum 0.02", "Production implementation is NOT part of D-078",
                        "No Abaqus was run"):

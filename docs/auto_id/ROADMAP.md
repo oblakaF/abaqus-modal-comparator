@@ -684,7 +684,7 @@ This does **not** authorise real calibration execution. Separate states:
 | Scientific / readiness implementation | `ACCEPTED` |
 | Production calibration execution | `BLOCKED / NOT_AUTHORISED` |
 | HUMAN-authorised real calibration run | `NOT YET AVAILABLE` |
-| M8 | `IN_PROGRESS` (new M8 track; historical branch `auto-id/m8` `PARKED`) |
+| M8 | `IN_PROGRESS` — accepted scope `READ_ONLY_EXISTING_JOURNALLED_RUNS` (M8.1–M8.8 `ACCEPTED`); original M8 GATE `NOT_MET` (D-079); historical prototype branch `auto-id/m8` `PARKED` |
 
 A synthetic (fake-solver) RELEASED record proves the adapter only; it is never an accepted physical calibration.
 No new FE work is authorised. Each step requires explicit SUPERVISOR authorisation, one at a time,
@@ -697,7 +697,7 @@ tests and review. No `install_*` layer: CLI and GUI must use the same scientific
 | V12-I3 | Specimen calibration gate: observability, non-degradation (max + RMS + 8 % row ceiling), precision conservative_uncertainty ≤ 0.08, refusal without fallback | `ACCEPTED` |
 | V12-I4 | Calibration reporting / output record: released/refused labels, bound identities, diagnostics and uncertainty; optional CAL_* material cloned from pinned source INP with Density and other supported options retained | `ACCEPTED` |
 | V12-I5 | Negative/regression closure: no fallback; τ_mf cannot rescue §13 FAIL; historical records immutable; calibration material cloning must fail closed on unknown/ambiguous Abaqus options | `ACCEPTED` |
-| V12-I6 | SPEC v1.2 backend/GUI readiness with the same scientific services (no `install_*`); separate M8 remains parked until authorised | `ACCEPTED` |
+| V12-I6 | SPEC v1.2 backend/GUI readiness with the same scientific services (no `install_*`); the M8 GUI track was later built on the same backend (see M8, D-079) | `ACCEPTED` |
 
 - **Normative acceptance merged:** PR #42 (`auto-id/spec-v1.2-acceptance` → `main`), merge commit `61b5016`.
 
@@ -767,7 +767,7 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   (cluster-average 8 % comparison, average tracking MAC, arbitrary or highest-MAC member mapping, reassigned
   experimental modes, dropped members). Valid cluster mathematics for objective terms, pattern and observability is
   preserved. Implementation limitation only: SPEC and M4 unchanged.
-- **V12-I6 (REVIEW_READY, PR #49, branch `auto-id/v12-i6` from `248d7eb`):** one read-only backend scientific path for a
+- **V12-I6 (`ACCEPTED`; prepared as REVIEW_READY on PR #49, branch `auto-id/v12-i6` from `248d7eb`):** one read-only backend scientific path for a
   journalled run. `services/campaign_lm_provenance.py` proves the M5 Jacobian from the journals (governed run
   identity; one CONVERGED result of this run; every evaluation its candidate's and the identical record of the
   specimen's hash-chained pipeline journal, whose run identity is exactly the governed pipeline (`run_identity` of
@@ -788,8 +788,8 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   transitions).
 - **Retained limitations:** a confirmed-cluster calibration cannot be released without per-member evidence
   (`CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE`, no fallback); the production execution gate remains in place; no governed
-  production calibration campaign has been authorised; real Abaqus execution needs separate HUMAN approval; M8 remains
-  parked pending a separate decision. No scientific gate is relaxed.
+  production calibration campaign has been authorised; real Abaqus execution needs separate HUMAN approval; the M8 GUI track
+  followed separately (read-only scope `ACCEPTED`, original M8 GATE `NOT_MET`; D-079). No scientific gate is relaxed.
 
 **V12 PRODUCTION GATE — EXECUTION NOT AUTHORISED:** the scientific / readiness implementation is accepted, but calibration
 execution stays refused by the unchanged execution gate. A production calibration run, SP10, t_face or other FE work
@@ -814,7 +814,7 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `IN_PROGRESS` — original M8 GATE still open (`NOT_MET`). SUPERVISOR final scope decision 2026-10-10: M8.1–M8.8 and the final integration review `ACCEPTED` for the read-only scope `READ_ONLY_EXISTING_JOURNALLED_RUNS`; the original gate is not waived and not marked PASS. The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
+Stage status: `IN_PROGRESS` — original M8 GATE still open (`NOT_MET`); accepted scope `READ_ONLY_EXISTING_JOURNALLED_RUNS` (D-079). SUPERVISOR final scope decision 2026-10-10: M8.1–M8.8 and the final integration review `ACCEPTED` for the read-only scope `READ_ONLY_EXISTING_JOURNALLED_RUNS`; the original gate is not waived and not marked PASS. The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
 `auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
 specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
 measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
@@ -889,7 +889,7 @@ identities, the evidence fingerprint and the M8.5 / M8.7 presentation. The campa
 journal are re-verified from disk immediately before export; a change since the evaluation refuses and invalidates the
 active presentation, an unverifiable fingerprint refuses, and the run is never evaluated again. Written only after Save
 As, atomically, outside the repository, the data stores and the selected run, never over a non-export file; no INP file. Final export-safety
-correction (still `REVIEW_READY`): the journals are re-verified again after the Save As dialog, immediately before
+correction (part of the accepted M8.8): the journals are re-verified again after the Save As dialog, immediately before
 writing; temporary-file creation failures are a typed WRITE_FAILED refusal; undeterminable data-store roots refuse.
 M8.8 merged: merge commit `1e88e9b` (tree identical to reviewed head `7f7408f`), post-merge main CI success (run
 `38044596355`).
@@ -908,6 +908,11 @@ GATE: `NOT_MET`.** Remaining gap: NEW specimen folder → governed campaign → 
 the GUI cannot currently complete this path. The limitation is acknowledged, not silently waived and not marked PASS.
 Overall M8 stage: `IN_PROGRESS` — original gate still open. No authorisation for real Abaqus execution, new FE solves,
 LM execution, computational resume, production calibration, SP10 or t_face; further work toward the original gate
-requires separate explicit authorisation. The parked prototype branch
+requires separate explicit authorisation.
+**M8 read-only closeout merged (D-079):** PR #59 (`auto-id/m8-integration-review` → `main`), reviewed head
+`f31510d`, merge commit `149debc3172cb4adb3ba6fcc48635b770340783e` (tree `f5aca52`, identical to the reviewed head), post-merge main CI success
+(run `38047072811`). Separate states: M8 stage `IN_PROGRESS`; accepted scope `READ_ONLY_EXISTING_JOURNALLED_RUNS`; original M8 GATE `NOT_MET`;
+production calibration execution `BLOCKED / NOT_AUTHORISED`. Release test checkpoint on `149debc`: 2022 OK without
+data stores (84 skipped), 2036 OK with all data stores (5 skipped), 0 failures. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.
