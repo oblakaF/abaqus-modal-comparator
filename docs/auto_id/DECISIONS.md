@@ -1352,3 +1352,45 @@ Rationale / scope: records the SUPERVISOR scope decision as a decision entry; no
 SPEC or code changes.
 Supersedes: the "M8 stays NOT_STARTED" / "M8 ON HOLD" / "`auto-id/m8` parked pending a decision" statements of D-076,
 D-077 and D-078 as the current M8 state (those entries remain unchanged as history).
+
+## D-080 — Companion material verdict of a specimen calibration run (SPEC v1.2 §1)
+Date: 2026-10-11 · Accepted by: SUPERVISOR · Source: SUPERVISOR "Abaqus Auto-ID V1 SPEC §1 decision review" and "Abaqus Auto-ID D-080 decision record" (2026-10-11); external audit finding V1; PR #61 (audit V1 / V2, open)
+Decision:
+- **Basis.** SPEC v1.2 §1 requires that, when a calibration run is executed, "its material verdict is still computed
+  and shown separately, first, and unchanged"; the accepted policy review states "material verdict always computed and
+  shown separately".
+- **Material and calibration are different outputs.** A material verdict answers "is this a material property?"
+  (§1 A); a specimen calibration answers "which constant calibrates this model of this specimen?" (§1 B). Neither
+  output ever replaces, relabels or releases the other.
+- **The material verdict of a SPECIMEN_ENGINEERING_CALIBRATION run is a companion verdict.** It is required by §1 for
+  every calibration run. It is **not** a second declared scientific question (a run still declares one question, which
+  decides the only number that may be released), it is **not** a fallback, and it does **not** influence the
+  calibration gate, the calibration output or its release.
+- **Current state — temporary non-conformance `MATERIAL_VERDICT_NOT_COMPUTED`.** The accepted V12-I6 backend computes no
+  material verdict for a calibration run, and PR #61 (audit V1) only shows that it is not computed. This is recorded as
+  a known, temporary non-conformance by omission with SPEC v1.2 §1; no number is produced and no fallback exists. It is
+  not reinterpreted as conformance: "material identification was not declared as the question" is not a valid
+  reason for the companion verdict to be absent.
+- **Target architecture — read-only companion material verdict.**
+  - Computation: judged read-only by the existing accepted material path on the existing journals of that calibration
+    run (campaign journal and governed pipeline journals, content-addressed FE packs already journalled). No Abaqus, no
+    FE solve, no LM execution, no new optimisation, no new journal entry.
+  - Result: recorded in its own field of the readiness output, with its own record hash, shown first and unchanged
+    (before the calibration verdict).
+  - Separation: never an input to the calibration gate, the calibration output, the calibration INP fragment or the
+    calibration release; never changed by the calibration result. For a one-specimen calibration campaign (SPEC §6) it is
+    a refusal by construction (§13 family consistency is mandatory for any global value).
+- **Production execution stays BLOCKED / NOT_AUTHORISED.** `CampaignDefinition.require_executable` and the production
+  gate are unchanged; `require_question_supported` stays in force for execution and for material reporting of a
+  calibration campaign as such. Implementing the companion verdict is a precondition for any future authorisation of
+  production calibration execution, which requires its own explicit HUMAN / SUPERVISOR decision.
+- **Rejected:** an automatic or undeclared run of the material-identification question inside a calibration (hidden
+  fallback channel); two declared scientific questions per run (conflicts with §1 "which one it asks" and adds no
+  protection).
+- **Implementation** of the companion verdict (proposed step V12-I7) and the interim wording of the PR #61 V1 block
+  (`MATERIAL_VERDICT_NOT_COMPUTED`, citing this decision) each require a separate explicit authorisation. No code is
+  changed by this decision.
+Rationale / scope: keeps the §1 protection that a calibration release can never hide a material refusal, and makes the
+existing SPEC v1.2 text effective without amending it; no SPEC text, D-078 text, threshold, gate, production gate,
+RUN_A / RUN_B record or historical result changes.
+Supersedes: none (clarifies the application of SPEC v1.2 §1 and D-078; their text is unchanged).
