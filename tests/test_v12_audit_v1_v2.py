@@ -65,7 +65,12 @@ class _Runs(unittest.TestCase):
 class MaterialVerdictFirstTests(_Runs):
     def test_material_verdict_cannot_be_hidden_by_a_calibration_result(self):
         for name, expected in (("base", "RELEASED"), ("imprecise", "REFUSED")):
-            record = self.judged(name).to_dict()
+            current = self.judged(name).to_dict()
+            # V12-I7: a current record carries the computed companion material verdict, shown first
+            values = dict(readiness_presentation(current))
+            self.assertTrue(values["Material verdict — status"].startswith("REFUSED: NO_GLOBAL_PARAMETER_VALUE"))
+            # a record from before V12-I7 (no companion field) keeps the D-080 interim wording
+            record = {k: v for k, v in current.items() if k != "companion_material_verdict"}
             self.assertEqual(record["status"], expected)
             rows = readiness_presentation(record)
             self.assertEqual(tuple(label for label, _ in rows[:4]), MATERIAL_ROWS + ("Calibration verdict",))
@@ -88,13 +93,18 @@ class MaterialVerdictFirstTests(_Runs):
         forged = dict(self.judged("base").to_dict(), material_formal_output={"status": "VALUES_RELEASED",
                                                                             "released_values": {"E_in_plane_mpa": 1.0}})
         self.assertTrue(dict(material_verdict(forged))["Material verdict — status"].startswith(
+            "REFUSED: NO_GLOBAL_PARAMETER_VALUE"))  # the companion record is shown, never material_formal_output
+        forged.pop("companion_material_verdict")
+        self.assertTrue(dict(material_verdict(forged))["Material verdict — status"].startswith(
             "MATERIAL_VERDICT_NOT_COMPUTED"))
 
     def test_the_material_path_is_not_run_for_a_calibration_definition(self):
-        # V1 shows what the backend recorded; it never re-runs the material question on a calibration campaign
+        # the calibration record never gains material-identification fields: the material verdict of a calibration run
+        # lives only in the separate companion record (D-080, V12-I7)
         record = self.judged("base").to_dict()
         self.assertIsNone(record["material_formal_output"])
         self.assertIsNone(record["material_family_consistency"])
+        self.assertEqual(record["companion_material_verdict"]["role"], "COMPANION_MATERIAL_VERDICT")
 
     def test_gui_shows_the_material_verdict_first(self):
         from test_material_identification_ui import _ApplicationHarness

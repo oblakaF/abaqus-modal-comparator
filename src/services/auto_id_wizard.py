@@ -613,6 +613,30 @@ def material_verdict(record) -> tuple[tuple[str, str], ...]:
     status = str(record.get("status", ""))
     reasons = "; ".join(f"{r.get('code')}: {r.get('detail')}" for r in record.get("refusal_reasons") or ()
                         if isinstance(r, Mapping))
+    companion = record.get("companion_material_verdict")
+    if question == "SPECIMEN_ENGINEERING_CALIBRATION" and isinstance(companion, Mapping):
+        # D-080 / V12-I7: the recorded companion material verdict, shown first and unchanged
+        why = "; ".join(str(r) for r in companion.get("reasons") or ())
+        cformal = companion.get("formal_output") if isinstance(companion.get("formal_output"), Mapping) else {}
+        cstatus = str(companion.get("status"))
+        if cstatus == "NOT_AVAILABLE":
+            shown = f"NOT_AVAILABLE — {why or 'no reason recorded'}; no material property"
+        elif cstatus == "VALUES_RELEASED":
+            shown = (f"VALUES_RELEASED (companion material verdict): "
+                     f"{_values(cformal.get('released_values'), 'effective model parameters')}; material claim "
+                     f"{companion.get('material_claim')}")
+        else:
+            shown = (f"REFUSED: {cstatus}"
+                     + (f"; SPEC §13 family consistency {companion.get('family_consistency')}"
+                        if companion.get("family_consistency") else "")
+                     + f"; no global material property; material claim {companion.get('material_claim')}"
+                     + (f" — {why}" if why else ""))
+        return (("Material verdict — question", "MATERIAL_IDENTIFICATION (companion material verdict of this "
+                                                "calibration run; SPEC v1.2 §1, D-080)"),
+                ("Material verdict — formal output", f"{cformal.get('status') or 'NOT_AVAILABLE'} (companion "
+                                                     f"record {str(companion.get('record_hash'))[:12]})"),
+                ("Material verdict — status", shown),
+                ("Calibration verdict", f"{status} (SPECIMEN_ENGINEERING_CALIBRATION; never a material property)"))
     if question == "SPECIMEN_ENGINEERING_CALIBRATION":
         return (("Material verdict — question", "MATERIAL_IDENTIFICATION (companion material verdict of this "
                                                 "calibration run; SPEC v1.2 §1, D-080)"),

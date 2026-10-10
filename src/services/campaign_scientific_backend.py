@@ -54,6 +54,7 @@ from .identification_campaign_run import (
     CampaignSpecimenInput,
     build_campaign_report,
     campaign_guards,
+    campaign_report_unchecked,
     campaign_m5_system,
     row_sigma,
 )
@@ -133,6 +134,8 @@ class ScientificReadiness:
     diagnostic_candidate: Optional[Mapping[str, Any]]
     calibration_record: Optional[CalibrationOutputRecord] = None
     material_report: Optional[Mapping[str, Any]] = None
+    # D-080: the companion material verdict of a calibration run (separate; never an input to the calibration)
+    companion_material_verdict: Optional[Mapping[str, Any]] = None
 
     @property
     def refusal_codes(self) -> tuple[str, ...]:
@@ -145,7 +148,7 @@ class ScientificReadiness:
 
     def to_dict(self) -> dict:
         released = self.released
-        return {"schema": SCHEMA, "status": self.status.value, "scientific_question": self.scientific_question,
+        record = {"schema": SCHEMA, "status": self.status.value, "scientific_question": self.scientific_question,
                 "tau_mf": self.tau_mf, "campaign": dict(self.campaign),
                 "refusal_reasons": [dict(r) for r in self.refusal_reasons], "evidence": dict(self.evidence),
                 "uncertainty_basis": self.uncertainty_basis, "diagnostic_candidate": self.diagnostic_candidate,
@@ -161,6 +164,10 @@ class ScientificReadiness:
                 "production_execution": PRODUCTION_EXECUTION,
                 "production_calibration": None if self.scientific_question != SPECIMEN_ENGINEERING_CALIBRATION
                 else NO_PRODUCTION_CALIBRATION}
+        if self.scientific_question == SPECIMEN_ENGINEERING_CALIBRATION:  # only for a calibration record (D-080)
+            record["companion_material_verdict"] = None if self.companion_material_verdict is None \
+                else dict(self.companion_material_verdict)
+        return record
 
     @property
     def record_hash(self) -> str:
@@ -191,11 +198,15 @@ def _evidence(specimens: Sequence[CampaignSpecimenInput], lm: Optional[VerifiedL
             "fe_sources": fe_sources, "lm_provenance": None if lm is None else lm.to_dict()}
 
 
-def _not_ready(definition, specimens, code: ReadinessRefusal, detail: str, lm=None) -> ScientificReadiness:
+def _not_ready(definition, specimens, code: ReadinessRefusal, detail: str, lm=None,
+               companion: Optional[Mapping[str, Any]] = None) -> ScientificReadiness:
+    if companion is None and getattr(definition, "scientific_question", None) == SPECIMEN_ENGINEERING_CALIBRATION:
+        companion = _companion_not_available(definition, lm, [f"run evidence not verified ({code.value}): {detail}"])
     return ScientificReadiness(ReadinessStatus.NOT_READY, getattr(definition, "scientific_question", None),
                                getattr(definition, "tau_mf", None),
                                _campaign(definition, None if lm is None else lm.run_hash),
-                               ({"code": code.value, "detail": detail},), _evidence(specimens, lm), None, None)
+                               ({"code": code.value, "detail": detail},), _evidence(specimens, lm), None, None,
+                               companion_material_verdict=companion)
 
 
 def _lm(definition, specimens, evidence: CampaignRunEvidence) -> VerifiedLMHistory:
@@ -227,6 +238,64 @@ def _material(definition, specimens, evidence: CampaignRunEvidence) -> Scientifi
     return ScientificReadiness(status, definition.scientific_question, definition.tau_mf,
                                _campaign(definition, lm.run_hash), reasons, _evidence(specimens, lm),
                                report["uncertainty_basis"], candidate, material_report=report)
+
+
+# ----------------------------------------------------------------------------- D-080 companion material verdict
+
+COMPANION_SCHEMA = "auto-id/companion-material-verdict/v1"
+COMPANION_ROLE = "COMPANION_MATERIAL_VERDICT"
+COMPANION_LABELS = ("COMPANION_MATERIAL_VERDICT", "NOT_THE_DECLARED_QUESTION", "NOT_A_FALLBACK",
+                    "NO_INFLUENCE_ON_CALIBRATION")
+COMPANION_SOURCE = ("existing journalled evidence of this calibration run (campaign journal, governed pipeline "
+                    "journals); judged read-only by the accepted M7 material campaign report")
+
+
+def _companion_record(definition, lm, status: str, reasons, **fields) -> dict:
+    provenance = {"source": COMPANION_SOURCE, "decision": "D-080", "campaign_id": definition.campaign_id,
+                  "campaign_hash": definition.campaign_hash, "run_hash": None if lm is None else lm.run_hash,
+                  "material_report_hash": fields.pop("material_report_hash", None),
+                  "abaqus_solves": 0, "lm_executions": 0, "new_journal_entries": 0}
+    if lm is not None:
+        lm_record = lm.to_dict()
+        provenance["final_candidate_hash"] = lm_record.get("final_candidate_hash")
+        provenance["pipeline_run_hashes"] = lm_record.get("pipeline_run_hashes")
+    body = {"schema": COMPANION_SCHEMA, "role": COMPANION_ROLE, "labels": list(COMPANION_LABELS),
+            "question": MATERIAL_IDENTIFICATION, "status": status, "reasons": [str(r) for r in reasons],
+            "provenance": provenance, **fields}
+    return dict(body, record_hash=canonical_hash(body))
+
+
+def _companion_not_available(definition, lm, reasons) -> dict:
+    return _companion_record(definition, lm, "NOT_AVAILABLE", reasons, formal_output=None)
+
+
+def _companion_material_verdict(definition, specimens, evidence: CampaignRunEvidence,
+                                lm: VerifiedLMHistory) -> dict:
+    """D-080: the material verdict of a calibration run — the accepted material report judged read-only on the run's
+    existing journals (no Abaqus, FE, LM or new journal entry). A separate record: it never enters the calibration
+    gate, output, fragment or release, never changes the declared question and is never a fallback."""
+
+    if getattr(definition, "scientific_question", None) != SPECIMEN_ENGINEERING_CALIBRATION:
+        raise ValueError("a companion material verdict belongs to a SPECIMEN_ENGINEERING_CALIBRATION run only.")
+    try:
+        _, _, entries = journal_document(evidence.campaign_journal, "campaign")
+        evaluations = [dict(e["record"]) for e in entries if e.get("kind") == "evaluation"]
+        report = campaign_report_unchecked(definition, specimens, evaluations, dict(lm.result))
+        formal = dict(report["formal_output"])
+        verdicts = {name: {"verdict": item.get("verdict"), "reasons": list(item.get("reasons") or ()),
+                           "statistical_sd_ln": item.get("statistical_sd_ln"),
+                           "birge_adjusted_sd_ln": item.get("birge_adjusted_sd_ln"),
+                           "conservative_ln": item.get("conservative_ln")}
+                    for name, item in sorted(((report.get("m5_verdict") or {}).get("verdicts") or {}).items())}
+        family = (report.get("family_consistency") or {}).get("status")
+        return _companion_record(definition, lm, str(formal.get("status")), formal.get("blockers") or (),
+                                 formal_output=formal, material_claim=report.get("material_claim"),
+                                 family_consistency=family, m5_verdicts=verdicts,
+                                 uncertainty_basis=report.get("uncertainty_basis"),
+                                 material_report_hash=canonical_hash(report))
+    except Exception as exc:  # isolated: a companion problem never changes the calibration verdict
+        return _companion_not_available(definition, lm, [f"material verdict not available "
+                                                         f"({type(exc).__name__}: {exc})"])
 
 
 # ----------------------------------------------------------------------------- SPECIMEN_ENGINEERING_CALIBRATION
@@ -399,7 +468,10 @@ def _calibration(definition, specimens, evidence: CampaignRunEvidence) -> Scient
     try:
         output = _judged_output(definition, specimens[0], lm, evidence)
     except _NotReady as refusal:
-        return _not_ready(definition, specimens, refusal.code, refusal.detail, lm)
+        return _not_ready(definition, specimens, refusal.code, refusal.detail, lm,
+                          companion=_companion_material_verdict(definition, specimens, evidence, lm))
+    # D-080: judged after the calibration output, from the same journals; never passed to the calibration
+    companion = _companion_material_verdict(definition, specimens, evidence, lm)
     if output.released:
         status, reasons, diagnostic = ReadinessStatus.RELEASED, (), None
     else:
@@ -409,7 +481,7 @@ def _calibration(definition, specimens, evidence: CampaignRunEvidence) -> Scient
         diagnostic = dict(output.diagnostic_optimizer_candidate)
     return ScientificReadiness(status, definition.scientific_question, tau, _campaign(definition, lm.run_hash),
                                reasons, _evidence(specimens, lm), dict(output.uncertainty_basis), diagnostic,
-                               calibration_record=output)
+                               calibration_record=output, companion_material_verdict=companion)
 
 
 def judge_campaign_run(definition, specimens: Sequence[CampaignSpecimenInput],

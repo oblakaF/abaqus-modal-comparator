@@ -795,7 +795,10 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
 computed and shown first. Current state: `MATERIAL_VERDICT_NOT_COMPUTED` (temporary non-conformance by omission). Target:
 a read-only companion material verdict from the run's existing journals (no Abaqus, FE, LM or new optimisation), with its
 own record hash, shown first, never an input to the calibration gate or release; it is not a second scientific question
-and not a fallback. Implementation step **V12-I7 `TODO`** (separate authorisation). The PR #61 V1 gap
+and not a fallback. Implementation step **V12-I7 `IN_PROGRESS`**: **V12-I7.1 core `REVIEW_READY`** (PR #63,
+branch `auto-id/v12-i7-companion`) — `ScientificReadiness.companion_material_verdict` (calibration records only; own
+schema and record hash; provenance = the run's existing journalled evidence), judged read-only by the accepted M7 report
+body after the calibration verdict and never an input to it; the public `build_campaign_report` guard is unchanged. The PR #61 V1 gap
 (material verdict of a calibration run shown as not computed) stays open until V12-I7 is accepted.
 Production calibration execution stays `BLOCKED / NOT_AUTHORISED`.
 

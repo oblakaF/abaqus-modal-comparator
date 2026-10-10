@@ -891,6 +891,19 @@ def build_campaign_report(definition: CampaignDefinition, specimens: Sequence[Ca
     """
 
     definition.require_question_supported()  # no effective-estimate report for a calibration campaign
+    return campaign_report_unchecked(definition, specimens, evaluations, result, reference, reference_label)
+
+
+def campaign_report_unchecked(definition: CampaignDefinition, specimens: Sequence[CampaignSpecimenInput],
+                              evaluations: Sequence[Mapping], result: Mapping,
+                              reference: Optional[Mapping[str, float]] = None, reference_label: str = "") -> dict:
+    """``build_campaign_report`` without its question guard — the same M5 / §13 / formal-output mathematics.
+
+    Only for the D-080 companion material verdict of a calibration run, built read-only from that run's existing
+    journals by ``campaign_scientific_backend`` (a guard test keeps it the only caller). Every other caller uses
+    ``build_campaign_report``, which still refuses a calibration definition.
+    """
+
     status = result["status"]
     parameters = result.get("parameters")
     final = start = None
