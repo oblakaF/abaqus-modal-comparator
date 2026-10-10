@@ -4629,3 +4629,43 @@ first internal provider.
   `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #56.
+
+## 2026-10-10 — M8.6 ACCEPTED and merged (PR #56); M8.7 — uncertainty and evidence-source breakdown (REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS); M8.1–M8.6 ACCEPTED; mini-step M8.7 only
+- **M8.6 merge:** PR #56 `auto-id/m8-6` → `main`, reviewed head `8bbee80db1abe62f2e5a9681823d95b2e1025dfd`, merge commit `4eb241da41dcb6af903663131b0d9a44693c08af`
+  (tree `6ded27bbf22f6a1f6c9d38cb3805138286591920`, identical to the reviewed head). Linux CI on main 4eb241d: success (run 38037350167). SUPERVISOR-authorised.
+- **M8.7 status:** REVIEW_READY — branch `auto-id/m8-7` from `4eb241d` (PR #57), exclusive worktree.
+- **Commits:** `cb8b063` uncertainty and evidence-source breakdown; this governance commit.
+- **Breakdown (`services/auto_id_wizard.uncertainty_breakdown`):** one read-only table on the Data Readiness Check, read
+  from the record shown under the current selection (the M8.5 record) and, for material identification only, from the
+  backend's formal campaign report of the current typed evaluation (M8.6 binding; never rebuilt from a dictionary).
+  - **A covariance basis:** Σ_setup / Σ_meas status, recorded basis, complete vs conditional (a conditional basis is never
+    called a complete measured uncertainty), provisional and missing components, the recorded statement; the campaign
+    report's Σ sources for material identification.
+  - **B statistical_sd:** the M5 verdict value with its covariance basis (material identification); NOT_AVAILABLE for a
+    calibration (not a field of the calibration output record) and for a record without the typed report.
+  - **C Birge:** the recorded birge_adjusted_sd_ln, or NOT_AVAILABLE with the recorded BIRGE_UNAVAILABLE reason.
+  - **D model form:** leave-one-family-out status, label, cases, half-ranges with provenance and the recorded
+    interpretation (a model-dependence diagnostic, not a confidence interval); an incomplete set shows no interval (the
+    M5 number that covers the valid cases only is not shown).
+  - **E conservative calibration uncertainty:** the recorded envelope, the recorded 0.08 ln p ceiling, the recorded
+    conservative_uncertainty_ln and PASS / REFUSED decision; for material identification only the M5 verdict envelope
+    (not a calibration precision).
+  - **F τ_mf:** an acceptance tolerance on |Δ ln f| only; never in Σ, never an uncertainty; the recorded
+    tau_mf_in_envelope flag.
+  - **Question-specific:** formal release vs diagnostic optimizer candidate, SPEC §13 status (FAIL decisive), M5 verdicts;
+    fitted (released or diagnostic) vs fixed calibration parameters (fixed: no fitted uncertainty).
+  - **Sources:** campaign / run hashes, specimens, solver profile ids and hashes (as journalled; not a claim of a physical
+    Abaqus solve), FE sources (an archived-validated-pack is never a new solve), LM provenance, gate record / pinned INP /
+    M5 evidence hashes, production status.
+- **States:** REFUSED quantities are labelled supporting / diagnostic only; NOT_READY shows the source facts and the
+  specific missing evidence; a confirmed cluster keeps CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; NOT_EVALUATED_FOR_SELECTION,
+  selection change, journal change and Reopen show no selection-bound quantity.
+- **Gaps shown, not filled:** no accepted record carries a complete measured covariance (Σ_meas only NOT_AVAILABLE,
+  D-069); the calibration output record has no statistical_sd field and no separate LOO status field.
+- **Tests:** test_m8_7_uncertainty_breakdown 27 tests (cases 1-26 plus material release / SPEC 13 FAIL; 2 store-gated RUN_A / RUN_B; real-Tk test); mutation checks 10 of 10 killed; M8.1-M8.6 and V12-I1..I6 tests retained; full suite without data stores 1989 OK (82 skipped); full suite with all data stores 2003 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** V12-I1..I6 ACCEPTED; SPEC v1.1 / v1.2, D-078, scientific services, thresholds and historical records;
+  production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #57.
