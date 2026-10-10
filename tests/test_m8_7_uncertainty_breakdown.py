@@ -225,9 +225,12 @@ class StatisticalBirgeTests(_Fixture):
                          f"{verdict['statistical_sd_ln']!r} ln p (conditional on the available covariance)")
         external = table(uncertainty_breakdown(readiness.to_dict()))  # the stored record alone holds no M5 evidence
         self.assertIn("held only by the current typed evaluation", external[(STATISTICAL, "statistical_sd")])
-        calibration = self.rows(self.base)  # the calibration output record has no statistical_sd field: the gap
-        self.assertTrue(calibration[(STATISTICAL, "statistical_sd · E_in_plane_mpa")].startswith(
-            "NOT_AVAILABLE — not a field of the specimen calibration output record"))
+        # audit V2: the calibration output record now carries the statistical_sd the gate judged (recorded value)
+        record = self.readiness(self.base).calibration_record
+        value = record.statistical_sd["statistical_sd_ln"]["E_in_plane_mpa"]
+        self.assertEqual(record.statistical_sd["status"], "AVAILABLE")
+        self.assertEqual(self.rows(self.base)[(STATISTICAL, "statistical_sd · E_in_plane_mpa")],
+                         f"{value!r} ln p (conditional on the available covariance)")
 
     def test_06_birge_available(self):
         readiness = self.readiness(self.base)
@@ -262,9 +265,9 @@ class ModelFormPrecisionTests(_Fixture):
         self.assertEqual(rows[(MODEL_FORM, "Label")], "MODEL_DEPENDENCE_DIAGNOSTIC")
         self.assertEqual((rows[(MODEL_FORM, "Case FAM-12")], rows[(MODEL_FORM, "Case FAM-B1")]), ("VALID", "VALID"))
         self.assertIn("not a confidence interval", rows[(MODEL_FORM, "Interpretation (recorded)")])
-        calibration = self.rows(self.base)
-        self.assertTrue(calibration[(MODEL_FORM, "Leave-one-FIT-family-out")].startswith(
-            "no LOO_INCOMPLETE refusal recorded"))
+        calibration = self.rows(self.base)  # audit V2: the recorded leave-one-FIT-family-out status
+        self.assertEqual(calibration[(MODEL_FORM, "Leave-one-FIT-family-out status")], "AVAILABLE_COMPLETE_LOO")
+        self.assertEqual(calibration[(MODEL_FORM, "Leave-one-FIT-family-out")], "COMPLETE (recorded AVAILABLE_COMPLETE_LOO)")
 
     def test_09_incomplete_loo_has_no_fabricated_interval(self):
         readiness = self.readiness(self.one_family)

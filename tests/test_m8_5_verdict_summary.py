@@ -318,7 +318,11 @@ class VerdictSafetyTests(_Fixture):
         calls = {getattr(n.func, "id", getattr(n.func, "attr", None)) for n in ast.walk(summary)
                  if isinstance(n, ast.Call)}
         self.assertLessEqual(calls, {"isinstance", "str", "get", "join", "append", "_values", "len", "tuple",
-                                     "sorted", "items"})  # reads and formats only
+                                     "sorted", "items", "material_verdict"})  # reads and formats only
+        material = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "material_verdict")
+        calls = {getattr(n.func, "id", getattr(n.func, "attr", None)) for n in ast.walk(material)
+                 if isinstance(n, ast.Call)}
+        self.assertLessEqual(calls, {"isinstance", "str", "get", "join", "_values"})  # audit V1: reads and formats only
 
 
 class RealTkVerdictTests(_Fixture):

@@ -503,7 +503,9 @@ def readiness_presentation(record: Mapping[str, Any]) -> tuple[tuple[str, str], 
                          sorted((evidence.get("solver_profiles") or {}).items()))
     sources = "; ".join(f"{label}: {', '.join(values)}" for label, values in
                         sorted((evidence.get("fe_sources") or {}).items()))
-    return (
+    from .auto_id_wizard import material_verdict  # presentation only (the wizard imports no backend)
+
+    return material_verdict(record) + (  # audit V1: the material verdict first, then the calibration verdict
         ("Scientific question", question or "not declared (v1 material identification)"),
         ("Readiness", str(record.get("status", ""))),
         ("τ_mf", "not declared" if tau is None else f"{tau:g} in |Δ ln f| (acceptance tolerance only; never an "

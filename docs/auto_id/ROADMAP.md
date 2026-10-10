@@ -799,6 +799,14 @@ and not a fallback. Implementation step **V12-I7 `TODO`** (separate authorisatio
 (material verdict of a calibration run shown as not computed) stays open until V12-I7 is accepted.
 Production calibration execution stays `BLOCKED / NOT_AUTHORISED`.
 
+**External audit corrections V1 / V2 (`REVIEW_READY`, branch `auto-id/v12-audit-v1-v2`, reporting only):** V1 — the
+material verdict (question, formal output, status / refusal) is shown first, read from the stored record, then the
+calibration verdict; for a calibration run it shows `MATERIAL_VERDICT_NOT_COMPUTED` — a known temporary SPEC v1.2 §1
+non-conformance, decided by D-080; the companion material verdict is implementation V12-I7 `TODO`. V2 — the calibration
+output record (schema v2) carries the recorded `statistical_sd` and leave-one-FIT-family-out status; missing values stay
+`NOT_AVAILABLE`; schema v2 changes the calibration `record_hash` and the derived `CAL_*` names (acceptable: no production
+calibration records exist). No SPEC, threshold, M5 / M7 or RUN_A / RUN_B change; no Abaqus.
+
 **V12 PRODUCTION GATE — EXECUTION NOT AUTHORISED:** the scientific / readiness implementation is accepted, but calibration
 execution stays refused by the unchanged execution gate. A production calibration run, SP10, t_face or other FE work
 requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN authorisation.
