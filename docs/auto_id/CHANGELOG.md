@@ -4725,3 +4725,50 @@ first internal provider.
 - **Tests:** test_m8_8_evidence_export 33 tests (30 + 3 red-probes: Save As freshness race, mkstemp failure, undeterminable protected roots — all three failed on 12fefb4 and pass after the fix; reverting each fix is caught, 4 of 4); M8.1-M8.7 and V12-I1..I6 tests retained; full suite without data stores 2022 OK (84 skipped); full suite with all data stores 2033+3 = 2036 OK (5 skipped, RUN_A / RUN_B store-gated included); 0 expected failures, 0 unexpected successes; no Abaqus
 - **Production calibration execution:** BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #58.
+
+## 2026-10-10 — M8.8 ACCEPTED and merged (PR #58); final M8 integration review (M8 stays IN_PROGRESS)
+
+- **Stage:** M8 GUI Auto-ID — M8.1–M8.8 ACCEPTED; the stage stays IN_PROGRESS pending the final SUPERVISOR scope decision.
+- **M8.8 merge:** PR #58 `auto-id/m8-8` → `main`, reviewed head `7f7408fce549d12758c876a0352f81c45554a192`, merge commit `1e88e9b8dd6a779fb95b789be86324964c11c528`
+  (tree `2fd18df63aad3853d2d43021068e6dc1368a56ae`, identical to the reviewed head). Linux CI on main 1e88e9b: success (run 38044596355). SUPERVISOR-authorised.
+- **Integration audit (real Tk, 33 of 33):** the actual `ModalComparatorApp` with the accepted GUI code paths — governed
+  campaign definition; specimen / passport preparation; explicit stored run; verified progress; Evaluate Stored Run (shared
+  backend); RELEASED verdict with SPECIMEN_ENGINEERING_CALIBRATION / NOT_A_MATERIAL_PROPERTY /
+  NOT_TRANSFERABLE_WITHOUT_VALIDATION; uncertainty / source breakdown (Σ_meas NOT_AVAILABLE, τ_mf an acceptance tolerance,
+  PASS precision, SYA/fake); nine governed constants and the CAL_* fragment only under the release gate (none for REFUSED);
+  deterministic verified JSON export (byte-identical repeats, cancel writes nothing); Reopen and campaign / run switch
+  clear every selection-bound result; Refresh detects a changed journal; a journal changed during Save As refuses with no
+  file; genuine NOT_READY stays visible and is not exported; incomplete LOO gains no interval; confirmed cluster refusal
+  preserved; RUN_A (REFUSED, SPEC §13 FAIL, NO_GLOBAL_PARAMETER_VALUE) and RUN_B (REFUSED, diagnostic candidate only)
+  evaluated and exported with their archived stores unchanged (tree hash); no solver, LM or extraction call.
+- **Original M8 GATE — not met in full (scope limitation for SUPERVISOR decision):**
+  - met: no optimisation number is entered in the GUI; no separate GUI scientific implementation; no new `install_*` layer
+    (`src/main.py`, `src/runtime_contracts.py` unchanged since `196503e`);
+  - not met: a NEW specimen folder alone gives no scientific result ("a specimen folder declares no campaign"); a result
+    requires a governed campaign definition (authored outside the GUI) and a previously journalled campaign run produced
+    behind the HUMAN execution gate (production calibration execution BLOCKED by `require_executable`). The implemented
+    workflow is read-only evaluation, presentation and export of existing runs. No new scientific execution was enabled.
+- **Protected files:** since the M8 start `196503e` no protected scientific file changed (registrations, baseline, campaigns,
+  fixtures, EVIDENCE, DECISIONS, SPEC, `src/domain`, gate / output / campaign-run / verdict / uncertainty services); the
+  only service additions are the accepted M8.4 `verify_campaign_run_identity` wrapper and the M8.6
+  `released_engineering_constants` accessor.
+- **Tests:** real-Tk integration audit 33 of 33 (scratch script, not committed); focused M8.1-M8.8 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 561 OK (0 skipped: real-Tk tests ran); full suite on main without data stores 2022 OK (84 skipped); full suite on main with all data stores 2036 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Unchanged:** V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at
+  `193db8d`.
+- **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR decision on the final M8 scope (governance PR #59).
+
+## 2026-10-10 — SUPERVISOR final M8 scope decision: read-only scope ACCEPTED; original M8 GATE NOT_MET
+
+- **Decision:** SUPERVISOR, on governance PR #59 (reviewed head `12138cb`).
+- **M8.1–M8.8:** ACCEPTED. **Final integration review:** ACCEPTED.
+- **Accepted scope:** `READ_ONLY_EXISTING_JOURNALLED_RUNS` — campaign preparation, explicit stored-run selection, verified progress, backend
+  evaluation, scientific verdict, uncertainty, governed constants preview and safe export.
+- **Original M8 GATE:** NOT_MET. Remaining gap: NEW specimen folder → governed campaign → new journalled scientific run →
+  new result; the GUI cannot currently complete this path. Acknowledged; not silently waived; not marked PASS.
+- **Overall M8 stage:** IN_PROGRESS — original gate still open. (This supersedes the "pending the final SUPERVISOR scope
+  decision" wording of the previous entry; that decision has now been made.)
+- **Execution:** no authorisation for real Abaqus execution, new FE solves, LM execution, computational resume,
+  production calibration, SP10 or t_face. Production calibration execution BLOCKED / NOT_AUTHORISED. Further work
+  toward the original M8 GATE requires separate explicit authorisation; none is started.
+- **Files:** docs only (ROADMAP, STATUS, CHANGELOG). **Abaqus run count:** 0.
