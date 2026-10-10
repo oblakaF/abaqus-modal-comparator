@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8 final integration review",
-  "status": "REVIEW_READY",
+  "current_ministep": "M8 final integration review (read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS)",
+  "status": "ACCEPTED",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
   "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
@@ -612,7 +612,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR decision on the final M8 scope (governance PR #59, not merged; the original M8 GATE is not met in full). V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no SP10, no t_face, no new FE work; no Abaqus; auto-id/m8 parked",
+  "next_action": "STOP: M8 stays IN_PROGRESS — original M8 GATE NOT_MET (new specimen folder -> governed campaign -> new journalled run -> new result); any further work toward it requires separate explicit SUPERVISOR / HUMAN authorisation. V12-I1..I6 ACCEPTED; production calibration execution BLOCKED / NOT_AUTHORISED; no Abaqus, no new FE solves, no LM execution, no computational resume, no SP10, no t_face; auto-id/m8 parked",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1168,7 +1168,7 @@
       "status": "PARKED_PENDING_SEPARATE_SUPERVISOR_DECISION",
       "note": "historical M8.1 prototype; untouched (not merged, not rebased, not cherry-picked as a whole); selected code reused on auto-id/m8-1"
     },
-    "authorisation": "SUPERVISOR 2026-10-10: M8.8 ACCEPTED; final M8 integration review only; the complete M8 track is not accepted until the final SUPERVISOR decision",
+    "authorisation": "SUPERVISOR 2026-10-10: M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS; original M8 GATE NOT_MET; no further M8 work authorised",
     "steps": {
       "M8.1": {
         "title": "Specimen / family setup wizard",
@@ -1341,9 +1341,9 @@
         }
       }
     },
-    "track": "IN_PROGRESS — M8.1..M8.8 ACCEPTED; final integration review complete for the implemented read-only scope; the original M8 GATE is NOT met in full (a new specimen folder alone cannot reach a new scientific result: a governed campaign definition and a previously journalled, HUMAN-gated run are prerequisites); the stage awaits the final SUPERVISOR scope decision; the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
+    "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
     "final_integration_review": {
-      "status": "REVIEW_READY",
+      "status": "ACCEPTED",
       "base": "1e88e9b8dd6a779fb95b789be86324964c11c528",
       "pr": 59,
       "workflow_audit": "real Tk application (ModalComparatorApp), the accepted GUI code paths, 33 of 33 checks: start; governed campaign definition; specimen / passport preparation rows; explicit stored run; verified progress; Evaluate Stored Run with the shared backend; RELEASED verdict with the calibration labels; uncertainty / source breakdown; nine governed constants and the CAL_* fragment only for the RELEASED calibration (none for REFUSED); deterministic verified JSON export (two exports byte-identical; cancel writes nothing); Reopen and campaign / run switch clear every selection-bound result; Refresh detects a changed pipeline journal; a journal changed during Save As refuses with no file; genuine NOT_READY stays visible and is not exported; incomplete LOO has no interval; confirmed cluster refusal preserved; RUN_A / RUN_B evaluated and exported with their archived stores unchanged (tree hash); no solver, LM or extraction call; only explicit exports written",
@@ -1360,9 +1360,32 @@
           "no new install_* layer (src/main.py and src/runtime_contracts.py unchanged since the M8 start 196503e)"
         ],
         "not_met": "from a NEW specimen folder the GUI shows the governed facts only ('a specimen folder declares no campaign'); a scientific result requires (1) a governed campaign definition for that specimen, authored outside the GUI with its optimisation settings, and (2) a previously journalled campaign run produced behind the HUMAN execution gate (CampaignRun; production calibration execution BLOCKED by require_executable). The implemented M8 workflow is read-only evaluation, presentation and export of such existing runs; it starts no solve, LM or extraction",
-        "decision": "SUPERVISOR decision required on the final M8 scope; no new scientific execution was enabled"
+        "decision": "SUPERVISOR 2026-10-10: original M8 GATE NOT_MET; the remaining gap is acknowledged and not waived; further work requires separate explicit authorisation",
+        "status": "NOT_MET"
       },
-      "tests": "real-Tk integration audit 33 of 33 (scratch script, not committed); focused M8.1-M8.8 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 561 OK (0 skipped: real-Tk tests ran); full suite on main without data stores 2022 OK (84 skipped); full suite on main with all data stores 2036 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus"
+      "tests": "real-Tk integration audit 33 of 33 (scratch script, not committed); focused M8.1-M8.8 / GUI / V12-I1..I6 / SPEC v1.2 / M7 / M7b with all data stores 561 OK (0 skipped: real-Tk tests ran); full suite on main without data stores 2022 OK (84 skipped); full suite on main with all data stores 2036 OK (5 skipped); 0 expected failures, 0 unexpected successes; no Abaqus",
+      "accepted_scope": "READ_ONLY_EXISTING_JOURNALLED_RUNS"
+    },
+    "scope_decision": {
+      "decided_by": "SUPERVISOR 2026-10-10 (final M8 scope decision on PR #59, reviewed head 12138cb)",
+      "m8_1_to_m8_8": "ACCEPTED",
+      "final_integration_review": "ACCEPTED",
+      "accepted_scope": "READ_ONLY_EXISTING_JOURNALLED_RUNS",
+      "accepted_scope_includes": [
+        "campaign preparation",
+        "explicit stored-run selection",
+        "verified progress",
+        "backend evaluation",
+        "scientific verdict",
+        "uncertainty",
+        "governed constants preview",
+        "safe export"
+      ],
+      "original_m8_gate": "NOT_MET",
+      "remaining_gap": "NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path",
+      "gap_handling": "acknowledged; not silently waived; not marked PASS",
+      "overall_m8_stage": "IN_PROGRESS — original gate still open",
+      "execution": "no authorisation for real Abaqus execution, new FE solves, LM execution, computational resume, production calibration, SP10 or t_face; production BLOCKED / NOT_AUTHORISED; further work toward the original M8 GATE requires separate explicit authorisation"
     }
   },
   "m7_acceptance_superseded": "D-076 (2026-10-09): M7 acceptance and gate PASS of D-075 superseded; M7 REWORK; M7 accepted again by D-077 (2026-10-09) after the M7b corrective merge (PR #39): gate PASS_BY_REFUSAL",
@@ -1593,14 +1616,14 @@
       "scientific_readiness_implementation": "ACCEPTED (all six planned steps V12-I1..I6 accepted and merged)",
       "production_calibration_execution": "BLOCKED / NOT_AUTHORISED",
       "human_authorised_real_calibration_run": "NOT YET AVAILABLE (no governed production calibration campaign authorised; real Abaqus needs separate HUMAN approval)",
-      "m8": "IN_PROGRESS — M8.1..M8.8 ACCEPTED; final integration review complete for the implemented read-only scope; the original M8 GATE is NOT met in full (a new specimen folder alone cannot reach a new scientific result: a governed campaign definition and a previously journalled, HUMAN-gated run are prerequisites); the stage awaits the final SUPERVISOR scope decision; the historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
+      "m8": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
       "meaning": "the six planned implementation steps are accepted; this does NOT authorise real calibration execution. Synthetic fake-solver RELEASED records prove the adapter only and are never an accepted physical calibration",
       "limitations": [
         "a confirmed-cluster calibration cannot be released without per-member evidence (CLUSTER_MEMBER_EVIDENCE_NOT_AVAILABLE; SUPERVISOR cluster policy; no fallback)",
         "the production calibration execution gate (CampaignDefinition.require_executable) remains in place",
         "no governed production calibration campaign has been authorised",
         "real Abaqus execution needs separate HUMAN approval",
-        "M8 (current state): M8.1-M8.8 ACCEPTED; the stage stays IN_PROGRESS pending the final SUPERVISOR scope decision (the original M8 GATE is not met in full: a governed campaign definition and a previously journalled HUMAN-gated run are prerequisites of a scientific result); the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
+        "M8 (current state): M8.1-M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS; the original M8 GATE is NOT_MET (NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path); the stage stays IN_PROGRESS with the original gate open; the historical prototype branch auto-id/m8 stays PARKED at 193db8dd4dd31c88ea1eae0a905f372e8a00c31d"
       ]
     }
   }

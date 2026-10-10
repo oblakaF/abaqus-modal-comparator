@@ -4757,3 +4757,18 @@ first internal provider.
   `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR decision on the final M8 scope (governance PR #59).
+
+## 2026-10-10 — SUPERVISOR final M8 scope decision: read-only scope ACCEPTED; original M8 GATE NOT_MET
+
+- **Decision:** SUPERVISOR, on governance PR #59 (reviewed head `12138cb`).
+- **M8.1–M8.8:** ACCEPTED. **Final integration review:** ACCEPTED.
+- **Accepted scope:** `READ_ONLY_EXISTING_JOURNALLED_RUNS` — campaign preparation, explicit stored-run selection, verified progress, backend
+  evaluation, scientific verdict, uncertainty, governed constants preview and safe export.
+- **Original M8 GATE:** NOT_MET. Remaining gap: NEW specimen folder → governed campaign → new journalled scientific run →
+  new result; the GUI cannot currently complete this path. Acknowledged; not silently waived; not marked PASS.
+- **Overall M8 stage:** IN_PROGRESS — original gate still open. (This supersedes the "pending the final SUPERVISOR scope
+  decision" wording of the previous entry; that decision has now been made.)
+- **Execution:** no authorisation for real Abaqus execution, new FE solves, LM execution, computational resume,
+  production calibration, SP10 or t_face. Production calibration execution BLOCKED / NOT_AUTHORISED. Further work
+  toward the original M8 GATE requires separate explicit authorisation; none is started.
+- **Files:** docs only (ROADMAP, STATUS, CHANGELOG). **Abaqus run count:** 0.

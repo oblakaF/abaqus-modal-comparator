@@ -814,7 +814,7 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1–M8.8 accepted; final integration review done; the stage stays `IN_PROGRESS` pending the final SUPERVISOR scope decision). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
+Stage status: `IN_PROGRESS` — original M8 GATE still open (`NOT_MET`). SUPERVISOR final scope decision 2026-10-10: M8.1–M8.8 and the final integration review `ACCEPTED` for the read-only scope `READ_ONLY_EXISTING_JOURNALLED_RUNS`; the original gate is not waived and not marked PASS. The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
 `auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
 specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
 measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
@@ -900,7 +900,14 @@ export; Reopen / switch / Refresh / Save As freshness; RUN_A, RUN_B, synthetic c
 LOO). **The original M8 GATE is not met in full:** no optimisation number is entered in the GUI, there is no separate GUI
 scientific implementation and no new `install_*` layer, but a NEW specimen folder alone cannot reach a new scientific
 result — a governed campaign definition (authored outside the GUI) and a previously journalled campaign run (produced
-behind the HUMAN execution gate; production calibration execution BLOCKED) are prerequisites. The stage stays
-`IN_PROGRESS` for the SUPERVISOR decision on the final M8 scope; no new scientific execution was enabled. The parked prototype branch
+behind the HUMAN execution gate; production calibration execution BLOCKED) are prerequisites. No new scientific execution was enabled.
+**SUPERVISOR final M8 scope decision (2026-10-10):** the M8.1–M8.8 read-only implementation and the final integration
+review are `ACCEPTED`; accepted scope `READ_ONLY_EXISTING_JOURNALLED_RUNS` — campaign preparation, explicit stored-run selection, verified
+progress, backend evaluation, scientific verdict, uncertainty, governed constants preview and safe export. **Original M8
+GATE: `NOT_MET`.** Remaining gap: NEW specimen folder → governed campaign → new journalled scientific run → new result;
+the GUI cannot currently complete this path. The limitation is acknowledged, not silently waived and not marked PASS.
+Overall M8 stage: `IN_PROGRESS` — original gate still open. No authorisation for real Abaqus execution, new FE solves,
+LM execution, computational resume, production calibration, SP10 or t_face; further work toward the original gate
+requires separate explicit authorisation. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.
