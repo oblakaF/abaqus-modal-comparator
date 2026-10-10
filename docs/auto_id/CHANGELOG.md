@@ -4705,3 +4705,23 @@ first internal provider.
   `require_executable`; production calibration execution BLOCKED / NOT_AUTHORISED; `auto-id/m8` at `193db8d`.
 - **Abaqus run count:** 0.
 - **Next gate:** SUPERVISOR review of PR #58; then a separate final M8 integration acceptance.
+
+## 2026-10-10 — M8.8 final export-safety correction (still REVIEW_READY)
+
+- **Stage:** M8 GUI Auto-ID (IN_PROGRESS); M8.8 REVIEW_READY on PR #58 (reviewed head `12fefb4`); no final M8
+  acceptance.
+- **Save As freshness race (red-probe):** a governed pipeline journal changed while the Save As dialog was open and the
+  earlier snapshot was still written. Fix: the snapshot is rebuilt from journals re-verified from disk after the dialog
+  returns, immediately before writing; a change refuses (EVIDENCE_CHANGED_SINCE_EVALUATION) and invalidates the active
+  presentation; the run is never evaluated again.
+- **Temporary-file creation (red-probe):** `tempfile.mkstemp` failed outside the write handler (raw OSError). Fix: it runs
+  inside the handler — a typed WRITE_FAILED refusal; no file left; an earlier export and the scientific record unchanged.
+- **Protected roots (red-probe):** an unreadable data-store configuration added an ignored `None` root and the export was
+  written. Fix: undeterminable configured roots refuse (DESTINATION_REFUSED) and `check_destination` refuses any
+  undetermined root; an unconfigured optional store is still not an error.
+- **Unchanged:** the snapshot builder, exact backend record and hash, governed identities, deterministic JSON,
+  material / calibration distinction, REFUSED / NOT_READY, synthetic labels, RUN_A / RUN_B outcomes, atomic writing and
+  the overwrite restrictions; SPEC, thresholds and provenance.
+- **Tests:** test_m8_8_evidence_export 33 tests (30 + 3 red-probes: Save As freshness race, mkstemp failure, undeterminable protected roots — all three failed on 12fefb4 and pass after the fix; reverting each fix is caught, 4 of 4); M8.1-M8.7 and V12-I1..I6 tests retained; full suite without data stores 2022 OK (84 skipped); full suite with all data stores 2033+3 = 2036 OK (5 skipped, RUN_A / RUN_B store-gated included); 0 expected failures, 0 unexpected successes; no Abaqus
+- **Production calibration execution:** BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
+- **Next gate:** SUPERVISOR review of PR #58.

@@ -1322,12 +1322,14 @@ def _auto_id_protected_roots(app, evaluation) -> tuple:
     the folder of the selected campaign definition or specimen passport."""
 
     from domain.experiment_fixture import fixture_roots_from_environment
+    from services.auto_id_evidence_export import ExportRefusal, ExportRefusalCode
 
-    roots = [AUTO_ID_REPO_ROOT]
     try:
-        roots += list(fixture_roots_from_environment().values())
-    except Exception:  # an unreadable store configuration protects nothing less: the export is refused below
-        roots.append(None)
+        stores = list(fixture_roots_from_environment().values())  # no store configured: an empty mapping
+    except Exception as error:  # the configured roots cannot be determined: no destination can be checked
+        raise ExportRefusal(ExportRefusalCode.DESTINATION, f"the configured data-store roots cannot be determined "
+                                                           f"({error}); nothing is written.") from error
+    roots = [AUTO_ID_REPO_ROOT, *stores]
     run = getattr(evaluation, "run", None)
     if run is not None:
         roots.append(run.run_root)
@@ -1341,10 +1343,11 @@ def _auto_id_protected_roots(app, evaluation) -> tuple:
 def export_auto_id_evidence(app, destination=None):
     """"Export Auto-ID Evidence...": a verified, deterministic JSON export snapshot of the current typed evaluation.
 
-    The campaign journal and every governed pipeline journal are re-verified immediately before the snapshot is built;
-    a change since the evaluation refuses the export and the earlier result stops being current (evaluate again). The
-    run is never evaluated again here. Written only after an explicit Save As, atomically, outside every protected
-    folder; cancelling writes nothing. The export is an external report, never an accepted evidence record.
+    The campaign journal and every governed pipeline journal are re-verified before the Save As dialog and again after
+    it, immediately before writing (a journal may change while the dialog is open); a change since the evaluation
+    refuses the export and the earlier result stops being current (evaluate again). The run is never evaluated again
+    here. Written only after an explicit Save As, atomically, outside every protected folder; cancelling writes
+    nothing. The export is an external report, never an accepted evidence record.
     """
 
     from services.auto_id_evidence_export import ExportRefusal, ExportRefusalCode, build_evidence_export, write_export
@@ -1357,24 +1360,28 @@ def export_auto_id_evidence(app, destination=None):
     specimens = None
     if definition is not None and run_path is not None and evaluation is not None:
         specimens, _ = _auto_id_specimens(app, definition)
-    try:
-        export = build_evidence_export(definition, run_path, specimens, evaluation,
-                                       getattr(app, "scientific_readiness_record", None),
-                                       getattr(app, "auto_id_evaluated_fingerprint", None))
-    except ExportRefusal as refusal:
-        if refusal.code is ExportRefusalCode.STALE:  # the journals changed after the evaluation: not current
-            app.auto_id_active_evaluation = None
-            app.auto_id_active_typed = None
-            app.auto_id_run_message = ("The selected run's journal changed or is no longer verified since its "
-                                       "evaluation: the earlier result is not current (evaluate it again).")
-            _inspect_auto_id_progress(app, run_path)
-        app.auto_id_export_message = f"No export: {refusal}"
-        _refresh_auto_id_setup_page(app)
+    def verified():
+        """The snapshot built from journals re-verified from disk now, or None (refusal shown; nothing written)."""
+        try:
+            return build_evidence_export(definition, run_path, specimens, evaluation,
+                                         getattr(app, "scientific_readiness_record", None),
+                                         getattr(app, "auto_id_evaluated_fingerprint", None))
+        except ExportRefusal as refusal:
+            if refusal.code is ExportRefusalCode.STALE:  # the journals changed after the evaluation: not current
+                app.auto_id_active_evaluation = None
+                app.auto_id_active_typed = None
+                app.auto_id_run_message = ("The selected run's journal changed or is no longer verified since its "
+                                           "evaluation: the earlier result is not current (evaluate it again).")
+                _inspect_auto_id_progress(app, run_path)
+            app.auto_id_export_message = f"No export: {refusal}"
+            _refresh_auto_id_setup_page(app)
+        except Exception as error:  # never a GUI crash; nothing is written
+            app.auto_id_export_message = f"No export: the snapshot could not be built ({error})"
         _refresh_data_readiness_page(app)
         return None
-    except Exception as error:  # never a GUI crash; nothing is written
-        app.auto_id_export_message = f"No export: the snapshot could not be built ({error})"
-        _refresh_data_readiness_page(app)
+
+    export = verified()
+    if export is None:
         return None
     if destination is None:
         destination = filedialog.asksaveasfilename(
@@ -1386,6 +1393,9 @@ def export_auto_id_evidence(app, destination=None):
     if not destination:
         app.auto_id_export_message = "Export cancelled: no file written."
         _refresh_data_readiness_page(app)
+        return None
+    export = verified()  # re-verified after the dialog, immediately before writing: never a stale snapshot
+    if export is None:
         return None
     try:
         path = write_export(export, destination, _auto_id_protected_roots(app, evaluation))

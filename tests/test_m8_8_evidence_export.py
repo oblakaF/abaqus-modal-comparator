@@ -644,6 +644,83 @@ class SafetyTests(_Fixture):
             self.assertNotIn(forbidden, source)
 
 
+class ExportSafetyCorrectionTests(_Fixture):
+    """M8.8 final export-safety correction: freshness after Save As and fail-closed write errors."""
+
+    def test_31_journal_changed_while_save_as_is_open_refuses(self):
+        import material_identification_ui as ui
+
+        application, root = self.evaluated()
+        self.assertEqual(application.scientific_readiness_record["status"], "RELEASED")
+        target = self.out / "raced.json"
+
+        def save_as(**_):  # the governed pipeline journal changes while the dialog is open
+            append_entry(next(root.glob("specimens/*/*/*/journal.json")))
+            return str(target)
+
+        with mock.patch.object(ui.filedialog, "asksaveasfilename", side_effect=save_as):
+            self.assertIsNone(self.gui(ui.export_auto_id_evidence, application, self.base))
+        self.assertIn("No export: EVIDENCE_CHANGED_SINCE_EVALUATION", self.message(application))
+        self.assertFalse(target.exists())
+        self.assertEqual(list(self.out.iterdir()), [])
+        self.assertIsNone(application.auto_id_active_evaluation)
+        self.assertIsNone(application.auto_id_active_typed)
+        self.assertEqual(application.material_scientific_readiness_status_label.kwargs["text"],
+                         "NOT_EVALUATED_FOR_SELECTION")
+        # unchanged evidence while the dialog is open: the same deterministic document as a direct export
+        application, _ = self.evaluated()
+        direct = Path(self.export(application, name="direct.json")).read_bytes()
+        with mock.patch.object(ui.filedialog, "asksaveasfilename", return_value=str(self.out / "dialog.json")):
+            path = self.gui(ui.export_auto_id_evidence, application, self.base)
+        self.assertEqual(Path(path).read_bytes(), direct)
+
+    def test_32_mkstemp_failure_is_a_typed_write_refusal(self):
+        application, _ = self.evaluated()
+        earlier = Path(self.export(application))
+        content = earlier.read_bytes()
+        record = application.scientific_readiness_record
+        snapshot = copy.deepcopy(record)
+        with mock.patch.object(export_module.tempfile, "mkstemp", side_effect=OSError("no space for temporary")):
+            self.assertIsNone(self.export(application))
+        self.assertIn("No export: WRITE_FAILED", self.message(application))
+        self.assertEqual(earlier.read_bytes(), content)
+        self.assertEqual(sorted(p.name for p in self.out.iterdir()), ["evidence.json"])
+        self.assertIs(application.scientific_readiness_record, record)
+        self.assertEqual(record, snapshot)
+        self.assertIsNotNone(application.auto_id_active_evaluation)
+        export = build_evidence_export(self.base.definition, application.auto_id_selected_run_path,
+                                       (self.base.item,), application.auto_id_active_typed[1], record,
+                                       application.auto_id_evaluated_fingerprint)
+        with mock.patch.object(export_module.tempfile, "mkstemp", side_effect=OSError("no space for temporary")):
+            with self.assertRaises(ExportRefusal) as caught:
+                write_export(export, self.out / "service.json", ())
+        self.assertIs(caught.exception.code, ExportRefusalCode.WRITE_FAILED)
+        self.assertFalse((self.out / "service.json").exists())
+
+    def test_33_undeterminable_protected_roots_refuse(self):
+        import material_identification_ui as ui
+
+        application, _ = self.evaluated()
+        target = self.out / "unprotected.json"
+        with mock.patch.object(adapter, "campaign_specimens", return_value=(self.base.item,)), \
+                mock.patch("domain.experiment_fixture.fixture_roots_from_environment",
+                           side_effect=RuntimeError("store configuration unreadable")):
+            self.assertIsNone(ui.export_auto_id_evidence(application, str(target)))
+        self.assertIn("No export: DESTINATION_REFUSED", self.message(application))
+        self.assertFalse(target.exists())
+        self.assertEqual(list(self.out.iterdir()), [])
+        self.assertIsNotNone(application.auto_id_active_evaluation)  # a configuration problem changes no verdict
+        export = build_evidence_export(self.base.definition, application.auto_id_selected_run_path,
+                                       (self.base.item,), application.auto_id_active_typed[1],
+                                       application.scientific_readiness_record,
+                                       application.auto_id_evaluated_fingerprint)
+        with self.assertRaises(ExportRefusal) as caught:  # an undetermined root is never ignored
+            write_export(export, target, (None,))
+        self.assertIs(caught.exception.code, ExportRefusalCode.DESTINATION)
+        self.assertFalse(target.exists())
+        self.assertIsNotNone(self.export(application, name="configured.json"))  # unconfigured stores are not an error
+
+
 def tearDownModule():
     if _Fixture._directory is not None:
         _Fixture._directory.cleanup()

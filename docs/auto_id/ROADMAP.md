@@ -888,6 +888,8 @@ fragment as a non-production preview (RELEASED calibration), verified campaign /
 identities, the evidence fingerprint and the M8.5 / M8.7 presentation. The campaign journal and every governed pipeline
 journal are re-verified from disk immediately before export; a change since the evaluation refuses and invalidates the
 active presentation, an unverifiable fingerprint refuses, and the run is never evaluated again. Written only after Save
-As, atomically, outside the repository, the data stores and the selected run, never over a non-export file; no INP file. The parked prototype branch
+As, atomically, outside the repository, the data stores and the selected run, never over a non-export file; no INP file. Final export-safety
+correction (still `REVIEW_READY`): the journals are re-verified again after the Save As dialog, immediately before
+writing; temporary-file creation failures are a typed WRITE_FAILED refusal; undeterminable data-store roots refuse. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.

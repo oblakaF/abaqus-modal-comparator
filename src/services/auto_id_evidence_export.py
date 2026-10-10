@@ -223,7 +223,9 @@ def check_destination(destination, protected_roots: Iterable) -> Path:
     if not target.parent.is_dir():
         _refuse(ExportRefusalCode.DESTINATION, f"the folder {target.parent} does not exist.")
     for root in protected_roots:
-        if root is not None and _inside(target, Path(root).resolve()):
+        if root is None:  # an undetermined protected root is never ignored
+            _refuse(ExportRefusalCode.DESTINATION, "a protected root could not be determined; nothing is written.")
+        if _inside(target, Path(root).resolve()):
             _refuse(ExportRefusalCode.DESTINATION, f"{target} is inside the protected {Path(root)} (repository, data "
                                                    "store or selected run); exports are written elsewhere.")
     if target.exists() and (not target.is_file() or not _is_export(target)):
@@ -237,18 +239,20 @@ def write_export(export: EvidenceExport, destination, protected_roots: Iterable)
 
     target = check_destination(destination, protected_roots)
     data = export.document()
-    handle, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".partial", dir=target.parent)
+    temporary = None
     try:
+        handle, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".partial", dir=target.parent)
         with os.fdopen(handle, "wb") as stream:
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, target)
     except BaseException as error:
-        try:
-            os.unlink(temporary)
-        except OSError:
-            pass
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
         if isinstance(error, Exception):
             raise ExportRefusal(ExportRefusalCode.WRITE_FAILED, f"{target}: {error}") from error
         raise
