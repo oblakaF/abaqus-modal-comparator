@@ -807,14 +807,14 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 | M8.4 | Progress / resume | `ACCEPTED` |
 | M8.5 | Verdict presentation | `ACCEPTED` |
 | M8.6 | Abaqus Engineering Constants block | `ACCEPTED` |
-| M8.7 | Uncertainty / source breakdown | `REVIEW_READY` |
-| M8.8 | Evidence / provenance export | `TODO` |
+| M8.7 | Uncertainty / source breakdown | `ACCEPTED` |
+| M8.8 | Evidence / provenance export | `REVIEW_READY` |
 
 **M8 GATE:** the user goes from a specimen/family folder to a scientifically guarded
 result without manually entering optimisation numbers other than specimen/passport
 measurements. No separate GUI scientific implementation. No new `install_*` layers.
 
-Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1–M8.6 accepted; M8.7 only). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
+Stage status: `IN_PROGRESS` (SUPERVISOR 2026-10-10: M8.1–M8.7 accepted; M8.8 only; the stage stays `IN_PROGRESS` until a separate final SUPERVISOR integration acceptance). The historical prototype branch `auto-id/m8` (`193db8d`) stays `PARKED` and untouched. **M8.1 `ACCEPTED`** (PR #51, branch
 `auto-id/m8-1` from `196503e`): page "0. Auto-ID Setup" in the existing Effective Material Identification tab loads one
 specimen folder or a family / campaign definition through the governed parsers and lists identity, physical
 measurements, passport / fixture, modal-data source, forward model, INP / ODB references, physical registration, the
@@ -870,7 +870,7 @@ record, REFUSED / NOT_READY / MATERIAL_VALUES_RELEASED, a cluster, a selection o
 NOT_AVAILABLE_FOR_SELECTION. A synthetic RELEASED preview is labelled SYNTHETIC / TEST EVIDENCE and NOT AUTHORISED FOR
 PRODUCTION. M8.6 merged: merge commit `4eb241d` (tree identical to reviewed head `8bbee80`), post-merge
 main CI success (run `38037350167`).
-**M8.7 `REVIEW_READY`** (PR #57, branch `auto-id/m8-7` from `4eb241d`): one read-only uncertainty and
+**M8.7 `ACCEPTED`** (PR #57, branch `auto-id/m8-7` from `4eb241d`): one read-only uncertainty and
 evidence-source section on the Data Readiness Check (`uncertainty_breakdown`), read from the record shown under the
 current selection and, for material identification only, from the backend's formal campaign report of the current typed
 evaluation. It shows the covariance basis (Σ_setup / Σ_meas status, complete vs conditional, provisional and missing
@@ -878,6 +878,16 @@ components), statistical_sd, the Birge adjustment, model-form robustness / leave
 calibration uncertainty against the recorded 0.08 ln p ceiling with the recorded decision, τ_mf separately as an
 acceptance tolerance, question-specific evidence and the evidence sources (hashes, specimens, solver profiles, FE
 sources, LM provenance, production status). Nothing is computed; a missing quantity is NOT_AVAILABLE with its recorded
-reason. M8.8 `TODO`. The parked prototype branch
+reason. M8.7 merged: merge commit `f523c38` (tree identical to reviewed head `0d9a03f`), post-merge main
+CI success (run `38040194804`).
+**M8.8 `REVIEW_READY`** (PR #58, branch `auto-id/m8-8` from `f523c38`): "Export Auto-ID Evidence..." on the Data
+Readiness Check writes a deterministic, report-only JSON export snapshot (`auto-id/evidence-export-snapshot/v1`, kind
+EXPORT_SNAPSHOT — not a scientific verdict and not an accepted evidence record) of the current typed evaluation: the
+exact backend record with its hash, the backend material report (material identification), the M8.6 constants and
+fragment as a non-production preview (RELEASED calibration), verified campaign / run / specimen / governed pipeline
+identities, the evidence fingerprint and the M8.5 / M8.7 presentation. The campaign journal and every governed pipeline
+journal are re-verified from disk immediately before export; a change since the evaluation refuses and invalidates the
+active presentation, an unverifiable fingerprint refuses, and the run is never evaluated again. Written only after Save
+As, atomically, outside the repository, the data stores and the selected run, never over a non-export file; no INP file. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.
