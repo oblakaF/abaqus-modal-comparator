@@ -4830,3 +4830,29 @@ first internal provider.
   closed V2 gap and the V1 formatter.
 - **Unchanged:** SPEC v1.1 / v1.2, D-078 / D-079, thresholds, M5 / M7, gates, RUN_A / RUN_B records and backend record
   hashes. Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
+
+## 2026-10-11 — V12-I7.1: companion material verdict core (REVIEW_READY; D-080)
+
+- **Branch:** `auto-id/v12-i7-companion` from `main` `8dc6955` (PR #63).
+- **Backend:** `ScientificReadiness.companion_material_verdict` — present only for SPECIMEN_ENGINEERING_CALIBRATION
+  records (schema `auto-id/companion-material-verdict/v1`: schema, role, labels, question MATERIAL_IDENTIFICATION,
+  status = the formal-output status or NOT_AVAILABLE, formal_output, reasons, material claim, §13 status, M5 verdicts,
+  uncertainty basis, provenance, own `record_hash`). Provenance: source = existing journalled evidence of the run,
+  campaign hash, run hash, material report hash, final candidate and pipeline run hashes; 0 Abaqus solves, 0 LM
+  executions, 0 new journal entries.
+- **Computation:** read-only by `identification_campaign_run.campaign_report_unchecked` — the body of
+  `build_campaign_report` moved out unchanged; the public `build_campaign_report` keeps
+  `require_question_supported()` and still refuses a calibration definition; a guard test keeps the backend its only
+  caller. Judged after the calibration verdict from the same journals; isolated (any failure gives NOT_AVAILABLE);
+  never passed to the calibration gate, output, fragment or release; the declared question and campaign hash are
+  unchanged. NOT_READY before verified evidence: NOT_AVAILABLE with the reason.
+- **GUI (presentation only):** the material verdict block shows the companion first (question, formal output with the
+  companion record hash, status / reasons), then the calibration verdict; a record without the field keeps
+  `MATERIAL_VERDICT_NOT_COMPUTED` (D-080, V12-I7).
+- **Synthetic result:** base RELEASED + companion NO_GLOBAL_PARAMETER_VALUE (§13 NOT_EVALUABLE, M5 NOT_IDENTIFIABLE);
+  imprecise / one_family / rank REFUSED + companion NO_GLOBAL_PARAMETER_VALUE.
+- **Tests:** `tests/test_v12_i7_companion_material_verdict.py`; `tests/test_v12_audit_v1_v2.py` expectations for current
+  records (the NOT_COMPUTED wording is now tested on records without the field).
+- **Unchanged:** SPEC v1.2, D-078, D-080, `src/domain`, production gate, M5 / M7 mathematics (the split report is
+  byte-identical), readiness schema `v1`, material records and RUN_A / RUN_B record and backend record hashes.
+  Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.

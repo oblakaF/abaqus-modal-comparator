@@ -1655,9 +1655,17 @@
       "not": "not a second scientific question; not a fallback; no influence on the calibration gate",
       "implementation": {
         "step": "V12-I7",
-        "status": "TODO",
+        "status": "IN_PROGRESS — V12-I7.1 core REVIEW_READY (PR #63)",
         "scope": "read-only companion material verdict in the calibration readiness output",
-        "authorisation": "separate explicit SUPERVISOR authorisation required"
+        "authorisation": "separate explicit SUPERVISOR authorisation required",
+        "V12-I7.1": {
+          "status": "REVIEW_READY",
+          "branch": "auto-id/v12-i7-companion",
+          "base": "8dc69550d28c8ac8b296e3ef08225095af76a5e4",
+          "pr": 63,
+          "scope": "ScientificReadiness.companion_material_verdict (key only for SPECIMEN_ENGINEERING_CALIBRATION records; schema auto-id/companion-material-verdict/v1; schema, role, labels, question, status, formal_output, reasons, provenance (source = existing journalled evidence, campaign_hash, run_hash, material_report_hash, final candidate, pipeline run hashes; 0 solves / LM / journal entries), own record_hash). Judged read-only by identification_campaign_run.campaign_report_unchecked (the body of build_campaign_report; the public guard is unchanged and still refuses a calibration definition) on the run's existing journals, after the calibration verdict; isolated (a failure gives NOT_AVAILABLE); never an input to the calibration gate, output or release. NOT_READY before verified evidence gives NOT_AVAILABLE. The GUI shows it first; a record without the field keeps MATERIAL_VERDICT_NOT_COMPUTED",
+          "unchanged": "SPEC v1.2, D-078, D-080, src/domain (require_executable, require_question_supported), production gate, M5 / M7 mathematics, readiness schema v1, material and RUN_A / RUN_B records and hashes"
+        }
       },
       "production_calibration_execution": "BLOCKED / NOT_AUTHORISED",
       "pr_61_v1_gap": "PR #61 (audit V1 / V2, open, not merged) shows the material verdict of a calibration run as not computed; this gap stays open until V12-I7 is implemented and accepted (relabelling it MATERIAL_VERDICT_NOT_COMPUTED also needs a separate authorisation)"
