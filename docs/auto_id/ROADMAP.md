@@ -791,6 +791,14 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
   production calibration campaign has been authorised; real Abaqus execution needs separate HUMAN approval; the M8 GUI track
   followed separately (read-only scope `ACCEPTED`, original M8 GATE `NOT_MET`; D-079). No scientific gate is relaxed.
 
+**Companion material verdict (D-080, architecture decision `ACCEPTED`):** SPEC v1.2 §1 requires the material verdict of a calibration run to be
+computed and shown first. Current state: `MATERIAL_VERDICT_NOT_COMPUTED` (temporary non-conformance by omission). Target:
+a read-only companion material verdict from the run's existing journals (no Abaqus, FE, LM or new optimisation), with its
+own record hash, shown first, never an input to the calibration gate or release; it is not a second scientific question
+and not a fallback. Implementation step **V12-I7 `TODO`** (separate authorisation). The PR #61 V1 gap
+(material verdict of a calibration run shown as not computed) stays open until V12-I7 is accepted.
+Production calibration execution stays `BLOCKED / NOT_AUTHORISED`.
+
 **External audit corrections V1 / V2 (`REVIEW_READY`, branch `auto-id/v12-audit-v1-v2`, reporting only):** V1 — the
 material verdict (question, formal output, status / refusal) is shown first, read from the stored record, then the
 calibration verdict; a calibration run records no material verdict and shows it as `NOT_EVALUATED` (open point: SPEC

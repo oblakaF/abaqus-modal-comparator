@@ -4794,6 +4794,21 @@ first internal provider.
 - **Unchanged:** SPEC v1.1 / v1.2, D-078 and all earlier decisions, `src`, campaigns, RUN_A / RUN_B records, historical
   checkpoints. Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
 
+## 2026-10-11 — D-080: companion material verdict of a specimen calibration run (governance only)
+
+- **Decision D-080 (SUPERVISOR):** material and calibration are different outputs; the material verdict of a
+  SPECIMEN_ENGINEERING_CALIBRATION run is a companion verdict required by SPEC v1.2 §1 — not a second scientific
+  question, not a fallback, no influence on the calibration gate.
+- **Current state:** `MATERIAL_VERDICT_NOT_COMPUTED`, a temporary non-conformance by omission (the accepted V12-I6
+  backend computes no material verdict for a calibration run; PR #61 audit V1 shows it as not computed).
+- **Target:** a read-only companion material verdict judged by the existing material path on the run's existing
+  journals — no Abaqus, no FE, no LM, no new optimisation; own field and record hash; shown first and unchanged; never an
+  input to the calibration gate, output, fragment or release. Accepted as an architecture decision; implementation
+  step V12-I7 `TODO` (separate authorisation).
+- **PR #61 V1 gap:** stays open (pending V12-I7); PR #61 itself is unchanged and not merged.
+- **Unchanged:** `src`, SPEC v1.2, D-078, the production gate (`require_executable`), RUN_A / RUN_B records. Production
+  calibration execution BLOCKED / NOT_AUTHORISED. Files: DECISIONS, STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
 ## 2026-10-11 — SPEC v1.2 external audit corrections V1 / V2 (REVIEW_READY; reporting only)
 
 - **Branch:** `auto-id/v12-audit-v1-v2` from `main` `e022e76`.
