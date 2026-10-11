@@ -18,6 +18,12 @@ decision or an authorisation: every such field is listed as missing.  Completene
 (``CAMPAIGN_KEYS``, ``CAMPAIGN_SPECIMEN_KEYS``, ``require_specimen_count``), and finalisation is exactly
 ``parse_campaign_definition`` — refused while anything is missing.  Nothing here runs Abaqus, FE or LM.
 
+Reopening (``load_draft``, M8-D2a) accepts only a ``auto-id/campaign-draft/v1`` document.  It rebuilds the draft from
+its explicit declarations through the domain validators and from its specimen selections through the governed binder
+(location, manifest, passport, fixture catalogue), and refuses any stored identity or pinned hash that differs from the
+current governed records, any missing or invalid reference and any conflicting preview; it never substitutes another
+specimen.  The stored status, missing inputs and preview are never trusted: they are recomputed.
+
 Writing (``write_draft``) happens only on an explicit Save As, to a ``.json`` destination outside the repository, the
 data stores and the selected source; never to a ``*.campaign.json`` name, never over a file that is not an earlier
 campaign draft; atomically (temporary file in the destination folder, then ``os.replace``).
@@ -25,7 +31,7 @@ campaign draft; atomically (temporary file in the destination folder, then ``os.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -60,6 +66,7 @@ DRAFT_NOTE = ("Campaign draft (Auto-ID M8-D1): a working document, not a campaig
 NOT_CHOSEN = ("not declared by the draft: M8-D1 never chooses mode pairings, FIT / HOLDOUT rows, registration evidence, "
               "solver profiles, FE baselines, uncertainties, parameters, settings, budgets, decisions or authorisation")
 PRODUCTION = "BLOCKED / NOT_AUTHORISED"
+AUTHORISATION = "none: a draft authorises no run; execution needs a HUMAN gate"
 FORWARD_MODEL_DIRECTORY = PurePosixPath("docs/auto_id/forward_models")  # the only governed specimen-input location
 QUESTION_CHOICES = SCIENTIFIC_QUESTIONS  # offered for an explicit choice; none is preselected
 
@@ -234,7 +241,7 @@ class CampaignDraft:
             "specimen_identities": [s.to_dict() for s in self.specimens],
             "intended_campaign_definition": self.intended_definition(),
             "missing_required_inputs": [{"field": g.field, "reason": g.reason} for g in gaps],
-            "authorisation": "none: a draft authorises no run; execution needs a HUMAN gate",
+            "authorisation": AUTHORISATION,
             "production_calibration_execution": PRODUCTION,
         }
 
@@ -275,6 +282,73 @@ def finalisation_state(draft: CampaignDraft) -> str:
     except CampaignDefinitionError as error:
         return f"Finalisation refused by the campaign-definition parser: {error}"
     return "All required inputs present: accepted by the campaign-definition parser (no definition is written here)."
+
+
+# ----------------------------------------------------------------------------- reopening (M8-D2a)
+
+_DOCUMENT_KEYS = {"schema", "kind", "labels", "note", "status", "declared", "specimen_identities",
+                  "intended_campaign_definition", "missing_required_inputs", "authorisation",
+                  "production_calibration_execution"}
+_SPECIMEN_FIELDS = tuple(f.name for f in fields(DraftSpecimen))
+
+
+def _refuse(message: str):
+    raise CampaignDraftError(message)
+
+
+def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureManifest) -> CampaignDraft:
+    """Rebuild a saved draft against the current governed records (refused on any mismatch; nothing substituted)."""
+
+    if not isinstance(document, dict) or document.get("schema") != DRAFT_SCHEMA:
+        _refuse(f"not a campaign draft: only {DRAFT_SCHEMA} documents can be opened.")
+    if set(document) != _DOCUMENT_KEYS:
+        _refuse(f"malformed draft: missing {sorted(_DOCUMENT_KEYS - set(document))}, unknown "
+                f"{sorted(set(document) - _DOCUMENT_KEYS)}.")
+    if document["kind"] != DRAFT_KIND or document["labels"] != list(DRAFT_LABELS)             or document["authorisation"] != AUTHORISATION or document["production_calibration_execution"] != PRODUCTION:
+        _refuse("malformed draft: its kind, labels, authorisation or production statement differ from a campaign "
+                "draft's (a draft authorises nothing).")
+    declared = document["declared"]
+    if not isinstance(declared, dict) or set(declared) != {"scientific_question", "tau_mf"}:
+        _refuse("malformed draft: 'declared' must state scientific_question and tau_mf (null when not declared).")
+    draft = CampaignDraft()
+    if declared["scientific_question"] is not None:
+        draft = draft.with_question(declared["scientific_question"])  # domain validation
+    if declared["tau_mf"] is not None:
+        if isinstance(declared["tau_mf"], str):
+            _refuse("malformed draft: the declared tau_mf must be a number.")
+        draft = draft.with_tau_mf(declared["tau_mf"])  # domain validation
+    identities = document["specimen_identities"]
+    if not isinstance(identities, list):
+        _refuse("malformed draft: 'specimen_identities' must be a list.")
+    for index, stored in enumerate(identities):
+        if not isinstance(stored, dict) or set(stored) != set(_SPECIMEN_FIELDS):
+            _refuse(f"specimen_identities[{index}]: malformed specimen identity.")
+        reference = stored["forward_model"]
+        if not isinstance(reference, str) or not reference or "\\" in reference                 or PurePosixPath(reference).is_absolute():
+            _refuse(f"specimen_identities[{index}]: the forward model must be a repository-relative POSIX path.")
+        try:
+            current = governed_specimen_input(Path(repo_root).joinpath(*PurePosixPath(reference).parts), repo_root,
+                                              fixtures)
+        except CampaignDraftError as error:
+            _refuse(f"specimen_identities[{index}] ({reference}): {error}")
+        changed = [name for name in _SPECIMEN_FIELDS if stored[name] != getattr(current, name)]
+        if changed:
+            _refuse(f"specimen_identities[{index}] ({reference}): the stored {', '.join(changed)} differ(s) from the "
+                    "current governed records; the selection is refused (never substituted).")
+        draft = draft.with_specimen(current)
+    if document["intended_campaign_definition"] != draft.intended_definition():
+        _refuse("conflicting draft: the stored preview does not match its declarations and specimen identities.")
+    return draft
+
+
+def load_draft(path, repo_root: Path, fixtures: ExperimentFixtureManifest) -> CampaignDraft:
+    """Open a saved campaign draft file and rebuild it (``draft_from_document``)."""
+
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise CampaignDraftError(f"{path} cannot be read as a JSON document: {error}") from error
+    return draft_from_document(document, repo_root, fixtures)
 
 
 # ----------------------------------------------------------------------------- writing

@@ -4949,3 +4949,22 @@ first internal provider.
      accepted; other repository paths are refused even when named `*.forward.json`.
 - **Tests:** focused regressions for all three in `tests/test_m8_d1_campaign_draft.py`.
 - **Unchanged:** `require_executable`, gates, thresholds, M7 records and campaign hashes. **Abaqus run count:** 0.
+
+## 2026-10-11 — M8-D1 ACCEPTED and merged; M8-D2a: Reopen Campaign Draft (REVIEW_READY)
+
+- **M8-D1:** SUPERVISOR ACCEPTED (PR #67, head `91dd8c8`); merge `01d7c7e8ce575e935a0b974d460ebb6121a2f312`; main Linux CI run `38142797322` success.
+- **M8-D2a** (branch `auto-id/m8-d2a` from `01d7c7e`): "Open Campaign Draft..." in the Campaign draft section.
+  - Opens only `auto-id/campaign-draft/v1` documents with the exact draft keys and the draft's kind, labels,
+    authorisation and production statement.
+  - Rebuilds the declared scientific question and τ_mf through the domain validators and every specimen selection
+    through the governed binder (forward_models location, manifest, passport, validated fixture catalogue,
+    fail-closed).
+  - Refuses any stored identity or pinned hash (forward-model, passport, registration) that differs from the current
+    governed records, any missing, invalid or duplicate reference and any preview that conflicts with the
+    declarations and identities; never substitutes a specimen.
+  - Recomputes status, missing inputs and finalisation (the stored values are not trusted); cancel or refusal keeps
+    the current draft; a reopened draft can be modified and saved again through the same safe Save As.
+- **Tests:** `tests/test_m8_d2a_reopen_campaign_draft.py`; the M8.1 button-set test lists "Open Campaign Draft...".
+- **Unchanged:** draft and campaign schemas, domain rules, `require_executable`, gates, thresholds, M7 records; no
+  finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET.
+  **Abaqus run count:** 0.

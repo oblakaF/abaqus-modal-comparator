@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8-D1 Create Campaign Draft in GUI",
+  "current_ministep": "M8-D2a Reopen Campaign Draft in GUI",
   "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
@@ -1348,7 +1348,7 @@
       },
       "M8-D1": {
         "title": "Create Campaign Draft in GUI (toward the original M8 GATE)",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/m8-d1",
         "base": "6915e1afcfc42b3c3f5d36bc7f402d17d71e0977",
         "authorisation": "SUPERVISOR task M8-D1 (one small step; no run execution)",
@@ -1356,7 +1356,19 @@
         "domain_change": "domain/campaign_definition.py: additive public names CAMPAIGN_KEYS, CAMPAIGN_SPECIMEN_KEYS, declared_scientific_question, declared_tau_mf, require_specimen_count; the parser calls require_specimen_count (identical rule and messages); campaign hashes unchanged (RUN_A 0a21ad05..., RUN_B 7c1f5db2...); require_unique_specimens (same pattern: the parser calls it, identical rule and message)",
         "unchanged": "require_executable, require_question_supported, campaign schema, scientific gates and thresholds, RUN_A / RUN_B records and hashes; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET",
         "pr": 67,
-        "review_corrections": "SUPERVISOR review of 219683d (CHANGES_REQUESTED): (1) fail-closed fixture validation — a specimen input is refused when the governed fixture catalogue cannot be loaded or validated (no fixtures=None fallback; the binder is unchanged; the draft is preserved); (2) duplicate specimen identity — the production uniqueness rule (labels and fixtures, domain require_unique_specimens, now also used by the parser with the identical message) reports e.g. SP02.forward.json + SP02.physical.forward.json as a gap; (3) governed input location — only manifests directly in docs/auto_id/forward_models/ are accepted"
+        "review_corrections": "SUPERVISOR review of 219683d (CHANGES_REQUESTED): (1) fail-closed fixture validation — a specimen input is refused when the governed fixture catalogue cannot be loaded or validated (no fixtures=None fallback; the binder is unchanged; the draft is preserved); (2) duplicate specimen identity — the production uniqueness rule (labels and fixtures, domain require_unique_specimens, now also used by the parser with the identical message) reports e.g. SP02.forward.json + SP02.physical.forward.json as a gap; (3) governed input location — only manifests directly in docs/auto_id/forward_models/ are accepted",
+        "acceptance": "SUPERVISOR: PR #67 head 91dd8c8 ACCEPTED and merged on explicit SUPERVISOR authorisation",
+        "merge_commit": "01d7c7e8ce575e935a0b974d460ebb6121a2f312",
+        "main_ci": "Linux CI on main 01d7c7e: success (run 38142797322)"
+      },
+      "M8-D2a": {
+        "title": "Reopen Campaign Draft in GUI",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-d2a",
+        "base": "01d7c7e8ce575e935a0b974d460ebb6121a2f312",
+        "authorisation": "SUPERVISOR task M8-D2a (one small step; no finalisation, no run)",
+        "scope": "\"Open Campaign Draft...\" in the Campaign draft section: services/campaign_draft.load_draft / draft_from_document open only auto-id/campaign-draft/v1 documents (exact keys; kind, labels, authorisation and production statement of a draft), rebuild the declarations through the domain validators and every specimen selection through the governed binder (forward_models location, manifest, passport, validated fixture catalogue; fail-closed), refuse any stored identity or pinned hash that differs from the current governed records, any missing / invalid / duplicate reference and any preview that conflicts with the declarations and identities; never substitute a specimen. The stored status, missing inputs and preview are recomputed, never trusted. Cancel or refusal keeps the current draft; the reopened draft can be modified and saved again (same safe Save As)",
+        "unchanged": "draft schema auto-id/campaign-draft/v1, campaign schema, domain rules, require_executable, gates, thresholds, M7 records; no finalisation; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
