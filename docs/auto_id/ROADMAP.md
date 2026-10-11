@@ -800,7 +800,13 @@ success, run `38084763361`): `ScientificReadiness.companion_material_verdict` (c
 record hash; provenance = the run's existing journalled evidence), judged read-only by the accepted M7 report body after
 the calibration verdict and never an input to it; the public `build_campaign_report` guard is unchanged. Current state: a
 calibration record evaluated on `7502424` or later carries the companion and the GUI shows it first; a stored record
-without the field still shows `MATERIAL_VERDICT_NOT_COMPUTED`. **V12-I7.2 `NOT_STARTED`** (separate SUPERVISOR command).
+without the field still shows `MATERIAL_VERDICT_NOT_COMPUTED`. **V12-I7.2 `REVIEW_READY`** (PR #65, branch
+`auto-id/v12-i7-2`, presentation / provenance only): the NOT_COMPUTED wording says the displayed record contains no
+companion (possibly a legacy record; not a computed decision; evaluate the stored run again explicitly); a refused
+calibration definition gives the companion reason "companion not judged: calibration definition refused (CODE)", while
+missing / unverified evidence keeps "run evidence not verified (CODE)"; the M8.7 Sources / provenance section shows the
+recorded companion record hash and material report hash (never in the calibration uncertainty sections); the M8.8
+export carries `scientific_evidence.companion_material_verdict_record_hash`. No scientific result changes.
 V12-I7 as a whole is not `ACCEPTED`; closing the D-080 non-conformance needs SUPERVISOR acceptance.
 Production calibration execution stays `BLOCKED / NOT_AUTHORISED`.
 

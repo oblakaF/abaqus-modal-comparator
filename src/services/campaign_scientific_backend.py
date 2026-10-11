@@ -198,10 +198,16 @@ def _evidence(specimens: Sequence[CampaignSpecimenInput], lm: Optional[VerifiedL
             "fe_sources": fe_sources, "lm_provenance": None if lm is None else lm.to_dict()}
 
 
+# refused from the calibration definition alone, before any run evidence is judged (``_calibration``)
+_DEFINITION_REFUSALS = frozenset({ReadinessRefusal.SPECIMEN_COUNT, ReadinessRefusal.TAU_MF_NOT_DECLARED})
+
+
 def _not_ready(definition, specimens, code: ReadinessRefusal, detail: str, lm=None,
                companion: Optional[Mapping[str, Any]] = None) -> ScientificReadiness:
     if companion is None and getattr(definition, "scientific_question", None) == SPECIMEN_ENGINEERING_CALIBRATION:
-        companion = _companion_not_available(definition, lm, [f"run evidence not verified ({code.value}): {detail}"])
+        why = (f"companion not judged: calibration definition refused ({code.value}): {detail}"
+               if lm is None and code in _DEFINITION_REFUSALS else f"run evidence not verified ({code.value}): {detail}")
+        companion = _companion_not_available(definition, lm, [why])
     return ScientificReadiness(ReadinessStatus.NOT_READY, getattr(definition, "scientific_question", None),
                                getattr(definition, "tau_mf", None),
                                _campaign(definition, None if lm is None else lm.run_hash),

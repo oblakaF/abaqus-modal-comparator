@@ -260,11 +260,12 @@ class NoFallbackTests(_Fixture):
 
     def test_missing_companion_is_shown_as_not_computed_never_inferred(self):
         record = self.judged("base").to_dict()
-        old = {k: v for k, v in record.items() if k != "companion_material_verdict"}  # a record before V12-I7
+        old = {k: v for k, v in record.items() if k != "companion_material_verdict"}  # e.g. a legacy record
         values = dict(material_verdict(old))
         self.assertTrue(values["Material verdict — status"].startswith(
-            "MATERIAL_VERDICT_NOT_COMPUTED — known temporary SPEC v1.2 §1 non-conformance (D-080); companion "
-            "material verdict pending V12-I7"))
+            "MATERIAL_VERDICT_NOT_COMPUTED — the displayed calibration record contains no companion material verdict "
+            "(D-080; it may be a legacy record); this absence is not a computed scientific decision; evaluate the "
+            "stored run again, explicitly, when its evidence is available"))
         self.assertEqual(values["Material verdict — formal output"], "NOT_AVAILABLE (MATERIAL_VERDICT_NOT_COMPUTED)")
         self.assertTrue(values["Calibration verdict"].startswith("RELEASED"))  # the calibration stays as recorded
 

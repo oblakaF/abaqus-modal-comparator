@@ -595,16 +595,19 @@ def _values(parameters, suffix: str = "") -> str:
     return ", ".join(items) + (f" ({suffix})" if suffix and items else "")
 
 
-MATERIAL_VERDICT_NOT_COMPUTED = ("MATERIAL_VERDICT_NOT_COMPUTED — known temporary SPEC v1.2 §1 non-conformance "
-                                 "(D-080); companion material verdict pending V12-I7")
+MATERIAL_VERDICT_NOT_COMPUTED = ("MATERIAL_VERDICT_NOT_COMPUTED — the displayed calibration record contains no "
+                                 "companion material verdict (D-080; it may be a legacy record); this absence is not "
+                                 "a computed scientific decision; evaluate the stored run again, explicitly, when its "
+                                 "evidence is available")
 
 
 def material_verdict(record) -> tuple[tuple[str, str], ...]:
     """The material verdict of a stored readiness record, shown first and unchanged (SPEC v1.2 §1; audit V1).
 
     Presentation only: read from the record (``ScientificReadiness.to_dict``); nothing is judged, recomputed or
-    inferred. A calibration record does not yet carry its companion material verdict (D-080; V12-I7), so it is
-    shown as MATERIAL_VERDICT_NOT_COMPUTED, never as computed.
+    inferred. A calibration record carries its recorded companion material verdict (D-080; V12-I7.1), shown first.
+    A calibration record without that field (possibly a legacy record; its age is never inferred from the missing
+    field) is shown as MATERIAL_VERDICT_NOT_COMPUTED, never as computed.
     """
 
     if not isinstance(record, Mapping) or record.get("schema") != READINESS_RECORD_SCHEMA:
@@ -1052,6 +1055,15 @@ def uncertainty_breakdown(record, material_report=None) -> tuple[tuple[str, str,
         add(section, "Calibration gate record hash", calibration.get("gate_record_hash"))
     if identity.get("inp_sha256"):
         add(section, "Pinned source INP SHA-256", identity.get("inp_sha256"))
+    companion = record.get("companion_material_verdict")
+    if calibration_question and isinstance(companion, Mapping):
+        # D-080: the recorded companion material provenance — a separate material result, not calibration uncertainty
+        add(section, "Companion material verdict · record hash",
+            f"{companion.get('record_hash') or _missing('not recorded')} (separate material result, D-080; not a "
+            "calibration uncertainty)")
+        add(section, "Companion material verdict · material report hash",
+            _mapping(companion.get("provenance")).get("material_report_hash")
+            or _missing("no material report recorded (companion " + str(companion.get("status")) + ")"))
     for name, value in sorted(_mapping(_mapping(report.get("m5_verdict")).get("evidence_hashes")).items()
                               if report else ()):
         add(section, f"M5 evidence hash · {name}", value or _missing("not recorded"))
