@@ -18,7 +18,11 @@ decision or an authorisation: every such field is listed as missing.  Completene
 (``CAMPAIGN_KEYS``, ``CAMPAIGN_SPECIMEN_KEYS``, ``require_specimen_count``), and finalisation is exactly
 ``parse_campaign_definition`` — refused while anything is missing.  Nothing here runs Abaqus, FE or LM.
 
-Reopening (``load_draft``, M8-D2a) accepts only a ``auto-id/campaign-draft/v1`` document.  It rebuilds the draft from
+M8-D2c adds the explicitly declared ``campaign_id`` and ``run_type`` (RUN_A or RUN_B; domain validation, no default;
+RUN_B grants no execution authorisation: its ``run_b_gate`` stays a missing, SUPERVISOR-gated input).  Drafts are
+saved as ``auto-id/campaign-draft/v2``; a ``v1`` draft (which declares neither field) is still opened as written.
+
+Reopening (``load_draft``, M8-D2a) accepts only a campaign-draft document (v1 or v2).  It rebuilds the draft from
 its explicit declarations through the domain validators and from its specimen selections through the governed binder
 (location, manifest, passport, fixture catalogue), and refuses any stored identity or pinned hash that differs from the
 current governed records, any missing or invalid reference and any conflicting preview; it never substitutes another
@@ -51,6 +55,11 @@ from domain.campaign_definition import (
     CAMPAIGN_SPECIMEN_KEYS,
     CampaignDefinition,
     CampaignDefinitionError,
+    RUN_B,
+    RUN_B_LABEL,
+    RUN_TYPES,
+    declared_campaign_id,
+    declared_run_type,
     declared_scientific_question,
     declared_tau_mf,
     parse_campaign_definition,
@@ -63,7 +72,11 @@ from domain.specimen_manifest import SpecimenManifestError
 
 from .forward_builder import load_bound_forward_model
 
-DRAFT_SCHEMA = "auto-id/campaign-draft/v1"
+DRAFT_SCHEMA_V1 = "auto-id/campaign-draft/v1"  # M8-D1 / D2a: declares scientific_question and tau_mf
+DRAFT_SCHEMA = "auto-id/campaign-draft/v2"  # M8-D2c: also campaign_id and run_type
+DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA)
+_DECLARED_KEYS = {DRAFT_SCHEMA_V1: ("scientific_question", "tau_mf"),
+                  DRAFT_SCHEMA: ("scientific_question", "tau_mf", "campaign_id", "run_type")}
 DRAFT_KIND = "CAMPAIGN_DRAFT"
 DRAFT_LABELS = ("DRAFT_NOT_A_CAMPAIGN_DEFINITION", "NOT_VALIDATED", "NOT_EXECUTABLE", "AUTHORISES_NOTHING")
 DRAFT_NOTE = ("Campaign draft (Auto-ID M8-D1): a working document, not a campaign definition. It is never loaded as "
@@ -75,6 +88,9 @@ PRODUCTION = "BLOCKED / NOT_AUTHORISED"
 AUTHORISATION = "none: a draft authorises no run; execution needs a HUMAN gate"
 FORWARD_MODEL_DIRECTORY = PurePosixPath("docs/auto_id/forward_models")  # the only governed specimen-input location
 QUESTION_CHOICES = SCIENTIFIC_QUESTIONS  # offered for an explicit choice; none is preselected
+RUN_TYPE_CHOICES = RUN_TYPES  # offered for an explicit choice; none is preselected
+RUN_B_NOT_AUTHORISED = (f"{RUN_B} ({RUN_B_LABEL}) is diagnostic only: selecting it authorises nothing; its own "
+                        "SUPERVISOR gate (run_b_gate) stays required and is never set by a draft")
 
 
 class CampaignDraftError(ValueError):
@@ -159,6 +175,8 @@ class CampaignDraft:
     scientific_question: Optional[str] = None
     tau_mf: Optional[float] = None
     specimens: tuple[DraftSpecimen, ...] = ()
+    campaign_id: Optional[str] = None  # M8-D2c
+    run_type: Optional[str] = None  # M8-D2c
 
     # ------------------------------------------------------------------ explicit declarations
     def with_question(self, question) -> "CampaignDraft":
@@ -175,6 +193,18 @@ class CampaignDraft:
                 raise CampaignDraftError(f"tau_mf: {value!r} is not a number; declare it explicitly.") from None
         try:
             return replace(self, tau_mf=declared_tau_mf(value))
+        except CampaignDefinitionError as error:
+            raise CampaignDraftError(str(error)) from error
+
+    def with_campaign_id(self, value) -> "CampaignDraft":
+        try:
+            return replace(self, campaign_id=declared_campaign_id(value))
+        except CampaignDefinitionError as error:
+            raise CampaignDraftError(str(error)) from error
+
+    def with_run_type(self, value) -> "CampaignDraft":
+        try:
+            return replace(self, run_type=declared_run_type(value))
         except CampaignDefinitionError as error:
             raise CampaignDraftError(str(error)) from error
 
@@ -197,6 +227,10 @@ class CampaignDraft:
             intended["scientific_question"] = self.scientific_question
         if self.tau_mf is not None:
             intended["tau_mf"] = self.tau_mf
+        if self.campaign_id is not None:
+            intended["campaign_id"] = self.campaign_id
+        if self.run_type is not None:
+            intended["run_type"] = self.run_type
         return intended
 
     def gaps(self) -> tuple[DraftGap, ...]:
@@ -225,7 +259,8 @@ class CampaignDraft:
             for key in sorted(CAMPAIGN_SPECIMEN_KEYS - set(item)):
                 gaps.append(DraftGap(f"specimens[{index}].{key}", NOT_CHOSEN))
         for key in sorted(CAMPAIGN_KEYS - set(intended)):
-            gaps.append(DraftGap(key, NOT_CHOSEN))
+            gaps.append(DraftGap(key, RUN_B_NOT_AUTHORISED if key == "run_b_gate" and self.run_type == RUN_B
+                                 else NOT_CHOSEN))
         return tuple(gaps)
 
     def finalise(self) -> CampaignDefinition:
@@ -243,7 +278,8 @@ class CampaignDraft:
         return {
             "schema": DRAFT_SCHEMA, "kind": DRAFT_KIND, "labels": list(DRAFT_LABELS), "note": DRAFT_NOTE,
             "status": "INCOMPLETE" if gaps else "COMPLETE_NOT_FINALISED",
-            "declared": {"scientific_question": self.scientific_question, "tau_mf": self.tau_mf},
+            "declared": {"scientific_question": self.scientific_question, "tau_mf": self.tau_mf,
+                         "campaign_id": self.campaign_id, "run_type": self.run_type},
             "specimen_identities": [s.to_dict() for s in self.specimens],
             "intended_campaign_definition": self.intended_definition(),
             "missing_required_inputs": [{"field": g.field, "reason": g.reason} for g in gaps],
@@ -264,7 +300,12 @@ def declare_tolerance(draft: CampaignDraft, value) -> CampaignDraft:
 def draft_rows(draft: CampaignDraft) -> tuple[tuple[str, str, str, str], ...]:
     """Table rows (section, item, value, status) for the GUI: declarations, specimen identities, missing inputs."""
 
-    rows = [("Declared", "Scientific question", draft.scientific_question or "",
+    run_type = draft.run_type or ""
+    if draft.run_type == RUN_B:
+        run_type = f"{RUN_B} — {RUN_B_NOT_AUTHORISED}"
+    rows = [("Declared", "Campaign id", draft.campaign_id or "", "PRESENT" if draft.campaign_id else "NOT_DECLARED"),
+            ("Declared", "Run type", run_type, "PRESENT" if draft.run_type else "NOT_DECLARED"),
+            ("Declared", "Scientific question", draft.scientific_question or "",
              "PRESENT" if draft.scientific_question else "NOT_DECLARED"),
             ("Declared", "τ_mf", "" if draft.tau_mf is None else f"{draft.tau_mf:g}",
              "NOT_DECLARED" if draft.tau_mf is None else "PRESENT")]
@@ -305,8 +346,9 @@ def _refuse(message: str):
 def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureManifest) -> CampaignDraft:
     """Rebuild a saved draft against the current governed records (refused on any mismatch; nothing substituted)."""
 
-    if not isinstance(document, dict) or document.get("schema") != DRAFT_SCHEMA:
-        _refuse(f"not a campaign draft: only {DRAFT_SCHEMA} documents can be opened.")
+    if not isinstance(document, dict) or document.get("schema") not in DRAFT_SCHEMAS:
+        _refuse(f"not a campaign draft: only {' / '.join(DRAFT_SCHEMAS)} documents can be opened.")
+    keys = _DECLARED_KEYS[document["schema"]]  # a v1 draft declares no campaign_id / run_type (never inferred)
     if set(document) != _DOCUMENT_KEYS:
         _refuse(f"malformed draft: missing {sorted(_DOCUMENT_KEYS - set(document))}, unknown "
                 f"{sorted(set(document) - _DOCUMENT_KEYS)}.")
@@ -314,9 +356,14 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
         _refuse("malformed draft: its kind, labels, authorisation or production statement differ from a campaign "
                 "draft's (a draft authorises nothing).")
     declared = document["declared"]
-    if not isinstance(declared, dict) or set(declared) != {"scientific_question", "tau_mf"}:
-        _refuse("malformed draft: 'declared' must state scientific_question and tau_mf (null when not declared).")
+    if not isinstance(declared, dict) or set(declared) != set(keys):
+        _refuse(f"malformed draft: 'declared' must state exactly {', '.join(keys)} for {document['schema']} (null "
+                "when not declared).")
     draft = CampaignDraft()
+    if declared.get("campaign_id") is not None:
+        draft = draft.with_campaign_id(declared["campaign_id"])  # domain validation
+    if declared.get("run_type") is not None:
+        draft = draft.with_run_type(declared["run_type"])  # domain validation
     if declared["scientific_question"] is not None:
         draft = draft.with_question(declared["scientific_question"])  # domain validation
     if declared["tau_mf"] is not None:
@@ -437,7 +484,7 @@ def _is_draft(path: Path) -> bool:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return False
-    return isinstance(document, dict) and document.get("schema") == DRAFT_SCHEMA
+    return isinstance(document, dict) and document.get("schema") in DRAFT_SCHEMAS
 
 
 def check_draft_destination(destination, protected_roots: Iterable) -> Path:
