@@ -24,6 +24,12 @@ its explicit declarations through the domain validators and from its specimen se
 current governed records, any missing or invalid reference and any conflicting preview; it never substitutes another
 specimen.  The stored status, missing inputs and preview are never trusted: they are recomputed.
 
+Checking the draft's inputs (``check_draft_inputs``, M8-D2b) re-verifies every selected specimen against the current
+governed records and runs the existing M8.1 wizard preparation on its passport and fixture: experimental modal data,
+FE inputs and other pinned external files are reported with their factual availability (PRESENT_SHA256_NOT_VERIFIED,
+NOT_CONFIGURED, NOT_FOUND, MISMATCH, ...) and the passport's recorded physical-data gaps are shown.  It is never a
+scientific readiness verdict (the shared backend judges readiness) and never substitutes an input.
+
 Writing (``write_draft``) happens only on an explicit Save As, to a ``.json`` destination outside the repository, the
 data stores and the selected source; never to a ``*.campaign.json`` name, never over a file that is not an earlier
 campaign draft; atomically (temporary file in the destination folder, then ``os.replace``).
@@ -349,6 +355,71 @@ def load_draft(path, repo_root: Path, fixtures: ExperimentFixtureManifest) -> Ca
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise CampaignDraftError(f"{path} cannot be read as a JSON document: {error}") from error
     return draft_from_document(document, repo_root, fixtures)
+
+
+# ----------------------------------------------------------------------------- input availability (M8-D2b)
+
+CHECK_NOTE = ("factual input availability only, not a scientific readiness verdict: PRESENT_SHA256_NOT_VERIFIED means "
+              "found with its pinned size, SHA-256 not verified here; readiness is judged by the shared backend on the "
+              "Data Readiness Check page")
+
+
+@dataclass(frozen=True)
+class DraftInputCheck:
+    """Rows (specimen, section, item, status, explanation) and refusals of one explicit check of one draft."""
+
+    rows: tuple[tuple[str, str, str, str, str], ...]
+    refusals: tuple[str, ...]
+
+    def summary(self) -> str:
+        if self.refusals:
+            return "Input check refused: " + "; ".join(self.refusals)
+        counts: dict[str, int] = {}
+        for row in self.rows:
+            counts[row[3]] = counts.get(row[3], 0) + 1
+        specimens = len({row[0] for row in self.rows})
+        return (f"Checked {specimens} specimen(s): " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items()))
+                + f" — {CHECK_NOTE}.")
+
+
+def check_draft_inputs(draft: CampaignDraft, repo_root: Path, fixtures: ExperimentFixtureManifest,
+                       roots) -> DraftInputCheck:
+    """Re-verify each selected specimen and report its inputs through the M8.1 wizard checks (read-only)."""
+
+    from .auto_id_wizard import prepare_specimen_passport  # the M8.1 factual checks, unchanged
+
+    if not isinstance(fixtures, ExperimentFixtureManifest):
+        return DraftInputCheck((), ("the governed experiment-fixture catalogue is not loaded and validated; no input "
+                                    "is checked",))
+    if roots is None:
+        return DraftInputCheck((), ("the configured data-store roots could not be determined; no input is checked",))
+    if not draft.specimens:
+        return DraftInputCheck((), ("the draft selects no specimen",))
+    rows = []
+    for stored in draft.specimens:
+        name = stored.label
+        try:
+            current = governed_specimen_input(Path(repo_root).joinpath(*PurePosixPath(stored.forward_model).parts),
+                                              repo_root, fixtures)
+        except CampaignDraftError as error:
+            rows.append((name, "Identity", f"Governed specimen input {stored.forward_model}", "INVALID",
+                         f"{error}; not checked further (never substituted)"))
+            continue
+        changed = [field for field in _SPECIMEN_FIELDS if getattr(stored, field) != getattr(current, field)]
+        if changed:
+            rows.append((name, "Identity", f"Governed specimen input {stored.forward_model}", "MISMATCH",
+                         f"the selected {', '.join(changed)} differ(s) from the current governed records; refused, "
+                         "not checked further (never substituted)"))
+            continue
+        rows.append((name, "Identity", f"Governed specimen input {stored.forward_model}", "PRESENT",
+                     f"re-verified against the current governed records (forward model {current.forward_model_id}, "
+                     f"manifest {current.forward_manifest_hash[:12]}; fixture {current.fixture_id})"))
+        preparation = prepare_specimen_passport(Path(repo_root).joinpath(*PurePosixPath(current.passport).parts),
+                                                repo_root, roots, fixtures)
+        for item in preparation.items:
+            rows.append((name, item.section, f"{item.label}: {item.value}" if item.value else item.label,
+                         item.status.value, item.detail))
+    return DraftInputCheck(tuple(rows), ())
 
 
 # ----------------------------------------------------------------------------- writing

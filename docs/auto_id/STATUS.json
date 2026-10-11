@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8-D2a Reopen Campaign Draft in GUI",
+  "current_ministep": "M8-D2b Check Draft Inputs in GUI",
   "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
@@ -1363,12 +1363,25 @@
       },
       "M8-D2a": {
         "title": "Reopen Campaign Draft in GUI",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/m8-d2a",
         "base": "01d7c7e8ce575e935a0b974d460ebb6121a2f312",
         "authorisation": "SUPERVISOR task M8-D2a (one small step; no finalisation, no run)",
         "scope": "\"Open Campaign Draft...\" in the Campaign draft section: services/campaign_draft.load_draft / draft_from_document open only auto-id/campaign-draft/v1 documents (exact keys; kind, labels, authorisation and production statement of a draft), rebuild the declarations through the domain validators and every specimen selection through the governed binder (forward_models location, manifest, passport, validated fixture catalogue; fail-closed), refuse any stored identity or pinned hash that differs from the current governed records, any missing / invalid / duplicate reference and any preview that conflicts with the declarations and identities; never substitute a specimen. The stored status, missing inputs and preview are recomputed, never trusted. Cancel or refusal keeps the current draft; the reopened draft can be modified and saved again (same safe Save As)",
-        "unchanged": "draft schema auto-id/campaign-draft/v1, campaign schema, domain rules, require_executable, gates, thresholds, M7 records; no finalisation; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
+        "unchanged": "draft schema auto-id/campaign-draft/v1, campaign schema, domain rules, require_executable, gates, thresholds, M7 records; no finalisation; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET",
+        "pr": 68,
+        "acceptance": "SUPERVISOR: PR #68 head 6db66e1 ACCEPTED and merged on explicit SUPERVISOR authorisation",
+        "merge_commit": "d78ea7e7e0980ec95b5c1eca079de7062d8d9c06",
+        "main_ci": "Linux CI on main d78ea7e: success (run 38155892460)"
+      },
+      "M8-D2b": {
+        "title": "Check Draft Inputs in GUI (factual input availability)",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-d2b",
+        "base": "d78ea7e7e0980ec95b5c1eca079de7062d8d9c06",
+        "authorisation": "SUPERVISOR task M8-D2b (one small step; no finalisation, no run)",
+        "scope": "\"Check Draft Inputs\" in the Campaign draft section: services/campaign_draft.check_draft_inputs re-verifies every selected specimen against the current governed records (governed binder, validated fixture catalogue, fail-closed; a changed or missing identity is MISMATCH / INVALID and nothing else is checked for it; never substituted) and runs the existing M8.1 wizard preparation on its passport and fixture: identity, recorded physical-data gaps (UNAVAILABLE / MISSING), registration, acquisition, modal set and the pinned external files (modal data, FE model input, reference ODB, FE geometry) with their factual statuses PRESENT_SHA256_NOT_VERIFIED / NOT_CONFIGURED / NOT_FOUND / MISMATCH. Shown in a separate table (specimen, section, item, status, explanation) with a summary stating that it is not a scientific readiness verdict; computed only on request; a result belongs to the exact draft checked (any change, reopen or discard hides it)",
+        "unchanged": "draft schema auto-id/campaign-draft/v1, M8.1 wizard checks, FIT / HOLDOUT pairings, domain rules, require_executable, gates, thresholds, M7 records; no finalisation; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",

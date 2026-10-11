@@ -4968,3 +4968,22 @@ first internal provider.
 - **Unchanged:** draft and campaign schemas, domain rules, `require_executable`, gates, thresholds, M7 records; no
   finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET.
   **Abaqus run count:** 0.
+
+## 2026-10-12 — M8-D2a ACCEPTED and merged; M8-D2b: Check Draft Inputs (REVIEW_READY)
+
+- **M8-D2a:** SUPERVISOR ACCEPTED (PR #68, head `6db66e1`); merge `d78ea7e7e0980ec95b5c1eca079de7062d8d9c06`; main Linux CI run `38155892460` success.
+- **M8-D2b** (branch `auto-id/m8-d2b` from `d78ea7e`): "Check Draft Inputs" in the Campaign draft section.
+  - `services/campaign_draft.check_draft_inputs` re-verifies every selected specimen against the current governed
+    records (governed binder, validated fixture catalogue, fail-closed); a changed identity is MISMATCH and a missing or
+    invalid one INVALID, and nothing else is checked for it (never substituted).
+  - For a verified specimen the existing M8.1 wizard preparation runs on its passport and fixture: identity, recorded
+    physical-data gaps (UNAVAILABLE / MISSING), registration, acquisition, modal set and the pinned modal data, FE model
+    input, reference ODB and FE geometry with their factual statuses (PRESENT_SHA256_NOT_VERIFIED, NOT_CONFIGURED,
+    NOT_FOUND, MISMATCH). A file found with its pinned size is never shown as scientifically ready.
+  - Separate GUI table (specimen, section, item, status, explanation) and summary ("not a scientific readiness
+    verdict"); computed only on request; a result belongs to the exact draft checked and is hidden after any change,
+    reopen or discard; a refused declaration (draft unchanged) keeps it.
+- **Tests:** `tests/test_m8_d2b_check_draft_inputs.py`; the M8.1 button-set test lists "Check Draft Inputs".
+- **Unchanged:** draft schema, M8.1 wizard checks, FIT / HOLDOUT pairings, domain rules, `require_executable`, gates,
+  thresholds, M7 records; no finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE
+  NOT_MET. **Abaqus run count:** 0.
