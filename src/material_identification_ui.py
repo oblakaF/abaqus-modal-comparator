@@ -1605,6 +1605,55 @@ def _refresh_campaign_draft(app) -> None:
     app.material_auto_id_draft_label.configure(text=view["message"])
     app.material_auto_id_draft_finalisation_label.configure(text=view["finalisation"])
     app.material_auto_id_draft_preview_label.configure(text=view["preview"])
+    if hasattr(app, "material_auto_id_draft_check_table"):
+        check = draft_input_check_view(app)
+        _replace_table_rows(app.material_auto_id_draft_check_table, check["rows"])
+        app.material_auto_id_draft_check_label.configure(text=check["summary"])
+
+
+AUTO_ID_DRAFT_CHECK_LABEL = "Check Draft Inputs"
+AUTO_ID_DRAFT_NOT_CHECKED = ("Draft inputs not checked (Check Draft Inputs re-verifies each selected specimen and "
+                             "reports the factual availability of its inputs; never a scientific readiness verdict).")
+
+
+def check_campaign_draft_inputs(app) -> None:
+    """"Check Draft Inputs": re-verify each selected specimen and report the factual availability of its passport,
+    fixture, modal data, FE inputs and other pinned files (the M8.1 wizard checks; read-only, on explicit request).
+    The result belongs to this exact draft: any change, reopen or discard invalidates it."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+    from services.campaign_draft import CampaignDraftError, DraftInputCheck, check_draft_inputs
+
+    draft = getattr(app, "auto_id_draft", None)
+    if draft is None:
+        app.auto_id_draft_message = "No campaign draft to check: use Create Campaign Draft... first."
+        app.auto_id_draft_check = None
+        _refresh_campaign_draft(app)
+        return
+    try:
+        fixtures = _draft_fixtures()
+    except CampaignDraftError as error:
+        result = DraftInputCheck((), (str(error),))
+    else:
+        try:
+            roots = fixture_roots_from_environment()
+        except Exception:  # the configured stores cannot be determined: nothing is checked
+            roots = None
+        try:
+            result = check_draft_inputs(draft, AUTO_ID_REPO_ROOT, fixtures, roots)
+        except Exception as error:  # never a GUI crash; never shown as available
+            result = DraftInputCheck((), (f"the inputs could not be checked ({error})",))
+    app.auto_id_draft_check = (draft, result)
+    _refresh_campaign_draft(app)
+
+
+def draft_input_check_view(app) -> dict[str, object]:
+    """The input check of the current draft only (a check of an earlier draft state is never shown)."""
+
+    stored, draft = getattr(app, "auto_id_draft_check", None), getattr(app, "auto_id_draft", None)
+    if stored is None or draft is None or stored[0] is not draft:
+        return {"summary": AUTO_ID_DRAFT_NOT_CHECKED, "rows": ()}
+    return {"summary": stored[1].summary(), "rows": stored[1].rows}
 
 
 def _choose_draft_specimen(app) -> None:
@@ -1766,6 +1815,18 @@ def _build_auto_id_setup_page(app, page) -> None:
     )
     app.material_auto_id_draft_preview_label = ttk.Label(draft, text="", justify="left", wraplength=1100)
     app.material_auto_id_draft_preview_label.pack(anchor="nw", fill="x", pady=(4, 0))
+    check = ttk.LabelFrame(draft, text="Draft input availability (factual; not a scientific readiness verdict)",
+                           padding=8)
+    check.pack(fill="x", pady=(8, 0))
+    ttk.Button(check, text=AUTO_ID_DRAFT_CHECK_LABEL, command=lambda: check_campaign_draft_inputs(app)).pack(
+        anchor="w", pady=(0, 4))
+    app.material_auto_id_draft_check_label = ttk.Label(check, text=AUTO_ID_DRAFT_NOT_CHECKED, justify="left",
+                                                       wraplength=1100)
+    app.material_auto_id_draft_check_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_draft_check_table = _build_read_only_table(
+        check, ("specimen", "section", "item", "status", "explanation"),
+        ("Specimen", "Section", "Item", "Status", "Explanation"), (90, 160, 300, 210, 540), height=12,
+    )
 
 
 def _refresh_auto_id_setup_page(app) -> None:
