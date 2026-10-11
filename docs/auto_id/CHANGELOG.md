@@ -4900,3 +4900,17 @@ first internal provider.
 - **Unchanged:** SPEC v1.2, D-078, D-080, `src/domain`, calibration gate and thresholds, M5 / M7 mathematics, RUN_A /
   RUN_B. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET; release checkpoint
   `e022e76` unchanged. V12-I7.1 `ACCEPTED`; V12-I7.2 `REVIEW_READY`; V12-I7 `IN_PROGRESS`. **Abaqus run count:** 0.
+
+## 2026-10-11 — V12-I7 ACCEPTED; D-080 implementation gap closed (governance only)
+
+- **Merge recorded:** PR #65 (`auto-id/v12-i7-2`, V12-I7.2) merge `280ff5b66e0ab9bf4768a9b655f482f0d3abdb44`; main Linux CI run
+  `38114141242` success. SUPERVISOR review: ALIGNED_WITH_D080.
+- **SUPERVISOR decision:** V12-I7.1 `ACCEPTED` (PR #63, `7502424`); V12-I7.2 `ACCEPTED` (PR #65, `280ff5b`); **V12-I7
+  overall `ACCEPTED`**. The D-080 companion material verdict implementation gap is **CLOSED for newly evaluated
+  calibration readiness records**.
+- **Historical truth preserved:** a stored calibration readiness record without `companion_material_verdict` stays
+  `MATERIAL_VERDICT_NOT_COMPUTED` and needs an explicit re-evaluation of the stored run; no scientific verdict is
+  assigned retroactively; RUN_A / RUN_B records and backend record hashes are unchanged.
+- **Unchanged:** `src`, `tests`, SPEC v1.1 / v1.2, DECISIONS (D-078, D-079, D-080), scientific calculations, gates and
+  thresholds, the historical release checkpoint `e022e76`. Original M8 GATE `NOT_MET`; production calibration
+  execution BLOCKED / NOT_AUTHORISED. Files: STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.

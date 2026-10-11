@@ -795,19 +795,21 @@ not today's acceptance status. The table above and `STATUS.json` define the curr
 §1 requires the material verdict of a calibration run to be computed and shown first: a read-only companion material
 verdict from the run's existing journals (no Abaqus, FE, LM or new optimisation), with its own record hash, shown first,
 never an input to the calibration gate or release; it is not a second scientific question and not a fallback.
-Implementation step **V12-I7 `IN_PROGRESS`**: **V12-I7.1 core `ACCEPTED`** — PR #63 merged (`7502424`, main Linux CI
+Implementation step **V12-I7 `ACCEPTED`**: **V12-I7.1 core `ACCEPTED`** — PR #63 merged (`7502424`, main Linux CI
 success, run `38084763361`): `ScientificReadiness.companion_material_verdict` (calibration records only; own schema and
 record hash; provenance = the run's existing journalled evidence), judged read-only by the accepted M7 report body after
 the calibration verdict and never an input to it; the public `build_campaign_report` guard is unchanged. Current state: a
 calibration record evaluated on `7502424` or later carries the companion and the GUI shows it first; a stored record
-without the field still shows `MATERIAL_VERDICT_NOT_COMPUTED`. **V12-I7.2 `REVIEW_READY`** (PR #65, branch
-`auto-id/v12-i7-2`, presentation / provenance only): the NOT_COMPUTED wording says the displayed record contains no
+without the field still shows `MATERIAL_VERDICT_NOT_COMPUTED`. **V12-I7.2 `ACCEPTED`** — PR #65 merged (`280ff5b`,
+main Linux CI success, run `38114141242`; presentation / provenance only): the NOT_COMPUTED wording says the displayed record contains no
 companion (possibly a legacy record; not a computed decision; evaluate the stored run again explicitly); a refused
 calibration definition gives the companion reason "companion not judged: calibration definition refused (CODE)", while
 missing / unverified evidence keeps "run evidence not verified (CODE)"; the M8.7 Sources / provenance section shows the
 recorded companion record hash and material report hash (never in the calibration uncertainty sections); the M8.8
 export carries `scientific_evidence.companion_material_verdict_record_hash`. No scientific result changes.
-V12-I7 as a whole is not `ACCEPTED`; closing the D-080 non-conformance needs SUPERVISOR acceptance.
+**D-080 implementation gap `CLOSED`** (SUPERVISOR) for newly evaluated calibration readiness records. Historical
+truth: a stored record without the companion stays `MATERIAL_VERDICT_NOT_COMPUTED` and needs an explicit
+re-evaluation; no scientific verdict is assigned retroactively; RUN_A / RUN_B are unchanged.
 Production calibration execution stays `BLOCKED / NOT_AUTHORISED`.
 
 **External audit corrections V1 / V2 (merged: PR #61, merge `8dc6955`, main Linux CI success, run `38078385546`;

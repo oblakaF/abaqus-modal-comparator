@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "V12-I7.2 final companion verdict integration (presentation / provenance)",
+  "current_ministep": "V12-I7 final acceptance and governance closeout (docs only)",
   "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
@@ -1647,15 +1647,15 @@
       ]
     },
     "companion_material_verdict": {
-      "status": "ACCEPTED — architecture decision (D-080); core implemented (V12-I7.1 ACCEPTED, merged PR #63); V12-I7.2 REVIEW_READY (PR #65); V12-I7 as a whole not ACCEPTED",
+      "status": "ACCEPTED — architecture decision (D-080); implementation V12-I7 ACCEPTED (V12-I7.1 PR #63, V12-I7.2 PR #65); D-080 implementation gap CLOSED for newly evaluated calibration readiness records",
       "decision": "D-080",
       "spec": "SPEC v1.2 §1 (\"its material verdict is still computed and shown separately, first, and unchanged\")",
-      "current_state": "a SPECIMEN_ENGINEERING_CALIBRATION readiness record evaluated on main 7502424 or later carries companion_material_verdict (schema auto-id/companion-material-verdict/v1, own record hash, provenance = the run's existing journalled evidence; read-only, no Abaqus / FE / LM); the GUI shows it first, then the calibration verdict; a stored record without the field (evaluated before V12-I7.1) still shows MATERIAL_VERDICT_NOT_COMPUTED; closing the D-080 non-conformance needs SUPERVISOR acceptance of V12-I7",
+      "current_state": "a SPECIMEN_ENGINEERING_CALIBRATION readiness record evaluated on main 7502424 or later carries companion_material_verdict (schema auto-id/companion-material-verdict/v1, own record hash, provenance = the run's existing journalled evidence; read-only, no Abaqus / FE / LM); the GUI shows it first, then the calibration verdict; since 280ff5b the M8.7 breakdown shows its record and material report hashes and the M8.8 export references its record hash; a stored calibration readiness record without companion_material_verdict stays MATERIAL_VERDICT_NOT_COMPUTED: the stored record contains no companion material verdict; it may predate V12-I7.1, but its age is not inferred from the missing field; explicit re-evaluation of the stored run is required when the evidence is available; no scientific verdict is assigned retroactively; RUN_A / RUN_B records and backend record hashes unchanged",
       "target": "read-only companion material verdict: existing material path on the calibration run's existing journals; no Abaqus, no FE, no LM, no new optimisation; own field and record hash; shown first and unchanged; never an input to the calibration gate or release",
       "not": "not a second scientific question; not a fallback; no influence on the calibration gate",
       "implementation": {
         "step": "V12-I7",
-        "status": "IN_PROGRESS — V12-I7.1 ACCEPTED (PR #63, 7502424); V12-I7.2 REVIEW_READY (PR #65)",
+        "status": "ACCEPTED — V12-I7.1 (PR #63, 7502424) and V12-I7.2 (PR #65, 280ff5b) ACCEPTED",
         "scope": "read-only companion material verdict in the calibration readiness output",
         "authorisation": "separate explicit SUPERVISOR authorisation required",
         "V12-I7.1": {
@@ -1670,14 +1670,18 @@
           "main_ci": "Linux CI on main 7502424: success (run 38084763361)"
         },
         "V12-I7.2": {
-          "status": "REVIEW_READY",
+          "status": "ACCEPTED",
           "branch": "auto-id/v12-i7-2",
           "base": "9f26c2f7111a87ea32eca95e6fb08aef44612b10",
           "pr": 65,
           "scope": "presentation / provenance only. (1) auto_id_wizard.MATERIAL_VERDICT_NOT_COMPUTED: a calibration record without companion_material_verdict says the displayed record contains no companion material verdict (it may be a legacy record; its age is never inferred from the missing field), that this absence is not a computed scientific decision, and that the stored run should be evaluated again explicitly when its evidence is available. (2) Companion NOT_AVAILABLE reasons: a calibration definition refused before any evidence judgement (SPECIMEN_COUNT, TAU_MF_NOT_DECLARED) gives 'companion not judged: calibration definition refused (CODE): ...'; missing / invalid / unverified LM or run evidence keeps 'run evidence not verified (CODE): ...'; refusal codes unchanged. (3) M8.7 Sources / provenance: for a calibration record carrying the companion, the recorded companion record_hash and provenance.material_report_hash, labelled a separate material result (D-080), never in the calibration uncertainty sections A-E. (4) M8.8 export: scientific_evidence.companion_material_verdict_record_hash (calibration records only), read from the current typed evaluation's backend_record; no verdict judged again, no material report built",
           "hash_effect": "calibration readiness records: RELEASED / REFUSED / evidence-level NOT_READY byte-identical to main 9f26c2f; only a definition-level NOT_READY record (SPECIMEN_COUNT, TAU_MF_NOT_DECLARED) changes, in its companion reason text and therefore its companion and readiness record_hash (no accepted records of this kind exist); without the companion field it is identical to main. Material records and RUN_A / RUN_B backend record hashes unchanged. M8.8 export content_hash of a calibration export changes (new companion hash reference and two presentation rows); material exports unchanged; no scientific record hash changes",
-          "unchanged": "SPEC v1.2, D-078, D-080, src/domain (require_executable, require_question_supported), calibration gate and thresholds, released parameters, scientific question, M5 / M7 mathematics, readiness schema v1, companion schema v1, RUN_A / RUN_B records; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET; release checkpoint e022e76 unchanged"
-        }
+          "unchanged": "SPEC v1.2, D-078, D-080, src/domain (require_executable, require_question_supported), calibration gate and thresholds, released parameters, scientific question, M5 / M7 mathematics, readiness schema v1, companion schema v1, RUN_A / RUN_B records; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET; release checkpoint e022e76 unchanged",
+          "acceptance": "SUPERVISOR: PR #65 reviewed (ALIGNED_WITH_D080) and merged on explicit SUPERVISOR authorisation",
+          "merge_commit": "280ff5b66e0ab9bf4768a9b655f482f0d3abdb44",
+          "main_ci": "Linux CI on main 280ff5b: success (run 38114141242)"
+        },
+        "acceptance": "SUPERVISOR: V12-I7 implementation accepted (V12-I7.1 + V12-I7.2)"
       },
       "production_calibration_execution": "BLOCKED / NOT_AUTHORISED",
       "pr_61_v1_gap": "PR #61 merged (8dc6955): its V1 MATERIAL_VERDICT_NOT_COMPUTED display is superseded for calibration records evaluated since V12-I7.1 (PR #63, 7502424), which carry the companion material verdict; it remains only for stored records without the field",
@@ -1685,6 +1689,12 @@
         "pr": 62,
         "merge_commit": "f5cbc2197834b3114c4d301107545b7e8ebadeb7",
         "main_ci": "Linux CI on main f5cbc21: success (run 38074570838)"
+      },
+      "implementation_gap": {
+        "status": "CLOSED",
+        "scope": "newly evaluated SPECIMEN_ENGINEERING_CALIBRATION readiness records (SPEC v1.2 §1 conformance by D-080)",
+        "decision": "SUPERVISOR: accept the completed V12-I7 implementation and close the D-080 companion material verdict implementation gap",
+        "historical_records": "a stored calibration readiness record without companion_material_verdict stays MATERIAL_VERDICT_NOT_COMPUTED: the stored record contains no companion material verdict; it may predate V12-I7.1, but its age is not inferred from the missing field; explicit re-evaluation of the stored run is required when the evidence is available; no scientific verdict is assigned retroactively; RUN_A / RUN_B records and backend record hashes unchanged"
       }
     },
     "audit_corrections_v1_v2": {
@@ -1694,7 +1704,7 @@
       "V1": "material verdict first: auto_id_wizard.material_verdict (presentation; used by the backend readiness_presentation; read from the stored readiness record only) is the first block of readiness_presentation and of the M8.5 verdict summary — material question, formal output and status (refusal reasons for NO_GLOBAL_PARAMETER_VALUE / NOT_IDENTIFIABLE) — followed by the calibration verdict; for a calibration record without the companion field the block shows MATERIAL_VERDICT_NOT_COMPUTED (D-080); since V12-I7.1 (PR #63) a calibration record carries the companion material verdict, which the block shows first (the NOT_COMPUTED label wording is updated by V12-I7.2, PR #65: no companion in the displayed record, possibly a legacy record, not a computed decision)",
       "V2": "specimen calibration output record (schema auto-id/specimen-engineering-calibration/v2) gains statistical_sd (status, statistical_sd_ln per fitted parameter, record hash, reasons; copied from the bound M5 statistical_sd record) and model_form_robustness (leave-one-FIT-family-out status, reasons, cases, record hash; copied from the gate observability); missing values stay NOT_AVAILABLE / null; no range is derived; the M8.7 breakdown reads these fields",
       "unchanged": "SPEC, thresholds, M5 / M7, RUN_A / RUN_B records and backend record hashes, gates and decisions; production calibration execution BLOCKED / NOT_AUTHORISED; Abaqus runs 0",
-      "material_verdict_of_calibration_run": "decided by D-080; core implemented by V12-I7.1 (ACCEPTED, PR #63, 7502424); V12-I7.2 REVIEW_READY (PR #65); V12-I7 not ACCEPTED as a whole",
+      "material_verdict_of_calibration_run": "decided by D-080; implemented by V12-I7 (ACCEPTED: V12-I7.1 PR #63, 7502424; V12-I7.2 PR #65, 280ff5b); implementation gap CLOSED for newly evaluated calibration readiness records; records without the companion stay MATERIAL_VERDICT_NOT_COMPUTED",
       "schema_v2_effect": "schema v2 changes the calibration record_hash and the derived CAL_* material names; this is acceptable because no production calibration records exist (production calibration execution BLOCKED / NOT_AUTHORISED)",
       "pr": 61,
       "merge_commit": "8dc69550d28c8ac8b296e3ef08225095af76a5e4",
