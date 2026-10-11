@@ -483,9 +483,13 @@ class SetupPageTests(_Tmp):
                 collect(child)
 
         collect(page)
-        self.assertEqual(sorted(buttons), ["Auto-ID — Evaluate Stored Run", "Refresh run progress",
-                                           "Reopen selected run", "Select family / campaign definition...",
-                                           "Select specimen folder...", "Select stored run journal..."])  # + M8.3, M8.4
+        self.assertEqual(sorted(buttons), sorted(
+            ["Auto-ID — Evaluate Stored Run", "Refresh run progress", "Reopen selected run",
+             "Select family / campaign definition...", "Select specimen folder...", "Select stored run journal...",
+             # M8-D1 campaign draft (preparation only; tested in test_m8_d1_campaign_draft)
+             "Create Campaign Draft...", "Add governed specimen input...", "Remove all specimens", "Discard draft",
+             "Question: MATERIAL_IDENTIFICATION", "Question: SPECIMEN_ENGINEERING_CALIBRATION", "Declare τ_mf...",
+             "Save Campaign Draft As..."]))  # + M8.3, M8.4
         with mock.patch.object(ui.filedialog, "askopenfilename", return_value=str(RUN_B)):
             buttons["Select family / campaign definition..."]()
         self.assertIn("RUN_B", application.material_auto_id_summary_label.kwargs["text"])

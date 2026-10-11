@@ -4,7 +4,7 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "V12-I7 final acceptance and governance closeout (docs only)",
+  "current_ministep": "M8-D1 Create Campaign Draft in GUI",
   "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
@@ -1345,6 +1345,16 @@
           "merge_ci": "Linux CI on main 1e88e9b: success (run 38044596355)",
           "acceptance": "SUPERVISOR 2026-10-10: ACCEPTED (incl. the final export-safety correction); merged as authorised"
         }
+      },
+      "M8-D1": {
+        "title": "Create Campaign Draft in GUI (toward the original M8 GATE)",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-d1",
+        "base": "6915e1afcfc42b3c3f5d36bc7f402d17d71e0977",
+        "authorisation": "SUPERVISOR task M8-D1 (one small step; no run execution)",
+        "scope": "\"Create Campaign Draft...\" on page \"0. Auto-ID Setup\" (no install_* layer): services/campaign_draft.py builds a separate draft document (schema auto-id/campaign-draft/v1, labels DRAFT_NOT_A_CAMPAIGN_DEFINITION / NOT_VALIDATED / NOT_EXECUTABLE / AUTHORISES_NOTHING) from governed specimen inputs (repository forward-model manifests loaded through the governed binder; identities shown as recorded) and the explicitly declared scientific question and tau_mf (validated by the domain rules; no default); it lists every missing required campaign input (domain CAMPAIGN_KEYS / CAMPAIGN_SPECIMEN_KEYS and require_specimen_count) and previews the intended v1.2 definition; finalisation is parse_campaign_definition and is refused while anything is missing. Never chooses pairings, FIT / HOLDOUT rows, registration evidence, solver profiles, FE baselines, uncertainties, parameters, settings, budgets, decisions or authorisation. Saved only on an explicit Save As, atomically, outside the repository, the data stores, the selected source and run; never as *.campaign.json; never over a non-draft file. No run, no Abaqus / FE / LM",
+        "domain_change": "domain/campaign_definition.py: additive public names CAMPAIGN_KEYS, CAMPAIGN_SPECIMEN_KEYS, declared_scientific_question, declared_tau_mf, require_specimen_count; the parser calls require_specimen_count (identical rule and messages); campaign hashes unchanged (RUN_A 0a21ad05..., RUN_B 7c1f5db2...)",
+        "unchanged": "require_executable, require_question_supported, campaign schema, scientific gates and thresholds, RUN_A / RUN_B records and hashes; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",

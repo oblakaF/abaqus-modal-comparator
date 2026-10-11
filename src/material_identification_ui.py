@@ -19,7 +19,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path, PureWindowsPath
 import textwrap
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from domain.identification_model import IdentificationModelDefinition
 from domain.material_identification_session import MaterialIdentificationSession
@@ -1409,6 +1409,182 @@ def export_auto_id_evidence(app, destination=None):
     return path
 
 
+AUTO_ID_DRAFT_LABEL = "Create Campaign Draft..."
+AUTO_ID_DRAFT_SAVE_LABEL = "Save Campaign Draft As..."
+AUTO_ID_DRAFT_SCOPE = (
+    "Campaign draft (M8-D1): select governed specimen inputs (forward-model manifests in the repository) and declare "
+    "the scientific question and τ_mf explicitly. The draft shows the chosen specimen identities, every required "
+    "campaign input that is still missing and a preview of the intended campaign definition. It never chooses mode "
+    "pairings, FIT / HOLDOUT rows, registration, uncertainties or solver settings, is never a validated campaign "
+    "definition, runs nothing and authorises nothing."
+)
+AUTO_ID_NO_DRAFT = "No campaign draft (Create Campaign Draft... starts one)."
+
+
+def create_campaign_draft(app) -> None:
+    """"Create Campaign Draft...": start a new, empty draft (no question, τ_mf or specimen is assumed)."""
+
+    from services.campaign_draft import CampaignDraft
+
+    app.auto_id_draft = CampaignDraft()
+    app.auto_id_draft_message = "New campaign draft: nothing declared yet."
+    _refresh_campaign_draft(app)
+
+
+def _change_campaign_draft(app, change, done: str) -> None:
+    from services.campaign_draft import CampaignDraftError
+
+    draft = getattr(app, "auto_id_draft", None)
+    if draft is None:
+        app.auto_id_draft_message = "No campaign draft: use Create Campaign Draft... first."
+    else:
+        try:
+            app.auto_id_draft = change(draft)
+        except CampaignDraftError as error:
+            app.auto_id_draft_message = f"Not changed: {error}"
+        except Exception as error:  # never a GUI crash; the draft is unchanged
+            app.auto_id_draft_message = f"Not changed: {error}"
+        else:
+            app.auto_id_draft_message = done
+    _refresh_campaign_draft(app)
+
+
+def add_draft_specimen(app, path) -> None:
+    """Add a governed specimen input (a repository forward-model manifest) to the draft, as its records state it."""
+
+    from domain.experiment_fixture import FixtureManifestError
+    from services.auto_id_wizard import load_fixtures
+    from services.campaign_draft import governed_specimen_input
+
+    def change(draft):
+        try:
+            fixtures = load_fixtures(AUTO_ID_REPO_ROOT)
+        except (OSError, FixtureManifestError):
+            fixtures = None
+        return draft.with_specimen(governed_specimen_input(path, AUTO_ID_REPO_ROOT, fixtures))
+
+    _change_campaign_draft(app, change, f"Added governed specimen input {Path(str(path)).name}.")
+
+
+def clear_draft_specimens(app) -> None:
+    _change_campaign_draft(app, lambda draft: draft.without_specimens(), "Removed every specimen from the draft.")
+
+
+def declare_draft_question(app, question) -> None:
+    _change_campaign_draft(app, lambda draft: draft.with_question(question), f"Declared question {question}.")
+
+
+def declare_draft_tolerance(app, value) -> None:
+    """Declare the draft's model-form acceptance tolerance τ_mf (validated by the campaign-definition rules)."""
+
+    from services.campaign_draft import declare_tolerance
+
+    _change_campaign_draft(app, lambda draft: declare_tolerance(draft, value), f"Declared τ_mf {value}.")
+
+
+def discard_campaign_draft(app) -> None:
+    """Discard the draft (nothing is written)."""
+
+    app.auto_id_draft = None
+    app.auto_id_draft_message = "Campaign draft discarded: nothing written."
+    _refresh_campaign_draft(app)
+
+
+def _draft_protected_roots(app) -> tuple:
+    """Folders a draft is never written into: the repository, every configured data store, the selected source and
+    the selected run."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+
+    try:
+        stores = list(fixture_roots_from_environment().values())
+    except Exception:  # the configured roots cannot be determined: no destination can be checked
+        return (None,)
+    roots = [AUTO_ID_REPO_ROOT, *stores]
+    source = getattr(app, "auto_id_source", None)
+    if source is not None:
+        path = Path(source[1])
+        roots.append(path if source[0] == "specimen" else path.parent)
+    run_path = getattr(app, "auto_id_selected_run_path", None)
+    if run_path is not None:  # <run root>/campaign/<run hash>/journal.json
+        roots.append(Path(run_path).resolve().parents[2])
+    return tuple(roots)
+
+
+def save_campaign_draft(app, destination=None):
+    """"Save Campaign Draft As...": the draft document, written only after an explicit Save As, atomically, outside
+    every protected folder; cancelling writes nothing. A draft is never a campaign definition."""
+
+    from services.campaign_draft import CampaignDraftError, write_draft
+
+    draft = getattr(app, "auto_id_draft", None)
+    if draft is None:
+        app.auto_id_draft_message = "No campaign draft to save: use Create Campaign Draft... first."
+        _refresh_campaign_draft(app)
+        return None
+    if destination is None:
+        destination = filedialog.asksaveasfilename(
+            title=AUTO_ID_DRAFT_SAVE_LABEL.rstrip("."),
+            defaultextension=".json",
+            initialfile="auto-id-campaign-draft.json",
+            filetypes=[("Auto-ID campaign draft", "*.json")],
+        )
+    if not destination:
+        app.auto_id_draft_message = "Save cancelled: no file written."
+        _refresh_campaign_draft(app)
+        return None
+    try:
+        path = write_draft(draft, destination, _draft_protected_roots(app))
+    except CampaignDraftError as error:
+        app.auto_id_draft_message = f"Not saved: {error}"
+        _refresh_campaign_draft(app)
+        return None
+    status = draft.document()["status"]
+    app.auto_id_draft_message = f"Saved the campaign draft ({status}) to {path} (a draft, not a campaign definition)."
+    _refresh_campaign_draft(app)
+    return path
+
+
+def campaign_draft_view(app) -> dict[str, object]:
+    """Rows, finalisation state and preview of the current draft (presentation only)."""
+
+    from services.campaign_draft import draft_rows, finalisation_state
+
+    draft = getattr(app, "auto_id_draft", None)
+    message = getattr(app, "auto_id_draft_message", None) or AUTO_ID_NO_DRAFT
+    if draft is None:
+        return {"message": message, "finalisation": "", "rows": (), "preview": ""}
+    preview = json.dumps(draft.intended_definition(), indent=1, ensure_ascii=False)
+    return {"message": message, "finalisation": finalisation_state(draft), "rows": draft_rows(draft),
+            "preview": preview}
+
+
+def _refresh_campaign_draft(app) -> None:
+    if not hasattr(app, "material_auto_id_draft_table"):
+        return
+    view = campaign_draft_view(app)
+    _replace_table_rows(app.material_auto_id_draft_table, view["rows"])
+    app.material_auto_id_draft_label.configure(text=view["message"])
+    app.material_auto_id_draft_finalisation_label.configure(text=view["finalisation"])
+    app.material_auto_id_draft_preview_label.configure(text=view["preview"])
+
+
+def _choose_draft_specimen(app) -> None:
+    path = filedialog.askopenfilename(
+        title="Governed specimen input (forward-model manifest)",
+        initialdir=str(AUTO_ID_REPO_ROOT / "docs" / "auto_id" / "forward_models"),
+        filetypes=(("Forward-model manifest", "*.forward.json"), ("JSON", "*.json")),
+    )
+    if path:
+        add_draft_specimen(app, path)
+
+
+def _ask_draft_tolerance(app) -> None:
+    value = simpledialog.askstring("Declare τ_mf", "τ_mf (0 < τ_mf ≤ 0.02, in |Δ ln f|):")
+    if value is not None:
+        declare_draft_tolerance(app, value)
+
+
 def _choose_auto_id_run(app) -> None:
     path = filedialog.askopenfilename(
         title="Stored campaign run journal (campaign/<run hash>/journal.json)",
@@ -1517,6 +1693,40 @@ def _build_auto_id_setup_page(app, page) -> None:
         justify="left",
         wraplength=1100,
     ).pack(anchor="nw", fill="x", pady=(8, 0))
+    draft = ttk.LabelFrame(page, text="Campaign draft (preparation only; not a campaign definition)", padding=8)
+    draft.pack(fill="x", pady=(8, 0))
+    ttk.Label(draft, text=AUTO_ID_DRAFT_SCOPE, justify="left", wraplength=1100).pack(anchor="nw", fill="x",
+                                                                                    pady=(0, 4))
+    draft_buttons = ttk.Frame(draft)
+    draft_buttons.pack(anchor="w", pady=(0, 4))
+    for text, command in (
+        (AUTO_ID_DRAFT_LABEL, lambda: create_campaign_draft(app)),
+        ("Add governed specimen input...", lambda: _choose_draft_specimen(app)),
+        ("Remove all specimens", lambda: clear_draft_specimens(app)),
+        ("Discard draft", lambda: discard_campaign_draft(app)),
+    ):
+        ttk.Button(draft_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
+    declare_buttons = ttk.Frame(draft)
+    declare_buttons.pack(anchor="w", pady=(0, 4))
+    from services.campaign_draft import QUESTION_CHOICES
+
+    for text, command in (
+        *((f"Question: {question}", lambda q=question: declare_draft_question(app, q)) for question in QUESTION_CHOICES),
+        ("Declare τ_mf...", lambda: _ask_draft_tolerance(app)),
+        (AUTO_ID_DRAFT_SAVE_LABEL, lambda: save_campaign_draft(app)),
+    ):
+        ttk.Button(declare_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
+    app.material_auto_id_draft_label = ttk.Label(draft, text=AUTO_ID_NO_DRAFT, justify="left", wraplength=1100)
+    app.material_auto_id_draft_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_draft_finalisation_label = ttk.Label(draft, text="", style="MetricValue.TLabel",
+                                                              justify="left", wraplength=1100)
+    app.material_auto_id_draft_finalisation_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_draft_table = _build_read_only_table(
+        draft, ("section", "item", "value", "status"), ("Section", "Item", "Value", "Status"),
+        (190, 230, 640, 140), height=10,
+    )
+    app.material_auto_id_draft_preview_label = ttk.Label(draft, text="", justify="left", wraplength=1100)
+    app.material_auto_id_draft_preview_label.pack(anchor="nw", fill="x", pady=(4, 0))
 
 
 def _refresh_auto_id_setup_page(app) -> None:
@@ -1533,6 +1743,7 @@ def _refresh_auto_id_setup_page(app) -> None:
         _replace_table_rows(app.material_auto_id_progress_table, () if progress is None else progress.rows)
         app.material_auto_id_progress_label.configure(text="NOT_SELECTED" if progress is None
                                                       else progress.state.value)
+    _refresh_campaign_draft(app)
 
 
 def _build_project_evidence_page(app, page) -> None:

@@ -350,6 +350,33 @@ def _tau_mf(value: object) -> float:
     return float(value)
 
 
+CAMPAIGN_KEYS = frozenset(_TOP_KEYS)  # the required top-level fields of every campaign definition
+CAMPAIGN_SPECIMEN_KEYS = frozenset(_SPECIMEN_KEYS)  # the required fields of every campaign specimen
+
+
+def declared_scientific_question(value: object) -> str:
+    """The SPEC v1.2 scientific question, validated exactly as ``parse_campaign_definition`` validates it."""
+    return _scientific_question(value)
+
+
+def declared_tau_mf(value: object) -> float:
+    """τ_mf, validated exactly as ``parse_campaign_definition`` validates it."""
+    return _tau_mf(value)
+
+
+def require_specimen_count(question: Optional[str], count: Optional[int]) -> None:
+    """SPEC v1.2 §6 / D-078: a calibration has exactly one physical specimen; a material campaign at least two.
+
+    ``count`` None means the specimens are not a list.
+    """
+    if question == SPECIMEN_ENGINEERING_CALIBRATION:
+        if count != 1:
+            _fail("specimens", f"{SPECIMEN_ENGINEERING_CALIBRATION} requires exactly one physical specimen under "
+                               "SPEC v1.2 / D-078.")
+    elif count is None or count < 2:  # v1 and v1.2 material campaigns
+        _fail("specimens", "a campaign needs at least two specimens.")
+
+
 def parse_campaign_definition(data: object) -> CampaignDefinition:
     if isinstance(data, Mapping) and data.get("schema") not in CAMPAIGN_SCHEMAS:
         _fail("schema", f"must be one of {CAMPAIGN_SCHEMAS}.")
@@ -435,12 +462,7 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
         _fail("not_fitted", "must state t_face, k_core and k_int explicitly.")
     not_fitted = {k: _text(v, f"not_fitted.{k}") for k, v in sorted(not_fitted.items())}
 
-    if question == SPECIMEN_ENGINEERING_CALIBRATION:  # SPEC v1.2 §6: one physical specimen
-        if not isinstance(data["specimens"], list) or len(data["specimens"]) != 1:
-            _fail("specimens", f"{SPECIMEN_ENGINEERING_CALIBRATION} requires exactly one physical specimen under "
-                               "SPEC v1.2 / D-078.")
-    elif not isinstance(data["specimens"], list) or len(data["specimens"]) < 2:  # v1 and v1.2 material campaigns
-        _fail("specimens", "a campaign needs at least two specimens.")
+    require_specimen_count(question, len(data["specimens"]) if isinstance(data["specimens"], list) else None)
     specimens = []
     for index, item in enumerate(data["specimens"]):
         field = f"specimens[{index}]"

@@ -4914,3 +4914,24 @@ first internal provider.
 - **Unchanged:** `src`, `tests`, SPEC v1.1 / v1.2, DECISIONS (D-078, D-079, D-080), scientific calculations, gates and
   thresholds, the historical release checkpoint `e022e76`. Original M8 GATE `NOT_MET`; production calibration
   execution BLOCKED / NOT_AUTHORISED. Files: STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-11 — M8-D1: Create Campaign Draft in GUI (REVIEW_READY)
+
+- **Branch:** `auto-id/m8-d1` from `main` `6915e1a`. One small step toward the original M8 GATE; no run execution.
+- **GUI:** "Create Campaign Draft..." section on page "0. Auto-ID Setup": add governed specimen inputs (forward-model
+  manifests in the repository), declare the question (MATERIAL_IDENTIFICATION / SPECIMEN_ENGINEERING_CALIBRATION) and
+  τ_mf explicitly, see the specimen identities, every missing required input, the finalisation state and the intended
+  definition preview; Save Campaign Draft As... / Discard draft.
+- **Service:** `services/campaign_draft.py` — draft document `auto-id/campaign-draft/v1` (labels
+  DRAFT_NOT_A_CAMPAIGN_DEFINITION, NOT_VALIDATED, NOT_EXECUTABLE, AUTHORISES_NOTHING; deterministic JSON); completeness
+  from the domain rules; finalisation = `parse_campaign_definition`, refused while inputs are missing; atomic write
+  outside the repository / data stores / selected source and run, never `*.campaign.json`, never over a non-draft file.
+- **Domain (additive):** public `CAMPAIGN_KEYS`, `CAMPAIGN_SPECIMEN_KEYS`, `declared_scientific_question`,
+  `declared_tau_mf`, `require_specimen_count` (the parser now calls it; identical rule and messages); RUN_A / RUN_B
+  campaign hashes unchanged.
+- **Never chosen:** mode pairings, FIT / HOLDOUT rows, registration or its evidence, solver profiles, FE baselines,
+  uncertainties, parameters, LM / solver settings, budgets, decisions, authorisation.
+- **Tests:** `tests/test_m8_d1_campaign_draft.py`; the M8.1 button-set test and the V12-I1 question / τ_mf module
+  guards list the new draft service (declaration only).
+- **Unchanged:** `require_executable`, `require_question_supported`, campaign schema, gates, thresholds, RUN_A / RUN_B.
+  Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET. **Abaqus run count:** 0.
