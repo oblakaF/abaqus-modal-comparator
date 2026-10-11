@@ -377,6 +377,13 @@ def require_specimen_count(question: Optional[str], count: Optional[int]) -> Non
         _fail("specimens", "a campaign needs at least two specimens.")
 
 
+def require_unique_specimens(labels, fixture_ids) -> None:
+    """Campaign specimens need distinct labels and distinct experiment fixtures."""
+    labels, fixture_ids = list(labels), list(fixture_ids)
+    if len(set(labels)) != len(labels) or len(set(fixture_ids)) != len(fixture_ids):
+        _fail("specimens", "labels and fixtures must be unique.")
+
+
 def parse_campaign_definition(data: object) -> CampaignDefinition:
     if isinstance(data, Mapping) and data.get("schema") not in CAMPAIGN_SCHEMAS:
         _fail("schema", f"must be one of {CAMPAIGN_SCHEMAS}.")
@@ -472,8 +479,7 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
             *(_repo_path(entry[k], f"{field}.{k}") for k in ("forward_model", "solver_profile", "baseline_shape_pack",
                                                              "archived_baseline", "registration_evidence")),
             _rows(entry["rows"], f"{field}.rows")))
-    if len({s.label for s in specimens}) != len(specimens) or len({s.fixture_id for s in specimens}) != len(specimens):
-        _fail("specimens", "labels and fixtures must be unique.")
+    require_unique_specimens((s.label for s in specimens), (s.fixture_id for s in specimens))
     fit_terms = sum(len(s.fit_rows) for s in specimens)
     if fit_terms < len(fitted):
         _fail("specimens", f"{fit_terms} campaign FIT rows < {len(fitted)} fitted parameters.")

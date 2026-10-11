@@ -1454,13 +1454,14 @@ def add_draft_specimen(app, path) -> None:
 
     from domain.experiment_fixture import FixtureManifestError
     from services.auto_id_wizard import load_fixtures
-    from services.campaign_draft import governed_specimen_input
+    from services.campaign_draft import CampaignDraftError, governed_specimen_input
 
     def change(draft):
-        try:
+        try:  # fail-closed: no specimen is added without the validated governed fixture catalogue
             fixtures = load_fixtures(AUTO_ID_REPO_ROOT)
-        except (OSError, FixtureManifestError):
-            fixtures = None
+        except (OSError, ValueError, FixtureManifestError) as error:
+            raise CampaignDraftError(f"the governed experiment-fixture catalogue could not be loaded or validated "
+                                     f"({error}); the specimen input is refused.") from error
         return draft.with_specimen(governed_specimen_input(path, AUTO_ID_REPO_ROOT, fixtures))
 
     _change_campaign_draft(app, change, f"Added governed specimen input {Path(str(path)).name}.")

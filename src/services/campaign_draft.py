@@ -43,6 +43,7 @@ from domain.campaign_definition import (
     declared_tau_mf,
     parse_campaign_definition,
     require_specimen_count,
+    require_unique_specimens,
 )
 from domain.experiment_fixture import ExperimentFixtureManifest, FixtureManifestError
 from domain.forward_model_manifest import ForwardModelManifestError
@@ -59,6 +60,7 @@ DRAFT_NOTE = ("Campaign draft (Auto-ID M8-D1): a working document, not a campaig
 NOT_CHOSEN = ("not declared by the draft: M8-D1 never chooses mode pairings, FIT / HOLDOUT rows, registration evidence, "
               "solver profiles, FE baselines, uncertainties, parameters, settings, budgets, decisions or authorisation")
 PRODUCTION = "BLOCKED / NOT_AUTHORISED"
+FORWARD_MODEL_DIRECTORY = PurePosixPath("docs/auto_id/forward_models")  # the only governed specimen-input location
 QUESTION_CHOICES = SCIENTIFIC_QUESTIONS  # offered for an explicit choice; none is preselected
 
 
@@ -101,9 +103,16 @@ class DraftSpecimen:
         return dict(self.__dict__)
 
 
-def governed_specimen_input(manifest_path, repo_root: Path,
-                            fixtures: Optional[ExperimentFixtureManifest] = None) -> DraftSpecimen:
-    """A forward-model manifest inside the repository, loaded through the governed binder (read-only)."""
+def governed_specimen_input(manifest_path, repo_root: Path, fixtures: ExperimentFixtureManifest) -> DraftSpecimen:
+    """A forward-model manifest in ``docs/auto_id/forward_models/``, loaded through the governed binder (read-only).
+
+    The governed fixture catalogue is required (fail-closed): without it the binder could not check the manifest
+    against its linked experiment fixture, so the selection is refused.
+    """
+
+    if not isinstance(fixtures, ExperimentFixtureManifest):
+        raise CampaignDraftError("the governed experiment-fixture catalogue is not loaded and validated; the specimen "
+                                 "input cannot be checked against its fixture and is refused.")
 
     path, root = Path(manifest_path).resolve(), Path(repo_root).resolve()
     try:
@@ -111,6 +120,9 @@ def governed_specimen_input(manifest_path, repo_root: Path,
     except ValueError:
         raise CampaignDraftError(f"{path} is not inside the repository: only governed forward-model manifests "
                                  f"(docs/auto_id/forward_models/*.forward.json) are campaign specimen inputs.") from None
+    if relative.parent != FORWARD_MODEL_DIRECTORY:
+        raise CampaignDraftError(f"{relative}: governed specimen inputs are the forward-model manifests in "
+                                 f"{FORWARD_MODEL_DIRECTORY}/ only.")
     if not path.name.endswith(".forward.json"):
         raise CampaignDraftError(f"{relative}: a governed specimen input is a forward-model manifest "
                                  "(*.forward.json).")
@@ -189,6 +201,10 @@ class CampaignDraft:
                 require_specimen_count(self.scientific_question, len(self.specimens))
             except CampaignDefinitionError as error:
                 gaps.append(DraftGap("specimens", str(error)))
+        try:
+            require_unique_specimens((s.label for s in self.specimens), (s.fixture_id for s in self.specimens))
+        except CampaignDefinitionError as error:
+            gaps.append(DraftGap("specimens", f"{error} ({', '.join(s.label for s in self.specimens)})"))
         for index, item in enumerate(intended["specimens"]):
             if item["fixture_id"] is None:
                 gaps.append(DraftGap(f"specimens[{index}].fixture_id", "the governed passport links no experiment "

@@ -4935,3 +4935,17 @@ first internal provider.
   (V12-I1, SPEC v1.2 normative and policy-draft tests) list the new draft service (declaration only).
 - **Unchanged:** `require_executable`, `require_question_supported`, campaign schema, gates, thresholds, RUN_A / RUN_B.
   Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET. **Abaqus run count:** 0.
+
+## 2026-10-11 — M8-D1 review corrections (PR #67; REVIEW_READY)
+
+- **SUPERVISOR review of `219683d`: CHANGES_REQUESTED.** Three corrections, no new GUI feature:
+  1. **Fail-closed fixture validation:** a specimen input is refused when the governed experiment-fixture catalogue
+     cannot be loaded or validated (the `fixtures=None` fallback is removed; the service requires the catalogue; the
+     governed binder is unchanged; the existing draft is preserved).
+  2. **Duplicate specimen identity:** the production uniqueness rule (distinct labels and fixtures) is the domain
+     function `require_unique_specimens`, called by the parser (identical rule and message) and by the draft; a
+     selection such as `SP02.forward.json` + `SP02.physical.forward.json` (both label SP02) is reported as a gap.
+  3. **Governed input location:** only forward-model manifests directly in `docs/auto_id/forward_models/` are
+     accepted; other repository paths are refused even when named `*.forward.json`.
+- **Tests:** focused regressions for all three in `tests/test_m8_d1_campaign_draft.py`.
+- **Unchanged:** `require_executable`, gates, thresholds, M7 records and campaign hashes. **Abaqus run count:** 0.

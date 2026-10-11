@@ -112,7 +112,7 @@ class GovernedInputTests(_Draft):
         outside = self.out / "SP02.physical.forward.json"
         shutil.copy(FORWARD / "SP02.physical.forward.json", outside)
         for path, text in ((outside, "not inside the repository"),
-                           (CAMPAIGNS / "M7_RUN_A.campaign.json", "forward-model manifest"),
+                           (CAMPAIGNS / "M7_RUN_A.campaign.json", "docs/auto_id/forward_models/ only"),
                            (FORWARD / "missing.forward.json", "refused by the governed forward-model binder")):
             with self.subTest(path=path.name), self.assertRaises(CampaignDraftError) as caught:
                 governed_specimen_input(path, ROOT, self.fixtures)
@@ -120,6 +120,32 @@ class GovernedInputTests(_Draft):
         draft = CampaignDraft().with_specimen(self.specimen("SP02.physical.forward.json"))
         with self.assertRaises(CampaignDraftError):  # the same input twice
             draft.with_specimen(self.specimen("SP02.physical.forward.json"))
+
+
+    def test_only_the_governed_forward_model_directory_is_accepted(self):
+        # PR #67 review 3: a *.forward.json elsewhere in the repository is never a governed specimen input
+        source = (FORWARD / "SP02.physical.forward.json").read_bytes()
+        repo = self.out / "repo"
+        for relative in ("docs/auto_id/campaigns/SP02.physical.forward.json", "docs/auto_id/SP02.physical.forward.json",
+                         "SP02.physical.forward.json", "docs/auto_id/forward_models/old/SP02.physical.forward.json"):
+            path = repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(source)
+            with self.subTest(path=relative), self.assertRaises(CampaignDraftError) as caught:
+                governed_specimen_input(path, repo, self.fixtures)
+            self.assertIn("docs/auto_id/forward_models/ only", str(caught.exception))
+        inside = repo / "docs" / "auto_id" / "forward_models" / "SP02.physical.forward.json"
+        inside.parent.mkdir(parents=True, exist_ok=True)
+        inside.write_bytes(source)
+        with self.assertRaises(CampaignDraftError) as caught:  # the location passes; the binder still decides
+            governed_specimen_input(inside, repo, self.fixtures)
+        self.assertIn("refused by the governed forward-model binder", str(caught.exception))
+
+    def test_fixture_catalogue_is_required(self):
+        # PR #67 review 1: fail-closed; never bound without the validated governed fixture catalogue
+        with self.assertRaises(CampaignDraftError) as caught:
+            governed_specimen_input(FORWARD / "SP02.physical.forward.json", ROOT, None)
+        self.assertIn("experiment-fixture catalogue", str(caught.exception))
 
 
 # ----------------------------------------------------------------------------- 2 missing input refusal
@@ -152,6 +178,26 @@ class MissingInputTests(_Draft):
         self.assertNotIn("specimens", {g.field for g in one.with_question(CALIBRATION).gaps()})
         no_question = {g.field: g.reason for g in one.gaps()}
         self.assertIn("follows the declared question", no_question["specimens"])
+
+    def test_duplicate_specimen_identity_is_never_a_valid_selection(self):
+        # PR #67 review 2: SP02.forward.json and SP02.physical.forward.json are different files with one label SP02
+        from domain.campaign_definition import require_unique_specimens
+
+        draft = (CampaignDraft().with_specimen(self.specimen("SP02.forward.json"))
+                 .with_specimen(self.specimen("SP02.physical.forward.json")).with_question(MATERIAL).with_tau_mf(0.02))
+        self.assertEqual([s.label for s in draft.specimens], ["SP02", "SP02"])
+        gaps = [g.reason for g in draft.gaps() if g.field == "specimens"]
+        with self.assertRaises(CampaignDefinitionError) as caught:
+            require_unique_specimens(["SP02", "SP02"], [s.fixture_id for s in draft.specimens])
+        self.assertEqual(gaps, [f"{caught.exception} (SP02, SP02)"])
+        with self.assertRaises(DraftIncomplete):
+            draft.finalise()
+        run_a = json.loads((CAMPAIGNS / "M7_RUN_A.campaign.json").read_text(encoding="utf-8"))
+        twins = [dict(s, label="SP02") for s in run_a["specimens"]]
+        with self.assertRaises(CampaignDefinitionError) as parsed:  # the same production rule in the parser
+            parse_campaign_definition(dict(run_a, specimens=twins))
+        self.assertEqual(str(parsed.exception), str(caught.exception))
+        self.assertNotIn("specimens", {g.field for g in self.physical_pair().with_question(MATERIAL).gaps()})
 
     def test_the_domain_rule_is_unchanged_inside_the_parser(self):
         run_a = json.loads((CAMPAIGNS / "M7_RUN_A.campaign.json").read_text(encoding="utf-8"))
@@ -273,6 +319,12 @@ class GuiTests(_Draft):
         for name in ("SP02.physical.forward.json", "SP13.physical.forward.json"):
             with mock.patch.object(ui.filedialog, "askopenfilename", return_value=str(FORWARD / name)):
                 buttons["Add governed specimen input..."]()
+        before = application.auto_id_draft
+        with mock.patch("services.auto_id_wizard.load_fixtures", side_effect=OSError("catalogue unreadable")),                 mock.patch.object(ui.filedialog, "askopenfilename",
+                                  return_value=str(FORWARD / "SP02.forward.json")):
+            buttons["Add governed specimen input..."]()  # PR #67 review 1: refused, never bound without fixtures
+        self.assertIs(application.auto_id_draft, before)
+        self.assertIn("fixture catalogue could not be loaded", application.material_auto_id_draft_label.kwargs["text"])
         buttons["Question: MATERIAL_IDENTIFICATION"]()
         with mock.patch.object(ui.simpledialog, "askstring", return_value="0.5"):  # refused, draft unchanged
             buttons["Declare τ_mf..."]()
