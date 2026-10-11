@@ -4931,7 +4931,7 @@ first internal provider.
   campaign hashes unchanged.
 - **Never chosen:** mode pairings, FIT / HOLDOUT rows, registration or its evidence, solver profiles, FE baselines,
   uncertainties, parameters, LM / solver settings, budgets, decisions, authorisation.
-- **Tests:** `tests/test_m8_d1_campaign_draft.py`; the M8.1 button-set test and the V12-I1 question / τ_mf module
-  guards list the new draft service (declaration only).
+- **Tests:** `tests/test_m8_d1_campaign_draft.py`; the M8.1 button-set test and the question / τ_mf module guards
+  (V12-I1, SPEC v1.2 normative and policy-draft tests) list the new draft service (declaration only).
 - **Unchanged:** `require_executable`, `require_question_supported`, campaign schema, gates, thresholds, RUN_A / RUN_B.
   Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET. **Abaqus run count:** 0.
