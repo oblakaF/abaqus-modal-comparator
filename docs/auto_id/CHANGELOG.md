@@ -4874,3 +4874,29 @@ first internal provider.
 - **Unchanged:** `src`, `tests`, SPEC v1.1 / v1.2, DECISIONS (D-078, D-079, D-080), production gate, M5 / M7, RUN_A /
   RUN_B records. Production calibration execution BLOCKED / NOT_AUTHORISED. Files: STATUS, ROADMAP, CHANGELOG.
   **Abaqus run count:** 0.
+
+## 2026-10-11 — V12-I7.2: final companion material verdict integration (REVIEW_READY; D-080)
+
+- **Branch:** `auto-id/v12-i7-2` from `main` `9f26c2f` (PR #65). Presentation and provenance only.
+- **Wording for a record without the companion:** `MATERIAL_VERDICT_NOT_COMPUTED` stays; the text now says the displayed
+  calibration record contains no companion material verdict (it may be a legacy record — the age of a record is never
+  inferred from the missing field), that the absence is not a computed scientific decision, and that the stored run
+  should be evaluated again explicitly when its evidence is available. Docstring updated.
+- **Companion NOT_AVAILABLE reasons:** a calibration definition refused before any evidence judgement (`SPECIMEN_COUNT`,
+  `TAU_MF_NOT_DECLARED`) → "companion not judged: calibration definition refused (CODE): …"; missing, invalid or
+  unverified LM / run evidence (e.g. `LM_HISTORY_MISSING`) → "run evidence not verified (CODE): …". Refusal codes,
+  calibration status, gate, released parameters and scientific question unchanged.
+- **M8.7 breakdown:** Sources / provenance shows, for a calibration record carrying the companion, the recorded
+  companion `record_hash` and `provenance.material_report_hash`, labelled a separate material result (D-080); the
+  companion's M5 uncertainties never enter the calibration uncertainty sections A–E.
+- **M8.8 export:** `scientific_evidence.companion_material_verdict_record_hash` (calibration records only), read from
+  the current typed evaluation's `backend_record`; nothing judged again, no material report built; `backend_record`,
+  fingerprint validation, deterministic JSON, atomic writing and destination rules unchanged.
+- **Hash effect:** RELEASED / REFUSED / evidence-level NOT_READY calibration records byte-identical to `main` `9f26c2f`;
+  a definition-level NOT_READY record changes only in its companion reason (so its companion and readiness record
+  hash; without the companion field identical). Material records and RUN_A / RUN_B backend record hashes unchanged. A
+  calibration export's content hash changes (new reference and two presentation rows); material exports unchanged.
+- **Tests:** `tests/test_v12_i7_2_companion_integration.py` (18); I7.1 and audit V1 / V2 wording expectations updated.
+- **Unchanged:** SPEC v1.2, D-078, D-080, `src/domain`, calibration gate and thresholds, M5 / M7 mathematics, RUN_A /
+  RUN_B. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET; release checkpoint
+  `e022e76` unchanged. V12-I7.1 `ACCEPTED`; V12-I7.2 `REVIEW_READY`; V12-I7 `IN_PROGRESS`. **Abaqus run count:** 0.

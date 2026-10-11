@@ -172,6 +172,10 @@ def build_evidence_export(definition, journal_path, specimens: Optional[Sequence
         "backend_material_report_hash": None if report is None else canonical_hash(report),
         "released_specimen_calibration": _calibration(readiness, evaluation),
     }
+    if "companion_material_verdict" in record:  # a calibration record only (D-080)
+        # a reference to the companion material verdict already inside backend_record (never judged again)
+        scientific["companion_material_verdict_record_hash"] = (record["companion_material_verdict"]
+                                                                or {}).get("record_hash")
     snapshot = {
         "export": {"schema": EXPORT_SCHEMA, "kind": EXPORT_KIND, "note": EXPORT_NOTE, "verification": VERIFICATION,
                    "freshness": "campaign journal and every governed pipeline journal re-verified from disk at export; "

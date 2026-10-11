@@ -69,15 +69,16 @@ class MaterialVerdictFirstTests(_Runs):
             # V12-I7: a current record carries the computed companion material verdict, shown first
             values = dict(readiness_presentation(current))
             self.assertTrue(values["Material verdict — status"].startswith("REFUSED: NO_GLOBAL_PARAMETER_VALUE"))
-            # a record from before V12-I7 (no companion field) keeps the D-080 interim wording
+            # a record without the companion field (possibly a legacy record) is shown as not computed (D-080)
             record = {k: v for k, v in current.items() if k != "companion_material_verdict"}
             self.assertEqual(record["status"], expected)
             rows = readiness_presentation(record)
             self.assertEqual(tuple(label for label, _ in rows[:4]), MATERIAL_ROWS + ("Calibration verdict",))
             values = dict(rows)
             self.assertTrue(values["Material verdict — status"].startswith(
-                "MATERIAL_VERDICT_NOT_COMPUTED — known temporary SPEC v1.2 §1 non-conformance (D-080); companion "
-                "material verdict pending V12-I7; no material property"))
+                "MATERIAL_VERDICT_NOT_COMPUTED — the displayed calibration record contains no companion material "
+                "verdict (D-080; it may be a legacy record); this absence is not a computed scientific decision; "
+                "evaluate the stored run again, explicitly, when its evidence is available; no material property"))
             self.assertIn("companion material verdict", values["Material verdict — question"])
             self.assertNotIn("D-078", " ".join(values[label] for label in MATERIAL_ROWS))
             self.assertEqual(values["Material verdict — formal output"],
