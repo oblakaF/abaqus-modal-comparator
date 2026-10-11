@@ -1,0 +1,344 @@
+"""Campaign draft preparation — Auto-ID M8-D1 (GUI preparation of a new campaign; nothing is validated as a campaign).
+
+A *campaign draft* is a working document, separate from the governed campaign schema: it collects what the user
+declares explicitly and what the selected governed records state, shows every required campaign input that is still
+missing, and previews the intended ``auto-id/identification-campaign/v1.2`` definition.  It is never a campaign
+definition, never executable and authorises nothing.
+
+The draft holds:
+- the explicitly declared scientific question (MATERIAL_IDENTIFICATION or SPECIMEN_ENGINEERING_CALIBRATION) and τ_mf,
+  each validated by the campaign-definition domain rules (``declared_scientific_question`` / ``declared_tau_mf``);
+  neither has a default;
+- governed specimen inputs: forward-model manifests inside the repository, loaded through the governed binder
+  (manifest, specimen passport, experiment fixture); their identities are shown as recorded.
+
+The draft never chooses or invents mode pairings, FIT / HOLDOUT rows, a registration or registration evidence, a
+solver profile, FE baselines, uncertainties, fitted or fixed parameters, bounds, LM or solver settings, a budget, a
+decision or an authorisation: every such field is listed as missing.  Completeness is judged by the domain rules
+(``CAMPAIGN_KEYS``, ``CAMPAIGN_SPECIMEN_KEYS``, ``require_specimen_count``), and finalisation is exactly
+``parse_campaign_definition`` — refused while anything is missing.  Nothing here runs Abaqus, FE or LM.
+
+Writing (``write_draft``) happens only on an explicit Save As, to a ``.json`` destination outside the repository, the
+data stores and the selected source; never to a ``*.campaign.json`` name, never over a file that is not an earlier
+campaign draft; atomically (temporary file in the destination folder, then ``os.replace``).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+import json
+import os
+from pathlib import Path, PurePosixPath
+import tempfile
+from typing import Iterable, Optional
+
+from domain.campaign_definition import (
+    CAMPAIGN_KEYS,
+    SCIENTIFIC_QUESTIONS,
+    CAMPAIGN_SCHEMA_V1_2,
+    CAMPAIGN_SPECIMEN_KEYS,
+    CampaignDefinition,
+    CampaignDefinitionError,
+    declared_scientific_question,
+    declared_tau_mf,
+    parse_campaign_definition,
+    require_specimen_count,
+    require_unique_specimens,
+)
+from domain.experiment_fixture import ExperimentFixtureManifest, FixtureManifestError
+from domain.forward_model_manifest import ForwardModelManifestError
+from domain.specimen_manifest import SpecimenManifestError
+
+from .forward_builder import load_bound_forward_model
+
+DRAFT_SCHEMA = "auto-id/campaign-draft/v1"
+DRAFT_KIND = "CAMPAIGN_DRAFT"
+DRAFT_LABELS = ("DRAFT_NOT_A_CAMPAIGN_DEFINITION", "NOT_VALIDATED", "NOT_EXECUTABLE", "AUTHORISES_NOTHING")
+DRAFT_NOTE = ("Campaign draft (Auto-ID M8-D1): a working document, not a campaign definition. It is never loaded as "
+              "a campaign, never executed and authorises nothing. Every required input it does not declare is listed "
+              "under missing_required_inputs; finalisation is the governed campaign-definition parser.")
+NOT_CHOSEN = ("not declared by the draft: M8-D1 never chooses mode pairings, FIT / HOLDOUT rows, registration evidence, "
+              "solver profiles, FE baselines, uncertainties, parameters, settings, budgets, decisions or authorisation")
+PRODUCTION = "BLOCKED / NOT_AUTHORISED"
+FORWARD_MODEL_DIRECTORY = PurePosixPath("docs/auto_id/forward_models")  # the only governed specimen-input location
+QUESTION_CHOICES = SCIENTIFIC_QUESTIONS  # offered for an explicit choice; none is preselected
+
+
+class CampaignDraftError(ValueError):
+    """A declaration or a selected input is refused; the draft is unchanged."""
+
+
+class DraftIncomplete(CampaignDraftError):
+    """Finalisation refused: required campaign inputs are missing."""
+
+    def __init__(self, gaps) -> None:
+        super().__init__(f"{len(gaps)} required campaign input(s) missing: "
+                         + "; ".join(f"{g.field}: {g.reason}" for g in gaps))
+        self.gaps = tuple(gaps)
+
+
+@dataclass(frozen=True)
+class DraftGap:
+    field: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class DraftSpecimen:
+    """A governed specimen input as its records state it (nothing is chosen)."""
+
+    label: str  # the governed forward model's job prefix
+    forward_model: str  # repository-relative POSIX path of the forward-model manifest
+    forward_model_id: str
+    forward_manifest_hash: str
+    fixture_id: Optional[str]  # the passport's linked experiment fixture
+    passport: str
+    passport_manifest_hash: str
+    physical_specimen_id: Optional[str]
+    test_run_id: str
+    registration_hash: str
+    registration_basis: str
+
+    def to_dict(self) -> dict:
+        return dict(self.__dict__)
+
+
+def governed_specimen_input(manifest_path, repo_root: Path, fixtures: ExperimentFixtureManifest) -> DraftSpecimen:
+    """A forward-model manifest in ``docs/auto_id/forward_models/``, loaded through the governed binder (read-only).
+
+    The governed fixture catalogue is required (fail-closed): without it the binder could not check the manifest
+    against its linked experiment fixture, so the selection is refused.
+    """
+
+    if not isinstance(fixtures, ExperimentFixtureManifest):
+        raise CampaignDraftError("the governed experiment-fixture catalogue is not loaded and validated; the specimen "
+                                 "input cannot be checked against its fixture and is refused.")
+
+    path, root = Path(manifest_path).resolve(), Path(repo_root).resolve()
+    try:
+        relative = PurePosixPath(path.relative_to(root).as_posix())
+    except ValueError:
+        raise CampaignDraftError(f"{path} is not inside the repository: only governed forward-model manifests "
+                                 f"(docs/auto_id/forward_models/*.forward.json) are campaign specimen inputs.") from None
+    if relative.parent != FORWARD_MODEL_DIRECTORY:
+        raise CampaignDraftError(f"{relative}: governed specimen inputs are the forward-model manifests in "
+                                 f"{FORWARD_MODEL_DIRECTORY}/ only.")
+    if not path.name.endswith(".forward.json"):
+        raise CampaignDraftError(f"{relative}: a governed specimen input is a forward-model manifest "
+                                 "(*.forward.json).")
+    try:
+        model = load_bound_forward_model(path, root, fixtures)
+    except (ForwardModelManifestError, SpecimenManifestError, FixtureManifestError, KeyError, OSError,
+            ValueError) as error:
+        raise CampaignDraftError(f"{relative} is refused by the governed forward-model binder: {error}") from error
+    manifest, passport = model.manifest, model.passport
+    return DraftSpecimen(
+        label=manifest.job_prefix, forward_model=str(relative), forward_model_id=manifest.forward_model_id,
+        forward_manifest_hash=manifest.manifest_hash, fixture_id=passport.acquisition.fixture_id,
+        passport=manifest.specimen_passport.path, passport_manifest_hash=passport.manifest_hash,
+        physical_specimen_id=None if passport.physical_specimen_id is None else str(passport.physical_specimen_id),
+        test_run_id=str(passport.test_run_id), registration_hash=manifest.registration_hash,
+        registration_basis=passport.geometry_calibration.registration_basis_status.value)
+
+
+@dataclass(frozen=True)
+class CampaignDraft:
+    scientific_question: Optional[str] = None
+    tau_mf: Optional[float] = None
+    specimens: tuple[DraftSpecimen, ...] = ()
+
+    # ------------------------------------------------------------------ explicit declarations
+    def with_question(self, question) -> "CampaignDraft":
+        try:
+            return replace(self, scientific_question=declared_scientific_question(question))
+        except CampaignDefinitionError as error:
+            raise CampaignDraftError(str(error)) from error
+
+    def with_tau_mf(self, value) -> "CampaignDraft":
+        if isinstance(value, str):
+            try:
+                value = float(value.strip())
+            except ValueError:
+                raise CampaignDraftError(f"tau_mf: {value!r} is not a number; declare it explicitly.") from None
+        try:
+            return replace(self, tau_mf=declared_tau_mf(value))
+        except CampaignDefinitionError as error:
+            raise CampaignDraftError(str(error)) from error
+
+    def with_specimen(self, specimen: DraftSpecimen) -> "CampaignDraft":
+        if any(s.forward_model == specimen.forward_model for s in self.specimens):
+            raise CampaignDraftError(f"{specimen.forward_model} is already in the draft.")
+        return replace(self, specimens=self.specimens + (specimen,))
+
+    def without_specimens(self) -> "CampaignDraft":
+        return replace(self, specimens=())
+
+    # ------------------------------------------------------------------ preview and completeness
+    def intended_definition(self) -> dict:
+        """The intended v1.2 campaign definition: only what is declared or recorded; nothing is filled in."""
+
+        intended = {"schema": CAMPAIGN_SCHEMA_V1_2,
+                    "specimens": [{"label": s.label, "fixture_id": s.fixture_id, "forward_model": s.forward_model}
+                                  for s in self.specimens]}
+        if self.scientific_question is not None:
+            intended["scientific_question"] = self.scientific_question
+        if self.tau_mf is not None:
+            intended["tau_mf"] = self.tau_mf
+        return intended
+
+    def gaps(self) -> tuple[DraftGap, ...]:
+        intended = self.intended_definition()
+        gaps = []
+        if self.scientific_question is None:
+            gaps.append(DraftGap("scientific_question", "not declared: choose MATERIAL_IDENTIFICATION or "
+                                                        "SPECIMEN_ENGINEERING_CALIBRATION explicitly"))
+        if self.tau_mf is None:
+            gaps.append(DraftGap("tau_mf", "not declared: no value is assumed"))
+        if self.scientific_question is None:
+            gaps.append(DraftGap("specimens", "the required number of specimens follows the declared question"))
+        else:
+            try:
+                require_specimen_count(self.scientific_question, len(self.specimens))
+            except CampaignDefinitionError as error:
+                gaps.append(DraftGap("specimens", str(error)))
+        try:
+            require_unique_specimens((s.label for s in self.specimens), (s.fixture_id for s in self.specimens))
+        except CampaignDefinitionError as error:
+            gaps.append(DraftGap("specimens", f"{error} ({', '.join(s.label for s in self.specimens)})"))
+        for index, item in enumerate(intended["specimens"]):
+            if item["fixture_id"] is None:
+                gaps.append(DraftGap(f"specimens[{index}].fixture_id", "the governed passport links no experiment "
+                                                                       "fixture"))
+            for key in sorted(CAMPAIGN_SPECIMEN_KEYS - set(item)):
+                gaps.append(DraftGap(f"specimens[{index}].{key}", NOT_CHOSEN))
+        for key in sorted(CAMPAIGN_KEYS - set(intended)):
+            gaps.append(DraftGap(key, NOT_CHOSEN))
+        return tuple(gaps)
+
+    def finalise(self) -> CampaignDefinition:
+        """The governed parser on the intended definition; refused while any required input is missing."""
+
+        gaps = self.gaps()
+        if gaps:
+            raise DraftIncomplete(gaps)
+        return parse_campaign_definition(self.intended_definition())
+
+    def document(self) -> dict:
+        """The deterministic draft document (no timestamps, no random identifiers)."""
+
+        gaps = self.gaps()
+        return {
+            "schema": DRAFT_SCHEMA, "kind": DRAFT_KIND, "labels": list(DRAFT_LABELS), "note": DRAFT_NOTE,
+            "status": "INCOMPLETE" if gaps else "COMPLETE_NOT_FINALISED",
+            "declared": {"scientific_question": self.scientific_question, "tau_mf": self.tau_mf},
+            "specimen_identities": [s.to_dict() for s in self.specimens],
+            "intended_campaign_definition": self.intended_definition(),
+            "missing_required_inputs": [{"field": g.field, "reason": g.reason} for g in gaps],
+            "authorisation": "none: a draft authorises no run; execution needs a HUMAN gate",
+            "production_calibration_execution": PRODUCTION,
+        }
+
+    def document_bytes(self) -> bytes:
+        return (json.dumps(self.document(), indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False)
+                + "\n").encode("utf-8")
+
+
+def declare_tolerance(draft: CampaignDraft, value) -> CampaignDraft:
+    """The draft with τ_mf declared explicitly (GUI entry text or a number)."""
+    return draft.with_tau_mf(value)
+
+
+def draft_rows(draft: CampaignDraft) -> tuple[tuple[str, str, str, str], ...]:
+    """Table rows (section, item, value, status) for the GUI: declarations, specimen identities, missing inputs."""
+
+    rows = [("Declared", "Scientific question", draft.scientific_question or "",
+             "PRESENT" if draft.scientific_question else "NOT_DECLARED"),
+            ("Declared", "τ_mf", "" if draft.tau_mf is None else f"{draft.tau_mf:g}",
+             "NOT_DECLARED" if draft.tau_mf is None else "PRESENT")]
+    for item in draft.specimens:
+        rows.append(("Specimens", item.label,
+                     f"fixture {item.fixture_id}; forward model {item.forward_model_id} ({item.forward_model}); "
+                     f"physical specimen {item.physical_specimen_id}; test run {item.test_run_id}; registration "
+                     f"{item.registration_basis} {item.registration_hash[:12]}", "PRESENT"))
+    rows.extend(("Missing required inputs", gap.field, gap.reason, "MISSING") for gap in draft.gaps())
+    return tuple(rows)
+
+
+def finalisation_state(draft: CampaignDraft) -> str:
+    """Whether the governed parser would accept the draft; it stays a draft either way (nothing is written)."""
+
+    try:
+        draft.finalise()
+    except DraftIncomplete as refusal:
+        return (f"Finalisation refused: {len(refusal.gaps)} required campaign input(s) missing. The draft stays a "
+                "draft (not a validated campaign definition).")
+    except CampaignDefinitionError as error:
+        return f"Finalisation refused by the campaign-definition parser: {error}"
+    return "All required inputs present: accepted by the campaign-definition parser (no definition is written here)."
+
+
+# ----------------------------------------------------------------------------- writing
+
+def _inside(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_draft(path: Path) -> bool:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    return isinstance(document, dict) and document.get("schema") == DRAFT_SCHEMA
+
+
+def check_draft_destination(destination, protected_roots: Iterable) -> Path:
+    """A permitted draft destination: ``.json`` (never ``*.campaign.json``), outside every protected root."""
+
+    if destination is None or not str(destination).strip():
+        raise CampaignDraftError("no destination selected.")
+    target = Path(destination).resolve()
+    if target.suffix.lower() != ".json":
+        raise CampaignDraftError(f"{target.name}: a campaign draft is a .json document.")
+    if target.name.lower().endswith(".campaign.json"):
+        raise CampaignDraftError(f"{target.name}: a draft is never saved under a campaign-definition name "
+                                 "(*.campaign.json).")
+    if not target.parent.is_dir():
+        raise CampaignDraftError(f"the folder {target.parent} does not exist.")
+    for root in protected_roots:
+        if root is None:  # an undetermined protected root is never ignored
+            raise CampaignDraftError("a protected root could not be determined; nothing is written.")
+        if _inside(target, Path(root).resolve()):
+            raise CampaignDraftError(f"{target} is inside the protected {Path(root)} (repository, data store or "
+                                     "selected source); drafts are written elsewhere.")
+    if target.exists() and (not target.is_file() or not _is_draft(target)):
+        raise CampaignDraftError(f"{target} exists and is not an earlier campaign draft; it is never overwritten.")
+    return target
+
+
+def write_draft(draft: CampaignDraft, destination, protected_roots: Iterable) -> Path:
+    """Write the draft document atomically (temporary file in the same folder, then ``os.replace``)."""
+
+    target = check_draft_destination(destination, protected_roots)
+    data = draft.document_bytes()
+    temporary = None
+    try:
+        handle, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".partial", dir=target.parent)
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, target)
+    except BaseException as error:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
+        if isinstance(error, Exception):
+            raise CampaignDraftError(f"{target}: {error}") from error
+        raise
+    return target

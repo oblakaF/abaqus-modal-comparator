@@ -839,6 +839,7 @@ requires a separate explicit HUMAN authorisation. Abaqus requires separate HUMAN
 | M8.6 | Abaqus Engineering Constants block | `ACCEPTED` |
 | M8.7 | Uncertainty / source breakdown | `ACCEPTED` |
 | M8.8 | Evidence / provenance export | `ACCEPTED` |
+| M8-D1 | Create Campaign Draft in GUI (preparation only; toward the original gate) | `REVIEW_READY` |
 
 **M8 GATE:** the user goes from a specimen/family folder to a scientifically guarded
 result without manually entering optimisation numbers other than specimen/passport
@@ -946,3 +947,4 @@ production calibration execution `BLOCKED / NOT_AUTHORISED`. Release test checkp
 data stores (84 skipped), 2036 OK with all data stores (5 skipped), 0 failures. The parked prototype branch
 `auto-id/m8` (`193db8d`) is untouched; selected code was reused. Production calibration execution remains
 `BLOCKED / NOT_AUTHORISED`.
+**M8-D1 `REVIEW_READY`** (branch `auto-id/m8-d1` from `6915e1a`): "Create Campaign Draft..." on the Auto-ID Setup page. A separate draft document (`auto-id/campaign-draft/v1`, never a campaign definition) collects governed specimen inputs (repository forward-model manifests, identities as recorded) and the explicitly declared scientific question and τ_mf (domain validation, no default), lists every missing required campaign input and previews the intended v1.2 definition; finalisation is the governed parser and is refused while anything is missing. Pairings, FIT / HOLDOUT rows, registration evidence, solver settings, uncertainties and authorisation are never chosen. Saved only by an explicit Save As outside protected folders. No run; original M8 GATE still `NOT_MET`.
