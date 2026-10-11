@@ -1411,6 +1411,7 @@ def export_auto_id_evidence(app, destination=None):
 
 AUTO_ID_DRAFT_LABEL = "Create Campaign Draft..."
 AUTO_ID_DRAFT_SAVE_LABEL = "Save Campaign Draft As..."
+AUTO_ID_DRAFT_OPEN_LABEL = "Open Campaign Draft..."
 AUTO_ID_DRAFT_SCOPE = (
     "Campaign draft (M8-D1): select governed specimen inputs (forward-model manifests in the repository) and declare "
     "the scientific question and τ_mf explicitly. The draft shows the chosen specimen identities, every required "
@@ -1452,19 +1453,55 @@ def _change_campaign_draft(app, change, done: str) -> None:
 def add_draft_specimen(app, path) -> None:
     """Add a governed specimen input (a repository forward-model manifest) to the draft, as its records state it."""
 
-    from domain.experiment_fixture import FixtureManifestError
-    from services.auto_id_wizard import load_fixtures
-    from services.campaign_draft import CampaignDraftError, governed_specimen_input
+    from services.campaign_draft import governed_specimen_input
 
     def change(draft):
-        try:  # fail-closed: no specimen is added without the validated governed fixture catalogue
-            fixtures = load_fixtures(AUTO_ID_REPO_ROOT)
-        except (OSError, ValueError, FixtureManifestError) as error:
-            raise CampaignDraftError(f"the governed experiment-fixture catalogue could not be loaded or validated "
-                                     f"({error}); the specimen input is refused.") from error
-        return draft.with_specimen(governed_specimen_input(path, AUTO_ID_REPO_ROOT, fixtures))
+        return draft.with_specimen(governed_specimen_input(path, AUTO_ID_REPO_ROOT, _draft_fixtures()))
 
     _change_campaign_draft(app, change, f"Added governed specimen input {Path(str(path)).name}.")
+
+
+def _draft_fixtures():
+    """The validated governed fixture catalogue (fail-closed: no specimen is bound without it)."""
+
+    from domain.experiment_fixture import FixtureManifestError
+    from services.auto_id_wizard import load_fixtures
+    from services.campaign_draft import CampaignDraftError
+
+    try:
+        return load_fixtures(AUTO_ID_REPO_ROOT)
+    except (OSError, ValueError, FixtureManifestError) as error:
+        raise CampaignDraftError(f"the governed experiment-fixture catalogue could not be loaded or validated "
+                                 f"({error}); the specimen input is refused.") from error
+
+
+def open_campaign_draft(app, path=None) -> None:
+    """"Open Campaign Draft...": reopen a saved campaign draft (auto-id/campaign-draft/v1) against the current governed
+    records. Missing inputs and finalisation are recomputed; on cancel or any refusal the current draft is unchanged."""
+
+    from services.campaign_draft import CampaignDraftError, load_draft
+
+    if path is None:
+        path = filedialog.askopenfilename(
+            title="Open campaign draft",
+            filetypes=(("Auto-ID campaign draft", "*.json"),),
+        )
+    if not path:
+        app.auto_id_draft_message = "Open cancelled: the current draft is unchanged."
+        _refresh_campaign_draft(app)
+        return
+    try:
+        draft = load_draft(path, AUTO_ID_REPO_ROOT, _draft_fixtures())
+    except CampaignDraftError as error:
+        app.auto_id_draft_message = f"Not opened: {error} The current draft is unchanged."
+    except Exception as error:  # never a GUI crash; the current draft is unchanged
+        app.auto_id_draft_message = f"Not opened: {error} The current draft is unchanged."
+    else:
+        app.auto_id_draft = draft
+        app.auto_id_draft_message = (f"Reopened the campaign draft {path}: declarations and specimen selections "
+                                     "re-verified against the current governed records; missing inputs and "
+                                     "finalisation recomputed (the stored status is not trusted).")
+    _refresh_campaign_draft(app)
 
 
 def clear_draft_specimens(app) -> None:
@@ -1702,6 +1739,7 @@ def _build_auto_id_setup_page(app, page) -> None:
     draft_buttons.pack(anchor="w", pady=(0, 4))
     for text, command in (
         (AUTO_ID_DRAFT_LABEL, lambda: create_campaign_draft(app)),
+        (AUTO_ID_DRAFT_OPEN_LABEL, lambda: open_campaign_draft(app)),
         ("Add governed specimen input...", lambda: _choose_draft_specimen(app)),
         ("Remove all specimens", lambda: clear_draft_specimens(app)),
         ("Discard draft", lambda: discard_campaign_draft(app)),
