@@ -132,7 +132,7 @@ class BlockingTests(unittest.TestCase):
             "REFERENCE_ONLY": recorded_sp02_evidence(ev.REFERENCE_ONLY),
             "NOT_APPLICABLE": ev.not_applicable("wrong ODB"),
             "no evidence": None,
-            "SP13": recorded_sp02_evidence(ev.VERIFIED, specimen="SP13"),
+            "unsupported specimen": recorded_sp02_evidence(ev.VERIFIED, specimen="SP05"),
         }
         for name, evidence in cases.items():
             with self.subTest(name=name):
@@ -140,6 +140,11 @@ class BlockingTests(unittest.TestCase):
                 self.assertEqual(result.status, wi.BLOCKED)
                 self.assertEqual(result.rows, ())
                 self.assertIsNone(result.e_trial_mpa)
+        # G2d-3: SP-13 is supported, but SP-02 rows relabelled SP13 are not SP-13 evidence (no preview at all)
+        spoofed = wi.e_what_if(recorded_sp02_evidence(ev.VERIFIED, specimen="SP13"), 0.02)
+        self.assertEqual(spoofed.status, wi.INCOMPLETE)
+        self.assertEqual(spoofed.rows, ())
+        self.assertIsNone(spoofed.e_trial_mpa)
         self.assertIn(ev.REFERENCE_ONLY, wi.e_what_if(cases["REFERENCE_ONLY"], 0.0).reason)
         other_baseline = replace(recorded_sp02_evidence(), baseline={"E_in_plane_mpa": 55593.0, "G12_mpa": 4500.0})
         self.assertEqual(wi.e_what_if(other_baseline, 0.0).status, wi.BLOCKED)
