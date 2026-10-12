@@ -11,11 +11,20 @@ from typing import Optional
 from abaqus_bridge import AnalysisCancelled, extraction_range_notice
 from coordinate_calibration import CoordinateCalibration
 from reviewed_core import GeometryOrientationAmbiguousError
-from services.archived_sensitivity_evidence import comparison_input_record
+from services.archived_sensitivity_evidence import (
+    AcceptedReferenceRefusal,
+    SensitivityCheckCancelled,
+    bind_accepted_reference,
+    comparison_input_record,
+)
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
 
 _INSTALLED = False
+
+
+class GovernedRegistrationRefused(ValueError):
+    """G2d-1: the accepted physical registration was requested but cannot be applied to these files."""
 _MATPLOTLIB_LOCK = threading.RLock()
 
 
@@ -152,10 +161,13 @@ def install_runtime_hardening(app_module) -> None:
                 if isinstance(orientation_selection, dict)
                 else ""
             )
+            # G2d-1: read once; the option never changes during a run
+            governed_requested = bool(getattr(self, "_governed_registration_requested", False))
             signature = (
                 f"{abaqus.resolve()}|{abaqus.stat().st_size}|{abaqus.stat().st_mtime_ns}|"
                 f"{experiment.resolve()}|{experiment.stat().st_size}|{experiment.stat().st_mtime_ns}|"
                 f"{start}|{end}|{calibration}|{modal_set or ''}|{orientation_candidate_id}"
+                + ("|governed-physical-registration" if governed_requested else "")
             )
             key = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:16]
             cache = workspace / f"analysis_{key}"
@@ -188,14 +200,33 @@ def install_runtime_hardening(app_module) -> None:
                 resolved_experiment,
                 modal_set=modal_set,
             )
-            stage(3, "Geometry alignment")
-            comparison_kwargs = (
-                {"geometry_calibration": calibration}
-                if isinstance(calibration, CoordinateCalibration)
-                else {"coordinate_scale_override": calibration}
-            )
-            if orientation_selection is not None:
-                comparison_kwargs["orientation_selection"] = orientation_selection
+            governed = None
+            if governed_requested:
+                # G2d-1: verify the exact files, modal set and frozen registration, then apply its mapping and
+                # rotation; on any refusal the analysis stops (never a silent automatic registration)
+                stage(3, "Accepted physical registration")
+                try:
+                    governed = bind_accepted_reference(
+                        abaqus, resolved_experiment, abaqus_data, experiment_data,
+                        cancel=getattr(self, "_analysis_cancel_event", None),
+                    )
+                except SensitivityCheckCancelled as error:
+                    raise AnalysisCancelled("Analysis stopped by user.") from error
+                except AcceptedReferenceRefusal as error:
+                    raise GovernedRegistrationRefused(
+                        f"Accepted physical registration refused: {error} The comparison was not run with any "
+                        "other registration; clear the option to use automatic geometry registration."
+                    ) from error
+                comparison_kwargs = {"frozen_registration": governed.registration}
+            else:
+                stage(3, "Geometry alignment")
+                comparison_kwargs = (
+                    {"geometry_calibration": calibration}
+                    if isinstance(calibration, CoordinateCalibration)
+                    else {"coordinate_scale_override": calibration}
+                )
+                if orientation_selection is not None:
+                    comparison_kwargs["orientation_selection"] = orientation_selection
             result = app_module.compare_modal_datasets(
                 abaqus_data,
                 experiment_data,
@@ -207,6 +238,19 @@ def install_runtime_hardening(app_module) -> None:
                     result.warnings.insert(0, range_notice)
             # G2c: the files this comparison actually read (archived sensitivity evidence is bound to them)
             result.metadata["comparison_inputs"] = comparison_input_record(abaqus, resolved_experiment, modal_set)
+            if governed is not None:
+                registration = governed.registration
+                result.metadata["governed_registration"] = {
+                    "specimen": governed.spec.specimen,
+                    "fixture_id": governed.fixture.fixture_id,
+                    "registration_hash": registration.registration_hash,
+                    "checks": list(governed.checks),
+                }
+                result.warnings.insert(0, (
+                    f"Accepted physical registration applied: {governed.spec.specimen} {governed.fixture.fixture_id}, "
+                    f"registration {registration.registration_hash[:12]}... (frozen measured-point-to-FE-node mapping "
+                    "and rotation; automatic geometry registration not used)."
+                ))
             stage(4, "Modal comparison")
             check_cancelled()
 

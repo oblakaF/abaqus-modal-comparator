@@ -137,8 +137,25 @@ class SensitivityCheckCancelled(Exception):
     """The check was cancelled (inputs or comparison changed); its partial state is discarded."""
 
 
-class _Refusal(Exception):
-    pass
+class AcceptedReferenceRefusal(ValueError):
+    """The files, datasets or records are not exactly an accepted SP-02 / SP-13 reference; the message says why."""
+
+    def __init__(self, message: str, specimen: Optional[str] = None) -> None:
+        super().__init__(message)
+        self.specimen = specimen
+
+
+_Refusal = AcceptedReferenceRefusal
+
+
+@dataclass(frozen=True)
+class AcceptedReference:
+    """An accepted specimen reference bound to the exact compared files and loaded datasets."""
+
+    spec: "SpecimenEvidence"
+    fixture: ExperimentFixture
+    registration: Any  # the sealed, content-compatible FrozenRegistration
+    checks: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -457,6 +474,67 @@ def _rows(spec, document, physical, perturbations, result, equivalent: bool) -> 
     return rows
 
 
+# ----------------------------------------------------------------------------- binding to an accepted reference
+
+def match_accepted_files(odb_path: Path, experimental_path: Path, *, repo_root: Path = REPO_ROOT, cancel=None):
+    """(spec, fixture, ODB identity, experimental identity) when both files are, by fresh SHA-256 and size, the
+    accepted baseline ODB and PolyMAX source of one fixture; otherwise AcceptedReferenceRefusal."""
+
+    _check_cancelled(cancel)
+    odb = fresh_content_identity(Path(odb_path), cancel)
+    experimental = fresh_content_identity(Path(experimental_path), cancel)
+    _check_cancelled(cancel)
+    try:
+        fixtures = load_experiment_fixture_manifest(Path(repo_root) / FIXTURE_MANIFEST)
+    except (OSError, ValueError, KeyError) as error:
+        raise _Refusal(f"accepted fixture manifest unavailable: {error}") from error
+    spec, fixture = _select_specimen(fixtures, odb, experimental)
+    return spec, fixture, odb, experimental
+
+
+def bind_accepted_reference(odb_path: Path, experimental_path: Path, abaqus, experimental_dataset, *,
+                            repo_root: Path = REPO_ROOT, cancel=None, checks: Optional[list] = None) -> AcceptedReference:
+    """Bind the exact files and their loaded datasets to an accepted specimen reference, or refuse with the reason.
+
+    Fresh SHA-256 of both files; the PolyMAX modal set, points and measured-DOF contract replay the frozen physical
+    registration; the sealed registration is content-compatible with the loaded files and every mapped FE node is
+    present. ``checks`` collects the passed checks (also on refusal).
+    """
+
+    checks = [] if checks is None else checks
+    spec, fixture, odb, experimental = match_accepted_files(odb_path, experimental_path, repo_root=repo_root,
+                                                            cancel=cancel)
+    try:
+        checks.append(f"ODB SHA-256 {_short(odb['sha256'])} = accepted {spec.specimen} CARBON-4C baseline ODB "
+                      f"{fixture.fe.odb_reference.file_name}")
+        checks.append(f"experimental SHA-256 {_short(experimental['sha256'])} = {fixture.experimental_source.file_name}")
+        try:
+            registration = load_fixture_registration(fixture, Path(repo_root))
+            report = verify_fixture_dataset(fixture, registration, experimental_dataset)
+        except FixtureRegressionError as error:
+            raise _Refusal(f"fixture {fixture.fixture_id}: {error}") from error
+        checks.append(f"PolyMAX modal set {report.modal_set_key!r} ({report.mode_source}; {report.mode_count} modes, "
+                      f"{report.point_count} points, measured {'/'.join(report.measured_dofs)}) replays the frozen "
+                      "registration's points and measured-DOF contract")
+        _check_cancelled(cancel)
+        try:
+            fe_identity = modal_dataset_geometry_identity(abaqus)
+            registration.check_content_compatible(experimental, fe_identity)
+        except (RegistrationMismatchError, ValueError) as error:
+            raise _Refusal(f"physical registration {_short(registration.registration_hash)}: {error}") from error
+        loaded_nodes = {str(value) for value in np.asarray(abaqus.sorted_modes()[0].node_ids, dtype=object)}
+        missing = [node for node in registration.mapped_fe_node_ids if node not in loaded_nodes]
+        _require(not missing, f"{len(missing)} FE nodes of the frozen measured-node mapping are absent from the ODB.")
+        checks.append(f"physical registration {_short(registration.registration_hash)} (sealed; calibration "
+                      f"{_short(registration.calibration_fingerprint)}, orientation {registration.orientation_candidate_id}"
+                      f") is content-compatible: FE geometry {_short(fe_identity['sha256'])} "
+                      f"({fe_identity['node_count']} nodes); all {len(registration.mapped_fe_node_ids)} mapped FE nodes present")
+        _check_cancelled(cancel)
+    except AcceptedReferenceRefusal as refusal:
+        raise AcceptedReferenceRefusal(str(refusal), spec.specimen) from refusal
+    return AcceptedReference(spec, fixture, registration, tuple(checks))
+
+
 # ----------------------------------------------------------------------------- the check
 
 def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, cancel=None) -> SensitivityEvidence:
@@ -473,42 +551,10 @@ def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, 
     try:
         _require(result is not None, "there is no comparison result.")
         odb_path, experimental_path = _recorded_inputs(result)
-        _check_cancelled(cancel)
-        odb = fresh_content_identity(odb_path, cancel)
-        experimental = fresh_content_identity(experimental_path, cancel)
-        _check_cancelled(cancel)
-        try:
-            fixtures = load_experiment_fixture_manifest(Path(repo_root) / FIXTURE_MANIFEST)
-        except (OSError, ValueError, KeyError) as error:
-            raise _Refusal(f"accepted fixture manifest unavailable: {error}") from error
-        spec, fixture = _select_specimen(fixtures, odb, experimental)
+        reference = bind_accepted_reference(odb_path, experimental_path, result.abaqus, result.experimental,
+                                            repo_root=repo_root, cancel=cancel, checks=checks)
+        spec, fixture, registration = reference.spec, reference.fixture, reference.registration
         specimen = spec.specimen
-        checks.append(f"ODB SHA-256 {_short(odb['sha256'])} = accepted {spec.specimen} CARBON-4C baseline ODB "
-                      f"{fixture.fe.odb_reference.file_name}")
-        checks.append(f"experimental SHA-256 {_short(experimental['sha256'])} = {fixture.experimental_source.file_name}")
-
-        try:
-            registration = load_fixture_registration(fixture, Path(repo_root))
-            report = verify_fixture_dataset(fixture, registration, result.experimental)
-        except FixtureRegressionError as error:
-            raise _Refusal(f"fixture {fixture.fixture_id}: {error}") from error
-        checks.append(f"PolyMAX modal set {report.modal_set_key!r} ({report.mode_source}; {report.mode_count} modes, "
-                      f"{report.point_count} points, measured {'/'.join(report.measured_dofs)}) replays the frozen "
-                      "registration's points and measured-DOF contract")
-        _check_cancelled(cancel)
-        try:
-            fe_identity = modal_dataset_geometry_identity(result.abaqus)
-            registration.check_content_compatible(experimental, fe_identity)
-        except (RegistrationMismatchError, ValueError) as error:
-            raise _Refusal(f"physical registration {_short(registration.registration_hash)}: {error}") from error
-        loaded_nodes = {str(value) for value in np.asarray(result.abaqus.sorted_modes()[0].node_ids, dtype=object)}
-        missing = [node for node in registration.mapped_fe_node_ids if node not in loaded_nodes]
-        _require(not missing, f"{len(missing)} FE nodes of the frozen measured-node mapping are absent from the ODB.")
-        checks.append(f"physical registration {_short(registration.registration_hash)} (sealed; calibration "
-                      f"{_short(registration.calibration_fingerprint)}, orientation {registration.orientation_candidate_id}"
-                      f") is content-compatible: FE geometry {_short(fe_identity['sha256'])} "
-                      f"({fe_identity['node_count']} nodes); all {len(registration.mapped_fe_node_ids)} mapped FE nodes present")
-        _check_cancelled(cancel)
 
         try:
             baseline = load_archived_baseline(Path(repo_root) / spec.baseline_path)
@@ -529,7 +575,7 @@ def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, 
         equivalent, mapping_note = registration_equivalence(result, registration)
         rows = _rows(spec, document, physical, perturbations, result, equivalent)
     except _Refusal as refusal:
-        return not_applicable(str(refusal), specimen=specimen, checks=checks)
+        return not_applicable(str(refusal), specimen=specimen or refusal.specimen, checks=checks)
 
     applicable = [row for row in rows if row.applicable]
     fit_rows = sum(row.role == "FIT" for row in rows)
