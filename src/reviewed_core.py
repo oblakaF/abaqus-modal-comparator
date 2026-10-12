@@ -448,6 +448,59 @@ def _candidate_summary(candidate: GeometryMatch) -> Dict[str, object]:
     return summary
 
 
+FROZEN_REGISTRATION_ORIENTATION_SOURCE = "frozen_registration"
+
+
+def geometry_from_frozen_registration(
+    registration,
+    abaqus_reference: ModeShape,
+    experimental_reference: ModeShape,
+) -> GeometryMatch:
+    """The geometry of an accepted frozen registration on the loaded datasets (G2d-1).
+
+    The frozen measured-point-to-FE-node mapping, rotation, scales and translation are applied as recorded; nothing
+    is searched or re-selected. The experimental points must be the frozen points in the frozen order and every
+    mapped FE node must exist, otherwise ValueError. Residuals and matched fraction use the same definitions as
+    ``geometry_alignment_candidates``.
+    """
+    frozen_points = [str(value) for value in registration.experimental_node_ids]
+    if [str(value) for value in np.asarray(experimental_reference.node_ids, dtype=object)] != frozen_points:
+        raise ValueError("The experimental measurement points are not the frozen registration's points.")
+    lookup = _node_lookup(abaqus_reference)
+    indices = [lookup.get(str(node)) for node in registration.mapped_fe_node_ids]
+    missing = sum(index is None for index in indices)
+    if missing:
+        raise ValueError(f"{missing} FE nodes of the frozen registration are absent from the Abaqus dataset.")
+    indices = np.asarray(indices, dtype=int)
+    rotation = np.asarray(registration.rotation, dtype=float)
+    translation = np.asarray(registration.translation, dtype=float)
+    scales = np.asarray(registration.coordinate_scales, dtype=float)
+    experimental = np.asarray(experimental_reference.coordinates, dtype=float)
+    residuals = (np.asarray(abaqus_reference.coordinates, dtype=float)[indices] @ rotation) * scales + translation \
+        - experimental
+    distances = np.linalg.norm(residuals, axis=1)
+    _, radius = _geometry_center_radius(experimental)
+    span = max(float(np.linalg.norm(np.ptp(experimental, axis=0))), radius)
+    tolerance = max(span * 0.03, 1.0e-12)
+    metrics = registration.registration_metrics
+    calibration = dict(metrics.get("geometry_calibration") or registration.calibration)
+    calibration["frozen_registration_hash"] = registration.registration_hash
+    subset = metrics.get("fe_mapping_node_subset")
+    return GeometryMatch(
+        experimental_to_abaqus=indices,
+        distances=distances,
+        rotation=rotation,
+        coordinate_scale=float(np.sqrt(scales[0] * scales[1])),
+        translation=translation,
+        normalized_rms_distance=float(np.sqrt(np.mean(distances ** 2)) / max(span, 1.0e-30)),
+        matched_fraction=float(np.mean(distances <= tolerance)),
+        coordinate_scales=scales,
+        calibration_details=calibration,
+        physical_distances=np.linalg.norm(residuals / scales, axis=1),
+        fe_mapping_node_subset=None if subset is None else dict(subset),
+    )
+
+
 def _select_user_confirmed_geometry(
     candidates: Sequence[GeometryMatch],
     orientation_selection: Optional[Dict[str, object]],
@@ -1116,6 +1169,7 @@ def compare_modal_datasets(
     geometry_calibration: Optional[CoordinateCalibration] = None,
     orientation_selection: Optional[Dict[str, object]] = None,
     fe_mapping_node_ids: Optional[Sequence[object]] = None,
+    frozen_registration=None,
 ) -> ComparisonResult:
     """Compare FE and experimental modes on one geometry-only registration.
 
@@ -1123,7 +1177,20 @@ def compare_modal_datasets(
     points may map onto (for example the measured exterior surface). It only
     restricts the geometry search; the FE dataset, its geometry identity and
     the full-model mode vectors are unchanged.
+
+    ``frozen_registration`` (G2d-1) applies an accepted, already verified
+    frozen registration instead of the geometry search: its point-to-node
+    mapping and rotation enter the MAC computation directly. It excludes every
+    other geometry option. MAC, frequency gates and assignment are unchanged.
     """
+    if frozen_registration is not None and any(
+        value is not None
+        for value in (coordinate_scale_override, geometry_calibration, orientation_selection, fe_mapping_node_ids)
+    ):
+        raise ValueError(
+            "A frozen registration fixes the geometry; calibration, scale, orientation and FE mapping options "
+            "cannot be combined with it."
+        )
     abaqus_modes = abaqus.sorted_modes()
     experimental_modes = experimental.sorted_modes()
     if not abaqus_modes:
@@ -1149,26 +1216,35 @@ def compare_modal_datasets(
         experimental_modes, experimental_node_ids
     )
 
-    fe_node_indices, fe_mapping_node_subset = _resolve_fe_mapping_node_ids(
-        abaqus_reference, fe_mapping_node_ids
-    )
-    candidates = geometry_alignment_candidates(
-        abaqus_reference.coordinates,
-        experimental_coordinates,
-        coordinate_scale_override=coordinate_scale_override,
-        geometry_calibration=geometry_calibration,
-        fe_node_indices=fe_node_indices,
-        fe_mapping_node_subset=fe_mapping_node_subset,
-    )
-    # Geometry/orientation is selected using ONLY geometric evidence, before
-    # any MAC/frequency/modal quantity is computed -- see
-    # _select_unambiguous_geometry and GeometryOrientationAmbiguousError.
-    geometry = _select_user_confirmed_geometry(candidates, orientation_selection)
-    orientation_was_user_confirmed = (
-        orientation_selection is not None
-        and _candidate_summary(geometry)["candidate_id"]
-        == orientation_selection.get("candidate_id")
-    )
+    if frozen_registration is not None:
+        geometry = geometry_from_frozen_registration(
+            frozen_registration, abaqus_reference, experimental_reference
+        )
+        candidates = [geometry]
+        fe_mapping_node_subset = geometry.fe_mapping_node_subset
+        orientation_source = FROZEN_REGISTRATION_ORIENTATION_SOURCE
+    else:
+        fe_node_indices, fe_mapping_node_subset = _resolve_fe_mapping_node_ids(
+            abaqus_reference, fe_mapping_node_ids
+        )
+        candidates = geometry_alignment_candidates(
+            abaqus_reference.coordinates,
+            experimental_coordinates,
+            coordinate_scale_override=coordinate_scale_override,
+            geometry_calibration=geometry_calibration,
+            fe_node_indices=fe_node_indices,
+            fe_mapping_node_subset=fe_mapping_node_subset,
+        )
+        # Geometry/orientation is selected using ONLY geometric evidence, before
+        # any MAC/frequency/modal quantity is computed -- see
+        # _select_unambiguous_geometry and GeometryOrientationAmbiguousError.
+        geometry = _select_user_confirmed_geometry(candidates, orientation_selection)
+        orientation_was_user_confirmed = (
+            orientation_selection is not None
+            and _candidate_summary(geometry)["candidate_id"]
+            == orientation_selection.get("candidate_id")
+        )
+        orientation_source = "user_confirmed" if orientation_was_user_confirmed else "geometry_unique"
     (
         mac_matrix,
         abaqus_indices,
@@ -1223,9 +1299,7 @@ def compare_modal_datasets(
     )
 
     warnings, selected_transform = _geometry_warnings_and_transform(geometry)
-    selected_transform["orientation_source"] = (
-        "user_confirmed" if orientation_was_user_confirmed else "geometry_unique"
-    )
+    selected_transform["orientation_source"] = orientation_source
     result_abaqus = _copy_dataset(abaqus)
     result_abaqus.metadata["selected_geometry_transform"] = selected_transform
     mapped_fe_coordinates = abaqus_reference.coordinates[geometry.experimental_to_abaqus]
@@ -1236,9 +1310,7 @@ def compare_modal_datasets(
     }
     result_metadata = {
         "geometry_calibration": dict(geometry.calibration_details),
-        "orientation_source": (
-            "user_confirmed" if orientation_was_user_confirmed else "geometry_unique"
-        ),
+        "orientation_source": orientation_source,
         "raw_experimental_bbox": {
             "minimum": experimental_coordinates.min(axis=0).tolist(),
             "maximum": experimental_coordinates.max(axis=0).tolist(),

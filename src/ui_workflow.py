@@ -837,6 +837,11 @@ def install_responsive_workflow(app_module) -> None:
             Tooltip(mapping, "Automatic mapping derives the scale from the selected units; Custom exposes a positive numeric override."),
         ))
 
+        governed = section("ACCEPTED PHYSICAL REGISTRATION (SP-02 / SP-13)")
+        build_governed = getattr(self, "_build_governed_registration", None)
+        if callable(build_governed):  # G2d-1: opt-in; automatic geometry registration stays the default
+            build_governed(governed)
+
         output = section("OUTPUT")
         self.workspace_path_entry, workspace_path_browse = self._responsive_file_row(
             output, 0, "Output workspace", self.workspace_path, self._choose_workspace,

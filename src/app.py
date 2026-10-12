@@ -32,6 +32,9 @@ from universal_reader import load_universal_modal_file, resolve_testlab_file
 APP_TITLE = "Abaqus–Simcenter Modal Comparator"
 SCALING_TAB_TITLE = "11. Frequency scaling (diagnostic)"  # G1 (ui_policy tab labels)
 SENSITIVITY_POLL_MS = 100
+GOVERNED_PRECHECK_DELAY_MS = 400
+GOVERNED_UNAVAILABLE = ("Not available: select an accepted SP-02 / SP-13 baseline ODB and its accepted PolyMAX UNV "
+                        "(checked by fresh SHA-256). Automatic geometry registration is used.")
 SENSITIVITY_NOT_CHECKED = ("Archived sensitivity evidence: not checked for the current comparison. Press 'Check "
                            "archived sensitivities' (the ODB and the experimental file are hashed in the background).")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -441,6 +444,108 @@ class ModalComparatorApp:
             variable.trace_add("write", lambda *_: self._invalidate_sensitivity_evidence(
                 "Archived sensitivity evidence: the input files changed; run the comparison and check again."))
         self._set_sensitivity_view(SENSITIVITY_NOT_CHECKED, details=sensitivity_evidence.CAVEAT)
+
+    def _build_governed_registration(self, parent) -> None:
+        """G2d-1: opt-in use of an accepted frozen physical registration instead of the automatic registration.
+
+        The choice is enabled only after the selected ODB and experimental file are, by fresh SHA-256, the accepted
+        files of one fixture (checked off the GUI thread). The analysis verifies the modal set and the frozen
+        registration again on the loaded data and refuses the run otherwise; automatic registration stays the default.
+        """
+        self.use_governed_registration = tk.BooleanVar(value=False)
+        self._governed_registration_requested = False
+        self._governed_available = None
+        self._governed_generation = 0
+        self._governed_cancel = None
+        self._governed_after = None
+        self.governed_registration_check = ttk.Checkbutton(
+            parent, variable=self.use_governed_registration, command=self._governed_registration_toggled,
+            state="disabled", text="Use the accepted physical registration (frozen measured-point-to-FE-node mapping "
+                                   "and rotation) instead of automatic geometry registration")
+        self.governed_registration_check.grid(row=0, column=0, columnspan=3, sticky="w")
+        self.governed_registration_status = ttk.Label(parent, text=GOVERNED_UNAVAILABLE, justify="left",
+                                                      wraplength=900)
+        self.governed_registration_status.grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        for variable in (self.abaqus_path, self.experimental_path):
+            variable.trace_add("write", lambda *_: self._schedule_governed_precheck())
+        self._schedule_governed_precheck()
+
+    def _governed_registration_toggled(self) -> None:
+        self._governed_registration_requested = bool(
+            self.use_governed_registration.get() and self._governed_available is not None)
+
+    def _set_governed_option(self, available, message: str) -> None:
+        self._governed_available = available
+        if available is None:
+            self.use_governed_registration.set(False)
+        self.governed_registration_check.configure(state="normal" if available is not None else "disabled")
+        self.governed_registration_status.configure(text=message)
+        self._governed_registration_toggled()
+
+    def _schedule_governed_precheck(self) -> None:
+        """Any change of the selected files withdraws the option until the new files are checked."""
+        if not hasattr(self, "governed_registration_check"):
+            return
+        self._governed_generation += 1
+        if self._governed_cancel is not None:
+            self._governed_cancel.set()
+            self._governed_cancel = None
+        if self._governed_after is not None:
+            try:
+                self.root.after_cancel(self._governed_after)
+            except tk.TclError:
+                pass
+            self._governed_after = None
+        self._set_governed_option(None, GOVERNED_UNAVAILABLE)
+        odb, experiment = self.abaqus_path.get().strip(), self.experimental_path.get().strip()
+        if odb and experiment and Path(odb).is_file() and Path(experiment).is_file():
+            self._governed_after = self.root.after(GOVERNED_PRECHECK_DELAY_MS, self._start_governed_precheck,
+                                                   Path(odb), Path(experiment), self._governed_generation)
+
+    def _start_governed_precheck(self, odb: Path, experiment: Path, generation: int) -> None:
+        self._governed_after = None
+        if generation != self._governed_generation:
+            return
+        cancel = threading.Event()
+        outcome: dict = {}
+        self._governed_cancel = cancel
+        self.governed_registration_status.configure(
+            text="Checking whether the selected files are an accepted SP-02 / SP-13 reference (SHA-256)...")
+        worker = threading.Thread(target=self._governed_precheck_worker, args=(odb, experiment, cancel, outcome),
+                                  daemon=True)
+        worker.start()
+        self.root.after(SENSITIVITY_POLL_MS, self._poll_governed_precheck, worker, outcome, generation, cancel)
+
+    @staticmethod
+    def _governed_precheck_worker(odb: Path, experiment: Path, cancel: threading.Event, outcome: dict) -> None:
+        """Background thread: no Tk call here."""
+        try:
+            spec, fixture, _, _ = sensitivity_evidence.match_accepted_files(
+                odb, resolve_testlab_file(experiment), cancel=cancel)
+            outcome["available"] = (spec.specimen, fixture.fixture_id, fixture.registration.registration_hash)
+        except sensitivity_evidence.SensitivityCheckCancelled:
+            outcome["cancelled"] = True
+        except Exception as error:  # noqa: BLE001 - every other outcome withdraws the option with its reason
+            outcome["reason"] = str(error)
+
+    def _poll_governed_precheck(self, worker, outcome: dict, generation: int, cancel: threading.Event) -> None:
+        if cancel.is_set() or generation != self._governed_generation:
+            return  # superseded by a newer file selection
+        if worker.is_alive():
+            self.root.after(SENSITIVITY_POLL_MS, self._poll_governed_precheck, worker, outcome, generation, cancel)
+            return
+        self._governed_cancel = None
+        available = outcome.get("available")
+        if available is None:
+            reason = outcome.get("reason") or "the check did not complete."
+            self._set_governed_option(None, f"Not available: {reason} Automatic geometry registration is used.")
+            return
+        specimen, fixture_id, registration_hash = available
+        self._set_governed_option(available, (
+            f"Available: {specimen} ({fixture_id}), accepted physical registration {registration_hash[:12]}... The "
+            "selected files are the accepted ODB and UNV by SHA-256. When the analysis runs, the PolyMAX modal set "
+            "and the frozen registration are verified again on the loaded data; a failed verification refuses the "
+            "run and never substitutes another registration."))
 
     def _set_sensitivity_view(self, status: str, rows=(), details: str = "") -> None:
         self.sensitivity_status.configure(text=status)
