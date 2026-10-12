@@ -5,7 +5,7 @@
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
   "current_ministep": "M8-D2c Campaign identity and run type in the campaign draft",
-  "status": "REVIEW_READY",
+  "status": "ACCEPTED",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
   "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
@@ -1389,13 +1389,17 @@
       },
       "M8-D2c": {
         "title": "Campaign identity and run type in the campaign draft",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "auto-id/m8-d2c",
         "base": "ac68548d028d7c66e6df65466ca64f26a92a12b3",
         "authorisation": "SUPERVISOR task M8-D2c (one small step; no finalisation, no run)",
         "scope": "explicit campaign_id (Declare campaign_id..., text input) and run_type (Run type: RUN_A / RUN_B) in the Campaign draft section; no default; validated by the production rules (domain declared_campaign_id / declared_run_type, now also called by parse_campaign_definition with identical messages); shown in the draft table and preview; missing inputs recomputed after every successful declaration; a refused declaration keeps the draft. Versioned draft format: saved as auto-id/campaign-draft/v2 (declared: scientific_question, tau_mf, campaign_id, run_type); auto-id/campaign-draft/v1 drafts still open exactly as written (they declare neither field; never inferred; opening never rewrites the file; an explicit Save As writes v2). RUN_B grants no execution authorisation: run_b_gate stays a missing, SUPERVISOR-gated input and is never set by a draft",
         "domain_change": "additive public declared_campaign_id and declared_run_type; the parser calls them (identical rules and messages); RUN_A / RUN_B campaign hashes unchanged",
-        "unchanged": "campaign schema, require_executable (RUN_B still needs run_b_gate), gates, thresholds, M7 records; no parameters, pairings, uncertainties, budgets or solver settings generated; no finalisation; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
+        "unchanged": "campaign schema, require_executable (RUN_B still needs run_b_gate), gates, thresholds, M7 records; no parameters, pairings, uncertainties, budgets or solver settings generated; no finalisation; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET",
+        "pr": 70,
+        "acceptance": "SUPERVISOR: PR #70 head 0dbb314 ACCEPTED and merged on explicit SUPERVISOR authorisation (after the SUPERVISOR review-only integration check of 0dbb314 on main 6f25d0a: no conflicts; merged tree identical to the checked integration)",
+        "merge_commit": "f72fc6b55f7757eeb1d3a18146cede6744d6d625",
+        "main_ci": "Linux CI on main f72fc6b: success (run 38290657879)"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
