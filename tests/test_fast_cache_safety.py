@@ -20,10 +20,13 @@ class FastCacheSafetyTests(unittest.TestCase):
     def test_dataset55_dof_pipeline_version_invalidates_older_unv_entries(self):
         # Zero-filled dataset-55 components are no longer measured DOFs, so
         # cached datasets carrying the old all-present masks must not be served.
+        # G2 frequency precision: extracted ODB datasets now take full-precision EIGFREQ history frequencies, so
+        # datasets cached with the rounded frame frequencies must not be served either.
         self.assertEqual(
             _ANALYSIS_PIPELINE_VERSION,
-            "2026.10.01.1-dataset55-zero-filled-dofs",
+            "2026.10.13.1-eigfreq-history-frequencies",
         )
+        self.assertNotIn("2026.10.01.1-dataset55-zero-filled-dofs", _CACHE_VERSION)
         self.assertNotIn("2026.09.16.3-residual-record-classification", _CACHE_VERSION)
         self.assertNotIn("2026.09.16.2-exp-only-dataset58", _CACHE_VERSION)
 
