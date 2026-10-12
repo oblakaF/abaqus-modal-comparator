@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import csv
+from decimal import Decimal
 import json
+import math
 import os
 import shlex
 import signal
@@ -543,6 +545,83 @@ def _load_mode_csv(
     return mode
 
 
+# The frame frequency of an Abaqus frequency step is reported with only 5-6 significant digits, while the EIGFREQ
+# history output carries the solver's single-precision value. The history value replaces the frame value only when its
+# mode identity is unambiguous and consistent; otherwise the frame value stays (fail-closed).
+FREQUENCY_SOURCE_HISTORY = "EIGFREQ history"
+FREQUENCY_SOURCE_FRAME = "frame frequency"
+_FLOAT32_RESOLUTION = 2.0 ** -23  # one single-precision ulp, relative (ODB results are stored in single precision)
+_EIGVAL_RELATIVE_TOLERANCE = 4 * 2.0 ** -24  # sqrt(EIGVAL)/2pi vs EIGFREQ: a few single-precision ulps
+
+
+def _reported_precision(value: float) -> float:
+    """Half a unit in the last reported decimal place of a frame frequency, never below float32 resolution."""
+    exponent = Decimal(repr(float(value))).as_tuple().exponent
+    half_unit = 0.5 * 10.0 ** exponent if isinstance(exponent, int) else 0.0
+    return max(half_unit, abs(value) * _FLOAT32_RESOLUTION)
+
+
+def _single_history(manifest: Mapping[str, Any], name: str):
+    """(mode number -> value, None); (None, None) when absent; (None, reason) when unusable."""
+    entries = [item for item in manifest.get("history") or () if isinstance(item, Mapping) and item.get("name") == name]
+    if not entries:
+        return None, None
+    if len(entries) > 1:
+        return None, f"{len(entries)} {name} histories (ambiguous)"
+    values: Dict[int, float] = {}
+    for pair in entries[0].get("data") or ():
+        try:
+            x, y = float(pair[0]), float(pair[1])
+        except (TypeError, ValueError, IndexError):
+            return None, f"{name} history has a malformed point"
+        if not (math.isfinite(x) and math.isfinite(y) and x.is_integer() and x >= 1):
+            return None, f"{name} history point {pair!r} is not (mode number, finite value)"
+        if int(x) in values:
+            return None, f"{name} history repeats mode {int(x)}"
+        values[int(x)] = y
+    if not values:
+        return None, f"{name} history is empty"
+    return values, None
+
+
+def history_frequencies(manifest: Mapping[str, Any], frame_frequencies: Mapping[int, float]):
+    """(mode -> full-precision EIGFREQ frequency, mode -> reason the frame frequency is kept).
+
+    A mode takes its EIGFREQ value only if: exactly one EIGFREQ history exists with unique integer mode numbers; it
+    contains the mode; the value agrees with the frame frequency within the frame's reported precision; no other
+    mode's EIGFREQ value is equally consistent with that frame frequency; and, when an EIGVAL history exists, it is
+    single, lists the same modes and sqrt(EIGVAL)/2pi agrees with EIGFREQ. Array order and nearest-value search are
+    never used.
+    """
+    eigfreq, eigfreq_problem = _single_history(manifest, "EIGFREQ")
+    eigval, eigval_problem = _single_history(manifest, "EIGVAL")
+    problem = eigfreq_problem or eigval_problem
+    if problem is None and eigfreq is None:
+        problem = "no EIGFREQ history"
+    if problem is None and eigval is not None and set(eigval) != set(eigfreq):
+        problem = "the EIGVAL and EIGFREQ histories list different modes"
+    if problem is not None:
+        return {}, {mode: problem for mode in frame_frequencies}
+    accepted: Dict[int, float] = {}
+    rejected: Dict[int, str] = {}
+    for mode, frame in frame_frequencies.items():
+        value = eigfreq.get(mode)
+        tolerance = _reported_precision(frame)
+        if value is None:
+            rejected[mode] = f"mode {mode} is not in the EIGFREQ history"
+        elif not (frame > 0.0 and abs(value - frame) <= tolerance):
+            rejected[mode] = f"EIGFREQ {value!r} contradicts the frame frequency {frame!r} of mode {mode}"
+        elif any(other != mode and abs(candidate - frame) <= tolerance for other, candidate in eigfreq.items()):
+            rejected[mode] = f"the frame frequency {frame!r} of mode {mode} also matches another EIGFREQ mode"
+        elif eigval is not None and not (
+                eigval[mode] > 0.0
+                and abs(math.sqrt(eigval[mode]) / (2.0 * math.pi) - value) <= _EIGVAL_RELATIVE_TOLERANCE * value):
+            rejected[mode] = f"the EIGVAL of mode {mode} contradicts its EIGFREQ"
+        else:
+            accepted[mode] = value
+    return accepted, rejected
+
+
 def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
     manifest_path = Path(manifest_path)
     with manifest_path.open("r", encoding="utf-8") as stream:
@@ -562,6 +641,8 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
             raise FileNotFoundError(f"Extracted geometry file is missing: {geometry_path}")
         geometry = _load_geometry_csv(geometry_path)
 
+    frame_frequencies = {int(entry["mode"]): float(entry["frequency_hz"]) for entry in manifest.get("modes", [])}
+    precise, kept = history_frequencies(manifest, frame_frequencies)
     modes: List[ModeShape] = []
     for mode_entry in manifest.get("modes", []):
         if cancel_event is not None and cancel_event.is_set():
@@ -573,16 +654,23 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
         file_path = manifest_path.parent / mode_entry["file"]
         if not file_path.exists():
             raise FileNotFoundError(f"Extracted mode file is missing: {file_path}")
+        mode_number = int(mode_entry["mode"])
+        frame_frequency = float(mode_entry["frequency_hz"])
+        metadata = {
+            "frame_index": mode_entry.get("frame_index"),
+            "frame_description": mode_entry.get("description"),
+            "step_name": manifest.get("step_name"),
+            "frame_frequency_hz": frame_frequency,
+            "frequency_source": FREQUENCY_SOURCE_HISTORY if mode_number in precise else FREQUENCY_SOURCE_FRAME,
+        }
+        if mode_number in kept:
+            metadata["frequency_history_note"] = kept[mode_number]
         modes.append(
             _load_mode_csv(
                 file_path=file_path,
-                mode_number=int(mode_entry["mode"]),
-                frequency_hz=float(mode_entry["frequency_hz"]),
-                metadata={
-                    "frame_index": mode_entry.get("frame_index"),
-                    "frame_description": mode_entry.get("description"),
-                    "step_name": manifest.get("step_name"),
-                },
+                mode_number=mode_number,
+                frequency_hz=precise.get(mode_number, frame_frequency),
+                metadata=metadata,
                 geometry=geometry,
             )
         )
@@ -592,6 +680,10 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
     notice = extraction_range_notice(manifest)
     if notice is not None:
         manifest["extraction_range_notice"] = notice
+    manifest["frequency_sources"] = {
+        "history_modes": sorted(precise),
+        "frame_modes": {str(mode): reason for mode, reason in sorted(kept.items())},
+    }
     return ModalDataset(
         source_name="Abaqus ODB",
         source_path=Path(manifest.get("odb_path", manifest_path)),

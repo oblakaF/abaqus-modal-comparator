@@ -28,6 +28,7 @@ G12_FIXED_MPA = 4500.0
 MAXIMUM_E_CHANGE = 0.05  # the archived CARBON-5A ±5 % interval; never extrapolated
 AVAILABLE = "E_WHAT_IF_AVAILABLE"
 BLOCKED = "E_WHAT_IF_BLOCKED"
+INCOMPLETE = "E_WHAT_IF_INCOMPLETE"  # a required strict row (FIT or HOLDOUT) is unavailable: no partial preview
 LABELS = ("LOCAL_MODEL_RESPONSE_WHAT_IF", "NOT_A_RECOMMENDED_E", "NOT_AN_IDENTIFIED_MATERIAL_PROPERTY",
           "NOT_A_SPECIMEN_CALIBRATION")
 LABEL_TEXT = " · ".join(LABELS)
@@ -140,6 +141,12 @@ def e_what_if(evidence: Optional[SensitivityEvidence], e_change: float) -> EWhat
                               row.experimental_hz, trial, before, after, row.s_e, _effect(before, after),
                               "recorded S_E of the resolved FE branch"))
     rows = tuple(rows)
+    strict = [row for row in rows if row.role in ("FIT", "HOLDOUT")]
+    missing = [row for row in strict if row.trial_hz is None]
+    if not strict or missing:
+        detail = "; ".join(f"{row.row_id} ({row.role}): {row.note}" for row in missing) or "no strict row"
+        return EWhatIf(INCOMPLETE, f"incomplete SP-02 strict evidence — {detail}. Every accepted strict row (FIT and "
+                                   "HOLDOUT) is required; a partial FIT/HOLDOUT preview is not shown.", e_change, None)
     return EWhatIf(AVAILABLE, "", e_change, E_BASELINE_MPA * factor, rows, _summary(rows, "FIT"),
                    _summary(rows, "HOLDOUT"))
 
