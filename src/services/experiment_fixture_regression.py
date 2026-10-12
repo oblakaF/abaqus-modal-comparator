@@ -126,6 +126,24 @@ def _node_list(node_ids: object) -> list:
     return [item.item() if isinstance(item, np.generic) else item for item in np.asarray(node_ids, dtype=object).reshape(-1)]
 
 
+def _expected_mode_source(fixture: ExperimentFixture) -> str:
+    expected_mode_source = SOURCE_TYPE_MODE_SOURCES.get(fixture.modal_set.source_type)
+    _require(
+        expected_mode_source is not None,
+        "modal_set.source_type",
+        f"{fixture.modal_set.source_type!r} has no registered reader mode source.",
+    )
+    return expected_mode_source
+
+
+def load_fixture_registration(fixture: ExperimentFixture, repo_root: Path) -> FrozenRegistration:
+    """The fixture's hash-sealed registration, checked against every identity the fixture pins; otherwise raise."""
+
+    registration = _load_registration(fixture, repo_root)
+    _check_registration(fixture, registration)
+    return registration
+
+
 def verify_experiment_fixture(
     fixture: ExperimentFixture,
     roots: Mapping[str, Path],
@@ -140,18 +158,25 @@ def verify_experiment_fixture(
     """
 
     source_path = resolve_external_file(fixture.experimental_source, roots)
+    registration = load_fixture_registration(fixture, repo_root)
+    _expected_mode_source(fixture)
+    dataset = load_modal_dataset(source_path, modal_set=fixture.modal_set.name)
+    return verify_fixture_dataset(fixture, registration, dataset)
 
-    registration = _load_registration(fixture, repo_root)
-    _check_registration(fixture, registration)
+
+def verify_fixture_dataset(
+    fixture: ExperimentFixture,
+    registration: FrozenRegistration,
+    dataset: ModalDataset,
+) -> FixtureRegressionReport:
+    """Check an imported modal dataset against the fixture's pinned modal set and its frozen registration.
+
+    The pinned source type, modal-set key, mode and point counts, the frozen measurement points and the
+    measured-DOF contract must all be reproduced exactly; every difference raises ``FixtureRegressionError``.
+    """
 
     pinned = fixture.modal_set
-    expected_mode_source = SOURCE_TYPE_MODE_SOURCES.get(pinned.source_type)
-    _require(
-        expected_mode_source is not None,
-        "modal_set.source_type",
-        f"{pinned.source_type!r} has no registered reader mode source.",
-    )
-    dataset = load_modal_dataset(source_path, modal_set=pinned.name)
+    expected_mode_source = _expected_mode_source(fixture)
     metadata = dataset.metadata
     _require(
         metadata.get("mode_source") == expected_mode_source,
