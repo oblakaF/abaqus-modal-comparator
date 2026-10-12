@@ -16,6 +16,8 @@ import numpy as np
 from PIL import Image, ImageTk
 
 from abaqus_bridge import AbaqusExtractionError, load_or_extract_odb
+from frequency_scaling import LABEL_TEXT as SCALING_LABELS, CAVEAT as SCALING_CAVEAT
+from frequency_scaling import frequency_scaling_diagnostic, table_rows as scaling_table_rows
 from modal_core import ComparisonResult, ModePairResult, compare_modal_datasets
 from reporting import (
     export_excel,
@@ -27,6 +29,7 @@ from reporting import (
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
 APP_TITLE = "Abaqus–Simcenter Modal Comparator"
+SCALING_TAB_TITLE = "11. Frequency scaling (diagnostic)"  # G1 (ui_policy tab labels)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORKSPACE = PROJECT_ROOT / "modal_comparator_output"
 
@@ -238,17 +241,21 @@ class ModalComparatorApp:
         self.shape_tab = ttk.Frame(self.tabs, padding=12)
         self.plot_tab = ttk.Frame(self.tabs, padding=12)
         self.details_tab = ttk.Frame(self.tabs, padding=12)
+        # G1: its own tab, appended last so the index-based tab insertions of later layers keep their places
+        self.scaling_tab = ttk.Frame(self.tabs, padding=12)
         for tab, title in (
             (self.input_tab, "1. Files and analysis"),
             (self.table_tab, "2. Comparison table"),
             (self.shape_tab, "3. Mode shapes"),
             (self.plot_tab, "4. MAC and frequencies"),
             (self.details_tab, "5. Details"),
+            (self.scaling_tab, SCALING_TAB_TITLE),
         ):
             self.tabs.add(tab, text=title)
 
         self._build_input()
         self._build_table()
+        self._build_scaling()
         self._build_shapes()
         self._build_plots()
         self._build_details()
@@ -349,6 +356,40 @@ class ModalComparatorApp:
         self.pdf_button = ttk.Button(actions, text="Export PDF report", command=self._pdf, state="disabled")
         self.excel_button.pack(side="left")
         self.pdf_button.pack(side="left", padx=10)
+
+    def _build_scaling(self) -> None:
+        """G1: frequency-scaling diagnostics of the matched pairs (diagnostic only; never a material property).
+
+        Its own tab: the comparison-table tab has no vertical room left at the minimum window size."""
+        scaling = ttk.LabelFrame(self.scaling_tab, text=f"Frequency scaling diagnostic — {SCALING_LABELS}",
+                                 padding=8)
+        scaling.pack(fill="both", expand=True)
+        ttk.Label(scaling, text=SCALING_CAVEAT, wraplength=1100, justify="left").pack(anchor="w")
+        self.scaling_summary = ttk.Label(scaling, text="Frequency-scaling diagnostic: no comparison result yet.",
+                                         wraplength=1100, justify="left")
+        self.scaling_summary.pack(anchor="w", pady=(4, 4))
+        scaling_columns = ("fe", "em", "ff", "ef", "mac", "ratio", "square", "log", "direction", "category",
+                           "status", "warnings")
+        scaling_titles = ("FE mode", "Exp. mode", "FE, Hz", "Exp., Hz", "MAC", "f_exp/f_FE", "(f_exp/f_FE)^2",
+                          "ln(f_exp/f_FE)", "Direction", "Category", "Comparator status", "Quality warnings")
+        scaling_widths = (70, 75, 95, 95, 65, 90, 105, 100, 170, 130, 120, 320)
+        scaling_frame = ttk.Frame(scaling)
+        scaling_frame.pack(fill="both", expand=True)
+        scaling_frame.columnconfigure(0, weight=1)
+        scaling_frame.rowconfigure(0, weight=1)
+        self.scaling_table = ttk.Treeview(scaling_frame, columns=scaling_columns, show="headings", height=6,
+                                          selectmode="none")
+        for key, title, width in zip(scaling_columns, scaling_titles, scaling_widths):
+            self.scaling_table.heading(key, text=title)
+            # fixed widths: the columns keep their size and the table scrolls instead of squeezing them
+            self.scaling_table.column(key, width=width, minwidth=width, stretch=False, anchor="center")
+        self.scaling_yscroll = ttk.Scrollbar(scaling_frame, orient="vertical", command=self.scaling_table.yview)
+        self.scaling_xscroll = ttk.Scrollbar(scaling_frame, orient="horizontal", command=self.scaling_table.xview)
+        self.scaling_table.configure(yscrollcommand=self.scaling_yscroll.set,
+                                     xscrollcommand=self.scaling_xscroll.set)
+        self.scaling_table.grid(row=0, column=0, sticky="nsew")
+        self.scaling_yscroll.grid(row=0, column=1, sticky="ns")
+        self.scaling_xscroll.grid(row=1, column=0, sticky="ew")
 
     def _build_shapes(self) -> None:
         self.pair_title = ttk.Label(self.shape_tab, text="Run the analysis and select a matched pair.",
@@ -547,6 +588,12 @@ class ModalComparatorApp:
         )
         self.metric_mac.configure(text="Mean MAC: —" if not macs else f"Mean MAC: {sum(macs) / len(macs):.3f}")
         self.metric_geometry.configure(text=f"Geometry match: {result.geometry.matched_fraction:.1%}")
+        if hasattr(self, "scaling_table"):  # G1 diagnostic of the same matched pairs (pairing is not redone)
+            scaling = frequency_scaling_diagnostic(result.pairs)
+            self.scaling_table.delete(*self.scaling_table.get_children())
+            for row in scaling_table_rows(scaling):
+                self.scaling_table.insert("", "end", values=row)
+            self.scaling_summary.configure(text=f"{scaling.status}: {scaling.message}")
 
         if self.cache:
             self._image(self.mac_label, self.cache / "plots" / "mac_matrix.png", "mac")

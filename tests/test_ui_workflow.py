@@ -285,12 +285,13 @@ class ResponsivePolicyTests(unittest.TestCase):
         self.assertEqual(button_grid_columns(LayoutMode.MEDIUM, 6), 3)
         self.assertEqual(button_grid_columns(LayoutMode.COMPACT, 6), 2)
 
-    def test_compact_tab_labels_keep_all_ten_tabs(self):
+    def test_compact_tab_labels_keep_all_eleven_tabs(self):
         labels = tab_labels_for(LayoutMode.COMPACT)
-        self.assertEqual(len(labels), 10)
+        self.assertEqual(len(labels), 11)  # + G1 frequency-scaling diagnostic tab
         self.assertEqual(labels[0], "1. Files")
-        self.assertEqual(labels[-2], "9. Identification")
-        self.assertEqual(labels[-1], "10. Details")
+        self.assertEqual(labels[-3], "9. Identification")
+        self.assertEqual(labels[-2], "10. Details")
+        self.assertEqual(labels[-1], "11. Scaling")
 
     def test_dynamic_wrap_width_is_bounded_and_increases(self):
         compact = text_wrap_width(1024)
@@ -340,6 +341,7 @@ class ResponsivePolicyTests(unittest.TestCase):
             manual_review_tab=object(),
             material_identification_tab=object(),
             details_tab=object(),
+            scaling_tab=object(),  # G1 frequency-scaling diagnostic tab
         )
 
         main.app.ModalComparatorApp._apply_responsive_layout(application)
@@ -593,7 +595,7 @@ class ConfigurationLockTests(unittest.TestCase):
 
 
 class TkRuntimeSmokeTests(unittest.TestCase):
-    def test_runtime_builds_ten_resizable_tabs_with_complete_headings(self):
+    def test_runtime_builds_eleven_resizable_tabs_with_complete_headings(self):
         try:
             import tkinter as tk
             root = tk.Tk()
@@ -707,7 +709,7 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             root.geometry("1120x700")
             root.update_idletasks()
             application._apply_responsive_layout()
-            self.assertEqual(len(application.tabs.tabs()), 10)
+            self.assertEqual(len(application.tabs.tabs()), 11)  # + G1 frequency-scaling diagnostic tab
             self.assertEqual(application._layout_mode, LayoutMode.COMPACT)
             self.assertEqual(application.ui_scale_percent.get(), 125)
             self.assertGreater(

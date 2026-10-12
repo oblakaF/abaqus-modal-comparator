@@ -161,6 +161,7 @@ class ModalCoreTests(unittest.TestCase):
                         "MAC Matrix",
                         "Geometry Match",
                         "Abaqus History",
+                        "Frequency Scaling",  # G1 frequency-scaling diagnostic (diagnostic only)
                     ],
                 )
 

@@ -318,6 +318,11 @@ def export_excel(result: ComparisonResult, output_path: Path, image_directory: P
                 ]
             )
 
+    # G1: frequency-scaling diagnostics of the matched pairs (diagnostic only; never a material property)
+    from frequency_scaling import frequency_scaling_diagnostic, write_excel_sheet
+
+    write_excel_sheet(workbook, frequency_scaling_diagnostic(result.pairs))
+
     workbook.save(output_path)
     return output_path
 

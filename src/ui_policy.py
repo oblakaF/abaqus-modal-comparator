@@ -41,6 +41,7 @@ FULL_TAB_LABELS = (
     "8. Manual review",
     "9. Effective Material Identification",
     "10. Details",
+    "11. Frequency scaling (diagnostic)",  # G1
 )
 
 COMPACT_TAB_LABELS = (
@@ -54,6 +55,7 @@ COMPACT_TAB_LABELS = (
     "8. Review",
     "9. Identification",
     "10. Details",
+    "11. Scaling",  # G1
 )
 
 MATERIAL_IDENTIFICATION_STEP_LABELS = (

@@ -1584,7 +1584,7 @@ class MaterialIdentificationGuiShellTests(unittest.TestCase):
             self.assertGreaterEqual(logical_width, 1500)
             self.assertIs(application._layout_mode, LayoutMode.WIDE)
             self.assertEqual(labels, FULL_TAB_LABELS)
-            self.assertEqual(len(labels), 10)
+            self.assertEqual(len(labels), 11)  # + G1 frequency-scaling diagnostic tab
         finally:
             self.root.withdraw()
 
