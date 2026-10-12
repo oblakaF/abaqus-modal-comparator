@@ -19,6 +19,7 @@ from abaqus_bridge import AbaqusExtractionError, load_or_extract_odb
 from frequency_scaling import LABEL_TEXT as SCALING_LABELS, CAVEAT as SCALING_CAVEAT
 from frequency_scaling import frequency_scaling_diagnostic, table_rows as scaling_table_rows
 from modal_core import ComparisonResult, ModePairResult, compare_modal_datasets
+from services import archived_sensitivity_evidence as sensitivity_evidence
 from reporting import (
     export_excel,
     export_pdf,
@@ -30,6 +31,9 @@ from universal_reader import load_universal_modal_file, resolve_testlab_file
 
 APP_TITLE = "Abaqus–Simcenter Modal Comparator"
 SCALING_TAB_TITLE = "11. Frequency scaling (diagnostic)"  # G1 (ui_policy tab labels)
+SENSITIVITY_POLL_MS = 100
+SENSITIVITY_NOT_CHECKED = ("Archived sensitivity evidence: not checked for the current comparison. Press 'Check "
+                           "archived sensitivities' (the ODB and the experimental file are hashed in the background).")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORKSPACE = PROJECT_ROOT / "modal_comparator_output"
 
@@ -361,9 +365,12 @@ class ModalComparatorApp:
         """G1: frequency-scaling diagnostics of the matched pairs (diagnostic only; never a material property).
 
         Its own tab: the comparison-table tab has no vertical room left at the minimum window size."""
-        scaling = ttk.LabelFrame(self.scaling_tab, text=f"Frequency scaling diagnostic — {SCALING_LABELS}",
+        # G2c: G1 and the archived sensitivity evidence share the tab; both tables shrink instead of being cut off
+        self.scaling_panes = ttk.Panedwindow(self.scaling_tab, orient="vertical")
+        self.scaling_panes.pack(fill="both", expand=True)
+        scaling = ttk.LabelFrame(self.scaling_panes, text=f"Frequency scaling diagnostic — {SCALING_LABELS}",
                                  padding=8)
-        scaling.pack(fill="both", expand=True)
+        self.scaling_panes.add(scaling, weight=3)
         ttk.Label(scaling, text=SCALING_CAVEAT, wraplength=1100, justify="left").pack(anchor="w")
         self.scaling_summary = ttk.Label(scaling, text="Frequency-scaling diagnostic: no comparison result yet.",
                                          wraplength=1100, justify="left")
@@ -390,6 +397,114 @@ class ModalComparatorApp:
         self.scaling_table.grid(row=0, column=0, sticky="nsew")
         self.scaling_yscroll.grid(row=0, column=1, sticky="ns")
         self.scaling_xscroll.grid(row=1, column=0, sticky="ew")
+        self._build_sensitivity_evidence()
+
+    def _build_sensitivity_evidence(self) -> None:
+        """G2c: recorded CARBON-5A sensitivities of the accepted SP-02 / SP-13 models (display only).
+
+        Checked only on request, off the GUI thread; any change of the inputs or the comparison discards it."""
+        self._sensitivity_generation = 0
+        self._sensitivity_cancel = None
+        evidence = ttk.LabelFrame(self.scaling_panes, padding=8,
+                                  text=f"Archived sensitivity evidence (SP-02 / SP-13) — {sensitivity_evidence.LABEL_TEXT}")
+        self.scaling_panes.add(evidence, weight=2)
+        actions = ttk.Frame(evidence)
+        actions.pack(fill="x", pady=(4, 4))
+        self.sensitivity_button = ttk.Button(actions, text="Check archived sensitivities",
+                                             command=self._check_archived_sensitivities)
+        self.sensitivity_button.pack(side="left")
+        self.sensitivity_status = ttk.Label(actions, text=SENSITIVITY_NOT_CHECKED, wraplength=850, justify="left")
+        self.sensitivity_status.pack(side="left", padx=(10, 0))
+        frame = ttk.Frame(evidence)
+        frame.pack(fill="both", expand=True)
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(0, weight=1)
+        frame.rowconfigure(2, weight=1)
+        columns = sensitivity_evidence.TABLE_COLUMNS
+        self.sensitivity_table = ttk.Treeview(frame, columns=columns, show="headings", height=3, selectmode="none")
+        for key, title, width in zip(columns, sensitivity_evidence.TABLE_TITLES, sensitivity_evidence.TABLE_WIDTHS):
+            self.sensitivity_table.heading(key, text=title)
+            self.sensitivity_table.column(key, width=width, minwidth=width, stretch=False, anchor="center")
+        self.sensitivity_yscroll = ttk.Scrollbar(frame, orient="vertical", command=self.sensitivity_table.yview)
+        self.sensitivity_xscroll = ttk.Scrollbar(frame, orient="horizontal", command=self.sensitivity_table.xview)
+        self.sensitivity_table.configure(yscrollcommand=self.sensitivity_yscroll.set,
+                                         xscrollcommand=self.sensitivity_xscroll.set)
+        self.sensitivity_table.grid(row=0, column=0, sticky="nsew")
+        self.sensitivity_yscroll.grid(row=0, column=1, sticky="ns")
+        self.sensitivity_xscroll.grid(row=1, column=0, sticky="ew")
+        self.sensitivity_details = tk.Text(frame, height=3, wrap="word", state="disabled")
+        details_scroll = ttk.Scrollbar(frame, orient="vertical", command=self.sensitivity_details.yview)
+        self.sensitivity_details.configure(yscrollcommand=details_scroll.set)
+        self.sensitivity_details.grid(row=2, column=0, sticky="nsew", pady=(4, 0))
+        details_scroll.grid(row=2, column=1, sticky="ns", pady=(4, 0))
+        for variable in (self.abaqus_path, self.experimental_path):
+            variable.trace_add("write", lambda *_: self._invalidate_sensitivity_evidence(
+                "Archived sensitivity evidence: the input files changed; run the comparison and check again."))
+        self._set_sensitivity_view(SENSITIVITY_NOT_CHECKED, details=sensitivity_evidence.CAVEAT)
+
+    def _set_sensitivity_view(self, status: str, rows=(), details: str = "") -> None:
+        self.sensitivity_status.configure(text=status)
+        self.sensitivity_table.delete(*self.sensitivity_table.get_children())
+        for row in rows:
+            self.sensitivity_table.insert("", "end", values=row)
+        self.sensitivity_details.configure(state="normal")
+        self.sensitivity_details.delete("1.0", "end")
+        self.sensitivity_details.insert("1.0", details)
+        self.sensitivity_details.configure(state="disabled")
+
+    def _invalidate_sensitivity_evidence(self, message: str = SENSITIVITY_NOT_CHECKED) -> None:
+        """Cancel a running check and clear the shown evidence (the inputs or the comparison changed)."""
+        if not hasattr(self, "sensitivity_table"):
+            return
+        self._sensitivity_generation += 1
+        if self._sensitivity_cancel is not None:
+            self._sensitivity_cancel.set()
+            self._sensitivity_cancel = None
+        self.sensitivity_button.configure(state="normal")
+        self._set_sensitivity_view(message, details=sensitivity_evidence.CAVEAT)
+
+    def _check_archived_sensitivities(self) -> None:
+        self._invalidate_sensitivity_evidence("Checking archived sensitivity evidence: hashing the ODB and the "
+                                              "experimental file, verifying the accepted records...")
+        result = getattr(self, "result", None)
+        cancel = threading.Event()
+        outcome: dict = {}
+        self._sensitivity_cancel = cancel
+        self.sensitivity_button.configure(state="disabled")
+        worker = threading.Thread(target=self._sensitivity_worker, args=(result, cancel, outcome), daemon=True)
+        worker.start()
+        self.root.after(SENSITIVITY_POLL_MS, self._poll_sensitivity_check, worker, outcome, result,
+                        self._sensitivity_generation, cancel)
+
+    @staticmethod
+    def _sensitivity_worker(result, cancel: threading.Event, outcome: dict) -> None:
+        """Background thread: no Tk call here; the GUI thread polls ``outcome``."""
+        try:
+            outcome["evidence"] = sensitivity_evidence.check_archived_sensitivity_evidence(result, cancel=cancel)
+        except sensitivity_evidence.SensitivityCheckCancelled:
+            outcome["evidence"] = None
+        except Exception as error:  # noqa: BLE001 - shown as a refusal, never as evidence
+            outcome["evidence"] = sensitivity_evidence.not_applicable(f"the check failed: {error}")
+
+    def _poll_sensitivity_check(self, worker, outcome: dict, result, generation: int,
+                                cancel: threading.Event) -> None:
+        if cancel.is_set() or generation != self._sensitivity_generation:
+            return  # superseded: the invalidation already reset the view
+        if worker.is_alive():
+            self.root.after(SENSITIVITY_POLL_MS, self._poll_sensitivity_check, worker, outcome, result, generation,
+                            cancel)
+            return
+        self._show_sensitivity_evidence(outcome.get("evidence"), result, generation, cancel)
+
+    def _show_sensitivity_evidence(self, evidence, result, generation: int, cancel: threading.Event) -> None:
+        if (evidence is None or cancel.is_set() or generation != self._sensitivity_generation
+                or getattr(self, "result", None) is not result):
+            return  # stale: the inputs or the comparison changed during the check
+        self._sensitivity_cancel = None
+        self.sensitivity_button.configure(state="normal")
+        self._set_sensitivity_view(evidence.status + (f" — {evidence.specimen}" if evidence.specimen else ""),
+                                   sensitivity_evidence.table_rows(evidence),
+                                   sensitivity_evidence.summary_text(evidence))
 
     def _build_shapes(self) -> None:
         self.pair_title = ttk.Label(self.shape_tab, text="Run the analysis and select a matched pair.",
@@ -594,6 +709,7 @@ class ModalComparatorApp:
             for row in scaling_table_rows(scaling):
                 self.scaling_table.insert("", "end", values=row)
             self.scaling_summary.configure(text=f"{scaling.status}: {scaling.message}")
+        self._invalidate_sensitivity_evidence()  # G2c: a new comparison result must be checked again
 
         if self.cache:
             self._image(self.mac_label, self.cache / "plots" / "mac_matrix.png", "mac")

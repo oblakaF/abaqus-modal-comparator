@@ -1925,6 +1925,9 @@ def install_responsive_workflow(app_module) -> None:
         self.metric_geometry.configure(text="Stopped" if stopped else EM_DASH)
 
     def clear_result_presentation(self, message: str) -> None:
+        invalidate = getattr(self, "_invalidate_sensitivity_evidence", None)
+        if callable(invalidate):  # G2c: evidence of a discarded comparison is never shown
+            invalidate()
         self.item_to_pair.clear()
         self.table.delete(*self.table.get_children())
         if hasattr(self, "review_table"):

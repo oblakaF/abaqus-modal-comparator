@@ -11,6 +11,7 @@ from typing import Optional
 from abaqus_bridge import AnalysisCancelled, extraction_range_notice
 from coordinate_calibration import CoordinateCalibration
 from reviewed_core import GeometryOrientationAmbiguousError
+from services.archived_sensitivity_evidence import comparison_input_record
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
 
@@ -204,6 +205,8 @@ def install_runtime_hardening(app_module) -> None:
                 result.metadata["extraction_range_notice"] = range_notice
                 if range_notice not in result.warnings:
                     result.warnings.insert(0, range_notice)
+            # G2c: the files this comparison actually read (archived sensitivity evidence is bound to them)
+            result.metadata["comparison_inputs"] = comparison_input_record(abaqus, resolved_experiment, modal_set)
             stage(4, "Modal comparison")
             check_cancelled()
 
