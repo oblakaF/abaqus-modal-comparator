@@ -5008,3 +5008,17 @@ first internal provider.
 - **Unchanged:** campaign schema, gates, thresholds, M7 records; no parameters, pairings, uncertainties, budgets or
   solver settings; no finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE
   NOT_MET. **Abaqus run count:** 0.
+
+## 2026-10-13 — M8-D2c ACCEPTED and merged (docs-only closure)
+
+- **M8-D2c:** SUPERVISOR ACCEPTED (PR #70, head `0dbb314`); merge `f72fc6b55f7757eeb1d3a18146cede6744d6d625`; main Linux CI run `38290657879` success.
+  - Before the merge, the SUPERVISOR review-only integration check applied `0dbb314` to main `6f25d0a` in a separate
+    local worktree: no conflicts; the integrated diff identical to the PR diff; focused M8-D1 / D2a / D2b / D2c / M8.1
+    tests including the real Tk tests, the G1 / G2 GUI and related M8 / V12-I1 tests and the full unit suite passed;
+    v1 drafts written by main opened and saved as v2; RUN_A / RUN_B authorised nothing. The merged tree is identical
+    to the checked integration.
+- **Stage:** M8 stays IN_PROGRESS (accepted scope `READ_ONLY_EXISTING_JOURNALLED_RUNS`); the original M8 GATE stays
+  `NOT_MET`. No next M8 mini-step is started; it needs a separate SUPERVISOR authorisation.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+- **Scientific behaviour changed:** NO (documentation only). **Tests run:** none (docs only; JSON parse and
+  `git diff --check`). Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
