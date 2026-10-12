@@ -20,6 +20,16 @@ the current two-file comparison only when the comparison is bound to exactly tha
 Anything else is ``SENSITIVITY_EVIDENCE_NOT_APPLICABLE`` with the precise reason. Specimen name, file name, similar
 frequencies, geometry or material family never establish compatibility.
 
+Two statuses show the recorded values, and they are kept apart:
+
+- ``ARCHIVED_SENSITIVITY_REFERENCE_ONLY``: the exact files and every accepted record match, so the values are valid
+  archived sensitivities of that FE model and its pinned physical reference. The live comparison's own registration
+  is not demonstrably the governed one, so this is NOT a governed verification of the current comparison (file
+  hashes, mode numbers and MAC do not establish it).
+- ``ARCHIVED_SENSITIVITY_EVIDENCE_VERIFIED``: additionally, the comparison maps every measurement point to the same
+  FE node as the frozen physical registration, with the same rotation. The GUI comparator places points by centring,
+  not by the panel edges of the physical registration, so it does not currently reach this status.
+
 Nothing is estimated: no E, G or ν, no sensitivity-based correction, no calibration or identification verdict. The
 recorded values are local sensitivities of those exact FE models; they do not transfer to any other model.
 """
@@ -51,8 +61,12 @@ from services.experiment_fixture_regression import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-APPLICABLE = "ARCHIVED_SENSITIVITY_EVIDENCE_VERIFIED"
+VERIFIED = "ARCHIVED_SENSITIVITY_EVIDENCE_VERIFIED"
+REFERENCE_ONLY = "ARCHIVED_SENSITIVITY_REFERENCE_ONLY"
 NOT_APPLICABLE = "SENSITIVITY_EVIDENCE_NOT_APPLICABLE"
+REFERENCE_ONLY_STATEMENT = (
+    "These are valid archived FE-model sensitivities of the exact ODB / UNV and the pinned physical reference; they "
+    "are NOT a governed verification of the current GUI comparison.")
 LABELS = ("ARCHIVED_SENSITIVITY_EVIDENCE_DISPLAY_ONLY", "NOT_A_MATERIAL_PROPERTY", "NOT_A_SPECIMEN_CALIBRATION",
           "NOT_TRANSFERABLE_TO_OTHER_MODELS")
 LABEL_TEXT = " · ".join(LABELS)
@@ -76,6 +90,8 @@ PERTURBATIONS = {
 CANDIDATE_FIELDS = {"E_in_plane_mpa": "e_in_plane_mpa", "G12_mpa": "g12_mpa"}
 # Mode identity only: FE frequencies are archived in single precision (as in the re-evaluation tools).
 FREQUENCY_IDENTITY_RELATIVE = 1.0e-6
+# Registration equivalence: rotations are signed-axis matrices; the same tolerance as domain.registration.
+ROTATION_IDENTITY_TOLERANCE = 1.0e-6
 CARBON5A_ARCHIVE_ROWS = "carbon5a-archive-rows"  # SP-02: per-row status / tracked modes from carbon5a CSVs
 BRANCH_TRACKED_PACKS = "branch-tracked-shape-packs"  # SP-13: track_branches over the ±5 % shape packs
 _CHUNK_BYTES = 1 << 22
@@ -149,7 +165,7 @@ class SensitivityEvidence:
     specimen: Optional[str]
     reasons: tuple[str, ...]
     rows: tuple[SensitivityRow, ...] = ()
-    verified: tuple[str, ...] = ()
+    checks: tuple[str, ...] = ()  # the identity / record checks that passed (never a verification of the comparison)
     limitations: tuple[str, ...] = ()
     baseline: Mapping[str, float] = field(default_factory=dict)
     perturbations: Mapping[str, float] = field(default_factory=dict)
@@ -157,12 +173,12 @@ class SensitivityEvidence:
     labels: tuple[str, ...] = LABELS
 
     @property
-    def applicable(self) -> bool:
-        return self.status == APPLICABLE
+    def shows_sensitivities(self) -> bool:
+        return self.status in (VERIFIED, REFERENCE_ONLY)
 
 
-def not_applicable(reason: str, *, specimen: Optional[str] = None, verified: Sequence[str] = ()) -> SensitivityEvidence:
-    return SensitivityEvidence(NOT_APPLICABLE, specimen, (reason,), verified=tuple(verified))
+def not_applicable(reason: str, *, specimen: Optional[str] = None, checks: Sequence[str] = ()) -> SensitivityEvidence:
+    return SensitivityEvidence(NOT_APPLICABLE, specimen, (reason,), checks=tuple(checks))
 
 
 # ----------------------------------------------------------------------------- comparison inputs
@@ -361,22 +377,39 @@ def _same_frequency(value: Optional[float], recorded: float) -> bool:
     return value is not None and math.isclose(value, recorded, rel_tol=FREQUENCY_IDENTITY_RELATIVE)
 
 
-def _comparison_mapping_note(result, registration) -> str:
+def registration_equivalence(result, registration) -> tuple[bool, str]:
+    """Whether the live comparison demonstrably uses the frozen physical registration, and why (or why not).
+
+    Equivalent only if every measurement point (in the frozen point order, already replayed) maps to the same FE
+    node and the rotation is the frozen one. Anything that cannot be read is not equivalent.
+    """
+    frozen = registration.mapped_fe_node_ids
     try:
         reference = result.abaqus.sorted_modes()[0]
         mapped = [str(value) for value in np.asarray(reference.node_ids, dtype=object)[
-            np.asarray(result.geometry.experimental_to_abaqus, dtype=int)]]
-    except Exception:  # noqa: BLE001 - the note is informative only
-        return "The comparison's own geometric registration could not be compared with the physical registration."
-    same = sum(left == right for left, right in zip(mapped, registration.mapped_fe_node_ids))
+            np.asarray(result.geometry.experimental_to_abaqus, dtype=int).reshape(-1)]]
+        rotation = np.asarray(result.geometry.rotation, dtype=float)
+    except Exception:  # noqa: BLE001 - an unreadable registration is never equivalent
+        return False, (f"The comparison's own registration cannot be compared with the physical registration "
+                       f"{_short(registration.registration_hash)}; it is not demonstrably equivalent.")
+    same = sum(left == right for left, right in zip(mapped, frozen))
+    same_rotation = rotation.shape == (3, 3) and bool(np.allclose(rotation, np.asarray(registration.rotation),
+                                                                  rtol=0.0, atol=ROTATION_IDENTITY_TOLERANCE))
+    equivalent = len(mapped) == len(frozen) and same == len(frozen) and same_rotation
     source = (getattr(result, "metadata", None) or {}).get("orientation_source", "unknown")
-    return (f"The comparison used its own geometric registration ({source}); it maps {same} of "
-            f"{len(registration.mapped_fe_node_ids)} measurement points to the same FE node as the accepted physical "
-            f"registration {_short(registration.registration_hash)}. Governed MAC values come from the strict freeze "
-            "on the physical registration; comparison MAC values from the current comparison.")
+    text = (f"The comparison's registration ({source}) maps {same} of {len(frozen)} measurement points to the same FE "
+            f"node as the accepted physical registration {_short(registration.registration_hash)}; rotation "
+            f"{'identical' if same_rotation else 'different'}.")
+    if equivalent:
+        return True, text + " It is the governed physical mapping."
+    return False, (text + " It is not demonstrably equivalent: governed MAC values come from the strict freeze on "
+                   "the physical registration, comparison MAC values from the current comparison.")
 
 
-def _rows(spec, document, physical, perturbations, result) -> list[SensitivityRow]:
+def _rows(spec, document, physical, perturbations, result, equivalent: bool) -> list[SensitivityRow]:
+    shown = ("accepted strict pair; the comparison uses the governed physical mapping; recorded values shown"
+             if equivalent else "accepted strict pair; archived FE-model values shown as REFERENCE ONLY (the "
+             "comparison's registration is not the governed physical registration)")
     fe_hz = _frequencies(result.abaqus)
     experimental_hz = _frequencies(result.experimental)
     pairs = list(getattr(result, "pairs", None) or ())
@@ -407,7 +440,7 @@ def _rows(spec, document, physical, perturbations, result) -> list[SensitivityRo
             float(pair_record["experimental_hz"]), float(pair_record["fe_hz"]),
             float(pair_record["relative_frequency_error"]), float(pair_record["mac"]), comparison_mac,
             None if reason else s_e, None if reason else s_g12, branch, not reason,
-            reason or "accepted strict pair; recorded values shown"))
+            reason or shown))
     best = {int(item["experimental_mode"]): item for item in physical.get("best_match_per_experimental_mode") or ()}
     for excluded in physical.get("excluded") or ():  # preserved outliers: no strict row, no sensitivity shown
         exp_mode = int(excluded["experimental_mode"])
@@ -427,12 +460,15 @@ def _rows(spec, document, physical, perturbations, result) -> list[SensitivityRo
 # ----------------------------------------------------------------------------- the check
 
 def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, cancel=None) -> SensitivityEvidence:
-    """Verify the comparison against the accepted SP-02 / SP-13 evidence and return the recorded rows, or refuse.
+    """Check the comparison against the accepted SP-02 / SP-13 evidence and return the recorded rows, or refuse.
+
+    The status is VERIFIED only for a demonstrably equivalent registration; with matching files and records but
+    another registration it is REFERENCE_ONLY; anything incompatible or unavailable is NOT_APPLICABLE.
 
     Raises ``SensitivityCheckCancelled`` when ``cancel`` is set; the caller discards the check.
     """
 
-    verified: list[str] = []
+    checks: list[str] = []
     specimen = None
     try:
         _require(result is not None, "there is no comparison result.")
@@ -447,18 +483,18 @@ def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, 
             raise _Refusal(f"accepted fixture manifest unavailable: {error}") from error
         spec, fixture = _select_specimen(fixtures, odb, experimental)
         specimen = spec.specimen
-        verified.append(f"ODB SHA-256 {_short(odb['sha256'])} = accepted {spec.specimen} CARBON-4C baseline ODB "
-                        f"{fixture.fe.odb_reference.file_name}")
-        verified.append(f"experimental SHA-256 {_short(experimental['sha256'])} = {fixture.experimental_source.file_name}")
+        checks.append(f"ODB SHA-256 {_short(odb['sha256'])} = accepted {spec.specimen} CARBON-4C baseline ODB "
+                      f"{fixture.fe.odb_reference.file_name}")
+        checks.append(f"experimental SHA-256 {_short(experimental['sha256'])} = {fixture.experimental_source.file_name}")
 
         try:
             registration = load_fixture_registration(fixture, Path(repo_root))
             report = verify_fixture_dataset(fixture, registration, result.experimental)
         except FixtureRegressionError as error:
             raise _Refusal(f"fixture {fixture.fixture_id}: {error}") from error
-        verified.append(f"PolyMAX modal set {report.modal_set_key!r} ({report.mode_source}; {report.mode_count} modes, "
-                        f"{report.point_count} points, measured {'/'.join(report.measured_dofs)}) replays the frozen "
-                        "registration's points and measured-DOF contract")
+        checks.append(f"PolyMAX modal set {report.modal_set_key!r} ({report.mode_source}; {report.mode_count} modes, "
+                      f"{report.point_count} points, measured {'/'.join(report.measured_dofs)}) replays the frozen "
+                      "registration's points and measured-DOF contract")
         _check_cancelled(cancel)
         try:
             fe_identity = modal_dataset_geometry_identity(result.abaqus)
@@ -468,10 +504,10 @@ def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, 
         loaded_nodes = {str(value) for value in np.asarray(result.abaqus.sorted_modes()[0].node_ids, dtype=object)}
         missing = [node for node in registration.mapped_fe_node_ids if node not in loaded_nodes]
         _require(not missing, f"{len(missing)} FE nodes of the frozen measured-node mapping are absent from the ODB.")
-        verified.append(f"physical registration {_short(registration.registration_hash)} (sealed; calibration "
-                        f"{_short(registration.calibration_fingerprint)}, orientation {registration.orientation_candidate_id}"
-                        f") is content-compatible: FE geometry {_short(fe_identity['sha256'])} "
-                        f"({fe_identity['node_count']} nodes); all {len(registration.mapped_fe_node_ids)} mapped FE nodes present")
+        checks.append(f"physical registration {_short(registration.registration_hash)} (sealed; calibration "
+                      f"{_short(registration.calibration_fingerprint)}, orientation {registration.orientation_candidate_id}"
+                      f") is content-compatible: FE geometry {_short(fe_identity['sha256'])} "
+                      f"({fe_identity['node_count']} nodes); all {len(registration.mapped_fe_node_ids)} mapped FE nodes present")
         _check_cancelled(cancel)
 
         try:
@@ -486,23 +522,24 @@ def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, 
         perturbations = _perturbations(spec, baseline, _load_json(repo_root, ACCEPTED_FORWARD_JOBS))
         document = _load_json(repo_root, spec.reevaluation_path)
         physical = _physical_freeze(spec, document, baseline, fixture, registration)
-        verified.append(f"accepted records pinned and consistent: baseline {_short(baseline.record_sha256)}, strict freeze "
-                        f"{_short(spec.reevaluation_hash)} ({STRICT_IDENTIFICATION_PAIRING.policy_id}), forward jobs "
-                        f"{_short(ACCEPTED_FORWARD_JOBS_HASH)}")
+        checks.append(f"accepted records pinned and consistent: baseline {_short(baseline.record_sha256)}, strict freeze "
+                      f"{_short(spec.reevaluation_hash)} ({STRICT_IDENTIFICATION_PAIRING.policy_id}), forward jobs "
+                      f"{_short(ACCEPTED_FORWARD_JOBS_HASH)}")
 
-        rows = _rows(spec, document, physical, perturbations, result)
+        equivalent, mapping_note = registration_equivalence(result, registration)
+        rows = _rows(spec, document, physical, perturbations, result, equivalent)
     except _Refusal as refusal:
-        return not_applicable(str(refusal), specimen=specimen, verified=verified)
+        return not_applicable(str(refusal), specimen=specimen, checks=checks)
 
     applicable = [row for row in rows if row.applicable]
     fit_rows = sum(row.role == "FIT" for row in rows)
     limitations = (
-        _comparison_mapping_note(result, registration),
+        mapping_note,
         f"Recorded strict freeze: {fit_rows} FIT row(s); observation_sufficient = "
         f"{physical.get('observation_sufficient')}.",
         *SCIENTIFIC_LIMITATIONS,
     )
-    common = dict(specimen=specimen, rows=tuple(rows), verified=tuple(verified), limitations=limitations,
+    common = dict(specimen=specimen, rows=tuple(rows), checks=tuple(checks), limitations=limitations,
                   baseline=dict(baseline.candidate),
                   perturbations={key: value for key, (value, _) in perturbations.items()},
                   source=f"{spec.reevaluation_path} (results.PHYSICAL); CARBON-5A ±5 %")
@@ -510,7 +547,9 @@ def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, 
         reasons = tuple(f"{row.row_id}: {row.reason}" for row in rows if row.role != "NO_STRICT_ROW")
         return SensitivityEvidence(NOT_APPLICABLE, reasons=("no accepted strict pair is supported by this "
                                                              "comparison.",) + reasons, **common)
-    return SensitivityEvidence(APPLICABLE, reasons=(), **common)
+    if not equivalent:
+        return SensitivityEvidence(REFERENCE_ONLY, reasons=(REFERENCE_ONLY_STATEMENT, mapping_note), **common)
+    return SensitivityEvidence(VERIFIED, reasons=(), **common)
 
 
 # ----------------------------------------------------------------------------- presentation
@@ -543,6 +582,6 @@ def summary_text(evidence: SensitivityEvidence) -> str:
         lines.append(f"Baseline (CARBON-4C template): E_in {base['E_in_plane_mpa']:.0f} MPa, G12 {base['G12_mpa']:.0f} MPa. "
                      f"Archived ±5 %: E_in {perturbed['E_in_plane_mpa-']:.0f} / {perturbed['E_in_plane_mpa+']:.0f} MPa, "
                      f"G12 {perturbed['G12_mpa-']:.0f} / {perturbed['G12_mpa+']:.0f} MPa. Source: {evidence.source}.")
-    lines += [f"Verified: {item}" for item in evidence.verified]
+    lines += [f"Checked: {item}" for item in evidence.checks]
     lines += [f"Limitation: {item}" for item in evidence.limitations]
     return "\n".join(lines)

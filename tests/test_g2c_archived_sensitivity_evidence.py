@@ -211,14 +211,17 @@ class World:
             self.jobs_hash = record_hash(self.jobs)
 
     # ------------------------------------------------------------------ the comparison and the check
-    def result(self, specimen: str, pairs=None, experimental=None, abaqus=None, unv: Path | None = None):
+    def result(self, specimen: str, pairs=None, experimental=None, abaqus=None, unv: Path | None = None,
+               geometry=None):
+        """A comparison; by default its mapping is exactly the frozen physical one (synthetic equivalence)."""
         odb, source = self.files[specimen]
         source = unv or source
         rows = [comparison_pair(fm, em) for _, em, fm in STRICT] + [comparison_pair(7, 1, mac=0.89)]
         return SimpleNamespace(
             abaqus=abaqus or _fe_dataset(odb), experimental=experimental or _experimental_dataset(source),
             pairs=rows if pairs is None else pairs,
-            geometry=SimpleNamespace(experimental_to_abaqus=np.arange(6)),
+            geometry=SimpleNamespace(experimental_to_abaqus=np.arange(6), rotation=np.eye(3)) if geometry is None
+            else geometry,
             metadata={"orientation_source": "geometry_unique",
                       "comparison_inputs": ev.comparison_input_record(odb, source, "set-a")})
 
@@ -249,7 +252,7 @@ class _Case(unittest.TestCase):
 
 class MatchingEvidenceTests(_Case):
     def assert_recorded_rows(self, evidence, specimen: str) -> None:
-        self.assertEqual(evidence.status, ev.APPLICABLE, evidence.reasons)
+        self.assertEqual(evidence.status, ev.VERIFIED, evidence.reasons)
         self.assertEqual(evidence.specimen, specimen)
         strict = [row for row in evidence.rows if row.role != "NO_STRICT_ROW"]
         self.assertEqual([(r.row_id, r.role, r.experimental_mode, r.fe_mode) for r in strict],
@@ -315,7 +318,7 @@ class FileIdentityTests(_Case):
 
     def test_same_size_content_modification_of_the_odb(self):
         result = self.world.result("SP02")
-        self.assertEqual(self.world.check(result).status, ev.APPLICABLE)
+        self.assertEqual(self.world.check(result).status, ev.VERIFIED)
         self._same_size_edit(self.world.files["SP02"][0])
         self.assertRefused(self.world.check(result), "is not an accepted baseline ODB")  # hashed afresh
 
@@ -382,7 +385,7 @@ class PairAndBranchTests(_Case):
     def test_mismatched_modal_pair(self):
         pairs = [comparison_pair(9, 2), comparison_pair(10, 3), comparison_pair(13, 4)]
         evidence = self.world.check(self.world.result("SP02", pairs=pairs))
-        self.assertEqual(evidence.status, ev.APPLICABLE)  # R2 and R3 stay supported
+        self.assertEqual(evidence.status, ev.VERIFIED)  # R2 and R3 stay supported
         r1 = next(row for row in evidence.rows if row.row_id == "R1")
         self.assertFalse(r1.applicable)
         self.assertEqual((r1.s_e, r1.s_g12), (None, None))
@@ -445,6 +448,72 @@ class PairAndBranchTests(_Case):
         self.world.reevaluations["SP13"]["packs"]["E_in_plane_mpa+"] = "SP13_0000000000000000"
         self.world.write()
         self.assertRefused(self.world.check(self.world.result("SP13")), "not the accepted CARBON-5A jobs")
+
+
+class RegistrationStatusTests(_Case):
+    """PR #72 review: matching files and records alone never verify the live comparison."""
+
+    def assertReferenceOnly(self, evidence, mapped: str) -> None:
+        self.assertEqual(evidence.status, ev.REFERENCE_ONLY, evidence.reasons)
+        self.assertNotEqual(evidence.status, ev.VERIFIED)
+        self.assertEqual(evidence.reasons[0], ev.REFERENCE_ONLY_STATEMENT)
+        self.assertIn(f"maps {mapped} measurement points", evidence.reasons[1])
+        self.assertIn("NOT a governed verification of the current GUI comparison", ev.summary_text(evidence))
+        self.assertNotIn(ev.VERIFIED, ev.summary_text(evidence) + " ".join(" ".join(r) for r in ev.table_rows(evidence)))
+        strict = [row for row in evidence.rows if row.role != "NO_STRICT_ROW"]
+        for row in strict:  # the archived FE-model values are still shown, unchanged, and marked as reference only
+            self.assertEqual((row.s_e, row.s_g12), S_VALUES[row.row_id])
+            self.assertIn("REFERENCE ONLY", row.reason)
+
+    def geometry(self, indices, rotation=None):
+        return SimpleNamespace(experimental_to_abaqus=np.asarray(indices), rotation=np.eye(3) if rotation is None
+                               else np.asarray(rotation, dtype=float))
+
+    def test_zero_matching_nodes_with_high_mac_is_reference_only(self):
+        pairs = [comparison_pair(fm, em, mac=0.99) for _, em, fm in STRICT]
+        for specimen in ("SP02", "SP13"):
+            with self.subTest(specimen=specimen):
+                result = self.world.result(specimen, pairs=pairs, geometry=self.geometry(np.arange(6) + 6))
+                self.assertReferenceOnly(self.world.check(result), "0 of 6")
+
+    def test_partial_mapping_rotation_or_unreadable_registration_is_reference_only(self):
+        cases = {"5 of 6": self.geometry([0, 1, 2, 3, 4, 11]),
+                 "6 of 6": self.geometry(np.arange(6), rotation=np.diag([-1.0, -1.0, 1.0])),
+                 "": SimpleNamespace(experimental_to_abaqus=np.arange(6))}  # no rotation recorded
+        for mapped, geometry in cases.items():
+            with self.subTest(mapped=mapped):
+                evidence = self.world.check(self.world.result("SP02", geometry=geometry))
+                if mapped:
+                    self.assertReferenceOnly(evidence, mapped)
+                else:
+                    self.assertEqual(evidence.status, ev.REFERENCE_ONLY)
+                    self.assertIn("not demonstrably equivalent", evidence.reasons[1])
+
+    def test_only_an_identical_mapping_and_rotation_is_verified(self):
+        self.assertEqual(self.world.check(self.world.result("SP02")).status, ev.VERIFIED)
+        self.assertEqual(self.world.check(self.world.result("SP13", geometry=self.geometry(np.arange(6)))).status,
+                         ev.VERIFIED)
+
+    def test_no_promotion_from_reference_only(self):
+        different = self.geometry(np.arange(6) + 6)
+        # perfect MAC, exact pairs and frequencies, repeated checks: still REFERENCE_ONLY
+        pairs = [comparison_pair(fm, em, mac=1.0) for _, em, fm in STRICT]
+        for _ in range(2):
+            self.assertEqual(self.world.check(self.world.result("SP02", pairs=pairs, geometry=different)).status,
+                             ev.REFERENCE_ONLY)
+        # no supported strict pair is NOT_APPLICABLE, never REFERENCE_ONLY or VERIFIED
+        evidence = self.world.check(self.world.result("SP02", pairs=[comparison_pair(9, 2)], geometry=different))
+        self.assertRefused(evidence, "no accepted strict pair is supported")
+
+    def test_wrong_source_or_record_stays_not_applicable(self):
+        different = self.geometry(np.arange(6) + 6)
+        result = self.world.result("SP02", unv=self.world.files["SP13"][1], geometry=different)
+        self.assertRefused(self.world.check(result), "is not the accepted SP02 PolyMAX source")
+        self.world.reevaluations["SP02"]["results"]["PHYSICAL"]["sensitivities_carbon5a"]["R1"]["S_E"] = 0.6
+        self.world.write(repin=False)
+        for geometry in (different, None):
+            self.assertRefused(self.world.check(self.world.result("SP02", geometry=geometry)),
+                               "differs from its pinned content")
 
 
 class CancellationTests(_Case):
@@ -545,16 +614,22 @@ class RealRecordTests(unittest.TestCase):
 
 
 class RealStoreTests(unittest.TestCase):
-    """Full chain on the real SP-02 / SP-13 files (store-gated: never in ordinary CI; no Abaqus).
+    """The real SP-02 / SP-13 files against the accepted records (store-gated: never in ordinary CI; no Abaqus).
 
-    FE mode shapes need Abaqus Python, so the FE dataset carries the archived FE geometry (identity-verified) and
-    the archived baseline frequencies; the comparison pairs mirror the recorded strict pairs.
+    What this tests: fresh SHA-256 of the real archived ODB and the real UNV, the real PolyMAX import of the pinned
+    modal set, the real frozen physical registration replayed on it, the identity-verified archived FE geometry, and
+    every accepted record.
+
+    What it does NOT test: no Abaqus mode-shape extraction and no comparator run or automatic pairing. The FE dataset
+    carries the archived FE geometry with the archived baseline frequencies (zero shape vectors), the comparison pairs
+    mirror the recorded strict pairs, and the comparison registration is supplied by the test. It is therefore an
+    archive-record verification, not a real comparator end-to-end test.
     """
 
     CASES = {"SP02": ("carbon4c/run_sp02/SP02_f3e592281bebce66.odb", "SP-02/SP02_polymax_retry_260803.unv"),
              "SP13": ("carbon4c/run_sp13/SP13_a46d08b52995e078.odb", "SP-13/SP13_a_polymax.unv")}
 
-    def test_real_sp02_and_sp13(self):
+    def test_real_archive_records(self):
         roots = fixture_roots_from_environment()
         missing = [store for store in ("snadwich", "carbon-project-archive") if store not in roots]
         if missing:
@@ -564,34 +639,44 @@ class RealStoreTests(unittest.TestCase):
         from universal_reader import load_universal_modal_file
 
         for specimen, (odb_relative, unv_relative) in self.CASES.items():
-            with self.subTest(specimen=specimen):
-                spec = SPEC_OF[specimen]
-                fixture = load_experiment_fixture_manifest(ROOT / ev.FIXTURE_MANIFEST).fixture(spec.fixture_id)
-                odb = roots["carbon-project-archive"] / odb_relative
-                unv = roots["snadwich"] / unv_relative
-                if not odb.is_file() or not unv.is_file():
-                    self.skipTest(f"{specimen} archive files are not available")
-                experimental = load_universal_modal_file(unv, modal_set=fixture.modal_set.name)
-                fe = load_fe_geometry(load_specimen_manifest(ROOT / f"docs/auto_id/specimens/{specimen}.physical.specimen.json"),
-                                      roots)
-                baseline = load_archived_baseline(ROOT / spec.baseline_path)
-                ids = np.asarray(fe.node_ids, dtype=object)
-                zeros = np.zeros((len(ids), 3))
-                abaqus = ModalDataset("archived", odb, [ModeShape(m.number, m.frequency_hz, ids, fe.coordinates, zeros)
-                                                        for m in baseline.fe_modes])
-                physical = json.loads((ROOT / spec.reevaluation_path).read_text(encoding="utf-8"))["results"]["PHYSICAL"]
-                pairs = [SimpleNamespace(abaqus_mode=p["fe_mode"], experimental_mode=p["experimental_mode"],
-                                         abaqus_frequency_hz=p["fe_hz"], experimental_frequency_hz=p["experimental_hz"],
-                                         mac=p["mac"], status="Excellent match", order_changed=False,
-                                         coverage_status="accepted") for p in physical["strict_pairs"]]
-                result = SimpleNamespace(abaqus=abaqus, experimental=experimental, pairs=pairs,
-                                         geometry=SimpleNamespace(experimental_to_abaqus=np.arange(len(experimental.sorted_modes()[0].node_ids))),
-                                         metadata={"comparison_inputs": ev.comparison_input_record(
-                                             odb, unv, fixture.modal_set.name)})
-                evidence = ev.check_archived_sensitivity_evidence(result)
-                self.assertEqual(evidence.status, ev.APPLICABLE, evidence.reasons)
-                self.assertEqual([r.row_id for r in evidence.rows if r.applicable],
-                                 [p["row_id"] for p in physical["strict_pairs"]])
+            spec = SPEC_OF[specimen]
+            fixture = load_experiment_fixture_manifest(ROOT / ev.FIXTURE_MANIFEST).fixture(spec.fixture_id)
+            odb = roots["carbon-project-archive"] / odb_relative
+            unv = roots["snadwich"] / unv_relative
+            if not odb.is_file() or not unv.is_file():
+                self.skipTest(f"{specimen} archive files are not available")
+            experimental = load_universal_modal_file(unv, modal_set=fixture.modal_set.name)
+            fe = load_fe_geometry(load_specimen_manifest(ROOT / f"docs/auto_id/specimens/{specimen}.physical.specimen.json"),
+                                  roots)
+            baseline = load_archived_baseline(ROOT / spec.baseline_path)
+            ids = np.asarray(fe.node_ids, dtype=object)
+            index = {node: i for i, node in enumerate(ids.tolist())}
+            zeros = np.zeros((len(ids), 3))
+            abaqus = ModalDataset("archived", odb, [ModeShape(m.number, m.frequency_hz, ids, fe.coordinates, zeros)
+                                                    for m in baseline.fe_modes])
+            physical = json.loads((ROOT / spec.reevaluation_path).read_text(encoding="utf-8"))["results"]["PHYSICAL"]
+            pairs = [SimpleNamespace(abaqus_mode=p["fe_mode"], experimental_mode=p["experimental_mode"],
+                                     abaqus_frequency_hz=p["fe_hz"], experimental_frequency_hz=p["experimental_hz"],
+                                     mac=p["mac"], status="Excellent match", order_changed=False,
+                                     coverage_status="accepted") for p in physical["strict_pairs"]]
+            mappings = {  # registration supplied by the test: replay of a frozen record, never a comparator run
+                ev.VERIFIED: fixture.registration.path,
+                ev.REFERENCE_ONLY: f"docs/registrations/{specimen}_frozen_registration.json",  # legacy centred
+            }
+            for expected, path in mappings.items():
+                with self.subTest(specimen=specimen, registration=path):
+                    frozen = FrozenRegistration.from_dict(json.loads((ROOT / path).read_text(encoding="utf-8")))
+                    geometry = SimpleNamespace(
+                        experimental_to_abaqus=np.array([index[node] for node in frozen.mapped_fe_node_ids]),
+                        rotation=np.asarray(frozen.rotation))
+                    result = SimpleNamespace(abaqus=abaqus, experimental=experimental, pairs=pairs, geometry=geometry,
+                                             metadata={"orientation_source": f"test replay of {path}",
+                                                       "comparison_inputs": ev.comparison_input_record(
+                                                           odb, unv, fixture.modal_set.name)})
+                    evidence = ev.check_archived_sensitivity_evidence(result)
+                    self.assertEqual(evidence.status, expected, evidence.reasons)
+                    self.assertEqual([r.row_id for r in evidence.rows if r.applicable],
+                                     [p["row_id"] for p in physical["strict_pairs"]])
 
 
 def _pump(root, condition, timeout: float = 10.0) -> bool:
@@ -666,8 +751,8 @@ class TkIntegrationTests(unittest.TestCase):
         shown = [tuple(str(v) for v in application.sensitivity_table.item(k, "values"))
                  for k in application.sensitivity_table.get_children()]
         self.assertEqual(shown, [tuple(str(v) for v in row) for row in ev.table_rows(evidence)])
-        self.assertTrue(application.sensitivity_status.cget("text").startswith(ev.APPLICABLE))
-        self.assertIn("Verified:", application.sensitivity_details.get("1.0", "end"))
+        self.assertTrue(application.sensitivity_status.cget("text").startswith(ev.VERIFIED))
+        self.assertIn("Checked:", application.sensitivity_details.get("1.0", "end"))
         self.assertEqual(application.scaling_table.get_children(), g1_rows)
         self.populate(application, root)  # a new comparison result: the evidence must be checked again
         self.assertFalse(application.sensitivity_table.get_children())
@@ -700,7 +785,7 @@ class TkIntegrationTests(unittest.TestCase):
                     release.set()
                     _pump(root, lambda: False, timeout=0.5)
                 self.assertFalse(application.sensitivity_table.get_children())  # stale evidence is never shown
-                self.assertNotIn(ev.APPLICABLE, application.sensitivity_status.cget("text"))
+                self.assertNotIn(ev.VERIFIED, application.sensitivity_status.cget("text"))
         # the display guard itself: evidence of another comparison, an old generation or a cancelled check
         current = application.result
         generation = application._sensitivity_generation
@@ -720,7 +805,7 @@ class TkIntegrationTests(unittest.TestCase):
         from ui_policy import MINIMUM_WINDOW_SIZE
 
         evidence = self.evidence()
-        application._set_sensitivity_view(ev.APPLICABLE, ev.table_rows(evidence) * 3, ev.summary_text(evidence))
+        application._set_sensitivity_view(ev.VERIFIED, ev.table_rows(evidence) * 3, ev.summary_text(evidence))
         application.tabs.select(application.scaling_tab)
         table = application.sensitivity_table
         for width, height in ((1160, 720), MINIMUM_WINDOW_SIZE):
