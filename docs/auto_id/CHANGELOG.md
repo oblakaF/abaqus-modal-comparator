@@ -5022,3 +5022,36 @@ first internal provider.
 - **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
 - **Scientific behaviour changed:** NO (documentation only). **Tests run:** none (docs only; JSON parse and
   `git diff --check`). Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
+
+## 2026-10-13 — M8-D2d: Bind Governed Specimen Records (REVIEW_READY)
+
+- **Before:** PR #77 (M8-D2c docs closure, head `8743000`, CI run `38297383664` success) merged on SUPERVISOR
+  authorisation as `daccb3a9303288efbc0ada217d982deddc1323aa`; main Linux CI run `38298561434` success.
+- **M8-D2d** (branch `auto-id/m8-d2d` from `daccb3a`): "Bind Governed Specimen Records" in the Campaign draft section.
+  - New read-only service `services/governed_specimen_records.py`: for each selected specimen (re-verified through the
+    governed binder) the `solver_profile`, `archived_baseline`, `baseline_shape_pack` and `registration_evidence` are
+    searched in `docs/auto_id/{solver_profiles, baselines, fe_shapes, registration_evidence}` with the production
+    loaders (`load_solver_profile`, `load_archived_baseline`, `load_shape_pack_record`) and identity checks:
+    solver profile forward_model_id / job_prefix; archived baseline forward-model manifest hash and forward model,
+    fixture ODB / FE geometry / experimental source / modal set, generated INP = the accepted CARBON-4C BASELINE job
+    of the pinned `accepted_forward_jobs.json`; BASELINE shape pack bound to the baseline by the production rule
+    `archived_baseline._bind_pack` against the fixture's physical registration; a
+    `registration-uncertainty-evaluation/v1` record with the fixture's registration hash and file and the bound pack.
+  - Bound only when every field has exactly one compatible candidate (atomic per specimen). Zero, several or
+    incompatible candidates refuse with the reasons and the candidates; the specimen is left unchanged; nothing is
+    chosen by order or name, nothing substituted.
+  - Stored as repository paths with canonical SHA-256 fingerprints (`record_hash`, independent of line endings) in
+    `auto-id/campaign-draft/v3`; re-verified on reopening (the same unique record with the same fingerprint, or the
+    draft is refused). v1 / v2 drafts open as written with nothing bound and cannot carry bound records.
+  - SP-02 and SP-13 (physical forward models) bind exactly the four M7 RUN_A references; the legacy forward models
+    are refused (no registration evidence of their registration).
+  - FIT / HOLDOUT rows, parameters, covariance, tolerances and solver settings stay missing; the message states that a
+    binding is not a scientific readiness verdict.
+- **Tests:** new `tests/test_m8_d2d_governed_records.py` (16: references, atomic gaps, refused specimen unchanged,
+  zero / several / incompatible solver, baseline, accepted-jobs and registration candidates, non-BASELINE pack,
+  v3 save / reopen, v1 / v2 compatibility, reopen re-verification of paths and fingerprints, fake GUI, real Tk, no
+  execution / no repository writes / M7 campaign hashes unchanged). Updated for v3: the M8.1 button-set test, the
+  M8-D2a unknown-schema case (now v4) and the M8-D2c v1 helper / saved-schema assertion.
+- **Unchanged:** campaign schema, domain rules, production loaders and checks, `require_executable`, gates,
+  thresholds, M7 records; no finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE
+  NOT_MET. **Abaqus run count:** 0.

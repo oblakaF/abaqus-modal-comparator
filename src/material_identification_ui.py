@@ -1520,6 +1520,34 @@ def declare_draft_run_type(app, run_type) -> None:
     _change_campaign_draft(app, lambda draft: draft.with_run_type(run_type), f"Declared run type {run_type}.")
 
 
+AUTO_ID_DRAFT_BIND_LABEL = "Bind Governed Specimen Records"
+
+
+def bind_draft_specimen_records(app) -> None:
+    """"Bind Governed Specimen Records": for each selected specimen, bind its solver profile, archived baseline,
+    baseline shape pack and registration evidence only when each has exactly one compatible governed record (atomic
+    per specimen; a refused specimen is left unchanged and the reasons are shown). Never rows, parameters, covariance,
+    tolerances or solver settings; never a readiness verdict."""
+
+    from services.campaign_draft import CampaignDraftError, bind_specimen_records, binding_summary
+
+    draft = getattr(app, "auto_id_draft", None)
+    if draft is None:
+        app.auto_id_draft_message = "No campaign draft: use Create Campaign Draft... first."
+    else:
+        try:
+            bound, outcomes = bind_specimen_records(draft, AUTO_ID_REPO_ROOT, _draft_fixtures())
+        except CampaignDraftError as error:
+            app.auto_id_draft_message = f"Not changed: {error}"
+        except Exception as error:  # never a GUI crash; the draft is unchanged
+            app.auto_id_draft_message = f"Not changed: {error}"
+        else:
+            if bound != draft:
+                app.auto_id_draft = bound
+            app.auto_id_draft_message = binding_summary(outcomes, bound)
+    _refresh_campaign_draft(app)
+
+
 def _ask_draft_campaign_id(app) -> None:
     value = simpledialog.askstring("Declare campaign_id", "campaign_id (letters, digits, '.', '_', '-', '+', '/'):")
     if value is not None:
@@ -1822,6 +1850,7 @@ def _build_auto_id_setup_page(app, page) -> None:
         ("Declare campaign_id...", lambda: _ask_draft_campaign_id(app)),
         *((f"Run type: {run_type}", lambda r=run_type: declare_draft_run_type(app, r))
           for run_type in RUN_TYPE_CHOICES),
+        (AUTO_ID_DRAFT_BIND_LABEL, lambda: bind_draft_specimen_records(app)),
     ):
         ttk.Button(identity_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
     for text, command in (

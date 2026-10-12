@@ -113,7 +113,7 @@ class PersistenceTests(_Identity):
         path = write_draft(draft, self.out / "draft.json", (ROOT,))
         document = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(document["schema"], DRAFT_SCHEMA)
-        self.assertEqual(document["schema"], "auto-id/campaign-draft/v2")
+        self.assertEqual(document["schema"], "auto-id/campaign-draft/v3")  # M8-D2d: saved as v3; v2 still opens
         self.assertEqual(document["declared"]["campaign_id"], "M8/D2c+draft_1.a-b")
         self.assertEqual(document["declared"]["run_type"], "RUN_A")
         reopened = load_draft(path, ROOT, self.fixtures)
@@ -127,6 +127,7 @@ class PersistenceTests(_Identity):
         document = draft.document()
         document["schema"] = DRAFT_SCHEMA_V1
         document["declared"] = {k: document["declared"][k] for k in ("scientific_question", "tau_mf")}
+        document.pop("specimen_records")  # M8-D2d: v1 / v2 drafts have no bound records
         return document
 
     def test_v1_drafts_open_as_written(self):
