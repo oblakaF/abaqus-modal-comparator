@@ -16,6 +16,8 @@ import numpy as np
 from PIL import Image, ImageTk
 
 from abaqus_bridge import AbaqusExtractionError, load_or_extract_odb
+from frequency_scaling import LABEL_TEXT as SCALING_LABELS, CAVEAT as SCALING_CAVEAT
+from frequency_scaling import frequency_scaling_diagnostic, table_rows as scaling_table_rows
 from modal_core import ComparisonResult, ModePairResult, compare_modal_datasets
 from reporting import (
     export_excel,
@@ -350,6 +352,26 @@ class ModalComparatorApp:
         self.excel_button.pack(side="left")
         self.pdf_button.pack(side="left", padx=10)
 
+        # G1: frequency-scaling diagnostics of the matched pairs (diagnostic only; never a material property)
+        scaling = ttk.LabelFrame(self.table_tab, text=f"Frequency scaling diagnostic — {SCALING_LABELS}",
+                                 padding=8)
+        scaling.pack(fill="x", pady=(10, 0))
+        ttk.Label(scaling, text=SCALING_CAVEAT, wraplength=1100, justify="left").pack(anchor="w")
+        self.scaling_summary = ttk.Label(scaling, text="Frequency-scaling diagnostic: no comparison result yet.",
+                                         wraplength=1100, justify="left")
+        self.scaling_summary.pack(anchor="w", pady=(4, 4))
+        scaling_columns = ("fe", "em", "ff", "ef", "mac", "ratio", "square", "log", "direction", "category",
+                           "status", "warnings")
+        scaling_titles = ("FE mode", "Exp. mode", "FE, Hz", "Exp., Hz", "MAC", "f_exp/f_FE", "(f_exp/f_FE)^2",
+                          "ln(f_exp/f_FE)", "Direction", "Category", "Comparator status", "Quality warnings")
+        scaling_widths = (70, 75, 95, 95, 65, 90, 105, 100, 170, 130, 120, 320)
+        self.scaling_table = ttk.Treeview(scaling, columns=scaling_columns, show="headings", height=6,
+                                          selectmode="none")
+        for key, title, width in zip(scaling_columns, scaling_titles, scaling_widths):
+            self.scaling_table.heading(key, text=title)
+            self.scaling_table.column(key, width=width, anchor="center")
+        self.scaling_table.pack(fill="x")
+
     def _build_shapes(self) -> None:
         self.pair_title = ttk.Label(self.shape_tab, text="Run the analysis and select a matched pair.",
                                     style="Metric.TLabel")
@@ -547,6 +569,12 @@ class ModalComparatorApp:
         )
         self.metric_mac.configure(text="Mean MAC: —" if not macs else f"Mean MAC: {sum(macs) / len(macs):.3f}")
         self.metric_geometry.configure(text=f"Geometry match: {result.geometry.matched_fraction:.1%}")
+        if hasattr(self, "scaling_table"):  # G1 diagnostic of the same matched pairs (pairing is not redone)
+            scaling = frequency_scaling_diagnostic(result.pairs)
+            self.scaling_table.delete(*self.scaling_table.get_children())
+            for row in scaling_table_rows(scaling):
+                self.scaling_table.insert("", "end", values=row)
+            self.scaling_summary.configure(text=f"{scaling.status}: {scaling.message}")
 
         if self.cache:
             self._image(self.mac_label, self.cache / "plots" / "mac_matrix.png", "mac")
