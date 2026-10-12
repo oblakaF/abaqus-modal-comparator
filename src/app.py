@@ -20,6 +20,7 @@ from frequency_scaling import LABEL_TEXT as SCALING_LABELS, CAVEAT as SCALING_CA
 from frequency_scaling import frequency_scaling_diagnostic, table_rows as scaling_table_rows
 from modal_core import ComparisonResult, ModePairResult, compare_modal_datasets
 from services import archived_sensitivity_evidence as sensitivity_evidence
+from services import sensitivity_what_if as what_if
 from reporting import (
     export_excel,
     export_pdf,
@@ -408,16 +409,20 @@ class ModalComparatorApp:
         Checked only on request, off the GUI thread; any change of the inputs or the comparison discards it."""
         self._sensitivity_generation = 0
         self._sensitivity_cancel = None
-        evidence = ttk.LabelFrame(self.scaling_panes, padding=8,
+        # G2d-2: the archived evidence and the E_in what-if sit side by side below G1
+        self.evidence_panes = ttk.Panedwindow(self.scaling_panes, orient="horizontal")
+        self.scaling_panes.add(self.evidence_panes, weight=3)
+        evidence = ttk.LabelFrame(self.evidence_panes, padding=8,
                                   text=f"Archived sensitivity evidence (SP-02 / SP-13) — {sensitivity_evidence.LABEL_TEXT}")
-        self.scaling_panes.add(evidence, weight=2)
+        self.evidence_panes.add(evidence, weight=1)
         actions = ttk.Frame(evidence)
         actions.pack(fill="x", pady=(4, 4))
         self.sensitivity_button = ttk.Button(actions, text="Check archived sensitivities",
                                              command=self._check_archived_sensitivities)
         self.sensitivity_button.pack(side="left")
-        self.sensitivity_status = ttk.Label(actions, text=SENSITIVITY_NOT_CHECKED, wraplength=850, justify="left")
-        self.sensitivity_status.pack(side="left", padx=(10, 0))
+        self.sensitivity_status = ttk.Label(evidence, text=SENSITIVITY_NOT_CHECKED, wraplength=500, justify="left")
+        self.sensitivity_status.pack(anchor="w", pady=(0, 4))
+        self._wrap_to_width(evidence, self.sensitivity_status)
         frame = ttk.Frame(evidence)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(0, weight=1)
@@ -444,6 +449,7 @@ class ModalComparatorApp:
             variable.trace_add("write", lambda *_: self._invalidate_sensitivity_evidence(
                 "Archived sensitivity evidence: the input files changed; run the comparison and check again."))
         self._set_sensitivity_view(SENSITIVITY_NOT_CHECKED, details=sensitivity_evidence.CAVEAT)
+        self._build_e_what_if()
 
     def _build_governed_registration(self, parent) -> None:
         """G2d-1: opt-in use of an accepted frozen physical registration instead of the automatic registration.
@@ -547,6 +553,84 @@ class ModalComparatorApp:
             "and the frozen registration are verified again on the loaded data; a failed verification refuses the "
             "run and never substitutes another registration."))
 
+    def _build_e_what_if(self) -> None:
+        """G2d-2: SP-02 E_in what-if on the archived local sensitivities (display only; never a recommended E).
+
+        Fed only by the G2c evidence currently shown; enabled only when that evidence is VERIFIED for SP-02."""
+        self._what_if_evidence = None
+        self.what_if_change = tk.StringVar(value="0.0")
+        frame = ttk.LabelFrame(self.evidence_panes, padding=8,
+                               text=f"E_in what-if, SP-02 (archived local sensitivities) — {what_if.LABEL_TEXT}")
+        self.evidence_panes.add(frame, weight=1)
+        controls = ttk.Frame(frame)
+        controls.pack(fill="x")
+        ttk.Label(controls, text="E_in change, % (−5 … +5):").pack(side="left")
+        self.what_if_spinbox = ttk.Spinbox(controls, from_=-5.0, to=5.0, increment=0.5, width=7,
+                                           textvariable=self.what_if_change, state="disabled")
+        self.what_if_spinbox.pack(side="left", padx=(6, 6))
+        self.what_if_reset_button = ttk.Button(controls, text="Reset to 0 %", state="disabled",
+                                               command=lambda: self.what_if_change.set("0.0"))
+        self.what_if_reset_button.pack(side="left")
+        self.what_if_status = ttk.Label(frame, text="", wraplength=500, justify="left")
+        self.what_if_status.pack(anchor="w", pady=(4, 4))
+        self._wrap_to_width(frame, self.what_if_status)
+        table_frame = ttk.Frame(frame)
+        table_frame.pack(fill="both", expand=True)
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
+        table_frame.rowconfigure(2, weight=1)
+        self.what_if_table = ttk.Treeview(table_frame, columns=what_if.TABLE_COLUMNS, show="headings", height=3,
+                                          selectmode="none")
+        for key, title, width in zip(what_if.TABLE_COLUMNS, what_if.TABLE_TITLES, what_if.TABLE_WIDTHS):
+            self.what_if_table.heading(key, text=title)
+            self.what_if_table.column(key, width=width, minwidth=width, stretch=False, anchor="center")
+        self.what_if_yscroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.what_if_table.yview)
+        self.what_if_xscroll = ttk.Scrollbar(table_frame, orient="horizontal", command=self.what_if_table.xview)
+        self.what_if_table.configure(yscrollcommand=self.what_if_yscroll.set, xscrollcommand=self.what_if_xscroll.set)
+        self.what_if_table.grid(row=0, column=0, sticky="nsew")
+        self.what_if_yscroll.grid(row=0, column=1, sticky="ns")
+        self.what_if_xscroll.grid(row=1, column=0, sticky="ew")
+        self.what_if_details = tk.Text(table_frame, height=3, wrap="word", state="disabled")
+        details_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.what_if_details.yview)
+        self.what_if_details.configure(yscrollcommand=details_scroll.set)
+        self.what_if_details.grid(row=2, column=0, sticky="nsew", pady=(4, 0))
+        details_scroll.grid(row=2, column=1, sticky="ns", pady=(4, 0))
+        self.what_if_change.trace_add("write", lambda *_: self._update_e_what_if())
+        self._set_what_if_evidence(None)
+
+    @staticmethod
+    def _wrap_to_width(frame, label) -> None:
+        """Wrap a label to the current width of its (resizable) pane."""
+        frame.bind("<Configure>", lambda event: label.configure(wraplength=max(200, event.width - 30)), add="+")
+
+    def _set_what_if_evidence(self, evidence) -> None:
+        """Bind the what-if to the G2c evidence now shown (None after any invalidation); the change resets to 0."""
+        if not hasattr(self, "what_if_table"):
+            return
+        self._what_if_evidence = evidence
+        enabled = what_if.e_what_if(evidence, 0.0).status == what_if.AVAILABLE
+        self.what_if_spinbox.configure(state="normal" if enabled else "disabled")
+        self.what_if_reset_button.configure(state="normal" if enabled else "disabled")
+        if self.what_if_change.get() != "0.0":
+            self.what_if_change.set("0.0")  # the trace recomputes
+        else:
+            self._update_e_what_if()
+
+    def _update_e_what_if(self) -> None:
+        try:
+            change = float(self.what_if_change.get().strip().replace(",", ".")) / 100.0
+        except ValueError:
+            change = float("nan")
+        result = what_if.e_what_if(self._what_if_evidence, change)
+        self.what_if_table.delete(*self.what_if_table.get_children())
+        for row in what_if.table_rows(result):
+            self.what_if_table.insert("", "end", values=row)
+        self.what_if_status.configure(text=what_if.short_status(result))
+        self.what_if_details.configure(state="normal")
+        self.what_if_details.delete("1.0", "end")
+        self.what_if_details.insert("1.0", what_if.summary_text(result) + "\n" + what_if.CAVEAT)
+        self.what_if_details.configure(state="disabled")
+
     def _set_sensitivity_view(self, status: str, rows=(), details: str = "") -> None:
         self.sensitivity_status.configure(text=status)
         self.sensitivity_table.delete(*self.sensitivity_table.get_children())
@@ -567,6 +651,7 @@ class ModalComparatorApp:
             self._sensitivity_cancel = None
         self.sensitivity_button.configure(state="normal")
         self._set_sensitivity_view(message, details=sensitivity_evidence.CAVEAT)
+        self._set_what_if_evidence(None)  # G2d-2: a what-if never outlives its evidence
 
     def _check_archived_sensitivities(self) -> None:
         self._invalidate_sensitivity_evidence("Checking archived sensitivity evidence: hashing the ODB and the "
@@ -610,6 +695,7 @@ class ModalComparatorApp:
         self._set_sensitivity_view(evidence.status + (f" — {evidence.specimen}" if evidence.specimen else ""),
                                    sensitivity_evidence.table_rows(evidence),
                                    sensitivity_evidence.summary_text(evidence))
+        self._set_what_if_evidence(evidence)
 
     def _build_shapes(self) -> None:
         self.pair_title = ttk.Label(self.shape_tab, text="Run the analysis and select a matched pair.",
