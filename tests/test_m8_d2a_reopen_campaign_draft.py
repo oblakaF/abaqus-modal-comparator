@@ -93,7 +93,7 @@ class RefusalTests(_Reopen):
     def test_only_the_draft_schema_is_opened(self):
         run_a = json.loads((CAMPAIGNS / "M7_RUN_A.campaign.json").read_text(encoding="utf-8"))
         self.refused(run_a, "only auto-id/campaign-draft/v1")
-        for change, text in ((lambda d: d.update(schema="auto-id/campaign-draft/v3"), "only auto-id/campaign-draft/v1"),
+        for change, text in ((lambda d: d.update(schema="auto-id/campaign-draft/v4"), "only auto-id/campaign-draft/v1"),
                              (lambda d: d.update(extra=1), "unknown ['extra']"),
                              (lambda d: d.pop("declared"), "missing ['declared']"),
                              (lambda d: d.update(labels=["DRAFT_NOT_A_CAMPAIGN_DEFINITION"]), "labels"),

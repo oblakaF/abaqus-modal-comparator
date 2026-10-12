@@ -22,9 +22,18 @@ M8-D2c adds the explicitly declared ``campaign_id`` and ``run_type`` (RUN_A or R
 RUN_B grants no execution authorisation: its ``run_b_gate`` stays a missing, SUPERVISOR-gated input).  Drafts are
 saved as ``auto-id/campaign-draft/v2``; a ``v1`` draft (which declares neither field) is still opened as written.
 
-Reopening (``load_draft``, M8-D2a) accepts only a campaign-draft document (v1 or v2).  It rebuilds the draft from
+M8-D2d adds "Bind Governed Specimen Records" (``bind_specimen_records``): for each selected specimen, its
+``solver_profile``, ``archived_baseline``, ``baseline_shape_pack`` and ``registration_evidence`` are bound only when
+each has exactly one compatible governed record (``services.governed_specimen_records``: production loaders and identity
+checks; atomic per specimen; nothing chosen by order or name).  Bound records are stored with their paths and
+canonical SHA-256 fingerprints and are governed references only: FIT / HOLDOUT rows, parameters, covariance, tolerances
+and solver settings stay missing, and a binding is never a readiness verdict.  Drafts are saved as
+``auto-id/campaign-draft/v3``; v1 / v2 drafts (no bound records) still open as written, with nothing bound.
+
+Reopening (``load_draft``, M8-D2a) accepts only a campaign-draft document (v1, v2 or v3).  It rebuilds the draft from
 its explicit declarations through the domain validators and from its specimen selections through the governed binder
-(location, manifest, passport, fixture catalogue), and refuses any stored identity or pinned hash that differs from the
+(location, manifest, passport, fixture catalogue), re-verifies every stored bound record (the same unique compatible
+record with the same fingerprint), and refuses any stored identity or pinned hash that differs from the
 current governed records, any missing or invalid reference and any conflicting preview; it never substitutes another
 specimen.  The stored status, missing inputs and preview are never trusted: they are recomputed.
 
@@ -71,19 +80,31 @@ from domain.forward_model_manifest import ForwardModelManifestError
 from domain.specimen_manifest import SpecimenManifestError
 
 from .forward_builder import load_bound_forward_model
+from .governed_specimen_records import (
+    BINDING_NOTE,
+    BOUND,
+    FIELDS as RECORD_FIELDS,
+    REFUSED,
+    RecordBinding,
+    SpecimenRecords,
+    bind_governed_specimen_records,
+)
 
 DRAFT_SCHEMA_V1 = "auto-id/campaign-draft/v1"  # M8-D1 / D2a: declares scientific_question and tau_mf
-DRAFT_SCHEMA = "auto-id/campaign-draft/v2"  # M8-D2c: also campaign_id and run_type
-DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA)
+DRAFT_SCHEMA_V2 = "auto-id/campaign-draft/v2"  # M8-D2c: also campaign_id and run_type
+DRAFT_SCHEMA = "auto-id/campaign-draft/v3"  # M8-D2d: also the bound governed specimen records
+DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA_V2, DRAFT_SCHEMA)
 _DECLARED_KEYS = {DRAFT_SCHEMA_V1: ("scientific_question", "tau_mf"),
+                  DRAFT_SCHEMA_V2: ("scientific_question", "tau_mf", "campaign_id", "run_type"),
                   DRAFT_SCHEMA: ("scientific_question", "tau_mf", "campaign_id", "run_type")}
 DRAFT_KIND = "CAMPAIGN_DRAFT"
 DRAFT_LABELS = ("DRAFT_NOT_A_CAMPAIGN_DEFINITION", "NOT_VALIDATED", "NOT_EXECUTABLE", "AUTHORISES_NOTHING")
 DRAFT_NOTE = ("Campaign draft (Auto-ID M8-D1): a working document, not a campaign definition. It is never loaded as "
               "a campaign, never executed and authorises nothing. Every required input it does not declare is listed "
               "under missing_required_inputs; finalisation is the governed campaign-definition parser.")
-NOT_CHOSEN = ("not declared by the draft: M8-D1 never chooses mode pairings, FIT / HOLDOUT rows, registration evidence, "
-              "solver profiles, FE baselines, uncertainties, parameters, settings, budgets, decisions or authorisation")
+NOT_CHOSEN = ("not declared by the draft: the draft never chooses mode pairings, FIT / HOLDOUT rows, uncertainties, "
+              "parameters, settings, budgets, decisions or authorisation; registration evidence, solver profiles "
+              "and FE baselines are bound only by Bind Governed Specimen Records")
 PRODUCTION = "BLOCKED / NOT_AUTHORISED"
 AUTHORISATION = "none: a draft authorises no run; execution needs a HUMAN gate"
 FORWARD_MODEL_DIRECTORY = PurePosixPath("docs/auto_id/forward_models")  # the only governed specimen-input location
@@ -177,6 +198,7 @@ class CampaignDraft:
     specimens: tuple[DraftSpecimen, ...] = ()
     campaign_id: Optional[str] = None  # M8-D2c
     run_type: Optional[str] = None  # M8-D2c
+    records: tuple[tuple[str, SpecimenRecords], ...] = ()  # M8-D2d: forward model -> its bound governed records
 
     # ------------------------------------------------------------------ explicit declarations
     def with_question(self, question) -> "CampaignDraft":
@@ -214,15 +236,29 @@ class CampaignDraft:
         return replace(self, specimens=self.specimens + (specimen,))
 
     def without_specimens(self) -> "CampaignDraft":
-        return replace(self, specimens=())
+        return replace(self, specimens=(), records=())
+
+    def specimen_records(self, forward_model: str) -> Optional[SpecimenRecords]:
+        return dict(self.records).get(forward_model)
+
+    def with_specimen_records(self, forward_model: str, records: SpecimenRecords) -> "CampaignDraft":
+        """The draft with the four governed records of one selected specimen bound (from a BOUND binding only)."""
+        if not any(s.forward_model == forward_model for s in self.specimens):
+            raise CampaignDraftError(f"{forward_model} is not a selected specimen of the draft.")
+        if not isinstance(records, SpecimenRecords):
+            raise CampaignDraftError("only a complete set of four bound governed records can be bound.")
+        kept = tuple((key, value) for key, value in self.records if key != forward_model)
+        return replace(self, records=kept + ((forward_model, records),))
 
     # ------------------------------------------------------------------ preview and completeness
     def intended_definition(self) -> dict:
         """The intended v1.2 campaign definition: only what is declared or recorded; nothing is filled in."""
 
-        intended = {"schema": CAMPAIGN_SCHEMA_V1_2,
-                    "specimens": [{"label": s.label, "fixture_id": s.fixture_id, "forward_model": s.forward_model}
-                                  for s in self.specimens]}
+        intended = {"schema": CAMPAIGN_SCHEMA_V1_2, "specimens": []}
+        for s in self.specimens:
+            bound = self.specimen_records(s.forward_model)
+            item = {"label": s.label, "fixture_id": s.fixture_id, "forward_model": s.forward_model}
+            intended["specimens"].append({**item, **(bound.paths() if bound is not None else {})})
         if self.scientific_question is not None:
             intended["scientific_question"] = self.scientific_question
         if self.tau_mf is not None:
@@ -281,6 +317,8 @@ class CampaignDraft:
             "declared": {"scientific_question": self.scientific_question, "tau_mf": self.tau_mf,
                          "campaign_id": self.campaign_id, "run_type": self.run_type},
             "specimen_identities": [s.to_dict() for s in self.specimens],
+            "specimen_records": [None if self.specimen_records(s.forward_model) is None
+                                 else self.specimen_records(s.forward_model).to_dict() for s in self.specimens],
             "intended_campaign_definition": self.intended_definition(),
             "missing_required_inputs": [{"field": g.field, "reason": g.reason} for g in gaps],
             "authorisation": AUTHORISATION,
@@ -290,6 +328,48 @@ class CampaignDraft:
     def document_bytes(self) -> bytes:
         return (json.dumps(self.document(), indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False)
                 + "\n").encode("utf-8")
+
+
+def bind_specimen_records(draft: CampaignDraft, repo_root: Path,
+                          fixtures: ExperimentFixtureManifest) -> tuple[CampaignDraft, tuple[RecordBinding, ...]]:
+    """"Bind Governed Specimen Records": each selected specimen, re-verified, gets its four governed records only when
+    every one has exactly one compatible candidate (atomic). A refused specimen is left unchanged with its reasons."""
+
+    outcomes = []
+    for stored in draft.specimens:
+        try:
+            current = governed_specimen_input(Path(repo_root).joinpath(*PurePosixPath(stored.forward_model).parts),
+                                              repo_root, fixtures)
+        except CampaignDraftError as error:
+            outcomes.append(RecordBinding(stored.forward_model, REFUSED, None, (),
+                                          (f"specimen input refused: {error}",)))
+            continue
+        changed = [name for name in _SPECIMEN_FIELDS if getattr(stored, name) != getattr(current, name)]
+        if changed:
+            outcomes.append(RecordBinding(stored.forward_model, REFUSED, None, (), (
+                f"the selected {', '.join(changed)} differ(s) from the current governed records (never substituted)",)))
+            continue
+        binding = bind_governed_specimen_records(stored.forward_model, repo_root, fixtures)
+        if binding.status == BOUND:
+            draft = draft.with_specimen_records(stored.forward_model, binding.records)
+        outcomes.append(binding)
+    return draft, tuple(outcomes)
+
+
+def binding_summary(outcomes, draft: CampaignDraft) -> str:
+    """One message for the GUI: bound and refused specimens, and what the binding is not."""
+
+    if not outcomes:
+        return "Bind Governed Specimen Records: the draft selects no specimen; nothing bound."
+    bound = [o for o in outcomes if o.status == BOUND]
+    refused = [o for o in outcomes if o.status != BOUND]
+    parts = []
+    if bound:
+        parts.append("Bound the four governed records of " + ", ".join(o.forward_model for o in bound) + ".")
+    if refused:
+        parts.append("Not bound (left unchanged): " + " | ".join(o.summary() for o in refused))
+    parts.append(f"Bound records are {BINDING_NOTE}; {len(draft.gaps())} required campaign input(s) are still missing.")
+    return " ".join(parts)
 
 
 def declare_tolerance(draft: CampaignDraft, value) -> CampaignDraft:
@@ -314,6 +394,15 @@ def draft_rows(draft: CampaignDraft) -> tuple[tuple[str, str, str, str], ...]:
                      f"fixture {item.fixture_id}; forward model {item.forward_model_id} ({item.forward_model}); "
                      f"physical specimen {item.physical_specimen_id}; test run {item.test_run_id}; registration "
                      f"{item.registration_basis} {item.registration_hash[:12]}", "PRESENT"))
+    for item in draft.specimens:
+        bound = draft.specimen_records(item.forward_model)
+        if bound is None:
+            rows.append(("Bound records", item.label, "not bound (Bind Governed Specimen Records)", "NOT_BOUND"))
+            continue
+        for name in RECORD_FIELDS:
+            record = getattr(bound, name)
+            rows.append(("Bound records", f"{item.label} {name}",
+                         f"{record.path} (canonical SHA-256 {record.canonical_sha256[:12]})", "BOUND"))
     rows.extend(("Missing required inputs", gap.field, gap.reason, "MISSING") for gap in draft.gaps())
     return tuple(rows)
 
@@ -335,7 +424,8 @@ def finalisation_state(draft: CampaignDraft) -> str:
 
 _DOCUMENT_KEYS = {"schema", "kind", "labels", "note", "status", "declared", "specimen_identities",
                   "intended_campaign_definition", "missing_required_inputs", "authorisation",
-                  "production_calibration_execution"}
+                  "production_calibration_execution"}  # v1 / v2
+_DOCUMENT_KEYS_V3 = _DOCUMENT_KEYS | {"specimen_records"}
 _SPECIMEN_FIELDS = tuple(f.name for f in fields(DraftSpecimen))
 
 
@@ -349,9 +439,10 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
     if not isinstance(document, dict) or document.get("schema") not in DRAFT_SCHEMAS:
         _refuse(f"not a campaign draft: only {' / '.join(DRAFT_SCHEMAS)} documents can be opened.")
     keys = _DECLARED_KEYS[document["schema"]]  # a v1 draft declares no campaign_id / run_type (never inferred)
-    if set(document) != _DOCUMENT_KEYS:
-        _refuse(f"malformed draft: missing {sorted(_DOCUMENT_KEYS - set(document))}, unknown "
-                f"{sorted(set(document) - _DOCUMENT_KEYS)}.")
+    expected_keys = _DOCUMENT_KEYS_V3 if document["schema"] == DRAFT_SCHEMA else _DOCUMENT_KEYS  # v1 / v2: no records
+    if set(document) != expected_keys:
+        _refuse(f"malformed draft: missing {sorted(expected_keys - set(document))}, unknown "
+                f"{sorted(set(document) - expected_keys)}.")
     if document["kind"] != DRAFT_KIND or document["labels"] != list(DRAFT_LABELS)             or document["authorisation"] != AUTHORISATION or document["production_calibration_execution"] != PRODUCTION:
         _refuse("malformed draft: its kind, labels, authorisation or production statement differ from a campaign "
                 "draft's (a draft authorises nothing).")
@@ -389,8 +480,36 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
             _refuse(f"specimen_identities[{index}] ({reference}): the stored {', '.join(changed)} differ(s) from the "
                     "current governed records; the selection is refused (never substituted).")
         draft = draft.with_specimen(current)
+    if document["schema"] == DRAFT_SCHEMA:
+        draft = _reverify_records(draft, document["specimen_records"], identities, repo_root, fixtures)
     if document["intended_campaign_definition"] != draft.intended_definition():
         _refuse("conflicting draft: the stored preview does not match its declarations and specimen identities.")
+    return draft
+
+
+def _reverify_records(draft: CampaignDraft, stored_records, identities, repo_root: Path,
+                      fixtures: ExperimentFixtureManifest) -> CampaignDraft:
+    """Every stored binding must still be the unique compatible binding, with the same paths and fingerprints."""
+
+    if not isinstance(stored_records, list) or len(stored_records) != len(identities):
+        _refuse("malformed draft: 'specimen_records' must list one entry (null when not bound) per specimen.")
+    for index, stored in enumerate(stored_records):
+        if stored is None:
+            continue
+        reference = identities[index]["forward_model"]
+        if not isinstance(stored, dict) or set(stored) != set(RECORD_FIELDS) or any(
+                not isinstance(item, dict) or set(item) != {"path", "canonical_sha256"} for item in stored.values()):
+            _refuse(f"specimen_records[{index}] ({reference}): malformed bound records.")
+        binding = bind_governed_specimen_records(reference, repo_root, fixtures)
+        if binding.status != BOUND:
+            _refuse(f"specimen_records[{index}] ({reference}): the stored records can no longer be bound — "
+                    + "; ".join(binding.reasons) + " (never substituted).")
+        current = binding.records.to_dict()
+        if current != stored:
+            changed = sorted(name for name in RECORD_FIELDS if current[name] != stored[name])
+            _refuse(f"specimen_records[{index}] ({reference}): the stored {', '.join(changed)} differ(s) from the "
+                    "current governed records (path or canonical SHA-256); refused, never substituted.")
+        draft = draft.with_specimen_records(reference, binding.records)
     return draft
 
 

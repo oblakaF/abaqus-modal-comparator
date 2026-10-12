@@ -490,7 +490,8 @@ class SetupPageTests(_Tmp):
              "Create Campaign Draft...", "Open Campaign Draft...", "Add governed specimen input...", "Remove all specimens", "Discard draft",
              "Question: MATERIAL_IDENTIFICATION", "Question: SPECIMEN_ENGINEERING_CALIBRATION", "Declare τ_mf...",
              "Save Campaign Draft As...", "Check Draft Inputs",
-             "Declare campaign_id...", "Run type: RUN_A", "Run type: RUN_B"]))  # + M8.3, M8.4
+             "Declare campaign_id...", "Run type: RUN_A", "Run type: RUN_B",
+             "Bind Governed Specimen Records"]))  # + M8.3, M8.4
         with mock.patch.object(ui.filedialog, "askopenfilename", return_value=str(RUN_B)):
             buttons["Select family / campaign definition..."]()
         self.assertIn("RUN_B", application.material_auto_id_summary_label.kwargs["text"])
