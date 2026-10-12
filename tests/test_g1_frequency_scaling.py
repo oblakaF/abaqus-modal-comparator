@@ -215,6 +215,76 @@ class IntegrationTests(unittest.TestCase):
         self.assertTrue(application.scaling_summary.cget("text").startswith(("AVAILABLE", "UNAVAILABLE")))
         self.assertEqual(len(application.table.get_children()), len(result.pairs))  # comparison table unchanged
 
+    def test_real_tk_scrolling_keeps_every_column_accessible(self):
+        # PR #71 review: all 12 columns, especially the last three, stay reachable at the minimum window widths
+        try:
+            import tkinter as tk
+
+            root = tk.Tk()
+        except Exception as error:  # noqa: BLE001
+            self.skipTest(f"Tk is unavailable: {error}")
+        self.addCleanup(root.destroy)
+        # runs before destroy: cancel pending idle callbacks of the shown window
+        self.addCleanup(lambda: [root.after_cancel(job) for job in root.tk.splitlist(root.tk.call("after", "info"))])
+        import main
+        import ui_workflow
+        from ui_policy import MINIMUM_WINDOW_SIZE
+
+        disabled = {"autosave_enabled": False, "restore_on_startup": False, "show_recovery_notice": False}
+        with mock.patch.object(ui_workflow, "load_recovery_preferences", return_value=disabled), \
+                mock.patch.object(ui_workflow, "discover_abaqus_installations", return_value=()):
+            application = main.app.ModalComparatorApp(root)
+        table = application.scaling_table
+        self.assertEqual(str(application.scaling_xscroll.cget("orient")), "horizontal")
+        self.assertEqual(str(application.scaling_yscroll.cget("orient")), "vertical")
+        self.assertTrue(str(table.cget("xscrollcommand")) and str(table.cget("yscrollcommand")))
+        rows = [pair(100.0 + i, 101.0 + i, fe_mode=7 + i, exp_mode=1 + i,
+                     order_changed=True, coverage="insufficient spatial coverage") for i in range(20)]
+        for row in fs.table_rows(fs.frequency_scaling_diagnostic(rows)):
+            table.insert("", "end", values=row)
+        # its own tab, appended last; the comparison-table tab gains no widget (its layout is unchanged)
+        tabs = application.tabs.tabs()
+        self.assertEqual(str(tabs[-1]), str(application.scaling_tab))
+        from ui_policy import COMPACT_TAB_LABELS, FULL_TAB_LABELS
+
+        self.assertEqual(main.app.SCALING_TAB_TITLE, FULL_TAB_LABELS[-1])
+        self.assertIn(application.tabs.tab(application.scaling_tab, "text"),
+                      (FULL_TAB_LABELS[-1], COMPACT_TAB_LABELS[-1]))  # responsive full / compact label
+        self.assertLess(tabs.index(str(application.table_tab)), tabs.index(str(application.details_tab)))
+        self.assertNotIn(str(application.scaling_tab), [str(w) for w in application.table_tab.winfo_children()])
+        self.assertFalse(any(str(w).startswith(str(application.table_tab)) for w in
+                             (table, application.scaling_summary)))
+        application.tabs.select(application.scaling_tab)
+        columns = table.cget("columns")
+        self.assertEqual(len(columns), 12)
+        for width, height in ((1160, 720), MINIMUM_WINDOW_SIZE):  # app.py minsize and the responsive minimum
+            with self.subTest(width=width, height=height):
+                root.geometry(f"{width}x{height}+0+0")
+                root.deiconify()
+                root.update()
+                table.xview_moveto(0.0)
+                table.yview_moveto(0.0)
+                root.update()
+                self.assertTrue(table.winfo_ismapped())  # fully shown at the minimum window size
+                self.assertTrue(application.scaling_xscroll.winfo_ismapped())
+                self.assertTrue(application.scaling_yscroll.winfo_ismapped())
+                self.assertLess(table.xview()[1], 1.0)  # wider than the window: scrolling is required
+                for key in columns:  # every column is fixed (never squeezed below its width)
+                    self.assertFalse(int(table.column(key, "stretch")))
+                table.xview_moveto(1.0)
+                root.update()
+                self.assertEqual(table.xview()[1], 1.0)
+                first = table.get_children()[0]
+                visible = table.winfo_width()
+                for key in ("category", "status", "warnings"):
+                    box = table.bbox(first, key)
+                    self.assertTrue(box, key)  # reachable through horizontal scrolling
+                    self.assertLessEqual(box[0] + box[2], visible + 1, key)
+                self.assertLess(table.yview()[1], 1.0)  # more rows than the table height
+                table.yview_moveto(1.0)
+                root.update()
+                self.assertTrue(table.bbox(table.get_children()[-1], "warnings"))
+
 
 if __name__ == "__main__":
     unittest.main()
