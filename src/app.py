@@ -554,13 +554,16 @@ class ModalComparatorApp:
             "run and never substitutes another registration."))
 
     def _build_e_what_if(self) -> None:
-        """G2d-2: SP-02 E_in what-if on the archived local sensitivities (display only; never a recommended E).
+        """G2d-2 / G2d-3: SP-02 / SP-13 E_in what-if on the archived local sensitivities (display only; never a
+        recommended E).
 
-        Fed only by the G2c evidence currently shown; enabled only when that evidence is VERIFIED for SP-02."""
+        Fed only by the G2c evidence currently shown; enabled only when that evidence is VERIFIED for SP-02 or SP-13
+        with exactly that specimen's accepted strict rows; specimen limitations go to the details area."""
         self._what_if_evidence = None
         self.what_if_change = tk.StringVar(value="0.0")
         frame = ttk.LabelFrame(self.evidence_panes, padding=8,
-                               text=f"E_in what-if, SP-02 (archived local sensitivities) — {what_if.LABEL_TEXT}")
+                               text="E_in what-if, SP-02 / SP-13 (archived local sensitivities) — "
+                                    f"{what_if.LABEL_TEXT}")
         self.evidence_panes.add(frame, weight=1)
         controls = ttk.Frame(frame)
         controls.pack(fill="x")
