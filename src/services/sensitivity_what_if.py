@@ -29,6 +29,9 @@ MAXIMUM_E_CHANGE = 0.05  # the archived CARBON-5A ±5 % interval; never extrapol
 AVAILABLE = "E_WHAT_IF_AVAILABLE"
 BLOCKED = "E_WHAT_IF_BLOCKED"
 INCOMPLETE = "E_WHAT_IF_INCOMPLETE"  # a required strict row (FIT or HOLDOUT) is unavailable: no partial preview
+# The accepted SP-02 strict freeze (registration_evidence/SP02_registration_reevaluation.json, results.PHYSICAL):
+# exactly these rows and roles, each once.
+REQUIRED_STRICT_ROWS = {"R1": "FIT", "R2": "FIT", "R3": "HOLDOUT"}
 LABELS = ("LOCAL_MODEL_RESPONSE_WHAT_IF", "NOT_A_RECOMMENDED_E", "NOT_AN_IDENTIFIED_MATERIAL_PROPERTY",
           "NOT_A_SPECIMEN_CALIBRATION")
 LABEL_TEXT = " · ".join(LABELS)
@@ -101,6 +104,22 @@ def _summary(rows, role: str) -> str:
     return text
 
 
+def _strict_identity_problems(strict) -> list[str]:
+    """Absent, duplicated, re-classified or unexpected strict rows against the accepted SP-02 freeze."""
+    problems = []
+    for row_id, role in REQUIRED_STRICT_ROWS.items():
+        found = [row for row in strict if row.row_id == row_id]
+        if not found:
+            problems.append(f"{row_id} ({role}) is absent")
+        elif len(found) > 1:
+            problems.append(f"{row_id} appears {len(found)} times")
+        elif found[0].role != role:
+            problems.append(f"{row_id} is {found[0].role}, the accepted role is {role}")
+    problems += [f"unexpected strict row {row.row_id} ({row.role})" for row in strict
+                 if row.row_id not in REQUIRED_STRICT_ROWS]
+    return problems
+
+
 def e_what_if(evidence: Optional[SensitivityEvidence], e_change: float) -> EWhatIf:
     """The what-if for a relative E_in change (``0.01`` = +1 %), or BLOCKED with the reason."""
 
@@ -142,11 +161,12 @@ def e_what_if(evidence: Optional[SensitivityEvidence], e_change: float) -> EWhat
                               "recorded S_E of the resolved FE branch"))
     rows = tuple(rows)
     strict = [row for row in rows if row.role in ("FIT", "HOLDOUT")]
-    missing = [row for row in strict if row.trial_hz is None]
-    if not strict or missing:
-        detail = "; ".join(f"{row.row_id} ({row.role}): {row.note}" for row in missing) or "no strict row"
-        return EWhatIf(INCOMPLETE, f"incomplete SP-02 strict evidence — {detail}. Every accepted strict row (FIT and "
-                                   "HOLDOUT) is required; a partial FIT/HOLDOUT preview is not shown.", e_change, None)
+    problems = _strict_identity_problems(strict)
+    problems += [f"{row.row_id} ({row.role}): {row.note}" for row in strict if row.trial_hz is None]
+    if problems:
+        return EWhatIf(INCOMPLETE, f"incomplete SP-02 strict evidence — {'; '.join(problems)}. Exactly the accepted "
+                                   "strict rows R1 FIT, R2 FIT and R3 HOLDOUT are required; a partial FIT/HOLDOUT "
+                                   "preview is not shown.", e_change, None)
     return EWhatIf(AVAILABLE, "", e_change, E_BASELINE_MPA * factor, rows, _summary(rows, "FIT"),
                    _summary(rows, "HOLDOUT"))
 

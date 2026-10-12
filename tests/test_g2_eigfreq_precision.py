@@ -186,6 +186,48 @@ class WhatIfCompletenessTests(unittest.TestCase):
                 self.assertIn(wi.INCOMPLETE, wi.summary_text(result))
                 self.assertFalse(result.mixed)
 
+    def assertIncomplete(self, rows, text: str) -> None:
+        result = wi.e_what_if(replace(recorded_sp02_evidence(), rows=tuple(rows)), 0.02)
+        self.assertEqual(result.status, wi.INCOMPLETE)
+        self.assertEqual(result.rows, ())  # no predicted row at all
+        self.assertIsNone(result.e_trial_mpa)
+        self.assertIn(text, result.reason)
+
+    def test_absent_strict_rows_are_incomplete(self):
+        # PR #75 review: an accepted strict row missing entirely from the evidence is not a complete preview
+        rows = recorded_sp02_evidence().rows
+        for absent, role in wi.REQUIRED_STRICT_ROWS.items():
+            with self.subTest(absent=absent):
+                self.assertIncomplete([row for row in rows if row.row_id != absent], f"{absent} ({role}) is absent")
+
+    def test_duplicated_misclassified_or_unexpected_strict_rows_are_incomplete(self):
+        rows = recorded_sp02_evidence().rows
+        r2 = next(row for row in rows if row.row_id == "R2")
+        self.assertIncomplete(list(rows) + [r2], "R2 appears 2 times")
+        for row_id, wrong in (("R3", "FIT"), ("R1", "HOLDOUT")):
+            with self.subTest(row_id=row_id):
+                self.assertIncomplete([replace(row, role=wrong) if row.row_id == row_id else row for row in rows],
+                                      f"{row_id} is {wrong}, the accepted role is "
+                                      f"{wi.REQUIRED_STRICT_ROWS[row_id]}")
+        self.assertIncomplete(list(rows) + [replace(r2, row_id="R4")], "unexpected strict row R4 (FIT)")
+
+    def test_complete_accepted_rows_stay_available_with_the_same_frequencies(self):
+        evidence = recorded_sp02_evidence()
+        recorded = {row.row_id: row for row in evidence.rows if row.role != "NO_STRICT_ROW"}
+        self.assertEqual({row_id: row.role for row_id, row in recorded.items()}, wi.REQUIRED_STRICT_ROWS)
+        for change in (0.0, -0.02, 0.02):
+            result = wi.e_what_if(evidence, change)
+            self.assertEqual(result.status, wi.AVAILABLE)
+            for row_id, row in predicted(result).items():
+                self.assertEqual(row.trial_hz, recorded[row_id].fe_hz * (1.0 + change) ** recorded[row_id].s_e)
+
+    def test_required_rows_are_the_accepted_sp02_strict_freeze(self):
+        physical = json.loads((ROOT / "docs/auto_id/registration_evidence/SP02_registration_reevaluation.json")
+                              .read_text(encoding="utf-8"))["results"]["PHYSICAL"]
+        holdouts = set(physical["holdouts"]["holdout_row_ids"])
+        self.assertEqual({row["row_id"]: "HOLDOUT" if row["row_id"] in holdouts else "FIT"
+                          for row in physical["strict_pairs"]}, wi.REQUIRED_STRICT_ROWS)
+
 
 class CachedSmokeManifestTests(unittest.TestCase):
     """The real SP-02 smoke-test extraction (a34dd17), read from its manifest only; no Abaqus is started."""
