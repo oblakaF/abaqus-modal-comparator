@@ -1508,6 +1508,24 @@ def clear_draft_specimens(app) -> None:
     _change_campaign_draft(app, lambda draft: draft.without_specimens(), "Removed every specimen from the draft.")
 
 
+def declare_draft_campaign_id(app, value) -> None:
+    """Declare the draft's campaign_id explicitly (validated by the campaign-definition rules; no default)."""
+
+    _change_campaign_draft(app, lambda draft: draft.with_campaign_id(value), f"Declared campaign_id {value!r}.")
+
+
+def declare_draft_run_type(app, run_type) -> None:
+    """Declare RUN_A or RUN_B explicitly (no default); a run type never authorises execution."""
+
+    _change_campaign_draft(app, lambda draft: draft.with_run_type(run_type), f"Declared run type {run_type}.")
+
+
+def _ask_draft_campaign_id(app) -> None:
+    value = simpledialog.askstring("Declare campaign_id", "campaign_id (letters, digits, '.', '_', '-', '+', '/'):")
+    if value is not None:
+        declare_draft_campaign_id(app, value)
+
+
 def declare_draft_question(app, question) -> None:
     _change_campaign_draft(app, lambda draft: draft.with_question(question), f"Declared question {question}.")
 
@@ -1796,8 +1814,16 @@ def _build_auto_id_setup_page(app, page) -> None:
         ttk.Button(draft_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
     declare_buttons = ttk.Frame(draft)
     declare_buttons.pack(anchor="w", pady=(0, 4))
-    from services.campaign_draft import QUESTION_CHOICES
+    from services.campaign_draft import QUESTION_CHOICES, RUN_TYPE_CHOICES
 
+    identity_buttons = ttk.Frame(draft)
+    identity_buttons.pack(anchor="w", pady=(0, 4))
+    for text, command in (
+        ("Declare campaign_id...", lambda: _ask_draft_campaign_id(app)),
+        *((f"Run type: {run_type}", lambda r=run_type: declare_draft_run_type(app, r))
+          for run_type in RUN_TYPE_CHOICES),
+    ):
+        ttk.Button(identity_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
     for text, command in (
         *((f"Question: {question}", lambda q=question: declare_draft_question(app, q)) for question in QUESTION_CHOICES),
         ("Declare τ_mf...", lambda: _ask_draft_tolerance(app)),

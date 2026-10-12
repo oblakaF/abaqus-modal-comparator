@@ -4987,3 +4987,24 @@ first internal provider.
 - **Unchanged:** draft schema, M8.1 wizard checks, FIT / HOLDOUT pairings, domain rules, `require_executable`, gates,
   thresholds, M7 records; no finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE
   NOT_MET. **Abaqus run count:** 0.
+
+## 2026-10-12 — M8-D2b ACCEPTED and merged; M8-D2c: campaign identity and run type (REVIEW_READY)
+
+- **M8-D2b:** SUPERVISOR ACCEPTED (PR #69, head `7fd34ed`); merge `ac68548d028d7c66e6df65466ca64f26a92a12b3`; main Linux CI run `38161996841` success.
+- **M8-D2c** (branch `auto-id/m8-d2c` from `ac68548`):
+  - GUI: "Declare campaign_id..." (explicit text input) and "Run type: RUN_A" / "Run type: RUN_B" in the Campaign draft
+    section; no default; declared values in the draft table and JSON preview; missing inputs recomputed after every
+    successful declaration; a refused declaration (or a cancelled input) keeps the draft and its input check.
+  - Validation: the production rules — domain `declared_campaign_id` / `declared_run_type` (additive public functions
+    that `parse_campaign_definition` now calls; identical rules and messages; campaign hashes unchanged).
+  - Draft format: saved as `auto-id/campaign-draft/v2` (`declared`: scientific_question, tau_mf, campaign_id,
+    run_type); `auto-id/campaign-draft/v1` drafts still open exactly as written (they declare neither field; nothing
+    is inferred; opening never rewrites the file; an explicit Save As writes v2). The declared keys must match the
+    draft version.
+  - RUN_B grants no execution authorisation: `run_b_gate` stays a missing, SUPERVISOR-gated input, never set by a
+    draft; `require_executable` unchanged.
+- **Tests:** `tests/test_m8_d2c_campaign_identity.py`; the M8.1 button-set test lists the new buttons; the M8-D2a
+  reopen tests use a v3 schema for the unknown-schema case and v2 `declared` keys for the domain-validation cases.
+- **Unchanged:** campaign schema, gates, thresholds, M7 records; no parameters, pairings, uncertainties, budgets or
+  solver settings; no finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE
+  NOT_MET. **Abaqus run count:** 0.

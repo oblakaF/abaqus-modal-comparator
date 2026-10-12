@@ -354,6 +354,22 @@ CAMPAIGN_KEYS = frozenset(_TOP_KEYS)  # the required top-level fields of every c
 CAMPAIGN_SPECIMEN_KEYS = frozenset(_SPECIMEN_KEYS)  # the required fields of every campaign specimen
 
 
+def declared_campaign_id(value: object) -> str:
+    """The campaign identifier, validated exactly as ``parse_campaign_definition`` validates it."""
+    campaign_id = _text(value, "campaign_id")
+    if not _IDENTIFIER.match(campaign_id):
+        _fail("campaign_id", "must use letters, digits, '.', '_', '-', '+' or '/'.")
+    return campaign_id
+
+
+def declared_run_type(value: object) -> str:
+    """The run type (RUN_A or RUN_B), validated exactly as ``parse_campaign_definition`` validates it; never an
+    execution authorisation (RUN_B stays refused without its own ``run_b_gate``)."""
+    if not isinstance(value, str) or value not in RUN_TYPES:
+        _fail("run_type", f"must be one of {RUN_TYPES}.")
+    return value
+
+
 def declared_scientific_question(value: object) -> str:
     """The SPEC v1.2 scientific question, validated exactly as ``parse_campaign_definition`` validates it."""
     return _scientific_question(value)
@@ -393,12 +409,8 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
     data = _mapping(data, "campaign", _TOP_KEYS | optional | declared)
     question = _scientific_question(data["scientific_question"]) if declared else None
     tau_mf = _tau_mf(data["tau_mf"]) if declared else None
-    campaign_id = _text(data["campaign_id"], "campaign_id")
-    if not _IDENTIFIER.match(campaign_id):
-        _fail("campaign_id", "must use letters, digits, '.', '_', '-', '+' or '/'.")
-    run_type = data["run_type"]
-    if run_type not in RUN_TYPES:
-        _fail("run_type", f"must be one of {RUN_TYPES}.")
+    campaign_id = declared_campaign_id(data["campaign_id"])
+    run_type = declared_run_type(data["run_type"])
     decision = _text(data["decision"], "decision")
 
     parameterisation_id = data["parameterisation"]
