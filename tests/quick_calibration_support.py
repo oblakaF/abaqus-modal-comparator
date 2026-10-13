@@ -65,6 +65,12 @@ class FakeAbaqus:
         self.solves = 0
         self.mixing = mixing  # optional callable e -> angle mixing modes 1 and 2 (branch-loss test)
         self.layers = layers  # >1: extra node layers below the scanned surface (a solid sandwich stand-in)
+        self.solver_identity = {"command": "fake-abaqus", "executable": "fake", "executable_sha256": "fake-solver-v1"}
+        self.extraction_identity = {"script": "fake-extract", "script_sha256": "fake-extract-v1", "start_mode": 1}
+
+    def identity(self) -> dict:
+        """Recorded with every job and compared before any reuse (like AbaqusRunner.identity)."""
+        return {"solver": dict(self.solver_identity), "extraction": dict(self.extraction_identity)}
 
     def solve(self, inp_path: Path, job_dir: Path, job_name: str) -> Path:
         self.solves += 1

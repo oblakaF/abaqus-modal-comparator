@@ -85,7 +85,28 @@ honestly instead of the much smaller sd of a mean.
 
 Output folder: `report.txt`, `result.json`, `modes.csv` (per mode: start/final error, MAC,
 sensitivity, the multiplier this mode alone asks for), `<model>_calibrated.inp` (only when a value
-is shown), `config.json`, and `work/` with the Abaqus jobs (a repeated run reuses finished jobs).
+is shown), `config.json`, and `work/` with the Abaqus jobs (a repeated run reuses a finished job only when its
+provenance is verified, see below).
+
+## Verified FE job cache
+
+Each finished job in `work/<job>/` has `provenance.json` (schema `quick-calibration/fe-job-provenance/v1`),
+written atomically only after a complete solve, extraction and mode-data write. It records the SHA-256 of
+the generated INP, every `INPUT=` file (nested includes) with its SHA-256 and size, the requested FE modal
+range (`fe_last_mode`), the Abaqus command and the SHA-256 of the launcher it resolves to (and the release
+read from the job's `.dat`/`.msg` when present), the extraction script SHA-256 and settings, the stored FE
+node set (all nodes for the baseline, the tracking subset for candidates), solve/extraction completion,
+the SHA-256 of `fe_modes.npz`, and a hash of the record itself.
+
+A job is reused (`VERIFIED_REUSE`) only when the record is intact, every field matches the current run and
+the mode data is the recorded data. `fe_modes.npz` alone is never enough. An old cache without a record, a
+changed include, modal range, Abaqus launcher, extraction script or setting, tracking subset, a corrupted or
+partial file, an interrupted job, or an identity that cannot be determined gives `INVALIDATED` (fail closed);
+the job is then solved again at the same path (`NEW_SOLVE`), which needs the FE solve budget. If a stop of a
+job's processes was not confirmed, `TERMINATION_UNCONFIRMED.json` stays in the job folder: the job is neither
+reused, deleted nor overwritten until the recorded processes are confirmed gone. Every decision is listed
+in `report.txt` and `result.json` (`fe_job_cache`) with its reason and fingerprints. The CPU count is not part
+of the identity (it does not change the model).
 
 ## FE solve budget
 

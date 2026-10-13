@@ -39,6 +39,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -65,7 +66,7 @@ from .forward_builder import (
     join_inp_lines,
 )
 from .identification_step import LMSettings, LMStatus, StepError, parameter_bounds, run_bounded_lm
-from .owned_processes import OwnedProcessTree
+from .owned_processes import ALIVE, GONE, OwnedProcessTree, process_state
 
 
 SCHEMA = "quick-calibration/v1"
@@ -473,6 +474,10 @@ class AbaqusRunner:
         self.cancel_event = cancel_event if cancel_event is not None else threading.Event()
         self._popen, self._tree_factory = popen, tree_factory
 
+    def identity(self) -> dict:
+        """Solver and extraction identity recorded with every job and compared before any reuse."""
+        return {"solver": abaqus_identity(self.abaqus_command), "extraction": extraction_identity()}
+
     def _command(self, arguments: Sequence[str]):
         if os.name == "nt":
             executable = self.abaqus_command
@@ -661,6 +666,186 @@ def _load_state(path: Path) -> ModalDataset:
         modes = [ModeShape(int(n), float(f), node_ids, data["coordinates"], v)
                  for n, f, v in zip(data["numbers"], data["frequencies"], data["vectors"])]
     return ModalDataset("Abaqus ODB (cached)", path, modes)
+
+
+# ----------------------------------------------------------------------------- verified FE job cache
+
+CACHE_SCHEMA = "quick-calibration/fe-job-provenance/v1"
+PROVENANCE_FILE = "provenance.json"  # the completion marker: written atomically after solve, extraction and data
+UNCONFIRMED_MARKER = "TERMINATION_UNCONFIRMED.json"
+VERIFIED_REUSE = "VERIFIED_REUSE"
+INVALIDATED = "INVALIDATED"
+NEW_SOLVE = "NEW_SOLVE"
+EXTRACT_SCRIPT = Path(__file__).resolve().parents[2] / "abaqus_scripts" / "extract_odb.py"
+_SOLVER_VERSION = re.compile(r"Abaqus(?:/Standard)?\s+(?:3DEXPERIENCE\s+)?(R?\d{4}[A-Za-z0-9._-]*)")
+
+
+def _file_fingerprint(path: Path) -> Optional[dict]:
+    digest = _sha256_file(Path(path))
+    if digest is None:
+        return None
+    return {"path": str(Path(path).resolve()), "sha256": digest, "size": Path(path).stat().st_size}
+
+
+def _canonical_hash(record: Mapping) -> str:
+    return hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def abaqus_identity(command: str) -> dict:
+    """The Abaqus command and the content of the launcher it resolves to (None when it cannot be resolved)."""
+    command = (command or "abaqus").strip()
+    try:
+        first = shlex.split(command, posix=os.name != "nt")[0].strip('"')
+    except (ValueError, IndexError):
+        first = command
+    located = shutil.which(first) or (first if Path(first).is_file() else None)
+    fingerprint = _file_fingerprint(Path(located)) if located else None
+    return {"command": command, "executable": None if fingerprint is None else fingerprint["path"],
+            "executable_sha256": None if fingerprint is None else fingerprint["sha256"]}
+
+
+def extraction_identity() -> dict:
+    return {"script": "abaqus_scripts/extract_odb.py", "script_sha256": _sha256_file(EXTRACT_SCRIPT),
+            "start_mode": 1, "reader": "abaqus_bridge.load_extracted_odb"}
+
+
+def input_file_fingerprints(source: bytes) -> list[dict]:
+    """Every file read through INPUT= (nested included), with its content hash; refuses what cannot be read."""
+    entries, seen = [], set()
+
+    def walk(content: bytes, origin: str, depth: int) -> None:
+        for number, keyword, value in inp_file_references(content):
+            path = Path(value)
+            if not path.is_absolute():
+                raise QuickCalibrationError(f"{origin} line {number}: relative INPUT={value} cannot be verified.")
+            fingerprint = _file_fingerprint(path)
+            if fingerprint is None:
+                raise QuickCalibrationError(f"{origin} line {number}: INPUT={value} cannot be read.")
+            entries.append(dict(fingerprint, reference=f"{origin} line {number} (*{keyword})"))
+            key = os.path.normcase(fingerprint["path"])
+            if key not in seen and depth < _INCLUDE_DEPTH:
+                seen.add(key)
+                walk(path.read_bytes(), path.name, depth + 1)
+
+    walk(source, "model INP", 0)
+    return entries
+
+
+def _node_set(node_ids: Sequence[str], kind: str) -> dict:
+    ids = [_node_key(n) for n in node_ids]
+    return {"kind": kind, "count": len(ids), "sha256": hashlib.sha256("\n".join(ids).encode("utf-8")).hexdigest()}
+
+
+def _solver_version(job_dir: Path, job_name: str) -> Optional[str]:
+    """The Abaqus release stated by the solved job itself (.dat / .msg header), when available."""
+    for suffix in (".dat", ".msg"):
+        try:
+            with open(Path(job_dir) / f"{job_name}{suffix}", encoding="utf-8", errors="replace") as handle:
+                match = _SOLVER_VERSION.search(handle.read(65536))
+        except OSError:
+            continue
+        if match:
+            return match.group(1)
+    return None
+
+
+def _identity_complete(value) -> bool:
+    return isinstance(value, Mapping) and bool(value) and all(item is not None for item in value.values())
+
+
+def verify_job_cache(job_dir: Path, required: Mapping, required_nodes: Optional[Sequence[str]]):
+    """(decision, reason, fingerprints, dataset): VERIFIED_REUSE only when the provenance record is intact, matches
+    every current requirement, and the mode data is the recorded, complete data. Anything else fails closed."""
+    job_dir = Path(job_dir)
+    record_path, data_path = job_dir / PROVENANCE_FILE, job_dir / "fe_modes.npz"
+    if not job_dir.exists():
+        return NEW_SOLVE, "no finished job", {}, None
+    if not record_path.is_file():
+        reason = ("NOT VERIFIED: mode data without a provenance record (old cache or interrupted job)"
+                  if data_path.exists() else "incomplete job without a provenance record (interrupted or failed)")
+        return INVALIDATED, reason, {}, None
+    try:
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return INVALIDATED, "provenance record unreadable", {}, None
+    if not isinstance(record, dict) or record.get("schema") != CACHE_SCHEMA:
+        return INVALIDATED, "provenance record of an unknown schema", {}, None
+    if record.get("record_hash") != _canonical_hash({k: v for k, v in record.items() if k != "record_hash"}):
+        return INVALIDATED, "provenance record corrupted (record hash mismatch)", {}, None
+    prints = {"generated_inp_sha256": str(record.get("generated_inp_sha256"))[:16],
+              "data_sha256": str((record.get("data") or {}).get("sha256"))[:16],
+              "solver": _canonical_hash(record.get("solver") or {})[:12],
+              "extraction": _canonical_hash(record.get("extraction") or {})[:12],
+              "input_files": len(record.get("input_files") or [])}
+    for key, label in (("generated_inp_sha256", "generated INP"), ("input_files", "INPUT= files"),
+                       ("fe_last_mode", "requested FE modal range"), ("solver", "Abaqus executable/configuration"),
+                       ("extraction", "extraction script/settings")):
+        current = required.get(key)
+        if current is None or (key in ("solver", "extraction") and not _identity_complete(current)):
+            return INVALIDATED, f"{label}: current identity unavailable (fail closed)", prints, None
+        if record.get(key) != current:
+            return INVALIDATED, f"{label} changed", prints, None
+    completion = record.get("completion") or {}
+    if completion.get("solve") != "COMPLETED" or completion.get("extraction") != "VALID":
+        return INVALIDATED, "the recorded solve or extraction is not complete", prints, None
+    stored_nodes, needed = record.get("node_set") or {}, required.get("node_set")
+    if needed is None and stored_nodes.get("kind") != "ALL":
+        return INVALIDATED, "the baseline needs every FE node; the job holds a tracking subset", prints, None
+    if needed is not None and stored_nodes.get("kind") != "ALL" and stored_nodes != needed:
+        return INVALIDATED, "tracking-node subset changed", prints, None
+    data = _file_fingerprint(data_path)
+    if data is None:
+        return INVALIDATED, "mode data missing", prints, None
+    recorded_data = record.get("data") or {}
+    if (data["sha256"], data["size"]) != (recorded_data.get("sha256"), recorded_data.get("size")):
+        return INVALIDATED, "mode data corrupted or replaced (SHA-256 mismatch)", prints, None
+    try:
+        dataset = _load_state(data_path)
+    except Exception:  # noqa: BLE001 - unreadable data is never reused
+        return INVALIDATED, "mode data unreadable", prints, None
+    modes = dataset.sorted_modes()
+    ids = [_node_key(n) for n in modes[0].node_ids] if modes else []
+    if [m.number for m in modes] != completion.get("mode_numbers") or \
+            _node_set(ids, stored_nodes.get("kind", "?")) != stored_nodes:
+        return INVALIDATED, "mode data does not match its provenance record", prints, None
+    if needed is not None and stored_nodes.get("kind") == "ALL" and not set(required_nodes or ()) <= set(ids):
+        return INVALIDATED, "tracking nodes missing from the stored full node set", prints, None
+    return VERIFIED_REUSE, "provenance and mode data verified", prints, dataset
+
+
+def _write_json_atomically(path: Path, value) -> None:
+    handle, temporary = tempfile.mkstemp(prefix=f".{Path(path).name}.", suffix=".partial", dir=Path(path).parent)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            json.dump(value, stream, indent=2, sort_keys=True)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
+
+
+def _unconfirmed_processes_gone(job_dir: Path, state=process_state) -> tuple[bool, str]:
+    """Whether every process recorded by an unconfirmed stop of this job is now confirmed gone."""
+    try:
+        marker = json.loads((Path(job_dir) / UNCONFIRMED_MARKER).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return False, "the unconfirmed-termination record cannot be read"
+    processes = marker.get("processes") if isinstance(marker, dict) else None
+    if processes is None:
+        return False, "the processes of the stopped job are unknown"
+    remaining = []
+    for item in processes:
+        status, created = state(int(item["pid"]))
+        recorded = None if item.get("created") is None else tuple(item["created"])
+        if status == GONE or (status == ALIVE and recorded is not None and created != recorded):
+            continue  # gone (or its PID now belongs to another process)
+        remaining.append(f"PID {item['pid']}")
+    return not remaining, ", ".join(remaining)
 
 
 # ----------------------------------------------------------------------------- experiment and baseline pairing
@@ -1049,8 +1234,12 @@ class _Evaluation:
 
 class QuickCalibration:
     def __init__(self, config: QuickCalibrationConfig, solve: SolveFunction, extract: ExtractFunction,
-                 progress: Optional[ProgressFunction] = None, cancel: Optional[threading.Event] = None) -> None:
+                 progress: Optional[ProgressFunction] = None, cancel: Optional[threading.Event] = None,
+                 solver_identity: Optional[Mapping] = None) -> None:
         self.config = config
+        self.solver_identity = dict(solver_identity or {})  # {"solver": ..., "extraction": ...}; empty: unknown
+        self.process_state = process_state  # re-checks processes recorded by an unconfirmed stop
+        self.cache_decisions: list[dict] = []
         self.solve, self.extract = solve, extract
         self.progress = progress or (lambda message: None)
         self.cancel = cancel if cancel is not None else threading.Event()
@@ -1058,6 +1247,10 @@ class QuickCalibration:
         if not source.is_file():
             raise QuickCalibrationError(f"model INP not found: {source}")
         self.model = InpModel(source.read_bytes(), config.parameters)
+        try:
+            self._input_files: Optional[list] = input_file_fingerprints(self.model.source)
+        except QuickCalibrationError:
+            self._input_files = None  # unverifiable: no job is reused (a solve then fails visibly)
         self.last_mode = config.fe_last_mode or self.model.eigenvalue_count or 60
         self.work = Path(config.output_dir) / "work"
         self.work.mkdir(parents=True, exist_ok=True)
@@ -1078,17 +1271,26 @@ class QuickCalibration:
         job_name = f"qc_{digest[:12]}"
         if job_name in self._cache:
             self.cache_hits += 1
+            self._decide(VERIFIED_REUSE, job_name, "verified or solved earlier in this run", {})
             return self._cache[job_name]
         job_dir = self.work / job_name
         cached = job_dir / "fe_modes.npz"
-        if cached.is_file():
-            dataset = _load_state(cached)
+        self._refuse_unconfirmed(job_dir)  # never reused, deleted or overwritten while its processes may run
+        required = self._requirements(digest)
+        decision, reason, prints, dataset = verify_job_cache(job_dir, required, self._tracking_order())
+        if decision == VERIFIED_REUSE:
             self.cache_hits += 1
-            self.progress(f"{job_name}: reused finished job ({self._describe(multipliers)})")
+            self._decide(VERIFIED_REUSE, job_name, reason, prints)
+            self.progress(f"{job_name}: verified reuse of a finished job ({self._describe(multipliers)})")
         else:
+            if decision == INVALIDATED:
+                self._decide(INVALIDATED, job_name, reason, prints)
+                self.progress(f"{job_name}: cached job not reused ({reason})")
             self._check_cancel()
             self._claim_new_solve()  # the hard per-run cap: refused here, before anything is started
-            _clear_incomplete_job(job_dir)  # leftovers of an interrupted attempt are never reused
+            self._decide(NEW_SOLVE, job_name, f"new solve {self.new_solve_attempts}/{self.config.max_new_fe_solves} "
+                                              f"({self.stage})", {"generated_inp_sha256": digest[:16]})
+            self._clear_job(job_dir)  # an unverified job is replaced at the same path, never beside it
             job_dir.mkdir(parents=True, exist_ok=True)
             inp = job_dir / f"{job_name}.inp"
             inp.write_bytes(content)
@@ -1103,12 +1305,15 @@ class QuickCalibration:
                               f"(solve took {time.monotonic() - started:.0f} s)")
                 dataset = self.extract(Path(odb), job_dir / "extraction", self.last_mode)
                 self._check_cancel()
-                _save_state(cached, dataset, None if self.reference is None else self._node_order)
-            except TerminationUnconfirmed:
-                raise  # processes may still write into the job: leave it untouched (it has no completion marker)
+                nodes = self._tracking_order()
+                _save_state(cached, dataset, nodes)
+                self._write_provenance(job_dir, job_name, required, nodes)
+            except TerminationUnconfirmed as error:
+                _mark_unconfirmed(job_dir, error)  # processes may still write: untouched, never reused or replaced
+                raise
             except BaseException:
                 try:  # a stopped or failed job leaves no partial cache (it never had a completion marker)
-                    _clear_incomplete_job(job_dir)
+                    self._clear_job(job_dir)
                 except QuickCalibrationError:
                     pass  # still in use: the next run clears it or refuses; the original outcome is reported
                 raise
@@ -1119,6 +1324,56 @@ class QuickCalibration:
         if self.reference is not None:  # candidates keep only their small tracking state in memory
             self._cache[job_name] = state
         return state
+
+    def _tracking_order(self) -> Optional[list]:
+        return None if self.reference is None else list(self._node_order)
+
+    def _requirements(self, digest: str) -> dict:
+        order = self._tracking_order()
+        return {"generated_inp_sha256": digest, "input_files": self._input_files, "fe_last_mode": self.last_mode,
+                "solver": self.solver_identity.get("solver"), "extraction": self.solver_identity.get("extraction"),
+                "node_set": None if order is None else _node_set(order, "SUBSET")}
+
+    def _write_provenance(self, job_dir: Path, job_name: str, required: Mapping, nodes: Optional[list]) -> None:
+        """The completion marker, written atomically only after a complete solve, extraction and data write."""
+        data = _file_fingerprint(job_dir / "fe_modes.npz")
+        stored = _load_state(job_dir / "fe_modes.npz")
+        modes = stored.sorted_modes()
+        record = {"schema": CACHE_SCHEMA, "job_name": job_name,
+                  "generated_inp_sha256": required["generated_inp_sha256"], "input_files": required["input_files"],
+                  "fe_last_mode": required["fe_last_mode"], "solver": required["solver"],
+                  "extraction": required["extraction"],
+                  "node_set": _node_set(modes[0].node_ids, "ALL" if nodes is None else "SUBSET"),
+                  "completion": {"solve": "COMPLETED", "extraction": "VALID",
+                                 "solver_version": _solver_version(job_dir, job_name),
+                                 "mode_numbers": [m.number for m in modes]},
+                  "data": {"file": "fe_modes.npz", "sha256": data["sha256"], "size": data["size"]}}
+        record["record_hash"] = _canonical_hash(record)
+        _write_json_atomically(job_dir / PROVENANCE_FILE, record)
+
+    def _decide(self, decision: str, job_name: str, reason: str, prints: Mapping) -> None:
+        self.cache_decisions.append({"job_name": job_name, "decision": decision, "stage": self.stage,
+                                     "reason": reason, "fingerprints": dict(prints)})
+
+    def _refuse_unconfirmed(self, job_dir: Path) -> None:
+        if not (job_dir / UNCONFIRMED_MARKER).exists():
+            return
+        gone, remaining = _unconfirmed_processes_gone(job_dir, self.process_state)
+        if not gone:
+            raise QuickCalibrationError(
+                f"{job_dir}: an earlier stop of this job's Abaqus processes was not confirmed ({remaining}); the job "
+                "is neither reused, deleted nor overwritten. Check Task Manager, then delete the folder manually.")
+
+    def _clear_job(self, job_dir: Path) -> None:
+        """Remove an unverified job folder; refused while an unconfirmed stop may still use it."""
+        self._refuse_unconfirmed(job_dir)
+        if not job_dir.exists():
+            return
+        try:
+            shutil.rmtree(job_dir)
+        except OSError as error:
+            raise QuickCalibrationError(f"{job_dir} holds an unverified Abaqus job that cannot be removed ({error}); "
+                                        "a process may still use it. Nothing was reused.") from None
 
     def _claim_new_solve(self) -> None:
         """Count one new FE solve attempt, or refuse it when the per-run cap is reached (failures count too)."""
@@ -1320,6 +1575,7 @@ class QuickCalibration:
                                   "correlation": correlation, "singular_values": singular.tolist()},
                       rows=rows, leave_one_out_cases=loo["cases"],
                       abaqus_solves=self.abaqus_solves, fe_solve_budget=self.budget_report(),
+                      fe_job_cache=list(self.cache_decisions),
                       evaluations=[asdict(e) for e in self.evaluations])
         return result
 
@@ -1372,6 +1628,7 @@ class QuickCalibration:
     def _refused(self, base: dict, reason: str) -> dict:
         return dict(base, status=STATUS_REFUSED, refusal_reasons=[reason], estimates={}, overall_grade=None,
                     abaqus_solves=self.abaqus_solves, fe_solve_budget=self.budget_report(),
+                    fe_job_cache=list(self.cache_decisions),
                     evaluations=[asdict(e) for e in self.evaluations], rows=[asdict(r) for r in self.rows])
 
     def _budget_refused(self, exhausted: FESolveBudgetExhausted) -> dict:
@@ -1400,16 +1657,16 @@ class QuickCalibration:
                                     for k, v in self.model.records.items()}}
 
 
-def _clear_incomplete_job(job_dir: Path) -> None:
-    """Remove a generated job directory that has no completion marker (``fe_modes.npz``)."""
-    job_dir = Path(job_dir)
-    if not job_dir.exists() or (job_dir / "fe_modes.npz").is_file():
-        return
+def _mark_unconfirmed(job_dir: Path, error: TerminationUnconfirmed) -> None:
+    """Record, inside the job, which processes may still run (``None``: unknown); nothing else is touched."""
+    remaining = error.still_running()
+    processes = None if remaining is None else [
+        {"pid": identity.pid, "created": None if identity.created is None else list(identity.created)}
+        for identity in remaining]
     try:
-        shutil.rmtree(job_dir)
-    except OSError as error:
-        raise QuickCalibrationError(f"{job_dir} holds an incomplete Abaqus job that cannot be removed ({error}); a "
-                                    "process may still use it. Nothing was reused.") from None
+        _write_json_atomically(Path(job_dir) / UNCONFIRMED_MARKER, {"reason": str(error), "processes": processes})
+    except OSError:
+        pass  # the job keeps no provenance record either way: it is never reused
 
 
 def _sha256_file(path: Path) -> Optional[str]:
@@ -1556,6 +1813,13 @@ def render_report(result: dict) -> str:
                   f"{p['fe_hz']:.2f} Hz, MAC {_p(p['mac'], 3)}" for p in result["excluded_pairs"]]
     if result.get("unpaired_experimental_modes"):
         lines.append(f"Unpaired experimental modes: {result['unpaired_experimental_modes']}")
+    decisions = result.get("fe_job_cache") or []
+    if decisions:
+        lines += ["", "FE JOB CACHE (reuse only with verified provenance)"]
+        for item in decisions:
+            prints = ", ".join(f"{k} {v}" for k, v in (item.get("fingerprints") or {}).items())
+            lines.append(f"  {item['decision']:<14} {item['job_name']} [{item['stage']}]: {item['reason']}"
+                         + (f" ({prints})" if prints else ""))
     budget = result.get("fe_solve_budget") or {}
     lines += ["", f"New Abaqus FE solves in this run: {budget.get('attempted_new_solves')} attempted, "
                   f"{budget.get('completed_new_solves')} completed, limit {budget.get('max_new_fe_solves')} "
@@ -1582,7 +1846,8 @@ def run_quick_calibration(config: QuickCalibrationConfig, solve: Optional[SolveF
                           extract: Optional[ExtractFunction] = None,
                           progress: Optional[ProgressFunction] = None,
                           cancel: Optional[threading.Event] = None,
-                          runner: Optional[AbaqusRunner] = None) -> tuple[dict, dict[str, Path]]:
+                          runner: Optional[AbaqusRunner] = None,
+                          solver_identity: Optional[Mapping] = None) -> tuple[dict, dict[str, Path]]:
     """Run the calibration and write result.json, report.txt, modes.csv (and the calibrated INP).
 
     The input preflight runs first; any refusal raises ``PreflightRefused`` before an Abaqus solve. ``cancel``
@@ -1599,7 +1864,11 @@ def run_quick_calibration(config: QuickCalibrationConfig, solve: Optional[SolveF
         runner = runner or AbaqusRunner(config.abaqus_command, config.cpus, config.timeout_minutes, cancel)
         solve = solve or runner.solve
         extract = extract or runner.extract
-    calibration = QuickCalibration(config, solve, extract, progress, cancel)
+    if solver_identity is None:  # the identity of the solver actually used (AbaqusRunner or an injected one)
+        owner = runner if runner is not None else getattr(solve, "__self__", None)
+        identify = getattr(owner, "identity", None)
+        solver_identity = identify() if callable(identify) else None
+    calibration = QuickCalibration(config, solve, extract, progress, cancel, solver_identity)
     result = calibration.run()
     result["preflight"] = report.to_dict()
     paths = write_outputs(result, config, calibration.model)

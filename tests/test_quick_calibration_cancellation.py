@@ -556,10 +556,15 @@ class UnknownChildWorkflowTests(unittest.TestCase):
         (job,) = list(calibration.work.iterdir())
         self.assertTrue((job / f"{job.name}.inp").is_file())  # no cleanup without confirmed termination
         self.assertFalse((job / "fe_modes.npz").exists())
+        fake = S.FakeAbaqus()
+        later = QuickCalibration(config, fake.solve, fake.extract)
+        later.process_state = self.system.state  # the recorded processes are re-checked (not the host's PIDs)
+        with self.assertRaisesRegex(QuickCalibrationError, "neither reused, deleted nor overwritten"):
+            later.fe_state({"E": 1.0})  # child 11 may still run: refused, untouched
+        self.assertTrue((job / f"{job.name}.inp").is_file())
         del self.system.processes[11]  # the child exits: now confirmed
         self.assertTrue(caught.exception.resolved())
-        fake = S.FakeAbaqus()
-        QuickCalibration(config, fake.solve, fake.extract).fe_state({"E": 1.0})  # only now cleared and solved
+        later.fe_state({"E": 1.0})  # only now cleared and solved
         self.assertEqual(fake.solves, 1)
 
 
@@ -616,9 +621,12 @@ class CacheTests(unittest.TestCase):
             calibration.fe_state({"E": 1.0})
         (job,) = list(calibration.work.iterdir())
         self.assertFalse((job / "fe_modes.npz").exists())  # never a completed job
+        before = sorted(p.name for p in job.iterdir())
         fake = S.FakeAbaqus()
-        self.calibration(fake.solve, fake.extract).fe_state({"E": 1.0})  # the leftover is cleared, then solved
-        self.assertEqual(fake.solves, 1)
+        with self.assertRaisesRegex(QuickCalibrationError, "neither reused, deleted nor overwritten"):
+            self.calibration(fake.solve, fake.extract).fe_state({"E": 1.0})  # unknown processes: refused (P1b-B)
+        self.assertEqual(fake.solves, 0)
+        self.assertEqual(sorted(p.name for p in job.iterdir()), before)  # untouched
 
     def test_completion_marker_is_written_atomically(self):
         dataset = S.FakeAbaqus().extract(self._odb(), self.folder, 9)
