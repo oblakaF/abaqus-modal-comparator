@@ -1,12 +1,13 @@
 """Process trees owned by one quick-calibration session: track, terminate, and confirm termination.
 
 An Abaqus solve is started as a launcher (``cmd.exe`` → ``abaqus`` driver → solver executables). Only processes this
-session started are ever terminated: the launcher, plus every process that was observed as its descendant while it
-ran. Descendants are recorded from periodic process-table snapshots with their creation time, so a child whose
-parent has already exited is still known, and a reused PID is never mistaken for an owned process.
+session started are ever terminated: the launcher, and every process observed as a child of an owned process while
+that parent was still the recorded process (same PID and creation time) and created after it. Every kill re-checks
+the identity on the process itself (Windows: the same handle; Linux: a pidfd), so a reused PID is never killed.
 
-``OwnedProcessTree.terminate`` returns True only after every owned process is confirmed gone; anything it cannot
-confirm is reported, never assumed.
+Termination is confirmed only when every owned process is known to be gone. A process whose state or identity cannot
+be determined is never killed and never counted as gone: ``terminate`` then returns False and ``unconfirmed`` reports
+it (``None`` when the tracker cannot establish identities at all).
 """
 
 from __future__ import annotations
@@ -17,34 +18,134 @@ from pathlib import Path
 import signal
 import subprocess
 import time
-from typing import Callable, Iterable, Mapping, Optional
+from typing import Callable, Mapping, Optional
+
+ALIVE = "ALIVE"
+GONE = "GONE"
+UNKNOWN = "UNKNOWN"  # the process may exist, but its state or identity cannot be read
 
 ProcessTable = Callable[[], Mapping[int, int]]  # pid -> parent pid
-CreationTime = Callable[[int], Optional[tuple]]
-Killer = Callable[[int], None]
+StateFunction = Callable[[int], tuple]  # pid -> (ALIVE | GONE | UNKNOWN, creation identity or None)
+Killer = Callable[["ProcessIdentity"], None]
 
 
 @dataclass(frozen=True)
 class ProcessIdentity:
     pid: int
-    created: Optional[tuple]  # creation time (Windows FILETIME or Linux start ticks); None if unavailable
+    created: Optional[tuple]  # creation time (Windows FILETIME or Linux start ticks); None if unknown
+
+
+# ----------------------------------------------------------------------------- platform queries
+
+def process_state(pid: int) -> tuple[str, Optional[tuple]]:
+    """(ALIVE, creation identity), (GONE, None) or (UNKNOWN, None) for one PID."""
+    return _windows_state(pid) if os.name == "nt" else _posix_state(pid)
 
 
 def creation_time(pid: int) -> Optional[tuple]:
-    """Creation time of a live process, or None (absent, a zombie, or not determinable)."""
-    if os.name == "nt":
-        from abaqus_bridge import _process_creation_time  # the application's Windows FILETIME query
+    """Creation identity of a live process, or None (gone or unknown)."""
+    status, created = process_state(pid)
+    return created if status == ALIVE else None
 
-        value = _process_creation_time(pid)
-        return None if value is None else tuple(value)
+
+def _posix_state(pid: int) -> tuple[str, Optional[tuple]]:
+    if not Path("/proc/self/stat").exists():
+        return UNKNOWN, None  # no /proc: identities cannot be established
     try:
         text = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
+    except (FileNotFoundError, ProcessLookupError):
+        return GONE, None
     except OSError:
-        return None
+        return UNKNOWN, None
     fields = text[text.rfind(")") + 2:].split()
-    if not fields or fields[0] in ("Z", "X"):  # a zombie has exited
-        return None
-    return (int(fields[19]),)  # starttime (field 22 of /proc/<pid>/stat)
+    if not fields:
+        return UNKNOWN, None
+    if fields[0] in ("Z", "X"):  # exited, not yet reaped
+        return GONE, None
+    return ALIVE, (int(fields[19]),)  # starttime (field 22 of /proc/<pid>/stat)
+
+
+def _kernel32():
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    return kernel32
+
+
+def _windows_handle_state(kernel32, handle) -> tuple[str, Optional[tuple]]:
+    import ctypes
+    from ctypes import wintypes
+
+    code = wintypes.DWORD()
+    if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+        return UNKNOWN, None
+    if code.value != 259:  # not STILL_ACTIVE: exited (a handle may keep the object)
+        return GONE, None
+    times = [wintypes.FILETIME() for _ in range(4)]
+    if not kernel32.GetProcessTimes(handle, *(ctypes.byref(t) for t in times)):
+        return UNKNOWN, None
+    return ALIVE, (int(times[0].dwLowDateTime), int(times[0].dwHighDateTime))
+
+
+def _windows_state(pid: int) -> tuple[str, Optional[tuple]]:
+    import ctypes
+
+    try:
+        kernel32 = _kernel32()
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return (GONE if ctypes.get_last_error() == 87 else UNKNOWN), None  # 87: no such process
+        try:
+            return _windows_handle_state(kernel32, handle)
+        finally:
+            kernel32.CloseHandle(handle)
+    except (OSError, AttributeError):
+        return UNKNOWN, None
+
+
+def kill_verified(identity: ProcessIdentity) -> None:
+    """Kill exactly this process: its identity is re-checked on the process object that receives the kill."""
+    if identity.created is None:
+        return  # ownership cannot be established: never killed
+    if os.name == "nt":
+        try:
+            kernel32 = _kernel32()
+            handle = kernel32.OpenProcess(0x0001 | 0x1000, False, identity.pid)  # TERMINATE | QUERY_LIMITED
+            if not handle:
+                return
+            try:
+                status, created = _windows_handle_state(kernel32, handle)
+                if status == ALIVE and created == identity.created:
+                    kernel32.TerminateProcess(handle, 1)
+            finally:
+                kernel32.CloseHandle(handle)
+        except (OSError, AttributeError):
+            pass
+        return
+    pidfd_open = getattr(os, "pidfd_open", None)
+    if pidfd_open is not None:
+        try:
+            descriptor = pidfd_open(identity.pid)
+        except OSError:
+            return
+        try:  # the pidfd pins the process: a PID reused after this point cannot receive the signal
+            status, created = _posix_state(identity.pid)
+            if status == ALIVE and created == identity.created:
+                signal.pidfd_send_signal(descriptor, signal.SIGKILL)
+        except OSError:
+            pass
+        finally:
+            os.close(descriptor)
+        return
+    status, created = _posix_state(identity.pid)
+    if status == ALIVE and created == identity.created:
+        try:
+            os.kill(identity.pid, signal.SIGKILL)
+        except OSError:
+            pass
 
 
 def process_table() -> dict[int, int]:
@@ -96,75 +197,107 @@ def _windows_process_table() -> dict[int, int]:
         return {}
 
 
-def kill_process(pid: int) -> None:
-    """Forced termination of one owned PID (and, on Windows, its current descendants)."""
-    if os.name == "nt":
-        try:
-            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=30, check=False)
-        except (OSError, subprocess.SubprocessError):
-            pass
-    else:
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except OSError:
-            pass
-
+# ----------------------------------------------------------------------------- the owned tree
 
 class OwnedProcessTree:
-    """The launcher started by this session and every descendant observed while it ran."""
+    """The launcher started by this session and every descendant whose ownership was established while it ran."""
 
     def __init__(self, process: subprocess.Popen, *, table: ProcessTable = process_table,
-                 created: CreationTime = creation_time, kill: Killer = kill_process) -> None:
+                 state: StateFunction = process_state, kill: Killer = kill_verified) -> None:
         self.process = process
-        self._table, self._created, self._kill = table, created, kill
-        self.members: dict[int, ProcessIdentity] = {process.pid: ProcessIdentity(process.pid, created(process.pid))}
+        self._table, self._state, self._kill = table, state, kill
+        status, created = state(process.pid)
+        self.root = ProcessIdentity(process.pid, created if status == ALIVE else None)
+        self.members: dict[int, ProcessIdentity] = {process.pid: self.root}
+        self.unverified: dict[int, int] = {}  # pid -> owned parent pid: a child whose identity cannot be read
+
+    @property
+    def identity_available(self) -> bool:
+        """Descendants can only be attributed when the launcher's own identity is known."""
+        return self.root.created is not None
+
+    def _is_recorded_process(self, pid: int) -> bool:
+        """The owned process at ``pid`` is still the one recorded (same PID and creation identity)."""
+        identity = self.members.get(pid)
+        if identity is None or identity.created is None:
+            return False
+        if pid == self.process.pid and self.process.poll() is not None:
+            return False
+        status, created = self._state(pid)
+        return status == ALIVE and created == identity.created
 
     def refresh(self) -> None:
-        """Record new descendants of any owned process (transitively; a child created before its recorded parent
-        is a reused PID and is ignored)."""
+        """Record children of owned processes whose ownership is established; never guess."""
         table = self._table()
         changed = True
         while changed:
             changed = False
             for pid, parent in table.items():
-                if pid in self.members or parent not in self.members:
+                if pid in self.members or parent not in self.members or not self._is_recorded_process(parent):
                     continue
+                status, created = self._state(pid)
                 owner = self.members[parent]
-                created = self._created(pid)
-                if created is not None and owner.created is not None and created < owner.created:
-                    continue
-                self.members[pid] = ProcessIdentity(pid, created)
-                changed = True
+                if status == ALIVE and created is not None:
+                    if created < owner.created:
+                        continue  # older than the recorded parent: a stale parent link, not ours
+                    self.members[pid] = ProcessIdentity(pid, created)
+                    self.unverified.pop(pid, None)
+                    changed = True
+                elif status == UNKNOWN or status == ALIVE:
+                    self.unverified[pid] = parent  # possibly ours, identity unreadable: never killed or confirmed
+        for pid, parent in list(self.unverified.items()):
+            if table.get(pid) != parent or self._state(pid)[0] == GONE:
+                del self.unverified[pid]
 
-    def _is_alive(self, identity: ProcessIdentity) -> bool:
+    def _member_status(self, identity: ProcessIdentity) -> str:
         if identity.pid == self.process.pid:
-            return self.process.poll() is None
-        current = self._created(identity.pid)
-        if current is None:
-            return False if identity.created is not None else _pid_visible(identity.pid, self._table)
-        return identity.created is None or current == identity.created
+            return ALIVE if self.process.poll() is None else GONE
+        status, created = self._state(identity.pid)
+        if status == ALIVE and created != identity.created:
+            return GONE  # the PID now belongs to another process; the owned one has exited
+        return status
 
-    def alive(self) -> list[ProcessIdentity]:
-        return [identity for identity in self.members.values() if self._is_alive(identity)]
+    def remaining(self) -> list[ProcessIdentity]:
+        """Owned processes not known to be gone, plus children whose identity could not be established."""
+        left = [identity for identity in self.members.values() if self._member_status(identity) != GONE]
+        return left + [ProcessIdentity(pid, None) for pid in self.unverified]
+
+    def unconfirmed(self) -> Optional[list[ProcessIdentity]]:
+        """What may still run; ``None`` when the tracker cannot establish identities (never 'all stopped')."""
+        if not self.identity_available:
+            return None
+        self.refresh()
+        return self.remaining()
 
     def terminate(self, timeout_seconds: float = 30.0, poll_seconds: float = 0.2) -> bool:
-        """Kill every live owned process and confirm that none remains; True only when confirmed."""
+        """Kill every owned process and confirm that none remains; True only when confirmed."""
         deadline = time.monotonic() + timeout_seconds
         attempts = 0
         while True:
             self.refresh()
-            living = self.alive()
-            if not living:
+            left = self.remaining()
+            if self.identity_available and not left:
                 self._reap()
                 return True
+            if not self.identity_available and self.process.poll() is not None:
+                return False  # the launcher is gone, but its descendants cannot be confirmed
             if time.monotonic() >= deadline:
                 return False
-            if attempts < 3:  # forced termination, retried while processes remain
-                for identity in living:
-                    self._kill(identity.pid)
+            if attempts < 3:
+                for identity in left:
+                    if identity.pid == self.process.pid:
+                        self._kill_root()
+                    elif identity.created is not None:
+                        self._kill(identity)
                 attempts += 1
             time.sleep(poll_seconds)
             self._reap()
+
+    def _kill_root(self) -> None:
+        try:
+            self.process.kill()  # our own process object: it cannot refer to a reused PID
+        except OSError:
+            pass
 
     def _reap(self) -> None:
         try:
@@ -172,10 +305,10 @@ class OwnedProcessTree:
         except OSError:
             pass
 
-    def describe(self, identities: Optional[Iterable[ProcessIdentity]] = None) -> str:
-        identities = list(self.alive() if identities is None else identities)
-        return ", ".join(f"PID {identity.pid}" for identity in identities) or "none"
-
-
-def _pid_visible(pid: int, table: ProcessTable) -> bool:
-    return pid in table()
+    def describe(self, identities=None) -> str:
+        if identities is None:
+            if not self.identity_available:
+                return "unknown (the launcher's identity could not be read; descendants cannot be attributed)"
+            identities = self.remaining()
+        return ", ".join(f"PID {i.pid}" + ("" if i.created is not None or i.pid == self.process.pid
+                                             else " (identity unreadable)") for i in identities) or "none"

@@ -89,11 +89,14 @@ is shown), `config.json`, and `work/` with the Abaqus jobs (a repeated run reuse
 
 ## Stop, timeout and closing the window
 
-- **Stop** terminates only the processes this run started: the Abaqus launcher and every process
-  observed as its descendant (solver, extraction worker), checked by creation time so a reused PID is
-  never touched. The window shows `STOPPING` until termination is confirmed, then
-  `STOPPED by the user ... (confirmed)`. If termination cannot be confirmed it shows
-  `STOP NOT CONFIRMED` with the PIDs; a new run is refused until they are gone.
+- **Stop** terminates only the processes this run started: the Abaqus launcher and every child
+  observed while its parent was still the recorded process (same PID and creation time) and created
+  after it. Each kill re-checks that identity on the process itself, so a reused PID is never killed;
+  a process whose identity cannot be read is never killed and never counted as stopped. The window
+  shows `STOPPING` until termination is confirmed, then `STOPPED by the user ... (confirmed)`. If
+  termination cannot be confirmed it shows `STOP NOT CONFIRMED` with the PIDs; closing and new runs
+  stay blocked until the processes are confirmed gone, or until the user confirms after checking Task
+  Manager (an unknown state, e.g. no tracker, always needs that confirmation).
 - A per-solve **timeout** stops the owned processes the same way and says whether termination was
   confirmed.
 - **Closing the window** during a run requests Stop and closes only after confirmed termination; if

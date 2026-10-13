@@ -104,15 +104,26 @@ class CalibrationCancelled(QuickCalibrationError):
 class TerminationUnconfirmed(QuickCalibrationError):
     """An owned Abaqus process was asked to stop, but its termination could not be confirmed.
 
-    ``still_running()`` re-checks the owned processes (empty once they are gone).
+    ``still_running()`` re-checks the owned processes: a list (empty once they are confirmed gone), or ``None`` when
+    there is no tracker or it cannot establish identities. Unknown is never "stopped": ``resolved()`` is True only
+    for a confirmed empty list.
     """
 
-    def __init__(self, message: str, still_running: Optional[Callable[[], list]] = None) -> None:
+    def __init__(self, message: str, check: Optional[Callable[[], Optional[list]]] = None) -> None:
         super().__init__(message)
-        self._still_running = still_running
+        self._check = check
 
-    def still_running(self) -> list:
-        return [] if self._still_running is None else list(self._still_running())
+    def still_running(self) -> Optional[list]:
+        if self._check is None:
+            return None
+        try:
+            remaining = self._check()
+        except Exception:  # noqa: BLE001 - a failing check is an unknown state
+            return None
+        return None if remaining is None else list(remaining)
+
+    def resolved(self) -> bool:
+        return self.still_running() == []
 
 
 class PreflightRefused(QuickCalibrationError):
@@ -451,20 +462,27 @@ class AbaqusRunner:
             process = self._popen(command, stdout=log, stderr=subprocess.STDOUT, **options)
             tree = self._tree_factory(process)
             started = time.monotonic()
-            while True:
-                try:
-                    code = process.wait(timeout=self.POLL_SECONDS)
-                    return code
-                except subprocess.TimeoutExpired:
-                    pass
-                except KeyboardInterrupt:  # Ctrl+C in the CLI: never leave the owned solve running
-                    tree.terminate(self.STOP_TIMEOUT_SECONDS)
-                    raise
-                tree.refresh()
-                if self.cancel_event.is_set():
-                    self._stop(tree, "stopped by the user", log_path)
-                if time.monotonic() - started > self.timeout_seconds:
-                    self._stop(tree, f"Abaqus exceeded {self.timeout_seconds // 60} min", log_path, timed_out=True)
+            try:
+                while True:
+                    try:
+                        return process.wait(timeout=self.POLL_SECONDS)
+                    except subprocess.TimeoutExpired:
+                        pass
+                    tree.refresh()
+                    if self.cancel_event.is_set():
+                        self._stop(tree, "stopped by the user", log_path)
+                    if time.monotonic() - started > self.timeout_seconds:
+                        self._stop(tree, f"Abaqus exceeded {self.timeout_seconds // 60} min", log_path,
+                                   timed_out=True)
+            except QuickCalibrationError:
+                raise  # _stop already terminated the tree and named the outcome
+            except BaseException as error:  # Ctrl+C or any failure while the solve may still run
+                if not tree.terminate(self.STOP_TIMEOUT_SECONDS):
+                    raise TerminationUnconfirmed(
+                        f"interrupted ({type(error).__name__}), but the termination of the owned Abaqus processes "
+                        f"could not be confirmed (still running: {tree.describe()}). Treat the solve as running; "
+                        f"check Task Manager before retrying. Log: {log_path}", tree.unconfirmed) from error
+                raise
 
     def _stop(self, tree: OwnedProcessTree, reason: str, log_path: Path, timed_out: bool = False) -> None:
         """Terminate the owned tree and raise; the outcome names whether termination was confirmed."""
@@ -472,7 +490,7 @@ class AbaqusRunner:
             raise TerminationUnconfirmed(
                 f"{reason}, but the termination of the owned Abaqus processes could not be confirmed (still "
                 f"running: {tree.describe()}). Treat the solve as running; check Task Manager before retrying. "
-                f"Log: {log_path}", tree.alive)
+                f"Log: {log_path}", tree.unconfirmed)
         if timed_out:
             raise QuickCalibrationError(f"{reason}; the owned process tree was terminated (confirmed). Log: {log_path}")
         raise CalibrationCancelled(f"{reason}; the owned Abaqus solve was terminated (confirmed).")
@@ -520,6 +538,8 @@ class AbaqusRunner:
             failure = error
         except abaqus_bridge.AnalysisCancelled as error:
             failure = error
+        except BaseException as error:  # Ctrl+C or any other failure while the extraction may still run
+            failure = error
         finally:
             watching.set()
             watcher.join()
@@ -527,11 +547,13 @@ class AbaqusRunner:
             return abaqus_bridge.load_extracted_odb(manifest)
         tree = owned.get("tree")
         if isinstance(failure, abaqus_bridge.ExtractionTerminationUnconfirmed):
-            raise TerminationUnconfirmed(str(failure), None if tree is None else tree.alive) from None
+            raise TerminationUnconfirmed(str(failure), None if tree is None else tree.unconfirmed) from None
         if tree is not None and not tree.terminate(self.STOP_TIMEOUT_SECONDS):
             raise TerminationUnconfirmed(
                 f"{failure}; afterwards owned extraction processes could not be confirmed terminated (still running: "
-                f"{tree.describe()}). Check Task Manager before retrying.", tree.alive) from None
+                f"{tree.describe()}). Check Task Manager before retrying.", tree.unconfirmed) from failure
+        if not isinstance(failure, (abaqus_bridge.AbaqusExtractionError, abaqus_bridge.AnalysisCancelled)):
+            raise failure  # the owned processes are confirmed gone; the original interruption is kept
         if isinstance(failure, abaqus_bridge.AnalysisCancelled):
             raise CalibrationCancelled("stopped by the user; the owned ODB extraction was terminated "
                                        "(confirmed).") from None

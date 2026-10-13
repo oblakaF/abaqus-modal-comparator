@@ -82,9 +82,10 @@ class _Dummy(unittest.TestCase):
             return []
 
     def _kill_leftovers(self) -> None:
+        """Test cleanup only: the dummy recorded these PIDs itself."""
         for pid in self.pids():
-            if alive(pid):
-                owned_processes.kill_process(pid)
+            identity = owned_processes.ProcessIdentity(pid, owned_processes.creation_time(pid))
+            owned_processes.kill_verified(identity)
 
     def wait_for_dummy(self, count: int = 2, settle: float = 1.5) -> None:
         deadline = time.monotonic() + 30
@@ -220,6 +221,8 @@ class NeverEnding:
 class StuckTree:
     """An owned tree whose termination can never be confirmed."""
 
+    tracker_available = True
+
     def __init__(self, process) -> None:
         self.process = process
         self.terminate_calls = 0
@@ -228,8 +231,10 @@ class StuckTree:
     def refresh(self) -> None:
         pass
 
-    def alive(self):
-        return [] if self.gone else [owned_processes.ProcessIdentity(self.process.pid, None)]
+    def unconfirmed(self):
+        if not self.tracker_available:
+            return None  # identities cannot be established: unknown, never "stopped"
+        return [] if self.gone else [owned_processes.ProcessIdentity(self.process.pid, (1,))]
 
     def terminate(self, timeout_seconds: float = 0.0) -> bool:
         self.terminate_calls += 1
@@ -237,6 +242,10 @@ class StuckTree:
 
     def describe(self, identities=None) -> str:
         return f"PID {self.process.pid}"
+
+
+class NoTrackerTree(StuckTree):
+    tracker_available = False
 
 
 class TerminationFailureTests(unittest.TestCase):
@@ -272,7 +281,7 @@ class TerminationFailureTests(unittest.TestCase):
             self.solve(runner)
         self.assertNotIn("terminated (confirmed)", str(caught.exception))
 
-    def test_ctrl_c_terminates_the_owned_solve(self):
+    def interrupted_runner(self, tree_class):
         trees = []
 
         class Interrupted(NeverEnding):
@@ -280,36 +289,173 @@ class TerminationFailureTests(unittest.TestCase):
                 raise KeyboardInterrupt
 
         runner = AbaqusRunner("abaqus", 1, 120.0, threading.Event(), popen=Interrupted,
-                              tree_factory=lambda process: trees.append(StuckTree(process)) or trees[-1])
+                              tree_factory=lambda process: trees.append(tree_class(process)) or trees[-1])
+        return runner, trees
+
+    def test_ctrl_c_with_confirmed_termination_keeps_the_interrupt(self):
+        class Stoppable(StuckTree):
+            def terminate(self, timeout_seconds: float = 0.0) -> bool:
+                self.terminate_calls += 1
+                return True
+
+        runner, trees = self.interrupted_runner(Stoppable)
         with self.assertRaises(KeyboardInterrupt):
             self.solve(runner)
         self.assertEqual(trees[0].terminate_calls, 1)
 
-    def test_tree_reports_confirmation_only_when_nothing_remains(self):
-        process = mock.Mock(pid=10, **{"poll.return_value": None})
-        table = {10: 1, 11: 10, 12: 11, 99: 1}
-        created = {10: (5,), 11: (6,), 12: (7,), 99: (1,)}
-        killed = []
+    def test_ctrl_c_with_a_tree_that_refuses_termination(self):
+        runner, trees = self.interrupted_runner(StuckTree)
+        with self.assertRaises(TerminationUnconfirmed) as caught:
+            self.solve(runner)
+        self.assertIsInstance(caught.exception.__cause__, KeyboardInterrupt)
+        self.assertIn("interrupted (KeyboardInterrupt)", str(caught.exception))
+        self.assertIn("could not be confirmed", str(caught.exception))
+        self.assertEqual(len(caught.exception.still_running()), 1)  # the unconfirmed state is preserved
+        self.assertFalse(caught.exception.resolved())
 
-        def kill(pid):
-            killed.append(pid)
-            created.pop(pid, None)
-            table.pop(pid, None)
-            if pid == 10:
-                process.poll.return_value = -9
+    def test_ctrl_c_during_the_extraction_with_a_tree_that_refuses_termination(self):
+        import abaqus_bridge
 
-        tree = owned_processes.OwnedProcessTree(process, table=lambda: dict(table), created=created.get, kill=kill)
+        def interrupted(*args, process_callback=None, **kwargs):
+            process_callback(NeverEnding())
+            raise KeyboardInterrupt
+
+        runner = AbaqusRunner("abaqus", 1, 120.0, threading.Event(), tree_factory=StuckTree)
+        with mock.patch.object(abaqus_bridge, "run_abaqus_extraction", side_effect=interrupted):
+            with self.assertRaises(TerminationUnconfirmed) as caught:
+                runner.extract(Path("x.odb"), Path("out"), 10)
+        self.assertIsInstance(caught.exception.__cause__, KeyboardInterrupt)
+
+    def test_a_missing_tracker_is_never_all_stopped(self):
+        unknown = TerminationUnconfirmed("not confirmed", None)
+        self.assertIsNone(unknown.still_running())
+        self.assertFalse(unknown.resolved())
+        failing = TerminationUnconfirmed("not confirmed", mock.Mock(side_effect=OSError("tracker broken")))
+        self.assertIsNone(failing.still_running())
+        self.assertFalse(failing.resolved())
+        self.assertTrue(TerminationUnconfirmed("x", lambda: []).resolved())  # confirmed gone by a tracker
+        runner = AbaqusRunner("abaqus", 1, 120.0, threading.Event(), popen=NeverEnding, tree_factory=NoTrackerTree)
+        runner.POLL_SECONDS = 0.01
+        runner.timeout_seconds = 0
+        with self.assertRaises(TerminationUnconfirmed) as caught:
+            self.solve(runner)
+        self.assertIsNone(caught.exception.still_running())
+        import abaqus_bridge
+
+        def unconfirmed(*args, **kwargs):  # the extraction's own stop failed before any tracker existed
+            raise abaqus_bridge.ExtractionTerminationUnconfirmed("Cancellation could not be confirmed")
+
+        with mock.patch.object(abaqus_bridge, "run_abaqus_extraction", side_effect=unconfirmed):
+            with self.assertRaises(TerminationUnconfirmed) as caught:
+                AbaqusRunner("abaqus", 1, 120.0, threading.Event()).extract(Path("x.odb"), Path("out"), 10)
+        self.assertIsNone(caught.exception.still_running())
+        self.assertFalse(caught.exception.resolved())
+
+
+# ----------------------------------------------------------------------------- ownership (fake process tables)
+
+class FakeSystem:
+    """A process table with creation identities; ``kill`` removes exactly the identity it is given."""
+
+    def __init__(self, processes) -> None:
+        self.processes = dict(processes)  # pid -> (parent, created)
+        self.killed: list[tuple] = []
+
+    def table(self):
+        return {pid: parent for pid, (parent, _) in self.processes.items()}
+
+    def state(self, pid):
+        if pid not in self.processes:
+            return owned_processes.GONE, None
+        created = self.processes[pid][1]
+        return (owned_processes.UNKNOWN, None) if created is None else (owned_processes.ALIVE, created)
+
+    def kill(self, identity) -> None:
+        current = self.processes.get(identity.pid)
+        if current is not None and current[1] == identity.created:  # identity-checked, like kill_verified
+            self.killed.append((identity.pid, identity.created))
+            del self.processes[identity.pid]
+
+    def tree(self, root_pid: int = 10):
+        system = self
+
+        class Launcher:
+            pid = root_pid
+
+            def poll(self):
+                return None if root_pid in system.processes else -9
+
+            def kill(self):
+                system.killed.append((root_pid, system.processes[root_pid][1]))
+                del system.processes[root_pid]
+
+        return owned_processes.OwnedProcessTree(Launcher(), table=self.table, state=self.state, kill=self.kill)
+
+
+class OwnershipTests(unittest.TestCase):
+    def test_owned_descendants_are_terminated_and_confirmed(self):
+        system = FakeSystem({10: (1, (5,)), 11: (10, (6,)), 12: (11, (7,)), 99: (1, (1,))})
+        tree = system.tree()
         tree.refresh()
         self.assertEqual(set(tree.members), {10, 11, 12})  # 99 is not ours
         self.assertTrue(tree.terminate(timeout_seconds=2, poll_seconds=0.01))
-        self.assertEqual(sorted(killed), [10, 11, 12])
-        reused = owned_processes.OwnedProcessTree(process, table=lambda: {10: 1, 13: 10},
-                                                  created={10: (5,), 13: (2,)}.get, kill=lambda pid: None)
-        reused.refresh()
-        self.assertNotIn(13, reused.members)  # created before its "parent": a reused PID, never killed
-        stuck = owned_processes.OwnedProcessTree(mock.Mock(pid=20, **{"poll.return_value": None}),
-                                                 table=lambda: {20: 1}, created={20: (1,)}.get, kill=lambda pid: None)
-        self.assertFalse(stuck.terminate(timeout_seconds=0.1, poll_seconds=0.01))
+        self.assertEqual(sorted(pid for pid, _ in system.killed), [10, 11, 12])
+        self.assertIn(99, system.processes)
+
+    def test_a_reused_pid_and_its_children_are_never_killed(self):
+        system = FakeSystem({10: (1, (5,)), 11: (10, (6,))})
+        tree = system.tree()
+        tree.refresh()
+        self.assertEqual(set(tree.members), {10, 11})
+        del system.processes[11]  # the owned child exits ...
+        system.processes[11] = (1, (20,))  # ... its PID is reused by an unrelated process ...
+        system.processes[12] = (11, (21,))  # ... which creates children
+        system.processes[13] = (12, (22,))
+        tree.refresh()
+        self.assertEqual(tree.members[11].created, (6,))  # still the original identity
+        self.assertNotIn(12, tree.members)
+        self.assertNotIn(13, tree.members)
+        self.assertTrue(tree.terminate(timeout_seconds=2, poll_seconds=0.01))
+        self.assertEqual(system.killed, [(10, (5,))])  # only the launcher; none of the unrelated processes
+        self.assertEqual(set(system.processes), {11, 12, 13})
+
+    def test_stale_parent_links_are_not_ours(self):
+        system = FakeSystem({10: (1, (5,)), 13: (10, (2,))})  # 13 is older than the recorded parent 10
+        tree = system.tree()
+        tree.refresh()
+        self.assertNotIn(13, tree.members)
+        tree.terminate(timeout_seconds=1, poll_seconds=0.01)
+        self.assertIn(13, system.processes)
+
+    def test_unreadable_identity_is_never_killed_and_never_confirmed(self):
+        system = FakeSystem({10: (1, (5,)), 11: (10, None)})  # a child whose identity cannot be read
+        tree = system.tree()
+        tree.refresh()
+        self.assertNotIn(11, tree.members)
+        self.assertFalse(tree.terminate(timeout_seconds=0.2, poll_seconds=0.01))
+        self.assertIn(11, system.processes)  # not killed
+        self.assertEqual([i.pid for i in tree.unconfirmed()], [11])
+        self.assertIn("identity unreadable", tree.describe())
+        del system.processes[11]  # once it is gone, the state is confirmed
+        self.assertEqual(tree.unconfirmed(), [])
+
+    def test_a_launcher_without_identity_cannot_confirm(self):
+        system = FakeSystem({10: (1, None), 11: (10, (6,))})
+        tree = system.tree()
+        self.assertFalse(tree.identity_available)
+        tree.refresh()
+        self.assertNotIn(11, tree.members)  # descendants cannot be attributed
+        self.assertFalse(tree.terminate(timeout_seconds=0.5, poll_seconds=0.01))
+        self.assertIsNone(tree.unconfirmed())
+        self.assertIn(11, system.processes)
+
+    def test_an_unknown_member_state_is_not_gone(self):
+        system = FakeSystem({10: (1, (5,)), 11: (10, (6,))})
+        tree = system.tree()
+        tree.refresh()
+        system.processes[11] = (10, None)  # the owned child's state can no longer be read
+        self.assertFalse(tree.terminate(timeout_seconds=0.2, poll_seconds=0.01))
+        self.assertEqual([i.pid for i in tree.unconfirmed()], [11])
 
 
 # ----------------------------------------------------------------------------- the workflow leaves no partial cache
@@ -461,30 +607,62 @@ class WindowLifecycleTests(_Dummy):
         self.assertTrue(self.pump(lambda: window.destroyed))
         self.assert_all_gone()
 
-    def test_unconfirmed_termination_keeps_the_window(self):
+    def stuck_window(self, tree_class):
         trees = []
 
         def stuck_runner(config, cancel):
             runner = AbaqusRunner("abaqus", 1, 120.0, cancel, popen=NeverEnding,
-                                  tree_factory=lambda process: trees.append(StuckTree(process)) or trees[-1])
+                                  tree_factory=lambda process: trees.append(tree_class(process)) or trees[-1])
             runner.POLL_SECONDS = 0.01
             return runner
 
         window = self.window(stuck_runner)
+        return window, trees
+
+    def close_during_a_stuck_run(self, window, trees):
+        import quick_calibration_window as qw
+
         window.start()
         self.assertTrue(self.pump(lambda: bool(trees)))
-        window.close()
         seen = []
-        self.assertTrue(self.pump(lambda: seen.append(window.summary.get()) or not window.running()))
-        self.pump(lambda: window.summary.get().startswith("NOT CLOSED"), timeout=5)
+        with mock.patch.object(qw.messagebox, "askyesno", return_value=False) as ask:
+            window.close()
+            self.assertTrue(self.pump(lambda: seen.append(window.summary.get()) or not window.running()))
+            self.pump(lambda: window.summary.get().startswith("NOT CLOSED"), timeout=5)
         self.assertFalse(window.destroyed)
         self.assertFalse(any(text.startswith("STOPPED") for text in seen))  # never a premature success
         self.assertTrue(window.summary.get().startswith("NOT CLOSED"), window.summary.get())
+        self.assertTrue(ask.called)  # the user is asked; the default answer keeps the window
         self.assertIn("could not be confirmed", window.log.get("1.0", "end"))
-        window.start()  # a new run is refused while the owned processes may run
+
+    def test_unconfirmed_termination_keeps_the_window(self):
+        import quick_calibration_window as qw
+
+        window, trees = self.stuck_window(StuckTree)
+        self.close_during_a_stuck_run(window, trees)
+        with mock.patch.object(qw.messagebox, "askyesno", return_value=False):
+            window.start()  # a new run is refused while the owned processes may run
         self.assertTrue(window.summary.get().startswith("NOT STARTED"))
         trees[0].gone = True
-        window.close()  # once they are gone, the window closes
+        with mock.patch.object(qw.messagebox, "askyesno") as ask:
+            window.close()  # confirmed gone by the tracker: closes without asking
+        ask.assert_not_called()
+        self.assertTrue(window.destroyed)
+
+    def test_missing_tracker_stays_blocked_until_the_user_confirms(self):
+        import quick_calibration_window as qw
+
+        window, trees = self.stuck_window(NoTrackerTree)
+        self.close_during_a_stuck_run(window, trees)
+        self.assertIn("UNKNOWN", window.summary.get())
+        trees[0].gone = True  # irrelevant: without a tracker nothing can be confirmed
+        with mock.patch.object(qw.messagebox, "askyesno", return_value=False):
+            window.close()
+            window.start()
+        self.assertFalse(window.destroyed)
+        self.assertTrue(window.summary.get().startswith("NOT STARTED"))
+        with mock.patch.object(qw.messagebox, "askyesno", return_value=True):
+            window.close()  # the user verified Task Manager explicitly
         self.assertTrue(window.destroyed)
 
     def test_closing_when_idle(self):

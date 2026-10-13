@@ -390,11 +390,8 @@ class QuickCalibrationWindow:
     def start(self) -> None:
         if self.running() or self.closing:
             return
-        if self.unconfirmed is not None and self.unconfirmed.still_running():
-            self.summary.set("NOT STARTED: owned Abaqus processes of the stopped run may still be running "
-                             f"({len(self.unconfirmed.still_running())}); wait or check Task Manager.")
+        if not self._unconfirmed_resolved("NOT STARTED", "start a new run"):
             return
-        self.unconfirmed = None
         try:
             data, config = self._config()
         except (QuickCalibrationError, ValueError) as error:
@@ -448,16 +445,36 @@ class QuickCalibrationWindow:
             self.summary.set("CLOSING: stopping the run first; the window closes once the owned Abaqus processes "
                              "are confirmed terminated.")
             return
-        if self.unconfirmed is not None:
-            remaining = self.unconfirmed.still_running()
-            if remaining:
-                self.closing = False
-                self.summary.set(f"NOT CLOSED: {len(remaining)} owned Abaqus process(es) of the stopped run may still "
-                                 "be running; their termination could not be confirmed. Check Task Manager, then "
-                                 "close again.")
-                return
+        if not self._unconfirmed_resolved("NOT CLOSED", "close the window"):
+            self.closing = False
+            return
         self.destroyed = True
         self.root.destroy()
+
+    def _unconfirmed_resolved(self, refusal: str, action: str) -> bool:
+        """True when no owned process of an unconfirmed stop can still run: confirmed gone by the tracker, or
+        explicitly confirmed by the user after checking Task Manager. An unknown state is never 'stopped'."""
+        if self.unconfirmed is None:
+            return True
+        remaining = self.unconfirmed.still_running()
+        if remaining == []:
+            self._write("\nThe owned Abaqus processes of the stopped run are now confirmed gone.\n")
+            self.unconfirmed = None
+            return True
+        detail = ("their state is UNKNOWN (no process tracker could confirm them)" if remaining is None else
+                  f"{len(remaining)} may still run: " + ", ".join(f"PID {identity.pid}" for identity in remaining))
+        self.summary.set(f"{refusal}: owned Abaqus processes of the stopped run were not confirmed terminated; "
+                         f"{detail}. Check Task Manager.")
+        if messagebox.askyesno(
+                TITLE, f"The termination of this run's Abaqus processes could not be confirmed ({detail}).\n\n"
+                       "Open Task Manager and end any remaining Abaqus processes of this run first.\n\n"
+                       f"Have you verified that none is still running? Yes lets you {action}.",
+                icon="warning", default="no", parent=self.root):
+            self._write(f"\nThe user confirmed after checking Task Manager that no process of the stopped run is "
+                        f"still running ({detail}).\n")
+            self.unconfirmed = None
+            return True
+        return False
 
     def _poll(self, reschedule: bool = True) -> None:
         finished = False
