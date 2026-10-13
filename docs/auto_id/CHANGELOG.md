@@ -5055,3 +5055,16 @@ first internal provider.
 - **Unchanged:** campaign schema, domain rules, production loaders and checks, `require_executable`, gates,
   thresholds, M7 records; no finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE
   NOT_MET. **Abaqus run count:** 0.
+
+## 2026-10-13 — M8-D2d ACCEPTED and merged (docs-only closure)
+
+- **M8-D2d:** SUPERVISOR ACCEPTED (PR #78, head `e8e30ef`); merge `2c4c50fbf489f5d3927e495eeff589529a08a9fb`;
+  main Linux CI run `38303983811` success.
+  - Before the merge: PR head `e8e30efa1e8823e29312e919ce37b71f7d84809d` as authorised, PR CI runs `38300137128` and
+    `38300131857` success, mergeable `clean`, base main `daccb3a` unchanged. Merged with a normal merge commit pinned
+    to the head SHA.
+- **Stage:** M8 stays IN_PROGRESS (accepted scope `READ_ONLY_EXISTING_JOURNALLED_RUNS`); the original M8 GATE stays
+  `NOT_MET`. No next M8 mini-step is started; it needs a separate SUPERVISOR authorisation.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+- **Scientific behaviour changed:** NO (documentation only). **Tests run:** none (docs only; JSON parse and
+  `git diff --check`). Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
