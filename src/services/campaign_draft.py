@@ -30,12 +30,22 @@ canonical SHA-256 fingerprints and are governed references only: FIT / HOLDOUT r
 and solver settings stay missing, and a binding is never a readiness verdict.  Drafts are saved as
 ``auto-id/campaign-draft/v3``; v1 / v2 drafts (no bound records) still open as written, with nothing bound.
 
-Reopening (``load_draft``, M8-D2a) accepts only a campaign-draft document (v1, v2 or v3).  It rebuilds the draft from
-its explicit declarations through the domain validators and from its specimen selections through the governed binder
-(location, manifest, passport, fixture catalogue), re-verifies every stored bound record (the same unique compatible
-record with the same fingerprint), and refuses any stored identity or pinned hash that differs from the
-current governed records, any missing or invalid reference and any conflicting preview; it never substitutes another
-specimen.  The stored status, missing inputs and preview are never trusted: they are recomputed.
+M8-D2e-A adds the explicit not-fitted declarations ``not_fitted.t_face``, ``not_fitted.k_core`` and
+``not_fitted.k_int`` (no default).  ``t_face`` and ``k_core`` take the user's own non-empty description, recorded as
+written (never a measurement, prior or provenance).  ``k_int`` is a selection whose only accepted value is ``OFF``;
+``ENABLED``, unknown values and ambiguous text are refused.  ``OFF`` is written into the intended definition as the
+fixed text ``K_INT_OFF_DEFINITION``.  The declaration enables no unsupported scientific configuration: the campaign
+parser, the holdout policy and the production holdout path are unchanged.  Drafts are saved as
+``auto-id/campaign-draft/v4``; v1 / v2 / v3 drafts (no not-fitted declarations) still open as written, with nothing
+declared.
+
+Reopening (``load_draft``, M8-D2a) accepts only a campaign-draft document (v1, v2, v3 or v4).  It rebuilds the draft
+from its explicit declarations through the domain validators and from its specimen selections through the governed
+binder (location, manifest, passport, fixture catalogue), re-verifies every stored bound record (the same unique
+compatible record with the same fingerprint), re-validates the not-fitted declarations, and refuses any stored
+identity or pinned hash that differs from the current governed records, any missing or invalid reference and any
+conflicting preview; it never substitutes another specimen.  The stored status, missing inputs and preview are never
+trusted: they are recomputed.
 
 Checking the draft's inputs (``check_draft_inputs``, M8-D2b) re-verifies every selected specimen against the current
 governed records and runs the existing M8.1 wizard preparation on its passport and fixture: experimental modal data,
@@ -92,11 +102,13 @@ from .governed_specimen_records import (
 
 DRAFT_SCHEMA_V1 = "auto-id/campaign-draft/v1"  # M8-D1 / D2a: declares scientific_question and tau_mf
 DRAFT_SCHEMA_V2 = "auto-id/campaign-draft/v2"  # M8-D2c: also campaign_id and run_type
-DRAFT_SCHEMA = "auto-id/campaign-draft/v3"  # M8-D2d: also the bound governed specimen records
-DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA_V2, DRAFT_SCHEMA)
+DRAFT_SCHEMA_V3 = "auto-id/campaign-draft/v3"  # M8-D2d: also the bound governed specimen records
+DRAFT_SCHEMA = "auto-id/campaign-draft/v4"  # M8-D2e-A: also the not-fitted declarations
+DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA_V2, DRAFT_SCHEMA_V3, DRAFT_SCHEMA)
 _DECLARED_KEYS = {DRAFT_SCHEMA_V1: ("scientific_question", "tau_mf"),
                   DRAFT_SCHEMA_V2: ("scientific_question", "tau_mf", "campaign_id", "run_type"),
-                  DRAFT_SCHEMA: ("scientific_question", "tau_mf", "campaign_id", "run_type")}
+                  DRAFT_SCHEMA_V3: ("scientific_question", "tau_mf", "campaign_id", "run_type"),
+                  DRAFT_SCHEMA: ("scientific_question", "tau_mf", "campaign_id", "run_type", "not_fitted")}
 DRAFT_KIND = "CAMPAIGN_DRAFT"
 DRAFT_LABELS = ("DRAFT_NOT_A_CAMPAIGN_DEFINITION", "NOT_VALIDATED", "NOT_EXECUTABLE", "AUTHORISES_NOTHING")
 DRAFT_NOTE = ("Campaign draft (Auto-ID M8-D1): a working document, not a campaign definition. It is never loaded as "
@@ -112,6 +124,18 @@ QUESTION_CHOICES = SCIENTIFIC_QUESTIONS  # offered for an explicit choice; none 
 RUN_TYPE_CHOICES = RUN_TYPES  # offered for an explicit choice; none is preselected
 RUN_B_NOT_AUTHORISED = (f"{RUN_B} ({RUN_B_LABEL}) is diagnostic only: selecting it authorises nothing; its own "
                         "SUPERVISOR gate (run_b_gate) stays required and is never set by a draft")
+NOT_FITTED_KEYS = ("t_face", "k_core", "k_int")  # the campaign definition's not_fitted entries (domain rule)
+DESCRIBED_NOT_FITTED = ("t_face", "k_core")  # declared by the user's own description
+K_INT_OFF = "OFF"
+K_INT_ENABLED = "ENABLED"
+K_INT_CHOICES = (K_INT_OFF,)  # the only selection offered and accepted; ENABLED is not supported
+# The intended definition's not_fitted.k_int for the OFF selection (the wording of the accepted M7 RUN_A definition).
+K_INT_OFF_DEFINITION = "OFF: disabled by default (SPEC §5); the torsion holdout rule is kept"
+K_INT_NOTE = ("k_int OFF: the interface stiffness is neither fitted nor enabled (the SPEC §5 default); the SPEC §12.3 "
+              "torsion-family holdout rule applies. The declaration enables no unsupported scientific configuration "
+              "and authorises nothing; ENABLED is not supported (no parameterisation contains k_int)")
+NOT_FITTED_DESCRIPTION_NOTE = ("the user's own description of why the parameter is not fitted, recorded as written; "
+                               "never a measurement, prior or provenance")
 
 
 class CampaignDraftError(ValueError):
@@ -199,6 +223,9 @@ class CampaignDraft:
     campaign_id: Optional[str] = None  # M8-D2c
     run_type: Optional[str] = None  # M8-D2c
     records: tuple[tuple[str, SpecimenRecords], ...] = ()  # M8-D2d: forward model -> its bound governed records
+    not_fitted_t_face: Optional[str] = None  # M8-D2e-A: the user's description
+    not_fitted_k_core: Optional[str] = None  # M8-D2e-A: the user's description
+    not_fitted_k_int: Optional[str] = None  # M8-D2e-A: K_INT_OFF only
 
     # ------------------------------------------------------------------ explicit declarations
     def with_question(self, question) -> "CampaignDraft":
@@ -229,6 +256,29 @@ class CampaignDraft:
             return replace(self, run_type=declared_run_type(value))
         except CampaignDefinitionError as error:
             raise CampaignDraftError(str(error)) from error
+
+    def with_not_fitted(self, key, value) -> "CampaignDraft":
+        """Declare one not_fitted entry explicitly: a description for t_face / k_core, the OFF selection for k_int."""
+        if key not in NOT_FITTED_KEYS:
+            raise CampaignDraftError(f"not_fitted: {key!r} is not one of {', '.join(NOT_FITTED_KEYS)}.")
+        field = f"not_fitted.{key}"
+        if key == "k_int":
+            if value == K_INT_ENABLED:
+                raise CampaignDraftError(f"{field}: {K_INT_ENABLED} is not supported (no parameterisation contains "
+                                         "k_int; the production holdout path treats k_int as disabled); select "
+                                         f"{K_INT_OFF} explicitly.")
+            if value != K_INT_OFF:  # exact selection only: no case folding, trimming or interpretation of text
+                raise CampaignDraftError(f"{field}: {value!r} is unknown or ambiguous; the only accepted selection is "
+                                         f"{K_INT_OFF}.")
+            return replace(self, not_fitted_k_int=K_INT_OFF)
+        if not isinstance(value, str) or not value.strip() or value != value.strip():
+            raise CampaignDraftError(f"{field}: must be a non-empty description without surrounding whitespace, "
+                                     "declared explicitly (no default).")
+        return replace(self, **{f"not_fitted_{key}": value})
+
+    def not_fitted(self) -> dict:
+        """The declared not_fitted entries (None when not declared)."""
+        return {key: getattr(self, f"not_fitted_{key}") for key in NOT_FITTED_KEYS}
 
     def with_specimen(self, specimen: DraftSpecimen) -> "CampaignDraft":
         if any(s.forward_model == specimen.forward_model for s in self.specimens):
@@ -267,6 +317,10 @@ class CampaignDraft:
             intended["campaign_id"] = self.campaign_id
         if self.run_type is not None:
             intended["run_type"] = self.run_type
+        not_fitted = {key: (K_INT_OFF_DEFINITION if key == "k_int" else value)
+                      for key, value in self.not_fitted().items() if value is not None}
+        if not_fitted:
+            intended["not_fitted"] = not_fitted
         return intended
 
     def gaps(self) -> tuple[DraftGap, ...]:
@@ -294,9 +348,14 @@ class CampaignDraft:
                                                                        "fixture"))
             for key in sorted(CAMPAIGN_SPECIMEN_KEYS - set(item)):
                 gaps.append(DraftGap(f"specimens[{index}].{key}", NOT_CHOSEN))
-        for key in sorted(CAMPAIGN_KEYS - set(intended)):
+        for key in sorted(CAMPAIGN_KEYS - set(intended) - {"not_fitted"}):
             gaps.append(DraftGap(key, RUN_B_NOT_AUTHORISED if key == "run_b_gate" and self.run_type == RUN_B
                                  else NOT_CHOSEN))
+        for key, value in self.not_fitted().items():
+            if value is None:
+                gaps.append(DraftGap(f"not_fitted.{key}", f"not declared: select {K_INT_OFF} explicitly (no default)"
+                                     if key == "k_int" else "not declared: describe explicitly why it is not fitted "
+                                                            "(no default; nothing is assumed)"))
         return tuple(gaps)
 
     def finalise(self) -> CampaignDefinition:
@@ -315,7 +374,8 @@ class CampaignDraft:
             "schema": DRAFT_SCHEMA, "kind": DRAFT_KIND, "labels": list(DRAFT_LABELS), "note": DRAFT_NOTE,
             "status": "INCOMPLETE" if gaps else "COMPLETE_NOT_FINALISED",
             "declared": {"scientific_question": self.scientific_question, "tau_mf": self.tau_mf,
-                         "campaign_id": self.campaign_id, "run_type": self.run_type},
+                         "campaign_id": self.campaign_id, "run_type": self.run_type,
+                         "not_fitted": self.not_fitted()},
             "specimen_identities": [s.to_dict() for s in self.specimens],
             "specimen_records": [None if self.specimen_records(s.forward_model) is None
                                  else self.specimen_records(s.forward_model).to_dict() for s in self.specimens],
@@ -389,6 +449,9 @@ def draft_rows(draft: CampaignDraft) -> tuple[tuple[str, str, str, str], ...]:
              "PRESENT" if draft.scientific_question else "NOT_DECLARED"),
             ("Declared", "τ_mf", "" if draft.tau_mf is None else f"{draft.tau_mf:g}",
              "NOT_DECLARED" if draft.tau_mf is None else "PRESENT")]
+    for key, value in draft.not_fitted().items():
+        shown = "" if value is None else (f"{value} — {K_INT_NOTE}" if key == "k_int" else value)
+        rows.append(("Declared", f"Not fitted: {key}", shown, "NOT_DECLARED" if value is None else "PRESENT"))
     for item in draft.specimens:
         rows.append(("Specimens", item.label,
                      f"fixture {item.fixture_id}; forward model {item.forward_model_id} ({item.forward_model}); "
@@ -438,8 +501,9 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
 
     if not isinstance(document, dict) or document.get("schema") not in DRAFT_SCHEMAS:
         _refuse(f"not a campaign draft: only {' / '.join(DRAFT_SCHEMAS)} documents can be opened.")
-    keys = _DECLARED_KEYS[document["schema"]]  # a v1 draft declares no campaign_id / run_type (never inferred)
-    expected_keys = _DOCUMENT_KEYS_V3 if document["schema"] == DRAFT_SCHEMA else _DOCUMENT_KEYS  # v1 / v2: no records
+    keys = _DECLARED_KEYS[document["schema"]]  # older drafts declare fewer fields (never inferred)
+    with_records = document["schema"] in (DRAFT_SCHEMA_V3, DRAFT_SCHEMA)
+    expected_keys = _DOCUMENT_KEYS_V3 if with_records else _DOCUMENT_KEYS  # v1 / v2: no records
     if set(document) != expected_keys:
         _refuse(f"malformed draft: missing {sorted(expected_keys - set(document))}, unknown "
                 f"{sorted(set(document) - expected_keys)}.")
@@ -461,6 +525,14 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
         if isinstance(declared["tau_mf"], str):
             _refuse("malformed draft: the declared tau_mf must be a number.")
         draft = draft.with_tau_mf(declared["tau_mf"])  # domain validation
+    if "not_fitted" in keys:  # v4 only
+        not_fitted = declared["not_fitted"]
+        if not isinstance(not_fitted, dict) or set(not_fitted) != set(NOT_FITTED_KEYS):
+            _refuse(f"malformed draft: 'declared.not_fitted' must state exactly {', '.join(NOT_FITTED_KEYS)} (null "
+                    "when not declared).")
+        for key in NOT_FITTED_KEYS:
+            if not_fitted[key] is not None:
+                draft = draft.with_not_fitted(key, not_fitted[key])  # re-validated; k_int OFF only
     identities = document["specimen_identities"]
     if not isinstance(identities, list):
         _refuse("malformed draft: 'specimen_identities' must be a list.")
@@ -480,7 +552,7 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
             _refuse(f"specimen_identities[{index}] ({reference}): the stored {', '.join(changed)} differ(s) from the "
                     "current governed records; the selection is refused (never substituted).")
         draft = draft.with_specimen(current)
-    if document["schema"] == DRAFT_SCHEMA:
+    if with_records:
         draft = _reverify_records(draft, document["specimen_records"], identities, repo_root, fixtures)
     if document["intended_campaign_definition"] != draft.intended_definition():
         _refuse("conflicting draft: the stored preview does not match its declarations and specimen identities.")

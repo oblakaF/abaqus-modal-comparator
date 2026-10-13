@@ -5068,3 +5068,36 @@ first internal provider.
 - **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
 - **Scientific behaviour changed:** NO (documentation only). **Tests run:** none (docs only; JSON parse and
   `git diff --check`). Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
+
+## 2026-10-13 — M8-D2e-A: Declare Not-Fitted Parameters (REVIEW_READY)
+
+- **Before:** PR #79 (M8-D2d docs closure, head `6257488`, CI run `38344561327` success) merged on SUPERVISOR
+  authorisation as `5613edaa26be3644fdcc83d49d90b7aa4ca8339c`; main Linux CI run `38355925407` success.
+- **M8-D2e-A** (branch `auto-id/m8-d2e-a` from `5613eda`): explicit not-fitted declarations in the Campaign draft
+  section, before any FIT / HOLDOUT row binding (the read-only D2e dependency check found that the production holdout
+  selection depends on k_int while the draft did not declare it).
+  - `not_fitted.t_face` and `not_fitted.k_core`: "Declare not_fitted.t_face..." / "Declare not_fitted.k_core..." take
+    the user's own non-empty description without surrounding whitespace, recorded as written; nothing is generated,
+    and a description is never a measurement, prior or provenance.
+  - `not_fitted.k_int`: "k_int: OFF" is the only selection offered and accepted. `ENABLED` is refused as not supported
+    (no parameterisation contains k_int); unknown values and ambiguous text (case variants, padding, free text,
+    booleans) are refused; a refusal leaves the draft unchanged.
+  - The intended definition carries `not_fitted` with the declared entries only; `OFF` is written as the fixed text
+    `K_INT_OFF_DEFINITION` (equal to the accepted M7 RUN_A wording). With all three declared, the unchanged campaign
+    parser accepts the entries as written.
+  - Missing inputs are listed per entry (`not_fitted.t_face`, `not_fitted.k_core`, `not_fitted.k_int`) and recomputed
+    after every declaration. The table shows the declarations; the k_int row and message state that the declaration
+    enables no unsupported scientific configuration and authorises nothing.
+  - Saved as `auto-id/campaign-draft/v4` (`declared.not_fitted`, null entries when not declared); re-validated on
+    reopening (ENABLED, ambiguous values, malformed or missing entries and a conflicting preview are refused). v1 / v2 /
+    v3 drafts open as written with nothing declared and cannot carry not-fitted declarations.
+- **Tests:** new `tests/test_m8_d2e_a_not_fitted.py` (15: no default, per-entry gaps recomputed, OFF accepted and
+  deterministic, ENABLED refused, unknown / ambiguous k_int refused, descriptions recorded as written, invalid
+  descriptions and keys refused with the draft unchanged, parser acceptance, v4 save / reopen, reopen re-validation,
+  v1 / v2 / v3 compatibility, production holdout path and parser unchanged, fake GUI, real Tk, no execution / no
+  repository writes / M7 campaign hashes unchanged). Updated for v4: the M8.1 button set, the M8-D2a unknown-schema
+  case (now v5) and declared-keys helper, the M8-D2c / M8-D2d saved-schema assertions and the M8-D2d v1 / v2 helper.
+- **Unchanged:** campaign parser and schema, `select_holdouts`, the hard-coded `False` in `prepare_campaign_specimen`,
+  `require_executable`, gates, thresholds, M7 records and campaign hashes. FIT / HOLDOUT rows are not bound; no
+  finalisation. Production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET. **Abaqus run
+  count:** 0.

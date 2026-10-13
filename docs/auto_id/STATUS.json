@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8-D2d Bind Governed Specimen Records",
-  "status": "ACCEPTED",
+  "current_ministep": "M8-D2e-A Declare Not-Fitted Parameters",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
   "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
@@ -1414,6 +1414,16 @@
         "acceptance": "SUPERVISOR: PR #78 head e8e30ef ACCEPTED and merged on explicit SUPERVISOR authorisation (PR CI runs 38300137128 and 38300131857 success; mergeable clean)",
         "merge_commit": "2c4c50fbf489f5d3927e495eeff589529a08a9fb",
         "main_ci": "Linux CI on main 2c4c50f: success (run 38303983811)"
+      },
+      "M8-D2e-A": {
+        "title": "Declare Not-Fitted Parameters",
+        "status": "REVIEW_READY",
+        "branch": "auto-id/m8-d2e-a",
+        "base": "5613edaa26be3644fdcc83d49d90b7aa4ca8339c",
+        "authorisation": "SUPERVISOR task M8-D2e-A (one small step before any FIT / HOLDOUT row binding; PR #79 merged before it)",
+        "scope": "explicit not_fitted.t_face, not_fitted.k_core and not_fitted.k_int in the Campaign draft section; no default. t_face and k_core take the user's own non-empty description without surrounding whitespace, recorded as written (never a measurement, prior or provenance). k_int is an explicit selection whose only accepted value is OFF (button k_int: OFF; no ENABLED button); ENABLED, unknown values and ambiguous text (case variants, padding, free text, booleans) are refused and the draft is unchanged. OFF is written into the intended definition's not_fitted.k_int as the fixed text K_INT_OFF_DEFINITION (the wording of the accepted M7 RUN_A definition); t_face / k_core as written. Missing inputs are listed per entry (not_fitted.<key>) and recomputed after every declaration. Saved as auto-id/campaign-draft/v4 (declared.not_fitted with t_face, k_core, k_int; null when not declared) and re-validated on reopening; v1 / v2 / v3 drafts open as written with nothing declared and cannot carry not-fitted declarations",
+        "statement": "the declaration enables no unsupported scientific configuration and authorises nothing; ENABLED is not supported (no parameterisation contains k_int)",
+        "unchanged": "campaign parser and schema, select_holdouts (holdout policy), the hard-coded k_int_enabled False in prepare_campaign_specimen, require_executable, gates, thresholds, M7 records and campaign hashes; FIT / HOLDOUT rows not bound; no finalisation; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
