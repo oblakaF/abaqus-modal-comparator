@@ -1,0 +1,45 @@
+@echo off
+setlocal
+cd /d "%~dp0"
+
+title Quick material calibration (Abaqus + Polytec)
+
+set "BASE_PYTHON="
+where py >nul 2>nul
+if not errorlevel 1 set "BASE_PYTHON=py -3"
+
+if not defined BASE_PYTHON (
+    where python >nul 2>nul
+    if not errorlevel 1 set "BASE_PYTHON=python"
+)
+
+if not defined BASE_PYTHON (
+    echo Python 3 was not found.
+    echo Install Python 3 and enable the "Add Python to PATH" option.
+    echo.
+    pause
+    exit /b 1
+)
+
+if not exist ".venv\Scripts\python.exe" (
+    echo Creating the local Python environment...
+    %BASE_PYTHON% -m venv .venv
+    if errorlevel 1 goto :error
+)
+
+".venv\Scripts\python.exe" src\ensure_dependencies.py
+if errorlevel 1 goto :error
+
+".venv\Scripts\python.exe" src\quick_calibration_window.py
+if errorlevel 1 goto :error
+
+endlocal
+exit /b 0
+
+:error
+echo.
+echo The program could not start or finished with an error.
+echo Review the messages above, then press any key.
+pause >nul
+endlocal
+exit /b 1

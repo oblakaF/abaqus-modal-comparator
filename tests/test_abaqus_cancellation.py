@@ -163,8 +163,12 @@ class AbaqusCancellationTests(unittest.TestCase):
             output = Path(directory) / "output"
             output.mkdir()
             manifest = output / "manifest.json"
-            manifest.write_text("{}", encoding="utf-8")
-            with patch("abaqus_bridge.subprocess.Popen", return_value=process):
+
+            def launch(*_args, **_kwargs):  # the extractor writes its manifest (audit F5: never a stale one)
+                manifest.write_text("{}", encoding="utf-8")
+                return process
+
+            with patch("abaqus_bridge.subprocess.Popen", side_effect=launch):
                 actual = run_abaqus_extraction(
                     Path(directory) / "model.odb",
                     output,
