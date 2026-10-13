@@ -180,7 +180,7 @@ def verify_abaqus_command(command: str, timeout_seconds: int = 15) -> tuple[bool
     arguments = ["information=release"]
     if os.name == "nt":
         command_line = subprocess.list2cmdline([resolved, *arguments])
-        invocation = ["cmd.exe", "/d", "/s", "/c", command_line]
+        invocation = f'cmd.exe /d /s /c "{command_line}"'  # audit V11: a string, so Popen does not re-quote it
     else:
         invocation = shlex.split(resolved) + arguments
     try:

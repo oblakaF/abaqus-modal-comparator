@@ -300,9 +300,11 @@ def stop_owned_process_and_wait(
     return process.poll() is not None
 
 
-def _windows_command(executable: str, arguments: List[str]) -> List[str]:
+def _windows_command(executable: str, arguments: List[str]) -> str:
+    # Audit V11: one string, not a list.  Given a list, Popen re-quotes the inner command line (\" escapes),
+    # cmd.exe keeps the backslashes and the Abaqus launcher splits every path that contains a space.
     command_line = subprocess.list2cmdline([executable] + arguments)
-    return ["cmd.exe", "/d", "/s", "/c", command_line]
+    return f'cmd.exe /d /s /c "{command_line}"'
 
 
 def run_abaqus_extraction(
@@ -331,10 +333,12 @@ def run_abaqus_extraction(
     # is never misread as belonging to this run (token differs; overwritten
     # atomically by the new worker as soon as it starts).
     registration_path = output_directory / "process_registration.json"
-    try:
-        registration_path.unlink()
-    except OSError:
-        pass
+    # Audit F5: a manifest left by an earlier extraction must never be read as this run's result.
+    for stale in (registration_path, output_directory / "manifest.json"):
+        try:
+            stale.unlink()
+        except OSError:
+            pass
 
     arguments = [
         "python",
@@ -364,7 +368,8 @@ def run_abaqus_extraction(
     started = time.monotonic()
     try:
         with log_path.open("w", encoding="utf-8") as log:
-            log.write("COMMAND\n" + " ".join(command) + "\n\nOUTPUT\n")
+            log.write("COMMAND\n" + (command if isinstance(command, str) else " ".join(command))
+                      + "\n\nOUTPUT\n")
             log.flush()
             popen_options = {
                 "cwd": str(script_path.parent),

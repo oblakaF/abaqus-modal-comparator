@@ -51,6 +51,13 @@ RUN_TYPES = (RUN_A, RUN_B)
 RUN_B_LABEL = "EFFECTIVE_MODEL_COMPENSATION_TEST"
 ROW_ROLES = ("FIT", "HOLDOUT")
 SIGMA_STATUSES = ("PROVISIONAL", "MEASURED")
+# Audit 2026-10-13 (K3, K4): SPEC constants are not campaign choices.  A campaign that could pick Σ_setup or the
+# LM stop rule could turn a scientific refusal into a released number (SPEC §1).  Synthetic test campaigns may still
+# use other values to exercise the gates; ``spec_constant_violations`` makes such a campaign release nothing and
+# the production CLI refuses to execute it.
+PROVISIONAL_SETUP_SD_LN = 0.003  # SPEC §7: provisional Σ_setup 0.3 % until a same-panel remount is measured
+SPEC_LM_CONSTANTS = {"max_iterations": 5, "stop_fraction": 0.2, "mu_increase": 10.0,  # SPEC §8
+                     "finite_difference_step": 0.05}  # SPEC §6 S4
 NOT_AVAILABLE = "NOT_AVAILABLE"
 EFFECTIVE_ESTIMATE = "EFFECTIVE_MODEL_PARAMETER_ESTIMATE"
 NO_EFFECTIVE_ESTIMATE = "NO_EFFECTIVE_ESTIMATE"
@@ -281,6 +288,25 @@ class CampaignDefinition:
                 "service (V12-I4) exist, but production calibration execution is intentionally blocked pending "
                 "V12-I5 / V12-I6; no calibration value is produced and the campaign is not run as material "
                 "identification (no fallback).")
+        return self
+
+    def spec_constant_violations(self) -> tuple[str, ...]:
+        """SPEC constants this campaign changes (audit K3/K4); any violation blocks every released value."""
+        problems = []
+        if self.sigma.setup_status != "PROVISIONAL":
+            problems.append(f"Σ_setup status {self.sigma.setup_status}: a measured Σ_setup needs a pinned same-panel "
+                            "remount evidence record, which the schema does not carry yet (SPEC §7)")
+        elif self.sigma.setup_sd_ln != PROVISIONAL_SETUP_SD_LN:
+            problems.append(f"provisional Σ_setup {self.sigma.setup_sd_ln:g} ≠ {PROVISIONAL_SETUP_SD_LN:g} (SPEC §7)")
+        for key, value in SPEC_LM_CONSTANTS.items():
+            if float(getattr(self.lm, key)) != value:
+                problems.append(f"lm.{key} {getattr(self.lm, key)!r} ≠ {value:g} (SPEC §6 S4 / §8)")
+        return tuple(problems)
+
+    def require_spec_constants(self) -> "CampaignDefinition":
+        problems = self.spec_constant_violations()
+        if problems:
+            raise CampaignDefinitionError("the campaign changes SPEC constants: " + "; ".join(problems))
         return self
 
     def require_executable(self) -> "CampaignDefinition":
