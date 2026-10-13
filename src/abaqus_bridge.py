@@ -113,9 +113,19 @@ def _pid_exists(pid: int) -> bool:
         return _process_creation_time(pid) is not None or _windows_pid_in_tasklist(pid)
     try:
         os.kill(pid, 0)
-        return True
     except OSError:
         return False
+    return not _posix_zombie(pid)
+
+
+def _posix_zombie(pid: int) -> bool:
+    """A killed process that is not yet reaped (state Z) has exited: it can no longer run or hold the job."""
+    try:
+        text = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
+    except OSError:
+        return False  # no /proc (e.g. macOS): existence alone, as before
+    fields = text[text.rfind(")") + 2:].split()
+    return bool(fields) and fields[0] in ("Z", "X")
 
 
 def _windows_pid_in_tasklist(pid: int) -> bool:

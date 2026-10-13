@@ -162,6 +162,21 @@ class ExtractionStopTests(_Dummy):
         self.assertFalse((out / "manifest.json").exists())
         self.assertFalse((out / "process_registration.json").exists())
 
+    @unittest.skipIf(os.name == "nt", "POSIX zombie semantics")
+    def test_a_killed_unreaped_child_is_not_alive(self):
+        import abaqus_bridge
+        import signal
+
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
+        self.addCleanup(child.wait)
+        self.assertTrue(abaqus_bridge._pid_exists(child.pid))
+        os.kill(child.pid, signal.SIGKILL)
+        deadline = time.monotonic() + 10
+        while abaqus_bridge._pid_exists(child.pid) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertFalse(abaqus_bridge._pid_exists(child.pid))  # a zombie (not reaped yet) has exited
+        self.assertIsNone(owned_processes.creation_time(child.pid))
+
     def test_unconfirmed_extraction_stop_is_never_reported_as_stopped(self):
         import abaqus_bridge
 
