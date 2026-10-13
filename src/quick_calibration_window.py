@@ -20,8 +20,11 @@ from typing import Callable, Optional
 
 from services.forward_builder import _parameters, inp_keyword, split_inp_lines
 from services.quick_calibration import (
+    AbaqusRunner,
+    CalibrationCancelled,
     PreflightRefused,
     QuickCalibrationError,
+    TerminationUnconfirmed,
     STATUS_ESTIMATE,
     config_from_dict,
     describe_orientation,
@@ -64,8 +67,15 @@ def summary_text(result: dict) -> str:
 
 class QuickCalibrationWindow:
     def __init__(self, root: tk.Misc, solve: Optional[Callable] = None, extract: Optional[Callable] = None,
-                 threaded: bool = True) -> None:
+                 threaded: bool = True, runner_factory: Optional[Callable] = None) -> None:
         self.root, self.solve, self.extract, self.threaded = root, solve, extract, threaded
+        # (config, cancel event) -> AbaqusRunner; the real runner unless solve / extract are injected
+        self.runner_factory = runner_factory or (lambda config, cancel: AbaqusRunner(
+            config.abaqus_command, config.cpus, config.timeout_minutes, cancel))
+        self.cancel_event = threading.Event()
+        self.closing = False
+        self.unconfirmed: Optional[TerminationUnconfirmed] = None  # owned processes whose stop was not confirmed
+        self.destroyed = False
         self.messages: "queue.Queue[tuple[str, object]]" = queue.Queue()
         self.result: Optional[dict] = None
         self.paths: dict = {}
@@ -94,6 +104,7 @@ class QuickCalibrationWindow:
         self._build()
         self._detect_abaqus()
         self.unv.trace_add("write", lambda *_: self._discover_modal_sets())
+        root.protocol("WM_DELETE_WINDOW", self.close)
 
     # ------------------------------------------------------------------ layout
     def _build(self) -> None:
@@ -166,6 +177,8 @@ class QuickCalibrationWindow:
         self.check_button.pack(side="left", padx=(0, 6))
         self.run_button = ttk.Button(buttons, text="Run calibration", command=self.start)
         self.run_button.pack(side="left")
+        self.stop_button = ttk.Button(buttons, text="Stop", command=self.stop, state="disabled")
+        self.stop_button.pack(side="left", padx=6)
         self.open_button = ttk.Button(buttons, text="Open output folder", command=self._open_output,
                                       state="disabled")
         self.open_button.pack(side="left", padx=6)
@@ -358,9 +371,14 @@ class QuickCalibrationWindow:
 
         self._launch(work)
 
-    def _launch(self, work) -> None:
+    def running(self) -> bool:
+        return self.worker is not None and self.worker.is_alive()
+
+    def _launch(self, work, stoppable: bool = False) -> None:
         self.run_button.configure(state="disabled")
         self.check_button.configure(state="disabled")
+        if stoppable:
+            self.stop_button.configure(state="normal")
         if self.threaded:
             self.worker = threading.Thread(target=work, daemon=True)
             self.worker.start()
@@ -370,13 +388,23 @@ class QuickCalibrationWindow:
             self._poll(reschedule=False)
 
     def start(self) -> None:
-        if self.worker is not None and self.worker.is_alive():
+        if self.running() or self.closing:
             return
+        if self.unconfirmed is not None and self.unconfirmed.still_running():
+            self.summary.set("NOT STARTED: owned Abaqus processes of the stopped run may still be running "
+                             f"({len(self.unconfirmed.still_running())}); wait or check Task Manager.")
+            return
+        self.unconfirmed = None
         try:
             data, config = self._config()
         except (QuickCalibrationError, ValueError) as error:
             messagebox.showerror(TITLE, str(error), parent=self.root)
             return
+        self.cancel_event = cancel = threading.Event()
+        solve, extract = self.solve, self.extract
+        if solve is None or extract is None:
+            runner = self.runner_factory(config, cancel)
+            solve, extract = solve or runner.solve, extract or runner.extract
         self.summary.set("Checking the inputs, then running... (Abaqus solves can take minutes each)")
         self._write(f"\n=== run: {config.output_dir}\n")
 
@@ -388,15 +416,48 @@ class QuickCalibrationWindow:
                     raise PreflightRefused(report)  # nothing is written, nothing is solved
                 Path(config.output_dir).mkdir(parents=True, exist_ok=True)
                 (Path(config.output_dir) / "config.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
-                result, paths = run_quick_calibration(config, self.solve, self.extract,
-                                                      lambda message: self.messages.put(("log", message)))
+                result, paths = run_quick_calibration(config, solve, extract,
+                                                      lambda message: self.messages.put(("log", message)),
+                                                      cancel=cancel)
                 self.messages.put(("done", (result, paths)))
+            except CalibrationCancelled as error:
+                self.messages.put(("cancelled", error))
+            except TerminationUnconfirmed as error:
+                self.messages.put(("unconfirmed", error))
             except QuickCalibrationError as error:
                 self.messages.put(("stopped", error))
             except Exception as error:  # noqa: BLE001 - shown to the user, never swallowed
                 self.messages.put(("failed", error))
 
-        self._launch(work)
+        self._launch(work, stoppable=True)
+
+    def stop(self) -> None:
+        """Ask the run to stop; STOPPED is shown only after the owned processes are confirmed terminated."""
+        if not self.running():
+            return
+        self.cancel_event.set()
+        self.stop_button.configure(state="disabled")
+        self.summary.set("STOPPING: waiting until the owned Abaqus processes are confirmed terminated...")
+        self._write("\nStop requested: terminating the owned Abaqus processes...\n")
+
+    def close(self) -> None:
+        """WM_DELETE_WINDOW: close only when no owned Abaqus process can be left behind."""
+        if self.running():
+            self.closing = True
+            self.stop()
+            self.summary.set("CLOSING: stopping the run first; the window closes once the owned Abaqus processes "
+                             "are confirmed terminated.")
+            return
+        if self.unconfirmed is not None:
+            remaining = self.unconfirmed.still_running()
+            if remaining:
+                self.closing = False
+                self.summary.set(f"NOT CLOSED: {len(remaining)} owned Abaqus process(es) of the stopped run may still "
+                                 "be running; their termination could not be confirmed. Check Task Manager, then "
+                                 "close again.")
+                return
+        self.destroyed = True
+        self.root.destroy()
 
     def _poll(self, reschedule: bool = True) -> None:
         finished = False
@@ -422,6 +483,15 @@ class QuickCalibrationWindow:
             elif kind == "stopped":
                 finished = True
                 self._stopped(payload)
+            elif kind == "cancelled":
+                finished = True
+                self.summary.set(f"STOPPED by the user: {payload}")
+                self._write(f"\nSTOPPED: {payload}\n")
+            elif kind == "unconfirmed":
+                finished = True
+                self.unconfirmed = payload
+                self.summary.set(f"STOP NOT CONFIRMED: {payload}")
+                self._write(f"\nSTOP NOT CONFIRMED: {payload}\n")
             elif kind == "failed":
                 finished = True
                 self.summary.set(f"FAILED: {payload}")
@@ -429,6 +499,10 @@ class QuickCalibrationWindow:
         if finished:
             self.run_button.configure(state="normal")
             self.check_button.configure(state="normal")
+            self.stop_button.configure(state="disabled")
+            if self.closing:
+                self.closing = False
+                self.close()  # closes only if nothing owned can be left running
         elif reschedule:
             self.root.after(200, self._poll)
 

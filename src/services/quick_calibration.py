@@ -40,7 +40,10 @@ import math
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
+import tempfile
+import threading
 import time
 from typing import Callable, Mapping, Optional, Sequence
 
@@ -62,6 +65,7 @@ from .forward_builder import (
     join_inp_lines,
 )
 from .identification_step import LMSettings, LMStatus, StepError, parameter_bounds, run_bounded_lm
+from .owned_processes import OwnedProcessTree
 
 
 SCHEMA = "quick-calibration/v1"
@@ -91,6 +95,24 @@ class QuickCalibrationError(ValueError):
     def __init__(self, message: str, candidates: Sequence[Mapping] = ()) -> None:
         super().__init__(message)
         self.candidates = list(candidates)  # orientation candidates when the registration is ambiguous
+
+
+class CalibrationCancelled(QuickCalibrationError):
+    """Stopped by the user; every Abaqus process this session owned is confirmed terminated."""
+
+
+class TerminationUnconfirmed(QuickCalibrationError):
+    """An owned Abaqus process was asked to stop, but its termination could not be confirmed.
+
+    ``still_running()`` re-checks the owned processes (empty once they are gone).
+    """
+
+    def __init__(self, message: str, still_running: Optional[Callable[[], list]] = None) -> None:
+        super().__init__(message)
+        self._still_running = still_running
+
+    def still_running(self) -> list:
+        return [] if self._still_running is None else list(self._still_running())
 
 
 class PreflightRefused(QuickCalibrationError):
@@ -387,14 +409,24 @@ ExtractFunction = Callable[[Path, Path, int], ModalDataset]  # (ODB, output dir,
 
 
 class AbaqusRunner:
-    """Real Abaqus: one solve per job directory, then the application's ODB extraction script."""
+    """Real Abaqus: one solve per job directory, then the application's ODB extraction script.
+
+    Every process is owned by this session: ``cancel_event`` stops the running solve or extraction, and a stop is
+    reported only after the owned process tree is confirmed terminated (``TerminationUnconfirmed`` otherwise).
+    """
 
     COMPLETED = "THE ANALYSIS HAS COMPLETED SUCCESSFULLY"
+    POLL_SECONDS = 0.5
+    STOP_TIMEOUT_SECONDS = 60.0
 
-    def __init__(self, abaqus_command: str = "abaqus", cpus: int = 1, timeout_minutes: float = 120.0) -> None:
+    def __init__(self, abaqus_command: str = "abaqus", cpus: int = 1, timeout_minutes: float = 120.0,
+                 cancel_event: Optional[threading.Event] = None, popen=subprocess.Popen,
+                 tree_factory=OwnedProcessTree) -> None:
         self.abaqus_command = (abaqus_command or "abaqus").strip()
         self.cpus = int(cpus)
-        self.timeout_seconds = int(timeout_minutes * 60)
+        self.timeout_seconds = max(1, int(timeout_minutes * 60))
+        self.cancel_event = cancel_event if cancel_event is not None else threading.Event()
+        self._popen, self._tree_factory = popen, tree_factory
 
     def _command(self, arguments: Sequence[str]):
         if os.name == "nt":
@@ -406,6 +438,8 @@ class AbaqusRunner:
         return shlex.split(self.abaqus_command) + list(arguments)
 
     def _run(self, command, directory: Path, log_path: Path) -> int:
+        if self.cancel_event.is_set():
+            raise CalibrationCancelled("stopped by the user before the Abaqus solve started.")
         options = {"cwd": str(directory), "stdin": subprocess.DEVNULL}
         if os.name == "nt":
             options["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
@@ -414,27 +448,34 @@ class AbaqusRunner:
         with open(log_path, "w", encoding="utf-8", errors="replace") as log:
             log.write(f"{command}\n")
             log.flush()
-            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, **options)
-            try:
-                return process.wait(timeout=self.timeout_seconds)
-            except subprocess.TimeoutExpired:
-                self._kill_tree(process)
-                raise QuickCalibrationError(f"Abaqus exceeded {self.timeout_seconds // 60} min; the process tree "
-                                            f"was stopped. Log: {log_path}") from None
+            process = self._popen(command, stdout=log, stderr=subprocess.STDOUT, **options)
+            tree = self._tree_factory(process)
+            started = time.monotonic()
+            while True:
+                try:
+                    code = process.wait(timeout=self.POLL_SECONDS)
+                    return code
+                except subprocess.TimeoutExpired:
+                    pass
+                except KeyboardInterrupt:  # Ctrl+C in the CLI: never leave the owned solve running
+                    tree.terminate(self.STOP_TIMEOUT_SECONDS)
+                    raise
+                tree.refresh()
+                if self.cancel_event.is_set():
+                    self._stop(tree, "stopped by the user", log_path)
+                if time.monotonic() - started > self.timeout_seconds:
+                    self._stop(tree, f"Abaqus exceeded {self.timeout_seconds // 60} min", log_path, timed_out=True)
 
-    @staticmethod
-    def _kill_tree(process: subprocess.Popen) -> None:
-        try:
-            if os.name == "nt":
-                subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=60)
-            else:
-                os.killpg(process.pid, 9)
-        except Exception:  # noqa: BLE001 - best effort; the caller reports the timeout either way
-            pass
-        try:
-            process.wait(timeout=30)
-        except Exception:  # noqa: BLE001
-            pass
+    def _stop(self, tree: OwnedProcessTree, reason: str, log_path: Path, timed_out: bool = False) -> None:
+        """Terminate the owned tree and raise; the outcome names whether termination was confirmed."""
+        if not tree.terminate(self.STOP_TIMEOUT_SECONDS):
+            raise TerminationUnconfirmed(
+                f"{reason}, but the termination of the owned Abaqus processes could not be confirmed (still "
+                f"running: {tree.describe()}). Treat the solve as running; check Task Manager before retrying. "
+                f"Log: {log_path}", tree.alive)
+        if timed_out:
+            raise QuickCalibrationError(f"{reason}; the owned process tree was terminated (confirmed). Log: {log_path}")
+        raise CalibrationCancelled(f"{reason}; the owned Abaqus solve was terminated (confirmed).")
 
     def solve(self, inp_path: Path, job_dir: Path, job_name: str) -> Path:
         arguments = [f"job={job_name}", f"input={Path(inp_path).name}", f"cpus={self.cpus}", "interactive",
@@ -451,10 +492,50 @@ class AbaqusRunner:
     def extract(self, odb_path: Path, output_dir: Path, last_mode: int) -> ModalDataset:
         import abaqus_bridge
 
-        manifest = abaqus_bridge.run_abaqus_extraction(odb_path, output_dir, abaqus_command=self.abaqus_command,
-                                                       start_mode=1, end_mode=int(last_mode),
-                                                       timeout_seconds=self.timeout_seconds)
-        return abaqus_bridge.load_extracted_odb(manifest)
+        if self.cancel_event.is_set():
+            raise CalibrationCancelled("stopped by the user before the ODB extraction started.")
+        # The extraction stops its own launcher and registered worker; this session also records every descendant
+        # of the launcher while it runs, so that after a stop or failure nothing it started is left behind.
+        owned: dict = {}
+        watching = threading.Event()
+
+        def remember(process) -> None:
+            if process is not None and "tree" not in owned:
+                owned["tree"] = self._tree_factory(process)
+
+        def watch() -> None:
+            while not watching.wait(self.POLL_SECONDS):
+                if "tree" in owned:
+                    owned["tree"].refresh()
+
+        watcher = threading.Thread(target=watch, daemon=True)
+        watcher.start()
+        failure: Optional[BaseException] = None
+        try:
+            manifest = abaqus_bridge.run_abaqus_extraction(odb_path, output_dir, abaqus_command=self.abaqus_command,
+                                                           start_mode=1, end_mode=int(last_mode),
+                                                           timeout_seconds=self.timeout_seconds,
+                                                           cancel_event=self.cancel_event, process_callback=remember)
+        except abaqus_bridge.AbaqusExtractionError as error:
+            failure = error
+        except abaqus_bridge.AnalysisCancelled as error:
+            failure = error
+        finally:
+            watching.set()
+            watcher.join()
+        if failure is None:
+            return abaqus_bridge.load_extracted_odb(manifest)
+        tree = owned.get("tree")
+        if isinstance(failure, abaqus_bridge.ExtractionTerminationUnconfirmed):
+            raise TerminationUnconfirmed(str(failure), None if tree is None else tree.alive) from None
+        if tree is not None and not tree.terminate(self.STOP_TIMEOUT_SECONDS):
+            raise TerminationUnconfirmed(
+                f"{failure}; afterwards owned extraction processes could not be confirmed terminated (still running: "
+                f"{tree.describe()}). Check Task Manager before retrying.", tree.alive) from None
+        if isinstance(failure, abaqus_bridge.AnalysisCancelled):
+            raise CalibrationCancelled("stopped by the user; the owned ODB extraction was terminated "
+                                       "(confirmed).") from None
+        raise QuickCalibrationError(str(failure)) from None
 
 
 # ----------------------------------------------------------------------------- FE states
@@ -500,11 +581,22 @@ def _save_state(path: Path, dataset: ModalDataset, nodes: Optional[Sequence[str]
     else:
         index = {k: i for i, k in enumerate(keys)}
         rows = np.array([index[k] for k in nodes])
-    np.savez_compressed(path, numbers=np.array([m.number for m in modes]),
-                        frequencies=np.array([m.frequency_hz for m in modes]),
-                        node_ids=np.array(keys)[rows],
-                        coordinates=np.asarray(modes[0].coordinates)[rows],
-                        vectors=np.stack([np.real(np.asarray(m.vectors))[rows] for m in modes]))
+    # Atomic: ``fe_modes.npz`` is the completed-job marker, so it appears only complete (temporary file, replace).
+    handle, temporary = tempfile.mkstemp(prefix=".fe_modes.", suffix=".partial", dir=Path(path).parent)
+    try:
+        with os.fdopen(handle, "wb") as stream:
+            np.savez_compressed(stream, numbers=np.array([m.number for m in modes]),
+                                frequencies=np.array([m.frequency_hz for m in modes]),
+                                node_ids=np.array(keys)[rows],
+                                coordinates=np.asarray(modes[0].coordinates)[rows],
+                                vectors=np.stack([np.real(np.asarray(m.vectors))[rows] for m in modes]))
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
 
 
 def _load_state(path: Path) -> ModalDataset:
@@ -894,10 +986,11 @@ class _Evaluation:
 
 class QuickCalibration:
     def __init__(self, config: QuickCalibrationConfig, solve: SolveFunction, extract: ExtractFunction,
-                 progress: Optional[ProgressFunction] = None) -> None:
+                 progress: Optional[ProgressFunction] = None, cancel: Optional[threading.Event] = None) -> None:
         self.config = config
         self.solve, self.extract = solve, extract
         self.progress = progress or (lambda message: None)
+        self.cancel = cancel if cancel is not None else threading.Event()
         source = Path(config.model_inp)
         if not source.is_file():
             raise QuickCalibrationError(f"model INP not found: {source}")
@@ -924,17 +1017,30 @@ class QuickCalibration:
             dataset = _load_state(cached)
             self.progress(f"{job_name}: reused finished job ({self._describe(multipliers)})")
         else:
+            self._check_cancel()
+            _clear_incomplete_job(job_dir)  # leftovers of an interrupted attempt are never reused
             job_dir.mkdir(parents=True, exist_ok=True)
             inp = job_dir / f"{job_name}.inp"
             inp.write_bytes(content)
             self.progress(f"{job_name}: Abaqus solve ({self._describe(multipliers)})")
             started = time.monotonic()
-            odb = self.solve(inp, job_dir, job_name)
-            self.abaqus_solves += 1
-            self.progress(f"{job_name}: extracting modes 1-{self.last_mode} "
-                          f"(solve took {time.monotonic() - started:.0f} s)")
-            dataset = self.extract(Path(odb), job_dir / "extraction", self.last_mode)
-            _save_state(cached, dataset, None if self.reference is None else self._node_order)
+            try:
+                odb = self.solve(inp, job_dir, job_name)
+                self.abaqus_solves += 1
+                self._check_cancel()
+                self.progress(f"{job_name}: extracting modes 1-{self.last_mode} "
+                              f"(solve took {time.monotonic() - started:.0f} s)")
+                dataset = self.extract(Path(odb), job_dir / "extraction", self.last_mode)
+                self._check_cancel()
+                _save_state(cached, dataset, None if self.reference is None else self._node_order)
+            except TerminationUnconfirmed:
+                raise  # processes may still write into the job: leave it untouched (it has no completion marker)
+            except BaseException:
+                try:  # a stopped or failed job leaves no partial cache (it never had a completion marker)
+                    _clear_incomplete_job(job_dir)
+                except QuickCalibrationError:
+                    pass  # still in use: the next run clears it or refuses; the original outcome is reported
+                raise
             dataset = _load_state(cached)
         order = None if self.reference is None else self._node_order
         state = FEState(job_name, dataset if self.reference is None else None,
@@ -942,6 +1048,10 @@ class QuickCalibration:
         if self.reference is not None:  # candidates keep only their small tracking state in memory
             self._cache[job_name] = state
         return state
+
+    def _check_cancel(self) -> None:
+        if self.cancel.is_set():
+            raise CalibrationCancelled("stopped by the user; no Abaqus process was running.")
 
     def _describe(self, multipliers: Mapping[str, float]) -> str:
         return ", ".join(f"{name} k={value:.4f}" for name, value in multipliers.items())
@@ -1179,6 +1289,18 @@ class QuickCalibration:
                                     for k, v in self.model.records.items()}}
 
 
+def _clear_incomplete_job(job_dir: Path) -> None:
+    """Remove a generated job directory that has no completion marker (``fe_modes.npz``)."""
+    job_dir = Path(job_dir)
+    if not job_dir.exists() or (job_dir / "fe_modes.npz").is_file():
+        return
+    try:
+        shutil.rmtree(job_dir)
+    except OSError as error:
+        raise QuickCalibrationError(f"{job_dir} holds an incomplete Abaqus job that cannot be removed ({error}); a "
+                                    "process may still use it. Nothing was reused.") from None
+
+
 def _sha256_file(path: Path) -> Optional[str]:
     try:
         digest = hashlib.sha256()
@@ -1340,21 +1462,26 @@ def _p(value, digits: int = 2) -> str:
 
 def run_quick_calibration(config: QuickCalibrationConfig, solve: Optional[SolveFunction] = None,
                           extract: Optional[ExtractFunction] = None,
-                          progress: Optional[ProgressFunction] = None) -> tuple[dict, dict[str, Path]]:
+                          progress: Optional[ProgressFunction] = None,
+                          cancel: Optional[threading.Event] = None,
+                          runner: Optional[AbaqusRunner] = None) -> tuple[dict, dict[str, Path]]:
     """Run the calibration and write result.json, report.txt, modes.csv (and the calibrated INP).
 
-    The input preflight runs first; any refusal raises ``PreflightRefused`` before an Abaqus solve.
+    The input preflight runs first; any refusal raises ``PreflightRefused`` before an Abaqus solve. ``cancel``
+    stops the run: ``CalibrationCancelled`` after the owned processes are confirmed terminated, otherwise
+    ``TerminationUnconfirmed``; nothing is written as a result and no partial job is reused.
     """
+    cancel = cancel if cancel is not None else threading.Event()
 
     report = preflight(config)
     if not report.ready:
         raise PreflightRefused(report)
     config = replace(config, modal_set=None if report.modal_set is None else report.modal_set.key)
     if solve is None or extract is None:
-        runner = AbaqusRunner(config.abaqus_command, config.cpus, config.timeout_minutes)
+        runner = runner or AbaqusRunner(config.abaqus_command, config.cpus, config.timeout_minutes, cancel)
         solve = solve or runner.solve
         extract = extract or runner.extract
-    calibration = QuickCalibration(config, solve, extract, progress)
+    calibration = QuickCalibration(config, solve, extract, progress, cancel)
     result = calibration.run()
     result["preflight"] = report.to_dict()
     paths = write_outputs(result, config, calibration.model)

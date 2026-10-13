@@ -26,6 +26,10 @@ class AnalysisCancelled(RuntimeError):
     """Raised when the user cancels work owned by this application."""
 
 
+class ExtractionTerminationUnconfirmed(AbaqusExtractionError):
+    """An owned extraction process was asked to stop but its termination could not be confirmed."""
+
+
 def new_owner_token() -> str:
     """A per-run ownership token the extractor echoes back in its registration."""
     return uuid.uuid4().hex
@@ -419,7 +423,7 @@ def run_abaqus_extraction(
             while process.poll() is None:
                 if cancel_event is not None and cancel_event.is_set():
                     if not stop_owned_extraction(process, registration_path, owner_token):
-                        raise AbaqusExtractionError(
+                        raise ExtractionTerminationUnconfirmed(
                             "Cancellation could not be confirmed: the owned Abaqus worker "
                             "or launcher process did not stop within the timeout. Treat "
                             "the extraction as still running and check Task Manager before retrying."
@@ -427,7 +431,7 @@ def run_abaqus_extraction(
                     raise AnalysisCancelled("Analysis stopped by user.")
                 if time.monotonic() - started > timeout_seconds:
                     if not stop_owned_extraction(process, registration_path, owner_token):
-                        raise AbaqusExtractionError(
+                        raise ExtractionTerminationUnconfirmed(
                             "Abaqus extraction timed out, but the owned process did not stop."
                         )
                     raise AbaqusExtractionError(

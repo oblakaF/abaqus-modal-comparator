@@ -87,6 +87,21 @@ Output folder: `report.txt`, `result.json`, `modes.csv` (per mode: start/final e
 sensitivity, the multiplier this mode alone asks for), `<model>_calibrated.inp` (only when a value
 is shown), `config.json`, and `work/` with the Abaqus jobs (a repeated run reuses finished jobs).
 
+## Stop, timeout and closing the window
+
+- **Stop** terminates only the processes this run started: the Abaqus launcher and every process
+  observed as its descendant (solver, extraction worker), checked by creation time so a reused PID is
+  never touched. The window shows `STOPPING` until termination is confirmed, then
+  `STOPPED by the user ... (confirmed)`. If termination cannot be confirmed it shows
+  `STOP NOT CONFIRMED` with the PIDs; a new run is refused until they are gone.
+- A per-solve **timeout** stops the owned processes the same way and says whether termination was
+  confirmed.
+- **Closing the window** during a run requests Stop and closes only after confirmed termination; if
+  it cannot be confirmed the window stays open with the reason.
+- A stopped or failed job leaves no completed-job marker (`fe_modes.npz` is written atomically and
+  only after a complete solve and extraction) and its job folder is removed; a later run never
+  reuses it.
+
 ## Implementation
 
 `src/services/quick_calibration.py` (service), `tools/quick_calibration.py` (CLI),
@@ -94,4 +109,6 @@ is shown), `config.json`, and `work/` with the Abaqus jobs (a repeated run reuse
 shared with the main window). Tests: `tests/test_quick_calibration.py`,
 `tests/test_quick_calibration_window.py`, `tests/test_quick_calibration_preflight.py` (synthetic
 plate, synthetic multi-modal-set UNV and a fake Abaqus; the real SP-13 UNV when the data store is
-configured).
+configured), `tests/test_quick_calibration_cancellation.py` (Stop, timeout and window closing with a
+dummy Abaqus process tree and mocked termination failures). Process ownership:
+`src/services/owned_processes.py`.
