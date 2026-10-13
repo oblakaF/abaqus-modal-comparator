@@ -673,6 +673,7 @@ def _load_state(path: Path) -> ModalDataset:
 CACHE_SCHEMA = "quick-calibration/fe-job-provenance/v1"
 PROVENANCE_FILE = "provenance.json"  # the completion marker: written atomically after solve, extraction and data
 UNCONFIRMED_MARKER = "TERMINATION_UNCONFIRMED.json"
+IN_PROGRESS_MARKER = "JOB_IN_PROGRESS.json"  # written before every new solve; removed only after a confirmed end
 VERIFIED_REUSE = "VERIFIED_REUSE"
 INVALIDATED = "INVALIDATED"
 NEW_SOLVE = "NEW_SOLVE"
@@ -715,6 +716,9 @@ def input_file_fingerprints(source: bytes) -> list[dict]:
 
     def walk(content: bytes, origin: str, depth: int) -> None:
         for number, keyword, value in inp_file_references(content):
+            if depth >= _INCLUDE_DEPTH:
+                raise QuickCalibrationError(f"{origin} line {number}: INPUT= nesting deeper than {_INCLUDE_DEPTH} "
+                                            "levels is not supported; the deeper files are not verified.")
             path = Path(value)
             if not path.is_absolute():
                 raise QuickCalibrationError(f"{origin} line {number}: relative INPUT={value} cannot be verified.")
@@ -723,7 +727,7 @@ def input_file_fingerprints(source: bytes) -> list[dict]:
                 raise QuickCalibrationError(f"{origin} line {number}: INPUT={value} cannot be read.")
             entries.append(dict(fingerprint, reference=f"{origin} line {number} (*{keyword})"))
             key = os.path.normcase(fingerprint["path"])
-            if key not in seen and depth < _INCLUDE_DEPTH:
+            if key not in seen:
                 seen.add(key)
                 walk(path.read_bytes(), path.name, depth + 1)
 
@@ -1027,6 +1031,10 @@ def check_inp_references(source: bytes, job_dir: Path) -> tuple[list[str], list[
     def walk(content: bytes, origin: str, depth: int) -> None:
         for number, keyword, value in inp_file_references(content):
             where = f"{origin} line {number} (*{keyword}, input={value})"
+            if depth >= _INCLUDE_DEPTH:
+                problems.append(f"{where}: beyond the supported nesting depth of {_INCLUDE_DEPTH} levels; this and "
+                                "any deeper reference are not verified")
+                continue
             path = Path(value)
             target = path if path.is_absolute() else Path(job_dir) / path
             if not path.is_absolute():
@@ -1043,7 +1051,7 @@ def check_inp_references(source: bytes, job_dir: Path) -> tuple[list[str], list[
                 continue
             resolved.append(f"{where} → {target}")
             key = os.path.normcase(str(target.resolve()))
-            if key in seen or depth >= _INCLUDE_DEPTH:
+            if key in seen:
                 continue
             seen.add(key)
             walk(data, target.name, depth + 1)
@@ -1275,7 +1283,7 @@ class QuickCalibration:
             return self._cache[job_name]
         job_dir = self.work / job_name
         cached = job_dir / "fe_modes.npz"
-        self._refuse_unconfirmed(job_dir)  # never reused, deleted or overwritten while its processes may run
+        self._refuse_unsafe(job_dir)  # never reused, deleted or overwritten while its processes may run
         required = self._requirements(digest)
         decision, reason, prints, dataset = verify_job_cache(job_dir, required, self._tracking_order())
         if decision == VERIFIED_REUSE:
@@ -1287,11 +1295,13 @@ class QuickCalibration:
                 self._decide(INVALIDATED, job_name, reason, prints)
                 self.progress(f"{job_name}: cached job not reused ({reason})")
             self._check_cancel()
+            self._ensure_clearable(job_dir)  # an unsafe folder is refused before any budget is used
             self._claim_new_solve()  # the hard per-run cap: refused here, before anything is started
             self._decide(NEW_SOLVE, job_name, f"new solve {self.new_solve_attempts}/{self.config.max_new_fe_solves} "
                                               f"({self.stage})", {"generated_inp_sha256": digest[:16]})
-            self._clear_job(job_dir)  # an unverified job is replaced at the same path, never beside it
+            self._clear_job(job_dir)  # an unverified, provably finished job is replaced at the same path
             job_dir.mkdir(parents=True, exist_ok=True)
+            self._mark_in_progress(job_dir, job_name)  # durable safety marker; without it Abaqus is not started
             inp = job_dir / f"{job_name}.inp"
             inp.write_bytes(content)
             self.progress(f"{job_name}: Abaqus solve {self.new_solve_attempts}/{self.config.max_new_fe_solves} "
@@ -1309,14 +1319,21 @@ class QuickCalibration:
                 _save_state(cached, dataset, nodes)
                 self._write_provenance(job_dir, job_name, required, nodes)
             except TerminationUnconfirmed as error:
-                _mark_unconfirmed(job_dir, error)  # processes may still write: untouched, never reused or replaced
+                # processes may still write: untouched; the in-progress marker stays even if this record fails
+                _mark_unconfirmed(job_dir, error)
                 raise
             except BaseException:
-                try:  # a stopped or failed job leaves no partial cache (it never had a completion marker)
-                    self._clear_job(job_dir)
+                try:  # the solver and extraction of this run have ended: no partial cache is left
+                    _remove_job(job_dir)
                 except QuickCalibrationError:
-                    pass  # still in use: the next run clears it or refuses; the original outcome is reported
+                    pass  # not removable: the in-progress marker keeps it out of any reuse or overwrite
                 raise
+            try:
+                (job_dir / IN_PROGRESS_MARKER).unlink()  # completed: the job is now an ordinary verified cache entry
+            except OSError as error:
+                message = (f"{job_dir}: the job completed, but its in-progress marker cannot be removed ({error}); "
+                           "it is not reused until the marker is removed.")
+                raise QuickCalibrationError(message) from None
             dataset = _load_state(cached)
         order = None if self.reference is None else self._node_order
         state = FEState(job_name, dataset if self.reference is None else None,
@@ -1355,25 +1372,48 @@ class QuickCalibration:
         self.cache_decisions.append({"job_name": job_name, "decision": decision, "stage": self.stage,
                                      "reason": reason, "fingerprints": dict(prints)})
 
-    def _refuse_unconfirmed(self, job_dir: Path) -> None:
-        if not (job_dir / UNCONFIRMED_MARKER).exists():
-            return
-        gone, remaining = _unconfirmed_processes_gone(job_dir, self.process_state)
-        if not gone:
-            raise QuickCalibrationError(
-                f"{job_dir}: an earlier stop of this job's Abaqus processes was not confirmed ({remaining}); the job "
-                "is neither reused, deleted nor overwritten. Check Task Manager, then delete the folder manually.")
+    def _mark_in_progress(self, job_dir: Path, job_name: str) -> None:
+        try:
+            _write_json_atomically(job_dir / IN_PROGRESS_MARKER, {
+                "schema": "quick-calibration/job-in-progress/v1", "job_name": job_name, "owner_pid": os.getpid(),
+                "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
+        except OSError as error:
+            try:
+                shutil.rmtree(job_dir)  # nothing was started in it
+            except OSError:
+                pass
+            raise QuickCalibrationError(f"{job_dir}: the in-progress safety marker cannot be written ({error}); "
+                                        "Abaqus was not started.") from None
 
-    def _clear_job(self, job_dir: Path) -> None:
-        """Remove an unverified job folder; refused while an unconfirmed stop may still use it."""
-        self._refuse_unconfirmed(job_dir)
+    def _refuse_unsafe(self, job_dir: Path) -> None:
+        """Refuse a job folder that a still-running or interrupted solve may use (manual recovery required)."""
+        recovery = "Check Task Manager, then delete the folder manually; nothing is reused, deleted or overwritten."
+        if (job_dir / UNCONFIRMED_MARKER).exists():
+            gone, remaining = _unconfirmed_processes_gone(job_dir, self.process_state)
+            if not gone:
+                raise QuickCalibrationError(f"{job_dir}: an earlier stop of this job's Abaqus processes was not "
+                                            f"confirmed ({remaining}). The job is neither reused, deleted nor "
+                                            f"overwritten. {recovery}")
+            return  # every recorded process is confirmed gone: recoverable
+        if (job_dir / IN_PROGRESS_MARKER).exists():
+            raise QuickCalibrationError(f"{job_dir}: a solve of this job was started and never confirmed finished or "
+                                        f"stopped (interrupted run, crash or unrecorded stop); its Abaqus processes "
+                                        f"may still run. {recovery}")
+
+    def _ensure_clearable(self, job_dir: Path) -> None:
+        """An unverified job folder may be replaced only with evidence that no solve can still use it."""
+        self._refuse_unsafe(job_dir)
         if not job_dir.exists():
             return
-        try:
-            shutil.rmtree(job_dir)
-        except OSError as error:
-            raise QuickCalibrationError(f"{job_dir} holds an unverified Abaqus job that cannot be removed ({error}); "
-                                        "a process may still use it. Nothing was reused.") from None
+        finished = any((job_dir / name).exists() for name in (PROVENANCE_FILE, "fe_modes.npz", UNCONFIRMED_MARKER))
+        if not finished:  # incomplete, without any record of how it ended (e.g. an older version, a crash)
+            raise QuickCalibrationError(f"{job_dir}: an incomplete Abaqus job without trustworthy termination "
+                                        "evidence; it is neither reused, deleted nor overwritten. Check Task Manager, "
+                                        "then delete the folder manually.")
+
+    def _clear_job(self, job_dir: Path) -> None:
+        self._ensure_clearable(job_dir)
+        _remove_job(job_dir)
 
     def _claim_new_solve(self) -> None:
         """Count one new FE solve attempt, or refuse it when the per-run cap is reached (failures count too)."""
@@ -1657,6 +1697,16 @@ class QuickCalibration:
                                     for k, v in self.model.records.items()}}
 
 
+def _remove_job(job_dir: Path) -> None:
+    if not Path(job_dir).exists():
+        return
+    try:
+        shutil.rmtree(job_dir)
+    except OSError as error:
+        raise QuickCalibrationError(f"{job_dir} holds an unverified Abaqus job that cannot be removed ({error}); "
+                                    "a process may still use it. Nothing was reused.") from None
+
+
 def _mark_unconfirmed(job_dir: Path, error: TerminationUnconfirmed) -> None:
     """Record, inside the job, which processes may still run (``None``: unknown); nothing else is touched."""
     remaining = error.still_running()
@@ -1666,7 +1716,7 @@ def _mark_unconfirmed(job_dir: Path, error: TerminationUnconfirmed) -> None:
     try:
         _write_json_atomically(Path(job_dir) / UNCONFIRMED_MARKER, {"reason": str(error), "processes": processes})
     except OSError:
-        pass  # the job keeps no provenance record either way: it is never reused
+        pass  # JOB_IN_PROGRESS.json stays: the job is never reused, deleted or overwritten (manual recovery)
 
 
 def _sha256_file(path: Path) -> Optional[str]:

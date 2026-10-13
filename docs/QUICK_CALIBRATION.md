@@ -104,7 +104,12 @@ changed include, modal range, Abaqus launcher, extraction script or setting, tra
 partial file, an interrupted job, or an identity that cannot be determined gives `INVALIDATED` (fail closed);
 the job is then solved again at the same path (`NEW_SOLVE`), which needs the FE solve budget. If a stop of a
 job's processes was not confirmed, `TERMINATION_UNCONFIRMED.json` stays in the job folder: the job is neither
-reused, deleted nor overwritten until the recorded processes are confirmed gone. Every decision is listed
+reused, deleted nor overwritten until the recorded processes are confirmed gone. Before every new solve the
+job folder gets `JOB_IN_PROGRESS.json` (if it cannot be written, Abaqus is not started); it is removed only
+after a completed job or a confirmed end. A folder with this marker (an interrupted run, a crash, an
+unrecorded stop) or an incomplete folder without any completion or termination record (for example from
+an older version) is never reused, deleted or overwritten automatically: check Task Manager, then delete
+the folder manually. `INPUT=` nesting deeper than 10 levels is refused by the preflight. Every decision is listed
 in `report.txt` and `result.json` (`fe_job_cache`) with its reason and fingerprints. The CPU count is not part
 of the identity (it does not change the model).
 
