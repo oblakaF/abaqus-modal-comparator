@@ -245,8 +245,10 @@ class OwnedProcessTree:
                     changed = True
                 elif status == UNKNOWN or status == ALIVE:
                     self.unverified[pid] = parent  # possibly ours, identity unreadable: never killed or confirmed
-        for pid, parent in list(self.unverified.items()):
-            if table.get(pid) != parent or self._state(pid)[0] == GONE:
+        # An unverified child is forgotten only when its own state is positively GONE. A changed parent (it was
+        # reparented) or its absence from one snapshot (an incomplete or failed table read) proves nothing.
+        for pid in list(self.unverified):
+            if self._state(pid)[0] == GONE:
                 del self.unverified[pid]
 
     def _member_status(self, identity: ProcessIdentity) -> str:

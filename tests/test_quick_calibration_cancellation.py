@@ -360,9 +360,18 @@ class FakeSystem:
     def __init__(self, processes) -> None:
         self.processes = dict(processes)  # pid -> (parent, created)
         self.killed: list[tuple] = []
+        self.table_fails = False  # a failed / incomplete process-table read (empty snapshot)
 
     def table(self):
+        if self.table_fails:
+            return {}
         return {pid: parent for pid, (parent, _) in self.processes.items()}
+
+    def reparent_orphans(self, dead: int) -> None:
+        """Like the OS: the children of an exited process get another parent and keep running."""
+        for pid, (parent, created) in list(self.processes.items()):
+            if parent == dead:
+                self.processes[pid] = (1, created)
 
     def state(self, pid):
         if pid not in self.processes:
@@ -379,17 +388,33 @@ class FakeSystem:
     def tree(self, root_pid: int = 10):
         system = self
 
+        return owned_processes.OwnedProcessTree(self.launcher(root_pid), table=self.table, state=self.state,
+                                                kill=self.kill)
+
+    def launcher(self, root_pid: int = 10):
+        system = self
+
         class Launcher:
             pid = root_pid
+
+            def __init__(self, *args, **kwargs) -> None:
+                pass
 
             def poll(self):
                 return None if root_pid in system.processes else -9
 
-            def kill(self):
-                system.killed.append((root_pid, system.processes[root_pid][1]))
-                del system.processes[root_pid]
+            def wait(self, timeout=None):
+                if root_pid in system.processes:
+                    raise subprocess.TimeoutExpired("abaqus", timeout)
+                return -9
 
-        return owned_processes.OwnedProcessTree(Launcher(), table=self.table, state=self.state, kill=self.kill)
+            def kill(self):
+                if root_pid in system.processes:
+                    system.killed.append((root_pid, system.processes[root_pid][1]))
+                    del system.processes[root_pid]
+                    system.reparent_orphans(root_pid)
+
+        return Launcher()
 
 
 class OwnershipTests(unittest.TestCase):
@@ -449,6 +474,40 @@ class OwnershipTests(unittest.TestCase):
         self.assertIsNone(tree.unconfirmed())
         self.assertIn(11, system.processes)
 
+    def test_a_reparented_unknown_child_stays_unconfirmed(self):
+        system = FakeSystem({10: (1, (5,)), 11: (10, None), 99: (1, (1,))})  # 11: an UNKNOWN child of the launcher
+        tree = system.tree()
+        tree.refresh()
+        self.assertEqual(list(tree.unverified), [11])
+        self.assertFalse(tree.terminate(timeout_seconds=0.3, poll_seconds=0.01))  # never True while 11 may run
+        self.assertEqual(system.processes[11], (1, None))  # the launcher died; 11 was reparented and still runs
+        self.assertEqual(system.killed, [(10, (5,))])  # only the verified launcher: neither 11 nor 99
+        self.assertEqual([identity.pid for identity in tree.unconfirmed()], [11])
+        for _ in range(3):
+            tree.refresh()  # repeated snapshots with the new parent never drop it
+        self.assertEqual([identity.pid for identity in tree.unconfirmed()], [11])
+        self.assertIn("identity unreadable", tree.describe())
+
+    def test_a_failed_process_table_read_never_drops_an_unknown_child(self):
+        system = FakeSystem({10: (1, (5,)), 11: (10, None)})
+        tree = system.tree()
+        tree.refresh()
+        system.table_fails = True  # the child is missing from the snapshot, but alive
+        tree.refresh()
+        self.assertEqual([identity.pid for identity in tree.unconfirmed()], [10, 11])  # launcher not stopped yet
+        self.assertFalse(tree.terminate(timeout_seconds=0.2, poll_seconds=0.01))
+        self.assertIn(11, system.processes)
+
+    def test_only_a_confirmed_exit_resolves_an_unknown_child(self):
+        system = FakeSystem({10: (1, (5,)), 11: (10, None)})
+        tree = system.tree()
+        tree.refresh()
+        self.assertFalse(tree.terminate(timeout_seconds=0.2, poll_seconds=0.01))
+        system.table_fails = True
+        del system.processes[11]  # the child really exits: its own state is GONE (independent of the table)
+        self.assertEqual(tree.unconfirmed(), [])
+        self.assertTrue(tree.terminate(timeout_seconds=0.2, poll_seconds=0.01))
+
     def test_an_unknown_member_state_is_not_gone(self):
         system = FakeSystem({10: (1, (5,)), 11: (10, (6,))})
         tree = system.tree()
@@ -456,6 +515,52 @@ class OwnershipTests(unittest.TestCase):
         system.processes[11] = (10, None)  # the owned child's state can no longer be read
         self.assertFalse(tree.terminate(timeout_seconds=0.2, poll_seconds=0.01))
         self.assertEqual([i.pid for i in tree.unconfirmed()], [11])
+
+
+class UnknownChildWorkflowTests(unittest.TestCase):
+    """Stop with an UNKNOWN child that survives its launcher: never STOPPED, the job folder stays."""
+
+    def setUp(self) -> None:
+        self.folder = Path(tempfile.mkdtemp(prefix="qc_p1a_unknown_"))
+        self.addCleanup(shutil.rmtree, self.folder, True)
+        self.system = FakeSystem({10: (1, (5,)), 11: (10, None), 99: (1, (1,))})
+
+    def runner(self, cancel) -> AbaqusRunner:
+        system = self.system
+
+        def tree_factory(process):
+            return owned_processes.OwnedProcessTree(process, table=system.table, state=system.state, kill=system.kill)
+
+        runner = AbaqusRunner("abaqus", 1, 120.0, cancel, popen=lambda *a, **k: system.launcher(),
+                              tree_factory=tree_factory)
+        runner.POLL_SECONDS = 0.01
+        runner.STOP_TIMEOUT_SECONDS = 0.3
+        return runner
+
+    def test_stop_is_unconfirmed_and_the_job_is_kept(self):
+        (self.folder / "model.inp").write_text(S.INP)
+        S.write_experiment(self.folder / "exp.unv", 0.9 * S.E0, S.G0)
+        config = config_from_dict({"model_inp": "model.inp", "experiment": "exp.unv", "output_dir": "out",
+                                   "parameters": [{"name": "E", "material": "CFRP_Face", "constants": ["E1", "E2"]}]},
+                                  self.folder)
+        cancel = threading.Event()
+        runner = self.runner(cancel)
+        threading.Timer(0.2, cancel.set).start()
+        calibration = QuickCalibration(config, runner.solve, runner.extract, cancel=cancel)
+        with self.assertRaises(TerminationUnconfirmed) as caught:
+            calibration.fe_state({"E": 1.0})
+        self.assertNotIsInstance(caught.exception, CalibrationCancelled)  # STOPPED is never reported
+        self.assertEqual([identity.pid for identity in caught.exception.still_running()], [11])
+        self.assertFalse(caught.exception.resolved())
+        self.assertEqual(self.system.killed, [(10, (5,))])  # no unrelated or unverifiable process killed
+        (job,) = list(calibration.work.iterdir())
+        self.assertTrue((job / f"{job.name}.inp").is_file())  # no cleanup without confirmed termination
+        self.assertFalse((job / "fe_modes.npz").exists())
+        del self.system.processes[11]  # the child exits: now confirmed
+        self.assertTrue(caught.exception.resolved())
+        fake = S.FakeAbaqus()
+        QuickCalibration(config, fake.solve, fake.extract).fe_state({"E": 1.0})  # only now cleared and solved
+        self.assertEqual(fake.solves, 1)
 
 
 # ----------------------------------------------------------------------------- the workflow leaves no partial cache
@@ -646,6 +751,40 @@ class WindowLifecycleTests(_Dummy):
         trees[0].gone = True
         with mock.patch.object(qw.messagebox, "askyesno") as ask:
             window.close()  # confirmed gone by the tracker: closes without asking
+        ask.assert_not_called()
+        self.assertTrue(window.destroyed)
+
+    def test_unknown_reparented_child_never_shows_stopped(self):
+        import quick_calibration_window as qw
+
+        system = FakeSystem({10: (1, (5,)), 11: (10, None), 99: (1, (1,))})
+
+        def unknown_child_runner(config, cancel):
+            runner = AbaqusRunner("abaqus", 1, 120.0, cancel, popen=lambda *a, **k: system.launcher(),
+                                  tree_factory=lambda process: owned_processes.OwnedProcessTree(
+                                      process, table=system.table, state=system.state, kill=system.kill))
+            runner.POLL_SECONDS = 0.01
+            runner.STOP_TIMEOUT_SECONDS = 0.3
+            return runner
+
+        window = self.window(unknown_child_runner)
+        window.start()
+        self.assertTrue(self.pump(lambda: window.running() and system.processes.get(11) is not None))
+        time.sleep(0.2)
+        seen = []
+        window.stop_button.invoke()
+        self.assertTrue(self.pump(lambda: seen.append(window.summary.get()) or not window.running()))
+        self.pump(lambda: window.summary.get().startswith("STOP NOT CONFIRMED"), timeout=5)
+        self.assertFalse(any(text.startswith("STOPPED") for text in seen))
+        self.assertTrue(window.summary.get().startswith("STOP NOT CONFIRMED"), window.summary.get())
+        self.assertEqual(system.killed, [(10, (5,))])
+        self.assertTrue(any((self.folder / "out" / "work").iterdir()))  # the job folder is kept
+        with mock.patch.object(qw.messagebox, "askyesno", return_value=False):
+            window.close()
+        self.assertFalse(window.destroyed)
+        del system.processes[11]  # confirmed exit
+        with mock.patch.object(qw.messagebox, "askyesno") as ask:
+            window.close()
         ask.assert_not_called()
         self.assertTrue(window.destroyed)
 
