@@ -100,8 +100,12 @@ class FakeAbaqus:
         return ModalDataset("fake ODB", Path(odb_path), modes[:last_mode])
 
 
-def write_experiment(path: Path, e: float, g: float, scale=None, noise=0.0, seed=0) -> Path:
-    """PolyMAX-like dataset 15 + 55 (complex shapes, small damping), coordinates in metres, U3 only."""
+def write_experiment(path: Path, e: float, g: float, scale=None, noise=0.0, seed=0, sets=None) -> Path:
+    """PolyMAX-like dataset 15 + 55 (complex shapes, small damping), coordinates in metres, U3 only.
+
+    ``sets``: optional ((processing name, number of modes), ...) to write several dataset-55 modal sets (the lowest
+    modes of each); by default one set named "PolyMAX" with every mode.
+    """
     import pyuff
 
     rng = np.random.default_rng(seed)
@@ -117,18 +121,20 @@ def write_experiment(path: Path, e: float, g: float, scale=None, noise=0.0, seed
                                     color=np.ones(n, dtype=int), x=x / 1000.0, y=y / 1000.0, z=np.zeros(n)), "add")
     order = np.argsort(frequencies(e, g, scale))
     freqs = frequencies(e, g, scale)
-    for k, index in enumerate(order):
-        m, nn = MODES[index][:2]
-        f = freqs[index] * math.exp(noise * rng.standard_normal())
-        zeta = 0.003
-        w = 2 * math.pi * f / math.sqrt(1 - zeta ** 2)
-        lam = -zeta * w + 1j * w * math.sqrt(1 - zeta ** 2)
-        values = shape(x, y, m, nn) * np.exp(1j * 0.3)
-        data = pyuff.prepare_55(id1="PolyMAX", id2="synthetic", id3="x", id4="x", id5="x", model_type=1,
-                                analysis_type=3, data_ch=2, spec_data_type=11, data_type=5, n_data_per_node=3,
-                                load_case=1, mode_n=k + 1, eig=lam, modal_a=1 + 0j, modal_b=1 + 0j, node_nums=nodes,
-                                r1=np.zeros(n, complex), r2=np.zeros(n, complex), r3=values, return_full_dict=True)
-        uff.write_sets(data, "add")
+    for name, count in sets or (("PolyMAX", len(MODES)),):
+        for k, index in enumerate(order[:count]):
+            m, nn = MODES[index][:2]
+            f = freqs[index] * math.exp(noise * rng.standard_normal())
+            zeta = 0.003
+            w = 2 * math.pi * f / math.sqrt(1 - zeta ** 2)
+            lam = -zeta * w + 1j * w * math.sqrt(1 - zeta ** 2)
+            values = shape(x, y, m, nn) * np.exp(1j * 0.3)
+            data = pyuff.prepare_55(id1=name, id2="synthetic", id3="x", id4="x", id5="x", model_type=1,
+                                    analysis_type=3, data_ch=2, spec_data_type=11, data_type=5, n_data_per_node=3,
+                                    load_case=1, mode_n=k + 1, eig=lam, modal_a=1 + 0j, modal_b=1 + 0j,
+                                    node_nums=nodes, r1=np.zeros(n, complex), r2=np.zeros(n, complex), r3=values,
+                                    return_full_dict=True)
+            uff.write_sets(data, "add")
     text = path.read_text()
     path.write_text(text.replace("        11         5         6", "        11         5         3"))
     return path

@@ -9,15 +9,40 @@ constants of *this* model for *this* specimen, not transferable without validati
 
 ## Start
 
-- Window: double-click `RUN_QUICK_CALIBRATION.cmd`. Choose the INP, the UNV/UFF, the material
-  (filled from the INP), press **Run calibration**.
+- Window: double-click `RUN_QUICK_CALIBRATION.cmd`. Choose the INP, the UNV/UFF, the
+  **experimental modal set** (listed from the file), the material (filled from the INP), press
+  **Check inputs** (no Abaqus run), then **Run calibration**.
 - Command line:
 
 ```text
-python tools/quick_calibration.py quick --inp SP13.inp --unv SP13.unv --material CFRP_Face --out SP13_quick --abaqus abq2024 --cpus 4
+python tools/quick_calibration.py sets SP13.unv           # list the dataset-55 modal sets (no Abaqus)
+python tools/quick_calibration.py quick --inp SP13.inp --unv SP13.unv --modal-set best --material CFRP_Face --out SP13_quick --abaqus abq2024 --cpus 4 --check-only
+python tools/quick_calibration.py quick --inp SP13.inp --unv SP13.unv --modal-set best --material CFRP_Face --out SP13_quick --abaqus abq2024 --cpus 4
 python tools/quick_calibration.py template case.json      # editable configuration
+python tools/quick_calibration.py check case.json         # input preflight only
 python tools/quick_calibration.py run case.json
 ```
+
+## Input readiness (checked before any Abaqus solve)
+
+Every run starts with the input preflight (also available alone: **Check inputs** / `check` /
+`--check-only`). Any `REFUSED` line stops the run before the first solve.
+
+| Check | Refused when |
+|---|---|
+| Model INP | the file cannot be read |
+| Material and elastic constants | the material, its single temperature-independent `*Elastic` record or a listed constant is missing, a value is not positive, or the INP has not exactly one `*Frequency` step |
+| INP file references | an `INPUT=` reference (`*Include`, `*Node, input=...`, ...) is relative — Abaqus resolves it from the newly generated job folder, where the file is not — or an absolute one does not exist / cannot be read (nested references too) |
+| Experimental file | it cannot be read |
+| Experimental modal set | the file has several dataset-55 modal sets and none is selected, or the selection is unknown / matches several sets (selection by key is exact). The first set is never chosen automatically; a file with one set uses it and says so |
+| Experimental modes | no mode remains after the set, mode and frequency selection (the count used is reported) |
+
+The physical orientation needs the baseline FE geometry: it is checked after the single baseline
+solve and before any optimisation step. If it is ambiguous the run stops there and lists the
+candidates.
+
+Example — the real SP-13 PolyMAX UNV has two modal sets, `Best — 12 modes` and
+`Processing — 21 modes`; without a selection the run is refused before Abaqus starts.
 
 ## Inputs
 
@@ -25,6 +50,7 @@ python tools/quick_calibration.py run case.json
 |---|---|
 | Abaqus model `.inp` | Re-solvable model with one `*Frequency` step. The calibrated material's `*Elastic` must be in this file (not in an `*Include`), temperature-independent, type `ENGINEERING CONSTANTS`, `LAMINA` or `ISOTROPIC`. An ODB is not enough: sandwich frequencies do not scale as √E. |
 | Polytec / Testlab `.unv` / `.uff` | Preferred: curve-fitted modes (PolyMAX, dataset 55/2414). Dataset 58 FRFs are accepted; their peak-derived modes cap the grade at APPROXIMATE. |
+| Experimental modal set | Required when the file holds several dataset-55 modal sets (e.g. PolyMAX `Best` and `Processing`). |
 | Material and constants | A multiplier k scales the listed constants together (default `E1,E2` for a face sheet). Optional second parameter: `G12` of the same material. |
 | Mode range | Set "from" above the suspension modes. |
 | Orientation | For a symmetric panel the scan orientation cannot be found from geometry; the program stops and lists the candidates. Choose from the photograph / corner marker, never from MAC. |
@@ -66,4 +92,6 @@ is shown), `config.json`, and `work/` with the Abaqus jobs (a repeated run reuse
 `src/services/quick_calibration.py` (service), `tools/quick_calibration.py` (CLI),
 `src/quick_calibration_window.py` (window), `src/application_layers.py` (reader/comparator layers
 shared with the main window). Tests: `tests/test_quick_calibration.py`,
-`tests/test_quick_calibration_window.py` (synthetic plate and a fake Abaqus).
+`tests/test_quick_calibration_window.py`, `tests/test_quick_calibration_preflight.py` (synthetic
+plate, synthetic multi-modal-set UNV and a fake Abaqus; the real SP-13 UNV when the data store is
+configured).

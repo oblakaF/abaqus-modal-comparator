@@ -20,16 +20,23 @@ from typing import Callable, Optional
 
 from services.forward_builder import _parameters, inp_keyword, split_inp_lines
 from services.quick_calibration import (
+    PreflightRefused,
     QuickCalibrationError,
     STATUS_ESTIMATE,
     config_from_dict,
     describe_orientation,
+    discover_modal_sets,
     locate_elastic,
+    preflight,
     run_quick_calibration,
 )
 
 TITLE = "Quick material calibration (Abaqus + Polytec)"
 DEFAULT_CONSTANTS = {"ENGINEERING CONSTANTS": "E1,E2", "LAMINA": "E1,E2", "ISOTROPIC": "E"}
+SELECT_MODAL_SET = "Select the modal set..."
+READING_MODAL_SETS = "Reading the modal sets..."
+NO_MODAL_SET = "no dataset-55 modal set (dataset 2414 / 58 fallback)"
+NOT_CHECKED = "Inputs not checked yet: press Check inputs (no Abaqus run)."
 
 
 def inp_materials(path: Path) -> list[tuple[str, str]]:
@@ -78,9 +85,15 @@ class QuickCalibrationWindow:
         self.min_hz = tk.StringVar(master=root)
         self.max_hz = tk.StringVar(master=root)
         self.orientation = tk.StringVar(master=root, value="automatic (geometry)")
+        self.modal_set = tk.StringVar(master=root)
+        self.modal_set_keys: dict[str, Optional[str]] = {}
+        self.modal_set_generation = 0
+        self.readiness = tk.StringVar(master=root, value=NOT_CHECKED)
+        self.preflight_report = None
         self.summary = tk.StringVar(master=root, value="Choose the files and press Run.")
         self._build()
         self._detect_abaqus()
+        self.unv.trace_add("write", lambda *_: self._discover_modal_sets())
 
     # ------------------------------------------------------------------ layout
     def _build(self) -> None:
@@ -100,6 +113,11 @@ class QuickCalibrationWindow:
 
         file_row("Abaqus model (.inp)", self.inp, self._browse_inp)
         file_row("Polytec / Testlab file (.unv/.uff)", self.unv, self._browse_unv)
+        ttk.Label(frame, text="Experimental modal set").grid(row=row, column=0, sticky="w", pady=2)
+        self.modal_set_box = ttk.Combobox(frame, textvariable=self.modal_set, state="readonly", values=())
+        self.modal_set_box.grid(row=row, column=1, columnspan=2, sticky="ew", padx=4)
+        self.modal_set_box.bind("<<ComboboxSelected>>", lambda _event: self._inputs_changed())
+        row += 1
         file_row("Output folder", self.out, self._browse_out)
 
         ttk.Label(frame, text="Abaqus command").grid(row=row, column=0, sticky="w", pady=2)
@@ -144,12 +162,26 @@ class QuickCalibrationWindow:
 
         buttons = ttk.Frame(frame)
         buttons.grid(row=row, column=0, columnspan=3, sticky="ew", pady=8)
+        self.check_button = ttk.Button(buttons, text="Check inputs", command=self.check_inputs)
+        self.check_button.pack(side="left", padx=(0, 6))
         self.run_button = ttk.Button(buttons, text="Run calibration", command=self.start)
         self.run_button.pack(side="left")
         self.open_button = ttk.Button(buttons, text="Open output folder", command=self._open_output,
                                       state="disabled")
         self.open_button.pack(side="left", padx=6)
         ttk.Button(buttons, text="Save configuration...", command=self._save_config).pack(side="left")
+        row += 1
+        readiness = ttk.LabelFrame(frame, text="Input readiness (checked before any Abaqus solve)", padding=4)
+        readiness.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(0, 6))
+        readiness.columnconfigure(0, weight=1)
+        ttk.Label(readiness, textvariable=self.readiness, wraplength=1000, justify="left").grid(
+            row=0, column=0, sticky="w")
+        self.readiness_table = ttk.Treeview(readiness, columns=("item", "status", "detail"), show="headings",
+                                            height=7, selectmode="none")
+        for key, title, width in (("item", "Check", 190), ("status", "Status", 80), ("detail", "Detail", 760)):
+            self.readiness_table.heading(key, text=title)
+            self.readiness_table.column(key, width=width, anchor="w", stretch=key == "detail")
+        self.readiness_table.grid(row=1, column=0, sticky="ew")
         row += 1
         ttk.Label(frame, textvariable=self.summary, wraplength=900, font=("TkDefaultFont", 10, "bold"),
                   justify="left").grid(row=row, column=0, columnspan=3, sticky="w")
@@ -205,6 +237,71 @@ class QuickCalibrationWindow:
         if path:
             self.unv.set(path)
 
+    def _discover_modal_sets(self) -> None:
+        """List the dataset-55 modal sets of the chosen file; several sets need an explicit choice."""
+        self.modal_set_generation += 1
+        generation = self.modal_set_generation
+        self.modal_set_keys = {}
+        self.modal_set_box["values"] = ()
+        self.modal_set.set("")
+        self._inputs_changed()
+        text = self.unv.get().strip()
+        path = Path(text) if text else None
+        if path is None or not path.is_file():
+            return
+        self.modal_set.set(READING_MODAL_SETS)
+
+        def work():
+            try:
+                outcome = (discover_modal_sets(path), None)
+            except Exception as error:  # noqa: BLE001 - shown in the readiness summary
+                outcome = ((), error)
+            self.messages.put(("modal_sets", (generation, outcome)))
+
+        if self.threaded:
+            threading.Thread(target=work, daemon=True).start()
+            self.root.after(100, self._poll_idle)
+        else:
+            work()
+            self._poll(reschedule=False)
+
+    def _apply_modal_sets(self, generation: int, outcome) -> None:
+        if generation != self.modal_set_generation:
+            return  # superseded by another file
+        choices, error = outcome
+        if error is not None:
+            self.modal_set.set("")
+            self.readiness.set(f"NOT READY: the experimental file cannot be read ({error}).")
+            return
+        if not choices:
+            self.modal_set_keys = {NO_MODAL_SET: None}
+            self.modal_set_box["values"] = (NO_MODAL_SET,)
+            self.modal_set.set(NO_MODAL_SET)
+            return
+        self.modal_set_keys = {f"{choice.label}   [{choice.key}]": choice.key for choice in choices}
+        labels = list(self.modal_set_keys)
+        if len(choices) == 1:
+            self.modal_set_box["values"] = labels
+            self.modal_set.set(labels[0])
+        else:  # never the first set: the user selects one
+            self.modal_set_box["values"] = [SELECT_MODAL_SET] + labels
+            self.modal_set.set(SELECT_MODAL_SET)
+            self.readiness.set(f"{len(choices)} modal sets in this file: select one in 'Experimental modal set'.")
+
+    def _inputs_changed(self) -> None:
+        self.preflight_report = None
+        self.readiness.set(NOT_CHECKED)
+        if hasattr(self, "readiness_table"):
+            self.readiness_table.delete(*self.readiness_table.get_children())
+
+    def _show_preflight(self, report) -> None:
+        self.preflight_report = report
+        self.readiness.set(report.summary())
+        self.readiness_table.delete(*self.readiness_table.get_children())
+        for check in report.checks:
+            self.readiness_table.insert("", "end", values=(check.item, check.status, check.detail))
+        self._write("\n=== input readiness\n" + "\n".join(report.lines()) + "\n")
+
     def _browse_out(self) -> None:
         path = filedialog.askdirectory(title="Output folder")
         if path:
@@ -225,6 +322,7 @@ class QuickCalibrationWindow:
                 "abaqus_command": self.abaqus.get().strip() or "abaqus", "cpus": int(self.cpus.get()),
                 "parameters": parameters, "min_experimental_hz": number(self.min_hz),
                 "max_experimental_hz": number(self.max_hz),
+                "modal_set": self.modal_set_keys.get(self.modal_set.get()),
                 "orientation_candidate_id": self.orientation_ids.get(self.orientation.get())}
 
     def _save_config(self) -> None:
@@ -234,25 +332,62 @@ class QuickCalibrationWindow:
             Path(path).write_text(json.dumps(self.config_data(), indent=2), encoding="utf-8")
 
     # ------------------------------------------------------------------ run
+    def _config(self):
+        data = self.config_data()
+        if not (data["model_inp"] and data["experiment"] and data["output_dir"] and data["parameters"][0]["material"]):
+            raise QuickCalibrationError("choose the INP, the UNV/UFF file, the output folder and the material.")
+        return data, config_from_dict(data)
+
+    def check_inputs(self) -> None:
+        """The input preflight only: no Abaqus solve, nothing written."""
+        if self.worker is not None and self.worker.is_alive():
+            return
+        try:
+            _, config = self._config()
+        except (QuickCalibrationError, ValueError) as error:
+            self.readiness.set(f"NOT READY: {error}")
+            return
+        self.readiness.set("Checking the inputs (no Abaqus run)...")
+
+        def work():
+            try:
+                self.messages.put(("preflight", preflight(config)))
+            except Exception as error:  # noqa: BLE001 - shown, never swallowed
+                self.messages.put(("failed", error))
+            self.messages.put(("idle", None))
+
+        self._launch(work)
+
+    def _launch(self, work) -> None:
+        self.run_button.configure(state="disabled")
+        self.check_button.configure(state="disabled")
+        if self.threaded:
+            self.worker = threading.Thread(target=work, daemon=True)
+            self.worker.start()
+            self.root.after(100, self._poll)
+        else:
+            work()
+            self._poll(reschedule=False)
+
     def start(self) -> None:
         if self.worker is not None and self.worker.is_alive():
             return
         try:
-            data = self.config_data()
-            if not (data["model_inp"] and data["experiment"] and data["output_dir"] and data["parameters"][0]["material"]):
-                raise QuickCalibrationError("choose the INP, the UNV/UFF file, the output folder and the material.")
-            config = config_from_dict(data)
+            data, config = self._config()
         except (QuickCalibrationError, ValueError) as error:
             messagebox.showerror(TITLE, str(error), parent=self.root)
             return
-        Path(config.output_dir).mkdir(parents=True, exist_ok=True)
-        (Path(config.output_dir) / "config.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
-        self.run_button.configure(state="disabled")
-        self.summary.set("Running... (Abaqus solves can take minutes each)")
+        self.summary.set("Checking the inputs, then running... (Abaqus solves can take minutes each)")
         self._write(f"\n=== run: {config.output_dir}\n")
 
         def work():
             try:
+                report = preflight(config)
+                self.messages.put(("preflight", report))  # shown before any solve
+                if not report.ready:
+                    raise PreflightRefused(report)  # nothing is written, nothing is solved
+                Path(config.output_dir).mkdir(parents=True, exist_ok=True)
+                (Path(config.output_dir) / "config.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
                 result, paths = run_quick_calibration(config, self.solve, self.extract,
                                                       lambda message: self.messages.put(("log", message)))
                 self.messages.put(("done", (result, paths)))
@@ -261,13 +396,7 @@ class QuickCalibrationWindow:
             except Exception as error:  # noqa: BLE001 - shown to the user, never swallowed
                 self.messages.put(("failed", error))
 
-        if self.threaded:
-            self.worker = threading.Thread(target=work, daemon=True)
-            self.worker.start()
-            self.root.after(100, self._poll)
-        else:
-            work()
-            self._poll(reschedule=False)
+        self._launch(work)
 
     def _poll(self, reschedule: bool = True) -> None:
         finished = False
@@ -278,6 +407,12 @@ class QuickCalibrationWindow:
                 break
             if kind == "log":
                 self._write(f"  {payload}\n")
+            elif kind == "modal_sets":
+                self._apply_modal_sets(*payload)
+            elif kind == "preflight":
+                self._show_preflight(payload)
+            elif kind == "idle":
+                finished = True
             elif kind == "done":
                 self.result, self.paths = payload
                 self.summary.set(summary_text(self.result))
@@ -293,13 +428,31 @@ class QuickCalibrationWindow:
                 self._write(f"\nFAILED: {type(payload).__name__}: {payload}\n")
         if finished:
             self.run_button.configure(state="normal")
+            self.check_button.configure(state="normal")
         elif reschedule:
             self.root.after(200, self._poll)
+
+    def _poll_idle(self) -> None:
+        """Deliver background modal-set discovery while no run or check is active."""
+        if self.worker is not None and self.worker.is_alive():
+            return  # the active worker's polling delivers the messages
+        self._poll(reschedule=False)
+        if self.modal_set.get() == READING_MODAL_SETS:
+            self.root.after(100, self._poll_idle)
 
     def _stopped(self, error: QuickCalibrationError) -> None:
         self.summary.set(f"STOPPED: {error}")
         self._write(f"\nSTOPPED: {error}\n")
+        if isinstance(error, PreflightRefused):
+            self.summary.set("NOT READY: no Abaqus solve was started; see Input readiness.")
+            return
         if error.candidates:
+            self.readiness.set(f"Physical orientation AMBIGUOUS ({len(error.candidates)} geometry candidates): the run "
+                               "stopped after the baseline solve, before any optimisation step.")
+            self.readiness_table.insert("", "end", values=(
+                "Physical orientation", "REFUSED",
+                f"{len(error.candidates)} equally plausible orientations from geometry alone; choose one in "
+                "'Scan orientation' from the photograph / corner marker (never from MAC)"))
             self.orientation_ids = {describe_orientation(c) + f"   [{c['candidate_id']}]": c["candidate_id"]
                                     for c in error.candidates}
             self.orientation_box["values"] = list(self.orientation_ids)

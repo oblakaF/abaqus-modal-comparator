@@ -93,6 +93,15 @@ class QuickCalibrationError(ValueError):
         self.candidates = list(candidates)  # orientation candidates when the registration is ambiguous
 
 
+class PreflightRefused(QuickCalibrationError):
+    """The input preflight refused the run; no Abaqus solve was started."""
+
+    def __init__(self, report) -> None:
+        super().__init__("input preflight refused the run (no Abaqus solve was started): "
+                         + " | ".join(report.refusals()))
+        self.report = report
+
+
 def describe_orientation(candidate: Mapping) -> str:
     """'exp X = +FE X, exp Y = -FE Y, exp Z = -FE Z' from a geometry candidate's rotation (geometry only)."""
     rotation = np.asarray(candidate.get("rotation"), dtype=float)
@@ -519,12 +528,75 @@ class ObservationRow:
     peak_derived: bool
 
 
+@dataclass(frozen=True)
+class ModalSetChoice:
+    """One dataset-55 modal set of the experimental file (as the application's reader discovers it)."""
+
+    key: str
+    display_name: str
+    processing_name: str
+    mode_count: int
+
+    @property
+    def label(self) -> str:
+        return f"{self.display_name} — {self.mode_count} modes"
+
+
+def discover_modal_sets(path: Path) -> tuple[ModalSetChoice, ...]:
+    import universal_reader  # resolved at call time: the application's installed reader
+
+    return tuple(ModalSetChoice(item.key, item.display_name, item.processing_name, len(item.modes))
+                 for item in universal_reader.discover_experimental_modal_sets(Path(path)))
+
+
+def _modal_set_listing(choices: Sequence[ModalSetChoice]) -> str:
+    return "; ".join(f"{c.label} (key {c.key!r})" for c in choices)
+
+
+def resolve_modal_set(choices: Sequence[ModalSetChoice], requested: Optional[str]) -> Optional[ModalSetChoice]:
+    """The explicitly requested modal set, matched by key first, then by a unique name; never the first set.
+
+    A single available set is used as the only set; several sets need an explicit choice. ``None`` means the file
+    has no dataset-55 modal set (the reader's dataset 2414 / 58 fallback).
+    """
+    requested = None if requested is None or not str(requested).strip() else str(requested).strip()
+    if not choices:
+        if requested is not None:
+            raise QuickCalibrationError(f"modal set {requested!r} was requested, but the experimental file has no "
+                                        "dataset-55 modal set.")
+        return None
+    if requested is None:
+        if len(choices) == 1:
+            return choices[0]
+        raise QuickCalibrationError(f"the experimental file has {len(choices)} dataset-55 modal sets; select one "
+                                    f"explicitly (none is chosen automatically): {_modal_set_listing(choices)}.")
+    text = requested.casefold()
+    by_key = [c for c in choices if c.key.casefold() == text]
+    if len(by_key) == 1:
+        return by_key[0]
+    by_name = [c for c in choices if text in (c.display_name.casefold(), c.processing_name.casefold())]
+    if len(by_name) == 1:
+        return by_name[0]
+    if by_name:
+        raise QuickCalibrationError(f"modal set {requested!r} matches several sets; select it by key: "
+                                    f"{_modal_set_listing(by_name)}.")
+    raise QuickCalibrationError(f"modal set {requested!r} was not found; available: {_modal_set_listing(choices)}.")
+
+
 def load_experiment(config: QuickCalibrationConfig) -> ModalDataset:
     import universal_reader  # resolved at call time: the application's installed (hardened, cached) reader
 
     if not Path(config.experiment).is_file():
         raise QuickCalibrationError(f"experiment file not found: {config.experiment}")
-    dataset = universal_reader.load_universal_modal_file(Path(config.experiment), modal_set=config.modal_set)
+    chosen = resolve_modal_set(discover_modal_sets(Path(config.experiment)), config.modal_set)
+    try:
+        dataset = universal_reader.load_universal_modal_file(Path(config.experiment),
+                                                             modal_set=None if chosen is None else chosen.key)
+    except ValueError as error:
+        raise QuickCalibrationError(f"the experimental file cannot be read: {error}") from None
+    if chosen is not None and dataset.metadata.get("modal_set_key") != chosen.key:
+        raise QuickCalibrationError(f"the reader loaded modal set {dataset.metadata.get('modal_set_key')!r}, not the "
+                                    f"selected {chosen.key!r}.")
     keep = []
     for mode in dataset.sorted_modes():
         if config.experimental_modes is not None and mode.number not in config.experimental_modes:
@@ -537,6 +609,198 @@ def load_experiment(config: QuickCalibrationConfig) -> ModalDataset:
     if not keep:
         raise QuickCalibrationError("no experimental modes remain after the mode / frequency selection.")
     return ModalDataset(dataset.source_name, dataset.source_path, keep, dict(dataset.metadata), list(dataset.history))
+
+
+# ----------------------------------------------------------------------------- input preflight (no Abaqus)
+
+CHECK_OK = "OK"
+CHECK_INFO = "INFO"
+CHECK_REFUSED = "REFUSED"
+READY = "READY"
+NOT_READY = "NOT_READY"
+ORIENTATION_PENDING = (
+    "checked from the baseline FE geometry after the single baseline solve and before any optimisation step; if it "
+    "is ambiguous the run stops there and lists the candidates (choose one from the photograph / corner marker, "
+    "never from MAC)")
+_INCLUDE_DEPTH = 10
+
+
+@dataclass(frozen=True)
+class PreflightCheck:
+    item: str
+    status: str  # OK | INFO | REFUSED
+    detail: str
+
+
+@dataclass(frozen=True)
+class PreflightReport:
+    checks: tuple[PreflightCheck, ...]
+    available_modal_sets: tuple[ModalSetChoice, ...]
+    modal_set: Optional[ModalSetChoice]
+    experimental_mode_count: Optional[int]
+    baseline_job_dir: Optional[Path]
+
+    @property
+    def ready(self) -> bool:
+        return not any(check.status == CHECK_REFUSED for check in self.checks)
+
+    @property
+    def status(self) -> str:
+        return READY if self.ready else NOT_READY
+
+    def refusals(self) -> list[str]:
+        return [f"{check.item}: {check.detail}" for check in self.checks if check.status == CHECK_REFUSED]
+
+    def summary(self) -> str:
+        if self.ready:
+            return (f"{READY}: inputs checked, no Abaqus run yet. Modal set: "
+                    f"{self.modal_set.label if self.modal_set else 'no dataset-55 set (fallback)'}; "
+                    f"{self.experimental_mode_count} experimental mode(s) used.")
+        return f"{NOT_READY}: " + " | ".join(self.refusals())
+
+    def lines(self) -> list[str]:
+        return [self.summary(), ""] + [f"[{c.status:>7}] {c.item}: {c.detail}" for c in self.checks]
+
+    def to_dict(self) -> dict:
+        return {"status": self.status, "checks": [asdict(c) for c in self.checks],
+                "available_modal_sets": [asdict(c) for c in self.available_modal_sets],
+                "modal_set": None if self.modal_set is None else asdict(self.modal_set),
+                "experimental_mode_count": self.experimental_mode_count,
+                "baseline_job_dir": None if self.baseline_job_dir is None else str(self.baseline_job_dir)}
+
+
+def inp_file_references(source: bytes) -> list[tuple[int, str, str]]:
+    """(line number, keyword, INPUT= value) of every keyword line that reads another file (*Include and others)."""
+    out = []
+    for number, line in enumerate(split_inp_lines(source), start=1):
+        keyword = inp_keyword(line)
+        if keyword is None:
+            continue
+        value = _parameters(line).get("input")
+        if value:
+            out.append((number, keyword, value))
+    return out
+
+
+def check_inp_references(source: bytes, job_dir: Path) -> tuple[list[str], list[str]]:
+    """(resolved, problems) for every file referenced by INPUT=, as Abaqus resolves it from ``job_dir``.
+
+    Abaqus resolves a relative INPUT= path from the directory the job runs in, which is the newly generated job
+    directory; a relative reference therefore never reaches the file next to the source INP. Absolute references
+    must be readable files; their own references are checked the same way.
+    """
+    resolved, problems, seen = [], [], set()
+
+    def walk(content: bytes, origin: str, depth: int) -> None:
+        for number, keyword, value in inp_file_references(content):
+            where = f"{origin} line {number} (*{keyword}, input={value})"
+            path = Path(value)
+            target = path if path.is_absolute() else Path(job_dir) / path
+            if not path.is_absolute():
+                problems.append(f"{where}: relative path; Abaqus would look for {target}, which the generated job "
+                                "directory does not contain (use an absolute path or merge the file into the INP)")
+                continue
+            if not target.is_file():
+                problems.append(f"{where}: {target} does not exist")
+                continue
+            try:
+                data = target.read_bytes()
+            except OSError as error:
+                problems.append(f"{where}: {target} is not readable ({error})")
+                continue
+            resolved.append(f"{where} → {target}")
+            key = os.path.normcase(str(target.resolve()))
+            if key in seen or depth >= _INCLUDE_DEPTH:
+                continue
+            seen.add(key)
+            walk(data, target.name, depth + 1)
+
+    walk(source, "model INP", 0)
+    return resolved, problems
+
+
+def _job_name(content: bytes) -> str:
+    return f"qc_{hashlib.sha256(content).hexdigest()[:12]}"
+
+
+def preflight(config: QuickCalibrationConfig) -> PreflightReport:
+    """Check every input that can be checked before an Abaqus solve; nothing is solved, written or guessed."""
+
+    checks: list[PreflightCheck] = []
+
+    def add(item: str, status: str, detail: str) -> None:
+        checks.append(PreflightCheck(item, status, detail))
+
+    source, job_dir = None, None
+    inp = Path(config.model_inp)
+    try:
+        source = inp.read_bytes()
+        add("Model INP", CHECK_OK, f"{inp} ({len(source):,} bytes, SHA-256 {hashlib.sha256(source).hexdigest()[:12]})")
+    except OSError as error:
+        add("Model INP", CHECK_REFUSED, f"{inp} cannot be read: {error}")
+    if source is not None:
+        try:
+            model = InpModel(source, config.parameters)
+        except (QuickCalibrationError, ForwardBuildError) as error:
+            add("Material and elastic constants", CHECK_REFUSED, str(error))
+        else:
+            for p in config.parameters:
+                record = model.records[p.material.lower()]
+                values = ", ".join(f"{c} = {record.value(c):g}" for c in p.constants)
+                add("Material and elastic constants", CHECK_OK,
+                    f"{p.name}: {p.material} (*Elastic type={record.elastic_type}) {values}; multiplier bounds "
+                    f"[{p.lower:g}, {p.upper:g}]")
+            last = config.fe_last_mode or model.eigenvalue_count or 60
+            add("FE modes extracted", CHECK_INFO, f"1-{last}")
+        job_dir = Path(config.output_dir) / "work" / _job_name(source)
+        resolved, problems = check_inp_references(source, job_dir)
+        for problem in problems:
+            add("INP file references", CHECK_REFUSED, problem)
+        if not problems:
+            add("INP file references", CHECK_OK, "; ".join(resolved) if resolved else
+                "none (*Include / INPUT= not used)")
+
+    choices: tuple[ModalSetChoice, ...] = ()
+    chosen, count = None, None
+    experiment = Path(config.experiment)
+    if not experiment.is_file():
+        add("Experimental file", CHECK_REFUSED, f"{experiment} does not exist")
+    else:
+        try:
+            choices = discover_modal_sets(experiment)
+        except Exception as error:  # noqa: BLE001 - any reader failure is a refusal with its reason
+            add("Experimental file", CHECK_REFUSED, f"{experiment} cannot be read: {error}")
+        else:
+            add("Experimental file", CHECK_OK, f"{experiment} ({experiment.stat().st_size:,} bytes); dataset-55 modal "
+                                               f"sets: {_modal_set_listing(choices) if choices else 'none'}")
+            try:
+                chosen = resolve_modal_set(choices, config.modal_set)
+            except QuickCalibrationError as error:
+                add("Experimental modal set", CHECK_REFUSED, str(error))
+            else:
+                add("Experimental modal set", CHECK_OK if chosen else CHECK_INFO,
+                    f"{chosen.label} (key {chosen.key!r}, "
+                    f"{'selected explicitly' if config.modal_set else 'the only set in the file'})" if chosen else
+                    "no dataset-55 set: the reader's dataset 2414 / 58 fallback is used (peak-derived modes are "
+                    "rougher evidence)")
+                try:
+                    dataset = load_experiment(replace(config, modal_set=None if chosen is None else chosen.key))
+                except QuickCalibrationError as error:
+                    add("Experimental modes", CHECK_REFUSED, str(error))
+                else:
+                    modes = dataset.sorted_modes()
+                    count = len(modes)
+                    add("Experimental modes", CHECK_OK,
+                        f"{count} mode(s) used, {modes[0].frequency_hz:.2f}-{modes[-1].frequency_hz:.2f} Hz"
+                        + (f" (of {chosen.mode_count} in the set)" if chosen and chosen.mode_count != count else ""))
+    if config.orientation_candidate_id:
+        add("Physical orientation", CHECK_INFO, f"selected by the user: {config.orientation_candidate_id}; it is "
+                                                "applied only if it is a geometry candidate of the baseline model")
+    else:
+        add("Physical orientation", CHECK_INFO, "not selected: " + ORIENTATION_PENDING)
+    add("Abaqus", CHECK_INFO, f"command {config.abaqus_command!r}, {config.cpus} CPU(s); optimiser evaluation "
+                              f"budget {config.solve_budget} (not a cap on all solves); no solve has been started")
+    return PreflightReport(tuple(checks), choices, chosen, count, job_dir)
 
 
 def _is_peak_derived(mode: ModeShape) -> bool:
@@ -1077,13 +1341,21 @@ def _p(value, digits: int = 2) -> str:
 def run_quick_calibration(config: QuickCalibrationConfig, solve: Optional[SolveFunction] = None,
                           extract: Optional[ExtractFunction] = None,
                           progress: Optional[ProgressFunction] = None) -> tuple[dict, dict[str, Path]]:
-    """Run the calibration and write result.json, report.txt, modes.csv (and the calibrated INP)."""
+    """Run the calibration and write result.json, report.txt, modes.csv (and the calibrated INP).
 
+    The input preflight runs first; any refusal raises ``PreflightRefused`` before an Abaqus solve.
+    """
+
+    report = preflight(config)
+    if not report.ready:
+        raise PreflightRefused(report)
+    config = replace(config, modal_set=None if report.modal_set is None else report.modal_set.key)
     if solve is None or extract is None:
         runner = AbaqusRunner(config.abaqus_command, config.cpus, config.timeout_minutes)
         solve = solve or runner.solve
         extract = extract or runner.extract
     calibration = QuickCalibration(config, solve, extract, progress)
     result = calibration.run()
+    result["preflight"] = report.to_dict()
     paths = write_outputs(result, config, calibration.model)
     return result, paths
