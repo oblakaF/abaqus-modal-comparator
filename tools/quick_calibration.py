@@ -14,6 +14,7 @@
 
     python tools/quick_calibration.py quick --inp SP13.inp --unv SP13.unv --modal-set best --material CFRP_Face \\
         --constants E1,E2 --out SP13_quick [--abaqus abq2024] [--cpus 4] [--g12] [--orientation <id>] [--check-only]
+        [--max-new-fe-solves 24]
         the same without a configuration file; the configuration used is saved in the output folder.
 
 Every run starts with the input preflight; a refusal stops it before any Abaqus solve. A file with several
@@ -44,7 +45,11 @@ def _quick_config(args) -> dict:
             "output_dir": str(Path(args.out).resolve()), "abaqus_command": args.abaqus, "cpus": args.cpus,
             "parameters": parameters, "orientation_candidate_id": args.orientation, "modal_set": args.modal_set,
             "min_experimental_hz": args.min_hz, "max_experimental_hz": args.max_hz,
-            "coordinate_scale": args.scale, "solve_budget": args.budget}
+            "coordinate_scale": args.scale, "solve_budget": args.budget,
+            "max_new_fe_solves": args.max_new_fe_solves}
+
+
+DEFAULT_MAX_NEW_FE_SOLVES = 24  # services.quick_calibration.DEFAULT_MAX_NEW_FE_SOLVES (checked by a test)
 
 
 def main(argv=None) -> int:
@@ -76,7 +81,10 @@ def main(argv=None) -> int:
     quick.add_argument("--min-hz", type=float, default=None)
     quick.add_argument("--max-hz", type=float, default=None)
     quick.add_argument("--scale", type=float, default=None, help="experiment → FE length factor (default: auto)")
-    quick.add_argument("--budget", type=int, default=16)
+    quick.add_argument("--budget", type=int, default=16, help="optimiser (LM) evaluation budget")
+    quick.add_argument("--max-new-fe-solves", type=int, default=DEFAULT_MAX_NEW_FE_SOLVES,
+                       help="hard cap on NEW Abaqus FE solve attempts in the whole run, failures included; "
+                            f"reused finished jobs do not count (default {DEFAULT_MAX_NEW_FE_SOLVES}; never unlimited)")
     args = parser.parse_args(argv)
 
     from services.quick_calibration import (QuickCalibrationError, config_from_dict, config_template,

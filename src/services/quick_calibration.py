@@ -87,6 +87,11 @@ GRADE_APPROXIMATE = "APPROXIMATE"
 GRADE_UNRELIABLE = "UNRELIABLE"
 STATUS_ESTIMATE = "ESTIMATE"
 STATUS_REFUSED = "REFUSED"
+BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
+# Hard per-run cap on NEW Abaqus FE solve attempts (baseline, optimiser, final evaluation, sensitivities, anything
+# else). Finished jobs reused from the cache do not count. 24 = 1 baseline + 16 optimiser evaluations (the default LM
+# evaluation budget) + 2 central differences for each of up to 2 parameters + 3 spare. Never unlimited.
+DEFAULT_MAX_NEW_FE_SOLVES = 24
 
 
 class QuickCalibrationError(ValueError):
@@ -124,6 +129,29 @@ class TerminationUnconfirmed(QuickCalibrationError):
 
     def resolved(self) -> bool:
         return self.still_running() == []
+
+
+class FESolveBudgetExhausted(QuickCalibrationError):
+    """The per-run cap on new Abaqus FE solves is reached; no further solve is started."""
+
+    def __init__(self, limit: int, attempted: int, completed: int, stage: str) -> None:
+        super().__init__(f"{BUDGET_EXHAUSTED}: the limit of {limit} new Abaqus FE solve(s) for this run is used up "
+                         f"({attempted} attempted, {completed} completed); the next solve ({stage}) was not started. "
+                         "No calibrated value is published.")
+        self.limit, self.attempted, self.completed, self.stage = limit, attempted, completed, stage
+
+
+def _max_new_fe_solves(value) -> int:
+    """A finite positive integer; there is no unlimited setting."""
+    if isinstance(value, bool) or value is None:
+        raise QuickCalibrationError("max_new_fe_solves must be a finite positive integer (no unlimited execution).")
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise QuickCalibrationError("max_new_fe_solves must be a finite positive integer.") from None
+    if not number.is_integer() or number < 1:  # also refuses inf and nan
+        raise QuickCalibrationError("max_new_fe_solves must be a finite positive integer (no unlimited execution).")
+    return int(number)
 
 
 class PreflightRefused(QuickCalibrationError):
@@ -183,6 +211,7 @@ class QuickCalibrationConfig:
     coordinate_scale: Optional[float] = None  # experiment → FE length factor; None = automatic
     orientation_candidate_id: Optional[str] = None  # needed only when the geometry is ambiguous
     solve_budget: int = 16  # LM evaluations (baseline and finite differences included)
+    max_new_fe_solves: int = DEFAULT_MAX_NEW_FE_SOLVES  # hard cap on NEW Abaqus solve attempts in the whole run
     timeout_minutes: float = 120.0
 
     def __post_init__(self) -> None:
@@ -200,6 +229,7 @@ class QuickCalibrationConfig:
                 seen.add(key)
         if self.cpus < 1 or self.solve_budget < 1 + 2 * len(self.parameters):
             raise QuickCalibrationError("cpus must be ≥ 1 and the solve budget ≥ 1 + 2·(number of parameters).")
+        object.__setattr__(self, "max_new_fe_solves", _max_new_fe_solves(self.max_new_fe_solves))
 
 
 def config_from_dict(data: Mapping, base_dir: Path = Path(".")) -> QuickCalibrationConfig:
@@ -207,7 +237,7 @@ def config_from_dict(data: Mapping, base_dir: Path = Path(".")) -> QuickCalibrat
 
     known = {"model_inp", "experiment", "parameters", "output_dir", "abaqus_command", "cpus", "modal_set",
              "experimental_modes", "min_experimental_hz", "max_experimental_hz", "fe_last_mode", "coordinate_scale",
-             "orientation_candidate_id", "solve_budget", "timeout_minutes", "comment"}
+             "orientation_candidate_id", "solve_budget", "max_new_fe_solves", "timeout_minutes", "comment"}
     unknown = set(data) - known
     if unknown:
         raise QuickCalibrationError(f"unknown configuration keys: {sorted(unknown)}")
@@ -238,7 +268,10 @@ def config_from_dict(data: Mapping, base_dir: Path = Path(".")) -> QuickCalibrat
         fe_last_mode=None if data.get("fe_last_mode") is None else int(data["fe_last_mode"]),
         coordinate_scale=_optional_float(data.get("coordinate_scale")),
         orientation_candidate_id=data.get("orientation_candidate_id"),
-        solve_budget=int(data.get("solve_budget", 16)), timeout_minutes=float(data.get("timeout_minutes", 120.0)))
+        solve_budget=int(data.get("solve_budget", 16)),
+        max_new_fe_solves=_max_new_fe_solves(data["max_new_fe_solves"]) if "max_new_fe_solves" in data
+        else DEFAULT_MAX_NEW_FE_SOLVES,
+        timeout_minutes=float(data.get("timeout_minutes", 120.0)))
 
 
 def load_config(path: Path) -> QuickCalibrationConfig:
@@ -266,6 +299,7 @@ def config_template() -> dict:
         "coordinate_scale": None,
         "orientation_candidate_id": None,
         "solve_budget": 16,
+        "max_new_fe_solves": DEFAULT_MAX_NEW_FE_SOLVES,
         "timeout_minutes": 120,
     }
 
@@ -912,8 +946,15 @@ def preflight(config: QuickCalibrationConfig) -> PreflightReport:
                                                 "applied only if it is a geometry candidate of the baseline model")
     else:
         add("Physical orientation", CHECK_INFO, "not selected: " + ORIENTATION_PENDING)
-    add("Abaqus", CHECK_INFO, f"command {config.abaqus_command!r}, {config.cpus} CPU(s); optimiser evaluation "
-                              f"budget {config.solve_budget} (not a cap on all solves); no solve has been started")
+    add("Abaqus", CHECK_INFO, f"command {config.abaqus_command!r}, {config.cpus} CPU(s); at most "
+                              f"{config.max_new_fe_solves} new FE solve(s) in this run (baseline, optimiser, final "
+                              "evaluation and sensitivities; reused finished jobs do not count); optimiser evaluation "
+                              f"budget {config.solve_budget} (separate); no solve has been started")
+    minimum = 1 + 2 * len(config.parameters)
+    if config.max_new_fe_solves < minimum:
+        add("FE solve budget", CHECK_INFO, f"{config.max_new_fe_solves} new FE solve(s) are fewer than a complete run "
+                                           f"needs without reusable jobs (at least {minimum}): unless finished jobs "
+                                           "are reused, the run ends BUDGET_EXHAUSTED without a value")
     return PreflightReport(tuple(checks), choices, chosen, count, job_dir)
 
 
@@ -1020,7 +1061,11 @@ class QuickCalibration:
         self.last_mode = config.fe_last_mode or self.model.eigenvalue_count or 60
         self.work = Path(config.output_dir) / "work"
         self.work.mkdir(parents=True, exist_ok=True)
-        self.abaqus_solves = 0
+        self.abaqus_solves = 0  # completed new solves (the solver returned)
+        self.new_solve_attempts = 0  # attempted new solves, failures included (the hard budget counts these)
+        self.cache_hits = 0
+        self.solve_stages: list[str] = []  # the workflow stage of every attempted new solve
+        self.stage = "baseline"
         self.evaluations: list[_Evaluation] = []
         self._cache: dict[str, FEState] = {}
         self.rows: tuple[ObservationRow, ...] = ()
@@ -1032,19 +1077,23 @@ class QuickCalibration:
         digest = hashlib.sha256(content).hexdigest()
         job_name = f"qc_{digest[:12]}"
         if job_name in self._cache:
+            self.cache_hits += 1
             return self._cache[job_name]
         job_dir = self.work / job_name
         cached = job_dir / "fe_modes.npz"
         if cached.is_file():
             dataset = _load_state(cached)
+            self.cache_hits += 1
             self.progress(f"{job_name}: reused finished job ({self._describe(multipliers)})")
         else:
             self._check_cancel()
+            self._claim_new_solve()  # the hard per-run cap: refused here, before anything is started
             _clear_incomplete_job(job_dir)  # leftovers of an interrupted attempt are never reused
             job_dir.mkdir(parents=True, exist_ok=True)
             inp = job_dir / f"{job_name}.inp"
             inp.write_bytes(content)
-            self.progress(f"{job_name}: Abaqus solve ({self._describe(multipliers)})")
+            self.progress(f"{job_name}: Abaqus solve {self.new_solve_attempts}/{self.config.max_new_fe_solves} "
+                          f"({self.stage}; {self._describe(multipliers)})")
             started = time.monotonic()
             try:
                 odb = self.solve(inp, job_dir, job_name)
@@ -1071,6 +1120,20 @@ class QuickCalibration:
             self._cache[job_name] = state
         return state
 
+    def _claim_new_solve(self) -> None:
+        """Count one new FE solve attempt, or refuse it when the per-run cap is reached (failures count too)."""
+        if self.new_solve_attempts >= self.config.max_new_fe_solves:
+            raise FESolveBudgetExhausted(self.config.max_new_fe_solves, self.new_solve_attempts, self.abaqus_solves,
+                                         self.stage)
+        self.new_solve_attempts += 1
+        self.solve_stages.append(self.stage)
+
+    def budget_report(self) -> dict:
+        return {"max_new_fe_solves": self.config.max_new_fe_solves, "attempted_new_solves": self.new_solve_attempts,
+                "completed_new_solves": self.abaqus_solves, "reused_finished_jobs": self.cache_hits,
+                "attempts_by_stage": {stage: self.solve_stages.count(stage) for stage in dict.fromkeys(
+                    self.solve_stages)}}
+
     def _check_cancel(self) -> None:
         if self.cancel.is_set():
             raise CalibrationCancelled("stopped by the user; no Abaqus process was running.")
@@ -1091,6 +1154,14 @@ class QuickCalibration:
         return np.asarray(residuals)
 
     def run(self) -> dict:
+        """The calibration; a reached FE solve cap ends it as an explicit BUDGET_EXHAUSTED refusal (no value)."""
+        self._base: Optional[dict] = None
+        try:
+            return self._workflow()
+        except FESolveBudgetExhausted as exhausted:
+            return self._budget_refused(exhausted)
+
+    def _workflow(self) -> dict:
         config = self.config
         names = [p.name for p in config.parameters]
         start = {name: 1.0 for name in names}
@@ -1098,6 +1169,7 @@ class QuickCalibration:
         experiment = load_experiment(config)
         peak_modes = [m.number for m in experiment.sorted_modes() if _is_peak_derived(m)]
 
+        self.stage = "baseline"
         baseline = self.fe_state(start)
         self.progress("pairing the baseline FE modes with the experiment")
         rows, excluded, unpaired, warnings, registration, mapped = pair_baseline(baseline.dataset, experiment, config)
@@ -1111,6 +1183,7 @@ class QuickCalibration:
                 "excluded_pairs": excluded, "unpaired_experimental_modes": unpaired,
                 "experimental_source": experiment.source_name, "peak_derived_modes": peak_modes,
                 "parameters": [asdict(p) for p in config.parameters], "sigma_ln": SIGMA_LN}
+        self._base = base
         if len(rows) < len(names) + 1:
             return self._refused(base, f"only {len(rows)} mode pair(s) with MAC ≥ {IDENTIFICATION_MAC:g}; at least "
                                        f"{len(names) + 1} are needed for {len(names)} parameter(s). Pairing uses the "
@@ -1123,6 +1196,7 @@ class QuickCalibration:
         bounds = parameter_bounds([(p.name, p.lower, p.upper) for p in config.parameters])
         settings = LMSettings(mu_initial=LM_MU_INITIAL, mu_decrease=LM_MU_DECREASE,
                               max_step_attempts=LM_STEP_ATTEMPTS, solve_budget=config.solve_budget)
+        self.stage = "optimiser"
         try:
             lm = run_bounded_lm(self.evaluate, start, bounds, settings)
         except StepError as error:
@@ -1146,7 +1220,9 @@ class QuickCalibration:
         p_hat = dict(lm.parameters)
         self.progress("convergence reached; fresh sensitivities at the optimum")
         try:
+            self.stage = "final evaluation"
             final = self.evaluate(p_hat)
+            self.stage = "sensitivities"
             jacobian = self._central_jacobian(p_hat, names)
         except BranchTrackingRefusal as refusal:
             return self._refused(base, f"mode identity lost at the optimum ({refusal})")
@@ -1243,7 +1319,7 @@ class QuickCalibration:
                                   "rms_relative_error": float(np.sqrt(np.mean(np.expm1(r * SIGMA_LN) ** 2))),
                                   "correlation": correlation, "singular_values": singular.tolist()},
                       rows=rows, leave_one_out_cases=loo["cases"],
-                      abaqus_solves=self.abaqus_solves,
+                      abaqus_solves=self.abaqus_solves, fe_solve_budget=self.budget_report(),
                       evaluations=[asdict(e) for e in self.evaluations])
         return result
 
@@ -1295,8 +1371,21 @@ class QuickCalibration:
 
     def _refused(self, base: dict, reason: str) -> dict:
         return dict(base, status=STATUS_REFUSED, refusal_reasons=[reason], estimates={}, overall_grade=None,
-                    abaqus_solves=self.abaqus_solves, evaluations=[asdict(e) for e in self.evaluations],
-                    rows=[asdict(r) for r in self.rows])
+                    abaqus_solves=self.abaqus_solves, fe_solve_budget=self.budget_report(),
+                    evaluations=[asdict(e) for e in self.evaluations], rows=[asdict(r) for r in self.rows])
+
+    def _budget_refused(self, exhausted: FESolveBudgetExhausted) -> dict:
+        """BUDGET_EXHAUSTED: the evidence is incomplete, so no optimiser point or calibrated value is published."""
+        base = dict(self._base) if self._base is not None else {
+            "schema": SCHEMA, "label": LABEL, "claim": NOT_A_MATERIAL_PROPERTY, "inputs": self._inputs(),
+            "parameters": [asdict(p) for p in self.config.parameters], "sigma_ln": SIGMA_LN}
+        if "lm" in base:  # the optimiser's point is not a value: withheld, only its progress is kept
+            base["lm"] = {key: base["lm"][key] for key in ("status", "iterations", "evaluations")}
+        result = self._refused(base, str(exhausted))
+        result.update(refusal_code=BUDGET_EXHAUSTED, budget_exhausted_stage=exhausted.stage, diagnostic_candidate=None,
+                      evaluations=[{"job_name": e.job_name} for e in self.evaluations],
+                      rows=[asdict(r) for r in self.rows])
+        return result
 
     def _inputs(self) -> dict:
         config = self.config
@@ -1369,6 +1458,9 @@ def write_outputs(result: dict, config: QuickCalibrationConfig, model: InpModel)
                                encoding="utf-8")
     paths["report"].write_text(render_report(result), encoding="utf-8")
     _write_modes_csv(paths["modes"], result)
+    calibrated = out / f"{Path(config.model_inp).stem}_calibrated.inp"
+    if result.get("status") != STATUS_ESTIMATE and calibrated.is_file():
+        calibrated.unlink()  # a calibrated INP of an earlier run never stands beside a refusal
     if result.get("status") == STATUS_ESTIMATE:
         multipliers = {name: e["multiplier"] for name, e in result["estimates"].items()}
         header = [f"QUICK CALIBRATION ({LABEL}, {NOT_A_MATERIAL_PROPERTY}; grade {result['overall_grade']})",
@@ -1427,7 +1519,8 @@ def render_report(result: dict) -> str:
         lines.append("WARNING: experimental modes are FRF peak-derived (dataset 58), not curve-fitted.")
     lines.append("")
     if result["status"] == STATUS_REFUSED:
-        lines += ["RESULT: NO VALUE", *[f"  reason: {r}" for r in result["refusal_reasons"]]]
+        code = f" ({result['refusal_code']})" if result.get("refusal_code") else ""
+        lines += [f"RESULT: NO VALUE{code}", *[f"  reason: {r}" for r in result["refusal_reasons"]]]
         candidate = result.get("diagnostic_candidate")
         if candidate:
             lines.append("  (optimiser candidate kept in result.json as a diagnostic only)")
@@ -1463,7 +1556,10 @@ def render_report(result: dict) -> str:
                   f"{p['fe_hz']:.2f} Hz, MAC {_p(p['mac'], 3)}" for p in result["excluded_pairs"]]
     if result.get("unpaired_experimental_modes"):
         lines.append(f"Unpaired experimental modes: {result['unpaired_experimental_modes']}")
-    lines += ["", f"New Abaqus solves in this run: {result.get('abaqus_solves')} (finished jobs are reused)",
+    budget = result.get("fe_solve_budget") or {}
+    lines += ["", f"New Abaqus FE solves in this run: {budget.get('attempted_new_solves')} attempted, "
+                  f"{budget.get('completed_new_solves')} completed, limit {budget.get('max_new_fe_solves')} "
+                  f"(finished jobs reused: {budget.get('reused_finished_jobs')})",
               "Band = max(scatter-scaled sd, half of the leave-one-mode-out range, mode spread); σ = 0.3 % per mode.",
               "Mode spread = how far apart the single modes are about the value (sensitivity-weighted).",
               "Grades: GOOD band ≤ 5 % and all modes ≤ 5 %; APPROXIMATE ≤ 10 %; otherwise UNRELIABLE.",

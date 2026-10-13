@@ -87,6 +87,18 @@ Output folder: `report.txt`, `result.json`, `modes.csv` (per mode: start/final e
 sensitivity, the multiplier this mode alone asks for), `<model>_calibrated.inp` (only when a value
 is shown), `config.json`, and `work/` with the Abaqus jobs (a repeated run reuses finished jobs).
 
+## FE solve budget
+
+`max_new_fe_solves` (window: **Max new FE solves**; CLI: `--max-new-fe-solves`; default **24**,
+never unlimited) is a hard cap on NEW Abaqus solve attempts in one run: baseline, optimiser
+evaluations, the final evaluation and the central-difference sensitivities together. It is checked
+immediately before every solve; a failed attempt counts, a finished job reused from `work/` does
+not. When it is reached no further solve starts and the run ends as `NO VALUE (BUDGET_EXHAUSTED)`
+with the attempted / completed counts and the limit: no calibrated value, no calibrated INP (one
+left by an earlier run in the same folder is removed), and the optimiser's point is not reported.
+The optimiser's own evaluation budget (`solve_budget`, default 16) is separate. The default 24 =
+1 baseline + 16 optimiser evaluations + 2 central differences for each of up to 2 parameters + 3 spare.
+
 ## Stop, timeout and closing the window
 
 - **Stop** terminates only the processes this run started: the Abaqus launcher and every child

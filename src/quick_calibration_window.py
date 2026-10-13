@@ -20,6 +20,7 @@ from typing import Callable, Optional
 
 from services.forward_builder import _parameters, inp_keyword, split_inp_lines
 from services.quick_calibration import (
+    DEFAULT_MAX_NEW_FE_SOLVES,
     AbaqusRunner,
     CalibrationCancelled,
     PreflightRefused,
@@ -87,6 +88,7 @@ class QuickCalibrationWindow:
         self.out = tk.StringVar(master=root)
         self.abaqus = tk.StringVar(master=root, value="abaqus")
         self.cpus = tk.StringVar(master=root, value=str(max(1, min(4, os.cpu_count() or 1))))
+        self.max_new_fe_solves = tk.StringVar(master=root, value=str(DEFAULT_MAX_NEW_FE_SOLVES))
         self.material = tk.StringVar(master=root)
         self.constants = tk.StringVar(master=root, value="E1,E2")
         self.fit_g12 = tk.BooleanVar(master=root, value=False)
@@ -138,6 +140,9 @@ class QuickCalibrationWindow:
         cpu_frame.grid(row=row, column=2, sticky="ew")
         ttk.Label(cpu_frame, text="CPUs").pack(side="left")
         ttk.Spinbox(cpu_frame, from_=1, to=64, width=4, textvariable=self.cpus).pack(side="left", padx=4)
+        ttk.Label(cpu_frame, text="Max new FE solves").pack(side="left", padx=(8, 0))
+        self.max_solves_box = ttk.Spinbox(cpu_frame, from_=1, to=500, width=5, textvariable=self.max_new_fe_solves)
+        self.max_solves_box.pack(side="left", padx=4)
         row += 1
 
         ttk.Label(frame, text="Material to calibrate").grid(row=row, column=0, sticky="w", pady=2)
@@ -333,6 +338,7 @@ class QuickCalibrationWindow:
                                "lower": 0.4, "upper": 2.5})
         return {"model_inp": self.inp.get(), "experiment": self.unv.get(), "output_dir": self.out.get(),
                 "abaqus_command": self.abaqus.get().strip() or "abaqus", "cpus": int(self.cpus.get()),
+                "max_new_fe_solves": self.max_new_fe_solves.get().strip(),
                 "parameters": parameters, "min_experimental_hz": number(self.min_hz),
                 "max_experimental_hz": number(self.max_hz),
                 "modal_set": self.modal_set_keys.get(self.modal_set.get()),
