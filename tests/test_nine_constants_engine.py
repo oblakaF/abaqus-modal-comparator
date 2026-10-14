@@ -186,11 +186,19 @@ class RefusalTests(unittest.TestCase):
         self.assertEqual(a.rank_status, "RANK_DEFICIENT")
         self.assertAlmostEqual(a.constants["nu23"].null_space_weight, 1.0, places=6)
         report = synthetic_demo("thin_plate")  # model level: a thin plate barely feels E3, ν13, ν23
-        weights = {r["constant"]: r["null_space_weight"] for r in report["constants"]}
-        self.assertEqual(report["identifiability"]["rank_status"], "RANK_DEFICIENT")
-        self.assertGreater(weights["E3"], 0.9)
-        self.assertGreater(weights["nu13"], 0.9)
-        self.assertLess(weights["E1"], 0.01)
+        rows = {r["constant"]: r for r in report["constants"]}
+        self.assertTrue(all(r["estimated_value"] is None for r in rows.values()))
+        self.assertEqual(rows["E3"]["status"], "NOT_IDENTIFIABLE")
+        # |S_E3| ~ 6e-6 sits at the numerical-noise edge: depending on the platform's eigensolver the SPEC S4 half-step
+        # check either refuses the column as unresolved, or the column enters and the full system is rank-deficient.
+        if report["identifiability"]["rank_status"] is None:
+            self.assertIn("not resolved above numerical noise", " ".join(rows["E3"]["reasons"]))
+        else:
+            weights = {name: row["null_space_weight"] for name, row in rows.items()}
+            self.assertEqual(report["identifiability"]["rank_status"], "RANK_DEFICIENT")
+            self.assertGreater(weights["E3"], 0.9)
+            self.assertGreater(weights["nu13"], 0.9)
+            self.assertLess(weights["E1"], 0.01)
 
     def test_declared_fixed_constants_are_never_estimated(self):
         report = synthetic_demo("thin_plate_reduced")

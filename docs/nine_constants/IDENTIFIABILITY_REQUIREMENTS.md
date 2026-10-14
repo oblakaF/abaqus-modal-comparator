@@ -62,7 +62,7 @@ The synthetic block has σ = 0.03 % per mode and 27 separated FIT families:
 |---|---|
 | thick block 26 × 12.6 × 8.8 mm, σ 0.03 %, 27 FIT families | all nine supported; recovery within 2σ for two noise seeds |
 | same, σ 0.1 % | ν12 sd 0.054 and ν13 sd 0.094 > declared research limit 0.05 → question refused before optimisation (the six moduli and ν23 alone would pass) |
-| thin plate 80 × 54 × 1.6 mm, σ 0.3 %, 18 FIT families | rank 6 < 9: E3, ν13, ν23 in the null space (weights ≈ 1) |
+| thin plate 80 × 54 × 1.6 mm, σ 0.3 %, 18 FIT families | rank 6 < 9: E3, ν13, ν23 in the null space (weights ≈ 1) on Windows; on Linux CI the E3 column (\|S\| ≈ 6·10⁻⁶) already fails the SPEC S4 noise check — the same refusal, reached earlier |
 | same, E3 / ν13 / ν23 declared fixed | E1, E2, G12 supported; ν12 sd 0.061; G13 sd 9.4 %, G23 sd 22 % (> 8 %) |
 | two accepted rows (SP-13-like) | rank ≤ 2: all nine NOT_IDENTIFIABLE, without any FE evaluation |
 
