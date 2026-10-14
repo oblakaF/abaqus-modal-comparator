@@ -56,7 +56,27 @@ def inp_materials(path: Path) -> list[tuple[str, str]]:
     return out
 
 
+NO_REGISTRATION = "none (automatic geometry registration)"
+
+
+def accepted_registration_fixtures() -> list[str]:
+    """Fixture ids of the accepted catalogue (listed for an explicit choice; none is preselected)."""
+    try:
+        from domain.experiment_fixture import load_experiment_fixture_manifest
+        from services.quick_calibration import FIXTURE_MANIFEST, REPO_ROOT
+
+        return sorted(f.fixture_id for f in load_experiment_fixture_manifest(REPO_ROOT / FIXTURE_MANIFEST).fixtures)
+    except Exception:  # noqa: BLE001 - the option is then unavailable
+        return []
+
+
 def summary_text(result: dict) -> str:
+    if result.get("status") == "BASELINE_ONLY":
+        pairs = (result.get("registration") or {}).get("pairs") or []
+        strong = [p for p in pairs if p.get("fitted_row")]
+        text = ", ".join(f"EXP {p['experimental_mode']} <-> FE {p['fe_mode']} MAC {p['mac']:.4f}" for p in strong)
+        return (f"BASELINE_ONLY (no estimate, no calibrated INP): {len(pairs)} pair(s), {len(strong)} with MAC ≥ 0.80"
+                + (f": {text}" if text else ""))
     if result.get("status") != STATUS_ESTIMATE:
         return "NO VALUE: " + "; ".join(result.get("refusal_reasons") or ["see the report"])
     parts = []
@@ -97,6 +117,8 @@ class QuickCalibrationWindow:
         self.min_hz = tk.StringVar(master=root)
         self.max_hz = tk.StringVar(master=root)
         self.orientation = tk.StringVar(master=root, value="automatic (geometry)")
+        self.registration_fixture = tk.StringVar(master=root, value=NO_REGISTRATION)
+        self.baseline_only = tk.BooleanVar(master=root, value=False)
         self.modal_set = tk.StringVar(master=root)
         self.modal_set_keys: dict[str, Optional[str]] = {}
         self.modal_set_generation = 0
@@ -174,6 +196,16 @@ class QuickCalibrationWindow:
         self.orientation_box = ttk.Combobox(frame, textvariable=self.orientation, state="readonly",
                                             values=["automatic (geometry)"])
         self.orientation_box.grid(row=row, column=1, columnspan=2, sticky="ew", padx=4)
+        row += 1
+        ttk.Label(frame, text="Physical registration").grid(row=row, column=0, sticky="w", pady=2)
+        registration_frame = ttk.Frame(frame)
+        registration_frame.grid(row=row, column=1, columnspan=2, sticky="ew", padx=4)
+        self.registration_box = ttk.Combobox(registration_frame, textvariable=self.registration_fixture,
+                                             state="readonly", width=40,
+                                             values=[NO_REGISTRATION] + accepted_registration_fixtures())
+        self.registration_box.pack(side="left")
+        ttk.Checkbutton(registration_frame, text="Baseline only (one FE solve, no optimisation, no value)",
+                        variable=self.baseline_only, command=self._baseline_only_changed).pack(side="left", padx=12)
         row += 1
 
         buttons = ttk.Frame(frame)
@@ -342,7 +374,14 @@ class QuickCalibrationWindow:
                 "parameters": parameters, "min_experimental_hz": number(self.min_hz),
                 "max_experimental_hz": number(self.max_hz),
                 "modal_set": self.modal_set_keys.get(self.modal_set.get()),
-                "orientation_candidate_id": self.orientation_ids.get(self.orientation.get())}
+                "orientation_candidate_id": self.orientation_ids.get(self.orientation.get()),
+                "physical_registration_fixture": (None if self.registration_fixture.get() == NO_REGISTRATION
+                                                  else self.registration_fixture.get()),
+                "baseline_only": bool(self.baseline_only.get())}
+
+    def _baseline_only_changed(self) -> None:
+        if self.baseline_only.get():
+            self.max_new_fe_solves.set("1")  # baseline only allows exactly one new FE solve
 
     def _save_config(self) -> None:
         path = filedialog.asksaveasfilename(title="Save configuration", defaultextension=".json",

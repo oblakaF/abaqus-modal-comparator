@@ -14,7 +14,7 @@
 
     python tools/quick_calibration.py quick --inp SP13.inp --unv SP13.unv --modal-set best --material CFRP_Face \\
         --constants E1,E2 --out SP13_quick [--abaqus abq2024] [--cpus 4] [--g12] [--orientation <id>] [--check-only]
-        [--max-new-fe-solves 24]
+        [--max-new-fe-solves 24] [--physical-registration-fixture SP13/best-physical] [--baseline-only]
         the same without a configuration file; the configuration used is saved in the output folder.
 
 Every run starts with the input preflight; a refusal stops it before any Abaqus solve. A file with several
@@ -46,7 +46,10 @@ def _quick_config(args) -> dict:
             "parameters": parameters, "orientation_candidate_id": args.orientation, "modal_set": args.modal_set,
             "min_experimental_hz": args.min_hz, "max_experimental_hz": args.max_hz,
             "coordinate_scale": args.scale, "solve_budget": args.budget,
-            "max_new_fe_solves": args.max_new_fe_solves}
+            "max_new_fe_solves": (args.max_new_fe_solves if args.max_new_fe_solves is not None
+                                  else 1 if args.baseline_only else DEFAULT_MAX_NEW_FE_SOLVES),
+            "physical_registration_fixture": args.physical_registration_fixture,
+            "baseline_only": args.baseline_only}
 
 
 DEFAULT_MAX_NEW_FE_SOLVES = 24  # services.quick_calibration.DEFAULT_MAX_NEW_FE_SOLVES (checked by a test)
@@ -82,9 +85,15 @@ def main(argv=None) -> int:
     quick.add_argument("--max-hz", type=float, default=None)
     quick.add_argument("--scale", type=float, default=None, help="experiment → FE length factor (default: auto)")
     quick.add_argument("--budget", type=int, default=16, help="optimiser (LM) evaluation budget")
-    quick.add_argument("--max-new-fe-solves", type=int, default=DEFAULT_MAX_NEW_FE_SOLVES,
+    quick.add_argument("--max-new-fe-solves", type=int, default=None,
                        help="hard cap on NEW Abaqus FE solve attempts in the whole run, failures included; "
-                            f"reused finished jobs do not count (default {DEFAULT_MAX_NEW_FE_SOLVES}; never unlimited)")
+                            f"reused finished jobs do not count (default {DEFAULT_MAX_NEW_FE_SOLVES}, 1 with "
+                            "--baseline-only; never unlimited)")
+    quick.add_argument("--physical-registration-fixture", default=None,
+                       help="apply the accepted frozen physical registration of this fixture (explicit; e.g. "
+                            "SP13/best-physical); excludes --orientation and --scale")
+    quick.add_argument("--baseline-only", action="store_true",
+                       help="one baseline FE dataset and its comparison only: no optimiser, no material value")
     args = parser.parse_args(argv)
 
     from services.quick_calibration import (QuickCalibrationError, config_from_dict, config_template,
@@ -129,7 +138,7 @@ def main(argv=None) -> int:
     print(Path(paths["report"]).read_text(encoding="utf-8"))
     for key, path in paths.items():
         print(f"{key:>15}: {path}")
-    return 0 if result["status"] == "ESTIMATE" else 1
+    return 0 if result["status"] in ("ESTIMATE", "BASELINE_ONLY") else 1
 
 
 if __name__ == "__main__":

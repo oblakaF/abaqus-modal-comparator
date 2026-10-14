@@ -88,6 +88,10 @@ GRADE_APPROXIMATE = "APPROXIMATE"
 GRADE_UNRELIABLE = "UNRELIABLE"
 STATUS_ESTIMATE = "ESTIMATE"
 STATUS_REFUSED = "REFUSED"
+STATUS_BASELINE_ONLY = "BASELINE_ONLY"  # a baseline comparison only: no optimiser, no material value
+REGISTRATION_MISMATCH = "REGISTRATION_IDENTITY_MISMATCH"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FIXTURE_MANIFEST = "docs/auto_id/fixtures/real_experiment_fixtures.json"
 BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
 # Hard per-run cap on NEW Abaqus FE solve attempts (baseline, optimiser, final evaluation, sensitivities, anything
 # else). Finished jobs reused from the cache do not count. 24 = 1 baseline + 16 optimiser evaluations (the default LM
@@ -213,6 +217,8 @@ class QuickCalibrationConfig:
     orientation_candidate_id: Optional[str] = None  # needed only when the geometry is ambiguous
     solve_budget: int = 16  # LM evaluations (baseline and finite differences included)
     max_new_fe_solves: int = DEFAULT_MAX_NEW_FE_SOLVES  # hard cap on NEW Abaqus solve attempts in the whole run
+    physical_registration_fixture: Optional[str] = None  # an accepted fixture whose frozen registration is applied
+    baseline_only: bool = False  # the baseline comparison only: no optimiser, no material value
     timeout_minutes: float = 120.0
 
     def __post_init__(self) -> None:
@@ -231,6 +237,16 @@ class QuickCalibrationConfig:
         if self.cpus < 1 or self.solve_budget < 1 + 2 * len(self.parameters):
             raise QuickCalibrationError("cpus must be ≥ 1 and the solve budget ≥ 1 + 2·(number of parameters).")
         object.__setattr__(self, "max_new_fe_solves", _max_new_fe_solves(self.max_new_fe_solves))
+        fixture = self.physical_registration_fixture
+        if fixture is not None and (not isinstance(fixture, str) or not fixture.strip() or fixture != fixture.strip()):
+            raise QuickCalibrationError("physical_registration_fixture must be an explicit fixture id.")
+        if fixture is not None and (self.orientation_candidate_id is not None or self.coordinate_scale is not None):
+            raise QuickCalibrationError("physical_registration_fixture fixes the geometry: it cannot be combined "
+                                        "with a manual orientation or coordinate scale.")
+        if not isinstance(self.baseline_only, bool):
+            raise QuickCalibrationError("baseline_only must be true or false.")
+        if self.baseline_only and self.max_new_fe_solves != 1:
+            raise QuickCalibrationError("baseline_only allows exactly one new FE solve: set max_new_fe_solves to 1.")
 
 
 def config_from_dict(data: Mapping, base_dir: Path = Path(".")) -> QuickCalibrationConfig:
@@ -238,7 +254,8 @@ def config_from_dict(data: Mapping, base_dir: Path = Path(".")) -> QuickCalibrat
 
     known = {"model_inp", "experiment", "parameters", "output_dir", "abaqus_command", "cpus", "modal_set",
              "experimental_modes", "min_experimental_hz", "max_experimental_hz", "fe_last_mode", "coordinate_scale",
-             "orientation_candidate_id", "solve_budget", "max_new_fe_solves", "timeout_minutes", "comment"}
+             "orientation_candidate_id", "solve_budget", "max_new_fe_solves", "timeout_minutes", "comment",
+             "physical_registration_fixture", "baseline_only"}
     unknown = set(data) - known
     if unknown:
         raise QuickCalibrationError(f"unknown configuration keys: {sorted(unknown)}")
@@ -272,6 +289,8 @@ def config_from_dict(data: Mapping, base_dir: Path = Path(".")) -> QuickCalibrat
         solve_budget=int(data.get("solve_budget", 16)),
         max_new_fe_solves=_max_new_fe_solves(data["max_new_fe_solves"]) if "max_new_fe_solves" in data
         else DEFAULT_MAX_NEW_FE_SOLVES,
+        physical_registration_fixture=data.get("physical_registration_fixture"),
+        baseline_only=data.get("baseline_only", False),
         timeout_minutes=float(data.get("timeout_minutes", 120.0)))
 
 
@@ -301,6 +320,8 @@ def config_template() -> dict:
         "orientation_candidate_id": None,
         "solve_budget": 16,
         "max_new_fe_solves": DEFAULT_MAX_NEW_FE_SOLVES,
+        "physical_registration_fixture": None,
+        "baseline_only": False,
         "timeout_minutes": 120,
     }
 
@@ -666,6 +687,116 @@ def _load_state(path: Path) -> ModalDataset:
         modes = [ModeShape(int(n), float(f), node_ids, data["coordinates"], v)
                  for n, f, v in zip(data["numbers"], data["frequencies"], data["vectors"])]
     return ModalDataset("Abaqus ODB (cached)", path, modes)
+
+
+# ----------------------------------------------------------------------------- accepted physical registration
+
+@dataclass(frozen=True)
+class RegistrationBinding:
+    """An explicitly selected accepted fixture whose frozen registration matches the run's inputs (before Abaqus)."""
+
+    fixture: object
+    registration: object
+    experimental_identity: dict
+    checks: tuple[str, ...]
+
+    def record(self, fe_identity: Optional[Mapping] = None, runtime_checks: Sequence[str] = ()) -> dict:
+        return {"source": "accepted frozen physical registration", "fixture_id": self.fixture.fixture_id,
+                "registration_file": self.fixture.registration.path,
+                "registration_hash": self.registration.registration_hash,
+                "orientation_candidate_id": self.registration.orientation_candidate_id,
+                "accepted_fe_geometry": {"sha256": self.registration.fe_geometry_identity.get("sha256"),
+                                         "node_count": self.registration.fe_geometry_identity.get("node_count")},
+                "fe_geometry_identity": None if fe_identity is None else {
+                    "sha256": fe_identity.get("sha256"), "node_count": fe_identity.get("node_count")},
+                "checks": list(self.checks) + list(runtime_checks)}
+
+
+def bind_physical_registration(config: QuickCalibrationConfig, repo_root: Optional[Path] = None) -> RegistrationBinding:
+    """Verify, before any solve, that the selected fixture's sealed registration belongs to these exact inputs."""
+    from domain.experiment_fixture import load_experiment_fixture_manifest
+    from services.archived_sensitivity_evidence import fresh_content_identity
+    from services.experiment_fixture_regression import (FixtureRegressionError, load_fixture_registration,
+                                                        verify_fixture_dataset)
+    import universal_reader
+
+    repo_root = REPO_ROOT if repo_root is None else Path(repo_root)
+    fixture_id = config.physical_registration_fixture
+    try:
+        fixtures = load_experiment_fixture_manifest(repo_root / FIXTURE_MANIFEST)
+        fixture = fixtures.fixture(fixture_id)
+    except KeyError:
+        raise QuickCalibrationError(f"physical registration fixture {fixture_id!r} is not an accepted fixture.") \
+            from None
+    except (OSError, ValueError) as error:
+        raise QuickCalibrationError(f"the accepted fixture catalogue cannot be read: {error}") from None
+    try:
+        registration = load_fixture_registration(fixture, repo_root)  # hash seal and every fixture pin
+    except (FixtureRegressionError, OSError, ValueError) as error:
+        raise QuickCalibrationError(f"fixture {fixture_id}: the physical registration is not verified: {error}") \
+            from None
+    checks = [f"fixture {fixture_id}: registration {fixture.registration.path} sealed "
+              f"{registration.registration_hash[:12]}… (pinned)"]
+    model_input = fixture.fe.model_input
+    inp = _file_fingerprint(Path(config.model_inp))
+    if model_input is None or inp is None or (inp["sha256"], inp["size"]) != (model_input.sha256,
+                                                                             model_input.size_bytes):
+        raise QuickCalibrationError(f"the model INP is not the fixture's accepted model input "
+                                    f"{getattr(model_input, 'file_name', None)} (SHA-256 / size differ).")
+    checks.append(f"model INP SHA-256 {inp['sha256'][:12]}… = {model_input.file_name} (necessary, not sufficient: "
+                  "the FE geometry identity is verified on the extracted baseline)")
+    try:
+        experimental = fresh_content_identity(Path(config.experiment))
+    except Exception as error:  # noqa: BLE001
+        raise QuickCalibrationError(f"the experimental file cannot be verified: {error}") from None
+    source = fixture.experimental_source
+    if (experimental["sha256"], experimental["size"]) != (source.sha256, source.size_bytes):
+        raise QuickCalibrationError(f"the experimental file is not the fixture's PolyMAX source {source.file_name}.")
+    checks.append(f"experimental SHA-256 {experimental['sha256'][:12]}… = {source.file_name}")
+    if config.modal_set is None or str(config.modal_set).strip().casefold() != fixture.modal_set.name.casefold():
+        raise QuickCalibrationError(f"the fixture's registration needs modal set {fixture.modal_set.name!r}; "
+                                    f"selected {config.modal_set!r}.")
+    try:
+        dataset = universal_reader.load_universal_modal_file(Path(config.experiment), modal_set=fixture.modal_set.name)
+        report = verify_fixture_dataset(fixture, registration, dataset)
+    except (FixtureRegressionError, ValueError) as error:
+        raise QuickCalibrationError(f"fixture {fixture_id}: the modal set does not replay the registration: "
+                                    f"{error}") from None
+    checks.append(f"modal set {report.modal_set_key!r}: {report.mode_count} modes, {report.point_count} points, "
+                  f"measured {'/'.join(report.measured_dofs)} (frozen points and DOF contract replayed)")
+    return RegistrationBinding(fixture, registration, experimental, tuple(checks))
+
+
+def verify_registration_fe_geometry(binding: RegistrationBinding, fe: ModalDataset) -> tuple[dict, list[str]]:
+    """The extracted baseline must have exactly the registration's FE geometry; otherwise QuickCalibrationError."""
+    from domain.registration import RegistrationMismatchError
+    from scientific_state import modal_dataset_geometry_identity
+
+    try:
+        identity = modal_dataset_geometry_identity(fe)
+    except ValueError as error:
+        raise QuickCalibrationError(f"{REGISTRATION_MISMATCH}: the FE geometry identity of the extracted baseline "
+                                    f"is unavailable ({error}).") from None
+    accepted = binding.registration.fe_geometry_identity
+    pinned = binding.fixture.fe.geometry_identity
+    if (identity.get("sha256"), identity.get("node_count")) != (accepted.get("sha256"), accepted.get("node_count")) \
+            or (identity.get("sha256"), identity.get("node_count")) != (pinned.sha256, pinned.node_count):
+        raise QuickCalibrationError(
+            f"{REGISTRATION_MISMATCH}: the extracted baseline has FE geometry {identity.get('sha256', '')[:12]}… "
+            f"({identity.get('node_count')} nodes), not the registration's {str(accepted.get('sha256'))[:12]}… "
+            f"({accepted.get('node_count')} nodes).")
+    try:
+        binding.registration.check_content_compatible(binding.experimental_identity, identity)
+    except (RegistrationMismatchError, ValueError) as error:
+        raise QuickCalibrationError(f"{REGISTRATION_MISMATCH}: {error}") from None
+    present = {str(node) for node in np.asarray(fe.sorted_modes()[0].node_ids, dtype=object)}
+    missing = [node for node in binding.registration.mapped_fe_node_ids if str(node) not in present]
+    if missing:
+        raise QuickCalibrationError(f"{REGISTRATION_MISMATCH}: {len(missing)} mapped FE nodes are absent.")
+    return identity, [f"extracted baseline FE geometry {identity['sha256'][:12]}… ({identity['node_count']} nodes) = "
+                      "registration and fixture (recomputed from the full extracted dataset)",
+                      f"registration content-compatible; all {len(binding.registration.mapped_fe_node_ids)} mapped "
+                      "FE nodes present"]
 
 
 # ----------------------------------------------------------------------------- verified FE job cache
@@ -1064,7 +1195,7 @@ def _job_name(content: bytes) -> str:
     return f"qc_{hashlib.sha256(content).hexdigest()[:12]}"
 
 
-def preflight(config: QuickCalibrationConfig) -> PreflightReport:
+def preflight(config: QuickCalibrationConfig, repo_root: Optional[Path] = None) -> PreflightReport:
     """Check every input that can be checked before an Abaqus solve; nothing is solved, written or guessed."""
 
     checks: list[PreflightCheck] = []
@@ -1134,17 +1265,31 @@ def preflight(config: QuickCalibrationConfig) -> PreflightReport:
                     add("Experimental modes", CHECK_OK,
                         f"{count} mode(s) used, {modes[0].frequency_hz:.2f}-{modes[-1].frequency_hz:.2f} Hz"
                         + (f" (of {chosen.mode_count} in the set)" if chosen and chosen.mode_count != count else ""))
-    if config.orientation_candidate_id:
+    if config.physical_registration_fixture:
+        try:
+            binding = bind_physical_registration(config, repo_root)
+        except QuickCalibrationError as error:
+            add("Physical registration", CHECK_REFUSED, str(error))
+        else:
+            for check in binding.checks:
+                add("Physical registration", CHECK_OK, check)
+            add("Physical orientation", CHECK_INFO, "fixed by the accepted frozen physical registration (no "
+                                                    "automatic orientation); the FE geometry identity is verified on "
+                                                    "the extracted baseline before any pairing")
+    elif config.orientation_candidate_id:
         add("Physical orientation", CHECK_INFO, f"selected by the user: {config.orientation_candidate_id}; it is "
                                                 "applied only if it is a geometry candidate of the baseline model")
     else:
         add("Physical orientation", CHECK_INFO, "not selected: " + ORIENTATION_PENDING)
+    if config.baseline_only:
+        add("Mode", CHECK_INFO, "BASELINE_ONLY: one baseline FE dataset and its comparison; no optimiser, no material "
+                                "update, no calibrated INP")
     add("Abaqus", CHECK_INFO, f"command {config.abaqus_command!r}, {config.cpus} CPU(s); at most "
                               f"{config.max_new_fe_solves} new FE solve(s) in this run (baseline, optimiser, final "
                               "evaluation and sensitivities; reused finished jobs do not count); optimiser evaluation "
                               f"budget {config.solve_budget} (separate); no solve has been started")
     minimum = 1 + 2 * len(config.parameters)
-    if config.max_new_fe_solves < minimum:
+    if config.max_new_fe_solves < minimum and not config.baseline_only:
         add("FE solve budget", CHECK_INFO, f"{config.max_new_fe_solves} new FE solve(s) are fewer than a complete run "
                                            f"needs without reusable jobs (at least {minimum}): unless finished jobs "
                                            "are reused, the run ends BUDGET_EXHAUSTED without a value")
@@ -1155,16 +1300,21 @@ def _is_peak_derived(mode: ModeShape) -> bool:
     return "peak" in str(mode.metadata.get("mode_source", "")).lower()
 
 
-def pair_baseline(fe: ModalDataset, experiment: ModalDataset, config: QuickCalibrationConfig):
-    """The application's comparison (geometry-only registration), then the strict MAC ≥ 0.80 row filter."""
+def pair_baseline(fe: ModalDataset, experiment: ModalDataset, config: QuickCalibrationConfig, registration=None):
+    """The application's comparison (an accepted frozen registration, or the geometry-only registration), then the
+    strict MAC ≥ 0.80 row filter."""
 
     import modal_core
     from reviewed_core import GeometryOrientationAmbiguousError
 
     selection = None if config.orientation_candidate_id is None else {"candidate_id": config.orientation_candidate_id}
     try:
-        comparison = modal_core.compare_modal_datasets(fe, experiment, coordinate_scale_override=config.coordinate_scale,
-                                                       orientation_selection=selection)
+        if registration is not None:  # the frozen mapping and rotation; nothing is searched
+            comparison = modal_core.compare_modal_datasets(fe, experiment, frozen_registration=registration)
+        else:
+            comparison = modal_core.compare_modal_datasets(fe, experiment,
+                                                           coordinate_scale_override=config.coordinate_scale,
+                                                           orientation_selection=selection)
     except GeometryOrientationAmbiguousError as error:
         options = "; ".join(f"{c.get('candidate_id')} [{describe_orientation(c)}]" for c in error.ambiguous_candidates)
         raise QuickCalibrationError(
@@ -1187,7 +1337,7 @@ def pair_baseline(fe: ModalDataset, experiment: ModalDataset, config: QuickCalib
     unpaired = sorted(set(experimental) - {p.experimental_mode for p in comparison.pairs})
     geometry = comparison.geometry
     mapped = np.asarray(comparison.abaqus.sorted_modes()[0].node_ids)[np.asarray(geometry.experimental_to_abaqus)]
-    registration = {
+    registration_info = {
         "mapped_fe_node_count": int(len(set(_node_key(n) for n in mapped))),
         "orientation_source": comparison.metadata.get("orientation_source"),
         "coordinate_scale": float(geometry.coordinate_scale),
@@ -1195,7 +1345,14 @@ def pair_baseline(fe: ModalDataset, experiment: ModalDataset, config: QuickCalib
         "matched_fraction": float(geometry.matched_fraction),
         "reflection": bool(np.linalg.det(geometry.rotation) < 0),
     }
-    return tuple(rows), excluded, unpaired, list(comparison.warnings), registration, [_node_key(n) for n in mapped]
+    registration_info["pairs"] = [
+        {"experimental_mode": p.experimental_mode, "experimental_hz": p.experimental_frequency_hz,
+         "fe_mode": p.abaqus_mode, "fe_hz": p.abaqus_frequency_hz, "mac": p.mac,
+         "frequency_error_percent": p.frequency_error_percent, "status": p.status,
+         "fitted_row": p.mac is not None and math.isfinite(p.mac) and p.mac >= IDENTIFICATION_MAC}
+        for p in sorted(comparison.pairs, key=lambda p: p.experimental_frequency_hz)]
+    return (tuple(rows), excluded, unpaired, list(comparison.warnings), registration_info,
+            [_node_key(n) for n in mapped])
 
 
 def tracking_nodes(fe: ModalDataset, mapped_ids: Sequence[str], cap: int = TRACKING_NODE_CAP) -> list[str]:
@@ -1243,8 +1400,9 @@ class _Evaluation:
 class QuickCalibration:
     def __init__(self, config: QuickCalibrationConfig, solve: SolveFunction, extract: ExtractFunction,
                  progress: Optional[ProgressFunction] = None, cancel: Optional[threading.Event] = None,
-                 solver_identity: Optional[Mapping] = None) -> None:
+                 solver_identity: Optional[Mapping] = None, repo_root: Optional[Path] = None) -> None:
         self.config = config
+        self.repo_root = repo_root
         self.solver_identity = dict(solver_identity or {})  # {"solver": ..., "extraction": ...}; empty: unknown
         self.process_state = process_state  # re-checks processes recorded by an unconfirmed stop
         self.cache_decisions: list[dict] = []
@@ -1464,10 +1622,24 @@ class QuickCalibration:
         experiment = load_experiment(config)
         peak_modes = [m.number for m in experiment.sorted_modes() if _is_peak_derived(m)]
 
+        binding = None
+        if config.physical_registration_fixture:
+            binding = bind_physical_registration(config, self.repo_root)  # again, immediately before the solve
         self.stage = "baseline"
         baseline = self.fe_state(start)
+        registration_record = None
+        if binding is not None:
+            self.progress("verifying the FE geometry identity of the extracted baseline against the registration")
+            try:
+                fe_identity, runtime_checks = verify_registration_fe_geometry(binding, baseline.dataset)
+            except QuickCalibrationError as error:
+                return self._registration_refused(binding, str(error))
+            registration_record = binding.record(fe_identity, runtime_checks)
         self.progress("pairing the baseline FE modes with the experiment")
-        rows, excluded, unpaired, warnings, registration, mapped = pair_baseline(baseline.dataset, experiment, config)
+        rows, excluded, unpaired, warnings, registration, mapped = pair_baseline(
+            baseline.dataset, experiment, config, None if binding is None else binding.registration)
+        if registration_record is not None:
+            registration["physical_registration"] = registration_record
         self.rows = rows
         self._node_order = tracking_nodes(baseline.dataset, mapped)
         registration["tracking_node_count"] = len(self._node_order)
@@ -1479,6 +1651,8 @@ class QuickCalibration:
                 "experimental_source": experiment.source_name, "peak_derived_modes": peak_modes,
                 "parameters": [asdict(p) for p in config.parameters], "sigma_ln": SIGMA_LN}
         self._base = base
+        if config.baseline_only:
+            return self._baseline_only(base, rows)
         if len(rows) < len(names) + 1:
             return self._refused(base, f"only {len(rows)} mode pair(s) with MAC ≥ {IDENTIFICATION_MAC:g}; at least "
                                        f"{len(names) + 1} are needed for {len(names)} parameter(s). Pairing uses the "
@@ -1671,6 +1845,24 @@ class QuickCalibration:
                     fe_job_cache=list(self.cache_decisions),
                     evaluations=[asdict(e) for e in self.evaluations], rows=[asdict(r) for r in self.rows])
 
+    def _baseline_only(self, base: dict, rows) -> dict:
+        """BASELINE_ONLY: the baseline frequency / MAC comparison; no optimiser, no material update, no value."""
+        result = dict(base, status=STATUS_BASELINE_ONLY, estimates={}, overall_grade=None, diagnostic_candidate=None,
+                      refusal_reasons=[], abaqus_solves=self.abaqus_solves, fe_solve_budget=self.budget_report(),
+                      fe_job_cache=list(self.cache_decisions), evaluations=[], rows=[asdict(r) for r in rows],
+                      baseline_only={"statement": "baseline comparison only: no optimiser evaluation, no material "
+                                                  "update, no calibrated INP, no estimate",
+                                     "pairs_with_mac_at_least_0.80": len(rows)})
+        return result
+
+    def _registration_refused(self, binding: RegistrationBinding, reason: str) -> dict:
+        base = {"schema": SCHEMA, "label": LABEL, "claim": NOT_A_MATERIAL_PROPERTY, "inputs": self._inputs(),
+                "parameters": [asdict(p) for p in self.config.parameters], "sigma_ln": SIGMA_LN,
+                "registration": {"physical_registration": binding.record()}}
+        result = self._refused(base, reason)
+        result.update(refusal_code=REGISTRATION_MISMATCH, diagnostic_candidate=None)
+        return result
+
     def _budget_refused(self, exhausted: FESolveBudgetExhausted) -> dict:
         """BUDGET_EXHAUSTED: the evidence is incomplete, so no optimiser point or calibrated value is published."""
         base = dict(self._base) if self._base is not None else {
@@ -1693,6 +1885,8 @@ class QuickCalibration:
                 "min_experimental_hz": config.min_experimental_hz, "max_experimental_hz": config.max_experimental_hz,
                 "fe_last_mode": self.last_mode, "coordinate_scale": config.coordinate_scale,
                 "orientation_candidate_id": config.orientation_candidate_id,
+                "physical_registration_fixture": config.physical_registration_fixture,
+                "baseline_only": config.baseline_only,
                 "elastic_records": {k: {"type": v.elastic_type, "values": dict(zip(v.names, v.values))}
                                     for k, v in self.model.records.items()}}
 
@@ -1825,7 +2019,20 @@ def render_report(result: dict) -> str:
     if result.get("peak_derived_modes"):
         lines.append("WARNING: experimental modes are FRF peak-derived (dataset 58), not curve-fitted.")
     lines.append("")
-    if result["status"] == STATUS_REFUSED:
+    physical = (result.get("registration") or {}).get("physical_registration")
+    if physical:
+        lines += [f"Physical registration: {physical['fixture_id']} {physical['registration_file']} "
+                  f"(sealed {physical['registration_hash'][:16]}…)",
+                  *[f"  check: {check}" for check in physical["checks"]], ""]
+    if result["status"] == STATUS_BASELINE_ONLY:
+        lines += ["RESULT: BASELINE_ONLY (no optimiser, no material update, no estimate, no calibrated INP)",
+                  "BASELINE COMPARISON (recomputed from the baseline FE dataset of this run)",
+                  f"{'EXP':>4} {'f_exp Hz':>10} {'FE':>4} {'f_FE Hz':>10} {'error %':>8} {'MAC':>8}  status"]
+        for pair in (result.get("registration") or {}).get("pairs") or []:
+            lines.append(f"{pair['experimental_mode']:>4} {pair['experimental_hz']:>10.3f} {pair['fe_mode']:>4} "
+                         f"{pair['fe_hz']:>10.3f} {pair['frequency_error_percent']:>+8.2f} {_p(pair['mac'], 6):>8}  "
+                         f"{pair['status']}" + ("  [MAC ≥ 0.80]" if pair["fitted_row"] else ""))
+    elif result["status"] == STATUS_REFUSED:
         code = f" ({result['refusal_code']})" if result.get("refusal_code") else ""
         lines += [f"RESULT: NO VALUE{code}", *[f"  reason: {r}" for r in result["refusal_reasons"]]]
         candidate = result.get("diagnostic_candidate")
@@ -1897,7 +2104,8 @@ def run_quick_calibration(config: QuickCalibrationConfig, solve: Optional[SolveF
                           progress: Optional[ProgressFunction] = None,
                           cancel: Optional[threading.Event] = None,
                           runner: Optional[AbaqusRunner] = None,
-                          solver_identity: Optional[Mapping] = None) -> tuple[dict, dict[str, Path]]:
+                          solver_identity: Optional[Mapping] = None,
+                          repo_root: Optional[Path] = None) -> tuple[dict, dict[str, Path]]:
     """Run the calibration and write result.json, report.txt, modes.csv (and the calibrated INP).
 
     The input preflight runs first; any refusal raises ``PreflightRefused`` before an Abaqus solve. ``cancel``
@@ -1906,7 +2114,7 @@ def run_quick_calibration(config: QuickCalibrationConfig, solve: Optional[SolveF
     """
     cancel = cancel if cancel is not None else threading.Event()
 
-    report = preflight(config)
+    report = preflight(config, repo_root)
     if not report.ready:
         raise PreflightRefused(report)
     config = replace(config, modal_set=None if report.modal_set is None else report.modal_set.key)
@@ -1918,7 +2126,7 @@ def run_quick_calibration(config: QuickCalibrationConfig, solve: Optional[SolveF
         owner = runner if runner is not None else getattr(solve, "__self__", None)
         identify = getattr(owner, "identity", None)
         solver_identity = identify() if callable(identify) else None
-    calibration = QuickCalibration(config, solve, extract, progress, cancel, solver_identity)
+    calibration = QuickCalibration(config, solve, extract, progress, cancel, solver_identity, repo_root)
     result = calibration.run()
     result["preflight"] = report.to_dict()
     paths = write_outputs(result, config, calibration.model)

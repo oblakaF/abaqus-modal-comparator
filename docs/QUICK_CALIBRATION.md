@@ -88,6 +88,25 @@ sensitivity, the multiplier this mode alone asks for), `<model>_calibrated.inp` 
 is shown), `config.json`, and `work/` with the Abaqus jobs (a repeated run reuses a finished job only when its
 provenance is verified, see below).
 
+## Accepted physical registration and baseline-only mode
+
+`physical_registration_fixture` (window: **Physical registration**; CLI: `--physical-registration-fixture`; never
+preselected) applies the frozen measured-point-to-FE-node mapping and rotation of an accepted fixture, e.g.
+`SP13/best-physical` (`docs/registrations/SP13_physical_registration.json`). It excludes a manual orientation and a
+coordinate scale. Before Abaqus the preflight verifies the fixture and the registration seal, the model INP SHA-256
+against the fixture's model input, the experimental file content and the modal set / points / measured-DOF contract.
+After the baseline, the FE geometry identity is recomputed from the full extracted dataset and must equal the
+registration's (for SP-13 `34d69d79…`, 1,585,637 nodes); the registration must be content-compatible and every mapped
+FE node present. Otherwise the run is refused (`REGISTRATION_IDENTITY_MISMATCH`) before any optimiser step; there is
+no automatic fallback. Pairing then uses `compare_modal_datasets(..., frozen_registration=...)` with the unchanged
+MAC and frequency gates.
+
+**Baseline only** (window checkbox; CLI `--baseline-only`; requires `max_new_fe_solves = 1`) runs the preflight,
+obtains one verified baseline FE dataset (or reuses a verified one), verifies the registration and writes the
+baseline frequency / MAC table as `BASELINE_ONLY`: no optimiser evaluation, no material update, no estimate and no
+calibrated INP. For SP-13 the archived regression references are EXP 4 <-> FE 10 (MAC 0.958458) and EXP 7 <-> FE 13
+(MAC 0.946904); they are references, not an independent validation.
+
 ## Verified FE job cache
 
 Each finished job in `work/<job>/` has `provenance.json` (schema `quick-calibration/fe-job-provenance/v1`),

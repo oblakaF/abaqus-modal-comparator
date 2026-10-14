@@ -67,6 +67,7 @@ class FakeAbaqus:
         self.layers = layers  # >1: extra node layers below the scanned surface (a solid sandwich stand-in)
         self.solver_identity = {"command": "fake-abaqus", "executable": "fake", "executable_sha256": "fake-solver-v1"}
         self.extraction_identity = {"script": "fake-extract", "script_sha256": "fake-extract-v1", "start_mode": 1}
+        self.node_id_format = "PLATE-1.{}"  # "PLATE-1:{}" gives "INSTANCE:label" ids with an FE geometry identity
 
     def identity(self) -> dict:
         """Recorded with every job and compared before any reuse (like AbaqusRunner.identity)."""
@@ -84,7 +85,7 @@ class FakeAbaqus:
         state = json.loads(Path(odb_path).read_text())
         e, g = state["E1"], state["G12"]
         x, y = fe_grid()
-        ids = np.array([f"PLATE-1.{i + 1}" for i in range(len(x))], dtype=object)
+        ids = np.array([self.node_id_format.format(i + 1) for i in range(len(x))], dtype=object)
         coordinates = np.column_stack([x, y, np.zeros_like(x)])
         shapes = [shape(x, y, m, n) for m, n, *_ in MODES]
         if self.mixing is not None:
@@ -96,7 +97,7 @@ class FakeAbaqus:
         modes = []
         count = len(x)
         if self.layers > 1:  # deeper layers at z = -5 mm, -10 mm ... with the same U3 (bending)
-            ids = np.array([f"PLATE-1.{i + 1}" for i in range(count * self.layers)], dtype=object)
+            ids = np.array([self.node_id_format.format(i + 1) for i in range(count * self.layers)], dtype=object)
             coordinates = np.vstack([np.column_stack([x, y, np.full(count, -5.0 * layer)])
                                      for layer in range(self.layers)])
         for number, (frequency, values) in enumerate(sorted(rigid + elastic, key=lambda item: item[0]), start=1):
