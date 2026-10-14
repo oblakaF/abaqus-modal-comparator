@@ -9,7 +9,19 @@ constants of *this* model for *this* specimen, not transferable without validati
 
 ## Start
 
-- Window: double-click `RUN_QUICK_CALIBRATION.cmd`. Choose the INP, the UNV/UFF, the
+- Main application (`RUN_PROGRAM.cmd`): it offers two workflows, in the **Workflow** menu and
+  as buttons under the title. **1. Compare modes (ODB + UNV/UFF)** is the main window itself
+  (tab "1. Files"). **2. Calibrate effective material properties (INP + UNV/UFF)** opens this
+  calibration window inside the application (one window; pressing it again brings it to the
+  front). Closing the application (window "X" or File > Exit) while a calibration runs, or
+  while the termination of its Abaqus processes is unconfirmed, first stops the calibration
+  (see *Stop, timeout and closing the window*); the application stays open until the
+  calibration window has closed.
+- The result line under **Run / Stop** states the status first: `ESTIMATE, grade ...` (effective
+  constants, multiplier, band; always *NOT A MATERIAL PROPERTY*; APPROXIMATE and UNRELIABLE are
+  marked as not validated / not to be used), `REFUSED (no value): ...` or `BASELINE_ONLY ...`.
+  **Open report** opens `report.txt`, **Open output folder** the run folder.
+- Window alone: double-click `RUN_QUICK_CALIBRATION.cmd`. Choose the INP, the UNV/UFF, the
   **experimental modal set** (listed from the file), the material (filled from the INP), press
   **Check inputs** (no Abaqus run), then **Run calibration**.
 - Command line:

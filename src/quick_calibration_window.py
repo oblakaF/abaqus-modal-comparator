@@ -1,4 +1,5 @@
-"""Quick effective-property calibration window (standalone; started by RUN_QUICK_CALIBRATION.cmd).
+"""Quick effective-property calibration window: workflow 2 of the main application (quick_calibration_ui, a
+Toplevel of its root), or stand-alone through RUN_QUICK_CALIBRATION.cmd.
 
 Choose the Abaqus model (INP), the Polytec / Testlab file (UNV/UFF) and the material, press Run.
 The work is done by services.quick_calibration (the same service as tools/quick_calibration.py).
@@ -70,7 +71,16 @@ def accepted_registration_fixtures() -> list[str]:
         return []
 
 
+NOT_A_MATERIAL_PROPERTY = "EFFECTIVE VALUE OF THIS MODEL - NOT A MATERIAL PROPERTY"
+GRADE_NOTES = {"GOOD": "consistent for this model and specimen; not validated material data",
+               "APPROXIMATE": "approximate; NOT validated material data",
+               "UNRELIABLE": "unreliable; do not use as a material value"}
+STATUS_COLOURS = {"GOOD": "#174a7c", "APPROXIMATE": "#9a5300", "UNRELIABLE": "#a11d1d", "REFUSED": "#a11d1d",
+                  "BASELINE_ONLY": "#33475b"}
+
+
 def summary_text(result: dict) -> str:
+    """One line for the window: the status (ESTIMATE / REFUSED / BASELINE_ONLY) first, never a bare value."""
     if result.get("status") == "BASELINE_ONLY":
         pairs = (result.get("registration") or {}).get("pairs") or []
         strong = [p for p in pairs if p.get("fitted_row")]
@@ -78,12 +88,26 @@ def summary_text(result: dict) -> str:
         return (f"BASELINE_ONLY (no estimate, no calibrated INP): {len(pairs)} pair(s), {len(strong)} with MAC ≥ 0.80"
                 + (f": {text}" if text else ""))
     if result.get("status") != STATUS_ESTIMATE:
-        return "NO VALUE: " + "; ".join(result.get("refusal_reasons") or ["see the report"])
+        return f"{result.get('status') or 'REFUSED'} (no value): " + "; ".join(
+            result.get("refusal_reasons") or ["see the report"])
+    grade = result.get("overall_grade")
     parts = []
     for name, estimate in result["estimates"].items():
         constants = ", ".join(f"{c} = {v['calibrated_value']:,.0f}" for c, v in estimate["constants"].items())
-        parts.append(f"{name}: k = {estimate['multiplier']:.4f} (±{estimate['band_percent']:.1f} %) → {constants}")
-    return f"{result['overall_grade']}: " + " | ".join(parts)
+        band = estimate.get("band_percent")
+        band_text = f"band ±{band:.1f} %" if band is not None else "no uncertainty band"
+        parts.append(f"{name}: effective {constants} (INP units; k = {estimate['multiplier']:.4f}, {band_text})")
+    return (f"ESTIMATE, grade {grade}: " + " | ".join(parts) + f". {NOT_A_MATERIAL_PROPERTY}"
+            + (f" ({GRADE_NOTES[grade]})." if grade in GRADE_NOTES else "."))
+
+
+def summary_colour(result: Optional[dict]) -> str:
+    """Status colour of the summary line; APPROXIMATE is never shown like a validated value."""
+    if not result:
+        return ""
+    if result.get("status") == STATUS_ESTIMATE:
+        return STATUS_COLOURS.get(result.get("overall_grade"), STATUS_COLOURS["UNRELIABLE"])
+    return STATUS_COLOURS.get(result.get("status"), STATUS_COLOURS["REFUSED"])
 
 
 class QuickCalibrationWindow:
@@ -219,7 +243,14 @@ class QuickCalibrationWindow:
         self.open_button = ttk.Button(buttons, text="Open output folder", command=self._open_output,
                                       state="disabled")
         self.open_button.pack(side="left", padx=6)
+        self.report_button = ttk.Button(buttons, text="Open report", command=self._open_report, state="disabled")
+        self.report_button.pack(side="left", padx=(0, 6))
         ttk.Button(buttons, text="Save configuration...", command=self._save_config).pack(side="left")
+        row += 1
+        # the result line sits right under Run / Stop so it stays visible in a small or DPI-scaled window
+        self.summary_label = ttk.Label(frame, textvariable=self.summary, wraplength=900,
+                                       font=("TkDefaultFont", 10, "bold"), justify="left")
+        self.summary_label.grid(row=row, column=0, columnspan=3, sticky="w", pady=(0, 6))
         row += 1
         readiness = ttk.LabelFrame(frame, text="Input readiness (checked before any Abaqus solve)", padding=4)
         readiness.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(0, 6))
@@ -232,9 +263,6 @@ class QuickCalibrationWindow:
             self.readiness_table.heading(key, text=title)
             self.readiness_table.column(key, width=width, anchor="w", stretch=key == "detail")
         self.readiness_table.grid(row=1, column=0, sticky="ew")
-        row += 1
-        ttk.Label(frame, textvariable=self.summary, wraplength=900, font=("TkDefaultFont", 10, "bold"),
-                  justify="left").grid(row=row, column=0, columnspan=3, sticky="w")
         row += 1
         self.log = ScrolledText(frame, height=22, width=110, font=("Consolas", 9))
         self.log.grid(row=row, column=0, columnspan=3, sticky="nsew")
@@ -448,6 +476,8 @@ class QuickCalibrationWindow:
             runner = self.runner_factory(config, cancel)
             solve, extract = solve or runner.solve, extract or runner.extract
         self.summary.set("Checking the inputs, then running... (Abaqus solves can take minutes each)")
+        self.summary_label.configure(foreground="")
+        self.report_button.configure(state="disabled")
         self._write(f"\n=== run: {config.output_dir}\n")
 
         def work():
@@ -539,8 +569,10 @@ class QuickCalibrationWindow:
             elif kind == "done":
                 self.result, self.paths = payload
                 self.summary.set(summary_text(self.result))
+                self.summary_label.configure(foreground=summary_colour(self.result))
                 self._write("\n" + Path(self.paths["report"]).read_text(encoding="utf-8"))
                 self.open_button.configure(state="normal")
+                self.report_button.configure(state="normal")
                 finished = True
             elif kind == "stopped":
                 finished = True
@@ -604,10 +636,19 @@ class QuickCalibrationWindow:
         folder = self.out.get()
         if not folder:
             return
-        if os.name == "nt":
-            os.startfile(folder)  # type: ignore[attr-defined]
-        else:
-            subprocess.Popen(["xdg-open", folder])
+        _open_path(folder)
+
+    def _open_report(self) -> None:
+        report = self.paths.get("report")
+        if report and Path(report).is_file():
+            _open_path(str(report))
+
+
+def _open_path(path: str) -> None:
+    if os.name == "nt":
+        os.startfile(path)  # type: ignore[attr-defined]
+    else:
+        subprocess.Popen(["xdg-open", path])
 
 
 def main() -> None:

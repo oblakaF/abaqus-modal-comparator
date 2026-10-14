@@ -47,6 +47,7 @@ from pair_plot_cache_ui import install_pair_plot_cache_ui
 from polymax_ui import install_polymax_ui
 from project_review import install_project_review
 from project_review_polish import install_project_review_polish
+from quick_calibration_ui import install_quick_calibration_ui
 from responsive_images import install_responsive_images
 from responsive_status_bar import install_responsive_status_bar
 from runtime_contracts import verify_runtime_contracts
@@ -73,6 +74,8 @@ install_idle_ui_state(app)
 install_responsive_status_bar(app)
 install_responsive_workflow(app)
 install_polymax_ui(app)
+# Last: wraps the final close owners so closing never bypasses the quick calibration's stop safeguards.
+install_quick_calibration_ui(app)
 verify_runtime_contracts(app)
 
 

@@ -266,7 +266,8 @@ class ConfigurationTests(_Case):
         self.assertEqual(fake.calls, 0)
         window.max_new_fe_solves.set("2")
         window.start()
-        self.assertTrue(window.summary.get().startswith(f"NO VALUE: {BUDGET_EXHAUSTED}"), window.summary.get())
+        self.assertTrue(window.summary.get().startswith(f"REFUSED (no value): {BUDGET_EXHAUSTED}"),
+                        window.summary.get())
         self.assertEqual(fake.calls, 2)
         self.assertEqual(json.loads((self.folder / "out" / "config.json").read_text())["max_new_fe_solves"], "2")
 
