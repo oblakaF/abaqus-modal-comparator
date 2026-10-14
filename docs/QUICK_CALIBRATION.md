@@ -17,6 +17,15 @@ constants of *this* model for *this* specimen, not transferable without validati
   while the termination of its Abaqus processes is unconfirmed, first stops the calibration
   (see *Stop, timeout and closing the window*); the application stays open until the
   calibration window has closed.
+- The two workflows never run at the same time. A calibration does not start while the ODB
+  comparison runs, stops or still owns an Abaqus process; the ODB comparison does not start
+  while a calibration runs, stops or has Abaqus processes whose termination is unconfirmed. The
+  user is told why; nothing running is interrupted. Both are available when idle.
+- **Run calibration** asks for explicit consent before a real Abaqus run, showing the CPUs, the
+  maximum NEW FE solve attempts, the output folder and the Abaqus command, with a warning about
+  RAM / paging file, disk space and Abaqus licence tokens. **Cancel** starts nothing (no solve, no
+  file). Window defaults are conservative and editable: **CPUs 1**, **Max new FE solves 8**
+  (Baseline only: 1); the service / CLI cap stays 24.
 - The result line under **Run / Stop** states the status first: `ESTIMATE, grade ...` (effective
   constants, multiplier, band; always *NOT A MATERIAL PROPERTY*; APPROXIMATE and UNRELIABLE are
   marked as not validated / not to be used), `REFUSED (no value): ...` or `BASELINE_ONLY ...`.
@@ -146,8 +155,8 @@ of the identity (it does not change the model).
 
 ## FE solve budget
 
-`max_new_fe_solves` (window: **Max new FE solves**; CLI: `--max-new-fe-solves`; default **24**,
-never unlimited) is a hard cap on NEW Abaqus solve attempts in one run: baseline, optimiser
+`max_new_fe_solves` (window: **Max new FE solves**, default **8**; CLI: `--max-new-fe-solves` and
+configuration files: default **24**; never unlimited) is a hard cap on NEW Abaqus solve attempts in one run: baseline, optimiser
 evaluations, the final evaluation and the central-difference sensitivities together. It is checked
 immediately before every solve; a failed attempt counts, a finished job reused from `work/` does
 not. When it is reached no further solve starts and the run ends as `NO VALUE (BUDGET_EXHAUSTED)`

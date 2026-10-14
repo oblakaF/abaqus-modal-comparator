@@ -7,6 +7,10 @@
 Closing the application (window "X" or File > Exit) never bypasses the quick calibration's own stop safeguards:
 while a calibration runs, or the termination of its Abaqus processes is unconfirmed, the close is handed to
 QuickCalibrationWindow.close() and the application stays open until that window has closed.
+
+The two workflows never run at the same time: the ODB comparison does not start (_start) while a calibration runs,
+stops or has unconfirmed owned processes, and a calibration does not start while the comparison runs, stops or
+still owns an Abaqus process. Nothing running is interrupted; the user is told why.
 """
 
 from __future__ import annotations
@@ -48,8 +52,26 @@ def open_quick_calibration(self, factory: Optional[Callable] = None):
     height = min(950, max(650, top.winfo_screenheight() - 120))
     top.geometry(f"{width}x{height}+30+20")
     window = (factory or QuickCalibrationWindow)(top)
+    window.other_workflow_busy = self._comparison_busy_reason  # no calibration while the comparison is busy
     self._quick_calibration = window
     return window
+
+
+def comparison_busy_reason(self) -> Optional[str]:
+    """Why a calibration must not start: the ODB comparison runs, stops or still owns an Abaqus process."""
+    if getattr(self, "running", False):
+        stopping = getattr(getattr(self, "analysis_state", None), "name", "") == "STOPPING"
+        return "the ODB comparison (workflow 1) is stopping" if stopping else "the ODB comparison (workflow 1) is running"
+    process = getattr(self, "_owned_analysis_process", None)
+    if process is not None and process.poll() is None:
+        return "an Abaqus process of the ODB comparison (workflow 1) is still active"
+    return None
+
+
+def quick_calibration_busy_reason(self) -> Optional[str]:
+    """Why the ODB comparison must not start: a calibration runs, stops or has unconfirmed owned processes."""
+    window = getattr(self, "_quick_calibration", None)
+    return window.busy_reason() if _window_open(window) else None
 
 
 def show_compare_workflow(self) -> None:
@@ -101,6 +123,17 @@ def install_quick_calibration_ui(app_module) -> None:
     original_init = application_class.__init__
     original_finish_close = application_class._finish_close
     original_close_with_session_save = application_class._close_with_session_save
+    original_start = application_class._start
+
+    def start_comparison(self) -> None:
+        reason = self._quick_calibration_busy_reason()
+        if reason:
+            self.status.set(f"ODB comparison not started: {reason}.")
+            messagebox.showwarning(COMPARE_LABEL, f"The ODB comparison was not started: {reason}.\n\nWait until the "
+                                                  "calibration has finished or stopped (see its window), then press "
+                                                  "Run analysis again.", parent=self.root)
+            return
+        original_start(self)
 
     def workflow_init(self, root) -> None:
         self._quick_calibration = None
@@ -121,6 +154,9 @@ def install_quick_calibration_ui(app_module) -> None:
     application_class._open_quick_calibration = open_quick_calibration
     application_class._show_compare_workflow = show_compare_workflow
     application_class._quick_calibration_released = quick_calibration_released
+    application_class._comparison_busy_reason = comparison_busy_reason
+    application_class._quick_calibration_busy_reason = quick_calibration_busy_reason
+    application_class._start = start_comparison
     application_class._finish_close = finish_close
     application_class._close_with_session_save = close_with_session_save
     _INSTALLED = True

@@ -657,6 +657,9 @@ class WindowLifecycleTests(_Dummy):
             self.skipTest(f"Tk is unavailable: {error}")
         self.root.withdraw()
         self.addCleanup(self._destroy)
+        confirm = mock.patch("quick_calibration_window.messagebox.askokcancel", return_value=True)  # the run consent
+        confirm.start()
+        self.addCleanup(confirm.stop)
         (self.folder / "model.inp").write_text(S.INP)
         S.write_experiment(self.folder / "exp.unv", 0.9 * S.E0, S.G0)
 

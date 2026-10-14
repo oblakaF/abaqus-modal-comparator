@@ -230,6 +230,9 @@ class ClosingDuringARunTests(_Application, _Dummy):
     def setUp(self) -> None:
         super().setUp()
         self.addCleanup(self._kill_leftovers)  # before the folder (and its PID list) is removed, even on failure
+        confirm = mock.patch("quick_calibration_window.messagebox.askokcancel", return_value=True)  # the run consent
+        confirm.start()
+        self.addCleanup(confirm.stop)
         (self.folder / "model.inp").write_text(S.INP)
         S.write_experiment(self.folder / "exp.unv", 0.9 * S.E0, S.G0)
 
@@ -268,6 +271,200 @@ class ClosingDuringARunTests(_Application, _Dummy):
         self.assertFalse(self.closed())
         self.assertTrue(self.pump(lambda: window.destroyed))
         self.assert_all_gone()
+
+    def test_the_comparison_waits_for_a_running_calibration(self):
+        application, window = self.running_window()
+        application._validate = mock.Mock(return_value=None)  # the comparison's own first step
+        with mock.patch("quick_calibration_ui.messagebox.showwarning") as warned:
+            application._start()  # the comparison entry point itself, not only its button
+            application.run_button.invoke()
+        self.assertEqual(warned.call_count, 2)
+        application._validate.assert_not_called()
+        self.assertIn("a quick calibration is running", application.status.get())
+        window.stop()
+        with mock.patch("quick_calibration_ui.messagebox.showwarning") as warned:
+            application._start()  # still stopping: refused, nothing interrupted
+        self.assertIn("stopping", warned.call_args[0][1])
+        self.assertTrue(self.pump(lambda: not window.running() and window.summary.get().startswith("STOPPED")))
+        self.assert_all_gone()
+        application._start()  # idle again: the comparison is available
+        application._validate.assert_called_once()
+
+
+class RunConfirmationTests(unittest.TestCase):
+    """Conservative window defaults and the explicit consent before a real Abaqus run (no solver executes)."""
+
+    def setUp(self) -> None:
+        try:
+            import tkinter as tk
+
+            self.root = tk.Tk()
+        except Exception as error:  # noqa: BLE001
+            self.skipTest(f"Tk is unavailable: {error}")
+        self.root.withdraw()
+        self.addCleanup(self.root.destroy)
+        self.folder = Path(tempfile.mkdtemp(prefix="qc_p6_confirm_"))
+        self.addCleanup(shutil.rmtree, self.folder, True)
+        (self.folder / "model.inp").write_text(S.INP)
+        S.write_experiment(self.folder / "exp.unv", 0.9 * S.E0, S.G0, noise=0.001)
+
+    def window(self, *args, **kwargs):
+        from quick_calibration_window import QuickCalibrationWindow
+
+        window = QuickCalibrationWindow(self.root, *args, threaded=False, **kwargs)
+        window.set_inp(str(self.folder / "model.inp"))
+        window.unv.set(str(self.folder / "exp.unv"))
+        window.out.set(str(self.folder / "out"))
+        return window
+
+    def test_conservative_defaults_stay_editable(self):
+        from services.quick_calibration import DEFAULT_MAX_NEW_FE_SOLVES
+
+        window = self.window()
+        self.assertEqual((window.cpus.get(), window.max_new_fe_solves.get()), ("1", "8"))
+        data = window.config_data()
+        self.assertEqual((data["cpus"], data["max_new_fe_solves"]), (1, "8"))
+        window.cpus.set("2")
+        window.max_new_fe_solves.set("12")
+        self.assertEqual((window.config_data()["cpus"], window.config_data()["max_new_fe_solves"]), (2, "12"))
+        window.baseline_only.set(True)
+        window._baseline_only_changed()
+        self.assertEqual(window.max_new_fe_solves.get(), "1")  # baseline only: exactly one new FE solve
+        self.assertEqual(DEFAULT_MAX_NEW_FE_SOLVES, 24)  # the service cap is unchanged (CLI: test_..._fe_budget)
+
+    def test_cancel_starts_nothing(self):
+        factory = mock.Mock()
+        window = self.window(runner_factory=factory)
+        with mock.patch("quick_calibration_window.messagebox.askokcancel", return_value=False) as asked:
+            window.start()
+        asked.assert_called_once()
+        message = asked.call_args[0][1]
+        for part in ("CPUs: 1", "Maximum NEW FE solve attempts: 8", f"Output folder: {self.folder / 'out'}", "RAM",
+                     "paging file", "scratch space", "GB in the output folder", "licence"):
+            self.assertIn(part, message)
+        factory.assert_not_called()  # no runner, so no Abaqus process
+        self.assertFalse((self.folder / "out").exists())  # nothing written
+        self.assertTrue(window.summary.get().startswith("NOT STARTED: cancelled by the user"), window.summary.get())
+        self.assertEqual(str(window.run_button["state"]), "normal")
+
+    def test_baseline_only_consent_names_the_single_solve(self):
+        window = self.window(runner_factory=mock.Mock())
+        window.baseline_only.set(True)
+        window._baseline_only_changed()
+        with mock.patch("quick_calibration_window.messagebox.askokcancel", return_value=False) as asked:
+            window.start()
+        self.assertIn("Maximum NEW FE solve attempts: 1 (baseline only", asked.call_args[0][1])
+
+    def test_accepted_run_uses_the_runner_with_the_fake_solver(self):
+        fake = S.FakeAbaqus()
+        factory = mock.Mock(return_value=SimpleNamespace(solve=fake.solve, extract=fake.extract))
+        window = self.window(runner_factory=factory)
+        with mock.patch("quick_calibration_window.messagebox.askokcancel", return_value=True) as asked:
+            window.start()
+            self.assertIn("Orientation is ambiguous", window.summary.get())
+            identity = next(c for c in window.orientation_box["values"]
+                            if c.startswith("exp X = +FE X, exp Y = +FE Y, exp Z = +FE Z"))
+            window.orientation.set(identity)
+            window.start()
+        self.assertEqual(asked.call_count, 2)  # every run asks
+        self.assertEqual(factory.call_count, 2)
+        self.assertGreater(fake.solves, 0)
+        self.assertTrue(window.summary.get().startswith("ESTIMATE, grade GOOD"), window.summary.get())
+
+    def test_injected_fake_abaqus_runs_without_a_dialog(self):
+        fake = S.FakeAbaqus()
+        window = self.window(fake.solve, fake.extract)
+        with mock.patch("quick_calibration_window.messagebox.askokcancel",
+                        side_effect=AssertionError("no consent dialog for an injected solver")):
+            window.start()
+        self.assertGreater(fake.solves, 0)
+        self.assertIn("Orientation is ambiguous", window.summary.get())
+
+
+class MutualExclusionTests(_Application, unittest.TestCase):
+    """Never both workflows at once; both stay available when idle; nothing running is interrupted."""
+
+    def setUp(self) -> None:
+        self.folder = Path(tempfile.mkdtemp(prefix="qc_p6_exclusive_"))
+        self.addCleanup(shutil.rmtree, self.folder, True)
+        (self.folder / "model.inp").write_text(S.INP)
+        S.write_experiment(self.folder / "exp.unv", 0.9 * S.E0, S.G0, noise=0.001)
+
+    def fake_window(self, application, fake):
+        from quick_calibration_window import QuickCalibrationWindow
+
+        window = application._open_quick_calibration(
+            factory=lambda top: QuickCalibrationWindow(top, fake.solve, fake.extract, threaded=False))
+        window.set_inp(str(self.folder / "model.inp"))
+        window.unv.set(str(self.folder / "exp.unv"))
+        window.out.set(str(self.folder / "out"))
+        return window
+
+    def test_no_calibration_while_the_comparison_runs_stops_or_owns_a_process(self):
+        from ui_policy import AnalysisState
+
+        application = self.start_application()
+        fake = S.FakeAbaqus()
+        window = self.fake_window(application, fake)
+        states = (
+            ({"running": True}, "the ODB comparison (workflow 1) is running"),
+            ({"running": True, "analysis_state": AnalysisState.STOPPING}, "the ODB comparison (workflow 1) is stopping"),
+            ({"running": False, "_owned_analysis_process": mock.Mock(poll=mock.Mock(return_value=None))},
+             "an Abaqus process of the ODB comparison (workflow 1) is still active"),
+        )
+        original = {name: getattr(application, name) for name in ("running", "analysis_state",
+                                                                   "_owned_analysis_process")}
+        for state, reason in states:
+            with self.subTest(reason=reason):
+                for name, value in state.items():
+                    setattr(application, name, value)
+                with mock.patch("quick_calibration_window.messagebox.showwarning") as warned:
+                    window.start()
+                warned.assert_called_once()
+                self.assertIn(reason, warned.call_args[0][1])
+                self.assertTrue(window.summary.get().startswith(f"NOT STARTED: {reason}"), window.summary.get())
+                self.assertEqual(fake.solves, 0)
+                self.assertFalse((self.folder / "out").exists())
+                self.assertTrue(application.running == state["running"])  # the comparison is not interrupted
+                for name, value in original.items():
+                    setattr(application, name, value)
+        window.start()  # idle: the calibration is available
+        self.assertGreater(fake.solves, 0)
+
+    def test_no_comparison_while_a_calibration_runs_stops_or_is_unconfirmed(self):
+        application = self.start_application()
+        window = application._open_quick_calibration()
+        application._validate = mock.Mock(return_value=None)
+
+        def refused(reason: str) -> None:
+            with mock.patch("quick_calibration_ui.messagebox.showwarning") as warned:
+                application._start()
+            warned.assert_called_once()
+            self.assertIn(reason, warned.call_args[0][1])
+            self.assertIn(reason, application.status.get())
+            application._validate.assert_not_called()
+            self.assertFalse(application.running)
+
+        with mock.patch.object(window, "running", return_value=True):
+            refused("a quick calibration is running")
+            window.cancel_event.set()
+            refused("a quick calibration is stopping")
+        window.cancel_event.clear()
+        window.closing = True
+        refused("the quick calibration window is closing")
+        window.closing = False
+        window.unconfirmed = SimpleNamespace(still_running=lambda: None)  # UNKNOWN: never treated as stopped
+        refused("not confirmed")
+        window.unconfirmed = SimpleNamespace(still_running=lambda: [mock.Mock(pid=4242)])
+        refused("not confirmed")
+        window.unconfirmed = SimpleNamespace(still_running=lambda: [])  # confirmed gone by the tracker
+        application._start()
+        application._validate.assert_called_once()  # idle: the comparison is available
+
+    def test_runtime_contract_guards_the_comparison_entry_point(self):
+        import main
+
+        self.assertEqual(main.app.ModalComparatorApp._start.__module__, "quick_calibration_ui")
 
 
 if __name__ == "__main__":

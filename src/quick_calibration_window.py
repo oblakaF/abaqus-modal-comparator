@@ -21,7 +21,6 @@ from typing import Callable, Optional
 
 from services.forward_builder import _parameters, inp_keyword, split_inp_lines
 from services.quick_calibration import (
-    DEFAULT_MAX_NEW_FE_SOLVES,
     AbaqusRunner,
     CalibrationCancelled,
     PreflightRefused,
@@ -37,6 +36,9 @@ from services.quick_calibration import (
 )
 
 TITLE = "Quick material calibration (Abaqus + Polytec)"
+# Conservative window defaults (editable); the service hard cap DEFAULT_MAX_NEW_FE_SOLVES is unchanged.
+GUI_DEFAULT_CPUS = 1
+GUI_DEFAULT_MAX_NEW_FE_SOLVES = 8
 DEFAULT_CONSTANTS = {"ENGINEERING CONSTANTS": "E1,E2", "LAMINA": "E1,E2", "ISOTROPIC": "E"}
 SELECT_MODAL_SET = "Select the modal set..."
 READING_MODAL_SETS = "Reading the modal sets..."
@@ -131,8 +133,10 @@ class QuickCalibrationWindow:
         self.unv = tk.StringVar(master=root)
         self.out = tk.StringVar(master=root)
         self.abaqus = tk.StringVar(master=root, value="abaqus")
-        self.cpus = tk.StringVar(master=root, value=str(max(1, min(4, os.cpu_count() or 1))))
-        self.max_new_fe_solves = tk.StringVar(master=root, value=str(DEFAULT_MAX_NEW_FE_SOLVES))
+        self.cpus = tk.StringVar(master=root, value=str(GUI_DEFAULT_CPUS))
+        self.max_new_fe_solves = tk.StringVar(master=root, value=str(GUI_DEFAULT_MAX_NEW_FE_SOLVES))
+        # set by the main application: the reason another workflow is busy (then no run starts), or None
+        self.other_workflow_busy: Callable[[], Optional[str]] = lambda: None
         self.material = tk.StringVar(master=root)
         self.constants = tk.StringVar(master=root, value="E1,E2")
         self.fit_g12 = tk.BooleanVar(master=root, value=False)
@@ -460,8 +464,26 @@ class QuickCalibrationWindow:
             work()
             self._poll(reschedule=False)
 
+    def busy_reason(self) -> Optional[str]:
+        """Why another workflow must not start now (a run, a stop, or owned processes not confirmed gone)."""
+        if self.running():
+            return ("a quick calibration is stopping" if self.cancel_event.is_set() or self.closing
+                    else "a quick calibration is running")
+        if self.closing:
+            return "the quick calibration window is closing"
+        if self.unconfirmed is not None and self.unconfirmed.still_running() != []:
+            return ("the termination of a stopped quick calibration's Abaqus processes is not confirmed "
+                    "(see its window)")
+        return None
+
     def start(self) -> None:
         if self.running() or self.closing:
+            return
+        other = self.other_workflow_busy()
+        if other:
+            self.summary.set(f"NOT STARTED: {other}; no Abaqus solve was started.")
+            messagebox.showwarning(TITLE, f"The quick calibration was not started: {other}.\n\nWait until it has "
+                                          "finished or stopped, then press Run calibration again.", parent=self.root)
             return
         if not self._unconfirmed_resolved("NOT STARTED", "start a new run"):
             return
@@ -470,8 +492,12 @@ class QuickCalibrationWindow:
         except (QuickCalibrationError, ValueError) as error:
             messagebox.showerror(TITLE, str(error), parent=self.root)
             return
-        self.cancel_event = cancel = threading.Event()
         solve, extract = self.solve, self.extract
+        if (solve is None or extract is None) and not self._confirm_abaqus_run(config):
+            self.summary.set("NOT STARTED: cancelled by the user; no Abaqus solve was started.")
+            self._write("\nRun cancelled before any Abaqus solve.\n")
+            return
+        self.cancel_event = cancel = threading.Event()
         if solve is None or extract is None:
             runner = self.runner_factory(config, cancel)
             solve, extract = solve or runner.solve, extract or runner.extract
@@ -502,6 +528,23 @@ class QuickCalibrationWindow:
                 self.messages.put(("failed", error))
 
         self._launch(work, stoppable=True)
+
+    def _confirm_abaqus_run(self, config) -> bool:
+        """Explicit consent before a real Abaqus run; Cancel starts nothing (no runner, no solve, no file)."""
+        solves = (f"{config.max_new_fe_solves} (baseline only: one baseline solve, no optimisation)"
+                  if config.baseline_only else str(config.max_new_fe_solves))
+        return messagebox.askokcancel(
+            TITLE,
+            "Start a real Abaqus run?\n\n"
+            f"CPUs: {config.cpus}\n"
+            f"Maximum NEW FE solve attempts: {solves}\n"
+            f"Output folder: {config.output_dir}\n"
+            f"Abaqus command: {config.abaqus_command}\n\n"
+            "Each Abaqus solve of a large model can use tens of GB of RAM and paging file, several GB of scratch "
+            "space on the TEMP drive and several GB in the output folder, and holds Abaqus licence tokens while it "
+            "runs. Finished jobs in the output folder are reused and do not count.\n\n"
+            "Cancel starts nothing.",
+            icon="warning", default="cancel", parent=self.root)
 
     def stop(self) -> None:
         """Ask the run to stop; STOPPED is shown only after the owned processes are confirmed terminated."""

@@ -252,7 +252,7 @@ class ConfigurationTests(_Case):
 
         fake = CountingAbaqus()
         window = qw.QuickCalibrationWindow(root, fake.solve, fake.extract, threaded=False)
-        self.assertEqual(window.max_new_fe_solves.get(), str(DEFAULT_MAX_NEW_FE_SOLVES))
+        self.assertEqual(window.max_new_fe_solves.get(), str(qw.GUI_DEFAULT_MAX_NEW_FE_SOLVES))  # window: 8
         window.set_inp(str(self.folder / "model.inp"))
         window.unv.set(str(self.folder / "exp.unv"))
         window.out.set(str(self.folder / "out"))
