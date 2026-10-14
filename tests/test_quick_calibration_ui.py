@@ -143,8 +143,9 @@ class MainApplicationWorkflowTests(_Application, unittest.TestCase):
         cascades = [bar.entrycget(i, "label") for i in range(bar.index("end") + 1) if bar.type(i) == "cascade"]
         self.assertEqual(cascades[:2], ["File", "Workflow"])
         menu = application.workflow_menu
-        self.assertEqual([menu.entrycget(i, "label") for i in range(menu.index("end") + 1)],
-                         [ui.COMPARE_LABEL, ui.CALIBRATE_LABEL + "..."])
+        self.assertEqual([menu.entrycget(i, "label") for i in range(menu.index("end") + 1)
+                          if menu.type(i) == "command"],
+                         [ui.COMPARE_LABEL, ui.CALIBRATE_LABEL + "...", ui.NINE_LABEL + "..."])
         self.assertEqual(application.compare_workflow_button["text"], "1. Compare modes (ODB + UNV/UFF)")
         self.assertEqual(application.calibrate_workflow_button["text"],
                          "2. Calibrate effective material properties (INP + UNV/UFF)")

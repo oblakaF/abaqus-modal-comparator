@@ -1,4 +1,4 @@
-"""The two workflows of the main application.
+"""The workflows of the main application (and the research nine-constant view, Workflow menu item 3, no Abaqus).
 
 1. Compare modes (ODB + UNV/UFF): the main window itself ("1. Files and analysis").
 2. Calibrate effective material properties (INP + UNV/UFF): the existing QuickCalibrationWindow, opened in a
@@ -21,6 +21,7 @@ from typing import Callable, Optional
 
 COMPARE_LABEL = "1. Compare modes (ODB + UNV/UFF)"
 CALIBRATE_LABEL = "2. Calibrate effective material properties (INP + UNV/UFF)"
+NINE_LABEL = "3. Nine elastic constants - research diagnostic (no Abaqus)"  # research track NINE-EC
 STILL_STOPPING = ("The quick calibration is stopping its Abaqus run. The application stays open until the owned "
                   "Abaqus processes are confirmed terminated and the calibration window has closed; then close the "
                   "application again.")
@@ -74,6 +75,28 @@ def quick_calibration_busy_reason(self) -> Optional[str]:
     return window.busy_reason() if _window_open(window) else None
 
 
+def open_nine_constants(self, factory: Optional[Callable] = None):
+    """Research view (no Abaqus): the nine-constant identifiability diagnostic, one window per application."""
+    from nine_constants_window import NineConstantsWindow
+
+    window = getattr(self, "_nine_constants", None)
+    if window is not None and not window.destroyed:
+        try:
+            if window.root.winfo_exists():
+                window.root.deiconify()
+                window.root.lift()
+                return window
+        except tk.TclError:
+            pass
+    top = tk.Toplevel(self.root)
+    width = min(1300, max(900, top.winfo_screenwidth() - 120))
+    height = min(900, max(650, top.winfo_screenheight() - 140))
+    top.geometry(f"{width}x{height}+50+30")
+    window = (factory or NineConstantsWindow)(top)
+    self._nine_constants = window
+    return window
+
+
 def show_compare_workflow(self) -> None:
     """Workflow 1: the comparison inputs of the main window."""
     self.root.deiconify()
@@ -102,6 +125,8 @@ def _build_workflow_controls(self) -> None:
     menu = tk.Menu(self.menu_bar, tearoff=False)
     menu.add_command(label=COMPARE_LABEL, command=self._show_compare_workflow)
     menu.add_command(label=CALIBRATE_LABEL + "...", command=self._open_quick_calibration)
+    menu.add_separator()
+    menu.add_command(label=NINE_LABEL + "...", command=self._open_nine_constants)
     self.menu_bar.insert_cascade(self.menu_bar.index("File") + 1, label="Workflow", menu=menu)  # after File
     self.workflow_menu = menu
     bar = ttk.Frame(self.header)
@@ -137,6 +162,7 @@ def install_quick_calibration_ui(app_module) -> None:
 
     def workflow_init(self, root) -> None:
         self._quick_calibration = None
+        self._nine_constants = None
         original_init(self, root)
         _build_workflow_controls(self)
 
@@ -152,6 +178,7 @@ def install_quick_calibration_ui(app_module) -> None:
 
     application_class.__init__ = workflow_init
     application_class._open_quick_calibration = open_quick_calibration
+    application_class._open_nine_constants = open_nine_constants
     application_class._show_compare_workflow = show_compare_workflow
     application_class._quick_calibration_released = quick_calibration_released
     application_class._comparison_busy_reason = comparison_busy_reason
