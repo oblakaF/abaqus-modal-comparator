@@ -7,11 +7,13 @@ NOT_A_VALIDATED_MATERIAL_PROPERTY.
 Parameter vector: the nine Engineering Constants in research coordinates (domain.orthotropic_elasticity): x = ln p for
 E1, E2, E3, G12, G13, G23 and x = ν for ν12, ν13, ν23 (signed, absolute; never ln ν).
 
-- **Sensitivities** (SPEC S4 reused where it applies): central differences x ± h, h = 0.05 in ln p (SPEC ±5 %) and
-  an explicit absolute ν step (PROPOSAL, not accepted); S_ij = (ln f⁺ − ln f⁻)/(x⁺ − x⁻). Every perturbed state is
-  checked for elastic admissibility BEFORE evaluation; branches are followed by the accepted FE-to-FE tracker
-  (branch_tracker.track_branches, STRICT policy: MAC ≥ 0.90, unique) and a loss is a refusal, never a re-pairing.
-  Noise control repeats each column with half steps (SPEC: ±2.5 % must give S within 5 %).
+- **Sensitivities** (SPEC S4 reused where it applies): central differences with physical perturbations of the
+  moduli, p⁺ = p·1.05 and p⁻ = p·0.95 (SPEC ±5 %), and an explicit absolute ν step (PROPOSAL, not accepted);
+  S_ij = (ln f⁺ − ln f⁻)/(x⁺ − x⁻) with the actual coordinates of the perturbed parameters (x = ln p⁺, ln p⁻ for
+  moduli). Every perturbed state is checked for elastic admissibility BEFORE evaluation; branches are followed by the
+  accepted FE-to-FE tracker (branch_tracker.track_branches, STRICT policy: MAC ≥ 0.90, unique) and a loss is a
+  refusal, never a re-pairing. Noise control repeats each column with half steps (SPEC: p·1.025 and p·0.975 must give
+  S within 5 %).
 - **Identifiability**: the accepted M5 engine (practical_identifiability: rcond 1e-3, rank deficiency = hard block,
   C = (AᵀA)⁻¹, q projections) on the whitened system with explicit Σ and explicit nuisance priors. Per constant: the
   SPEC §10 sd ≤ 0.08 (ln p) rule for moduli; for Poisson ratios no accepted rule exists (POLICY blocker unless the
@@ -46,6 +48,7 @@ from domain.orthotropic_elasticity import (
     CoordinateKind,
     ElasticAdmissibilityError,
     admissibility,
+    constants_from,
     from_coordinates,
     to_coordinates,
 )
@@ -67,7 +70,7 @@ from .practical_identifiability import (
 
 SCHEMA = "research/nine-constants-analysis/v1"
 CLAIM_LABELS = ("RESEARCH_DIAGNOSTIC_ONLY", "NOT_A_VALIDATED_MATERIAL_PROPERTY")
-SPEC_LN_STEP = 0.05  # SPEC S4: ±5 % in p (ln p step)
+SPEC_RELATIVE_STEP = 0.05  # SPEC S4: p⁺ = p·1.05, p⁻ = p·0.95 (half step: p·1.025, p·0.975)
 SPEC_NOISE_RELATIVE = 0.05  # SPEC S4: a repeat with half steps must give S within 5 %
 LM_MAX_ITERATIONS = 5  # SPEC §8
 LM_STOP_FRACTION = 0.2  # SPEC §8: max|Δx_j| < 0.2·sd_j
@@ -117,21 +120,42 @@ class ObservationRow:
                 "sd_ln": self.sd_ln}
 
 
+def perturbed_constant(base: EngineeringConstants, name: str, step: float) -> tuple[EngineeringConstants, float]:
+    """``base`` with one constant perturbed, and that constant's research coordinate.
+
+    Moduli: the physical factor p·(1 + step) (SPEC S4: step ±0.05 gives p·1.05 and p·0.95), coordinate ln of the
+    perturbed value. Poisson ratios: ν + step (absolute, PROPOSAL), coordinate ν. Never p·exp(step).
+    """
+    values = base.to_dict()
+    if COORDINATES[name] is CoordinateKind.LOG:
+        values[name] = values[name] * (1.0 + step)
+        return constants_from(values), math.log(values[name])
+    values[name] = values[name] + step
+    return constants_from(values), values[name]
+
+
 @dataclass(frozen=True)
 class SensitivityDesign:
     """Finite-difference steps per coordinate kind. The ν step is a PROPOSAL needing SUPERVISOR acceptance."""
 
-    ln_step: float = SPEC_LN_STEP
+    relative_step: float = SPEC_RELATIVE_STEP  # moduli: p·(1 ± relative_step), SPEC S4
     poisson_step: float = 0.02  # PROPOSAL: absolute ν step (no accepted value)
     noise_check: bool = True  # half-step repeat (SPEC S4 noise control)
     noise_relative: float = SPEC_NOISE_RELATIVE
 
+    def __post_init__(self) -> None:
+        if not 0.0 < self.relative_step < 1.0:
+            raise ValueError("the relative modulus step must lie in (0, 1).")
+
     def step(self, name: str, scale: float = 1.0) -> float:
-        base = self.ln_step if COORDINATES[name] is CoordinateKind.LOG else self.poisson_step
+        base = self.relative_step if COORDINATES[name] is CoordinateKind.LOG else self.poisson_step
         return base * scale
 
     def to_dict(self) -> dict:
-        return {"ln_step": self.ln_step, "poisson_step": self.poisson_step, "poisson_step_status": "PROPOSAL",
+        h = self.relative_step
+        return {"relative_step": h, "modulus_factors": [1.0 + h, 1.0 - h],
+                "modulus_half_step_factors": [1.0 + h / 2.0, 1.0 - h / 2.0],
+                "poisson_step": self.poisson_step, "poisson_step_status": "PROPOSAL",
                 "noise_check": self.noise_check, "noise_relative": self.noise_relative}
 
 
@@ -192,11 +216,11 @@ def central_sensitivities(counter: EvaluationCounter, base: EngineeringConstants
                           mapping: Optional[Mapping[str, int]] = None) -> SensitivityResult:
     """S_ij = (ln f⁺ − ln f⁻)/(x⁺ − x⁻) per estimated constant, with tracking, admissibility and a noise check.
 
+    x⁺ and x⁻ are the coordinates of the actually perturbed parameters (moduli: ln(p·1.05) and ln(p·0.95)).
     ``mapping`` gives each row's mode in the state at ``base`` (default: the frozen baseline modes).
     """
     reference = counter.evaluate(base)
     mapping = dict(mapping) if mapping is not None else {r.row_id: r.baseline_fe_mode for r in rows}
-    x0 = to_coordinates(base, estimated)
     values = {r.row_id: {} for r in rows}
     half = {r.row_id: {} for r in rows}
     status, reasons, minimum_mac = {}, {}, {}
@@ -206,17 +230,16 @@ def central_sensitivities(counter: EvaluationCounter, base: EngineeringConstants
         h = design.step(name, scale)
         out = {}
         mac = 1.0
-        logs = []
+        logs, coordinates = [], []
         for sign in (+1, -1):
-            x = x0.copy()
-            x[j] += sign * h
-            candidate = from_coordinates(base, estimated, x)
+            candidate, x = perturbed_constant(base, name, sign * h)
             state = counter.evaluate(candidate)  # refuses an inadmissible state before evaluating
             log_f, _, tracked_mac = _track(reference, mapping, state)
             logs.append(log_f)
+            coordinates.append(x)
             mac = min(mac, tracked_mac)
         for r in rows:
-            out[r.row_id] = (logs[0][r.row_id] - logs[1][r.row_id]) / (2.0 * h)
+            out[r.row_id] = (logs[0][r.row_id] - logs[1][r.row_id]) / (coordinates[0] - coordinates[1])
         return out, mac
 
     for j, name in enumerate(estimated):

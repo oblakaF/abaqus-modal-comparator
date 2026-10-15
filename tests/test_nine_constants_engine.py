@@ -20,6 +20,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "tests"))
 
 from domain.forward_model_manifest import EngineeringConstants  # noqa: E402
 from domain.orthotropic_elasticity import NAMES, ElasticAdmissibilityError, admissibility  # noqa: E402
@@ -64,7 +65,7 @@ class SyntheticModelTests(unittest.TestCase):
         self.assertTrue(np.allclose(analytic[:, moduli].sum(axis=1), 0.5, atol=1e-9))
         forward = BlockForwardModel(block, 12)
         rows = [ObservationRow(f"X{m}", 1.0, m, f"F{m}", Role.FIT, 0.001) for m in range(1, 9)]
-        fine = SensitivityDesign(ln_step=0.01, poisson_step=0.005, noise_check=False)
+        fine = SensitivityDesign(relative_step=0.01, poisson_step=0.005, noise_check=False)
         numeric = central_sensitivities(EvaluationCounter(forward, 100), TRUTH, rows, NAMES, fine)
         fd = np.array([[numeric.values[f"X{m}"][n] for n in NAMES] for m in range(1, 9)])
         self.assertLess(np.max(np.abs(fd - analytic[:8])), 1e-3)  # tracked central differences match eigen-derivatives
@@ -72,8 +73,65 @@ class SyntheticModelTests(unittest.TestCase):
         self.assertEqual(set(coarse.column_status.values()), {"EVALUATED"})  # SPEC half-step noise check passes
 
 
+class _PowerLawForward:
+    """ln f_m exactly linear in the research coordinates (ln p for moduli, ν): a central difference in x is exact
+    only when its denominator is the actual coordinate difference of the evaluated states. Records every state."""
+
+    MODULI = ("E1", "E2", "E3", "G12", "G13", "G23")
+
+    def __init__(self, base: EngineeringConstants, exponents: np.ndarray) -> None:
+        self.base, self.exponents, self.seen = base, exponents, []
+
+    def evaluate(self, constants: EngineeringConstants) -> FEModalState:
+        self.seen.append(constants)
+        x = [math.log(getattr(constants, n) / getattr(self.base, n)) if n in self.MODULI
+             else getattr(constants, n) - getattr(self.base, n) for n in NAMES]
+        hz = tuple(100.0 * (m + 1) * math.exp(float(self.exponents[m] @ x)) for m in range(len(self.exponents)))
+        modes = len(self.exponents)
+        return FEModalState(f"s{len(self.seen)}", "g", "n", tuple(range(1, modes + 1)), hz, np.eye(modes, 2 * modes))
+
+    def identity(self) -> dict:
+        return {"model": "power-law test stub"}
+
+
+class FiniteDifferenceFactorTests(unittest.TestCase):
+    """SPEC §6 S4: p⁺ = p·1.05, p⁻ = p·0.95; half step p·1.025, p·0.975; denominator ln p⁺ − ln p⁻ (never exp(±h))."""
+
+    def test_central_differences_use_the_exact_physical_perturbation_factors(self):
+        exponents = np.array([[0.5, 0.1, 0.0, 0.3, 0.0, 0.0, 0.2, 0.05, 0.0],
+                              [0.2, 0.4, 0.01, -0.1, 0.02, 0.03, 0.3, 0.02, 0.01],
+                              [0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.1, 0.1, 0.1]])
+        stub = _PowerLawForward(TRUTH, exponents)
+        rows = [ObservationRow(f"X{m}", 1.0, m, f"F{m}", Role.FIT, 0.001) for m in (1, 2, 3)]
+        result = central_sensitivities(EvaluationCounter(stub, 100), TRUTH, rows, NAMES, SensitivityDesign())
+        self.assertEqual(len(stub.seen), 1 + 18 + 18)
+        self.assertEqual(stub.seen[0], TRUTH)
+        for j, name in enumerate(NAMES):
+            p = getattr(TRUTH, name)
+            if name[0] == "n":  # signed absolute ν step: PROPOSAL, unchanged
+                expected = [p + 0.02, p - 0.02, p + 0.01, p - 0.01]
+            else:
+                expected = [p * 1.05, p * 0.95, p * 1.025, p * 0.975]
+                exponential = [p * math.exp(0.05), p * math.exp(-0.05), p * math.exp(0.025), p * math.exp(-0.025)]
+            states = stub.seen[1 + 4 * j: 5 + 4 * j]
+            for state, value in zip(states, expected):
+                self.assertTrue(math.isclose(getattr(state, name), value, rel_tol=1e-14), (name, getattr(state, name)))
+                others = {n: getattr(state, n) for n in NAMES if n != name}
+                self.assertEqual(others, {n: getattr(TRUTH, n) for n in NAMES if n != name})  # one at a time
+            if name[0] != "n":
+                for state, value in zip(states, exponential):
+                    self.assertFalse(math.isclose(getattr(state, name), value, rel_tol=1e-6), name)
+            for m, row in enumerate(rows):  # exact only with the denominator ln(1.05) − ln(0.95) (or ±0.02 for ν)
+                self.assertLess(abs(result.values[row.row_id][name] - exponents[m, j]), 1e-12, (name, row.row_id))
+                self.assertLess(abs(result.half_step_values[row.row_id][name] - exponents[m, j]), 1e-12)
+        self.assertEqual(set(result.column_status.values()), {"EVALUATED"})
+        design = SensitivityDesign().to_dict()
+        self.assertEqual((design["modulus_factors"], design["modulus_half_step_factors"]), ([1.05, 0.95], [1.025, 0.975]))
+        self.assertEqual(design["poisson_step_status"], "PROPOSAL")
+
+
 class FullObservabilityTests(unittest.TestCase):
-    """F1: a deliberately well-conditioned synthetic dataset (thick block, 27 FIT families, sd 0.03 %)."""
+    """F1:a deliberately well-conditioned synthetic dataset (thick block, 27 FIT families, sd 0.03 %)."""
 
     @classmethod
     def setUpClass(cls):
@@ -315,6 +373,51 @@ class ReportContractTests(unittest.TestCase):
             self.assertIsNone(rows[name]["uncertainty"])
             self.assertEqual(rows[name]["input_value"], getattr(START, name))
         self.assertIn("E1, E2, G12 only", report["headline"])
+
+    def test_moduli_carry_the_unspecified_inp_stress_unit_unless_one_is_declared(self):
+        from services.nine_constants_offline import offline_preview
+        from services.nine_constants_report import UNSPECIFIED_STRESS_UNITS, stress_units_record
+        from test_nine_constants_model import TWO_MATERIALS
+
+        folder = Path(tempfile.mkdtemp(prefix="nine_units_"))
+        self.addCleanup(shutil.rmtree, folder, True)
+        inp = folder / "si.inp"  # the same material in Pa (an INP declares no unit; nothing may be inferred)
+        inp.write_text(TWO_MATERIALS.replace(" 120000., 9000., 8500., 0.3, 0.32, 0.45, 5000., 4800.,\n 3200.",
+                                             " 1.2e+11, 9.e+09, 8.5e+09, 0.3, 0.32, 0.45, 5.e+09, 4.8e+09,\n 3.2e+09"))
+        unv = folder / "exp.unv"
+        unv.write_text("placeholder")
+        moduli = ("E1", "E2", "E3", "G12", "G13", "G23")
+
+        def check(report, label, source):
+            rows = {r["constant"]: r for r in report["constants"]}
+            self.assertEqual({rows[n]["units"] for n in moduli}, {label})
+            self.assertEqual({rows[n]["units"] for n in ("nu12", "nu13", "nu23")}, {"dimensionless"})
+            self.assertEqual(report["units"]["moduli"]["source"], source)
+            self.assertEqual(report["units"]["poisson_ratios"], "dimensionless")
+            csv_rows = {line.split(",")[0]: line.split(",")[1] for line in report_csv(report).splitlines()[1:]}
+            self.assertEqual({csv_rows[n] for n in moduli}, {label})
+            self.assertEqual({csv_rows[n] for n in ("nu12", "nu13", "nu23")}, {"dimensionless"})
+            text = report_text(report)
+            self.assertIn(f"Units: E and G in {label} (source: {source}); Poisson ratios dimensionless.", text)
+            return rows, text
+
+        report = offline_preview(inp, unv, "Face_A", discover=lambda _path: [])
+        rows, text = check(report, UNSPECIFIED_STRESS_UNITS, "NOT_DECLARED")
+        self.assertEqual(rows["E1"]["input_value"], 1.2e11)  # the INP value as written, never rescaled
+        self.assertNotIn("MPa", json.dumps(report, ensure_ascii=False) + report_csv(report) + text)
+        for label in ("Pa", "psi", "kN/mm²"):  # an explicit user declaration is shown as declared
+            check(offline_preview(inp, unv, "Face_A", discover=lambda _path: [], stress_units=label), label,
+                  "USER_SUPPLIED")
+        with self.assertRaises(ValueError):
+            stress_units_record("  ")
+        # a report built without any declaration never labels moduli MPa either
+        bare = build_report(question="t", inputs={}, model={"constants": START.to_dict()}, experiment=None,
+                            registration=None, observations=[], assessment=None, estimation=None, fe_plan=None,
+                            fe_provenance=None, effective_model_reference=None, refusals=[])
+        check(bare, UNSPECIFIED_STRESS_UNITS, "NOT_DECLARED")
+        # the synthetic block declares its own unit system (mm, t/mm³): labelled as that declaration
+        synthetic = synthetic_demo("two_rows")
+        self.assertEqual(synthetic["units"]["moduli"], {"label": "MPa (N/mm²)", "source": "SYNTHETIC_MODEL_DECLARATION"})
 
     def test_refusal_report_files_and_contents(self):
         report = synthetic_demo("two_rows")

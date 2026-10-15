@@ -32,9 +32,9 @@ from .nine_constants_engine import (
     plan_fe_evaluations,
 )
 from .nine_constants_inp import NineConstantsInputError, material_candidates, read_nine_constants_model
-from .nine_constants_report import build_report
+from .nine_constants_report import build_report, stress_units_record
 from .nine_constants_synthetic import perturbed_states, separated_modes, synthetic_experiment
-from .orthotropic_block_model import BlockForwardModel, OrthotropicBlock
+from .orthotropic_block_model import STRESS_UNITS as SYNTHETIC_STRESS_UNITS, BlockForwardModel, OrthotropicBlock
 
 QUESTION = "RESEARCH_DIAGNOSTIC: nine independent orthotropic Engineering Constants (identifiability first)"
 NO_FE = ("no FE sensitivity evaluation: the nine-constant sensitivities need Abaqus solves of this model "
@@ -93,8 +93,13 @@ def _effective_reference(result: dict) -> Optional[dict]:
 
 def offline_preview(inp_path: Path, unv_path: Path, material: Optional[str] = None, modal_set: Optional[str] = None,
                     quick_calibration_result: Optional[Path] = None,
-                    discover: Optional[Callable] = None) -> dict:
-    """The nine-row research diagnostic of real files without any FE solve (see module docstring)."""
+                    discover: Optional[Callable] = None, stress_units: Optional[str] = None) -> dict:
+    """The nine-row research diagnostic of real files without any FE solve (see module docstring).
+
+    ``stress_units``: an explicit stress unit declared by the user for this INP; without it the moduli are reported in
+    "INP stress units (unspecified)" (an INP declares no unit, and none is inferred).
+    """
+    units = stress_units_record(stress_units)
     inp_path, unv_path = Path(inp_path), Path(unv_path)
     source = inp_path.read_bytes()
     inp_sha = hashlib.sha256(source).hexdigest()
@@ -111,14 +116,15 @@ def offline_preview(inp_path: Path, unv_path: Path, material: Optional[str] = No
                             observations=[], assessment=None, estimation=None, fe_plan=None, fe_provenance=None,
                             effective_model_reference=None, refusals=[str(error)],
                             blanket_status=ConstantStatus.INVALID_OR_UNSUPPORTED_MODEL.value,
-                            blanket_reason=str(error))
+                            blanket_reason=str(error), stress_units=units)
     model_record = model.to_dict()
     if not model.admissibility.admissible:
         reason = "input constants are not physically admissible: " + "; ".join(model.admissibility.violations)
         return build_report(question=QUESTION, inputs=inputs, model=model_record, experiment=None, registration=None,
                             observations=[], assessment=None, estimation=None, fe_plan=None, fe_provenance=None,
                             effective_model_reference=None, refusals=[reason],
-                            blanket_status=ConstantStatus.INVALID_OR_UNSUPPORTED_MODEL.value, blanket_reason=reason)
+                            blanket_status=ConstantStatus.INVALID_OR_UNSUPPORTED_MODEL.value, blanket_reason=reason,
+                            stress_units=units)
     if discover is None:
         from .quick_calibration import discover_modal_sets as discover
     sets = list(discover(unv_path))
@@ -152,7 +158,7 @@ def offline_preview(inp_path: Path, unv_path: Path, material: Optional[str] = No
                         registration=registration, observations=rows, assessment=assessment, estimation=None,
                         fe_plan=plan, fe_provenance={"fe_evaluations_in_this_preview": 0,
                                                      "abaqus_started": False},
-                        effective_model_reference=reference, refusals=refusals)
+                        effective_model_reference=reference, refusals=refusals, stress_units=units)
 
 
 # ----------------------------------------------------------------------------- synthetic demonstrations
@@ -202,4 +208,5 @@ def synthetic_demo(case: str) -> dict:
                         fe_plan=plan_fe_evaluations(len(estimated)),
                         fe_provenance={"forward_evaluations": estimation.evaluations,
                                                                        "abaqus_started": False},
-                        effective_model_reference=None, refusals=[], synthetic=synthetic)
+                        effective_model_reference=None, refusals=[], synthetic=synthetic,
+                        stress_units=stress_units_record(SYNTHETIC_STRESS_UNITS, "SYNTHETIC_MODEL_DECLARATION"))

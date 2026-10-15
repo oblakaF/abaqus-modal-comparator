@@ -22,7 +22,7 @@ BANNER = ("RESEARCH_DIAGNOSTIC_ONLY  ·  NOT_A_VALIDATED_MATERIAL_PROPERTY  ·  
           "a value appears only where the evidence supports it")
 SELECT = "Select..."
 COLUMNS = (("constant", "Constant", 90), ("input", "Input value", 120), ("estimate", "Estimated value", 130),
-           ("uncertainty", "Uncertainty", 120), ("status", "Status", 330))
+           ("uncertainty", "Uncertainty", 120), ("units", "Units", 190), ("status", "Status", 330))
 STATUS_COLOURS = {"SUPPORTED_RESEARCH_ESTIMATE": "#174a7c", "NOT_IDENTIFIABLE": "#a11d1d", "NOT_EVALUATED": "#555555",
                   "FIXED_INPUT_NOT_IDENTIFIED": "#6b4e00", "POLICY_OR_EVIDENCE_BLOCKER": "#9a5300",
                   "INVALID_OR_UNSUPPORTED_MODEL": "#a11d1d"}
@@ -275,7 +275,7 @@ class NineConstantsWindow:
         for row in report["constants"]:
             self.table.insert("", "end", values=(row["constant"], _format(row["input_value"]),
                                                  _format(row["estimated_value"]), _uncertainty(row["uncertainty"]),
-                                                 row["status_text"]), tags=(row["status"],))
+                                                 row["units"], row["status_text"]), tags=(row["status"],))
         self.text.delete("1.0", "end")
         self._write(report_text(report))
         self.save_button.configure(state="normal")

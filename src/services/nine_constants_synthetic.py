@@ -20,27 +20,22 @@ from domain.forward_model_manifest import EngineeringConstants
 from domain.identification_pairing_policy import STRICT_IDENTIFICATION_PAIRING
 
 from .branch_tracker import track_branches
-from .nine_constants_engine import ObservationRow, Role
+from .nine_constants_engine import ObservationRow, Role, SensitivityDesign, perturbed_constant
 from .orthotropic_block_model import BlockForwardModel
 
 SYNTHETIC_LABEL = "SYNTHETIC / TEST EVIDENCE — NOT A MEASUREMENT"
 CLUSTER_TRIGGER = 0.03  # SPEC §12.4 cluster trigger |Δf|/f < 3 % (used here only to exclude same-class neighbours)
 
 
-def perturbed_states(base: EngineeringConstants, ln_step: float = 0.05, poisson_step: float = 0.02
+def perturbed_states(base: EngineeringConstants, design: SensitivityDesign = SensitivityDesign()
                      ) -> list[EngineeringConstants]:
-    """``base`` and its one-at-a-time sensitivity perturbations (moduli ×e^{±h}, ν ± step), admissible ones only."""
-    from domain.orthotropic_elasticity import COORDINATES, CoordinateKind, NAMES, admissibility, from_coordinates, \
-        to_coordinates
+    """``base`` and its one-at-a-time sensitivity perturbations (moduli p·(1 ± h), ν ± step), admissible ones only."""
+    from domain.orthotropic_elasticity import NAMES, admissibility
 
     states = [base]
-    x0 = to_coordinates(base)
-    for j, name in enumerate(NAMES):
-        step = ln_step if COORDINATES[name] is CoordinateKind.LOG else poisson_step
+    for name in NAMES:
         for sign in (1, -1):
-            x = x0.copy()
-            x[j] += sign * step
-            candidate = from_coordinates(base, NAMES, x)
+            candidate, _ = perturbed_constant(base, name, sign * design.step(name))
             if admissibility(candidate).admissible:
                 states.append(candidate)
     return states

@@ -20,7 +20,9 @@ It stays disabled in production (`BLOCKED_PENDING_SUPERVISOR_DECISION`). A nine-
    CONSTANTS` record order. ν_ij (i < j) are the input ratios. The reciprocal ratios ν21 = ν12·E2/E1,
    ν31 = ν13·E3/E1 and ν32 = ν23·E3/E2 are derived and never input.
 2. **Units and conventions:**
-   - moduli in the INP's stress unit (MPa for the project models), Poisson ratios dimensionless;
+   - moduli in the INP's own stress unit, reported as "INP stress units (unspecified)": an INP declares no stress
+     unit and none is inferred (not from the names or magnitudes of the constants); an explicit unit is shown only
+     when the user declares it (recorded with source USER_SUPPLIED). Poisson ratios are dimensionless;
    - Voigt order (11, 22, 33, 12, 13, 23) with engineering shear strain;
    - material axes 1, 2, 3 as declared by the model's `*Orientation` or default axes, stated in the report.
 3. **Admissible domain:** E_i > 0, G_ij > 0, |ν_ij| < sqrt(E_i/E_j), and 1 − ν12ν21 − ν23ν32 − ν31ν13 − 2ν21ν32ν13 > 0.
@@ -33,12 +35,13 @@ It stays disabled in production (`BLOCKED_PENDING_SUPERVISOR_DECISION`). A nine-
    - the experimental file SHA-256, modal set, physical registration hash and frozen strict pairs;
    - fit and holdout rows by physical family;
    - no dynamic addition or removal of rows.
-7. **Sensitivity definition:** S_ij = ∂ln f_i/∂x_j by central differences. x = ln p for moduli (step ±0.05, SPEC S4)
-   and x = ν for Poisson ratios with an absolute step.
+7. **Sensitivity definition:** S_ij = ∂ln f_i/∂x_j by central differences. x = ln p for moduli with the SPEC S4
+   physical perturbations p⁺ = p·1.05 and p⁻ = p·0.95, S_ij = (ln f⁺ − ln f⁻)/(ln p⁺ − ln p⁻) (never p·exp(±0.05));
+   x = ν for Poisson ratios with an absolute step.
    - **The ν step (0.02) is a PROPOSAL** (`REQUIRES_SUPERVISOR_DECISION`).
    - ln ν is never used: ν may be zero or negative.
 8. **Numerical noise:**
-   - a half-step repeat must agree within 5 % (SPEC S4 for ln p);
+   - a half-step repeat (moduli p·1.025 and p·0.975) must agree within 5 % (SPEC S4);
    - the same criterion for ν columns is a PROPOSAL;
    - a column failing it is `NOT_IDENTIFIABLE` (not resolved above noise);
    - the FE discretisation and convergence noise of the real model must be measured before acceptance

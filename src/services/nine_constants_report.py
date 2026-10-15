@@ -45,7 +45,22 @@ STATUS_TEXT = {
     "POLICY_OR_EVIDENCE_BLOCKER": "scientific policy / evidence blocker",
     "INVALID_OR_UNSUPPORTED_MODEL": "invalid or unsupported model",
 }
-UNITS = {name: ("MPa" if name[0] in "EG" else "-") for name in NAMES}
+UNSPECIFIED_STRESS_UNITS = "INP stress units (unspecified)"  # an INP declares no stress unit; never inferred
+POISSON_UNITS = "dimensionless"
+
+
+def stress_units_record(stress_units: Optional[str] = None, source: str = "USER_SUPPLIED") -> dict:
+    """The unit of E and G: an explicit declaration (with its source) or the unspecified INP stress unit."""
+    if stress_units is None:
+        return {"label": UNSPECIFIED_STRESS_UNITS, "source": "NOT_DECLARED",
+                "statement": "the INP does not declare a stress unit; moduli are in the INP's own consistent units"}
+    if not isinstance(stress_units, str) or not stress_units.strip():
+        raise ValueError("a declared stress unit must be a non-empty text.")
+    return {"label": stress_units.strip(), "source": source}
+
+
+def units(stress_units: Mapping) -> dict[str, str]:
+    return {name: (POISSON_UNITS if name[0] == "n" else stress_units["label"]) for name in NAMES}
 
 
 def _uncertainty(name: str, sd: Optional[float], value: Optional[float]) -> Optional[dict]:
@@ -59,8 +74,9 @@ def _uncertainty(name: str, sd: Optional[float], value: Optional[float]) -> Opti
 
 def nine_rows(input_constants: Optional[Mapping[str, float]], assessment: Optional[IdentifiabilityAssessment],
               estimation: Optional[EstimationResult], blanket_status: Optional[str] = None,
-              blanket_reason: Optional[str] = None) -> list[dict]:
+              blanket_reason: Optional[str] = None, stress_units: Optional[Mapping] = None) -> list[dict]:
     """Exactly nine rows, in record order. Estimated values only from a completed research estimation."""
+    unit_of = units(stress_units or stress_units_record())
     final = None
     if estimation is not None and estimation.status == "ESTIMATED_RESEARCH":
         final = estimation.final_assessment
@@ -83,7 +99,7 @@ def nine_rows(input_constants: Optional[Mapping[str, float]], assessment: Option
                                  "question must be declared explicitly to estimate it"]
         fixed = status == ConstantStatus.FIXED_INPUT_NOT_IDENTIFIED.value
         rows.append({
-            "constant": name, "units": UNITS[name], "coordinate": COORDINATE_UNITS[name],
+            "constant": name, "units": unit_of[name], "coordinate": COORDINATE_UNITS[name],
             "input_value": None if input_constants is None else input_constants.get(name),
             "input_value_class": "ASSUMED_FIXED" if fixed else "INPUT_CONSTANT",
             "estimated_value": estimated,
@@ -114,9 +130,12 @@ def build_report(*, question: str, inputs: Mapping, model: Optional[Mapping], ex
                  fe_plan: Optional[FECostPlan], fe_provenance: Optional[Mapping],
                  effective_model_reference: Optional[Mapping], refusals: Sequence[str],
                  synthetic: Optional[Mapping] = None, blanket_status: Optional[str] = None,
-                 blanket_reason: Optional[str] = None, nuisance_assumptions: Sequence[str] = ()) -> dict:
+                 blanket_reason: Optional[str] = None, nuisance_assumptions: Sequence[str] = (),
+                 stress_units: Optional[Mapping] = None) -> dict:
+    """``stress_units``: a ``stress_units_record`` of an explicit declaration; default: unspecified INP units."""
+    stress_units = dict(stress_units or stress_units_record())
     input_constants = None if model is None else model.get("constants")
-    rows = nine_rows(input_constants, assessment, estimation, blanket_status, blanket_reason)
+    rows = nine_rows(input_constants, assessment, estimation, blanket_status, blanket_reason, stress_units)
     source = (estimation.final_assessment if estimation is not None and estimation.final_assessment is not None
               else estimation.gate if estimation is not None else assessment)
     fit = [r for r in observations if r.role.value == "FIT"]
@@ -143,6 +162,7 @@ def build_report(*, question: str, inputs: Mapping, model: Optional[Mapping], ex
                          "holdout_families": len({r.family_key for r in holdout} - {r.family_key for r in fit}),
                          "rows": [r.to_dict() for r in observations],
                          "rank_upper_bound": len(fit)},
+        "units": {"moduli": stress_units, "poisson_ratios": POISSON_UNITS},
         "constants": rows,
         "identifiability": None if source is None else source.to_dict(),
         "estimation": None if estimation is None else {k: v for k, v in estimation.to_dict().items()
@@ -195,7 +215,11 @@ def report_text(report: Mapping) -> str:
     obs = report["observations"]
     lines.append(f"Accepted observations: {obs['accepted_fit']} FIT ({obs['fit_families']} families), "
                  f"{obs['holdout']} HOLDOUT; the sensitivity system has rank <= {obs['rank_upper_bound']}.")
-    lines += ["", f"{'Constant':<8} {'Input':>12} {'Estimated':>12} {'Uncertainty':>14}  Status", "-" * 96]
+    moduli = report["units"]["moduli"]
+    lines.append(f"Units: E and G in {moduli['label']} (source: {moduli['source']}); Poisson ratios "
+                 f"{report['units']['poisson_ratios']}.")
+    lines += ["", f"{'Constant':<8} {'Input':>12} {'Estimated':>12} {'Uncertainty':>14}  {'Units':<32} Status",
+              "-" * 96]
     for row in report["constants"]:
         u = row["uncertainty"]
         if u is None:
@@ -205,7 +229,7 @@ def report_text(report: Mapping) -> str:
         else:
             unc = f"±{u['sd']:.3g}"
         lines.append(f"{row['constant']:<8} {_value(row['input_value']):>12} {_value(row['estimated_value']):>12} "
-                     f"{unc:>14}  {row['status_text']}")
+                     f"{unc:>14}  {row['units']:<32} {row['status_text']}")
     lines += ["", "Why:"]
     for row in report["constants"]:
         lines.append(f"  {row['constant']}: " + "; ".join(row["reasons"]))

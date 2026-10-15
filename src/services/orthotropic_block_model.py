@@ -35,6 +35,7 @@ from domain.orthotropic_elasticity import COORDINATES, CoordinateKind, NAMES, co
 from .branch_tracker import FEModalState
 
 RIGID_MODES = 6
+STRESS_UNITS = "MPa (N/mm²)"  # declared by this model's unit system (mm, t/mm³, Hz), not inferred from any INP
 _VOIGT = {(0, 0): 0, (1, 1): 1, (2, 2): 2, (0, 1): 3, (1, 0): 3, (0, 2): 4, (2, 0): 4, (1, 2): 5, (2, 1): 5}
 
 

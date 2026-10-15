@@ -88,9 +88,13 @@ class NineConstantsViewTests(_Application, unittest.TestCase):
         window.run_diagnostic()
         rows = self.rows(window)
         self.assertEqual([r[0] for r in rows], ["E1", "E2", "E3", "nu12", "nu13", "nu23", "G12", "G13", "G23"])
-        self.assertEqual({r[4] for r in rows}, {"not evaluated"})
+        self.assertEqual({r[5] for r in rows}, {"not evaluated"})
         self.assertEqual({r[2] for r in rows}, {"-"})  # no estimated value without evidence
         self.assertEqual(rows[0][1], "52,000")
+        units = dict((r[0], r[4]) for r in rows)  # an INP declares no stress unit: never shown as MPa
+        self.assertEqual({units[n] for n in ("E1", "E2", "E3", "G12", "G13", "G23")},
+                         {"INP stress units (unspecified)"})
+        self.assertEqual({units[n] for n in ("nu12", "nu13", "nu23")}, {"dimensionless"})
         self.assertTrue(window.headline.get().startswith("No constant can be determined"), window.headline.get())
         self.assertIn("NOT_A_VALIDATED_MATERIAL_PROPERTY", window.text.get("1.0", "end"))
 
@@ -102,7 +106,7 @@ class NineConstantsViewTests(_Application, unittest.TestCase):
         unv_sha = hashlib.sha256(self.unv.read_bytes()).hexdigest()
         window.result_file.set(str(self.quick_result(inp_sha, unv_sha)))
         window.run_diagnostic()
-        self.assertEqual({r[4] for r in self.rows(window)}, {"not identifiable"})
+        self.assertEqual({r[5] for r in self.rows(window)}, {"not identifiable"})
         text = window.text.get("1.0", "end")
         self.assertIn("rank <= 2", text)
         self.assertIn("Separate effective FE-model calibration", text)
@@ -124,14 +128,14 @@ class NineConstantsViewTests(_Application, unittest.TestCase):
         self.assertTrue(window.headline.get().startswith("CHOICE REQUIRED"), window.headline.get())
         window.material.set("Skin_B")  # a shell section: E3, ν13, ν23 cannot act on its spectrum
         window.run_diagnostic()
-        statuses = dict((r[0], r[4]) for r in self.rows(window))
+        statuses = dict((r[0], r[5]) for r in self.rows(window))
         self.assertEqual({statuses[n] for n in ("E3", "nu13", "nu23")}, {"not identifiable"})
 
     def test_synthetic_demonstration_and_report_files(self):
         window = self.window()
         window.case.set("two_rows")
         window.run_demo()
-        self.assertEqual({r[4] for r in self.rows(window)}, {"not identifiable"})
+        self.assertEqual({r[5] for r in self.rows(window)}, {"not identifiable"})
         self.assertIn("SYNTHETIC", window.text.get("1.0", "end"))
         target = self.folder / "report"
         with mock.patch("nine_constants_window.filedialog.askdirectory", return_value=str(target)):
