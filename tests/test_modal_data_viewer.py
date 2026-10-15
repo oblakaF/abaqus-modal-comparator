@@ -427,6 +427,24 @@ class WindowTests(_Files):
         self.assertIn("previous results are no longer active", panel.fe.image.cget("text"))
         self.assertIs(panel.frame.winfo_toplevel(), self.root)
 
+    def test_a_resize_while_drawing_never_reshows_the_previous_view(self):  # P8 acceptance finding
+        application = self.application()
+        error = ambiguity()
+        error.loaded_modal_data = self.loaded(load_unv(self.fitted_path))
+        application._failed(error)
+        pane = application.mode_viewer.fe
+        self.assertIsNotNone(pane.image_path)  # mode 1 is shown
+        deferred = []
+        application.mode_viewer.post = lambda callback: deferred.append(callback) or True  # mode 5 still drawing
+        pane.select_number(5)
+        pane._fit()  # a <Configure> re-fit arrives while the new view is drawn
+        self.assertIsNone(pane.photo)  # the old picture never reappears under the new selection
+        self.assertIn("Drawing FE mode 5", pane.image.cget("text"))
+        for callback in deferred:
+            callback()
+        self.assertIsNotNone(pane.photo)
+        self.assertTrue(pane.image_path.name.startswith("fe_0005"), pane.image_path)
+
     def test_save_diagnostic_output(self):
         application = self.application()
         experimental = load_unv(self.frf_path)
