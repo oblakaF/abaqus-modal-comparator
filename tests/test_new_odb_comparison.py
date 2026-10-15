@@ -4,8 +4,8 @@ When the automatic geometry registration finds several equally plausible orienta
 discarded:
 
 - a new ODB with exactly the FE geometry identity of an accepted physical registration, the accepted PolyMAX source
-  and modal set reuses that frozen mapping; its own frequencies and shapes are compared, it is never the accepted
-  baseline ODB and archived sensitivities stay not applicable;
+  and modal set reuses that frozen mapping; its own frequencies and shapes are compared, it is not assumed to be the
+  accepted baseline ODB, and archived sensitivities apply only when 11. Scaling verifies the baseline ODB by SHA-256;
 - otherwise a FREQUENCY_ONLY_DIAGNOSTIC shows both frequency lists and nearest-frequency differences, without an
   orientation choice, MAC or mode pairs.
 
@@ -82,8 +82,12 @@ class BindingTests(_Case):
         provenance = bound.provenance()
         self.assertEqual(provenance["source"], new.GEOMETRY_REUSE_SOURCE)
         self.assertEqual(provenance["fe_geometry_sha256"], bound.registration.fe_geometry_identity["sha256"])
-        self.assertIn("this ODB is not treated as the accepted baseline ODB", provenance["limits"])
-        self.assertIn("archived sensitivities do not apply", bound.warning())
+        self.assertIn("this ODB is not assumed to be the accepted baseline ODB (its content is not hashed by this "
+                      "reuse)", provenance["limits"])
+        # CORE-E2E T1b: the reused path may load the accepted baseline ODB itself, which 11. Scaling then verifies;
+        # the warning must not claim that archived sensitivities never apply
+        self.assertIn("archived sensitivities apply only if 11. Scaling verifies this ODB", bound.warning())
+        self.assertNotIn("archived sensitivities do not apply", bound.warning())
         self.assertEqual(len(bound.checks), 4)
 
     def test_different_geometry_is_never_reused(self):

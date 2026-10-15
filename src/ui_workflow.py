@@ -1292,7 +1292,7 @@ def install_responsive_workflow(app_module) -> None:
             message += " Physical orientation: user-confirmed."
         if result.metadata.get("geometry_verified_registration"):
             message += (" Physical registration: reused by FE geometry identity (accepted mapping; this ODB's own "
-                        "frequencies and shapes; not the accepted baseline ODB).")
+                        "frequencies and shapes; not assumed to be the accepted baseline ODB).")
         self._show_loaded_modal_data(getattr(result, "loaded_modal_data", None), ESTABLISHED_VIEWER_MESSAGE)
         if not result.pairs and hasattr(self, "mode_viewer"):
             self._show_shape_view(SHAPE_VIEW_INDIVIDUAL)  # no gated pair to show: each file's own modes instead

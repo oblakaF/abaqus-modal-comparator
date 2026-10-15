@@ -8,8 +8,9 @@ alone (``GeometryOrientationAmbiguousError``). Two outcomes replace a discarded 
    measured-point-to-FE-node mapping and rotation, provided the experimental file is, by fresh SHA-256 and size, the
    accepted PolyMAX source, the imported modal set replays the frozen registration (``verify_fixture_dataset``), the
    sealed registration is content-compatible with the loaded files and every mapped FE node is present. Only the
-   geometric mapping is reused: the frequencies and mode shapes are the new ODB's own, the ODB is never treated as
-   the accepted baseline ODB, and archived sensitivities never apply (they stay bound to the baseline ODB SHA-256).
+   geometric mapping is reused: the frequencies and mode shapes are the new ODB's own, the ODB is not assumed to be
+   the accepted baseline ODB (its content is not hashed here), and archived sensitivities apply only when the
+   separate check (11. Scaling) verifies the ODB as the accepted baseline ODB by SHA-256.
    A different geometry, experimental file or modal set, or an unverifiable registration, refuses the reuse.
 
 2. ``frequency_only_diagnostic``: otherwise the extracted Abaqus frequencies, the PolyMAX frequencies and their
@@ -41,8 +42,8 @@ GEOMETRY_REUSE_SOURCE = "REUSED_PHYSICAL_REGISTRATION_BY_FE_GEOMETRY_IDENTITY"
 FREQUENCY_ONLY = "FREQUENCY_ONLY_DIAGNOSTIC"
 REUSE_LIMITS = (
     "only the frozen geometric mapping is reused: frequencies and mode shapes are this ODB's own",
-    "this ODB is not treated as the accepted baseline ODB",
-    "archived sensitivities do not apply (they belong to the accepted baseline ODB only)",
+    "this ODB is not assumed to be the accepted baseline ODB (its content is not hashed by this reuse)",
+    "archived sensitivities apply only if 11. Scaling verifies this ODB as the accepted baseline ODB by SHA-256",
     "no acceptance gate or threshold is changed",
 )
 FREQUENCY_ONLY_STATEMENT = (
