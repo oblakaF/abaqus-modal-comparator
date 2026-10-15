@@ -1804,6 +1804,24 @@
     "known_flaky": "test_registration_factory.test_no_full_model_contamination (substring check against JSON that contains a random temporary path; intermittent; passed in both runs; not modified)",
     "note": "release checkpoint audit (no Abaqus, no FE, no LM); the historical audit_test_baseline / ci_baseline are unchanged"
   },
+  "p11_observation_readiness": {
+    "title": "Records-only observation readiness (P11)",
+    "status": "ACCEPTED",
+    "acceptance": "SUPERVISOR P11 CLOSEOUT (2026-10-15): ACCEPTED; local fast-forward integration into main authorised (no push, no PR)",
+    "branch": "p11/observation-readiness",
+    "base": "5613edaa26be3644fdcc83d49d90b7aa4ca8339c",
+    "implementation_commit": "f7d383af1b33914d43c6cb21ae460a4967287c27",
+    "schema": "auto-id/observation-readiness/v1",
+    "scope": "services/observation_readiness.specimen_observation_readiness: one record per governed forward-model manifest, from committed governed records only (governed binder, fixture catalogue, archived_sensitivity_evidence.accepted_physical_freeze, governed specimen records, physical measurements, M6.4 result as DIAGNOSTIC_ONLY context). Three separate sections: data governance (GOVERNED / AVAILABLE / DIAGNOSTIC_ONLY / NOT_AVAILABLE / NOT_VERIFIED), observation count (strict FIT / HOLDOUT rows, terms, unique families and the SPEC v1.2 §8 counting conditions for a declared k; rows counted only on governed, curve-fitted, registration-not-limited inputs) and numerical identifiability (NOT_ASSESSED); scientific_readiness NOT_DECLARED; canonical record hash. services/observation_count.count_observations is the one §8 counting rule, also used by the specimen calibration gate",
+    "verified_specimens": "SP-02 (SP02.physical.forward.json): 2 FIT + 1 HOLDOUT rows, 2 FIT + 1 HOLDOUT families, §8 count met for k = 1; SP-13 (SP13.physical.forward.json): 1 FIT + 1 HOLDOUT, count not met for k = 1; k = 9 refused by count for each specimen and pooled (3 FIT rows, 2 unique FIT families < 10, 1 HOLDOUT family), without FE; the legacy SP02.forward.json is not counted",
+    "numerical_identifiability": "NOT_ASSESSED (rank, precision, leave-one-FIT-family-out and sensitivities are not computed from records)",
+    "calibration_gate": "behaviour unchanged: the 305 gate records of the gate-using tests are identical before and after; the counting rule sits outside the calibration-gate module, so the V12-I1 / V12-I5 import guards are unchanged",
+    "tests": "Windows without data stores at f7d383a: 2247 ran, OK, 92 skipped; P11 tests 15 OK; mutation check 5 / 5 caught",
+    "production_calibration_execution": "BLOCKED / NOT_AUTHORISED (D-079, D-080 unchanged)",
+    "gui_integration": "NOT_STARTED: separate task (the Data Readiness page contract has no observation section; its READY / WARNING / BLOCKED states are not reused)",
+    "main_ci": "not run (local integration, no push)",
+    "abaqus_runs": 0
+  },
   "stage_status": {
     "M8": "IN_PROGRESS",
     "M8_accepted_scope": "READ_ONLY_EXISTING_JOURNALLED_RUNS",
