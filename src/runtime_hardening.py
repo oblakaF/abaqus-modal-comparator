@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Optional
 
+import abaqus_bridge
 from abaqus_bridge import AnalysisCancelled, extraction_range_notice
 from coordinate_calibration import CoordinateCalibration
 from reviewed_core import GeometryOrientationAmbiguousError
@@ -39,6 +40,22 @@ _INSTALLED = False
 class GovernedRegistrationRefused(ValueError):
     """G2d-1: the accepted physical registration was requested but cannot be applied to these files."""
 _MATPLOTLIB_LOCK = threading.RLock()
+
+
+def reusable_extraction_cache(workspace: Path, abaqus: Path, command: str, start: int, end: int) -> Optional[Path]:
+    """A completed extraction of the same ODB and mode range in another analysis folder of this workspace.
+
+    The FE extraction depends only on the ODB, the Abaqus command and the mode range (``_source_signature``), so a
+    confirmed orientation, another modal set, experimental file, calibration or registration option must not run
+    Abaqus again. The program's own cache check decides; each analysis keeps its own results folder.
+    """
+    if Path(abaqus).suffix.lower() != ".odb":
+        return None
+    signature = abaqus_bridge._source_signature(Path(abaqus), command, start, end)
+    for candidate in sorted(Path(workspace).glob("analysis_*/abaqus")):
+        if abaqus_bridge._cache_is_valid(candidate, signature):
+            return candidate
+    return None
 
 
 def _parse_coordinate_scale(text: str) -> Optional[float]:
@@ -194,9 +211,11 @@ def install_runtime_hardening(app_module) -> None:
                 # extract_odb.py's "PROGRESS:" markers). Never fails the run.
                 stage(1, f"Abaqus extraction: {text}")
 
+            # The analysis folder keys every input; the extraction itself is reused by its own signature.
+            extraction_cache = reusable_extraction_cache(workspace, abaqus, command, start, end) or cache / "abaqus"
             abaqus_data = app_module.load_or_extract_odb(
                 abaqus,
-                cache / "abaqus",
+                extraction_cache,
                 command,
                 start,
                 end,
