@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
 import frf_unv_support as F  # noqa: E402
-import quick_calibration_support as S  # noqa: E402
+import synthetic_plate_support as S  # noqa: E402
 from modal_core import ModalDataset, ModeShape  # noqa: E402
 from reviewed_core import GeometryOrientationAmbiguousError  # noqa: E402
 from services import modal_data_viewer as viewer  # noqa: E402
@@ -74,7 +74,7 @@ class _Files(unittest.TestCase):
         self.fitted_path = S.write_experiment(self.folder / "fitted.unv", S.E0, S.G0)
         self.frf_path = F.write_frf_only(self.folder / "frf_only.uff")
         (self.folder / "plate.odb").write_bytes(b"synthetic ODB stand-in; never opened")
-        for target in ("subprocess.Popen", "services.quick_calibration.AbaqusRunner"):
+        for target in ("subprocess.Popen",):
             patcher = mock.patch(target, side_effect=_no_process)
             patcher.start()
             self.addCleanup(patcher.stop)

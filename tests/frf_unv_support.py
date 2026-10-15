@@ -1,6 +1,6 @@
 """Synthetic Testlab-like UNV/UFF files without fitted modes: geometry (dataset 15) + dataset-58 FRFs (no Abaqus).
 
-The plate and its modes are those of ``quick_calibration_support``; FRFs H(f) = Σ φ_i(rsp) φ_i(ref) / (f_i² − f² +
+The plate and its modes are those of ``synthetic_plate_support``; FRFs H(f) = Σ φ_i(rsp) φ_i(ref) / (f_i² − f² +
 2jζ f_i f) are written for the U3 direction of every measured point, with coherence channels.  ``points`` limits the
 measured points (two points are not enough for a spatial view).
 """
@@ -13,7 +13,7 @@ from typing import Optional
 
 import numpy as np
 
-import quick_calibration_support as S
+import synthetic_plate_support as S
 
 
 def write_frf_only(path: Path, points: Optional[int] = None, coherence: bool = True) -> Path:
