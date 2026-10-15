@@ -148,8 +148,28 @@ class FrequencyOnlyTests(_Case):
         self.assertIn("MAC and the physical modal correspondence are NOT verified", text)
         self.assertIn("NOT mode pairs", text)
         for row in new.frequency_only_table_rows(diagnostic):
-            self.assertEqual((row[5], row[8]), ("not computed", "FREQUENCY ONLY — not a pair"))
+            self.assertEqual(row[5], "not computed")
+            self.assertTrue(row[8].startswith("FREQUENCY ONLY — not a pair"))  # + a range note when outside
             self.assertTrue(row[0].endswith("(nearest)"))
+
+    def test_frequencies_outside_the_extracted_fe_range_are_marked(self):
+        # CORE-E2E T4 (SP-04): FRF peaks at 9.7 / 15.6 Hz lie below FE mode 7 (58.15 Hz) and peaks up to 977 Hz above
+        # FE mode 25 (678 Hz); their "nearest" differences (+500 %, -31 %) describe the mode range, not the model
+        m = self.baseline.sorted_modes()[0]
+
+        def modes(pairs):
+            return [ModeShape(n, hz, m.node_ids, m.coordinates, m.vectors) for n, hz in pairs]
+
+        fe = ModalDataset("FE", self.new_odb, modes(((7, 60.0), (8, 140.0))))
+        experimental = ModalDataset("EXP", self.unv, modes(((1, 9.7), (2, 61.0), (3, 900.0))))
+        diagnostic = new.frequency_only_diagnostic(fe, experimental, "x")
+        statuses = [row[8] for row in new.frequency_only_table_rows(diagnostic)]
+        self.assertEqual(statuses[0], "FREQUENCY ONLY — not a pair; below the lowest extracted FE mode (60.00 Hz)")
+        self.assertEqual(statuses[1], "FREQUENCY ONLY — not a pair")
+        self.assertTrue(statuses[2].endswith("above the highest extracted FE mode (140.00 Hz); extend the Abaqus "
+                                             "mode range"))
+        self.assertIn("below the lowest extracted FE mode", "\n".join(diagnostic.text_lines()))
+        self.assertEqual(diagnostic.to_dict()["mac"], "NOT_COMPUTED")
 
     def test_no_fe_frequency(self):
         empty = ModalDataset("FE", self.new_odb, [])
@@ -312,7 +332,8 @@ class TkTests(_Case):
         table = application.table
         rows = [tuple(str(v) for v in table.item(k, "values")) for k in table.get_children()]
         self.assertEqual(len(rows), 4)
-        self.assertTrue(all(row[5] == "not computed" and row[8] == "FREQUENCY ONLY — not a pair" for row in rows))
+        self.assertTrue(all(row[5] == "not computed" and row[8].startswith("FREQUENCY ONLY — not a pair")
+                            for row in rows))
         self.assertEqual(application.item_to_pair, {})  # nothing selectable as a pair
         self.assertEqual(application.metric_mac.cget("text"), "not computed")
         details = application.details.get("1.0", "end")

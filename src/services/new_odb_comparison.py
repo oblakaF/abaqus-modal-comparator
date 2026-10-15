@@ -195,6 +195,17 @@ class FrequencyOnlyDiagnostic:
         """True when the experimental frequencies are FRF peak candidates, not fitted modes."""
         return "PROVISIONAL" in self.experimental_source
 
+    def range_note(self, experimental_hz: float) -> str:
+        """Why a nearest-frequency difference says nothing: the frequency lies outside the extracted FE modes."""
+        if not self.fe_modes:
+            return ""
+        low, high = min(f for _, f in self.fe_modes), max(f for _, f in self.fe_modes)
+        if experimental_hz < low:
+            return f"below the lowest extracted FE mode ({low:.2f} Hz)"
+        if experimental_hz > high:
+            return f"above the highest extracted FE mode ({high:.2f} Hz); extend the Abaqus mode range"
+        return ""
+
     def to_dict(self) -> dict:
         return {
             "status": self.status, "statement": self.statement, "reason": self.reason,
@@ -227,7 +238,8 @@ class FrequencyOnlyDiagnostic:
             if row.next_fe_mode is not None:
                 text += (f"; next FE {row.next_fe_mode} {row.next_fe_hz:.4f} Hz "
                          f"({row.next_difference_percent:+.2f} %)")
-            lines.append(text)
+            note = self.range_note(row.experimental_hz)
+            lines.append(text + (f" — {note}" if note else ""))
         return lines
 
 
@@ -260,9 +272,10 @@ def frequency_only_table_rows(diagnostic: FrequencyOnlyDiagnostic) -> list[tuple
               else "FREQUENCY ONLY — not a pair")
     rows = []
     for row in diagnostic.rows:
+        note = diagnostic.range_note(row.experimental_hz)
         rows.append((
             "—" if row.nearest_fe_mode is None else f"{row.nearest_fe_mode} (nearest)", str(row.experimental_mode),
             "—" if row.nearest_fe_hz is None else f"{row.nearest_fe_hz:.4f}", f"{row.experimental_hz:.4f}",
             "—" if row.nearest_difference_percent is None else f"{row.nearest_difference_percent:.2f}",
-            "not computed", "—", "—", status))
+            "not computed", "—", "—", status + (f"; {note}" if note else "")))
     return rows
