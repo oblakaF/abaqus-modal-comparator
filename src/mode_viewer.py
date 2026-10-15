@@ -122,8 +122,13 @@ class _Pane:
         generation = self.generation
         component = self.component_labels.get(self.component.get(), "normal")
         self.info.configure(text=self._info_text(entry))
+        # The previous view is forgotten at once: a resize while the new view is drawn must not re-show the old
+        # picture under the new selection.
+        self.image_path = None
+        if self._fit_job is not None:
+            self.image.after_cancel(self._fit_job)
+            self._fit_job = None
         if not entry.spatial_available:
-            self.image_path = None
             self._show_text(f"No spatial view for {entry.label()}:\n{entry.spatial_reason}")
             return
         self._show_text(f"Drawing {entry.label()} ...")
