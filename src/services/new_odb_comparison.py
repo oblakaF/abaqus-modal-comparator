@@ -187,10 +187,17 @@ class FrequencyOnlyDiagnostic:
     experimental_modes: tuple[tuple[int, float], ...]
     rows: tuple[FrequencyOnlyRow, ...]
     statement: str = FREQUENCY_ONLY_STATEMENT
+    experimental_source: str = "curve-fitted modal set (PolyMAX)"
+
+    @property
+    def provisional_experimental(self) -> bool:
+        """True when the experimental frequencies are FRF peak candidates, not fitted modes."""
+        return "PROVISIONAL" in self.experimental_source
 
     def to_dict(self) -> dict:
         return {
             "status": self.status, "statement": self.statement, "reason": self.reason,
+            "experimental_frequency_source": self.experimental_source,
             "mac": "NOT_COMPUTED", "mode_pairs": "NONE (physical modal correspondence not verified)",
             "fe_modes": [{"mode": n, "frequency_hz": f} for n, f in self.fe_modes],
             "experimental_modes": [{"mode": n, "frequency_hz": f} for n, f in self.experimental_modes],
@@ -201,8 +208,13 @@ class FrequencyOnlyDiagnostic:
         lines = [FREQUENCY_ONLY, "=" * 80, self.statement, "", f"Why: {self.reason}", ""]
         lines.extend(["EXTRACTED ABAQUS FREQUENCIES", "-" * 80])
         lines.extend(f"FE mode {n}: {f:.4f} Hz" for n, f in self.fe_modes)
-        lines.extend(["", "EXPERIMENTAL POLYMAX FREQUENCIES", "-" * 80])
-        lines.extend(f"Experimental mode {n}: {f:.4f} Hz" for n, f in self.experimental_modes)
+        if self.provisional_experimental:
+            lines.extend(["", "EXPERIMENTAL FRF RESONANCE-PEAK CANDIDATES (dataset 58; PROVISIONAL, not validated "
+                          "fitted modes)", "-" * 80])
+            lines.extend(f"FRF peak {n}: {f:.4f} Hz" for n, f in self.experimental_modes)
+        else:
+            lines.extend(["", f"EXPERIMENTAL FREQUENCIES: {self.experimental_source}".upper(), "-" * 80])
+            lines.extend(f"Experimental mode {n}: {f:.4f} Hz" for n, f in self.experimental_modes)
         lines.extend(["", "NEAREST FE FREQUENCIES (frequency proximity only; NOT mode pairs; MAC not computed)",
                       "-" * 80])
         for row in self.rows:
@@ -221,6 +233,8 @@ class FrequencyOnlyDiagnostic:
 def frequency_only_diagnostic(abaqus, experimental, reason: str) -> FrequencyOnlyDiagnostic:
     """Frequencies of both datasets and, per experimental mode, the two nearest FE frequencies (no shapes used)."""
 
+    from services.modal_data_viewer import experimental_frequency_source
+
     fe = tuple((int(m.number), float(m.frequency_hz)) for m in abaqus.sorted_modes())
     exp = tuple((int(m.number), float(m.frequency_hz)) for m in experimental.sorted_modes())
     rows = []
@@ -234,17 +248,20 @@ def frequency_only_diagnostic(abaqus, experimental, reason: str) -> FrequencyOnl
             None if nearest is None else frequency_error_percent(nearest[1], hz),
             None if following is None else following[0], None if following is None else following[1],
             None if following is None else frequency_error_percent(following[1], hz)))
-    return FrequencyOnlyDiagnostic(FREQUENCY_ONLY, reason, fe, exp, tuple(rows))
+    return FrequencyOnlyDiagnostic(FREQUENCY_ONLY, reason, fe, exp, tuple(rows),
+                                   experimental_source=experimental_frequency_source(experimental))
 
 
 def frequency_only_table_rows(diagnostic: FrequencyOnlyDiagnostic) -> list[tuple[str, ...]]:
     """Rows for the comparison table (its columns), visibly not pairs: MAC not computed, status FREQUENCY ONLY."""
 
+    status = ("FREQUENCY ONLY — FRF peak (provisional), not a pair" if diagnostic.provisional_experimental
+              else "FREQUENCY ONLY — not a pair")
     rows = []
     for row in diagnostic.rows:
         rows.append((
             "—" if row.nearest_fe_mode is None else f"{row.nearest_fe_mode} (nearest)", str(row.experimental_mode),
             "—" if row.nearest_fe_hz is None else f"{row.nearest_fe_hz:.4f}", f"{row.experimental_hz:.4f}",
             "—" if row.nearest_difference_percent is None else f"{row.nearest_difference_percent:.2f}",
-            "not computed", "—", "—", "FREQUENCY ONLY — not a pair"))
+            "not computed", "—", "—", status))
     return rows
