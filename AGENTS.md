@@ -65,6 +65,30 @@ EVIDENCE > older roadmap/design/history documents (`docs/auto_id/README.md`).
 - Never merge a stage PR without explicit HUMAN authorisation. After a merge, record
   the `main` merge SHA in STATUS.json and CHANGELOG.md before starting the next stage.
 
+## Original user data protection
+
+Applies to every agent that reads or processes user engineering files: Abaqus `.odb`, `.inp`, `.cae` and job files;
+experimental `.unv`, `.uff` and `.lms` files; extraction caches and manifests; solver scratch and output; and specimen
+datasets such as SP-02, SP-04 and SP-13.
+
+- **Read-only.** Original files are read-only. Never overwrite, rename, delete or modify them, and never write
+  generated files into their directories.
+- **Copy first.**
+  - Never run an analysis against an original file.
+  - Check free disk space, then copy the inputs into a new, uniquely named run directory under
+    `D:\git\abaqus-modal-comparator-work\` (for example `acceptance\<task>\<run-id>\`). Never overwrite an earlier run.
+  - Verify every copy by size and SHA-256 before use. If a verified copy cannot be made, STOP.
+- **Separate outputs.** Results, plots, diagnostics and temporary files go only to separate working directories. No
+  symbolic links or junctions that lead back into source directories.
+- **Extraction bundles.** Copy the manifest together with every file it references. Keep the recorded provenance
+  unchanged. A source path recorded in a manifest is history, not permission to open that file.
+- **Active Abaqus work.**
+  - Never open or copy an ODB that Abaqus may still be writing; if its state is uncertain, do not copy it.
+  - Never start, stop, inspect beyond a non-invasive status check, or otherwise interfere with user-owned Abaqus or
+    licence processes.
+  - Never change the user's Abaqus/CAE session or settings.
+  - While the user is working in Abaqus, ask the HUMAN before any resource-intensive test.
+
 ## Codebase orientation
 
 - Entry point `src/main.py` builds the app from an ordered chain of `install_*`
