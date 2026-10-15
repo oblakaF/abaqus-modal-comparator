@@ -1222,6 +1222,9 @@ def install_responsive_workflow(app_module) -> None:
         message = status_text(state, pair_count=automatic_pair_count)
         if result.metadata.get("orientation_source") == "user_confirmed":
             message += " Physical orientation: user-confirmed."
+        if result.metadata.get("geometry_verified_registration"):
+            message += (" Physical registration: reused by FE geometry identity (accepted mapping; this ODB's own "
+                        "frequencies and shapes; not the accepted baseline ODB).")
         self._set_analysis_state(state, message)
 
     def failed(self, error: Exception) -> None:
@@ -1381,11 +1384,37 @@ def install_responsive_workflow(app_module) -> None:
         self._set_empty_states()
         self.metric_geometry_caption.configure(text="STATE")
         self.metric_geometry.configure(text="Orientation ambiguous")
+        diagnostic = getattr(error, "frequency_only_diagnostic", None)
+        if diagnostic is None:
+            self._set_analysis_state(
+                AnalysisState.DIAGNOSTIC,
+                "Diagnostic / orientation ambiguous: physical provenance required.",
+            )
+        else:
+            self._show_frequency_only_diagnostic(diagnostic)
+        self._show_orientation_ambiguity_dialog(error)
+
+    def show_frequency_only_diagnostic(self, diagnostic) -> None:
+        """FREQUENCY_ONLY_DIAGNOSTIC: frequencies and nearest-frequency rows, visibly not pairs (no MAC, no shapes)."""
+        from services.new_odb_comparison import frequency_only_table_rows
+
+        self.table.delete(*self.table.get_children())
+        for values in frequency_only_table_rows(diagnostic):
+            self.table.insert("", "end", values=values, tags=("frequency_only",))
+        self.metric_pairs.configure(text="0 (frequency only)")
+        self.metric_mac.configure(text="not computed")
+        self.metric_geometry.configure(text="Frequency only")
+        if hasattr(self, "pair_title"):
+            self.pair_title.configure(text=diagnostic.statement)
+        self.details.configure(state="normal")
+        self.details.delete("1.0", "end")
+        self.details.insert("1.0", "\n".join(diagnostic.text_lines()))
+        self.details.configure(state="disabled")
         self._set_analysis_state(
             AnalysisState.DIAGNOSTIC,
-            "Diagnostic / orientation ambiguous: physical provenance required.",
+            "FREQUENCY_ONLY_DIAGNOSTIC: orientation ambiguous; frequencies shown, MAC and modal correspondence "
+            "not verified (no mode pairs).",
         )
-        self._show_orientation_ambiguity_dialog(error)
 
     def populate(self, result) -> None:
         original_populate(self, result)
@@ -2202,6 +2231,7 @@ def install_responsive_workflow(app_module) -> None:
     application_class._failed = failed
     application_class._orientation_ambiguous = orientation_ambiguous
     application_class._show_orientation_ambiguity_dialog = show_orientation_ambiguity_dialog
+    application_class._show_frequency_only_diagnostic = show_frequency_only_diagnostic
     application_class._confirm_orientation_candidate = confirm_orientation_candidate
     application_class._populate = populate
     application_class._rebuild_metric_cards = rebuild_metric_cards
