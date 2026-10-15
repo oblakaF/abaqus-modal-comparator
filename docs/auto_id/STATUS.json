@@ -1824,7 +1824,7 @@
   },
   "p12_observation_readiness_ui": {
     "title": "Observation Readiness section of the Data Readiness page (P12)",
-    "status": "REVIEW_READY",
+    "status": "ACCEPTED",
     "authorisation": "SUPERVISOR P12 task (2026-10-15): GUI integration of auto-id/observation-readiness/v1; one local commit; no push, merge or PR",
     "branch": "p12/observation-readiness-ui",
     "base": "efe005436230a4dcb8cdb608169016b751bab856",
@@ -1832,7 +1832,15 @@
     "separation": "the data-readiness gate (READY / WARNING / BLOCKED) and its view are unchanged; observation states never use those words; a met count is never shown as scientific readiness",
     "failure_states": "NO MODEL SELECTED; RECORD NOT AVAILABLE (outside the repository, refused by the governed binder, any service error); RECORD NOT VERIFIED (schema or hash); NO GOVERNED OBSERVATIONS / DIAGNOSTIC DATA ONLY: NO GOVERNED OBSERVATIONS",
     "production_calibration_execution": "BLOCKED / NOT_AUTHORISED (D-079, D-080 unchanged)",
-    "abaqus_runs": 0
+    "abaqus_runs": 0,
+    "acceptance": "SUPERVISOR P12 CLOSEOUT (2026-10-15): ACCEPTED; local fast-forward integration into main authorised (no push, no PR)",
+    "closure": "CLOSED: implementation bf52d74 and this closeout integrated into main by a local fast-forward",
+    "implementation_commit": "bf52d742b74f3cf4769eb2d26eb157c5198a8daf",
+    "record_schema": "auto-id/observation-readiness/v1",
+    "supported_inputs": "governed forward-model manifests of docs/auto_id/forward_models only (governed binder)",
+    "count_semantics": "the SPEC v1.2 §8 result is a counting check only; numerical identifiability stays NOT_ASSESSED; scientific_readiness stays NOT_DECLARED",
+    "tests": "Windows without data stores at bf52d74: 2261 ran, OK, 92 skipped; P12 tests 14 OK; mutation check 4 / 4 caught; visual check in the real window (acceptance/P12, 0 process starts)",
+    "main_ci": "not run (local integration, no push)"
   },
   "stage_status": {
     "M8": "IN_PROGRESS",

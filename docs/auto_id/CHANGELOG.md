@@ -5114,3 +5114,18 @@ first internal provider.
   counted the V12-I1 / V12-I5 guard tests).
 - **Unchanged:** P11 service, calibration gate, SPEC, DECISIONS, EVIDENCE. Production calibration execution BLOCKED /
   NOT_AUTHORISED. **Abaqus run count:** 0.
+
+## 2026-10-15 — P12 Observation Readiness GUI ACCEPTED and closed (local fast-forward into main)
+
+- **P12:** SUPERVISOR ACCEPTED (P12 CLOSEOUT). Implementation `bf52d74` on `p12/observation-readiness-ui` from `main`
+  `efe0054`; integrated with this closeout by a local fast-forward of `main`. No PR, no push, so no main CI run.
+- **Recorded:**
+  - the GUI shows `auto-id/observation-readiness/v1` records;
+  - only governed forward-model manifests of `docs/auto_id/forward_models` are inputs;
+  - the SPEC v1.2 §8 result is a counting check only;
+  - numerical identifiability stays `NOT_ASSESSED`, and `scientific_readiness` stays `NOT_DECLARED`;
+  - production calibration execution stays BLOCKED / NOT_AUTHORISED (D-079, D-080).
+- **Unchanged:** the M8 stage status and the original M8 GATE (`NOT_MET`); SPEC, DECISIONS, EVIDENCE; the P11 service and
+  the calibration gate.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+- **Scientific behaviour changed:** NO (documentation only). **Abaqus run count:** 0.
