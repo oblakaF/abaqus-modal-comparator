@@ -1007,6 +1007,149 @@ def data_readiness_view(app) -> dict[str, object]:
     }
 
 
+# ----------------------------------------------------------------------------- observation readiness (P12)
+
+OBSERVATION_READINESS_K = 1  # the main counting check: one declared parameter
+OBSERVATION_DIAGNOSTIC_K = 9  # observation-deficit diagnostic only
+OBSERVATION_SELECT_LABEL = "Select Governed Forward Model..."
+OBSERVATION_CLEAR_LABEL = "Clear Selection"
+OBSERVATION_NOTHING_SELECTED = (
+    "No governed forward model selected. Select Governed Forward Model... chooses one manifest of "
+    "docs/auto_id/forward_models; nothing is selected automatically."
+)
+OBSERVATION_SCOPE = (
+    "Observation readiness of one governed specimen, from the committed governed records only "
+    "(auto-id/observation-readiness/v1). It is separate from the data-readiness states above: it shows "
+    "the governance of the observation inputs, the SPEC v1.2 §8 counting conditions and the state of the "
+    "numerical identifiability, which is NOT_ASSESSED (practical rank, precision, sensitivities and "
+    "leave-one-FIT-family-out need FE evidence). A met counting condition is not scientific readiness. "
+    "No file outside the repository is read, nothing is calculated, calibrated or run."
+)
+OBSERVATION_K9_NOTE = (
+    "observation-deficit check only: a nine-parameter question is not permitted by SPEC v1.2 "
+    "(§5, §5.2, §16)"
+)
+
+
+def _governed_forward_model(path) -> str:
+    """The repository-relative POSIX path of a selected manifest (the governed binder judges the rest)."""
+
+    try:
+        relative = Path(str(path)).resolve().relative_to(AUTO_ID_REPO_ROOT.resolve())
+    except ValueError:
+        raise ValueError(f"{path} is not inside the program's repository: only the governed forward-model "
+                         "manifests of docs/auto_id/forward_models are observation-readiness inputs.") from None
+    return relative.as_posix()
+
+
+def select_observation_readiness_model(app, path) -> None:
+    """Build the observation-readiness records of one explicitly selected governed forward model (read-only).
+
+    The k = 1 record is the main counting check; the k = 9 record is an observation-deficit diagnostic. Any failure is
+    kept as an error state: it is never shown as counted or met.
+    """
+
+    from services.observation_readiness import specimen_observation_readiness
+
+    if not path:
+        app.observation_readiness_state = None
+        _refresh_data_readiness_page(app)
+        return
+    selection = str(path)
+    try:
+        selection = _governed_forward_model(path)
+        fixtures = _draft_fixtures()
+        records = {k: specimen_observation_readiness(selection, k, repo_root=AUTO_ID_REPO_ROOT,
+                                                     fixtures=fixtures).to_dict()
+                   for k in (OBSERVATION_READINESS_K, OBSERVATION_DIAGNOSTIC_K)}
+    except Exception as error:  # never a GUI crash; never shown as an observation count
+        app.observation_readiness_state = {"selection": selection, "error": str(error) or type(error).__name__}
+    else:
+        app.observation_readiness_state = {"selection": selection, "records": records}
+    _refresh_data_readiness_page(app)
+
+
+def _verified_observation_record(record) -> bool:
+    from domain.identification_run import canonical_hash
+    from services.observation_readiness import SCHEMA
+
+    if not isinstance(record, Mapping) or record.get("schema") != SCHEMA:
+        return False
+    unsealed = {key: value for key, value in record.items() if key != "record_hash"}
+    return record.get("record_hash") == canonical_hash(unsealed)
+
+
+def _count_text(count: Mapping) -> str:
+    met = "MET" if count["met"] else "NOT MET"
+    overlap = f"; FIT/HOLDOUT overlap {count['holdout_fit_overlap']}" if count["holdout_fit_overlap"] else ""
+    return (f"{met}: {len(count['fit_family_keys'])} unique FIT families (≥ {count['required_fit_families']} "
+            f"required), {len(count['holdout_family_keys'])} HOLDOUT{overlap}")
+
+
+def observation_readiness_view(app) -> dict[str, object]:
+    """Status, summary and rows of the selected observation-readiness record (presentation only)."""
+
+    from services.observation_readiness import DataStatus, NOT_ASSESSED
+
+    state = getattr(app, "observation_readiness_state", None)
+    if not state:
+        return {"status": "NO MODEL SELECTED", "summary": OBSERVATION_NOTHING_SELECTED, "rows": ()}
+    selection = state["selection"]
+    if "error" in state:
+        return {"status": "RECORD NOT AVAILABLE",
+                "summary": f"No observation-readiness record for {selection}: {state['error']} Nothing is counted.",
+                "rows": (("Selected model", selection), ("Record", f"NOT AVAILABLE: {state['error']}"))}
+    record = state["records"].get(OBSERVATION_READINESS_K)
+    diagnostic = state["records"].get(OBSERVATION_DIAGNOSTIC_K)
+    if not _verified_observation_record(record) or not _verified_observation_record(diagnostic):
+        return {"status": "RECORD NOT VERIFIED",
+                "summary": f"The observation-readiness record of {selection} failed its schema or hash check. "
+                           "Nothing is counted.",
+                "rows": (("Selected model", selection), ("Record", "NOT VERIFIED (schema or record hash)"))}
+    count = record["observation_count"]
+    section = count["section_8_count"]
+    governance = record["data_governance"]
+    if not count["governed_observations_counted"]:
+        diagnostic_only = any(item["status"] == DataStatus.DIAGNOSTIC_ONLY.value for item in governance.values())
+        status = "DIAGNOSTIC DATA ONLY: NO GOVERNED OBSERVATIONS" if diagnostic_only else "NO GOVERNED OBSERVATIONS"
+    else:
+        status = f"§8 COUNT {'MET' if section['met'] else 'NOT MET'} (k = {OBSERVATION_READINESS_K})"
+    numerical = record["numerical_identifiability"]
+    numerical_text = "; ".join(f"{key.replace('_status', '').replace('_', ' ')} {value}"
+                               for key, value in numerical.items() if key.endswith("_status"))
+    summary = (f"{status}. Numerical identifiability: {numerical_text}. Scientific readiness: "
+               f"{record['scientific_readiness']}.")
+    if any(value != NOT_ASSESSED for key, value in numerical.items() if key.endswith("_status")):
+        summary += " (unexpected numerical state in the record)"
+    specimen = record["specimen"]
+    rows = [("Selected model", selection),
+            ("Specimen", f"{specimen.get('label')}: physical {specimen.get('physical_specimen_id') or 'not recorded'}, "
+                         f"fixture {specimen.get('fixture_id')}, test run {specimen.get('test_run_id')}")]
+    rows += [(f"Data: {name}", f"{item['status']}: {item['detail']}") for name, item in governance.items()]
+    rows += [
+        ("Strict rows FIT / HOLDOUT", f"{count['strict_rows']['FIT']} / {count['strict_rows']['HOLDOUT']}"),
+        ("Terms FIT / HOLDOUT", f"{count['terms']['FIT']} / {count['terms']['HOLDOUT']}"),
+        ("Unique families FIT / HOLDOUT",
+         f"{count['families']['FIT']} / {count['families']['HOLDOUT']}: FIT {section['fit_family_keys']}; "
+         f"HOLDOUT {section['holdout_family_keys']}"),
+        (f"SPEC v1.2 §8 count (k = {OBSERVATION_READINESS_K})", _count_text(section)),
+    ]
+    reasons = record["insufficiency_reasons"]
+    rows += ([("Insufficiency reason", f"{reason['code']}: {reason['detail']}") for reason in reasons]
+             or [("Insufficiency reasons", "none recorded")])
+    rows += [
+        ("Numerical identifiability", numerical_text),
+        ("Scientific readiness", record["scientific_readiness"]),
+        (f"Diagnostic k = {OBSERVATION_DIAGNOSTIC_K}",
+         f"{_count_text(diagnostic['observation_count']['section_8_count'])} — {OBSERVATION_K9_NOTE}"),
+        ("M6.4 screening (diagnostic)", f"{record['diagnostics'].get('m6_4_transverse_screening', {}).get('status')}"
+                                        ": fixed-constant budget screening only"),
+        (f"Record hash (k = {OBSERVATION_READINESS_K})", record["record_hash"]),
+        (f"Record hash (k = {OBSERVATION_DIAGNOSTIC_K})", diagnostic["record_hash"]),
+    ]
+    return {"status": status, "summary": summary, "rows": tuple(rows)}
+
+
 def scientific_readiness_view(app) -> dict[str, object]:
     """Present a stored SPEC v1.2 scientific readiness record (V12-I6) without judging anything.
 
@@ -1702,14 +1845,26 @@ def draft_input_check_view(app) -> dict[str, object]:
     return {"summary": stored[1].summary(), "rows": stored[1].rows}
 
 
-def _choose_draft_specimen(app) -> None:
-    path = filedialog.askopenfilename(
+def _ask_governed_forward_model() -> str:
+    """The governed forward-model manifest chosen by the user ('' when cancelled)."""
+
+    return filedialog.askopenfilename(
         title="Governed specimen input (forward-model manifest)",
         initialdir=str(AUTO_ID_REPO_ROOT / "docs" / "auto_id" / "forward_models"),
         filetypes=(("Forward-model manifest", "*.forward.json"), ("JSON", "*.json")),
     )
+
+
+def _choose_draft_specimen(app) -> None:
+    path = _ask_governed_forward_model()
     if path:
         add_draft_specimen(app, path)
+
+
+def _choose_observation_readiness_model(app) -> None:
+    path = _ask_governed_forward_model()
+    if path:  # cancelling keeps the current selection
+        select_observation_readiness_model(app, path)
 
 
 def _ask_draft_tolerance(app) -> None:
@@ -2034,7 +2189,42 @@ def _build_read_only_table(parent, columns, headings, widths, *, height):
     return table
 
 
+def _scrollable_page(page):
+    """A vertically scrollable content frame filling ``page`` (as the Files tab): the page's sections keep their
+    order and widgets and stay reachable when they are taller than the window."""
+
+    import tkinter as tk
+
+    if not isinstance(page, tk.Misc):  # presentation tests build the pages from stand-in widgets
+        return page
+    canvas = tk.Canvas(page, highlightthickness=0, borderwidth=0)
+    scrollbar = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
+    content = ttk.Frame(canvas)
+    window = canvas.create_window((0, 0), window=content, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+    canvas.bind("<Configure>", lambda event: canvas.itemconfigure(window, width=max(1, event.width)), add="+")
+    content.bind("<Configure>", lambda _event: canvas.configure(scrollregion=canvas.bbox("all")), add="+")
+
+    def wheel(event) -> None:
+        try:
+            widget = canvas.winfo_containing(event.x_root, event.y_root)
+            if isinstance(widget, ttk.Treeview):  # a table scrolls itself
+                return
+            while widget is not None and widget is not canvas:
+                widget = getattr(widget, "master", None)
+            if widget is canvas:
+                canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        except (tk.TclError, KeyError):
+            pass
+
+    canvas.bind_all("<MouseWheel>", wheel, add="+")
+    return content
+
+
 def _build_data_readiness_page(app, page) -> None:
+    page = _scrollable_page(page)  # P12: the page is taller than the window once Observation Readiness is added
     ttk.Label(
         page,
         text=(
@@ -2087,6 +2277,40 @@ def _build_data_readiness_page(app, page) -> None:
         ("Check", "State", "Existing evidence"),
         (220, 100, 350),
         height=5,
+    )
+    observation = ttk.LabelFrame(
+        page, text="Observation Readiness (governed records; SPEC v1.2 §8 count only)", padding=8
+    )
+    observation.pack(fill="both", expand=True, pady=(8, 0))
+    ttk.Label(
+        observation, text=OBSERVATION_SCOPE, style="Secondary.TLabel", justify="left", wraplength=1040
+    ).pack(anchor="w", pady=(0, 4))
+    observation_row = ttk.Frame(observation)
+    observation_row.pack(anchor="w", fill="x", pady=(0, 4))
+    ttk.Button(
+        observation_row,
+        text=OBSERVATION_SELECT_LABEL,
+        command=lambda: _choose_observation_readiness_model(app),
+    ).pack(side="left")
+    ttk.Button(
+        observation_row,
+        text=OBSERVATION_CLEAR_LABEL,
+        command=lambda: select_observation_readiness_model(app, None),
+    ).pack(side="left", padx=(8, 0))
+    app.material_observation_readiness_status_label = ttk.Label(
+        observation, text="NO MODEL SELECTED", style="MetricValue.TLabel"
+    )
+    app.material_observation_readiness_status_label.pack(anchor="w", pady=(0, 4))
+    app.material_observation_readiness_summary_label = ttk.Label(
+        observation, text=OBSERVATION_NOTHING_SELECTED, justify="left", wraplength=1040
+    )
+    app.material_observation_readiness_summary_label.pack(anchor="w", pady=(0, 6))
+    app.material_observation_readiness_table = _build_read_only_table(
+        observation,
+        ("item", "status"),  # "status" columns are left-aligned (long record values)
+        ("Item", "Observation-readiness record"),
+        (240, 800),
+        height=12,
     )
     scientific = ttk.LabelFrame(
         page, text="Scientific readiness (SPEC v1.2, read-only)", padding=8
@@ -2222,6 +2446,11 @@ def _refresh_data_readiness_page(app) -> None:
     app.material_readiness_empty_label.configure(
         text="" if view["available"] else "No data-readiness evidence available."
     )
+    if hasattr(app, "material_observation_readiness_table"):  # P12: separate from the READY / WARNING / BLOCKED gate
+        observation = observation_readiness_view(app)
+        _replace_table_rows(app.material_observation_readiness_table, observation["rows"])
+        app.material_observation_readiness_status_label.configure(text=observation["status"])
+        app.material_observation_readiness_summary_label.configure(text=observation["summary"])
     if hasattr(app, "material_scientific_readiness_table"):
         scientific = scientific_readiness_view(app)
         _replace_table_rows(app.material_scientific_readiness_table, scientific["rows"])

@@ -1816,10 +1816,22 @@
     "verified_specimens": "SP-02 (SP02.physical.forward.json): 2 FIT + 1 HOLDOUT rows, 2 FIT + 1 HOLDOUT families, §8 count met for k = 1; SP-13 (SP13.physical.forward.json): 1 FIT + 1 HOLDOUT, count not met for k = 1; k = 9 refused by count for each specimen and pooled (3 FIT rows, 2 unique FIT families < 10, 1 HOLDOUT family), without FE; the legacy SP02.forward.json is not counted",
     "numerical_identifiability": "NOT_ASSESSED (rank, precision, leave-one-FIT-family-out and sensitivities are not computed from records)",
     "calibration_gate": "behaviour unchanged: the 305 gate records of the gate-using tests are identical before and after; the counting rule sits outside the calibration-gate module, so the V12-I1 / V12-I5 import guards are unchanged",
-    "tests": "Windows without data stores at f7d383a: 2247 ran, OK, 92 skipped; P11 tests 15 OK; mutation check 5 / 5 caught",
+    "tests": "Windows without data stores at f7d383a: 2247 ran, OK, 92 skipped; P11 tests 14 OK (corrected in P12: 15 had counted the V12-I1 / V12-I5 guard tests); mutation check 5 / 5 caught",
     "production_calibration_execution": "BLOCKED / NOT_AUTHORISED (D-079, D-080 unchanged)",
     "gui_integration": "NOT_STARTED: separate task (the Data Readiness page contract has no observation section; its READY / WARNING / BLOCKED states are not reused)",
     "main_ci": "not run (local integration, no push)",
+    "abaqus_runs": 0
+  },
+  "p12_observation_readiness_ui": {
+    "title": "Observation Readiness section of the Data Readiness page (P12)",
+    "status": "REVIEW_READY",
+    "authorisation": "SUPERVISOR P12 task (2026-10-15): GUI integration of auto-id/observation-readiness/v1; one local commit; no push, merge or PR",
+    "branch": "p12/observation-readiness-ui",
+    "base": "efe005436230a4dcb8cdb608169016b751bab856",
+    "scope": "material_identification_ui: a separate Observation Readiness section on the 2. Data Readiness Check page. The model is chosen explicitly with Select Governed Forward Model..., which reuses the campaign draft's forward-model dialog (docs/auto_id/forward_models); nothing is selected automatically. The section shows specimen_observation_readiness for k = 1 (the main count) and k = 9 (an observation-deficit diagnostic; a nine-parameter question is not permitted by SPEC v1.2): data governance, strict FIT / HOLDOUT rows, terms, unique families, the §8 count, insufficiency reasons, numerical identifiability NOT_ASSESSED, scientific_readiness NOT_DECLARED and record hashes. Each record's schema and hash are checked before display. The page content is in a vertical scroll container (as the Files tab); the existing sections are unchanged",
+    "separation": "the data-readiness gate (READY / WARNING / BLOCKED) and its view are unchanged; observation states never use those words; a met count is never shown as scientific readiness",
+    "failure_states": "NO MODEL SELECTED; RECORD NOT AVAILABLE (outside the repository, refused by the governed binder, any service error); RECORD NOT VERIFIED (schema or hash); NO GOVERNED OBSERVATIONS / DIAGNOSTIC DATA ONLY: NO GOVERNED OBSERVATIONS",
+    "production_calibration_execution": "BLOCKED / NOT_AUTHORISED (D-079, D-080 unchanged)",
     "abaqus_runs": 0
   },
   "stage_status": {

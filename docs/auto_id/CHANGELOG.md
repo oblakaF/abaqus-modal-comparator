@@ -5094,3 +5094,23 @@ first internal provider.
   `docs/auto_id/CHANGELOG.md`.
 - **Scientific behaviour changed:** NO. **Tests run:** Windows without data stores, 2247 ran, OK (92 skipped).
   **Abaqus run count:** 0.
+
+## 2026-10-15 — P12 Observation Readiness in the GUI (REVIEW_READY)
+
+- **P12:** branch `p12/observation-readiness-ui` from `main` `efe0054`; one local commit; no push, merge or PR.
+- **GUI:** a separate **Observation Readiness** section on the *2. Data Readiness Check* page, between the data-readiness
+  tables and the scientific-readiness section.
+  - *Select Governed Forward Model...* reuses the campaign draft's forward-model dialog
+    (`docs/auto_id/forward_models`). Nothing is selected automatically.
+  - The section shows `specimen_observation_readiness` for k = 1 (the main count) and k = 9 (an observation-deficit
+    diagnostic only; a nine-parameter question is not permitted by SPEC v1.2).
+  - Shown: data governance, strict FIT / HOLDOUT rows, terms and unique families, the §8 count, insufficiency
+    reasons, numerical identifiability `NOT_ASSESSED`, `scientific_readiness` `NOT_DECLARED` and record hashes.
+  - Each record's schema and hash are checked before display. Failures show RECORD NOT AVAILABLE / NOT VERIFIED;
+    no failure is ever shown as a count.
+- **Layout:** the page content scrolls vertically, as on the Files tab. The existing sections and the READY / WARNING /
+  BLOCKED gate are unchanged.
+- **Correction:** STATUS `p11_observation_readiness.tests` said "P11 tests 15 OK"; there are 14 P11 tests (the 15 had
+  counted the V12-I1 / V12-I5 guard tests).
+- **Unchanged:** P11 service, calibration gate, SPEC, DECISIONS, EVIDENCE. Production calibration execution BLOCKED /
+  NOT_AUTHORISED. **Abaqus run count:** 0.
