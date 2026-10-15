@@ -56,6 +56,23 @@ def verify_runtime_contracts(app_module) -> None:
             reporting.export_pdf,
             "advanced_reporting",
         ),
+        # The ODB comparison must not start while a quick calibration runs, stops or has unconfirmed processes.
+        (
+            "ModalComparatorApp._start",
+            app_module.ModalComparatorApp._start,
+            "quick_calibration_ui",
+        ),
+        # Closing (window "X" and File > Exit) must pass the quick-calibration stop safeguards.
+        (
+            "ModalComparatorApp._finish_close",
+            app_module.ModalComparatorApp._finish_close,
+            "quick_calibration_ui",
+        ),
+        (
+            "ModalComparatorApp._close_with_session_save",
+            app_module.ModalComparatorApp._close_with_session_save,
+            "quick_calibration_ui",
+        ),
     )
     failures = [
         f"{name}: expected {module_name}, got {_owner(value)}"

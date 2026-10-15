@@ -43,6 +43,7 @@ class LMStatus(str, Enum):
     REFUSED = "REFUSED"  # branch/pair identity lost: scientific refusal, no re-pairing
     STEP_REJECTED = "STEP_REJECTED"  # no decrease of Φ within the allowed step attempts
     SOLVE_BUDGET = "SOLVE_BUDGET"  # the authorised number of solves is used up
+    AT_BOUND = "AT_BOUND"  # stopped on a solver-only search bound: not a stationary point, never an estimate
 
 
 @dataclass(frozen=True)
@@ -183,6 +184,14 @@ class _BudgetExhausted(Exception):
     pass
 
 
+def _active_bounds(p: np.ndarray, step: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> np.ndarray:
+    """Parameters sitting on a bound whose unconstrained step points outward (audit K1 / V2)."""
+    tolerance = 1.0e-12
+    at_lower = p <= lower * (1.0 + tolerance)
+    at_upper = p >= upper * (1.0 - tolerance)
+    return (at_lower & (step < 0.0)) | (at_upper & (step > 0.0))
+
+
 def run_bounded_lm(evaluate: ResidualFunction, start: Mapping[str, float], bounds: ParameterBounds,
                    settings: LMSettings) -> LMResult:
     """Bounded LM in ln p over ``evaluate`` (each call is one authorised solve)."""
@@ -220,12 +229,28 @@ def run_bounded_lm(evaluate: ResidualFunction, start: Mapping[str, float], bound
             while True:
                 x = np.log(p)
                 step = lm_step(r, jacobian, mu)
+                # Audit K1 / V2: a parameter already on a bound with an outward step is held there and the step
+                # of the free parameters is solved from the reduced system (projection of the full step would
+                # assume the held parameter moved, giving a false convergence of the others).
+                active = _active_bounds(p, step, lower, upper)
+                if active.all():
+                    history.append(IterationRecord(iteration, mu, tuple(x), tuple(x), objective(r), None,
+                                                   False, "every parameter held on a search bound"))
+                    return result(LMStatus.AT_BOUND, refusal="estimate on a solver-only search bound",
+                                  jacobian=jacobian)
+                if active.any():
+                    free = ~active
+                    step = np.zeros_like(x)
+                    step[free] = lm_step(r, jacobian[:, free], mu)
                 trial_p = np.clip(np.exp(x + step), lower, upper)  # projected onto the physical bounds
                 effective = np.log(trial_p) - x
                 sd = local_sd(jacobian)
                 if np.max(np.abs(effective) / sd) < settings.stop_fraction:
                     history.append(IterationRecord(iteration, mu, tuple(x), tuple(np.log(trial_p)), objective(r), None,
                                                    False, "step below stop_fraction·sd"))
+                    if active.any():
+                        return result(LMStatus.AT_BOUND, refusal="estimate on a solver-only search bound",
+                                      jacobian=jacobian)
                     return result(LMStatus.CONVERGED, jacobian=jacobian)
                 trial_r = loop.residuals(trial_p)
                 accepted = objective(trial_r) < objective(r)

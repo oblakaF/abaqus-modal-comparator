@@ -26,6 +26,10 @@ class AnalysisCancelled(RuntimeError):
     """Raised when the user cancels work owned by this application."""
 
 
+class ExtractionTerminationUnconfirmed(AbaqusExtractionError):
+    """An owned extraction process was asked to stop but its termination could not be confirmed."""
+
+
 def new_owner_token() -> str:
     """A per-run ownership token the extractor echoes back in its registration."""
     return uuid.uuid4().hex
@@ -109,9 +113,19 @@ def _pid_exists(pid: int) -> bool:
         return _process_creation_time(pid) is not None or _windows_pid_in_tasklist(pid)
     try:
         os.kill(pid, 0)
-        return True
     except OSError:
         return False
+    return not _posix_zombie(pid)
+
+
+def _posix_zombie(pid: int) -> bool:
+    """A killed process that is not yet reaped (state Z) has exited: it can no longer run or hold the job."""
+    try:
+        text = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
+    except OSError:
+        return False  # no /proc (e.g. macOS): existence alone, as before
+    fields = text[text.rfind(")") + 2:].split()
+    return bool(fields) and fields[0] in ("Z", "X")
 
 
 def _windows_pid_in_tasklist(pid: int) -> bool:
@@ -300,9 +314,11 @@ def stop_owned_process_and_wait(
     return process.poll() is not None
 
 
-def _windows_command(executable: str, arguments: List[str]) -> List[str]:
+def _windows_command(executable: str, arguments: List[str]) -> str:
+    # Audit V11: one string, not a list.  Given a list, Popen re-quotes the inner command line (\" escapes),
+    # cmd.exe keeps the backslashes and the Abaqus launcher splits every path that contains a space.
     command_line = subprocess.list2cmdline([executable] + arguments)
-    return ["cmd.exe", "/d", "/s", "/c", command_line]
+    return f'cmd.exe /d /s /c "{command_line}"'
 
 
 def run_abaqus_extraction(
@@ -331,10 +347,12 @@ def run_abaqus_extraction(
     # is never misread as belonging to this run (token differs; overwritten
     # atomically by the new worker as soon as it starts).
     registration_path = output_directory / "process_registration.json"
-    try:
-        registration_path.unlink()
-    except OSError:
-        pass
+    # Audit F5: a manifest left by an earlier extraction must never be read as this run's result.
+    for stale in (registration_path, output_directory / "manifest.json"):
+        try:
+            stale.unlink()
+        except OSError:
+            pass
 
     arguments = [
         "python",
@@ -364,7 +382,8 @@ def run_abaqus_extraction(
     started = time.monotonic()
     try:
         with log_path.open("w", encoding="utf-8") as log:
-            log.write("COMMAND\n" + " ".join(command) + "\n\nOUTPUT\n")
+            log.write("COMMAND\n" + (command if isinstance(command, str) else " ".join(command))
+                      + "\n\nOUTPUT\n")
             log.flush()
             popen_options = {
                 "cwd": str(script_path.parent),
@@ -414,7 +433,7 @@ def run_abaqus_extraction(
             while process.poll() is None:
                 if cancel_event is not None and cancel_event.is_set():
                     if not stop_owned_extraction(process, registration_path, owner_token):
-                        raise AbaqusExtractionError(
+                        raise ExtractionTerminationUnconfirmed(
                             "Cancellation could not be confirmed: the owned Abaqus worker "
                             "or launcher process did not stop within the timeout. Treat "
                             "the extraction as still running and check Task Manager before retrying."
@@ -422,7 +441,7 @@ def run_abaqus_extraction(
                     raise AnalysisCancelled("Analysis stopped by user.")
                 if time.monotonic() - started > timeout_seconds:
                     if not stop_owned_extraction(process, registration_path, owner_token):
-                        raise AbaqusExtractionError(
+                        raise ExtractionTerminationUnconfirmed(
                             "Abaqus extraction timed out, but the owned process did not stop."
                         )
                     raise AbaqusExtractionError(

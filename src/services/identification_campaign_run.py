@@ -953,6 +953,10 @@ def campaign_report_unchecked(definition: CampaignDefinition, specimens: Sequenc
     # optimiser output stays visible as a diagnostic candidate and nothing is presented as a released parameter.
     released = {name: v["reported_value"] for name, v in (verdict or {}).get("verdicts", {}).items()
                 if v["verdict"] in (Verdict.IDENTIFIED.value, Verdict.WIDE.value) and v["reported_value"] is not None}
+    bound_hit = any(at_bound.values())
+    spec_violations = definition.spec_constant_violations()
+    if bound_hit or spec_violations:  # audit K1 / K3 / K4: nothing is released
+        released = {}
     all_released = bool(verdict) and set(released) == set(definition.fitted_parameters)
     if reasons:
         estimate = NO_EFFECTIVE_ESTIMATE
@@ -963,6 +967,9 @@ def campaign_report_unchecked(definition: CampaignDefinition, specimens: Sequenc
     if definition.run_type == RUN_B:
         estimate = RUN_B_LABEL if not reasons else f"{RUN_B_LABEL}_INCOMPLETE"
     blockers = []
+    if bound_hit:
+        blockers.append("ESTIMATE_AT_SEARCH_BOUND: non-stationary point on a solver-only bound; no value released")
+    blockers.extend(f"SPEC_CONSTANT_CHANGED: {problem}" for problem in spec_violations)
     if consistency is not None and consistency["status"] == FamilyConsistencyStatus.FAIL.value:
         blockers.append(FAMILY_CONSISTENCY_FAIL)
     for name, v in (verdict or {}).get("verdicts", {}).items():
@@ -994,7 +1001,8 @@ def campaign_report_unchecked(definition: CampaignDefinition, specimens: Sequenc
         "m5_verdict": verdict,
         "uncertainty_basis": uncertainty_basis(definition),
         "model_form_robustness": model_form_robustness_reporting(robustness),
-        "material_claim": IDENTIFIED_MATERIAL_PROPERTY if identified else NO_MATERIAL_CLAIM,
+        "material_claim": (IDENTIFIED_MATERIAL_PROPERTY if identified and not bound_hit and not spec_violations
+                           else NO_MATERIAL_CLAIM),
         "validation": NOT_EXTERNALLY_VALIDATED,
         "reporting": ("released values are model-calibrated effective constants within this FE model (SPEC §5.2); "
                       f"{NOT_EXTERNALLY_VALIDATED} (D-060); an optimizer candidate is diagnostic evidence only "

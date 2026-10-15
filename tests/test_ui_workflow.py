@@ -896,6 +896,10 @@ class TkRuntimeSmokeTests(unittest.TestCase):
                 "tkinter.messagebox.showerror"
             ) as generic_error:
                 application._failed(ambiguity)
+                # P7: never a blocking dead end; the orientation dialog opens only on request
+                decision_dialog.assert_not_called()
+                self.assertEqual(str(application.mode_viewer.confirm_button.cget("state")), "normal")
+                application.mode_viewer.confirm_button.invoke()
             self.assertIs(application.analysis_state, AnalysisState.DIAGNOSTIC)
             self.assertIsNone(application._confirmed_orientation)
             decision_dialog.assert_called_once_with(ambiguity)

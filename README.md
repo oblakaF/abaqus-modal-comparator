@@ -30,6 +30,14 @@ No manual frequency entry or Abaqus screenshots are required.
 - Displays mode-shape fields, a shared-scale correlation plot, FRF/coherence diagnostics, and frequency regression.
 - Exports Excel and PDF reports.
 
+## Quick material calibration
+
+`RUN_QUICK_CALIBRATION.cmd` opens a separate window: Abaqus model (`*.inp`) + Polytec/Testlab
+file (`*.unv`/`*.uff`) → effective face-sheet constants (for example E1 = E2) with an honest
+uncertainty band and a grade (GOOD / APPROXIMATE / UNRELIABLE, or NO VALUE with the reason).
+It is an engineering calibration of the model, not a material property. See
+`docs/QUICK_CALIBRATION.md`.
+
 ## First launch on Windows
 
 Double-click:

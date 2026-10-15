@@ -55,6 +55,7 @@ FIXTURES = ROOT / "docs" / "auto_id" / "fixtures" / "real_experiment_fixtures.js
 def build(run_root: Path, roots, campaign: str = "run-a"):
     definition = load_campaign_definition(CAMPAIGNS[campaign])
     definition.require_executable()
+    definition.require_spec_constants()  # audit K3/K4: SPEC constants are not campaign choices
     reuse = load_archive_reuse(ROOT / definition.archive_reuse, definition.parameterisation_id)
     specimens = prepare_campaign_specimens(definition, ROOT, load_experiment_fixture_manifest(FIXTURES), roots)
     manifest, manifest_hash = prepare_run_manifest(definition, reuse, specimens, roots, ROOT, run_root / "plan_jobs")

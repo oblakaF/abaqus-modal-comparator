@@ -178,15 +178,17 @@ class ProgressCallbackTests(unittest.TestCase):
             log_file = kwargs["stdout"]
             log_file.write("PROGRESS: opening ODB\nExtracted mode 7 at 1.0 Hz (1 nodes)\n")
             log_file.flush()
+            manifest_holder["path"].write_text("{}", encoding="utf-8")  # written by the extractor (audit F5)
             process = _Process()
             process_holder["process"] = process
             return process
 
         seen = []
+        manifest_holder = {}
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "output"
             output.mkdir()
-            (output / "manifest.json").write_text("{}", encoding="utf-8")
+            manifest_holder["path"] = output / "manifest.json"
             with patch("abaqus_bridge.subprocess.Popen", side_effect=fake_popen):
                 run_abaqus_extraction(
                     Path(directory) / "model.odb",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import threading
 import traceback
 from pathlib import Path
@@ -16,6 +17,18 @@ from services.archived_sensitivity_evidence import (
     SensitivityCheckCancelled,
     bind_accepted_reference,
     comparison_input_record,
+)
+from services.modal_data_viewer import (
+    AMBIGUOUS,
+    ESTABLISHED,
+    ExperimentalDataUnavailable,
+    LoadedModalData,
+    attach_loaded_data,
+)
+from services.new_odb_comparison import (
+    GeometryReuseRefusal,
+    bind_registration_by_fe_geometry,
+    frequency_only_diagnostic,
 )
 from universal_reader import load_universal_modal_file, resolve_testlab_file
 
@@ -126,6 +139,7 @@ def install_runtime_hardening(app_module) -> None:
         failure = None
         result = None
         cache = None
+        loaded = None  # the datasets this run loaded, kept for separate viewing whatever the outcome
 
         def post_to_ui(callback) -> bool:
             post = getattr(self, "_post_to_ui", None)
@@ -193,13 +207,24 @@ def install_runtime_hardening(app_module) -> None:
             range_notice = extraction_range_notice(abaqus_data.metadata)
             if range_notice is not None:
                 abaqus_data.metadata["extraction_range_notice"] = range_notice
+            loaded = LoadedModalData(abaqus_data, directory=cache / "viewer")
             check_cancelled()
             stage(2, "Experimental import")
-            resolved_experiment = resolve_testlab_file(experiment)
-            experiment_data = load_universal_modal_file(
-                resolved_experiment,
-                modal_set=modal_set,
-            )
+            try:
+                resolved_experiment = resolve_testlab_file(experiment)
+                experiment_data = load_universal_modal_file(
+                    resolved_experiment,
+                    modal_set=modal_set,
+                )
+            except (ValueError, KeyError, IndexError, TypeError, OSError) as error:
+                # The FE data stay available for viewing; the experimental limitation is stated, never hidden.
+                loaded.experimental_error = str(error)
+                loaded.reason = f"the experimental file gave no usable modal or FRF data: {error}"
+                raise ExperimentalDataUnavailable(
+                    f"The experimental file could not be used ({error}). The extracted FE frequencies and mode "
+                    "shapes remain available in 3. Mode shapes > Individual modes."
+                ) from error
+            loaded.experimental = experiment_data
             governed = None
             if governed_requested:
                 # G2d-1: verify the exact files, modal set and frozen registration, then apply its mapping and
@@ -227,11 +252,57 @@ def install_runtime_hardening(app_module) -> None:
                 )
                 if orientation_selection is not None:
                     comparison_kwargs["orientation_selection"] = orientation_selection
-            result = app_module.compare_modal_datasets(
-                abaqus_data,
-                experiment_data,
-                **comparison_kwargs,
-            )
+            try:
+                result = app_module.compare_modal_datasets(
+                    abaqus_data,
+                    experiment_data,
+                    **comparison_kwargs,
+                )
+            except GeometryOrientationAmbiguousError as ambiguity:
+                count = len(getattr(ambiguity, "ambiguous_candidates", ()) or ())
+                loaded.registration = AMBIGUOUS
+                loaded.reason = f"{count} physically distinct orientations are equally plausible from geometry alone"
+                if governed is not None or orientation_selection is not None:
+                    raise
+                # The automatic registration cannot choose an orientation. Reuse an accepted physical registration
+                # only when the FE geometry, PolyMAX source, modal set and registration are verified; otherwise keep
+                # the frequencies as a frequency-only diagnostic (never an orientation choice, never MAC).
+                stage(3, "Accepted physical registration by FE geometry identity")
+                try:
+                    reuse = bind_registration_by_fe_geometry(
+                        resolved_experiment, abaqus_data, experiment_data,
+                        cancel=getattr(self, "_analysis_cancel_event", None),
+                    )
+                except SensitivityCheckCancelled as error:
+                    raise AnalysisCancelled("Analysis stopped by user.") from error
+                except GeometryReuseRefusal as refusal:
+                    diagnostic = frequency_only_diagnostic(abaqus_data, experiment_data, (
+                        f"{count} physically distinct orientations are equally plausible from geometry alone, and "
+                        f"no accepted physical registration could be reused: {refusal}"))
+                    ambiguity.frequency_only_diagnostic = diagnostic
+                    loaded.frequency_diagnostic = diagnostic
+                    loaded.reason = diagnostic.reason
+                    try:
+                        (cache / "frequency_only_diagnostic.json").write_text(
+                            json.dumps(diagnostic.to_dict(), indent=2), encoding="utf-8")
+                        (cache / "modal_data_inventory.json").write_text(
+                            json.dumps(loaded.inventory(), indent=2, default=str), encoding="utf-8")
+                    except OSError:
+                        pass
+                    raise ambiguity
+                result = app_module.compare_modal_datasets(
+                    abaqus_data,
+                    experiment_data,
+                    frozen_registration=reuse.registration,
+                )
+                result.metadata["geometry_verified_registration"] = reuse.provenance()
+                result.warnings.insert(0, reuse.warning())
+            loaded.registration = ESTABLISHED
+            loaded.reason = "the comparator established the physical registration; see the gated comparison"
+            try:
+                result.loaded_modal_data = loaded
+            except AttributeError:
+                pass
             if range_notice is not None:
                 result.metadata["extraction_range_notice"] = range_notice
                 if range_notice not in result.warnings:
@@ -289,7 +360,7 @@ def install_runtime_hardening(app_module) -> None:
             except Exception:
                 pass
         except GeometryOrientationAmbiguousError as error:
-            failure = error
+            failure = attach_loaded_data(error, loaded)
             try:
                 workspace.mkdir(parents=True, exist_ok=True)
                 (workspace / "last_orientation_ambiguity.log").write_text(
@@ -298,7 +369,13 @@ def install_runtime_hardening(app_module) -> None:
             except Exception:
                 pass
         except Exception as error:
-            failure = error
+            failure = attach_loaded_data(error, loaded)
+            if isinstance(error, ExperimentalDataUnavailable) and cache is not None:
+                try:
+                    (cache / "modal_data_inventory.json").write_text(
+                        json.dumps(loaded.inventory(), indent=2, default=str), encoding="utf-8")
+                except OSError:
+                    pass
             try:
                 workspace.mkdir(parents=True, exist_ok=True)
                 (workspace / "last_error.log").write_text(

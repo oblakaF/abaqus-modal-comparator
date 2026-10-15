@@ -1043,11 +1043,11 @@ class AbaqusMatrixJobResult:
     launch_log_path: Path
 
 
-def _abaqus_command(executable: str, arguments: Sequence[str]) -> list[str]:
+def _abaqus_command(executable: str, arguments: Sequence[str]) -> list[str] | str:
     executable = executable.strip() or "abaqus"
     if os.name == "nt":
         command_line = subprocess.list2cmdline([executable, *arguments])
-        return ["cmd.exe", "/d", "/s", "/c", command_line]
+        return f'cmd.exe /d /s /c "{command_line}"'  # audit V11: a string, so Popen does not re-quote it
     return shlex.split(executable) + list(arguments)
 
 
@@ -1100,7 +1100,7 @@ def run_abaqus_matrix_job(
     launch_log_path = output_directory / f"{normalized_job_name}.launch.log"
     launch_log_path.write_text(
         "COMMAND\n"
-        + " ".join(command)
+        + (command if isinstance(command, str) else " ".join(command))
         + "\n\nSTDOUT\n"
         + completed.stdout
         + "\n\nSTDERR\n"
