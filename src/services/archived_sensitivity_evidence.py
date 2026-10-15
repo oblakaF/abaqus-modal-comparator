@@ -349,6 +349,57 @@ def _physical_freeze(spec: SpecimenEvidence, document: Mapping[str, Any], baseli
     return physical
 
 
+def _bound_baseline(spec: SpecimenEvidence, fixture: ExperimentFixture, repo_root: Path):
+    try:
+        baseline = load_archived_baseline(Path(repo_root) / spec.baseline_path)
+    except (OSError, ValueError, ArchivedBaselineError) as error:
+        raise _Refusal(f"archived baseline {spec.baseline_path} unavailable: {error}") from error
+    _require(baseline.odb.sha256 == fixture.fe.odb_reference.sha256
+             and baseline.fe_geometry_sha256 == fixture.fe.geometry_identity.sha256
+             and baseline.experimental_source_sha256 == fixture.experimental_source.sha256
+             and baseline.modal_set == fixture.modal_set.name,
+             f"archived baseline {spec.baseline_path} is not bound to fixture {fixture.fixture_id}.")
+    return baseline
+
+
+@dataclass(frozen=True)
+class AcceptedPhysicalFreeze:
+    """The accepted strict physical freeze of one specimen, with the records it was verified against."""
+
+    specimen: str
+    fixture: ExperimentFixture
+    registration: Any  # the fixture's sealed FrozenRegistration
+    reevaluation_path: str
+    reevaluation_hash: str  # canonical content hash, equal to the pinned one
+    baseline_path: str
+    baseline_record_sha256: str
+    freeze: Mapping[str, Any]  # a copy of the record's results.PHYSICAL (status FROZEN)
+
+
+def accepted_physical_freeze(fixture_id: str, *, repo_root: Path = REPO_ROOT) -> AcceptedPhysicalFreeze:
+    """The accepted strict physical freeze of ``fixture_id`` from the repository records only, or refuse.
+
+    The same checks as the sensitivity display: the fixture's sealed registration, the archived baseline bound to the
+    fixture, the pinned strict-freeze record under the accepted strict pairing policy on that registration. No data
+    store is read and no observation is created. Raises ``AcceptedReferenceRefusal`` with the reason.
+    """
+    spec = next((item for item in SPECIMENS if item.fixture_id == fixture_id), None)
+    _require(spec is not None, f"no accepted strict freeze is recorded for fixture {fixture_id!r}.")
+    try:
+        fixture = load_experiment_fixture_manifest(Path(repo_root) / FIXTURE_MANIFEST).fixture(fixture_id)
+        registration = load_fixture_registration(fixture, Path(repo_root))
+    except (OSError, ValueError, KeyError) as error:
+        raise _Refusal(f"fixture {fixture_id}: {error}", spec.specimen) from error
+    try:
+        baseline = _bound_baseline(spec, fixture, repo_root)
+        document = _load_json(repo_root, spec.reevaluation_path)
+        physical = _physical_freeze(spec, document, baseline, fixture, registration)
+    except AcceptedReferenceRefusal as refusal:
+        raise AcceptedReferenceRefusal(str(refusal), spec.specimen) from refusal
+    return AcceptedPhysicalFreeze(spec.specimen, fixture, registration, spec.reevaluation_path, spec.reevaluation_hash,
+                                  spec.baseline_path, baseline.record_sha256, json.loads(json.dumps(physical)))
+
+
 def _branch(spec: SpecimenEvidence, document: Mapping[str, Any], physical: Mapping[str, Any], row_id: str,
             perturbations: Mapping[str, tuple[float, str]]) -> tuple[Optional[float], Optional[float], str, str]:
     """(S_E, S_G12, branch text, refusal reason or '') of one strict row, from the record's own structure."""
@@ -556,15 +607,7 @@ def check_archived_sensitivity_evidence(result, *, repo_root: Path = REPO_ROOT, 
         spec, fixture, registration = reference.spec, reference.fixture, reference.registration
         specimen = spec.specimen
 
-        try:
-            baseline = load_archived_baseline(Path(repo_root) / spec.baseline_path)
-        except (OSError, ValueError, ArchivedBaselineError) as error:
-            raise _Refusal(f"archived baseline {spec.baseline_path} unavailable: {error}") from error
-        _require(baseline.odb.sha256 == fixture.fe.odb_reference.sha256
-                 and baseline.fe_geometry_sha256 == fixture.fe.geometry_identity.sha256
-                 and baseline.experimental_source_sha256 == fixture.experimental_source.sha256
-                 and baseline.modal_set == fixture.modal_set.name,
-                 f"archived baseline {spec.baseline_path} is not bound to fixture {fixture.fixture_id}.")
+        baseline = _bound_baseline(spec, fixture, repo_root)
         perturbations = _perturbations(spec, baseline, _load_json(repo_root, ACCEPTED_FORWARD_JOBS))
         document = _load_json(repo_root, spec.reevaluation_path)
         physical = _physical_freeze(spec, document, baseline, fixture, registration)

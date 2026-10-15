@@ -5068,3 +5068,64 @@ first internal provider.
 - **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
 - **Scientific behaviour changed:** NO (documentation only). **Tests run:** none (docs only; JSON parse and
   `git diff --check`). Production calibration execution BLOCKED / NOT_AUTHORISED. **Abaqus run count:** 0.
+
+## 2026-10-15 — P11 observation readiness ACCEPTED (local fast-forward into main)
+
+- **P11:** SUPERVISOR ACCEPTED (P11 CLOSEOUT). Branch `p11/observation-readiness` from `main` `5613eda`, implementation
+  commit `f7d383a`; integrated by a local fast-forward of `main`. No PR, no push, so no main CI run.
+- **Implemented:** `services/observation_readiness` (`auto-id/observation-readiness/v1`): a records-only, hash-sealed
+  readiness record per governed forward-model manifest, with three separate sections:
+  - data governance (GOVERNED / AVAILABLE / DIAGNOSTIC_ONLY / NOT_AVAILABLE / NOT_VERIFIED);
+  - the SPEC v1.2 §8 observation count for a declared k;
+  - numerical identifiability, always `NOT_ASSESSED`.
+
+  `scientific_readiness` is `NOT_DECLARED`. M6.4 is attached as DIAGNOSTIC_ONLY context.
+  `services/observation_count.count_observations` is the one §8 counting rule; the specimen calibration gate uses
+  it. `archived_sensitivity_evidence.accepted_physical_freeze` gives read-only access to the accepted strict freeze
+  through the existing checks.
+- **Verified:** SP-02 2 FIT + 1 HOLDOUT (count met for k = 1); SP-13 1 FIT + 1 HOLDOUT (not met for k = 1). k = 9 is
+  refused by count, per specimen and pooled (3 FIT rows, 2 unique FIT families, 1 HOLDOUT family), without FE.
+- **Unchanged:** calibration-gate behaviour (305 gate records identical before and after); the V12-I1 / V12-I5 import
+  guards; SPEC, DECISIONS, EVIDENCE and every governed record. Production calibration execution BLOCKED /
+  NOT_AUTHORISED (D-079, D-080). GUI integration is a separate task. Original M8 GATE `NOT_MET`.
+- **Files changed:** `src/services/observation_count.py`, `src/services/observation_readiness.py`,
+  `src/services/specimen_calibration_gate.py`, `src/services/archived_sensitivity_evidence.py`,
+  `tests/test_p11_observation_readiness.py`, `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`,
+  `docs/auto_id/CHANGELOG.md`.
+- **Scientific behaviour changed:** NO. **Tests run:** Windows without data stores, 2247 ran, OK (92 skipped).
+  **Abaqus run count:** 0.
+
+## 2026-10-15 — P12 Observation Readiness in the GUI (REVIEW_READY)
+
+- **P12:** branch `p12/observation-readiness-ui` from `main` `efe0054`; one local commit; no push, merge or PR.
+- **GUI:** a separate **Observation Readiness** section on the *2. Data Readiness Check* page, between the data-readiness
+  tables and the scientific-readiness section.
+  - *Select Governed Forward Model...* reuses the campaign draft's forward-model dialog
+    (`docs/auto_id/forward_models`). Nothing is selected automatically.
+  - The section shows `specimen_observation_readiness` for k = 1 (the main count) and k = 9 (an observation-deficit
+    diagnostic only; a nine-parameter question is not permitted by SPEC v1.2).
+  - Shown: data governance, strict FIT / HOLDOUT rows, terms and unique families, the §8 count, insufficiency
+    reasons, numerical identifiability `NOT_ASSESSED`, `scientific_readiness` `NOT_DECLARED` and record hashes.
+  - Each record's schema and hash are checked before display. Failures show RECORD NOT AVAILABLE / NOT VERIFIED;
+    no failure is ever shown as a count.
+- **Layout:** the page content scrolls vertically, as on the Files tab. The existing sections and the READY / WARNING /
+  BLOCKED gate are unchanged.
+- **Correction:** STATUS `p11_observation_readiness.tests` said "P11 tests 15 OK"; there are 14 P11 tests (the 15 had
+  counted the V12-I1 / V12-I5 guard tests).
+- **Unchanged:** P11 service, calibration gate, SPEC, DECISIONS, EVIDENCE. Production calibration execution BLOCKED /
+  NOT_AUTHORISED. **Abaqus run count:** 0.
+
+## 2026-10-15 — P12 Observation Readiness GUI ACCEPTED and closed (local fast-forward into main)
+
+- **P12:** SUPERVISOR ACCEPTED (P12 CLOSEOUT). Implementation `bf52d74` on `p12/observation-readiness-ui` from `main`
+  `efe0054`; integrated with this closeout by a local fast-forward of `main`. No PR, no push, so no main CI run.
+- **Recorded:**
+  - the GUI shows `auto-id/observation-readiness/v1` records;
+  - only governed forward-model manifests of `docs/auto_id/forward_models` are inputs;
+  - the SPEC v1.2 §8 result is a counting check only;
+  - numerical identifiability stays `NOT_ASSESSED`, and `scientific_readiness` stays `NOT_DECLARED`;
+  - production calibration execution stays BLOCKED / NOT_AUTHORISED (D-079, D-080).
+- **Unchanged:** the M8 stage status and the original M8 GATE (`NOT_MET`); SPEC, DECISIONS, EVIDENCE; the P11 service and
+  the calibration gate.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+- **Scientific behaviour changed:** NO (documentation only). **Abaqus run count:** 0.

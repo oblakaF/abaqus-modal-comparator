@@ -58,6 +58,7 @@ from domain.identification_run import canonical_hash
 from .identification_uncertainty import BirgeResult, BirgeStatus, PatternTestResult, StatisticalSDResult
 from .identification_verdict import EvidenceState, GuardEvidence
 from .model_form_robustness import CaseStatus, ModelFormRobustnessResult
+from .observation_count import count_observations
 from .practical_identifiability import RCOND, PracticalIdentifiabilityInputError, PracticalIdentifiabilityResult
 
 
@@ -328,16 +329,11 @@ def _bind(inputs: CalibrationGateInputs) -> None:
 
 
 def _observability(inputs: CalibrationGateInputs, k: int, refusals: _Refusals) -> dict:
-    fit_keys = sorted(set(inputs.fit_families.values()))
-    holdout_keys = sorted(set(inputs.holdout_families.values()))
-    overlap = sorted(set(fit_keys) & set(holdout_keys))
-    if len(fit_keys) < k + 1:
-        refusals.add(CalibrationRefusal.INSUFFICIENT_FIT_FAMILIES,
-                     f"{len(fit_keys)} distinct FIT families {fit_keys} < k + 1 = {k + 1}")
-    if not holdout_keys:
-        refusals.add(CalibrationRefusal.NO_HOLDOUT_FAMILY, "no HOLDOUT family")
-    if overlap:
-        refusals.add(CalibrationRefusal.HOLDOUT_FAMILY_OVERLAPS_FIT, f"HOLDOUT families shared with FIT: {overlap}")
+    count = count_observations(inputs.fit_families, inputs.holdout_families, k)  # the shared SPEC v1.2 §8 count
+    for code, detail in count.refusals:
+        refusals.add(CalibrationRefusal(code), detail)
+    fit_keys, holdout_keys, overlap = list(count.fit_family_keys), list(count.holdout_family_keys), list(
+        count.holdout_fit_overlap)
     full_rank = inputs.analysis is not None and inputs.analysis.full_rank
     if inputs.analysis is None:
         refusals.add(CalibrationRefusal.MISSING_EVIDENCE, "practical-rank analysis not available")
