@@ -63,6 +63,26 @@ SETTLED_RESIZE_MS = 210
 AUTOSAVE_DEBOUNCE_MS = 650
 STOP_CLOSE_TIMEOUT_MS = 12_000
 RECOVERY_SETTINGS_NAME = "ui_preferences.json"
+SHAPE_VIEW_PAIR = "pair"
+SHAPE_VIEW_INDIVIDUAL = "individual"
+AMBIGUOUS_VIEWER_MESSAGE = (
+    "Physical orientation is AMBIGUOUS ({count} equally plausible candidates from geometry alone). No orientation was "
+    "chosen and no MAC was computed: the FE modes and the experimental data are shown separately, never overlaid or "
+    "paired. Frequency proximity is listed in 2. Comparison table (not mode pairs). Confirm a physical orientation "
+    "only when independent setup evidence identifies it."
+)
+ESTABLISHED_VIEWER_MESSAGE = (
+    "Physical registration established by the comparator. Gated FE–experiment pairs and MAC are in the "
+    "pair view and 2. Comparison table; here each file's own modes are shown separately."
+)
+EXPERIMENT_UNAVAILABLE_MESSAGE = (
+    "The experimental file gave no usable modal or FRF data, so nothing can be compared. The extracted FE modes "
+    "remain available. Reason: {reason}"
+)
+FAILED_VIEWER_MESSAGE = (
+    "The comparison could not be completed ({reason}). The loaded FE modes and experimental data are shown "
+    "separately; no registration, pairing or MAC is implied."
+)
 DIAGNOSTIC_SHAPE_MESSAGE = (
     "No accepted mode pairs.\n"
     "See MAC and frequencies / Manual review for diagnostic candidates."
@@ -606,6 +626,7 @@ def install_responsive_workflow(app_module) -> None:
         self.tabs.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
         footer.grid(row=2, column=0, sticky="ew")
         _configure_styles(root, self.ui_scale_percent.get())
+        self._build_mode_viewer()
         self._rebuild_metric_cards()
         self._finalize_tables()
         self._install_text_editing()
@@ -630,6 +651,53 @@ def install_responsive_workflow(app_module) -> None:
                 root.after_idle(self._show_recovery_notice)
         else:
             self._reset_dirty()
+
+    def build_mode_viewer(self) -> None:
+        """3. Mode shapes: the gated pair view, or the FE and experimental modes separately (no registration)."""
+        from mode_viewer import ModeViewerPanel
+        from runtime_hardening import _MATPLOTLIB_LOCK
+
+        pair_widgets = [(child, child.pack_info()) for child in self.shape_tab.pack_slaves()]
+        self.shape_view = tk.StringVar(master=self.root, value=SHAPE_VIEW_PAIR)
+        selector = ttk.Frame(self.shape_tab)
+        ttk.Label(selector, text="View:").pack(side="left", padx=(0, 6))
+        for value, text in ((SHAPE_VIEW_PAIR, "Verified FE–experiment pair (MAC)"),
+                            (SHAPE_VIEW_INDIVIDUAL, "Individual modes (FE and experimental, separately)")):
+            ttk.Radiobutton(selector, text=text, value=value, variable=self.shape_view,
+                            command=lambda: self._show_shape_view(self.shape_view.get())).pack(side="left", padx=4)
+        before = pair_widgets[0][0] if pair_widgets else None
+        selector.pack(fill="x", pady=(0, 6), **({"before": before} if before is not None else {}))
+        self._shape_pair_widgets = pair_widgets
+        self.mode_viewer = ModeViewerPanel(self.shape_tab, post=self._post_to_ui, lock=_MATPLOTLIB_LOCK,
+                                           confirm_orientation=lambda error: self._show_orientation_ambiguity_dialog(
+                                               error))
+
+    def show_shape_view(self, view: str) -> None:
+        self.shape_view.set(view)
+        individual = view == SHAPE_VIEW_INDIVIDUAL
+        for widget, _info in self._shape_pair_widgets:
+            widget.pack_forget()
+        self.mode_viewer.frame.pack_forget()
+        if individual:
+            self.mode_viewer.frame.pack(fill="both", expand=True)
+        else:
+            for widget, info in self._shape_pair_widgets:
+                options = {key: value for key, value in info.items() if key != "in"}
+                widget.pack(in_=self.shape_tab, **options)
+
+    def show_loaded_modal_data(self, loaded, message: str, ambiguity=None, select: bool = False) -> None:
+        if not hasattr(self, "mode_viewer"):
+            return
+        if loaded is None:
+            if ambiguity is not None:
+                from services.modal_data_viewer import AMBIGUOUS
+
+                self.mode_viewer.set_message(message, AMBIGUOUS, ambiguity)
+            return
+        self.mode_viewer.set_data(loaded, message, ambiguity)
+        if select:
+            self._show_shape_view(SHAPE_VIEW_INDIVIDUAL)
+            self.tabs.select(self.shape_tab)
 
     def build_input(self) -> None:
         self.end_mode.set(15)
@@ -1225,21 +1293,50 @@ def install_responsive_workflow(app_module) -> None:
         if result.metadata.get("geometry_verified_registration"):
             message += (" Physical registration: reused by FE geometry identity (accepted mapping; this ODB's own "
                         "frequencies and shapes; not the accepted baseline ODB).")
+        self._show_loaded_modal_data(getattr(result, "loaded_modal_data", None), ESTABLISHED_VIEWER_MESSAGE)
+        if not result.pairs and hasattr(self, "mode_viewer"):
+            self._show_shape_view(SHAPE_VIEW_INDIVIDUAL)  # no gated pair to show: each file's own modes instead
         self._set_analysis_state(state, message)
 
     def failed(self, error: Exception) -> None:
         if isinstance(error, GeometryOrientationAmbiguousError):
             self._orientation_ambiguous(error)
             return
+        from services.modal_data_viewer import ExperimentalDataUnavailable
+
+        loaded = getattr(error, "loaded_modal_data", None)
+        if isinstance(error, ExperimentalDataUnavailable) and loaded is not None:
+            # Not a dead end: the FE modes stay viewable and the experimental limitation is stated.
+            self.running = False
+            self.progress.stop()
+            self.result = None
+            self.cache = None
+            self._clear_result_presentation("No comparison: the experimental file gave no usable data.")
+            self._set_empty_states()
+            self.metric_geometry_caption.configure(text="STATE")
+            self.metric_geometry.configure(text="FE data only")
+            reason = loaded.experimental_error or str(error)
+            self._show_loaded_modal_data(loaded, EXPERIMENT_UNAVAILABLE_MESSAGE.format(reason=reason), select=True)
+            self._set_analysis_state(
+                AnalysisState.DIAGNOSTIC,
+                "DIAGNOSTIC: experimental file not usable; FE frequencies and modes shown in 3. Mode shapes.",
+            )
+            self._finish_pending_close()
+            return
         original_failed(self, error)
         self._clear_result_presentation("Analysis could not be completed.")
         self._set_empty_states()
         self.metric_geometry_caption.configure(text="STATE")
         self.metric_geometry.configure(text="Error")
+        if loaded is not None:
+            self._show_loaded_modal_data(loaded, FAILED_VIEWER_MESSAGE.format(reason=error))
         self._set_analysis_state(
             AnalysisState.ERROR,
             "Analysis could not be completed. See last_error.log in the output workspace.",
         )
+        self._finish_pending_close()
+
+    def finish_pending_close(self) -> None:
         if self._close_after_cancel:
             self._close_after_cancel = False
             process = self._owned_analysis_process
@@ -1392,7 +1489,11 @@ def install_responsive_workflow(app_module) -> None:
             )
         else:
             self._show_frequency_only_diagnostic(diagnostic)
-        self._show_orientation_ambiguity_dialog(error)
+        # A usable result, not a dead end: the loaded data are shown separately; the orientation dialog opens only
+        # when the user asks for it (3. Mode shapes > Confirm physical orientation).
+        count = len(getattr(error, "ambiguous_candidates", ()) or ())
+        self._show_loaded_modal_data(getattr(error, "loaded_modal_data", None),
+                                     AMBIGUOUS_VIEWER_MESSAGE.format(count=count), ambiguity=error, select=True)
 
     def show_frequency_only_diagnostic(self, diagnostic) -> None:
         """FREQUENCY_ONLY_DIAGNOSTIC: frequencies and nearest-frequency rows, visibly not pairs (no MAC, no shapes)."""
@@ -1992,6 +2093,9 @@ def install_responsive_workflow(app_module) -> None:
             self.cmif_summary.delete("1.0", "end")
             self.cmif_summary.insert("1.0", message)
             self.cmif_summary.configure(state="disabled")
+        if hasattr(self, "mode_viewer"):  # never a stale previous run
+            self.mode_viewer.clear(message)
+            self._show_shape_view(SHAPE_VIEW_PAIR)
 
     def set_visual_placeholder(self, label, message: str) -> None:
         discard = getattr(self, "_discard_responsive_image", None)
@@ -2212,6 +2316,10 @@ def install_responsive_workflow(app_module) -> None:
 
     application_class.__init__ = workflow_init
     application_class._build_input = build_input
+    application_class._build_mode_viewer = build_mode_viewer
+    application_class._show_shape_view = show_shape_view
+    application_class._show_loaded_modal_data = show_loaded_modal_data
+    application_class._finish_pending_close = finish_pending_close
     application_class._responsive_file_row = responsive_file_row
     application_class._sync_coordinate_mapping = sync_coordinate_mapping
     application_class._scroll_input_tab = scroll_input_tab
