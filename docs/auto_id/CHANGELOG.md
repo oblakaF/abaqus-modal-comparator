@@ -5185,3 +5185,13 @@ first internal provider.
   build*, leaves no registration, disables Apply and Save and states `FAILED (unexpected <type>)`; the build can be
   retried. Open and Save report their errors the same way. Test reproduces the error in the background thread.
 - **Abaqus run count:** 0. SPEC, DECISIONS, EVIDENCE and governed records unchanged.
+
+## 2026-10-17 — CORE-E2E-C R3: no stale registration in the dialog (REVIEW_READY)
+
+- **R3:** a registration shown in *Establish physical registration...* always belongs to the inputs shown. Choosing
+  the accepted scan calibration, loading an evidence file (also an unreadable one), locating a reference FE geometry,
+  opening a saved registration and Clear discard the shown result (Apply / Save disabled; a new Check and build is
+  required). A cancelled file dialog changes nothing. A generation counter tags every build; a background result
+  whose generation is no longer current is ignored. The registration already applied to the analysis changes only by
+  Apply or Clear (and the file verification before every analysis).
+- **Tests:** `StaleResultTests` (9). R1 / R2 unchanged. **Abaqus run count:** 0.

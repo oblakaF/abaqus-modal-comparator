@@ -380,6 +380,171 @@ class DialogTests(_World, unittest.TestCase):
 
 
 
+class StaleResultTests(_World, unittest.TestCase):
+    """R3: a registration shown in the dialog always belongs to the inputs shown; a stale one is never applicable."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        import tkinter as tk
+
+        from guided_registration_ui import GuidedRegistrationDialog
+        from services.archived_sensitivity_evidence import fresh_content_identity
+        from services.modal_data_viewer import LoadedModalData
+
+        try:
+            self.root = tk.Tk()
+        except tk.TclError as error:
+            self.skipTest(f"no display: {error}")
+        self.root.withdraw()
+        self.addCleanup(self.root.destroy)
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.folder = Path(directory.name)
+        unv = self.folder / "synthetic.unv"
+        unv.write_bytes(b"synthetic experimental content")
+        identity = fresh_content_identity(unv)
+        self.document = evidence_document(dict(self.frame))
+        self.document["experimental_source"] = {"name": unv.name, "sha256": identity["sha256"],
+                                                "size": identity["size"]}
+        self.write("evidence.json", self.document)
+        other = copy.deepcopy(self.document)
+        other["label"] = "another physical record of the same scan"
+        self.write("other.json", other)
+        (self.folder / "broken.json").write_text("{ not json", encoding="utf-8")
+        self.loaded = LoadedModalData(as_dataset(self.variant), self.experimental,
+                                      abaqus_path=self.folder / "plate.odb", experimental_path=unv)
+        self.started = []
+        self.app = SimpleNamespace(root=self.root, status=tk.StringVar(master=self.root),
+                                   _start=lambda: self.started.append(True), _guided_registration=None)
+        self.dialog = GuidedRegistrationDialog(self.app, self.loaded)
+        self.addCleanup(lambda: self.dialog.window.winfo_exists() and self.dialog.window.destroy())
+        self.assertTrue(self.pump(lambda: self.dialog.identity is not None))
+
+    def write(self, name, document):
+        (self.folder / name).write_text(json.dumps(document), encoding="utf-8")
+
+    def pump(self, condition, timeout=30.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and not condition():
+            self.root.update()
+            time.sleep(0.01)
+        return condition()
+
+    def built(self):
+        self.dialog.load_evidence(self.folder / "evidence.json")
+        self.dialog.build()
+        self.assertTrue(self.pump(lambda: self.dialog.result is not None))
+        self.assertEqual(self.applicable(), (True, True))
+        return self.dialog.result
+
+    def applicable(self):
+        return (str(self.dialog.apply_button.cget("state")) == "normal",
+                str(self.dialog.save_button.cget("state")) == "normal")
+
+    def assertStale(self):
+        self.assertIsNone(self.dialog.result)
+        self.assertEqual(self.applicable(), (False, False))
+        self.dialog.apply()  # nothing is applied
+        self.assertIsNone(self.app._guided_registration)
+        self.assertEqual(self.started, [])
+
+    def test_new_evidence_invalidates_the_result(self):
+        self.built()
+        self.dialog.load_evidence(self.folder / "other.json")
+        self.assertStale()
+        self.assertEqual(str(self.dialog.build_button.cget("state")), "normal")  # a new Check and build is required
+
+    def test_accepted_scan_choice_invalidates_the_result(self):
+        self.built()
+        self.dialog.use_accepted()  # this synthetic file has no accepted passport: refused, nothing stale kept
+        self.assertTrue(self.dialog.status.cget("text").startswith("NO ACCEPTED SCAN CALIBRATION"))
+        self.assertStale()
+
+    def test_unreadable_new_evidence_leaves_no_applicable_result(self):
+        self.built()
+        self.dialog.load_evidence(self.folder / "broken.json")
+        self.assertTrue(self.dialog.status.cget("text").startswith("EVIDENCE REFUSED"))
+        self.assertIsNone(self.dialog.evidence)
+        self.assertStale()
+
+    def test_another_reference_geometry_requires_a_new_check(self):
+        self.built()
+        self.dialog.locate(self.folder / "reference_geometry.csv")
+        self.assertEqual(self.dialog.reference_path, self.folder / "reference_geometry.csv")
+        self.assertIn("Press Check and build again", self.dialog.status.cget("text"))
+        self.assertStale()
+
+    def test_cancelled_file_choice_changes_nothing(self):
+        result = self.built()
+        status = self.dialog.status.cget("text")
+        with mock.patch("tkinter.filedialog.askopenfilename", return_value=""):
+            self.dialog.load_evidence()
+            self.dialog.locate()
+            self.dialog.open_saved()
+        self.assertIs(self.dialog.result, result)
+        self.assertEqual(self.applicable(), (True, True))
+        self.assertEqual(self.dialog.status.cget("text"), status)
+        self.assertIsNone(self.dialog.reference_path)
+
+    def _held_build(self):
+        """A build whose background work waits until released (a real registration is returned afterwards)."""
+        release, real = threading.Event(), guided.establish_guided_registration
+
+        def held(*args, **kwargs):
+            release.wait(30)
+            return real(*args, **kwargs)
+
+        patcher = mock.patch.object(guided, "establish_guided_registration", side_effect=held)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.dialog.load_evidence(self.folder / "evidence.json")
+        self.dialog.build()
+        self.assertEqual(str(self.dialog.build_button.cget("state")), "disabled")
+        return release, held
+
+    def test_a_build_overtaken_by_new_evidence_is_ignored(self):
+        release, held = self._held_build()
+        self.dialog.load_evidence(self.folder / "other.json")
+        release.set()
+        self.assertFalse(self.pump(lambda: self.dialog.result is not None, timeout=3.0))
+        self.assertStale()
+
+    def test_a_build_overtaken_by_clear_is_ignored(self):
+        release, held = self._held_build()
+        self.dialog.clear()
+        release.set()
+        self.assertFalse(self.pump(lambda: self.dialog.result is not None, timeout=3.0))
+        self.assertStale()
+
+    def test_reopened_registration_is_verified_and_replaces_the_shown_result(self):
+        first = self.built()
+        saved = self.dialog.save(self.folder / "saved.json")
+        self.dialog.load_evidence(self.folder / "other.json")
+        self.dialog.build()
+        self.assertTrue(self.pump(lambda: self.dialog.result is not None))
+        self.assertNotEqual(self.dialog.result.evidence_hash, first.evidence_hash)
+        self.dialog.open_saved(saved)
+        self.assertTrue(self.dialog.status.cget("text").startswith("OPENED"))
+        self.assertEqual(self.dialog.result.evidence_hash, first.evidence_hash)
+        self.dialog.apply()
+        self.assertEqual(self.app._guided_registration.evidence_hash, first.evidence_hash)
+        self.assertEqual(self.started, [True])
+
+    def test_an_applied_registration_is_not_changed_by_new_inputs(self):
+        applied = self.built()
+        self.dialog.apply()
+        from guided_registration_ui import GuidedRegistrationDialog
+
+        again = GuidedRegistrationDialog(self.app, self.loaded)
+        self.addCleanup(lambda: again.window.winfo_exists() and again.window.destroy())
+        self.assertTrue(self.pump(lambda: again.identity is not None))
+        again.load_evidence(self.folder / "other.json")
+        again.locate(self.folder / "reference_geometry.csv")
+        self.assertIsNone(again.result)
+        self.assertIs(self.app._guided_registration, applied)  # only Clear removes it
+        again.clear()
+        self.assertIsNone(self.app._guided_registration)
+
 REAL_T3_GEOMETRY = os.environ.get("AUTO_ID_CORE_E2E_SP13_MODAL_GEOMETRY")  # geometry.csv of the new SP13_modal.odb
 
 

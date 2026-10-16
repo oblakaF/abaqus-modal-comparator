@@ -31,6 +31,9 @@ class GuidedRegistrationDialog:
         self.result: Optional[guided.GuidedRegistration] = None
         self.identity: Optional[dict] = None
         self.reference_path: Optional[Path] = None
+        # R3: every change of the inputs (evidence, reference geometry, opened record, Clear) and every build starts a
+        # new generation; a background build delivers its result only if its generation is still the current one
+        self._generation = 0
         self._calls: queue.Queue = queue.Queue()  # worker threads hand their results to the Tk thread
         self.window = tk.Toplevel(app.root)
         self.window.title("Establish physical registration")
@@ -162,10 +165,23 @@ class GuidedRegistrationDialog:
         if self.window.winfo_exists():
             self.status.configure(text=text)
 
+    def _invalidate(self) -> int:
+        """The shown registration no longer matches the inputs: discard it and require a new Check and build.
+
+        The registration already applied to the analysis (``app._guided_registration``) is not touched here; only
+        Clear or the file verification before each analysis removes it.
+        """
+        self._generation += 1
+        self._discard_result()
+        self._fill(self.checks, [])
+        self.build_button.configure(state="normal" if self.evidence is not None else "disabled")
+        return self._generation
+
     def use_accepted(self) -> None:
         if self.identity is None:
             self._set_status("The experimental file is still being hashed; try again in a moment.")
             return
+        self._invalidate()
         try:
             self.evidence = guided.accepted_scan_evidence(self.identity)
         except guided.GuidedRegistrationRefusal as error:
@@ -177,7 +193,8 @@ class GuidedRegistrationDialog:
         chosen = path or filedialog.askopenfilename(title="Physical evidence file", parent=self.window,
                                                     filetypes=[("Evidence", "*.json"), ("All files", "*.*")])
         if not chosen:
-            return
+            return  # cancelled: nothing changes
+        self._invalidate()
         try:
             self.evidence = guided.load_evidence_file(Path(chosen))
             self._set_status(f"Evidence loaded from {Path(chosen).name}. Press Check and build.")
@@ -204,16 +221,19 @@ class GuidedRegistrationDialog:
     def locate(self, path: Optional[Path] = None) -> None:
         chosen = path or filedialog.askopenfilename(title="Reference FE geometry file (instance,node_label,x,y,z)",
                                                     parent=self.window, filetypes=[("CSV", "*.csv")])
-        if chosen:
-            self.reference_path = Path(chosen)
-            self._set_status(f"Reference FE geometry: {chosen} (its SHA-256 is checked when building).")
+        if not chosen:
+            return  # cancelled: nothing changes
+        self.reference_path = Path(chosen)
+        self._invalidate()
+        self._set_status(f"Reference FE geometry: {chosen} (its SHA-256 is checked when building). Press Check and "
+                         "build again.")
 
     # ------------------------------------------------------------------ build / apply / save / open
     def build(self) -> None:
         if self.evidence is None or self.identity is None:
             return
+        generation = self._invalidate()  # never a stale or partial registration while (or after) building
         self.build_button.configure(state="disabled")
-        self._discard_result()  # never a stale or partial registration while (or after) building
         self._set_status("Checking the evidence and building the registration...")
         evidence, identity, reference = self.evidence, self.identity, self.reference_path
 
@@ -222,15 +242,15 @@ class GuidedRegistrationDialog:
                 result = guided.establish_guided_registration(self.loaded.abaqus, self.loaded.experimental, identity,
                                                               evidence, reference_geometry_path=reference)
             except Exception as error:  # noqa: BLE001  (a refusal or an unexpected error: shown, never swallowed)
-                self._calls.put(lambda error=error: self._built(None, error))
+                self._calls.put(lambda error=error: self._built(None, error, generation))
                 return
-            self._calls.put(lambda: self._built(result, None))
+            self._calls.put(lambda: self._built(result, None, generation))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _built(self, result, error) -> None:
-        if not self.window.winfo_exists():
-            return
+    def _built(self, result, error, generation: int) -> None:
+        if not self.window.winfo_exists() or generation != self._generation:
+            return  # the inputs changed (or Clear) while this build ran: its outcome belongs to nothing shown
         self.build_button.configure(state="normal")
         if error is not None:
             self._show_failure(error, "REFUSED", "The analysis stays a frequency-only diagnostic.")
@@ -289,10 +309,11 @@ class GuidedRegistrationDialog:
         chosen = path or filedialog.askopenfilename(title="Open guided registration", parent=self.window,
                                                     filetypes=[("Registration", "*.json")])
         if not chosen:
-            return
+            return  # cancelled: nothing changes
         if self.identity is None:
             self._set_status("The experimental file is still being hashed; try again in a moment.")
             return
+        self._invalidate()  # the shown result is replaced only by a record verified against the current files
         try:
             result = guided.load_guided_registration(Path(chosen))
             guided.verify_for_files(result, self.loaded.abaqus, self.loaded.experimental, self.identity)
@@ -303,10 +324,7 @@ class GuidedRegistrationDialog:
 
     def clear(self) -> None:
         self.app._guided_registration = None
-        self.result = None
-        self._fill(self.checks, [])
-        self.apply_button.configure(state="disabled")
-        self.save_button.configure(state="disabled")
+        self._invalidate()  # a build still running never brings a result back
         self._set_status("No guided registration is applied; the next analysis uses automatic geometry registration.")
 
 
