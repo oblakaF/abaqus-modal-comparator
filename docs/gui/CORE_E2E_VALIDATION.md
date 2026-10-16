@@ -58,3 +58,23 @@ E 55 593 MPa (+6.9 %) within 0.02 % on all five strict rows (`archived_linearity
   SUPERVISOR decision.
 - The 11. Scaling tab wraps its text into a narrow column (known narrow-wrap behaviour of hidden tabs).
 - The "Mean MAC" card averages every admissible pair, including Review / Poor ones.
+
+## Closure (2026-10-17)
+
+**CORE-E2E: ACCEPTED / CLOSED** (PR #84, merge `716ce32`). The sections above are the record as delivered.
+
+**CORE-E2E-B: ACCEPTED / CLOSED.** The stage B solves planned above were later authorised and executed:
+
+| | SP-02 | SP-13 |
+|---|---|---|
+| Job | `SP02_c3a8d68e81ca46c2` | `SP13_c8f5b51e3863775f` |
+| Abaqus | completed successfully, no WARNING / ERROR | completed successfully, no WARNING / ERROR |
+| ODB SHA-256 | `357ecad3…` | `86c24c61…` |
+| Extraction | 10 / 10 checks PASS, FE geometry identity preserved | 10 / 10 checks PASS, FE geometry identity preserved |
+| Strict rows: FE-to-FE MAC | R1 0.999999998, R2 0.999999715, R3 0.999999871 | R1 0.999999731, R2 0.999999927 |
+| +2 % vs archived +-5 % prediction | R1 -0.00001 %, R2 -0.0019 %, R3 +0.0002 % | R1 -0.0019 %, R2 +0.0001 % |
+
+This verifies the FE pipeline and the local E_in sensitivity only: no material constant is determined and
+NO_GLOBAL_PARAMETER_VALUE for SP-02 + SP-13 is unchanged.
+
+**CORE-E2E-C: ACCEPTED / CLOSED** (PR #85, merge `24c755d`); see `docs/gui/GUIDED_PHYSICAL_REGISTRATION.md`.

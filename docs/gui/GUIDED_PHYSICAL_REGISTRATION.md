@@ -74,3 +74,11 @@ passport / fixture route. Choosing one of the geometric orientation candidates i
   model.
 - SP-04 (dataset 58, no physical record): no evidence, every field `MISSING`; the analysis stays
   `FREQUENCY_ONLY_DIAGNOSTIC`.
+
+## Closure (2026-10-17)
+
+**CORE-E2E-C: ACCEPTED / CLOSED** (PR #85, merge `24c755d`): implementation `0ccfdd8`; R1 `6a893f6` (FE frame by the
+identity of the measured surface, not bounding boxes; otherwise `FE_FRAME_NOT_VERIFIED`) and R2 (dialog recovery from
+any background error); R3 `13af39a` (no stale registration: every input change invalidates the shown result, a
+generation counter discards overtaken background builds). The guided registration remains a diagnostic engineering
+registration: `governed = false`, `production_ready = false`, no Auto-ID observation.
