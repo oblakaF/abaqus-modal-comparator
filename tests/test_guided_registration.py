@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -47,6 +48,15 @@ def mesh_variant(fe: FEGeometry) -> FEGeometry:
     return FEGeometry(ids, coordinates, fe_geometry_identity(ids.tolist(), coordinates))
 
 
+def guided_boxes(fe: FEGeometry) -> dict:
+    instances = np.array([value.split(":")[0] for value in fe.node_ids])
+    boxes = {}
+    for name in sorted(set(instances.tolist())):
+        points = fe.coordinates[instances == name]
+        boxes[name] = (tuple(points.min(axis=0)), tuple(points.max(axis=0)))
+    return boxes
+
+
 def as_dataset(fe: FEGeometry) -> ModalDataset:
     rng = np.random.default_rng(1)
     modes = [ModeShape(n, 10.0 * n, fe.node_ids.astype(object), fe.coordinates, rng.normal(size=(len(fe.node_ids), 3)))
@@ -68,10 +78,13 @@ class _World:
         self.reference = synthetic_fe("mm")
         self.variant = mesh_variant(self.reference)
         self.experimental = experiment()
-        self.boxes = guided._instance_boxes(self.reference.node_ids, self.reference.coordinates)
+        self.surface = guided.measured_surface_identity(self.reference.node_ids, self.reference.coordinates, "TOP",
+                                                        "max_z", "mm")
+        self.frame = {"measured_surface_identity": {"sha256": self.surface["sha256"],
+                                                    "node_count": self.surface["node_count"]}}
 
     def evidence(self, **overrides) -> guided.PhysicalEvidence:
-        return guided.evidence_from_document(evidence_document({"instance_boxes": self.boxes}, **overrides))
+        return guided.evidence_from_document(evidence_document(dict(self.frame), **overrides))
 
     def establish(self, fe=None, evidence=None, identity=None, experimental=None):
         return guided.establish_guided_registration(as_dataset(fe or self.variant), experimental or self.experimental,
@@ -101,8 +114,7 @@ class GuidedRegistrationTests(_World, unittest.TestCase):
         self.assertEqual(variant["sha256"], self.variant.identity["sha256"])
         self.assertEqual(list(result.registration.mapped_fe_node_ids), true_top_ids())
         self.assertLess(result.metrics["mapping_max_residual_in_abaqus_units"], 1e-9)
-        self.assertTrue(any(check.startswith("FE frame: every instance bounding box equals")
-                            for check in result.checks))
+        self.assertTrue(any(check.startswith("FE frame: the measured surface TOP max_z") for check in result.checks))
         self.assertFalse(result.provenance()["production_ready"])
         self.assertFalse(result.provenance()["governed"])
 
@@ -120,17 +132,32 @@ class GuidedRegistrationTests(_World, unittest.TestCase):
             self.establish(evidence=evidence)
         self.assertEqual(caught.exception.field, "orientation.experimental_axes_in_fe")
 
-    def test_another_fe_frame_is_refused(self):
-        moved = FEGeometry(self.variant.node_ids, self.variant.coordinates * np.array([-1.0, 1.0, 1.0]),
-                           fe_geometry_identity(self.variant.node_ids.tolist(),
-                                                self.variant.coordinates * np.array([-1.0, 1.0, 1.0])))
-        swapped_coordinates = self.variant.coordinates[:, [1, 0, 2]]
-        swapped = FEGeometry(self.variant.node_ids, swapped_coordinates,
-                             fe_geometry_identity(self.variant.node_ids.tolist(), swapped_coordinates))
-        for label, fe in (("mirrored model", moved), ("axes swapped", swapped)):
-            with self.subTest(label), self.assertRaises(guided.GuidedRegistrationRefusal) as caught:
-                self.establish(fe)
-            self.assertEqual(caught.exception.field, "fe_frame")
+    def test_same_bounding_boxes_but_another_internal_orientation_is_refused(self):
+        """R1: a mirrored, rotated or relabelled mesh of the symmetric plate keeps every bounding box; not the frame."""
+        def variant(coordinates=None, node_ids=None):
+            ids = self.variant.node_ids if node_ids is None else node_ids
+            xyz = self.variant.coordinates if coordinates is None else coordinates
+            return FEGeometry(ids, xyz, fe_geometry_identity(ids.tolist(), xyz))
+
+        xyz = self.variant.coordinates
+        span = xyz.max(axis=0) + xyz.min(axis=0)
+        mirrored = xyz.copy()
+        mirrored[:, 0] = span[0] - xyz[:, 0]  # mirror about the plate centre: same boxes
+        rotated = xyz.copy()
+        rotated[:, :2] = span[:2] - xyz[:, :2]  # 180 degrees in plane: same boxes
+        top = np.flatnonzero([value.startswith("TOP:") for value in self.variant.node_ids])
+        relabelled = self.variant.node_ids.copy()
+        relabelled[top] = relabelled[top[::-1]]  # the same TOP points under other node labels
+        swapped = xyz[:, [1, 0, 2]]  # axes swapped: other boxes as well
+        for label, fe in (("mirrored", variant(mirrored)), ("rotated 180", variant(rotated)),
+                          ("relabelled surface", variant(node_ids=relabelled)), ("axes swapped", variant(swapped))):
+            with self.subTest(label):
+                if label != "axes swapped":
+                    self.assertEqual(guided_boxes(fe), guided_boxes(self.variant))  # bounding boxes are no evidence
+                with self.assertRaises(guided.GuidedRegistrationRefusal) as caught:
+                    self.establish(fe)
+                self.assertEqual(caught.exception.field, "fe_frame")
+                self.assertIn(guided.FE_FRAME_NOT_VERIFIED, str(caught.exception))
 
     def test_changed_files_and_dof_mismatch_are_refused(self):
         cases = {
@@ -142,7 +169,7 @@ class GuidedRegistrationTests(_World, unittest.TestCase):
             with self.subTest(field_name), self.assertRaises(guided.GuidedRegistrationRefusal) as caught:
                 self.establish(**kwargs)
             self.assertEqual(caught.exception.field, field_name)
-        document = evidence_document({"instance_boxes": self.boxes})
+        document = evidence_document(dict(self.frame))
         document["measured_dofs"] = ["U1", "U2", "U3"]
         with self.assertRaises(guided.GuidedRegistrationRefusal) as caught:
             self.establish(evidence=guided.evidence_from_document(document))
@@ -153,7 +180,7 @@ class GuidedRegistrationTests(_World, unittest.TestCase):
         with self.assertRaises(guided.GuidedRegistrationRefusal) as caught:
             guided.evidence_from_document(document)
         self.assertEqual(caught.exception.field, "fe_frame")
-        centered = evidence_document({"instance_boxes": self.boxes}, mode="documented_centered_alignment",
+        centered = evidence_document(dict(self.frame), mode="documented_centered_alignment",
                                      orientation={"experimental_axes_in_fe": ["+X", "+Y", "+Z"],
                                                   "reference": "documented_convention", "source": "convention"})
         del centered["geometry_calibration"]["corner_A"]
@@ -196,6 +223,9 @@ class GuidedRegistrationTests(_World, unittest.TestCase):
         self.assertEqual(evidence.geometry_calibration.mode, "scan_to_panel_edges")
         self.assertEqual(evidence.reference_geometry_file.sha256,
                          "78d197376f7a5cce644d7c0eeb218df3151d3c349284caffa48c333f3ff11d39")
+        self.assertEqual(dict(evidence.fe_frame["accepted_surface_label_set"]), {
+            "node_count": 29754, "sha256": "bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db",
+            "registration_hash": "2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823"})
         with self.assertRaises(guided.GuidedRegistrationRefusal):
             guided.accepted_scan_evidence({"sha256": "d" * 64, "size": source.size_bytes})
 
@@ -281,7 +311,7 @@ class DialogTests(_World, unittest.TestCase):
             from services.archived_sensitivity_evidence import fresh_content_identity
 
             identity = fresh_content_identity(unv)
-            document = evidence_document({"instance_boxes": self.boxes})
+            document = evidence_document(dict(self.frame))
             document["experimental_source"] = {"name": unv.name, "sha256": identity["sha256"], "size": identity["size"]}
             (folder / "evidence.json").write_text(json.dumps(document), encoding="utf-8")
             loaded = LoadedModalData(as_dataset(self.variant), self.experimental, abaqus_path=folder / "plate.odb",
@@ -301,7 +331,8 @@ class DialogTests(_World, unittest.TestCase):
             self.assertTrue(pump(lambda: dialog.identity is not None))
             self.assertEqual({row[2] for row in guided.evidence_rows(None)}, {"MISSING"})
             wrong = copy.deepcopy(document)  # an FE frame that is not this model's: refused, the reason shown
-            wrong["fe_frame"] = {"instance_boxes": {k: [v + 5.0 for v in box] for k, box in self.boxes.items()}}
+            wrong["fe_frame"] = {"measured_surface_identity": {"sha256": "e" * 64,
+                                                               "node_count": self.surface["node_count"]}}
             (folder / "wrong.json").write_text(json.dumps(wrong), encoding="utf-8")
             dialog.load_evidence(folder / "wrong.json")
             dialog.build()
@@ -310,6 +341,21 @@ class DialogTests(_World, unittest.TestCase):
             self.assertEqual(str(dialog.build_button.cget("state")), "normal")
             self.assertEqual(str(dialog.apply_button.cget("state")), "disabled")
             dialog.load_evidence(folder / "evidence.json")
+            # R2: an unexpected error in the background build (unreadable file, broken CSV, ...) never leaves the
+            # dialog blocked, never leaves a registration, and the operation can be retried
+            with mock.patch.object(guided, "establish_guided_registration",
+                                   side_effect=OSError("reference FE geometry: read error")):
+                dialog.build()
+                self.assertTrue(pump(lambda: str(dialog.build_button.cget("state")) == "normal"))
+            self.assertTrue(dialog.status.cget("text").startswith("FAILED (unexpected OSError)"),
+                            dialog.status.cget("text"))
+            self.assertIsNone(dialog.result)
+            self.assertEqual((str(dialog.apply_button.cget("state")), str(dialog.save_button.cget("state"))),
+                             ("disabled", "disabled"))
+            with mock.patch.object(guided, "establish_guided_registration", side_effect=ValueError("bad CSV row")):
+                dialog.build()
+                self.assertTrue(pump(lambda: str(dialog.build_button.cget("state")) == "normal"))
+            self.assertIn("unexpected ValueError", dialog.status.cget("text"))
             dialog.build()
             self.assertTrue(pump(lambda: dialog.result is not None))
             self.assertTrue(dialog.status.cget("text").startswith("ESTABLISHED"))
@@ -331,6 +377,29 @@ class DialogTests(_World, unittest.TestCase):
             for window in (dialog, again, changed):
                 if window.window.winfo_exists():
                     window.window.destroy()
+
+
+
+REAL_T3_GEOMETRY = os.environ.get("AUTO_ID_CORE_E2E_SP13_MODAL_GEOMETRY")  # geometry.csv of the new SP13_modal.odb
+
+
+@unittest.skipUnless(REAL_T3_GEOMETRY and os.environ.get("AUTO_ID_FIXTURE_ROOT_CARBON_PROJECT_ARCHIVE"),
+                     "needs AUTO_ID_CORE_E2E_SP13_MODAL_GEOMETRY (new SP13_modal.odb geometry.csv) and the "
+                     "carbon-project-archive store (pinned SP13_fe_geometry.csv)")
+class RealSp13FrameTests(unittest.TestCase):
+    """R1 on the real case: the new SP13_modal.odb measured surface is the accepted model's, label and coordinate."""
+
+    def test_new_sp13_mesh_shares_the_accepted_measured_surface(self):
+        from domain.experiment_fixture import fixture_roots_from_environment, resolve_external_file
+        from domain.specimen_manifest import load_specimen_manifest
+
+        manifest = load_specimen_manifest(ROOT / "docs/auto_id/specimens/SP13.physical.specimen.json")
+        reference = resolve_external_file(manifest.fe_reference.geometry_file, fixture_roots_from_environment())
+        accepted = guided.geometry_file_surface_identity(reference, "CFRP_PLATE_TOP", "max_z", "mm")
+        new = guided.geometry_file_surface_identity(Path(REAL_T3_GEOMETRY), "CFRP_PLATE_TOP", "max_z", "mm")
+        self.assertEqual((new["sha256"], new["node_count"]), (accepted["sha256"], accepted["node_count"]))
+        self.assertEqual((accepted["label_set_sha256"], accepted["node_count"]),
+                         ("bdfec8bf94605fdbe967353e56fbe36e379f73928fcdc3ca3bbaaa1c316b02db", 29754))
 
 
 if __name__ == "__main__":

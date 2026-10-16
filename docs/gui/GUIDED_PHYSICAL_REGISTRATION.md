@@ -45,9 +45,13 @@ evidence the comparison stays a `FREQUENCY_ONLY_DIAGNOSTIC` with separate mode v
   the stated axes (existing M2.3 rule).
 - The loaded experimental content (SHA-256, size), modal set, point count and measured-DOF contract are those the
   evidence describes.
-- FE frame: the loaded model is the FE model the evidence refers to, or every FE instance bounding box equals the
-  reference FE geometry's within the passport surface tolerance (1e-4 mm). This detects swapped axes and mirrored or
-  moved models. The old node mapping is never reused.
+- FE frame: the loaded model is the FE model the evidence refers to (exact FE geometry identity), or its measured
+  surface (selected exactly as the M2 builder selects it) is node for node and coordinate for coordinate the measured
+  surface of the reference FE geometry: the canonical identity of the surface node labels and x, y, z must be equal,
+  and the reference surface's label set must be the accepted registration's `fe_mapping_node_subset`. Bounding boxes
+  are not evidence (a mirrored, rotated or relabelled mesh of a symmetric panel keeps them). Otherwise
+  `FE_FRAME_NOT_VERIFIED`; a different surface mesh needs an evidence record stated for that FE model. The old node
+  mapping is never reused.
 - The registration is built by the accepted M2.3 core (`physical_registration.register_from_physical_calibration`);
   it reads no MAC, frequency or mode shape and never chooses among geometric candidates.
 - Mapping: matched fraction ≥ 0.90 and normalised RMS ≤ 0.03 (the comparator's existing geometry limits), every point
@@ -63,7 +67,9 @@ passport / fixture route. Choosing one of the geometric orientation candidates i
 
 - On the accepted SP-13 mesh the guided path reproduces the accepted registration hash `2eeeaa86…` exactly.
 - New `SP13_modal.odb` (1 558 721 nodes; faces identical, refined core): with the accepted SP-13 scan calibration and
-  the reference FE geometry `SP13_fe_geometry.csv` (`78d19737…`) the FE frame matches exactly; registration
+  the reference FE geometry `SP13_fe_geometry.csv` (`78d19737…`), the measured surface CFRP_PLATE_TOP max_z of both
+  models is identical (29 754 nodes, labels and coordinates `3087cba5…`, labels `bdfec8bf…` = the accepted
+  registration's subset); registration
   `e9c8dc5d…`, matched 100 %, RMS 1.23 mm. The comparison gives the five SP-13 pairs, MAC within 1e-5 of the accepted
   model.
 - SP-04 (dataset 58, no physical record): no evidence, every field `MISSING`; the analysis stays

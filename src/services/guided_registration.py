@@ -11,12 +11,15 @@ Evidence sources:
 - ``ACCEPTED_SCAN_CALIBRATION``: the experimental file is, by fresh SHA-256 and size, the source of an accepted
   physical passport (``docs/auto_id/specimens/*.physical.specimen.json``) whose calibration is physical (corner-A
   marker or measured scan-to-panel-edge offsets). That passport's orientation is stated in the frame of *its* FE model,
-  so the loaded FE model must be in the same frame: every FE instance's bounding box must equal the reference FE
-  geometry's (pinned geometry file, SHA-256 checked) within the passport surface tolerance. The old node mapping is
-  never reused: the frozen registration of the accepted FE geometry is not applied to another node identity.
+  so the loaded FE model must be in the same frame. Bounding boxes cannot show that (a mirrored or rotated mesh of a
+  symmetric panel has the same boxes): the measured surface of the loaded model, selected exactly as the M2 builder
+  selects it, must be node for node and coordinate for coordinate the measured surface of the reference FE geometry
+  (pinned geometry file, SHA-256 checked), whose label set must also be the accepted registration's recorded
+  ``fe_mapping_node_subset``. Otherwise ``FE_FRAME_NOT_VERIFIED``. The old node mapping is never reused: the frozen
+  registration of the accepted FE geometry is not applied to another node identity.
 - ``EVIDENCE_FILE``: a ``auto-id/guided-physical-evidence/v1`` record with the same ``geometry_calibration`` rules
   as a passport, the experimental source it describes (SHA-256, size, modal set, measured DOFs) and the FE frame it
-  refers to (the exact FE geometry identity, or reference instance bounding boxes).
+  refers to (the exact FE geometry identity, or the measured-surface identity of the reference FE model).
 
 The checks before a registration exists: physical calibration mode and orientation reference; the experimental
 content, modal set, point count and measured-DOF contract; the FE frame; the measured surface. After it: the
@@ -34,11 +37,10 @@ from dataclasses import dataclass, field
 import json
 import math
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional
 
 import numpy as np
 
-from coordinate_calibration import millimetres_to_model_units
 from domain.experiment_fixture import (
     FixtureSourceUnavailableError,
     fixture_roots_from_environment,
@@ -52,15 +54,16 @@ from domain.specimen_manifest import (
     load_specimen_manifest,
     parse_geometry_calibration,
 )
-from scientific_state import modal_dataset_geometry_identity
+from scientific_state import fe_geometry_identity, modal_dataset_geometry_identity
 
+from .fe_shape_pack import node_set_sha256
 from .physical_registration import (
     PHYSICAL_ORIENTATION_REFERENCES,
-    SURFACE_TOLERANCE_MM,
     FEGeometry,
     PhysicalRegistrationRefusal,
     register_from_physical_calibration,
 )
+from .experiment_fixture_regression import FixtureRegressionError, load_fixture_registration
 from .production_modal_input import FIXTURE_MANIFEST_PATH, REPO_ROOT
 
 EVIDENCE_SCHEMA = "auto-id/guided-physical-evidence/v1"
@@ -97,16 +100,7 @@ def _short(value: object) -> str:
 
 # ----------------------------------------------------------------------------- FE frame
 
-Box = tuple[float, float, float, float, float, float]
-
-
-def _instance_boxes(node_ids: Sequence[object], coordinates: np.ndarray) -> dict[str, Box]:
-    instances = np.array([str(value).split(":")[0] for value in node_ids])
-    boxes = {}
-    for name in sorted(set(instances.tolist())):
-        points = coordinates[instances == name]
-        boxes[name] = tuple(float(v) for v in (*points.min(axis=0), *points.max(axis=0)))
-    return boxes
+FE_FRAME_NOT_VERIFIED = "FE_FRAME_NOT_VERIFIED"
 
 
 def fe_geometry_of(abaqus) -> FEGeometry:
@@ -118,39 +112,37 @@ def fe_geometry_of(abaqus) -> FEGeometry:
     return FEGeometry(node_ids, np.asarray(reference.coordinates, dtype=float), modal_dataset_geometry_identity(abaqus))
 
 
-def geometry_file_boxes(path: Path) -> dict[str, Box]:
-    """Instance bounding boxes of an FE geometry file (instance,node_label,x,y,z), streamed."""
-    boxes: dict[str, list[float]] = {}
+def measured_surface_identity(node_ids, coordinates, instance: str, side: str, abaqus_unit: str) -> dict:
+    """The measured surface exactly as the M2 builder selects it, identified by its node labels AND coordinates.
+
+    ``sha256`` is the project's canonical geometry identity of the surface nodes (label + x, y, z); ``label_set_sha256``
+    is the label-only fingerprint the accepted registrations record as ``fe_mapping_node_subset``.
+    """
+    fe = FEGeometry(np.asarray(node_ids), np.asarray(coordinates, dtype=float), {})
+    try:
+        surface = sorted(fe.surface_node_ids(instance, side, abaqus_unit))
+    except PhysicalRegistrationRefusal as error:
+        raise GuidedRegistrationRefusal("measured_surface", str(error)) from error
+    row = {value: index for index, value in enumerate(fe.node_ids.tolist())}
+    points = fe.coordinates[[row[value] for value in surface]]
+    return {"instance": instance, "side": side, "node_count": len(surface),
+            "sha256": fe_geometry_identity(surface, points)["sha256"], "label_set_sha256": node_set_sha256(surface)}
+
+
+def geometry_file_surface_identity(path: Path, instance: str, side: str, abaqus_unit: str) -> dict:
+    """The measured-surface identity of an FE geometry file (instance,node_label,x,y,z); only that instance is read."""
+    ids, points = [], []
     with open(path, newline="", encoding="utf-8") as stream:
         reader = csv.reader(stream)
         header = next(reader)
         _require(header[:5] == ["instance", "node_label", "x", "y", "z"], "fe_frame.geometry_file",
-                 f"{path.name} is not an FE geometry file (instance,node_label,x,y,z).")
-        for instance, _label, x, y, z in reader:
-            point = (float(x), float(y), float(z))
-            box = boxes.get(instance)
-            if box is None:
-                boxes[instance] = [*point, *point]
-                continue
-            for axis in range(3):
-                if point[axis] < box[axis]:
-                    box[axis] = point[axis]
-                if point[axis] > box[axis + 3]:
-                    box[axis + 3] = point[axis]
-    return {name: tuple(box) for name, box in sorted(boxes.items())}
-
-
-def compare_fe_frames(loaded: Mapping[str, Box], reference: Mapping[str, Box], abaqus_unit: str) -> list[str]:
-    """Differences between two FE frames (empty: the same frame within the passport surface tolerance)."""
-    tolerance = millimetres_to_model_units(SURFACE_TOLERANCE_MM, abaqus_unit)
-    problems = []
-    if set(loaded) != set(reference):
-        problems.append(f"instances {sorted(loaded)} differ from the reference {sorted(reference)}")
-    for name in sorted(set(loaded) & set(reference)):
-        worst = max(abs(a - b) for a, b in zip(loaded[name], reference[name]))
-        if worst > tolerance:
-            problems.append(f"{name} bounding box differs by up to {worst:.6g} {abaqus_unit} (limit {tolerance:.3g})")
-    return problems
+                 f"{Path(path).name} is not an FE geometry file (instance,node_label,x,y,z).")
+        for name, label, x, y, z in reader:
+            if name == instance:
+                ids.append(f"{name}:{label}")
+                points.append((float(x), float(y), float(z)))
+    _require(bool(ids), "fe_frame.geometry_file", f"{Path(path).name} has no instance {instance!r}.")
+    return measured_surface_identity(ids, np.asarray(points), instance, side, abaqus_unit)
 
 
 # ----------------------------------------------------------------------------- evidence
@@ -167,7 +159,7 @@ class PhysicalEvidence:
     modal_set: str
     measured_dofs: tuple[str, ...]
     point_count: Optional[int]
-    fe_frame: Mapping[str, Any]  # {"fe_geometry_identity": {...}} and/or {"instance_boxes": {...}} / {"geometry_file"}
+    fe_frame: Mapping[str, Any]  # {"fe_geometry_identity"} and/or {"measured_surface_identity"} / {"geometry_file"}
     provenance: tuple[str, ...] = ()
     reference_geometry_file: Any = None  # pinned ExternalFileReference of an accepted passport
 
@@ -211,6 +203,12 @@ def accepted_scan_evidence(experimental_identity: Mapping[str, Any], *, repo_roo
     _, document = parse_geometry_calibration(json.loads(path.read_text(encoding="utf-8"))["geometry_calibration"])
     source = fixture.experimental_source
     reference = manifest.fe_reference
+    try:
+        accepted = load_fixture_registration(fixture, Path(repo_root))  # hash-sealed and pinned
+    except (FixtureRegressionError, OSError, ValueError) as error:
+        raise GuidedRegistrationRefusal("fe_frame", f"the accepted registration of {fixture.fixture_id} cannot be "
+                                                    f"verified: {error}") from error
+    subset = accepted.registration_metrics.get("fe_mapping_node_subset") or {}
     return PhysicalEvidence(
         kind=ACCEPTED_SCAN, label=f"accepted physical scan calibration of {fixture.fixture_id} ({path.name})",
         physical_specimen_id=None if manifest.physical_specimen_id is None else str(manifest.physical_specimen_id),
@@ -226,7 +224,10 @@ def accepted_scan_evidence(experimental_identity: Mapping[str, Any], *, repo_roo
                                            "node_count": reference.geometry_identity.node_count},
                   "geometry_file": {"file_name": reference.geometry_file.file_name,
                                     "sha256": reference.geometry_file.sha256,
-                                    "size_bytes": reference.geometry_file.size_bytes}},
+                                    "size_bytes": reference.geometry_file.size_bytes},
+                  "accepted_surface_label_set": {"node_count": subset.get("node_count"),
+                                                 "sha256": subset.get("sha256"),
+                                                 "registration_hash": accepted.registration_hash}},
         provenance=(f"passport {path.name} (manifest {_short(manifest.manifest_hash)})",
                     f"orientation: {calibration.orientation.source}"),
         reference_geometry_file=reference.geometry_file)
@@ -248,9 +249,12 @@ def evidence_from_document(document: Mapping[str, Any]) -> PhysicalEvidence:
     _require(isinstance(dofs, list) and dofs and all(d in ("U1", "U2", "U3") for d in dofs), "measured_dofs",
              "the measured DOFs (for example [\"U3\"]) are required.")
     frame = document.get("fe_frame") or {}
-    _require(isinstance(frame.get("fe_geometry_identity"), Mapping) or isinstance(frame.get("instance_boxes"), Mapping),
-             "fe_frame", "the FE frame the orientation refers to is required: the exact FE geometry identity or the "
-                         "reference instance bounding boxes.")
+    surface = frame.get("measured_surface_identity")
+    _require(isinstance(frame.get("fe_geometry_identity"), Mapping)
+             or (isinstance(surface, Mapping) and isinstance(surface.get("sha256"), str)
+                 and isinstance(surface.get("node_count"), int)),
+             "fe_frame", "the FE frame the orientation refers to is required: the exact FE geometry identity, or the "
+                         "measured-surface identity (node labels and coordinates) of the reference FE model.")
     modal_set = document.get("modal_set")
     _require(isinstance(modal_set, str) and modal_set.strip() != "", "modal_set", "the modal set key is required.")
     name = str(source.get("name") or "experimental file")
@@ -283,7 +287,9 @@ def evidence_template(abaqus, experimental, experimental_identity: Mapping[str, 
         "modal_set": experimental.metadata.get("modal_set_key"), "measured_dofs": ["U3"],
         "point_count": len(modes[0].node_ids) if modes else None,
         "fe_frame": {"fe_geometry_identity": dict(modal_dataset_geometry_identity(abaqus)),
-                     "note": "the orientation below is stated in THIS FE model's axes"},
+                     "note": "the orientation below is stated in THIS FE model's axes; for another mesh give instead "
+                             "measured_surface_identity {sha256, node_count} of the measured surface (labels and "
+                             "coordinates) of the FE model the orientation was stated in"},
         "geometry_calibration": {
             "mode": "scan_to_panel_edges or corner_coordinates_mm",
             "coordinate_calibration": {"mode": "camera_grid or metric", "abaqus_unit": "mm", "experimental_unit": "m",
@@ -369,7 +375,6 @@ def establish_guided_registration(abaqus, experimental, experimental_identity: M
     checks.append(f"modal set {key!r}, {points} measurement points")
 
     fe = fe_geometry_of(abaqus)
-    loaded_boxes = _instance_boxes(fe.node_ids, fe.coordinates)
     frame = evidence.fe_frame
     identity = frame.get("fe_geometry_identity")
     same_identity = isinstance(identity, Mapping) and identity.get("sha256") == fe.identity["sha256"] \
@@ -377,16 +382,22 @@ def establish_guided_registration(abaqus, experimental, experimental_identity: M
     if same_identity:
         checks.append(f"FE geometry {_short(fe.identity['sha256'])} is the FE model the evidence refers to")
     else:
-        reference = frame.get("instance_boxes")
-        source = "the evidence's reference instance boxes"
+        surface = calibration.measured_surface
+        loaded = measured_surface_identity(fe.node_ids, fe.coordinates, surface.fe_instance, surface.side, unit)
+        reference, source = frame.get("measured_surface_identity"), "the evidence's reference measured surface"
         if reference is None:
-            reference, source = _reference_boxes(evidence, roots, reference_geometry_path)
-        problems = compare_fe_frames(loaded_boxes, {k: tuple(v) for k, v in reference.items()}, unit)
-        _require(not problems, "fe_frame",
-                 "the loaded FE model is not in the frame the orientation is stated in: " + "; ".join(problems))
-        checks.append(f"FE frame: every instance bounding box equals {source} within "
-                      f"{SURFACE_TOLERANCE_MM:g} mm (FE geometry {_short(fe.identity['sha256'])}, "
-                      f"{fe.identity['node_count']} nodes, differs from the reference node identity)")
+            reference, source = _reference_surface(evidence, roots, reference_geometry_path)
+        _require((loaded["sha256"], loaded["node_count"]) == (reference.get("sha256"), reference.get("node_count")),
+                 "fe_frame",
+                 f"{FE_FRAME_NOT_VERIFIED}: the measured surface {surface.fe_instance} {surface.side} of the loaded "
+                 f"model ({loaded['node_count']} nodes, {_short(loaded['sha256'])}) is not node for node and "
+                 f"coordinate for coordinate {source} ({reference.get('node_count')} nodes, "
+                 f"{_short(reference.get('sha256'))}); the orientation evidence is not transferred (bounding boxes "
+                 "alone are not evidence of the frame).")
+        checks.append(f"FE frame: the measured surface {surface.fe_instance} {surface.side} ({loaded['node_count']} "
+                      f"nodes, labels and coordinates {_short(loaded['sha256'])}) is identical to {source}; the "
+                      f"loaded FE geometry {_short(fe.identity['sha256'])} ({fe.identity['node_count']} nodes) differs "
+                      "elsewhere (another node identity: a new registration, the old mapping not reused)")
     try:
         registration, surface_ids = register_from_physical_calibration(
             calibration, fe, experimental, evidence.measured_dofs, evidence.registration_source_identity)
@@ -415,9 +426,11 @@ def establish_guided_registration(abaqus, experimental, experimental_identity: M
                               tuple(checks), warnings, metrics)
 
 
-def _reference_boxes(evidence: PhysicalEvidence, roots, reference_geometry_path) -> tuple[dict, str]:
+def _reference_surface(evidence: PhysicalEvidence, roots, reference_geometry_path) -> tuple[dict, str]:
+    """The measured surface of the pinned reference FE geometry, tied to the accepted registration's label set."""
     pinned = evidence.reference_geometry_file
-    _require(pinned is not None, "fe_frame", "the evidence names no reference FE geometry for its orientation.")
+    _require(pinned is not None, "fe_frame", f"{FE_FRAME_NOT_VERIFIED}: the evidence names no reference FE geometry "
+                                             "for its orientation.")
     if reference_geometry_path is not None:
         from services.archived_sensitivity_evidence import fresh_content_identity
 
@@ -434,7 +447,19 @@ def _reference_boxes(evidence: PhysicalEvidence, roots, reference_geometry_path)
                 "fe_frame.geometry_file",
                 f"the reference FE geometry {pinned.file_name} ({_short(pinned.sha256)}) is not available: {error} "
                 "Locate a copy of it (for example the geometry.csv of an extraction of the accepted ODB).") from error
-    return geometry_file_boxes(path), f"the reference FE geometry {pinned.file_name} ({_short(pinned.sha256)})"
+    surface = evidence.geometry_calibration.measured_surface
+    unit = evidence.geometry_calibration.calibration.abaqus_unit
+    reference = geometry_file_surface_identity(path, surface.fe_instance, surface.side, unit)
+    governed = evidence.fe_frame.get("accepted_surface_label_set") or {}
+    _require((reference["label_set_sha256"], reference["node_count"]) == (governed.get("sha256"),
+                                                                          governed.get("node_count")),
+             "fe_frame", f"{FE_FRAME_NOT_VERIFIED}: the reference measured surface ({reference['node_count']} nodes, "
+                         f"labels {_short(reference['label_set_sha256'])}) is not the accepted registration's "
+                         f"fe_mapping_node_subset ({governed.get('node_count')} nodes, "
+                         f"{_short(governed.get('sha256'))}).")
+    return reference, (f"the measured surface of the reference FE geometry {pinned.file_name} "
+                       f"({_short(pinned.sha256)}; labels = accepted registration subset "
+                       f"{_short(governed.get('sha256'))})")
 
 
 # ----------------------------------------------------------------------------- save / reopen
@@ -552,7 +577,8 @@ def evidence_rows(evidence: Optional[PhysicalEvidence]) -> list[tuple[str, str, 
     frame_text = (f"stated for FE geometry {_short(identity.get('sha256'))} ({identity.get('node_count')} nodes)"
                   + (f"; reference geometry file {reference.get('file_name')} ({_short(reference.get('sha256'))})"
                      if reference else "")
-                  + ("; reference instance boxes given" if frame.get("instance_boxes") else ""))
+                  + ("; reference measured-surface identity given" if frame.get("measured_surface_identity")
+                     else ""))
     uncertainty = calibration.uncertainty
     return [
         ("evidence", f"{evidence.label} [{evidence.kind}]", "PROVIDED"),

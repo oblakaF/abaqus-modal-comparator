@@ -213,6 +213,7 @@ class GuidedRegistrationDialog:
         if self.evidence is None or self.identity is None:
             return
         self.build_button.configure(state="disabled")
+        self._discard_result()  # never a stale or partial registration while (or after) building
         self._set_status("Checking the evidence and building the registration...")
         evidence, identity, reference = self.evidence, self.identity, self.reference_path
 
@@ -220,9 +221,10 @@ class GuidedRegistrationDialog:
             try:
                 result = guided.establish_guided_registration(self.loaded.abaqus, self.loaded.experimental, identity,
                                                               evidence, reference_geometry_path=reference)
-                self._calls.put(lambda: self._built(result, None))
-            except guided.GuidedRegistrationRefusal as error:
+            except Exception as error:  # noqa: BLE001  (a refusal or an unexpected error: shown, never swallowed)
                 self._calls.put(lambda error=error: self._built(None, error))
+                return
+            self._calls.put(lambda: self._built(result, None))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -231,13 +233,25 @@ class GuidedRegistrationDialog:
             return
         self.build_button.configure(state="normal")
         if error is not None:
-            self.result = None
-            self._fill(self.checks, [("refused", f"{error.field}: {error}")])
-            self._set_status(f"REFUSED ({error.field}): {error} The analysis stays a frequency-only diagnostic.")
-            self.apply_button.configure(state="disabled")
-            self.save_button.configure(state="disabled")
+            self._show_failure(error, "REFUSED", "The analysis stays a frequency-only diagnostic.")
             return
         self._show_result(result, "ESTABLISHED: the registration is ready; Apply runs the gated comparison.")
+
+    def _discard_result(self) -> None:
+        self.result = None
+        self.apply_button.configure(state="disabled")
+        self.save_button.configure(state="disabled")
+
+    def _show_failure(self, error: Exception, label: str, consequence: str) -> None:
+        """A refusal names its field; any other error is reported as FAILED with its type. Nothing is registered."""
+        self._discard_result()
+        if isinstance(error, guided.GuidedRegistrationRefusal):
+            text = f"{label} ({error.field}): {error}"
+        else:
+            text = (f"FAILED (unexpected {type(error).__name__}): {error} No registration was made; correct the "
+                    "cause and retry.")
+        self._fill(self.checks, [("refused" if label == "REFUSED" else label.lower(), text)])
+        self._set_status(f"{text} {consequence}")
 
     def _show_result(self, result, message: str) -> None:
         self.result = result
@@ -263,7 +277,11 @@ class GuidedRegistrationDialog:
                                                       defaultextension=".json", filetypes=[("Registration", "*.json")])
         if not chosen:
             return None
-        saved = guided.save_guided_registration(self.result, Path(chosen))
+        try:
+            saved = guided.save_guided_registration(self.result, Path(chosen))
+        except OSError as error:
+            self._set_status(f"NOT SAVED: {error}")
+            return None
         self._set_status(f"Saved to {saved}. It is re-verified against the files whenever it is opened or used.")
         return saved
 
@@ -278,11 +296,8 @@ class GuidedRegistrationDialog:
         try:
             result = guided.load_guided_registration(Path(chosen))
             guided.verify_for_files(result, self.loaded.abaqus, self.loaded.experimental, self.identity)
-        except guided.GuidedRegistrationRefusal as error:
-            self.result = None
-            self._fill(self.checks, [("refused", f"{error.field}: {error}")])
-            self._set_status(f"SAVED REGISTRATION REFUSED ({error.field}): {error}")
-            self.apply_button.configure(state="disabled")
+        except Exception as error:  # noqa: BLE001  (a refusal or an unreadable file: shown, never applied)
+            self._show_failure(error, "SAVED REGISTRATION REFUSED", "")
             return
         self._show_result(result, f"OPENED {Path(chosen).name}: verified against the loaded files.")
 

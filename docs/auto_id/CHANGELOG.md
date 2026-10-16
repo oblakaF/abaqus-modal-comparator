@@ -5170,3 +5170,18 @@ first internal provider.
 - **Scientific behaviour changed:** NO for every governed path. A guided registration is diagnostic: not governed
   evidence, no Auto-ID observation, never production-ready.
 - **Abaqus run count:** 0 solves, 0 extractions.
+
+## 2026-10-16 — CORE-E2E-C rework: FE-frame evidence and dialog recovery (REVIEW_READY)
+
+- **R1 FE frame:** bounding boxes are no longer accepted as evidence of a shared FE frame. A new mesh must have the
+  measured surface (selected as the M2 builder selects it) identical in node labels and coordinates to the reference
+  FE geometry's, whose label set must be the accepted registration's `fe_mapping_node_subset`; otherwise
+  `FE_FRAME_NOT_VERIFIED`. The exact FE-identity path is unchanged; no new numeric threshold. Evidence records state
+  `measured_surface_identity` instead of instance boxes.
+  - SP-13: the new SP13_modal.odb and the reference `SP13_fe_geometry.csv` have the same CFRP_PLATE_TOP max_z surface
+    (29 754 nodes, `3087cba5…`; labels `bdfec8bf…` = the accepted registration subset).
+  - New negative tests: mirrored, 180-degree rotated and relabelled meshes with the same bounding boxes are refused.
+- **R2 dialog recovery:** any unexpected error of the background build (not only a refusal) re-enables *Check and
+  build*, leaves no registration, disables Apply and Save and states `FAILED (unexpected <type>)`; the build can be
+  retried. Open and Save report their errors the same way. Test reproduces the error in the background thread.
+- **Abaqus run count:** 0. SPEC, DECISIONS, EVIDENCE and governed records unchanged.
