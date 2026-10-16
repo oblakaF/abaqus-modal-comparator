@@ -18,6 +18,9 @@ ABOUT_TEXT = (
 
 
 def _guarded(self, ready_message: str, action) -> None:
+    if self.result is None and getattr(self, "_diagnostic_export_source", None) is not None:
+        action()  # CORE-E2E-D: the diagnostic report of a frequency-only / FE-only analysis
+        return
     if self.result is None or self.cache is None:
         messagebox.showinfo("Not ready yet", ready_message)
         return
