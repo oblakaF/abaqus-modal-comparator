@@ -89,6 +89,20 @@ DIAGNOSTIC_SHAPE_MESSAGE = (
 )
 
 
+CONFIDENT_PAIR_STATUSES = ("Excellent match", "Good match")
+
+
+def mean_mac_card_text(pairs) -> str:
+    """The MEAN MAC card states what it averages: the Excellent / Good pairs, and all admissible pairs."""
+    macs = [float(pair.mac) for pair in pairs if pair.mac is not None]
+    if not macs:
+        return EM_DASH
+    confident = [float(pair.mac) for pair in pairs if pair.mac is not None and pair.status in CONFIDENT_PAIR_STATUSES]
+    first = (f"{sum(confident) / len(confident):.3f} Excellent/Good ({len(confident)})" if confident
+             else f"{EM_DASH} Excellent/Good (0)")
+    return "\n".join((first, f"{sum(macs) / len(macs):.3f} all admissible ({len(macs)})"))
+
+
 def orientation_candidate_rows(candidates) -> list[dict[str, object]]:
     """Return display-only geometry evidence in geometry-candidate order."""
     rows = []
@@ -668,9 +682,12 @@ def install_responsive_workflow(app_module) -> None:
         before = pair_widgets[0][0] if pair_widgets else None
         selector.pack(fill="x", pady=(0, 6), **({"before": before} if before is not None else {}))
         self._shape_pair_widgets = pair_widgets
+        from guided_registration_ui import open_guided_registration_dialog
+
         self.mode_viewer = ModeViewerPanel(self.shape_tab, post=self._post_to_ui, lock=_MATPLOTLIB_LOCK,
                                            confirm_orientation=lambda error: self._show_orientation_ambiguity_dialog(
-                                               error))
+                                               error),
+                                           establish_registration=lambda: open_guided_registration_dialog(self))
 
     def show_shape_view(self, view: str) -> None:
         self.shape_view.set(view)
@@ -1293,6 +1310,9 @@ def install_responsive_workflow(app_module) -> None:
         if result.metadata.get("geometry_verified_registration"):
             message += (" Physical registration: reused by FE geometry identity (accepted mapping; this ODB's own "
                         "frequencies and shapes; not assumed to be the accepted baseline ODB).")
+        if result.metadata.get("guided_physical_registration"):
+            message += (" Physical registration: guided, from independent physical evidence (diagnostic; not governed; "
+                        "not production-ready).")
         self._show_loaded_modal_data(getattr(result, "loaded_modal_data", None), ESTABLISHED_VIEWER_MESSAGE)
         if not result.pairs and hasattr(self, "mode_viewer"):
             self._show_shape_view(SHAPE_VIEW_INDIVIDUAL)  # no gated pair to show: each file's own modes instead
@@ -1527,7 +1547,7 @@ def install_responsive_workflow(app_module) -> None:
         pair_text = f"{len(pairs)} manual" if automatic_diagnostic and pairs else str(len(pairs))
         self.metric_pairs.configure(text=pair_text)
         self.metric_error.configure(text=EM_DASH if not errors else f"{sum(errors) / len(errors):.2f}%")
-        self.metric_mac.configure(text=EM_DASH if not macs else f"{sum(macs) / len(macs):.3f}")
+        self.metric_mac.configure(text=mean_mac_card_text(pairs))
         if automatic_diagnostic:
             self.metric_geometry_caption.configure(text="STATE")
             detail = "manual review only" if pairs else "gates not satisfied"
@@ -1587,7 +1607,9 @@ def install_responsive_workflow(app_module) -> None:
         frame.columnconfigure(tuple(range(4)), weight=1)
         self._metrics_frame = frame
         self._tooltips.extend((
-            Tooltip(self.metric_mac, "MAC is the modal assurance criterion for an admissible paired mode."),
+            Tooltip(self.metric_mac, "MAC is the modal assurance criterion of an admissible paired mode. The first "
+                                     "line averages the Excellent / Good match pairs only, the second every admissible "
+                                     "pair (Review and Poor match included); no pair status is changed."),
             Tooltip(self.metric_geometry, "Geometry match is the fraction of experimental points mapped within the existing scientific tolerance."),
         ))
 

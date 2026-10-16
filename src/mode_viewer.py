@@ -208,9 +208,11 @@ class ModeViewerPanel:
     """The separate FE / experimental views; ``post`` runs a callback on the Tk thread."""
 
     def __init__(self, parent, *, post: Callable[[Callable[[], None]], bool], lock,
-                 confirm_orientation: Callable[[object], None], threaded: bool = True) -> None:
+                 confirm_orientation: Callable[[object], None], threaded: bool = True,
+                 establish_registration: Optional[Callable[[], None]] = None) -> None:
         self.post, self.lock, self.threaded = post, lock, threaded
         self.confirm_orientation = confirm_orientation
+        self.establish_registration = establish_registration
         self.loaded: Optional[viewer.LoadedModalData] = None
         self.ambiguity = None
         self.frame = ttk.Frame(parent)
@@ -222,6 +224,10 @@ class ModeViewerPanel:
         self.confirm_button = ttk.Button(actions, text="Confirm physical orientation (independent evidence)...",
                                          command=self._confirm, state="disabled")
         self.confirm_button.pack(side="left")
+        # CORE-E2E-C: a physical registration from independent evidence (enabled when both files are loaded)
+        self.register_button = ttk.Button(actions, text="Establish physical registration...",
+                                          command=self._establish, state="disabled")
+        self.register_button.pack(side="left", padx=(8, 0))
         self.save_button = ttk.Button(actions, text="Save diagnostic output...", command=self.save,
                                       state="disabled")
         self.save_button.pack(side="left", padx=8)
@@ -247,6 +253,8 @@ class ModeViewerPanel:
         self.loaded, self.ambiguity = loaded, ambiguity
         self._set_banner(message, loaded.registration)
         self.confirm_button.configure(state="normal" if ambiguity is not None else "disabled")
+        both = loaded.abaqus is not None and loaded.experimental is not None and self.establish_registration is not None
+        self.register_button.configure(state="normal" if both else "disabled")
         self.save_button.configure(state="normal")
         self.fe.set_dataset(loaded.abaqus, "No FE modes were extracted.")
         if loaded.experimental is None:
@@ -266,6 +274,7 @@ class ModeViewerPanel:
         self.loaded, self.ambiguity = None, None
         self._set_banner(message, "EMPTY")
         self.confirm_button.configure(state="disabled")
+        self.register_button.configure(state="disabled")
         self.save_button.configure(state="disabled")
         self.fe.clear(message)
         self.experimental.clear(message)
@@ -273,6 +282,10 @@ class ModeViewerPanel:
     def _set_banner(self, text: str, state: str) -> None:
         foreground, background = STATE_COLOURS.get(state, STATE_COLOURS["EMPTY"])
         self.banner.configure(text=text, fg=foreground, bg=background)
+
+    def _establish(self) -> None:
+        if self.loaded is not None and self.establish_registration is not None:
+            self.establish_registration()
 
     def _confirm(self) -> None:
         if self.ambiguity is not None:

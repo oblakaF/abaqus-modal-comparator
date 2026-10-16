@@ -478,6 +478,11 @@ def _geometry_calibration(value: object) -> tuple[GeometryCalibration, dict[str,
     return result, canonical
 
 
+def parse_geometry_calibration(value: object) -> tuple[GeometryCalibration, dict[str, Any]]:
+    """The passport's geometry-calibration rules for a stand-alone record (guided physical registration)."""
+    return _geometry_calibration(value)
+
+
 def _fe_reference(value: object) -> tuple[FEReference, dict[str, Any]]:
     field = "fe_reference"
     data = _mapping(value, field, {"model_name", "geometry_identity", "geometry_file"})

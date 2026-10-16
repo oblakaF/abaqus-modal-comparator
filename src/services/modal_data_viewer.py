@@ -310,6 +310,8 @@ class LoadedModalData:
     registration: str = NOT_ESTABLISHED
     reason: str = ""
     frequency_diagnostic: Any = None
+    abaqus_path: Optional[Path] = None  # the files this run read (a guided registration is bound to them)
+    experimental_path: Optional[Path] = None
 
     def inventory(self) -> dict:
         return modal_inventory(self.abaqus, self.experimental, registration=self.registration, reason=self.reason,

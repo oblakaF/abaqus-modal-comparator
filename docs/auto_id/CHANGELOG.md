@@ -5149,3 +5149,49 @@ first internal provider.
 - **Files changed:** `src/runtime_hardening.py`, `src/services/new_odb_comparison.py`, `src/ui_workflow.py`,
   `src/application_layers.py`, the P7 files, tests, `docs/gui/CORE_E2E_VALIDATION.md`, `docs/auto_id/STATUS.json`,
   `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+
+## 2026-10-16 — CORE-E2E-C guided physical registration of a new FE mesh (REVIEW_READY)
+
+- **Branch:** `feature/guided-physical-registration` from `main` `716ce32`. Pushed for review; no merge.
+- **GUI:** 3. Mode shapes > *Establish physical registration...* (`src/guided_registration_ui.py`): the files of the last
+  analysis, the physical evidence (accepted scan calibration of this exact experimental file, or a
+  `auto-id/guided-physical-evidence/v1` record; a template with explicit empty fields), PROVIDED / MISSING fields,
+  checks, the registration, Apply (gated comparison), Save / Open (hash-sealed, re-verified against the files) and
+  Clear. A guided registration of other files refuses the run (`GuidedRegistrationRefused`); nothing is substituted.
+- **Service:** `src/services/guided_registration.py`. The registration is built by the accepted M2.3 core, now
+  `physical_registration.register_from_physical_calibration` (extracted from `build_physical_registration` without
+  behaviour change: the accepted SP-02 / SP-13 registrations are rebuilt with their hashes). `parse_geometry_calibration`
+  exposes the passport rules for an evidence record.
+- **MEAN MAC card:** states its composition: Excellent / Good pairs and all admissible pairs (SP-02 0.948 (3) /
+  0.775 (6)). No pair status, gate or MAC computation changes.
+- **Validation:** the guided path reproduces the accepted SP-13 registration hash on the accepted mesh; the new
+  SP13_modal.odb (same frame, refined core) is registered (`e9c8dc5d…`) and gives the five SP-13 pairs; SP-02 / SP-13
+  regression identical; SP-04 stays FREQUENCY_ONLY_DIAGNOSTIC with every physical field MISSING.
+- **Scientific behaviour changed:** NO for every governed path. A guided registration is diagnostic: not governed
+  evidence, no Auto-ID observation, never production-ready.
+- **Abaqus run count:** 0 solves, 0 extractions.
+
+## 2026-10-16 — CORE-E2E-C rework: FE-frame evidence and dialog recovery (REVIEW_READY)
+
+- **R1 FE frame:** bounding boxes are no longer accepted as evidence of a shared FE frame. A new mesh must have the
+  measured surface (selected as the M2 builder selects it) identical in node labels and coordinates to the reference
+  FE geometry's, whose label set must be the accepted registration's `fe_mapping_node_subset`; otherwise
+  `FE_FRAME_NOT_VERIFIED`. The exact FE-identity path is unchanged; no new numeric threshold. Evidence records state
+  `measured_surface_identity` instead of instance boxes.
+  - SP-13: the new SP13_modal.odb and the reference `SP13_fe_geometry.csv` have the same CFRP_PLATE_TOP max_z surface
+    (29 754 nodes, `3087cba5…`; labels `bdfec8bf…` = the accepted registration subset).
+  - New negative tests: mirrored, 180-degree rotated and relabelled meshes with the same bounding boxes are refused.
+- **R2 dialog recovery:** any unexpected error of the background build (not only a refusal) re-enables *Check and
+  build*, leaves no registration, disables Apply and Save and states `FAILED (unexpected <type>)`; the build can be
+  retried. Open and Save report their errors the same way. Test reproduces the error in the background thread.
+- **Abaqus run count:** 0. SPEC, DECISIONS, EVIDENCE and governed records unchanged.
+
+## 2026-10-17 — CORE-E2E-C R3: no stale registration in the dialog (REVIEW_READY)
+
+- **R3:** a registration shown in *Establish physical registration...* always belongs to the inputs shown. Choosing
+  the accepted scan calibration, loading an evidence file (also an unreadable one), locating a reference FE geometry,
+  opening a saved registration and Clear discard the shown result (Apply / Save disabled; a new Check and build is
+  required). A cancelled file dialog changes nothing. A generation counter tags every build; a background result
+  whose generation is no longer current is ignored. The registration already applied to the analysis changes only by
+  Apply or Clear (and the file verification before every analysis).
+- **Tests:** `StaleResultTests` (9). R1 / R2 unchanged. **Abaqus run count:** 0.
