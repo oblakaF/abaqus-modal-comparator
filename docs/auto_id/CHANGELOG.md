@@ -5129,3 +5129,23 @@ first internal provider.
   the calibration gate.
 - **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
 - **Scientific behaviour changed:** NO (documentation only). **Abaqus run count:** 0.
+
+## 2026-10-16 — CORE-E2E validation of the ODB + UNV comparator (REVIEW_READY)
+
+- **Branch:** `validation/core-modal-e2e` from `main` `eaaf60a` (PR #83 merged). Pushed for review; no merge.
+- **P7 (PR #82):** the five P7 commits (incl. the PR #81 port) cherry-picked without the Quick Calibration commits that
+  PR #82 is stacked on; the P7 tests no longer import `services.quick_calibration`.
+- **Fixes (each with a reproducing test):**
+  - a completed Abaqus extraction is reused across analysis folders of one workspace; a confirmed orientation, another
+    modal set or the registration option no longer re-runs Abaqus (`tests/test_extraction_cache_reuse.py`);
+  - the FE-geometry reuse warning no longer says that archived sensitivities "do not apply" (it never hashes the ODB);
+  - FREQUENCY_ONLY rows outside the extracted FE mode range are marked.
+- **Real GUI scenarios:** T1 SP-02 (fresh extraction byte-identical to the archived one; strict pairs, FE Hz and MAC
+  reproduced), T1b SP-02 automatic, T2 SP-13, T3 new SP13 ODB (FREQUENCY_ONLY_DIAGNOSTIC), T4 SP-04 dataset 58: all
+  checks PASS. Evidence: `docs/gui/CORE_E2E_VALIDATION.md`.
+- **Abaqus run count:** 1 Abaqus Python extraction, 0 solves. The two diagnostic E_in +2 % solves are planned
+  (manifest `104583b845dab985db949f0fec109254f51a9b158a447f81cc6ec1e9e992ae52`) and not executed.
+- **Scientific behaviour changed:** NO (no threshold, gate, SPEC, DECISIONS or EVIDENCE change).
+- **Files changed:** `src/runtime_hardening.py`, `src/services/new_odb_comparison.py`, `src/ui_workflow.py`,
+  `src/application_layers.py`, the P7 files, tests, `docs/gui/CORE_E2E_VALIDATION.md`, `docs/auto_id/STATUS.json`,
+  `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.

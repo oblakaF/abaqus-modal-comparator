@@ -1842,6 +1842,23 @@
     "tests": "Windows without data stores at bf52d74: 2261 ran, OK, 92 skipped; P12 tests 14 OK; mutation check 4 / 4 caught; visual check in the real window (acceptance/P12, 0 process starts)",
     "main_ci": "not run (local integration, no push)"
   },
+  "core_e2e_validation": {
+    "title": "CORE-E2E validation of the ODB + UNV comparator (real GUI, real Abaqus extraction)",
+    "status": "REVIEW_READY",
+    "authorisation": "SUPERVISOR CORE-E2E task (2026-10-16): end-to-end validation; at most 2 diagnostic solves and 4 Abaqus Python extractions; branch push only, no merge",
+    "branch": "validation/core-modal-e2e",
+    "base": "eaaf60a1128f4e09e499153d13379bbf22e87025",
+    "pr82_p7_commits": "cherry-picked without the Quick Calibration base (aa76de3): 137574e (PR #81 port), be88a08, 35533d8, ccc1b21, 7c697d8; test helpers made independent of services.quick_calibration",
+    "fixes": [
+      "extraction reused across analysis folders of one workspace (orientation, modal set, registration option no longer re-run Abaqus)",
+      "FE-geometry reuse wording no longer denies archived sensitivities it does not check",
+      "frequency-only rows outside the extracted FE mode range are marked"
+    ],
+    "gui_scenarios": "T1 SP-02 accepted registration (fresh extraction byte-identical to the archived one; strict pairs and MAC reproduced), T1b SP-02 automatic (registration reused by FE geometry), T2 SP-13 accepted registration (pre-seeded archived extraction), T3 new SP13 ODB (FREQUENCY_ONLY_DIAGNOSTIC, no MAC), T4 SP-04 dataset 58 (provisional FRF peaks, no MAC): all checks PASS",
+    "abaqus": "Abaqus 2024; 1 Abaqus Python extraction (T1); 0 solves. Stage B (E_in +2 %, SP-02 and SP-13) planned, manifest 104583b845dab985db949f0fec109254f51a9b158a447f81cc6ec1e9e992ae52, not executed (awaiting authorisation)",
+    "evidence": "docs/gui/CORE_E2E_VALIDATION.md; machine-local run root D:/git/abaqus-modal-comparator-work/runs/core_e2e/run_20261016",
+    "unchanged": "SPEC, DECISIONS, EVIDENCE, registrations, thresholds, gates; M8 IN_PROGRESS, original M8 GATE NOT_MET; production calibration BLOCKED / NOT_AUTHORISED (D-079, D-080)"
+  },
   "stage_status": {
     "M8": "IN_PROGRESS",
     "M8_accepted_scope": "READ_ONLY_EXISTING_JOURNALLED_RUNS",
