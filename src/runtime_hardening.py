@@ -18,6 +18,7 @@ from services.archived_sensitivity_evidence import (
     SensitivityCheckCancelled,
     bind_accepted_reference,
     comparison_input_record,
+    fresh_content_identity,
 )
 from services.modal_data_viewer import (
     AMBIGUOUS,
@@ -26,6 +27,7 @@ from services.modal_data_viewer import (
     LoadedModalData,
     attach_loaded_data,
 )
+from services.guided_registration import GuidedRegistrationRefusal, verify_for_files
 from services.new_odb_comparison import (
     GeometryReuseRefusal,
     bind_registration_by_fe_geometry,
@@ -39,6 +41,10 @@ _INSTALLED = False
 
 class GovernedRegistrationRefused(ValueError):
     """G2d-1: the accepted physical registration was requested but cannot be applied to these files."""
+
+
+class GuidedRegistrationRefused(ValueError):
+    """CORE-E2E-C: the active guided physical registration does not belong to these files."""
 _MATPLOTLIB_LOCK = threading.RLock()
 
 
@@ -194,11 +200,14 @@ def install_runtime_hardening(app_module) -> None:
             )
             # G2d-1: read once; the option never changes during a run
             governed_requested = bool(getattr(self, "_governed_registration_requested", False))
+            # CORE-E2E-C: a guided physical registration set by the user (read once; never with the governed option)
+            guided = None if governed_requested else getattr(self, "_guided_registration", None)
             signature = (
                 f"{abaqus.resolve()}|{abaqus.stat().st_size}|{abaqus.stat().st_mtime_ns}|"
                 f"{experiment.resolve()}|{experiment.stat().st_size}|{experiment.stat().st_mtime_ns}|"
                 f"{start}|{end}|{calibration}|{modal_set or ''}|{orientation_candidate_id}"
                 + ("|governed-physical-registration" if governed_requested else "")
+                + (f"|guided-registration-{guided.registration.registration_hash}" if guided is not None else "")
             )
             key = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:16]
             cache = workspace / f"analysis_{key}"
@@ -244,6 +253,8 @@ def install_runtime_hardening(app_module) -> None:
                     "shapes remain available in 3. Mode shapes > Individual modes."
                 ) from error
             loaded.experimental = experiment_data
+            loaded.experimental_path = resolved_experiment
+            loaded.abaqus_path = abaqus
             governed = None
             if governed_requested:
                 # G2d-1: verify the exact files, modal set and frozen registration, then apply its mapping and
@@ -262,6 +273,21 @@ def install_runtime_hardening(app_module) -> None:
                         "other registration; clear the option to use automatic geometry registration."
                     ) from error
                 comparison_kwargs = {"frozen_registration": governed.registration}
+            elif guided is not None:
+                # CORE-E2E-C: the exact files must be the ones the guided registration was established for
+                stage(3, "Guided physical registration")
+                try:
+                    identity = fresh_content_identity(Path(resolved_experiment),
+                                                      cancel=getattr(self, "_analysis_cancel_event", None))
+                    verify_for_files(guided, abaqus_data, experiment_data, identity)
+                except SensitivityCheckCancelled as error:
+                    raise AnalysisCancelled("Analysis stopped by user.") from error
+                except (GuidedRegistrationRefusal, AcceptedReferenceRefusal) as error:
+                    raise GuidedRegistrationRefused(
+                        f"Guided physical registration refused: {error} The comparison was not run with any other "
+                        "registration; clear it in 3. Mode shapes > Establish physical registration... to use "
+                        "automatic geometry registration.") from error
+                comparison_kwargs = {"frozen_registration": guided.registration}
             else:
                 stage(3, "Geometry alignment")
                 comparison_kwargs = (
@@ -281,7 +307,7 @@ def install_runtime_hardening(app_module) -> None:
                 count = len(getattr(ambiguity, "ambiguous_candidates", ()) or ())
                 loaded.registration = AMBIGUOUS
                 loaded.reason = f"{count} physically distinct orientations are equally plausible from geometry alone"
-                if governed is not None or orientation_selection is not None:
+                if governed is not None or guided is not None or orientation_selection is not None:
                     raise
                 # The automatic registration cannot choose an orientation. Reuse an accepted physical registration
                 # only when the FE geometry, PolyMAX source, modal set and registration are verified; otherwise keep
@@ -328,6 +354,9 @@ def install_runtime_hardening(app_module) -> None:
                     result.warnings.insert(0, range_notice)
             # G2c: the files this comparison actually read (archived sensitivity evidence is bound to them)
             result.metadata["comparison_inputs"] = comparison_input_record(abaqus, resolved_experiment, modal_set)
+            if guided is not None:
+                result.metadata["guided_physical_registration"] = guided.provenance()
+                result.warnings.insert(0, guided.warning())
             if governed is not None:
                 registration = governed.registration
                 result.metadata["governed_registration"] = {

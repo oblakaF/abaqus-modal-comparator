@@ -5149,3 +5149,24 @@ first internal provider.
 - **Files changed:** `src/runtime_hardening.py`, `src/services/new_odb_comparison.py`, `src/ui_workflow.py`,
   `src/application_layers.py`, the P7 files, tests, `docs/gui/CORE_E2E_VALIDATION.md`, `docs/auto_id/STATUS.json`,
   `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+
+## 2026-10-16 — CORE-E2E-C guided physical registration of a new FE mesh (REVIEW_READY)
+
+- **Branch:** `feature/guided-physical-registration` from `main` `716ce32`. Pushed for review; no merge.
+- **GUI:** 3. Mode shapes > *Establish physical registration...* (`src/guided_registration_ui.py`): the files of the last
+  analysis, the physical evidence (accepted scan calibration of this exact experimental file, or a
+  `auto-id/guided-physical-evidence/v1` record; a template with explicit empty fields), PROVIDED / MISSING fields,
+  checks, the registration, Apply (gated comparison), Save / Open (hash-sealed, re-verified against the files) and
+  Clear. A guided registration of other files refuses the run (`GuidedRegistrationRefused`); nothing is substituted.
+- **Service:** `src/services/guided_registration.py`. The registration is built by the accepted M2.3 core, now
+  `physical_registration.register_from_physical_calibration` (extracted from `build_physical_registration` without
+  behaviour change: the accepted SP-02 / SP-13 registrations are rebuilt with their hashes). `parse_geometry_calibration`
+  exposes the passport rules for an evidence record.
+- **MEAN MAC card:** states its composition: Excellent / Good pairs and all admissible pairs (SP-02 0.948 (3) /
+  0.775 (6)). No pair status, gate or MAC computation changes.
+- **Validation:** the guided path reproduces the accepted SP-13 registration hash on the accepted mesh; the new
+  SP13_modal.odb (same frame, refined core) is registered (`e9c8dc5d…`) and gives the five SP-13 pairs; SP-02 / SP-13
+  regression identical; SP-04 stays FREQUENCY_ONLY_DIAGNOSTIC with every physical field MISSING.
+- **Scientific behaviour changed:** NO for every governed path. A guided registration is diagnostic: not governed
+  evidence, no Auto-ID observation, never production-ready.
+- **Abaqus run count:** 0 solves, 0 extractions.

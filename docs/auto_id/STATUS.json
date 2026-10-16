@@ -1859,6 +1859,19 @@
     "evidence": "docs/gui/CORE_E2E_VALIDATION.md; machine-local run root D:/git/abaqus-modal-comparator-work/runs/core_e2e/run_20261016",
     "unchanged": "SPEC, DECISIONS, EVIDENCE, registrations, thresholds, gates; M8 IN_PROGRESS, original M8 GATE NOT_MET; production calibration BLOCKED / NOT_AUTHORISED (D-079, D-080)"
   },
+  "core_e2e_c_guided_registration": {
+    "title": "Guided physical registration of a new FE mesh in the GUI (CORE-E2E-C)",
+    "status": "REVIEW_READY",
+    "authorisation": "SUPERVISOR CORE-E2E-C task (2026-10-16): branch feature/guided-physical-registration from 716ce32; push of the branch only, no merge; no Abaqus solve",
+    "branch": "feature/guided-physical-registration",
+    "base": "716ce324e1f9d7047044a58ba950dcd2c8fc3916",
+    "scope": "3. Mode shapes > Establish physical registration...: physical evidence (the accepted scan calibration of this exact experimental file, or a guided-physical-evidence/v1 record), explicit fields with MISSING items, checks, a registration for the loaded FE geometry built by the accepted M2.3 core (physical_registration.register_from_physical_calibration, extracted from build_physical_registration without behaviour change), save / reopen with re-verification, apply to the gated comparison; MEAN MAC card states its composition",
+    "checks": "physical calibration mode and orientation reference; no mirroring; experimental content, modal set, points and measured-DOF contract; FE frame (same FE identity, or every instance bounding box equal to the reference FE geometry within the passport surface tolerance); mapping matched fraction >= 0.90 and normalised RMS <= 0.03 (existing comparator limits), one FE node per point",
+    "validation": "accepted SP-13 mesh: guided path reproduces the accepted registration hash 2eeeaa86; new SP13_modal.odb (1558721 nodes): FE frame equal, registration e9c8dc5d, the five SP-13 pairs with MAC within 1e-5 of the accepted model; SP-02 / SP-13 governed regression identical; SP-04: evidence missing, FREQUENCY_ONLY_DIAGNOSTIC kept",
+    "scientific_scope": "diagnostic engineering registration of the exact files: not governed evidence, no Auto-ID observation, never production-ready; SPEC v1.2 §11 passport / fixture route unchanged",
+    "abaqus": "0 solves, 0 extractions (existing extraction caches reused)",
+    "unchanged": "SPEC, DECISIONS, EVIDENCE, registrations, pairing rules, thresholds, D-079 / D-080, Auto-ID optimiser, nine-constant research branch; M8 IN_PROGRESS, original M8 GATE NOT_MET"
+  },
   "stage_status": {
     "M8": "IN_PROGRESS",
     "M8_accepted_scope": "READ_ONLY_EXISTING_JOURNALLED_RUNS",

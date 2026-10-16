@@ -212,9 +212,9 @@ def _measured_contract(dataset: ModalDataset, measured_dofs: tuple[str, ...]) ->
     return reference.tolist()
 
 
-def _scale_vector(manifest: SpecimenManifest, experimental_coordinates: np.ndarray) -> tuple[np.ndarray, dict]:
-    calibration = manifest.geometry_calibration.calibration
-    rotation = manifest.geometry_calibration.orientation.rotation
+def _scale_vector(geometry_calibration, experimental_coordinates: np.ndarray) -> tuple[np.ndarray, dict]:
+    calibration = geometry_calibration.calibration
+    rotation = geometry_calibration.orientation.rotation
     swapped = [int(np.argmax(np.abs(rotation[:, axis]))) for axis in (0, 1)] == [1, 0]
     options = [(np.asarray(s, float), d) for s, d in scale_candidates(calibration, experimental_coordinates)]
     # Only a camera-grid calibration offers a swapped and an unswapped scale; the documented
@@ -256,8 +256,9 @@ def _map_to_surface(fe: FEGeometry, surface_indices: np.ndarray, rotation: np.nd
     return mapped, distances, physical
 
 
-def _corner_translation(manifest, fe, surface_indices, rotation, scales, dataset) -> tuple[np.ndarray, dict]:
-    corner = manifest.geometry_calibration.corner_a
+def _corner_translation(geometry_calibration, fe, surface_indices, rotation, scales,
+                        dataset) -> tuple[np.ndarray, dict]:
+    corner = geometry_calibration.corner_a
     reference = dataset.sorted_modes()[0]
     lookup = {int(value): index for index, value in enumerate(_plain_ids(reference.node_ids))}
     for node in (corner.unv_node, corner.x_axis_towards_unv_node):
@@ -265,7 +266,7 @@ def _corner_translation(manifest, fe, surface_indices, rotation, scales, dataset
             raise PhysicalRegistrationRefusal("geometry_calibration.corner_A", f"UNV node {node} is not on the grid.")
     a = reference.coordinates[lookup[corner.unv_node]]
     b = reference.coordinates[lookup[corner.x_axis_towards_unv_node]]
-    unit = manifest.geometry_calibration.calibration.abaqus_unit
+    unit = geometry_calibration.calibration.abaqus_unit
     surface_z = float(fe.coordinates[surface_indices, 2].mean())
     fe_corner = np.array([millimetres_to_model_units(corner.fe_xy_mm[0], unit),
                           millimetres_to_model_units(corner.fe_xy_mm[1], unit), surface_z])
@@ -279,11 +280,11 @@ def _corner_translation(manifest, fe, surface_indices, rotation, scales, dataset
     return translation, {"corner_A_marker_angle_deg": angle}
 
 
-def _edge_translation(manifest, fe, surface_indices, rotation, scales, dataset) -> tuple[np.ndarray, dict]:
-    offsets = manifest.geometry_calibration.panel_edges
+def _edge_translation(geometry_calibration, fe, surface_indices, rotation, scales, dataset) -> tuple[np.ndarray, dict]:
+    offsets = geometry_calibration.panel_edges
     experimental = dataset.sorted_modes()[0].coordinates
     in_fe = (experimental / scales) @ rotation.T
-    unit = manifest.geometry_calibration.calibration.abaqus_unit
+    unit = geometry_calibration.calibration.abaqus_unit
     surface = fe.coordinates[surface_indices]
     target = np.array([surface[:, 0].min() + millimetres_to_model_units(offsets.x_mm, unit),
                        surface[:, 1].min() + millimetres_to_model_units(offsets.y_mm, unit),
@@ -331,7 +332,34 @@ def build_physical_registration(
         raise PhysicalRegistrationRefusal("fe_reference.geometry_identity",
                                           "the passport's FE geometry differs from the fixture's FE identity.")
 
+    source_identity, basis = _source_identity(manifest, fixture, repo_root)
+    registration, surface_ids = register_from_physical_calibration(
+        manifest.geometry_calibration, fe, dataset, fixture.modal_set.measured_dofs, source_identity)
     calibration = manifest.geometry_calibration
+    return PhysicalRegistrationResult(
+        registration=registration,
+        calibration_mode=calibration.mode,
+        registration_basis_status=calibration.registration_basis_status,
+        uncertainty_availability=calibration.uncertainty_availability,
+        missing_physical_evidence=calibration.missing_physical_evidence,
+        missing_uncertainty=calibration.missing_uncertainty,
+        orientation_reference=calibration.orientation.reference,
+        physical_specimen_id=None if manifest.physical_specimen_id is None else str(manifest.physical_specimen_id),
+        manifest_hash=manifest.manifest_hash,
+        source_identity_basis=basis,
+        surface_node_ids=tuple(surface_ids),
+    )
+
+
+def register_from_physical_calibration(calibration, fe: FEGeometry, dataset: ModalDataset,
+                                       measured_dofs: tuple[str, ...],
+                                       source_identity: Mapping[str, Any]) -> tuple[FrozenRegistration, list]:
+    """Freeze the registration one geometry calibration defines for one FE geometry and one modal set.
+
+    The M2.3 core shared by the passport builder and the guided registration of a new FE geometry
+    (``services.guided_registration``): orientation, scale and translation come only from the calibration; the
+    measured-surface nodes of this FE geometry receive the experimental points. No modal quantity is read.
+    """
     reference = dataset.sorted_modes()[0]
     experimental_coordinates = np.asarray(reference.coordinates, dtype=float)
     surface = calibration.measured_surface
@@ -370,9 +398,9 @@ def build_physical_registration(
         }
         candidate_id = summary["candidate_id"]
     else:
-        scales, details = _scale_vector(manifest, experimental_coordinates)
+        scales, details = _scale_vector(calibration, experimental_coordinates)
         locate = _corner_translation if calibration.mode == CORNER_COORDINATES else _edge_translation
-        translation, extra = locate(manifest, fe, surface_indices, rotation, scales, dataset)
+        translation, extra = locate(calibration, fe, surface_indices, rotation, scales, dataset)
         mapped, distances, physical = _map_to_surface(fe, surface_indices, rotation, scales, translation,
                                                       experimental_coordinates)
         span = max(float(np.linalg.norm(np.ptp(experimental_coordinates, axis=0))), 1.0e-30)
@@ -414,7 +442,6 @@ def build_physical_registration(
         "unique_mapped_abaqus_nodes": int(len(np.unique(mapped))),
         "experimental_point_count": int(len(mapped)),
     })
-    source_identity, basis = _source_identity(manifest, fixture, repo_root)
     registration = FrozenRegistration.create(
         experimental_source_identity=source_identity,
         experimental_modal_set_identity=dataset.metadata.get("modal_set_key"),
@@ -427,19 +454,7 @@ def build_physical_registration(
         coordinate_scales=np.asarray(scales, float),
         experimental_node_ids=_plain_ids(reference.node_ids),
         mapped_fe_node_ids=[str(value) for value in fe.node_ids[np.asarray(mapped, dtype=int)]],
-        measured_dof_contract=_measured_contract(dataset, fixture.modal_set.measured_dofs),
+        measured_dof_contract=_measured_contract(dataset, measured_dofs),
         registration_metrics=metrics,
     )
-    return PhysicalRegistrationResult(
-        registration=registration,
-        calibration_mode=calibration.mode,
-        registration_basis_status=calibration.registration_basis_status,
-        uncertainty_availability=calibration.uncertainty_availability,
-        missing_physical_evidence=calibration.missing_physical_evidence,
-        missing_uncertainty=calibration.missing_uncertainty,
-        orientation_reference=calibration.orientation.reference,
-        physical_specimen_id=None if manifest.physical_specimen_id is None else str(manifest.physical_specimen_id),
-        manifest_hash=manifest.manifest_hash,
-        source_identity_basis=basis,
-        surface_node_ids=tuple(surface_ids),
-    )
+    return registration, surface_ids
