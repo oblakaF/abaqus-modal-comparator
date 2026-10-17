@@ -50,7 +50,12 @@ HELP_TOPICS: List[HelpTopic] = [
         "Mode shapes tab. The metric labels above the table (matched pairs, mean "
         "frequency error, mean MAC, geometry match) summarize the whole comparison. "
         "'Export Excel report' and 'Export PDF report' generate the full reports from "
-        "this result.",
+        "this result. When the analysis ends as a diagnostic (FREQUENCY_ONLY_DIAGNOSTIC, or "
+        "an experimental file without usable data) the same buttons read 'Export diagnostic "
+        "Excel' / 'Export diagnostic PDF' and save a diagnostic report: sources and "
+        "identities, why no physical registration was established, the FE and experimental "
+        "frequencies with their classification, frequency proximity (never mode pairs) and "
+        "what is needed for MAC. It contains no MAC, no mode pair and no material property.",
     ),
     (
         "3. Mode shapes",

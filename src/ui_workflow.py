@@ -12,6 +12,7 @@ import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 from typing import Mapping, Optional
 
+import diagnostic_report_ui
 from coordinate_calibration import (
     CALIBRATED_PHYSICAL,
     CAMERA_GRID,
@@ -433,6 +434,8 @@ def install_responsive_workflow(app_module) -> None:
     original_init = application_class.__init__
     original_complete = application_class._complete
     original_failed = application_class._failed
+    original_pdf = application_class._pdf
+    original_excel = application_class._excel
     original_populate = application_class._populate
     original_apply_project = application_class._apply_project_payload
     original_new_project = application_class._new_project
@@ -1263,6 +1266,7 @@ def install_responsive_workflow(app_module) -> None:
         self.result = None
         self.cache = None
         self._clear_result_presentation("Analysis is running; previous results are no longer active.")
+        diagnostic_report_ui.disable_report_export(self)  # no report of the previous analysis is offered
         self.running = True
         self.progress.start(12)
         self._set_analysis_state(AnalysisState.RUNNING, "1/6 Abaqus extraction...")
@@ -1286,6 +1290,7 @@ def install_responsive_workflow(app_module) -> None:
             button = getattr(self, button_name, None)
             if button is not None:
                 button.configure(state="disabled")
+        diagnostic_report_ui.disable_report_export(self)
         self._set_analysis_state(AnalysisState.STOPPED)
         if self._close_after_cancel:
             self._close_after_cancel = False
@@ -1298,6 +1303,7 @@ def install_responsive_workflow(app_module) -> None:
         automatic_pair_count = len(result.pairs)
         self._automatic_admissible_pair_count = automatic_pair_count
         original_complete(self, result)
+        diagnostic_report_ui.restore_comparison_export(self)  # the comparison report, unchanged
         if not result.pairs:
             self._set_mode_shape_placeholder(DIAGNOSTIC_SHAPE_MESSAGE)
         range_notice = result.metadata.get("extraction_range_notice")
@@ -1337,6 +1343,7 @@ def install_responsive_workflow(app_module) -> None:
             self.metric_geometry.configure(text="FE data only")
             reason = loaded.experimental_error or str(error)
             self._show_loaded_modal_data(loaded, EXPERIMENT_UNAVAILABLE_MESSAGE.format(reason=reason), select=True)
+            diagnostic_report_ui.enable_diagnostic_export(self, loaded)
             self._set_analysis_state(
                 AnalysisState.DIAGNOSTIC,
                 "DIAGNOSTIC: experimental file not usable; FE frequencies and modes shown in 3. Mode shapes.",
@@ -1514,6 +1521,8 @@ def install_responsive_workflow(app_module) -> None:
         count = len(getattr(error, "ambiguous_candidates", ()) or ())
         self._show_loaded_modal_data(getattr(error, "loaded_modal_data", None),
                                      AMBIGUOUS_VIEWER_MESSAGE.format(count=count), ambiguity=error, select=True)
+        if diagnostic is not None:  # a FREQUENCY_ONLY_DIAGNOSTIC is a result: its report can be exported
+            diagnostic_report_ui.enable_diagnostic_export(self, getattr(error, "loaded_modal_data", None))
 
     def show_frequency_only_diagnostic(self, diagnostic) -> None:
         """FREQUENCY_ONLY_DIAGNOSTIC: frequencies and nearest-frequency rows, visibly not pairs (no MAC, no shapes)."""
@@ -2360,6 +2369,21 @@ def install_responsive_workflow(app_module) -> None:
     application_class._complete = complete
     application_class._failed = failed
     application_class._orientation_ambiguous = orientation_ambiguous
+
+    def export_pdf(self) -> None:
+        if self.result is not None:
+            original_pdf(self)  # an established comparison: the comparison report, unchanged
+        else:
+            diagnostic_report_ui.export_report(self, "pdf")
+
+    def export_excel(self) -> None:
+        if self.result is not None:
+            original_excel(self)
+        else:
+            diagnostic_report_ui.export_report(self, "xlsx")
+
+    application_class._pdf = export_pdf
+    application_class._excel = export_excel
     application_class._show_orientation_ambiguity_dialog = show_orientation_ambiguity_dialog
     application_class._show_frequency_only_diagnostic = show_frequency_only_diagnostic
     application_class._confirm_orientation_candidate = confirm_orientation_candidate
