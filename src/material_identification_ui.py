@@ -1691,6 +1691,25 @@ def bind_draft_specimen_records(app) -> None:
     _refresh_campaign_draft(app)
 
 
+def declare_draft_not_fitted(app, key, value) -> None:
+    """Declare one not_fitted entry explicitly (no default): a description for t_face / k_core, OFF for k_int.
+    The declaration enables no unsupported scientific configuration; ENABLED is refused."""
+
+    from services.campaign_draft import K_INT_NOTE
+
+    done = (f"Declared not_fitted.k_int {value}. {K_INT_NOTE}." if key == "k_int"
+            else f"Declared not_fitted.{key}: {value!r} (recorded as written; not a measurement, prior or provenance).")
+    _change_campaign_draft(app, lambda draft: draft.with_not_fitted(key, value), done)
+
+
+def _ask_draft_not_fitted(app, key) -> None:
+    value = simpledialog.askstring(f"Declare not_fitted.{key}",
+                                   f"Why is {key} not fitted? (your own description; no measurement, prior or "
+                                   "provenance is assumed):")
+    if value is not None:
+        declare_draft_not_fitted(app, key, value)
+
+
 def _ask_draft_campaign_id(app) -> None:
     value = simpledialog.askstring("Declare campaign_id", "campaign_id (letters, digits, '.', '_', '-', '+', '/'):")
     if value is not None:
@@ -2008,6 +2027,16 @@ def _build_auto_id_setup_page(app, page) -> None:
         (AUTO_ID_DRAFT_BIND_LABEL, lambda: bind_draft_specimen_records(app)),
     ):
         ttk.Button(identity_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
+    from services.campaign_draft import DESCRIBED_NOT_FITTED, K_INT_CHOICES
+
+    not_fitted_buttons = ttk.Frame(draft)  # M8-D2e-A: explicit not-fitted declarations (no default)
+    not_fitted_buttons.pack(anchor="w", pady=(0, 4))
+    for text, command in (
+        *((f"Declare not_fitted.{key}...", lambda k=key: _ask_draft_not_fitted(app, k))
+          for key in DESCRIBED_NOT_FITTED),
+        *((f"k_int: {choice}", lambda c=choice: declare_draft_not_fitted(app, "k_int", c)) for choice in K_INT_CHOICES),
+    ):
+        ttk.Button(not_fitted_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
     for text, command in (
         *((f"Question: {question}", lambda q=question: declare_draft_question(app, q)) for question in QUESTION_CHOICES),
         ("Declare τ_mf...", lambda: _ask_draft_tolerance(app)),
