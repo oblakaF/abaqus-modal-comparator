@@ -5214,3 +5214,26 @@ first internal provider.
   D-080); SPEC, DECISIONS, EVIDENCE, governed records.
 - **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`,
   `docs/gui/CORE_E2E_VALIDATION.md`, `docs/gui/GUIDED_PHYSICAL_REGISTRATION.md`. **Abaqus run count:** 0.
+
+## 2026-10-17 — M8-D2e-A + M8-D2e-B: campaign preparation on existing data (REVIEW_READY)
+
+- **Branch:** `feature/m8-existing-data-preparation` from `29ccfed` (PR #86 / #87 merged). PR #80 is not merged; its code and tests are
+  re-applied (commit `ebc273f`).
+- **M8-D2e-A:** explicit `not_fitted.t_face` / `k_core` descriptions and `k_int` OFF only (ENABLED refused); draft v4.
+- **M8-D2e-B:** "Bind Accepted FIT / HOLDOUT Observations" (`services/campaign_observations`) binds the accepted
+  strict-freeze rows of record-bound specimens exactly as recorded, only when the P11 record counts them; legacy,
+  peak-derived, unverified and limited inputs are refused; nothing is typed, re-paired or re-labelled. Drafts v5;
+  observations re-verified on reopening. "Review Draft Preparation": §8 counts (SP-02 met; SP-13 not met; SP-02 +
+  SP-13 pooled met for k = 1; k = 9 not met, no nine-constant parameterisation), numerical availability (rank,
+  leave-one-family-out, family consistency NOT_ASSESSED; Σ_meas NOT_AVAILABLE), D-077 NO_GLOBAL_PARAMETER_VALUE
+  unchanged, 14 missing inputs with reasons, parser finalisation; verdict INCOMPLETE. The Auto-ID Setup page scrolls.
+- **Existing Abaqus models** (copies of `external_models`): 5 Abaqus 2024 Python extractions, no solve. SP-02 V02 ODB
+  FE geometry `72e8597a…` = accepted identity, strict rows reproduced; SP2job tracked (FE-to-FE MAC ≥ 0.99999999);
+  500x500newproperty refused (BRANCH_LOSS R1, MAC 0.839); SP-03 / SP-05 frequency-only diagnostics with provisional
+  peaks; SP-04 existing cache = `.dat`. Diagnostic only; nothing governed.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen pairing, MAC, thresholds, gates, D-079 / D-080;
+  M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED.
+- **Files changed:** `src/services/campaign_draft.py`, `src/services/campaign_observations.py` (new),
+  `src/material_identification_ui.py`, `tests/test_m8_d2e_a_not_fitted.py` (from PR #80),
+  `tests/test_m8_existing_data_preparation.py` (new), five adapted draft tests, `docs/gui/M8_EXISTING_DATA_PREPARATION.md`
+  (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 5 extractions, 0 solves.

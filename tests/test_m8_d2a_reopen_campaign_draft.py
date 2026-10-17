@@ -93,7 +93,7 @@ class RefusalTests(_Reopen):
     def test_only_the_draft_schema_is_opened(self):
         run_a = json.loads((CAMPAIGNS / "M7_RUN_A.campaign.json").read_text(encoding="utf-8"))
         self.refused(run_a, "only auto-id/campaign-draft/v1")
-        for change, text in ((lambda d: d.update(schema="auto-id/campaign-draft/v4"), "only auto-id/campaign-draft/v1"),
+        for change, text in ((lambda d: d.update(schema="auto-id/campaign-draft/v6"), "only auto-id/campaign-draft/v1"),
                              (lambda d: d.update(extra=1), "unknown ['extra']"),
                              (lambda d: d.pop("declared"), "missing ['declared']"),
                              (lambda d: d.update(labels=["DRAFT_NOT_A_CAMPAIGN_DEFINITION"]), "labels"),
@@ -119,8 +119,10 @@ class RefusalTests(_Reopen):
                                ({"scientific_question": MATERIAL, "tau_mf": True}, "tau_mf"),
                                ({"scientific_question": MATERIAL}, "'declared' must state")):
             document = self.document()
-            # a v2 draft also declares campaign_id / run_type (null: not declared)
-            document["declared"] = dict(declared, campaign_id=None, run_type=None) if "tau_mf" in declared else declared
+            # a v2 draft also declares campaign_id / run_type, a v4 draft also not_fitted (null: not declared)
+            unset = {"campaign_id": None, "run_type": None,
+                     "not_fitted": {"t_face": None, "k_core": None, "k_int": None}}
+            document["declared"] = dict(declared, **unset) if "tau_mf" in declared else declared
             with self.subTest(declared=declared):
                 self.refused(document, text)
 
