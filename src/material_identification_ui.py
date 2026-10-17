@@ -1710,6 +1710,130 @@ def _ask_draft_not_fitted(app, key) -> None:
         declare_draft_not_fitted(app, key, value)
 
 
+# ----------------------------------------------------------------------------- M8-D2f campaign configuration
+
+AUTO_ID_CONFIGURATION_REFERENCE_LABEL = "Show archived M7 RUN_A settings (reference)"
+AUTO_ID_RUN_B_GATE_NONE_LABEL = "run_b_gate: none (RUN_A)"
+
+
+def declare_draft_configuration(app, group, texts, source) -> bool:
+    """Declare one configuration group from form text (validated by the campaign-definition rules and the repository
+    checks; no default). Returns whether the draft changed; a refusal leaves it unchanged."""
+
+    from services.campaign_configuration import declare_configuration
+    from services.campaign_draft import GROUP_TITLES
+
+    before = getattr(app, "auto_id_draft", None)
+    _change_campaign_draft(app, lambda draft: declare_configuration(draft, group, texts, AUTO_ID_REPO_ROOT, source),
+                           f"Declared {GROUP_TITLES[group]} ({source}).")
+    return getattr(app, "auto_id_draft", None) is not before
+
+
+def clear_draft_configuration(app, group) -> None:
+    _change_campaign_draft(app, lambda draft: draft.without_configuration(group), f"Cleared the {group} declaration.")
+
+
+def declare_draft_run_b_gate_none(app) -> None:
+    _change_campaign_draft(app, lambda draft: draft.with_run_b_gate_none(),
+                           "Declared run_b_gate none (RUN_A carries no RUN_B gate).")
+
+
+def show_configuration_reference(app) -> None:
+    """Fill the read-only reference table with the archived M7 RUN_A settings (nothing is copied)."""
+
+    from services.campaign_configuration import reference_rows
+
+    try:
+        rows = reference_rows(AUTO_ID_REPO_ROOT)
+    except Exception as error:  # never a GUI crash
+        rows = (("Reference", "unavailable", str(error), "NOT_AVAILABLE"),)
+    if hasattr(app, "material_auto_id_reference_table"):
+        _replace_table_rows(app.material_auto_id_reference_table, rows)
+
+
+def _open_configuration_form(app, group) -> None:
+    """A form for one group: empty fields (or the current declaration), an explicit copy of the reference settings
+    for settings groups, Apply (validated; the form stays open on a refusal) and Cancel."""
+
+    import tkinter as tk
+
+    from services.campaign_configuration import (COPYABLE_GROUPS, FORM_FIELDS, copy_reference_texts,
+                                                 reference_configuration, reference_source, texts_from_values)
+    from services.campaign_draft import CONFIGURATION_GROUPS, GROUP_TITLES
+
+    draft = getattr(app, "auto_id_draft", None)
+    if draft is None:
+        app.auto_id_draft_message = "No campaign draft: use Create Campaign Draft... first."
+        _refresh_campaign_draft(app)
+        return
+    configured = draft.configured()
+    current = (texts_from_values(group, {k: configured[k] for k in CONFIGURATION_GROUPS[group]})
+               if all(k in configured for k in CONFIGURATION_GROUPS[group]) else {})
+    window = tk.Toplevel(app.root)
+    window.title(f"Declare {GROUP_TITLES[group]}")
+    app.material_auto_id_configuration_form = window
+    state = {"copied": None, "reference": None}
+    widgets = {}
+    body = ttk.Frame(window, padding=12)
+    body.pack(fill="both", expand=True)
+    ttk.Label(body, text="Every field is entered explicitly (no default); values are validated by the "
+                         "campaign-definition rules when applied.", wraplength=720, justify="left").grid(
+        row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+    for index, (field, label, kind) in enumerate(FORM_FIELDS[group], start=1):
+        ttk.Label(body, text=label).grid(row=index, column=0, sticky="nw", padx=(0, 8), pady=2)
+        if kind == "multiline":
+            widget = tk.Text(body, width=80, height=4, wrap="word")
+            widget.insert("1.0", current.get(field, ""))
+        else:
+            widget = ttk.Entry(body, width=80)
+            widget.insert(0, current.get(field, ""))
+        widget.grid(row=index, column=1, sticky="we", pady=2)
+        widgets[field] = widget
+    status = ttk.Label(body, text="", wraplength=720, justify="left")
+    status.grid(row=len(widgets) + 1, column=0, columnspan=2, sticky="w", pady=(8, 4))
+
+    def texts():
+        return {field: (widget.get("1.0", "end-1c") if isinstance(widget, tk.Text) else widget.get())
+                for field, widget in widgets.items()}
+
+    def copy():
+        try:
+            state["reference"] = reference_configuration(AUTO_ID_REPO_ROOT)
+            copied = copy_reference_texts(group, state["reference"])
+        except Exception as error:
+            status.configure(text=f"Not copied: {error}")
+            return
+        for field, widget in widgets.items():
+            if isinstance(widget, tk.Text):
+                widget.delete("1.0", "end")
+                widget.insert("1.0", copied[field])
+            else:
+                widget.delete(0, "end")
+                widget.insert(0, copied[field])
+        state["copied"] = copied
+        status.configure(text=f"Copied from {state['reference']['path']} — not applied yet; review every value, "
+                              "then Apply (each value is validated).")
+
+    def apply():
+        entered = texts()
+        if state["copied"] is None:
+            source = "declared by the user"
+        else:
+            source = reference_source(state["reference"], edited=entered != state["copied"])
+        if declare_draft_configuration(app, group, entered, source):
+            window.destroy()
+        else:
+            status.configure(text=getattr(app, "auto_id_draft_message", "") or "Not applied.")
+
+    buttons = ttk.Frame(body)
+    buttons.grid(row=len(widgets) + 2, column=0, columnspan=2, sticky="w")
+    if group in COPYABLE_GROUPS:
+        ttk.Button(buttons, text="Copy from archived M7 RUN_A (reference)", command=copy).pack(side="left",
+                                                                                          padx=(0, 8))
+    ttk.Button(buttons, text="Apply", command=apply).pack(side="left", padx=(0, 8))
+    ttk.Button(buttons, text="Cancel", command=window.destroy).pack(side="left")
+
+
 AUTO_ID_DRAFT_OBSERVATIONS_LABEL = "Bind Accepted FIT / HOLDOUT Observations"
 
 
@@ -2114,6 +2238,30 @@ def _build_auto_id_setup_page(app, page) -> None:
         (AUTO_ID_DRAFT_SAVE_LABEL, lambda: save_campaign_draft(app)),
     ):
         ttk.Button(declare_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
+    from services.campaign_draft import CONFIGURATION_GROUPS, GROUP_TITLES, RUN_B_GATE
+
+    configuration = ttk.LabelFrame(draft, text="Campaign configuration (M8-D2f: explicit values, no default)",
+                                   padding=8)
+    configuration.pack(fill="x", pady=(0, 4))
+    configuration_buttons = ttk.Frame(configuration)
+    configuration_buttons.pack(anchor="w", pady=(0, 4))
+    for group in CONFIGURATION_GROUPS:
+        ttk.Button(configuration_buttons, text=f"Declare {GROUP_TITLES[group]}...",
+                   command=lambda g=group: _open_configuration_form(app, g)).pack(side="left", padx=(0, 8))
+    configuration_more = ttk.Frame(configuration)
+    configuration_more.pack(anchor="w", pady=(0, 4))
+    for text, command in (
+        (AUTO_ID_RUN_B_GATE_NONE_LABEL, lambda: declare_draft_run_b_gate_none(app)),
+        *((f"Clear {GROUP_TITLES[group]}", lambda g=group: clear_draft_configuration(app, g))
+          for group in CONFIGURATION_GROUPS),
+        ("Clear run_b_gate", lambda: clear_draft_configuration(app, RUN_B_GATE)),
+        (AUTO_ID_CONFIGURATION_REFERENCE_LABEL, lambda: show_configuration_reference(app)),
+    ):
+        ttk.Button(configuration_more, text=text, command=command).pack(side="left", padx=(0, 6))
+    app.material_auto_id_reference_table = _build_read_only_table(
+        configuration, ("section", "item", "value", "status"), ("Section", "Item", "Value", "Status"),
+        (110, 330, 700, 150), height=6,
+    )
     app.material_auto_id_draft_label = ttk.Label(draft, text=AUTO_ID_NO_DRAFT, justify="left", wraplength=1100)
     app.material_auto_id_draft_label.pack(anchor="nw", fill="x", pady=(0, 4))
     app.material_auto_id_draft_finalisation_label = ttk.Label(draft, text="", style="MetricValue.TLabel",

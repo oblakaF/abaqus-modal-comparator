@@ -204,7 +204,7 @@ class PersistenceTests(_Observations):
         draft = self.observed(SP02, SP13).with_campaign_id("M8/existing-data").with_not_fitted("k_int", "OFF")
         path = write_draft(draft, self.out / "draft.json", (ROOT,))
         document = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual((document["schema"], DRAFT_SCHEMA), ("auto-id/campaign-draft/v5", "auto-id/campaign-draft/v5"))
+        self.assertEqual((document["schema"], DRAFT_SCHEMA), ("auto-id/campaign-draft/v6", "auto-id/campaign-draft/v6"))
         self.assertEqual(document["specimen_observations"][0], draft.specimen_observations(SP02).to_dict())
         reopened = load_draft(path, ROOT, self.fixtures)
         self.assertEqual(reopened, draft)
@@ -262,6 +262,7 @@ class PersistenceTests(_Observations):
         document = draft.document()
         document["schema"] = DRAFT_SCHEMA_V4
         document.pop("specimen_observations")
+        document["declared"].pop("configuration"), document["declared"].pop("configuration_sources")  # v1 - v5
         reopened = draft_from_document(document, ROOT, self.fixtures)
         self.assertEqual((reopened, reopened.observations), (draft, ()))
         carrying = dict(document, specimen_observations=[None, None])
@@ -342,8 +343,8 @@ class ReviewTests(_Observations):
                                                   "engineering_plausibility", "fitted_parameters",
                                                   "fixed_parameters", "lm", "parameterisation", "practical_target",
                                                   "provenance", "run_b_gate", "sigma", "start"]))
-        self.assertIn("never invented", missing["bounds"])
-        self.assertIn("parser rule", missing["fitted_parameters"])
+        self.assertIn("no default", missing["bounds"])  # M8-D2f: declared only explicitly
+        self.assertIn("Material parameters", missing["fitted_parameters"])
         intended = draft.intended_definition()
         for field in missing:
             self.assertNotIn(field, intended)

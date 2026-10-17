@@ -46,7 +46,14 @@ counts them; they become the intended definition's ``rows``.  Nothing is paired,
 specimen is unchanged.  Drafts are saved as ``auto-id/campaign-draft/v5``; v1 - v4 drafts open with no observations,
 and stored observations are re-verified on reopening (an added, removed or edited row is refused).
 
-Reopening (``load_draft``, M8-D2a) accepts only a campaign-draft document (v1 to v5).  It rebuilds the draft
+M8-D2f adds the campaign configuration: the remaining required fields, declared explicitly in groups (material
+parameters, uncertainty and acceptance, LM, budget and archive reuse, decision and provenance; `services.campaign_configuration`)
+and validated by the parser's own field validators (`domain.campaign_definition.declared_*`); no value has a default.
+run_b_gate is declared only as none for RUN_A and is never set for RUN_B.  Drafts are saved as `auto-id/campaign-draft/v6`;
+v1 - v5 drafts open with no configuration.  A complete draft is accepted by `parse_campaign_definition`; that is neither
+identifiability nor an execution authorisation.
+
+Reopening (`load_draft`, M8-D2a) accepts only a campaign-draft document (v1 to v6).  It rebuilds the draft
 from its explicit declarations through the domain validators and from its specimen selections through the governed
 binder (location, manifest, passport, fixture catalogue), re-verifies every stored bound record (the same unique
 compatible record with the same fingerprint), re-validates the not-fitted declarations, and refuses any stored
@@ -81,12 +88,22 @@ from domain.campaign_definition import (
     CAMPAIGN_SPECIMEN_KEYS,
     CampaignDefinition,
     CampaignDefinitionError,
+    RUN_A,
     RUN_B,
     RUN_B_LABEL,
     RUN_TYPES,
+    declared_archive_reuse,
     declared_campaign_id,
+    declared_decision,
+    declared_lm,
+    declared_material_parameters,
+    declared_practical_target,
+    declared_provenance,
+    declared_run_b_gate,
     declared_run_type,
     declared_scientific_question,
+    declared_sigma,
+    declared_solve_budget,
     declared_tau_mf,
     parse_campaign_definition,
     require_specimen_count,
@@ -111,13 +128,16 @@ DRAFT_SCHEMA_V1 = "auto-id/campaign-draft/v1"  # M8-D1 / D2a: declares scientifi
 DRAFT_SCHEMA_V2 = "auto-id/campaign-draft/v2"  # M8-D2c: also campaign_id and run_type
 DRAFT_SCHEMA_V3 = "auto-id/campaign-draft/v3"  # M8-D2d: also the bound governed specimen records
 DRAFT_SCHEMA_V4 = "auto-id/campaign-draft/v4"  # M8-D2e-A: also the not-fitted declarations
-DRAFT_SCHEMA = "auto-id/campaign-draft/v5"  # M8 existing data: also the bound accepted FIT / HOLDOUT observations
-DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA_V2, DRAFT_SCHEMA_V3, DRAFT_SCHEMA_V4, DRAFT_SCHEMA)
+DRAFT_SCHEMA_V5 = "auto-id/campaign-draft/v5"  # M8 existing data: also the bound accepted FIT / HOLDOUT observations
+DRAFT_SCHEMA = "auto-id/campaign-draft/v6"  # M8-D2f: also the declared campaign configuration
+DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA_V2, DRAFT_SCHEMA_V3, DRAFT_SCHEMA_V4, DRAFT_SCHEMA_V5, DRAFT_SCHEMA)
 _DECLARED_KEYS = {DRAFT_SCHEMA_V1: ("scientific_question", "tau_mf"),
                   DRAFT_SCHEMA_V2: ("scientific_question", "tau_mf", "campaign_id", "run_type"),
                   DRAFT_SCHEMA_V3: ("scientific_question", "tau_mf", "campaign_id", "run_type"),
                   DRAFT_SCHEMA_V4: ("scientific_question", "tau_mf", "campaign_id", "run_type", "not_fitted"),
-                  DRAFT_SCHEMA: ("scientific_question", "tau_mf", "campaign_id", "run_type", "not_fitted")}
+                  DRAFT_SCHEMA_V5: ("scientific_question", "tau_mf", "campaign_id", "run_type", "not_fitted"),
+                  DRAFT_SCHEMA: ("scientific_question", "tau_mf", "campaign_id", "run_type", "not_fitted",
+                                 "configuration", "configuration_sources")}
 DRAFT_KIND = "CAMPAIGN_DRAFT"
 DRAFT_LABELS = ("DRAFT_NOT_A_CAMPAIGN_DEFINITION", "NOT_VALIDATED", "NOT_EXECUTABLE", "AUTHORISES_NOTHING")
 DRAFT_NOTE = ("Campaign draft (Auto-ID M8-D1): a working document, not a campaign definition. It is never loaded as "
@@ -147,21 +167,72 @@ NOT_FITTED_DESCRIPTION_NOTE = ("the user's own description of why the parameter 
                                "never a measurement, prior or provenance")
 ROWS_NOT_BOUND = ("not bound: Bind Accepted FIT / HOLDOUT Observations takes the accepted strict-freeze rows of a "
                   "record-bound specimen as recorded; the draft never pairs modes or assigns roles")
-_NUMERIC = ("a numerical value that no accepted record provides for a new campaign; never invented: it needs an "
-            "explicit, sourced declaration in the final definition")
-# Why a required top-level field stays missing (the draft writes none of them; reasons only, never values).
-MISSING_REASONS = {
-    "parameterisation": "the governed forward models' parameterisation; written only in the final definition",
-    "fitted_parameters": "follows the run type by the parser rule (RUN_A: E_in_plane_mpa; RUN_B: E_in_plane_mpa and "
-                         "G12_mpa); written only in the final definition",
-    "fixed_parameters": _NUMERIC, "start": _NUMERIC, "bounds": _NUMERIC, "engineering_plausibility": _NUMERIC,
-    "practical_target": _NUMERIC, "lm": _NUMERIC, "abaqus_solve_budget": _NUMERIC,
-    "sigma": ("Σ_setup sd_ln and its source are not recorded for a new campaign (Σ_meas would be NOT_AVAILABLE, "
-              "D-069); never invented"),
-    "archive_reuse": "a governed archive-reuse plan (repository path); none is chosen by the draft",
-    "decision": "the SUPERVISOR decision authorising the definition; never invented",
-    "provenance": "the definition's provenance list; never invented",
+# M8-D2f: the remaining required fields, declared explicitly in groups and validated by the parser's own field
+# validators (domain.campaign_definition.declared_*). No value has a default; run_b_gate is declared only as "none" for
+# RUN_A and is never set for RUN_B (its SUPERVISOR gate).
+CONFIGURATION_GROUPS = {
+    "material": ("parameterisation", "fitted_parameters", "fixed_parameters", "start", "bounds",
+                 "engineering_plausibility"),
+    "uncertainty": ("sigma", "practical_target"),
+    "algorithm": ("lm",),
+    "budget": ("abaqus_solve_budget", "archive_reuse"),
+    "provenance": ("decision", "provenance"),
 }
+GROUP_TITLES = {"material": "Material parameters", "uncertainty": "Uncertainty and acceptance",
+                "algorithm": "Numerical algorithm (LM)", "budget": "Budget and archive reuse",
+                "provenance": "Decision and provenance"}
+RUN_B_GATE = "run_b_gate"
+CONFIGURATION_KEYS = tuple(key for keys in CONFIGURATION_GROUPS.values() for key in keys) + (RUN_B_GATE,)
+GROUP_OF = {key: group for group, keys in CONFIGURATION_GROUPS.items() for key in keys}
+RUN_B_GATE_NONE = "none (RUN_A carries no RUN_B gate)"
+# Why a required top-level field is still missing (reasons only, never values).
+MISSING_REASONS = {key: f"not declared: {GROUP_TITLES[group]} (explicit values, validated by the campaign-definition "
+                        "rules; no default)" for key, group in GROUP_OF.items()}
+MISSING_REASONS[RUN_B_GATE] = f"not declared: for RUN_A declare run_b_gate {RUN_B_GATE_NONE} explicitly"
+
+
+_GROUP_ORDER = (*CONFIGURATION_GROUPS, RUN_B_GATE)
+
+
+def _ordered(items, order) -> tuple:
+    """Configuration entries in canonical order (declaration order never changes the draft)."""
+    return tuple(sorted(items, key=lambda item: order.index(item[0])))
+
+
+def validate_configuration_group(group: str, values, run_type: Optional[str]) -> dict:
+    """The group's values in canonical form, validated exactly as ``parse_campaign_definition`` validates them."""
+
+    if group not in CONFIGURATION_GROUPS:
+        raise CampaignDraftError(f"unknown configuration group {group!r}.")
+    keys = CONFIGURATION_GROUPS[group]
+    if not isinstance(values, dict) or set(values) != set(keys):
+        raise CampaignDraftError(f"{GROUP_TITLES[group]}: state exactly {', '.join(keys)}.")
+    try:
+        if group == "material":
+            if run_type is None:
+                raise CampaignDraftError("Material parameters: declare the run type first (RUN_A and RUN_B fit "
+                                         "different parameters).")
+            fitted, fixed, start, bounds, plausibility = declared_material_parameters(
+                values["parameterisation"], run_type, values["fitted_parameters"], values["fixed_parameters"],
+                values["start"], values["bounds"], values["engineering_plausibility"])
+            return {"parameterisation": values["parameterisation"], "fitted_parameters": list(fitted),
+                    "fixed_parameters": fixed, "start": start, "bounds": {k: list(v) for k, v in bounds.items()},
+                    "engineering_plausibility": {k: list(v) for k, v in plausibility.items()}}
+        if group == "uncertainty":
+            preferred, acceptable, note = declared_practical_target(values["practical_target"])
+            return {"sigma": declared_sigma(values["sigma"]).to_dict(),
+                    "practical_target": {"preferred_max_abs_relative_error": preferred,
+                                         "acceptable_max_abs_relative_error": acceptable, "note": note}}
+        if group == "algorithm":
+            lm = declared_lm(values["lm"])
+            return {"lm": {key: getattr(lm, key) for key in sorted(values["lm"])}}
+        if group == "budget":
+            return {"abaqus_solve_budget": declared_solve_budget(values["abaqus_solve_budget"]),
+                    "archive_reuse": declared_archive_reuse(values["archive_reuse"])}
+        return {"decision": declared_decision(values["decision"]),
+                "provenance": list(declared_provenance(values["provenance"]))}
+    except CampaignDefinitionError as error:
+        raise CampaignDraftError(f"{GROUP_TITLES[group]}: {error}") from error
 
 
 class CampaignDraftError(ValueError):
@@ -254,6 +325,9 @@ class CampaignDraft:
     not_fitted_k_int: Optional[str] = None  # M8-D2e-A: K_INT_OFF only
     # M8 existing data: forward model -> its bound accepted observations (campaign_observations.SpecimenObservations)
     observations: tuple[tuple[str, object], ...] = ()
+    # M8-D2f: declared configuration (field -> canonical value) and, per group, how it was declared
+    configuration: tuple[tuple[str, object], ...] = ()
+    configuration_sources: tuple[tuple[str, str], ...] = ()
 
     # ------------------------------------------------------------------ explicit declarations
     def with_question(self, question) -> "CampaignDraft":
@@ -281,9 +355,58 @@ class CampaignDraft:
 
     def with_run_type(self, value) -> "CampaignDraft":
         try:
-            return replace(self, run_type=declared_run_type(value))
+            changed = replace(self, run_type=declared_run_type(value))
         except CampaignDefinitionError as error:
             raise CampaignDraftError(str(error)) from error
+        configuration = dict(self.configuration)
+        if changed.run_type != self.run_type:  # the declared configuration must still hold for the new run type
+            if "parameterisation" in configuration:
+                try:
+                    validate_configuration_group("material", {k: configuration[k] for k in
+                                                              CONFIGURATION_GROUPS["material"]}, changed.run_type)
+                except CampaignDraftError as error:
+                    raise CampaignDraftError(f"run type not changed: {error} Clear or re-declare the material "
+                                             "parameters first.") from error
+            if RUN_B_GATE in configuration and changed.run_type != RUN_A:
+                raise CampaignDraftError(f"run type not changed: run_b_gate is declared {RUN_B_GATE_NONE}; clear it "
+                                         "first (a RUN_B gate is never set by a draft).")
+        return changed
+
+    # ------------------------------------------------------------------ M8-D2f configuration
+    def configured(self) -> dict:
+        return dict(self.configuration)
+
+    def configuration_source(self, group: str) -> Optional[str]:
+        return dict(self.configuration_sources).get(group)
+
+    def with_configuration(self, group: str, values, source: str) -> "CampaignDraft":
+        """Declare one configuration group explicitly (all its fields at once, validated by the parser rules)."""
+        if not isinstance(source, str) or not source.strip():
+            raise CampaignDraftError("the source of a configuration declaration must be stated.")
+        canonical = validate_configuration_group(group, values, self.run_type)
+        kept = tuple((k, v) for k, v in self.configuration if k not in canonical)
+        sources = tuple((g, s) for g, s in self.configuration_sources if g != group)
+        return replace(self, configuration=_ordered(kept + tuple(canonical.items()), CONFIGURATION_KEYS),
+                       configuration_sources=_ordered(sources + ((group, source),), _GROUP_ORDER))
+
+    def without_configuration(self, group: str) -> "CampaignDraft":
+        keys = (RUN_B_GATE,) if group == RUN_B_GATE else CONFIGURATION_GROUPS.get(group)
+        if keys is None:
+            raise CampaignDraftError(f"unknown configuration group {group!r}.")
+        return replace(self, configuration=tuple((k, v) for k, v in self.configuration if k not in keys),
+                       configuration_sources=tuple((g, s) for g, s in self.configuration_sources if g != group))
+
+    def with_run_b_gate_none(self) -> "CampaignDraft":
+        """RUN_A only: declare explicitly that the definition carries no RUN_B gate (the parser's rule)."""
+        if self.run_type != RUN_A:
+            raise CampaignDraftError(f"run_b_gate: only a RUN_A draft can declare {RUN_B_GATE_NONE}; a RUN_B gate is "
+                                     "the SUPERVISOR's and is never set by a draft.")
+        declared_run_b_gate(None, self.run_type)
+        kept = tuple((k, v) for k, v in self.configuration if k != RUN_B_GATE)
+        sources = tuple((g, s) for g, s in self.configuration_sources if g != RUN_B_GATE)
+        return replace(self, configuration=_ordered(kept + ((RUN_B_GATE, None),), CONFIGURATION_KEYS),
+                       configuration_sources=_ordered(sources + ((RUN_B_GATE, "declared by the user (RUN_A rule)"),),
+                                                      _GROUP_ORDER))
 
     def with_not_fitted(self, key, value) -> "CampaignDraft":
         """Declare one not_fitted entry explicitly: a description for t_face / k_core, the OFF selection for k_int."""
@@ -376,6 +499,7 @@ class CampaignDraft:
                       for key, value in self.not_fitted().items() if value is not None}
         if not_fitted:
             intended["not_fitted"] = not_fitted
+        intended.update(self.configuration)  # M8-D2f: declared fields only
         return intended
 
     def gaps(self) -> tuple[DraftGap, ...]:
@@ -404,7 +528,7 @@ class CampaignDraft:
             for key in sorted(CAMPAIGN_SPECIMEN_KEYS - set(item)):
                 gaps.append(DraftGap(f"specimens[{index}].{key}", ROWS_NOT_BOUND if key == "rows" else NOT_CHOSEN))
         for key in sorted(CAMPAIGN_KEYS - set(intended) - {"not_fitted"}):
-            gaps.append(DraftGap(key, RUN_B_NOT_AUTHORISED if key == "run_b_gate" and self.run_type == RUN_B
+            gaps.append(DraftGap(key, RUN_B_NOT_AUTHORISED if key == RUN_B_GATE and self.run_type == RUN_B
                                  else MISSING_REASONS.get(key, NOT_CHOSEN)))
         for key, value in self.not_fitted().items():
             if value is None:
@@ -430,7 +554,12 @@ class CampaignDraft:
             "status": "INCOMPLETE" if gaps else "COMPLETE_NOT_FINALISED",
             "declared": {"scientific_question": self.scientific_question, "tau_mf": self.tau_mf,
                          "campaign_id": self.campaign_id, "run_type": self.run_type,
-                         "not_fitted": self.not_fitted()},
+                         "not_fitted": self.not_fitted(),
+                         "configuration": {key: ({"value": dict(self.configuration)[key]}
+                                                 if key in dict(self.configuration) else None)
+                                           for key in CONFIGURATION_KEYS},
+                         "configuration_sources": {group: self.configuration_source(group)
+                                                   for group in (*CONFIGURATION_GROUPS, RUN_B_GATE)}},
             "specimen_identities": [s.to_dict() for s in self.specimens],
             "specimen_records": [None if self.specimen_records(s.forward_model) is None
                                  else self.specimen_records(s.forward_model).to_dict() for s in self.specimens],
@@ -581,6 +710,16 @@ def draft_rows(draft: CampaignDraft) -> tuple[tuple[str, str, str, str], ...]:
                          "NOT_BOUND"))
         else:
             rows.extend(observation_rows(item.label, observations))
+    configured = draft.configured()
+    for group in (*CONFIGURATION_GROUPS, RUN_B_GATE):
+        keys = (RUN_B_GATE,) if group == RUN_B_GATE else CONFIGURATION_GROUPS[group]
+        title = "run_b_gate" if group == RUN_B_GATE else GROUP_TITLES[group]
+        if not any(key in configured for key in keys):
+            continue
+        rows.append(("Configuration", title, draft.configuration_source(group) or "", "DECLARED"))
+        for key in keys:
+            value = RUN_B_GATE_NONE if key == RUN_B_GATE else json.dumps(configured[key], ensure_ascii=False)
+            rows.append(("Configuration", f"  {key}", value, "PRESENT"))
     rows.extend(("Missing required inputs", gap.field, gap.reason, "MISSING") for gap in draft.gaps())
     return tuple(rows)
 
@@ -618,8 +757,8 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
     if not isinstance(document, dict) or document.get("schema") not in DRAFT_SCHEMAS:
         _refuse(f"not a campaign draft: only {' / '.join(DRAFT_SCHEMAS)} documents can be opened.")
     keys = _DECLARED_KEYS[document["schema"]]  # older drafts declare fewer fields (never inferred)
-    with_records = document["schema"] in (DRAFT_SCHEMA_V3, DRAFT_SCHEMA_V4, DRAFT_SCHEMA)
-    with_observations = document["schema"] == DRAFT_SCHEMA  # v1 - v4: no observations
+    with_records = document["schema"] in (DRAFT_SCHEMA_V3, DRAFT_SCHEMA_V4, DRAFT_SCHEMA_V5, DRAFT_SCHEMA)
+    with_observations = document["schema"] in (DRAFT_SCHEMA_V5, DRAFT_SCHEMA)  # v1 - v4: no observations
     expected_keys = (_DOCUMENT_KEYS_V5 if with_observations else _DOCUMENT_KEYS_V3 if with_records
                      else _DOCUMENT_KEYS)  # v1 / v2: no records
     if set(document) != expected_keys:
@@ -674,8 +813,43 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
         draft = _reverify_records(draft, document["specimen_records"], identities, repo_root, fixtures)
     if with_observations:
         draft = _reverify_observations(draft, document["specimen_observations"], identities, repo_root, fixtures)
+    if "configuration" in keys:  # v6
+        draft = _reverify_configuration(draft, declared["configuration"], declared["configuration_sources"], repo_root)
     if document["intended_campaign_definition"] != draft.intended_definition():
         _refuse("conflicting draft: the stored preview does not match its declarations and specimen identities.")
+    return draft
+
+
+def _reverify_configuration(draft: CampaignDraft, stored, sources, repo_root: Path) -> CampaignDraft:
+    """Every declared group is re-validated by the parser rules and its repository checks; nothing is completed."""
+
+    from .campaign_configuration import configuration_problems
+
+    groups = (*CONFIGURATION_GROUPS, RUN_B_GATE)
+    if not isinstance(stored, dict) or set(stored) != set(CONFIGURATION_KEYS) or not isinstance(sources, dict) \
+            or set(sources) != set(groups):
+        _refuse("malformed draft: 'declared.configuration' must state every configuration field (null when not "
+                "declared) and 'declared.configuration_sources' every group.")
+    for key, item in stored.items():
+        if item is not None and (not isinstance(item, dict) or set(item) != {"value"}):
+            _refuse(f"malformed draft: declared.configuration.{key} must be null or {{\"value\": ...}}.")
+    for group in CONFIGURATION_GROUPS:
+        present = [stored[key] is not None for key in CONFIGURATION_GROUPS[group]]
+        if any(present) != all(present) or (all(present) != (sources[group] is not None)):
+            _refuse(f"malformed draft: the {GROUP_TITLES[group]} group is incomplete or its source is missing.")
+        if all(present):
+            draft = draft.with_configuration(group, {key: stored[key]["value"] for key in CONFIGURATION_GROUPS[group]},
+                                             sources[group])
+    if stored[RUN_B_GATE] is not None:
+        if stored[RUN_B_GATE]["value"] is not None:
+            _refuse("malformed draft: a draft never carries a RUN_B gate value.")
+        draft = draft.with_run_b_gate_none()
+    elif sources[RUN_B_GATE] is not None:
+        _refuse("malformed draft: run_b_gate has a source but is not declared.")
+    problems = configuration_problems(draft, repo_root)
+    if problems:
+        _refuse("declared configuration refused against the current records: " + "; ".join(problems)
+                + " (never substituted).")
     return draft
 
 
