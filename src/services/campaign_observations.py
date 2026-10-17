@@ -28,11 +28,11 @@ from pathlib import Path, PurePosixPath
 from typing import Optional
 
 from domain.campaign_definition import (
+    CALIBRATION_NOT_IMPLEMENTED,
     MATERIAL_IDENTIFICATION,
     NOT_AVAILABLE,
     RUN_A,
     RUN_B,
-    SPECIMEN_ENGINEERING_CALIBRATION,
 )
 from domain.experiment_fixture import ExperimentFixtureManifest
 from domain.forward_model_manifest import PARAMETERISATIONS
@@ -267,10 +267,10 @@ def draft_preparation_review(draft, repo_root: Path, fixtures: ExperimentFixture
     k = K_BY_RUN_TYPE.get(draft.run_type)
     rows.append(("Question", "Scientific question", draft.scientific_question or "not declared",
                  "PRESENT" if draft.scientific_question else "NOT_DECLARED"))
-    if draft.scientific_question == SPECIMEN_ENGINEERING_CALIBRATION:
+    if draft.scientific_question not in (None, MATERIAL_IDENTIFICATION):  # the specimen-calibration question
         rows.append(("Question", "Consequence", "exactly one physical specimen; the calibration gate is the governed "
                      "SPEC v1.2 §6 gate; production calibration execution BLOCKED / NOT_AUTHORISED "
-                     "(SPECIMEN_ENGINEERING_CALIBRATION_NOT_IMPLEMENTED); never rerouted to material identification",
+                     f"({CALIBRATION_NOT_IMPLEMENTED}); never rerouted to material identification",
                      "BLOCKED"))
     elif draft.scientific_question == MATERIAL_IDENTIFICATION:
         rows.append(("Question", "Consequence", "at least two physical specimens sharing one material; a met count is "

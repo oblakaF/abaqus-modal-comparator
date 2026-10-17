@@ -1997,6 +1997,7 @@ def auto_id_setup_view(app) -> dict[str, object]:
 
 
 def _build_auto_id_setup_page(app, page) -> None:
+    page = _scrollable_page(page)  # the campaign-draft sections (input check, preparation review) exceed the window
     ttk.Label(page, text=AUTO_ID_SETUP_SCOPE, justify="left", wraplength=1100).pack(
         anchor="nw", fill="x", pady=(0, 8)
     )
@@ -2141,11 +2142,11 @@ def _build_auto_id_setup_page(app, page) -> None:
     ttk.Button(review, text=AUTO_ID_DRAFT_REVIEW_LABEL, command=lambda: review_campaign_draft_preparation(app)).pack(
         anchor="w", pady=(0, 4))
     app.material_auto_id_draft_review_label = ttk.Label(review, text=AUTO_ID_DRAFT_NOT_REVIEWED, justify="left",
-                                                        wraplength=1100, style="MetricValue.TLabel")
+                                                        wraplength=1100)
     app.material_auto_id_draft_review_label.pack(anchor="nw", fill="x", pady=(0, 4))
     app.material_auto_id_draft_review_table = _build_read_only_table(
         review, ("section", "item", "value", "status"), ("Section", "Item", "Value", "Status"),
-        (190, 230, 640, 170), height=14,
+        (180, 220, 590, 250), height=14,
     )
 
 
