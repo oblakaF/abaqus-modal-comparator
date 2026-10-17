@@ -5237,3 +5237,21 @@ first internal provider.
   `src/material_identification_ui.py`, `tests/test_m8_d2e_a_not_fitted.py` (from PR #80),
   `tests/test_m8_existing_data_preparation.py` (new), five adapted draft tests, `docs/gui/M8_EXISTING_DATA_PREPARATION.md`
   (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 5 extractions, 0 solves.
+
+## 2026-10-18 — M8-D2e-A / M8-D2e-B ACCEPTED; M8-D2f complete campaign configuration (REVIEW_READY)
+
+- **M8-D2e-A, M8-D2e-B:** ACCEPTED (PR #88, merge `699b770`, main CI success, run `39047865147`).
+- **M8-D2f** (branch `feature/m8-d2f-complete-configuration` from `699b770`): the 14 remaining required fields are declared
+  explicitly in five groups plus run_b_gate none for RUN_A; no default. `parse_campaign_definition` now validates
+  through public field validators (`declared_*`) that the draft uses too (one rule; M7 campaign hashes unchanged).
+  Repository checks: forward-model parameterisation; archive-reuse plan exists, loads, names only selected specimens.
+  The archived M7 RUN_A definition is a reference: settings copyable only by an explicit choice, validated and
+  recorded; never its decision, provenance or results. Drafts v6 (v1-v5 open with no configuration; v5 record
+  re-verification fixed). SP-02 + SP-13 RUN_A: complete, accepted by the parser with a new v1.2 identity; review
+  DEFINITION_COMPLETE_FOR_FURTHER_REVIEW, execution NOT_AUTHORISED. SP-13 / SP-02 alone and RUN_B: INCOMPLETE.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates, D-079 / D-080;
+  M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED.
+- **Files changed:** `src/domain/campaign_definition.py`, `src/services/campaign_configuration.py` (new),
+  `src/services/campaign_draft.py`, `src/services/campaign_observations.py`, `src/material_identification_ui.py`,
+  `tests/test_m8_d2f_campaign_configuration.py` (new), six adapted draft tests,
+  `docs/gui/M8_D2F_CAMPAIGN_CONFIGURATION.md` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
