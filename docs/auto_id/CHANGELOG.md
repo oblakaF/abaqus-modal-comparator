@@ -5195,3 +5195,22 @@ first internal provider.
   whose generation is no longer current is ignored. The registration already applied to the analysis changes only by
   Apply or Clear (and the file verification before every analysis).
 - **Tests:** `StaleResultTests` (9). R1 / R2 unchanged. **Abaqus run count:** 0.
+
+## 2026-10-17 — CORE-E2E, CORE-E2E-B and CORE-E2E-C ACCEPTED and closed
+
+- **CORE-E2E** (PR #84, merge `716ce32`): ACCEPTED / CLOSED. Real GUI scenarios T1 SP-02 (fresh Abaqus Python
+  extraction byte-identical to the archived one; strict pairs and MAC reproduced), T1b, T2 SP-13, T3 new SP13 ODB
+  (FREQUENCY_ONLY_DIAGNOSTIC), T4 SP-04 (provisional FRF peaks): all checks PASS on verified copies (56 files).
+- **CORE-E2E-B**: ACCEPTED / CLOSED (no code change, no PR). Two authorised diagnostic solves, SP-02 and SP-13 at
+  E_in +2 % (manifest `104583b8…`), accepted solver profiles, M3 builder and M4.6 pipeline, no LM: both completed
+  successfully, two pinned extractions with every check PASS, FE geometry identity preserved, FE-to-FE tracking MAC
+  >= 0.9999997, the archived +-5 % central-difference prediction within 0.002 %. This verifies the FE pipeline and the
+  local E_in sensitivity; it determines no material constant. NO_GLOBAL_PARAMETER_VALUE unchanged.
+- **CORE-E2E-C** (PR #85 with R1-R3, merge `24c755d`): ACCEPTED / CLOSED. Guided physical registration of a new FE
+  mesh: the new SP13_modal.odb shares the accepted measured surface (29 754 nodes, labels and coordinates `3087cba5…`)
+  and is registered (`e9c8dc5d…`). A guided registration stays diagnostic: not governed, not production-ready, no
+  Auto-ID observation.
+- **Unchanged:** M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED (D-079,
+  D-080); SPEC, DECISIONS, EVIDENCE, governed records.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`,
+  `docs/gui/CORE_E2E_VALIDATION.md`, `docs/gui/GUIDED_PHYSICAL_REGISTRATION.md`. **Abaqus run count:** 0.

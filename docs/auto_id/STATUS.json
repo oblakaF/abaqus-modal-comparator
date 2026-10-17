@@ -1844,7 +1844,7 @@
   },
   "core_e2e_validation": {
     "title": "CORE-E2E validation of the ODB + UNV comparator (real GUI, real Abaqus extraction)",
-    "status": "REVIEW_READY",
+    "status": "ACCEPTED",
     "authorisation": "SUPERVISOR CORE-E2E task (2026-10-16): end-to-end validation; at most 2 diagnostic solves and 4 Abaqus Python extractions; branch push only, no merge",
     "branch": "validation/core-modal-e2e",
     "base": "eaaf60a1128f4e09e499153d13379bbf22e87025",
@@ -1855,13 +1855,44 @@
       "frequency-only rows outside the extracted FE mode range are marked"
     ],
     "gui_scenarios": "T1 SP-02 accepted registration (fresh extraction byte-identical to the archived one; strict pairs and MAC reproduced), T1b SP-02 automatic (registration reused by FE geometry), T2 SP-13 accepted registration (pre-seeded archived extraction), T3 new SP13 ODB (FREQUENCY_ONLY_DIAGNOSTIC, no MAC), T4 SP-04 dataset 58 (provisional FRF peaks, no MAC): all checks PASS",
-    "abaqus": "Abaqus 2024; 1 Abaqus Python extraction (T1); 0 solves. Stage B (E_in +2 %, SP-02 and SP-13) planned, manifest 104583b845dab985db949f0fec109254f51a9b158a447f81cc6ec1e9e992ae52, not executed (awaiting authorisation)",
+    "abaqus": "Abaqus 2024; CORE-E2E: 1 Abaqus Python extraction (T1), 0 solves. The two diagnostic E_in +2 % solves were executed later under CORE-E2E-B (core_e2e_b_stage_b)",
     "evidence": "docs/gui/CORE_E2E_VALIDATION.md; machine-local run root D:/git/abaqus-modal-comparator-work/runs/core_e2e/run_20261016",
-    "unchanged": "SPEC, DECISIONS, EVIDENCE, registrations, thresholds, gates; M8 IN_PROGRESS, original M8 GATE NOT_MET; production calibration BLOCKED / NOT_AUTHORISED (D-079, D-080)"
+    "unchanged": "SPEC, DECISIONS, EVIDENCE, registrations, thresholds, gates; M8 IN_PROGRESS, original M8 GATE NOT_MET; production calibration BLOCKED / NOT_AUTHORISED (D-079, D-080)",
+    "closure": "CLOSED: SUPERVISOR accepted CORE-E2E (PR #84, merged as 716ce324e1f9d7047044a58ba950dcd2c8fc3916). Real GUI scenarios T1 SP-02, T1b, T2 SP-13, T3 new SP13 ODB, T4 SP-04: all checks PASS; the fresh Abaqus Python extraction of SP-02 is byte-identical to the archived one; verified copies only",
+    "pr": 84,
+    "main_merge": "716ce324e1f9d7047044a58ba950dcd2c8fc3916"
+  },
+  "core_e2e_b_stage_b": {
+    "title": "CORE-E2E-B diagnostic Abaqus solves (E_in +2 %, SP-02 and SP-13)",
+    "status": "ACCEPTED",
+    "closure": "CLOSED: SUPERVISOR accepted CORE-E2E-B (2026-10-16); no code change, no PR",
+    "authorisation": "SUPERVISOR CORE-E2E-B (Stage B AUTHORISED): exactly two diagnostic solves, sequential, accepted solver profiles, accepted M3 builder and M4.6 pipeline, no LM",
+    "manifest_hash": "104583b845dab985db949f0fec109254f51a9b158a447f81cc6ec1e9e992ae52",
+    "candidate": "E1 = E2 = 52000 -> 53040 MPa (+2 %); every other constant, the mesh, geometry, densities, core, ties and boundary conditions unchanged (one changed INP line per specimen)",
+    "solves": {
+      "SP02": {
+        "job": "SP02_c3a8d68e81ca46c2",
+        "generated_inp_sha256": "c3a8d68e81ca46c2488513f1542015e46b57d9da13393d35847643975b2f0dbc",
+        "odb_sha256": "357ecad3c93044524bbe93c5c37d42eddf57fc1270a72a697cebc47cd13b19a3",
+        "pack_content_sha256": "a6bf94b42b153e2a968776f70c87934f92ea08ea41b7179d66f92bfeacc252ba",
+        "profile": "SP02/abaqus-2024/v1 (8 CPU, scratch on D:)"
+      },
+      "SP13": {
+        "job": "SP13_c8f5b51e3863775f",
+        "generated_inp_sha256": "c8f5b51e3863775f6eb26aeae6a54ff3f1056a927ae926f65e7894c744e33148",
+        "odb_sha256": "86c24c61c0e0a8a14ac24537b45935a161816d34c1787afca30b626a0ebac8e9",
+        "pack_content_sha256": "fd27fdc353df7efb201905c771641bca72b15fda7b2e9a9a1f5522c0c512502a",
+        "profile": "SP13/abaqus-2024/v1 (1 CPU)"
+      }
+    },
+    "results": "both solves THE ANALYSIS HAS COMPLETED SUCCESSFULLY (no WARNING / ERROR in .msg / .dat); 2 pinned extractions, every extraction check PASS (FE geometry identity and node set preserved); FE-to-FE tracking MAC >= 0.9999997 on SP-02 R1-R3 and SP-13 R1-R2, no branch exchange; the archived +-5 % central-difference prediction holds within 0.002 %",
+    "interpretation": "verification of the FE pipeline and of the local E_in sensitivity only; not a material constant, not an identification, not a calibration; NO_GLOBAL_PARAMETER_VALUE for SP-02 + SP-13 unchanged",
+    "budget": "2 of 2 solves, 2 extractions (CORE-E2E total 2 solves, 3 of 4 Abaqus Python extractions)",
+    "evidence": "machine-local run root D:/git/abaqus-modal-comparator-work/runs/core_e2e/run_20261016/stage_b (stage_b_report.json, stage_b_log.json, journals, ODB, logs); docs/gui/CORE_E2E_VALIDATION.md"
   },
   "core_e2e_c_guided_registration": {
     "title": "Guided physical registration of a new FE mesh in the GUI (CORE-E2E-C)",
-    "status": "REVIEW_READY",
+    "status": "ACCEPTED",
     "authorisation": "SUPERVISOR CORE-E2E-C task (2026-10-16): branch feature/guided-physical-registration from 716ce32; push of the branch only, no merge; no Abaqus solve",
     "branch": "feature/guided-physical-registration",
     "base": "716ce324e1f9d7047044a58ba950dcd2c8fc3916",
@@ -1871,7 +1902,15 @@
     "scientific_scope": "diagnostic engineering registration of the exact files: not governed evidence, no Auto-ID observation, never production-ready; SPEC v1.2 §11 passport / fixture route unchanged",
     "abaqus": "0 solves, 0 extractions (existing extraction caches reused)",
     "unchanged": "SPEC, DECISIONS, EVIDENCE, registrations, pairing rules, thresholds, D-079 / D-080, Auto-ID optimiser, nine-constant research branch; M8 IN_PROGRESS, original M8 GATE NOT_MET",
-    "rework": "SUPERVISOR REWORK (R1 FE-frame evidence, R2 dialog recovery after an unexpected background error) addressed on the same branch"
+    "rework": "SUPERVISOR REWORK (R1 FE-frame evidence, R2 dialog recovery after an unexpected background error) addressed on the same branch",
+    "closure": "CLOSED: SUPERVISOR accepted CORE-E2E-C with R1 (shared measured-surface identity), R2 (dialog recovery) and R3 (no stale registration) (PR #85, merged as 24c755d27cee215f1181b8820890efef3d734dd8). A guided registration stays diagnostic: governed = false, production_ready = false, no Auto-ID observation",
+    "pr": 85,
+    "main_merge": "24c755d27cee215f1181b8820890efef3d734dd8",
+    "commits": [
+      "0ccfdd8 (implementation)",
+      "6a893f6 (R1, R2)",
+      "13af39a (R3)"
+    ]
   },
   "stage_status": {
     "M8": "IN_PROGRESS",
