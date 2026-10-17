@@ -491,7 +491,7 @@ class SetupPageTests(_Tmp):
              "Question: MATERIAL_IDENTIFICATION", "Question: SPECIMEN_ENGINEERING_CALIBRATION", "Declare τ_mf...",
              "Save Campaign Draft As...", "Check Draft Inputs",
              "Declare campaign_id...", "Run type: RUN_A", "Run type: RUN_B",
-             "Bind Governed Specimen Records",
+             "Bind Governed Specimen Records", "Bind Accepted FIT / HOLDOUT Observations", "Review Draft Preparation",
              "Declare not_fitted.t_face...", "Declare not_fitted.k_core...", "k_int: OFF"]))  # + M8.3, M8.4
         with mock.patch.object(ui.filedialog, "askopenfilename", return_value=str(RUN_B)):
             buttons["Select family / campaign definition..."]()

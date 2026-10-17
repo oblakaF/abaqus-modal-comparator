@@ -186,7 +186,7 @@ class PersistenceTests(_Records):
         bound = self.bound_pair().with_campaign_id("M8/D2d").with_run_type("RUN_A")
         path = write_draft(bound, self.out / "draft.json", (ROOT,))
         document = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual(document["schema"], "auto-id/campaign-draft/v4")  # M8-D2e-A: saved as v4
+        self.assertEqual(document["schema"], "auto-id/campaign-draft/v5")  # M8 existing data: saved as v5
         self.assertEqual(document["specimen_records"][0], bound.specimen_records(SP02).to_dict())
         reopened = load_draft(path, ROOT, self.fixtures)
         self.assertEqual(reopened, bound)
@@ -199,6 +199,7 @@ class PersistenceTests(_Records):
                 document = draft.document()
                 document["schema"] = schema
                 document.pop("specimen_records")
+                document.pop("specimen_observations")  # v1 - v4 bind no observations
                 document["declared"].pop("not_fitted")  # M8-D2e-A: v1 / v2 / v3 declare no not_fitted
                 if schema == DRAFT_SCHEMA_V1:
                     document["declared"] = {k: document["declared"][k] for k in ("scientific_question", "tau_mf")}
@@ -247,7 +248,7 @@ class GuiTests(_Records):
         ui.add_draft_specimen(application, FORWARD / "SP02.physical.forward.json")
         ui.add_draft_specimen(application, FORWARD / "SP13.forward.json")  # legacy registration: refused
         rows = list(application.material_auto_id_draft_table.items.values())
-        self.assertEqual(sum(r[3] == "NOT_BOUND" for r in rows), 2)
+        self.assertEqual(sum(r[0] == "Bound records" and r[3] == "NOT_BOUND" for r in rows), 2)
         buttons["Bind Governed Specimen Records"]()
         message = application.material_auto_id_draft_label.kwargs["text"]
         self.assertIn(f"Bound the four governed records of {SP02}", message)

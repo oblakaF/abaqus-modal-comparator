@@ -39,7 +39,14 @@ parser, the holdout policy and the production holdout path are unchanged.  Draft
 ``auto-id/campaign-draft/v4``; v1 / v2 / v3 drafts (no not-fitted declarations) still open as written, with nothing
 declared.
 
-Reopening (``load_draft``, M8-D2a) accepts only a campaign-draft document (v1, v2, v3 or v4).  It rebuilds the draft
+M8 existing data adds "Bind Accepted FIT / HOLDOUT Observations" (``bind_draft_observations``): each selected,
+record-bound specimen gets the strict rows of its accepted strict freeze exactly as recorded (row id, mode numbers, the
+freeze's FIT / HOLDOUT split, family, MAC; ``services.campaign_observations``), only when its P11 observation record
+counts them; they become the intended definition's ``rows``.  Nothing is paired, ranked or entered by hand; a refused
+specimen is unchanged.  Drafts are saved as ``auto-id/campaign-draft/v5``; v1 - v4 drafts open with no observations,
+and stored observations are re-verified on reopening (an added, removed or edited row is refused).
+
+Reopening (``load_draft``, M8-D2a) accepts only a campaign-draft document (v1 to v5).  It rebuilds the draft
 from its explicit declarations through the domain validators and from its specimen selections through the governed
 binder (location, manifest, passport, fixture catalogue), re-verifies every stored bound record (the same unique
 compatible record with the same fingerprint), re-validates the not-fitted declarations, and refuses any stored
@@ -103,11 +110,13 @@ from .governed_specimen_records import (
 DRAFT_SCHEMA_V1 = "auto-id/campaign-draft/v1"  # M8-D1 / D2a: declares scientific_question and tau_mf
 DRAFT_SCHEMA_V2 = "auto-id/campaign-draft/v2"  # M8-D2c: also campaign_id and run_type
 DRAFT_SCHEMA_V3 = "auto-id/campaign-draft/v3"  # M8-D2d: also the bound governed specimen records
-DRAFT_SCHEMA = "auto-id/campaign-draft/v4"  # M8-D2e-A: also the not-fitted declarations
-DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA_V2, DRAFT_SCHEMA_V3, DRAFT_SCHEMA)
+DRAFT_SCHEMA_V4 = "auto-id/campaign-draft/v4"  # M8-D2e-A: also the not-fitted declarations
+DRAFT_SCHEMA = "auto-id/campaign-draft/v5"  # M8 existing data: also the bound accepted FIT / HOLDOUT observations
+DRAFT_SCHEMAS = (DRAFT_SCHEMA_V1, DRAFT_SCHEMA_V2, DRAFT_SCHEMA_V3, DRAFT_SCHEMA_V4, DRAFT_SCHEMA)
 _DECLARED_KEYS = {DRAFT_SCHEMA_V1: ("scientific_question", "tau_mf"),
                   DRAFT_SCHEMA_V2: ("scientific_question", "tau_mf", "campaign_id", "run_type"),
                   DRAFT_SCHEMA_V3: ("scientific_question", "tau_mf", "campaign_id", "run_type"),
+                  DRAFT_SCHEMA_V4: ("scientific_question", "tau_mf", "campaign_id", "run_type", "not_fitted"),
                   DRAFT_SCHEMA: ("scientific_question", "tau_mf", "campaign_id", "run_type", "not_fitted")}
 DRAFT_KIND = "CAMPAIGN_DRAFT"
 DRAFT_LABELS = ("DRAFT_NOT_A_CAMPAIGN_DEFINITION", "NOT_VALIDATED", "NOT_EXECUTABLE", "AUTHORISES_NOTHING")
@@ -136,6 +145,23 @@ K_INT_NOTE = ("k_int OFF: the interface stiffness is neither fitted nor enabled 
               "and authorises nothing; ENABLED is not supported (no parameterisation contains k_int)")
 NOT_FITTED_DESCRIPTION_NOTE = ("the user's own description of why the parameter is not fitted, recorded as written; "
                                "never a measurement, prior or provenance")
+ROWS_NOT_BOUND = ("not bound: Bind Accepted FIT / HOLDOUT Observations takes the accepted strict-freeze rows of a "
+                  "record-bound specimen as recorded; the draft never pairs modes or assigns roles")
+_NUMERIC = ("a numerical value that no accepted record provides for a new campaign; never invented: it needs an "
+            "explicit, sourced declaration in the final definition")
+# Why a required top-level field stays missing (the draft writes none of them; reasons only, never values).
+MISSING_REASONS = {
+    "parameterisation": "the governed forward models' parameterisation; written only in the final definition",
+    "fitted_parameters": "follows the run type by the parser rule (RUN_A: E_in_plane_mpa; RUN_B: E_in_plane_mpa and "
+                         "G12_mpa); written only in the final definition",
+    "fixed_parameters": _NUMERIC, "start": _NUMERIC, "bounds": _NUMERIC, "engineering_plausibility": _NUMERIC,
+    "practical_target": _NUMERIC, "lm": _NUMERIC, "abaqus_solve_budget": _NUMERIC,
+    "sigma": ("Σ_setup sd_ln and its source are not recorded for a new campaign (Σ_meas would be NOT_AVAILABLE, "
+              "D-069); never invented"),
+    "archive_reuse": "a governed archive-reuse plan (repository path); none is chosen by the draft",
+    "decision": "the SUPERVISOR decision authorising the definition; never invented",
+    "provenance": "the definition's provenance list; never invented",
+}
 
 
 class CampaignDraftError(ValueError):
@@ -226,6 +252,8 @@ class CampaignDraft:
     not_fitted_t_face: Optional[str] = None  # M8-D2e-A: the user's description
     not_fitted_k_core: Optional[str] = None  # M8-D2e-A: the user's description
     not_fitted_k_int: Optional[str] = None  # M8-D2e-A: K_INT_OFF only
+    # M8 existing data: forward model -> its bound accepted observations (campaign_observations.SpecimenObservations)
+    observations: tuple[tuple[str, object], ...] = ()
 
     # ------------------------------------------------------------------ explicit declarations
     def with_question(self, question) -> "CampaignDraft":
@@ -286,19 +314,43 @@ class CampaignDraft:
         return replace(self, specimens=self.specimens + (specimen,))
 
     def without_specimens(self) -> "CampaignDraft":
-        return replace(self, specimens=(), records=())
+        return replace(self, specimens=(), records=(), observations=())
 
     def specimen_records(self, forward_model: str) -> Optional[SpecimenRecords]:
         return dict(self.records).get(forward_model)
 
     def with_specimen_records(self, forward_model: str, records: SpecimenRecords) -> "CampaignDraft":
-        """The draft with the four governed records of one selected specimen bound (from a BOUND binding only)."""
+        """The draft with the four governed records of one selected specimen bound (from a BOUND binding only).
+        Observations bound on other records are dropped (they rest on the records they were bound with)."""
         if not any(s.forward_model == forward_model for s in self.specimens):
             raise CampaignDraftError(f"{forward_model} is not a selected specimen of the draft.")
         if not isinstance(records, SpecimenRecords):
             raise CampaignDraftError("only a complete set of four bound governed records can be bound.")
         kept = tuple((key, value) for key, value in self.records if key != forward_model)
-        return replace(self, records=kept + ((forward_model, records),))
+        observations = self.observations
+        if self.specimen_records(forward_model) != records:
+            observations = tuple((key, value) for key, value in observations if key != forward_model)
+        return replace(self, records=kept + ((forward_model, records),), observations=observations)
+
+    def specimen_observations(self, forward_model: str):
+        return dict(self.observations).get(forward_model)
+
+    def with_specimen_observations(self, forward_model: str, observations) -> "CampaignDraft":
+        """The draft with the accepted observations of one record-bound specimen (from a BOUND binding only)."""
+        from .campaign_observations import SpecimenObservations
+
+        if not any(s.forward_model == forward_model for s in self.specimens):
+            raise CampaignDraftError(f"{forward_model} is not a selected specimen of the draft.")
+        if not isinstance(observations, SpecimenObservations) or observations.forward_model != forward_model:
+            raise CampaignDraftError("only the accepted observations bound for this specimen can be bound (no row is "
+                                     "entered by hand).")
+        records = self.specimen_records(forward_model)
+        if records is None or (records.registration_evidence.path, records.registration_evidence.canonical_sha256) \
+                != observations.registration_evidence:
+            raise CampaignDraftError(f"{forward_model}: the observations rest on registration evidence other than the "
+                                     "records bound to the draft; bind the governed specimen records first.")
+        kept = tuple((key, value) for key, value in self.observations if key != forward_model)
+        return replace(self, observations=kept + ((forward_model, observations),))
 
     # ------------------------------------------------------------------ preview and completeness
     def intended_definition(self) -> dict:
@@ -308,6 +360,9 @@ class CampaignDraft:
         for s in self.specimens:
             bound = self.specimen_records(s.forward_model)
             item = {"label": s.label, "fixture_id": s.fixture_id, "forward_model": s.forward_model}
+            observations = self.specimen_observations(s.forward_model)
+            if observations is not None:
+                item["rows"] = observations.campaign_rows()
             intended["specimens"].append({**item, **(bound.paths() if bound is not None else {})})
         if self.scientific_question is not None:
             intended["scientific_question"] = self.scientific_question
@@ -347,10 +402,10 @@ class CampaignDraft:
                 gaps.append(DraftGap(f"specimens[{index}].fixture_id", "the governed passport links no experiment "
                                                                        "fixture"))
             for key in sorted(CAMPAIGN_SPECIMEN_KEYS - set(item)):
-                gaps.append(DraftGap(f"specimens[{index}].{key}", NOT_CHOSEN))
+                gaps.append(DraftGap(f"specimens[{index}].{key}", ROWS_NOT_BOUND if key == "rows" else NOT_CHOSEN))
         for key in sorted(CAMPAIGN_KEYS - set(intended) - {"not_fitted"}):
             gaps.append(DraftGap(key, RUN_B_NOT_AUTHORISED if key == "run_b_gate" and self.run_type == RUN_B
-                                 else NOT_CHOSEN))
+                                 else MISSING_REASONS.get(key, NOT_CHOSEN)))
         for key, value in self.not_fitted().items():
             if value is None:
                 gaps.append(DraftGap(f"not_fitted.{key}", f"not declared: select {K_INT_OFF} explicitly (no default)"
@@ -379,6 +434,9 @@ class CampaignDraft:
             "specimen_identities": [s.to_dict() for s in self.specimens],
             "specimen_records": [None if self.specimen_records(s.forward_model) is None
                                  else self.specimen_records(s.forward_model).to_dict() for s in self.specimens],
+            "specimen_observations": [None if self.specimen_observations(s.forward_model) is None
+                                      else self.specimen_observations(s.forward_model).to_dict()
+                                      for s in self.specimens],
             "intended_campaign_definition": self.intended_definition(),
             "missing_required_inputs": [{"field": g.field, "reason": g.reason} for g in gaps],
             "authorisation": AUTHORISATION,
@@ -432,6 +490,54 @@ def binding_summary(outcomes, draft: CampaignDraft) -> str:
     return " ".join(parts)
 
 
+def bind_draft_observations(draft: CampaignDraft, repo_root: Path, fixtures: ExperimentFixtureManifest):
+    """"Bind Accepted FIT / HOLDOUT Observations": each selected, re-verified, record-bound specimen gets the accepted
+    strict-freeze rows exactly as recorded (``campaign_observations``). A refused specimen is left unchanged."""
+
+    from .campaign_observations import REFUSED as OBSERVATIONS_REFUSED, ObservationBinding, \
+        bind_specimen_observations
+
+    outcomes = []
+    for stored in draft.specimens:
+        try:
+            current = governed_specimen_input(Path(repo_root).joinpath(*PurePosixPath(stored.forward_model).parts),
+                                              repo_root, fixtures)
+        except CampaignDraftError as error:
+            outcomes.append(ObservationBinding(stored.forward_model, OBSERVATIONS_REFUSED, None,
+                                               (f"specimen input refused: {error}",)))
+            continue
+        changed = [name for name in _SPECIMEN_FIELDS if getattr(stored, name) != getattr(current, name)]
+        if changed:
+            outcomes.append(ObservationBinding(stored.forward_model, OBSERVATIONS_REFUSED, None, (
+                f"the selected {', '.join(changed)} differ(s) from the current governed records (never substituted)",)))
+            continue
+        binding = bind_specimen_observations(stored.forward_model, repo_root, fixtures,
+                                             draft.specimen_records(stored.forward_model))
+        if binding.status == BOUND:
+            draft = draft.with_specimen_observations(stored.forward_model, binding.observations)
+        outcomes.append(binding)
+    return draft, tuple(outcomes)
+
+
+def observation_binding_summary(outcomes, draft: CampaignDraft) -> str:
+    """One message for the GUI: specimens with bound observations, refused specimens with their reasons."""
+
+    from .campaign_observations import OBSERVATION_NOTE
+
+    if not outcomes:
+        return "Bind Accepted FIT / HOLDOUT Observations: the draft selects no specimen; nothing bound."
+    bound = [o for o in outcomes if o.status == BOUND]
+    refused = [o for o in outcomes if o.status != BOUND]
+    parts = []
+    if bound:
+        parts.append("Bound: " + "; ".join(o.summary() for o in bound) + ".")
+    if refused:
+        parts.append("Not bound (left unchanged): " + " | ".join(o.summary() for o in refused))
+    parts.append(f"Observations are {OBSERVATION_NOTE}; {len(draft.gaps())} required campaign input(s) are still "
+                 "missing.")
+    return " ".join(parts)
+
+
 def declare_tolerance(draft: CampaignDraft, value) -> CampaignDraft:
     """The draft with τ_mf declared explicitly (GUI entry text or a number)."""
     return draft.with_tau_mf(value)
@@ -466,6 +572,15 @@ def draft_rows(draft: CampaignDraft) -> tuple[tuple[str, str, str, str], ...]:
             record = getattr(bound, name)
             rows.append(("Bound records", f"{item.label} {name}",
                          f"{record.path} (canonical SHA-256 {record.canonical_sha256[:12]})", "BOUND"))
+    if draft.specimens:
+        from .campaign_observations import observation_rows
+    for item in draft.specimens:
+        observations = draft.specimen_observations(item.forward_model)
+        if observations is None:
+            rows.append(("Observations", item.label, "not bound (Bind Accepted FIT / HOLDOUT Observations)",
+                         "NOT_BOUND"))
+        else:
+            rows.extend(observation_rows(item.label, observations))
     rows.extend(("Missing required inputs", gap.field, gap.reason, "MISSING") for gap in draft.gaps())
     return tuple(rows)
 
@@ -488,7 +603,8 @@ def finalisation_state(draft: CampaignDraft) -> str:
 _DOCUMENT_KEYS = {"schema", "kind", "labels", "note", "status", "declared", "specimen_identities",
                   "intended_campaign_definition", "missing_required_inputs", "authorisation",
                   "production_calibration_execution"}  # v1 / v2
-_DOCUMENT_KEYS_V3 = _DOCUMENT_KEYS | {"specimen_records"}
+_DOCUMENT_KEYS_V3 = _DOCUMENT_KEYS | {"specimen_records"}  # v3 / v4
+_DOCUMENT_KEYS_V5 = _DOCUMENT_KEYS_V3 | {"specimen_observations"}
 _SPECIMEN_FIELDS = tuple(f.name for f in fields(DraftSpecimen))
 
 
@@ -502,8 +618,10 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
     if not isinstance(document, dict) or document.get("schema") not in DRAFT_SCHEMAS:
         _refuse(f"not a campaign draft: only {' / '.join(DRAFT_SCHEMAS)} documents can be opened.")
     keys = _DECLARED_KEYS[document["schema"]]  # older drafts declare fewer fields (never inferred)
-    with_records = document["schema"] in (DRAFT_SCHEMA_V3, DRAFT_SCHEMA)
-    expected_keys = _DOCUMENT_KEYS_V3 if with_records else _DOCUMENT_KEYS  # v1 / v2: no records
+    with_records = document["schema"] in (DRAFT_SCHEMA_V3, DRAFT_SCHEMA_V4, DRAFT_SCHEMA)
+    with_observations = document["schema"] == DRAFT_SCHEMA  # v1 - v4: no observations
+    expected_keys = (_DOCUMENT_KEYS_V5 if with_observations else _DOCUMENT_KEYS_V3 if with_records
+                     else _DOCUMENT_KEYS)  # v1 / v2: no records
     if set(document) != expected_keys:
         _refuse(f"malformed draft: missing {sorted(expected_keys - set(document))}, unknown "
                 f"{sorted(set(document) - expected_keys)}.")
@@ -525,7 +643,7 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
         if isinstance(declared["tau_mf"], str):
             _refuse("malformed draft: the declared tau_mf must be a number.")
         draft = draft.with_tau_mf(declared["tau_mf"])  # domain validation
-    if "not_fitted" in keys:  # v4 only
+    if "not_fitted" in keys:  # v4 / v5
         not_fitted = declared["not_fitted"]
         if not isinstance(not_fitted, dict) or set(not_fitted) != set(NOT_FITTED_KEYS):
             _refuse(f"malformed draft: 'declared.not_fitted' must state exactly {', '.join(NOT_FITTED_KEYS)} (null "
@@ -554,8 +672,39 @@ def draft_from_document(document, repo_root: Path, fixtures: ExperimentFixtureMa
         draft = draft.with_specimen(current)
     if with_records:
         draft = _reverify_records(draft, document["specimen_records"], identities, repo_root, fixtures)
+    if with_observations:
+        draft = _reverify_observations(draft, document["specimen_observations"], identities, repo_root, fixtures)
     if document["intended_campaign_definition"] != draft.intended_definition():
         _refuse("conflicting draft: the stored preview does not match its declarations and specimen identities.")
+    return draft
+
+
+def _reverify_observations(draft: CampaignDraft, stored_observations, identities, repo_root: Path,
+                           fixtures: ExperimentFixtureManifest) -> CampaignDraft:
+    """Every stored observation set must be exactly what the accepted records bind now (rows, roles, families, MAC,
+    excluded modes, strict freeze and registration evidence); an added, removed or edited row is refused."""
+
+    from .campaign_observations import bind_specimen_observations
+
+    if not isinstance(stored_observations, list) or len(stored_observations) != len(identities):
+        _refuse("malformed draft: 'specimen_observations' must list one entry (null when not bound) per specimen.")
+    for index, stored in enumerate(stored_observations):
+        if stored is None:
+            continue
+        reference = identities[index]["forward_model"]
+        if not isinstance(stored, dict):
+            _refuse(f"specimen_observations[{index}] ({reference}): malformed observations.")
+        binding = bind_specimen_observations(reference, repo_root, fixtures, draft.specimen_records(reference))
+        if binding.status != BOUND:
+            _refuse(f"specimen_observations[{index}] ({reference}): the stored observations can no longer be bound — "
+                    + "; ".join(binding.reasons) + " (never substituted).")
+        current = binding.observations.to_dict()
+        if current != stored:
+            changed = sorted(name for name in current if current[name] != stored.get(name)) or sorted(stored)
+            _refuse(f"specimen_observations[{index}] ({reference}): the stored {', '.join(changed)} differ(s) from the "
+                    "accepted records (an added, removed or edited row is never accepted); refused, never "
+                    "substituted.")
+        draft = draft.with_specimen_observations(reference, binding.observations)
     return draft
 
 

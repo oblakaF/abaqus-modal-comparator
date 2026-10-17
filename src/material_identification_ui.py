@@ -1710,6 +1710,71 @@ def _ask_draft_not_fitted(app, key) -> None:
         declare_draft_not_fitted(app, key, value)
 
 
+AUTO_ID_DRAFT_OBSERVATIONS_LABEL = "Bind Accepted FIT / HOLDOUT Observations"
+
+
+def bind_draft_accepted_observations(app) -> None:
+    """"Bind Accepted FIT / HOLDOUT Observations": attach to each selected, record-bound specimen the strict rows of
+    its accepted strict freeze exactly as recorded (roles, families, MAC). Nothing is paired or chosen; a specimen
+    without counted governed observations is refused with its reasons and left unchanged."""
+
+    from services.campaign_draft import CampaignDraftError, bind_draft_observations, observation_binding_summary
+
+    draft = getattr(app, "auto_id_draft", None)
+    if draft is None:
+        app.auto_id_draft_message = "No campaign draft: use Create Campaign Draft... first."
+    else:
+        try:
+            bound, outcomes = bind_draft_observations(draft, AUTO_ID_REPO_ROOT, _draft_fixtures())
+        except CampaignDraftError as error:
+            app.auto_id_draft_message = f"Not changed: {error}"
+        except Exception as error:  # never a GUI crash; the draft is unchanged
+            app.auto_id_draft_message = f"Not changed: {error}"
+        else:
+            if bound != draft:
+                app.auto_id_draft = bound
+            app.auto_id_draft_message = observation_binding_summary(outcomes, bound)
+    _refresh_campaign_draft(app)
+
+
+AUTO_ID_DRAFT_REVIEW_LABEL = "Review Draft Preparation"
+AUTO_ID_DRAFT_NOT_REVIEWED = ("Draft preparation not reviewed (Review Draft Preparation reports the SPEC v1.2 §8 "
+                              "counting conditions, numerical availability, history, missing inputs and the parser's "
+                              "finalisation for this exact draft; never a scientific gate).")
+
+
+def review_campaign_draft_preparation(app) -> None:
+    """"Review Draft Preparation": the preliminary preparation review of the current draft (records only). The result
+    belongs to this exact draft: any change, reopen or discard invalidates it."""
+
+    from services.campaign_draft import CampaignDraftError
+    from services.campaign_observations import INCOMPLETE, PreparationReview, draft_preparation_review
+
+    draft = getattr(app, "auto_id_draft", None)
+    if draft is None:
+        app.auto_id_draft_message = "No campaign draft to review: use Create Campaign Draft... first."
+        app.auto_id_draft_review = None
+        _refresh_campaign_draft(app)
+        return
+    try:
+        result = draft_preparation_review(draft, AUTO_ID_REPO_ROOT, _draft_fixtures())
+    except CampaignDraftError as error:
+        result = PreparationReview((), INCOMPLETE, (str(error),))
+    except Exception as error:  # never a GUI crash; never shown as ready
+        result = PreparationReview((), INCOMPLETE, (f"the draft could not be reviewed ({error})",))
+    app.auto_id_draft_review = (draft, result)
+    _refresh_campaign_draft(app)
+
+
+def draft_preparation_review_view(app) -> dict[str, object]:
+    """The preparation review of the current draft only (a review of an earlier draft state is never shown)."""
+
+    stored, draft = getattr(app, "auto_id_draft_review", None), getattr(app, "auto_id_draft", None)
+    if stored is None or draft is None or stored[0] is not draft:
+        return {"summary": AUTO_ID_DRAFT_NOT_REVIEWED, "rows": ()}
+    return {"summary": stored[1].summary(), "rows": stored[1].rows}
+
+
 def _ask_draft_campaign_id(app) -> None:
     value = simpledialog.askstring("Declare campaign_id", "campaign_id (letters, digits, '.', '_', '-', '+', '/'):")
     if value is not None:
@@ -1817,6 +1882,10 @@ def _refresh_campaign_draft(app) -> None:
         check = draft_input_check_view(app)
         _replace_table_rows(app.material_auto_id_draft_check_table, check["rows"])
         app.material_auto_id_draft_check_label.configure(text=check["summary"])
+    if hasattr(app, "material_auto_id_draft_review_table"):
+        review = draft_preparation_review_view(app)
+        _replace_table_rows(app.material_auto_id_draft_review_table, review["rows"])
+        app.material_auto_id_draft_review_label.configure(text=review["summary"])
 
 
 AUTO_ID_DRAFT_CHECK_LABEL = "Check Draft Inputs"
@@ -2025,6 +2094,7 @@ def _build_auto_id_setup_page(app, page) -> None:
         *((f"Run type: {run_type}", lambda r=run_type: declare_draft_run_type(app, r))
           for run_type in RUN_TYPE_CHOICES),
         (AUTO_ID_DRAFT_BIND_LABEL, lambda: bind_draft_specimen_records(app)),
+        (AUTO_ID_DRAFT_OBSERVATIONS_LABEL, lambda: bind_draft_accepted_observations(app)),
     ):
         ttk.Button(identity_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
     from services.campaign_draft import DESCRIBED_NOT_FITTED, K_INT_CHOICES
@@ -2065,6 +2135,17 @@ def _build_auto_id_setup_page(app, page) -> None:
     app.material_auto_id_draft_check_table = _build_read_only_table(
         check, ("specimen", "section", "item", "status", "explanation"),
         ("Specimen", "Section", "Item", "Status", "Explanation"), (90, 160, 300, 210, 540), height=12,
+    )
+    review = ttk.LabelFrame(draft, text="Draft preparation review (preliminary; not a scientific gate)", padding=8)
+    review.pack(fill="x", pady=(8, 0))
+    ttk.Button(review, text=AUTO_ID_DRAFT_REVIEW_LABEL, command=lambda: review_campaign_draft_preparation(app)).pack(
+        anchor="w", pady=(0, 4))
+    app.material_auto_id_draft_review_label = ttk.Label(review, text=AUTO_ID_DRAFT_NOT_REVIEWED, justify="left",
+                                                        wraplength=1100, style="MetricValue.TLabel")
+    app.material_auto_id_draft_review_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_draft_review_table = _build_read_only_table(
+        review, ("section", "item", "value", "status"), ("Section", "Item", "Value", "Status"),
+        (190, 230, 640, 170), height=14,
     )
 
 
