@@ -908,6 +908,19 @@ def _reverify_records(draft: CampaignDraft, stored_records, identities, repo_roo
     return draft
 
 
+def draft_declared_from_definition(definition: CampaignDefinition) -> CampaignDraft:
+    """A new draft with the explicit declarations of a parsed v1.2 definition (M8-D2g Pre-run Validation): campaign
+    id, run type, scientific question, tau_mf and the not-fitted declarations, through the domain validators."""
+
+    draft = (CampaignDraft().with_campaign_id(definition.campaign_id).with_run_type(definition.run_type)
+             .with_question(definition.scientific_question).with_tau_mf(definition.tau_mf))
+    for key in DESCRIBED_NOT_FITTED:
+        draft = draft.with_not_fitted(key, definition.not_fitted[key])
+    if definition.not_fitted.get("k_int") != K_INT_OFF_DEFINITION:
+        raise CampaignDraftError("not_fitted.k_int is not the supported OFF declaration.")
+    return draft.with_not_fitted("k_int", K_INT_OFF)
+
+
 def load_draft(path, repo_root: Path, fixtures: ExperimentFixtureManifest) -> CampaignDraft:
     """Open a saved campaign draft file and rebuild it (``draft_from_document``)."""
 

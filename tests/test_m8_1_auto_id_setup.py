@@ -498,7 +498,9 @@ class SetupPageTests(_Tmp):
              "Declare Numerical algorithm (LM)...", "Declare Budget and archive reuse...",
              "Declare Decision and provenance...", "run_b_gate: none (RUN_A)", "Clear Material parameters",
              "Clear Uncertainty and acceptance", "Clear Numerical algorithm (LM)", "Clear Budget and archive reuse",
-             "Clear Decision and provenance", "Clear run_b_gate", "Show archived M7 RUN_A settings (reference)"]))
+             "Clear Decision and provenance", "Clear run_b_gate", "Show archived M7 RUN_A settings (reference)",
+             # M8-D2g finalisation and pre-run validation
+             "Finalise & Export Campaign Definition...", "Pre-run Validation..."]))
         with mock.patch.object(ui.filedialog, "askopenfilename", return_value=str(RUN_B)):
             buttons["Select family / campaign definition..."]()
         self.assertIn("RUN_B", application.material_auto_id_summary_label.kwargs["text"])

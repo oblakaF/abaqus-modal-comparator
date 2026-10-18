@@ -210,6 +210,9 @@ def declare_configuration(draft: CampaignDraft, group: str, texts, repo_root: Pa
     """The draft with one group declared from form text, refused on any rule or repository problem."""
 
     changed = draft.with_configuration(group, values_from_text(group, texts), source)
+    if group == "budget" and "parameterisation" not in changed.configured():
+        raise CampaignDraftError("archive_reuse: declare the material parameters (parameterisation) first; the plan is "
+                                 "checked against it.")
     problems = configuration_problems(changed, repo_root, groups=(group,))
     if problems:
         raise CampaignDraftError("; ".join(problems))
@@ -237,9 +240,7 @@ def configuration_problems(draft: CampaignDraft, repo_root: Path, groups=None) -
         path = root.joinpath(*PurePosixPath(reuse).parts)
         if not path.is_file():
             problems.append(f"archive_reuse {reuse}: no such file in the repository")
-        elif parameterisation is None:
-            problems.append(f"archive_reuse {reuse}: declare the material parameters (parameterisation) to check it")
-        else:
+        elif parameterisation is not None:  # without a parameterisation the plan is checked once it is declared
             try:
                 plan = load_archive_reuse(path, parameterisation)
             except (OSError, ValueError, KeyError) as error:

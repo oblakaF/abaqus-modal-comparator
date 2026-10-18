@@ -1946,6 +1946,109 @@ def _draft_protected_roots(app) -> tuple:
     return tuple(roots)
 
 
+AUTO_ID_FINALISE_LABEL = "Finalise & Export Campaign Definition..."
+AUTO_ID_PRERUN_LABEL = "Pre-run Validation..."
+AUTO_ID_NO_EXPORT = ("No campaign definition exported (Finalise & Export re-verifies the draft, finalises it with the "
+                     "governed parser and saves the definition; it authorises nothing).")
+AUTO_ID_NO_PRERUN = ("No Pre-run Validation (Pre-run Validation... checks a saved campaign definition in six separate "
+                     "sections; it never authorises execution).")
+
+
+def _export_message(app, text) -> None:
+    app.auto_id_export_message = text
+    if hasattr(app, "material_auto_id_export_label"):
+        app.material_auto_id_export_label.configure(text=text)
+
+
+def finalise_and_export_campaign(app, destination=None, confirm_overwrite=None):
+    """"Finalise & Export Campaign Definition...": re-verify the draft (governed records, observations, configuration,
+    archive plan), finalise it with the governed parser, then save the exact definition after an explicit Save As,
+    atomically, outside the repository and data stores; it is re-read by load_campaign_definition and its campaign
+    hash compared. Cancel or any refusal writes nothing. A definition authorises nothing."""
+
+    from services.campaign_draft import CampaignDraftError, DraftIncomplete
+    from services.campaign_finalisation import NOT_AN_AUTHORISATION, export_campaign_definition, finalise_campaign
+
+    draft = getattr(app, "auto_id_draft", None)
+    if draft is None:
+        _export_message(app, "No campaign draft to finalise: use Create Campaign Draft... first.")
+        return None
+    try:
+        fixtures = _draft_fixtures()
+        finalised = finalise_campaign(draft, AUTO_ID_REPO_ROOT, fixtures)
+    except DraftIncomplete as refusal:
+        _export_message(app, f"Not finalised: {len(refusal.gaps)} required campaign input(s) missing "
+                             f"({', '.join(g.field for g in refusal.gaps)}); nothing written.")
+        return None
+    except Exception as error:  # a refusal of the re-verification or of the parser; never a GUI crash
+        _export_message(app, f"Not finalised: {error} Nothing written.")
+        return None
+    if destination is None:
+        name = "".join(c if c.isalnum() or c in "._-+" else "_" for c in finalised.definition.campaign_id)
+        destination = filedialog.asksaveasfilename(
+            title=AUTO_ID_FINALISE_LABEL.rstrip("."), defaultextension=".json",
+            initialfile=f"{name}.campaign.json", filetypes=[("Auto-ID campaign definition", "*.json")],
+            confirmoverwrite=False)  # the replacement is confirmed explicitly below
+    if not destination:
+        _export_message(app, f"Export cancelled: nothing written (checked {finalised.definition.campaign_id}, campaign "
+                             f"hash {finalised.campaign_hash}).")
+        return None
+    overwrite = False
+    if Path(destination).exists():
+        ask = confirm_overwrite or (lambda path: messagebox.askyesno(
+            "Replace campaign definition?", f"{path} exists. Replace it? (only an earlier campaign definition can be "
+                                            "replaced)"))
+        if not ask(destination):
+            _export_message(app, "Export cancelled: the existing file was not replaced; nothing written.")
+            return None
+        overwrite = True
+    try:
+        result = export_campaign_definition(draft, destination, AUTO_ID_REPO_ROOT, fixtures, _draft_protected_roots(app),
+                                            finalised.campaign_hash, overwrite=overwrite)
+    except CampaignDraftError as error:
+        _export_message(app, f"Not exported: {error}")
+        return None
+    except Exception as error:  # never a GUI crash; nothing is published by a failed atomic write
+        _export_message(app, f"Not exported: {error}")
+        return None
+    app.auto_id_last_definition = result.path
+    _export_message(app, result.summary())
+    return result
+
+
+def run_prerun_validation(app, path=None):
+    """"Pre-run Validation...": the six-section check of a saved campaign definition (read-only; never an
+    authorisation)."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+    from services.prerun_validation import prerun_validation
+
+    if path is None:
+        last = getattr(app, "auto_id_last_definition", None)
+        path = filedialog.askopenfilename(
+            title="Campaign definition for Pre-run Validation", filetypes=(("Auto-ID campaign definition", "*.json"),),
+            **({"initialdir": str(Path(last).parent), "initialfile": Path(last).name} if last else {}))
+    if not path:
+        text = "Pre-run Validation cancelled."
+        rows = ()
+    else:
+        try:
+            roots = fixture_roots_from_environment()
+        except Exception:  # the configured stores cannot be determined: source files are reported NOT_CONFIGURED
+            roots = None
+        try:
+            result = prerun_validation(path, AUTO_ID_REPO_ROOT, _draft_fixtures(), roots)
+        except Exception as error:  # never a GUI crash; never shown as valid
+            text, rows = f"Pre-run Validation refused: {error}", ()
+        else:
+            text, rows = result.summary(), result.rows
+            app.auto_id_prerun = result
+    app.auto_id_prerun_message = text
+    if hasattr(app, "material_auto_id_prerun_label"):
+        app.material_auto_id_prerun_label.configure(text=text)
+        _replace_table_rows(app.material_auto_id_prerun_table, rows)
+
+
 def save_campaign_draft(app, destination=None):
     """"Save Campaign Draft As...": the draft document, written only after an explicit Save As, atomically, outside
     every protected folder; cancelling writes nothing. A draft is never a campaign definition."""
@@ -2295,6 +2398,22 @@ def _build_auto_id_setup_page(app, page) -> None:
     app.material_auto_id_draft_review_table = _build_read_only_table(
         review, ("section", "item", "value", "status"), ("Section", "Item", "Value", "Status"),
         (180, 220, 590, 250), height=14,
+    )
+    export = ttk.LabelFrame(draft, text="Finalise & Export / Pre-run Validation (M8-D2g; authorises nothing)",
+                            padding=8)
+    export.pack(fill="x", pady=(8, 0))
+    export_buttons = ttk.Frame(export)
+    export_buttons.pack(anchor="w", pady=(0, 4))
+    for text, command in ((AUTO_ID_FINALISE_LABEL, lambda: finalise_and_export_campaign(app)),
+                          (AUTO_ID_PRERUN_LABEL, lambda: run_prerun_validation(app))):
+        ttk.Button(export_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
+    app.material_auto_id_export_label = ttk.Label(export, text=AUTO_ID_NO_EXPORT, justify="left", wraplength=1100)
+    app.material_auto_id_export_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_prerun_label = ttk.Label(export, text=AUTO_ID_NO_PRERUN, justify="left", wraplength=1100)
+    app.material_auto_id_prerun_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_prerun_table = _build_read_only_table(
+        export, ("section", "check", "detail", "status"), ("Section", "Check", "Detail", "Status"),
+        (170, 250, 610, 220), height=14,
     )
 
 
