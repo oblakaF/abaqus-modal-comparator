@@ -31,7 +31,6 @@ from domain.campaign_definition import (
     CalibrationNotImplementedRefusal,
     CampaignDefinitionError,
     RUN_A,
-    RunGateRefusal,
     load_campaign_definition,
     parse_campaign_definition,
 )
@@ -219,13 +218,11 @@ def prerun_validation(path, repo_root: Path, fixtures: ExperimentFixtureManifest
         if row[0] == "History":
             rows.append(("Scientific readiness", row[1], row[2], row[3]))
 
-    try:
-        definition.require_executable()
-    except (RunGateRefusal, CalibrationNotImplementedRefusal) as refusal:
-        formal = f"refused: {refusal}"
-    else:
-        formal = "no formal refusal (a formal check of the run type and question only; never an authorisation)"
-    rows.append(("Execution authorisation", "require_executable (formal)", formal, "FORMAL_CHECK_ONLY"))
+    # The execution gate itself (CampaignDefinition.require_executable) belongs to the execution path only; it is never
+    # called, wrapped or lifted here. The RUN_B gate is shown as the definition records it.
+    gate = ("RUN_A: the definition carries no RUN_B gate" if definition.run_type == RUN_A else
+            f"RUN_B: run_b_gate {definition.run_b_gate!r} as recorded (the SUPERVISOR's gate; never set by a draft)")
+    rows.append(("Execution authorisation", "Run-type gate (as recorded)", gate, "RECORDED"))
     rows.append(("Execution authorisation", "Authorisation",
                  f"none: a campaign definition carries no execution authorisation; its decision "
                  f"{definition.decision!r} and provenance are text, never an authorisation; execution needs its own "
