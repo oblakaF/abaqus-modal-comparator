@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
+from services.campaign_draft import CONFIGURATION_GROUPS, CONFIGURATION_KEYS, RUN_B_GATE  # noqa: E402
 from services.campaign_draft import (  # noqa: E402
     DRAFT_SCHEMA,
     CampaignDraft,
@@ -93,7 +94,7 @@ class RefusalTests(_Reopen):
     def test_only_the_draft_schema_is_opened(self):
         run_a = json.loads((CAMPAIGNS / "M7_RUN_A.campaign.json").read_text(encoding="utf-8"))
         self.refused(run_a, "only auto-id/campaign-draft/v1")
-        for change, text in ((lambda d: d.update(schema="auto-id/campaign-draft/v6"), "only auto-id/campaign-draft/v1"),
+        for change, text in ((lambda d: d.update(schema="auto-id/campaign-draft/v7"), "only auto-id/campaign-draft/v1"),
                              (lambda d: d.update(extra=1), "unknown ['extra']"),
                              (lambda d: d.pop("declared"), "missing ['declared']"),
                              (lambda d: d.update(labels=["DRAFT_NOT_A_CAMPAIGN_DEFINITION"]), "labels"),
@@ -121,7 +122,9 @@ class RefusalTests(_Reopen):
             document = self.document()
             # a v2 draft also declares campaign_id / run_type, a v4 draft also not_fitted (null: not declared)
             unset = {"campaign_id": None, "run_type": None,
-                     "not_fitted": {"t_face": None, "k_core": None, "k_int": None}}
+                     "not_fitted": {"t_face": None, "k_core": None, "k_int": None},
+                     "configuration": {key: None for key in CONFIGURATION_KEYS},  # M8-D2f
+                     "configuration_sources": {group: None for group in (*CONFIGURATION_GROUPS, RUN_B_GATE)}}
             document["declared"] = dict(declared, **unset) if "tau_mf" in declared else declared
             with self.subTest(declared=declared):
                 self.refused(document, text)

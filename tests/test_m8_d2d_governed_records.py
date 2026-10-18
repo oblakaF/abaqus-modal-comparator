@@ -186,7 +186,7 @@ class PersistenceTests(_Records):
         bound = self.bound_pair().with_campaign_id("M8/D2d").with_run_type("RUN_A")
         path = write_draft(bound, self.out / "draft.json", (ROOT,))
         document = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual(document["schema"], "auto-id/campaign-draft/v5")  # M8 existing data: saved as v5
+        self.assertEqual(document["schema"], "auto-id/campaign-draft/v6")  # M8-D2f: saved as v6
         self.assertEqual(document["specimen_records"][0], bound.specimen_records(SP02).to_dict())
         reopened = load_draft(path, ROOT, self.fixtures)
         self.assertEqual(reopened, bound)
@@ -200,6 +200,7 @@ class PersistenceTests(_Records):
                 document["schema"] = schema
                 document.pop("specimen_records")
                 document.pop("specimen_observations")  # v1 - v4 bind no observations
+                document["declared"].pop("configuration"), document["declared"].pop("configuration_sources")  # v1 - v5
                 document["declared"].pop("not_fitted")  # M8-D2e-A: v1 / v2 / v3 declare no not_fitted
                 if schema == DRAFT_SCHEMA_V1:
                     document["declared"] = {k: document["declared"][k] for k in ("scientific_question", "tau_mf")}

@@ -113,7 +113,7 @@ class PersistenceTests(_Identity):
         path = write_draft(draft, self.out / "draft.json", (ROOT,))
         document = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(document["schema"], DRAFT_SCHEMA)
-        self.assertEqual(document["schema"], "auto-id/campaign-draft/v5")  # M8 existing data: saved as v5; v2 still opens
+        self.assertEqual(document["schema"], "auto-id/campaign-draft/v6")  # M8-D2f: saved as v6; v2 still opens
         self.assertEqual(document["declared"]["campaign_id"], "M8/D2c+draft_1.a-b")
         self.assertEqual(document["declared"]["run_type"], "RUN_A")
         reopened = load_draft(path, ROOT, self.fixtures)

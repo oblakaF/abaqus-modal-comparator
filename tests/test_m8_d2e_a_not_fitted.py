@@ -164,8 +164,8 @@ class PersistenceTests(_NotFitted):
         draft = self.declared().with_campaign_id("M8/D2e-A").with_run_type("RUN_A")
         path = write_draft(draft, self.out / "draft.json", (ROOT,))
         document = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual(document["schema"], "auto-id/campaign-draft/v5")  # M8 existing data: saved as v5
-        self.assertEqual(DRAFT_SCHEMA, "auto-id/campaign-draft/v5")
+        self.assertEqual(document["schema"], "auto-id/campaign-draft/v6")  # M8-D2f: saved as v6
+        self.assertEqual(DRAFT_SCHEMA, "auto-id/campaign-draft/v6")
         reopened = load_draft(path, ROOT, self.fixtures)
         self.assertEqual(reopened, draft)
         self.assertEqual(reopened.document_bytes(), path.read_bytes())
@@ -200,6 +200,7 @@ class PersistenceTests(_NotFitted):
                 document["schema"] = schema
                 document["declared"].pop("not_fitted")
                 document.pop("specimen_observations")  # v1 - v4 bind no observations
+                document["declared"].pop("configuration"), document["declared"].pop("configuration_sources")  # v1 - v5
                 if schema != DRAFT_SCHEMA_V3:
                     document.pop("specimen_records")
                 if schema == DRAFT_SCHEMA_V1:

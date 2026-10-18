@@ -400,6 +400,112 @@ def require_unique_specimens(labels, fixture_ids) -> None:
         _fail("specimens", "labels and fixtures must be unique.")
 
 
+# Field validators: ``parse_campaign_definition`` validates through these, so a campaign draft (M8-D2f) checks each
+# declared field exactly as the parser does (one rule, never a copy).
+
+def declared_decision(value: object) -> str:
+    return _text(value, "decision")
+
+
+def declared_parameterisation(value: object) -> str:
+    if not isinstance(value, str) or value not in PARAMETERISATIONS:
+        _fail("parameterisation", f"unknown parameterisation {value!r}.")
+    return value
+
+
+def declared_material_parameters(parameterisation_id: object, run_type: object, fitted: object, fixed: object,
+                                 start: object, bounds: object, plausibility: object):
+    """Fitted / fixed parameters, start, numerical search bounds and the engineering plausibility window.
+
+    Returns ``(fitted, fixed, start, bounds, plausibility)`` in canonical form.
+    """
+    parameterisation_id = declared_parameterisation(parameterisation_id)
+    parameters = PARAMETERISATIONS[parameterisation_id].parameters
+    if not isinstance(fitted, list) or not fitted or len(set(fitted)) != len(fitted) or not set(fitted) <= set(parameters):
+        _fail("fitted_parameters", f"must be a non-empty list of distinct parameters of {parameterisation_id}.")
+    fitted = tuple(name for name in parameters if name in fitted)  # parameterisation order
+    if not isinstance(fixed, Mapping) or set(fixed) != set(parameters) - set(fitted):
+        _fail("fixed_parameters", f"must fix exactly {sorted(set(parameters) - set(fitted))}.")
+    fixed = {name: _positive(fixed[name], f"fixed_parameters.{name}") for name in parameters if name in fixed}
+    if run_type == RUN_A and fitted != ("E_in_plane_mpa",):
+        _fail("fitted_parameters", "RUN_A fits E_in_plane_mpa only (G12 fixed; D-069).")
+    if run_type == RUN_B and fitted != ("E_in_plane_mpa", "G12_mpa"):
+        _fail("fitted_parameters", f"RUN_B ({RUN_B_LABEL}) fits E_in_plane_mpa and G12_mpa.")
+
+    if not isinstance(start, Mapping) or set(start) != set(fitted):
+        _fail("start", f"must give exactly {fitted}.")
+    start = {name: _positive(start[name], f"start.{name}") for name in fitted}
+    if not isinstance(bounds, Mapping) or set(bounds) != set(fitted):
+        _fail("bounds", f"must bound exactly {fitted}.")
+    bounds = {name: _pair(bounds[name], f"bounds.{name}") for name in fitted}
+    for name in fitted:
+        if not bounds[name][0] <= start[name] <= bounds[name][1]:
+            _fail(f"start.{name}", "lies outside the search bounds.")
+    if not isinstance(plausibility, Mapping) or not set(plausibility) <= set(fitted):
+        _fail("engineering_plausibility", "may only describe fitted parameters.")
+    plausibility = {name: _pair(plausibility[name], f"engineering_plausibility.{name}") for name in plausibility}
+    return fitted, fixed, start, bounds, plausibility
+
+
+def declared_practical_target(value: object) -> tuple[float, float, str]:
+    """``(preferred, acceptable, note)`` of the engineering practical target."""
+    target = _mapping(value, "practical_target", {"preferred_max_abs_relative_error",
+                                                  "acceptable_max_abs_relative_error", "note"})
+    preferred = _positive(target["preferred_max_abs_relative_error"], "practical_target.preferred")
+    acceptable = _positive(target["acceptable_max_abs_relative_error"], "practical_target.acceptable")
+    if not preferred <= acceptable < 1.0:
+        _fail("practical_target", "needs preferred ≤ acceptable < 1.")
+    return preferred, acceptable, _text(target["note"], "practical_target.note")
+
+
+def declared_sigma(value: object) -> SigmaState:
+    sigma = _mapping(value, "sigma", {"setup", "measurement"})
+    setup = _mapping(sigma["setup"], "sigma.setup", {"sd_ln", "status", "source"})
+    measurement = _mapping(sigma["measurement"], "sigma.measurement", {"status", "source"})
+    if setup["status"] not in SIGMA_STATUSES:
+        _fail("sigma.setup.status", f"must be one of {SIGMA_STATUSES}.")
+    if measurement["status"] != NOT_AVAILABLE:
+        _fail("sigma.measurement.status", "only NOT_AVAILABLE is supported: no real Σ_meas exists (D-069).")
+    return SigmaState(_positive(setup["sd_ln"], "sigma.setup.sd_ln"), setup["status"],
+                      _text(setup["source"], "sigma.setup.source"), NOT_AVAILABLE,
+                      _text(measurement["source"], "sigma.measurement.source"))
+
+
+def declared_lm(value: object) -> LMConfiguration:
+    lm = _mapping(value, "lm", _LM_KEYS)
+    return LMConfiguration(_positive(lm["mu_initial"], "lm.mu_initial"),
+                           _positive(lm["mu_decrease"], "lm.mu_decrease"),
+                           _count(lm["max_step_attempts"], "lm.max_step_attempts"),
+                           _count(lm["evaluation_budget"], "lm.evaluation_budget"),
+                           _count(lm["max_iterations"], "lm.max_iterations"),
+                           _positive(lm["stop_fraction"], "lm.stop_fraction"),
+                           _positive(lm["mu_increase"], "lm.mu_increase"),
+                           _positive(lm["finite_difference_step"], "lm.finite_difference_step"))
+
+
+def declared_solve_budget(value: object) -> int:
+    return _count(value, "abaqus_solve_budget")
+
+
+def declared_run_b_gate(value: object, run_type: object) -> Optional[str]:
+    """None for RUN_A; a RUN_B gate is the SUPERVISOR's (this validates its form only, never authorises it)."""
+    if value is not None:
+        value = _text(value, "run_b_gate")
+    if run_type == RUN_A and value is not None:
+        _fail("run_b_gate", "a RUN_A definition carries no RUN_B gate.")
+    return value
+
+
+def declared_archive_reuse(value: object) -> str:
+    return _repo_path(value, "archive_reuse")
+
+
+def declared_provenance(value: object) -> tuple[str, ...]:
+    if not isinstance(value, list) or not value:
+        _fail("provenance", "must be a non-empty list.")
+    return tuple(_text(p, "provenance[]") for p in value)
+
+
 def parse_campaign_definition(data: object) -> CampaignDefinition:
     if isinstance(data, Mapping) and data.get("schema") not in CAMPAIGN_SCHEMAS:
         _fail("schema", f"must be one of {CAMPAIGN_SCHEMAS}.")
@@ -411,70 +517,16 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
     tau_mf = _tau_mf(data["tau_mf"]) if declared else None
     campaign_id = declared_campaign_id(data["campaign_id"])
     run_type = declared_run_type(data["run_type"])
-    decision = _text(data["decision"], "decision")
+    decision = declared_decision(data["decision"])
 
-    parameterisation_id = data["parameterisation"]
-    if parameterisation_id not in PARAMETERISATIONS:
-        _fail("parameterisation", f"unknown parameterisation {parameterisation_id!r}.")
-    parameters = PARAMETERISATIONS[parameterisation_id].parameters
-    fitted = data["fitted_parameters"]
-    if not isinstance(fitted, list) or not fitted or len(set(fitted)) != len(fitted) or not set(fitted) <= set(parameters):
-        _fail("fitted_parameters", f"must be a non-empty list of distinct parameters of {parameterisation_id}.")
-    fitted = tuple(name for name in parameters if name in fitted)  # parameterisation order
-    fixed = data["fixed_parameters"]
-    if not isinstance(fixed, Mapping) or set(fixed) != set(parameters) - set(fitted):
-        _fail("fixed_parameters", f"must fix exactly {sorted(set(parameters) - set(fitted))}.")
-    fixed = {name: _positive(fixed[name], f"fixed_parameters.{name}") for name in parameters if name in fixed}
-    if run_type == RUN_A and fitted != ("E_in_plane_mpa",):
-        _fail("fitted_parameters", "RUN_A fits E_in_plane_mpa only (G12 fixed; D-069).")
-    if run_type == RUN_B and fitted != ("E_in_plane_mpa", "G12_mpa"):
-        _fail("fitted_parameters", f"RUN_B ({RUN_B_LABEL}) fits E_in_plane_mpa and G12_mpa.")
-
-    start = data["start"]
-    if not isinstance(start, Mapping) or set(start) != set(fitted):
-        _fail("start", f"must give exactly {fitted}.")
-    start = {name: _positive(start[name], f"start.{name}") for name in fitted}
-    bounds_data = data["bounds"]
-    if not isinstance(bounds_data, Mapping) or set(bounds_data) != set(fitted):
-        _fail("bounds", f"must bound exactly {fitted}.")
-    bounds = {name: _pair(bounds_data[name], f"bounds.{name}") for name in fitted}
-    for name in fitted:
-        if not bounds[name][0] <= start[name] <= bounds[name][1]:
-            _fail(f"start.{name}", "lies outside the search bounds.")
-    plausibility = data["engineering_plausibility"]
-    if not isinstance(plausibility, Mapping) or not set(plausibility) <= set(fitted):
-        _fail("engineering_plausibility", "may only describe fitted parameters.")
-    plausibility = {name: _pair(plausibility[name], f"engineering_plausibility.{name}") for name in plausibility}
-
-    target = _mapping(data["practical_target"], "practical_target", {"preferred_max_abs_relative_error",
-                                                                     "acceptable_max_abs_relative_error", "note"})
-    preferred = _positive(target["preferred_max_abs_relative_error"], "practical_target.preferred")
-    acceptable = _positive(target["acceptable_max_abs_relative_error"], "practical_target.acceptable")
-    if not preferred <= acceptable < 1.0:
-        _fail("practical_target", "needs preferred ≤ acceptable < 1.")
-    _text(target["note"], "practical_target.note")
-
-    sigma = _mapping(data["sigma"], "sigma", {"setup", "measurement"})
-    setup = _mapping(sigma["setup"], "sigma.setup", {"sd_ln", "status", "source"})
-    measurement = _mapping(sigma["measurement"], "sigma.measurement", {"status", "source"})
-    if setup["status"] not in SIGMA_STATUSES:
-        _fail("sigma.setup.status", f"must be one of {SIGMA_STATUSES}.")
-    if measurement["status"] != NOT_AVAILABLE:
-        _fail("sigma.measurement.status", "only NOT_AVAILABLE is supported: no real Σ_meas exists (D-069).")
-    sigma_state = SigmaState(_positive(setup["sd_ln"], "sigma.setup.sd_ln"), setup["status"],
-                             _text(setup["source"], "sigma.setup.source"), NOT_AVAILABLE,
-                             _text(measurement["source"], "sigma.measurement.source"))
-
-    lm = _mapping(data["lm"], "lm", _LM_KEYS)
-    lm_config = LMConfiguration(_positive(lm["mu_initial"], "lm.mu_initial"),
-                                _positive(lm["mu_decrease"], "lm.mu_decrease"),
-                                _count(lm["max_step_attempts"], "lm.max_step_attempts"),
-                                _count(lm["evaluation_budget"], "lm.evaluation_budget"),
-                                _count(lm["max_iterations"], "lm.max_iterations"),
-                                _positive(lm["stop_fraction"], "lm.stop_fraction"),
-                                _positive(lm["mu_increase"], "lm.mu_increase"),
-                                _positive(lm["finite_difference_step"], "lm.finite_difference_step"))
-    solve_budget = _count(data["abaqus_solve_budget"], "abaqus_solve_budget")
+    parameterisation_id = declared_parameterisation(data["parameterisation"])
+    fitted, fixed, start, bounds, plausibility = declared_material_parameters(
+        parameterisation_id, run_type, data["fitted_parameters"], data["fixed_parameters"], data["start"],
+        data["bounds"], data["engineering_plausibility"])
+    preferred, acceptable, note = declared_practical_target(data["practical_target"])
+    sigma_state = declared_sigma(data["sigma"])
+    lm_config = declared_lm(data["lm"])
+    solve_budget = declared_solve_budget(data["abaqus_solve_budget"])
 
     not_fitted = data["not_fitted"]
     if not isinstance(not_fitted, Mapping) or set(not_fitted) != {"t_face", "k_core", "k_int"}:
@@ -496,16 +548,9 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
     if fit_terms < len(fitted):
         _fail("specimens", f"{fit_terms} campaign FIT rows < {len(fitted)} fitted parameters.")
 
-    run_b_gate = data["run_b_gate"]
-    if run_b_gate is not None:
-        run_b_gate = _text(run_b_gate, "run_b_gate")
-    if run_type == RUN_A and run_b_gate is not None:
-        _fail("run_b_gate", "a RUN_A definition carries no RUN_B gate.")
-    archive_reuse = _repo_path(data["archive_reuse"], "archive_reuse")
-    provenance = data["provenance"]
-    if not isinstance(provenance, list) or not provenance:
-        _fail("provenance", "must be a non-empty list.")
-    provenance = tuple(_text(p, "provenance[]") for p in provenance)
+    run_b_gate = declared_run_b_gate(data["run_b_gate"], run_type)
+    archive_reuse = declared_archive_reuse(data["archive_reuse"])
+    provenance = declared_provenance(data["provenance"])
 
     canonical = {
         "schema": schema, "campaign_id": campaign_id, "run_type": run_type, "decision": decision,
@@ -513,7 +558,7 @@ def parse_campaign_definition(data: object) -> CampaignDefinition:
         "start": start, "bounds": {k: list(v) for k, v in bounds.items()},
         "engineering_plausibility": {k: list(v) for k, v in plausibility.items()},
         "practical_target": {"preferred_max_abs_relative_error": preferred,
-                             "acceptable_max_abs_relative_error": acceptable, "note": target["note"]},
+                             "acceptable_max_abs_relative_error": acceptable, "note": note},
         "sigma": sigma_state.to_dict(),
         "lm": {k: getattr(lm_config, k) for k in sorted(_LM_KEYS)}, "abaqus_solve_budget": solve_budget,
         "not_fitted": not_fitted,

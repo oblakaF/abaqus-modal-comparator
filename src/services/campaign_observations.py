@@ -341,11 +341,16 @@ def draft_preparation_review(draft, repo_root: Path, fixtures: ExperimentFixture
     history = _historical(root, {s.forward_model for s in draft.specimens})
     if history:
         rows.append(("History", "Earlier campaign on these specimens", history, "UNCHANGED"))
+    from .campaign_configuration import configuration_problems, configuration_rows  # M8-D2f
+
+    rows.extend(configuration_rows(draft, root))
+    reasons.extend(f"configuration: {problem}" for problem in configuration_problems(draft, root))
     gaps = draft.gaps()
     for gap in gaps:
         rows.append(("Missing required inputs", gap.field, gap.reason, "MISSING"))
+    definition = None
     try:
-        draft.finalise()
+        definition = draft.finalise()
     except DraftIncomplete as refusal:
         finalisation = f"refused: {len(refusal.gaps)} required campaign input(s) missing"
         reasons.insert(0, f"{len(gaps)} required campaign input(s) missing")
@@ -355,7 +360,14 @@ def draft_preparation_review(draft, repo_root: Path, fixtures: ExperimentFixture
     else:
         finalisation = "accepted by the campaign-definition parser (no definition is written here)"
     rows.append(("Definition", "Finalisation (parse_campaign_definition)", finalisation,
-                 "ACCEPTED_BY_PARSER" if finalisation.startswith("accepted") else "REFUSED"))
+                 "ACCEPTED_BY_PARSER" if definition is not None else "REFUSED"))
+    if definition is not None:
+        rows.append(("Definition", "New campaign identity", f"{definition.campaign_id}: campaign hash "
+                     f"{definition.campaign_hash} (schema {definition.schema}); a new identity — no earlier (M7) "
+                     "result is carried over", "NOT_EXECUTED"))
+        rows.append(("Definition", "Execution", "not authorised: a complete definition is not identifiability and "
+                     "not an execution authorisation; execution needs its own HUMAN gate, production calibration "
+                     "stays BLOCKED / NOT_AUTHORISED", "NOT_AUTHORISED"))
     verdict = INCOMPLETE if reasons else READY_FOR_REVIEW
     rows.append(("Verdict", "Preparation", verdict, verdict))
     return PreparationReview(tuple(rows), verdict, tuple(reasons))
