@@ -5264,3 +5264,25 @@ first internal provider.
   NO_GLOBAL_PARAMETER_VALUE (D-077); SPEC, DECISIONS, EVIDENCE, governed records.
 - **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
   **Abaqus run count:** 0.
+
+## 2026-10-18 — M8-D2g Finalise Campaign Definition + Pre-run Validation (REVIEW_READY)
+
+- **Branch:** `feature/m8-d2g-campaign-finalisation` from `1159a31`.
+- **Finalise & Export Campaign Definition:** re-verification through `draft_from_document` (identities, records,
+  accepted observations, registrations, configuration, archive plan), finalisation by `parse_campaign_definition`,
+  atomic export of the exact definition outside the repository and data stores, re-read by
+  `load_campaign_definition` with the same campaign hash; cancel, write error or a change between check and save
+  write nothing; diagnostic export protocol (not governed evidence).
+- **Pre-run Validation:** six separate sections; Sources reproduce the definition and verify SHA-256 of the pinned
+  files; NOT_ASSESSED / NOT_AVAILABLE / COUNT_CONDITIONS_MET never become PASS; Execution authorisation always
+  NOT_AUTHORISED (decision / provenance text is not an authorisation).
+- **Results:** SP-02 + SP-13 RUN_A exported and validated (SHA256_VERIFIED, COUNT_CONDITIONS_MET, NOT_ASSESSED,
+  NOT_EVALUATED, NOT_AUTHORISED); SP-13 / SP-02 alone and RUN_B not finalised; tampering refused.
+- **Fix (M8-D2f):** an archive plan not yet checkable is pending, not a mismatch (cleared drafts reopen).
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates, D-079 / D-080;
+  M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE unchanged; no material constant released.
+- **Files changed:** `src/services/campaign_finalisation.py` (new), `src/services/prerun_validation.py` (new),
+  `src/services/campaign_draft.py`, `src/services/campaign_configuration.py`, `src/material_identification_ui.py`,
+  `tests/test_m8_d2g_campaign_finalisation.py` (new), `tests/test_m8_1_auto_id_setup.py`,
+  `docs/gui/M8_D2G_FINALISATION_PRERUN.md` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.

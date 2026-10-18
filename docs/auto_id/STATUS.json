@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8-D2f Complete Campaign Configuration",
-  "status": "ACCEPTED",
+  "current_ministep": "M8-D2g Finalise Campaign Definition + Pre-run Validation",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
   "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
@@ -618,7 +618,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M8-D2f ACCEPTED (PR #89, merge 1159a31). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED",
+  "next_action": "STOP: SUPERVISOR review of feature/m8-d2g-campaign-finalisation (M8-D2g REVIEW_READY, not merged). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1469,6 +1469,23 @@
         "merge_commit": "1159a314c15602f2c6fc16b7b3e69f2f155ac139",
         "branch_ci": "push CI run 39068777451 success; PR CI run 39100382516 success",
         "main_ci": "Linux CI on main 1159a31: success (run 39100415717)"
+      },
+      "M8-D2g": {
+        "title": "Finalise Campaign Definition + Pre-run Validation",
+        "status": "REVIEW_READY",
+        "branch": "feature/m8-d2g-campaign-finalisation",
+        "base": "1159a314c15602f2c6fc16b7b3e69f2f155ac139",
+        "authorisation": "SUPERVISOR task M8-D2g (2026-10-18)",
+        "scope": "Finalise & Export Campaign Definition: the draft is re-verified by draft_from_document (governed identities, bound records, accepted FIT / HOLDOUT on the strict freeze and physical registration, configuration with its repository checks, archive plan) and must equal the current draft, then CampaignDraft.finalise (parse_campaign_definition); the exact accepted definition is saved after an explicit Save As, outside the repository and data stores, atomically (the temporary file loaded by load_campaign_definition and published only with the checked campaign hash; re-read after publishing); a change between check and save, a cancel or a write error writes nothing; replacement only after confirmation and only of a campaign definition; a separate export protocol is diagnostic, not governed evidence. Pre-run Validation: Definition, Sources (governed records reproduce the definition; pinned files SHA-256 verified), Observations (§8 counts), Numerical evidence (NOT_ASSESSED / NOT_AVAILABLE kept), Scientific readiness (NOT_EVALUATED without a journalled run; calibration BLOCKED), Execution authorisation (always NOT_AUTHORISED; decision / provenance text is never an authorisation)",
+        "results": {
+          "SP02+SP13 MATERIAL_IDENTIFICATION RUN_A": "finalised, exported, re-read with the same campaign hash; Pre-run: FORMALLY_VALID, SHA256_VERIFIED (10 pinned files), COUNT_CONDITIONS_MET (pooled k = 1), NOT_ASSESSED, NOT_EVALUATED, NOT_AUTHORISED",
+          "SP13 alone": "not finalised (budget / archive plan missing); §8 INSUFFICIENT_FIT_FAMILIES",
+          "SP02 alone": "not finalised (no compatible archive-reuse plan)",
+          "RUN_B": "not finalised (run_b_gate never set by a draft)",
+          "tampering": "changed registration evidence not finalised; swapped registration / promoted holdout / altered source SHA give Pre-run Sources MISMATCH; corrupted definition INVALID; freeze changed during Save As writes nothing"
+        },
+        "fix": "M8-D2f: an archive plan that cannot be checked yet (no parameterisation) is pending, not a mismatch; a saved draft whose material parameters were cleared reopens",
+        "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, MAC / pairing rules, thresholds, gates, D-079 / D-080; no Abaqus, FE or LM; no material constant released; NO_GLOBAL_PARAMETER_VALUE unchanged; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
