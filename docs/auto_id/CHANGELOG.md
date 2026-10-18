@@ -5255,3 +5255,12 @@ first internal provider.
   `src/services/campaign_draft.py`, `src/services/campaign_observations.py`, `src/material_identification_ui.py`,
   `tests/test_m8_d2f_campaign_configuration.py` (new), six adapted draft tests,
   `docs/gui/M8_D2F_CAMPAIGN_CONFIGURATION.md` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-18 — M8-D2f ACCEPTED and closed
+
+- **M8-D2f Complete Campaign Configuration:** ACCEPTED (PR #89, merge `1159a314`; push CI `39068777451` and PR CI
+  `39100382516` success; main CI `39100415717` success). Editorial closure; no scientific result changes.
+- **Unchanged:** M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE (D-077); SPEC, DECISIONS, EVIDENCE, governed records.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+  **Abaqus run count:** 0.
