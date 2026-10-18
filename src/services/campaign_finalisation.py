@@ -28,7 +28,6 @@ import tempfile
 from typing import Iterable, Optional
 
 from domain.campaign_definition import (
-    CAMPAIGN_SCHEMAS,
     CampaignDefinition,
     CampaignDefinitionError,
     load_campaign_definition,
@@ -113,11 +112,13 @@ def _inside(path: Path, root: Path) -> bool:
 
 
 def _is_definition(path: Path) -> bool:
+    """Only a file the governed ``load_campaign_definition`` accepts is a campaign definition (a matching ``schema``
+    alone is not enough)."""
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        load_campaign_definition(path)
+    except (OSError, ValueError, TypeError, KeyError, CampaignDefinitionError):
         return False
-    return isinstance(data, dict) and data.get("schema") in CAMPAIGN_SCHEMAS
+    return True
 
 
 def _is_protocol(path: Path) -> bool:

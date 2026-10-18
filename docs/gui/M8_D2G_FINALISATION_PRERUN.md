@@ -38,7 +38,8 @@ are shown and nothing is saved. There is no second validator.
   equals the hash that was checked. The published file is then read again.
 - **Data changed after the check:** if the data changed between the check and the save (for example while the Save As
   dialog is open), nothing is written.
-- **Replacing a file:** only after an explicit confirmation, and only if the existing file is a campaign definition.
+- **Replacing a file:** only after an explicit confirmation, and only if `load_campaign_definition` accepts the
+  existing file (a matching `schema` alone is not enough; such a file is left byte-for-byte unchanged).
 - **Cancel, write error, locked file:** nothing is changed, and no partial file is left.
 - **Shown to the user:** the path, the campaign id, the campaign hash and the re-read hash.
 - **Protocol:** `<name>.export-protocol.json` is a diagnostic record of the checks, labelled
@@ -54,7 +55,7 @@ Checks a saved definition in six separate sections, each with the status of the 
 | Sources | the current governed records must reproduce the definition (same campaign hash); pinned files (modal source, FE input, reference ODB, FE geometry, forward-model INP) resolved with SHA-256 verified | `SHA256_VERIFIED` / `NOT_VERIFIED` (stores not configured) / `MISMATCH` |
 | Observations | accepted rows and registrations; SPEC v1.2 §8 counts (counting only) | `COUNT_CONDITIONS_MET` / `COUNT_CONDITIONS_NOT_MET` |
 | Numerical evidence | sensitivity, rank, leave-one-FIT-family-out, family consistency, Σ_meas | `NOT_ASSESSED`, `NOT_AVAILABLE`, `RECORDED_DIAGNOSTIC_ONLY` |
-| Scientific readiness | the scientific backend judges journalled runs only; history shown unchanged | `NOT_EVALUATED` (no run) / `BLOCKED` (calibration) |
+| Scientific readiness | not evaluated by this check (no run journal is looked up or judged); history shown unchanged | `NOT_EVALUATED` / `BLOCKED` (calibration) |
 | Execution authorisation | a definition carries no authorisation; its decision and provenance text is never one | always `NOT_AUTHORISED` |
 
 The overall result is always `NOT_AUTHORISED_FOR_EXECUTION`. Execution needs its own HUMAN gate.

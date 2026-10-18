@@ -11,8 +11,8 @@ Six separate sections, each with the status of the existing service that judges 
   (counting only);
 - **Numerical evidence** — sensitivity, practical rank, leave-one-FIT-family-out, family consistency, Σ_meas, as the
   preparation review reports them (NOT_ASSESSED / NOT_AVAILABLE stay so);
-- **Scientific readiness** — no journalled run of this campaign exists, so the scientific backend has no verdict
-  (NOT_EVALUATED); a calibration question is BLOCKED; the history of the same specimens is shown unchanged;
+- **Scientific readiness** — the scientific result is not evaluated by this check (NOT_EVALUATED: no run journal is
+  looked up or judged here); a calibration question is BLOCKED; the history of the same specimens is shown unchanged;
 - **Execution authorisation** — always NOT_AUTHORISED here: a definition carries no authorisation, its decision and
   provenance text is never one, and execution needs its own HUMAN gate.
 
@@ -211,8 +211,8 @@ def prerun_validation(path, repo_root: Path, fixtures: ExperimentFixtureManifest
         sections["Scientific readiness"] = "BLOCKED"
     else:
         rows.append(("Scientific readiness", "Scientific verdict",
-                     "no journalled run of this campaign exists: the scientific backend judges journalled runs only, so "
-                     "there is no verdict (not identified, not released)", NOT_EVALUATED))
+                     "not evaluated by this check: no run journal is looked up or judged here (the scientific backend "
+                     "judges journalled runs); no verdict, nothing identified or released", NOT_EVALUATED))
         sections["Scientific readiness"] = NOT_EVALUATED
     for row in review.rows:
         if row[0] == "History":

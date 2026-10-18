@@ -155,6 +155,15 @@ class ExportTests(_Finalisation):
         other.write_text('{"note": "not a definition"}', encoding="utf-8")
         with self.assertRaisesRegex(CampaignDraftError, "never overwritten"):
             export_campaign_definition(draft, other, ROOT, self.fixtures, (ROOT,), expected, overwrite=True)
+        # SUPERVISOR remark (PR #90): the right schema with required fields missing is not a campaign definition
+        schema_only = self.out / "schema_only.campaign.json"
+        schema_only.write_text(json.dumps({"schema": "auto-id/identification-campaign/v1.2", "campaign_id": "X"}),
+                               encoding="utf-8")
+        before = schema_only.read_bytes()
+        with self.assertRaisesRegex(CampaignDraftError, "is not a campaign definition; it is never overwritten"):
+            export_campaign_definition(draft, schema_only, ROOT, self.fixtures, (ROOT,), expected, overwrite=True)
+        self.assertEqual(schema_only.read_bytes(), before)  # byte-for-byte unchanged
+        self.assertEqual(sorted(p.name for p in self.out.iterdir()), ["other.json", "schema_only.campaign.json"])
         target = self.out / "test.campaign.json"
         export_campaign_definition(draft, target, ROOT, self.fixtures, (ROOT,), expected)
         with self.assertRaisesRegex(CampaignDraftError, "explicit confirmation"):
