@@ -47,6 +47,7 @@ from domain.campaign_definition import (
     CampaignDefinition,
     CampaignSpecimen,
     at_search_bound,
+    load_archive_reuse,
 )
 from domain.experiment_fixture import ExperimentFixtureManifest
 from domain.forward_model_manifest import BoundForwardModel
@@ -628,6 +629,23 @@ def prepare_run_manifest(definition: CampaignDefinition, reuse: ArchiveReusePlan
     if new_points:
         raise CampaignError(f"initial points need new solves {new_points}; the approved design reuses all of them.")
     return manifest, canonical_hash(manifest)
+
+
+def prepare_campaign_plan(definition: CampaignDefinition, repo_root: Path, fixtures: ExperimentFixtureManifest,
+                          roots: Mapping[str, Path], jobs_directory: Path, verify_odbs: bool = True):
+    """The one planning sequence of the CLI and the GUI (no Abaqus): the run-type / question gate, the definition's
+    governed archive-reuse plan, ``prepare_campaign_specimens`` and ``prepare_run_manifest``.
+
+    Returns ``(reuse, specimens, manifest, manifest_hash)``; the jobs of the initial points are rendered into
+    ``jobs_directory`` only.
+    """
+
+    definition.require_executable()  # before any preparation: RUN_B without its gate, calibration (V12-I5 / I6)
+    reuse = load_archive_reuse(_repo_file(repo_root, definition.archive_reuse), definition.parameterisation_id)
+    specimens = prepare_campaign_specimens(definition, repo_root, fixtures, roots)
+    manifest, manifest_hash = prepare_run_manifest(definition, reuse, specimens, roots, repo_root, jobs_directory,
+                                                   verify_odbs)
+    return reuse, specimens, manifest, manifest_hash
 
 
 # ----------------------------------------------------------------------------- report (no Abaqus)

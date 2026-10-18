@@ -5298,3 +5298,31 @@ first internal provider.
   NO_GLOBAL_PARAMETER_VALUE (D-077); SPEC, DECISIONS, EVIDENCE, governed records.
 - **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
   **Abaqus run count:** 0.
+
+## 2026-10-18 — M8-D2h Auto-ID Execution Planning & GUI Integration (REVIEW_READY)
+
+- **Branch:** `feature/m8-d2h-execution-planning` from `85b6687` (separately authorised SUPERVISOR stage).
+- **Integration point:** `identification_campaign_run.prepare_campaign_plan` is the one planning sequence of the
+  executor (run-type / question gate, governed archive-reuse plan, `prepare_campaign_specimens`,
+  `prepare_run_manifest`); `tools/m7_campaign.py` now calls it (behaviour and hashes unchanged), and
+  `services/campaign_execution_plan` puts the M8-D2g Pre-run Validation in front of it for the GUI and the plan-only
+  CLI `tools/auto_id_execution_plan.py`. No new optimiser, backend or planning scheme.
+- **Prepare Auto-ID Execution Plan...:** Definition FORMALLY_VALID and Sources SHA256_VERIFIED required; FIT /
+  HOLDOUT rows and budgets cross-checked; `run_manifest.json`, `plan_jobs/`, `execution_plan.json` written only into
+  an empty working directory outside the repository and data stores (refusal publishes nothing). Shown: campaign and
+  hash, Pre-run, manifest hash, initial-state sources, budgets, gated operations, authorisation scope.
+- **Execution:** status NOT_AUTHORISED; `request_execution` refuses before any executor, extraction, run journal or
+  LM; typed hashes, decision / provenance text and M7 authorisations are never an authorisation; a changed campaign
+  makes the plan STALE. Evaluate Stored Run and progress unchanged.
+- **Results (real GUI, SP-02 + SP-13 RUN_A):** campaign `300726a3a27e`, manifest `91df8d01027f` (reproducible),
+  scope `0d048be94ab6`; 4 archived packs ready, 2 archived SP-02 ODBs need extraction, 0 new initial solves; LM 11
+  (3 reused), hard solve budget 16; refusals as documented; 46/46 GUI checks PASS.
+- **Tests:** full suite 2436 tests OK (6 skipped) with data stores; D2h tests 25 (8 store-gated); mutation checks caught.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, MAC, pairing, frozen observations, stopping criteria, thresholds,
+  gates, D-079 / D-080; M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED /
+  NOT_AUTHORISED; NO_GLOBAL_PARAMETER_VALUE (D-077); numerical identifiability NOT_ASSESSED.
+- **Files changed:** `src/services/campaign_execution_plan.py` (new), `src/services/identification_campaign_run.py`
+  (`prepare_campaign_plan`), `tools/m7_campaign.py`, `tools/auto_id_execution_plan.py` (new),
+  `src/material_identification_ui.py`, `tests/test_m8_d2h_execution_planning.py` (new),
+  `tests/test_m8_1_auto_id_setup.py`, `docs/gui/M8_D2H_EXECUTION_PLANNING.md` (new), STATUS, ROADMAP, CHANGELOG.
+  **Abaqus run count:** 0.

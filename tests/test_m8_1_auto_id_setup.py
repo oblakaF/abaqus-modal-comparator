@@ -500,7 +500,9 @@ class SetupPageTests(_Tmp):
              "Clear Uncertainty and acceptance", "Clear Numerical algorithm (LM)", "Clear Budget and archive reuse",
              "Clear Decision and provenance", "Clear run_b_gate", "Show archived M7 RUN_A settings (reference)",
              # M8-D2g finalisation and pre-run validation
-             "Finalise & Export Campaign Definition...", "Pre-run Validation..."]))
+             "Finalise & Export Campaign Definition...", "Pre-run Validation...",
+             # M8-D2h execution plan (execution NOT_AUTHORISED; tested in test_m8_d2h_execution_planning)
+             "Prepare Auto-ID Execution Plan...", "Start Execution (not authorised)"]))
         with mock.patch.object(ui.filedialog, "askopenfilename", return_value=str(RUN_B)):
             buttons["Select family / campaign definition..."]()
         self.assertIn("RUN_B", application.material_auto_id_summary_label.kwargs["text"])

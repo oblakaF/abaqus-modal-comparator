@@ -5,7 +5,7 @@
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
   "current_ministep": "M8-D2h Auto-ID Execution Planning & GUI Integration",
-  "status": "IN_PROGRESS",
+  "status": "REVIEW_READY",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
   "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
@@ -618,7 +618,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "M8-D2h IN_PROGRESS on feature/m8-d2h-execution-planning (execution planning only; no execution). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
+  "next_action": "STOP: SUPERVISOR review of feature/m8-d2h-execution-planning (M8-D2h REVIEW_READY, not merged). Execution NOT_AUTHORISED. M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1495,10 +1495,21 @@
       },
       "M8-D2h": {
         "title": "Auto-ID Execution Planning & GUI Integration",
-        "status": "IN_PROGRESS",
+        "status": "REVIEW_READY",
         "branch": "feature/m8-d2h-execution-planning",
         "base": "85b66872147549eeb949d2338e197362441d8155",
-        "authorisation": "SUPERVISOR task M8-D2h (2026-10-18): a separately authorised stage; execution itself stays forbidden"
+        "authorisation": "SUPERVISOR task M8-D2h (2026-10-18): a separately authorised stage; execution itself stays forbidden",
+        "scope": "Prepare Auto-ID Execution Plan: a saved SPEC v1.2 campaign definition is re-checked by the M8-D2g Pre-run Validation (Definition FORMALLY_VALID, Sources SHA256_VERIFIED), loaded with load_campaign_definition and prepared by the existing executor's planning sequence identification_campaign_run.prepare_campaign_plan (the run-type / question gate, the governed archive-reuse plan, prepare_campaign_specimens, prepare_run_manifest; the M7 CLI uses the same function, hashes unchanged); prepared FIT / HOLDOUT rows cross-checked against the definition and budgets; run_manifest.json, plan_jobs/ and execution_plan.json (NOT_GOVERNED_EVIDENCE, AUTHORISES_NOTHING) written only into an empty working directory outside the repository and data stores; the plan distinguishes ready archived shape packs, archived ODBs needing a gated extraction and new solves, names the HUMAN gates and the authorisation scope (campaign hash, definition file, manifest hash, operations, budgets). Execution status NOT_AUTHORISED: request_execution refuses every request before any executor, extraction, run journal or LM; typed hashes, decision / provenance text and M7 authorisations are never an authorisation; a changed campaign makes the plan STALE. CLI tools/auto_id_execution_plan.py (plan only). Evaluate Stored Run and progress unchanged",
+        "results": {
+          "SP02+SP13 MATERIAL_IDENTIFICATION RUN_A": "campaign hash 300726a3a27ef30d28546987adc0cc9c532772c2082bf3b8a0bffaf14d48486f; Pre-run FORMALLY_VALID / SHA256_VERIFIED / COUNT_CONDITIONS_MET / NOT_ASSESSED / NOT_EVALUATED / NOT_AUTHORISED; manifest hash 91df8d01027f7332e6a1e336cdc91e49b94c69d0d01a9a07c482e008364b2364 (reproducible); authorisation scope 0d048be94ab6c6d90bbdc89e99cab7f840534181f175950be98ff53dab0a69e6",
+          "initial_states": "4 of 6 archived shape packs ready (SP02 p0; SP13 p0, E+, E-); 2 archived SP02 ODBs need an extraction (E+ SP02_13363f977809dbff, E- SP02_84753f636064e192); 0 new solves for the initial points",
+          "budgets": "LM 11 evaluations (3 reused, at most 8 new); hard Abaqus solve budget 16 (8 x 2 specimens); at most 18 Abaqus Python extractions; FIT / HOLDOUT 3 + 2 = accepted strict freezes",
+          "refusals": "Start / typed manifest, scope or M7 hash / decision text refused (nothing executed); changed campaign STALE; non-empty, repository or store folder refused; M7 v1 campaign refused; altered source MISMATCH; altered archived ODB refused; missing archive store NOT_VERIFIED; RUN_B without gate and calibration refused (BLOCKED at the backend gate); wrong archive-reuse plan refused",
+          "gui": "real Windows GUI 46/46 checks PASS, 11 screenshots; no process, executor, extraction, journal or LM reached; archived ODBs, accepted M7 journals and external_models copies unchanged",
+          "tests": "full suite 2436 tests OK (6 skipped) with data stores; D2h tests 25 (8 store-gated); mutation checks caught"
+        },
+        "statement": "an execution plan is not scientific readiness and not a right to run; numerical identifiability of the new campaign NOT_ASSESSED until a real journalled result",
+        "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, MAC / pairing rules, frozen observations, stopping criteria, thresholds, gates, D-079 / D-080, campaign / run / manifest hash semantics and journals; no Abaqus, Abaqus Python, FE or LM; no material constant released; NO_GLOBAL_PARAMETER_VALUE (D-077) unchanged; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",

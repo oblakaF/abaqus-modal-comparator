@@ -29,7 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from domain.campaign_definition import load_archive_reuse, load_campaign_definition  # noqa: E402
+from domain.campaign_definition import load_campaign_definition  # noqa: E402
 from domain.experiment_fixture import fixture_roots_from_environment, load_experiment_fixture_manifest  # noqa: E402
 from domain.identification_run import RunJournal  # noqa: E402
 from services.identification_campaign_run import (  # noqa: E402
@@ -40,8 +40,7 @@ from services.identification_campaign_run import (  # noqa: E402
     build_campaign_report,
     extract_archived_odbs,
     journalled_archive_records,
-    prepare_campaign_specimens,
-    prepare_run_manifest,
+    prepare_campaign_plan,
     reused_pack_records,
 )
 
@@ -55,9 +54,8 @@ FIXTURES = ROOT / "docs" / "auto_id" / "fixtures" / "real_experiment_fixtures.js
 def build(run_root: Path, roots, campaign: str = "run-a"):
     definition = load_campaign_definition(CAMPAIGNS[campaign])
     definition.require_executable()
-    reuse = load_archive_reuse(ROOT / definition.archive_reuse, definition.parameterisation_id)
-    specimens = prepare_campaign_specimens(definition, ROOT, load_experiment_fixture_manifest(FIXTURES), roots)
-    manifest, manifest_hash = prepare_run_manifest(definition, reuse, specimens, roots, ROOT, run_root / "plan_jobs")
+    reuse, specimens, manifest, manifest_hash = prepare_campaign_plan(  # the planning sequence the GUI uses too
+        definition, ROOT, load_experiment_fixture_manifest(FIXTURES), roots, run_root / "plan_jobs")
     return definition, reuse, specimens, manifest, manifest_hash
 
 
