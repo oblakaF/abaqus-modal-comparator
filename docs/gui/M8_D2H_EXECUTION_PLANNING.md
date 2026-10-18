@@ -55,8 +55,13 @@ The section is on **0. Auto-ID Setup**, below *Finalise & Export / Pre-run Valid
 ### The working directory
 
 - **Allowed:** an existing folder, outside (and not above) the repository and every data store. It must be empty, or
-  hold an earlier plan of the same campaign.
-- **Refused:** a folder with other files, for example the `external_models` copies. Nothing is written into it.
+  hold exactly one complete, consistent earlier plan of the same campaign:
+  - exactly `plan_jobs/`, `run_manifest.json` and `execution_plan.json`;
+  - the record's schema, labels, status, campaign hash, manifest hash and authorisation scope agree with each other and
+    with the manifest;
+  - `plan_jobs/` holds exactly the manifest's initial-point jobs, each with its generated INP SHA-256.
+- **Refused, left untouched:** a folder with other files (for example the `external_models` copies), a forged plan
+  record, an altered manifest, scope or job, or a damaged plan. Nothing is written into it and nothing is removed.
 
 ### Files written
 
@@ -66,7 +71,19 @@ The section is on **0. Auto-ID Setup**, below *Finalise & Export / Pre-run Valid
 | `plan_jobs/` | the rendered initial-point INPs |
 | `execution_plan.json` | the plan record, labelled `NOT_GOVERNED_EVIDENCE` / `AUTHORISES_NOTHING` |
 
-All derived files go only into the working directory. A refusal publishes nothing and leaves no partial files.
+All derived files go only into the working directory. Publication is all or nothing:
+
+1. **Staging:** the complete plan is written into a private staging folder inside the working directory and must pass
+   the same consistency check.
+2. **Identical plan:** if an earlier identical plan is already in place, nothing is written.
+3. **Replacement:** otherwise each earlier entry is moved aside into the staging folder before its replacement is moved
+   in.
+4. **Write error:** the new entries are moved back out and the earlier ones restored. A new plan leaves the folder empty;
+   an earlier plan stays byte for byte.
+5. **Incomplete restore:** if a restore itself fails, the earlier files are kept in the staging folder, never deleted,
+   and the error says where they are.
+
+A refusal publishes nothing and leaves no partial files.
 Original INP, CAE, ODB and UNV files and accepted journals are never opened for writing.
 
 ### What is shown
@@ -142,7 +159,7 @@ SP-02 + SP-13, `MATERIAL_IDENTIFICATION`, RUN_A (campaign `M8/D2h/SP02+SP13`):
 | Abaqus Python extractions | at most 18 (2 archived + one per new solve) |
 | Execution status | `NOT_AUTHORISED` |
 
-Real Windows GUI driver: 46/46 checks PASS, 11 screenshots, no process start, no executor reached.
+Real Windows GUI driver: 50/50 checks PASS (after the PR #91 correction, including a forged plan record, an altered earlier manifest and an unchanged byte-for-byte re-plan), 11 screenshots, no process start, no executor reached.
 
 ### Refusals
 

@@ -16,7 +16,10 @@ without running it:
 5. **Writing** — only into the chosen working directory (the future run root), never the repository, a data store or a
    folder that holds other files: ``run_manifest.json`` (the manifest exactly as the CLI writes it), ``plan_jobs/``
    (the rendered initial-point INPs) and ``execution_plan.json`` (labelled ``NOT_GOVERNED_EVIDENCE`` /
-   ``AUTHORISES_NOTHING``). A refusal publishes nothing.
+   ``AUTHORISES_NOTHING``).  The complete plan is prepared and checked in a private staging folder and published all
+   or nothing: on a write error a new plan leaves the folder empty and an earlier plan of the same campaign stays byte
+   for byte.  A folder is re-planned only when it holds exactly one complete, consistent earlier plan of this campaign
+   (identities, manifest hash, scope and initial-point jobs agree); other or damaged contents are refused untouched.
 
 The plan distinguishes ready archived shape packs, archived ODBs that need a gated extraction and new Abaqus solves,
 and names the separate HUMAN gates they need.  ``authorisation_scope`` is what a later authorisation must bind exactly
@@ -59,6 +62,7 @@ SCOPE_SCHEMA = "auto-id/execution-authorisation-scope/v1"
 PLAN_LABELS = ("EXECUTION_PLAN", "NOT_GOVERNED_EVIDENCE", "AUTHORISES_NOTHING")
 NOT_AUTHORISED = "NOT_AUTHORISED"
 MANIFEST_FILE, PLAN_FILE, JOBS_FOLDER = "run_manifest.json", "execution_plan.json", "plan_jobs"
+PLAN_ENTRIES = (JOBS_FOLDER, MANIFEST_FILE, PLAN_FILE)  # exactly what a plan folder holds, in publication order
 SOURCE_STATUS = {"archived-validated-pack": "ARCHIVED_SHAPE_PACK_READY",
                  "archived-odb-extraction": "ARCHIVED_ODB_NEEDS_EXTRACTION", "NEW_SOLVE": "NEW_ABAQUS_SOLVE"}
 GATE_ARCHIVE_EXTRACTION = "ARCHIVE_EXTRACTION"
@@ -71,6 +75,10 @@ STATEMENT = ("An execution plan is not scientific readiness and not an execution
 
 class ExecutionPlanError(ValueError):
     """The definition cannot be planned (or the plan cannot be written); nothing is published."""
+
+
+class PlanRollbackIncomplete(ExecutionPlanError):
+    """Publishing failed and the folder could not be fully restored; the earlier plan's files are kept, never deleted."""
 
 
 class ExecutionNotAuthorised(Exception):
@@ -150,9 +158,54 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _content(path: Path):
+    return _tree(path) if path.is_dir() else path.read_bytes()
+
+
+def plan_set_problems(folder, campaign_hash: str, ignore: Iterable = ()) -> list:
+    """Why ``folder`` does not hold exactly one complete, consistent execution plan of this campaign ([] if it does).
+
+    Exactly ``plan_jobs/``, ``run_manifest.json`` and ``execution_plan.json`` (besides the names in ``ignore``); the
+    record's schema, labels, status, campaign hash, manifest hash and authorisation scope agree with each other and with
+    the manifest; ``plan_jobs/`` holds exactly the manifest's initial-point jobs with their generated INP SHA-256.
+    """
+
+    folder = Path(folder)
+    names = sorted(p.name for p in folder.iterdir() if p.name not in set(ignore))
+    if names != sorted(PLAN_ENTRIES):
+        return [f"it holds {names}, not exactly {sorted(PLAN_ENTRIES)}"]
+    try:
+        record = json.loads((folder / PLAN_FILE).read_text(encoding="utf-8"))
+        manifest = json.loads((folder / MANIFEST_FILE).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        return [f"the plan files cannot be read ({error})"]
+    try:
+        if record["definition"]["campaign_hash"] != campaign_hash:
+            return ["it holds the execution plan of another campaign"]
+        scope, manifest_hash = record["authorisation_scope"], canonical_hash(manifest)
+        checks = {
+            "schema / labels / status": (record["schema"], record["labels"], record["execution_status"])
+            == (PLAN_SCHEMA, list(PLAN_LABELS), NOT_AUTHORISED),
+            "campaign hash": manifest["campaign_hash"] == scope["campaign_hash"] == campaign_hash,
+            "manifest hash": (record["manifest"]["file"], record["manifest"]["manifest_hash"], scope["manifest_hash"])
+            == (MANIFEST_FILE, manifest_hash, manifest_hash),
+            "authorisation scope": record["authorisation_scope_hash"] == canonical_hash(scope),
+            "definition file": record["definition"]["file_sha256"] == scope["definition_file_sha256"],
+        }
+        expected = {f"{p['specimen']}/{p['job_name']}.inp": p["generated_inp_sha256"]
+                    for p in manifest["initial_points"]}
+    except (KeyError, TypeError, AttributeError) as error:
+        return [f"incomplete plan record or manifest ({error!r})"]
+    problems = [f"{name} inconsistent" for name, ok in checks.items() if not ok]
+    if not (folder / JOBS_FOLDER).is_dir() or _tree(folder / JOBS_FOLDER) != expected:
+        problems.append(f"{JOBS_FOLDER}/ does not hold exactly the manifest's initial-point jobs")
+    return problems
+
+
 def check_work_directory(directory, protected_roots: Iterable, campaign_hash: str) -> Path:
     """A permitted working directory: an existing folder outside (and not above) the repository, every data store and
-    every other protected root, which is empty or holds an earlier plan of the same campaign."""
+    every other protected root, which is empty or holds exactly one complete, consistent earlier plan of the same
+    campaign (``plan_set_problems``); anything else is refused and left untouched."""
 
     if directory is None or not str(directory).strip():
         raise ExecutionPlanError("no working directory selected.")
@@ -166,19 +219,12 @@ def check_work_directory(directory, protected_roots: Iterable, campaign_hash: st
         if _inside(target, root) or _inside(root, target):
             raise ExecutionPlanError(f"{target} is inside or above the protected {root} (repository, data store or "
                                      "source folder); an execution plan is written elsewhere.")
-    entries = [p for p in target.iterdir() if not p.name.startswith(".plan-staging-")]
-    if entries:
-        plan = target / PLAN_FILE
-        try:
-            earlier = json.loads(plan.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            earlier = None
-        if not isinstance(earlier, dict) or earlier.get("schema") != PLAN_SCHEMA:
-            raise ExecutionPlanError(f"{target} is not empty and holds no execution plan; choose an empty working "
-                                     "directory (other files are never mixed with a plan).")
-        if (earlier.get("definition") or {}).get("campaign_hash") != campaign_hash:
-            raise ExecutionPlanError(f"{target} holds the execution plan of another campaign; choose a new working "
-                                     "directory.")
+    if any(target.iterdir()):
+        problems = plan_set_problems(target, campaign_hash)
+        if problems:
+            raise ExecutionPlanError(f"{target} is not empty and does not hold exactly one complete, consistent "
+                                     f"execution plan of this campaign ({'; '.join(problems)}); choose an empty working "
+                                     "directory. Nothing written; no file there is changed or removed.")
     return target
 
 
@@ -379,6 +425,7 @@ def prepare_execution_plan(definition_path, work_directory, repo_root: Path, fix
         raise ExecutionPlanError("the definition changed during Pre-run Validation; nothing written.")
     work = check_work_directory(work_directory, protected_roots, definition.campaign_hash)
     staging = work / f".plan-staging-{uuid.uuid4().hex}"
+    keep_staging = False
     try:
         staging.mkdir()
         try:
@@ -406,26 +453,72 @@ def prepare_execution_plan(definition_path, work_directory, repo_root: Path, fix
             raise ExecutionPlanError("the campaign definition file changed while the plan was prepared; nothing "
                                      "written.")
         _publish(plan, staging)
+    except PlanRollbackIncomplete:
+        keep_staging = True  # it holds the earlier plan's files that could not be put back: never deleted
+        raise
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        if not keep_staging:
+            shutil.rmtree(staging, ignore_errors=True)
     return plan
 
 
 def _publish(plan: ExecutionPlan, staging: Path) -> None:
-    jobs, staged = plan.work_directory / JOBS_FOLDER, staging / JOBS_FOLDER
-    if jobs.exists():
-        if _tree(jobs) != _tree(staged):
-            raise ExecutionPlanError(f"{jobs} holds other initial-point jobs; nothing replaced or written.")
-    else:
-        os.replace(staged, jobs)
+    """Publish the three plan entries, all or nothing.
+
+    The complete plan is first written into the private staging folder and must itself pass ``plan_set_problems``.  An
+    earlier plan of the same campaign is re-checked; if it is identical nothing is written.  Otherwise each earlier entry
+    is moved into the staging folder before its replacement is moved in; on a write error every new entry is moved back
+    out and every earlier entry restored, so a new plan leaves the folder empty and an earlier plan stays byte for byte.
+    """
+
+    work = plan.work_directory
 
     def verify(temporary: Path) -> None:
         if canonical_hash(json.loads(temporary.read_text(encoding="utf-8"))) != plan.manifest_hash:
             raise ExecutionPlanError("the written run manifest re-reads with another manifest hash; nothing "
                                      "published.")
 
-    _atomic_write(plan.manifest_path, json.dumps(plan.manifest, indent=1).encode("utf-8"), verify)
-    _atomic_write(plan.plan_path, (json.dumps(plan.record(), indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+    _atomic_write(staging / MANIFEST_FILE, json.dumps(plan.manifest, indent=1).encode("utf-8"), verify)
+    _atomic_write(staging / PLAN_FILE, (json.dumps(plan.record(), indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+    problems = plan_set_problems(staging, plan.campaign_hash)
+    if problems:
+        raise ExecutionPlanError("the prepared plan is not a complete, consistent plan (" + "; ".join(problems)
+                                 + "); nothing published.")
+    own = (staging.name,)
+    if any(p.name not in own for p in work.iterdir()):
+        problems = plan_set_problems(work, plan.campaign_hash, ignore=own)
+        if problems:
+            raise ExecutionPlanError(f"{work} changed since it was checked ({'; '.join(problems)}); nothing written.")
+        if all(_content(work / name) == _content(staging / name) for name in PLAN_ENTRIES):
+            return  # the identical plan is already in place: nothing is written
+    earlier = staging / ".earlier"
+    moved_earlier, moved_new = [], []
+    try:
+        for name in PLAN_ENTRIES:
+            if (work / name).exists():
+                earlier.mkdir(exist_ok=True)
+                os.replace(work / name, earlier / name)
+                moved_earlier.append(name)
+            os.replace(staging / name, work / name)
+            moved_new.append(name)
+    except OSError as error:
+        failures = []
+        for name in reversed(moved_new):
+            try:
+                os.replace(work / name, staging / name)
+            except OSError as undo:
+                failures.append(f"{name}: {undo}")
+        for name in reversed(moved_earlier):
+            try:
+                os.replace(earlier / name, work / name)
+            except OSError as undo:
+                failures.append(f"{name}: {undo}")
+        if failures:
+            raise PlanRollbackIncomplete(f"publishing the plan failed ({error}) and the folder could not be fully "
+                                         f"restored ({'; '.join(failures)}); the earlier plan's files are kept in "
+                                         f"{earlier}.") from error
+        raise ExecutionPlanError(f"publishing the plan failed ({error}); the working directory was restored "
+                                 "unchanged; nothing published.") from error
 
 
 # ----------------------------------------------------------------------------- staleness and the execution entry point
@@ -474,5 +567,5 @@ def request_execution(plan: Optional[ExecutionPlan], authorisation: object = Non
     raise ExecutionNotAuthorised(f"Execution status {NOT_AUTHORISED}: " + "; ".join(reasons) + ". Nothing executed.")
 
 
-__all__ = ["ExecutionPlan", "ExecutionPlanError", "ExecutionNotAuthorised", "prepare_execution_plan",
-           "check_work_directory", "plan_problems", "request_execution", "authorisation_scope", "NOT_AUTHORISED"]
+__all__ = ["ExecutionPlan", "ExecutionPlanError", "ExecutionNotAuthorised", "PlanRollbackIncomplete",
+           "prepare_execution_plan", "check_work_directory", "plan_set_problems", "plan_problems", "request_execution", "authorisation_scope", "NOT_AUTHORISED"]

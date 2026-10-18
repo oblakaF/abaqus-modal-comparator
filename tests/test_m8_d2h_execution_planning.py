@@ -39,6 +39,7 @@ from services.campaign_execution_plan import (  # noqa: E402
     ExecutionPlanError,
     check_work_directory,
     plan_problems,
+    plan_set_problems,
     prepare_execution_plan,
     request_execution,
 )
@@ -83,7 +84,8 @@ def fake_manifest(definition, sources=("archived-validated-pack", "archived-odb-
         for point, source in zip(points, sources):
             job = f"{spec.label}_{hashlib.sha256((spec.label + point).encode()).hexdigest()[:16]}"
             initial.append({"specimen": spec.label, "point": point, "parameters": {"E_in_plane_mpa": 52000.0},
-                            "job_name": job, "generated_inp_sha256": "0" * 64, "source": source})
+                            "job_name": job, "generated_inp_sha256": hashlib.sha256(job_content(job)).hexdigest(),
+                            "source": source})
             if source == "archived-odb-extraction":
                 extraction.append({"specimen": spec.label, "point": point, "job_name": job,
                                    "odb": {"store": "archive", "relative_path": f"runs/{job}.odb", "sha256": "a" * 64,
@@ -103,9 +105,48 @@ def fake_manifest(definition, sources=("archived-validated-pack", "archived-odb-
                         "max_new_campaign_evaluations": lm - len(points)}}
 
 
+def job_content(job: str) -> bytes:
+    return b"*HEADING " + job.encode()
+
+
+def write_jobs(jobs_directory, manifest) -> None:
+    """The initial-point INPs as the planning sequence renders them: plan_jobs/<specimen>/<job>.inp."""
+    for point in manifest["initial_points"]:
+        target = Path(jobs_directory, point["specimen"], point["job_name"] + ".inp")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(job_content(point["job_name"]))
+
+
 def tree(folder: Path) -> dict:
     return {p.relative_to(folder).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(Path(folder).rglob("*")) if p.is_file()}
+
+
+def snapshot(folder: Path) -> dict:
+    """Every file and folder under ``folder`` with its bytes (byte-for-byte comparison)."""
+    return {p.relative_to(folder).as_posix(): (p.read_bytes() if p.is_file() else None)
+            for p in sorted(Path(folder).rglob("*"))}
+
+
+@contextlib.contextmanager
+def failing_publication(publish=(), restore=()):
+    """Injected write errors: publishing the named plan entries, or restoring the earlier ones."""
+
+    import os
+
+    real = os.replace
+
+    def replace(source, destination):
+        source, destination = Path(source), Path(destination)
+        into_work = not destination.parent.name.startswith(".plan-staging-")  # not a write inside the staging folder
+        if into_work and source.parent.name.startswith(".plan-staging-") and destination.name in publish:
+            raise OSError(f"injected failure publishing {destination.name}")
+        if source.parent.name == ".earlier" and destination.name in restore:
+            raise OSError(f"injected failure restoring {destination.name}")
+        return real(source, destination)
+
+    with mock.patch.object(plan_module.os, "replace", side_effect=replace):
+        yield
 
 
 class _Planning(unittest.TestCase):
@@ -158,8 +199,7 @@ class _FakePlan(_Planning):
         manifest = manifest or fake_manifest(definition)
 
         def planning(definition, repo_root, fixtures, roots, jobs_directory, verify_odbs=True):
-            Path(jobs_directory, "SP02").mkdir(parents=True)
-            Path(jobs_directory, "SP02", "job.inp").write_text("*HEADING\n", encoding="utf-8")
+            write_jobs(jobs_directory, manifest)
             if during is not None:
                 during()
             return None, (), manifest, canonical_hash(manifest)
@@ -251,7 +291,100 @@ class FakePlanningTests(_FakePlan):
         before = tree(work)
         second = self.plan(work=work)
         self.assertEqual(second.manifest_hash, first.manifest_hash)
-        self.assertEqual(tree(work), before)
+        self.assertEqual(second.authorisation_scope_hash, first.authorisation_scope_hash)
+        self.assertEqual(tree(work), before)  # identical plan: nothing written
+
+    def test_replanning_replaces_the_earlier_plan_completely(self):
+        work = self.work()
+        first = self.plan(work=work)
+        other = self.copy_definition()  # the same campaign (same hash) saved at another path: another plan record
+        second = self.plan(path=other, work=work)
+        self.assertEqual(second.campaign_hash, first.campaign_hash)
+        self.assertEqual(second.manifest_hash, first.manifest_hash)
+        self.assertNotEqual(second.authorisation_scope_hash, first.authorisation_scope_hash)  # definition file pinned
+        self.assertEqual(sorted(p.name for p in work.iterdir()), sorted(plan_module.PLAN_ENTRIES))  # no leftovers
+        self.assertEqual(plan_set_problems(work, second.campaign_hash), [])
+        self.assertEqual(json.loads((work / "execution_plan.json").read_text(encoding="utf-8")),
+                         json.loads(json.dumps(second.record())))
+
+    def test_a_failure_publishing_the_second_or_third_file_leaves_a_new_folder_empty(self):
+        for entry in ("run_manifest.json", "execution_plan.json"):
+            with self.subTest(failing=entry):
+                work = self.work()
+                with failing_publication(publish=(entry,)), \
+                        self.assertRaisesRegex(ExecutionPlanError, "restored unchanged; nothing published"):
+                    self.plan(work=work)
+                self.assertEqual(list(work.iterdir()), [])  # no plan_jobs/, no manifest, no staging left
+
+    def test_a_failure_publishing_the_second_or_third_file_keeps_the_earlier_plan(self):
+        for entry in ("run_manifest.json", "execution_plan.json"):
+            with self.subTest(failing=entry):
+                work = self.work()
+                self.plan(work=work)
+                before = snapshot(work)
+                with failing_publication(publish=(entry,)), \
+                        self.assertRaisesRegex(ExecutionPlanError, "restored unchanged; nothing published"):
+                    self.plan(path=self.copy_definition(), work=work)  # a differing plan of the same campaign
+                self.assertEqual(snapshot(work), before)  # byte for byte, no staging left
+
+    def test_an_incomplete_rollback_never_deletes_the_earlier_plan(self):
+        work = self.work()
+        self.plan(work=work)
+        manifest = (work / "run_manifest.json").read_bytes()
+        with failing_publication(publish=("execution_plan.json",), restore=("run_manifest.json",)), \
+                self.assertRaises(plan_module.PlanRollbackIncomplete):
+            self.plan(path=self.copy_definition(), work=work)
+        kept = list(work.glob(".plan-staging-*/.earlier/run_manifest.json"))
+        self.assertEqual([p.read_bytes() for p in kept], [manifest])  # kept for recovery, never removed
+
+    def test_forged_or_damaged_earlier_plans_are_refused_untouched(self):
+        valid = self.work()
+        self.plan(work=valid)
+        definition_hash = self.definition.campaign_hash
+
+        def forged_record_only(folder):
+            for name in ("run_manifest.json", "plan_jobs"):
+                shutil.rmtree(folder / name) if (folder / name).is_dir() else (folder / name).unlink()
+
+        def forged_record_claims(folder):  # right schema and campaign hash, nothing else consistent
+            (folder / "execution_plan.json").write_text(json.dumps(
+                {"schema": PLAN_SCHEMA, "definition": {"campaign_hash": definition_hash}}), encoding="utf-8")
+
+        def altered_manifest(folder):
+            manifest = json.loads((folder / "run_manifest.json").read_text(encoding="utf-8"))
+            manifest["budgets"]["max_new_abaqus_solves"] += 1
+            (folder / "run_manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+
+        def altered_scope(folder):
+            record = json.loads((folder / "execution_plan.json").read_text(encoding="utf-8"))
+            record["authorisation_scope"]["operations"]["lm_evaluation_budget"] = 99
+            (folder / "execution_plan.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+        def extra_job(folder):
+            (folder / "plan_jobs" / "SP02" / "extra.inp").write_bytes(b"*HEADING")
+
+        def altered_job(folder):
+            job = next((folder / "plan_jobs").rglob("*.inp"))
+            job.write_bytes(job.read_bytes() + b" ")
+
+        def foreign_file(folder):
+            (folder / "notes.txt").write_bytes(b"user notes")
+
+        def corrupted_record(folder):
+            (folder / "execution_plan.json").write_bytes(b"{")
+
+        for damage in (forged_record_only, forged_record_claims, altered_manifest, altered_scope, extra_job,
+                       altered_job, foreign_file, corrupted_record):
+            with self.subTest(damage=damage.__name__):
+                work = self.work()
+                shutil.rmtree(work)
+                shutil.copytree(valid, work)
+                damage(work)
+                before = snapshot(work)
+                self.assertNotEqual(plan_set_problems(work, definition_hash), [])
+                with self.assertRaisesRegex(ExecutionPlanError, "does not hold exactly one complete, consistent"):
+                    self.plan(work=work)
+                self.assertEqual(snapshot(work), before)  # nothing written, nothing removed
 
     def test_working_directory_rules(self):
         definition_hash = self.definition.campaign_hash
@@ -269,7 +402,7 @@ class FakePlanningTests(_FakePlan):
             check_work_directory(self.work(), (None,), definition_hash)
         models = self.work()  # a folder of user files (for example external_models copies)
         (models / "SP02.inp").write_text("*HEADING\n", encoding="utf-8")
-        with self.assertRaisesRegex(ExecutionPlanError, "not empty and holds no execution plan"):
+        with self.assertRaisesRegex(ExecutionPlanError, "not empty and does not hold exactly one complete, consistent"):
             check_work_directory(models, (ROOT,), definition_hash)
         work = self.work()
         with self.assertRaisesRegex(ExecutionPlanError, "not empty"):
@@ -373,7 +506,7 @@ class ExecutionEntryTests(_FakePlan):
         definition = self.definition
 
         def planning(definition_, repo_root, fixtures, roots, jobs_directory, verify_odbs=True):
-            Path(jobs_directory).mkdir(parents=True)
+            write_jobs(jobs_directory, manifest)
             return None, (), manifest, canonical_hash(manifest)
 
         with mock.patch.object(plan_module, "prerun_validation",

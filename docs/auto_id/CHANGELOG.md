@@ -5326,3 +5326,27 @@ first internal provider.
   `src/material_identification_ui.py`, `tests/test_m8_d2h_execution_planning.py` (new),
   `tests/test_m8_1_auto_id_setup.py`, `docs/gui/M8_D2H_EXECUTION_PLANNING.md` (new), STATUS, ROADMAP, CHANGELOG.
   **Abaqus run count:** 0.
+
+## 2026-10-19 — M8-D2h review correction (PR #91): all-or-nothing plan publication
+
+- **Remark:** `_publish` wrote `plan_jobs/`, `run_manifest.json` and `execution_plan.json` one after another; a write
+  error after the first could leave the working directory partly changed.
+- **Fix:** the complete plan is written into a private staging folder and must pass `plan_set_problems`. An identical
+  earlier plan is left as is (nothing written). Otherwise each earlier entry is moved aside into the staging folder
+  before its replacement is moved in. On a write error the new entries are moved back and the earlier ones restored:
+  a new plan leaves the folder empty, an earlier plan stays byte for byte. If a restore fails, the earlier files are
+  kept (`PlanRollbackIncomplete`), never deleted.
+- **Re-planning:** only in a folder holding exactly one complete, consistent earlier plan of the same campaign
+  (exactly the three entries; record schema / labels / status, campaign hash, manifest hash and authorisation scope
+  agree with the manifest; `plan_jobs/` holds exactly the manifest's initial-point jobs with their INP SHA-256).
+  Foreign files, a forged `execution_plan.json`, an altered manifest / scope / job or a damaged plan are refused and
+  left untouched.
+- **Tests:** injected failures publishing the second and third file (new folder stays empty; earlier plan byte for
+  byte), incomplete rollback keeps the earlier plan, forged / damaged folders refused untouched; mutation checks caught; D2h tests 30
+  (8 store-gated) OK; full suite with data stores 2441 OK (6 skipped).
+  Real Windows GUI 50/50 checks PASS (forged plan record, altered earlier manifest refused untouched; same-campaign
+  re-plan byte for byte); campaign `300726a3`, manifest `91df8d01`, scope `0d048be9` unchanged.
+- **Unchanged:** manifest hash and authorisation scope (reproducible), planning sequence, scientific criteria, gates,
+  execution NOT_AUTHORISED. **Files changed:** `src/services/campaign_execution_plan.py`,
+  `tests/test_m8_d2h_execution_planning.py`, `docs/gui/M8_D2H_EXECUTION_PLANNING.md`, STATUS, CHANGELOG.
+  **Abaqus run count:** 0.
