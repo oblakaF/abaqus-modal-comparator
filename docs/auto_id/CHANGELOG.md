@@ -5286,3 +5286,15 @@ first internal provider.
   `src/services/campaign_draft.py`, `src/services/campaign_configuration.py`, `src/material_identification_ui.py`,
   `tests/test_m8_d2g_campaign_finalisation.py` (new), `tests/test_m8_1_auto_id_setup.py`,
   `docs/gui/M8_D2G_FINALISATION_PRERUN.md` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-18 — M8-D2g ACCEPTED and closed
+
+- **M8-D2g Finalise Campaign Definition + Pre-run Validation:** ACCEPTED (PR #90, merge `85b66872`; push CI
+  `39118749662` and PR CI `39118752870` success; main CI `39120292310` success). Editorial closure; no scientific
+  result changes.
+- **M8-D2h** Auto-ID Execution Planning & GUI Integration entered in the ROADMAP as a separately authorised SUPERVISOR
+  stage (`IN_PROGRESS`; execution not authorised).
+- **Unchanged:** M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE (D-077); SPEC, DECISIONS, EVIDENCE, governed records.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+  **Abaqus run count:** 0.

@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8-D2g Finalise Campaign Definition + Pre-run Validation",
-  "status": "REVIEW_READY",
+  "current_ministep": "M8-D2h Auto-ID Execution Planning & GUI Integration",
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
   "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
@@ -618,7 +618,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of feature/m8-d2g-campaign-finalisation (M8-D2g REVIEW_READY, not merged). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
+  "next_action": "M8-D2h IN_PROGRESS on feature/m8-d2h-execution-planning (execution planning only; no execution). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1472,7 +1472,7 @@
       },
       "M8-D2g": {
         "title": "Finalise Campaign Definition + Pre-run Validation",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "feature/m8-d2g-campaign-finalisation",
         "base": "1159a314c15602f2c6fc16b7b3e69f2f155ac139",
         "authorisation": "SUPERVISOR task M8-D2g (2026-10-18)",
@@ -1486,7 +1486,19 @@
         },
         "fix": "M8-D2f: an archive plan that cannot be checked yet (no parameterisation) is pending, not a mismatch; a saved draft whose material parameters were cleared reopens",
         "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, MAC / pairing rules, thresholds, gates, D-079 / D-080; no Abaqus, FE or LM; no material constant released; NO_GLOBAL_PARAMETER_VALUE unchanged; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET",
-        "review_correction": "SUPERVISOR remark (PR #90): an existing file is replaced only when load_campaign_definition accepts it (a matching schema alone is refused, file unchanged); Pre-run states NOT_EVALUATED without claiming that no run journal exists"
+        "review_correction": "SUPERVISOR remark (PR #90): an existing file is replaced only when load_campaign_definition accepts it (a matching schema alone is refused, file unchanged); Pre-run states NOT_EVALUATED without claiming that no run journal exists",
+        "acceptance": "SUPERVISOR: M8-D2g ACCEPTED (task M8-D2h, 2026-10-18); PR #90 merged",
+        "pr": 90,
+        "merge_commit": "85b66872147549eeb949d2338e197362441d8155",
+        "branch_ci": "push CI run 39118749662 success; PR CI run 39118752870 success",
+        "main_ci": "Linux CI on main 85b6687: success (run 39120292310)"
+      },
+      "M8-D2h": {
+        "title": "Auto-ID Execution Planning & GUI Integration",
+        "status": "IN_PROGRESS",
+        "branch": "feature/m8-d2h-execution-planning",
+        "base": "85b66872147549eeb949d2338e197362441d8155",
+        "authorisation": "SUPERVISOR task M8-D2h (2026-10-18): a separately authorised stage; execution itself stays forbidden"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
