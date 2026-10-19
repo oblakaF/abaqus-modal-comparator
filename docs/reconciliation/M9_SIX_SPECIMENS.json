@@ -1,0 +1,881 @@
+{
+ "schema": "m9/six-specimen-reconciliation/v1",
+ "labels": [
+  "ANALYSIS_ONLY",
+  "NOT_GOVERNED_EVIDENCE",
+  "NO_MODE_PAIRING_BY_FREQUENCY"
+ ],
+ "report": "docs/reconciliation/M9_SIX_SPECIMENS.md",
+ "verdicts": {
+  "SP-02": {
+   "comparison": "READY_FOR_COMPARISON",
+   "auto_id": "GOVERNED_HISTORICAL (D-077 NO_GLOBAL_PARAMETER_VALUE)",
+   "accepted_model": "SP02_Modal_V02.inp (574ae78a)",
+   "new_odb": "DIAGNOSTIC_ONLY until FE frame verified"
+  },
+  "SP-13": {
+   "comparison": "READY_FOR_COMPARISON",
+   "auto_id": "GOVERNED_HISTORICAL (D-077 NO_GLOBAL_PARAMETER_VALUE)",
+   "accepted_model": "SP13_mesh_local_v1_modal.inp (9d410584)",
+   "new_odb": "DIAGNOSTIC_ONLY (other meshes)"
+  },
+  "SP-10": {
+   "comparison": "DIAGNOSTIC_ONLY",
+   "auto_id": "MISSING_EVIDENCE",
+   "reason": "no physical registration (scan-window reconstruction not done; in-plane orientation of panel and lattice against FE axes not recorded; near-square 520x515; session b rotated 90 deg); no SPEC v1.2 section 11 records; models tuned on own data; FE rows 10-12 not reproducible"
+  },
+  "SP-03": {
+   "comparison": "DIAGNOSTIC_ONLY",
+   "auto_id": "MISSING_EVIDENCE",
+   "reason": "PolyMAX only in the sumin zip; no physical registration; twill constants blank"
+  },
+  "SP-04": {
+   "comparison": "DIAGNOSTIC_ONLY",
+   "auto_id": "MISSING_EVIDENCE",
+   "reason": "PolyMAX only in the zip (LMS 'not good'); TPU and old 0.25 mm carbon unknown; adhesive 29 % of mass"
+  },
+  "SP-05": {
+   "comparison": "DIAGNOSTIC_ONLY",
+   "auto_id": "MISSING_EVIDENCE",
+   "reason": "PolyMAX only in the zip; TPU and old 0.25 mm carbon unknown; Excel damping copied from SP-04; mass 166.4 calculated vs 161.34 measured"
+  }
+ },
+ "face_membrane_stiffness_E_t_N_per_mm": {
+  "SP-02 new": 24480,
+  "SP-03 new": 24480,
+  "SP-10 new top/bottom": [
+   24520,
+   24492
+  ],
+  "SP-13 FINAL": 24480,
+  "accepted SP-02": 23400,
+  "accepted SP-13": 22100
+ },
+ "control_regression": "103 store-gated tests OK, 0 skipped (2026-10-20)",
+ "tables": {
+  "faces": {
+   "SP-02": {
+    "plan_mm": [
+     515,
+     510
+    ],
+    "faces": {
+     "top": {
+      "t_mm": 0.45,
+      "mass_g": 175.6,
+      "areal_g_m2": 668.6,
+      "density_g_cm3": 1.4857
+     },
+     "bottom": {
+      "t_mm": 0.45,
+      "mass_g": 175.6,
+      "areal_g_m2": 668.6,
+      "density_g_cm3": 1.4857
+     }
+    },
+    "core_g": 144.58,
+    "core_areal_g_m2": 550.5,
+    "adhesive_g": 90.35,
+    "adhesive_areal_g_m2": 344.0,
+    "adhesive_share": 0.1551,
+    "finished_g": 582.71,
+    "weave": "plain",
+    "stock": "old",
+    "nominal_t_mm": 0.45,
+    "core": "PLA honeycomb"
+   },
+   "SP-03": {
+    "plan_mm": [
+     515,
+     510
+    ],
+    "faces": {
+     "top": {
+      "t_mm": 0.45,
+      "mass_g": 165,
+      "areal_g_m2": 628.2,
+      "density_g_cm3": 1.396
+     },
+     "bottom": {
+      "t_mm": 0.45,
+      "mass_g": 165.8,
+      "areal_g_m2": 631.3,
+      "density_g_cm3": 1.4028
+     }
+    },
+    "core_g": 178.6,
+    "core_areal_g_m2": 680.0,
+    "adhesive_g": 87.99,
+    "adhesive_areal_g_m2": 335.0,
+    "adhesive_share": 0.1477,
+    "finished_g": 595.7,
+    "weave": "twill",
+    "stock": "old",
+    "nominal_t_mm": 0.45,
+    "core": "PLA auxetic"
+   },
+   "SP-04": {
+    "plan_mm": [
+     302,
+     297.5
+    ],
+    "faces": {
+     "top": {
+      "t_mm": 0.25,
+      "mass_g": 30.8,
+      "areal_g_m2": 342.8,
+      "density_g_cm3": 1.3713
+     },
+     "bottom": {
+      "t_mm": 0.25,
+      "mass_g": 30.75,
+      "areal_g_m2": 342.3,
+      "density_g_cm3": 1.369
+     }
+    },
+    "core_g": 63.38,
+    "core_areal_g_m2": 705.4,
+    "adhesive_g": 50.52,
+    "adhesive_areal_g_m2": 562.3,
+    "adhesive_share": 0.2903,
+    "finished_g": 174.03,
+    "weave": "plain",
+    "stock": "old",
+    "nominal_t_mm": 0.25,
+    "core": "TPU honeycomb"
+   },
+   "SP-05": {
+    "plan_mm": [
+     301.14,
+     302
+    ],
+    "faces": {
+     "top": {
+      "t_mm": 0.245,
+      "mass_g": 31.5,
+      "areal_g_m2": 346.4,
+      "density_g_cm3": 1.4137
+     },
+     "bottom": {
+      "t_mm": 0.245,
+      "mass_g": 31.4,
+      "areal_g_m2": 345.3,
+      "density_g_cm3": 1.4093
+     }
+    },
+    "core_g": 54,
+    "core_areal_g_m2": 593.8,
+    "adhesive_g": 49.5,
+    "adhesive_areal_g_m2": 544.3,
+    "adhesive_share": 0.3068,
+    "finished_g": 161.34,
+    "weave": "plain",
+    "stock": "old",
+    "nominal_t_mm": 0.25,
+    "core": "TPU auxetic"
+   },
+   "SP-10": {
+    "plan_mm": [
+     520,
+     515
+    ],
+    "faces": {
+     "top": {
+      "t_mm": 0.4,
+      "mass_g": 161.5,
+      "areal_g_m2": 603.1,
+      "density_g_cm3": 1.5077
+     },
+     "bottom": {
+      "t_mm": 0.39,
+      "mass_g": 163,
+      "areal_g_m2": 608.7,
+      "density_g_cm3": 1.5607
+     }
+    },
+    "core_g": 145.84,
+    "core_areal_g_m2": 544.6,
+    "adhesive_g": 84.72,
+    "adhesive_areal_g_m2": 316.4,
+    "adhesive_share": 0.1526,
+    "finished_g": 555.23,
+    "weave": "plain",
+    "stock": "old",
+    "nominal_t_mm": 0.45,
+    "core": "PLA honeycomb"
+   },
+   "SP-13": {
+    "plan_mm": [
+     510,
+     520
+    ],
+    "faces": {
+     "top": {
+      "t_mm": 0.425,
+      "mass_g": 163.6,
+      "areal_g_m2": 616.9,
+      "density_g_cm3": 1.4515
+     },
+     "bottom": {
+      "t_mm": 0.425,
+      "mass_g": 158.5,
+      "areal_g_m2": 597.7,
+      "density_g_cm3": 1.4063
+     }
+    },
+    "core_g": 179.13,
+    "core_areal_g_m2": 675.5,
+    "adhesive_g": 83.16,
+    "adhesive_areal_g_m2": 313.6,
+    "adhesive_share": 0.1423,
+    "finished_g": 584.6,
+    "weave": "plain",
+    "stock": "old",
+    "nominal_t_mm": 0.45,
+    "core": "PLA auxetic"
+   }
+  },
+  "mass_check": {
+   "SP-02": {
+    "SP02_Modal_V02 (accepted)": {
+     "model_g": 582.1,
+     "deviation_pct": -0.1
+    },
+    "SP2job": {
+     "model_g": 582.1,
+     "deviation_pct": -0.1
+    },
+    "SP02_NSM_CORE_NEWCFRPE1E2": {
+     "model_g": 582.78,
+     "deviation_pct": 0.01
+    }
+   },
+   "SP-03": {
+    "SP03_FreeFree_Modal": {
+     "model_g": 597.47,
+     "deviation_pct": 0.3
+    },
+    "SP03_NEWCFRP_NSM": {
+     "model_g": 595.78,
+     "deviation_pct": 0.01
+    }
+   },
+   "SP-04": {
+    "Honeycomb_TPU_FreeFree": {
+     "model_g": 174.01,
+     "deviation_pct": -0.01
+    },
+    "SP04_CFRP_E1=E2": {
+     "model_g": 174.01,
+     "deviation_pct": -0.01
+    },
+    "SP04TPU320": {
+     "model_g": 174.01,
+     "deviation_pct": -0.01
+    }
+   },
+   "SP-05": {
+    "SP05_FreeFree": {
+     "model_g": 161.34,
+     "deviation_pct": -0.0
+    },
+    "SP05_modal": {
+     "model_g": 161.59,
+     "deviation_pct": 0.15
+    }
+   },
+   "SP-10": {
+    "SP10nemash63000": {
+     "model_g": 555.23,
+     "deviation_pct": -0.0
+    },
+    "SP10_NEW_E1=E2_NSM_DENSITY": {
+     "model_g": 555.13,
+     "deviation_pct": -0.02
+    },
+    "SP_10": {
+     "model_g": 583.73,
+     "deviation_pct": 5.13
+    }
+   },
+   "SP-13": {
+    "SP13_mesh_local_v1_modal (accepted)": {
+     "model_g": 584.45,
+     "deviation_pct": -0.02
+    },
+    "SP13FINAL": {
+     "model_g": 584.43,
+     "deviation_pct": -0.03
+    },
+    "SP13Spring0_1 (shaker+springs)": {
+     "model_g": 745.43,
+     "deviation_pct": 27.51
+    }
+   }
+  },
+  "governed_pairs": {
+   "SP-02": [
+    {
+     "row": "R1",
+     "role": "FIT",
+     "exp_mode": 2,
+     "exp_hz": 74.376,
+     "fe_mode": 8,
+     "fe_hz": 75.241,
+     "error_pct": 1.16
+    },
+    {
+     "row": "R2",
+     "role": "FIT",
+     "exp_mode": 4,
+     "exp_hz": 90.5749,
+     "fe_mode": 10,
+     "fe_hz": 89.327,
+     "error_pct": -1.38
+    },
+    {
+     "row": "R3",
+     "role": "HOLDOUT",
+     "exp_mode": 7,
+     "exp_hz": 201.9995,
+     "fe_mode": 13,
+     "fe_hz": 207.43,
+     "error_pct": 2.69
+    }
+   ],
+   "SP-13": [
+    {
+     "row": "R1",
+     "role": "FIT",
+     "exp_mode": 4,
+     "exp_hz": 94.3991,
+     "fe_mode": 10,
+     "fe_hz": 85.851,
+     "error_pct": -9.06
+    },
+    {
+     "row": "R2",
+     "role": "HOLDOUT",
+     "exp_mode": 7,
+     "exp_hz": 205.6489,
+     "fe_mode": 13,
+     "fe_hz": 199.98,
+     "error_pct": -2.76
+    }
+   ]
+  },
+  "rank_tables": {
+   "SP-02": {
+    "exp_hz": [
+     28.0062,
+     74.376,
+     78.1616,
+     90.575,
+     91.9496,
+     144.763,
+     202.0,
+     208.216,
+     219.444
+    ],
+    "C": {
+     "header": "Abaq Freq",
+     "source_job": [
+      "temp_root/SP2job"
+     ],
+     "fe_hz": [
+      23.57,
+      75.24,
+      78.255,
+      89.33,
+      90.55,
+      144.2,
+      207.46,
+      210.87,
+      216.47
+     ],
+     "rank_ratio_pct": [
+      -15.84,
+      1.16,
+      0.12,
+      -1.37,
+      -1.52,
+      -0.39,
+      2.7,
+      1.27,
+      -1.36
+     ]
+    },
+    "D": {
+     "header": null,
+     "source_job": [
+      "temp_root/SP02_NSM_CORE_NEWCFRPE1E2"
+     ],
+     "fe_hz": [
+      23.57,
+      76.909,
+      79.962,
+      90.783,
+      92.009,
+      146.05,
+      212.01,
+      215.34,
+      220.73
+     ],
+     "rank_ratio_pct": [
+      -15.84,
+      3.41,
+      2.3,
+      0.23,
+      0.06,
+      0.89,
+      4.96,
+      3.42,
+      0.59
+     ]
+    }
+   },
+   "SP-03": {
+    "exp_hz": [
+     28.1655,
+     77.0903,
+     80.4163,
+     91.9405,
+     94.5378,
+     146.634,
+     209.06,
+     215.85,
+     218.984
+    ],
+    "C": {
+     "header": "Abaq Freq",
+     "source_job": [
+      "temp_root/SP03_FreeFree_Modal"
+     ],
+     "fe_hz": [
+      23.29,
+      75.04,
+      77.98,
+      88.93,
+      90.101,
+      142.75,
+      206.71,
+      210.23,
+      215.81
+     ],
+     "rank_ratio_pct": [
+      -17.31,
+      -2.66,
+      -3.03,
+      -3.27,
+      -4.69,
+      -2.65,
+      -1.12,
+      -2.6,
+      -1.45
+     ]
+    },
+    "D": {
+     "header": null,
+     "source_job": [
+      "temp_root/SP03_NEWCFRP_NSM"
+     ],
+     "fe_hz": [
+      23.338,
+      76.831,
+      79.85,
+      90.545,
+      91.744,
+      144.86,
+      211.58,
+      215.16,
+      220.45
+     ],
+     "rank_ratio_pct": [
+      -17.14,
+      -0.34,
+      -0.7,
+      -1.52,
+      -2.96,
+      -1.21,
+      1.21,
+      -0.32,
+      0.67
+     ]
+    }
+   },
+   "SP-04": {
+    "exp_hz": [
+     58.1681,
+     143.413,
+     161.308,
+     170.433,
+     185.322,
+     274.473,
+     385.022
+    ],
+    "C": {
+     "header": "Abaq Freq",
+     "source_job": [
+      "temp_root/Honeycomb_TPU_FreeFree"
+     ],
+     "fe_hz": [
+      58.145,
+      144.7,
+      161.04,
+      177.6,
+      190.18,
+      283.45,
+      343.61
+     ],
+     "rank_ratio_pct": [
+      -0.04,
+      0.9,
+      -0.17,
+      4.21,
+      2.62,
+      3.27,
+      -10.76
+     ]
+    }
+   },
+   "SP-05": {
+    "exp_hz": [
+     50.9671,
+     134.242,
+     149.173,
+     163.476,
+     166.902,
+     259.456,
+     350.915
+    ],
+    "C": {
+     "header": "Abaq Freq",
+     "source_job": [
+      "temp_root/SP05_FreeFree"
+     ],
+     "fe_hz": [
+      54.92,
+      134.89,
+      148.71,
+      167.23,
+      177.67,
+      268.37,
+      319.51
+     ],
+     "rank_ratio_pct": [
+      7.76,
+      0.48,
+      -0.31,
+      2.3,
+      6.45,
+      3.44,
+      -8.95
+     ]
+    }
+   },
+   "SP-10": {
+    "exp_hz": [
+     29.2882,
+     76.816,
+     79.7287,
+     92.8652,
+     95.2688,
+     146.014,
+     206.916,
+     213.572,
+     219.862,
+     224.854,
+     227.276,
+     261.564
+    ],
+    "C": {
+     "header": "Abaq Freq old",
+     "source_job": [
+      {
+       "job": "temp_root/SP10nemash63000",
+       "equal_values": 9,
+       "of": 12
+      },
+      {
+       "job": "temp_root/SP10_new_E_NSM_DENS",
+       "equal_values": 1,
+       "of": 12
+      }
+     ],
+     "fe_hz": [
+      23.889,
+      77.098,
+      80.162,
+      91.279,
+      92.49,
+      146.75,
+      212.42,
+      215.79,
+      221.5,
+      228.43,
+      266.44,
+      268.56
+     ],
+     "rank_ratio_pct": [
+      -18.43,
+      0.37,
+      0.54,
+      -1.71,
+      -2.92,
+      0.5,
+      2.66,
+      1.04,
+      0.75,
+      1.59,
+      17.23,
+      2.67
+     ]
+    },
+    "D": {
+     "header": "Abaq Freq new",
+     "source_job": [
+      {
+       "job": "temp_root/SP10_NEW_E1=E2_NSM_DENSITY",
+       "equal_values": 9,
+       "of": 12
+      },
+      {
+       "job": "temp_root/SP10_new_E_NSM_DENS",
+       "equal_values": 2,
+       "of": 12
+      }
+     ],
+     "fe_hz": [
+      23.886,
+      76.529,
+      79.572,
+      90.785,
+      91.986,
+      146.12,
+      210.88,
+      214.23,
+      220.04,
+      226.95,
+      265.04,
+      267.14
+     ],
+     "rank_ratio_pct": [
+      -18.44,
+      -0.37,
+      -0.2,
+      -2.24,
+      -3.45,
+      0.07,
+      1.92,
+      0.31,
+      0.08,
+      0.93,
+      16.62,
+      2.13
+     ]
+    }
+   },
+   "SP-13": {
+    "exp_hz": [
+     31.4234,
+     74.1587,
+     80.8819,
+     94.3992,
+     96.5211,
+     147.504,
+     205.649,
+     212.664,
+     222.493,
+     228.607,
+     230.89,
+     261.836
+    ],
+    "C": {
+     "header": "Abaq Freq",
+     "source_job": [
+      "temp_root/SP13FINAL",
+      "temp_root/SP13NEWE"
+     ],
+     "fe_hz": [
+      22.609,
+      76.818,
+      79.833,
+      89.723,
+      91.113,
+      142.88,
+      211.58,
+      214.85,
+      219.79,
+      226.37,
+      261.28,
+      262.94
+     ],
+     "rank_ratio_pct": [
+      -28.05,
+      3.59,
+      -1.3,
+      -4.95,
+      -5.6,
+      -3.13,
+      2.88,
+      1.03,
+      -1.21,
+      -0.98,
+      13.16,
+      0.42
+     ]
+    },
+    "D": {
+     "header": "Abaq+shaker+string",
+     "source_job": [
+      {
+       "job": "temp_root/SP13_modal",
+       "equal_values": 0,
+       "of": 12
+      },
+      {
+       "job": "temp_root/SP13_WholeCore",
+       "equal_values": 0,
+       "of": 12
+      }
+     ],
+     "fe_hz": [
+      26.015,
+      74.541,
+      79.396,
+      89.121,
+      90.721,
+      143.33,
+      155.58,
+      212.68,
+      219.5,
+      221.47,
+      258.63,
+      263.22
+     ],
+     "rank_ratio_pct": [
+      -17.21,
+      0.52,
+      -1.84,
+      -5.59,
+      -6.01,
+      -2.83,
+      -24.35,
+      0.01,
+      -1.35,
+      -3.12,
+      12.01,
+      0.53
+     ]
+    }
+   }
+  },
+  "repeatability": {
+   "SP-13 260909 vs 260910a (re-suspension, H6)": {
+    "first": [
+     31.6405,
+     74.136,
+     80.8155,
+     94.4293,
+     96.5499,
+     147.8584,
+     206.1502,
+     212.6103,
+     228.7518
+    ],
+    "second": [
+     31.4234,
+     74.1587,
+     80.8819,
+     94.3991,
+     96.5211,
+     147.5045,
+     205.6489,
+     212.6644,
+     222.4938
+    ],
+    "rank_difference_pct": [
+     -0.69,
+     0.03,
+     0.08,
+     -0.03,
+     -0.03,
+     -0.24,
+     -0.24,
+     0.03,
+     -2.74
+    ]
+   },
+   "SP-10 260831 vs 260911b (remount, rotated 90 deg)": {
+    "first": [
+     29.7244,
+     76.7886,
+     79.623,
+     92.6721,
+     95.5942,
+     146.6554,
+     206.7423,
+     214.1971,
+     223.6031
+    ],
+    "second": [
+     29.2882,
+     76.816,
+     79.7287,
+     92.8652,
+     95.2689,
+     146.0145,
+     206.9157,
+     213.5716,
+     219.8614
+    ],
+    "rank_difference_pct": [
+     -1.47,
+     0.04,
+     0.13,
+     0.21,
+     -0.34,
+     -0.44,
+     0.08,
+     -0.29,
+     -1.67
+    ]
+   },
+   "SP-02 vs SP-10b (nominal copies, different specimens)": {
+    "first": [
+     28.0062,
+     74.376,
+     78.1616,
+     90.5749,
+     91.9495,
+     144.7627,
+     201.9995,
+     208.216,
+     219.4444
+    ],
+    "second": [
+     29.2882,
+     76.816,
+     79.7287,
+     92.8652,
+     95.2689,
+     146.0145,
+     206.9157,
+     213.5716,
+     219.8614
+    ],
+    "rank_difference_pct": [
+     4.58,
+     3.28,
+     2.0,
+     2.53,
+     3.61,
+     0.86,
+     2.43,
+     2.57,
+     0.19
+    ]
+   }
+  }
+ }
+}

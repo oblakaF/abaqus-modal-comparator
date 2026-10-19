@@ -5405,3 +5405,30 @@ first internal provider.
   `src/services/auto_id_evidence_export.py`, `src/material_identification_ui.py`,
   `tests/test_m8_d2i_pr92_corrections.py` (new), `docs/gui/M8_D2I_GUARDED_EXECUTION.md`, STATUS, CHANGELOG.
   **Abaqus run count:** 0.
+
+## 2026-10-20 — M8-D2i ACCEPTED and closed
+
+- **M8-D2i Guarded Auto-ID Execution Integration:** ACCEPTED (PR #92, merge `9e1921e`; push CI `39277639590` and PR CI
+  `39277650698` success; main CI `39297351023` success). Editorial closure; no scientific result changes.
+
+## 2026-10-20 — M9 six-specimen scientific reconciliation (REVIEW_READY; analysis only)
+
+- **Branch:** `analysis/m9-six-specimens` from `9e1921e` (SUPERVISOR analysis task; outside the Auto-ID mini-step
+  sequence).
+- **Report:** `docs/reconciliation/M9_SIX_SPECIMENS.md` (+ `M9_SIX_SPECIMENS.json`): unified specimen table, carbon
+  properties against the INPs and Excel, control regression of SP-02 / SP-13 on the accepted models (103 store-gated
+  tests OK), the inventory contradictions checked, SP-10 registration feasibility, frequency-only review of SP-03 / 04 /
+  05, verdicts and the plan of experiments and meaningful Abaqus runs.
+- **Findings:**
+  - the latest user models keep the face E·t at about 24 480 N/mm in SP-02 / SP-03 / SP-10 / SP-13; their E
+    differences follow the recorded face thickness;
+  - FE mode 1 is 16–28 % low on every PLA core (model form);
+  - the "PolyMAX / LMS" differences are separate sessions;
+  - the Excel SP-05 damping is SP-04's;
+  - SP-10 FE rows 10–12 are not reproducible;
+  - PolyMAX for SP-03 / 04 / 05 / 10 exists in the `sumin` zip.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates; no FE solve,
+  Abaqus Python or LM; M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE (D-077).
+- **Files changed:** `docs/reconciliation/M9_SIX_SPECIMENS.md` (new), `docs/reconciliation/M9_SIX_SPECIMENS.json` (new), STATUS,
+  ROADMAP, CHANGELOG. **Abaqus run count:** 0.
