@@ -5386,3 +5386,22 @@ first internal provider.
   (`plan_operations` / `plan_gates` public), `src/material_identification_ui.py`, `tools/auto_id_execute.py` (new),
   `tests/m8_d2i_support.py` (new), `tests/test_m8_d2i_guarded_execution.py` (new), `tests/test_m8_1_auto_id_setup.py`,
   `docs/gui/M8_D2I_GUARDED_EXECUTION.md` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-19 — M8-D2i review corrections (PR #92)
+
+- **A. Attempt log:** `guarded_execution.json` is written in two phases (STARTED before anything runs, the outcome
+  afterwards). A damaged earlier log refuses before running and is never overwritten; a STARTED write error runs
+  nothing; an outcome write error keeps the computed state with the reason (`COMPLETED_ATTEMPT_LOG_NOT_RECORDED`, never
+  confirmed); the background worker always ends in a final state; computation journals untouched; the plan reopens.
+- **B. Synthetic results:** `services/execution_provenance` (SIMULATED / EXECUTION_LOG_UNREADABLE blocking;
+  GUARDED_EXECUTION_RECORDED / NO_GUARDED_EXECUTION_RECORD not blocking and not evidence of a real origin) plus an
+  independent `SIMULATED_TEST_EXECUTION.json` marker. Blocking runs are labelled in Data Readiness and the uncertainty
+  breakdown, never show Engineering Constants and are refused by the evidence export; the backend record is unchanged;
+  the archived M7 RUN_A presents and exports as before (NO_GLOBAL_PARAMETER_VALUE).
+- **Tests:** `tests/test_m8_d2i_pr92_corrections.py` 13 OK (injected log write errors, sync and background; damaged log;
+  simulated / marker-only / unreadable-log / unlabelled provenance; negative export; archived RUN_A positive
+  regression, store-gated); mutation checks caught; full suite 2478 OK (6 skipped).
+- **Files changed:** `src/services/execution_provenance.py` (new), `src/services/guarded_execution.py`,
+  `src/services/auto_id_evidence_export.py`, `src/material_identification_ui.py`,
+  `tests/test_m8_d2i_pr92_corrections.py` (new), `docs/gui/M8_D2I_GUARDED_EXECUTION.md`, STATUS, CHANGELOG.
+  **Abaqus run count:** 0.

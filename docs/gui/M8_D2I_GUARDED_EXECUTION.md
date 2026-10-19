@@ -164,6 +164,44 @@ refuses both operations (`NO_TRUSTED_AUTHORISATION_SOURCE`); no executor is reac
 
 Tests: `tests/test_m8_d2i_guarded_execution.py` 24 tests, one of them store-gated; full suite 2465 OK (6 skipped).
 
+## Review corrections (PR #92)
+
+### A. Attempt log
+
+`guarded_execution.json` is written in two phases:
+
+1. **STARTED**, before anything runs. If this entry cannot be written, or the earlier log is damaged, nothing runs and
+   the earlier log is never overwritten.
+2. **The outcome**, afterwards. If it cannot be written:
+   - the computed state is kept, with the reason;
+   - a completed operation is shown as `COMPLETED_ATTEMPT_LOG_NOT_RECORDED`, never as confirmed;
+   - the computation journals are untouched.
+
+The worker thread always ends in a final state, never `RUNNING`. The plan can always be reopened.
+
+### B. Synthetic results are never a material result
+
+`services/execution_provenance` reads the run root and gives one of four states:
+
+| State | When | Effect |
+|---|---|---|
+| `SIMULATED_TEST_EXECUTION_NEVER_A_MATERIAL_RESULT` | the independent marker `SIMULATED_TEST_EXECUTION.json`, or a simulated / unlabelled attempt in the log | blocking |
+| `EXECUTION_LOG_UNREADABLE` | the log exists but cannot be read | blocking |
+| `GUARDED_EXECUTION_RECORDED` | the log records only non-simulated attempts | not blocking |
+| `NO_GUARDED_EXECUTION_RECORD` | no guarded record, for example the archived M7 runs | not blocking |
+
+`NO_GUARDED_EXECUTION_RECORD` is not taken as evidence of a real origin: the existing journal and evidence checks apply
+unchanged.
+
+For a blocking run:
+
+- Data Readiness and the uncertainty breakdown carry the label, and every value is marked "not a material result";
+- no Engineering Constants or material fragment are built;
+- the evidence export refuses (`SIMULATED_TEST_EXECUTION_NEVER_A_MATERIAL_RESULT` / `EXECUTION_PROVENANCE_UNREADABLE`).
+
+The backend record itself is unchanged. The archived M7 RUN_A presents and exports as before, including
+`NO_GLOBAL_PARAMETER_VALUE`.
+
 ## What a real Abaqus run needs
 
 1. **A trusted HUMAN authorisation source** decided by the SUPERVISOR: a governed record type with an attestation that

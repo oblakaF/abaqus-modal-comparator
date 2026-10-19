@@ -1151,6 +1151,20 @@ def observation_readiness_view(app) -> dict[str, object]:
     return {"status": status, "summary": summary, "rows": tuple(rows)}
 
 
+def _blocking_provenance(app):
+    """M8-D2i: ``(state, detail)`` when the selected run must never be presented as a material result (a simulated
+    test run, or a run whose guarded attempt log is unreadable), else ``None``. ``None`` is not evidence of a real
+    origin: the existing journal and evidence checks apply unchanged."""
+
+    from services.execution_provenance import blocking, run_execution_provenance
+
+    path = getattr(app, "auto_id_selected_run_path", None)
+    if path is None:
+        return None
+    state, detail = run_execution_provenance(path)
+    return (state.value, detail) if blocking(state) else None
+
+
 def scientific_readiness_view(app) -> dict[str, object]:
     """Present a stored SPEC v1.2 scientific readiness record (V12-I6) without judging anything.
 
@@ -1187,6 +1201,14 @@ def scientific_readiness_view(app) -> dict[str, object]:
     else:
         status = "NOT AVAILABLE"
         summary = ("No scientific verdict available.",)
+    blocked = _blocking_provenance(app) if rows else None
+    if blocked:  # M8-D2i: the backend record stays unchanged; only its presentation is labelled
+        label, detail = blocked
+        rows = (("Execution provenance", f"{label}: {detail}"),) + tuple(
+            (name, f"{value} [{label}: not a material result]") for name, value in rows)
+        status = f"{label} (backend status {status})"
+        summary = (f"{label}: nothing shown for this run is a material property or an Engineering Constant of a real "
+                   "specimen; the scientific backend's record is kept unchanged.",) + tuple(summary)
     return {
         "available": bool(rows),
         "status": status,
@@ -1235,7 +1257,11 @@ def uncertainty_breakdown_view(app) -> tuple[tuple[str, str, str], ...]:
         return ()
     evaluation = _current_typed_evaluation(app, view)
     report = getattr(getattr(evaluation, "readiness", None), "material_report", None)
-    return uncertainty_breakdown(getattr(app, "scientific_readiness_record", None), report)
+    rows = uncertainty_breakdown(getattr(app, "scientific_readiness_record", None), report)
+    blocked = _blocking_provenance(app)
+    if blocked:  # M8-D2i
+        rows = (("Execution provenance", blocked[0], f"{blocked[1]}; not a material result"),) + tuple(rows)
+    return rows
 
 
 def calibration_preview_view(app) -> dict[str, object]:
@@ -1256,7 +1282,11 @@ def calibration_preview_view(app) -> dict[str, object]:
 
     evaluation = _current_typed_evaluation(app, scientific_readiness_view(app))
     readiness = getattr(evaluation, "readiness", None)
-    if readiness is None:
+    blocked = _blocking_provenance(app)
+    if blocked:  # M8-D2i: never Engineering Constants of a real specimen from a simulated run
+        preview = not_available(f"{blocked[0]}: {blocked[1]}; no Engineering Constants or material fragment are shown "
+                                "for this run.")
+    elif readiness is None:
         preview = not_available("no current typed evaluation of the selected run (evaluate the selected stored run; "
                                 "a stored, external or changed record never produces constants or a fragment).")
     else:

@@ -41,8 +41,15 @@ A long operation runs in a worker thread.  Stop takes effect before the next Aba
 running process is not killed.  Journals are append-only and hash-chained: a stop, an executor error or an interruption
 leaves the written records intact, and a later authorised run resumes from them without repeating a journalled solve.
 
-Every attempt is logged in ``guarded_execution.json`` in the plan folder (``NOT_GOVERNED_EVIDENCE``).  A run attested by
-a simulated authority is labelled ``SIMULATED`` and is never a material result.
+Every attempt is logged in ``guarded_execution.json`` in the plan folder (``NOT_GOVERNED_EVIDENCE``), in two phases:
+
+- **STARTED** — written before anything runs.  If it cannot be written, or an earlier log is damaged (never
+  overwritten), nothing runs.
+- **Outcome** — written afterwards.  If it cannot be written, the computed state is kept with the log error, and a
+  completed operation is reported as ``COMPLETED_ATTEMPT_LOG_NOT_RECORDED``, never as confirmed.
+
+The worker thread always ends in a final state, never RUNNING.  A run attested by a simulated authority also gets the
+marker ``SIMULATED_TEST_EXECUTION.json``.  Its result is never a material result (``services.execution_provenance``).
 """
 
 from __future__ import annotations
@@ -76,23 +83,26 @@ from .campaign_execution_plan import (
     plan_set_problems,
 )
 from .campaign_lm_provenance import LMProvenanceRefusal, journal_document
+from .execution_provenance import EXECUTION_LOG, EXECUTION_LOG_SCHEMA, SIMULATED, SIMULATED_MARKER
+from .execution_provenance import ProvenanceState, run_execution_provenance
 from .prerun_validation import prerun_validation
 
 ARCHIVE_EXTRACTION, CAMPAIGN_RUN = GATE_ARCHIVE_EXTRACTION, GATE_CAMPAIGN_RUN
 OPERATIONS = (ARCHIVE_EXTRACTION, CAMPAIGN_RUN)
 AUTHORISATION_SCHEMA = "auto-id/execution-authorisation/v1"
-EXECUTION_LOG_SCHEMA = "auto-id/guarded-execution-log/v1"
-EXECUTION_LOG = "guarded_execution.json"
-# what the executor adds to a plan folder, which is the run root (CampaignRun / IdentificationPipeline layout)
-RUN_ENTRIES = ("archive_reuse", "campaign", "specimens", EXECUTION_LOG)
+# what the executor and this controller add to a plan folder, which is the run root (CampaignRun layout)
+RUN_ENTRIES = ("archive_reuse", "campaign", "specimens", EXECUTION_LOG, SIMULATED_MARKER)
 LOG_LABELS = ("EXECUTION_LOG", "NOT_GOVERNED_EVIDENCE")
-SIMULATED = "SIMULATED_TEST_EXECUTION_NEVER_A_MATERIAL_RESULT"
 NO_TRUSTED_SOURCE = ("NO_TRUSTED_AUTHORISATION_SOURCE: no trusted HUMAN authorisation source exists in this "
                      "installation; the executor stays blocked (no authorisation record is accepted or fabricated)")
 
 
 class ExecutionContextError(ValueError):
     """The Execution Plan cannot be opened for execution (missing, damaged or no longer current); nothing runs."""
+
+
+class ExecutionLogError(Exception):
+    """The attempt log cannot be recorded (write error, or an earlier log that is damaged and never overwritten)."""
 
 
 class ExecutionStopped(BaseException):
@@ -103,6 +113,7 @@ class ExecutionState(str, Enum):
     IDLE = "IDLE"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
+    COMPLETED_LOG_NOT_RECORDED = "COMPLETED_ATTEMPT_LOG_NOT_RECORDED"  # computed, but the attempt is unconfirmed
     STOPPED = "STOPPED"
     FAILED = "FAILED"
     REFUSED = "REFUSED"
@@ -301,6 +312,7 @@ class ExecutionOutcome:
     started: str = ""
     finished: str = ""
     labels: tuple = field(default_factory=tuple)
+    log_error: Optional[str] = None  # the attempt log could not be recorded (the attempt is unconfirmed)
 
 
 def _stamp() -> str:
@@ -358,21 +370,67 @@ class GuardedExecutionController:
             return executor(*args, **kwargs)
         return run
 
-    def _log(self, entry: Mapping) -> None:
-        path = self.context.work_directory / EXECUTION_LOG
+    # -- the attempt log (two phases: STARTED before anything runs, the outcome afterwards) ----------------------
+
+    @property
+    def log_path(self) -> Path:
+        return self.context.work_directory / EXECUTION_LOG
+
+    def _read_log(self) -> dict:
+        """The current attempt log; a damaged or unrecognised earlier log is never silently replaced."""
+        path = self.log_path
+        if not path.exists():
+            return {"schema": EXECUTION_LOG_SCHEMA, "labels": list(LOG_LABELS), "attempts": []}
         try:
-            document = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
-        except (OSError, ValueError):
-            document = None
-        if not isinstance(document, dict) or document.get("schema") != EXECUTION_LOG_SCHEMA:
-            document = {"schema": EXECUTION_LOG_SCHEMA, "labels": list(LOG_LABELS), "attempts": []}
-        document["attempts"].append(json.loads(json.dumps(entry, default=str)))
+            document = json.loads(path.read_text(encoding="utf-8"))
+            if document.get("schema") != EXECUTION_LOG_SCHEMA or not isinstance(document.get("attempts"), list):
+                raise ValueError("not a guarded-execution attempt log")
+        except (OSError, UnicodeDecodeError, ValueError, AttributeError) as error:
+            raise ExecutionLogError(f"the earlier attempt log {path} is damaged or unrecognised ({error}); it is never "
+                                    "overwritten (move or repair it, then start again)") from error
+        return document
+
+    def _write_log(self, document: Mapping) -> None:
+        path = self.log_path
         temporary = path.with_name(f".{path.name}.partial")
-        temporary.write_text(json.dumps(document, indent=1, ensure_ascii=False), encoding="utf-8")
-        os.replace(temporary, path)
+        try:
+            temporary.write_text(json.dumps(document, indent=1, ensure_ascii=False), encoding="utf-8")
+            os.replace(temporary, path)
+        except OSError as error:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+            raise ExecutionLogError(f"the attempt log {path} could not be written ({error})") from error
+
+    def _record(self, entry: Mapping, index: Optional[int] = None) -> int:
+        document = self._read_log()
+        entry = json.loads(json.dumps(entry, default=str))
+        if index is None:
+            document["attempts"].append(entry)
+            index = len(document["attempts"]) - 1
+        else:
+            document["attempts"][index] = entry
+        self._write_log(document)
+        return index
+
+    def _mark_simulated(self) -> None:
+        """An independent marker in the run root of a simulated execution (written before anything runs)."""
+        path = self.context.work_directory / SIMULATED_MARKER
+        try:
+            if not path.exists():
+                path.write_text(json.dumps({"label": SIMULATED, "authority": self.authority.name}, indent=1),
+                                encoding="utf-8")
+        except OSError as error:
+            raise ExecutionLogError(f"the simulated-execution marker {path} could not be written ({error})") from error
 
     def execute(self, operation: str, authorisation) -> ExecutionOutcome:
-        """Run one authorised operation synchronously (refused with ``ExecutionNotAuthorised`` before anything runs)."""
+        """Run one authorised operation synchronously.
+
+        Refused with ``ExecutionNotAuthorised`` (or ``ExecutionLogError`` when the attempt cannot be logged) before
+        anything runs.  If the outcome cannot be logged afterwards, the computed state is kept with the log error and a
+        COMPLETED operation becomes ``COMPLETED_ATTEMPT_LOG_NOT_RECORDED``; the computation journals are untouched.
+        """
 
         problems = self.authorisation_problems(operation, authorisation)
         if problems:
@@ -391,7 +449,10 @@ class GuardedExecutionController:
         outcome = ExecutionOutcome(operation, ExecutionState.RUNNING, "running", simulated=simulated, started=_stamp(),
                                    labels=(SIMULATED,) if simulated else ())
         entry = {"operation": operation, "authorisation": authorisation.binding(), "authority": self.authority.name,
-                 "simulated": simulated, "started": outcome.started}
+                 "simulated": simulated, "started": outcome.started, "state": "STARTED"}
+        if simulated:
+            self._mark_simulated()
+        index = self._record(entry)  # ExecutionLogError: nothing has run
         try:
             outcome.summary = self._run(operation)
             outcome.state, outcome.detail = ExecutionState.COMPLETED, "completed"
@@ -402,8 +463,14 @@ class GuardedExecutionController:
         except Exception as error:  # an executor or evidence error; never repaired, the journals stay as written
             outcome.state, outcome.detail = ExecutionState.FAILED, f"{type(error).__name__}: {error}"
         outcome.finished = _stamp()
-        self._log(dict(entry, state=outcome.state.value, detail=outcome.detail, finished=outcome.finished,
-                       summary=outcome.summary, labels=list(outcome.labels)))
+        try:
+            self._record(dict(entry, state=outcome.state.value, detail=outcome.detail, finished=outcome.finished,
+                              summary=outcome.summary, labels=list(outcome.labels)), index)
+        except ExecutionLogError as error:  # the computation journals stay as written; the attempt is unconfirmed
+            outcome.log_error = str(error)
+            if outcome.state is ExecutionState.COMPLETED:
+                outcome.state = ExecutionState.COMPLETED_LOG_NOT_RECORDED
+            outcome.detail += f"; attempt log NOT recorded: {error} (the attempt stays logged as STARTED at best)"
         return outcome
 
     def _run(self, operation: str) -> dict:
@@ -450,11 +517,18 @@ class GuardedExecutionController:
             self.state, self.operation = ExecutionState.RUNNING, operation
 
             def work():
+                outcome = ExecutionOutcome(operation, ExecutionState.FAILED, "the worker ended without an outcome")
                 try:
                     outcome = self.execute(operation, authorisation)
                 except ExecutionNotAuthorised as refusal:
                     outcome = ExecutionOutcome(operation, ExecutionState.REFUSED, str(refusal))
-                self.outcome, self.state = outcome, outcome.state
+                except ExecutionLogError as error:
+                    outcome = ExecutionOutcome(operation, ExecutionState.REFUSED, f"{error}; nothing executed",
+                                               log_error=str(error))
+                except BaseException as error:  # never leaves the controller RUNNING
+                    outcome = ExecutionOutcome(operation, ExecutionState.FAILED, f"{type(error).__name__}: {error}")
+                finally:
+                    self.outcome, self.state = outcome, outcome.state
                 if on_done is not None:
                     on_done(outcome)
 
@@ -478,22 +552,21 @@ class GuardedExecutionController:
 
 
 def execution_provenance(journal_path) -> Optional[str]:
-    """``SIMULATED_...`` when the run root of this campaign journal holds any attempt attested by a simulated authority
-    (such a folder is test material, never a material result); ``None`` otherwise (read-only)."""
+    """The blocking provenance state of a run (``SIMULATED_...`` or ``EXECUTION_LOG_UNREADABLE``), or ``None``.
 
-    try:
-        root = Path(journal_path).resolve().parents[2]  # <run root>/campaign/<run hash>/journal.json
-        document = json.loads((root / EXECUTION_LOG).read_text(encoding="utf-8"))
-        attempts = document.get("attempts") if document.get("schema") == EXECUTION_LOG_SCHEMA else None
-    except (OSError, IndexError, ValueError, AttributeError):
-        return None
-    return SIMULATED if any(isinstance(a, Mapping) and a.get("simulated") for a in attempts or ()) else None
+    ``None`` is not evidence of a real origin (see ``services.execution_provenance``).
+    """
+
+    state, _ = run_execution_provenance(journal_path)
+    return state.value if state in (ProvenanceState.SIMULATED, ProvenanceState.LOG_UNREADABLE) else None
 
 
 def outcome_text(outcome: Optional[ExecutionOutcome]) -> str:
     if outcome is None:
         return "No execution attempted."
     text = f"{outcome.operation}: {outcome.state.value} — {outcome.detail}"
+    if outcome.log_error:
+        text += " [ATTEMPT LOG NOT RECORDED: unconfirmed]"
     if outcome.simulated:
         text += f" [{SIMULATED}]"
     if outcome.summary and "status" in outcome.summary:
@@ -503,5 +576,5 @@ def outcome_text(outcome: Optional[ExecutionOutcome]) -> str:
 
 __all__ = ["ARCHIVE_EXTRACTION", "CAMPAIGN_RUN", "ExecutionAuthorisation", "NoTrustedAuthority", "PRODUCTION_AUTHORITY",
            "ExecutionContext", "ExecutionContextError", "ExecutionOutcome", "ExecutionState", "ExecutionStopped",
-           "GuardedExecutionController", "campaign_journals", "execution_provenance", "open_execution_context",
-           "operation_budget", "outcome_text"]
+           "ExecutionLogError", "GuardedExecutionController", "campaign_journals", "execution_provenance",
+           "open_execution_context", "operation_budget", "outcome_text"]

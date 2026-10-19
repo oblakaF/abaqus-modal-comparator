@@ -19,6 +19,10 @@ equals the fingerprint stored when the run was evaluated.  Anything else refuses
 here.  Nothing is computed scientifically: no constant, uncertainty, verdict or hash of the evidence is derived except
 the accepted canonical hashes of the records themselves.
 
+M8-D2i: a run whose execution provenance is simulated (or whose guarded attempt log is unreadable, so a simulated
+origin cannot be excluded) is refused (``SIMULATED`` / ``PROVENANCE_UNREADABLE``); runs without a guarded record (the
+archived M7 runs) export exactly as before.
+
 Writing (``write_export``) happens only on an explicit user action, to a ``.json`` destination outside the repository,
 the data stores and the selected run, never over a file that is not an earlier Auto-ID export; the document is created
 atomically (temporary file in the destination folder, then ``os.replace``), and nothing is left behind on failure.
@@ -39,6 +43,7 @@ from domain.identification_run import canonical_hash
 
 from .auto_id_wizard import uncertainty_breakdown, verdict_summary
 from .calibration_material_preview import PreviewState, calibration_material_preview
+from .execution_provenance import ProvenanceState, run_execution_provenance
 from .campaign_scientific_backend import ReadinessStatus, ScientificReadiness
 from .identification_campaign_run import CampaignSpecimenInput
 from .run_progress import inspect_run_progress
@@ -65,6 +70,8 @@ class ExportRefusalCode(str, Enum):
     STALE = "EVIDENCE_CHANGED_SINCE_EVALUATION"
     DESTINATION = "DESTINATION_REFUSED"
     WRITE_FAILED = "WRITE_FAILED"
+    SIMULATED = "SIMULATED_TEST_EXECUTION_NEVER_A_MATERIAL_RESULT"  # M8-D2i
+    PROVENANCE_UNREADABLE = "EXECUTION_PROVENANCE_UNREADABLE"  # M8-D2i: a simulated origin cannot be excluded
 
 
 class ExportRefusal(ValueError):
@@ -141,6 +148,12 @@ def build_evidence_export(definition, journal_path, specimens: Optional[Sequence
             or evaluation.run.campaign_hash != definition.campaign_hash \
             or (record.get("campaign") or {}).get("campaign_hash") != definition.campaign_hash:
         _refuse(ExportRefusalCode.RUN_MISMATCH, "the evaluated run is not the selected run of the selected campaign.")
+    provenance, detail = run_execution_provenance(journal_path)  # M8-D2i: never export a simulated run as evidence
+    if provenance is ProvenanceState.SIMULATED:
+        _refuse(ExportRefusalCode.SIMULATED, f"{detail}; a simulated test run is never exported as material evidence "
+                                             "(the backend record itself is unchanged).")
+    if provenance is ProvenanceState.LOG_UNREADABLE:
+        _refuse(ExportRefusalCode.PROVENANCE_UNREADABLE, f"{detail}; the run is not exported.")
     if specimens is None:
         _refuse(ExportRefusalCode.SPECIMENS_UNAVAILABLE, "the campaign's governed specimen inputs are unavailable, so "
                                                          "the pipeline journals cannot be verified.")

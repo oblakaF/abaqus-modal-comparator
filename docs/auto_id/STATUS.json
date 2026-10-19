@@ -618,7 +618,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of feature/m8-d2i-guarded-execution (M8-D2i REVIEW_READY, not merged). Production executor blocked (no trusted HUMAN authorisation source). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no real campaign run",
+  "next_action": "STOP: SUPERVISOR review of PR #92 (feature/m8-d2i-guarded-execution; M8-D2i REVIEW_READY, remarks A and B addressed, not merged). Production executor blocked (no trusted HUMAN authorisation source). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no real campaign run",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1530,7 +1530,9 @@
           "gui": "real Windows GUI 34/34 checks PASS, 8 screenshots; production start disabled; simulated run responsive, stopped, resumed, labelled SIMULATED",
           "tests": "D2i 24 tests OK; mutation checks caught (authority availability, operation binding, re-check, attestation, stop guard); full suite 2465 OK (6 skipped)"
         },
-        "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, MAC, frozen pairing, thresholds, stopping criteria, scientific backend rules; no real Abaqus, ODB extraction or LM on user models; no material constant released; NO_GLOBAL_PARAMETER_VALUE (D-077) unchanged; production calibration BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET"
+        "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, MAC, frozen pairing, thresholds, stopping criteria, scientific backend rules; no real Abaqus, ODB extraction or LM on user models; no material constant released; NO_GLOBAL_PARAMETER_VALUE (D-077) unchanged; production calibration BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET",
+        "pr": 92,
+        "review_correction": "SUPERVISOR remarks (PR #92). A: the attempt log is written in two phases (STARTED before anything runs; the outcome afterwards); a damaged earlier log refuses before running and is never overwritten; a STARTED write error runs nothing; an outcome write error keeps the computed state with the reason (a completed operation becomes COMPLETED_ATTEMPT_LOG_NOT_RECORDED, never confirmed); the worker thread always ends in a final state; computation journals untouched; the plan reopens. B: services/execution_provenance gives SIMULATED / EXECUTION_LOG_UNREADABLE (blocking) or GUARDED_EXECUTION_RECORDED / NO_GUARDED_EXECUTION_RECORD (not evidence of a real origin; existing checks apply unchanged); a simulated run also writes the independent SIMULATED_TEST_EXECUTION.json marker; blocking runs are labelled in Data Readiness and the uncertainty breakdown, show no Engineering Constants and are refused by the evidence export (codes SIMULATED_TEST_EXECUTION_NEVER_A_MATERIAL_RESULT / EXECUTION_PROVENANCE_UNREADABLE); the backend record is unchanged; archived M7 runs present and export as before"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
