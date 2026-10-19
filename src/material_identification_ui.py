@@ -2049,6 +2049,94 @@ def run_prerun_validation(app, path=None):
         _replace_table_rows(app.material_auto_id_prerun_table, rows)
 
 
+AUTO_ID_PLAN_LABEL = "Prepare Auto-ID Execution Plan..."
+AUTO_ID_START_LABEL = "Start Execution (not authorised)"
+AUTO_ID_NO_PLAN = ("No execution plan (Prepare Auto-ID Execution Plan... re-checks a saved campaign definition, prepares "
+                   "it with the existing executor's planning sequence and writes the run manifest into an empty "
+                   "working directory you choose; nothing is executed).")
+
+
+def _execution_status_text(app) -> str:
+    from services.campaign_execution_plan import NOT_AUTHORISED, plan_problems
+
+    plan = getattr(app, "auto_id_execution_plan", None)
+    if plan is None:
+        return f"Execution status: {NOT_AUTHORISED} (no execution plan)."
+    problems = plan_problems(plan)
+    state = "plan current" if not problems else "plan STALE: " + "; ".join(problems)
+    return (f"Execution status: {NOT_AUTHORISED}. Campaign {plan.campaign_id}, campaign hash {plan.campaign_hash}; "
+            f"manifest hash {plan.manifest_hash}; authorisation scope {plan.authorisation_scope_hash}; {state}. "
+            "No Abaqus solve, extraction or LM can be started from here; a later authorisation must bind this exact "
+            "scope.")
+
+
+def _plan_message(app, text, rows=None) -> None:
+    app.auto_id_plan_message = text
+    if hasattr(app, "material_auto_id_plan_label"):
+        app.material_auto_id_plan_label.configure(text=text)
+        if rows is not None:
+            _replace_table_rows(app.material_auto_id_plan_table, rows)
+        app.material_auto_id_execution_label.configure(text=_execution_status_text(app))
+
+
+def prepare_auto_id_execution_plan(app, path=None, work_directory=None):
+    """"Prepare Auto-ID Execution Plan...": re-check a saved SPEC v1.2 campaign definition (Pre-run Validation), prepare
+    it with the existing executor's planning sequence (prepare_campaign_specimens, prepare_run_manifest) and write the
+    run manifest and plan into a chosen empty working directory outside the repository and data stores. Nothing is
+    executed; execution stays NOT_AUTHORISED."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+    from services.campaign_execution_plan import ExecutionPlanError, prepare_execution_plan
+
+    if path is None:
+        last = getattr(app, "auto_id_last_definition", None)
+        path = filedialog.askopenfilename(
+            title="Campaign definition for the execution plan", filetypes=(("Auto-ID campaign definition", "*.json"),),
+            **({"initialdir": str(Path(last).parent), "initialfile": Path(last).name} if last else {}))
+    if not path:
+        _plan_message(app, "Execution plan cancelled: nothing written.")
+        return None
+    if work_directory is None:
+        work_directory = filedialog.askdirectory(
+            title="Working directory for the execution plan (an empty folder outside the repository and data stores)",
+            mustexist=True)
+    if not work_directory:
+        _plan_message(app, "Execution plan cancelled: no working directory chosen; nothing written.")
+        return None
+    app.auto_id_execution_plan = None  # an earlier plan is not current for a new selection
+    try:
+        roots = fixture_roots_from_environment()
+    except Exception:  # the configured stores cannot be determined: Pre-run reports the sources NOT_VERIFIED
+        roots = None
+    try:
+        plan = prepare_execution_plan(path, work_directory, AUTO_ID_REPO_ROOT, _draft_fixtures(), roots,
+                                      _draft_protected_roots(app))
+    except ExecutionPlanError as error:
+        _plan_message(app, f"No execution plan: {error}", ())
+        return None
+    except Exception as error:  # never a GUI crash; nothing is published by a refused plan
+        _plan_message(app, f"No execution plan: {error} Nothing written.", ())
+        return None
+    app.auto_id_execution_plan = plan
+    _plan_message(app, plan.summary(), plan.rows)
+    return plan
+
+
+def request_auto_id_execution(app, authorisation=None) -> None:
+    """"Start Execution": refused in M8-D2h (NOT_AUTHORISED) by the execution entry point itself, before any executor,
+    archive extraction, run journal or LM; a typed hash, a decision or provenance text is never an authorisation."""
+
+    from services.campaign_execution_plan import ExecutionNotAuthorised, request_execution
+
+    try:
+        request_execution(getattr(app, "auto_id_execution_plan", None), authorisation)
+    except ExecutionNotAuthorised as refusal:
+        app.auto_id_execution_message = str(refusal)
+    if hasattr(app, "material_auto_id_execution_label"):
+        app.material_auto_id_execution_label.configure(
+            text=" ".join((_execution_status_text(app), app.auto_id_execution_message)))
+
+
 def save_campaign_draft(app, destination=None):
     """"Save Campaign Draft As...": the draft document, written only after an explicit Save As, atomically, outside
     every protected folder; cancelling writes nothing. A draft is never a campaign definition."""
@@ -2414,6 +2502,22 @@ def _build_auto_id_setup_page(app, page) -> None:
     app.material_auto_id_prerun_table = _build_read_only_table(
         export, ("section", "check", "detail", "status"), ("Section", "Check", "Detail", "Status"),
         (170, 250, 610, 220), height=14,
+    )
+    plan = ttk.LabelFrame(page, text="Auto-ID Execution Plan (M8-D2h; execution NOT_AUTHORISED)", padding=8)
+    plan.pack(fill="x", pady=(8, 0))
+    plan_buttons = ttk.Frame(plan)
+    plan_buttons.pack(anchor="w", pady=(0, 4))
+    for text, command in ((AUTO_ID_PLAN_LABEL, lambda: prepare_auto_id_execution_plan(app)),
+                          (AUTO_ID_START_LABEL, lambda: request_auto_id_execution(app))):
+        ttk.Button(plan_buttons, text=text, command=command).pack(side="left", padx=(0, 8))
+    app.material_auto_id_execution_label = ttk.Label(plan, text=_execution_status_text(app), justify="left",
+                                                     wraplength=1100)
+    app.material_auto_id_execution_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_plan_label = ttk.Label(plan, text=AUTO_ID_NO_PLAN, justify="left", wraplength=1100)
+    app.material_auto_id_plan_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_plan_table = _build_read_only_table(
+        plan, ("section", "item", "detail", "status"), ("Section", "Item", "Detail", "Status"),
+        (150, 230, 650, 220), height=18,
     )
 
 

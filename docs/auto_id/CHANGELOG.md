@@ -5286,3 +5286,67 @@ first internal provider.
   `src/services/campaign_draft.py`, `src/services/campaign_configuration.py`, `src/material_identification_ui.py`,
   `tests/test_m8_d2g_campaign_finalisation.py` (new), `tests/test_m8_1_auto_id_setup.py`,
   `docs/gui/M8_D2G_FINALISATION_PRERUN.md` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-18 — M8-D2g ACCEPTED and closed
+
+- **M8-D2g Finalise Campaign Definition + Pre-run Validation:** ACCEPTED (PR #90, merge `85b66872`; push CI
+  `39118749662` and PR CI `39118752870` success; main CI `39120292310` success). Editorial closure; no scientific
+  result changes.
+- **M8-D2h** Auto-ID Execution Planning & GUI Integration entered in the ROADMAP as a separately authorised SUPERVISOR
+  stage (`IN_PROGRESS`; execution not authorised).
+- **Unchanged:** M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE (D-077); SPEC, DECISIONS, EVIDENCE, governed records.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+  **Abaqus run count:** 0.
+
+## 2026-10-18 — M8-D2h Auto-ID Execution Planning & GUI Integration (REVIEW_READY)
+
+- **Branch:** `feature/m8-d2h-execution-planning` from `85b6687` (separately authorised SUPERVISOR stage).
+- **Integration point:** `identification_campaign_run.prepare_campaign_plan` is the one planning sequence of the
+  executor (run-type / question gate, governed archive-reuse plan, `prepare_campaign_specimens`,
+  `prepare_run_manifest`); `tools/m7_campaign.py` now calls it (behaviour and hashes unchanged), and
+  `services/campaign_execution_plan` puts the M8-D2g Pre-run Validation in front of it for the GUI and the plan-only
+  CLI `tools/auto_id_execution_plan.py`. No new optimiser, backend or planning scheme.
+- **Prepare Auto-ID Execution Plan...:** Definition FORMALLY_VALID and Sources SHA256_VERIFIED required; FIT /
+  HOLDOUT rows and budgets cross-checked; `run_manifest.json`, `plan_jobs/`, `execution_plan.json` written only into
+  an empty working directory outside the repository and data stores (refusal publishes nothing). Shown: campaign and
+  hash, Pre-run, manifest hash, initial-state sources, budgets, gated operations, authorisation scope.
+- **Execution:** status NOT_AUTHORISED; `request_execution` refuses before any executor, extraction, run journal or
+  LM; typed hashes, decision / provenance text and M7 authorisations are never an authorisation; a changed campaign
+  makes the plan STALE. Evaluate Stored Run and progress unchanged.
+- **Results (real GUI, SP-02 + SP-13 RUN_A):** campaign `300726a3a27e`, manifest `91df8d01027f` (reproducible),
+  scope `0d048be94ab6`; 4 archived packs ready, 2 archived SP-02 ODBs need extraction, 0 new initial solves; LM 11
+  (3 reused), hard solve budget 16; refusals as documented; 46/46 GUI checks PASS.
+- **Tests:** full suite 2436 tests OK (6 skipped) with data stores; D2h tests 25 (8 store-gated); mutation checks caught.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, MAC, pairing, frozen observations, stopping criteria, thresholds,
+  gates, D-079 / D-080; M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED /
+  NOT_AUTHORISED; NO_GLOBAL_PARAMETER_VALUE (D-077); numerical identifiability NOT_ASSESSED.
+- **Files changed:** `src/services/campaign_execution_plan.py` (new), `src/services/identification_campaign_run.py`
+  (`prepare_campaign_plan`), `tools/m7_campaign.py`, `tools/auto_id_execution_plan.py` (new),
+  `src/material_identification_ui.py`, `tests/test_m8_d2h_execution_planning.py` (new),
+  `tests/test_m8_1_auto_id_setup.py`, `docs/gui/M8_D2H_EXECUTION_PLANNING.md` (new), STATUS, ROADMAP, CHANGELOG.
+  **Abaqus run count:** 0.
+
+## 2026-10-19 — M8-D2h review correction (PR #91): all-or-nothing plan publication
+
+- **Remark:** `_publish` wrote `plan_jobs/`, `run_manifest.json` and `execution_plan.json` one after another; a write
+  error after the first could leave the working directory partly changed.
+- **Fix:** the complete plan is written into a private staging folder and must pass `plan_set_problems`. An identical
+  earlier plan is left as is (nothing written). Otherwise each earlier entry is moved aside into the staging folder
+  before its replacement is moved in. On a write error the new entries are moved back and the earlier ones restored:
+  a new plan leaves the folder empty, an earlier plan stays byte for byte. If a restore fails, the earlier files are
+  kept (`PlanRollbackIncomplete`), never deleted.
+- **Re-planning:** only in a folder holding exactly one complete, consistent earlier plan of the same campaign
+  (exactly the three entries; record schema / labels / status, campaign hash, manifest hash and authorisation scope
+  agree with the manifest; `plan_jobs/` holds exactly the manifest's initial-point jobs with their INP SHA-256).
+  Foreign files, a forged `execution_plan.json`, an altered manifest / scope / job or a damaged plan are refused and
+  left untouched.
+- **Tests:** injected failures publishing the second and third file (new folder stays empty; earlier plan byte for
+  byte), incomplete rollback keeps the earlier plan, forged / damaged folders refused untouched; mutation checks caught; D2h tests 30
+  (8 store-gated) OK; full suite with data stores 2441 OK (6 skipped).
+  Real Windows GUI 50/50 checks PASS (forged plan record, altered earlier manifest refused untouched; same-campaign
+  re-plan byte for byte); campaign `300726a3`, manifest `91df8d01`, scope `0d048be9` unchanged.
+- **Unchanged:** manifest hash and authorisation scope (reproducible), planning sequence, scientific criteria, gates,
+  execution NOT_AUTHORISED. **Files changed:** `src/services/campaign_execution_plan.py`,
+  `tests/test_m8_d2h_execution_planning.py`, `docs/gui/M8_D2H_EXECUTION_PLANNING.md`, STATUS, CHANGELOG.
+  **Abaqus run count:** 0.
