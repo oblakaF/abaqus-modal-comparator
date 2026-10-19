@@ -5350,3 +5350,13 @@ first internal provider.
   execution NOT_AUTHORISED. **Files changed:** `src/services/campaign_execution_plan.py`,
   `tests/test_m8_d2h_execution_planning.py`, `docs/gui/M8_D2H_EXECUTION_PLANNING.md`, STATUS, CHANGELOG.
   **Abaqus run count:** 0.
+
+## 2026-10-19 — M8-D2h ACCEPTED and closed
+
+- **M8-D2h Auto-ID Execution Planning & GUI Integration:** ACCEPTED (PR #91, merge `2d1b729`; push CI `39150191926`
+  and PR CI `39150195672` success; main CI `39204929033` success). Editorial closure; no scientific result changes.
+- **M8-D2i** Guarded Auto-ID Execution Integration entered in the ROADMAP (`IN_PROGRESS`; simulated executors only).
+- **Unchanged:** M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE (D-077); SPEC, DECISIONS, EVIDENCE, governed records.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+  **Abaqus run count:** 0.

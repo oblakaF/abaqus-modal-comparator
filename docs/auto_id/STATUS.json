@@ -4,8 +4,8 @@
   "audit": "docs/auto_id/AUDIT_121ba1d_V1_1.md",
   "audited_snapshot": "121ba1d06b7c268b3051f1407a3ea26a9027dca3",
   "current_stage": "M8",
-  "current_ministep": "M8-D2h Auto-ID Execution Planning & GUI Integration",
-  "status": "REVIEW_READY",
+  "current_ministep": "M8-D2i Guarded Auto-ID Execution Integration",
+  "status": "IN_PROGRESS",
   "last_accepted_stage": "M7",
   "last_accepted_ministep": "M7.1 + M7b corrective",
   "last_accepted_commit": "b9db2c1bc5c281d8f126ffe9f2abfec4dbd60e2c",
@@ -618,7 +618,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of PR #91 (feature/m8-d2h-execution-planning; M8-D2h REVIEW_READY, publication remark addressed, not merged). Execution NOT_AUTHORISED. M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
+  "next_action": "M8-D2i IN_PROGRESS on feature/m8-d2i-guarded-execution (simulated executors only). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no real campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1495,7 +1495,7 @@
       },
       "M8-D2h": {
         "title": "Auto-ID Execution Planning & GUI Integration",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "feature/m8-d2h-execution-planning",
         "base": "85b66872147549eeb949d2338e197362441d8155",
         "authorisation": "SUPERVISOR task M8-D2h (2026-10-18): a separately authorised stage; execution itself stays forbidden",
@@ -1511,7 +1511,18 @@
         "statement": "an execution plan is not scientific readiness and not a right to run; numerical identifiability of the new campaign NOT_ASSESSED until a real journalled result",
         "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, MAC / pairing rules, frozen observations, stopping criteria, thresholds, gates, D-079 / D-080, campaign / run / manifest hash semantics and journals; no Abaqus, Abaqus Python, FE or LM; no material constant released; NO_GLOBAL_PARAMETER_VALUE (D-077) unchanged; production calibration execution BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET",
         "pr": 91,
-        "review_correction": "SUPERVISOR remark (PR #91): publication of the execution plan is all or nothing: the complete plan is staged and checked in a private staging folder, earlier entries are moved aside before replacement and restored on a write error (a new plan leaves the folder empty, an earlier plan stays byte for byte; an incomplete restore keeps the earlier files, never deletes them); re-planning only in a folder holding exactly one complete, consistent earlier plan of the same campaign (plan_set_problems: exactly plan_jobs/, run_manifest.json, execution_plan.json; record, manifest hash, authorisation scope and initial-point jobs agree); foreign files, forged or damaged plans refused untouched; manifest hash and authorisation scope unchanged"
+        "review_correction": "SUPERVISOR remark (PR #91): publication of the execution plan is all or nothing: the complete plan is staged and checked in a private staging folder, earlier entries are moved aside before replacement and restored on a write error (a new plan leaves the folder empty, an earlier plan stays byte for byte; an incomplete restore keeps the earlier files, never deletes them); re-planning only in a folder holding exactly one complete, consistent earlier plan of the same campaign (plan_set_problems: exactly plan_jobs/, run_manifest.json, execution_plan.json; record, manifest hash, authorisation scope and initial-point jobs agree); foreign files, forged or damaged plans refused untouched; manifest hash and authorisation scope unchanged",
+        "acceptance": "SUPERVISOR: M8-D2h ACCEPTED (task M8-D2i, 2026-10-19); PR #91 merged",
+        "merge_commit": "2d1b729e982a4b99dc609e5189e3529a45ddc236",
+        "branch_ci": "push CI run 39150191926 success; PR CI run 39150195672 success",
+        "main_ci": "Linux CI on main 2d1b729: success (run 39204929033)"
+      },
+      "M8-D2i": {
+        "title": "Guarded Auto-ID Execution Integration",
+        "status": "IN_PROGRESS",
+        "branch": "feature/m8-d2i-guarded-execution",
+        "base": "2d1b729e982a4b99dc609e5189e3529a45ddc236",
+        "authorisation": "SUPERVISOR task M8-D2i (2026-10-19): guarded execution integration with simulated executors only; no real Abaqus, extraction or LM"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
