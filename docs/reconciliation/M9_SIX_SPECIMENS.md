@@ -101,8 +101,8 @@ Every face is one homogenised solid layer with its 0/90 axes on the global X / Y
 1. **Model tuning and thickness dependence, not independent material measurement.** The nominal old plain stock
    appears with E between 52 000 and 63 000 MPa, while the latest models (including the distinct twill SP-03) keep
    almost the same face membrane stiffness: **E·t ≈ 24 480 N/mm**. The inverse E-versus-t pattern is consistent with
-   compensation for recorded face
-   thicknesses (0.45 / 0.425 / 0.40 / 0.39 mm), but do not establish that the underlying materials are identical.
+   compensation for recorded face thicknesses (0.45 / 0.425 / 0.40 / 0.39 mm), but it does not establish that the
+   underlying materials are identical.
    Sandwich frequencies depend strongly on E·t and face spacing; E and t cannot be reliably separated by these
    frequency fits alone without independent, well-characterised thickness and model-form inputs. This is a practical
    limitation of the present evidence, not a proof of mathematical non-identifiability. SP-03 is twill and cannot be
