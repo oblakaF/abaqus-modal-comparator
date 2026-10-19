@@ -98,14 +98,18 @@ Every face is one homogenised solid layer with its 0/90 axes on the global X / Y
 
 ### 3.2 Why the carbon values differ
 
-1. **Hand tuning against frequencies, not material.** The same old plain 0.45 stock appears with E between 52 000 and
-   63 000 MPa. The latest models keep almost exactly the same face membrane stiffness:
-   **E·t ≈ 24 480 N/mm in SP-02, SP-03, SP-10 and SP-13.** The E differences therefore follow the recorded face
-   thickness (0.45 / 0.425 / 0.40 / 0.39 mm), not a different material. The measurable sandwich quantity is E·t (and
-   E·t·(h+t)²), not E alone. With calipers of 0.01 mm resolution and a recorded local variation of 0.40–0.50 mm for this
-   stock, E and t are not separable from these panels.
-2. **The tuning compensates the model form.** For every PLA panel the FE first mode is 16–28 % below the experimental
-   one:
+1. **Model tuning and thickness dependence, not independent material measurement.** The nominal old plain stock
+   appears with E between 52 000 and 63 000 MPa, while the latest models (including the distinct twill SP-03) keep
+   almost the same face membrane stiffness: **E·t ≈ 24 480 N/mm**. The inverse E-versus-t pattern is consistent with
+   compensation for recorded face
+   thicknesses (0.45 / 0.425 / 0.40 / 0.39 mm), but do not establish that the underlying materials are identical.
+   Sandwich frequencies depend strongly on E·t and face spacing; E and t cannot be reliably separated by these
+   frequency fits alone without independent, well-characterised thickness and model-form inputs. This is a practical
+   limitation of the present evidence, not a proof of mathematical non-identifiability. SP-03 is twill and cannot be
+   classified as the same carbon stock on the basis of E·t.
+2. **Lowest-frequency discrepancy; cause not yet established.** In the present frequency-by-rank comparisons for
+   PLA-core panels the lowest listed FE elastic frequency is 16–28 % below the experimental one. Those entries are
+   not all MAC-confirmed correspondences, so first verify the modal branch / physical correspondence:
 
    | Specimen | First experimental mode against FE |
    |---|---|
@@ -114,9 +118,10 @@ Every face is one homogenised solid layer with its 0/90 axes on the global X / Y
    | SP-10 | −18.4 % |
    | SP-13 accepted model | −28.0 % (−17.2 % with the shaker model) |
 
-   This is common to all PLA cores and points to the core / adhesive / bonding model. The Excel "Карбон" sheet says
-   the same about G12: 6 500–9 300 MPa would be "needed", which is core compensation. D-077 records the
-   family-consistency FAIL for SP-02 + SP-13.
+   The repeated discrepancy makes core shear, adhesive/bonding representation, face orientation and test-fixture
+   dynamics worth testing as competing explanations; it does not identify one cause. The Excel "Карбон" sheet notes
+   that G12 values of 6 500–9 300 MPa would be "needed" in its effective fits, but this does not prove core
+   compensation. D-077 separately records the family-consistency FAIL for SP-02 + SP-13.
 3. **Face areal mass differs within the same stock.** SP-02 668.6 g/m², against 598–631 g/m² for SP-03, SP-10 and
    SP-13. SP-02 is 6–11 % heavier per area: thicker sheet or more resin. The derived densities spread
    1.40–1.56 g/cm³.
@@ -310,7 +315,7 @@ up to +10 % (rank 7: 366.9 → 403.6 Hz), so E_core is the governing unknown the
 2. **SP-10 governed baseline**, only after item 8.1-2 and the §11 records: one M3-rendered baseline solve plus E ±5 %
    (3 solves, the D2h / D2i guarded path). This turns SP-10 into a second honeycomb specimen for a specimen-to-specimen
    consistency test with SP-02.
-3. **Model-form study of the torsion error (mode 1, −16…−28 % on all PLA cores):**
+3. **Diagnostic sensitivity study of the low-frequency discrepancy (rank-1, −16…−28 % in the current PLA-core comparisons):**
    - core shear stiffness;
    - explicit adhesive layer / fillets (the `SP13_interface_*` work exists but has no completed jobs);
    - face fibre angle (as `SP13ANGLE`).
