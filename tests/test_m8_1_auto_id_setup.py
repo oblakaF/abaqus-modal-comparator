@@ -502,7 +502,10 @@ class SetupPageTests(_Tmp):
              # M8-D2g finalisation and pre-run validation
              "Finalise & Export Campaign Definition...", "Pre-run Validation...",
              # M8-D2h execution plan (execution NOT_AUTHORISED; tested in test_m8_d2h_execution_planning)
-             "Prepare Auto-ID Execution Plan...", "Start Execution (not authorised)"]))
+             "Prepare Auto-ID Execution Plan...", "Start Execution (not authorised)",
+             # M8-D2i guarded execution (tested in test_m8_d2i_guarded_execution)
+             "Open Execution Plan...", "Re-check Sources", "Start Archive Extraction", "Start Identification Run",
+             "Stop After Current Step", "Refresh Execution Status", "Show Run Journal in Stored Run View"]))
         with mock.patch.object(ui.filedialog, "askopenfilename", return_value=str(RUN_B)):
             buttons["Select family / campaign definition..."]()
         self.assertIn("RUN_B", application.material_auto_id_summary_label.kwargs["text"])
