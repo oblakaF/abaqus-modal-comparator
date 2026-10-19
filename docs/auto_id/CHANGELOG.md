@@ -5350,3 +5350,58 @@ first internal provider.
   execution NOT_AUTHORISED. **Files changed:** `src/services/campaign_execution_plan.py`,
   `tests/test_m8_d2h_execution_planning.py`, `docs/gui/M8_D2H_EXECUTION_PLANNING.md`, STATUS, CHANGELOG.
   **Abaqus run count:** 0.
+
+## 2026-10-19 — M8-D2h ACCEPTED and closed
+
+- **M8-D2h Auto-ID Execution Planning & GUI Integration:** ACCEPTED (PR #91, merge `2d1b729`; push CI `39150191926`
+  and PR CI `39150195672` success; main CI `39204929033` success). Editorial closure; no scientific result changes.
+- **M8-D2i** Guarded Auto-ID Execution Integration entered in the ROADMAP (`IN_PROGRESS`; simulated executors only).
+- **Unchanged:** M8 `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE (D-077); SPEC, DECISIONS, EVIDENCE, governed records.
+- **Files changed:** `docs/auto_id/STATUS.json`, `docs/auto_id/ROADMAP.md`, `docs/auto_id/CHANGELOG.md`.
+  **Abaqus run count:** 0.
+
+## 2026-10-19 — M8-D2i Guarded Auto-ID Execution Integration (REVIEW_READY)
+
+- **Branch:** `feature/m8-d2i-guarded-execution` from `2d1b729`.
+- **Controller:** `services/guarded_execution` (GUI and CLI `tools/auto_id_execute.py`). It re-checks a prepared
+  Execution Plan as current (plan set, definition file, Pre-run, re-planned manifest and scope) and runs
+  ARCHIVE_EXTRACTION (`extract_archived_odbs`) and CAMPAIGN_RUN (`CampaignRun.run`) with the existing executor only,
+  in a worker thread, with stop before the next solve / extraction, resume from the journals and an attempt log
+  (`NOT_GOVERNED_EVIDENCE`). Progress: `run_progress`; verdict: `evaluate_stored_run` -> `judge_campaign_run`
+  (unchanged).
+- **Authorisation:** `auto-id/execution-authorisation/v1` binds operation, scope hash, campaign hash, manifest hash and
+  the operation's budget; attested by a trusted authority; re-checked against a fresh context before execution. The
+  production authority attests nothing (no trusted HUMAN source exists; nothing fabricated): the executor stays
+  blocked. Tests use an isolated HMAC SimulatedAuthority; simulated runs are labelled
+  `SIMULATED_TEST_EXECUTION_NEVER_A_MATERIAL_RESULT`.
+- **Simulated end-to-end:** extraction of 2 archived ODBs; extraction authorisation refused for the run; RUN_A
+  CONVERGED through CampaignRun; journals verified; backend judgement; budgets (SOLVE_BUDGET, LM 4); branch-tracking
+  REFUSED; executor error / interruption / stop with journals intact; resume without repeated solves; changes after
+  authorisation refused. Real SP-02 + SP-13 plan opens as current; production refuses both operations.
+- **Tests:** D2i 24 OK; mutation checks caught; full suite 2465 OK (6 skipped); real Windows GUI 34/34 PASS.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, MAC, pairing, thresholds, criteria, backend rules; M8 `IN_PROGRESS`,
+  original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED; NO_GLOBAL_PARAMETER_VALUE (D-077).
+- **Files changed:** `src/services/guarded_execution.py` (new), `src/services/campaign_execution_plan.py`
+  (`plan_operations` / `plan_gates` public), `src/material_identification_ui.py`, `tools/auto_id_execute.py` (new),
+  `tests/m8_d2i_support.py` (new), `tests/test_m8_d2i_guarded_execution.py` (new), `tests/test_m8_1_auto_id_setup.py`,
+  `docs/gui/M8_D2I_GUARDED_EXECUTION.md` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-19 — M8-D2i review corrections (PR #92)
+
+- **A. Attempt log:** `guarded_execution.json` is written in two phases (STARTED before anything runs, the outcome
+  afterwards). A damaged earlier log refuses before running and is never overwritten; a STARTED write error runs
+  nothing; an outcome write error keeps the computed state with the reason (`COMPLETED_ATTEMPT_LOG_NOT_RECORDED`, never
+  confirmed); the background worker always ends in a final state; computation journals untouched; the plan reopens.
+- **B. Synthetic results:** `services/execution_provenance` (SIMULATED / EXECUTION_LOG_UNREADABLE blocking;
+  GUARDED_EXECUTION_RECORDED / NO_GUARDED_EXECUTION_RECORD not blocking and not evidence of a real origin) plus an
+  independent `SIMULATED_TEST_EXECUTION.json` marker. Blocking runs are labelled in Data Readiness and the uncertainty
+  breakdown, never show Engineering Constants and are refused by the evidence export; the backend record is unchanged;
+  the archived M7 RUN_A presents and exports as before (NO_GLOBAL_PARAMETER_VALUE).
+- **Tests:** `tests/test_m8_d2i_pr92_corrections.py` 13 OK (injected log write errors, sync and background; damaged log;
+  simulated / marker-only / unreadable-log / unlabelled provenance; negative export; archived RUN_A positive
+  regression, store-gated); mutation checks caught; full suite 2478 OK (6 skipped).
+- **Files changed:** `src/services/execution_provenance.py` (new), `src/services/guarded_execution.py`,
+  `src/services/auto_id_evidence_export.py`, `src/material_identification_ui.py`,
+  `tests/test_m8_d2i_pr92_corrections.py` (new), `docs/gui/M8_D2I_GUARDED_EXECUTION.md`, STATUS, CHANGELOG.
+  **Abaqus run count:** 0.

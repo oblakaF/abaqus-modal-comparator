@@ -278,7 +278,7 @@ def _cross_check(definition, manifest: Mapping) -> list:
     return problems
 
 
-def _operations(manifest: Mapping) -> dict:
+def plan_operations(manifest: Mapping) -> dict:
     budgets, initial = manifest["budgets"], manifest["initial_points"]
     specimens = len(manifest["specimens"])
     later = budgets["max_new_campaign_evaluations"] * specimens  # every later LM evaluation solves each specimen anew
@@ -301,7 +301,7 @@ def _operations(manifest: Mapping) -> dict:
     }
 
 
-def _gates(operations: Mapping) -> tuple:
+def plan_gates(operations: Mapping) -> tuple:
     gates = []
     if operations["archive_extractions"]:
         gates.append({"gate": GATE_ARCHIVE_EXTRACTION, "status": NOT_AUTHORISED,
@@ -441,8 +441,8 @@ def prepare_execution_plan(definition_path, work_directory, repo_root: Path, fix
         problems = _cross_check(definition, manifest)
         if problems:
             raise ExecutionPlanError("the prepared plan does not match the definition: " + "; ".join(problems))
-        operations = _operations(manifest)
-        gates = _gates(operations)
+        operations = plan_operations(manifest)
+        gates = plan_gates(operations)
         scope = authorisation_scope(definition, sha, manifest, manifest_hash, operations, gates)
         plan = ExecutionPlan(path, sha, definition.campaign_id, definition.campaign_hash,
                              definition.scientific_question, definition.run_type, prerun, manifest, manifest_hash,
@@ -568,4 +568,5 @@ def request_execution(plan: Optional[ExecutionPlan], authorisation: object = Non
 
 
 __all__ = ["ExecutionPlan", "ExecutionPlanError", "ExecutionNotAuthorised", "PlanRollbackIncomplete",
-           "prepare_execution_plan", "check_work_directory", "plan_set_problems", "plan_problems", "request_execution", "authorisation_scope", "NOT_AUTHORISED"]
+           "prepare_execution_plan", "check_work_directory", "plan_set_problems", "plan_operations", "plan_gates",
+           "plan_problems", "request_execution", "authorisation_scope", "NOT_AUTHORISED"]

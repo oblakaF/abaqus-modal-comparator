@@ -19,6 +19,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path, PureWindowsPath
 import textwrap
+import threading
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from domain.identification_model import IdentificationModelDefinition
@@ -1150,6 +1151,20 @@ def observation_readiness_view(app) -> dict[str, object]:
     return {"status": status, "summary": summary, "rows": tuple(rows)}
 
 
+def _blocking_provenance(app):
+    """M8-D2i: ``(state, detail)`` when the selected run must never be presented as a material result (a simulated
+    test run, or a run whose guarded attempt log is unreadable), else ``None``. ``None`` is not evidence of a real
+    origin: the existing journal and evidence checks apply unchanged."""
+
+    from services.execution_provenance import blocking, run_execution_provenance
+
+    path = getattr(app, "auto_id_selected_run_path", None)
+    if path is None:
+        return None
+    state, detail = run_execution_provenance(path)
+    return (state.value, detail) if blocking(state) else None
+
+
 def scientific_readiness_view(app) -> dict[str, object]:
     """Present a stored SPEC v1.2 scientific readiness record (V12-I6) without judging anything.
 
@@ -1186,6 +1201,14 @@ def scientific_readiness_view(app) -> dict[str, object]:
     else:
         status = "NOT AVAILABLE"
         summary = ("No scientific verdict available.",)
+    blocked = _blocking_provenance(app) if rows else None
+    if blocked:  # M8-D2i: the backend record stays unchanged; only its presentation is labelled
+        label, detail = blocked
+        rows = (("Execution provenance", f"{label}: {detail}"),) + tuple(
+            (name, f"{value} [{label}: not a material result]") for name, value in rows)
+        status = f"{label} (backend status {status})"
+        summary = (f"{label}: nothing shown for this run is a material property or an Engineering Constant of a real "
+                   "specimen; the scientific backend's record is kept unchanged.",) + tuple(summary)
     return {
         "available": bool(rows),
         "status": status,
@@ -1234,7 +1257,11 @@ def uncertainty_breakdown_view(app) -> tuple[tuple[str, str, str], ...]:
         return ()
     evaluation = _current_typed_evaluation(app, view)
     report = getattr(getattr(evaluation, "readiness", None), "material_report", None)
-    return uncertainty_breakdown(getattr(app, "scientific_readiness_record", None), report)
+    rows = uncertainty_breakdown(getattr(app, "scientific_readiness_record", None), report)
+    blocked = _blocking_provenance(app)
+    if blocked:  # M8-D2i
+        rows = (("Execution provenance", blocked[0], f"{blocked[1]}; not a material result"),) + tuple(rows)
+    return rows
 
 
 def calibration_preview_view(app) -> dict[str, object]:
@@ -1255,7 +1282,11 @@ def calibration_preview_view(app) -> dict[str, object]:
 
     evaluation = _current_typed_evaluation(app, scientific_readiness_view(app))
     readiness = getattr(evaluation, "readiness", None)
-    if readiness is None:
+    blocked = _blocking_provenance(app)
+    if blocked:  # M8-D2i: never Engineering Constants of a real specimen from a simulated run
+        preview = not_available(f"{blocked[0]}: {blocked[1]}; no Engineering Constants or material fragment are shown "
+                                "for this run.")
+    elif readiness is None:
         preview = not_available("no current typed evaluation of the selected run (evaluate the selected stored run; "
                                 "a stored, external or changed record never produces constants or a fragment).")
     else:
@@ -1448,6 +1479,11 @@ def evaluate_auto_id_run(app) -> None:
             specimens, _ = _auto_id_specimens(app, definition)
             app.auto_id_evaluated_fingerprint = run_evidence_fingerprint(definition, run_path, specimens)
             notes = f" Loading notes: {'; '.join(evaluation.notes)}." if evaluation.notes else ""
+            from services.guarded_execution import execution_provenance
+
+            provenance = execution_provenance(run_path)  # M8-D2i: a simulated test run is never a material result
+            if provenance:
+                notes += f" {provenance}: this run was executed under a simulated test authority; not a material result."
             app.auto_id_run_message = (f"Evaluated stored run {evaluation.run.run_hash[:12]} with the shared backend: "
                                        f"{record['status']} (see Data Readiness Check).{notes}")
     _refresh_auto_id_setup_page(app)
@@ -2137,6 +2173,243 @@ def request_auto_id_execution(app, authorisation=None) -> None:
             text=" ".join((_execution_status_text(app), app.auto_id_execution_message)))
 
 
+AUTO_ID_EXEC_OPEN_LABEL = "Open Execution Plan..."
+AUTO_ID_EXEC_RECHECK_LABEL = "Re-check Sources"
+AUTO_ID_EXEC_EXTRACT_LABEL = "Start Archive Extraction"
+AUTO_ID_EXEC_RUN_LABEL = "Start Identification Run"
+AUTO_ID_EXEC_STOP_LABEL = "Stop After Current Step"
+AUTO_ID_EXEC_REFRESH_LABEL = "Refresh Execution Status"
+AUTO_ID_EXEC_JOURNAL_LABEL = "Show Run Journal in Stored Run View"
+AUTO_ID_EXEC_NONE = ("No Execution Plan opened (Open Execution Plan... re-checks a prepared plan folder against the "
+                     "current sources; nothing runs).")
+
+
+def _execution_authority(app):
+    """The authorisation authority of this GUI: in production there is no trusted HUMAN authorisation source."""
+    from services.guarded_execution import PRODUCTION_AUTHORITY
+
+    return getattr(app, "auto_id_execution_authority", PRODUCTION_AUTHORITY)
+
+
+def _in_background(app, work, done) -> None:
+    """Run ``work`` in a worker thread and ``done(result, error)`` back on the Tk thread (synchronously without Tk)."""
+
+    root = getattr(app, "root", None)
+    if not hasattr(root, "after"):
+        try:
+            result, error = work(), None
+        except Exception as caught:  # reported by ``done``, never a GUI crash
+            result, error = None, caught
+        done(result, error)
+        return
+    box = {}
+
+    def run():
+        try:
+            box["result"] = work()
+        except Exception as caught:  # reported by ``done``
+            box["error"] = caught
+
+    thread = threading.Thread(target=run, name="auto-id-background", daemon=True)
+    thread.start()
+
+    def poll():
+        if thread.is_alive():
+            root.after(250, poll)
+        else:
+            done(box.get("result"), box.get("error"))
+
+    root.after(250, poll)
+
+
+def _abaqus_command(app) -> str:
+    variable = getattr(app, "abaqus_command", None)
+    return (variable.get() if hasattr(variable, "get") else "") or "abaqus"
+
+
+def _execution_controller(app, context):
+    """The one guarded controller over the existing executor (real executors are created only after authorisation)."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+    from services.guarded_execution import GuardedExecutionController, open_execution_context
+
+    command = _abaqus_command(app)
+
+    def solve_executor():
+        from services.forward_solver import subprocess_executor
+
+        return subprocess_executor(7200)
+
+    def extraction_executor():
+        from services.shape_extraction import pinned_script_executor
+
+        return pinned_script_executor(AUTO_ID_REPO_ROOT, command, 7200)
+
+    def recheck():
+        return open_execution_context(context.work_directory, AUTO_ID_REPO_ROOT, _draft_fixtures(),
+                                      fixture_roots_from_environment())
+
+    return GuardedExecutionController(context, _execution_authority(app), abaqus_command=command,
+                                      solve_executor_factory=solve_executor,
+                                      extraction_executor_factory=extraction_executor, recheck=recheck)
+
+
+def _guarded_message(app, text, rows=None) -> None:
+    app.auto_id_guarded_message = text
+    if hasattr(app, "material_auto_id_exec_label"):
+        app.material_auto_id_exec_label.configure(text=text)
+        if rows is not None:
+            _replace_table_rows(app.material_auto_id_exec_table, rows)
+        available = getattr(app, "auto_id_execution_controller", None) is not None and \
+            app.auto_id_execution_controller.start_available()[0]
+        for button in getattr(app, "material_auto_id_exec_start_buttons", ()):
+            button.configure(state="normal" if available else "disabled")
+
+
+def guarded_execution_rows(app) -> tuple:
+    """Plan, gates, budgets, execution state and the verified journal progress (read-only)."""
+
+    from services.guarded_execution import campaign_journals
+    from services.run_progress import inspect_run_progress
+
+    controller = getattr(app, "auto_id_execution_controller", None)
+    if controller is None:
+        return ()
+    rows = list(controller.context.rows())
+    rows += [("Gate", gate, f"{scope}; budget {budget}", status) for gate, scope, budget, status in controller.gate_rows()]
+    rows.append(("Execution", "State", controller.state.value, controller.state.value))
+    for journal in campaign_journals(controller.context):
+        progress = inspect_run_progress(controller.context.definition, journal, controller.context.specimens)
+        rows += [("Progress", item, value, progress.state.value) for item, value in progress.rows]
+    return tuple(rows)
+
+
+def _guarded_status_text(app) -> str:
+    from services.guarded_execution import outcome_text
+
+    controller = getattr(app, "auto_id_execution_controller", None)
+    if controller is None:
+        return AUTO_ID_EXEC_NONE
+    available, reason = controller.start_available()
+    gate = "Start enabled (trusted authority)" if available else f"Execution status: NOT_AUTHORISED — {reason}"
+    return (f"Execution Plan {controller.context.work_directory}: campaign {controller.context.definition.campaign_id}, "
+            f"manifest {controller.context.manifest_hash[:12]}, scope {controller.context.scope_hash[:12]}. {gate}. "
+            f"State: {controller.state.value}. {outcome_text(controller.outcome)}")
+
+
+def refresh_guarded_execution(app) -> None:
+    """"Refresh Execution Status": the controller state and the verified journal progress (reads only)."""
+
+    try:
+        rows = guarded_execution_rows(app)
+    except Exception as error:  # never a GUI crash; never shown as progress
+        rows = (("Execution", "Status", f"could not be read ({error})", "NOT_VERIFIED"),)
+    _guarded_message(app, _guarded_status_text(app), rows)
+
+
+def open_guarded_execution(app, work_directory=None) -> None:
+    """"Open Execution Plan...": re-check a prepared plan folder (the plan itself, Pre-run Validation, the existing
+    planning sequence giving the same manifest and scope); nothing is written or run."""
+
+    from domain.experiment_fixture import fixture_roots_from_environment
+    from services.guarded_execution import open_execution_context
+
+    if work_directory is None:
+        work_directory = filedialog.askdirectory(title="Execution Plan folder (prepared by Prepare Auto-ID Execution "
+                                                       "Plan...)", mustexist=True)
+    if not work_directory:
+        _guarded_message(app, "Open Execution Plan cancelled.")
+        return
+    if getattr(app, "auto_id_execution_controller", None) is not None and app.auto_id_execution_controller.running:
+        _guarded_message(app, "An operation is running: stop it or wait before opening another plan.")
+        return
+    app.auto_id_execution_controller = None
+    _guarded_message(app, f"Re-checking {work_directory} against the current sources (re-planning; this can take a "
+                          "minute)...", ())
+
+    def work():
+        return open_execution_context(work_directory, AUTO_ID_REPO_ROOT, _draft_fixtures(),
+                                      fixture_roots_from_environment())
+
+    def done(context, error):
+        if error is not None:
+            _guarded_message(app, f"Execution Plan not opened: {error}", ())
+            return
+        app.auto_id_execution_controller = _execution_controller(app, context)
+        refresh_guarded_execution(app)
+
+    _in_background(app, work, done)
+
+
+def recheck_guarded_execution(app) -> None:
+    """"Re-check Sources": open the same plan folder again (a changed source, record or definition makes it STALE)."""
+
+    controller = getattr(app, "auto_id_execution_controller", None)
+    if controller is None:
+        _guarded_message(app, "Nothing to re-check: open an Execution Plan first.")
+        return
+    open_guarded_execution(app, controller.context.work_directory)
+
+
+def start_guarded_operation(app, operation: str) -> None:
+    """Start ARCHIVE_EXTRACTION or CAMPAIGN_RUN through the guarded controller, only with an authorisation the trusted
+    authority supplies; refused (nothing called) otherwise. The operation runs in a worker thread."""
+
+    from services.campaign_execution_plan import ExecutionNotAuthorised
+
+    controller = getattr(app, "auto_id_execution_controller", None)
+    if controller is None:
+        _guarded_message(app, "Not started: open an Execution Plan first.")
+        return
+    available, reason = controller.start_available()
+    authorisation = _execution_authority(app).authorisation_for(controller.context, operation) if available else None
+    if authorisation is None:
+        why = reason if not available else "the trusted authority supplies no authorisation for this plan and operation"
+        _guarded_message(app, f"{operation} not started: NOT_AUTHORISED — {why}. Nothing executed.")
+        return
+    try:
+        controller.start(operation, authorisation)
+    except (ExecutionNotAuthorised, RuntimeError) as refusal:
+        _guarded_message(app, f"{operation} not started: {refusal}")
+        return
+    _poll_guarded_execution(app)
+
+
+def _poll_guarded_execution(app) -> None:
+    refresh_guarded_execution(app)
+    controller = getattr(app, "auto_id_execution_controller", None)
+    root = getattr(app, "root", None)
+    if controller is not None and controller.running and hasattr(root, "after"):
+        root.after(1000, lambda: _poll_guarded_execution(app))
+
+
+def stop_guarded_execution(app) -> None:
+    """"Stop After Current Step": no new solve or extraction is started; the journals keep what was written."""
+
+    controller = getattr(app, "auto_id_execution_controller", None)
+    if controller is None or not controller.running:
+        _guarded_message(app, "Nothing is running.")
+        return
+    controller.stop()
+    _guarded_message(app, "Stop requested: the running step finishes, no further solve or extraction starts.")
+
+
+def show_guarded_journal(app) -> None:
+    """"Show Run Journal in Stored Run View": select the plan's campaign and its newest run journal in the existing
+    read-only Stored Run view (progress, Evaluate Stored Run with the shared scientific backend)."""
+
+    from services.guarded_execution import campaign_journals
+
+    controller = getattr(app, "auto_id_execution_controller", None)
+    journals = [] if controller is None else campaign_journals(controller.context)
+    if not journals:
+        _guarded_message(app, "No run journal of this plan yet.")
+        return
+    load_auto_id_source(app, "family", str(controller.context.definition_path))
+    select_auto_id_run(app, journals[-1])
+    refresh_guarded_execution(app)
+
+
 def save_campaign_draft(app, destination=None):
     """"Save Campaign Draft As...": the draft document, written only after an explicit Save As, atomically, outside
     every protected folder; cancelling writes nothing. A draft is never a campaign definition."""
@@ -2518,6 +2791,30 @@ def _build_auto_id_setup_page(app, page) -> None:
     app.material_auto_id_plan_table = _build_read_only_table(
         plan, ("section", "item", "detail", "status"), ("Section", "Item", "Detail", "Status"),
         (150, 230, 650, 220), height=18,
+    )
+    guarded = ttk.LabelFrame(page, text="Guarded Auto-ID Execution (M8-D2i; starts only with a trusted HUMAN "
+                                        "authorisation)", padding=8)
+    guarded.pack(fill="x", pady=(8, 0))
+    guarded_buttons = ttk.Frame(guarded)
+    guarded_buttons.pack(anchor="w", pady=(0, 4))
+    app.material_auto_id_exec_start_buttons = []
+    for text, command in ((AUTO_ID_EXEC_OPEN_LABEL, lambda: open_guarded_execution(app)),
+                          (AUTO_ID_EXEC_RECHECK_LABEL, lambda: recheck_guarded_execution(app)),
+                          (AUTO_ID_EXEC_EXTRACT_LABEL, lambda: start_guarded_operation(app, "ARCHIVE_EXTRACTION")),
+                          (AUTO_ID_EXEC_RUN_LABEL, lambda: start_guarded_operation(app, "CAMPAIGN_RUN")),
+                          (AUTO_ID_EXEC_STOP_LABEL, lambda: stop_guarded_execution(app)),
+                          (AUTO_ID_EXEC_REFRESH_LABEL, lambda: refresh_guarded_execution(app)),
+                          (AUTO_ID_EXEC_JOURNAL_LABEL, lambda: show_guarded_journal(app))):
+        button = ttk.Button(guarded_buttons, text=text, command=command)
+        button.pack(side="left", padx=(0, 8))
+        if text in (AUTO_ID_EXEC_EXTRACT_LABEL, AUTO_ID_EXEC_RUN_LABEL):
+            button.configure(state="disabled")  # enabled only while a trusted authority is available
+            app.material_auto_id_exec_start_buttons.append(button)
+    app.material_auto_id_exec_label = ttk.Label(guarded, text=AUTO_ID_EXEC_NONE, justify="left", wraplength=1100)
+    app.material_auto_id_exec_label.pack(anchor="nw", fill="x", pady=(0, 4))
+    app.material_auto_id_exec_table = _build_read_only_table(
+        guarded, ("section", "item", "detail", "status"), ("Section", "Item", "Detail", "Status"),
+        (130, 230, 650, 240), height=16,
     )
 
 
