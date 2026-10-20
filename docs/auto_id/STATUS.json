@@ -618,7 +618,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of PR #92 (feature/m8-d2i-guarded-execution; M8-D2i REVIEW_READY, remarks A and B addressed, not merged). Production executor blocked (no trusted HUMAN authorisation source). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no real campaign run",
+  "next_action": "STOP: SUPERVISOR review of analysis/m9-six-specimens (M9 reconciliation REVIEW_READY, not merged). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -1519,7 +1519,7 @@
       },
       "M8-D2i": {
         "title": "Guarded Auto-ID Execution Integration",
-        "status": "REVIEW_READY",
+        "status": "ACCEPTED",
         "branch": "feature/m8-d2i-guarded-execution",
         "base": "2d1b729e982a4b99dc609e5189e3529a45ddc236",
         "authorisation": "SUPERVISOR task M8-D2i (2026-10-19): guarded execution integration with simulated executors only; no real Abaqus, extraction or LM",
@@ -1532,7 +1532,11 @@
         },
         "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, MAC, frozen pairing, thresholds, stopping criteria, scientific backend rules; no real Abaqus, ODB extraction or LM on user models; no material constant released; NO_GLOBAL_PARAMETER_VALUE (D-077) unchanged; production calibration BLOCKED / NOT_AUTHORISED; original M8 GATE NOT_MET",
         "pr": 92,
-        "review_correction": "SUPERVISOR remarks (PR #92). A: the attempt log is written in two phases (STARTED before anything runs; the outcome afterwards); a damaged earlier log refuses before running and is never overwritten; a STARTED write error runs nothing; an outcome write error keeps the computed state with the reason (a completed operation becomes COMPLETED_ATTEMPT_LOG_NOT_RECORDED, never confirmed); the worker thread always ends in a final state; computation journals untouched; the plan reopens. B: services/execution_provenance gives SIMULATED / EXECUTION_LOG_UNREADABLE (blocking) or GUARDED_EXECUTION_RECORDED / NO_GUARDED_EXECUTION_RECORD (not evidence of a real origin; existing checks apply unchanged); a simulated run also writes the independent SIMULATED_TEST_EXECUTION.json marker; blocking runs are labelled in Data Readiness and the uncertainty breakdown, show no Engineering Constants and are refused by the evidence export (codes SIMULATED_TEST_EXECUTION_NEVER_A_MATERIAL_RESULT / EXECUTION_PROVENANCE_UNREADABLE); the backend record is unchanged; archived M7 runs present and export as before"
+        "review_correction": "SUPERVISOR remarks (PR #92). A: the attempt log is written in two phases (STARTED before anything runs; the outcome afterwards); a damaged earlier log refuses before running and is never overwritten; a STARTED write error runs nothing; an outcome write error keeps the computed state with the reason (a completed operation becomes COMPLETED_ATTEMPT_LOG_NOT_RECORDED, never confirmed); the worker thread always ends in a final state; computation journals untouched; the plan reopens. B: services/execution_provenance gives SIMULATED / EXECUTION_LOG_UNREADABLE (blocking) or GUARDED_EXECUTION_RECORDED / NO_GUARDED_EXECUTION_RECORD (not evidence of a real origin; existing checks apply unchanged); a simulated run also writes the independent SIMULATED_TEST_EXECUTION.json marker; blocking runs are labelled in Data Readiness and the uncertainty breakdown, show no Engineering Constants and are refused by the evidence export (codes SIMULATED_TEST_EXECUTION_NEVER_A_MATERIAL_RESULT / EXECUTION_PROVENANCE_UNREADABLE); the backend record is unchanged; archived M7 runs present and export as before",
+        "acceptance": "SUPERVISOR: M8-D2i ACCEPTED (task M9, 2026-10-20); PR #92 merged",
+        "merge_commit": "9e1921e2b5234afee6fac9c0c9f4f9c92ae443c2",
+        "branch_ci": "push CI run 39277639590 success; PR CI run 39277650698 success",
+        "main_ci": "Linux CI on main 9e1921e: success (run 39297351023)"
       }
     },
     "track": "IN_PROGRESS — original M8 GATE still open (NOT_MET). M8.1..M8.8 and the final integration review ACCEPTED for the read-only scope READ_ONLY_EXISTING_JOURNALLED_RUNS (SUPERVISOR final scope decision 2026-10-10). Remaining gap: NEW specimen folder -> governed campaign -> new journalled scientific run -> new result: the GUI cannot currently complete this path; acknowledged, not waived and not marked PASS. Further work toward the original gate requires separate explicit authorisation. The historical prototype branch auto-id/m8 (193db8d) stays PARKED and untouched",
@@ -2036,5 +2040,21 @@
     "M8_accepted_scope": "READ_ONLY_EXISTING_JOURNALLED_RUNS",
     "M8_original_gate": "NOT_MET",
     "note": "the top-level status refers to current_ministep; the M8 stage is not ACCEPTED"
+  },
+  "m9_six_specimen_reconciliation": {
+    "status": "REVIEW_READY",
+    "kind": "SUPERVISOR analysis task (2026-10-20), outside the Auto-ID mini-step sequence; no stage started",
+    "branch": "analysis/m9-six-specimens",
+    "base": "9e1921e2b5234afee6fac9c0c9f4f9c92ae443c2",
+    "report": "docs/reconciliation/M9_SIX_SPECIMENS.md",
+    "verdicts": {
+      "SP-02": "READY_FOR_COMPARISON / Auto-ID GOVERNED_HISTORICAL (D-077 NO_GLOBAL_PARAMETER_VALUE)",
+      "SP-13": "READY_FOR_COMPARISON / Auto-ID GOVERNED_HISTORICAL (D-077 NO_GLOBAL_PARAMETER_VALUE)",
+      "SP-10": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE",
+      "SP-03": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE",
+      "SP-04": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE",
+      "SP-05": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE"
+    },
+    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates; no FE solve, no Abaqus Python, no LM; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE"
   }
 }
