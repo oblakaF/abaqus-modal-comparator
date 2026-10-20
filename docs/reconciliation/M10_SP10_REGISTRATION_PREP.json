@@ -1,0 +1,846 @@
+{
+ "schema": "m10/sp10-registration-prep/v1",
+ "status": "READY_FOR_HUMAN_CONFIRMATION",
+ "labels": [
+  "ANALYSIS_ONLY",
+  "NOT_GOVERNED_EVIDENCE",
+  "NO_REGISTRATION_BUILT",
+  "NO_MAC_NO_FREQUENCY_USED"
+ ],
+ "copies_verified": [
+  {
+   "file": "16_10_SP10_NEW_PLA_HCOMB_500x500.jnl",
+   "sha256": "d3f56d0ab8180da6cfb7529a3ecc679d71d53b79931bbc80c1ccad59621c3354",
+   "ok": true
+  },
+  {
+   "file": "19_10_SP10_NEW_CFRP_HCOMB_500x500.jnl",
+   "sha256": "4bff38ea79417432d0fec5212026cdeb867e93ce45980e05b4b02bcd7198667d",
+   "ok": true
+  },
+  {
+   "file": "SP10_500by500_Glue420_Honeycomb_PlainFiber_260831.svd",
+   "sha256": "16833e048e7c3e40f3d17646a8227d64ec9ec16d258715175b29e41f2fed1c1f",
+   "ok": true
+  },
+  {
+   "file": "SP10_500by500_Glue420_Honeycomb_PlainFiber_260831.unv",
+   "sha256": "8b6eebd344e999bdbbd7dca94fc475321a1279a181877f52d0a9eb0f0d4381c6",
+   "ok": true
+  },
+  {
+   "file": "SP10_b_polymax.unv",
+   "sha256": "497c7a47a3addff99f2feb8efd13f85accb73ece9d3c4a954181e6d897d38697",
+   "ok": true
+  },
+  {
+   "file": "SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911.svd",
+   "sha256": "c1898e3a0eb2d752382ba930c2e2f067e7127170132ee15bdede841638ac8ca6",
+   "ok": true
+  },
+  {
+   "file": "SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911_polytec.unv",
+   "sha256": "4035657d790f1a5c629ae5e7615872302a358ca843a0ab4c398c8f887a42d48e",
+   "ok": true
+  },
+  {
+   "file": "SP10_NEW_PLA_HCOMB_500x500.jnl",
+   "sha256": "e1b33008a1eae8251dd773304e3b704e5741de2a5a91dfc79b5d604bb1bbcac2",
+   "ok": true
+  },
+  {
+   "file": "SP10_PLA_HCOMB_500x500.jnl",
+   "sha256": "7e9699ccc98dcc5cdf3686aa3eb825955153f9cf6150e6b7a663a1f556c24326",
+   "ok": true
+  },
+  {
+   "file": "spec.txt",
+   "sha256": "b7256e96a8d5ec52c9bed3c0d8e16364064b604e29dff5c3541418159a0569c1",
+   "ok": true
+  },
+  {
+   "file": "SP10.inp",
+   "sha256": "bdc85c3a7f6a45d7cb62a457c5cb9a9c2b84e6f42914a52344f97ce414a2ce65",
+   "ok": true
+  },
+  {
+   "file": "SP10_NEW_E1=E2_NSM_DENSITY.inp",
+   "sha256": "851ed627afd2ebc7539304247aefac3248507b5be2fc19ac992be84cb6f7f16f",
+   "ok": true
+  },
+  {
+   "file": "SP10_new_E_NSM_DENS.inp",
+   "sha256": "a19053745ca57086fd1cf97e25877ffe2fa038cc1eb3a42df507760a73b22c8f",
+   "ok": true
+  },
+  {
+   "file": "SP10nemash63000.inp",
+   "sha256": "1befaaec712acf30f5e55aaaf35c2a7ffdc09dd6a67c15111103fb4bd5d2b385",
+   "ok": true
+  },
+  {
+   "file": "SP10newmash.inp",
+   "sha256": "e7646a8177ae27d8867bf8c6b2d61c42e1475e04bfb759ec60ca2c3386234a9b",
+   "ok": true
+  },
+  {
+   "file": "SP_10.inp",
+   "sha256": "3500cce391762884853a24b77bbfb76147f82980b9c950ab43982870941c9f73",
+   "ok": true
+  },
+  {
+   "file": "SP10_polymax.unv",
+   "sha256": "b20549e6d8a0d747b042157dd4e2fbd2c27820c840ca7625dc4540b9f7a503bb",
+   "ok": true
+  }
+ ],
+ "sessions": {
+  "260831": {
+   "experimental_file": {
+    "sha256": "b20549e6d8a0d747b042157dd4e2fbd2c27820c840ca7625dc4540b9f7a503bb",
+    "modal_set": "bravo",
+    "modes": 10
+   },
+   "svd_sha256": "16833e048e7c3e40f3d17646a8227d64ec9ec16d258715175b29e41f2fed1c1f",
+   "points": 121,
+   "parser_validation_max_residual": 0.0006,
+   "edge_rms_px": {
+    "bottom": 0.213,
+    "left": 0.182,
+    "right": 0.39,
+    "top": 0.242
+   },
+   "edge_rms_px_accepted_constants": {
+    "bottom": 10.104,
+    "left": 0.182,
+    "right": 0.39,
+    "top": 0.242
+   },
+   "method": "diagnostic variant EDGE_CLUSTER_MIN_SHARE 0.25 (accepted 0.30 fits the shaker contour as the bottom edge)",
+   "panel_dimensions_mm_horizontal_vertical": [
+    520.0,
+    515.0
+   ],
+   "scan_window_mm": {
+    "height": 496.469,
+    "width": 376.5267
+   },
+   "grid_to_edge_gaps_mm": {
+    "bottom": 8.2963,
+    "left": 76.4565,
+    "right": 67.0167,
+    "top": 10.2347
+   },
+   "camera_grid_model_residual_mm": {
+    "max": 3.1255,
+    "median": 1.4641,
+    "p95": 2.268
+   },
+   "axis_misalignment_deg": 0.049,
+   "unv_scale_over_physical": [
+    1.168,
+    0.8738
+   ],
+   "stream_sha256": {
+    "Info/APS_Mixed/MeshObject1/DefaultSettings": "3cccb317fec2d113bf41ac74ebda0de4eb233e64b165430d8a183054c8329a79",
+    "Info/Geometry/MeasPoints": "9e128c8fee439714fce5dd0503a14292c10705b7f049fc5aab84ac17980279d1",
+    "Info/VideoBitmap": "37bf302869346871ac48c593a7469f0d08ceb0045b95ebdfe9d097bd28fc36be",
+    "Info/VideoSettings": "2ea2a2cbe8ba892941ad99124ba29a3619bea0c542789cc33b01c2aadec710b8"
+   }
+  },
+  "260911b": {
+   "experimental_file": {
+    "sha256": "497c7a47a3addff99f2feb8efd13f85accb73ece9d3c4a954181e6d897d38697",
+    "modal_set": "bestttt",
+    "modes": 13
+   },
+   "svd_sha256": "c1898e3a0eb2d752382ba930c2e2f067e7127170132ee15bdede841638ac8ca6",
+   "points": 323,
+   "parser_validation_max_residual": 0.0007,
+   "edge_rms_px": {
+    "bottom": 0.128,
+    "left": 0.491,
+    "right": 0.363,
+    "top": 0.199
+   },
+   "edge_rms_px_accepted_constants": {
+    "bottom": 0.128,
+    "left": 0.491,
+    "right": 0.363,
+    "top": 0.199
+   },
+   "method": "accepted constants (variant identical)",
+   "panel_dimensions_mm_horizontal_vertical": [
+    515.0,
+    520.0
+   ],
+   "scan_window_mm": {
+    "height": 497.9441,
+    "width": 370.2426
+   },
+   "grid_to_edge_gaps_mm": {
+    "bottom": 9.4012,
+    "left": 71.807,
+    "right": 72.9504,
+    "top": 12.6547
+   },
+   "camera_grid_model_residual_mm": {
+    "max": 2.9927,
+    "median": 1.1619,
+    "p95": 2.2455
+   },
+   "axis_misalignment_deg": 0.2939,
+   "unv_scale_over_physical": [
+    1.1767,
+    0.8825
+   ],
+   "stream_sha256": {
+    "Info/APS_Mixed/MeshObject1/DefaultSettings": "b65755cb34d4ea459045a4225843e9396b93155b93a3a42f2be338bb8c9c2c34",
+    "Info/Geometry/MeasPoints": "2ae93e1f85c4efde6870d18a382029207365651d8db6d7762c7723568233621f",
+    "Info/VideoBitmap": "514e7c9c989584d8cb8c4b814d09b399a1de13883e8e49225397f10cbb3e9132",
+    "Info/VideoSettings": "ec36d6566ecdda942947740d0040a73f2df22721d5da5acd6fe72333e512b442"
+   }
+  }
+ },
+ "frame_aspect_px_per_mm_x_over_y": {
+  "260831 (variant)": {
+   "horizontal 520": 1.0008,
+   "horizontal 515": 1.0203
+  },
+  "260911b": {
+   "horizontal 520": 0.9792,
+   "horizontal 515": 0.9983
+  },
+  "rig reference (accepted)": {
+   "SP-02 510x515": 1.0013,
+   "SP-13 510x520": 1.003
+  },
+  "260831 accepted constants (bottom edge wrong)": {
+   "horizontal 520": 0.9693,
+   "horizontal 515": 0.9882
+  }
+ },
+ "orientation_facts": {
+  "confirmed_from_frames": [
+   "the handwritten label is legible (not mirrored) in both frames: the labelled face faced the scanner in both sessions",
+   "label top-right in 260831, bottom-right and turned 90 deg clockwise in 260911b: the panel was rotated 90 deg clockwise as seen by the scanner",
+   "the red 'b-top' mark is on the top edge in 260911b = the left edge (A-D) in 260831; it is not visible in the 260831 frame",
+   "experimental +x = image right, +y = image up in both sessions (MeasPoints vs UNV); measured DOF +Z only"
+  ],
+  "indicated_needs_ruler": "the label edge (D-C, horizontal in 260831) is the 520 mm edge (frame aspect of both sessions against the rig reference)",
+  "not_determinable_from_records": [
+   "FE in-plane sign (candidate pairs related by 180 deg)",
+   "measured face against FE TOP / BOTTOM",
+   "physical honeycomb wall direction (not visible through the face)",
+   "which physical edge the FE model's X / Y were built from"
+  ]
+ },
+ "fe_model": {
+  "inp": "SP10_NEW_E1=E2_NSM_DENSITY.inp",
+  "inp_sha256": "851ed627afd2ebc7539304247aefac3248507b5be2fc19ac992be84cb6f7f16f",
+  "same_mesh_and_placement": [
+   "SP10nemash63000",
+   "SP10newmash",
+   "SP10_new_E_NSM_DENS"
+  ],
+  "inp_nodes": 1667491,
+  "faces_mm": {
+   "X": 515,
+   "Y": 520
+  },
+  "TOP": "CFRP_TOP-1 0.40 mm, z 2.39-2.79 (max_z), E 61 300",
+  "BOTTOM": "CFRP_BOT-1 0.39 mm, z 0-0.39 (min_z), E 62 800",
+  "core": "SP02_Honeycomb_Core-1 (C3D20R), X 3-513, Y 2-517, z 0.39-2.39; straight honeycomb walls parallel to FE Y",
+  "material_orientation": "global axes; E1 = E2 on the faces",
+  "steps": {
+   "Modal_FreeFree": 15,
+   "SP_10_MODAL_FREE": 25
+  },
+  "extraction": "MISSING: no geometry.csv / shape pack for any SP-10 ODB; Abaqus Python extraction not authorised"
+ },
+ "candidates": {
+  "T0": {
+   "measured_face": "TOP",
+   "fe_instance": "CFRP_TOP-1",
+   "side": "max_z",
+   "p_x_in_fe": "+X",
+   "p_y_in_fe": "+Y",
+   "dimension_consistent_with_frame_aspect": false,
+   "sessions": {
+    "260831": {
+     "experimental_axes_in_fe": [
+      "+X",
+      "+Y",
+      "+Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 76.46,
+      "y_mm": 8.3
+     },
+     "scan_window_mm": {
+      "physical_width": 376.527,
+      "physical_height": 496.469
+     },
+     "points_inside_face": 121,
+     "points": 121,
+     "nearest_fe_node_mm": {
+      "median": 1.218,
+      "max": 2.001
+     },
+     "distinct_fe_nodes": 121
+    },
+    "260911b": {
+     "experimental_axes_in_fe": [
+      "+Y",
+      "-X",
+      "+Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 12.65,
+      "y_mm": 71.81
+     },
+     "scan_window_mm": {
+      "physical_width": 370.243,
+      "physical_height": 497.944
+     },
+     "points_inside_face": 323,
+     "points": 323,
+     "nearest_fe_node_mm": {
+      "median": 1.188,
+      "max": 2.036
+     },
+     "distinct_fe_nodes": 299
+    }
+   },
+   "corners_in_fe_mm": {
+    "A": [
+     0.0,
+     0.0
+    ],
+    "B": [
+     520.0,
+     0.0
+    ],
+    "C": [
+     520.0,
+     515.0
+    ],
+    "D": [
+     0.0,
+     515.0
+    ]
+   }
+  },
+  "T90": {
+   "measured_face": "TOP",
+   "fe_instance": "CFRP_TOP-1",
+   "side": "max_z",
+   "p_x_in_fe": "+Y",
+   "p_y_in_fe": "-X",
+   "dimension_consistent_with_frame_aspect": true,
+   "sessions": {
+    "260831": {
+     "experimental_axes_in_fe": [
+      "+Y",
+      "-X",
+      "+Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 10.23,
+      "y_mm": 76.46
+     },
+     "scan_window_mm": {
+      "physical_width": 376.527,
+      "physical_height": 496.469
+     },
+     "points_inside_face": 121,
+     "points": 121,
+     "nearest_fe_node_mm": {
+      "median": 1.199,
+      "max": 2.05
+     },
+     "distinct_fe_nodes": 121
+    },
+    "260911b": {
+     "experimental_axes_in_fe": [
+      "-X",
+      "-Y",
+      "+Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 72.95,
+      "y_mm": 12.65
+     },
+     "scan_window_mm": {
+      "physical_width": 370.243,
+      "physical_height": 497.944
+     },
+     "points_inside_face": 323,
+     "points": 323,
+     "nearest_fe_node_mm": {
+      "median": 1.229,
+      "max": 2.11
+     },
+     "distinct_fe_nodes": 300
+    }
+   },
+   "corners_in_fe_mm": {
+    "A": [
+     515.0,
+     0.0
+    ],
+    "B": [
+     515.0,
+     520.0
+    ],
+    "C": [
+     0.0,
+     520.0
+    ],
+    "D": [
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "T180": {
+   "measured_face": "TOP",
+   "fe_instance": "CFRP_TOP-1",
+   "side": "max_z",
+   "p_x_in_fe": "-X",
+   "p_y_in_fe": "-Y",
+   "dimension_consistent_with_frame_aspect": false,
+   "sessions": {
+    "260831": {
+     "experimental_axes_in_fe": [
+      "-X",
+      "-Y",
+      "+Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 67.02,
+      "y_mm": 10.23
+     },
+     "scan_window_mm": {
+      "physical_width": 376.527,
+      "physical_height": 496.469
+     },
+     "points_inside_face": 121,
+     "points": 121,
+     "nearest_fe_node_mm": {
+      "median": 1.25,
+      "max": 1.906
+     },
+     "distinct_fe_nodes": 121
+    },
+    "260911b": {
+     "experimental_axes_in_fe": [
+      "-Y",
+      "+X",
+      "+Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 9.4,
+      "y_mm": 72.95
+     },
+     "scan_window_mm": {
+      "physical_width": 370.243,
+      "physical_height": 497.944
+     },
+     "points_inside_face": 323,
+     "points": 323,
+     "nearest_fe_node_mm": {
+      "median": 1.209,
+      "max": 1.979
+     },
+     "distinct_fe_nodes": 293
+    }
+   },
+   "corners_in_fe_mm": {
+    "A": [
+     520.0,
+     515.0
+    ],
+    "B": [
+     0.0,
+     515.0
+    ],
+    "C": [
+     0.0,
+     0.0
+    ],
+    "D": [
+     520.0,
+     0.0
+    ]
+   }
+  },
+  "T270": {
+   "measured_face": "TOP",
+   "fe_instance": "CFRP_TOP-1",
+   "side": "max_z",
+   "p_x_in_fe": "-Y",
+   "p_y_in_fe": "+X",
+   "dimension_consistent_with_frame_aspect": true,
+   "sessions": {
+    "260831": {
+     "experimental_axes_in_fe": [
+      "-Y",
+      "+X",
+      "+Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 8.3,
+      "y_mm": 67.02
+     },
+     "scan_window_mm": {
+      "physical_width": 376.527,
+      "physical_height": 496.469
+     },
+     "points_inside_face": 121,
+     "points": 121,
+     "nearest_fe_node_mm": {
+      "median": 1.199,
+      "max": 2.05
+     },
+     "distinct_fe_nodes": 121
+    },
+    "260911b": {
+     "experimental_axes_in_fe": [
+      "+X",
+      "+Y",
+      "+Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 71.81,
+      "y_mm": 9.4
+     },
+     "scan_window_mm": {
+      "physical_width": 370.243,
+      "physical_height": 497.944
+     },
+     "points_inside_face": 323,
+     "points": 323,
+     "nearest_fe_node_mm": {
+      "median": 1.229,
+      "max": 2.11
+     },
+     "distinct_fe_nodes": 300
+    }
+   },
+   "corners_in_fe_mm": {
+    "A": [
+     0.0,
+     520.0
+    ],
+    "B": [
+     0.0,
+     0.0
+    ],
+    "C": [
+     515.0,
+     0.0
+    ],
+    "D": [
+     515.0,
+     520.0
+    ]
+   }
+  },
+  "B0": {
+   "measured_face": "BOTTOM",
+   "fe_instance": "CFRP_BOT-1",
+   "side": "min_z",
+   "p_x_in_fe": "+X",
+   "p_y_in_fe": "-Y",
+   "dimension_consistent_with_frame_aspect": false,
+   "sessions": {
+    "260831": {
+     "experimental_axes_in_fe": [
+      "+X",
+      "-Y",
+      "-Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 76.46,
+      "y_mm": 10.23
+     },
+     "scan_window_mm": {
+      "physical_width": 376.527,
+      "physical_height": 496.469
+     },
+     "points_inside_face": 121,
+     "points": 121,
+     "nearest_fe_node_mm": {
+      "median": 1.242,
+      "max": 1.977
+     },
+     "distinct_fe_nodes": 121
+    },
+    "260911b": {
+     "experimental_axes_in_fe": [
+      "-Y",
+      "-X",
+      "-Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 12.65,
+      "y_mm": 72.95
+     },
+     "scan_window_mm": {
+      "physical_width": 370.243,
+      "physical_height": 497.944
+     },
+     "points_inside_face": 323,
+     "points": 323,
+     "nearest_fe_node_mm": {
+      "median": 1.231,
+      "max": 1.99
+     },
+     "distinct_fe_nodes": 299
+    }
+   },
+   "corners_in_fe_mm": {
+    "A": [
+     0.0,
+     515.0
+    ],
+    "B": [
+     520.0,
+     515.0
+    ],
+    "C": [
+     520.0,
+     0.0
+    ],
+    "D": [
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "B90": {
+   "measured_face": "BOTTOM",
+   "fe_instance": "CFRP_BOT-1",
+   "side": "min_z",
+   "p_x_in_fe": "+Y",
+   "p_y_in_fe": "+X",
+   "dimension_consistent_with_frame_aspect": true,
+   "sessions": {
+    "260831": {
+     "experimental_axes_in_fe": [
+      "+Y",
+      "+X",
+      "-Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 8.3,
+      "y_mm": 76.46
+     },
+     "scan_window_mm": {
+      "physical_width": 376.527,
+      "physical_height": 496.469
+     },
+     "points_inside_face": 121,
+     "points": 121,
+     "nearest_fe_node_mm": {
+      "median": 1.199,
+      "max": 2.05
+     },
+     "distinct_fe_nodes": 121
+    },
+    "260911b": {
+     "experimental_axes_in_fe": [
+      "+X",
+      "-Y",
+      "-Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 71.81,
+      "y_mm": 12.65
+     },
+     "scan_window_mm": {
+      "physical_width": 370.243,
+      "physical_height": 497.944
+     },
+     "points_inside_face": 323,
+     "points": 323,
+     "nearest_fe_node_mm": {
+      "median": 1.229,
+      "max": 2.11
+     },
+     "distinct_fe_nodes": 300
+    }
+   },
+   "corners_in_fe_mm": {
+    "A": [
+     0.0,
+     0.0
+    ],
+    "B": [
+     0.0,
+     520.0
+    ],
+    "C": [
+     515.0,
+     520.0
+    ],
+    "D": [
+     515.0,
+     0.0
+    ]
+   }
+  },
+  "B180": {
+   "measured_face": "BOTTOM",
+   "fe_instance": "CFRP_BOT-1",
+   "side": "min_z",
+   "p_x_in_fe": "-X",
+   "p_y_in_fe": "+Y",
+   "dimension_consistent_with_frame_aspect": false,
+   "sessions": {
+    "260831": {
+     "experimental_axes_in_fe": [
+      "-X",
+      "+Y",
+      "-Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 67.02,
+      "y_mm": 8.3
+     },
+     "scan_window_mm": {
+      "physical_width": 376.527,
+      "physical_height": 496.469
+     },
+     "points_inside_face": 121,
+     "points": 121,
+     "nearest_fe_node_mm": {
+      "median": 1.172,
+      "max": 1.965
+     },
+     "distinct_fe_nodes": 121
+    },
+    "260911b": {
+     "experimental_axes_in_fe": [
+      "+Y",
+      "+X",
+      "-Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 9.4,
+      "y_mm": 71.81
+     },
+     "scan_window_mm": {
+      "physical_width": 370.243,
+      "physical_height": 497.944
+     },
+     "points_inside_face": 323,
+     "points": 323,
+     "nearest_fe_node_mm": {
+      "median": 1.173,
+      "max": 2.018
+     },
+     "distinct_fe_nodes": 293
+    }
+   },
+   "corners_in_fe_mm": {
+    "A": [
+     520.0,
+     0.0
+    ],
+    "B": [
+     0.0,
+     0.0
+    ],
+    "C": [
+     0.0,
+     515.0
+    ],
+    "D": [
+     520.0,
+     515.0
+    ]
+   }
+  },
+  "B270": {
+   "measured_face": "BOTTOM",
+   "fe_instance": "CFRP_BOT-1",
+   "side": "min_z",
+   "p_x_in_fe": "-Y",
+   "p_y_in_fe": "-X",
+   "dimension_consistent_with_frame_aspect": true,
+   "sessions": {
+    "260831": {
+     "experimental_axes_in_fe": [
+      "-Y",
+      "-X",
+      "-Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 10.23,
+      "y_mm": 67.02
+     },
+     "scan_window_mm": {
+      "physical_width": 376.527,
+      "physical_height": 496.469
+     },
+     "points_inside_face": 121,
+     "points": 121,
+     "nearest_fe_node_mm": {
+      "median": 1.199,
+      "max": 2.05
+     },
+     "distinct_fe_nodes": 121
+    },
+    "260911b": {
+     "experimental_axes_in_fe": [
+      "-X",
+      "+Y",
+      "-Z"
+     ],
+     "panel_edges_offsets_mm": {
+      "x_mm": 72.95,
+      "y_mm": 9.4
+     },
+     "scan_window_mm": {
+      "physical_width": 370.243,
+      "physical_height": 497.944
+     },
+     "points_inside_face": 323,
+     "points": 323,
+     "nearest_fe_node_mm": {
+      "median": 1.229,
+      "max": 2.11
+     },
+     "distinct_fe_nodes": 300
+    }
+   },
+   "corners_in_fe_mm": {
+    "A": [
+     515.0,
+     520.0
+    ],
+    "B": [
+     515.0,
+     0.0
+    ],
+    "C": [
+     0.0,
+     0.0
+    ],
+    "D": [
+     0.0,
+     520.0
+    ]
+   }
+  }
+ },
+ "registration_blockers": [
+  "owner confirmation of orientation, measured face and corner naming (questions Q1-Q8)",
+  "FE geometry identity: extraction of the chosen SP-10 ODB (HUMAN gate)",
+  "260911b: 34 point pairs 0.56 mm apart share FE nodes; CORE-E2E-C refuses (rule unchanged)",
+  "260831: reconstruction needs a recorded deviation of one image-analysis constant (SUPERVISOR decision)"
+ ],
+ "m9_erratum": "SP-10 FE rows 10-12 ARE reproducible: step 2 SP_10_MODAL_FREE (25 modes) of SP10nemash63000 (column C) and SP10_NEW_E1=E2_NSM_DENSITY (column D) gives 228.43 / 266.44 / 268.56 and 226.95 / 265.04 / 267.14 Hz exactly; the M9 inventory parser read only the first eigenvalue table."
+}
