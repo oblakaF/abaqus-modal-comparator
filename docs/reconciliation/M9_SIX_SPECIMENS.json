@@ -22,7 +22,7 @@
   "SP-10": {
    "comparison": "DIAGNOSTIC_ONLY",
    "auto_id": "MISSING_EVIDENCE",
-   "reason": "no physical registration (scan-window reconstruction not done; in-plane orientation of panel and lattice against FE axes not recorded; near-square 520x515; session b rotated 90 deg); no SPEC v1.2 section 11 records; models tuned on own data; FE rows 10-12 not reproducible"
+   "reason": "no physical registration (scan-window reconstruction not done; in-plane orientation of panel and lattice against FE axes not recorded; near-square 520x515; session b rotated 90 deg); no SPEC v1.2 section 11 records; models tuned on own data; FE rows 10-12 traced to the second preserved frequency step (M10 correction); not MAC-verified pairings"
   },
   "SP-03": {
    "comparison": "DIAGNOSTIC_ONLY",
