@@ -174,12 +174,13 @@ R1.
 
 ### 5.1 SP-10 rows 10–12
 
-- **Findings.**
-  - All completed SP-10 jobs requested 15 modes (9 elastic).
-  - The SP-10 CAE journals also contain `numEigen=25`.
-  - The job name `SP10` was submitted 7 times, and its stored result has 15 modes.
-- **Conclusion.** The FE values of rows 10–12 (228.43 / 266.44 / 268.56 and 226.95 / 265.04 / 267.14) come from an
-  overwritten run and are **not reproducible** from the stored results. They are not used.
+- **Correction from M10 (2026-10-21).** The earlier inventory parser read only the first eigenvalue table.
+  Saved SP-10 model outputs contain **two frequency steps**: `Modal_FreeFree` (15 modes) and
+  `SP_10_MODAL_FREE` (25 modes); the CAE journals also record `numEigen=25`.
+- **Reproducible FE source.** Rows 10–12 are modes 16–18 of the second step: `SP10nemash63000`
+  gives 228.43 / 266.44 / 268.56 Hz and `SP10_NEW_E1=E2_NSM_DENSITY` gives
+  226.95 / 265.04 / 267.14 Hz. The values are **reproducible from preserved files**, but remain
+  frequency-by-rank entries, **not** independently confirmed experimental/FE mode pairings.
 - **Rank alignment.** Row 11 also shows that rank alignment fails at higher modes: +17 % against the experimental
   227.28 Hz.
 - **Experimental side.** Rows 10–12 are PolyMAX "Bestttt" of session 260911 b: 224.854, 227.276, 261.563 Hz.
@@ -275,7 +276,7 @@ In addition:
 
 - the SP-10 models were tuned against SP-10's own frequencies (E 61 300–63 000), so they cannot be an independent
   start;
-- the FE rows 10–12 are not reproducible;
+- the FE rows 10–12 are reproducible from the second frequency step, but do not establish MAC-verified mode pairing;
 - the face thickness uncertainty enters E directly (§3.2.1).
 
 ## 7. SP-03, SP-04, SP-05 by frequency
