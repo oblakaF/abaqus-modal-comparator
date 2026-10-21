@@ -5563,3 +5563,17 @@ first internal provider.
   not a model of the experiment; the four-corner strap model remains a hypothesis; the frequencies are not proof.
 - **Evidence draft:** only confirmed fields are filled; the existing parser refuses it.
 - No code change, no Abaqus, no MAC, no fitting.
+
+## 2026-10-22 — M11 R6.2: final orientation scheme (FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING)
+
+- **Figures and owner sheet** (outside git): a shaker-side and a scanner-side view of the plate (the scanner view on
+  the stored PSV frame with the 289 points), four candidate pictures A–D, and a two-question owner sheet.
+- **Candidate table:** for A–D, the experimental axes in FE, determinant +1, the FE axes and origin corner in the
+  shaker view, the side of the shell normal, the scanned face relative to the normal, and the scan-window offsets.
+- **Reconstruction check:** all 289 points lie inside the plate and the gaps close 301 / 300 mm. The reconstruction
+  stays diagnostic: the three deviations are not accepted.
+- **Status split:** proven / supported (scanner saw the unmarked face; shaker right of centre in the scanner view) /
+  unknown (A–D).
+- **Minimum confirmations:** the owner picks A–D and confirms the scanned face; the SUPERVISOR decides on the
+  deviations. Nothing needs re-measuring.
+- No Abaqus, MAC or fitting; no orientation chosen; no registration built.

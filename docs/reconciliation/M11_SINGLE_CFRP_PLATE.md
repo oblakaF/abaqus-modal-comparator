@@ -923,7 +923,100 @@ built and no MAC was computed.
 
 **Status: `FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING`** (unchanged).
 
-## 14. What did not change
+## 14. R6.2 (2026-10-22): final physical orientation scheme (preparation; nothing registered)
+
+Derived materials only, from the verified V3 copies, the R6 extraction, the HUMAN records of §8, §11 and §13, and the
+PSV frame extracted earlier from the V3 `.svd` copy. No Abaqus, extraction, MAC or fitting was used, and orientation
+was not chosen from shapes or frequencies. The figures and the owner's question sheet are in
+`runs\m11_carbon_plate\r62\` and are not committed:
+
+- `fig_r62_view_shaker.png`
+- `fig_r62_view_scanner.png`
+- `fig_r62_candidates.png`
+- `M11_R62_OWNER_QUESTIONS.md`
+
+### 14.1 The two views
+
+| | Shaker-side view (owner's sketches) | Scanner-side view (PSV camera) |
+|---|---|---|
+| Face seen | the marked face (handwritten numerals) | the face without marks (supported, §14.4) |
+| Edge labels | 1 top, 2 right, 3 bottom, 4 left | 1 top, **4 right**, 3 bottom, **2 left** (mirror) |
+| Edge mean thickness, mm | 1: 0.880, 2: 0.816, 3: 0.882, 4: 0.926 | the same edges, mirrored left / right |
+| Shaker (approximate) | bottom edge, left of the midline | bottom edge, right of the midline; the shaker disc in the frame is centred at about 0.77 of the plate width from the left |
+| FE X / Y | X along the horizontal 301 mm edge, Y along the vertical 300 mm edge; **signs and origin unknown** | the same lines, mirrored |
+| FE +Z (shell normal) | towards or away from the viewer: **unknown** | the opposite of the shaker view |
+
+The FE geometry (R6): X 0–301 mm, Y 0–300 mm, Z = 0. The S4R normals are +Z for all 10 000 elements (V3 INP copy,
+bound node for node to R6 in R7 R1).
+
+### 14.2 The four remaining candidates
+
+The experimental axes are those of the scanner view: x right, y up, z towards the scanner.
+
+| Picture | Experimental axes in FE | det | Shaker view: FE axes and origin (physical corner) | FE +Z points | Scanned face vs normal | Scan-window offsets to the FE origin, mm | Confirmation needed |
+|---|---|---|---|---|---|---|---|
+| **A** | -X +Y -Z | +1 | X right, Y up; origin bottom-left (between edges 3 and 4) | towards the shaker (marked side) | negative_normal | x 29.19, y 7.02 | owner picks picture A |
+| **B** | +X -Y -Z | +1 | X left, Y down; origin top-right (between edges 1 and 2) | towards the shaker (marked side) | negative_normal | x 56.4, y 7.78 | owner picks picture B |
+| **C** | -X -Y +Z | +1 | X right, Y down; origin top-left (between edges 1 and 4) | towards the scanner (unmarked side) | positive_normal | x 29.19, y 7.78 | owner picks picture C |
+| **D** | +X +Y +Z | +1 | X left, Y up; origin bottom-right (between edges 3 and 2) | towards the scanner (unmarked side) | positive_normal | x 56.4, y 7.02 | owner picks picture D |
+
+**Notes:**
+
+- The four candidates are symmetry-equivalent for this homogeneous E1 = E2 model (§12.3), but they are physically
+  different. The choice is the owner's: one picture.
+- The offsets follow from the scanner-view gaps (left 56.4, right 29.19, bottom
+  7.02, top 7.78 mm). They inherit the status of the reconstruction (§14.3).
+- Picture A corresponds to the Abaqus default front view (X right, Y up, Z towards the viewer) seen from the shaker
+  side. That it would place the origin at the orange dot of the owner's sketch is **not** evidence, and A is not
+  pre-selected.
+
+### 14.3 The 289-point reconstruction against the plate geometry
+
+- All 289 points lie inside the 301 × 300 mm plate.
+- Scan window 215.42 × 285.2 mm. The gaps close the plate exactly:
+  301.0 mm horizontally and 300.0 mm vertically.
+- Camera-grid residual median 1.29 mm, max
+  3.23 mm.
+- Axis misalignment 0.87°; MeasPoints ↔ UNV parser residual
+  1.1e-03.
+- Under every remaining candidate each point lands on its own FE node within 2.06 mm (§12.3).
+- **This is a diagnostic reconstruction.** The three deviations of §9 and §13.4 are **not** accepted as a physical
+  calibration; that remains a SUPERVISOR decision.
+
+### 14.4 Status of the information
+
+| Status | Items |
+|---|---|
+| **Proven** (verified copies / data, or HUMAN-confirmed by the owner) | plate 301 × 300 mm and mass 118.37 g (HUMAN sheet); edge thickness (20 readings); FE geometry X 0–301, Y 0–300, Z 0 and S4R normals +Z (R6 + V3 INP, bound); FE X = 301 mm, Y = 300 mm (HUMAN); 301 mm horizontal in the test (HUMAN); edge labels 1–4 in the shaker view (HUMAN); marks on the shaker side (HUMAN); shaker not at a corner (HUMAN); experimental axes of the PSV grid (data); 289 points with DOF U3, set `polymax-bravo` (data) |
+| **Supported by observation, not established** | the scanner saw the face opposite the shaker, i.e. the unmarked face (the shaker is occluded by the plate in the PSV frame and no numerals are visible); the shaker position right of centre in the scanner view (the disc behind the plate) |
+| **Unknown** | the FE axis signs and origin relative to a physical corner, i.e. which of A–D; hence the FE +Z relative to a physical face; the reconstruction's three deviations (SUPERVISOR decision, not an owner question); the INP-to-ODB link (R7 R2: node match only) |
+
+### 14.5 Minimum additional confirmations for an unambiguous diagnostic registration
+
+From the owner:
+
+1. **Which picture, A, B, C or D**, matches the Abaqus model when the real plate is seen from the shaker side.
+   This fixes the axis signs, the origin corner (between two numbered edges) and the side of the shell normal.
+2. **Yes / no:** the laser looked at the face without marks.
+
+The face relative to the normal then follows from the table: `negative_normal` for A / B, `positive_normal` for C / D.
+
+From the SUPERVISOR, not the owner:
+
+3. A decision on the three reconstruction deviations, or an independent check of the scan-to-edge offsets.
+
+**Not needed again:** plan, mass, thickness, weave photographs and shaker coordinates; they are already recorded, or not
+needed for the registration.
+
+After 1–3, the evidence draft `evidence_r61/evidence_DRAFT_plate_r61.json` can be completed:
+
+- the axes from the table;
+- `shell_measured_face` with normal +Z and the face from the table;
+- the panel-edge offsets from the table.
+
+It would then go through the R7 gate (PR #96, not merged). **The registration is not completed here.**
+
+## 15. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.

@@ -1608,5 +1608,172 @@
    }
   },
   "mac": "not computed"
+ },
+ "r62_orientation_scheme": {
+  "status": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING",
+  "figures_outside_git": [
+   "runs/m11_carbon_plate/r62/fig_r62_view_shaker.png",
+   "runs/m11_carbon_plate/r62/fig_r62_view_scanner.png",
+   "runs/m11_carbon_plate/r62/fig_r62_candidates.png"
+  ],
+  "owner_question_sheet": "runs/m11_carbon_plate/r62/M11_R62_OWNER_QUESTIONS.md",
+  "candidates": {
+   "A": {
+    "experimental_axes_in_fe": [
+     "-X",
+     "+Y",
+     "-Z"
+    ],
+    "determinant": 1,
+    "shaker_view": {
+     "fe_x": "right",
+     "fe_y": "up",
+     "fe_origin_corner": "нижний левый",
+     "fe_plus_z": "towards the viewer (towards the shaker)",
+     "fe_origin_corner_en": "bottom-left"
+    },
+    "scanned_face_relative_to_shell_normal": "negative_normal",
+    "marked_face_is": "positive_normal side",
+    "panel_edges_offsets_mm": {
+     "x_mm": 29.19,
+     "y_mm": 7.02
+    },
+    "fe_origin_physical_corner": "between edges 3 and 4"
+   },
+   "B": {
+    "experimental_axes_in_fe": [
+     "+X",
+     "-Y",
+     "-Z"
+    ],
+    "determinant": 1,
+    "shaker_view": {
+     "fe_x": "left",
+     "fe_y": "down",
+     "fe_origin_corner": "верхний правый",
+     "fe_plus_z": "towards the viewer (towards the shaker)",
+     "fe_origin_corner_en": "top-right"
+    },
+    "scanned_face_relative_to_shell_normal": "negative_normal",
+    "marked_face_is": "positive_normal side",
+    "panel_edges_offsets_mm": {
+     "x_mm": 56.4,
+     "y_mm": 7.78
+    },
+    "fe_origin_physical_corner": "between edges 1 and 2"
+   },
+   "C": {
+    "experimental_axes_in_fe": [
+     "-X",
+     "-Y",
+     "+Z"
+    ],
+    "determinant": 1,
+    "shaker_view": {
+     "fe_x": "right",
+     "fe_y": "down",
+     "fe_origin_corner": "верхний левый",
+     "fe_plus_z": "away from the viewer (towards the scanner)",
+     "fe_origin_corner_en": "top-left"
+    },
+    "scanned_face_relative_to_shell_normal": "positive_normal",
+    "marked_face_is": "negative_normal side",
+    "panel_edges_offsets_mm": {
+     "x_mm": 29.19,
+     "y_mm": 7.78
+    },
+    "fe_origin_physical_corner": "between edges 1 and 4"
+   },
+   "D": {
+    "experimental_axes_in_fe": [
+     "+X",
+     "+Y",
+     "+Z"
+    ],
+    "determinant": 1,
+    "shaker_view": {
+     "fe_x": "left",
+     "fe_y": "up",
+     "fe_origin_corner": "нижний правый",
+     "fe_plus_z": "away from the viewer (towards the scanner)",
+     "fe_origin_corner_en": "bottom-right"
+    },
+    "scanned_face_relative_to_shell_normal": "positive_normal",
+    "marked_face_is": "negative_normal side",
+    "panel_edges_offsets_mm": {
+     "x_mm": 56.4,
+     "y_mm": 7.02
+    },
+    "fe_origin_physical_corner": "between edges 3 and 2"
+   }
+  },
+  "reconstruction_check": {
+   "points": 289,
+   "all_inside_plate": true,
+   "window_mm": [
+    215.42,
+    285.2
+   ],
+   "gaps_mm": {
+    "bottom": 7.02,
+    "left": 56.4,
+    "right": 29.19,
+    "top": 7.78
+   },
+   "closure_x_mm": 301.0,
+   "closure_y_mm": 300.0,
+   "camera_grid_residual_mm": {
+    "max": 3.2305866176863924,
+    "median": 1.294167306180516,
+    "p95": 2.6026432330929534
+   },
+   "axis_misalignment_deg": 0.8740987988276921,
+   "parser_residual_max": 0.0011036286670564892,
+   "panel_px": [
+    892.1794958549951,
+    892.5894671297592
+   ],
+   "deviations": [
+    "stored frame rectangle v -2.4667..1.0 replaced by 0..1",
+    "edge search window 220 px",
+    "bottom edge inverted polarity"
+   ],
+   "status": "DIAGNOSTIC reconstruction; the three deviations are NOT accepted as a physical calibration"
+  },
+  "proven": [
+   "plate 301x300 mm, mass 118.37 g",
+   "edge thickness",
+   "FE X 0-301, Y 0-300, Z 0, S4R normals +Z (bound INP)",
+   "FE X = 301 mm, Y = 300 mm (HUMAN)",
+   "301 mm horizontal (HUMAN)",
+   "edge labels 1-4 shaker view (HUMAN)",
+   "marks on the shaker side (HUMAN)",
+   "shaker not at a corner (HUMAN)",
+   "PSV axes, 289 points, U3, polymax-bravo"
+  ],
+  "supported_not_established": [
+   "scanner saw the unmarked face opposite the shaker (PSV occlusion, no numerals visible)",
+   "shaker right of centre in the scanner view (disc behind the plate)"
+  ],
+  "unknown": [
+   "FE axis signs and origin (picture A-D)",
+   "FE +Z relative to a physical face (follows from A-D)",
+   "acceptance of the three reconstruction deviations (SUPERVISOR)",
+   "INP-to-ODB link (R7 R2)"
+  ],
+  "minimum_confirmations": [
+   "owner: picture A, B, C or D",
+   "owner: laser saw the unmarked face (yes/no)",
+   "SUPERVISOR: decision on the three reconstruction deviations"
+  ],
+  "not_needed_again": [
+   "plan",
+   "mass",
+   "thickness",
+   "weave photographs",
+   "shaker coordinates"
+  ],
+  "registration": "not built; not accepted; not governed",
+  "mac": "not computed"
  }
 }
