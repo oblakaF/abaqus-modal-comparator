@@ -50,8 +50,10 @@ class Frame:
 
 class PinnedExtractorRootCause(unittest.TestCase):
     def test_pinned_script_is_unchanged(self):
-        sha = hashlib.sha256((ROOT / PINNED_EXTRACT_SCRIPT).read_bytes()).hexdigest()
-        self.assertEqual(sha, PINNED_EXTRACT_SCRIPT_SHA256)
+        # The pin was taken on a CRLF (Windows) checkout; the git blob is LF (`* text=auto`). Compare the content with
+        # CRLF line endings so the check is independent of the checkout platform.
+        data = (ROOT / PINNED_EXTRACT_SCRIPT).read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        self.assertEqual(hashlib.sha256(data).hexdigest(), PINNED_EXTRACT_SCRIPT_SHA256)
 
     def test_zero_frequency_frame_falls_back_to_the_mode_number(self):
         # Root cause, documented: `frequency == 0` is treated as missing and `frameValue` (the mode number in a

@@ -181,3 +181,7 @@ and not caused by R7. CI results are given in the SUPERVISOR report.
   carries a warning, because the element type is not in the extraction package and the synthetic solid fixtures are
   single-layer.
 - The store-gated SP-02 / SP-13 regressions should be re-run by the SUPERVISOR with the store roots configured.
+- **Pre-existing finding:** `PINNED_EXTRACT_SCRIPT_SHA256` (`039aa067…`) is the hash of a CRLF (Windows) checkout. The git
+  blob is LF (`* text=auto`), with hash `043e89e1…`. On a Linux checkout the governed `pinned_script_executor` would
+  therefore refuse an unchanged script. The R7 test compares the CRLF-normalised content. The pin itself is not
+  changed; this needs a governed decision.
