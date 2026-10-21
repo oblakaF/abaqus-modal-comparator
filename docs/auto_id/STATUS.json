@@ -618,7 +618,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of analysis/m9-six-specimens (M9 reconciliation REVIEW_READY, not merged). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
+  "next_action": "STOP: SUPERVISOR review of analysis/m11-single-carbon-plate (M11 REVIEW_READY, not merged) and of analysis/m10-sp10-registration-prep (PR #94). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -2056,5 +2056,15 @@
       "SP-05": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE"
     },
     "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates; no FE solve, no Abaqus Python, no LM; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE"
+  },
+  "m11_single_cfrp_plate": {
+    "status": "REVIEW_READY",
+    "outcome": "FREQUENCY_DIAGNOSTIC_ONLY",
+    "kind": "SUPERVISOR analysis task (2026-10-21), outside the Auto-ID mini-step sequence; no stage started",
+    "branch": "analysis/m11-single-carbon-plate",
+    "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
+    "report": "docs/reconciliation/M11_SINGLE_CFRP_PLATE.md",
+    "summary": "plate 301 x 300, thickness / mass / layup UNKNOWN; four free-free FE jobs (S4R 0.875, S4R wedge, C3D8I, manual fit E30E26); experimental rank 1 33.45 Hz vs 19.07 Hz in the template models (-43 %); if it is the twist mode, D66/(rho h) is about 3.08x the model value (scaling, not identification); no shape data file, no pairing confirmed, no transfer to the sandwich faces",
+    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, criteria, gates; originals and earlier copies; M10 branch and PR #94; no FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no fitting"
   }
 }

@@ -1,0 +1,663 @@
+{
+ "schema": "m11/single-cfrp-plate/v1",
+ "status": "REVIEW_READY",
+ "outcome": "FREQUENCY_DIAGNOSTIC_ONLY",
+ "labels": [
+  "ANALYSIS_ONLY",
+  "NOT_GOVERNED_EVIDENCE",
+  "NO_MODE_PAIRING_CONFIRMED",
+  "NO_FITTING",
+  "NO_MAC"
+ ],
+ "copies": {
+  "models": [
+   {
+    "file": "SInglePlate1mm.cae",
+    "source": "C:\\temp\\12 sampls\\results\\Plate\\SInglePlate1mm.cae",
+    "sha256": "4e30a8e861ab87a8ab82b08751d0b11e4368c1e6aae865d1910dc109136a0120"
+   },
+   {
+    "file": "SInglePlate1mm.jnl",
+    "source": "C:\\temp\\12 sampls\\results\\Plate\\SInglePlate1mm.jnl",
+    "sha256": "223643adb947f51e117b6624bdb5f3d4766fb4f16ebbda133e0fc46f963cf08d"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.inp",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.inp",
+    "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.dat",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.dat",
+    "sha256": "f440592598a21bd23dd7fa68f1032ebcd4d0da4d33b48156adc68ec690625de9"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.msg",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.msg",
+    "sha256": "3be1b2d15905d40d20f9735d19033e4b8586bff0b6577335fd681c9caece3321"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.sta",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.sta",
+    "sha256": "6d8684af9bd4f2949a62885245b7113f49b3f34a627ae7e34cf913eb7e8f2d4f"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.log",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.log",
+    "sha256": "9275ae7914aab83113599dee190079410b851b877fd024cee775c033d5ce2c97"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.prt",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.prt",
+    "sha256": "147bf4ecace79ab72087e9920c7f6786e9a577e7e35eae7642d71c272bc18e82"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.com",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.com",
+    "sha256": "7d3c831bfa62fa5cd962866a3901b6b00560f60678c8024f4f9125273688f4d4"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.ipm",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.ipm",
+    "sha256": "72112b021ec8755ad6527ff298b4b64cc3a0ef76485cdcd0686cca2334cbe0eb"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.odb",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.odb",
+    "sha256": "7daeb7e35adf6bd6fabe8f9f582859935ca3d8927ae32fcf07a35c38e8c023b8"
+   },
+   {
+    "file": "CFRP_S4R_0875_FreeFree.sim",
+    "source": "C:\\temp\\CFRP_S4R_0875_FreeFree.sim",
+    "sha256": "9672f3daa0b33100a4880aeef463a55942a143cc8d37818456de5c4ca3f984a2"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.inp",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.inp",
+    "sha256": "dcb639f14a008eeb29179d36817993279451b615b9061753a9afec27b628bb4b"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.dat",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.dat",
+    "sha256": "d545876a72d7ebf5c1f2e0c76a84a6188821ea26e59cd3642a89aaeb0d4394fe"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.msg",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.msg",
+    "sha256": "11b4ac74a368f0b5529d72a5cc44bcd876bdc2d019fc1d0fe1201be9d6c4642f"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.sta",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.sta",
+    "sha256": "c41de675ab90f4409b1479eb3f2507b8842f519d7ccd7e10d537a2b49aefc0d2"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.log",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.log",
+    "sha256": "00b46c8a82a5a3d7a3487bfce07de3db2d296c5b40876209d7f047632d95abc7"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.prt",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.prt",
+    "sha256": "147bf4ecace79ab72087e9920c7f6786e9a577e7e35eae7642d71c272bc18e82"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.com",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.com",
+    "sha256": "3a1ab72a2bb28549a5cbda8fca9dea68f9c49d22232bc9a323391833e6abff54"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.ipm",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.ipm",
+    "sha256": "e90ef979ca22563cd44865d01f72582518de957c1c02e3dd9fc4309769eeeb3a"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.odb",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.odb",
+    "sha256": "6f26bd19b07277c6275bc9eedce2d1eb1dcd2bee024ff99a285ae0fe4384b474"
+   },
+   {
+    "file": "CFRP_S4R_WEDGE_FreeFree.sim",
+    "source": "C:\\temp\\CFRP_S4R_WEDGE_FreeFree.sim",
+    "sha256": "52e8b5d0b45c2c5c97eaa3606e8c089707230524aaf73b2ada35ea69d8c97cd4"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.inp",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.inp",
+    "sha256": "b2be6ff5f12b51196601c510f31b7fcc77a1cc5fff8c039bb04efa38f25c7e3e"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.dat",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.dat",
+    "sha256": "8dcc84881bda7a5607a38e42c0e1c255a762bafb268cdbcd4ced0b43e162c6cd"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.msg",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.msg",
+    "sha256": "8b5082a3d3ce25e2597ede036e730c2bf23b43e6f8b4652f4ef2fca031b5c06a"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.sta",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.sta",
+    "sha256": "11949ab888a6f27ee578d10d4d0f72cedb97714eeea61ea413d459f0812466f3"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.log",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.log",
+    "sha256": "e4e9315cbca9fdccb9d7c8a6f3cb13ab0c2c12976168ccc7978e9f184142136d"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.prt",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.prt",
+    "sha256": "4ef964f356e99a416822b35ec2f908c099faa7ef536fe1ddd5600fa17cfee4f6"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.com",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.com",
+    "sha256": "2aaf1b6185d694fce7464d5b1fb4c45891e38ec5c502a57787b41ac64259a183"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.ipm",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.ipm",
+    "sha256": "a099d9e35f516cadb7d885460df0c14e58a65beaa73446ed0729482bc98f1cd5"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.odb",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.odb",
+    "sha256": "675a06d80f29c5a5154733b9500730ff06a2d6a6356671a5002f5bc149eb5649"
+   },
+   {
+    "file": "CFRP_C3D8I_0875_FreeFree.sim",
+    "source": "C:\\temp\\CFRP_C3D8I_0875_FreeFree.sim",
+    "sha256": "f833b47268c31be3280ce4f3a730513c19ccd00276d462fd87b46392196353fa"
+   },
+   {
+    "file": "E30E26.inp",
+    "source": "C:\\temp\\E30E26.inp",
+    "sha256": "3ac44ab34931d1dd524fc60893a4f551f9dd089a6996309170ea21d3c8acf9e6"
+   },
+   {
+    "file": "E30E26.dat",
+    "source": "C:\\temp\\E30E26.dat",
+    "sha256": "e24129e25e44969e5c49f0354ee1281813bab883a7b88bfe2d2a6399cb4471f3"
+   },
+   {
+    "file": "E30E26.msg",
+    "source": "C:\\temp\\E30E26.msg",
+    "sha256": "43d816aab65ac707ee218ed8d6e114830beb5d30662e7be12444ec19eccd02d7"
+   },
+   {
+    "file": "E30E26.sta",
+    "source": "C:\\temp\\E30E26.sta",
+    "sha256": "a8cea1e37979612656357a95988da1986abbdf4add8c021893a2ec59a4379dbc"
+   },
+   {
+    "file": "E30E26.log",
+    "source": "C:\\temp\\E30E26.log",
+    "sha256": "3778d5db6905e37cecdb2ee1b9997d36cd6e006cb8559fb35f200452ab33b692"
+   },
+   {
+    "file": "E30E26.prt",
+    "source": "C:\\temp\\E30E26.prt",
+    "sha256": "4ef964f356e99a416822b35ec2f908c099faa7ef536fe1ddd5600fa17cfee4f6"
+   },
+   {
+    "file": "E30E26.com",
+    "source": "C:\\temp\\E30E26.com",
+    "sha256": "af85bb2d5fd1053e68ba2205dcdef25e87c6936d3830f51e50e66aa5a48ea06b"
+   },
+   {
+    "file": "E30E26.ipm",
+    "source": "C:\\temp\\E30E26.ipm",
+    "sha256": "305304140405ea58c9cb77397b94afa3f3034228f03bef78ef123a717e390503"
+   },
+   {
+    "file": "E30E26.odb",
+    "source": "C:\\temp\\E30E26.odb",
+    "sha256": "5aba148681fd56f26c4badd5da9f5829d4fbd270c3562a606a0b3245de8a04a7"
+   },
+   {
+    "file": "E30E26.sim",
+    "source": "C:\\temp\\E30E26.sim",
+    "sha256": "a6bcf9783a6dc061839941e958faf7719f211875513ca9c678f7aff05e22a2d6"
+   },
+   {
+    "file": "E30E26.env",
+    "source": "C:\\temp\\E30E26.env",
+    "sha256": "64b72f3b4a504173c4df36825982defb4945984b6473a578cceb460ad094e8c7"
+   },
+   {
+    "file": "abaqus.rpy",
+    "source": "C:\\temp\\abaqus.rpy",
+    "sha256": "a727124322968731fc64007dc8febc221c3273e55a064a72b9aec2702a2810a2"
+   },
+   {
+    "file": "abaqus.rpy.66",
+    "source": "C:\\temp\\abaqus.rpy.66",
+    "sha256": "9cc4f3dc723e1e5a48f87d4adcb2e5c215e938c2af05326bb8147d317111455f"
+   }
+  ],
+  "excel": [
+   {
+    "file": "results sadwich.xlsx",
+    "source": "C:\\Users\\VadimKrysko\\Desktop\\results sadwich.xlsx",
+    "sha256": "3d7e803b03de634def64ace4d90b3da982934dd47f4d8c373eeea6129429b0a5"
+   },
+   {
+    "file": "Experiment_Freq_damping_LMS_onlyupdated.xlsx",
+    "source": "C:\\Users\\VadimKrysko\\Desktop\\Experiment_Freq_damping_LMS_onlyupdated.xlsx",
+    "sha256": "6bbf65ab1bfdb060cf6493dfc15b53dd830a59ca3a2b5eb32e99a45264173412"
+   },
+   {
+    "file": "Образцы_трекер_Abaqus.xlsx",
+    "source": "C:\\Users\\VadimKrysko\\Desktop\\Образцы_трекер_Abaqus.xlsx",
+    "sha256": "917fae267a539dd020cc1b80653ed6ee39e3616f791a99c85fc39aac8a737929"
+   }
+  ],
+  "verified_after": "48/48"
+ },
+ "plate": {
+  "plan_mm": [
+   301,
+   300
+  ],
+  "thickness_mm": "UNKNOWN (model 0.875; wedge 0.93->0.81; E30E26 1.0; nominal 1)",
+  "mass_g": "UNKNOWN (model masses CFRP_S4R_0875_FreeFree 118.36, CFRP_S4R_WEDGE_FreeFree 117.68, CFRP_C3D8I_0875_FreeFree 118.36, E30E26 118.76)",
+  "weave": "UNKNOWN",
+  "layup": "UNKNOWN",
+  "test_setup": "UNKNOWN",
+  "identity": "UNKNOWN (not in catalog)"
+ },
+ "models": {
+  "CFRP_S4R_0875_FreeFree": {
+   "elem": "S4R shell, 101x101 nodes (3 mm)",
+   "t": "0.875 uniform",
+   "E1": 56000,
+   "E2": 56000,
+   "nu12": 0.05,
+   "G12": 5000,
+   "rho": 1.498e-09
+  },
+  "CFRP_S4R_WEDGE_FreeFree": {
+   "elem": "S4R shell, nodal thickness",
+   "t": "0.93 - 0.12*(X+251)/301 (0.93 -> 0.81 along X)",
+   "E1": 56000,
+   "E2": 56000,
+   "nu12": 0.05,
+   "G12": 5000,
+   "rho": 1.498e-09
+  },
+  "CFRP_C3D8I_0875_FreeFree": {
+   "elem": "C3D8I solid, 3 layers",
+   "t": "0.875",
+   "E1": 60000,
+   "E2": 60000,
+   "nu12": 0.05,
+   "G12": 5000,
+   "rho": 1.498e-09
+  },
+  "E30E26": {
+   "elem": "C3D8I solid, 3 layers",
+   "t": "1.0",
+   "E1": 30820,
+   "E2": 26520,
+   "nu12": 0.3,
+   "G12": 10000,
+   "rho": 1.31522e-09
+  }
+ },
+ "excel_column_provenance": {
+  "C first value": {
+   "matches_per_job_of_12": {
+    "CFRP_S4R_0875_FreeFree": 12,
+    "CFRP_S4R_WEDGE_FreeFree": 1,
+    "CFRP_C3D8I_0875_FreeFree": 0,
+    "E30E26": 0
+   },
+   "mismatches_vs_best": {}
+  },
+  "C second value": {
+   "matches_per_job_of_12": {
+    "CFRP_S4R_0875_FreeFree": 1,
+    "CFRP_S4R_WEDGE_FreeFree": 10,
+    "CFRP_C3D8I_0875_FreeFree": 0,
+    "E30E26": 0
+   },
+   "mismatches_vs_best": {
+    "1": [
+     19.997,
+     18.997
+    ],
+    "2": [
+     59.383,
+     59.389
+    ],
+    "3": [
+     61.483,
+     61.438
+    ]
+   }
+  },
+  "D": {
+   "matches_per_job_of_12": {
+    "CFRP_S4R_0875_FreeFree": 0,
+    "CFRP_S4R_WEDGE_FreeFree": 0,
+    "CFRP_C3D8I_0875_FreeFree": 1,
+    "E30E26": 0
+   },
+   "mismatches_vs_best": {
+    "1": [
+     19.09,
+     19.1
+    ],
+    "2": [
+     59.85,
+     61.95
+    ],
+    "3": [
+     61.98,
+     64.159
+    ],
+    "4": [
+     71.833,
+     73.675
+    ],
+    "5": [
+     72.173,
+     74.03
+    ],
+    "6": [
+     116.56,
+     118.93
+    ],
+    "7": [
+     167.34,
+     173.21
+    ],
+    "8": [
+     168.46,
+     174.37
+    ],
+    "9": [
+     174.65,
+     180.2
+    ],
+    "10": [
+     179.76,
+     185.46
+    ],
+    "11": [
+     213.05,
+     218.48
+    ],
+    "12": [
+     213.8,
+     219.27
+    ]
+   }
+  }
+ },
+ "rank_table": [
+  {
+   "exp_rank": 1,
+   "exp_hz": 33.4491,
+   "exp_damping_pct": 0.495657,
+   "lms_updated_hz": 33.4491,
+   "fe_mode_number_in_dat": 7,
+   "CFRP_S4R_0875_FreeFree": 19.072,
+   "CFRP_S4R_0875_FreeFree_dev_pct": -42.98,
+   "CFRP_S4R_WEDGE_FreeFree": 18.997,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": -43.21,
+   "CFRP_C3D8I_0875_FreeFree": 19.1,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": -42.9,
+   "E30E26": 31.966,
+   "E30E26_dev_pct": -4.43,
+   "excel_D_hz": 19.09,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED",
+   "pairing_note": "Excel screenshots: experimental magnitude pattern resembles the FE twist mode; magnitude only, no phase, axes unknown: not a confirmation"
+  },
+  {
+   "exp_rank": 2,
+   "exp_hz": 55.2538,
+   "exp_damping_pct": 0.345736,
+   "lms_updated_hz": 55.2538,
+   "fe_mode_number_in_dat": 8,
+   "CFRP_S4R_0875_FreeFree": 59.874,
+   "CFRP_S4R_0875_FreeFree_dev_pct": 8.36,
+   "CFRP_S4R_WEDGE_FreeFree": 59.389,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": 7.48,
+   "CFRP_C3D8I_0875_FreeFree": 61.95,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": 12.12,
+   "E30E26": 48.671,
+   "E30E26_dev_pct": -11.91,
+   "excel_D_hz": 59.85,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED"
+  },
+  {
+   "exp_rank": 3,
+   "exp_hz": 68.1022,
+   "exp_damping_pct": 0.116455,
+   "lms_updated_hz": 68.1022,
+   "fe_mode_number_in_dat": 9,
+   "CFRP_S4R_0875_FreeFree": 62.009,
+   "CFRP_S4R_0875_FreeFree_dev_pct": -8.95,
+   "CFRP_S4R_WEDGE_FreeFree": 61.438,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": -9.79,
+   "CFRP_C3D8I_0875_FreeFree": 64.159,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": -5.79,
+   "E30E26": 59.987,
+   "E30E26_dev_pct": -11.92,
+   "excel_D_hz": 61.98,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED"
+  },
+  {
+   "exp_rank": 4,
+   "exp_hz": 71.9596,
+   "exp_damping_pct": 0.207897,
+   "lms_updated_hz": 71.9596,
+   "fe_mode_number_in_dat": 10,
+   "CFRP_S4R_0875_FreeFree": 71.85,
+   "CFRP_S4R_0875_FreeFree_dev_pct": -0.15,
+   "CFRP_S4R_WEDGE_FreeFree": 71.429,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": -0.74,
+   "CFRP_C3D8I_0875_FreeFree": 73.675,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": 2.38,
+   "E30E26": 82.91,
+   "E30E26_dev_pct": 15.22,
+   "excel_D_hz": 71.833,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED"
+  },
+  {
+   "exp_rank": 5,
+   "exp_hz": 80.4743,
+   "exp_damping_pct": 0.291409,
+   "lms_updated_hz": 80.4743,
+   "fe_mode_number_in_dat": 11,
+   "CFRP_S4R_0875_FreeFree": 72.19,
+   "CFRP_S4R_0875_FreeFree_dev_pct": -10.29,
+   "CFRP_S4R_WEDGE_FreeFree": 72.101,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": -10.4,
+   "CFRP_C3D8I_0875_FreeFree": 74.03,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": -8.01,
+   "E30E26": 85.152,
+   "E30E26_dev_pct": 5.81,
+   "excel_D_hz": 72.173,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED"
+  },
+  {
+   "exp_rank": 6,
+   "exp_hz": 116.9,
+   "exp_damping_pct": 0.311095,
+   "lms_updated_hz": 116.9,
+   "fe_mode_number_in_dat": 12,
+   "CFRP_S4R_0875_FreeFree": 116.58,
+   "CFRP_S4R_0875_FreeFree_dev_pct": -0.27,
+   "CFRP_S4R_WEDGE_FreeFree": 115.93,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": -0.83,
+   "CFRP_C3D8I_0875_FreeFree": 118.93,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": 1.74,
+   "E30E26": 145.94,
+   "E30E26_dev_pct": 24.84,
+   "excel_D_hz": 116.56,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED"
+  },
+  {
+   "exp_rank": 7,
+   "exp_hz": 144.599,
+   "exp_damping_pct": 0.576501,
+   "lms_updated_hz": 144.599,
+   "fe_mode_number_in_dat": 13,
+   "CFRP_S4R_0875_FreeFree": 167.49,
+   "CFRP_S4R_0875_FreeFree_dev_pct": 15.83,
+   "CFRP_S4R_WEDGE_FreeFree": 164.12,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": 13.5,
+   "CFRP_C3D8I_0875_FreeFree": 173.21,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": 19.79,
+   "E30E26": 152.64,
+   "E30E26_dev_pct": 5.56,
+   "excel_D_hz": 167.34,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED",
+   "pairing_note": "Excel screenshots: experimental pattern differs from the FE rank-k pattern"
+  },
+  {
+   "exp_rank": 8,
+   "exp_hz": 158.841,
+   "exp_damping_pct": 0.349744,
+   "lms_updated_hz": 158.841,
+   "fe_mode_number_in_dat": 14,
+   "CFRP_S4R_0875_FreeFree": 168.61,
+   "CFRP_S4R_0875_FreeFree_dev_pct": 6.15,
+   "CFRP_S4R_WEDGE_FreeFree": 166.42,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": 4.77,
+   "CFRP_C3D8I_0875_FreeFree": 174.37,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": 9.78,
+   "E30E26": 156.14,
+   "E30E26_dev_pct": -1.7,
+   "excel_D_hz": 168.46,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED",
+   "pairing_note": "Excel screenshots: experimental pattern differs from the FE rank-k pattern"
+  },
+  {
+   "exp_rank": 9,
+   "exp_hz": 178.037,
+   "exp_damping_pct": 0.133854,
+   "lms_updated_hz": 178.037,
+   "fe_mode_number_in_dat": 15,
+   "CFRP_S4R_0875_FreeFree": 174.8,
+   "CFRP_S4R_0875_FreeFree_dev_pct": -1.82,
+   "CFRP_S4R_WEDGE_FreeFree": 174.8,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": -1.82,
+   "CFRP_C3D8I_0875_FreeFree": 180.2,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": 1.21,
+   "E30E26": 168.53,
+   "E30E26_dev_pct": -5.34,
+   "excel_D_hz": 174.65,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED"
+  },
+  {
+   "exp_rank": 10,
+   "exp_hz": 213.17,
+   "exp_damping_pct": 0.281777,
+   "lms_updated_hz": 213.17,
+   "fe_mode_number_in_dat": 16,
+   "CFRP_S4R_0875_FreeFree": 179.9,
+   "CFRP_S4R_0875_FreeFree_dev_pct": -15.61,
+   "CFRP_S4R_WEDGE_FreeFree": 180.49,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": -15.33,
+   "CFRP_C3D8I_0875_FreeFree": 185.46,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": -13.0,
+   "E30E26": 188.96,
+   "E30E26_dev_pct": -11.36,
+   "excel_D_hz": 179.76,
+   "pairing_status": "RANK_ONLY_NOT_CONFIRMED"
+  },
+  {
+   "exp_rank": 11,
+   "exp_hz": null,
+   "exp_damping_pct": null,
+   "lms_updated_hz": null,
+   "fe_mode_number_in_dat": 17,
+   "CFRP_S4R_0875_FreeFree": 213.2,
+   "CFRP_S4R_0875_FreeFree_dev_pct": null,
+   "CFRP_S4R_WEDGE_FreeFree": 211.86,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": null,
+   "CFRP_C3D8I_0875_FreeFree": 218.48,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": null,
+   "E30E26": 251.63,
+   "E30E26_dev_pct": null,
+   "excel_D_hz": 213.05,
+   "pairing_status": "NO_EXPERIMENTAL_VALUE"
+  },
+  {
+   "exp_rank": 12,
+   "exp_hz": null,
+   "exp_damping_pct": null,
+   "lms_updated_hz": null,
+   "fe_mode_number_in_dat": 18,
+   "CFRP_S4R_0875_FreeFree": 213.95,
+   "CFRP_S4R_0875_FreeFree_dev_pct": null,
+   "CFRP_S4R_WEDGE_FreeFree": 213.1,
+   "CFRP_S4R_WEDGE_FreeFree_dev_pct": null,
+   "CFRP_C3D8I_0875_FreeFree": 219.27,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": null,
+   "E30E26": 256.48,
+   "E30E26_dev_pct": null,
+   "excel_D_hz": 213.8,
+   "pairing_status": "NO_EXPERIMENTAL_VALUE"
+  }
+ ],
+ "twist_rayleigh_check": {
+  "CFRP_S4R_0875_FreeFree": {
+   "t_mm": 0.875,
+   "D66_Nmm": 279.13,
+   "rho_h_t_per_mm2": 1.31075e-09,
+   "rayleigh_hz": 19.52,
+   "fe_hz": 19.072,
+   "fe_over_rayleigh": 0.977
+  },
+  "CFRP_S4R_WEDGE_FreeFree": {
+   "t_mm": 0.875,
+   "D66_Nmm": 279.13,
+   "rho_h_t_per_mm2": 1.31075e-09,
+   "rayleigh_hz": 19.52,
+   "fe_hz": 18.997,
+   "fe_over_rayleigh": 0.9732
+  },
+  "CFRP_C3D8I_0875_FreeFree": {
+   "t_mm": 0.875,
+   "D66_Nmm": 279.13,
+   "rho_h_t_per_mm2": 1.31075e-09,
+   "rayleigh_hz": 19.52,
+   "fe_hz": 19.1,
+   "fe_over_rayleigh": 0.9785
+  },
+  "E30E26": {
+   "t_mm": 1.0,
+   "D66_Nmm": 833.33,
+   "rho_h_t_per_mm2": 1.31522e-09,
+   "rayleigh_hz": 33.671,
+   "fe_hz": 31.966,
+   "fe_over_rayleigh": 0.9494
+  }
+ },
+ "implied_twist_stiffness": {
+  "assumption": "experimental rank 1 is the twist mode (not confirmed)",
+  "D66_over_rhoh_exp_over_model": 3.076,
+  "D66_eff_Nmm_if_rhoh_as_model": 858.6,
+  "G12eff_t3_Nmm": 10303.0,
+  "equivalent_G12_MPa_for_t": {
+   "0.81": 19387,
+   "0.875": 15379,
+   "0.93": 12809,
+   "1.0": 10303
+  },
+  "status": "SCALING CONSEQUENCE, NOT AN IDENTIFIED CONSTANT"
+ },
+ "ratios": {
+  "exp_f1_over_f2": 0.6054,
+  "CFRP_S4R_0875_FreeFree_f1_over_f2": 0.3185,
+  "CFRP_S4R_WEDGE_FreeFree_f1_over_f2": 0.3199,
+  "CFRP_C3D8I_0875_FreeFree_f1_over_f2": 0.3083,
+  "E30E26_f1_over_f2": 0.6568
+ }
+}

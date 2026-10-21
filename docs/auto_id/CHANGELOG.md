@@ -5432,3 +5432,28 @@ first internal provider.
   NO_GLOBAL_PARAMETER_VALUE (D-077).
 - **Files changed:** `docs/reconciliation/M9_SIX_SPECIMENS.md` (new), `docs/reconciliation/M9_SIX_SPECIMENS.json` (new), STATUS,
   ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-21 — M11 single CFRP plate (REVIEW_READY; FREQUENCY_DIAGNOSTIC_ONLY; analysis only)
+
+- **Branch:** `analysis/m11-single-carbon-plate` from `aa08ad9` (SUPERVISOR analysis task; outside the Auto-ID
+  mini-step sequence).
+- **Report:** `docs/reconciliation/M11_SINGLE_CFRP_PLATE.md` (+ JSON); work data in `runs\m11_carbon_plate`.
+- **Sources and copies:**
+  - `C:\temp\12 sampls\results\Plate` (CAE, journal);
+  - four plate jobs in `C:\temp`;
+  - the updated `results sadwich.xlsx` (new sheet `Sample (2)`, "Plate 301x300 1mm") and
+    `Experiment_Freq_damping_LMS_onlyupdated.xlsx`;
+  - copied to `external_models\v3_20261021` and `excel_copies\20261021`: 48 files, SHA-256 verified before, after
+    and again at the end.
+- **Findings:**
+  - thickness, mass, weave, layup and test setup are UNKNOWN;
+  - Excel column C = `CFRP_S4R_0875_FreeFree` (exact) / `CFRP_S4R_WEDGE_FreeFree` (3 transcription slips);
+    column D is an overwritten C3D8I run;
+  - experimental rank 1 is 33.45 Hz against 19.07 Hz in the template models; if it is the twist mode,
+    D66/(ρh) is about 3.08 times the model value (scaling, not identification);
+  - no shape file and no pairing confirmed; nothing transferred to the sandwich faces.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, registrations, criteria, gates; originals and earlier copies; M10
+  branch and PR #94. No FE solve, Abaqus Python, Auto-ID / LM, MAC or fitting. M8 original GATE `NOT_MET`;
+  production calibration BLOCKED / NOT_AUTHORISED; NO_GLOBAL_PARAMETER_VALUE (D-077).
+- **Files changed:** `docs/reconciliation/M11_SINGLE_CFRP_PLATE.md` (new), `docs/reconciliation/M11_SINGLE_CFRP_PLATE.json`
+  (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
