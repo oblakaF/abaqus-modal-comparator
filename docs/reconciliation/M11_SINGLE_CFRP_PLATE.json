@@ -334,7 +334,7 @@
   "mass_g": 118.37,
   "weave": "plain (owner); plies and orientation UNKNOWN",
   "layup": "UNKNOWN",
-  "test_setup": "UNKNOWN",
+  "test_setup": "PARTIAL: measured PSV/PolyMAX and shaker/suspension FRF peaks are known; fixture geometry and shaker/stinger/support measurements UNKNOWN",
   "identity": "UNKNOWN (not in catalog)",
   "areal_mass_g_m2": 1310.9,
   "density_g_cm3_at_mean_t": 1.4964
@@ -347,7 +347,7 @@
    "E2": 56000,
    "nu12": 0.05,
    "G12": 5000,
-   "rho": 1.498e-09
+   "rho": 1.498e-9
   },
   "CFRP_S4R_WEDGE_FreeFree": {
    "elem": "S4R shell, nodal thickness",
@@ -356,7 +356,7 @@
    "E2": 56000,
    "nu12": 0.05,
    "G12": 5000,
-   "rho": 1.498e-09
+   "rho": 1.498e-9
   },
   "CFRP_C3D8I_0875_FreeFree": {
    "elem": "C3D8I solid, 3 layers",
@@ -365,7 +365,7 @@
    "E2": 60000,
    "nu12": 0.05,
    "G12": 5000,
-   "rho": 1.498e-09
+   "rho": 1.498e-9
   },
   "E30E26": {
    "elem": "C3D8I solid, 3 layers",
@@ -374,7 +374,7 @@
    "E2": 26520,
    "nu12": 0.3,
    "G12": 10000,
-   "rho": 1.31522e-09
+   "rho": 1.31522e-9
   }
  },
  "excel_column_provenance": {
@@ -638,7 +638,7 @@
    "CFRP_S4R_WEDGE_FreeFree": 180.49,
    "CFRP_S4R_WEDGE_FreeFree_dev_pct": -15.33,
    "CFRP_C3D8I_0875_FreeFree": 185.46,
-   "CFRP_C3D8I_0875_FreeFree_dev_pct": -13.0,
+   "CFRP_C3D8I_0875_FreeFree_dev_pct": -13,
    "E30E26": 188.96,
    "E30E26_dev_pct": -11.36,
    "excel_D_hz": 179.76,
@@ -683,7 +683,7 @@
   "CFRP_S4R_0875_FreeFree": {
    "t_mm": 0.875,
    "D66_Nmm": 279.13,
-   "rho_h_t_per_mm2": 1.31075e-09,
+   "rho_h_t_per_mm2": 1.31075e-9,
    "rayleigh_hz": 19.52,
    "fe_hz": 19.072,
    "fe_over_rayleigh": 0.977
@@ -691,7 +691,7 @@
   "CFRP_S4R_WEDGE_FreeFree": {
    "t_mm": 0.875,
    "D66_Nmm": 279.13,
-   "rho_h_t_per_mm2": 1.31075e-09,
+   "rho_h_t_per_mm2": 1.31075e-9,
    "rayleigh_hz": 19.52,
    "fe_hz": 18.997,
    "fe_over_rayleigh": 0.9732
@@ -699,25 +699,25 @@
   "CFRP_C3D8I_0875_FreeFree": {
    "t_mm": 0.875,
    "D66_Nmm": 279.13,
-   "rho_h_t_per_mm2": 1.31075e-09,
+   "rho_h_t_per_mm2": 1.31075e-9,
    "rayleigh_hz": 19.52,
    "fe_hz": 19.1,
    "fe_over_rayleigh": 0.9785
   },
   "E30E26": {
-   "t_mm": 1.0,
+   "t_mm": 1,
    "D66_Nmm": 833.33,
-   "rho_h_t_per_mm2": 1.31522e-09,
+   "rho_h_t_per_mm2": 1.31522e-9,
    "rayleigh_hz": 33.671,
    "fe_hz": 31.966,
    "fe_over_rayleigh": 0.9494
   }
  },
  "implied_twist_stiffness": {
-  "assumption": "first listed experimental frequency 33.4491 Hz is the same twist branch as modeled FE 19.072 Hz, no lower experimental mode was omitted, and the test/setup and modal-shape factor are sufficiently close to the free-free model (NONE verified)",
+  "assumption": "Measured first PolyMAX mode is twist-dominated (xy projection 96%). FE first elastic mode is twist-dominated; physical FE pairing/MAC not verified. FRF search found no additional elastic pole below 33.45 Hz, but cannot prove none was missed. A like-for-like D66/(rho h) scaling further requires comparable modal-shape factors and negligible shaker/suspension effects (NOT ESTABLISHED).",
   "D66_over_rhoh_exp_over_model": 3.076,
   "D66_eff_Nmm_if_rhoh_as_model": 858.6,
-  "G12eff_t3_Nmm": 10303.0,
+  "G12eff_t3_Nmm": 10303,
   "equivalent_G12_MPa_for_t": {
    "0.81": 19387,
    "0.875": 15379,
@@ -725,7 +725,7 @@
    "1.0": 10303
   },
   "status": "CONDITIONAL MODEL SCALING ONLY, NOT AN IDENTIFIED MATERIAL CONSTANT",
-  "requires_missed_low_frequency_mode_check": "checked from PSV FRFs: no elastic mode below 33.45 Hz (rigid modes 9.06 / 15.6 Hz)",
+  "requires_missed_low_frequency_mode_check": "reviewed experimental FRF/ODS (0.3125-500 Hz): rigid-body-like peaks at 9.06 and 15.6 Hz, no lower elastic mode IDENTIFIED; not a proof of no missed mode",
   "requires_verified_mode_identity_and_test_boundary_conditions": true,
   "assumes_model_areal_mass_to_infer_D66_or_G12": true,
   "equivalent_G12_MPa_for_measured_t": {
@@ -825,10 +825,10 @@
     "mpc": 0.8483,
     "twist_share": 0.9613,
     "quadrant_signs": {
-     "++": 1.0,
-     "-+": -1.0,
-     "--": 1.0,
-     "+-": -1.0
+     "++": 1,
+     "-+": -1,
+     "--": 1,
+     "+-": -1
     }
    },
    {
@@ -837,22 +837,22 @@
     "mpc": 0.8762,
     "twist_share": 0.0117,
     "quadrant_signs": {
-     "++": 1.0,
-     "-+": -1.0,
-     "--": -1.0,
-     "+-": -1.0
+     "++": 1,
+     "-+": -1,
+     "--": -1,
+     "+-": -1
     }
    },
    {
     "mode": 3,
     "frequency_hz": 68.1022,
     "mpc": 0.9213,
-    "twist_share": 0.0,
+    "twist_share": 0,
     "quadrant_signs": {
-     "++": -1.0,
-     "-+": 1.0,
-     "--": 1.0,
-     "+-": -1.0
+     "++": -1,
+     "-+": 1,
+     "--": 1,
+     "+-": -1
     }
    },
    {
@@ -861,10 +861,10 @@
     "mpc": 0.5916,
     "twist_share": 0.0016,
     "quadrant_signs": {
-     "++": 1.0,
-     "-+": -1.0,
-     "--": 1.0,
-     "+-": -1.0
+     "++": 1,
+     "-+": -1,
+     "--": 1,
+     "+-": -1
     }
    },
    {
@@ -873,10 +873,10 @@
     "mpc": 0.4411,
     "twist_share": 0.0004,
     "quadrant_signs": {
-     "++": -1.0,
-     "-+": 1.0,
-     "--": -1.0,
-     "+-": 1.0
+     "++": -1,
+     "-+": 1,
+     "--": -1,
+     "+-": 1
     }
    },
    {
@@ -885,34 +885,34 @@
     "mpc": 0.9548,
     "twist_share": 0.0001,
     "quadrant_signs": {
-     "++": 1.0,
-     "-+": 1.0,
-     "--": -1.0,
-     "+-": -1.0
+     "++": 1,
+     "-+": 1,
+     "--": -1,
+     "+-": -1
     }
    },
    {
     "mode": 7,
     "frequency_hz": 144.5994,
     "mpc": 0.9029,
-    "twist_share": 0.0,
+    "twist_share": 0,
     "quadrant_signs": {
-     "++": 1.0,
-     "-+": 1.0,
-     "--": -1.0,
-     "+-": -1.0
+     "++": 1,
+     "-+": 1,
+     "--": -1,
+     "+-": -1
     }
    },
    {
     "mode": 8,
     "frequency_hz": 158.8406,
     "mpc": 0.9165,
-    "twist_share": 0.0,
+    "twist_share": 0,
     "quadrant_signs": {
-     "++": -1.0,
-     "-+": 1.0,
-     "--": -1.0,
-     "+-": 1.0
+     "++": -1,
+     "-+": 1,
+     "--": -1,
+     "+-": 1
     }
    },
    {
@@ -921,10 +921,10 @@
     "mpc": 0.8599,
     "twist_share": 0.0052,
     "quadrant_signs": {
-     "++": -1.0,
-     "-+": 1.0,
-     "--": -1.0,
-     "+-": 1.0
+     "++": -1,
+     "-+": 1,
+     "--": -1,
+     "+-": 1
     }
    },
    {
@@ -933,14 +933,14 @@
     "mpc": 0.9466,
     "twist_share": 0.0006,
     "quadrant_signs": {
-     "++": 1.0,
-     "-+": -1.0,
-     "--": 1.0,
-     "+-": -1.0
+     "++": 1,
+     "-+": -1,
+     "--": 1,
+     "+-": -1
     }
    }
   ],
-  "mode_1": "twist pattern from the experimental data (PolyMAX xy share 0.96); FRFs show no elastic mode below it; free-free not verified",
+  "mode_1": "Measured PolyMAX mode 1 has twist-dominated U3 pattern (xy projection 96% after plane removal; quadrant signs alternate); no lower elastic mode identified by FRF/PolyMAX; FE pairing/MAC and free-free conditions not verified",
   "missed_low_mode_check": {
    "frf_peaks_hz": [
     9.062,
@@ -1003,18 +1003,20 @@
      "phase_scatter_imag_over_norm": 0.752,
      "plane_coefficients": [
       0.0058,
-      0.0,
+      0,
       0.0002
      ]
     }
    ],
-   "result": "no elastic mode identified below 33.45 Hz; 9.06 Hz rigid translation, 15.6 Hz rigid rocking (ODS, not identified modes)",
+   "result": "No additional elastic mode identified in analysed 0.3125–33.45 Hz FRF and PolyMAX data. Peaks near 9.06 and 15.6 Hz have rigid-body-like U3 ODS patterns consistent with suspension/attachment; ODS are NOT modal-pole identifications. A weaker missing elastic mode cannot be excluded.",
    "rigid_over_first_elastic": [
     0.271,
     0.467
    ],
-   "free_free_verified": false
-  }
+   "free_free_verified": false,
+   "rocking_axis_note": "U3 ODS at 15.625 Hz is a plane mainly tilted along scanner x: this is compatible with rotation about the in-plane scanner y axis, not about the vertical scanner z axis. Only one measured component; full rotation axis is unknown."
+  },
+  "mode_4_5_quality_note": "Modes 4 and 5 have MPC 0.59 / 0.44; do not interpret frequency rank 4/5 splitting as confirmed paired stiffness anisotropy."
  },
  "owner_answers_2": {
   "rows": "1 top, 3 bottom, 2 right, 4 left (owner wrote '3 levaya'; to confirm), seen from the shaker side",
