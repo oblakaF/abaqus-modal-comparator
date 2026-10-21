@@ -1,187 +1,240 @@
-# R7 — Zero-frequency safety of extraction packages and the shell mid-surface guard
+# R7 — Frequency-record safety of extraction packages and the fail-closed shell gate
 
-**Branch:** `fix/r7-shell-modal-safety`, from `origin/main` `aa08ad9`. **Status:** `REVIEW_READY`. It is not merged.
+**Branch:** `fix/r7-shell-modal-safety`, from `origin/main` `aa08ad9`; PR #96. **Status:** `REVIEW_READY` (R7 R1). It
+is not merged.
 
-No Abaqus was run. No original was opened. The pinned extractor and every governed rule are unchanged.
+No Abaqus was run and no original was opened. The pinned extractor, `PINNED_EXTRACT_SCRIPT_SHA256`,
+`parse_geometry_calibration`, the governed passports, SPEC v1.2, every threshold and every production gate are
+unchanged.
 
-## 1. R7-A: zero eigenfrequencies recorded as mode numbers
+**History:**
 
-### Error
+- R7: `7d46a2f`, `ae0fb6a`.
+- R7 R1, after the SUPERVISOR audit: this revision. It closes the remaining frequency gap, replaces the optional shell
+  hint by a fail-closed gate in the real GUI path, and records the pin's line-ending dependence as an open decision.
 
-The R6 extraction package of the single CFRP plate records modes 1 and 2 at 1 Hz and 2 Hz. The `.dat` file, the
-frame descriptions ("`Freq = 0.0000`") and the EIGFREQ history all give 0 Hz.
+## 1. R7-A: frequency records of an extraction package
 
-**Exact cause** (`abaqus_scripts/extract_odb.py`, `frame_frequency`):
+### Error and cause
 
-- `frame.frequency == 0` is treated as missing, by the test `value not in (None, 0)`;
-- the code then falls back to `frame.frameValue`, which in an Abaqus frequency step holds the mode number;
-- the fallback search of the description uses `frequency\s*[:=]`, which does not match the actual "`Freq =`" text.
+The R6 plate package records modes 1 and 2 at 1 Hz and 2 Hz. Their `.dat` values, the frame descriptions
+("`Freq = 0.0000`") and EIGFREQ all give 0 Hz.
 
-A zero-frequency (rigid-body) frame therefore receives its mode number as its frequency. `select_modal_step` keeps it,
-because the value is now positive.
+The pinned `abaqus_scripts/extract_odb.py` (`frame_frequency`) treats `frame.frequency == 0` as missing and writes
+`frame.frameValue`, which in an Abaqus frequency step is the mode number. Its description fallback (`frequency\s*[:=]`)
+does not match "`Freq =`".
 
-### Why the extractor itself was not edited
+### Fix (loader `src/abaqus_bridge.py`; the pinned script is unchanged)
 
-`abaqus_scripts/extract_odb.py` is **pinned**:
+**Three records of the same mode:**
 
-- `services/shape_extraction.py` holds `PINNED_EXTRACT_SCRIPT_SHA256 = 039aa067…`;
-- that hash enters the extraction identity of the governed Auto-ID shape-pack path.
+- the manifest value;
+- the frame description "`Freq = …`" (`described_frequency`, with the half-unit precision of the printed text);
+- a **reliable** EIGFREQ value (`reliable_eigfreq`).
 
-Editing the script would either break that path or require changing the pin, which would change governed extraction
-identities. That is a governed-gate change, outside R7's authority. A new test asserts that the pin is unchanged and
-documents the root-cause behaviour.
+EIGFREQ is reliable only when its history is single and well formed and, when an EIGVAL history exists, EIGVAL agrees
+for that mode: sqrt(max(EIGVAL, 0))/2π within the existing four single-precision ulps. A rigid mode's non-positive
+EIGVAL agrees with EIGFREQ = 0. This is the existing EIGFREQ/EIGVAL policy, used here only to judge consistency.
 
-### Fix (loader, `src/abaqus_bridge.py`)
+**`manifest_frequency_problem`:**
 
-- `described_frequency()` reads the frame description's "`Freq = …`" and the half-unit precision of its printed text.
-- `manifest_frequency_problem()` compares the manifest frequency with the independent records of the same frame:
-  - first the frame description;
-  - if there is none, the EIGFREQ history, but only when the manifest value equals the mode number (the artifact
-    signature).
-- A contradicted manifest frequency is **refused for that mode**:
-  - the mode is not loaded and cannot take part in pairing, MAC or frequency errors;
-  - the reason, the manifest value, the described value, the EIGFREQ value and whether the independent records agree
-    are stored in `metadata["rejected_frequency_modes"]`.
-- **No value is substituted.** If every mode is refused, the package is refused with the reasons.
-- A consistent value, or one that cannot be checked (a legacy package with no description and no history), is left
-  unchanged.
-- The EIGFREQ / EIGVAL refinement (`history_frequencies`) is unchanged and runs only on the modes that are kept.
+- the manifest must agree with the description;
+- the frame frequency (the description, or the manifest when there is no description) must agree with the reliable
+  EIGFREQ;
+- tolerances are the printed precision plus float32 resolution;
+- **R7 R1:** a manifest and description that agree while EIGFREQ contradicts them are now **refused**. In R7 this
+  case passed silently.
 
-On the stored R6 package (read only) the loader now:
+**Refusal is per mode:**
 
-- refuses modes 1 and 2; description and EIGFREQ agree on 0.0 Hz, which is recorded but not used;
-- loads modes 3–20;
-- gives mode 7 at 19.07217 Hz from EIGFREQ.
+- the mode is not loaded and cannot take part in pairing, MAC or frequency errors;
+- the reason, all records and whether the independent records agree are stored in
+  `metadata["rejected_frequency_modes"]`;
+- nothing is chosen between the records and nothing is substituted;
+- a package whose every mode is refused is refused;
+- EIGFREQ values not usable for the check are listed in `metadata["eigfreq_not_used_for_consistency"]`.
 
-The R6 package itself is not modified.
+**Compatibility:** a value with no second record (a legacy package without description or history) is unchanged. The
+EIGFREQ refinement of kept modes (`history_frequencies`, G2) is unchanged.
 
-### Proposed extractor patch (NOT applied; needs a SUPERVISOR decision on the pin)
+**On the stored R6 package** (read only; `runs\r7_r1`):
 
-```python
-_DESCRIPTION_FREQUENCY = re.compile(r"\bfreq(?:uency)?\s*[:=]\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)", re.I)
+- modes 1 and 2 are refused; description and EIGFREQ agree on 0.0 Hz, which is recorded but not used;
+- modes 3–20 load, with the EIGFREQ refinement; for example mode 7 is 19.07217 Hz.
 
-def frame_frequency(frame):
-    """Physical frequency of a modal frame, or None. frameValue is never used (it can be the mode number)."""
-    value = getattr(frame, "frequency", None)          # 0.0 is a valid frequency
-    match = _DESCRIPTION_FREQUENCY.search(getattr(frame, "description", "") or "")
-    described = float(match.group(1)) if match else None
-    if value is not None and described is not None and abs(float(value) - described) > half_unit(match.group(1)):
-        raise RuntimeError("frame frequency contradicts its description")   # REFUSE
-    return float(value) if value is not None else described
-```
+### Open decision OD-R7-1: the pinned extractor hash depends on line endings
 
-The patch also needs these changes:
+`PINNED_EXTRACT_SCRIPT_SHA256 = 039aa067…` is the hash of a **CRLF** (Windows) checkout. The git blob is **LF**
+(`* text=auto`, hash `043e89e1…`). On a Linux checkout `services/shape_extraction.pinned_script_executor` would refuse
+the unchanged script.
 
-- select a mode frame by mode number ≥ 1 rather than by frequency > 0, which excludes the base state;
-- record zero-frequency modes explicitly (for example `zero_frequency_modes` in the manifest);
-- then re-pin the script, with `PINNED_EXTRACT_SCRIPT_SHA256` and extraction identities, as a governed decision.
+This is not hidden:
 
-## 2. R7-B: shell mid-surface and `measured_surface.side`
+- `tests/test_r7_shell_modal_safety.py` asserts both facts: the CRLF content equals the pin, and the LF blob hash
+  differs;
+- the pin and the executor are unchanged.
 
-### Problem
+**Options for the SUPERVISOR:**
 
-The measured surface is selected by `side` (`max_z` / `min_z`) among one instance's nodes. For a conventional shell
-(S4R in the plate model: 10 201 nodes, z = 0, normals +Z) both select the same nodes. **`side` cannot say which
-physical face the scanner saw**; only the Z sign of `experimental_axes_in_fe` relative to the element normal does.
+- (a) pin the content hash after line-ending normalisation;
+- (b) pin the LF blob hash and keep a `.gitattributes` rule `abaqus_scripts/extract_odb.py -text` / `eol=lf`;
+- (c) keep the CRLF pin and declare governed extraction Windows-only.
 
-### Why the full solution is stopped here (decision required)
+Each is a governed decision, because the hash enters the extraction identity.
 
-An explicit face statement needs a new evidence field, for example `side: "mid_surface"` and
-`shell_face: "positive_normal" | "negative_normal"`. The guided evidence is parsed by
-`domain.specimen_manifest.parse_geometry_calibration`, the parser of the governed specimen passports
-(`auto-id/specimen/v1.1`). A new field or `side` value would change that governed contract. Per the R7 instruction this
-part is **stopped and proposed** (§2.3). It is not implemented.
+The root-cause extractor patch (no `frameValue`; a zero frequency stays 0; refuse a frame contradicting its
+description; select mode frames by mode number) remains a proposal that depends on the same re-pin decision.
 
-### Implemented (diagnostic only; no format, rule or gate changed)
+## 2. R7-B: fail-closed shell gate of guided registration
 
-- **New `src/services/shell_surface.py`:**
-  - `is_conventional_shell()`: S…/STRI… element types; the continuum shells SC6R / SC8R are excluded;
-  - `surface_is_degenerate(fe, instance, unit)`: true when `max_z` and `min_z` select the same nodes;
-  - `inp_element_summary(text)`: per assembly instance, the element types from the FE input text (with its SHA-256)
-    and, for flat 3- / 4-node shells, the z sign of the connectivity normal. A rotated instance is reported as
-    `unknown`, never guessed.
-- **`guided_registration.establish_guided_registration(..., fe_element_summary=None)`:**
-  - **refuses** when the supplied FE element summary confirms that the measured instance is a conventional shell
-    (field `measured_surface`); this is the R7 rule "no confirmed face → refuse";
-  - when the measured surface is degenerate but the element types are not supplied, the registration is built as
-    before and **states the limitation** in its warnings: the face is fixed only by the Z sign, and a shell is not
-    excluded;
-  - equal z coordinates alone are never taken as proof of a shell, because the synthetic single-layer solid fixtures
-    have them too;
-  - mirrored axes (determinant −1) stay refused;
-  - a guided registration stays `governed = false` and `production_ready = false`.
-- **Unchanged:**
-  - the M2 builder (`physical_registration.py`) and every solid registration rule;
-  - the evidence format;
-  - the GUI, which does not pass `fe_element_summary`; behaviour there is unchanged apart from the warning.
+### Problem and the defect found by the audit
 
-### Proposed format (for a SUPERVISOR decision)
+For a conventional shell (S4R in the plate model: 10 201 nodes, z = 0, normals +Z), `max_z` and `min_z` select the
+same nodes, so `side` cannot name the measured face. In R7, `fe_element_summary` was optional and the GUI never passed
+it, so a flat surface was still registered, with only a warning.
 
-`measured_surface = {fe_instance, side: "mid_surface", shell_face: "positive_normal" | "negative_normal",
-normal_evidence: {inp_sha256, element_types, normal_counts}}`
+### Architecture (SUPERVISOR-authorised diagnostic extension; no governed contract changed)
 
-Accepted only when all of the following hold:
+**`src/services/shell_surface.py`:**
 
-1. the element summary confirms a conventional shell for that instance, from an INP with a pinned SHA-256;
-2. every normal of the instance points the same way (all +Z or all −Z), with no rotated instance;
-3. the Z sign of `experimental_axes_in_fe` equals the stated face: positive normal side ⇔ the experimental +z axis
-   (towards the scanner) maps to the normal's direction; a contradiction is refused;
-4. the determinant is +1.
+- `load_fe_input` / `parse_fe_input`: the model's INP, with its SHA-256. For the measured instance's part only it
+  reads the element types, the node coordinates with the instance translation, and the connectivity normals of flat
+  3- / 4-node conventional shells. A rotated instance is marked.
+- `bind_fe_input`: **the INP is accepted only if the instance's node labels AND coordinates equal the loaded FE
+  geometry, node for node** (tolerance 1·10⁻³ mm). A matching SHA-256 of some INP is not enough. Rotated instances,
+  missing instances and mixed shell / solid types are refused. The binding yields `kind` (shell or non-shell) and a
+  uniform normal direction (+Z / −Z, or none).
+- `parse_shell_face`: the guided-only evidence block `shell_measured_face` (`auto-id/guided-shell-face/v1`), with
+  fields `fe_instance`, `fe_input_sha256`, `normal_direction`, `measured_face` (`positive_normal` /
+  `negative_normal`) and `face_evidence`.
 
-Solid models keep `max_z` / `min_z` unchanged. This would be a change of the governed passport schema, or a
-guided-only schema split, and needs a decision.
+**`src/services/guided_registration.py`:**
 
-## 3. Files changed
+- `PhysicalEvidence.shell_face` is optional. `document()` adds `shell_measured_face` only when it is present, so every
+  pre-R7 evidence hash is unchanged.
+- `evidence_from_document` parses the block separately. **`parse_geometry_calibration` is not touched.**
+- `establish_guided_registration(..., fe_input=None)` calls `_shell_gate`. It runs after the existing orientation,
+  determinant, experimental-source, modal-set and FE-frame checks, and before the M2 builder:
+  1. **A flat measured surface (one z level) without a bound FE input → REFUSE** (`fe_input`). Equal z alone is never
+     taken as proof of a shell.
+  2. An FE input that does not bind node for node → REFUSE (`fe_input`).
+  3. A bound non-shell: proceeds as before. A flat one carries a warning. A shell-face statement for it → REFUSE.
+  4. A bound conventional shell:
+     - the `shell_measured_face` block is required;
+     - its `fe_input_sha256` and `fe_instance` must be the bound ones;
+     - the element normals must be uniform, and the stated normal must equal them;
+     - the experimental +z axis (towards the scanner) must map to the normal for `positive_normal`, or to its opposite
+       for `negative_normal`, as stated in `experimental_axes_in_fe`;
+     - any contradiction → REFUSE.
+  5. Mirrored axes (determinant −1): refused, as before.
+  6. The binding and the face statement are recorded in `metrics["fe_input"]`, inside the hash-sealed record.
+- `verify_for_files`, which runs when a saved registration is opened and before every analysis, **refuses a record of
+  a flat measured surface that carries no bound FE input**: records made before R7, or without the INP.
+
+**GUI (`src/guided_registration_ui.py`) — the real path:**
+
+- the new button **Locate FE input (INP)...**;
+- a files-table row "FE input (INP)";
+- *Check and build* loads the INP and passes it to `establish_guided_registration`;
+- without it, a flat surface is shown as `REFUSED (fe_input)`;
+- the evidence table shows the "shell measured face" row.
+
+This is exercised by `DialogTests` in `tests/test_guided_registration.py`.
+
+**Unchanged:**
+
+- the M2 builder (`physical_registration.py`) and `parse_geometry_calibration`;
+- the governed passports (`auto-id/specimen/v1.1`), SPEC v1.2, the MAC and geometry thresholds and production gates;
+- a guided registration stays `governed = false` and `production_ready = false`.
+
+### Effect on existing data
+
+| Case | Effect |
+|---|---|
+| Accepted SP-02 / SP-13 (solid face instances with two z levels) | not degenerate; no FE input is required; built by the unchanged builder |
+| Synthetic M2 fixtures (single-layer "solid" instances) | flat, so now need a bound FE input. The guided tests supply a generated solid INP bound to the same geometry (`tests/r7_support.py`). The governed builder tests (`test_physical_registration`, `test_registration_uncertainty`) do not use the guided path and are unchanged |
+| Real plate (diagnostic, `runs\r7_r1\real_plate_binding.json`) | V3 INP copy (SHA-256 equal to its manifest) bound to the R6 extraction: 10 201 nodes, max difference 1.5·10⁻⁵ mm, S4R, normals +Z (10 000 / 10 000) → `shell` |
+
+## 3. Files changed (R7 + R7 R1)
 
 | File | Change |
 |---|---|
-| `src/abaqus_bridge.py` | `described_frequency`, `manifest_frequency_problem`; `load_extracted_odb` refuses contradicted manifest frequencies per mode |
-| `src/services/shell_surface.py` | new diagnostic service |
-| `src/services/guided_registration.py` | optional `fe_element_summary`; shell refusal; degenerate-surface limitation |
-| `tests/test_r7_shell_modal_safety.py` | 18 regression tests |
-| `docs/reconciliation/R7_SHELL_MODAL_SAFETY.md` | this report |
-| `docs/gui/GUIDED_PHYSICAL_REGISTRATION.md` | R7 note |
-| `docs/auto_id/STATUS.json`, `docs/auto_id/CHANGELOG.md` | R7 entry |
+| `src/abaqus_bridge.py` | `described_frequency`, `reliable_eigfreq`, `manifest_frequency_problem`; per-mode refusal in `load_extracted_odb` |
+| `src/services/shell_surface.py` | FE-input parsing, node-for-node binding, shell-face block |
+| `src/services/guided_registration.py` | `shell_face` evidence field; `_shell_gate`; `fe_input`; `verify_for_files` binding rule; evidence row |
+| `src/guided_registration_ui.py` | Locate FE input (INP)...; passed to the build |
+| `tests/test_r7_shell_modal_safety.py`, `tests/r7_support.py` | 31 R7 tests and the INP generator |
+| `tests/test_guided_registration.py` | the synthetic flat instances get a bound solid INP; the GUI fail-closed case is added |
+| `docs/reconciliation/R7_SHELL_MODAL_SAFETY.md`, `docs/gui/GUIDED_PHYSICAL_REGISTRATION.md`, `docs/auto_id/STATUS.json`, `docs/auto_id/CHANGELOG.md` | documentation |
 
 ## 4. Tests
 
-**New (`tests/test_r7_shell_modal_safety.py`, 18 tests):**
+**R7 (`tests/test_r7_shell_modal_safety.py`, 31 tests):**
 
-- the pinned script is unchanged, and the root cause is documented;
-- description parsing for zero, near-zero and elastic modes and for the base state;
-- zero, near-zero and elastic consistency;
-- the mode-number artifact is caught by the description and, without one, by EIGFREQ;
-- unverifiable legacy values are left unchanged; a contradicted value is refused with the disagreement recorded;
-- an R6-like package loads modes 3 and 7 without 1 Hz / 2 Hz, the rejections are recorded, and mode 7 takes the
-  EIGFREQ value;
-- an all-false package is refused, and a correct package is unchanged;
-- INP element types and normals per instance; rotated instance → unknown; SC8R is not a conventional shell;
-- equal z is detected but is not a shell claim;
-- guided: a confirmed shell is refused; a degenerate surface of unknown type states the limitation; solid element
-  types keep the same registration hash; mirrored axes are refused; the registration is not governed.
+- pinned script content and OD-R7-1, documented as a fact;
+- all records agree;
+- **manifest and description agree but EIGFREQ contradicts → refused** (function and loader);
+- the zero mode recorded as the mode number is refused;
+- without a description, the manifest is checked against EIGFREQ, and the rounded frame value 207.43 against EIGFREQ
+  207.4273 is accepted;
+- single records are unchanged;
+- an EIGVAL-inconsistent EIGFREQ is not a reliable record; a rigid negative EIGVAL agrees with 0;
+- an R6-like package loads 3 and 7 without the false 1 / 2 Hz, and the elastic value is kept;
+- correct old packages are unchanged; an all-false package is refused;
+- INP element types and normals; node-for-node binding; shifted, rotated and other-instance inputs refused;
+- flat geometry is not a shell claim;
+- a flat surface without an FE input is refused;
+- a bound non-shell builds and is not governed;
+- a shell without a face is refused; a shell with a consistent face passes;
+- a wrong normal, a face contradicting the axes' Z sign, a statement for another FE input, a shell statement for a
+  non-shell and non-uniform normals are all refused;
+- mirrored axes are refused, and an invalid block is refused;
+- the pre-R7 evidence hash is unchanged;
+- a saved flat-surface record without a binding is not applied.
 
-**Existing related tests:** guided, physical, SP-02, SP-13, the loader format and the extractor gave **71 passed,
-11 skipped** in this group.
+The results of the existing guided, physical, SP-02 / SP-13, loader and full-suite runs are given in §6.
 
-- The 11 skips are the store-gated SP-02 / SP-13 data tests. They need the `snadwich` store, `D:\Snadwich`, which
-  is an **original** that R7 forbade opening.
-- Those tests were therefore **not run**. The accepted SP-02 / SP-13 registrations, passports and hashes are produced
-  by `physical_registration.py`, which R7 does not change; the store-free SP-02 / SP-13 tests pass.
+## 5. Baseline issue (not fixed): `test_v12_i5_contract_closure`
 
-**Full pytest** on this branch: **2411 passed, 112 skipped, 1 failed**. The failure is
-`test_v12_i5_contract_closure.py::QuestionContractTests::test_a_calibration_pass_does_not_change_the_material_verdict`
-(`KeyError` in a class-level dict). It fails identically on clean `origin/main` `aa08ad9`, so it is pre-existing
-and not caused by R7. CI results are given in the SUPERVISOR report.
+The test `QuestionContractTests.test_a_calibration_pass_does_not_change_the_material_verdict` reads
+`FamilyConsistencyTests.campaigns`, a class attribute filled in **another class's** `setUpClass`.
 
-## 5. Remaining limitations
+- `unittest` loads a module's test classes in alphabetical order (`FamilyConsistencyTests` first), so CI passes.
+- pytest collects them in definition order (`QuestionContractTests` first), so the dict is empty and a `KeyError`
+  follows.
 
-- The pinned extractor still writes mode numbers for zero-frequency frames. The loader refuses such values, but the
-  root-cause fix needs the re-pin decision (§1).
-- A shell face cannot yet be stated in evidence. A confirmed shell is refused; an unconfirmed degenerate surface only
-  carries a warning, because the element type is not in the extraction package and the synthetic solid fixtures are
-  single-layer.
-- The store-gated SP-02 / SP-13 regressions should be re-run by the SUPERVISOR with the store roots configured.
-- **Pre-existing finding:** `PINNED_EXTRACT_SCRIPT_SHA256` (`039aa067…`) is the hash of a CRLF (Windows) checkout. The git
-  blob is LF (`* text=auto`), with hash `043e89e1…`. On a Linux checkout the governed `pinned_script_executor` would
-  therefore refuse an unchanged script. The R7 test compares the CRLF-normalised content. The pin itself is not
-  changed; this needs a governed decision.
+It fails identically on clean `origin/main` `aa08ad9`. It is a test-order dependency outside R7's scope. No scientific
+logic was changed.
+
+## 6. Test results (R7 R1)
+
+| Run | Result |
+|---|---|
+| `tests/test_r7_shell_modal_safety.py` | 31 passed |
+| `tests/test_guided_registration.py` | 22 passed, 1 skipped (store-gated real SP-13 frame test) |
+| Full `python -m unittest discover -s tests` (the CI command) | **2486 tests, OK, 96 skipped** |
+| Full pytest | **2424 passed, 112 skipped, 1 failed**; the failure is the baseline `test_v12_i5_contract_closure` (§5) |
+
+**Executed, not skipped:**
+
+- the store-free SP-02 / SP-13 tests: frozen registration hashes, passports, re-evaluation records and the G2
+  precision tests;
+- the governed builder tests (`test_physical_registration`, `test_registration_uncertainty`), which are unchanged by R7.
+
+**Skipped (92 store-gated tests in pytest):** these need `snadwich` (the original `D:\Snadwich`),
+`carbon-project-archive` or `m7-run-*`. Among them are the real-data SP-02 / SP-13 registration, fixture, QC and
+what-if regressions.
+
+- They were **not run**. Their inputs `SP02_polymax_retry_260803.unv`, `SP02_fe_geometry.csv` and
+  `SP13_fe_geometry.csv` are not in the verified V2 / V3 copies (only `SP13_a_polymax.unv` is), and originals may not
+  be opened.
+- The accepted SP-02 / SP-13 registrations are produced by `physical_registration.py`, which R7 does not change.
+  Their guided path ("Use accepted scan calibration") selects non-degenerate solid face surfaces, which the shell gate
+  does not affect.
+
+## 7. Remaining limitations
+
+- **OD-R7-1** (§1) and the extractor re-pin are open governed decisions.
+- The shell gate supports flat conventional shells with uniform normals and unrotated instances; curved or rotated
+  shells are refused.
+- The store-gated SP-02 / SP-13 data tests need the original store `D:\Snadwich` and were not run (§6).

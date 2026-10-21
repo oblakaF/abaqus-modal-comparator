@@ -34,6 +34,7 @@ from scientific_state import fe_geometry_identity  # noqa: E402
 from services import guided_registration as guided  # noqa: E402
 from services.physical_registration import FEGeometry, build_physical_registration  # noqa: E402
 from test_physical_registration import true_top_ids  # noqa: E402
+from r7_support import synthetic_fe_input, synthetic_inp_text  # noqa: E402
 
 IDENTITY = {"sha256": "a" * 64, "size": 4096}
 
@@ -86,9 +87,14 @@ class _World:
     def evidence(self, **overrides) -> guided.PhysicalEvidence:
         return guided.evidence_from_document(evidence_document(dict(self.frame), **overrides))
 
-    def establish(self, fe=None, evidence=None, identity=None, experimental=None):
+    def establish(self, fe=None, evidence=None, identity=None, experimental=None, fe_input="bound solid"):
+        # R7-B: the synthetic instances are single z levels, so the FE input proving their (solid) element type is
+        # supplied, bound node for node to the same synthetic geometry.
+        if fe_input == "bound solid":
+            fe_input = synthetic_fe_input(fe or self.variant)
         return guided.establish_guided_registration(as_dataset(fe or self.variant), experimental or self.experimental,
-                                                    identity or IDENTITY, evidence or self.evidence())
+                                                    identity or IDENTITY, evidence or self.evidence(),
+                                                    fe_input=fe_input)
 
 
 class GuidedRegistrationTests(_World, unittest.TestCase):
@@ -341,6 +347,13 @@ class DialogTests(_World, unittest.TestCase):
             self.assertEqual(str(dialog.build_button.cget("state")), "normal")
             self.assertEqual(str(dialog.apply_button.cget("state")), "disabled")
             dialog.load_evidence(folder / "evidence.json")
+            # R7-B in the real GUI path: a single-z-level measured surface without the FE input is refused
+            dialog.build()
+            self.assertTrue(pump(lambda: dialog.status.cget("text").startswith("REFUSED")))
+            self.assertIn("(fe_input)", dialog.status.cget("text"))
+            self.assertIsNone(dialog.result)
+            (folder / "model.inp").write_text(synthetic_inp_text(self.variant), encoding="utf-8")
+            dialog.locate_fe_input(folder / "model.inp")
             # R2: an unexpected error in the background build (unreadable file, broken CSV, ...) never leaves the
             # dialog blocked, never leaves a registration, and the operation can be retried
             with mock.patch.object(guided, "establish_guided_registration",
@@ -419,6 +432,8 @@ class StaleResultTests(_World, unittest.TestCase):
         self.dialog = GuidedRegistrationDialog(self.app, self.loaded)
         self.addCleanup(lambda: self.dialog.window.winfo_exists() and self.dialog.window.destroy())
         self.assertTrue(self.pump(lambda: self.dialog.identity is not None))
+        (self.folder / "model.inp").write_text(synthetic_inp_text(self.variant), encoding="utf-8")
+        self.dialog.locate_fe_input(self.folder / "model.inp")  # R7-B: the single-z-level surface needs the INP
 
     def write(self, name, document):
         (self.folder / name).write_text(json.dumps(document), encoding="utf-8")

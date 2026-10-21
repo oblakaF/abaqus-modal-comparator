@@ -5450,3 +5450,24 @@ first internal provider.
 - **Tests:** 18 new tests. The store-gated SP-02 / SP-13 tests were not run because they need the original
   `D:\Snadwich`.
 - No Abaqus, no FE solve, no rule, threshold or gate change; no merge.
+
+## 2026-10-21 — R7 R1: corrections after the SUPERVISOR audit (REVIEW_READY; PR #96)
+
+- **R7-A:** the loader checks the mutual consistency of the manifest frequency, the frame description and a reliable
+  (EIGVAL-consistent) EIGFREQ.
+  - A manifest and description that agree while EIGFREQ contradicts them are now refused per mode.
+  - Nothing is substituted; legacy single-record values are unchanged.
+  - R6: modes 1–2 are refused; modes 3–20 load.
+- **OD-R7-1 (open, governed):** the extractor pin `039aa067…` is a CRLF hash; the LF blob is `043e89e1…`. It is
+  recorded as a fact in the tests and the report; the pin is not changed.
+- **R7-B:** the optional element hint is replaced by a fail-closed gate in the real GUI path.
+  - A flat measured surface needs the model's INP, bound node for node.
+  - A bound shell needs `shell_measured_face` consistent with the uniform normal and the axes' Z sign.
+  - Contradictions and mirrored axes are refused.
+  - Saved flat-surface records without a binding are not applied.
+  - `parse_geometry_calibration`, the governed passports, SPEC v1.2, thresholds and gates are unchanged.
+- **Tests:** 31 R7 tests; the guided tests supply a bound solid INP for the synthetic flat instances.
+  - The baseline issue `test_v12_i5_contract_closure` is a cross-class order dependency (unittest alphabetical vs
+    pytest definition order); it is not fixed.
+  - The store-gated SP-02 / SP-13 tests were not run: their inputs are not in V2 / V3, and the originals may not be
+    opened.

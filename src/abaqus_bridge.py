@@ -646,34 +646,68 @@ def described_frequency(description: Any) -> Optional[tuple]:
     return value, max(half_unit, abs(value) * _FLOAT32_RESOLUTION)
 
 
+def reliable_eigfreq(manifest: Mapping[str, Any]) -> tuple:
+    """(mode -> EIGFREQ value usable as an independent record, mode -> why it is not).
+
+    EIGFREQ counts only when its history is single and well formed and, when an EIGVAL history exists, EIGVAL agrees
+    for that mode (sqrt(max(EIGVAL, 0))/2pi within a few single-precision ulps; a rigid mode's non-positive EIGVAL
+    agrees with EIGFREQ = 0). This is the existing EIGFREQ/EIGVAL policy applied to consistency checking only.
+    """
+    eigfreq, problem = _single_history(manifest, "EIGFREQ")
+    if eigfreq is None:
+        return {}, {}
+    eigval, eigval_problem = _single_history(manifest, "EIGVAL")
+    if eigval_problem is not None:
+        return {}, {mode: f"EIGVAL history unusable ({eigval_problem})" for mode in eigfreq}
+    reliable: Dict[int, float] = {}
+    notes: Dict[int, str] = {}
+    for mode, value in eigfreq.items():
+        if eigval is not None:
+            if mode not in eigval:
+                notes[mode] = f"mode {mode} has EIGFREQ but no EIGVAL"
+                continue
+            expected = math.sqrt(max(eigval[mode], 0.0)) / (2.0 * math.pi)
+            if abs(expected - value) > _EIGVAL_RELATIVE_TOLERANCE * max(abs(value), expected) + 1e-12:
+                notes[mode] = f"the EIGVAL of mode {mode} contradicts its EIGFREQ"
+                continue
+        reliable[mode] = value
+    return reliable, notes
+
+
 def manifest_frequency_problem(mode: int, manifest_frequency: float, description: Any,
                                eigfreq: Optional[Mapping[int, float]]) -> Optional[dict]:
-    """Why a manifest frequency cannot be used (with the independent records), or None when it is consistent.
+    """Why a manifest frequency cannot be used (with the independent records), or None when every record agrees.
 
-    The frame description is checked first; without one, a manifest frequency equal to its mode number that the
-    EIGFREQ history contradicts is the frameValue artifact. A consistent or unverifiable value is left unchanged.
+    Records of the same mode: the manifest value, the frame description ("Freq = ...") and a reliable EIGFREQ value
+    (``reliable_eigfreq``). The manifest must agree with the description; the frame frequency (the description, or the
+    manifest when there is none) must agree with EIGFREQ, within the printed precision plus float32 resolution. Any
+    contradiction refuses the mode: nothing is chosen between the records and nothing is substituted. A value with no
+    second record is left unchanged (legacy packages).
     """
     history = None if eigfreq is None else eigfreq.get(mode)
     described = described_frequency(description)
+    reasons = []
     if described is not None:
-        value, precision = described
-        if abs(manifest_frequency - value) <= max(precision, _reported_precision(manifest_frequency)):
-            return None
-        reason = (f"manifest frequency {manifest_frequency!r} Hz of mode {mode} contradicts its frame description "
-                  f"({value!r} Hz)")
-    elif history is not None and manifest_frequency == float(mode) \
-            and abs(history - manifest_frequency) > _reported_precision(manifest_frequency):
-        reason = (f"manifest frequency {manifest_frequency!r} Hz of mode {mode} equals the mode number and "
-                  f"contradicts EIGFREQ ({history!r} Hz)")
+        frame_value, frame_tolerance = described
+        if abs(manifest_frequency - frame_value) > max(frame_tolerance, _reported_precision(manifest_frequency)):
+            reasons.append(f"manifest frequency {manifest_frequency!r} Hz of mode {mode} contradicts its frame "
+                           f"description ({frame_value!r} Hz)")
     else:
+        frame_value, frame_tolerance = manifest_frequency, _reported_precision(manifest_frequency)
+    if history is not None and abs(frame_value - history) > frame_tolerance + abs(history) * _FLOAT32_RESOLUTION:
+        source = "frame description" if described is not None else "manifest frequency"
+        reasons.append(f"the {source} {frame_value!r} Hz of mode {mode} contradicts EIGFREQ ({history!r} Hz)")
+    if not reasons:
         return None
+    reason = "; ".join(reasons)
     if manifest_frequency == float(mode):
-        reason += "; it equals the mode number (frameValue fallback of a zero-frequency frame)"
-    independent = [item for item in ((None if described is None else described[0]), history) if item is not None]
+        reason += "; the manifest value equals the mode number (frameValue fallback of a zero-frequency frame)"
     agreed = None
-    if independent and all(abs(item - independent[0]) <= (described[1] if described else 0.0) + _reported_precision(
-            independent[0]) for item in independent):
-        agreed = independent[0]
+    if described is not None and history is not None and \
+            abs(described[0] - history) <= described[1] + abs(history) * _FLOAT32_RESOLUTION:
+        agreed = history
+    elif described is not None and history is None:
+        agreed = None  # one independent record only: recorded, never used
     return {"reason": reason, "manifest_frequency_hz": manifest_frequency,
             "described_frequency_hz": None if described is None else described[0], "eigfreq_hz": history,
             "independent_records_agree_on_hz": agreed}
@@ -698,7 +732,7 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
             raise FileNotFoundError(f"Extracted geometry file is missing: {geometry_path}")
         geometry = _load_geometry_csv(geometry_path)
 
-    eigfreq, _ = _single_history(manifest, "EIGFREQ")
+    eigfreq, eigfreq_notes = reliable_eigfreq(manifest)
     rejected: Dict[int, dict] = {}
     for entry in manifest.get("modes", []):
         problem = manifest_frequency_problem(int(entry["mode"]), float(entry["frequency_hz"]),
@@ -747,6 +781,8 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
         raise ValueError("The extracted Abaqus package contains no modes.")
     if rejected:
         manifest["rejected_frequency_modes"] = {str(mode): item for mode, item in sorted(rejected.items())}
+    if eigfreq_notes:
+        manifest["eigfreq_not_used_for_consistency"] = {str(mode): note for mode, note in sorted(eigfreq_notes.items())}
     notice = extraction_range_notice(manifest)
     if notice is not None:
         manifest["extraction_range_notice"] = notice

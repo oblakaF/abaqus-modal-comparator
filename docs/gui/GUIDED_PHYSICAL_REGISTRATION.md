@@ -83,14 +83,19 @@ any background error); R3 `13af39a` (no stale registration: every input change i
 generation counter discards overtaken background builds). The guided registration remains a diagnostic engineering
 registration: `governed = false`, `production_ready = false`, no Auto-ID observation.
 
-## R7 (2026-10-21): shell mid-surface guard (diagnostic; branch `fix/r7-shell-modal-safety`)
+## R7 / R7 R1 (2026-10-21): fail-closed shell gate (branch `fix/r7-shell-modal-safety`)
 
 For a conventional shell (S4R …) all nodes lie on the mid-surface, so `max_z` and `min_z` select the same nodes and
 `side` cannot name the measured face.
 
-- The guided path **refuses** a measured instance that a supplied FE element summary (INP text, with its SHA-256)
-  confirms to be a conventional shell.
-- A degenerate measured surface of unknown element type is registered as before, with a stated limitation: the face
-  is fixed only by the Z sign of the axes.
-- An explicit face-versus-normal field is proposed, not implemented, because it would change the governed passport
-  schema. See `docs/reconciliation/R7_SHELL_MODAL_SAFETY.md`.
+- **Flat measured surface (one z level):** the dialog requires **Locate FE input (INP)...**. The INP is bound to the
+  loaded FE instance node for node (labels and coordinates); without a bound INP the build is `REFUSED (fe_input)`.
+- **Bound non-shell:** proceeds as before.
+- **Bound conventional shell:** the evidence needs the guided-only block `shell_measured_face`
+  (`auto-id/guided-shell-face/v1`): the bound INP's SHA-256, the instance, the uniform element normal (+Z / −Z), the
+  measured face (`positive_normal` / `negative_normal`) and its physical record. The experimental +z axis must map to
+  that face. Any contradiction and mirrored axes are refused.
+- **Saved registrations** of a flat surface without a bound INP are not applied.
+
+`parse_geometry_calibration`, the governed passports and the solid rules are unchanged. See
+`docs/reconciliation/R7_SHELL_MODAL_SAFETY.md`.
