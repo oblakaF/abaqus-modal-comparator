@@ -58,10 +58,10 @@ and SP-15 a 520 mm plate. Its identity is UNKNOWN.
 
 | Item | Value | Source / status |
 |---|---|---|
-| Plan | 301 × 300 mm | CAE sketch dimensions and Excel title; the LMS sheet says "300*300". Measurement method **UNKNOWN** |
-| Thickness | **UNKNOWN as a measurement.** 0.875 mm is the model input (shell, solid); the wedge model uses 0.93 → 0.81 mm linear along X; `E30E26` uses 1.0 mm; Excel and LMS say "1mm" (nominal) | no thickness record; whether 0.81 / 0.93 were measured is unknown |
-| Mass | **UNKNOWN as a measurement.** Model masses: 118.36 g (ρ 1.498·10⁻⁹ × 0.875 mm), 117.68 g (wedge), 118.76 g (`E30E26`, ρ 1.31522·10⁻⁹ × 1.0 mm) | `.dat` TOTAL MASS. The two densities give almost the same mass, which suggests a mass of about 118.4–118.8 g was the basis; it is not recorded |
-| Implied areal mass | about 1 311 g/m² (from the model mass) | DERIVED from model inputs, not measured |
+| Plan | **x 301 × y 300 mm** | owner's measurement sheet (§8); it matches the CAE sketch and the Excel title |
+| Thickness | **20 edge readings, 0.71–0.94 mm; mean 0.876, median 0.915** (§8). Side means 0.880 / 0.816 / 0.882 / 0.926 mm | owner's measurement sheet; the instrument is not stated. The model's 0.875 is the mean of these readings; the wedge model 0.93 → 0.81 uses the two extreme side means. `E30E26` (t = 1.0) contradicts them |
+| Mass | **118.37 g** | owner's measurement sheet. The models' 118.36 g (ρ 1.498·10⁻⁹ × 0.875 mm) is this mass |
+| Areal mass / density | **1 310.9 g/m²**; 1.496 g/cm³ at the mean thickness | DERIVED from the measured mass, plan and mean edge thickness |
 | Weave / material | **UNKNOWN**. The material is named `CFRP_T300_TEST` | no record |
 | Plies, layup, fibre direction | **UNKNOWN** | all models use one homogeneous material on global axes |
 | Experimental conditions (suspension, excitation, scanner) | **UNKNOWN** | the screenshots look like full-field scans; no setup record |
@@ -163,8 +163,8 @@ This estimate reproduces the stored FE results within 2–5 %: FE / Rayleigh = 0
 
 - **D66/(ρh) of the plate is (33.45 / 19.07)² = 3.08 times the model value.**
 - With the model's areal mass, this is D66 ≈ 860 N·mm, i.e. G12_eff·t³ ≈ 10 300 N·mm.
-- The equivalent homogeneous G12 is about 19 400 / 15 400 / 12 800 / 10 300 MPa for t = 0.81 / 0.875 / 0.93 /
-  1.0 mm.
+- The equivalent homogeneous G12 is about 19 000 / 15 300 / 13 000 MPa for the measured side mean 0.816, the overall
+  mean 0.876 and the side mean 0.926 mm. The model's areal mass equals the measured one (§8).
 
 **This is a scaling consequence, not an identified constant.** These values are 2–4 times the 4 500–6 000 MPa used for
 the sandwich faces and unusually high for a 0/90 woven laminate. Either:
@@ -226,14 +226,60 @@ its material identity and layup are known.
 
 1. What is the plate, and is it a new specimen ID? Which stock (old plain 0.45, old twill, new plain 0.25 …), how many
    plies, and in what orientations relative to the 301 / 300 mm edges?
-2. Were the thickness and the mass measured? Give the values and instruments. Do 0.81 / 0.93 mm in the wedge model
-   come from measurements, and from which edges?
+2. ~~Were the thickness and the mass measured?~~ **Answered 2026-10-21 (§8)**: mass 118.37 g, 301 × 300 mm, 20
+   edge thickness readings. Still open:
+   - which physical edge each row 1–4 is, and from which corner;
+   - the instrument;
+   - whether the interior was measured.
 3. Test setup: suspension (cords, positions), excitation (shaker or hammer, point), scanner. Is there an LMS / PSV
    project or a UNV export of the plate test? Where is it?
 4. Column D of `Sample (2)` ("Abaqus plate (thinkness)"): which run produced it?
 5. Should the Excel transcription slips in column C (wedge) be corrected by the owner?
 
-## 8. What did not change
+## 8. Addendum (2026-10-21): the owner's measurement sheet
+
+The owner sent a photograph of the handwritten measurement sheet: "Мерил по 5 точек на стороне", i.e. five points
+per side. The copy is `runs\m11_carbon_plate\owner_records\plate_measurements_20261021.jpg`, SHA-256 `df5339cd…`.
+The transcription is in `plate_measurements_20261021.json`, and the photograph is not committed. This is a HUMAN
+record. It is not governed evidence, and no instrument or resolution is stated.
+
+**Transcription:**
+
+- Header: "Plate – 1mm"; m = 118.37 g; x = 301; y = 300.
+- Three draft lines h1–h3 are struck through on the sheet and are not used.
+- The sketch shows the measuring points along two edges, about 4.5 and 6.5 mm from the edge. **All readings are
+  therefore at the perimeter; the interior thickness is not measured.**
+
+| Row (side) | Readings, mm | Mean |
+|---|---|---|
+| 1 | 0.94, 0.92, 0.94, 0.89, **0.71** | 0.880 |
+| 2 | 0.79, 0.82, 0.84*, 0.81, 0.82 | 0.816 |
+| 3 | **0.74**, 0.89, 0.94, 0.92, 0.92 | 0.882 |
+| 4 | 0.93, 0.94, 0.93, 0.92, 0.91 | 0.926 |
+
+\* The reading could also be 0.81; the overall mean would then be 0.8745 instead of 0.876.
+
+**Consequences:**
+
+- The mass and the 0.875 mm mean thickness of the stored models are confirmed as measured inputs, not template
+  values.
+- The thickness varies by −19 % / +7 % around the mean. The two low readings, 0.71 and 0.74, are at the ends of rows
+  1 and 3, possibly corners. The flexural stiffness scales with t³, so the plate is not uniform. The wedge model
+  represents only one hypothesis: sides 2 and 4 opposite, with a linear taper.
+- The twist-mode conclusion of §5 stands: with the measured areal mass and thickness, the equivalent homogeneous
+  G12 is about 13–19 GPa, if experimental rank 1 is the twist mode. The elastic constants, weave and layup remain
+  UNKNOWN. **Nothing was fitted.**
+
+**Still open:**
+
+- the assignment of rows 1–4 to the physical edges, and the corner each row starts from;
+- the instrument;
+- the interior thickness;
+- the weave and layup;
+- the test setup;
+- the experimental shape file.
+
+## 9. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.

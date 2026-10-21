@@ -5457,3 +5457,16 @@ first internal provider.
   production calibration BLOCKED / NOT_AUTHORISED; NO_GLOBAL_PARAMETER_VALUE (D-077).
 - **Files changed:** `docs/reconciliation/M11_SINGLE_CFRP_PLATE.md` (new), `docs/reconciliation/M11_SINGLE_CFRP_PLATE.json`
   (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-21 — M11 addendum: owner's plate measurements
+
+- The owner's measurement sheet is recorded as a HUMAN record, not governed evidence; the photograph is in the work
+  directory only.
+- **Plate:** mass 118.37 g, 301 × 300 mm. Thickness: 20 edge readings (5 per side), 0.71–0.94 mm, mean 0.876 mm;
+  side means 0.880 / 0.816 / 0.882 / 0.926 mm.
+- **Model inputs confirmed:** the stored models' mass (118.36 g) and 0.875 mm are these measurements, and the wedge
+  model uses the extreme side means.
+- **Twist-mode scaling:** with the measured thickness, the equivalent G12 is 13–19 GPa if rank 1 is the twist mode.
+  No fitting.
+- **Still open:** the edge assignment of the rows, the instrument, the interior thickness, the layup, the test setup
+  and the shape file.

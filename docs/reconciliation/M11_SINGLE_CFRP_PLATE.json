@@ -261,12 +261,83 @@
    301,
    300
   ],
-  "thickness_mm": "UNKNOWN (model 0.875; wedge 0.93->0.81; E30E26 1.0; nominal 1)",
-  "mass_g": "UNKNOWN (model masses CFRP_S4R_0875_FreeFree 118.36, CFRP_S4R_WEDGE_FreeFree 117.68, CFRP_C3D8I_0875_FreeFree 118.36, E30E26 118.76)",
+  "thickness_mm": {
+   "source": "owner measurement sheet (HUMAN record, 2026-10-21), 5 points per side at the edges",
+   "rows": {
+    "1": [
+     0.94,
+     0.92,
+     0.94,
+     0.89,
+     0.71
+    ],
+    "2": [
+     0.79,
+     0.82,
+     0.84,
+     0.81,
+     0.82
+    ],
+    "3": [
+     0.74,
+     0.89,
+     0.94,
+     0.92,
+     0.92
+    ],
+    "4": [
+     0.93,
+     0.94,
+     0.93,
+     0.92,
+     0.91
+    ]
+   },
+   "per_row": {
+    "1": {
+     "mean": 0.88,
+     "min": 0.71,
+     "max": 0.94
+    },
+    "2": {
+     "mean": 0.816,
+     "min": 0.79,
+     "max": 0.84
+    },
+    "3": {
+     "mean": 0.882,
+     "min": 0.74,
+     "max": 0.94
+    },
+    "4": {
+     "mean": 0.926,
+     "min": 0.91,
+     "max": 0.94
+    }
+   },
+   "all": {
+    "n": 20,
+    "mean": 0.876,
+    "median": 0.915,
+    "sd": 0.0714,
+    "min": 0.71,
+    "max": 0.94,
+    "mean_if_0.81": 0.8745
+   },
+   "uncertain_readings": {
+    "row 2 col 3": "0.84 (could be read 0.81)"
+   },
+   "interior": "UNKNOWN",
+   "instrument": "UNKNOWN",
+   "row_to_edge_assignment": "UNKNOWN"
+  },
+  "mass_g": 118.37,
   "weave": "UNKNOWN",
   "layup": "UNKNOWN",
   "test_setup": "UNKNOWN",
-  "identity": "UNKNOWN (not in catalog)"
+  "identity": "UNKNOWN (not in catalog)",
+  "areal_mass_g_m2": 1310.9,
+  "density_g_cm3_at_mean_t": 1.4964
  },
  "models": {
   "CFRP_S4R_0875_FreeFree": {
@@ -651,7 +722,12 @@
    "0.93": 12809,
    "1.0": 10303
   },
-  "status": "SCALING CONSEQUENCE, NOT AN IDENTIFIED CONSTANT"
+  "status": "SCALING CONSEQUENCE, NOT AN IDENTIFIED CONSTANT",
+  "equivalent_G12_MPa_for_measured_t": {
+   "0.816": 18963,
+   "0.876": 15327,
+   "0.926": 12976
+  }
  },
  "ratios": {
   "exp_f1_over_f2": 0.6054,
@@ -659,5 +735,9 @@
   "CFRP_S4R_WEDGE_FreeFree_f1_over_f2": 0.3199,
   "CFRP_C3D8I_0875_FreeFree_f1_over_f2": 0.3083,
   "E30E26_f1_over_f2": 0.6568
+ },
+ "owner_measurement_record": {
+  "photo_sha256": "df5339cd90fe8d114ad8c62c2e76c13bdb14c91c39d96ccac9b2a9b06bf1caaf",
+  "status": "HUMAN record, not governed evidence; photo not committed"
  }
 }
