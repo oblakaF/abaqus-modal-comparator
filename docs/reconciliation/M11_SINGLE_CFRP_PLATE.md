@@ -135,7 +135,7 @@ FE / experiment − 1.
 
 ## 4. Do the experiment and the model agree? (question 4)
 
-**No, for the stored models with E 56 000–60 000 and G12 5 000:**
+**Not established as a physically paired comparison.** The frequency-by-rank spectra of the stored models with E 56 000–60 000 and G12 5 000 differ substantially from the listed experimental spectrum:
 
 - **Rank 1:** the experiment is 33.45 Hz and the models give 19.0–19.1 Hz (−43 %).
 - **The frequency ratio f1 / f2:** 0.605 in the experiment, against 0.31–0.32 in those models. `E30E26` gives 0.657.
@@ -146,39 +146,48 @@ FE / experiment − 1.
 **The boundary conditions cannot be compared**, because the test setup is not recorded. The FE models are ideal
 free-free.
 
-`E30E26` brings rank 1 to −4.4 % but makes other ranks worse (rank 6 +24.8 %, rank 4 +15.2 %). Hand-tuning on rank
-order is not converging to a consistent set.
+`E30E26` brings the first listed rank difference to −4.4 % but worsens others (rank 6 +24.8 %, rank 4 +15.2 %).
+These frequency-by-rank comparisons do not establish a consistent modal fit or a converged identification.
 
 ## 5. What the plate test can and cannot constrain (question 6)
 
-**Twist mode.** For a free square plate the first mode is the twist mode. Its frequency is governed by the twisting
-stiffness:
+**Twist-mode hypothesis.** In the stored ideal free-free FE models the first *elastic* mode is twist-dominated.
+This is not a universal ordering for every laminate or set of test conditions, and **the first listed experimental
+frequency may not be the lowest physical mode**. The modeled twist frequency is governed by the twisting stiffness:
 
 > f_twist ≈ (12 / π) · √(D66 / ρh) / (a·b), with D66 = G12·t³ / 12 for a homogeneous plate (a Rayleigh estimate with w = xy).
 
 This estimate reproduces the stored FE results within 2–5 %: FE / Rayleigh = 0.977 for the S4R and solid models,
 0.949 for `E30E26`.
 
-**If experimental rank 1 is the twist mode** (consistent with the screenshot, not confirmed):
+**Only if experimental rank 1 is the same twist-mode branch**, the real test is sufficiently close to free-free,
+and a lower mode near the modeled 19 Hz was not omitted from the experimental identification, can a like-for-like
+frequency scaling be discussed:
 
-- **D66/(ρh) of the plate is (33.45 / 19.07)² = 3.08 times the model value.**
-- With the model's areal mass, this is D66 ≈ 860 N·mm, i.e. G12_eff·t³ ≈ 10 300 N·mm.
+- The **squared frequency ratio** is (33.45 / 19.07)² ≈ 3.08. A model with the same geometry, mode branch and
+  comparable modal-shape factor would need roughly 3.08 times the modeled D66/(ρh) to match this rank.
+  **This is not an experimental determination of the plate's D66/(ρh).**
+- Under the *additional, unverified* assumption that the real plate has the modeled areal mass and the scaling
+  factor remains similar, this corresponds to D66 ≈ 860 N·mm, i.e. G12_eff·t³ ≈ 10 300 N·mm.
 - The equivalent homogeneous G12 is about 19 000 / 15 300 / 13 000 MPa for the measured side mean 0.816, the overall
   mean 0.876 and the side mean 0.926 mm. The model's areal mass equals the measured one (§8).
 
-**This is a scaling consequence, not an identified constant.** These values are 2–4 times the 4 500–6 000 MPa used for
-the sandwich faces and unusually high for a 0/90 woven laminate. Either:
+**This is a conditional model-scaling illustration, not an identified constant.** These values are 2–4 times the
+4 500–6 000 MPa assumed for the sandwich faces. Possible explanations include:
 
 - the plate's layup contains ±45° plies; or
-- the plate is another material; or
-- rank 1 is not the twist mode.
+- the plate is another material;
+- a lower torsional mode was absent from the reported modal set;
+- rank 1 is not the twist mode, or the experimental suspension is not well represented by free-free.
 
 The data cannot decide among them.
 
-**What can be identified once the missing data exist.** The free-free frequencies of a plate with confirmed mode
-pairs can identify the effective flexural stiffnesses D11, D22, D12, D66 (normalised by ρh). Today only the D66/(ρh)
-scaling above is available, and only conditionally. Converting D to ply E1, E2, G12 additionally needs the layup
-(laminate theory), and flexural stiffness is not membrane stiffness for a layered laminate.
+**What could be constrained once the missing data exist.** Correctly paired free-free frequencies and shapes,
+with measured mass, thickness, orientation and boundary conditions, may constrain effective flexural stiffnesses
+D11, D22, D12 and D66 (relative to areal mass). **Separately identifying all four is not guaranteed**: an
+identifiability/sensitivity-rank check is required before any fit. The D66/(ρh) scaling above remains conditional,
+not a released experimental property. Converting D to ply E1, E2 and G12 additionally needs the layup (laminate
+theory); flexural and membrane stiffness of a layered laminate need not have identical effective constants.
 
 **Needed to go further:**
 
@@ -217,10 +226,11 @@ authorised step.
 2. The shape file and the thickness and mass measurements exist.
 3. D66 and D11 / D22 are identified under an authorised step.
 
-**Hypothesis for later testing, not a finding.** Every PLA-core sandwich model has a low first (twist) mode,
-−16 … −28 % (M9). That is consistent in direction with a G12 template that is too low, as the plate test also
-suggests. M9 attributed the deficit to core / adhesive model form. The plate cannot discriminate between the two until
-its material identity and layup are known.
+**Hypothesis for later testing, not a finding.** The lowest frequency-by-rank FE entry of the PLA-core sandwich
+models is 16–28 % below the corresponding experimental entry (M9); these are not universally MAC-confirmed twist
+pairings. A low G12 template is one *possible* explanation, but the unregistered plate does not establish it.
+M9 explicitly retained core/bond modelling, face orientation, modal correspondence and fixture effects as competing
+explanations. The plate cannot discriminate among them until its modal identity, test setup, material and layup are known.
 
 ## 7. Questions for the owner
 
@@ -234,7 +244,10 @@ its material identity and layup are known.
 3. Test setup: suspension (cords, positions), excitation (shaker or hammer, point), scanner. Is there an LMS / PSV
    project or a UNV export of the plate test? Where is it?
 4. Column D of `Sample (2)` ("Abaqus plate (thinkness)"): which run produced it?
-5. Should the Excel transcription slips in column C (wedge) be corrected by the owner?
+5. Can the owner confirm that the three wedge-column entries differing from saved `.dat` values are transcription
+   mistakes? **Do not edit the original Excel;** any corrected values belong only in a separately traced analytical copy.
+6. What was the acquisition/PolyMAX identification frequency range and stabilization selection? Specifically, was a
+   peak or torsional mode around 19 Hz searched for and excluded, or could a lower mode have been missed?
 
 ## 8. Addendum (2026-10-21): the owner's measurement sheet
 
