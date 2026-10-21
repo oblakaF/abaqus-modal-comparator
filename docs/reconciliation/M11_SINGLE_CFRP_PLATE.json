@@ -1024,5 +1024,50 @@
   "low_values": "at the edge, about 0.5 mm from it, not in corners",
   "instrument": "caliper 0.01 mm + electronic caliper",
   "material": "plain carbon; plies unknown"
+ },
+ "photographs": {
+  "status": "PENDING (files not received in the session; no copy, no SHA-256)",
+  "supervisor_visual_assessment": {
+   "outer_fabric": "plain weave",
+   "visible_tow_directions": "about 0/90 deg to the edges",
+   "plus_minus_45_on_visible_face": "not observed",
+   "plies_and_internal_layup": "UNKNOWN",
+   "local_thickness_from_photo": "not determined"
+  },
+  "scope": "HUMAN supporting material; not proof of the laminate structure; not transferred to other specimens"
+ },
+ "twist_gap_assessment": {
+  "source": "runs/m11_carbon_plate/twist_causes.json",
+  "inputs": {
+   "mass_kg": 0.11837,
+   "plan_m": [
+    0.301,
+    0.3
+   ],
+   "f_fe_twist_hz": 19.072,
+   "f_exp_twist_hz": 33.4491,
+   "rigid_translation_hz": 9.0625,
+   "rigid_rocking_hz": 15.625
+  },
+  "required_stiffness_ratio_same_mass": 3.076,
+  "attachment": {
+   "k_point_spring_from_bounce_N_per_m": 383.8,
+   "twist_generalised_mass_kg": 0.01315,
+   "f_twist_with_that_spring_at_a_corner_hz": 33.21,
+   "twist_amplitude_at_attachment_needed_for_full_gap": 1.011,
+   "note": "upper bound: the bounce stiffness also includes the cords; the shaker armature mass lowers frequencies; location UNKNOWN"
+  },
+  "laminate": {
+   "G45_of_rotated_fabric_MPa": 26667,
+   "E45_MPa": 17099,
+   "d66_ratio_vs_all_0_90": {
+    "4 plies, two inner at 45": 1.54,
+    "3 plies, middle at 45": 1.16,
+    "2 plies, hidden face ply at 45 (unsymmetric)": 3.17,
+    "4 plies, hidden-face ply at 45": 2.9
+   }
+  },
+  "status": "BOUNDING ESTIMATES, NOT IDENTIFICATION",
+  "conclusion": "conditional: support stiffness (if attached near a corner) or an unsymmetric laminate with a hidden-face 45 deg ply could each explain most of the gap; a higher G12 and interior 45 deg plies contribute moderately; not discriminated"
  }
 }

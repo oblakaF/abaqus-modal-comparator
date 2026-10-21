@@ -3,7 +3,7 @@
 **Status: `REVIEW_READY` / outcome `FREQUENCY_DIAGNOSTIC_ONLY`.**
 
 - The initial frequency-only review was supplemented by the owner's mass and 20 perimeter thickness readings (§8)
-  and verified copies of the LMS/PSV/PolyMAX modal and FRF data (§10): **10 experimental shapes at 289 points**.
+  and verified copies of the LMS/PSV/PolyMAX modal and FRF data (§9): **10 experimental shapes at 289 points**.
 - The experimental first shape is twist-dominated, but no physical FE registration or experimental/FE MAC pairing
   exists. Laminate layup, measured interior thickness and the complete shaker/suspension setup remain unknown.
 - No material constant was fitted.
@@ -66,7 +66,7 @@ and SP-15 a 520 mm plate. Its identity is UNKNOWN.
 | Areal mass / density | **1 310.9 g/m²**; 1.496 g/cm³ at the mean thickness | DERIVED from the measured mass, plan and mean edge thickness |
 | Weave / material | **Plain weave, stated by the owner (§8.1)**; batch and equivalence to sandwich-face stock UNKNOWN. Abaqus names the material `CFRP_T300_TEST` | HUMAN statement; ply count and orientation UNKNOWN |
 | Plies, layup, fibre direction | **UNKNOWN** | all models use one homogeneous material on global axes |
-| Experimental conditions (suspension, excitation, scanner) | **Partially known**: the experiment used PSV scanning with a shaker and suspension; the exact attachment geometry, support stiffness and excitation record are UNKNOWN | LMS/PSV/UNV source (§10), owner statement |
+| Experimental conditions (suspension, excitation, scanner) | **Partially known**: the experiment used PSV scanning with a shaker and suspension; the exact attachment geometry, support stiffness and excitation record are UNKNOWN | LMS/PSV/UNV source (§9), owner statement |
 
 **Abaqus inputs:** the elastic constants are assumed/fitted rather than measured; the S4R mass and nominal thickness reflect the owner's measurements (§8), but this is not a validated interior thickness field.
 
@@ -128,10 +128,10 @@ FE / experiment − 1.
 | 10 | 213.17 | 0.28 | 179.90 (−15.6 %) | 180.49 (−15.3 %) | 185.46 (−13.0 %) | 188.96 (−11.4 %) | rank only |
 
 **No experimental/FE pairing is physically confirmed.** This rank table documents the original frequency-only
-screen; it predates the recovery of the experimental PolyMAX shapes (§10).
+screen; it predates the recovery of the experimental PolyMAX shapes (§9).
 
 - The experimental shape file and PSV project **are now available** (10 PolyMAX modes, 289 points); their diagnostic
-  shape types and FRF checks are in §10.
+  shape types and FRF checks are in §9.
 - FE shape extraction from a verified ODB copy, an independently supported physical registration, and MAC are still
   missing; no experimental-to-FE pair has been accepted.
 - Frequency rank alignment visibly breaks at ranks 7–8.
@@ -144,12 +144,12 @@ screen; it predates the recovery of the experimental PolyMAX shapes (§10).
 - **The frequency ratio f1 / f2:** 0.605 in the experiment, against 0.31–0.32 in those models. `E30E26` gives 0.657.
 - **Near-degenerate ranks:** the near-square E1 = E2 models predict 71.85 / 72.19 Hz and 167.5 / 168.6 Hz, whereas
   the experimental list has 71.96 / 80.47 Hz and 144.6 / 158.8 Hz. These are **not confirmed paired doublets**:
-  experimental modes 4 and 5 have low modal phase collinearity (MPC 0.59 and 0.44; §10), so their shapes are not
+  experimental modes 4 and 5 have low modal phase collinearity (MPC 0.59 and 0.44; §9), so their shapes are not
   reliable grounds for inferring material orthotropy. Thickness variation, fixture effects and mode identity all
   remain possible explanations.
 
 **The boundary conditions are not equivalent by evidence:** the models are ideal free-free, whereas the test involved
-suspension and a shaker. The recorded FRF contains rigid-body-like peaks at 9.06 and 15.6 Hz (§10); their influence
+suspension and a shaker. The recorded FRF contains rigid-body-like peaks at 9.06 and 15.6 Hz (§9); their influence
 on elastic modes is unknown because support and attachment details have not been measured.
 
 `E30E26` brings the first listed rank difference to −4.4 % but worsens others (rank 6 +24.8 %, rank 4 +15.2 %).
@@ -168,7 +168,7 @@ This estimate reproduces the stored FE results within 2–5 %: FE / Rayleigh = 0
 
 **Only if experimental rank 1 is the same twist-mode branch**, the real test is sufficiently close to free-free,
 and the model and test have sufficiently similar modal-shape factors, can a like-for-like frequency scaling be
-considered. The available FRF/PolyMAX evidence (§10) does **not identify** an elastic mode near 19 Hz, but cannot
+considered. The available FRF/PolyMAX evidence (§9) does **not identify** an elastic mode near 19 Hz, but cannot
 by itself validate the free-free test assumption:
 
 - The **squared frequency ratio** is (33.45 / 19.07)² ≈ 3.08. A model with the same geometry, mode branch and
@@ -232,7 +232,7 @@ authorised step.
 **Can it check the faces of SP-02 / SP-10 / SP-13? Not now.** It would become useful in three steps:
 
 1. The owner confirms the plate is from the same stock as those faces and states its ply count and orientation.
-2. The already recovered shape data (§10) receive a defensible physical FE registration; the thickness **interior**
+2. The already recovered shape data (§9) receive a defensible physical FE registration; the thickness **interior**
    field and shaker/suspension influence are independently assessed.
 3. A separate authorised identifiability study establishes which effective flexural stiffness combinations can be
    constrained; no membrane material constants are inferred merely from the plate-frequency match.
@@ -291,7 +291,7 @@ specified a caliper of 0.01 mm resolution and an electronic caliper (§8.1).
 - The thickness varies by −19 % / +7 % around the mean. The two low readings, 0.71 and 0.74, are at the ends of rows
   1 and 3; according to the owner they are not corners but edge readings about 0.5 mm from the edge (§8.1). The flexural stiffness scales with t³, so the plate is not uniform. The wedge model
   represents only one hypothesis: sides 2 and 4 opposite, with a linear taper.
-- The §5 scaling remains conditional (see §10): with the measured areal mass and thickness, the equivalent
+- The §5 scaling remains conditional (see §9): with the measured areal mass and thickness, the equivalent
   homogeneous G12 would be about 13–19 GPa, only under the §5 conditions. The elastic constants, weave and layup remain
   UNKNOWN. **Nothing was fitted.**
 
@@ -316,7 +316,7 @@ These are HUMAN statements and are not governed evidence.
 - **Material:** plain carbon; the number of plies is unknown to the owner.
 - **Experiment files:** the experiment is in `D:\Snadwich\Plate`.
 
-## 10. Addendum (2026-10-21): the plate experiment `D:\Snadwich\Plate`
+## 9. Addendum (2026-10-21): the plate experiment `D:\Snadwich\Plate`
 
 **Copies.** `external_models\v3_20261021\Plate\snadwich_Plate` (`COPY_MANIFEST_V3_SNADWICH_PLATE.json`), 5 files,
 SHA-256 equal before copying, after copying and at the source again:
@@ -410,17 +410,72 @@ These are operating deflection shapes at single frequency lines, not identified 
 - **Consistent hypothesis, not a finding:** plain-weave fabric (E = 56 GPa, G12 = 5 GPa) rotated 45° to the edges
   would give G ≈ 27 GPa and E ≈ 17 GPa. A laminate mixing 0/90 and ±45 plies lies in between, which is close to the
   owner's manual fit `E30E26` (30.8 / 26.5 / 10 GPa). The weave direction relative to the edges cannot be read from
-  the PSV frame (texture at about 2 mm per 6 px). **The owner should look at the plate.**
+  the PSV frame (texture at about 2 mm per 6 px). **Updated in §10:** on the photographed surface the plain weave runs
+  about 0/90° to the edges, so an outer ±45° ply on that face is excluded; the hidden face and the interior remain
+  UNKNOWN.
 
 **Open questions for the owner:**
 
 1. Row 4 is the left edge (seen from the shaker side)?
-2. Do the fibres / weave run parallel to the edges or at 45°? Is it one fabric ply or several?
+2. ~~Do the fibres / weave run parallel to the edges or at 45°?~~ The photographed face is 0/90 (§10.1). Still open:
+   the other face, and the number of plies.
 3. Was 301 or 300 mm horizontal in the test?
 4. Where was the shaker attached (point, stinger), and how was the plate suspended (cords, points)? The rigid-body
    modes at 9.1 and 15.6 Hz depend on it.
 
-## 9. What did not change
+## 10. Addendum (2026-10-21): plate photographs and an updated assessment of the twist gap
+
+### 10.1 Photographs: SUPERVISOR's visual assessment (copies PENDING)
+
+The owner provided two photographs of the plate: the surface and the edge. The SUPERVISOR's visual assessment,
+recorded as a HUMAN statement:
+
+- the outer fabric is **plain weave**;
+- the visible tow directions are approximately **parallel to the edges (0°/90°)**;
+- no ±45° orientation is visible on that surface;
+- the number of plies and the internal layup remain **UNKNOWN**;
+- the local thickness is not to be determined from a photograph.
+
+**The photograph files have not reached this session.** No verified copy and no SHA-256 exist yet. When the files
+arrive they will be copied outside git with SHA-256, as for the measurement sheet. These photographs are supporting
+HUMAN material, not proof of the laminate structure. The information is not transferred to other specimens without
+confirmation that the material is common.
+
+### 10.2 The twist gap, 33.45 Hz (test) against 19.07 Hz (FE): updated assessment
+
+These are bounding estimates (`twist_causes.json`). Nothing was fitted and no constant was identified.
+
+At equal mass, matching the frequency needs **(33.45 / 19.07)² = 3.076** times the
+modelled effective twisting stiffness, or an equivalent external contribution.
+
+| Candidate cause | Assessment | Status |
+|---|---|---|
+| Mass, plan, mean thickness | equal to the measurements (118.37 g, 301 × 300 mm, 0.876 mm mean edge thickness) | **excluded** as the main cause; the t³ variation along the edges (0.82–0.93 mm side means) changes D locally by tens of per cent, not by a factor of 3 |
+| Mode identity | experimental mode 1 has the twist pattern; FE elastic mode 1 is twist | consistent; **no lower elastic mode identified** (not a proof) |
+| ±45° plies on the visible face | not observed (§10.1) | **excluded for the visible face** |
+| Interior plies at 45° (rotated plain weave, G ≈ 26667 MPa) | D66 ratio ×1.16 (3 plies, middle at 45°) to ×1.54 (4 plies, two inner at 45°) | **insufficient alone**: plies near the mid-plane contribute little to D66 |
+| A 45° ply on the hidden face (unsymmetric laminate) | ×2.9 (one of 4 plies) to ×3.17 (one of 2) | **could reach the gap**, but implies bending-extension coupling and warping; the other face must be inspected |
+| Plain-weave G12 above the 5 000 MPa template | typical woven CFRP in-plane shear moduli are a few GPa | plausible for a part of the gap, **not ×3** (literature range, not measured here) |
+| Shaker attachment / suspension | the rigid translation at 9.06 Hz implies about 383.8 N/m of support stiffness. Placed entirely as one point spring at a plate corner, where the twist amplitude is largest, it would lift the FE twist to about 33.21 Hz; it acts much less elsewhere, and not at all on the centre lines. The rigid rocking at 15.6 Hz (47 % of the first elastic frequency) confirms that the support is not negligible | **can be a major contributor** only if the attachment is near a corner and carries most of that stiffness (an extreme upper bound: the cords share it and the armature mass lowers frequencies). **The decisive unknown is the attachment point** |
+
+**Conclusion (conditional).** The visible 0/90 plain weave removes the simplest laminate explanation, an outer ±45°
+ply. Two candidates remain that could each account for most of the gap:
+
+1. the stiffness of the shaker attachment or suspension, if the attachment is near a corner;
+2. an unsymmetric laminate with a 45° ply on the hidden face.
+
+A higher G12 than the template and interior ±45° plies can contribute moderately. **The data in hand do not
+discriminate among these.** The twist scaling stays a conditional illustration, and no E1, E2 or G12 is inferred.
+
+**Checks that would discriminate** (no Abaqus needed to collect them):
+
+- the shaker / stinger attachment point and the suspension points, with a photograph;
+- a photograph of the other face (weave direction);
+- a ply count from the edge photograph or a cut section;
+- ideally a repeat free-free test with impact excitation (shaker detached) or with the attachment at the plate centre.
+  Comparing the twist frequency between the two setups separates the support effect from the laminate effect.
+
+## 11. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.

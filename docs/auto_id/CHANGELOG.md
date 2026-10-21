@@ -5490,3 +5490,16 @@ first internal provider.
   - the peaks at 9.06 Hz and 15.6 Hz are a rigid translation and a rigid rocking (ODS);
   - those rigid modes lie at 27–47 % of the first elastic frequency, so the free-free idealisation is not verified
     and the twist scaling stays conditional.
+
+## 2026-10-21 — M11 addendum 3: plate photographs (copies pending) and the twist-gap assessment
+
+- **Photographs:** SUPERVISOR's visual assessment recorded as a HUMAN statement (outer plain weave, tows about 0/90°
+  to the edges, no ±45° visible; plies and layup UNKNOWN). The photograph files have not reached the session; copies
+  and SHA-256 are pending.
+- **Twist gap 33.45 / 19.07 Hz** (bounding estimates, no fitting): a ×3.08 stiffness is needed at equal mass.
+  - excluded as the main cause: mass, mean thickness, an outer ±45° ply;
+  - insufficient alone: interior 45° plies (×1.2–1.5);
+  - could each explain most of it: the support stiffness, if the attachment is near a corner (the 9.06 Hz bounce
+    implies about 384 N/m), and an unsymmetric laminate with a hidden-face 45° ply (×2.9–3.2);
+  - not discriminated by the data. The attachment point, the other face, the ply count and an impact test are needed.
+- No Abaqus run, no constant inferred, no status changed.
