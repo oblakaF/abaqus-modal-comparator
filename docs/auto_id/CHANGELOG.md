@@ -5475,7 +5475,7 @@ first internal provider.
 
 - **Owner's answers** (HUMAN record): the row-to-edge mapping, seen from the shaker side; a caliper with 0.01 mm
   resolution plus an electronic one; plain carbon, plies unknown; the experiment folder `D:\Snadwich\Plate`.
-- **Copies:** `D:\Snadwich\Plate` copied to `external_models3_20261021\Plate\snadwich_Plate` (5 files, SHA-256
+- **Copies:** `D:\Snadwich\Plate` copied to `external_models\v3_20261021\Plate\snadwich_Plate` (5 files, SHA-256
   verified).
 - **Modal data:** PolyMAX `Polymax_bravo`, 10 modes, 289 points, Z only; the frequencies equal Excel and LMS.
 - **Scan reconstruction:** done with the M2.3 code and three recorded deviations (an anomalous stored frame rectangle,
