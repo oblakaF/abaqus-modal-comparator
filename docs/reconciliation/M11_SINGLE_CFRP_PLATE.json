@@ -1026,16 +1026,34 @@
   "material": "plain carbon; plies unknown"
  },
  "photographs": {
-  "status": "PENDING: M11_plate_photos_verified.zip absent from owner_records/incoming and the searched locations (R4, 2026-10-21); no copy, no SHA-256",
-  "supervisor_visual_assessment": {
-   "outer_fabric": "plain weave",
-   "visible_tow_directions": "about 0/90 deg to the edges",
-   "plus_minus_45_on_visible_face": "not observed",
-   "back_face": "UNKNOWN",
-   "plies_and_internal_layup": "UNKNOWN",
-   "local_thickness_from_photo": "not determined"
-  },
-  "scope": "HUMAN supporting material; only the approximate orientation of the visible weave; not transferred to other specimens"
+  "status": "VERIFIED (R5): HUMAN supporting evidence; copies outside git",
+  "archive": "runs/m11_carbon_plate/owner_records/M11_plate_photos_verified.zip",
+  "archive_sha256": "070d7ccda2eaea3dc4a2aaeaeaa4068074f4dc5d64fa9a1f92f1268f7a184ced",
+  "files": [
+   {
+    "file": "plate_visible_surface.jpeg",
+    "sha256": "4730cd23815f6000da920f4f7156c9e17bf9879a48de2e078304c372924df540",
+    "manifest_match": true
+   },
+   {
+    "file": "plate_edge_detail.jpeg",
+    "sha256": "5f7ce39f3b8cccf959c7e287d0b410b43a23ae8cfcbbcdfc6cbebc688a30ec0b",
+    "manifest_match": true
+   }
+  ],
+  "confirmed_visually": [
+   "photographed face is plain weave",
+   "tows approximately parallel to the edges (0/90)",
+   "no +/-45 pattern on the photographed face",
+   "edge photo out of focus; plies not resolvable"
+  ],
+  "not_established": [
+   "whether the photographed face was scanned",
+   "back face",
+   "ply count and layup",
+   "thickness"
+  ],
+  "scope": "not transferred to other specimens"
  },
  "twist_gap_assessment": {
   "revision": "R4 (supersedes the 1c42e84 assessment: corner placement of the 1-D translation stiffness and D66-as-frequency claims withdrawn)",
@@ -1250,5 +1268,28 @@
    "unknown_interior_thickness": "not excluded (x1.13-1.22 for 0.95-1.0 mm interior)"
   },
   "conclusion": "no single cause established; four-corner support, interior thickness and laminate/fabric constants remain open"
+ },
+ "r5_support_and_rocking": {
+  "rocking_band_source": "runs/m11_carbon_plate/plate_rocking_band.json",
+  "rocking_directions": "tilt direction rotates 150-160 -> 18 -> 76 -> 102 deg over 15.0-16.25 Hz; suggests two close rocking responses about 0.3 Hz apart; not separable (0.3125 Hz resolution, single reference, coherence 0.67-0.77, ODS not poles)",
+  "four_corner_model_shape_check": {
+   "translation": "partial (94 % plane, uniform:tilt about 5:1; residual tilt)",
+   "rocking_pair": "consistent, not confirmed",
+   "twist_rigid_content": "consistent but not discriminating (material stiffness gives the same)",
+   "other_modes": "unchecked (no FE shapes)",
+   "verdict": "not contradicted, not confirmed"
+  },
+  "registration_and_mac_data_needed": [
+   "authorised ODB extraction of the chosen FE model (geometry + shapes, FE geometry identity)",
+   "shell mid-surface check of the measured-surface rule",
+   "scanned face on 2026-10-16",
+   "which edge (301/300) was horizontal",
+   "corner reference / corner-A statement fixing the FE X/Y axes and signs",
+   "confirmation of the thickness-row mapping",
+   "SUPERVISOR acceptance of the 3 reconstruction deviations or independent scan-to-edge offsets",
+   "instrument for the plan dimensions",
+   "Polymax_bravo U3 289 pt; flag complex modes 4/5",
+   "suspension and stinger records (for the frequency comparison)"
+  ]
  }
 }

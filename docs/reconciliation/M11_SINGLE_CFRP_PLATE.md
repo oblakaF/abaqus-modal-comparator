@@ -436,9 +436,9 @@ recorded as a HUMAN statement:
 - the number of plies and the internal layup remain **UNKNOWN**;
 - the local thickness is not to be determined from a photograph.
 
-**The photograph files have not reached this session.** On 2026-10-21 (R4) the archive
-`M11_plate_photos_verified.zip` was absent from `runs\m11_carbon_plate\owner_records\incoming` (the folder does
-not exist) and from the other searched locations. No verified copy and no SHA-256 exist; the status is **PENDING**. When the files
+**Update R5:** the archive arrived later in `runs\m11_carbon_plate\owner_records\` (not `incoming\`). Both
+photographs were verified against its SHA-256 manifest; see §11.1. (In R4 the archive was absent; that status is
+superseded.) When the files
 arrive they will be copied outside git with SHA-256, as for the measurement sheet. These photographs are supporting
 HUMAN material, not proof of the laminate structure. The information is not transferred to other specimens without
 confirmation that the material is common.
@@ -508,7 +508,127 @@ laminate A–B–D). Nothing is fitted, no FE solve was run, and no constant is 
 Comparing the twist frequency between two support conditions separates the support effect from the material and
 thickness effects.
 
-## 11. What did not change
+## 11. R5 (2026-10-21): photographs, rocking directions and the support-model shape check
+
+### 11.1 Photographs (HUMAN supporting evidence, verified copies outside git)
+
+The owner placed the archive `M11_plate_photos_verified.zip` directly in `runs\m11_carbon_plate\owner_records\`
+(not in `incoming\`). Archive SHA-256 `070d7ccda2eaea3d…`. It was extracted into a new folder
+`owner_records\photos_20261021`, and both JPEGs match the archive's manifest:
+
+| File | Manifest description | SHA-256 |
+|---|---|---|
+| `plate_visible_surface.jpeg` | visible face, plain weave | `4730cd23815f6000…` |
+| `plate_edge_detail.jpeg` | edge close-up | `5f7ce39f3b8cccf9…` |
+
+The record is `owner_records\photos_20261021_verification.json`. The photographs are not committed.
+
+**Confirmed visually, and only this:**
+
+- the photographed face is **plain weave**;
+- its tows run approximately **parallel to the plate edges** (0°/90°); no ±45° pattern is visible on that face;
+- the edge photograph shows the plate edge but is out of focus: **plies are not resolvable**, as its manifest also says;
+- handwritten marks (numerals) near the edges are visible on the photographed face; they are not interpreted here.
+
+**Not established by the photographs:**
+
+- whether the photographed face is the one the scanner measured;
+- the back face;
+- the number of plies and the layup;
+- any thickness.
+
+### 11.2 Rocking directions near 15.6 Hz
+
+This check uses the existing FRF / ODS only (`plate_rocking_band.json`, `fig_plate_rocking_band.png`): per frequency
+line, the phase-aligned ODS, its least-squares plane and the direction of the plane's tilt.
+
+- 9.4–13.4 Hz: the ODS stays rigid (plane share 0.93–0.99), with a stable
+  tilt direction of about 130°. The uniform-to-tilt ratio falls from 2.742 to
+  0.325, a smooth transition between the translation and the tilt response.
+- 14.06–14.69 Hz: the plane share is 0.10–0.35 and the coherence
+  0.34–0.39. These lines are **not interpretable**.
+- 15.0–16.25 Hz: the tilt direction **rotates line by line**:
+
+  | Hz | Tilt direction (gradient angle) | Coherence |
+  |---|---|---|
+  | 15.00 | 150.1° | 0.594 |
+  | 15.31 | 160.0° | 0.656 |
+  | 15.625 | 18.3° (mainly along scanner x) | 0.668 |
+  | 15.94 | 76.0° (mainly along scanner y) | 0.767 |
+  | 16.25 | 102.2° | 0.816 |
+
+  It then settles at 110–118° up to 18.75 Hz.
+- **Result:**
+  - the data *suggest* two close rocking responses with different tilt axes, about 0.3 Hz apart near 15.6–15.9 Hz;
+  - they **cannot separate or identify two rocking modes**: the frequency resolution is 0.3125 Hz, there is one
+    reference (one shaker), the coherence is 0.67–0.77, and these are ODS, not poles;
+  - the band SVD (second singular value 0.6584 of the first) is only
+    indicative, because it mixes response shape with modal rank.
+
+### 11.3 Shape check of the four-equal-corner-support model
+
+The model predicts (§10.2): a pure uniform translation at 9.06 Hz, a degenerate rocking pair about both axes at
+15.70 Hz, and a twist with no rigid content at about 33.2 Hz.
+
+| Prediction | Observation (ODS / PolyMAX) | Agreement |
+|---|---|---|
+| pure translation, zero tilt, at the lowest rigid frequency | plane share 0.937, uniform-to-tilt about 5.027:1 at 9.06 Hz; the tilt fraction grows towards 13 Hz | **partial**: mostly uniform, but a residual tilt shows the supports are not equal or symmetric (e.g. the stinger), or a tilt response is overlapping |
+| degenerate rocking about x and y, ratio √3 to the translation | tilt about one axis at 15.625 Hz and about the other at 15.94 Hz (§11.2); 15.625 / 9.0625 = 1.724 | **consistent, not confirmed**: the ODS are not modes, and the pair is not separable |
+| twist without rigid content | rigid-plane share 1.6 % in PolyMAX mode 1; xy share 0.95–0.99 over 31–35 Hz | **consistent, but not discriminating**: a stiffer laminate in a truly free plate gives the same pure twist |
+| other elastic modes shifted according to their corner amplitude | not checkable without FE mode shapes (no ODB extraction) | **unchecked** |
+
+**Verdict: the four-corner model is not contradicted by the observed ODS, but it is not confirmed.**
+
+- The frequency coincidence (√3) and the qualitative shapes are its only support.
+- The residual tilt at 9.06 Hz departs from the equal-support form.
+- The twist shape cannot distinguish support stiffness from material stiffness.
+- The strap tension, the strap lengths and angles, and the stinger stiffness and position are unmeasured.
+
+The §10.2 conclusion stands: no cause of the twist gap is established.
+
+### 11.4 Data needed for a diagnostic physical registration and MAC of the plate
+
+These follow the CORE-E2E-C evidence requirements (`docs/gui/GUIDED_PHYSICAL_REGISTRATION.md`). Nothing below
+relaxes a check.
+
+**FE side (HUMAN gate):**
+
+1. The choice of the FE model to compare (`CFRP_S4R_0875_FreeFree`, the wedge, the C3D8I or `E30E26`), and an
+   **authorised Abaqus Python extraction** of its ODB: node geometry (`geometry.csv`) and mode shapes. This gives the
+   FE geometry identity the evidence must name.
+2. For the shell models, every node lies at z = 0. The measured-surface rule (`max_z` / `min_z`) and the
+   one-point-per-node mapping must be checked for a shell mid-surface before use. The 3 mm mesh against the
+   13–18 mm scan pitch is not expected to be a problem.
+
+**Physical orientation (owner statements; a convention is not evidence):**
+
+3. Which face faced the scanner on 2026-10-16. Is it the photographed face with the numerals?
+4. Which physical edge was horizontal: the 301 mm or the 300 mm edge? The frame aspect cannot decide (0.996 against
+   1.003).
+5. A corner reference visible in the stored PSV frame, or a corner-A statement linking a frame corner to a marked
+   physical corner. This must also fix how the FE X / Y axes (301 / 300) and their signs map onto the frame.
+6. Confirmation of the thickness-row mapping (row 4 = left edge seen from the shaker side).
+
+**Scan calibration:**
+
+7. SUPERVISOR acceptance of the three reconstruction deviations of §9 (anomalous stored rectangle, wider edge
+   search, inverted bottom edge), or an independent measurement of the scan-to-edge offsets.
+8. The instrument and resolution of the plan dimensions 301 × 300.
+
+**Experimental data for MAC:**
+
+9. Use of the set `Polymax_bravo`: 289 points, measured DOF U3. Modes 4 and 5 (MPC 0.59 / 0.44) are strongly
+   complex and need a marking that limits their MAC interpretation.
+10. The PolyMAX damping values are not read by the comparator's reader; LMS damping is in Excel.
+
+**Setup, for the frequency comparison (not for MAC):**
+
+11. The suspension: strap positions, lengths and tension. The shaker / stinger: point, stiffness and armature mass.
+    Photographs of the test setup.
+
+Until items 1, 3–5 and 7 exist, the comparison stays **FREQUENCY_DIAGNOSTIC** plus experimental mode types.
+
+## 12. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.

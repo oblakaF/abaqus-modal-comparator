@@ -5510,3 +5510,23 @@ first internal provider.
   - the unknown interior thickness is not excluded (an interior of 0.95–1.0 mm gives ×1.13–1.22).
 - **Result:** no cause is established; experimental facts, model assumptions and hypotheses are separated in §10.2.
 - No Abaqus run, no constant inferred, no criterion or status changed.
+
+## 2026-10-21 — M11 R5: photographs verified, rocking directions, support-model shape check
+
+- **Photographs:**
+  - `M11_plate_photos_verified.zip` (found in `owner_records\`, not `incoming\`) was extracted to a new folder;
+    both JPEGs match the SHA-256 manifest;
+  - recorded as HUMAN supporting evidence outside git;
+  - confirmed visually: the photographed face is plain weave with tows about 0/90° to the edges; the edge photo does
+    not resolve the plies;
+  - not established: the scanned face, the back face, the plies and the thickness.
+- **Rocking near 15.6 Hz** (FRF / ODS only): the tilt axis rotates between 15.0 and 16.25 Hz, which suggests two close
+  rocking responses about 0.3 Hz apart. They are not separable: 0.3125 Hz resolution, single reference, coherence
+  0.67–0.77, ODS rather than poles.
+- **Four-corner-support model:** not contradicted, not confirmed.
+  - partial agreement: the translation has a residual tilt;
+  - the rocking pair is consistent;
+  - the twist shape does not discriminate support from material;
+  - the other modes are unchecked without FE shapes.
+- **New in the report:** the data needed for a diagnostic physical registration and MAC (§11.4).
+- No FE solve, no Abaqus Python, no ODB extraction, no fitting, no status change.
