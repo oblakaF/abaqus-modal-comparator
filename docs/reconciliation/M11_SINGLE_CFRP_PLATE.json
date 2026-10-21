@@ -394,6 +394,8 @@
     "CFRP_C3D8I_0875_FreeFree": 0,
     "E30E26": 0
    },
+   "comparison_tolerance_hz": 0.01,
+   "exact_matches_of_12_for_wedge": 9,
    "mismatches_vs_best": {
     "1": [
      19.997,
@@ -712,7 +714,7 @@
   }
  },
  "implied_twist_stiffness": {
-  "assumption": "experimental rank 1 is the twist mode (not confirmed)",
+  "assumption": "first listed experimental frequency 33.4491 Hz is the same twist branch as modeled FE 19.072 Hz, no lower experimental mode was omitted, and the test/setup and modal-shape factor are sufficiently close to the free-free model (NONE verified)",
   "D66_over_rhoh_exp_over_model": 3.076,
   "D66_eff_Nmm_if_rhoh_as_model": 858.6,
   "G12eff_t3_Nmm": 10303.0,
@@ -722,7 +724,10 @@
    "0.93": 12809,
    "1.0": 10303
   },
-  "status": "SCALING CONSEQUENCE, NOT AN IDENTIFIED CONSTANT",
+  "status": "CONDITIONAL MODEL SCALING ONLY, NOT AN IDENTIFIED MATERIAL CONSTANT",
+  "requires_missed_low_frequency_mode_check": true,
+  "requires_verified_mode_identity_and_test_boundary_conditions": true,
+  "assumes_model_areal_mass_to_infer_D66_or_G12": true,
   "equivalent_G12_MPa_for_measured_t": {
    "0.816": 18963,
    "0.876": 15327,
