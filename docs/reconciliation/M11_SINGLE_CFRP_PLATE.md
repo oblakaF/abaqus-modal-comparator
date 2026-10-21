@@ -286,8 +286,8 @@ specified a caliper of 0.01 mm resolution and an electronic caliper (§8.1).
 
 **Consequences:**
 
-- The mass and the 0.875 mm mean thickness of the stored models are confirmed as measured inputs, not template
-  values.
+- The stored models' mass equals the measured mass (118.37 g), and their 0.875 mm equals the mean of the 20 edge
+  readings. **This mean is not the plate's thickness**: the interior is not measured (R4).
 - The thickness varies by −19 % / +7 % around the mean. The two low readings, 0.71 and 0.74, are at the ends of rows
   1 and 3; according to the owner they are not corners but edge readings about 0.5 mm from the edge (§8.1). The flexural stiffness scales with t³, so the plate is not uniform. The wedge model
   represents only one hypothesis: sides 2 and 4 opposite, with a linear taper.
@@ -436,44 +436,77 @@ recorded as a HUMAN statement:
 - the number of plies and the internal layup remain **UNKNOWN**;
 - the local thickness is not to be determined from a photograph.
 
-**The photograph files have not reached this session.** No verified copy and no SHA-256 exist yet. When the files
+**The photograph files have not reached this session.** On 2026-10-21 (R4) the archive
+`M11_plate_photos_verified.zip` was absent from `runs\m11_carbon_plate\owner_records\incoming` (the folder does
+not exist) and from the other searched locations. No verified copy and no SHA-256 exist; the status is **PENDING**. When the files
 arrive they will be copied outside git with SHA-256, as for the measurement sheet. These photographs are supporting
 HUMAN material, not proof of the laminate structure. The information is not transferred to other specimens without
 confirmation that the material is common.
 
-### 10.2 The twist gap, 33.45 Hz (test) against 19.07 Hz (FE): updated assessment
+### 10.2 The twist gap, 33.45 Hz (test) against 19.07 Hz (FE): corrected assessment (R4)
 
-These are bounding estimates (`twist_causes.json`). Nothing was fitted and no constant was identified.
+The first version of this subsection (commit `1c42e84`) is **withdrawn** on two points:
 
-At equal mass, matching the frequency needs **(33.45 / 19.07)² = 3.076** times the
-modelled effective twisting stiffness, or an equivalent external contribution.
+- its corner-spring estimate put the 1-D translation stiffness into a corner without the coupled rigid-body motion;
+- its hidden-45°-ply numbers compared D66 ratios with the frequency gap, ignoring bending-extension coupling.
 
-| Candidate cause | Assessment | Status |
+All numbers below are parametric estimates in `runs\m11_carbon_plate\twist_causes_r4.json` (4-DOF Ritz and
+laminate A–B–D). Nothing is fitted, no FE solve was run, and no constant is identified.
+
+**A. Experimentally established (from the copies)**
+
+- Mode 1 of `Polymax_bravo` is 33.4491 Hz with a twist pattern: 96 % xy projection after removing the rigid plane;
+  its own rigid-plane content on the grid is 0.016.
+- The averaged PSV FRFs have two lower peaks, 9.06 Hz and 15.6 Hz. Their operating deflection shapes are a uniform
+  translation and a tilt about the in-plane y axis. **They are ODS at single frequency lines, not identified modes.**
+- The measured mass is 118.37 g and the plan 301 × 300 mm.
+- The thickness is known only at the edges: 20 readings, 0.71–0.94 mm, mean 0.876 mm. **The interior thickness is not
+  measured.**
+- The PSV frame shows elastic straps at all four plate corners and the shaker behind the plate. The attachment point
+  and the strap / stinger stiffnesses are **not measured**.
+- Photographs: the SUPERVISOR's visual assessment says the visible face is plain weave at about 0/90° (§10.1).
+
+**B. Model assumptions used in the estimates**
+
+- The plate is uniform: a rigid plane plus one twist shape (2x/a)(2y/b) (4-DOF Ritz).
+- The free twist is 19.07 Hz, taken from the stored S4R model.
+- Supports are vertical point springs.
+- Laminate estimates use the TEMPLATE fabric constants E = 56 000 MPa, ν12 = 0.05, G12 = 5 000 MPa, with t = 0.875 mm
+  and equal ply thicknesses.
+
+**C. Hypotheses and what the estimates say about them**
+
+| Hypothesis | Estimate (under B) | Status |
 |---|---|---|
-| Mass, plan, mean thickness | equal to the measurements (118.37 g, 301 × 300 mm, 0.876 mm mean edge thickness) | **excluded** as the main cause; the t³ variation along the edges (0.82–0.93 mm side means) changes D locally by tens of per cent, not by a factor of 3 |
-| Mode identity | experimental mode 1 has the twist pattern; FE elastic mode 1 is twist | consistent; **no lower elastic mode identified** (not a proof) |
-| ±45° plies on the visible face | not observed (§10.1) | **excluded for the visible face** |
-| Interior plies at 45° (rotated plain weave, G ≈ 26667 MPa) | D66 ratio ×1.16 (3 plies, middle at 45°) to ×1.54 (4 plies, two inner at 45°) | **insufficient alone**: plies near the mid-plane contribute little to D66 |
-| A 45° ply on the hidden face (unsymmetric laminate) | ×2.9 (one of 4 plies) to ×3.17 (one of 2) | **could reach the gap**, but implies bending-extension coupling and warping; the other face must be inspected |
-| Plain-weave G12 above the 5 000 MPa template | typical woven CFRP in-plane shear moduli are a few GPa | plausible for a part of the gap, **not ×3** (literature range, not measured here) |
-| Shaker attachment / suspension | the rigid translation at 9.06 Hz implies about 383.8 N/m of support stiffness. Placed entirely as one point spring at a plate corner, where the twist amplitude is largest, it would lift the FE twist to about 33.21 Hz; it acts much less elsewhere, and not at all on the centre lines. The rigid rocking at 15.6 Hz (47 % of the first elastic frequency) confirms that the support is not negligible | **can be a major contributor** only if the attachment is near a corner and carries most of that stiffness (an extreme upper bound: the cords share it and the armature mass lowers frequencies). **The decisive unknown is the attachment point** |
+| **One** vertical attachment spring (e.g. the stinger) | Control: one corner spring of 384 N/m gives a non-zero rigid-subspace frequency of **23.98 Hz**, not 9.06 Hz; the 384 N/m (1-D translation) cannot be placed in a corner. To raise the coupled twist to 33.45 Hz a single spring needs 257.1 N/m at a corner, 507.5 N/m at (0.4a, 0.4b) or 1568.5 N/m at (a/4, b/4). The resulting twist-like mode would then contain 31%–70% rigid-plane content, against 1.6% measured | **not supported as the main cause** by the measured mode-1 shape; a smaller contribution is not excluded |
+| **Four equal corner supports** (the straps visible in the frame) | Total 383.8 N/m gives a translation at 9.06 Hz, rocking about both axes at 15.697 Hz (ratio √3 = 1.7322; the observed ODS ratio is 1.7241), no rigid content in the twist by symmetry, and a twist at 33.21 Hz | **open hypothesis, consistent with the two ODS frequencies.** Not established: the ODS are not identified modes; the strap stiffness and geometry, the stinger and the effect on the other modes are unchecked. **33.21 Hz is not a bound or a proof** |
+| A 45° ply on the hidden face (unsymmetric laminate) | With the template constants the B-coupling reduces D66 to D66* = D66 − (B A⁻¹ B)66: ×2.055 for [0/90 \| 45] and ×1.945 for [0,0,0,45], i.e. a Rayleigh twist-frequency ratio of 1.433 / 1.395 against the required 1.754. At exactly 45° a balanced fabric gives D16 = D26 = 0; off-45° plies give D16, D26 ≠ 0 (e.g. ±0.3574 D66 at 30°) | **parametric only.** Under the template constants it does **not** reach the gap. With the real (unknown) ply constants, thicknesses and angles no numerical claim is made. The earlier ×2.9–3.2 D66 figures are withdrawn as frequency evidence |
+| Interior 45° plies (symmetric) | D66 ×1.16–1.542, i.e. a twist-frequency ratio of 1.077–1.242 | insufficient alone under B |
+| Plain-weave G12 above the 5 000 MPa template | not measured; the literature range is a few GPa | a partial contribution is possible; not quantified |
+| **Unknown interior thickness** | With the mass fixed (ρh known on average) the twist frequency scales with √⟨E t³⟩. If the interior were 0.95 or 1.0 mm instead of the 0.876 mm edge mean, the frequency ratio would be ×1.129 or ×1.22; if 0.80 mm, ×0.873 | **not excluded**: the edge mean is not the plate's thickness distribution (the nominal value is 1 mm) |
+| Mode identity, lower missed mode | experimental mode 1 is twist-like; no lower elastic mode was identified (not a proof) | consistent; not a cause |
 
-**Conclusion (conditional).** The visible 0/90 plain weave removes the simplest laminate explanation, an outer ±45°
-ply. Two candidates remain that could each account for most of the gap:
+**Conclusion (R4).**
 
-1. the stiffness of the shaker attachment or suspension, if the attachment is near a corner;
-2. an unsymmetric laminate with a 45° ply on the hidden face.
+- No single cause is established.
+- A single point attachment as the main cause is not supported by the measured mode-1 shape.
+- Three explanations remain open and cannot be ranked with the data in hand:
+  - symmetric four-corner support stiffness, consistent with the two ODS frequencies;
+  - an unknown interior thickness;
+  - the unknown laminate and fabric constants, including asymmetric or off-axis plies.
+- The twist scaling of §5 stays a conditional illustration. No E1, E2 or G12 is inferred.
 
-A higher G12 than the template and interior ±45° plies can contribute moderately. **The data in hand do not
-discriminate among these.** The twist scaling stays a conditional illustration, and no E1, E2 or G12 is inferred.
+**Discriminating data** (none needs Abaqus):
 
-**Checks that would discriminate** (no Abaqus needed to collect them):
+- strap positions, lengths and tension, and the stinger point, with photographs;
+- interior thickness at several points (e.g. a 3 × 3 grid, by micrometer through an access point or by ultrasonic
+  gauge);
+- the other face and the ply count;
+- a repeat test with softer suspension or a different support (e.g. impact excitation on soft cords at the nodal
+  lines of the twist mode).
 
-- the shaker / stinger attachment point and the suspension points, with a photograph;
-- a photograph of the other face (weave direction);
-- a ply count from the edge photograph or a cut section;
-- ideally a repeat free-free test with impact excitation (shaker detached) or with the attachment at the plate centre.
-  Comparing the twist frequency between the two setups separates the support effect from the laminate effect.
+Comparing the twist frequency between two support conditions separates the support effect from the material and
+thickness effects.
 
 ## 11. What did not change
 

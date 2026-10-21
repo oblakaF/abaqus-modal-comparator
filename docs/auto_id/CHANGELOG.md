@@ -5491,15 +5491,22 @@ first internal provider.
   - those rigid modes lie at 27–47 % of the first elastic frequency, so the free-free idealisation is not verified
     and the twist scaling stays conditional.
 
-## 2026-10-21 — M11 addendum 3: plate photographs (copies pending) and the twist-gap assessment
+## 2026-10-21 — M11 addendum 3: plate photographs (copies pending) and the twist-gap assessment (corrected R4)
 
-- **Photographs:** SUPERVISOR's visual assessment recorded as a HUMAN statement (outer plain weave, tows about 0/90°
-  to the edges, no ±45° visible; plies and layup UNKNOWN). The photograph files have not reached the session; copies
-  and SHA-256 are pending.
-- **Twist gap 33.45 / 19.07 Hz** (bounding estimates, no fitting): a ×3.08 stiffness is needed at equal mass.
-  - excluded as the main cause: mass, mean thickness, an outer ±45° ply;
-  - insufficient alone: interior 45° plies (×1.2–1.5);
-  - could each explain most of it: the support stiffness, if the attachment is near a corner (the 9.06 Hz bounce
-    implies about 384 N/m), and an unsymmetric laminate with a hidden-face 45° ply (×2.9–3.2);
-  - not discriminated by the data. The attachment point, the other face, the ply count and an impact test are needed.
-- No Abaqus run, no constant inferred, no status changed.
+- **Photographs:** SUPERVISOR's visual assessment recorded as a HUMAN statement (visible face plain weave about 0/90°;
+  back face, plies and layup UNKNOWN). `M11_plate_photos_verified.zip` was absent from
+  `owner_records\incoming`, so copies and SHA-256 are PENDING.
+- **R4 correction of §10.2** (supersedes the `1c42e84` assessment):
+  - withdrawn: the corner placement of the 1-D translation stiffness. Control: one corner spring of 384 N/m gives
+    about 24.0 Hz in the rigid subspace, not 9.06 Hz;
+  - withdrawn: 33.2 Hz as a bound;
+  - withdrawn: the D66 ×2.9–3.2 figures as frequency evidence.
+- **R4 findings** (4-DOF Ritz and A–B–D; parametric, template constants; no FE, no fitting):
+  - a single point attachment as the main cause is not supported by the measured mode-1 shape (rigid content 1.6 %
+    measured, against 31–70 % needed);
+  - four equal corner supports remain open: they are consistent with the ODS ratio 15.6 / 9.06 ≈ √3; not a bound;
+  - the hidden-face 45° ply is parametric only: the B-reduced D66* gives a frequency ratio of 1.39–1.43 against the
+    required 1.754 under the template constants;
+  - the unknown interior thickness is not excluded (an interior of 0.95–1.0 mm gives ×1.13–1.22).
+- **Result:** no cause is established; experimental facts, model assumptions and hypotheses are separated in §10.2.
+- No Abaqus run, no constant inferred, no criterion or status changed.

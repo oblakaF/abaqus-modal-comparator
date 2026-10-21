@@ -1026,48 +1026,229 @@
   "material": "plain carbon; plies unknown"
  },
  "photographs": {
-  "status": "PENDING (files not received in the session; no copy, no SHA-256)",
+  "status": "PENDING: M11_plate_photos_verified.zip absent from owner_records/incoming and the searched locations (R4, 2026-10-21); no copy, no SHA-256",
   "supervisor_visual_assessment": {
    "outer_fabric": "plain weave",
    "visible_tow_directions": "about 0/90 deg to the edges",
    "plus_minus_45_on_visible_face": "not observed",
+   "back_face": "UNKNOWN",
    "plies_and_internal_layup": "UNKNOWN",
    "local_thickness_from_photo": "not determined"
   },
-  "scope": "HUMAN supporting material; not proof of the laminate structure; not transferred to other specimens"
+  "scope": "HUMAN supporting material; only the approximate orientation of the visible weave; not transferred to other specimens"
  },
  "twist_gap_assessment": {
-  "source": "runs/m11_carbon_plate/twist_causes.json",
-  "inputs": {
-   "mass_kg": 0.11837,
-   "plan_m": [
-    0.301,
-    0.3
-   ],
-   "f_fe_twist_hz": 19.072,
-   "f_exp_twist_hz": 33.4491,
-   "rigid_translation_hz": 9.0625,
-   "rigid_rocking_hz": 15.625
+  "revision": "R4 (supersedes the 1c42e84 assessment: corner placement of the 1-D translation stiffness and D66-as-frequency claims withdrawn)",
+  "source": "runs/m11_carbon_plate/twist_causes_r4.json",
+  "experimental_facts": [
+   "mode 1 33.4491 Hz twist pattern (xy 96 %, rigid-plane share 1.6 %)",
+   "FRF peaks 9.06 / 15.6 Hz are ODS (translation / tilt about in-plane y), not identified modes",
+   "mass 118.37 g, plan 301 x 300 mm, edge thickness only (mean 0.876 mm); interior UNKNOWN",
+   "straps at all four corners visible in the PSV frame; attachment and stiffnesses unmeasured"
+  ],
+  "model_assumptions": [
+   "uniform plate, rigid plane + one twist shape (4-DOF Ritz)",
+   "free twist 19.07 Hz (stored S4R)",
+   "vertical point springs",
+   "template fabric constants for A-B-D"
+  ],
+  "estimates": {
+   "inputs": {
+    "mass_kg": 0.11837,
+    "plan_m": [
+     0.301,
+     0.3
+    ],
+    "f_fe_twist_hz": 19.072,
+    "f_exp_twist_hz": 33.4491,
+    "required_frequency_ratio": 1.7538,
+    "required_stiffness_ratio": 3.076
+   },
+   "support_4dof": {
+    "control_one_corner_spring_k384_rigid_subspace_hz": 23.98,
+    "k_corner_for_rigid_9.06_hz_N_per_m": 54.8,
+    "k_centre_for_rigid_9.06_hz_N_per_m": 383.8,
+    "single_spring_cases": {
+     "corner": {
+      "k_giving_9.06Hz_rigid_mode_N_per_m": 54.8,
+      "modes_hz_with_that_k": [
+       0.0,
+       0.0,
+       7.804,
+       22.149
+      ],
+      "k_needed_for_33.45Hz_twist_N_per_m": 257.1,
+      "modes_hz_with_k_needed": [
+       0.0,
+       0.0,
+       11.19,
+       33.45
+      ]
+     },
+     "edge mid (x=a/2, y=0)": {
+      "k_giving_9.06Hz_rigid_mode_N_per_m": 95.9,
+      "modes_hz_with_that_k": [
+       0.0,
+       0.0,
+       9.062,
+       19.072
+      ],
+      "k_needed_for_33.45Hz_twist_N_per_m": null,
+      "modes_hz_with_k_needed": null
+     },
+     "centre": {
+      "k_giving_9.06Hz_rigid_mode_N_per_m": 383.8,
+      "modes_hz_with_that_k": [
+       0.0,
+       0.0,
+       9.062,
+       19.072
+      ],
+      "k_needed_for_33.45Hz_twist_N_per_m": null,
+      "modes_hz_with_k_needed": null
+     },
+     "quarter point (a/4, b/4)": {
+      "k_giving_9.06Hz_rigid_mode_N_per_m": 153.5,
+      "modes_hz_with_that_k": [
+       0.0,
+       0.0,
+       8.784,
+       19.677
+      ],
+      "k_needed_for_33.45Hz_twist_N_per_m": 1568.5,
+      "modes_hz_with_k_needed": [
+       0.0,
+       0.0,
+       16.517,
+       33.449
+      ]
+     },
+     "near corner (0.4a, 0.4b)": {
+      "k_giving_9.06Hz_rigid_mode_N_per_m": 79.3,
+      "modes_hz_with_that_k": [
+       0.0,
+       0.0,
+       8.234,
+       20.991
+      ],
+      "k_needed_for_33.45Hz_twist_N_per_m": 507.5,
+      "modes_hz_with_k_needed": [
+       0.0,
+       0.0,
+       13.072,
+       33.449
+      ]
+     }
+    },
+    "coupled_twist_mode_rigid_plane_share": {
+     "corner k=257.1": {
+      "twist_hz": 33.45,
+      "rigid_plane_energy_share_on_grid": 0.306
+     },
+     "near corner (0.4a,0.4b) k=507.5": {
+      "twist_hz": 33.45,
+      "rigid_plane_energy_share_on_grid": 0.423
+     },
+     "quarter point k=1568.5": {
+      "twist_hz": 33.45,
+      "rigid_plane_energy_share_on_grid": 0.702
+     }
+    },
+    "experimental_mode1_rigid_plane_share": 0.0157,
+    "four_equal_corner_springs": {
+     "assumption": "four equal vertical point springs at the corners (elastic straps at all four corners are visible in the PSV frame); stiffness from the 9.06 Hz translation ODS; uniform plate; twist shape (2x/a)(2y/b); 4-DOF Ritz",
+     "k_each_N_per_m": 95.9,
+     "k_total_N_per_m": 383.8,
+     "frequencies_hz": [
+      9.062,
+      15.697,
+      15.697,
+      33.21
+     ],
+     "predicted_rocking_over_translation": 1.7322,
+     "observed_15.625_over_9.0625": 1.7241,
+     "twist_mode_rigid_content": "zero by symmetry (equal corner springs)",
+     "status": "MODEL HYPOTHESIS consistent with two ODS frequencies; ODS are not identified modes; strap stiffness, geometry and the shaker stinger are unmeasured; the effect on the other modes is unchecked; NOT a bound"
+    }
+   },
+   "laminate_ABD_template_constants": {
+    "all 0/90 (reference)": {
+     "D66_ratio": 1.0,
+     "D66star_ratio_B_reduced": 1.0,
+     "rayleigh_twist_freq_ratio_sqrt_D66star": 1.0,
+     "B_max_abs_N": 0.0,
+     "D16_D26_over_D66": [
+      0.0,
+      0.0
+     ]
+    },
+    "2 plies [0/90 | 45]": {
+     "D66_ratio": 3.167,
+     "D66star_ratio_B_reduced": 2.055,
+     "rayleigh_twist_freq_ratio_sqrt_D66star": 1.433,
+     "B_max_abs_N": 2073.6,
+     "D16_D26_over_D66": [
+      -0.0,
+      0.0
+     ]
+    },
+    "4 plies [0,0,0,45]": {
+     "D66_ratio": 2.896,
+     "D66star_ratio_B_reduced": 1.945,
+     "rayleigh_twist_freq_ratio_sqrt_D66star": 1.395,
+     "B_max_abs_N": 1555.2,
+     "D16_D26_over_D66": [
+      -0.0,
+      0.0
+     ]
+    },
+    "4 plies [0,45,45,0] (symmetric, interior)": {
+     "D66_ratio": 1.542,
+     "D66star_ratio_B_reduced": 1.542,
+     "rayleigh_twist_freq_ratio_sqrt_D66star": 1.242,
+     "B_max_abs_N": 0.0,
+     "D16_D26_over_D66": [
+      -0.0,
+      0.0
+     ]
+    },
+    "3 plies [0,45,0] (symmetric, interior)": {
+     "D66_ratio": 1.16,
+     "D66star_ratio_B_reduced": 1.16,
+     "rayleigh_twist_freq_ratio_sqrt_D66star": 1.077,
+     "B_max_abs_N": 0.0,
+     "D16_D26_over_D66": [
+      -0.0,
+      0.0
+     ]
+    },
+    "2 plies [0/90 | 30] (off-45 example)": {
+     "D66_ratio": 2.625,
+     "D66star_ratio_B_reduced": 1.842,
+     "rayleigh_twist_freq_ratio_sqrt_D66star": 1.357,
+     "B_max_abs_N": 1555.2,
+     "D16_D26_over_D66": [
+      0.3574,
+      -0.3574
+     ]
+    }
+   },
+   "thickness_twist_frequency_ratio_uniform_material_fixed_mass": {
+    "interior 0.8 mm vs edge mean 0.876": 0.873,
+    "interior 0.876 mm vs edge mean 0.876": 1.0,
+    "interior 0.95 mm vs edge mean 0.876": 1.129,
+    "interior 1.0 mm vs edge mean 0.876": 1.22
+   },
+   "status": "PARAMETRIC BOUNDING ESTIMATES ON ASSUMED CONSTANTS; NOT IDENTIFICATION"
   },
-  "required_stiffness_ratio_same_mass": 3.076,
-  "attachment": {
-   "k_point_spring_from_bounce_N_per_m": 383.8,
-   "twist_generalised_mass_kg": 0.01315,
-   "f_twist_with_that_spring_at_a_corner_hz": 33.21,
-   "twist_amplitude_at_attachment_needed_for_full_gap": 1.011,
-   "note": "upper bound: the bounce stiffness also includes the cords; the shaker armature mass lowers frequencies; location UNKNOWN"
+  "hypotheses_status": {
+   "single_point_attachment_main_cause": "not supported by the measured mode-1 rigid content",
+   "four_equal_corner_supports": "open; consistent with the ODS frequency ratio (sqrt 3); 33.2 Hz is not a bound",
+   "hidden_face_45_ply": "parametric only; under template constants B-reduced D66* gives a frequency ratio 1.39-1.43 < 1.754; no numerical claim with unknown constants",
+   "interior_45_plies": "insufficient alone under template constants",
+   "higher_plain_weave_G12": "possible partial contribution; not quantified",
+   "unknown_interior_thickness": "not excluded (x1.13-1.22 for 0.95-1.0 mm interior)"
   },
-  "laminate": {
-   "G45_of_rotated_fabric_MPa": 26667,
-   "E45_MPa": 17099,
-   "d66_ratio_vs_all_0_90": {
-    "4 plies, two inner at 45": 1.54,
-    "3 plies, middle at 45": 1.16,
-    "2 plies, hidden face ply at 45 (unsymmetric)": 3.17,
-    "4 plies, hidden-face ply at 45": 2.9
-   }
-  },
-  "status": "BOUNDING ESTIMATES, NOT IDENTIFICATION",
-  "conclusion": "conditional: support stiffness (if attached near a corner) or an unsymmetric laminate with a hidden-face 45 deg ply could each explain most of the gap; a higher G12 and interior 45 deg plies contribute moderately; not discriminated"
+  "conclusion": "no single cause established; four-corner support, interior thickness and laminate/fabric constants remain open"
  }
 }
