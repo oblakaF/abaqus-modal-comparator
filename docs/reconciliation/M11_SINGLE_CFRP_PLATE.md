@@ -2,9 +2,11 @@
 
 **Status: `REVIEW_READY` / outcome `FREQUENCY_DIAGNOSTIC_ONLY`.**
 
-- The plate has free-free FE models and experimental frequencies, but no experimental mode-shape data file, no
-  measured thickness, mass or layup record, and no physical registration.
-- No mode pairing is confirmed. No constant was fitted.
+- The initial frequency-only review was supplemented by the owner's mass and 20 perimeter thickness readings (§8)
+  and verified copies of the LMS/PSV/PolyMAX modal and FRF data (§10): **10 experimental shapes at 289 points**.
+- The experimental first shape is twist-dominated, but no physical FE registration or experimental/FE MAC pairing
+  exists. Laminate layup, measured interior thickness and the complete shaker/suspension setup remain unknown.
+- No material constant was fitted.
 - No FE solve, Abaqus Python, Auto-ID or LM was run. No original was modified.
 - Nothing here is governed evidence.
 
@@ -62,11 +64,11 @@ and SP-15 a 520 mm plate. Its identity is UNKNOWN.
 | Thickness | **20 edge readings, 0.71–0.94 mm; mean 0.876, median 0.915** (§8). Side means 0.880 / 0.816 / 0.882 / 0.926 mm | owner's measurement sheet; the instrument is not stated. The model's 0.875 is the mean of these readings; the wedge model 0.93 → 0.81 uses the two extreme side means. `E30E26` (t = 1.0) contradicts them |
 | Mass | **118.37 g** | owner's measurement sheet. The models' 118.36 g (ρ 1.498·10⁻⁹ × 0.875 mm) is this mass |
 | Areal mass / density | **1 310.9 g/m²**; 1.496 g/cm³ at the mean thickness | DERIVED from the measured mass, plan and mean edge thickness |
-| Weave / material | **UNKNOWN**. The material is named `CFRP_T300_TEST` | no record |
+| Weave / material | **Plain weave, stated by the owner (§8.1)**; batch and equivalence to sandwich-face stock UNKNOWN. Abaqus names the material `CFRP_T300_TEST` | HUMAN statement; ply count and orientation UNKNOWN |
 | Plies, layup, fibre direction | **UNKNOWN** | all models use one homogeneous material on global axes |
-| Experimental conditions (suspension, excitation, scanner) | **UNKNOWN** | the screenshots look like full-field scans; no setup record |
+| Experimental conditions (suspension, excitation, scanner) | **Partially known**: the experiment used PSV scanning with a shaker and suspension; the exact attachment geometry, support stiffness and excitation record are UNKNOWN | LMS/PSV/UNV source (§10), owner statement |
 
-**Abaqus inputs (all assumed, none measured):**
+**Abaqus inputs:** the elastic constants are assumed/fitted rather than measured; the S4R mass and nominal thickness reflect the owner's measurements (§8), but this is not a validated interior thickness field.
 
 | Job (stored result) | Elements | t, mm | E1 / E2, MPa | ν12 | G12 | E3 / G13 / G23 | ρ, t/mm³ |
 |---|---|---|---|---|---|---|---|
@@ -125,13 +127,14 @@ FE / experiment − 1.
 | 9 | 178.04 | 0.13 | 174.80 (−1.8 %) | 174.80 (−1.8 %) | 180.20 (+1.2 %) | 168.53 (−5.3 %) | rank only |
 | 10 | 213.17 | 0.28 | 179.90 (−15.6 %) | 180.49 (−15.3 %) | 185.46 (−13.0 %) | 188.96 (−11.4 %) | rank only |
 
-**No pairing is physically confirmed.**
+**No experimental/FE pairing is physically confirmed.** This rank table documents the original frequency-only
+screen; it predates the recovery of the experimental PolyMAX shapes (§10).
 
-- The only shape information is the screenshots in Excel: magnitude colour maps without phase, with unknown axes and
-  orientation.
-- MAC needs the experimental shape file (UNV dataset 55 / 58 or the PSV project) and a physical registration; neither
-  exists.
-- The rank alignment visibly breaks at ranks 7–8.
+- The experimental shape file and PSV project **are now available** (10 PolyMAX modes, 289 points); their diagnostic
+  shape types and FRF checks are in §10.
+- FE shape extraction from a verified ODB copy, an independently supported physical registration, and MAC are still
+  missing; no experimental-to-FE pair has been accepted.
+- Frequency rank alignment visibly breaks at ranks 7–8.
 
 ## 4. Do the experiment and the model agree? (question 4)
 
@@ -143,8 +146,9 @@ FE / experiment − 1.
   instead shows split pairs, 71.96 / 80.47 Hz and 144.6 / 158.8 Hz. That points to in-plane orthotropy, a thickness
   or geometry imperfection, or a different mode identity — the data cannot tell which.
 
-**The boundary conditions cannot be compared**, because the test setup is not recorded. The FE models are ideal
-free-free.
+**The boundary conditions are not equivalent by evidence:** the models are ideal free-free, whereas the test involved
+suspension and a shaker. The recorded FRF contains rigid-body-like peaks at 9.06 and 15.6 Hz (§10); their influence
+on elastic modes is unknown because support and attachment details have not been measured.
 
 `E30E26` brings the first listed rank difference to −4.4 % but worsens others (rank 6 +24.8 %, rank 4 +15.2 %).
 These frequency-by-rank comparisons do not establish a consistent modal fit or a converged identification.
@@ -161,14 +165,16 @@ This estimate reproduces the stored FE results within 2–5 %: FE / Rayleigh = 0
 0.949 for `E30E26`.
 
 **Only if experimental rank 1 is the same twist-mode branch**, the real test is sufficiently close to free-free,
-and a lower mode near the modeled 19 Hz was not omitted from the experimental identification, can a like-for-like
-frequency scaling be discussed:
+and the model and test have sufficiently similar modal-shape factors, can a like-for-like frequency scaling be
+considered. The available FRF/PolyMAX evidence (§10) does **not identify** an elastic mode near 19 Hz, but cannot
+by itself validate the free-free test assumption:
 
 - The **squared frequency ratio** is (33.45 / 19.07)² ≈ 3.08. A model with the same geometry, mode branch and
   comparable modal-shape factor would need roughly 3.08 times the modeled D66/(ρh) to match this rank.
   **This is not an experimental determination of the plate's D66/(ρh).**
-- Under the *additional, unverified* assumption that the real plate has the modeled areal mass and the scaling
-  factor remains similar, this corresponds to D66 ≈ 860 N·mm, i.e. G12_eff·t³ ≈ 10 300 N·mm.
+- The owner's measured mass and plan area now substantiate the **areal mass** used by the model (§8). However,
+  the comparable modal-shape factor and negligible support/attachment effects are **not established**. Conditional
+  on both, the illustration is D66 ≈ 860 N·mm, i.e. G12_eff·t³ ≈ 10 300 N·mm.
 - The equivalent homogeneous G12 is about 19 000 / 15 300 / 13 000 MPa for the measured side mean 0.816, the overall
   mean 0.876 and the side mean 0.926 mm. The model's areal mass equals the measured one (§8).
 
@@ -205,16 +211,17 @@ authorised step.
 
 | | Plate | SP-02 | SP-03 | SP-04 | SP-05 | SP-10 | SP-13 |
 |---|---|---|---|---|---|---|---|
-| Face stock / weave | UNKNOWN | old plain 0.45 | old twill 0.45 | old plain 0.25 | old plain 0.25 | old plain 0.45 | old plain 0.45 |
-| Thickness, mm | UNKNOWN (model 0.875; nominal 1) | 0.45 | 0.45 | 0.25 | 0.245 | 0.40 / 0.39 | 0.425 |
-| Areal mass, g/m² | about 1 311 (model-implied) | 668.6 | 628–631 | 342–343 | 345–346 | 603–609 | 598–617 |
+| Face stock / weave | plain (owner); batch/layup UNKNOWN | old plain 0.45 | old twill 0.45 | old plain 0.25 | old plain 0.25 | old plain 0.45 | old plain 0.45 |
+| Thickness, mm | 0.71–0.94 edge readings, mean 0.876; interior UNKNOWN | 0.45 | 0.45 | 0.25 | 0.245 | 0.40 / 0.39 | 0.425 |
+| Areal mass, g/m² | 1 310.9 (measured mass / measured plan area) | 668.6 | 628–631 | 342–343 | 345–346 | 603–609 | 598–617 |
 | FE E1 = E2 / G12, MPa | 56 000–60 000 / 5 000 (template); `E30E26` 30 820 / 26 520 / 10 000 (manual fit) | 52 000–54 400 / 4 500 | 52 000–54 400 / 4 500 | 46 200 / 6 000 | 46 200 / 6 000 | 61 300–62 800 / 5 400 | 52 000–57 600 / 4 500 |
 
 **Observations:**
 
-- The implied areal mass and the 0.875 mm thickness are about twice an old 0.45 plain face (0.9 mm, 1 200–1 340 g/m²).
+- The **measured** areal mass and mean edge thickness are about twice an old 0.45 plain face (0.9 mm, 1 200–1 340 g/m²).
   This is consistent with, but not evidence of, a two-ply laminate of that stock.
-- The batch, weave, ply count and orientation are not recorded, so **no common material can be claimed**. E1, E2,
+- The owner reports a plain weave, but the batch, ply count and fibre orientation are not recorded, so **no common
+  material can be claimed**. E1, E2,
   G12 and density were not transferred in either direction.
 - The plate test is flexural. The faces work mainly in membrane in the sandwich panels, so even for the same material
   the plate's flexural constants are not the faces' membrane constants unless the laminate is homogeneous through the
@@ -222,9 +229,11 @@ authorised step.
 
 **Can it check the faces of SP-02 / SP-10 / SP-13? Not now.** It would become useful in three steps:
 
-1. The owner confirms that the plate is made of the same stock as those faces and states its ply count and orientation.
-2. The shape file and the thickness and mass measurements exist.
-3. D66 and D11 / D22 are identified under an authorised step.
+1. The owner confirms the plate is from the same stock as those faces and states its ply count and orientation.
+2. The already recovered shape data (§10) receive a defensible physical FE registration; the thickness **interior**
+   field and shaker/suspension influence are independently assessed.
+3. A separate authorised identifiability study establishes which effective flexural stiffness combinations can be
+   constrained; no membrane material constants are inferred merely from the plate-frequency match.
 
 **Hypothesis for later testing, not a finding.** The lowest frequency-by-rank FE entry of the PLA-core sandwich
 models is 16–28 % below the corresponding experimental entry (M9); these are not universally MAC-confirmed twist
@@ -360,11 +369,14 @@ far as the data allow.
   peak is as high as the 33.45 Hz peak.
 - The operating deflection shape at **9.06 Hz** is a **rigid translation**: 94 % of the shape is a plane, essentially
   constant. Mean coherence 0.75.
-- At **15.6 Hz** it is a **rigid rocking about the vertical axis**: 81 % is a plane tilted along x, with no twist
-  component. Mean coherence 0.67.
+- At **15.6 Hz** the out-of-plane ODS is **rigid-body-like rocking**: 81 % is approximated by a plane tilted
+  mainly along scanner x, with negligible twist. Such a vertical-displacement tilt corresponds primarily to rotation
+  about the **in-plane y axis**, **not** the vertical z axis. Mean coherence 0.67; the full 3D rotation axis cannot
+  be recovered from U3 alone.
 - At 33.44 Hz the ODS is twist-like.
-- **No elastic mode is identified between 0.3 Hz and 33.45 Hz.** The two low peaks are rigid-body modes of the
-  suspended plate and its attachment.
+- **No additional elastic mode was identified between 0.3 Hz and 33.45 Hz in the analysed PolyMAX and FRF data.**
+  The low peaks have rigid-body-like ODS patterns consistent with suspension/attachment motion, not independently
+  identified modal poles. This does not prove that a weaker elastic mode cannot be missed.
 - Their frequencies are **27 % and 47 % of the first elastic frequency**. That is not a negligible suspension or
   attachment stiffness. **The free-free idealisation of mode 1 is therefore not verified**: its effect on 33.45 Hz is
   UNKNOWN without the shaker attachment and suspension records.
@@ -373,8 +385,9 @@ These are operating deflection shapes at single frequency lines, not identified 
 
 **Consequences.**
 
-- **Experimental mode 1 (33.45 Hz) has the twist pattern.** This comes from the experimental data alone: PolyMAX shape
-  with 96 % xy share and alternating quadrants. The FRFs show no elastic mode below it.
+- **Experimental mode 1 (33.45 Hz) has a twist-dominated measured U3 pattern.** PolyMAX has 96 % xy projection
+  after removing the rigid plane and alternating quadrant signs. No lower elastic modal pole was identified in the
+  available data, subject to the FRF/ODS limitations above.
 - Every stored FE model's first elastic mode is the twist mode (Rayleigh consistency 2–5 % and the Abaqus
   screenshots). The squared ratio (33.45 / 19.07)² ≈ 3.08 therefore compares the same mode family. Three conditions of
   §5 remain unverified:
@@ -383,10 +396,11 @@ These are operating deflection shapes at single frequency lines, not identified 
   - the equivalent G12 assumes a homogeneous plate.
 
   The scaling therefore stays a **conditional illustration, not an experimental D66 or G12**.
-- Modes 2 and 3 are separate bending patterns in the two directions at 55.25 and 68.10 Hz. The square, E1 = E2
-  models instead give the combined X and ring patterns at nearly equal frequencies. The plate is therefore
-  **orthotropic in bending**, or non-uniform: its edge thickness varies from 0.816 to 0.926 mm between opposite sides.
-  The data do not separate the two causes.
+- Modes 2 and 3 show distinct measured bending patterns at 55.25 and 68.10 Hz. The current near-square E1 = E2
+  models predict different frequency groupings. This indicates **direction-dependent behaviour of the tested
+  plate/fixture system**, potentially arising from laminate stiffness, nonuniform thickness (opposing side means
+  0.816 / 0.926 mm), support/attachment, or modal classification. Neither pure material orthotropy nor one
+  thickness profile is established by this observation alone.
 - **The FE pairing is still not confirmed formally.** MAC needs the FE shapes (an Abaqus Python extraction of the
   ODB, which needs separate authorisation) and a registration that uses this reconstruction. The reconstruction
   itself relies on three deviations.
