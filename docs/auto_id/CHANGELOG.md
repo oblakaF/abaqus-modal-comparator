@@ -5577,3 +5577,15 @@ first internal provider.
 - **Minimum confirmations:** the owner picks A–D and confirms the scanned face; the SUPERVISOR decides on the
   deviations. Nothing needs re-measuring.
 - No Abaqus, MAC or fitting; no orientation chosen; no registration built.
+
+## 2026-10-22 — M11 R6.2a: R6.2 schematic figures published for visual review
+
+- **Published** in `docs/reconciliation/figures/m11_r62/` as byte-identical copies, with GitHub previews in §14.0 of
+  the M11 report and SHA-256 recorded:
+  - the shaker-side view;
+  - the candidates A–D;
+  - the owner's question sheet.
+- **Not published:** the scanner-side figure. Its PSV camera frame shows a person and equipment asset labels in the
+  background; it is withheld pending a decision on a redacted version.
+- **Unchanged:** no data or interpretation changed, no candidate selected, no registration built, and the status is
+  unchanged.

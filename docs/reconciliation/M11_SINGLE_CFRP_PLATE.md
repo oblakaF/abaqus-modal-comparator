@@ -927,13 +927,42 @@ built and no MAC was computed.
 
 Derived materials only, from the verified V3 copies, the R6 extraction, the HUMAN records of §8, §11 and §13, and the
 PSV frame extracted earlier from the V3 `.svd` copy. No Abaqus, extraction, MAC or fitting was used, and orientation
-was not chosen from shapes or frequencies. The figures and the owner's question sheet are in
-`runs\m11_carbon_plate\r62\` and are not committed:
+was not chosen from shapes or frequencies. The figures and the owner's question sheet were made in
+`runs\m11_carbon_plate\r62\`.
 
-- `fig_r62_view_shaker.png`
-- `fig_r62_view_scanner.png`
-- `fig_r62_candidates.png`
-- `M11_R62_OWNER_QUESTIONS.md`
+### 14.0 Published figures (R6.2a)
+
+> **Diagnostic reconstruction only.** These pictures illustrate the candidates and the open questions. They are
+> **not** an approved physical registration, and none of the pictures A–D is selected.
+
+Copies, unchanged byte for byte, are in [`figures/m11_r62/`](figures/m11_r62/):
+
+**Figure 14.1 — the plate seen from the shaker side** (the marked face; edges 1 top, 2 right, 3 bottom, 4 left;
+shaker position approximate).
+
+[![The plate seen from the shaker side](figures/m11_r62/fig_r62_view_shaker.png)](figures/m11_r62/fig_r62_view_shaker.png)
+
+**Figure 14.2 — the four possible orientations A–D of the FE axes**, seen from the shaker side. Red = FE X, green =
+FE Y, white circle = FE origin X = 0, Y = 0, centre text = FE +Z towards or away from the viewer. Same as the table in
+§14.2.
+
+[![The four possible orientations A-D](figures/m11_r62/fig_r62_candidates.png)](figures/m11_r62/fig_r62_candidates.png)
+
+**The plate seen from the scanner side (`fig_r62_view_scanner.png`): not published.**
+
+- Its left panel is the stored PSV camera frame, which shows a person and equipment asset labels in the laboratory
+  background.
+- It is withheld pending a decision on a redacted version.
+- It remains in `runs\m11_carbon_plate\r62\`.
+- The owner's question sheet refers to it by name.
+
+The owner's question sheet: [`M11_R62_OWNER_QUESTIONS.md`](figures/m11_r62/M11_R62_OWNER_QUESTIONS.md).
+
+| File | SHA-256 |
+|---|---|
+| `fig_r62_view_shaker.png` | `7702df3925e5818c4eee1ad4750578741ecc9e7b0d1610e0ea280a970e45546b` |
+| `fig_r62_candidates.png` | `6454cefa768ae60e8f678dc24ae4f338d7d06da62f0ee531e876c59feed4879c` |
+| `M11_R62_OWNER_QUESTIONS.md` | `b761eb0d358b32070b2f195ead8bd11d3bd3bab169c184e4f9c9d98477ac3000` |
 
 ### 14.1 The two views
 
