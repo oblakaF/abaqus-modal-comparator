@@ -142,9 +142,11 @@ screen; it predates the recovery of the experimental PolyMAX shapes (§10).
 
 - **Rank 1:** the experiment is 33.45 Hz and the models give 19.0–19.1 Hz (−43 %).
 - **The frequency ratio f1 / f2:** 0.605 in the experiment, against 0.31–0.32 in those models. `E30E26` gives 0.657.
-- **Near-degenerate pairs:** the square, E1 = E2 models predict 71.85 / 72.19 Hz and 167.5 / 168.6 Hz. The experiment
-  instead shows split pairs, 71.96 / 80.47 Hz and 144.6 / 158.8 Hz. That points to in-plane orthotropy, a thickness
-  or geometry imperfection, or a different mode identity — the data cannot tell which.
+- **Near-degenerate ranks:** the near-square E1 = E2 models predict 71.85 / 72.19 Hz and 167.5 / 168.6 Hz, whereas
+  the experimental list has 71.96 / 80.47 Hz and 144.6 / 158.8 Hz. These are **not confirmed paired doublets**:
+  experimental modes 4 and 5 have low modal phase collinearity (MPC 0.59 and 0.44; §10), so their shapes are not
+  reliable grounds for inferring material orthotropy. Thickness variation, fixture effects and mode identity all
+  remain possible explanations.
 
 **The boundary conditions are not equivalent by evidence:** the models are ideal free-free, whereas the test involved
 suspension and a shaker. The recorded FRF contains rigid-body-like peaks at 9.06 and 15.6 Hz (§10); their influence
@@ -263,7 +265,8 @@ explanations. The plate cannot discriminate among them until its modal identity,
 The owner sent a photograph of the handwritten measurement sheet: "Мерил по 5 точек на стороне", i.e. five points
 per side. The copy is `runs\m11_carbon_plate\owner_records\plate_measurements_20261021.jpg`, SHA-256 `df5339cd…`.
 The transcription is in `plate_measurements_20261021.json`, and the photograph is not committed. This is a HUMAN
-record. It is not governed evidence, and no instrument or resolution is stated.
+record, not governed evidence. The measurement **photograph alone** does not state the instrument; the owner later
+specified a caliper of 0.01 mm resolution and an electronic caliper (§8.1).
 
 **Transcription:**
 
@@ -376,7 +379,7 @@ far as the data allow.
 - At 33.44 Hz the ODS is twist-like.
 - **No additional elastic mode was identified between 0.3 Hz and 33.45 Hz in the analysed PolyMAX and FRF data.**
   The low peaks have rigid-body-like ODS patterns consistent with suspension/attachment motion, not independently
-  identified modal poles. This does not prove that a weaker elastic mode cannot be missed.
+  identified modal poles. This does not prove that a weaker elastic mode cannot have been missed.
 - Their frequencies are **27 % and 47 % of the first elastic frequency**. That is not a negligible suspension or
   attachment stiffness. **The free-free idealisation of mode 1 is therefore not verified**: its effect on 33.45 Hz is
   UNKNOWN without the shaker attachment and suspension records.
