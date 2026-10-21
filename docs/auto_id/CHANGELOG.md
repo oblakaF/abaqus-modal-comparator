@@ -5470,3 +5470,18 @@ first internal provider.
   No fitting.
 - **Still open:** the edge assignment of the rows, the instrument, the interior thickness, the layup, the test setup
   and the shape file.
+
+## 2026-10-21 — M11 addendum 2: plate experiment files and experimental mode types
+
+- **Owner's answers** (HUMAN record): the row-to-edge mapping, seen from the shaker side; a caliper with 0.01 mm
+  resolution plus an electronic one; plain carbon, plies unknown; the experiment folder `D:\Snadwich\Plate`.
+- **Copies:** `D:\Snadwich\Plate` copied to `external_models3_20261021\Plate\snadwich_Plate` (5 files, SHA-256
+  verified).
+- **Modal data:** PolyMAX `Polymax_bravo`, 10 modes, 289 points, Z only; the frequencies equal Excel and LMS.
+- **Scan reconstruction:** done with the M2.3 code and three recorded deviations (an anomalous stored frame rectangle,
+  a wider edge search, the bottom edge with inverted polarity). Residual 1.29 / 3.23 mm, misalignment 0.87°.
+- **Experimental mode types** (no FE, no MAC):
+  - mode 1 (33.45 Hz) is the twist mode, so D66/(ρh) is about 3.1 times the model value (not a constant);
+  - modes 2 and 3 are separate bending patterns in the two directions: the plate is orthotropic or non-uniform in
+    bending.
+- **Not done:** the FE pairing by MAC still needs an ODB extraction (authorisation) and the registration.

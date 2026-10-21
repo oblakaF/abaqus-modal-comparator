@@ -1,7 +1,7 @@
 {
  "schema": "m11/single-cfrp-plate/v1",
  "status": "REVIEW_READY",
- "outcome": "FREQUENCY_DIAGNOSTIC_ONLY",
+ "outcome": "FREQUENCY_DIAGNOSTIC + EXPERIMENTAL_MODE_TYPES (no FE pairing confirmed)",
  "labels": [
   "ANALYSIS_ONLY",
   "NOT_GOVERNED_EVIDENCE",
@@ -325,14 +325,14 @@
     "mean_if_0.81": 0.8745
    },
    "uncertain_readings": {
-    "row 2 col 3": "0.84 (could be read 0.81)"
+    "row 2 col 3": "0.84 (confirmed by owner)"
    },
    "interior": "UNKNOWN",
-   "instrument": "UNKNOWN",
-   "row_to_edge_assignment": "UNKNOWN"
+   "instrument": "caliper 0.01 mm + electronic caliper (owner)",
+   "row_to_edge_assignment": "1 top, 2 right, 3 bottom, 4 left (seen from the shaker side; row 4 to confirm)"
   },
   "mass_g": 118.37,
-  "weave": "UNKNOWN",
+  "weave": "plain (owner); plies and orientation UNKNOWN",
   "layup": "UNKNOWN",
   "test_setup": "UNKNOWN",
   "identity": "UNKNOWN (not in catalog)",
@@ -744,5 +744,209 @@
  "owner_measurement_record": {
   "photo_sha256": "df5339cd90fe8d114ad8c62c2e76c13bdb14c91c39d96ccac9b2a9b06bf1caaf",
   "status": "HUMAN record, not governed evidence; photo not committed"
+ },
+ "experiment": {
+  "copies": [
+   {
+    "file": "300by300_plate_only_1mm_261016.lms",
+    "source": "D:\\Snadwich\\Plate\\300by300_plate_only_1mm_261016.lms",
+    "sha256": "d862ee20a140349d9e600784431fc102e4ab563b8e7d2d366ac6455d5c9207f3"
+   },
+   {
+    "file": "300by300_plate_only_1mm_261016.svd",
+    "source": "D:\\Snadwich\\Plate\\300by300_plate_only_1mm_261016.svd",
+    "sha256": "0a770b1b18f8d1192343be84caf4b5e359416179ec1077004036f3b0674d2e6e"
+   },
+   {
+    "file": "300by300_plate_only_1mm_261016.unv",
+    "source": "D:\\Snadwich\\Plate\\300by300_plate_only_1mm_261016.unv",
+    "sha256": "6d66eafe6558e22614b8068046a1c0454c1c96e3e713a3fad6e3ab72781d48e6"
+   },
+   {
+    "file": "300by300_plate_only_1mm_261016_POLYMAX.unv",
+    "source": "D:\\Snadwich\\Plate\\300by300_plate_only_1mm_261016_POLYMAX.unv",
+    "sha256": "117c893bafbbeba2c38861d5781e291e4c3bf37b91a29b7766419e764bacd3ff"
+   },
+   {
+    "file": "Experiment_Freq_damping_LMS_onlyupdated.xlsx",
+    "source": "D:\\Snadwich\\Plate\\Experiment_Freq_damping_LMS_onlyupdated.xlsx",
+    "sha256": "6bbf65ab1bfdb060cf6493dfc15b53dd830a59ca3a2b5eb32e99a45264173412"
+   }
+  ],
+  "modal_set": "Polymax_bravo",
+  "points": 289,
+  "component": "Z",
+  "reconstruction": {
+   "px_x_over_y": 0.9962,
+   "panel_px": [
+    892.2,
+    892.6
+   ],
+   "edges_rms_px": {
+    "left": 0.289,
+    "right": 0.209,
+    "top": 0.134,
+    "bottom": 0.213
+   },
+   "edges_used": {
+    "left": "108/120",
+    "right": "73/116",
+    "top": "51/109",
+    "bottom": "82/108"
+   },
+   "scan_window_mm": {
+    "width": 215.42,
+    "height": 285.2
+   },
+   "gaps_mm": {
+    "left": 56.4,
+    "right": 29.19,
+    "bottom": 7.02,
+    "top": 7.78
+   },
+   "camera_grid_residual_mm": {
+    "median": 1.294,
+    "p95": 2.603,
+    "max": 3.231
+   },
+   "axis_misalignment_deg": 0.874,
+   "parser_max_residual": 0.0011036286670564892,
+   "isotropy": 0.9721
+  },
+  "reconstruction_deviations": [
+   "standard full-frame rectangle v 0..1 (stored v -2.4667..1.0)",
+   "EDGE_SEARCH_WINDOW_PX 220 instead of 150",
+   "bottom edge on the inverted image, step 8 (dark shaker behind)"
+  ],
+  "mode_types": [
+   {
+    "mode": 1,
+    "frequency_hz": 33.4491,
+    "mpc": 0.8483,
+    "twist_share": 0.9613,
+    "quadrant_signs": {
+     "++": 1.0,
+     "-+": -1.0,
+     "--": 1.0,
+     "+-": -1.0
+    }
+   },
+   {
+    "mode": 2,
+    "frequency_hz": 55.2538,
+    "mpc": 0.8762,
+    "twist_share": 0.0117,
+    "quadrant_signs": {
+     "++": 1.0,
+     "-+": -1.0,
+     "--": -1.0,
+     "+-": -1.0
+    }
+   },
+   {
+    "mode": 3,
+    "frequency_hz": 68.1022,
+    "mpc": 0.9213,
+    "twist_share": 0.0,
+    "quadrant_signs": {
+     "++": -1.0,
+     "-+": 1.0,
+     "--": 1.0,
+     "+-": -1.0
+    }
+   },
+   {
+    "mode": 4,
+    "frequency_hz": 71.9595,
+    "mpc": 0.5916,
+    "twist_share": 0.0016,
+    "quadrant_signs": {
+     "++": 1.0,
+     "-+": -1.0,
+     "--": 1.0,
+     "+-": -1.0
+    }
+   },
+   {
+    "mode": 5,
+    "frequency_hz": 80.4743,
+    "mpc": 0.4411,
+    "twist_share": 0.0004,
+    "quadrant_signs": {
+     "++": -1.0,
+     "-+": 1.0,
+     "--": -1.0,
+     "+-": 1.0
+    }
+   },
+   {
+    "mode": 6,
+    "frequency_hz": 116.9001,
+    "mpc": 0.9548,
+    "twist_share": 0.0001,
+    "quadrant_signs": {
+     "++": 1.0,
+     "-+": 1.0,
+     "--": -1.0,
+     "+-": -1.0
+    }
+   },
+   {
+    "mode": 7,
+    "frequency_hz": 144.5994,
+    "mpc": 0.9029,
+    "twist_share": 0.0,
+    "quadrant_signs": {
+     "++": 1.0,
+     "-+": 1.0,
+     "--": -1.0,
+     "+-": -1.0
+    }
+   },
+   {
+    "mode": 8,
+    "frequency_hz": 158.8406,
+    "mpc": 0.9165,
+    "twist_share": 0.0,
+    "quadrant_signs": {
+     "++": -1.0,
+     "-+": 1.0,
+     "--": -1.0,
+     "+-": 1.0
+    }
+   },
+   {
+    "mode": 9,
+    "frequency_hz": 178.0371,
+    "mpc": 0.8599,
+    "twist_share": 0.0052,
+    "quadrant_signs": {
+     "++": -1.0,
+     "-+": 1.0,
+     "--": -1.0,
+     "+-": 1.0
+    }
+   },
+   {
+    "mode": 10,
+    "frequency_hz": 213.1705,
+    "mpc": 0.9466,
+    "twist_share": 0.0006,
+    "quadrant_signs": {
+     "++": 1.0,
+     "-+": -1.0,
+     "--": 1.0,
+     "+-": -1.0
+    }
+   }
+  ],
+  "mode_1": "twist mode established from the experimental data (xy share 0.96, alternating quadrants)"
+ },
+ "owner_answers_2": {
+  "rows": "1 top, 3 bottom, 2 right, 4 left (owner wrote '3 levaya'; to confirm), seen from the shaker side",
+  "row2_col3": 0.84,
+  "low_values": "at the edge, about 0.5 mm from it, not in corners",
+  "instrument": "caliper 0.01 mm + electronic caliper",
+  "material": "plain carbon; plies unknown"
  }
 }

@@ -292,6 +292,93 @@ record. It is not governed evidence, and no instrument or resolution is stated.
 - the test setup;
 - the experimental shape file.
 
+### 8.1 Owner's answers (2026-10-21, second message)
+
+These are HUMAN statements and are not governed evidence.
+
+- **Rows:** 1 = top, 3 = bottom, 2 = right; the owner wrote "3 левая" for the left edge, presumably row 4 (to be
+  confirmed). Left and right are **seen from the shaker side**.
+- **Reading:** row 2, column 3 = 0.84.
+- **Low values 0.71 / 0.74:** "not in the corners, but at the edge, about 0.5 mm from it".
+- **Instrument:** a caliper with 0.01 mm resolution, plus an electronic one.
+- **Material:** plain carbon; the number of plies is unknown to the owner.
+- **Experiment files:** the experiment is in `D:\Snadwich\Plate`.
+
+## 10. Addendum (2026-10-21): the plate experiment `D:\Snadwich\Plate`
+
+**Copies.** `external_models\v3_20261021\Plate\snadwich_Plate` (`COPY_MANIFEST_V3_SNADWICH_PLATE.json`), 5 files,
+SHA-256 equal before copying, after copying and at the source again:
+
+| File | SHA-256 |
+|---|---|
+| `300by300_plate_only_1mm_261016.lms` (Test.Lab project) | `d862ee20…` |
+| `300by300_plate_only_1mm_261016.svd` (PSV) | `0a770b1b…` |
+| `300by300_plate_only_1mm_261016.unv` (PSV export, 289 points) | `6d66eafe…` |
+| `300by300_plate_only_1mm_261016_POLYMAX.unv` | `117c893b…` |
+| `Experiment_Freq_damping_LMS_onlyupdated.xlsx` | identical to the Desktop copy |
+
+**Modal data.** The PolyMAX set `Polymax_bravo` has 10 modes, 289 points (17 × 17) and the Z component only. Its
+frequencies equal the Excel and LMS values to 4 decimals. The session is 2026-10-16.
+
+**Physical scan reconstruction** (M2.3 code; diagnostic):
+
+- The PSV MeasPoints validate against the UNV geometry: maximum residual 1.1·10⁻³, limit 2·10⁻³.
+- **Three recorded deviations** from the accepted constants were needed:
+  1. the `.svd` stores an anomalous full-frame rectangle, v −2.4667…1.0 instead of the 0…1 of every other session;
+     the standard v 0…1 is used;
+  2. the scan grid ends about 167 px from the left plate edge, so `EDGE_SEARCH_WINDOW_PX` is 220 instead of 150;
+  3. the bottom edge lies in front of the dark shaker with the opposite brightness polarity, so it is fitted on the
+     inverted image with a step threshold of 8.
+- **Result:**
+  - edge RMS 0.13–0.29 px;
+  - scan window 215.4 × 285.2 mm;
+  - gaps to the edges, left / right / bottom / top: 56.4 / 29.2 / 7.0 / 7.8 mm;
+  - camera-grid model residual 1.29 / 3.23 mm (median / maximum);
+  - axis misalignment 0.87°.
+- Whether the 301 mm side was horizontal cannot be resolved from the frame: the aspect test gives 0.996 against
+  1.003.
+- In the frame the shaker is behind the plate, so the scanner saw the face opposite the one the thickness rows were
+  described from. Seen by the scanner, the thin side (row 2, mean 0.816) is on the **left** and the thick side
+  (row 4, 0.926) on the **right**.
+
+**Experimental mode types** (experimental data only; no FE shape, no MAC): see `fig_plate_modes.png` and
+`plate_modes.json`.
+
+| Mode | Hz | MPC | Pattern |
+|---|---|---|---|
+| 1 | 33.45 | 0.85 | **twist**: nodal lines along both centre lines, quadrant signs alternate, 96 % of the shape (after removing the rigid plane) is the xy twist function |
+| 2 | 55.25 | 0.88 | two curved nodal lines parallel to the scanner x axis: bending with curvature along y |
+| 3 | 68.10 | 0.92 | two curved nodal lines parallel to the scanner y axis: bending with curvature along x |
+| 4, 5 | 71.96, 80.47 | 0.59, 0.44 | strongly complex (close or coupled modes); the shapes are not reliable |
+| 6–10 | 116.9–213.2 | 0.86–0.95 | higher-order patterns |
+
+**Consequences.**
+
+- **Experimental mode 1 is the twist mode.** The condition of §5 is now established from the experimental data
+  alone.
+- Every stored FE model's first elastic mode is also the twist mode (Rayleigh consistency 2–5 % and the Abaqus
+  screenshots). The scaling **D66/(ρh) (experiment) ≈ 3.1 × the model** therefore holds; orthotropy and thickness
+  variation affect it by an estimated ±5 %. With the measured areal mass, D66_eff ≈ 860 N·mm.
+- **This is still not a material constant.** It is an effective twisting stiffness of a plate whose layup is unknown.
+- Modes 2 and 3 are separate bending patterns in the two directions at 55.25 and 68.10 Hz. The square, E1 = E2
+  models instead give the combined X and ring patterns at nearly equal frequencies. The plate is therefore
+  **orthotropic in bending**, or non-uniform: its edge thickness varies from 0.816 to 0.926 mm between opposite sides.
+  The data do not separate the two causes.
+- **The FE pairing is still not confirmed formally.** MAC needs the FE shapes (an Abaqus Python extraction of the
+  ODB, which needs separate authorisation) and a registration that uses this reconstruction. The reconstruction
+  itself relies on three deviations.
+- **Consistent hypothesis, not a finding:** plain-weave fabric (E = 56 GPa, G12 = 5 GPa) rotated 45° to the edges
+  would give G ≈ 27 GPa and E ≈ 17 GPa. A laminate mixing 0/90 and ±45 plies lies in between, which is close to the
+  owner's manual fit `E30E26` (30.8 / 26.5 / 10 GPa). The weave direction relative to the edges cannot be read from
+  the PSV frame (texture at about 2 mm per 6 px). **The owner should look at the plate.**
+
+**Open questions for the owner:**
+
+1. Row 4 is the left edge (seen from the shaker side)?
+2. Do the fibres / weave run parallel to the edges or at 45°? Is it one fabric ply or several?
+3. Was 301 or 300 mm horizontal in the test?
+4. Where was the shaker attached?
+
 ## 9. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
