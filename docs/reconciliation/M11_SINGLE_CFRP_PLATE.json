@@ -1291,5 +1291,205 @@
    "Polymax_bravo U3 289 pt; flag complex modes 4/5",
    "suspension and stinger records (for the frequency comparison)"
   ]
+ },
+ "r6_fe_extraction": {
+  "status": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING",
+  "authorisation": "one diagnostic Abaqus Python extraction of CFRP_S4R_0875_FreeFree.odb (HUMAN/SUPERVISOR R6)",
+  "original_accessed": false,
+  "v3_copy_sha256_before_after": [
+   "7daeb7e35adf6bd6fabe8f9f582859935ca3d8927ae32fcf07a35c38e8c023b8",
+   "7daeb7e35adf6bd6fabe8f9f582859935ca3d8927ae32fcf07a35c38e8c023b8"
+  ],
+  "work_copy": "runs/m11_carbon_plate/odb_extraction_r6/input/CFRP_S4R_0875_FreeFree.odb",
+  "work_copy_sha256_before_after": [
+   "7daeb7e35adf6bd6fabe8f9f582859935ca3d8927ae32fcf07a35c38e8c023b8",
+   "7daeb7e35adf6bd6fabe8f9f582859935ca3d8927ae32fcf07a35c38e8c023b8"
+  ],
+  "script": {
+   "path": "abaqus_scripts/extract_odb.py (unchanged)",
+   "sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "open_mode": "openOdb(readOnly=True)"
+  },
+  "run": {
+   "count": 1,
+   "exit": "exit=0",
+   "start": "start=2026-10-21T18:52:45.3588390+08:00",
+   "end": "end=2026-10-21T18:52:51.8809042+08:00",
+   "retries": 0,
+   "solver_artifacts_in_workspace": [],
+   "fe_solve": false
+  },
+  "output": {
+   "format_version": 2,
+   "step": "Modal_FreeFree_plate",
+   "instance": "CFRP_301X300_SHELL-1",
+   "nodes": 10201,
+   "x_range": [
+    0.0,
+    301.0
+   ],
+   "y_range": [
+    0.0,
+    300.0
+   ],
+   "z_range": [
+    0.0,
+    0.0
+   ],
+   "modes": [
+    1,
+    20
+   ],
+   "files": "geometry.csv, mode_0001..0020.csv, manifest.json (outside git)"
+  },
+  "frequency_check_vs_dat": {
+   "elastic_7_20_max_abs_diff_hz": 0.0,
+   "rigid_1_2_note": "extractor parses mode numbers as frequency for zero-frequency frames (quirk; not fixed)"
+  },
+  "shell_surface_diagnostic": {
+   "max_z_equals_min_z": true,
+   "surface_identity": {
+    "instance": "CFRP_301X300_SHELL-1",
+    "side": "max_z",
+    "node_count": 10201,
+    "sha256": "02fb9f9925aab3ce4aa0f947c096b03a232c4a1218a9a26fabaff62e5eb4c497",
+    "label_set_sha256": "58994f0d3acd97dd53b497c98693681cbcc65524f50629f981d80986965d4023"
+   },
+   "shell_normal": {
+    "elements": 10000,
+    "normal_plus_z": 10000,
+    "normal_minus_z": 0
+   },
+   "blocker": "measured_surface.side cannot express the measured face of a mid-surface shell and is not cross-checked against the Z sign of experimental_axes_in_fe; proposed separate fix: side=mid_surface + explicit face-vs-normal statement checked against the Z sign"
+  },
+  "geometric_candidates": {
+   "H301 +Z rot0": {
+    "experimental_axes_in_fe": [
+     "+X",
+     "+Y",
+     "+Z"
+    ],
+    "horizontal_edge_in_frame_mm": 301.0,
+    "face": "scanner sees the +Z normal side",
+    "nearest_node_mm": {
+     "median": 1.246,
+     "max": 2.059
+    },
+    "distinct_nodes": 289,
+    "points": 289
+   },
+   "H301 +Z rot180": {
+    "experimental_axes_in_fe": [
+     "-X",
+     "-Y",
+     "+Z"
+    ],
+    "horizontal_edge_in_frame_mm": 301.0,
+    "face": "scanner sees the +Z normal side",
+    "nearest_node_mm": {
+     "median": 1.246,
+     "max": 2.059
+    },
+    "distinct_nodes": 289,
+    "points": 289
+   },
+   "H301 -Z rot0": {
+    "experimental_axes_in_fe": [
+     "+X",
+     "-Y",
+     "-Z"
+    ],
+    "horizontal_edge_in_frame_mm": 301.0,
+    "face": "scanner sees the -Z normal side",
+    "nearest_node_mm": {
+     "median": 1.246,
+     "max": 2.059
+    },
+    "distinct_nodes": 289,
+    "points": 289
+   },
+   "H301 -Z rot180": {
+    "experimental_axes_in_fe": [
+     "-X",
+     "+Y",
+     "-Z"
+    ],
+    "horizontal_edge_in_frame_mm": 301.0,
+    "face": "scanner sees the -Z normal side",
+    "nearest_node_mm": {
+     "median": 1.246,
+     "max": 2.059
+    },
+    "distinct_nodes": 289,
+    "points": 289
+   },
+   "H300 +Z rot90": {
+    "experimental_axes_in_fe": [
+     "+Y",
+     "-X",
+     "+Z"
+    ],
+    "horizontal_edge_in_frame_mm": 300.0,
+    "face": "scanner sees the +Z normal side",
+    "nearest_node_mm": {
+     "median": 1.25,
+     "max": 2.059
+    },
+    "distinct_nodes": 289,
+    "points": 289
+   },
+   "H300 +Z rot270": {
+    "experimental_axes_in_fe": [
+     "-Y",
+     "+X",
+     "+Z"
+    ],
+    "horizontal_edge_in_frame_mm": 300.0,
+    "face": "scanner sees the +Z normal side",
+    "nearest_node_mm": {
+     "median": 1.25,
+     "max": 2.059
+    },
+    "distinct_nodes": 289,
+    "points": 289
+   },
+   "H300 -Z rot90": {
+    "experimental_axes_in_fe": [
+     "+Y",
+     "+X",
+     "-Z"
+    ],
+    "horizontal_edge_in_frame_mm": 300.0,
+    "face": "scanner sees the -Z normal side",
+    "nearest_node_mm": {
+     "median": 1.25,
+     "max": 2.059
+    },
+    "distinct_nodes": 289,
+    "points": 289
+   },
+   "H300 -Z rot270": {
+    "experimental_axes_in_fe": [
+     "-Y",
+     "-X",
+     "-Z"
+    ],
+    "horizontal_edge_in_frame_mm": 300.0,
+    "face": "scanner sees the -Z normal side",
+    "nearest_node_mm": {
+     "median": 1.25,
+     "max": 2.059
+    },
+    "distinct_nodes": 289,
+    "points": 289
+   }
+  },
+  "candidate_note": "geometry does not discriminate; within each H301/H300 group the candidates are symmetry-equivalent for this homogeneous model; never chosen by MAC",
+  "needed_before_registration": [
+   "owner: scanned face relative to a physical mark",
+   "owner: 301 or 300 edge horizontal + corner reference",
+   "SUPERVISOR: accept the 3 reconstruction deviations or independent scan-to-edge offsets",
+   "shell-side rule fixed separately or face stated through the Z sign with the limitation recorded"
+  ]
  }
 }

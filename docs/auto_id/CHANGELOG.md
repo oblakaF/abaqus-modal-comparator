@@ -5530,3 +5530,20 @@ first internal provider.
   - the other modes are unchecked without FE shapes.
 - **New in the report:** the data needed for a diagnostic physical registration and MAC (§11.4).
 - No FE solve, no Abaqus Python, no ODB extraction, no fitting, no status change.
+
+## 2026-10-21 — M11 R6: authorised FE extraction (FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING)
+
+- **Run:** one authorised Abaqus Python run of the unchanged `abaqus_scripts/extract_odb.py` (`openOdb` readOnly) on a
+  level-C working copy of `CFRP_S4R_0875_FreeFree.odb`.
+  - The original was not accessed.
+  - The V3 copy and the working copy kept SHA-256 `7daeb7e3…`.
+  - No FE solve, no job; no solver artefacts.
+- **Output (outside git, comparator format 2):** geometry of 10201 mid-surface nodes and modes 1–20 (U1/U2/U3).
+  The elastic frequencies 7–20 equal the `.dat` exactly.
+- **Shell diagnostic:** `max_z` and `min_z` select the same 10201 nodes, and all normals point to +Z. The
+  measured face can only be stated through the Z sign of the axes, and `side` is not cross-checked against it. This
+  is recorded as a blocker with a proposed separate fix; no rule was changed.
+- **Geometric candidates:** 8, all with each point on its own node (≤ 2.06 mm), so geometry does not discriminate.
+  Within each H301 / H300 group they are symmetry-equivalent for this model. Nothing was chosen by MAC.
+- **Pending:** the owner's face and edge statements, SUPERVISOR acceptance of the reconstruction deviations, and the
+  shell-side rule.

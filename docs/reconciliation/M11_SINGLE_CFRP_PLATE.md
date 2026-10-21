@@ -628,10 +628,154 @@ relaxes a check.
 
 Until items 1, 3–5 and 7 exist, the comparison stays **FREQUENCY_DIAGNOSTIC** plus experimental mode types.
 
-## 12. What did not change
+## 12. R6 (2026-10-21): authorised FE extraction from a copy of `CFRP_S4R_0875_FreeFree.odb`
+
+**Authorisation and scope.** HUMAN / SUPERVISOR allowed **one** diagnostic Abaqus Python run, for extraction only. No
+FE solve, no job, no model, INP or CAE change, no Auto-ID / LM and no change of material constants were made. No
+original was opened: the run used the level-C working copy below.
+
+### 12.1 Three-level protection and the run
+
+| Level | File | SHA-256 |
+|---|---|---|
+| A, original | `C:\temp\CFRP_S4R_0875_FreeFree.odb` | **not accessed** |
+| B, verified copy (V3) | `external_models\v3_20261021\Plate\temp_root\CFRP_S4R_0875_FreeFree.odb` (from `COPY_MANIFEST_V3.json`) | `7daeb7e35adf6bd6…` before, `7daeb7e35adf6bd6…` after: equal to the expected value |
+| C, working copy | `runs\m11_carbon_plate\odb_extraction_r6\input\CFRP_S4R_0875_FreeFree.odb` | `7daeb7e35adf6bd6…` before, `7daeb7e35adf6bd6…` after: unchanged |
+
+**The run** (`logs\abaqus_python_run.log`, `logs\run_meta.txt`):
+
+- command `abaqus python scripts\extract_odb.py --odb input\… --output output --start-mode 1 --end-mode 20`, with
+  the working directory and TEMP / TMP set to `logs\`;
+- the script is the repository's existing extractor `abaqus_scripts/extract_odb.py`, unchanged (SHA-256
+  `039aa067adeac83e…`). It opens the ODB with `openOdb(path, readOnly=True)` and writes only to
+  `--output`;
+- start=2026-10-21T18:52:45.3588390+08:00, end=2026-10-21T18:52:51.8809042+08:00, exit=0: one run, with no retry.
+
+**Checks after the run:**
+
+- all V3 and Excel copies are equal to their manifests;
+- no unlisted file appeared in the V3 folder;
+- the workspace contains no solver artefact (`.sta`, `.msg`, `.dat`, `.lck`, …): no FE solve took place.
+
+The created files are listed in `logs\postflight.json`. The post-run analysis files (`output_analysis\`: the shell diagnostic and the candidates) were
+created afterwards with ordinary Python from the output and the V3 INP text, without Abaqus. All copies were
+re-verified unchanged after them.
+
+**Output, in the comparator's extraction format 2 (outside git):**
+
+- `output\geometry.csv`: instance `CFRP_301X300_SHELL-1`, 10201 nodes, X 0–301,
+  Y 0–300, Z 0 (mid-surface);
+- `output\mode_0001.csv` … `mode_0020.csv`: U1 / U2 / U3 per node, real and imaginary parts;
+- `output\manifest.json`: step `Modal_FreeFree_plate`, modes 1–20.
+
+It can be loaded as an extraction `manifest.json`.
+
+**Frequencies against the stored `.dat` (V3 copy):** elastic modes 7–20 are identical, maximum difference
+0.0 Hz. The extractor reports the rigid modes 1 and 2 as "1 Hz" and "2 Hz": these are
+mode numbers parsed from the frame description because the `.dat` frequency is 0. This is a known parser quirk for
+zero-frequency frames; it was noted and not fixed, and it affects no elastic mode.
+
+| Mode | ODB (manifest), Hz | `.dat`, Hz |
+|---|---|---|
+| 1 | 1 | 0 |
+| 2 | 2 | 0 |
+| 3 | 0.000218304 | 0.000218304 |
+| 4 | 0.000331046 | 0.000331046 |
+| 5 | 0.00191413 | 0.00191413 |
+| 6 | 0.00208984 | 0.00208984 |
+| 7 | 19.072 | 19.072 |
+| 8 | 59.874 | 59.874 |
+| 9 | 62.009 | 62.009 |
+| 10 | 71.85 | 71.85 |
+| 11 | 72.19 | 72.19 |
+| 12 | 116.58 | 116.58 |
+| 13 | 167.49 | 167.49 |
+| 14 | 168.61 | 168.61 |
+| 15 | 174.8 | 174.8 |
+| 16 | 179.9 | 179.9 |
+| 17 | 213.2 | 213.2 |
+| 18 | 213.95 | 213.95 |
+| 19 | 295.78 | 295.78 |
+| 20 | 327.9 | 327.9 |
+
+### 12.2 Shell measured-surface diagnostic (no rule changed)
+
+The existing rule (`physical_registration.FEGeometry.surface_node_ids`) selects the nodes of the instance at
+z = max(z) (`max_z`) or z = min(z) (`min_z`), within 1·10⁻⁴ mm.
+
+- All 10201 shell nodes lie at z = 0. **`max_z` and `min_z` select the same 10201 nodes,
+  with an identical surface identity** (`02fb9f9925aab3ce…`), checked with the existing
+  `guided_registration.geometry_file_surface_identity`.
+- The S4R normals from the INP connectivity: 10000 of
+  10000 elements point to **+Z**.
+- **Consequence:** for this shell, `measured_surface.side` cannot express which face was measured. The face is
+  expressed only by the Z sign in `experimental_axes_in_fe`: +Z if the scanner looked at the side of the +Z shell
+  normal, −Z otherwise, together with the matching in-plane mapping (determinant +1). The current code does **not**
+  check that `side` agrees with that sign. For a solid this is implicit; for a mid-surface shell any `side` label
+  passes.
+- **Diagnostic blocker (to fix separately, not changed here):** for an instance whose z-range is within the surface
+  tolerance, the guided path should record `side: mid_surface` and require an explicit statement of the measured face
+  relative to the shell normal (positive or negative side). It should refuse an `experimental_axes_in_fe` Z sign that
+  contradicts that statement.
+- Mapping the points to mid-surface nodes is geometrically sound: U3 of the mid-surface is the out-of-plane
+  displacement the vibrometer measures, ignoring thickness offset. The 3 mm mesh gives every point its own node.
+
+### 12.3 Geometric candidates of the 289-point grid on the FE mid-surface (not confirmed)
+
+This uses the reconstructed scan window of §9, which needs SUPERVISOR acceptance of its three deviations. The panel
+frame P (scanner view) is mapped onto the FE plan (301 along FE X, 300 along FE Y). Only the candidates whose
+rectangle coincides with the FE plan are admissible. No MAC and no frequency were used.
+
+| Candidate (horizontal edge in the frame, face, rotation) | Experimental axes in FE | Nearest node, median / max, mm | Distinct nodes / points |
+|---|---|---|---|
+| H301 +Z rot0 | +X +Y +Z | 1.246 / 2.059 | 289 / 289 |
+| H301 +Z rot180 | -X -Y +Z | 1.246 / 2.059 | 289 / 289 |
+| H301 -Z rot0 | +X -Y -Z | 1.246 / 2.059 | 289 / 289 |
+| H301 -Z rot180 | -X +Y -Z | 1.246 / 2.059 | 289 / 289 |
+| H300 +Z rot90 | +Y -X +Z | 1.25 / 2.059 | 289 / 289 |
+| H300 +Z rot270 | -Y +X +Z | 1.25 / 2.059 | 289 / 289 |
+| H300 -Z rot90 | +Y +X -Z | 1.25 / 2.059 | 289 / 289 |
+| H300 -Z rot270 | -Y -X -Z | 1.25 / 2.059 | 289 / 289 |
+
+**Geometry does not discriminate.** Every candidate puts each point on its own node within 2.06 mm.
+
+For this FE model (homogeneous, E1 = E2, plan 301 × 300) the four candidates within each group (H301 or H300) are
+**symmetry-equivalent**: 180° rotation and mirrors about the centre lines map the model onto itself, so its modes map
+onto ±themselves. The physically relevant open choices are therefore:
+
+1. which physical edge (301 or 300 mm) lay along scanner x;
+2. the face convention, needed for traceability.
+
+This is an observation about the model's symmetry, not a selection. **Orientation is never chosen by MAC.**
+
+### 12.4 Status and what is still needed
+
+**Status: `FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING`.** No registration was built or accepted, and nothing
+is governed evidence.
+
+**Physical registration may proceed only after:**
+
+1. the owner states which face faced the scanner on 2026-10-16, relative to a physical mark (e.g. the photographed
+   face with the numerals);
+2. the owner states which physical edge (301 or 300 mm) was horizontal in the test, and a corner reference fixing the
+   signs; for the CAE model, also how the sketch's X (301) relates to the physical plate, if it was built with
+   intent;
+3. SUPERVISOR accepts the three reconstruction deviations of §9, or an independent scan-to-edge measurement exists;
+4. the shell-side rule of §12.2 is either fixed in a separate change, or the evidence states the face explicitly
+   through the Z sign, with that limitation recorded.
+
+**MAC interpretation caveats** for later:
+
+- modes 4 and 5 are strongly complex (MPC 0.59 / 0.44);
+- the experiment shows split bending modes (55.25 / 68.10 Hz), while the E1 = E2 model has near-degenerate pairs, so
+  MAC of near-degenerate FE pairs needs subspace treatment;
+- the free-free model does not represent the suspension (§10.2).
+
+## 13. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.
 - Branch `analysis/m10-sp10-registration-prep` and PR #94.
-- No FE solve, no Abaqus Python, no Auto-ID or LM, no MAC, no material change.
+- No FE solve, no Auto-ID or LM, no MAC, no material change. Abaqus Python: exactly one authorised extraction run
+  (R6) on a working copy of `CFRP_S4R_0875_FreeFree.odb`; no other ODB was opened.
 - M8 original gate `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE.

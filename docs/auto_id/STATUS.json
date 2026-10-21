@@ -2067,6 +2067,7 @@
     "summary": "plate 301 x 300, thickness / mass / layup UNKNOWN; four free-free FE jobs (S4R 0.875, S4R wedge, C3D8I, manual fit E30E26); experimental rank 1 33.45 Hz vs 19.07 Hz in the template models (-43 %); if it is the twist mode, D66/(rho h) is about 3.08x the model value (scaling, not identification); no shape data file, no pairing confirmed, no transfer to the sandwich faces",
     "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, criteria, gates; originals and earlier copies; M10 branch and PR #94; no FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no fitting",
     "owner_measurements": "2026-10-21: mass 118.37 g, 301 x 300 mm, edge thickness 0.71-0.94 (mean 0.876) mm; HUMAN record",
-    "experiment": "D:\\Snadwich\\Plate copied (5 files); PolyMAX Polymax_bravo 10 modes / 289 pt; scan reconstruction with 3 recorded deviations; experimental mode 1 = twist (33.45 Hz)"
+    "experiment": "D:\\Snadwich\\Plate copied (5 files); PolyMAX Polymax_bravo 10 modes / 289 pt; scan reconstruction with 3 recorded deviations; experimental mode 1 = twist (33.45 Hz)",
+    "registration_state": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING (R6, 2026-10-21)"
   }
 }
