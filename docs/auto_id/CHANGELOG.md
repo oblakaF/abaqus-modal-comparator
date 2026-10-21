@@ -5485,3 +5485,8 @@ first internal provider.
   - modes 2 and 3 are separate bending patterns in the two directions: the plate is orthotropic or non-uniform in
     bending.
 - **Not done:** the FE pairing by MAC still needs an ODB extraction (authorisation) and the registration.
+- **Missed-low-mode check** (raw PSV FRFs; experimental data only):
+  - no elastic mode below 33.45 Hz;
+  - the peaks at 9.06 Hz and 15.6 Hz are a rigid translation and a rigid rocking (ODS);
+  - those rigid modes lie at 27–47 % of the first elastic frequency, so the free-free idealisation is not verified
+    and the twist scaling stays conditional.

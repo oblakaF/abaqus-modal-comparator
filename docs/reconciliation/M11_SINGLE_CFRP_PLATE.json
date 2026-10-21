@@ -725,7 +725,7 @@
    "1.0": 10303
   },
   "status": "CONDITIONAL MODEL SCALING ONLY, NOT AN IDENTIFIED MATERIAL CONSTANT",
-  "requires_missed_low_frequency_mode_check": true,
+  "requires_missed_low_frequency_mode_check": "checked from PSV FRFs: no elastic mode below 33.45 Hz (rigid modes 9.06 / 15.6 Hz)",
   "requires_verified_mode_identity_and_test_boundary_conditions": true,
   "assumes_model_areal_mass_to_infer_D66_or_G12": true,
   "equivalent_G12_MPa_for_measured_t": {
@@ -940,7 +940,81 @@
     }
    }
   ],
-  "mode_1": "twist mode established from the experimental data (xy share 0.96, alternating quadrants)"
+  "mode_1": "twist pattern from the experimental data (PolyMAX xy share 0.96); FRFs show no elastic mode below it; free-free not verified",
+  "missed_low_mode_check": {
+   "frf_peaks_hz": [
+    9.062,
+    15.625,
+    33.438,
+    55.312,
+    68.125,
+    71.875,
+    80.625,
+    116.875,
+    144.688,
+    158.438,
+    169.375,
+    180.938,
+    200.625,
+    213.438
+   ],
+   "ods": [
+    {
+     "hz": 9.0625,
+     "rigid_plane_share": 0.9374,
+     "twist_share_of_remainder": 0.0046,
+     "mean_coherence": 0.753,
+     "phase_scatter_imag_over_norm": 0.319,
+     "plane_coefficients": [
+      0.4296,
+      -0.0003,
+      0.0005
+     ]
+    },
+    {
+     "hz": 15.625,
+     "rigid_plane_share": 0.8117,
+     "twist_share_of_remainder": 0.0002,
+     "mean_coherence": 0.668,
+     "phase_scatter_imag_over_norm": 0.6,
+     "plane_coefficients": [
+      0.0536,
+      -0.0047,
+      -0.0016
+     ]
+    },
+    {
+     "hz": 33.4375,
+     "rigid_plane_share": 0.0242,
+     "twist_share_of_remainder": 0.675,
+     "mean_coherence": 0.574,
+     "phase_scatter_imag_over_norm": 0.667,
+     "plane_coefficients": [
+      0.005,
+      0.0003,
+      -0.0003
+     ]
+    },
+    {
+     "hz": 55.3125,
+     "rigid_plane_share": 0.0117,
+     "twist_share_of_remainder": 0.0042,
+     "mean_coherence": 0.726,
+     "phase_scatter_imag_over_norm": 0.752,
+     "plane_coefficients": [
+      0.0058,
+      0.0,
+      0.0002
+     ]
+    }
+   ],
+   "result": "no elastic mode identified below 33.45 Hz; 9.06 Hz rigid translation, 15.6 Hz rigid rocking (ODS, not identified modes)",
+   "rigid_over_first_elastic": [
+    0.271,
+    0.467
+   ],
+   "free_free_verified": false
+  }
  },
  "owner_answers_2": {
   "rows": "1 top, 3 bottom, 2 right, 4 left (owner wrote '3 levaya'; to confirm), seen from the shaker side",

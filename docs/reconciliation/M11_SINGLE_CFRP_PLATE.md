@@ -277,10 +277,10 @@ record. It is not governed evidence, and no instrument or resolution is stated.
 - The mass and the 0.875 mm mean thickness of the stored models are confirmed as measured inputs, not template
   values.
 - The thickness varies by −19 % / +7 % around the mean. The two low readings, 0.71 and 0.74, are at the ends of rows
-  1 and 3, possibly corners. The flexural stiffness scales with t³, so the plate is not uniform. The wedge model
+  1 and 3; according to the owner they are not corners but edge readings about 0.5 mm from the edge (§8.1). The flexural stiffness scales with t³, so the plate is not uniform. The wedge model
   represents only one hypothesis: sides 2 and 4 opposite, with a linear taper.
-- The twist-mode conclusion of §5 stands: with the measured areal mass and thickness, the equivalent homogeneous
-  G12 is about 13–19 GPa, if experimental rank 1 is the twist mode. The elastic constants, weave and layup remain
+- The §5 scaling remains conditional (see §10): with the measured areal mass and thickness, the equivalent
+  homogeneous G12 would be about 13–19 GPa, only under the §5 conditions. The elastic constants, weave and layup remain
   UNKNOWN. **Nothing was fitted.**
 
 **Still open:**
@@ -352,14 +352,37 @@ frequencies equal the Excel and LMS values to 4 decimals. The session is 2026-10
 | 4, 5 | 71.96, 80.47 | 0.59, 0.44 | strongly complex (close or coupled modes); the shapes are not reliable |
 | 6–10 | 116.9–213.2 | 0.86–0.95 | higher-order patterns |
 
+**Missed-low-mode check** (raw PSV H1 FRFs, 289 points, 0.3125–500 Hz; experimental data only; files
+`plate_frf_peaks.json`, `plate_ods.json`, `fig_plate_frf.png`, `fig_plate_ods.png`). This answers question 6 of §7 as
+far as the data allow.
+
+- The point-averaged |H1| has two strong peaks below the first PolyMAX mode: **9.06 Hz** and **15.6 Hz**. The 15.6 Hz
+  peak is as high as the 33.45 Hz peak.
+- The operating deflection shape at **9.06 Hz** is a **rigid translation**: 94 % of the shape is a plane, essentially
+  constant. Mean coherence 0.75.
+- At **15.6 Hz** it is a **rigid rocking about the vertical axis**: 81 % is a plane tilted along x, with no twist
+  component. Mean coherence 0.67.
+- At 33.44 Hz the ODS is twist-like.
+- **No elastic mode is identified between 0.3 Hz and 33.45 Hz.** The two low peaks are rigid-body modes of the
+  suspended plate and its attachment.
+- Their frequencies are **27 % and 47 % of the first elastic frequency**. That is not a negligible suspension or
+  attachment stiffness. **The free-free idealisation of mode 1 is therefore not verified**: its effect on 33.45 Hz is
+  UNKNOWN without the shaker attachment and suspension records.
+
+These are operating deflection shapes at single frequency lines, not identified modes.
+
 **Consequences.**
 
-- **Experimental mode 1 is the twist mode.** The condition of §5 is now established from the experimental data
-  alone.
-- Every stored FE model's first elastic mode is also the twist mode (Rayleigh consistency 2–5 % and the Abaqus
-  screenshots). The scaling **D66/(ρh) (experiment) ≈ 3.1 × the model** therefore holds; orthotropy and thickness
-  variation affect it by an estimated ±5 %. With the measured areal mass, D66_eff ≈ 860 N·mm.
-- **This is still not a material constant.** It is an effective twisting stiffness of a plate whose layup is unknown.
+- **Experimental mode 1 (33.45 Hz) has the twist pattern.** This comes from the experimental data alone: PolyMAX shape
+  with 96 % xy share and alternating quadrants. The FRFs show no elastic mode below it.
+- Every stored FE model's first elastic mode is the twist mode (Rayleigh consistency 2–5 % and the Abaqus
+  screenshots). The squared ratio (33.45 / 19.07)² ≈ 3.08 therefore compares the same mode family. Three conditions of
+  §5 remain unverified:
+  - the test is close enough to free-free (rigid-body modes at 9.1 / 15.6 Hz, attachment unknown);
+  - the modal-shape factor is comparable, given the orthotropy and the measured thickness variation;
+  - the equivalent G12 assumes a homogeneous plate.
+
+  The scaling therefore stays a **conditional illustration, not an experimental D66 or G12**.
 - Modes 2 and 3 are separate bending patterns in the two directions at 55.25 and 68.10 Hz. The square, E1 = E2
   models instead give the combined X and ring patterns at nearly equal frequencies. The plate is therefore
   **orthotropic in bending**, or non-uniform: its edge thickness varies from 0.816 to 0.926 mm between opposite sides.
@@ -377,7 +400,8 @@ frequencies equal the Excel and LMS values to 4 decimals. The session is 2026-10
 1. Row 4 is the left edge (seen from the shaker side)?
 2. Do the fibres / weave run parallel to the edges or at 45°? Is it one fabric ply or several?
 3. Was 301 or 300 mm horizontal in the test?
-4. Where was the shaker attached?
+4. Where was the shaker attached (point, stinger), and how was the plate suspended (cords, points)? The rigid-body
+   modes at 9.1 and 15.6 Hz depend on it.
 
 ## 9. What did not change
 
