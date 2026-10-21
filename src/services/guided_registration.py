@@ -56,6 +56,7 @@ from domain.specimen_manifest import (
 )
 from scientific_state import fe_geometry_identity, modal_dataset_geometry_identity
 
+from . import shell_surface
 from .fe_shape_pack import node_set_sha256
 from .physical_registration import (
     PHYSICAL_ORIENTATION_REFERENCES,
@@ -344,8 +345,15 @@ class GuidedRegistration:
 
 def establish_guided_registration(abaqus, experimental, experimental_identity: Mapping[str, Any],
                                   evidence: PhysicalEvidence, *, roots: Optional[Mapping[str, Path]] = None,
-                                  reference_geometry_path: Optional[Path] = None) -> GuidedRegistration:
-    """Build the registration the evidence defines for the loaded FE geometry, or refuse with the reason."""
+                                  reference_geometry_path: Optional[Path] = None,
+                                  fe_element_summary: Optional[shell_surface.InpElementSummary] = None
+                                  ) -> GuidedRegistration:
+    """Build the registration the evidence defines for the loaded FE geometry, or refuse with the reason.
+
+    ``fe_element_summary`` (optional, R7-B): element types read from the FE input text. When it confirms that the
+    measured instance is a conventional shell, the registration is refused: ``measured_surface.side`` cannot name the
+    measured face of a mid-surface and the evidence format has no face-versus-normal field yet.
+    """
     checks: list[str] = []
     calibration = evidence.geometry_calibration
     unit = calibration.calibration.abaqus_unit
@@ -398,11 +406,29 @@ def establish_guided_registration(abaqus, experimental, experimental_identity: M
                       f"nodes, labels and coordinates {_short(loaded['sha256'])}) is identical to {source}; the "
                       f"loaded FE geometry {_short(fe.identity['sha256'])} ({fe.identity['node_count']} nodes) differs "
                       "elsewhere (another node identity: a new registration, the old mapping not reused)")
+    measured = calibration.measured_surface
+    shell = None if fe_element_summary is None else fe_element_summary.shell_confirmed(measured.fe_instance)
+    if shell:
+        types = ", ".join(fe_element_summary.instance_element_types.get(measured.fe_instance.upper(), ()))
+        raise GuidedRegistrationRefusal(
+            "measured_surface",
+            f"{measured.fe_instance} is a conventional shell (element types {types}, INP "
+            f"{_short(fe_element_summary.inp_sha256)}): its nodes are the mid-surface, so measured_surface.side "
+            f"({measured.side}) cannot name the face the scanner saw, and the evidence format has no field for that "
+            "face relative to the element normal. A shell registration is refused until that format is decided (R7).")
     try:
+        degenerate = shell_surface.surface_is_degenerate(fe, measured.fe_instance, unit)
         registration, surface_ids = register_from_physical_calibration(
             calibration, fe, experimental, evidence.measured_dofs, evidence.registration_source_identity)
     except PhysicalRegistrationRefusal as error:
         raise GuidedRegistrationRefusal(error.field, str(error)) from error
+    surface_limitation = ()
+    if degenerate:
+        surface_limitation = (
+            f"measured surface {measured.fe_instance}: max_z and min_z select the same nodes (one z level), so "
+            f"side={measured.side} does not identify a face; the measured face is fixed only by the Z sign of the "
+            "stated axes" + (" (element types not supplied: a shell is not excluded)" if shell is None
+                             else " (element types supplied: not a conventional shell)"),)
     metrics = registration.to_dict()["registration_metrics"]  # plain JSON values
     checks.append(f"measured surface {calibration.measured_surface.fe_instance} {calibration.measured_surface.side}: "
                   f"{len(surface_ids)} FE nodes; measured DOFs {'/'.join(evidence.measured_dofs)}")
@@ -418,9 +444,9 @@ def establish_guided_registration(abaqus, experimental, experimental_identity: M
                   f"{metrics['mapping_rms_in_abaqus_units']:.3g} {unit} (max "
                   f"{metrics['mapping_max_residual_in_abaqus_units']:.3g} {unit}), axis permutation "
                   f"{metrics['axis_permutation']}, every point on its own FE node")
-    warnings = ()
+    warnings = surface_limitation
     if calibration.uncertainty.missing:
-        warnings = (f"registration uncertainty not available: {', '.join(calibration.uncertainty.missing)}",)
+        warnings += (f"registration uncertainty not available: {', '.join(calibration.uncertainty.missing)}",)
     return GuidedRegistration(registration, evidence.document(), evidence.evidence_hash, dict(fe.identity),
                               {"sha256": experimental_identity["sha256"], "size": experimental_identity["size"]},
                               tuple(checks), warnings, metrics)

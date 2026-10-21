@@ -5,6 +5,7 @@ from decimal import Decimal
 import json
 import math
 import os
+import re
 import shlex
 import signal
 import subprocess
@@ -622,6 +623,62 @@ def history_frequencies(manifest: Mapping[str, Any], frame_frequencies: Mapping[
     return accepted, rejected
 
 
+# R7: the pinned extractor writes `frame.frameValue` as the frequency when `frame.frequency` is exactly 0. In a
+# frequency step `frameValue` holds the mode number, so a zero-frequency (rigid-body) frame is recorded as "1 Hz",
+# "2 Hz", ... The frame description ("Mode 1: Value = ... Freq = 0.0000 (cycles/time)") and the EIGFREQ history are
+# independent records of the same frame. A manifest frequency that contradicts them never enters a comparison; the
+# mode is not loaded and the reason is recorded. Nothing is replaced by an inferred value.
+_DESCRIPTION_FREQUENCY = re.compile(r"\bfreq(?:uency)?\s*[:=]\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)",
+                                    re.IGNORECASE)
+
+
+def described_frequency(description: Any) -> Optional[tuple]:
+    """(frequency, half a unit in its last printed digit) from an Abaqus frame description, or None."""
+    match = _DESCRIPTION_FREQUENCY.search(str(description or ""))
+    if match is None:
+        return None
+    text = match.group(1)
+    value = float(text)
+    if not math.isfinite(value):
+        return None
+    exponent = Decimal(text).as_tuple().exponent
+    half_unit = 0.5 * 10.0 ** exponent if isinstance(exponent, int) else 0.0
+    return value, max(half_unit, abs(value) * _FLOAT32_RESOLUTION)
+
+
+def manifest_frequency_problem(mode: int, manifest_frequency: float, description: Any,
+                               eigfreq: Optional[Mapping[int, float]]) -> Optional[dict]:
+    """Why a manifest frequency cannot be used (with the independent records), or None when it is consistent.
+
+    The frame description is checked first; without one, a manifest frequency equal to its mode number that the
+    EIGFREQ history contradicts is the frameValue artifact. A consistent or unverifiable value is left unchanged.
+    """
+    history = None if eigfreq is None else eigfreq.get(mode)
+    described = described_frequency(description)
+    if described is not None:
+        value, precision = described
+        if abs(manifest_frequency - value) <= max(precision, _reported_precision(manifest_frequency)):
+            return None
+        reason = (f"manifest frequency {manifest_frequency!r} Hz of mode {mode} contradicts its frame description "
+                  f"({value!r} Hz)")
+    elif history is not None and manifest_frequency == float(mode) \
+            and abs(history - manifest_frequency) > _reported_precision(manifest_frequency):
+        reason = (f"manifest frequency {manifest_frequency!r} Hz of mode {mode} equals the mode number and "
+                  f"contradicts EIGFREQ ({history!r} Hz)")
+    else:
+        return None
+    if manifest_frequency == float(mode):
+        reason += "; it equals the mode number (frameValue fallback of a zero-frequency frame)"
+    independent = [item for item in ((None if described is None else described[0]), history) if item is not None]
+    agreed = None
+    if independent and all(abs(item - independent[0]) <= (described[1] if described else 0.0) + _reported_precision(
+            independent[0]) for item in independent):
+        agreed = independent[0]
+    return {"reason": reason, "manifest_frequency_hz": manifest_frequency,
+            "described_frequency_hz": None if described is None else described[0], "eigfreq_hz": history,
+            "independent_records_agree_on_hz": agreed}
+
+
 def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
     manifest_path = Path(manifest_path)
     with manifest_path.open("r", encoding="utf-8") as stream:
@@ -641,10 +698,18 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
             raise FileNotFoundError(f"Extracted geometry file is missing: {geometry_path}")
         geometry = _load_geometry_csv(geometry_path)
 
-    frame_frequencies = {int(entry["mode"]): float(entry["frequency_hz"]) for entry in manifest.get("modes", [])}
+    eigfreq, _ = _single_history(manifest, "EIGFREQ")
+    rejected: Dict[int, dict] = {}
+    for entry in manifest.get("modes", []):
+        problem = manifest_frequency_problem(int(entry["mode"]), float(entry["frequency_hz"]),
+                                             entry.get("description"), eigfreq)
+        if problem is not None:
+            rejected[int(entry["mode"])] = problem
+    mode_entries = [entry for entry in manifest.get("modes", []) if int(entry["mode"]) not in rejected]
+    frame_frequencies = {int(entry["mode"]): float(entry["frequency_hz"]) for entry in mode_entries}
     precise, kept = history_frequencies(manifest, frame_frequencies)
     modes: List[ModeShape] = []
-    for mode_entry in manifest.get("modes", []):
+    for mode_entry in mode_entries:
         if cancel_event is not None and cancel_event.is_set():
             # Cooperative cancellation during Python-side parse/read: no
             # Abaqus worker is alive at this point (extraction already
@@ -676,7 +741,12 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
         )
 
     if not modes:
+        if rejected:
+            raise ValueError("The extracted Abaqus package contains no usable modes: "
+                             + "; ".join(item["reason"] for item in rejected.values()))
         raise ValueError("The extracted Abaqus package contains no modes.")
+    if rejected:
+        manifest["rejected_frequency_modes"] = {str(mode): item for mode, item in sorted(rejected.items())}
     notice = extraction_range_notice(manifest)
     if notice is not None:
         manifest["extraction_range_notice"] = notice

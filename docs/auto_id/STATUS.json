@@ -2056,5 +2056,13 @@
       "SP-05": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE"
     },
     "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates; no FE solve, no Abaqus Python, no LM; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE"
+  },
+  "r7_shell_modal_safety": {
+    "status": "REVIEW_READY",
+    "branch": "fix/r7-shell-modal-safety",
+    "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
+    "report": "docs/reconciliation/R7_SHELL_MODAL_SAFETY.md",
+    "summary": "loader refuses manifest frequencies contradicted by the frame description / EIGFREQ (zero-frequency frameValue artifact of the pinned extractor; script unchanged); guided registration refuses a confirmed shell mid-surface and states the degenerate-surface limitation; shell-face field and extractor re-pin proposed for SUPERVISOR decision",
+    "unchanged": "pinned extract_odb.py, physical_registration.py, evidence formats, governed and production gates"
   }
 }

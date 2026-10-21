@@ -82,3 +82,15 @@ identity of the measured surface, not bounding boxes; otherwise `FE_FRAME_NOT_VE
 any background error); R3 `13af39a` (no stale registration: every input change invalidates the shown result, a
 generation counter discards overtaken background builds). The guided registration remains a diagnostic engineering
 registration: `governed = false`, `production_ready = false`, no Auto-ID observation.
+
+## R7 (2026-10-21): shell mid-surface guard (diagnostic; branch `fix/r7-shell-modal-safety`)
+
+For a conventional shell (S4R …) all nodes lie on the mid-surface, so `max_z` and `min_z` select the same nodes and
+`side` cannot name the measured face.
+
+- The guided path **refuses** a measured instance that a supplied FE element summary (INP text, with its SHA-256)
+  confirms to be a conventional shell.
+- A degenerate measured surface of unknown element type is registered as before, with a stated limitation: the face
+  is fixed only by the Z sign of the axes.
+- An explicit face-versus-normal field is proposed, not implemented, because it would change the governed passport
+  schema. See `docs/reconciliation/R7_SHELL_MODAL_SAFETY.md`.

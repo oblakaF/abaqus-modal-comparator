@@ -5432,3 +5432,21 @@ first internal provider.
   NO_GLOBAL_PARAMETER_VALUE (D-077).
 - **Files changed:** `docs/reconciliation/M9_SIX_SPECIMENS.md` (new), `docs/reconciliation/M9_SIX_SPECIMENS.json` (new), STATUS,
   ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-21 — R7 zero-frequency safety and shell mid-surface guard (REVIEW_READY; branch fix/r7-shell-modal-safety)
+
+- **R7-A:**
+  - root cause: the pinned `extract_odb.py` writes `frameValue` (the mode number) as the frequency of a
+    zero-frequency frame;
+  - the script is pinned (governed extraction identity) and is unchanged;
+  - `abaqus_bridge.load_extracted_odb` refuses, per mode, a manifest frequency contradicted by the frame description
+    or EIGFREQ, records why (with the independent value) and substitutes nothing;
+  - an extractor patch is proposed for a re-pin decision.
+- **R7-B:**
+  - new `services/shell_surface.py` (element types and normals from INP text; degenerate-surface detection);
+  - the guided registration refuses a confirmed conventional shell and states the limitation for a degenerate surface
+    of unknown type;
+  - an explicit shell-face field is proposed, not implemented (governed passport schema).
+- **Tests:** 18 new tests. The store-gated SP-02 / SP-13 tests were not run because they need the original
+  `D:\Snadwich`.
+- No Abaqus, no FE solve, no rule, threshold or gate change; no merge.
