@@ -2062,9 +2062,9 @@
     "branch": "fix/r7-shell-modal-safety",
     "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
     "report": "docs/reconciliation/R7_SHELL_MODAL_SAFETY.md",
-    "summary": "loader refuses any frequency record contradiction per mode (manifest / description / reliable EIGFREQ), nothing substituted; fail-closed shell gate in the real GUI path: flat measured surface needs a node-for-node bound INP, bound shell needs a consistent shell_measured_face; saved flat records without a binding are not applied",
+    "summary": "loader refuses any frequency record contradiction per mode (manifest / description / reliable EIGFREQ), nothing substituted; fail-closed shell gate in the real GUI path: flat measured surface needs a node-for-node bound INP, bound shell needs a consistent shell_measured_face; saved flat records without a binding are not applied; R2: every re-application of a flat / shell registration re-runs the full shell gate against the re-supplied INP (sha, nodes, types, connectivity, normals, face, Z sign, determinant) and must reproduce the recorded v2 binding; INP-to-ODB link recorded as NOT proven",
     "unchanged": "pinned extract_odb.py and its pin, physical_registration.py, parse_geometry_calibration, governed passports, SPEC v1.2, thresholds, production gates",
-    "revision": "R7 R1 (SUPERVISOR audit corrections)",
+    "revision": "R7 R2 (re-application of saved registrations fail-closed)",
     "pr": 96,
     "open_decisions": [
       "OD-R7-1: PINNED_EXTRACT_SCRIPT_SHA256 is a CRLF hash (LF blob 043e89e1...); re-pin options in R7_SHELL_MODAL_SAFETY.md",

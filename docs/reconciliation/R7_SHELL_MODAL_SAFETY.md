@@ -147,6 +147,60 @@ This is exercised by `DialogTests` in `tests/test_guided_registration.py`.
 - the governed passports (`auto-id/specimen/v1.1`), SPEC v1.2, the MAC and geometry thresholds and production gates;
 - a guided registration stays `governed = false` and `production_ready = false`.
 
+### R7 R2: re-application of saved registrations (the gap found by the audit)
+
+**Defect in R7 R1.** `verify_for_files()` re-applied a saved registration of a flat measured surface when the record
+carried `fe_input.bound = true`. It did not check the INP or the shell face again.
+
+**Fix.** `verify_for_files(..., fe_input=...)` calls `_reverify_fe_input` for every single-z-level measured surface. It
+runs at every re-application: opening a saved registration in the dialog, and the check before every analysis in the
+worker.
+
+1. **Record format.** The record must carry the re-verifiable binding `auto-id/guided-fe-input-binding/v2`. Records
+   from R7 / R7 R1, and older ones, are **refused**: "build it again".
+2. **The FE input must be supplied again.** A recorded `bound = true` alone is never sufficient; without the INP the
+   registration is **refused**.
+3. **The INP identity.** Its SHA-256 must equal the recorded one; otherwise **refused**.
+4. **The complete gate of the build runs again** (`_shell_gate`):
+   - node-for-node binding (labels and coordinates) to the loaded FE instance;
+   - element types;
+   - the element normals and their uniformity;
+   - the saved `shell_measured_face`, re-parsed with the guided-only parser;
+   - consistency of the face with the normal;
+   - the experimental Z sign.
+5. **The transformation determinant** is checked twice: from the saved axes and from the registration's actual
+   rotation matrix. It must be +1.
+6. **Exact reproduction.** The fresh binding must equal the recorded one in `binding_schema`, `fe_input_sha256`,
+   `instance`, `element_types`, `kind`, `normal_direction`, `normal_counts`, **`connectivity_sha256`** (sorted element
+   types and node labels of the part) and `node_count`. The shell statement must be the recorded one. Any difference
+   → **refused**.
+
+**Real GUI and worker path:**
+
+- *Apply* keeps the FE-input path next to the applied registration (`app._guided_fe_input_path`), and *Clear*
+  removes it.
+- The worker (`runtime_hardening`) reads it again before every analysis and passes it to `verify_for_files`.
+  Without it, or with another INP, the run is refused with no comparison
+  (`WorkerTests.test_an_active_flat_registration_without_its_fe_input_refuses_the_run`).
+- *Open saved registration...* uses the INP located in the dialog and refuses without it (`DialogTests`).
+
+**What node equality proves (requirement 6), recorded in every binding as `fe_model_identity`.** The INP with the
+exact SHA-256 has the extraction's node labels and coordinates. **The INP-to-ODB link is NOT proven:** the extraction
+package carries no element types, no connectivity and no job input record. The registration therefore never claims the
+identity of the FE model, and a warning states this.
+
+The additional provenance needed to prove that link (not implemented here) is one of:
+
+- (a) element types and connectivity exported from the ODB by the extractor and compared with the INP's
+  `connectivity_sha256`. This changes the pinned extractor and depends on OD-R7-1 and the re-pin.
+- (b) the ODB's own job input record (`odb.jobData`) read by Abaqus Python. This needs an authorised run.
+
+Until one of them exists, a shell registration stays a diagnostic engineering registration whose FE-model identity
+rests on the node match plus the exact INP content.
+
+**Unchanged:** solid (non-flat) registrations need no FE input on re-application; governed registrations are not
+handled by this path.
+
 ### Effect on existing data
 
 | Case | Effect |
@@ -162,14 +216,15 @@ This is exercised by `DialogTests` in `tests/test_guided_registration.py`.
 | `src/abaqus_bridge.py` | `described_frequency`, `reliable_eigfreq`, `manifest_frequency_problem`; per-mode refusal in `load_extracted_odb` |
 | `src/services/shell_surface.py` | FE-input parsing, node-for-node binding, shell-face block |
 | `src/services/guided_registration.py` | `shell_face` evidence field; `_shell_gate`; `fe_input`; `verify_for_files` binding rule; evidence row |
-| `src/guided_registration_ui.py` | Locate FE input (INP)...; passed to the build |
-| `tests/test_r7_shell_modal_safety.py`, `tests/r7_support.py` | 31 R7 tests and the INP generator |
-| `tests/test_guided_registration.py` | the synthetic flat instances get a bound solid INP; the GUI fail-closed case is added |
+| `src/guided_registration_ui.py` | Locate FE input (INP)...; passed to the build, to the reopen check and kept on Apply (R2) |
+| `src/runtime_hardening.py` | R2: the applied FE input is re-read and re-verified before every analysis |
+| `tests/test_r7_shell_modal_safety.py`, `tests/r7_support.py` | 41 R7 tests and the INP generator |
+| `tests/test_guided_registration.py` | the synthetic flat instances get a bound solid INP (byte-exact files); GUI and worker fail-closed cases for building and re-applying |
 | `docs/reconciliation/R7_SHELL_MODAL_SAFETY.md`, `docs/gui/GUIDED_PHYSICAL_REGISTRATION.md`, `docs/auto_id/STATUS.json`, `docs/auto_id/CHANGELOG.md` | documentation |
 
 ## 4. Tests
 
-**R7 (`tests/test_r7_shell_modal_safety.py`, 31 tests):**
+**R7 (`tests/test_r7_shell_modal_safety.py`, 41 tests):**
 
 - pinned script content and OD-R7-1, documented as a fact;
 - all records agree;
@@ -190,7 +245,22 @@ This is exercised by `DialogTests` in `tests/test_guided_registration.py`.
   non-shell and non-uniform normals are all refused;
 - mirrored axes are refused, and an invalid block is refused;
 - the pre-R7 evidence hash is unchanged;
-- a saved flat-surface record without a binding is not applied.
+- a recorded `bound = true` alone is not sufficient.
+
+**R7 R2 re-application (`SavedRegistrationReapplication`):**
+
+- a fully confirmed saved shell registration passes, and the identity limitation is recorded;
+- FE input unavailable → refused;
+- a changed INP (other SHA-256: other normals, or a solid) → refused;
+- same nodes but other connectivity → refused (`connectivity_sha256`);
+- same nodes but other normals → refused;
+- a saved face contradicting the normal → refused;
+- a saved Z sign contradicting the face → refused;
+- saved mirrored axes → refused;
+- an old record without the R2 binding → refused;
+- a non-flat solid needs no FE input.
+
+**GUI / worker:** reopen without the INP is refused, and an active registration without its INP refuses the analysis.
 
 The results of the existing guided, physical, SP-02 / SP-13, loader and full-suite runs are given in §6.
 
@@ -206,35 +276,42 @@ The test `QuestionContractTests.test_a_calibration_pass_does_not_change_the_mate
 It fails identically on clean `origin/main` `aa08ad9`. It is a test-order dependency outside R7's scope. No scientific
 logic was changed.
 
-## 6. Test results (R7 R1)
+## 6. Test results
 
-| Run | Result |
-|---|---|
-| `tests/test_r7_shell_modal_safety.py` | 31 passed |
-| `tests/test_guided_registration.py` | 22 passed, 1 skipped (store-gated real SP-13 frame test) |
-| Full `python -m unittest discover -s tests` (the CI command) | **2486 tests, OK, 96 skipped** |
-| Full pytest | **2424 passed, 112 skipped, 1 failed**; the failure is the baseline `test_v12_i5_contract_closure` (§5) |
-
-**Executed, not skipped:**
-
-- the store-free SP-02 / SP-13 tests: frozen registration hashes, passports, re-evaluation records and the G2
-  precision tests;
-- the governed builder tests (`test_physical_registration`, `test_registration_uncertainty`), which are unchanged by R7.
-
-**Skipped (92 store-gated tests in pytest):** these need `snadwich` (the original `D:\Snadwich`),
-`carbon-project-archive` or `m7-run-*`. Among them are the real-data SP-02 / SP-13 registration, fixture, QC and
-what-if regressions.
-
-- They were **not run**. Their inputs `SP02_polymax_retry_260803.unv`, `SP02_fe_geometry.csv` and
-  `SP13_fe_geometry.csv` are not in the verified V2 / V3 copies (only `SP13_a_polymax.unv` is), and originals may not
-  be opened.
-- The accepted SP-02 / SP-13 registrations are produced by `physical_registration.py`, which R7 does not change.
-  Their guided path ("Use accepted scan calibration") selects non-degenerate solid face surfaces, which the shell gate
-  does not affect.
+See R7 R2 below (§8).
 
 ## 7. Remaining limitations
 
 - **OD-R7-1** (§1) and the extractor re-pin are open governed decisions.
 - The shell gate supports flat conventional shells with uniform normals and unrotated instances; curved or rotated
   shells are refused.
+- The INP-to-ODB link is not proven by the node match (R2). The provenance needed for it is defined above;
+  until then the FE-model identity is `NODES_AND_INP_CONTENT`.
 - The store-gated SP-02 / SP-13 data tests need the original store `D:\Snadwich` and were not run (§6).
+
+## 8. R7 R2 test results
+
+| Run | Result |
+|---|---|
+| `tests/test_r7_shell_modal_safety.py` | 41 passed |
+| Related suites: guided, R7, physical, SP-02, SP-13, G2d1 governed, registration uncertainty | 138 passed, 12 skipped (store-gated) |
+| Full `python -m unittest discover -s tests` (the CI command) | **2497 tests, OK, 96 skipped** |
+| Full pytest | **2434 passed, 113 skipped, 1 failed** |
+
+**Baseline pytest failure (not R7):**
+`test_v12_i5_contract_closure.py::QuestionContractTests::test_a_calibration_pass_does_not_change_the_material_verdict`
+(`KeyError (0.02, 1.12)`). It is the cross-class order dependency of §5, identical on `origin/main`, and passes under
+unittest.
+
+**Skipped in pytest (113):**
+
+- **92 need data stores** that are not available: `snadwich` (the original `D:\Snadwich`), `carbon-project-archive`
+  and `m7-run-a` / `m7-run-b`. Among them are the real-data SP-02 / SP-13 registration, fixture, QC, what-if and
+  governed-registration regressions. They were not run: their inputs (`SP02_polymax_retry_260803.unv`,
+  `SP02_fe_geometry.csv`, `SP13_fe_geometry.csv`) are not in the verified V2 / V3 copies, and originals may not be
+  opened.
+- **3 need Tk or Abaqus** (`test_new_odb_comparison` Tk init, `test_stage_a_matrix_abaqus_integration` ×2).
+- The rest are skipped by their own conditions.
+
+**Executed:** the store-free SP-02 / SP-13 tests (frozen registration hashes, passports, re-evaluation records) and the
+governed builder and G2d1 tests all pass. `physical_registration.py` and the governed paths are unchanged.

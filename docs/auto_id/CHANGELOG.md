@@ -5471,3 +5471,21 @@ first internal provider.
     pytest definition order); it is not fixed.
   - The store-gated SP-02 / SP-13 tests were not run: their inputs are not in V2 / V3, and the originals may not be
     opened.
+
+## 2026-10-21 — R7 R2: re-application of saved guided registrations is fail-closed (REVIEW_READY; PR #96)
+
+- **Re-verification:** `verify_for_files(..., fe_input=...)` re-runs the complete shell gate for every
+  single-z-level measured surface:
+  - the record must carry the v2 binding, so R7 / R7 R1 records are refused;
+  - the INP must be supplied again, so a recorded `bound = true` alone is refused;
+  - the INP SHA-256 must be the recorded one;
+  - node-for-node binding, element types, normals, `connectivity_sha256`, the saved shell face, the Z sign and the
+    determinant (from the axes and from the registration rotation) are checked again;
+  - the binding must reproduce the record exactly.
+- **Real path:** Apply keeps the INP path; the worker re-reads it before every analysis; dialog reopen uses the located
+  INP.
+- **Provenance (requirement 6):** the node match proves only the INP's nodes; the INP-to-ODB link is NOT proven and is
+  recorded as `fe_model_identity`. The required provenance (an ODB connectivity export after a re-pin, or `odb.jobData`
+  via Abaqus Python) is defined, not implemented.
+- **Tests:** 41 R7 tests, plus GUI / worker refusal cases.
+- **Unchanged:** non-flat solid registrations, governed paths, the pinned extractor and OD-R7-1.

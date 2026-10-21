@@ -305,6 +305,8 @@ class GuidedRegistrationDialog:
         if self.result is None:
             return
         self.app._guided_registration = self.result
+        # R7 R2: the FE input is re-read and re-verified with the registration before every analysis
+        self.app._guided_fe_input_path = self.fe_input_path
         self.app.status.set("Guided physical registration set; the analysis runs again with it.")
         self.window.destroy()
         self.app._start()
@@ -335,7 +337,8 @@ class GuidedRegistrationDialog:
         self._invalidate()  # the shown result is replaced only by a record verified against the current files
         try:
             result = guided.load_guided_registration(Path(chosen))
-            guided.verify_for_files(result, self.loaded.abaqus, self.loaded.experimental, self.identity)
+            guided.verify_for_files(result, self.loaded.abaqus, self.loaded.experimental, self.identity,
+                                    fe_input=guided.load_fe_input_for(result, self.fe_input_path))
         except Exception as error:  # noqa: BLE001  (a refusal or an unreadable file: shown, never applied)
             self._show_failure(error, "SAVED REGISTRATION REFUSED", "")
             return
@@ -343,6 +346,7 @@ class GuidedRegistrationDialog:
 
     def clear(self) -> None:
         self.app._guided_registration = None
+        self.app._guided_fe_input_path = None
         self._invalidate()  # a build still running never brings a result back
         self._set_status("No guided registration is applied; the next analysis uses automatic geometry registration.")
 

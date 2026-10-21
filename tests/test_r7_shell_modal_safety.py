@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import csv
+import dataclasses
 import hashlib
 import importlib.util
 import json
@@ -23,6 +24,8 @@ import tempfile
 import types
 import unittest
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
@@ -30,6 +33,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 import abaqus_bridge  # noqa: E402
 from services import guided_registration as guided  # noqa: E402
 from services import shell_surface  # noqa: E402
+from services.physical_registration import FEGeometry  # noqa: E402
+from scientific_state import fe_geometry_identity  # noqa: E402
 from services.shape_extraction import PINNED_EXTRACT_SCRIPT, PINNED_EXTRACT_SCRIPT_SHA256  # noqa: E402
 from r7_support import synthetic_fe_input, synthetic_inp_text  # noqa: E402
 from test_guided_registration import IDENTITY, _World, as_dataset, evidence_document  # noqa: E402
@@ -300,16 +305,95 @@ class GuidedShellGate(_World, unittest.TestCase):
         evidence = guided.evidence_from_document(evidence_document(dict(self.frame)))
         self.assertNotIn("shell_measured_face", evidence.document())
 
-    def test_saved_records_of_flat_surfaces_need_the_binding(self):
+    def test_saved_bound_flag_alone_is_not_sufficient(self):
         result = self.build()
-        dataset = as_dataset(self.variant)
-        guided.verify_for_files(result, dataset, self.experimental, IDENTITY)  # bound: applied
-        legacy = copy.copy(result)
-        object.__setattr__(legacy, "metrics", {k: v for k, v in result.metrics.items() if k != "fe_input"})
-        with self.assertRaises(guided.GuidedRegistrationRefusal) as caught:
-            guided.verify_for_files(legacy, dataset, self.experimental, IDENTITY)
+        with self.assertRaises(guided.GuidedRegistrationRefusal) as caught:  # recorded bound=true, no FE input given
+            guided.verify_for_files(result, as_dataset(self.variant), self.experimental, IDENTITY)
         self.assertEqual(caught.exception.field, "fe_input")
 
+
+class SavedRegistrationReapplication(_World, unittest.TestCase):
+    """R7 R2: a saved flat / shell registration is re-applied only after the complete shell gate passes again."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.shell = synthetic_fe_input(self.variant, element_type="S4R")
+        built = self.establish(evidence=guided.evidence_from_document(_shell_document(self, self.shell)),
+                               fe_input=self.shell)
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.saved = guided.load_guided_registration(
+            guided.save_guided_registration(built, Path(directory.name) / "shell.json"))
+        self.dataset = as_dataset(self.variant)
+
+    def verify(self, record=None, fe_input="shell"):
+        return guided.verify_for_files(record or self.saved, self.dataset, self.experimental, IDENTITY,
+                                       fe_input=self.shell if fe_input == "shell" else fe_input)
+
+    def refused(self, field, **kwargs):
+        with self.assertRaises(guided.GuidedRegistrationRefusal) as caught:
+            self.verify(**kwargs)
+        self.assertEqual(caught.exception.field, field, str(caught.exception))
+        return str(caught.exception)
+
+    def tampered(self, **face):
+        evidence = copy.deepcopy(dict(self.saved.evidence))
+        evidence["shell_measured_face"].update(face)
+        return dataclasses.replace(self.saved, evidence=evidence)
+
+    def test_fully_confirmed_saved_shell_registration_passes(self):
+        checks = self.verify()
+        self.assertTrue(any("shell measured face: positive_normal" in item for item in checks))
+        self.assertIn("NOT proven", self.saved.metrics["fe_input"]["fe_model_identity"])
+
+    def test_fe_input_unavailable_is_refused(self):
+        self.assertIn("not available", self.refused("fe_input", fe_input=None))
+
+    def test_changed_fe_input_is_refused(self):
+        for other in (synthetic_fe_input(self.variant, element_type="S4R", normal="-Z"),
+                      synthetic_fe_input(self.variant)):
+            with self.subTest(other.instance("TOP").element_types):
+                self.assertIn("is not the one", self.refused("fe_input", fe_input=other))
+
+    def _same_hash(self, **instance_changes):
+        item = self.shell.instance("TOP")
+        return shell_surface.FEInputModel(self.shell.file_name, self.shell.sha256, self.shell.size_bytes,
+                                          {"TOP": dataclasses.replace(item, **instance_changes)})
+
+    def test_same_nodes_other_connectivity_is_refused(self):
+        text = self.refused("fe_input", fe_input=self._same_hash(connectivity_sha256="d" * 64))
+        self.assertIn("connectivity_sha256", text)
+
+    def test_same_nodes_other_normals_are_refused(self):
+        self.refused("shell_measured_face", fe_input=self._same_hash(normal_counts={"+Z": 0, "-Z": 1, "in_plane": 0}))
+
+    def test_saved_face_contradicting_the_normal_is_refused(self):
+        self.refused("shell_measured_face", record=self.tampered(normal_direction="-Z"))
+
+    def test_saved_z_sign_contradicting_the_face_is_refused(self):
+        self.assertIn("must map to -Z", self.refused("orientation.experimental_axes_in_fe",
+                                                     record=self.tampered(measured_face="negative_normal")))
+
+    def test_saved_mirrored_axes_are_refused(self):
+        evidence = copy.deepcopy(dict(self.saved.evidence))
+        evidence["geometry_calibration"]["orientation"]["experimental_axes_in_fe"] = ["+X", "-Y", "+Z"]
+        self.assertIn("right-handed", self.refused("orientation.experimental_axes_in_fe",
+                                                   record=dataclasses.replace(self.saved, evidence=evidence)))
+
+    def test_old_record_without_the_r2_binding_is_refused(self):
+        metrics = {**self.saved.metrics, "fe_input": {key: value for key, value in self.saved.metrics["fe_input"].items()
+                                                      if key not in ("binding_schema", "connectivity_sha256")}}
+        self.assertIn("before R7 R2", self.refused("fe_input", record=dataclasses.replace(self.saved, metrics=metrics)))
+
+    def test_non_flat_solid_needs_no_fe_input(self):
+        top = [k for k, value in enumerate(self.variant.node_ids) if str(value).startswith("TOP:")]
+        lower = self.variant.coordinates[top] - np.array([0.0, 0.0, 0.45])
+        ids = np.concatenate([self.variant.node_ids, np.array([f"TOP:{900000 + k}" for k in range(len(top))])])
+        coordinates = np.vstack([self.variant.coordinates, lower])
+        thick = FEGeometry(ids, coordinates, fe_geometry_identity(ids.tolist(), coordinates))
+        result = self.establish(fe=thick, fe_input=None)
+        self.assertNotIn("fe_input", result.metrics)
+        guided.verify_for_files(result, as_dataset(thick), self.experimental, IDENTITY)  # no FE input required
 
 if __name__ == "__main__":
     unittest.main()

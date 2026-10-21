@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
+import json
 from pathlib import Path
 import re
 from typing import Any, Mapping, Optional
@@ -28,6 +29,11 @@ from typing import Any, Mapping, Optional
 import numpy as np
 
 SHELL_FACE_SCHEMA = "auto-id/guided-shell-face/v1"
+BINDING_SCHEMA = "auto-id/guided-fe-input-binding/v2"  # R7 R2: re-verifiable binding record
+# What node-for-node equality proves, and what it does not (R7 R2, requirement 6).
+FE_MODEL_IDENTITY = ("NODES_AND_INP_CONTENT: the INP (exact SHA-256) has the extraction's node labels and coordinates; "
+                     "the INP-to-ODB link is NOT proven (the extraction carries no element types or connectivity and "
+                     "no job input record)")
 BINDING_TOLERANCE_MM = 1.0e-3  # INP text precision against float32 ODB coordinates
 _SHELL_TYPE = re.compile(r"^(S\d+[A-Z0-9]*|STRI\d+)$", re.IGNORECASE)
 NORMAL_DIRECTIONS = ("+Z", "-Z")
@@ -65,6 +71,7 @@ class FEInputInstance:
     nodes: Mapping[int, tuple] = field(repr=False)  # label -> (x, y, z), instance translation applied
     element_types: tuple
     normal_counts: Mapping[str, int]  # conventional shell elements only: {"+Z", "-Z", "in_plane"}
+    connectivity_sha256: str = ""  # sorted (element type, node labels) of the part's elements
 
 
 @dataclass(frozen=True)
@@ -117,7 +124,8 @@ def parse_fe_input(text: str, *, file_name: str = "model.inp", sha256: Optional[
                 name = _option(line, "name").upper()
                 current = name if wanted_parts is None or name in wanted_parts else None
                 if current is not None:
-                    parts[current] = {"nodes": {}, "types": set(), "normals": {"+Z": 0, "-Z": 0, "in_plane": 0}}
+                    parts[current] = {"nodes": {}, "types": set(), "normals": {"+Z": 0, "-Z": 0, "in_plane": 0},
+                                      "elements": []}
             elif upper.startswith("*END PART"):
                 current = None
             elif current is not None and upper.startswith("*NODE") and not upper.startswith("*NODE OUTPUT"):
@@ -133,8 +141,11 @@ def parse_fe_input(text: str, *, file_name: str = "model.inp", sha256: Optional[
             if len(values) >= 3:
                 xyz = [float(item) for item in values[1:4]] + [0.0] * (4 - len(values))
                 parts[current]["nodes"][int(values[0])] = tuple(xyz[:3])
-        elif mode == "element" and is_conventional_shell(element_type):
+        elif mode == "element":
             ids = [int(item) for item in line.split(",") if item.strip()]
+            parts[current]["elements"].append((element_type.upper(), tuple(ids[1:])))
+            if not is_conventional_shell(element_type):
+                continue
             corner = ids[1:5] if len(ids) >= 5 else ids[1:4]
             points = [parts[current]["nodes"].get(item) for item in corner]
             if len(points) < 3 or any(point is None for point in points):
@@ -151,8 +162,10 @@ def parse_fe_input(text: str, *, file_name: str = "model.inp", sha256: Optional[
         translation = tuple(float(v) for v in body[0].split(",")[:3]) if body else (0.0, 0.0, 0.0)
         shift = np.asarray(translation, dtype=float)
         nodes = {label: tuple((np.asarray(xyz) + shift).tolist()) for label, xyz in parts[part]["nodes"].items()}
+        connectivity = hashlib.sha256(json.dumps(sorted(parts[part]["elements"])).encode("utf-8")).hexdigest()
         instances[name] = FEInputInstance(name, part, translation, len(body) >= 2, nodes,
-                                          tuple(sorted(parts[part]["types"])), dict(parts[part]["normals"]))
+                                          tuple(sorted(parts[part]["types"])), dict(parts[part]["normals"]),
+                                          connectivity)
     return FEInputModel(file_name, sha, len(raw) if size_bytes is None else size_bytes, instances)
 
 
@@ -173,13 +186,24 @@ class FEInputBinding:
     normal_counts: Mapping[str, int]
     node_count: int
     max_coordinate_difference: float
+    connectivity_sha256: str = ""
 
     def to_dict(self) -> dict:
-        return {"fe_input_sha256": self.fe_input_sha256, "file_name": self.file_name, "instance": self.instance,
-                "element_types": list(self.element_types), "kind": self.kind,
-                "normal_direction": self.normal_direction, "normal_counts": dict(self.normal_counts),
+        return {"binding_schema": BINDING_SCHEMA, "fe_input_sha256": self.fe_input_sha256,
+                "file_name": self.file_name, "instance": self.instance, "element_types": list(self.element_types),
+                "kind": self.kind, "normal_direction": self.normal_direction,
+                "normal_counts": dict(self.normal_counts), "connectivity_sha256": self.connectivity_sha256,
                 "node_count": self.node_count, "max_coordinate_difference": self.max_coordinate_difference,
-                "bound": True}
+                "fe_model_identity": FE_MODEL_IDENTITY, "bound": True}
+
+    def identity(self) -> dict:
+        """The fields a re-application must reproduce exactly (the coordinate difference is not one of them)."""
+        record = self.to_dict()
+        return {key: record[key] for key in REBINDING_FIELDS}
+
+
+REBINDING_FIELDS = ("binding_schema", "fe_input_sha256", "instance", "element_types", "kind", "normal_direction",
+                    "normal_counts", "connectivity_sha256", "node_count")
 
 
 def bind_fe_input(model: FEInputModel, fe, instance: str, abaqus_unit: str) -> FEInputBinding:
@@ -221,7 +245,7 @@ def bind_fe_input(model: FEInputModel, fe, instance: str, abaqus_unit: str) -> F
         elif counts.get("-Z", 0) > 0 and counts.get("+Z", 0) == 0:
             direction = "-Z"
     return FEInputBinding(model.sha256, model.file_name, item.name, item.element_types, kind, direction, counts,
-                          len(labels), difference)
+                          len(labels), difference, item.connectivity_sha256)
 
 
 # ----------------------------------------------------------------------------- shell-face statement
