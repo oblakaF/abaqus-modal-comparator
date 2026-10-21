@@ -1491,5 +1491,122 @@
    "SUPERVISOR: accept the 3 reconstruction deviations or independent scan-to-edge offsets",
    "shell-side rule fixed separately or face stated through the Z sign with the limitation recorded"
   ]
+ },
+ "r61_owner_orientation_and_shaker": {
+  "status": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING",
+  "archives": {
+   "M11_R6_owner_orientation_evidence.zip": {
+    "archive_sha256": "07c4d59b42c6ee1fe15c805535408d53215f7eea621093e6e153530e33a9d7b2",
+    "files": [
+     {
+      "file": "orientation_r61/plate_orientation_shaker_view.png",
+      "manifest_sha256": "40db5103f28f1ec005cb6e7288268268b22b71bc5db610169c2fd693ee2da4e0",
+      "sha256": "40db5103f28f1ec005cb6e7288268268b22b71bc5db610169c2fd693ee2da4e0",
+      "ok": true
+     }
+    ],
+    "verified": true,
+    "extracted_to": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\owner_records\\orientation_r61"
+   },
+   "M11_shaker_location_owner_evidence.zip": {
+    "archive_sha256": "1a248d388d71cef88e20f0e28f7026d634e357ef54358b41201b071911334020",
+    "files": [
+     {
+      "file": "shaker_location_r61/owner_shaker_location_schema.png",
+      "manifest_sha256": "e8a569459d3b2325834c33c9869af16f82ed883df5051bf9a91a680093d9f8ed",
+      "sha256": "e8a569459d3b2325834c33c9869af16f82ed883df5051bf9a91a680093d9f8ed",
+      "ok": true
+     }
+    ],
+    "verified": true,
+    "extracted_to": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\owner_records\\shaker_location_r61"
+   }
+  },
+  "human_statements": {
+   "plate_mm": [
+    301,
+    300
+   ],
+   "fe_x": "301 mm edge",
+   "fe_y": "300 mm edge",
+   "abaqus_reproduces_experiment": "owner statement; does not pin axis signs relative to the camera",
+   "sketch_view": "shaker side = side with handwritten marks",
+   "thickness_rows_shaker_view": {
+    "1": "top",
+    "2": "right",
+    "3": "bottom",
+    "4": "left"
+   },
+   "shaker": "not at a corner; near the bottom edge, left of the midline (shaker view); approximate",
+   "orange_dot": "role unconfirmed; not the FE origin; not corner-A"
+  },
+  "closed": [
+   "FE X = 301 mm, Y = 300 mm",
+   "301 mm horizontal in the test (300-horizontal candidates excluded)",
+   "thickness row to edge mapping"
+  ],
+  "supported_not_established": [
+   "scanner saw the side opposite the shaker (PSV frame occlusion), i.e. the unmarked face"
+  ],
+  "open": [
+   "FE axis signs / origin relative to a physical corner",
+   "FE +Z relative to a physical face",
+   "shell-face evidence field (R7 design)",
+   "SUPERVISOR decision on the 3 reconstruction deviations",
+   "plan-dimension instrument"
+  ],
+  "remaining_candidates": [
+   [
+    "+X",
+    "+Y",
+    "+Z"
+   ],
+   [
+    "-X",
+    "-Y",
+    "+Z"
+   ],
+   [
+    "+X",
+    "-Y",
+    "-Z"
+   ],
+   [
+    "-X",
+    "+Y",
+    "-Z"
+   ]
+  ],
+  "support_models": {
+   "four_corner_straps": "unconfirmed hypothesis",
+   "shaker_stinger": "off-corner; approximate; stiffness unmeasured; corner-spring scenarios not a model of the experiment",
+   "frequencies_as_proof": false
+  },
+  "deviation_justifications": "M11 §13.4 (not accepted)",
+  "evidence_draft": {
+   "path": "runs/m11_carbon_plate/evidence_r61/evidence_DRAFT_plate_r61.json",
+   "parser_result": "refused (measured_surface.side unfilled)",
+   "fe_geometry_identity": {
+    "schema_version": "fe-geometry-identity/2",
+    "node_count": 10201,
+    "instances": [
+     "CFRP_301X300_SHELL-1"
+    ],
+    "dof_components": [
+     "U1",
+     "U2",
+     "U3"
+    ],
+    "sha256": "02fb9f9925aab3ce4aa0f947c096b03a232c4a1218a9a26fabaff62e5eb4c497"
+   },
+   "experimental_source": {
+    "name": "300by300_plate_only_1mm_261016_POLYMAX.unv",
+    "sha256": "117c893bafbbeba2c38861d5781e291e4c3bf37b91a29b7766419e764bacd3ff",
+    "manifest_sha256": "117c893bafbbeba2c38861d5781e291e4c3bf37b91a29b7766419e764bacd3ff",
+    "ok": true,
+    "size": 393967
+   }
+  },
+  "mac": "not computed"
  }
 }

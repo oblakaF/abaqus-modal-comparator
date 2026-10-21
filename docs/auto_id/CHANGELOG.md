@@ -5547,3 +5547,19 @@ first internal provider.
   Within each H301 / H300 group they are symmetry-equivalent for this model. Nothing was chosen by MAC.
 - **Pending:** the owner's face and edge statements, SUPERVISOR acceptance of the reconstruction deviations, and the
   shell-side rule.
+
+## 2026-10-21 — M11 R6.1: owner orientation and shaker evidence (FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING)
+
+- **Owner archives:** `M11_R6_owner_orientation_evidence.zip` and `M11_shaker_location_owner_evidence.zip` were
+  verified against their SHA-256 manifests and extracted outside git as HUMAN supporting evidence.
+- **Closed (HUMAN):**
+  - FE X = 301 mm, Y = 300 mm;
+  - 301 mm horizontal in the test, so the 300-horizontal candidates are excluded;
+  - thickness rows 1 top / 2 right / 3 bottom / 4 left (shaker view).
+- **Supported, not established:** the scanner saw the face opposite the shaker (PSV frame occlusion).
+- **Open:** FE axis signs and origin, FE +Z relative to a face, the shell-face field (R7 design), and SUPERVISOR's
+  decision on the three reconstruction deviations (justifications in §13.4).
+- **Shaker:** not at a corner (bottom edge, left of the midline in the shaker view). The corner-spring scenarios are
+  not a model of the experiment; the four-corner strap model remains a hypothesis; the frequencies are not proof.
+- **Evidence draft:** only confirmed fields are filled; the existing parser refuses it.
+- No code change, no Abaqus, no MAC, no fitting.

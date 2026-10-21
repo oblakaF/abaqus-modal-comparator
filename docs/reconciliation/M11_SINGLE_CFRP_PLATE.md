@@ -478,7 +478,7 @@ laminate A–B–D). Nothing is fitted, no FE solve was run, and no constant is 
 
 | Hypothesis | Estimate (under B) | Status |
 |---|---|---|
-| **One** vertical attachment spring (e.g. the stinger) | Control: one corner spring of 384 N/m gives a non-zero rigid-subspace frequency of **23.98 Hz**, not 9.06 Hz; the 384 N/m (1-D translation) cannot be placed in a corner. To raise the coupled twist to 33.45 Hz a single spring needs 257.1 N/m at a corner, 507.5 N/m at (0.4a, 0.4b) or 1568.5 N/m at (a/4, b/4). The resulting twist-like mode would then contain 31%–70% rigid-plane content, against 1.6% measured | **not supported as the main cause** by the measured mode-1 shape; a smaller contribution is not excluded |
+| **One** vertical attachment spring at a corner (hypothetical; R6.1: the shaker was **not** at a corner, §13.3) | Control: one corner spring of 384 N/m gives a non-zero rigid-subspace frequency of **23.98 Hz**, not 9.06 Hz; the 384 N/m (1-D translation) cannot be placed in a corner. To raise the coupled twist to 33.45 Hz a single spring needs 257.1 N/m at a corner, 507.5 N/m at (0.4a, 0.4b) or 1568.5 N/m at (a/4, b/4). The resulting twist-like mode would then contain 31%–70% rigid-plane content, against 1.6% measured | **not supported as the main cause** by the measured mode-1 shape; a smaller contribution is not excluded |
 | **Four equal corner supports** (the straps visible in the frame) | Total 383.8 N/m gives a translation at 9.06 Hz, rocking about both axes at 15.697 Hz (ratio √3 = 1.7322; the observed ODS ratio is 1.7241), no rigid content in the twist by symmetry, and a twist at 33.21 Hz | **open hypothesis, consistent with the two ODS frequencies.** Not established: the ODS are not identified modes; the strap stiffness and geometry, the stinger and the effect on the other modes are unchecked. **33.21 Hz is not a bound or a proof** |
 | A 45° ply on the hidden face (unsymmetric laminate) | With the template constants the B-coupling reduces D66 to D66* = D66 − (B A⁻¹ B)66: ×2.055 for [0/90 \| 45] and ×1.945 for [0,0,0,45], i.e. a Rayleigh twist-frequency ratio of 1.433 / 1.395 against the required 1.754. At exactly 45° a balanced fabric gives D16 = D26 = 0; off-45° plies give D16, D26 ≠ 0 (e.g. ±0.3574 D66 at 30°) | **parametric only.** Under the template constants it does **not** reach the gap. With the real (unknown) ply constants, thicknesses and angles no numerical claim is made. The earlier ×2.9–3.2 D66 figures are withdrawn as frequency evidence |
 | Interior 45° plies (symmetric) | D66 ×1.16–1.542, i.e. a twist-frequency ratio of 1.077–1.242 | insufficient alone under B |
@@ -771,7 +771,159 @@ is governed evidence.
   MAC of near-degenerate FE pairs needs subspace treatment;
 - the free-free model does not represent the suspension (§10.2).
 
-## 13. What did not change
+## 13. R6.1 (2026-10-21): owner orientation and shaker evidence; preparation for a diagnostic registration
+
+Part B of the combined SUPERVISOR task R7 + M11 R6.1. These are scientific documents and evidence only: no code
+change, no Abaqus, no extraction, no MAC and no fitting. No original was opened.
+
+### 13.1 HUMAN evidence (verified copies outside git)
+
+| Archive | Archive SHA-256 | Content | Manifest check |
+|---|---|---|---|
+| `M11_R6_owner_orientation_evidence.zip` | `07c4d59b42c6ee1f…` | `plate_orientation_shaker_view.png` (`40db5103f28f1ec0…`) + `ORIENTATION_MANIFEST.json` | match |
+| `M11_shaker_location_owner_evidence.zip` | `1a248d388d71cef8…` | `owner_shaker_location_schema.png` (`e8a569459d3b2325…`) + `MANIFEST_SHA256.json` | match |
+
+The archives were extracted to `owner_records\orientation_r61` and `owner_records\shaker_location_r61`; the record is
+`owner_records\owner_archives_r61_verification.json`.
+
+**Owner statements**, recorded as HUMAN supporting evidence, not governed and not a registration:
+
+- The plate is 301 × 300 mm. **Abaqus X corresponds to the 301 mm dimension and Y to the 300 mm dimension.**
+- The real orientation of the plate in the test is reproduced in the Abaqus model.
+- The sketches are drawn **from the shaker side, which is the side with the handwritten marks**.
+- Thickness rows in that view: **1 = top, 2 = right, 3 = bottom, 4 = left.** The last item is now confirmed by the
+  sketch; earlier the owner's text read "3 left".
+- The shaker was **not at a corner**. Its attachment (red circle, approximate) is near the bottom edge, left of the
+  midline, in the shaker-side view.
+- The orange dot near the bottom-left corner has an **unconfirmed role**. It is not taken as the Abaqus origin and
+  not as corner A.
+
+The orientation sketch also shows the scanner camera and the shaker on opposite sides of the plate, schematically.
+
+### 13.2 Orientation: closed and open questions
+
+**Three frames are kept separate:**
+
+- (a) the shaker-side view of the owner's sketches;
+- (b) the scanner (PSV camera) view;
+- (c) the positive side of the S4R shell normal (+Z for all 10 000 elements, from the INP copy).
+
+**FE geometry (R6 extraction):**
+
+- X 0–301 mm and Y 0–300 mm; Z = 0;
+- corners (0, 0), (301, 0), (301, 300) and (0, 300); positive axes +X along the 301 mm edge and +Y along the 300 mm
+  edge;
+- FE geometry identity `02fb9f9925aab3ce…` (10 201 nodes, `CFRP_301X300_SHELL-1`).
+
+| Question | Status |
+|---|---|
+| Which plate dimension lies along FE X / Y | **closed (HUMAN):** X = 301 mm, Y = 300 mm |
+| Which edge was horizontal in the test | **closed (HUMAN):** 301 mm horizontal in the shaker-side view, hence also in the scanner view (opposite views of a hanging plate share the horizontal). The 300-mm-horizontal candidate group of §12.3 is excluded; the reconstruction `W301xH300` applies |
+| Thickness row ↔ edge | **closed (HUMAN):** shaker view 1 top, 2 right, 3 bottom, 4 left. In the scanner view left and right swap: the thin side (row 2, mean 0.816 mm) is on the scanner's left, the thick side (row 4, 0.926 mm) on its right |
+| Which face the scanner saw | **supported, not established.** In the stored PSV frame (scanner view) the plate occludes the shaker body visible at the lower right, so the scanner faced the side opposite the shaker. With the owner's statement that the marks are on the shaker side, the scanner saw the unmarked face. Owner confirmation against the recorded setup is still requested |
+| FE axis signs and origin relative to a physical corner | **open.** The 2-D sketch does not pin them; corner A is not assigned; the orange dot is not used |
+| FE +Z (shell normal) relative to a physical face | **open.** "Abaqus reproduces the experiment" does not fix which physical face is +Z |
+
+**Consequence:** of the 8 geometric candidates of §12.3, the four with 300 mm horizontal are excluded. Four remain,
+with experimental axes in FE:
+
+- [+X, +Y, +Z]
+- [−X, −Y, +Z]
+- [+X, −Y, −Z]
+- [−X, +Y, −Z]
+
+All four have determinant +1. They are symmetry-equivalent for this homogeneous E1 = E2 model, but they are **not**
+physically chosen. **No choice is made by MAC.**
+
+### 13.3 Shaker, suspension and marks: kept separate
+
+1. **Four corner straps (suspension).** Visible in the PSV frame. The "four equal corner supports" model (§10.2,
+   §11.3) remains an **unconfirmed hypothesis**: the strap stiffness, length and tension are unmeasured.
+2. **Shaker stinger.** Off-corner, near the bottom edge, left of the midline in the shaker view (right of it in the
+   scanner view, consistent with the shaker body seen at the lower right behind the plate in the PSV frame). The
+   position is approximate; the stiffness and armature mass are unmeasured.
+   - **The single-corner-spring scenarios of §10.2 do not represent the shaker and are not a model of this
+     experiment.** They remain only as parametric statements about a hypothetical corner spring.
+   - At an off-corner bottom-edge point the twist shape has a non-zero but smaller amplitude than at a corner. The
+     stinger's effect on the 33.45 Hz twist is **not quantified**.
+3. **Physical marks.** Handwritten numerals near the edges on the shaker-side face (photograph, §11.1); the orange dot
+   in the sketch, role unconfirmed.
+
+**The rigid-body / ODS frequencies 9.06 / 15.6 Hz and the twist at 33.45 Hz are not evidence that any support model
+is correct.** No E1, E2 or G12 is derived from them.
+
+### 13.4 The three scan-reconstruction deviations (§9): justification for a SUPERVISOR decision
+
+They are **not accepted**, and no normative threshold is changed retroactively. All numbers are from
+`plate_reconstruction_W301xH300.json`.
+
+**1. Stored full-frame rectangle**
+
+| Aspect | Content |
+|---|---|
+| Observation | the `.svd` stores u −0.2222…1.5556, v **−2.4667…1.0**; every other stored session (SP-02, SP-10 ×2, SP-13) has the same u range with v 0…1 |
+| Why the standard failed | with the stored v range the 289 MeasPoints map to image rows 795–1039 (244 px), while the plate occupies about 890 px. The grid would be compressed about 3.5 times vertically and partly lie below the plate edge (row 960), which is geometrically impossible |
+| Why the change is justified | the frame is 1920 × 1080 as in the other sessions, and u is identical. v 0…1 maps the points to rows 92–939, inside the plate. The scanner-angle isotropy is 0.972, against SP-02 0.973 and SP-13 0.966 |
+| Independent control | MeasPoints ↔ UNV parser residual max 1.1e-03 (independent of the rectangle); camera-grid model residual 1.29 / 3.23 mm (median / max), better than the accepted SP-02 2.83 / 5.93 and SP-13 2.68 / 5.72 |
+| Remaining uncertainty | why the PSV software stored that rectangle is unknown. A different crop or zoom would shift points against the edges; only the small residual argues against it |
+
+**2. Edge search window**
+
+| Aspect | Content |
+|---|---|
+| Observation | the scan grid ends about 167 px (56 mm) from the left plate edge |
+| Why the standard failed | `EDGE_SEARCH_WINDOW_PX` = 150 does not reach the edge ("too few edge samples") |
+| Why the change is justified | only the search range grows (220 px). The edge criterion (step, gradient, clustering) is unchanged |
+| Independent control | left edge RMS 0.289 px, 108/120 samples, angle -0.39° (right edge 0.18°); plate 892.2 × 892.6 px, i.e. 301 / 300 within 0.4 % |
+| Remaining uncertainty | a wider band could catch another structure; the edge-sample cluster and the visual overlay show the plate edge |
+
+**3. Bottom-edge polarity**
+
+| Aspect | Content |
+|---|---|
+| Observation | behind the bottom edge lie the dark shaker and fixture. The plate is about 22 grey levels, the background about 10: a step of the opposite sign to the detector's assumption |
+| Why the standard failed | with constants unchanged the fit took other structures: RMS 16.9 px, 29 samples, bottom gap −17 mm |
+| Why the change is justified | the physical edge exists as a dark-to-darker step. On the inverted image with a step threshold of 8 and a minimum gradient of 2, the same detector finds it |
+| Independent control | bottom edge RMS 0.213 px, 82/108 samples, angle -0.004° (top edge 0.25°); plate aspect consistent with 301 × 300; residual as above |
+| Remaining uncertainty | low contrast, so a shadow could bias the line by a pixel or two (about 0.3–0.7 mm). The threshold is specific to this frame |
+
+### 13.5 Evidence draft for a future diagnostic registration
+
+The draft is `runs\m11_carbon_plate\evidence_r61\evidence_DRAFT_plate_r61.json` (`auto-id/guided-physical-evidence/v1`).
+
+**Filled:**
+
+- FE instance `CFRP_301X300_SHELL-1` and FE geometry identity `02fb9f9925aab3ce…`;
+- experimental source `300by300_plate_only_1mm_261016_POLYMAX.unv` (SHA-256 `117c893bafbbeba2…`), set
+  `polymax-bravo`, 289 points, U3;
+- scan window 215.42 × 285.20 mm, with provenance naming the
+  three unaccepted deviations;
+- the X / Y dimensions and the HUMAN orientation statements, the marked face and the shaker location.
+
+**Explicitly empty:**
+
+- the scanned face (`side`), the axis signs (`experimental_axes_in_fe`) and the orientation reference;
+- the panel-edge offsets and the uncertainty.
+
+The existing parser **refuses** the draft (`measured_surface.side` must be `max_z` / `min_z`). No registration was
+built and no MAC was computed.
+
+### 13.6 Remaining obstacles before a diagnostic registration and MAC
+
+| # | Obstacle | Who / what closes it |
+|---|---|---|
+| 1 | Scanned face relative to the marked face, confirmed against the recorded setup (the PSV frame supports "unmarked face") | owner |
+| 2 | FE axis signs and origin relative to a physical corner (corner reference; corner A not assigned) | owner, with a marked photograph |
+| 3 | FE +Z (shell normal) relative to a physical face | owner statement on the CAE model, or the R7 shell-face design |
+| 4 | The shell-face evidence field (`side` cannot name the face of an S4R mid-surface) | SUPERVISOR decision on the R7 design (governed passport schema) |
+| 5 | Acceptance or rejection of the three reconstruction deviations (§13.4), or independent scan-to-edge offsets | SUPERVISOR |
+| 6 | Instrument and resolution of the plan dimensions 301 × 300 | owner |
+| 7 | Zero-frequency rigid modes 1–2 of the R6 package carry false 1 Hz / 2 Hz | R7 loader (review) refuses them; the R6 package is not modified |
+| 8 | MAC caveats: complex modes 4 / 5; split experimental bending vs near-degenerate FE pairs; no support in the FE model | to be handled in the MAC step |
+
+**Status: `FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING`** (unchanged).
+
+## 14. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.
