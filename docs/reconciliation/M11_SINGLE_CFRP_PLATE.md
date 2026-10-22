@@ -1937,7 +1937,8 @@ assignment.
 
 [![Frequency vs G12](figures/m11_r66/fig_r66_frequency_vs_g12.png)](figures/m11_r66/fig_r66_frequency_vs_g12.png)
 
-*Figure 18.1 — FE frequency branches against G12.* SHA-256 `cb93fff9a5a29b01…`.
+*Figure 18.1 — FE frequency branches against G12.* SHA-256 `6d6da3dc046e95b8…`. The legend was corrected in
+R6.7 §19.6; the R6.6 numbers are unchanged.
 
 | Baseline FE mode | G12 5 000, Hz | G12 10 000, Hz | G12 15 000, Hz | d ln f / d ln G12 (5 000 → 15 000) | FE–FE MAC to baseline (A / B) | Branch |
 |---|---|---|---|---|---|---|
@@ -2000,7 +2001,10 @@ variant pair subspace):
 trial function w = (x − a/2)(y − b/2). Its strain energy depends on D66 = G12·h³/12 only. The Rayleigh quotient gives
 f = (1/2π)·√(576·D66 / (ρ·h·a²·b²)) = 19.52 / 27.61 / 33.81 Hz.
 
-- This is an upper bound: the true shape is not exactly xy, and transverse shear is absent from Kirchhoff theory.
+- Within Kirchhoff theory this Rayleigh quotient bounds the Kirchhoff twist frequency from above. It is used here
+  only as an **analytical reference**. It is **not** claimed to be a strict upper bound for the S4R model, whose
+  variational formulation (transverse shear, reduced integration) differs; no comparability proof is given
+  (wording corrected in R6.7).
 - The FE values lie 2–5 % below it. They also fall below √ scaling as G12 grows, because G13 and G23 stay at 3 000 MPa,
   so the share of transverse-shear deformation grows.
 
@@ -2075,13 +2079,213 @@ What this shows:
 Auto-ID / LM, production gates, material passports, R7 and PR #94 / #96. No automatic fitting of E1, E2, G12, ν12,
 density or thickness. The Abaqus outputs stay outside Git.
 
-## 19. What did not change
+## 19. R6.7 (2026-10-23): independent E1/E2 modal sensitivity
+
+**Authorisation (SUPERVISOR R6.7 §0).** Two controlled Abaqus frequency runs were made. This is a sensitivity matrix
+of the **computational model**: not a material identification, not an optimisation and not a fit. No E1 or E2 was
+chosen from experimental frequencies.
+
+The statuses are unchanged: **research result `RESEARCH_MAC_COMPUTED`**; **physical registration
+`PHYSICAL_REGISTRATION_PENDING`**. No material property is accepted.
+
+### 19.1 Parameters, preparation and runs
+
+- **Source:** the verified copy `CFRP_S4R_0875_FreeFree.inp`, SHA-256 `962f75f2…` (checked).
+- **Edit:** in each working INP (outside Git, `runs\m11_carbon_plate\r67\<job>\`) **only one field** of the
+  `*Elastic, type=ENGINEERING CONSTANTS` line changed: line 20239, field
+  1 (E1) in variant A and field
+  2 (E2) in variant B. The file length is unchanged and every other byte
+  is identical.
+- **Model checks:**
+  - mass 118.36 g;
+  - free-free;
+  - mesh, geometry, section and step unchanged;
+  - orthotropic compliance positive definite;
+  - the Poisson bounds hold (|ν12| < √(E1/E2), |ν13| < √(E1/E3), |ν23| < √(E2/E3)) in all three models.
+- **Material axes:** there is no `*Orientation` and no `orientation=` on the shell section, and the journal sets
+  `MaterialOrientation` GLOBAL. The instance has a translation only.
+  - So **material axis 1 = Assembly X** (the 301 mm side) and **axis 2 = Assembly Y** (the 300 mm side).
+  - The axis lines follow from the HUMAN records (FE X = 301 mm, horizontal in the test).
+  - The fibre directions of the real plain-weave plate are **not** evidenced, so "E1 / E2" are model directions,
+    not measured fibre directions.
+- **Coupling inside each variant:** with ν12 fixed, ν21 = ν12·E2/E1 changes to
+  0.0556 (A) and 0.0450 (B), from 0.05.
+
+| Model | E1, MPa | E2, MPa | G12, MPa | E3 | ν12 / ν13 / ν23 | G13 = G23 | ρ, t/mm³ | h, mm | INP SHA-256 |
+|---|---|---|---|---|---|---|---|---|---|
+| Baseline R6 (stored, not re-run) | 56 000 | 56 000 | 5 000 | 8 500 | 0.05 / 0.3 / 0.3 | 3 000 | 1.498e-9 | 0.875 | `962f75f2…` |
+| R6.7-A `CFRP_S4R_0875_FreeFree_R67A_E1_50400` | **50 400** | 56 000 | 5 000 | same | same | same | same | same | `fd220f14755f2cca…` |
+| R6.7-B `CFRP_S4R_0875_FreeFree_R67B_E2_50400` | 56 000 | **50 400** | 5 000 | same | same | same | same | same | `5c08084b51c8af44…` |
+
+**Runs:**
+
+- both COMPLETED;
+- `.sta` successful; `.msg` 0 warnings and 0 errors;
+- 20 eigenvalues each, 14 elastic;
+- six rigid modes ≤ 0.009 Hz.
+
+**Shapes** came from the pinned extractor (SHA-256 `039aa067adeac83e…` = `PINNED_EXTRACT_SCRIPT_SHA256`, OD-R7-1 not
+bypassed), applied **only** to the two new work ODBs.
+
+### 19.2 Frequencies and FE–FE confirmation of the branches
+
+Tracking uses FE–FE MAC on the full U1–U3 fields at the identical 10 201 nodes. For every baseline mode it also uses
+the share of its shape inside the span of all 14 computed variant modes, so no assignment is forced.
+
+The evidence falls into three groups: single branches with MAC ≥ 0.9999; same-class pairs with 0.68–0.84 per mode but
+a full subspace; and FE 20, only partly inside the computed modes. This grouping comes from the data, not from a new
+criterion.
+
+| Baseline branch | G12 5 000, E1 = E2 = 56 000, Hz | E1 −10 %, Hz | E2 −10 %, Hz | FE–FE MAC to baseline (A / B) | Status |
+|---|---|---|---|---|---|
+| FE 7 | 19.07 | 19.05 (-0.09 %) | 19.05 (-0.09 %) | 1.00000 / 1.00000 | single branch |
+| FE 8 | 59.87 | see pair table | see pair table | 0.837 / 0.706 | same-class pair: subspace kept, shape rotates |
+| FE 9 | 62.01 | see pair table | see pair table | 0.837 / 0.707 | same-class pair: subspace kept, shape rotates |
+| FE 10 | 71.85 | 69.23 (-3.65 %) | 71.80 (-0.06 %) | 1.00000 / 0.99999 | single branch |
+| FE 11 | 72.19 | 72.16 (-0.04 %) | 69.53 (-3.68 %) | 0.99999 / 1.00000 | single branch |
+| FE 12 | 116.58 | 114.93 (-1.42 %) | 114.83 (-1.50 %) | 0.99999 / 0.99999 | single branch |
+| FE 13 | 167.49 | 158.92 (-5.12 %) | 167.48 (-0.01 %) | 1.00000 / 1.00000 | single branch |
+| FE 14 | 168.61 | 168.62 (+0.01 %) | 159.95 (-5.14 %) | 1.00000 / 0.99999 | single branch |
+| FE 15 | 174.80 | see pair table | see pair table | 0.829 / 0.684 | same-class pair: subspace kept, shape rotates |
+| FE 16 | 179.90 | see pair table | see pair table | 0.827 / 0.682 | same-class pair: subspace kept, shape rotates |
+| FE 17 | 213.20 | 206.50 (-3.14 %) | 212.06 (-0.53 %) | 0.99999 / 0.99997 | single branch |
+| FE 18 | 213.95 | 212.99 (-0.45 %) | 207.03 (-3.23 %) | 0.99997 / 0.99998 | single branch |
+| FE 19 | 295.78 | 290.91 (-1.65 %) | 290.51 (-1.78 %) | 0.99998 / 0.99996 | single branch |
+| FE 20 | 327.90 | not established | not established | 0.887 / 0.209 | only 0.89 / 0.21 of the shape inside the computed modes |
+
+**Same-class pairs** (R6.4: 8–9 class −−+, 15–16 class +++). The baseline pair subspace is kept almost exactly, but
+the individual shapes **rotate** inside it once E1 ≠ E2. Only the ordered pair eigenvalues are defined; a single-branch
+frequency is not.
+
+| Pair | Baseline, Hz | E1 −10 %: lower / upper, Hz | s_E1 lower / upper | E2 −10 %: lower / upper, Hz | s_E2 lower / upper | Subspace angle A / B | Baseline lower shape split A / B |
+|---|---|---|---|---|---|---|---|
+| 8-9 | 59.87 / 62.01 | 57.32 / 61.45 | 0.413 / 0.086 | 57.70 / 61.04 | 0.352 / 0.149 | 0.03° / 0.06° | 0.84 + 0.16 / 0.71 + 0.29 |
+| 15-16 | 174.80 / 179.90 | 168.06 / 178.52 | 0.373 / 0.073 | 168.96 / 177.46 | 0.323 / 0.130 | 0.16° / 0.25° | 0.83 + 0.17 / 0.68 + 0.32 |
+
+**FE 20** (327.9 Hz): only 0.89 (A) and
+0.21 (B) of its shape lie inside the computed modes. It mixes with modes from
+above the computed range, so **its frequency is not established**, and no correspondence is forced.
+
+### 19.3 Sensitivity matrix of the model: E1, E2 and G12
+
+The quantities are:
+
+- s = ln(f_variant / f_baseline) / ln(0.9), a finite logarithmic sensitivity for −10 %;
+- the G12 column is the R6.6 **secant** for 5 000 → 10 000 MPa (+100 %). It is not a local derivative and is not
+  directly comparable with the −10 % values.
+
+[![E1/E2/G12 sensitivity](figures/m11_r67/fig_r67_sensitivity.png)](figures/m11_r67/fig_r67_sensitivity.png)
+
+*Figure 19.1 — E1 / E2 / G12 sensitivity.* SHA-256 `b1894f6b6d4610c3…`.
+
+| Branch | f, Hz | s_E1 | s_E2 | s_G12 (secant, R6.6) | FE–FE MAC A / B | Shape |
+|---|---|---|---|---|---|---|
+| FE 7 | 19.07 | **0.008** | **0.008** | 0.479 | 1.00000 / 1.00000 | kept |
+| FE 8 | 59.87 | pair only | pair only | 0.000 | 0.837 / 0.706 | **changes** (rotation inside the pair) |
+| FE 9 | 62.01 | pair only | pair only | 0.000 | 0.837 / 0.707 | **changes** (rotation inside the pair) |
+| FE 10 | 71.85 | **0.353** | **0.006** | 0.169 | 1.00000 / 0.99999 | kept |
+| FE 11 | 72.19 | **0.004** | **0.356** | 0.167 | 0.99999 / 1.00000 | kept |
+| FE 12 | 116.58 | **0.135** | **0.144** | 0.245 | 0.99999 / 0.99999 | kept |
+| FE 13 | 167.49 | **0.499** | **0.001** | 0.000 | 1.00000 / 1.00000 | kept |
+| FE 14 | 168.61 | **-0.001** | **0.500** | 0.000 | 1.00000 / 0.99999 | kept |
+| FE 15 | 174.80 | pair only | pair only | 0.066 | 0.829 / 0.684 | **changes** (rotation inside the pair) |
+| FE 16 | 179.90 | pair only | pair only | 0.064 | 0.827 / 0.682 | **changes** (rotation inside the pair) |
+| FE 17 | 213.20 | **0.303** | **0.051** | 0.169 | 0.99999 / 0.99997 | kept |
+| FE 18 | 213.95 | **0.043** | **0.312** | 0.168 | 0.99997 / 0.99998 | kept |
+| FE 19 | 295.78 | **0.158** | **0.171** | — | 0.99998 / 0.99996 | kept |
+| FE 20 | 327.90 | not established | not established | 0.000 | 0.887 / 0.209 | mixes beyond the range |
+
+### 19.4 Answers to the scientific questions (model only)
+
+1. **Mainly E1** (bending along Assembly X, the 301 mm direction):
+   - **FE 13**: s_E1 0.499, s_E2 0.0006, s_G12 ≈ 0; a pure E1 branch.
+   - **FE 10**: 0.353 / 0.006.
+   - **FE 17**: 0.303 / 0.051.
+2. **Mainly E2** (along Assembly Y):
+   - **FE 14**: s_E2 0.500, s_E1 -0.0006, s_G12 ≈ 0; a pure E2 branch.
+   - **FE 11**: 0.004 / 0.356.
+   - **FE 18**: 0.043 / 0.312.
+3. **Sensitive to both moduli:**
+   - FE 12 (0.135 / 0.144) and FE 19 (0.158 /
+     0.171);
+   - the same-class pairs **8–9** and **15–16**: each pair eigenvalue moves with both E1 and E2, and the shapes rotate.
+4. **The torsional branch FE 7 is practically unchanged:** 19.072 → 19.055 /
+   19.055 Hz (-0.09 %); s_E1 = s_E2 = 0.0085; FE–FE MAC
+   1.00000. It remains governed by G12 (R6.6).
+5. **Can torsion and the two branches be controlled separately in this model? Only partly.**
+   - **FE 7** responds essentially to G12 alone.
+   - **FE 14** responds essentially to E2 alone (s_E2 0.50; s_E1 and s_G12 ≈ 0). These two channels are separate.
+   - **FE 8** is not a single branch once E1 ≠ E2: it belongs to the same-class pair 8–9.
+     - The lower pair eigenvalue moves with both moduli: s 0.41 for E1 and
+       0.35 for E2.
+     - Its shape rotates within the pair: the baseline FE 8 splits 0.84 /
+       0.16 in A and 0.71 /
+       0.29 in B.
+     - So FE 8 cannot be moved without changing its shape, and with it any research shape correlation computed for the
+       E1 = E2 model.
+6. **Interactions that rule out a simple conclusion:**
+   - the rotation of the same-class pairs 8–9 and 15–16 as soon as E1 ≠ E2;
+   - each modulus also moves other branches (FE 10–12, 17–19), and G12 moves FE 10–12 and 17–18 (R6.6). No parameter
+     acts on one branch only, apart from FE 13 / FE 14 for E1 / E2;
+   - FE 20 mixes with modes beyond the computed range;
+   - ν21 changes with E1 or E2 (fixed ν12);
+   - the G12 values are wide secants, not local derivatives;
+   - E1 / E2 are model directions; the fibre directions of the real weave are unknown;
+   - the experimental correspondences are research-only, and the physical registration is pending.
+
+**References, consulted only after the computation and used for nothing:**
+
+- exp 1 (33.45 Hz) is compared with FE 7: insensitive to E1 / E2.
+- exp 2 (55.25 Hz) is compared with FE 8: inside the E1 / E2-dependent, rotating pair 8–9.
+- exp 7 (144.60 Hz) is compared with FE 14: E2-only.
+- No E1, E2 or G12 was chosen to bring frequencies closer.
+
+### 19.5 Possibilities and limits of the homogeneous orthotropic model
+
+**Possibilities.**
+
+- E1, E2 and G12 act through clearly different sensitivity patterns:
+  - G12: twist and the twist-containing branches;
+  - E1: bending along X;
+  - E2: bending along Y.
+- So the model has, in principle, separate channels for D11, D22 and D66 (D = Q·h³/12).
+
+**Limits.**
+
+- A single homogeneous layer has:
+  - no bend–twist coupling (D16 = D26 = 0);
+  - no extension–bending coupling (B = 0);
+  - a uniform thickness;
+  - no representation of the setup (shaker, suspension).
+- The same-class pairs 8–9 and 15–16 change their shapes when the E1 / E2 balance changes. Their correspondence to an
+  experimental shape therefore depends on the parameters themselves.
+- Branches outside the computed 20 modes (FE 19 in R6.6, FE 20 here) cannot be followed.
+- **Consequence:** the model's sensitivity matrix shows which parameters a model can move. It does **not** show that
+  the experimental data identify them. Identification would also need an accepted physical registration and accepted
+  modal correspondences, neither of which exists.
+
+### 19.6 Correction to R6.6 §18.3
+
+The Kirchhoff Rayleigh estimate is now described as an **analytical reference**, not a strict upper bound for S4R:
+
+- The R6.6 text is corrected in place.
+- The legend of Figure 18.1 is corrected and the figure regenerated: SHA-256 `6d6da3dc046e95b8…`, previously
+  `cb93fff9a5a29b01…`.
+- The R6.6 numbers are unchanged: the regenerated `r66_branches.json` is byte-identical.
+
+**Unchanged:** the R6.5 complex MAC and `research/m11_r65/`, the R6.6 results, SPEC v1.2, governed evidence,
+thresholds, R7, production gates, physical registrations and PR #94 / #96. No Auto-ID or LM, no fitting, no
+hypothetical supports, springs or masses. The Abaqus outputs stay outside Git.
+
+## 20. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.
 - Branch `analysis/m10-sp10-registration-prep` and PR #94.
 - No Auto-ID or LM, no governed MAC, no material change. Until R6.4 no MAC was computed at all;
-  R6.5 computed a research-only complex MAC (§17). FE solves: none until R6.6; R6.6 made exactly two authorised
-  frequency runs (G12 variants, §18) in a working directory, with the pinned extractor applied only to their new ODBs. Abaqus Python: exactly one authorised extraction run
-  (R6) on a working copy of `CFRP_S4R_0875_FreeFree.odb`; no other ODB was opened.
+  R6.5 computed a research-only complex MAC (§17).
+- FE solves: none until R6.6. R6.6 (G12, §18) and R6.7 (E1 / E2, §19) each made exactly two authorised frequency
+  runs in a working directory.
+- Abaqus Python: the R6 extraction on a working copy of `CFRP_S4R_0875_FreeFree.odb`, and the pinned extractor
+  applied only to the four new work ODBs of R6.6 and R6.7. No other ODB was opened.
 - M8 original gate `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE.

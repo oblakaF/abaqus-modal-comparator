@@ -5711,3 +5711,20 @@ first internal provider.
   Competing explanations are listed. One proposed next experiment: a free-free test without the shaker.
 - **Not done:** no material identification, G12 fitting, Auto-ID or LM. `research/m11_r65` unchanged, statuses
   unchanged.
+
+## 2026-10-23 — M11 R6.7: independent E1/E2 modal sensitivity (research result RESEARCH_MAC_COMPUTED; physical registration PENDING)
+
+- **Two authorised Abaqus frequency runs** from the verified V3 INP copy: E1 −10 % (50 400 MPa) and E2 −10 %, each a
+  single field of the `*Elastic` line; all other bytes identical.
+  - Both completed with 0 warnings and 0 errors, 14 elastic modes each.
+  - Shapes extracted with the pinned extractor from the new ODBs only.
+  - Material axis 1 = Assembly X, axis 2 = Assembly Y (GLOBAL orientation); fibre directions not evidenced.
+- **Sensitivity matrix of the model** (FE–FE tracking, no forced assignment):
+  - FE 13 pure E1 (s 0.50) and FE 14 pure E2 (s 0.50);
+  - FE 10 / 17 mainly E1, FE 11 / 18 mainly E2, FE 12 / 19 both;
+  - the twist branch FE 7 is insensitive (s 0.0085);
+  - the same-class pairs 8–9 and 15–16 keep their subspace but rotate when E1 ≠ E2 (pair eigenvalues only);
+  - FE 20 is not established (it mixes beyond the computed range).
+- **Correction:** the R6.6 §18.3 wording now calls the Kirchhoff Rayleigh estimate an analytical reference, not a
+  strict upper bound for S4R. The Figure 18.1 legend is corrected and regenerated; the R6.6 numbers are unchanged.
+- **Not done:** no identification, fitting, Auto-ID, LM or pairing. R6.5 and R6.6 results unchanged.

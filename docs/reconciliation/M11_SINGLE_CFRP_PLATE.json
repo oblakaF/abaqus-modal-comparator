@@ -11225,7 +11225,7 @@
     }
    },
    "analytical_twist": {
-    "model": "Kirchhoff orthotropic plate, trial function w = (x - a/2)(y - b/2): strain energy depends on D66 only; Rayleigh quotient f = (1/2pi) sqrt(576 D66 / (rho h a^2 b^2)), D66 = G12 h^3 / 12; an upper bound, no transverse shear (S4R includes it)",
+    "model": "Kirchhoff orthotropic plate, trial function w = (x - a/2)(y - b/2): strain energy depends on D66 only; Rayleigh quotient f = (1/2pi) sqrt(576 D66 / (rho h a^2 b^2)), D66 = G12 h^3 / 12; an analytical Kirchhoff reference (an upper bound only within Kirchhoff theory; NOT claimed as a strict upper bound for S4R; wording corrected in R6.7), no transverse shear (S4R includes it)",
     "rayleigh_hz": {
      "5000": 19.52,
      "10000": 27.606,
@@ -11300,7 +11300,8 @@
   "proposed_next_experiment": "free-free modal test of the same plate without the shaker (impact or acoustic excitation, documented soft suspension, same PSV grid); proposal only",
   "published_figure": {
    "path": "docs/reconciliation/figures/m11_r66/fig_r66_frequency_vs_g12.png",
-   "sha256": "cb93fff9a5a29b01f9c73236de65fb0677df6052f984ef3386edc423670f0169"
+   "sha256": "6d6da3dc046e95b8fc239fdaa65b3ad36be56ef81ce0d39faef6a55fe6e984dc",
+   "sha256_before_r67_legend_correction": "cb93fff9a5a29b01f9c73236de65fb0677df6052f984ef3386edc423670f0169"
   },
   "not_done": [
    "material identification",
@@ -11311,6 +11312,1799 @@
    "fictitious springs or masses",
    "changes to research/m11_r65",
    "re-opening original or earlier ODBs"
+  ]
+ },
+ "r67_e1_e2_sensitivity": {
+  "nature": "sensitivity matrix of the computational model; not identification, optimisation or fitting; no E1/E2 chosen from experimental frequencies; no material property accepted",
+  "statuses": {
+   "research_result": "RESEARCH_MAC_COMPUTED",
+   "physical_registration": "PHYSICAL_REGISTRATION_PENDING"
+  },
+  "preparation": {
+   "source": {
+    "file": "V3 temp_root/CFRP_S4R_0875_FreeFree.inp",
+    "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+   },
+   "baseline_constants": {
+    "E1": 56000.0,
+    "E2": 56000.0,
+    "E3": 8500.0,
+    "nu12": 0.05,
+    "nu13": 0.3,
+    "nu23": 0.3,
+    "G12": 5000.0,
+    "G13": 3000.0,
+    "G23": 3000.0
+   },
+   "density_t_per_mm3": 1.498e-09,
+   "thickness_mm": 0.875,
+   "mass_g": 118.360725,
+   "free_free": true,
+   "supports_or_loads_keywords": [],
+   "material_orientation": {
+    "inp_orientation_keywords": [],
+    "statement": "no *Orientation and no orientation= on the shell section; journal MaterialOrientation GLOBAL (axis 3); instance translation only: material axis 1 = Assembly X (301 mm side), axis 2 = Assembly Y (300 mm side); the physical edge of either axis is NOT determined (R6.3)"
+   },
+   "baseline_poisson": {
+    "nu21": 0.05,
+    "nu31": 0.045535714285714284,
+    "nu32": 0.045535714285714284,
+    "abs_nu12_lt_sqrt_E1_over_E2": true,
+    "abs_nu13_lt_sqrt_E1_over_E3": true,
+    "abs_nu23_lt_sqrt_E2_over_E3": true,
+    "determinant_term": 0.9688125000000001,
+    "positive_definite": true
+   },
+   "sha256_all_but_elastic_line_1": "8121589991478645019ade07ccc5bd4444f4ab834a2fcfd5dcf01f5b6eb3c487",
+   "variants": {
+    "R67A": {
+     "job": "CFRP_S4R_0875_FreeFree_R67A_E1_50400",
+     "changed_constant": "E1",
+     "value": 50400.0,
+     "relative_change": -0.09999999999999998,
+     "inp_sha256": "fd220f14755f2ccaed21c0848c82b67f4b6e2c43b23490aa190294ec32976ad6",
+     "changed_lines": [
+      20239
+     ],
+     "changed_fields_of_elastic_line": [
+      0
+     ],
+     "old_line": "56000.,56000., 8500.,  0.05,   0.3,   0.3, 5000., 3000.",
+     "new_line": "50400.,56000., 8500.,  0.05,   0.3,   0.3, 5000., 3000.",
+     "same_bytes_elsewhere": true,
+     "same_length": true,
+     "poisson": {
+      "nu21": 0.05555555555555555,
+      "nu31": 0.050595238095238096,
+      "nu32": 0.045535714285714284,
+      "abs_nu12_lt_sqrt_E1_over_E2": true,
+      "abs_nu13_lt_sqrt_E1_over_E3": true,
+      "abs_nu23_lt_sqrt_E2_over_E3": true,
+      "determinant_term": 0.9668650793650795,
+      "positive_definite": true
+     }
+    },
+    "R67B": {
+     "job": "CFRP_S4R_0875_FreeFree_R67B_E2_50400",
+     "changed_constant": "E2",
+     "value": 50400.0,
+     "relative_change": -0.09999999999999998,
+     "inp_sha256": "5c08084b51c8af446be69fd8c49fae7389f86e90b37b4d81f100955eebdba2eb",
+     "changed_lines": [
+      20239
+     ],
+     "changed_fields_of_elastic_line": [
+      1
+     ],
+     "old_line": "56000.,56000., 8500.,  0.05,   0.3,   0.3, 5000., 3000.",
+     "new_line": "56000.,50400., 8500.,  0.05,   0.3,   0.3, 5000., 3000.",
+     "same_bytes_elsewhere": true,
+     "same_length": true,
+     "poisson": {
+      "nu21": 0.045,
+      "nu31": 0.045535714285714284,
+      "nu32": 0.050595238095238096,
+      "abs_nu12_lt_sqrt_E1_over_E2": true,
+      "abs_nu13_lt_sqrt_E1_over_E3": true,
+      "abs_nu23_lt_sqrt_E2_over_E3": true,
+      "determinant_term": 0.9675446428571429,
+      "positive_definite": true
+     }
+    }
+   }
+  },
+  "job_checks": {
+   "baseline": {
+    "completed_sta": true,
+    "completed_log": true,
+    "warnings_input": 0,
+    "warnings_analysis": 0,
+    "errors": 0,
+    "eigenvalues": 20,
+    "rigid_max_hz": 0.00923527,
+    "elastic_modes": 14,
+    "frequencies_hz": {
+     "7": 19.072,
+     "8": 59.874,
+     "9": 62.009,
+     "10": 71.85,
+     "11": 72.19,
+     "12": 116.58,
+     "13": 167.49,
+     "14": 168.61,
+     "15": 174.8,
+     "16": 179.9,
+     "17": 213.2,
+     "18": 213.95,
+     "19": 295.78,
+     "20": 327.9,
+     "1": -7.64942e-08,
+     "2": -0.00570223,
+     "3": 0.000745097,
+     "4": 0.00923527,
+     "5": -1.82258e-08,
+     "6": -1.5636e-08
+    }
+   },
+   "A_E1": {
+    "completed_sta": true,
+    "completed_log": true,
+    "warnings_input": 0,
+    "warnings_analysis": 0,
+    "errors": 0,
+    "eigenvalues": 20,
+    "rigid_max_hz": 0.00775305,
+    "elastic_modes": 14,
+    "odb_sha256": "f1885157de4e7514c803667498e349bd6844c52cfde24cbc656f153f51d72fae",
+    "inp_sha256": "fd220f14755f2ccaed21c0848c82b67f4b6e2c43b23490aa190294ec32976ad6",
+    "frequencies_hz": {
+     "7": 19.055,
+     "8": 57.324,
+     "9": 61.452,
+     "10": 69.229,
+     "11": 72.16,
+     "12": 114.93,
+     "13": 158.92,
+     "14": 168.06,
+     "15": 168.62,
+     "16": 178.52,
+     "17": 206.5,
+     "18": 212.99,
+     "19": 290.91,
+     "20": 311.53,
+     "1": -0.00775305,
+     "2": -0.000185125,
+     "3": 0.00762999,
+     "4": -1.8219e-08,
+     "5": -1.49873e-08,
+     "6": -1.81292e-08
+    }
+   },
+   "B_E2": {
+    "completed_sta": true,
+    "completed_log": true,
+    "warnings_input": 0,
+    "warnings_analysis": 0,
+    "errors": 0,
+    "eigenvalues": 20,
+    "rigid_max_hz": 0.00890756,
+    "elastic_modes": 14,
+    "odb_sha256": "d22020068870bb06f130b85e325f65d7ea34c67c0d5c289d0ac4e316f0e216dd",
+    "inp_sha256": "5c08084b51c8af446be69fd8c49fae7389f86e90b37b4d81f100955eebdba2eb",
+    "frequencies_hz": {
+     "7": 19.055,
+     "8": 57.695,
+     "9": 61.044,
+     "10": 69.531,
+     "11": 71.804,
+     "12": 114.83,
+     "13": 159.95,
+     "14": 167.48,
+     "15": 168.96,
+     "16": 177.46,
+     "17": 207.03,
+     "18": 212.06,
+     "19": 290.51,
+     "20": 313.55,
+     "1": 0.00624625,
+     "2": 2.18325e-05,
+     "3": 0.00890756,
+     "4": -3.73993e-08,
+     "5": -1.44484e-08,
+     "6": -1.08394e-09
+    }
+   }
+  },
+  "extractor": {
+   "sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pinned_match": true,
+   "applied_to": "the two new work ODBs only"
+  },
+  "tracking": {
+   "A_E1": {
+    "assignments": [
+     {
+      "baseline_mode": 7,
+      "variant_mode": 7,
+      "mac": 1.0,
+      "second_best": 0.0016,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 8,
+      "variant_mode": 8,
+      "mac": 0.83681,
+      "second_best": 0.16298,
+      "row_max": 0.83681,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 9,
+      "variant_mode": 9,
+      "mac": 0.83697,
+      "second_best": 0.16324,
+      "row_max": 0.83697,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 10,
+      "variant_mode": 10,
+      "mac": 1.0,
+      "second_best": 0.00091,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 11,
+      "variant_mode": 11,
+      "mac": 0.99999,
+      "second_best": 0.00109,
+      "row_max": 0.99999,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 12,
+      "variant_mode": 12,
+      "mac": 0.99999,
+      "second_best": 0.00055,
+      "row_max": 0.99999,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 13,
+      "variant_mode": 13,
+      "mac": 1.0,
+      "second_best": 0.00037,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 14,
+      "variant_mode": 15,
+      "mac": 1.0,
+      "second_best": 0.00035,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 15,
+      "variant_mode": 14,
+      "mac": 0.82854,
+      "second_best": 0.17319,
+      "row_max": 0.82854,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 16,
+      "variant_mode": 16,
+      "mac": 0.8272,
+      "second_best": 0.17107,
+      "row_max": 0.8272,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 17,
+      "variant_mode": 17,
+      "mac": 0.99999,
+      "second_best": 0.00078,
+      "row_max": 0.99999,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 18,
+      "variant_mode": 18,
+      "mac": 0.99997,
+      "second_best": 0.00095,
+      "row_max": 0.99997,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 19,
+      "variant_mode": 19,
+      "mac": 0.99998,
+      "second_best": 0.00118,
+      "row_max": 0.99998,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 20,
+      "variant_mode": 20,
+      "mac": 0.88709,
+      "second_best": 0.0014,
+      "row_max": 0.88709,
+      "tracked": true
+     }
+    ],
+    "fe_fe_mac": [
+     [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00061,
+      0.0,
+      0.0016,
+      0.0,
+      0.0,
+      1e-05,
+      0.0
+     ],
+     [
+      0.0,
+      0.83681,
+      0.16298,
+      0.0,
+      0.0,
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00092
+     ],
+     [
+      0.0,
+      0.16324,
+      0.83697,
+      0.0,
+      0.0,
+      0.00069,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00055
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00091,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99999,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00109,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.00017,
+      0.00055,
+      0.0,
+      0.0,
+      0.99999,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00037,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.00035,
+      0.0,
+      0.0
+     ],
+     [
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.82854,
+      0.0,
+      0.17319,
+      0.0,
+      0.0,
+      1e-05,
+      0.0
+     ],
+     [
+      0.00205,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.17107,
+      0.0,
+      0.8272,
+      0.0,
+      0.0,
+      0.00198,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00078,
+      0.0,
+      0.00036,
+      0.0,
+      0.0,
+      0.0,
+      0.99999,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.00095,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00038,
+      0.0,
+      0.0,
+      0.99997,
+      0.0,
+      0.0
+     ],
+     [
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00051,
+      0.0,
+      0.00118,
+      0.0,
+      0.0,
+      0.99998,
+      0.0
+     ],
+     [
+      0.0,
+      0.0014,
+      2e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.88709
+     ]
+    ]
+   },
+   "B_E2": {
+    "assignments": [
+     {
+      "baseline_mode": 7,
+      "variant_mode": 7,
+      "mac": 1.0,
+      "second_best": 0.00168,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 8,
+      "variant_mode": 8,
+      "mac": 0.7062,
+      "second_best": 0.29355,
+      "row_max": 0.7062,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 9,
+      "variant_mode": 9,
+      "mac": 0.70651,
+      "second_best": 0.29374,
+      "row_max": 0.70651,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 10,
+      "variant_mode": 11,
+      "mac": 0.99999,
+      "second_best": 0.00113,
+      "row_max": 0.99999,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 11,
+      "variant_mode": 10,
+      "mac": 1.0,
+      "second_best": 0.00095,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 12,
+      "variant_mode": 12,
+      "mac": 0.99999,
+      "second_best": 0.00052,
+      "row_max": 0.99999,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 13,
+      "variant_mode": 14,
+      "mac": 1.0,
+      "second_best": 0.00042,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 14,
+      "variant_mode": 13,
+      "mac": 0.99999,
+      "second_best": 0.00044,
+      "row_max": 0.99999,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 15,
+      "variant_mode": 15,
+      "mac": 0.68447,
+      "second_best": 0.31757,
+      "row_max": 0.68447,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 16,
+      "variant_mode": 16,
+      "mac": 0.68192,
+      "second_best": 0.31602,
+      "row_max": 0.68192,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 17,
+      "variant_mode": 18,
+      "mac": 0.99997,
+      "second_best": 0.00092,
+      "row_max": 0.99997,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 18,
+      "variant_mode": 17,
+      "mac": 0.99998,
+      "second_best": 0.00075,
+      "row_max": 0.99998,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 19,
+      "variant_mode": 19,
+      "mac": 0.99996,
+      "second_best": 0.00113,
+      "row_max": 0.99996,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 20,
+      "variant_mode": 20,
+      "mac": 0.20942,
+      "second_best": 0.00084,
+      "row_max": 0.20942,
+      "tracked": true
+     }
+    ],
+    "fe_fe_mac": [
+     [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00053,
+      0.00168,
+      0.0,
+      0.0,
+      1e-05,
+      0.0
+     ],
+     [
+      0.0,
+      0.7062,
+      0.29355,
+      0.0,
+      0.0,
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00067
+     ],
+     [
+      0.0,
+      0.29374,
+      0.70651,
+      0.0,
+      0.0,
+      0.00075,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0008
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99999,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00113,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00095,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.00013,
+      0.00052,
+      0.0,
+      0.0,
+      0.99999,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00042,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99999,
+      0.0,
+      0.0,
+      0.0,
+      0.00044,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      3e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.68447,
+      0.31757,
+      0.0,
+      0.0,
+      4e-05,
+      0.0
+     ],
+     [
+      0.00203,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.31602,
+      0.68192,
+      0.0,
+      0.0,
+      0.00211,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.00092,
+      0.0,
+      0.0,
+      0.0,
+      0.00031,
+      0.0,
+      0.0,
+      0.0,
+      0.99997,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00075,
+      0.0,
+      0.0003,
+      0.0,
+      0.0,
+      0.0,
+      0.99998,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00041,
+      0.00113,
+      0.0,
+      0.0,
+      0.99996,
+      0.0
+     ],
+     [
+      0.0,
+      0.00057,
+      0.00084,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.20942
+     ]
+    ]
+   }
+  },
+  "subspaces": {
+   "A_E1": {
+    "per_mode": {
+     "7": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 7,
+        "mac": 1.0,
+        "hz": 19.055
+       },
+       {
+        "mode": 16,
+        "mac": 0.0016,
+        "hz": 178.52
+       }
+      ]
+     },
+     "8": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 8,
+        "mac": 0.83681,
+        "hz": 57.324
+       },
+       {
+        "mode": 9,
+        "mac": 0.16298,
+        "hz": 61.452
+       }
+      ]
+     },
+     "9": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 9,
+        "mac": 0.83697,
+        "hz": 61.452
+       },
+       {
+        "mode": 8,
+        "mac": 0.16324,
+        "hz": 57.324
+       }
+      ]
+     },
+     "10": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 10,
+        "mac": 1.0,
+        "hz": 69.229
+       },
+       {
+        "mode": 18,
+        "mac": 0.00091,
+        "hz": 212.99
+       }
+      ]
+     },
+     "11": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 11,
+        "mac": 0.99999,
+        "hz": 72.16
+       },
+       {
+        "mode": 17,
+        "mac": 0.00109,
+        "hz": 206.5
+       }
+      ]
+     },
+     "12": {
+      "share_in_span_of_computed_modes": 0.99999,
+      "top_variant_modes": [
+       {
+        "mode": 12,
+        "mac": 0.99999,
+        "hz": 114.93
+       },
+       {
+        "mode": 9,
+        "mac": 0.00055,
+        "hz": 61.452
+       }
+      ]
+     },
+     "13": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 13,
+        "mac": 1.0,
+        "hz": 158.92
+       },
+       {
+        "mode": 17,
+        "mac": 0.00037,
+        "hz": 206.5
+       }
+      ]
+     },
+     "14": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 15,
+        "mac": 1.0,
+        "hz": 168.62
+       },
+       {
+        "mode": 18,
+        "mac": 0.00035,
+        "hz": 212.99
+       }
+      ]
+     },
+     "15": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 14,
+        "mac": 0.82854,
+        "hz": 168.06
+       },
+       {
+        "mode": 16,
+        "mac": 0.17319,
+        "hz": 178.52
+       }
+      ]
+     },
+     "16": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 16,
+        "mac": 0.8272,
+        "hz": 178.52
+       },
+       {
+        "mode": 14,
+        "mac": 0.17107,
+        "hz": 168.06
+       }
+      ]
+     },
+     "17": {
+      "share_in_span_of_computed_modes": 0.99999,
+      "top_variant_modes": [
+       {
+        "mode": 17,
+        "mac": 0.99999,
+        "hz": 206.5
+       },
+       {
+        "mode": 11,
+        "mac": 0.00078,
+        "hz": 72.16
+       }
+      ]
+     },
+     "18": {
+      "share_in_span_of_computed_modes": 0.99997,
+      "top_variant_modes": [
+       {
+        "mode": 18,
+        "mac": 0.99997,
+        "hz": 212.99
+       },
+       {
+        "mode": 10,
+        "mac": 0.00095,
+        "hz": 69.229
+       }
+      ]
+     },
+     "19": {
+      "share_in_span_of_computed_modes": 0.99998,
+      "top_variant_modes": [
+       {
+        "mode": 19,
+        "mac": 0.99998,
+        "hz": 290.91
+       },
+       {
+        "mode": 16,
+        "mac": 0.00118,
+        "hz": 178.52
+       }
+      ]
+     },
+     "20": {
+      "share_in_span_of_computed_modes": 0.88727,
+      "top_variant_modes": [
+       {
+        "mode": 20,
+        "mac": 0.88709,
+        "hz": 311.53
+       },
+       {
+        "mode": 8,
+        "mac": 0.0014,
+        "hz": 57.324
+       }
+      ]
+     }
+    },
+    "same_class_pairs": {
+     "8-9": {
+      "variant_modes": [
+       8,
+       9
+      ],
+      "variant_hz": [
+       57.324,
+       61.452
+      ],
+      "variant_share_in_baseline_pair": [
+       1.0,
+       1.0
+      ],
+      "max_principal_angle_deg": 0.0276,
+      "baseline_hz": [
+       59.874,
+       62.009
+      ]
+     },
+     "15-16": {
+      "variant_modes": [
+       14,
+       16
+      ],
+      "variant_hz": [
+       168.06,
+       178.52
+      ],
+      "variant_share_in_baseline_pair": [
+       1.0,
+       0.99999
+      ],
+      "max_principal_angle_deg": 0.1574,
+      "baseline_hz": [
+       174.8,
+       179.9
+      ]
+     }
+    }
+   },
+   "B_E2": {
+    "per_mode": {
+     "7": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 7,
+        "mac": 1.0,
+        "hz": 19.055
+       },
+       {
+        "mode": 16,
+        "mac": 0.00168,
+        "hz": 177.46
+       }
+      ]
+     },
+     "8": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 8,
+        "mac": 0.7062,
+        "hz": 57.695
+       },
+       {
+        "mode": 9,
+        "mac": 0.29355,
+        "hz": 61.044
+       }
+      ]
+     },
+     "9": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 9,
+        "mac": 0.70651,
+        "hz": 61.044
+       },
+       {
+        "mode": 8,
+        "mac": 0.29374,
+        "hz": 57.695
+       }
+      ]
+     },
+     "10": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 11,
+        "mac": 0.99999,
+        "hz": 71.804
+       },
+       {
+        "mode": 17,
+        "mac": 0.00113,
+        "hz": 207.03
+       }
+      ]
+     },
+     "11": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 10,
+        "mac": 1.0,
+        "hz": 69.531
+       },
+       {
+        "mode": 18,
+        "mac": 0.00095,
+        "hz": 212.06
+       }
+      ]
+     },
+     "12": {
+      "share_in_span_of_computed_modes": 0.99999,
+      "top_variant_modes": [
+       {
+        "mode": 12,
+        "mac": 0.99999,
+        "hz": 114.83
+       },
+       {
+        "mode": 9,
+        "mac": 0.00052,
+        "hz": 61.044
+       }
+      ]
+     },
+     "13": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 14,
+        "mac": 1.0,
+        "hz": 167.48
+       },
+       {
+        "mode": 18,
+        "mac": 0.00042,
+        "hz": 212.06
+       }
+      ]
+     },
+     "14": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 13,
+        "mac": 0.99999,
+        "hz": 159.95
+       },
+       {
+        "mode": 17,
+        "mac": 0.00044,
+        "hz": 207.03
+       }
+      ]
+     },
+     "15": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 15,
+        "mac": 0.68447,
+        "hz": 168.96
+       },
+       {
+        "mode": 16,
+        "mac": 0.31757,
+        "hz": 177.46
+       }
+      ]
+     },
+     "16": {
+      "share_in_span_of_computed_modes": 1.0,
+      "top_variant_modes": [
+       {
+        "mode": 16,
+        "mac": 0.68192,
+        "hz": 177.46
+       },
+       {
+        "mode": 15,
+        "mac": 0.31602,
+        "hz": 168.96
+       }
+      ]
+     },
+     "17": {
+      "share_in_span_of_computed_modes": 0.99997,
+      "top_variant_modes": [
+       {
+        "mode": 18,
+        "mac": 0.99997,
+        "hz": 212.06
+       },
+       {
+        "mode": 10,
+        "mac": 0.00092,
+        "hz": 69.531
+       }
+      ]
+     },
+     "18": {
+      "share_in_span_of_computed_modes": 0.99999,
+      "top_variant_modes": [
+       {
+        "mode": 17,
+        "mac": 0.99998,
+        "hz": 207.03
+       },
+       {
+        "mode": 11,
+        "mac": 0.00075,
+        "hz": 71.804
+       }
+      ]
+     },
+     "19": {
+      "share_in_span_of_computed_modes": 0.99998,
+      "top_variant_modes": [
+       {
+        "mode": 19,
+        "mac": 0.99996,
+        "hz": 290.51
+       },
+       {
+        "mode": 16,
+        "mac": 0.00113,
+        "hz": 177.46
+       }
+      ]
+     },
+     "20": {
+      "share_in_span_of_computed_modes": 0.21058,
+      "top_variant_modes": [
+       {
+        "mode": 20,
+        "mac": 0.20942,
+        "hz": 313.55
+       },
+       {
+        "mode": 9,
+        "mac": 0.00084,
+        "hz": 61.044
+       }
+      ]
+     }
+    },
+    "same_class_pairs": {
+     "8-9": {
+      "variant_modes": [
+       8,
+       9
+      ],
+      "variant_hz": [
+       57.695,
+       61.044
+      ],
+      "variant_share_in_baseline_pair": [
+       1.0,
+       1.0
+      ],
+      "max_principal_angle_deg": 0.0626,
+      "baseline_hz": [
+       59.874,
+       62.009
+      ]
+     },
+     "15-16": {
+      "variant_modes": [
+       15,
+       16
+      ],
+      "variant_hz": [
+       168.96,
+       177.46
+      ],
+      "variant_share_in_baseline_pair": [
+       1.0,
+       0.99998
+      ],
+      "max_principal_angle_deg": 0.2469,
+      "baseline_hz": [
+       174.8,
+       179.9
+      ]
+     }
+    }
+   }
+  },
+  "matrix": {
+   "rows": [
+    {
+     "branch": 7,
+     "f0_hz": 19.072,
+     "category": "single branch",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      1.0,
+      1.0
+     ],
+     "s_G12_secant_5000_10000": 0.47877640468549293,
+     "fE1_hz": 19.055,
+     "fE2_hz": 19.055,
+     "rel_E1": -0.0008913590604026078,
+     "rel_E2": -0.0008913590604026078,
+     "s_E1": 0.008463859079920893,
+     "s_E2": 0.008463859079920893
+    },
+    {
+     "branch": 8,
+     "f0_hz": 59.874,
+     "category": "same-class pair: subspace kept, shapes rotate inside it",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      0.83681,
+      0.7062
+     ],
+     "s_G12_secant_5000_10000": 2.4095316719310757e-05
+    },
+    {
+     "branch": 9,
+     "f0_hz": 62.009,
+     "category": "same-class pair: subspace kept, shapes rotate inside it",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      0.83697,
+      0.70651
+     ],
+     "s_G12_secant_5000_10000": 0.00013958863207250778
+    },
+    {
+     "branch": 10,
+     "f0_hz": 71.85,
+     "category": "single branch",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      1.0,
+      0.99999
+     ],
+     "s_G12_secant_5000_10000": 0.16865275398677465,
+     "fE1_hz": 69.229,
+     "fE2_hz": 71.804,
+     "rel_E1": -0.036478775226165605,
+     "rel_E2": -0.0006402226861516036,
+     "s_E1": 0.3527010314285975,
+     "s_E2": 0.006078441361183334
+    },
+    {
+     "branch": 11,
+     "f0_hz": 72.19,
+     "category": "single branch",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      0.99999,
+      1.0
+     ],
+     "s_G12_secant_5000_10000": 0.167173373393159,
+     "fE1_hz": 72.16,
+     "fE2_hz": 69.531,
+     "rel_E1": -0.0004155700235489723,
+     "rel_E2": -0.03683335642055674,
+     "s_E1": 0.003945086962665766,
+     "s_E2": 0.3561944968494431
+    },
+    {
+     "branch": 12,
+     "f0_hz": 116.58,
+     "category": "single branch",
+     "share_in_computed_span": [
+      0.99999,
+      0.99999
+     ],
+     "top_mac": [
+      0.99999,
+      0.99999
+     ],
+     "s_G12_secant_5000_10000": 0.24512409949344144,
+     "fE1_hz": 114.93,
+     "fE2_hz": 114.83,
+     "rel_E1": -0.014153371075656174,
+     "rel_E2": -0.0150111511408475,
+     "s_E1": 0.13529247790538454,
+     "s_E2": 0.14355433565289596
+    },
+    {
+     "branch": 13,
+     "f0_hz": 167.49,
+     "category": "single branch",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      1.0,
+      1.0
+     ],
+     "s_G12_secant_5000_10000": 8.613361839566142e-05,
+     "fE1_hz": 158.92,
+     "fE2_hz": 167.48,
+     "rel_E1": -0.05116723386470845,
+     "rel_E2": -5.970505701846651e-05,
+     "s_E1": 0.49850474550215673,
+     "s_E2": 0.0005666908429931817
+    },
+    {
+     "branch": 14,
+     "f0_hz": 168.61,
+     "category": "single branch",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      1.0,
+      0.99999
+     ],
+     "s_G12_secant_5000_10000": 8.556148867590043e-05,
+     "fE1_hz": 168.62,
+     "fE2_hz": 159.95,
+     "rel_E1": 5.930846331758666e-05,
+     "rel_E2": -0.051361129233141734,
+     "s_E1": -0.0005628930749809472,
+     "s_E2": 0.5004444887646655
+    },
+    {
+     "branch": 15,
+     "f0_hz": 174.8,
+     "category": "same-class pair: subspace kept, shapes rotate inside it",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      0.82854,
+      0.68447
+     ],
+     "s_G12_secant_5000_10000": 0.06558650753660558
+    },
+    {
+     "branch": 16,
+     "f0_hz": 179.9,
+     "category": "same-class pair: subspace kept, shapes rotate inside it",
+     "share_in_computed_span": [
+      1.0,
+      1.0
+     ],
+     "top_mac": [
+      0.8272,
+      0.68192
+     ],
+     "s_G12_secant_5000_10000": 0.06361421237057584
+    },
+    {
+     "branch": 17,
+     "f0_hz": 213.2,
+     "category": "single branch",
+     "share_in_computed_span": [
+      0.99999,
+      0.99997
+     ],
+     "top_mac": [
+      0.99999,
+      0.99997
+     ],
+     "s_G12_secant_5000_10000": 0.16938355086703644,
+     "fE1_hz": 206.5,
+     "fE2_hz": 212.06,
+     "rel_E1": -0.031425891181988685,
+     "rel_E2": -0.005347091932457748,
+     "s_E1": 0.30305736158600655,
+     "s_E2": 0.05088660358733764
+    },
+    {
+     "branch": 18,
+     "f0_hz": 213.95,
+     "category": "single branch",
+     "share_in_computed_span": [
+      0.99997,
+      0.99999
+     ],
+     "top_mac": [
+      0.99997,
+      0.99998
+     ],
+     "s_G12_secant_5000_10000": 0.1682832366411027,
+     "fE1_hz": 212.99,
+     "fE2_hz": 207.03,
+     "rel_E1": -0.004487029679831611,
+     "rel_E2": -0.03234400560878703,
+     "s_E1": 0.042683225155444315,
+     "s_E2": 0.31205838692915855
+    },
+    {
+     "branch": 19,
+     "f0_hz": 295.78,
+     "category": "single branch",
+     "share_in_computed_span": [
+      0.99998,
+      0.99998
+     ],
+     "top_mac": [
+      0.99998,
+      0.99996
+     ],
+     "s_G12_secant_5000_10000": null,
+     "fE1_hz": 290.91,
+     "fE2_hz": 290.51,
+     "rel_E1": -0.016464940158225527,
+     "rel_E2": -0.01781729663939413,
+     "s_E1": 0.1575732014066415,
+     "s_E2": 0.17063257064532214
+    },
+    {
+     "branch": 20,
+     "f0_hz": 327.9,
+     "category": "mixed with modes beyond the computed range: frequency not established",
+     "share_in_computed_span": [
+      0.88727,
+      0.21058
+     ],
+     "top_mac": [
+      0.88709,
+      0.20942
+     ],
+     "s_G12_secant_5000_10000": 0.0003079532628288567
+    }
+   ],
+   "same_class_pairs": {
+    "8-9": {
+     "baseline_hz": [
+      59.874,
+      62.009
+     ],
+     "E1": {
+      "variant_modes": [
+       8,
+       9
+      ],
+      "hz_lower_upper": [
+       57.324,
+       61.452
+      ],
+      "s_lower": 0.41308615151194433,
+      "s_upper": 0.08564074953300364,
+      "subspace_angle_deg": 0.0276,
+      "baseline_shape_split": [
+       0.83681,
+       0.16298
+      ]
+     },
+     "E2": {
+      "variant_modes": [
+       8,
+       9
+      ],
+      "hz_lower_upper": [
+       57.695,
+       61.044
+      ],
+      "s_lower": 0.35185704295521597,
+      "s_upper": 0.14886620546584461,
+      "subspace_angle_deg": 0.0626,
+      "baseline_shape_split": [
+       0.7062,
+       0.29355
+      ]
+     }
+    },
+    "15-16": {
+     "baseline_hz": [
+      174.8,
+      179.9
+     ],
+     "E1": {
+      "variant_modes": [
+       14,
+       16
+      ],
+      "hz_lower_upper": [
+       168.06,
+       178.52
+      ],
+      "s_lower": 0.37320816508781185,
+      "s_upper": 0.07308716313070013,
+      "subspace_angle_deg": 0.1574,
+      "baseline_shape_split": [
+       0.82854,
+       0.17319
+      ]
+     },
+     "E2": {
+      "variant_modes": [
+       15,
+       16
+      ],
+      "hz_lower_upper": [
+       168.96,
+       177.46
+      ],
+      "s_lower": 0.3225161009452065,
+      "s_upper": 0.1296112634228673,
+      "subspace_angle_deg": 0.2469,
+      "baseline_shape_split": [
+       0.68447,
+       0.31757
+      ]
+     }
+    }
+   },
+   "notes": {
+    "s_definition": "finite logarithmic sensitivity ln(f_variant / f_baseline) / ln(0.9) for a -10 % change",
+    "g12": "R6.6 secant 5 000 -> 10 000 MPa (+100 %): NOT a local derivative",
+    "nu21": "with nu12 fixed, nu21 = nu12 E2/E1 changes with E1 or E2 (0.0556 / 0.045): part of each variant",
+    "axes": "E1 along Assembly X (301 mm), E2 along Assembly Y (300 mm); physical edges NOT determined"
+   }
+  },
+  "answers": {
+   "mainly_E1": [
+    "FE 13 (pure)",
+    "FE 10",
+    "FE 17"
+   ],
+   "mainly_E2": [
+    "FE 14 (pure)",
+    "FE 11",
+    "FE 18"
+   ],
+   "both": [
+    "FE 12",
+    "FE 19",
+    "pairs 8-9 and 15-16 (shapes rotate)"
+   ],
+   "twist_FE7": "practically unchanged (s_E1 = s_E2 = 0.0085; MAC 1.0000)",
+   "separate_control": "partly: FE 7 via G12 and FE 14 via E2 are separate channels; FE 8 is inside the rotating same-class pair 8-9, so it cannot be moved without changing its shape",
+   "interactions": [
+    "same-class pair rotation (8-9, 15-16)",
+    "cross-effects on FE 10-12, 17-19",
+    "FE 20 mixes beyond the computed range",
+    "nu21 changes with E1/E2",
+    "G12 secants are not local derivatives",
+    "E1/E2 are model directions; fibre directions unknown",
+    "research-only correspondences; physical registration pending"
+   ]
+  },
+  "r66_correction": {
+   "section": "18.3",
+   "figure_sha256_new": "6d6da3dc046e95b8fc239fdaa65b3ad36be56ef81ce0d39faef6a55fe6e984dc",
+   "figure_sha256_old": "cb93fff9a5a29b01f9c73236de65fb0677df6052f984ef3386edc423670f0169",
+   "r66_numbers_changed": false
+  },
+  "published_figure": {
+   "path": "docs/reconciliation/figures/m11_r67/fig_r67_sensitivity.png",
+   "sha256": "b1894f6b6d4610c373ac1784ef7638a1f4f681e11e8b16093167701181ab22c0"
+  },
+  "not_done": [
+   "material identification",
+   "E1/E2/G12 fitting",
+   "Auto-ID",
+   "LM",
+   "experimental MAC",
+   "registration",
+   "accepted pairing",
+   "hypothetical supports, springs or masses"
   ]
  }
 }

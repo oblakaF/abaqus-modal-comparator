@@ -2071,6 +2071,7 @@
     "registration_state": "PHYSICAL_REGISTRATION_PENDING (FE extraction ready since R6, 2026-10-21; not completed by the R6.5 research MAC)",
     "research_mac": "R6.5: research-only complex MAC 10 x 14 (polymax-bravo x FE 7-20), RESEARCH_DIAGNOSTIC_ONLY / COMPUTATIONAL_CONVENTION_ONLY / NO_ACCEPTED_PHYSICAL_REGISTRATION; no pairing, no registration, nothing passed to Auto-ID / LM",
     "research_result": "RESEARCH_MAC_COMPUTED (R6.5, 2026-10-22; QA R6.5a)",
-    "r66": "R6.6 (2026-10-22): two authorised Abaqus frequency runs, G12 10 000 / 15 000 MPa, all else identical; FE 7 19.07 -> 26.58 -> 32.18 Hz; sensitivity study only, no material identification; statuses unchanged"
+    "r66": "R6.6 (2026-10-22): two authorised Abaqus frequency runs, G12 10 000 / 15 000 MPa, all else identical; FE 7 19.07 -> 26.58 -> 32.18 Hz; sensitivity study only, no material identification; statuses unchanged",
+    "r67": "R6.7 (2026-10-23): two authorised Abaqus frequency runs, E1 -10 % / E2 -10 %, all else identical; FE 13 pure E1, FE 14 pure E2, FE 7 insensitive; pairs 8-9 and 15-16 rotate; sensitivity matrix only, no material identification; statuses unchanged"
   }
 }
