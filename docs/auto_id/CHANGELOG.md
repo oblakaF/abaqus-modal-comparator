@@ -5624,3 +5624,21 @@ first internal provider.
 - **INP–ODB:** the job records are consistent; mesh identity is not proven, so NODES_AND_INP_CONTENT is unchanged.
 - **Diagnostic MAC blockers** are listed. FE schematic published in `docs/reconciliation/figures/m11_r63/`.
 - **Status unchanged.** No Abaqus, MAC or fitting.
+
+## 2026-10-22 — M11 R6.4: FE modal symmetry and scan-mapping sensitivity (diagnostic; no MAC)
+
+- **FE symmetry, checked on the R6 modes themselves:** elastic modes 7–20 are exactly symmetric or antisymmetric
+  under the three 180° rotations. The largest residual is 1.8e-07 (single precision); a negative control gives
+  0.03–0.10.
+- **Adjacent subspaces** are invariant. The near-degenerate pairs 10–11, 13–14 and 17–18 lie in different FE classes
+  and should be treated as subspaces; 8–9 and 15–16 share a class and should be watched.
+- **Candidates A–D** are exactly equivalent at the 289 points: symmetric nodes at 100 % of points in 59 scenarios;
+  the sampled U3 is identical up to sign. D is labelled only `COMPUTATIONAL_CONVENTION_ONLY`; the physical
+  orientation is NOT_DETERMINED.
+- **Mapping sensitivity:**
+  - every point stays on the plate; RMS 1.1–1.3 mm, max ≤ 2.09 mm; no repeated nodes;
+  - the existing limits pass in every scenario but cannot detect 1–3 mm;
+  - node assignment is unstable: 27–52 % reassigned at 1 mm, 100 % at 3 mm;
+  - the sampled FE field changes only 2–14 %.
+- **Readiness:** a research, non-governed diagnostic shape comparison may be proposed to the SUPERVISOR. Nothing is
+  implemented, no experimental–FE MAC is computed, and the status is unchanged.

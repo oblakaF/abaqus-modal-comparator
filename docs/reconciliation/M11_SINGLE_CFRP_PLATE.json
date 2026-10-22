@@ -2367,5 +2367,3570 @@
    "material constants",
    "registration"
   ]
+ },
+ "r64_fe_modal_symmetry_and_scan_mapping": {
+  "statuses_unchanged": {
+   "PHYSICAL_FE_ORIENTATION": "NOT_DETERMINED",
+   "SCANNER_FACE": "HUMAN_CONFIRMATION_PENDING",
+   "SCAN_WINDOW_CALIBRATION": "DIAGNOSTIC_ONLY",
+   "FE_MODEL_IDENTITY": "NODES_AND_INP_CONTENT"
+  },
+  "deviations_status": "diagnostic algorithmic assumptions for sensitivity studies (SUPERVISOR R6.4 §4); not a physical calibration",
+  "fe_symmetry": {
+   "verdict": "all elastic modes 7-20 exactly symmetric or antisymmetric under Rx, Ry, Rz (max residual 1.8e-07); adjacent subspaces invariant (max angle 1.1e-05 deg)",
+   "near_degenerate_pairs": [
+    "10-11 (0.47 %, different classes)",
+    "13-14 (0.67 %, different classes)",
+    "17-18 (0.35 %, different classes)"
+   ],
+   "same_class_pairs_to_watch": ["8-9 (3.6 %, class --+)", "15-16 (2.9 %, class +++)"],
+   "data": {
+    "node_maps": {
+     "Rx: 180 deg about FE X (Y -> 300-Y, Z -> -Z)": {
+      "bijective": true,
+      "max_coordinate_mismatch_mm": 0.0,
+      "involution": true
+     },
+     "Ry: 180 deg about FE Y (X -> 301-X, Z -> -Z)": {
+      "bijective": true,
+      "max_coordinate_mismatch_mm": 1.525878909092171e-05,
+      "involution": true
+     },
+     "Rz: 180 deg about FE Z (X -> 301-X, Y -> 300-Y)": {
+      "bijective": true,
+      "max_coordinate_mismatch_mm": 1.525878909092171e-05,
+      "involution": true
+     }
+    },
+    "per_mode": [
+     {
+      "mode": 7,
+      "fe_hz": 19.072,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 2.1587247439563387e-14,
+      "transforms": {
+       "Rx": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 2.8545768939473547e-10
+       },
+       "Ry": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 5.737703387148817e-08
+       },
+       "Rz": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 5.7377033860213136e-08
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 5.737703387148817e-08
+     },
+     {
+      "mode": 8,
+      "fe_hz": 59.874,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 5.8525045843553305e-15,
+      "transforms": {
+       "Rx": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.3977473185118895e-13
+       },
+       "Ry": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 8.379404624026919e-08
+       },
+       "Rz": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 8.379404624026922e-08
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 8.379404624026922e-08
+     },
+     {
+      "mode": 9,
+      "fe_hz": 62.009,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 5.551454891757502e-15,
+      "transforms": {
+       "Rx": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 2.5591078162584554e-09
+       },
+       "Ry": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 6.997884971967208e-08
+       },
+       "Rz": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 6.997884972413461e-08
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 6.997884972413461e-08
+     },
+     {
+      "mode": 10,
+      "fe_hz": 71.85,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 4.0950661236208546e-15,
+      "transforms": {
+       "Rx": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 6.6308523677406535e-09
+       },
+       "Ry": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.0314134168007488e-07
+       },
+       "Rz": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.0313727215065524e-07
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 1.0314134168007488e-07
+     },
+     {
+      "mode": 11,
+      "fe_hz": 72.19,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 2.8249658275959702e-15,
+      "transforms": {
+       "Rx": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 6.0391192281778905e-09
+       },
+       "Ry": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 5.666524218027207e-08
+       },
+       "Rz": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 5.664212411122628e-08
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 5.666524218027207e-08
+     },
+     {
+      "mode": 12,
+      "fe_hz": 116.58,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 4.016901331341318e-15,
+      "transforms": {
+       "Rx": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 2.697259893673405e-15
+       },
+       "Ry": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.0305203057439643e-07
+       },
+       "Rz": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.0305203057439643e-07
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 1.0305203057439643e-07
+     },
+     {
+      "mode": 13,
+      "fe_hz": 167.49,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 6.020401501693523e-15,
+      "transforms": {
+       "Rx": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 2.363018313664472e-09
+       },
+       "Ry": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.376277338335472e-07
+       },
+       "Rz": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.376277335971126e-07
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 1.376277338335472e-07
+     },
+     {
+      "mode": 14,
+      "fe_hz": 168.61,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 2.1053780046989954e-15,
+      "transforms": {
+       "Rx": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 6.405470839052366e-10
+       },
+       "Ry": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 9.689777665380445e-09
+       },
+       "Rz": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 9.689772535105237e-09
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 9.689777665380445e-09
+     },
+     {
+      "mode": 15,
+      "fe_hz": 174.8,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 6.799307015480902e-15,
+      "transforms": {
+       "Rx": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.1431591895317233e-09
+       },
+       "Ry": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.1446735136828621e-07
+       },
+       "Rz": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.144673513970322e-07
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 1.144673513970322e-07
+     },
+     {
+      "mode": 16,
+      "fe_hz": 179.9,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 1.314855126697024e-14,
+      "transforms": {
+       "Rx": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 7.999095858098047e-13
+       },
+       "Ry": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 9.631478823658726e-08
+       },
+       "Rz": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 9.631478823968499e-08
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 9.631478823968499e-08
+     },
+     {
+      "mode": 17,
+      "fe_hz": 213.2,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 5.358225926051223e-15,
+      "transforms": {
+       "Rx": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 3.198271135912034e-09
+       },
+       "Ry": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.3675936353830543e-07
+       },
+       "Rz": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.3675932318328744e-07
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 1.3675936353830543e-07
+     },
+     {
+      "mode": 18,
+      "fe_hz": 213.95,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 1.0640528727245427e-14,
+      "transforms": {
+       "Rx": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 9.098698566898034e-10
+       },
+       "Ry": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.015045700376515e-07
+       },
+       "Rz": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.0150376729938852e-07
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 1.015045700376515e-07
+     },
+     {
+      "mode": 19,
+      "fe_hz": 295.78,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 1.506655387096599e-11,
+      "transforms": {
+       "Rx": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 2.1056121340814118e-08
+       },
+       "Ry": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.3548626741756603e-07
+       },
+       "Rz": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.353232837936809e-07
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 1.3548626741756603e-07
+     },
+     {
+      "mode": 20,
+      "fe_hz": 327.9,
+      "imag_max": 0.0,
+      "in_plane_over_out_of_plane_norm": 2.617505952056907e-11,
+      "transforms": {
+       "Rx": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 2.5524428276241702e-08
+       },
+       "Ry": {
+        "parity": -1,
+        "projection": -1.0,
+        "residual_rel_l2": 1.8364424369496603e-07
+       },
+       "Rz": {
+        "parity": 1,
+        "projection": 1.0,
+        "residual_rel_l2": 1.8330307255837747e-07
+       }
+      },
+      "class_consistent_Rz_eq_Rx_times_Ry": true,
+      "max_residual": 1.8364424369496603e-07
+     }
+    ],
+    "negative_controls_residual_rel_l2": {
+     "mode 7: shift by one node pitch along X (not a symmetry)": 0.0341,
+     "mode 8: shift by one node pitch along X (not a symmetry)": 0.0541,
+     "mode 13: shift by one node pitch along X (not a symmetry)": 0.1043
+    },
+    "adjacent_pair_subspaces": [
+     {
+      "modes": [
+       7,
+       8
+      ],
+      "fe_hz": [
+       19.072,
+       59.874
+      ],
+      "relative_gap": 2.13937,
+      "max_principal_angle_deg": {
+       "Rx": 1.6355511868009864e-08,
+       "Ry": 4.80104519786524e-06,
+       "Rz": 4.801045210345335e-06
+      }
+     },
+     {
+      "modes": [
+       8,
+       9
+      ],
+      "fe_hz": [
+       59.874,
+       62.009
+      ],
+      "relative_gap": 0.03566,
+      "max_principal_angle_deg": {
+       "Rx": 1.4662607730319446e-07,
+       "Ry": 5.9939785617683175e-06,
+       "Rz": 5.993978561774041e-06
+      }
+     },
+     {
+      "modes": [
+       9,
+       10
+      ],
+      "fe_hz": [
+       62.009,
+       71.85
+      ],
+      "relative_gap": 0.1587,
+      "max_principal_angle_deg": {
+       "Rx": 3.7972618177958884e-07,
+       "Ry": 5.909563571717622e-06,
+       "Rz": 5.909317956354362e-06
+      }
+     },
+     {
+      "modes": [
+       10,
+       11
+      ],
+      "fe_hz": [
+       71.85,
+       72.19
+      ],
+      "relative_gap": 0.00473,
+      "max_principal_angle_deg": {
+       "Rx": 3.768099982679325e-07,
+       "Ry": 5.909364456985923e-06,
+       "Rz": 5.909377096704713e-06
+      }
+     },
+     {
+      "modes": [
+       11,
+       12
+      ],
+      "fe_hz": [
+       72.19,
+       116.58
+      ],
+      "relative_gap": 0.61491,
+      "max_principal_angle_deg": {
+       "Rx": 3.4601604366246565e-07,
+       "Ry": 5.90435219086474e-06,
+       "Rz": 5.904352190989776e-06
+      }
+     },
+     {
+      "modes": [
+       12,
+       13
+      ],
+      "fe_hz": [
+       116.58,
+       167.49
+      ],
+      "relative_gap": 0.4367,
+      "max_principal_angle_deg": {
+       "Rx": 1.353909762884352e-07,
+       "Ry": 7.885386918367874e-06,
+       "Rz": 7.885386904802835e-06
+      }
+     },
+     {
+      "modes": [
+       13,
+       14
+      ],
+      "fe_hz": [
+       167.49,
+       168.61
+      ],
+      "relative_gap": 0.00669,
+      "max_principal_angle_deg": {
+       "Rx": 1.3530760831788137e-07,
+       "Ry": 7.885486861715953e-06,
+       "Rz": 7.885488283343183e-06
+      }
+     },
+     {
+      "modes": [
+       14,
+       15
+      ],
+      "fe_hz": [
+       168.61,
+       174.8
+      ],
+      "relative_gap": 0.03671,
+      "max_principal_angle_deg": {
+       "Rx": 6.549819680248799e-08,
+       "Ry": 6.558378644662175e-06,
+       "Rz": 6.5583786462809706e-06
+      }
+     },
+     {
+      "modes": [
+       15,
+       16
+      ],
+      "fe_hz": [
+       174.8,
+       179.9
+      ],
+      "relative_gap": 0.02918,
+      "max_principal_angle_deg": {
+       "Rx": 6.549820570455523e-08,
+       "Ry": 7.97950372005276e-06,
+       "Rz": 7.979503720638744e-06
+      }
+     },
+     {
+      "modes": [
+       16,
+       17
+      ],
+      "fe_hz": [
+       179.9,
+       213.2
+      ],
+      "relative_gap": 0.1851,
+      "max_principal_angle_deg": {
+       "Rx": 1.8308138440393653e-07,
+       "Ry": 7.835744772689906e-06,
+       "Rz": 7.83572814588703e-06
+      }
+     },
+     {
+      "modes": [
+       17,
+       18
+      ],
+      "fe_hz": [
+       213.2,
+       213.95
+      ],
+      "relative_gap": 0.00352,
+      "max_principal_angle_deg": {
+       "Rx": 1.8287254943039439e-07,
+       "Ry": 7.835725581345112e-06,
+       "Rz": 7.83573204151613e-06
+      }
+     },
+     {
+      "modes": [
+       18,
+       19
+      ],
+      "fe_hz": [
+       213.95,
+       295.78
+      ],
+      "relative_gap": 0.38247,
+      "max_principal_angle_deg": {
+       "Rx": 1.2064269773851329e-06,
+       "Ry": 7.761985290362988e-06,
+       "Rz": 7.752646045834008e-06
+      }
+     },
+     {
+      "modes": [
+       19,
+       20
+      ],
+      "fe_hz": [
+       295.78,
+       327.9
+      ],
+      "relative_gap": 0.10859,
+      "max_principal_angle_deg": {
+       "Rx": 1.4624335790568909e-06,
+       "Ry": 1.052203892311559e-05,
+       "Rz": 1.0502532071516578e-05
+      }
+     }
+    ],
+    "float32_relative_resolution": 1.1920928955078125e-07
+   }
+  },
+  "candidates": {
+   "relation": {
+    "B": "Rz A",
+    "C": "Rx A",
+    "D": "Ry A"
+   },
+   "node_equivalence_at_points": {
+    "B vs A via Rz": {
+     "min_fraction_symmetric_node": 1.0,
+     "scenarios": 59
+    },
+    "C vs A via Rx": {
+     "min_fraction_symmetric_node": 1.0,
+     "scenarios": 59
+    },
+    "D vs A via Ry": {
+     "min_fraction_symmetric_node": 1.0,
+     "scenarios": 59
+    }
+   },
+   "sampled_u3_max_relative_difference_up_to_sign": 1.55e-07,
+   "D_label": "COMPUTATIONAL_CONVENTION_ONLY (illustration only)",
+   "not_written_as": [
+    "HUMAN_CONFIRMED",
+    "PHYSICALLY_ESTABLISHED",
+    "ACCEPTED_REGISTRATION",
+    "panel_edges",
+    "corner_A_marker"
+   ]
+  },
+  "mapping_sensitivity": {
+   "input": {
+    "reconstruction": "plate_reconstruction_W301xH300.json (DIAGNOSTIC)",
+    "points": 289,
+    "window_mm": [
+     215.42,
+     285.2
+    ],
+    "scan_diagonal_mm": 357.41,
+    "existing_matched_distance_mm": 10.72,
+    "fe_pitch_mm": [
+     3.01,
+     3.0
+    ],
+    "scan_pitch_mm": [
+     13.464,
+     17.825
+    ],
+    "misalignment_deg_diagnostic": 0.874
+   },
+   "per_candidate": {
+    "A": {
+     "dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.975,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003462,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.115,
+      "max_mm": 2.017,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00312,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.975,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003462,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.115,
+      "max_mm": 2.017,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00312,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.045,
+      "changed_node_fraction": 0.8097,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.075,
+      "changed_node_fraction": 0.7474,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003204,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 0.6332,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.045,
+      "changed_node_fraction": 0.8235,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.075,
+      "changed_node_fraction": 0.8858,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003204,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.6332,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.4983,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.3114,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.6782,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.8131,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.982,
+      "changed_node_fraction": 0.4844,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00346,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.025,
+      "changed_node_fraction": 0.2664,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003118,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 0.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.982,
+      "changed_node_fraction": 0.5156,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00346,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.025,
+      "changed_node_fraction": 0.7336,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003118,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.038,
+      "changed_node_fraction": 0.6678,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.068,
+      "changed_node_fraction": 0.5121,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003205,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 0.3599,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.038,
+      "changed_node_fraction": 0.692,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.068,
+      "changed_node_fraction": 0.8478,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003205,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.8512,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.7682,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 0.6886,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.8374,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.9204,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.236,
+      "max_mm": 1.989,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003459,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.032,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003117,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.236,
+      "max_mm": 1.989,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003459,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.032,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003117,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.072,
+      "changed_node_fraction": 0.6298,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.9931,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.065,
+      "changed_node_fraction": 0.9585,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.9723,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.065,
+      "changed_node_fraction": 0.9931,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.081,
+      "changed_node_fraction": 0.5675,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.088,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003383,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.074,
+      "changed_node_fraction": 0.9654,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.088,
+      "changed_node_fraction": 0.9481,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003383,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.074,
+      "changed_node_fraction": 0.9792,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     }
+    },
+    "B": {
+     "dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.975,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003462,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.115,
+      "max_mm": 2.017,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00312,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.975,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003462,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.115,
+      "max_mm": 2.017,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00312,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.045,
+      "changed_node_fraction": 0.8097,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.075,
+      "changed_node_fraction": 0.7474,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003204,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 0.6332,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.045,
+      "changed_node_fraction": 0.8235,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.075,
+      "changed_node_fraction": 0.8858,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003204,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.6332,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.4983,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.3114,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.6782,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.8131,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.982,
+      "changed_node_fraction": 0.4844,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00346,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.025,
+      "changed_node_fraction": 0.2664,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003118,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 0.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.982,
+      "changed_node_fraction": 0.5156,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00346,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.025,
+      "changed_node_fraction": 0.7336,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003118,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.038,
+      "changed_node_fraction": 0.6678,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.068,
+      "changed_node_fraction": 0.5121,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003205,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 0.3599,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.038,
+      "changed_node_fraction": 0.692,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.068,
+      "changed_node_fraction": 0.8478,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003205,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.8512,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.7682,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 0.6886,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.8374,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.9204,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.236,
+      "max_mm": 1.989,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003459,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.032,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003117,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.236,
+      "max_mm": 1.989,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003459,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.032,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003117,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.072,
+      "changed_node_fraction": 0.6298,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.9931,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.065,
+      "changed_node_fraction": 0.9585,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.9723,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.065,
+      "changed_node_fraction": 0.9931,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.081,
+      "changed_node_fraction": 0.5675,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.088,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003383,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.074,
+      "changed_node_fraction": 0.9654,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.088,
+      "changed_node_fraction": 0.9481,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003383,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.074,
+      "changed_node_fraction": 0.9792,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     }
+    },
+    "C": {
+     "dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.975,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003462,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.115,
+      "max_mm": 2.017,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00312,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.975,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003462,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.115,
+      "max_mm": 2.017,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00312,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.045,
+      "changed_node_fraction": 0.8097,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.075,
+      "changed_node_fraction": 0.7474,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003204,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 0.6332,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.045,
+      "changed_node_fraction": 0.8235,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.075,
+      "changed_node_fraction": 0.8858,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003204,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.6332,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.4983,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.3114,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.6782,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.8131,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.982,
+      "changed_node_fraction": 0.4844,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00346,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.025,
+      "changed_node_fraction": 0.2664,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003118,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 0.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.982,
+      "changed_node_fraction": 0.5156,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00346,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.025,
+      "changed_node_fraction": 0.7336,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003118,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.038,
+      "changed_node_fraction": 0.6678,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.068,
+      "changed_node_fraction": 0.5121,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003205,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 0.3599,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.038,
+      "changed_node_fraction": 0.692,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.068,
+      "changed_node_fraction": 0.8478,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003205,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.8512,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.7682,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 0.6886,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.8374,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.9204,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.236,
+      "max_mm": 1.989,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003459,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.032,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003117,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.236,
+      "max_mm": 1.989,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003459,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.032,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003117,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.072,
+      "changed_node_fraction": 0.6298,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.9931,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.065,
+      "changed_node_fraction": 0.9585,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.9723,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.065,
+      "changed_node_fraction": 0.9931,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.081,
+      "changed_node_fraction": 0.5675,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.088,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003383,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.074,
+      "changed_node_fraction": 0.9654,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.088,
+      "changed_node_fraction": 0.9481,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003383,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.074,
+      "changed_node_fraction": 0.9792,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     }
+    },
+    "D": {
+     "dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.975,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003462,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.115,
+      "max_mm": 2.017,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00312,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.975,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003462,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.115,
+      "max_mm": 2.017,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00312,
+      "existing_limits_pass": true
+     },
+     "dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.052,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003532,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.045,
+      "changed_node_fraction": 0.8097,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.075,
+      "changed_node_fraction": 0.7474,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003204,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 0.6332,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.045,
+      "changed_node_fraction": 0.8235,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.075,
+      "changed_node_fraction": 0.8858,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003204,
+      "existing_limits_pass": true
+     },
+     "dx-2_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.077,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.6332,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.4983,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.3114,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.6782,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.042,
+      "changed_node_fraction": 0.8131,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx-1_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.079,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.982,
+      "changed_node_fraction": 0.4844,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00346,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.025,
+      "changed_node_fraction": 0.2664,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003118,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 0.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.237,
+      "max_mm": 1.982,
+      "changed_node_fraction": 0.5156,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00346,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.025,
+      "changed_node_fraction": 0.7336,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003118,
+      "existing_limits_pass": true
+     },
+     "dx+0_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.262,
+      "max_mm": 2.059,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.00353,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.038,
+      "changed_node_fraction": 0.6678,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.068,
+      "changed_node_fraction": 0.5121,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003205,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 0.3599,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.265,
+      "max_mm": 2.038,
+      "changed_node_fraction": 0.692,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003538,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.145,
+      "max_mm": 2.068,
+      "changed_node_fraction": 0.8478,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003205,
+      "existing_limits_pass": true
+     },
+     "dx+1_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.289,
+      "max_mm": 2.071,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003607,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.8512,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.7682,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 0.6886,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.263,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.8374,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003534,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.144,
+      "max_mm": 2.035,
+      "changed_node_fraction": 0.9204,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.0032,
+      "existing_limits_pass": true
+     },
+     "dx+2_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.288,
+      "max_mm": 2.072,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003603,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.236,
+      "max_mm": 1.989,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003459,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy-1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.032,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003117,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+1": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.236,
+      "max_mm": 1.989,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003459,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+2": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.114,
+      "max_mm": 2.032,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003117,
+      "existing_limits_pass": true
+     },
+     "dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.261,
+      "max_mm": 2.066,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003529,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.072,
+      "changed_node_fraction": 0.6298,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.9931,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.065,
+      "changed_node_fraction": 0.9585,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.079,
+      "changed_node_fraction": 0.9723,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot-0.874_dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.239,
+      "max_mm": 2.065,
+      "changed_node_fraction": 0.9931,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003467,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+0_dy+0": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.081,
+      "changed_node_fraction": 0.5675,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.088,
+      "changed_node_fraction": 1.0,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003383,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx-3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.074,
+      "changed_node_fraction": 0.9654,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx+3_dy-3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.088,
+      "changed_node_fraction": 0.9481,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003383,
+      "existing_limits_pass": true
+     },
+     "rot+0.874_dx-3_dy+3": {
+      "inside": 289,
+      "outside_no_admissible_binding": 0,
+      "rms_mm": 1.209,
+      "max_mm": 2.074,
+      "changed_node_fraction": 0.9792,
+      "repeated_node_assignments": 0,
+      "existing_method_matched_fraction": 1.0,
+      "existing_method_normalized_rms": 0.003382,
+      "existing_limits_pass": true
+     }
+    }
+   },
+   "changed_fraction_theory_uniform": {
+    "dx-3_dy-3": 1.0,
+    "dx-3_dy-2": 0.9989,
+    "dx-3_dy-1": 0.9978,
+    "dx-3_dy+0": 0.9967,
+    "dx-3_dy+1": 0.9978,
+    "dx-3_dy+2": 0.9989,
+    "dx-3_dy+3": 1.0,
+    "dx-2_dy-3": 1.0,
+    "dx-2_dy-2": 0.8882,
+    "dx-2_dy-1": 0.7763,
+    "dx-2_dy+0": 0.6645,
+    "dx-2_dy+1": 0.7763,
+    "dx-2_dy+2": 0.8882,
+    "dx-2_dy+3": 1.0,
+    "dx-1_dy-3": 1.0,
+    "dx-1_dy-2": 0.7774,
+    "dx-1_dy-1": 0.5548,
+    "dx-1_dy+0": 0.3322,
+    "dx-1_dy+1": 0.5548,
+    "dx-1_dy+2": 0.7774,
+    "dx-1_dy+3": 1.0,
+    "dx+0_dy-3": 1.0,
+    "dx+0_dy-2": 0.6667,
+    "dx+0_dy-1": 0.3333,
+    "dx+0_dy+0": 0.0,
+    "dx+0_dy+1": 0.3333,
+    "dx+0_dy+2": 0.6667,
+    "dx+0_dy+3": 1.0,
+    "dx+1_dy-3": 1.0,
+    "dx+1_dy-2": 0.7774,
+    "dx+1_dy-1": 0.5548,
+    "dx+1_dy+0": 0.3322,
+    "dx+1_dy+1": 0.5548,
+    "dx+1_dy+2": 0.7774,
+    "dx+1_dy+3": 1.0,
+    "dx+2_dy-3": 1.0,
+    "dx+2_dy-2": 0.8882,
+    "dx+2_dy-1": 0.7763,
+    "dx+2_dy+0": 0.6645,
+    "dx+2_dy+1": 0.7763,
+    "dx+2_dy+2": 0.8882,
+    "dx+2_dy+3": 1.0,
+    "dx+3_dy-3": 1.0,
+    "dx+3_dy-2": 0.9989,
+    "dx+3_dy-1": 0.9978,
+    "dx+3_dy+0": 0.9967,
+    "dx+3_dy+1": 0.9978,
+    "dx+3_dy+2": 0.9989,
+    "dx+3_dy+3": 1.0
+   },
+   "candidate_equivalence_at_points": {
+    "B vs A via Rz": {
+     "min_fraction_symmetric_node": 1.0,
+     "scenarios": 59
+    },
+    "C vs A via Rx": {
+     "min_fraction_symmetric_node": 1.0,
+     "scenarios": 59
+    },
+    "D vs A via Ry": {
+     "min_fraction_symmetric_node": 1.0,
+     "scenarios": 59
+    }
+   },
+   "sampled_fe_u3_relative_difference_vs_A_up_to_sign": {
+    "7": {
+     "B": 6.2e-08,
+     "C": 0.0,
+     "D": 6.2e-08
+    },
+    "8": {
+     "B": 7.1e-08,
+     "C": 0.0,
+     "D": 7.1e-08
+    },
+    "9": {
+     "B": 5.9e-08,
+     "C": 0.0,
+     "D": 5.9e-08
+    },
+    "10": {
+     "B": 9.5e-08,
+     "C": 2e-09,
+     "D": 9.5e-08
+    },
+    "11": {
+     "B": 5.6e-08,
+     "C": 2e-09,
+     "D": 5.6e-08
+    },
+    "12": {
+     "B": 9.5e-08,
+     "C": 0.0,
+     "D": 9.5e-08
+    },
+    "13": {
+     "B": 8.9e-08,
+     "C": 0.0,
+     "D": 8.9e-08
+    },
+    "14": {
+     "B": 8e-09,
+     "C": 0.0,
+     "D": 8e-09
+    },
+    "15": {
+     "B": 9e-08,
+     "C": 0.0,
+     "D": 9e-08
+    },
+    "16": {
+     "B": 7.9e-08,
+     "C": 0.0,
+     "D": 7.9e-08
+    },
+    "17": {
+     "B": 8.6e-08,
+     "C": 1e-09,
+     "D": 8.6e-08
+    },
+    "18": {
+     "B": 9.6e-08,
+     "C": 0.0,
+     "D": 9.6e-08
+    },
+    "19": {
+     "B": 9.2e-08,
+     "C": 1.9e-08,
+     "D": 9.2e-08
+    },
+    "20": {
+     "B": 1.55e-07,
+     "C": 2.4e-08,
+     "D": 1.55e-07
+    }
+   },
+   "sampled_fe_u3_relative_change_vs_nominal_candidate_A": {
+    "7": {
+     "dx+1_dy+0": 0.0261,
+     "dx+0_dy+1": 0.0232,
+     "dx+1_dy+1": 0.0383,
+     "dx+2_dy+2": 0.0485,
+     "dx+3_dy+0": 0.0444,
+     "dx+0_dy+3": 0.0342,
+     "dx+3_dy+3": 0.0562,
+     "rot+0.874_dx+0_dy+0": 0.034
+    },
+    "8": {
+     "dx+1_dy+0": 0.0345,
+     "dx+0_dy+1": 0.0402,
+     "dx+1_dy+1": 0.0489,
+     "dx+2_dy+2": 0.0634,
+     "dx+3_dy+0": 0.0529,
+     "dx+0_dy+3": 0.0499,
+     "dx+3_dy+3": 0.0727,
+     "rot+0.874_dx+0_dy+0": 0.0511
+    },
+    "9": {
+     "dx+1_dy+0": 0.0276,
+     "dx+0_dy+1": 0.0462,
+     "dx+1_dy+1": 0.0574,
+     "dx+2_dy+2": 0.0677,
+     "dx+3_dy+0": 0.0423,
+     "dx+0_dy+3": 0.0577,
+     "dx+3_dy+3": 0.0716,
+     "rot+0.874_dx+0_dy+0": 0.0308
+    },
+    "10": {
+     "dx+1_dy+0": 0.0478,
+     "dx+0_dy+1": 0.0239,
+     "dx+1_dy+1": 0.0543,
+     "dx+2_dy+2": 0.067,
+     "dx+3_dy+0": 0.0755,
+     "dx+0_dy+3": 0.0336,
+     "dx+3_dy+3": 0.0828,
+     "rot+0.874_dx+0_dy+0": 0.0567
+    },
+    "11": {
+     "dx+1_dy+0": 0.0258,
+     "dx+0_dy+1": 0.0542,
+     "dx+1_dy+1": 0.0633,
+     "dx+2_dy+2": 0.0789,
+     "dx+3_dy+0": 0.0437,
+     "dx+0_dy+3": 0.0694,
+     "dx+3_dy+3": 0.0821,
+     "rot+0.874_dx+0_dy+0": 0.0526
+    },
+    "12": {
+     "dx+1_dy+0": 0.0495,
+     "dx+0_dy+1": 0.0557,
+     "dx+1_dy+1": 0.0748,
+     "dx+2_dy+2": 0.0901,
+     "dx+3_dy+0": 0.0748,
+     "dx+0_dy+3": 0.0683,
+     "dx+3_dy+3": 0.1014,
+     "rot+0.874_dx+0_dy+0": 0.0528
+    },
+    "13": {
+     "dx+1_dy+0": 0.0517,
+     "dx+0_dy+1": 0.0018,
+     "dx+1_dy+1": 0.0519,
+     "dx+2_dy+2": 0.0719,
+     "dx+3_dy+0": 0.0908,
+     "dx+0_dy+3": 0.0021,
+     "dx+3_dy+3": 0.0909,
+     "rot+0.874_dx+0_dy+0": 0.0546
+    },
+    "14": {
+     "dx+1_dy+0": 0.001,
+     "dx+0_dy+1": 0.0832,
+     "dx+1_dy+1": 0.0834,
+     "dx+2_dy+2": 0.0956,
+     "dx+3_dy+0": 0.0016,
+     "dx+0_dy+3": 0.1043,
+     "dx+3_dy+3": 0.1043,
+     "rot+0.874_dx+0_dy+0": 0.0578
+    },
+    "15": {
+     "dx+1_dy+0": 0.0448,
+     "dx+0_dy+1": 0.0562,
+     "dx+1_dy+1": 0.0679,
+     "dx+2_dy+2": 0.0917,
+     "dx+3_dy+0": 0.0793,
+     "dx+0_dy+3": 0.0701,
+     "dx+3_dy+3": 0.106,
+     "rot+0.874_dx+0_dy+0": 0.0845
+    },
+    "16": {
+     "dx+1_dy+0": 0.0394,
+     "dx+0_dy+1": 0.0549,
+     "dx+1_dy+1": 0.0754,
+     "dx+2_dy+2": 0.0867,
+     "dx+3_dy+0": 0.0697,
+     "dx+0_dy+3": 0.0749,
+     "dx+3_dy+3": 0.1024,
+     "rot+0.874_dx+0_dy+0": 0.0557
+    },
+    "17": {
+     "dx+1_dy+0": 0.0541,
+     "dx+0_dy+1": 0.0527,
+     "dx+1_dy+1": 0.0775,
+     "dx+2_dy+2": 0.0972,
+     "dx+3_dy+0": 0.0929,
+     "dx+0_dy+3": 0.0673,
+     "dx+3_dy+3": 0.1147,
+     "rot+0.874_dx+0_dy+0": 0.0684
+    },
+    "18": {
+     "dx+1_dy+0": 0.0484,
+     "dx+0_dy+1": 0.0852,
+     "dx+1_dy+1": 0.0973,
+     "dx+2_dy+2": 0.1124,
+     "dx+3_dy+0": 0.0743,
+     "dx+0_dy+3": 0.1037,
+     "dx+3_dy+3": 0.128,
+     "rot+0.874_dx+0_dy+0": 0.0675
+    },
+    "19": {
+     "dx+1_dy+0": 0.0534,
+     "dx+0_dy+1": 0.0798,
+     "dx+1_dy+1": 0.0978,
+     "dx+2_dy+2": 0.1202,
+     "dx+3_dy+0": 0.0944,
+     "dx+0_dy+3": 0.1025,
+     "dx+3_dy+3": 0.1394,
+     "rot+0.874_dx+0_dy+0": 0.0822
+    },
+    "20": {
+     "dx+1_dy+0": 0.0666,
+     "dx+0_dy+1": 0.0436,
+     "dx+1_dy+1": 0.08,
+     "dx+2_dy+2": 0.1033,
+     "dx+3_dy+0": 0.105,
+     "dx+0_dy+3": 0.0534,
+     "dx+3_dy+3": 0.1178,
+     "rot+0.874_dx+0_dy+0": 0.0757
+    }
+   }
+  },
+  "published_figure": {
+   "path": "docs/reconciliation/figures/m11_r64/fig_r64_mapping_sensitivity.png",
+   "sha256": "a06834f13709b0b6862a649885e757a22d093c1bfd5d9d8a1a208a8dfaf394bc"
+  },
+  "readiness": "READY_FOR_SUPERVISOR_DECISION: research, non-governed, non-production, A-D- and scanner-face-invariant diagnostic shape comparison may be proposed; not implemented; no experimental-FE MAC computed",
+  "still_needed_for_physical_registration": [
+   "SCANNER_FACE owner yes/no",
+   "FE-physical correspondence (convention or asymmetric model)",
+   "independent window-position check (PSV overlay screenshot)",
+   "INP-ODB mesh identity (R7 R2 a/b)"
+  ],
+  "not_done": [
+   "experimental-FE MAC",
+   "existing MAC run",
+   "new MAC algorithm",
+   "Abaqus",
+   "ODB extraction",
+   "FE solve",
+   "Auto-ID",
+   "LM",
+   "material fitting",
+   "registration"
+  ],
+  "status": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING"
  }
 }

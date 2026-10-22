@@ -1256,7 +1256,252 @@ The INP–ODB identity limit is not a blocker: R7 records it as a warning.
 
 M11 stays FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING.
 
-## 16. What did not change
+## 16. R6.4 (2026-10-22): FE modal symmetry and scan-mapping sensitivity
+
+Read-only inputs:
+
+- the R6 extraction: `geometry.csv`, `mode_0007…0020.csv`;
+- the **diagnostic** reconstruction `plate_reconstruction_W301xH300.json`.
+
+**No experimental modal data and no experimental frequencies are used, and no MAC is computed** (neither the
+existing implementation nor a new one). FE fields are compared only by relative L2 norms of differences and by
+principal angles between FE subspaces.
+
+The R6.3 statuses are unchanged:
+
+- FE frame established;
+- PHYSICAL_FE_ORIENTATION = NOT_DETERMINED;
+- SCANNER_FACE = HUMAN_CONFIRMATION_PENDING;
+- reconstruction diagnostic;
+- FE_MODEL_IDENTITY = NODES_AND_INP_CONTENT.
+
+The SUPERVISOR decision of R6.4 §4 applies: the three reconstruction deviations are **diagnostic algorithmic
+assumptions for sensitivity studies only**, not a physical calibration.
+
+Derived files are in `runs\m11_carbon_plate\r64\`: `r64_fe_symmetry.json` and `r64_mapping_sensitivity.json`.
+Scripts: `tools\r64_*.py`.
+
+### 16.1 FE modal symmetry, checked on the extracted modes 7–20
+
+**Node maps.** The three 180° rotations about axes through the plate centre are:
+
+- Rx: Y → 300 − Y, Z → −Z; displacement (u1, −u2, −u3);
+- Ry: X → 301 − X, Z → −Z; displacement (−u1, u2, −u3);
+- Rz: X → 301 − X, Y → 300 − Y; displacement (−u1, −u2, u3).
+
+Each is a bijection and an involution on the 10 201 nodes. The maximum coordinate mismatch is
+1.5e-05 mm, which is single-precision ODB
+coordinates.
+
+**Test.** For each mode φ, the field is transformed (Tφ)ᵢ = Q φ_g(i), the parity p = ⟨φ, Tφ⟩ / ⟨φ, φ⟩ is taken, and
+the residual is ‖Tφ − sign(p) φ‖ / ‖φ‖ over all three components. The modes are real (imaginary parts 0), so
+"arbitrary phase" reduces to the sign.
+
+**Negative control:** a shift by one node pitch, which is not a symmetry, gives residuals
+0.03–0.10. The test therefore discriminates.
+
+| Mode | FE Hz | Rx | Ry | Rz | residual Rx | residual Ry | residual Rz | Rz = Rx·Ry | in-plane / out-of-plane norm | Symmetry |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 7 | 19.072 | + | + | + | 2.9e-10 | 5.7e-08 | 5.7e-08 | yes | 2e-14 | holds |
+| 8 | 59.874 | − | − | + | 1.4e-13 | 8.4e-08 | 8.4e-08 | yes | 6e-15 | holds |
+| 9 | 62.009 | − | − | + | 2.6e-09 | 7.0e-08 | 7.0e-08 | yes | 6e-15 | holds |
+| 10 | 71.850 | + | − | − | 6.6e-09 | 1.0e-07 | 1.0e-07 | yes | 4e-15 | holds |
+| 11 | 72.190 | − | + | − | 6.0e-09 | 5.7e-08 | 5.7e-08 | yes | 3e-15 | holds |
+| 12 | 116.580 | − | − | + | 2.7e-15 | 1.0e-07 | 1.0e-07 | yes | 4e-15 | holds |
+| 13 | 167.490 | − | + | − | 2.4e-09 | 1.4e-07 | 1.4e-07 | yes | 6e-15 | holds |
+| 14 | 168.610 | + | − | − | 6.4e-10 | 9.7e-09 | 9.7e-09 | yes | 2e-15 | holds |
+| 15 | 174.800 | + | + | + | 1.1e-09 | 1.1e-07 | 1.1e-07 | yes | 7e-15 | holds |
+| 16 | 179.900 | + | + | + | 8.0e-13 | 9.6e-08 | 9.6e-08 | yes | 1e-14 | holds |
+| 17 | 213.200 | − | + | − | 3.2e-09 | 1.4e-07 | 1.4e-07 | yes | 5e-15 | holds |
+| 18 | 213.950 | + | − | − | 9.1e-10 | 1.0e-07 | 1.0e-07 | yes | 1e-14 | holds |
+| 19 | 295.780 | + | + | + | 2.1e-08 | 1.4e-07 | 1.4e-07 | yes | 2e-11 | holds |
+| 20 | 327.900 | − | − | + | 2.6e-08 | 1.8e-07 | 1.8e-07 | yes | 3e-11 | holds |
+
+- Every elastic mode is exactly symmetric or antisymmetric under all three rotations. The largest residual is
+  1.8e-07, the order of single-precision data.
+- The modes are pure out-of-plane bending: in-plane / out-of-plane ≤ 3e-11.
+- No transformation and no mode is non-equivalent.
+
+**Adjacent pairs: subspace invariance.** The maximum principal angle between span{φᵢ, φⱼ} and its transformed
+span is ≤ 1.1e-05° for every adjacent pair.
+
+| Pair | FE Hz | Relative gap | Parity class (Rx Ry Rz) | Max principal angle |
+|---|---|---|---|---|
+| 7–8 | 19.07 / 59.87 | 213.94 % | +++ / −−+ | 4.8e-06° |
+| 8–9 | 59.87 / 62.01 | 3.57 % | −−+ / −−+ | 6.0e-06° |
+| 9–10 | 62.01 / 71.85 | 15.87 % | −−+ / +−− | 5.9e-06° |
+| 10–11 | 71.85 / 72.19 | 0.47 % | +−− / −+− | 5.9e-06° |
+| 11–12 | 72.19 / 116.58 | 61.49 % | −+− / −−+ | 5.9e-06° |
+| 12–13 | 116.58 / 167.49 | 43.67 % | −−+ / −+− | 7.9e-06° |
+| 13–14 | 167.49 / 168.61 | 0.67 % | −+− / +−− | 7.9e-06° |
+| 14–15 | 168.61 / 174.80 | 3.67 % | +−− / +++ | 6.6e-06° |
+| 15–16 | 174.80 / 179.90 | 2.92 % | +++ / +++ | 8.0e-06° |
+| 16–17 | 179.90 / 213.20 | 18.51 % | +++ / −+− | 7.8e-06° |
+| 17–18 | 213.20 / 213.95 | 0.35 % | −+− / +−− | 7.8e-06° |
+| 18–19 | 213.95 / 295.78 | 38.25 % | +−− / +++ | 7.8e-06° |
+| 19–20 | 295.78 / 327.90 | 10.86 % | +++ / −−+ | 1.1e-05° |
+
+- **Three near-degenerate pairs stand out** by an order of magnitude: **10–11** (0.47 %), **13–14** (0.67 %) and
+  **17–18** (0.35 %). Every other adjacent gap is ≥ 2.9 %. This is a natural grouping, not a new threshold.
+- In each of these pairs the two FE modes belong to **different** symmetry classes, so the FE model cannot mix them.
+- The real plate is not exactly symmetric: the edge thicknesses are 0.816–0.926 mm. Its modes may therefore be mixed
+  within these pairs. A future comparison should treat them **as two-dimensional subspaces**.
+- Two adjacent pairs share a class and could mix in the real plate: **8–9** (−−+, 3.6 %) and **15–16** (+++,
+  2.9 %). They should be watched.
+
+### 16.2 The four candidates A–D (no physical orientation chosen)
+
+- A–D map to one another exactly through the FE symmetries: B = Rz·A, C = Rx·A, D = Ry·A.
+- In all 59 mapping scenarios of §16.3, the node chosen for each point under B, C and D is **exactly** the symmetric
+  image of the node chosen under A: 100 % of points, minimum
+  1.00.
+- The FE U3 vectors sampled at the 289 points are identical across A–D up to sign: largest relative difference
+  1.5e-07.
+- All mapping metrics in §16.3 are identical for A, B, C and D.
+- **Consequence:** for this FE model, a shape comparison is mathematically invariant to the choice among A–D. The set
+  of four admissible matrices is also the same under both scanner-face hypotheses (§15.2), so the comparison is
+  invariant to SCANNER_FACE too.
+- Where a label is needed for illustration, D is used **only as `COMPUTATIONAL_CONVENTION_ONLY`**, never as
+  `HUMAN_CONFIRMED`, `PHYSICALLY_ESTABLISHED` or `ACCEPTED_REGISTRATION`.
+- PHYSICAL_FE_ORIENTATION = NOT_DETERMINED is unchanged.
+- The convention is **not** written as `panel_edges` or `corner_A_marker` evidence, and the R7 guided
+  physical-registration gate is not used or changed.
+
+### 16.3 Sensitivity of the 289-point mapping (diagnostic reconstruction)
+
+[![Mapping sensitivity](figures/m11_r64/fig_r64_mapping_sensitivity.png)](figures/m11_r64/fig_r64_mapping_sensitivity.png)
+
+*Figure 16.1 — mapping sensitivity.* SHA-256 `a06834f13709b0b6862a649885e757a22d093c1bfd5d9d8a1a208a8dfaf394bc`. Generated from the FE data alone; it contains no
+photograph or personal data.
+
+**Inputs:**
+
+| Quantity | Value |
+|---|---|
+| Nominal window | 215.42 × 285.2 mm, offsets 56.40 / 29.19 / 7.02 / 7.78 mm (scanner view). Diagnostic, **not** measured. |
+| Scan pitch | 13.464 × 17.825 mm |
+| FE pitch | 3.01 × 3.0 mm |
+| Shifts | ±1, ±2, ±3 mm in X and Y, separately and together (49 cases) |
+| Rotation | ±0.874° about the window centre (the observed axis misalignment, used as a scenario, not as an established error), alone and with corner shifts of ±3 mm |
+| Existing method | `services.physical_registration`: nearest measured-surface node; the limits `matched_fraction` ≥ 0.90 within 0.03 × scan diagonal (10.72 mm) and normalised RMS ≤ 0.03 are **unchanged** |
+
+The table is for candidate A; B, C and D are identical.
+
+| Scenario | Inside FE plate | Without admissible binding | Nearest-node RMS, mm | Max, mm | Points assigned another node | Expected for uniform sub-cell positions | Repeated node assignments | Existing method: matched fraction / normalised RMS |
+|---|---|---|---|---|---|---|---|---|
+| `dx+0_dy+0` | 289 / 289 | 0 | 1.26 | 2.06 | 0.0 % | 0.0 % | 0 | 1.00 / 0.0035 |
+| `dx+1_dy+0` | 289 / 289 | 0 | 1.29 | 2.07 | 36.0 % | 33.2 % | 0 | 1.00 / 0.0036 |
+| `dx-1_dy+0` | 289 / 289 | 0 | 1.29 | 2.08 | 31.1 % | 33.2 % | 0 | 1.00 / 0.0036 |
+| `dx+0_dy+1` | 289 / 289 | 0 | 1.24 | 1.98 | 51.6 % | 33.3 % | 0 | 1.00 / 0.0035 |
+| `dx+0_dy-1` | 289 / 289 | 0 | 1.11 | 2.02 | 26.6 % | 33.3 % | 0 | 1.00 / 0.0031 |
+| `dx+1_dy+1` | 289 / 289 | 0 | 1.26 | 2.04 | 69.2 % | 55.5 % | 0 | 1.00 / 0.0035 |
+| `dx+2_dy+0` | 289 / 289 | 0 | 1.29 | 2.07 | 68.9 % | 66.5 % | 0 | 1.00 / 0.0036 |
+| `dx+0_dy+2` | 289 / 289 | 0 | 1.11 | 2.02 | 73.4 % | 66.7 % | 0 | 1.00 / 0.0031 |
+| `dx+2_dy+2` | 289 / 289 | 0 | 1.14 | 2.04 | 92.0 % | 88.8 % | 0 | 1.00 / 0.0032 |
+| `dx+3_dy+0` | 289 / 289 | 0 | 1.26 | 2.07 | 100.0 % | 99.7 % | 0 | 1.00 / 0.0035 |
+| `dx+0_dy+3` | 289 / 289 | 0 | 1.26 | 2.06 | 100.0 % | 100.0 % | 0 | 1.00 / 0.0035 |
+| `dx+3_dy+3` | 289 / 289 | 0 | 1.26 | 2.07 | 100.0 % | 100.0 % | 0 | 1.00 / 0.0035 |
+| `dx-3_dy-3` | 289 / 289 | 0 | 1.26 | 2.05 | 100.0 % | 100.0 % | 0 | 1.00 / 0.0035 |
+| `rot-0.874_dx+0_dy+0` | 289 / 289 | 0 | 1.24 | 2.07 | 63.0 % | — | 0 | 1.00 / 0.0035 |
+| `rot+0.874_dx+0_dy+0` | 289 / 289 | 0 | 1.21 | 2.08 | 56.8 % | — | 0 | 1.00 / 0.0034 |
+| `rot+0.874_dx+3_dy+3` | 289 / 289 | 0 | 1.21 | 2.09 | 100.0 % | — | 0 | 1.00 / 0.0034 |
+| `rot-0.874_dx-3_dy-3` | 289 / 289 | 0 | 1.24 | 2.06 | 95.9 % | — | 0 | 1.00 / 0.0035 |
+
+1. **The geometry is never the problem.**
+   - In all 59 scenarios every point lies on the plate.
+   - No point lacks a binding, and no FE node receives two points.
+   - The nearest-node distance is RMS 1.1–1.3 mm and at most 2.09 mm, bounded by the half-diagonal of the
+     3.01 × 3.00 mm cell (2.12 mm).
+   - The existing method's limits pass in **every** scenario. They are 3–4 times looser than the uncertainty studied,
+     so they **cannot detect** a 1–3 mm window error. The limits are not changed.
+2. **The node assignment is not stable at the 1–3 mm level, as stated plainly.**
+   - A 1 mm shift reassigns 27–52 % of the points; 2 mm reassigns 69–92 %.
+   - A 3 mm shift, one FE pitch, reassigns **100 %**: every point moves to the neighbouring node.
+   - The 0.87° rotation alone reassigns 57–63 %.
+   - The fractions follow the estimate for sub-cell positions spread uniformly within a cell, except in Y. There
+     17.825 / 3.0 ≈ 5.94 mesh cells, so the sub-cell positions are not uniform and +1 mm and −1 mm differ
+     (52 % vs 27 %).
+3. **What the reassignment means for the shapes.** The FE U3 field sampled at the 289 points changes smoothly. The
+   relative L2 change, FE against itself (not MAC, no experimental data), is:
+
+| FE mode | 1 mm X | 1 mm Y | 1 mm X+Y | 2 mm X+Y | 3 mm X+Y | rotation 0.87° |
+|---|---|---|---|---|---|---|
+| 7 | 2.6 | 2.3 | 3.8 | 4.9 | 5.6 | 3.4 |
+| 8 | 3.5 | 4.0 | 4.9 | 6.3 | 7.3 | 5.1 |
+| 9 | 2.8 | 4.6 | 5.7 | 6.8 | 7.2 | 3.1 |
+| 10 | 4.8 | 2.4 | 5.4 | 6.7 | 8.3 | 5.7 |
+| 11 | 2.6 | 5.4 | 6.3 | 7.9 | 8.2 | 5.3 |
+| 12 | 5.0 | 5.6 | 7.5 | 9.0 | 10.1 | 5.3 |
+| 13 | 5.2 | 0.2 | 5.2 | 7.2 | 9.1 | 5.5 |
+| 14 | 0.1 | 8.3 | 8.3 | 9.6 | 10.4 | 5.8 |
+| 15 | 4.5 | 5.6 | 6.8 | 9.2 | 10.6 | 8.5 |
+| 16 | 3.9 | 5.5 | 7.5 | 8.7 | 10.2 | 5.6 |
+| 17 | 5.4 | 5.3 | 7.8 | 9.7 | 11.5 | 6.8 |
+| 18 | 4.8 | 8.5 | 9.7 | 11.2 | 12.8 | 6.8 |
+| 19 | 5.3 | 8.0 | 9.8 | 12.0 | 13.9 | 8.2 |
+| 20 | 6.7 | 4.4 | 8.0 | 10.3 | 11.8 | 7.6 |
+
+- The change grows with mode order: 0.1–9.8 % at 1 mm and up to 13.9 %
+  at 3 mm.
+- Some modes are insensitive in one direction: mode 13 to Y and mode 14 to X.
+- For two vectors whose relative difference is ε, any normalised shape-correlation measure degrades only at second
+  order, at most about ε² / (1 − ε)². For ε ≤ 0.14 that is ≈ 0.02. This is an analytical bound; no MAC was computed.
+- **The nearest-node quantisation itself** (RMS 1.26 mm, max 2.06 mm at the nominal position) is as large as the
+  calibration uncertainty under study.
+- Interpolating the FE field with the S4R bilinear shape functions at the point positions would remove the
+  discontinuous node jumps. This is proposed only, not implemented.
+
+### 16.4 The three reconstruction deviations in this light
+
+| Deviation | Status (SUPERVISOR, R6.4 §4) | Effect on this analysis |
+|---|---|---|
+| 1. v range 0..1 | Consistent with the image-independent scanner-angle record of the same measurement system. The absolute window position is not fully confirmed. | Fixes the grid shape and scale. Position errors are covered by the ±3 mm and ±0.87° scenarios. |
+| 2. Edge window 220 px | Supported by identical results at 220–300 px | No separate effect: the left edge is the same line. |
+| 3. Bottom edge, inverted polarity | Supported by the polarity checks; no external physical control | Its main risk is a Y offset of ≈ 1 mm (cross-check 1.13 mm), within the ±3 mm scenarios. The competing feature about 6 mm away (§15.4) lies **outside** the studied range and would need a physical check. |
+
+The 1–3 mm engineering estimate is **not** a confidence interval and not a criterion.
+
+### 16.5 Proposal to the SUPERVISOR for the next step (nothing implemented)
+
+**Readiness verdict.** The current data are sufficient to **propose** a research, non-governed, non-production
+diagnostic shape comparison that is invariant to A–D and to SCANNER_FACE. It is not a physical registration. It cannot
+use the R7 guided-registration gate, because that gate admits physical references only. **It needs a SUPERVISOR
+decision before any experimental–FE MAC is computed.**
+
+Outline of a separate research protocol, proposed only:
+
+1. **Status.** It runs outside the guided registration and outside `panel_edges` / `corner_A_marker`. It is labelled
+   `DIAGNOSTIC_NOT_REGISTERED / COMPUTATIONAL_CONVENTION_ONLY`. It writes no `FrozenRegistration` and changes no
+   evidence schema, gate, threshold, SPEC or R7 code.
+2. **Fixed in advance,** before any experimental shape is read:
+   - the mapping: nearest node, as in the existing method, plus bilinear interpolation as a declared secondary
+     result;
+   - the sensitivity scenarios: ±1/2/3 mm and ±0.87°;
+   - the subspace groups: 10–11, 13–14, 17–18, and 8–9 and 15–16 to be watched;
+   - the rule that every result is reported as a range over the scenarios. It is never re-tuned, and no shift is
+     selected by agreement.
+3. **Built-in self-check:** the computation is repeated for A, B, C and D and must give identical results up to mode
+   sign. §16.2 shows this holds exactly for this model.
+4. **Data checks before the first experimental–FE MAC:**
+   - experimental set `polymax-bravo`: 10 modes, 289 points, U3 only, point order validated (MeasPoints ↔ UNV);
+   - the handling of complex experimental modes, i.e. the real-normalisation convention, is declared;
+   - the beam inclination (scan angles ≤ about 7°, cos ≥ 0.99) is noted;
+   - the FE U3 component only; rigid modes 1–6 excluded;
+   - no pairing by frequency.
+5. **Output:** diagnostic only. It does not feed Auto-ID, LM, material constants or any governed gate.
+
+**What this does not replace** (independent physical data still needed for a physical registration):
+
+- SCANNER_FACE: owner yes / no;
+- the FE ↔ physical correspondence: not determinable from this model; only by convention or by a model with a
+  physical asymmetry;
+- an independent check of the window position: a Polytec PSV overlay screenshot of a copy of the `.svd`, not
+  published;
+- the INP–ODB mesh identity: R7 R2 option (a) or (b).
+
+M11 remains FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING.
+
+## 17. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.
