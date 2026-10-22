@@ -83,7 +83,7 @@ any background error); R3 `13af39a` (no stale registration: every input change i
 generation counter discards overtaken background builds). The guided registration remains a diagnostic engineering
 registration: `governed = false`, `production_ready = false`, no Auto-ID observation.
 
-## R7 / R7 R1 (2026-10-21): fail-closed shell gate (branch `fix/r7-shell-modal-safety`)
+## R7 / R7 R1 / R7 R2 (2026-10-21): fail-closed shell gate (branch `fix/r7-shell-modal-safety`, not merged)
 
 For a conventional shell (S4R …) all nodes lie on the mid-surface, so `max_z` and `min_z` select the same nodes and
 `side` cannot name the measured face.
@@ -95,7 +95,16 @@ For a conventional shell (S4R …) all nodes lie on the mid-surface, so `max_z` 
   (`auto-id/guided-shell-face/v1`): the bound INP's SHA-256, the instance, the uniform element normal (+Z / −Z), the
   measured face (`positive_normal` / `negative_normal`) and its physical record. The experimental +z axis must map to
   that face. Any contradiction and mirrored axes are refused.
-- **Saved registrations** of a flat surface without a bound INP are not applied.
+- **Saved registrations of a flat surface (R7 R2)** are re-applied only after a complete re-check. This happens on
+  **Open saved registration...**, on **Apply** and before every analysis in the worker.
+  - The record must carry the v2 binding (`auto-id/guided-fe-input-binding/v2`).
+  - The INP must be supplied again, and its SHA-256 must be the recorded one.
+  - The full shell gate runs again: node binding, element types, `connectivity_sha256`, normals, measured face,
+    Z sign and determinant.
+  - A recorded `bound = true` alone is never enough: without the INP, or with another one, the registration is
+    refused and the analysis does not run.
+- The guided result stays diagnostic: not governed, not production-ready. The FE-model identity is
+  `NODES_AND_INP_CONTENT`; the INP–ODB connectivity identity is not proven.
 
 `parse_geometry_calibration`, the governed passports and the solid rules are unchanged. See
 `docs/reconciliation/R7_SHELL_MODAL_SAFETY.md`.

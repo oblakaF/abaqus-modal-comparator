@@ -1,7 +1,7 @@
 # R7 — Frequency-record safety of extraction packages and the fail-closed shell gate
 
-**Branch:** `fix/r7-shell-modal-safety`, from `origin/main` `aa08ad9`; PR #96. **Status:** `REVIEW_READY` (R7 R1). It
-is not merged.
+**Branch:** `fix/r7-shell-modal-safety`, from `origin/main` `aa08ad9`; PR #96. **Status:** `REVIEW_READY` (R7 R2; integration-readiness check R7 FINAL, §9). It
+is not merged; PR #96 is a draft.
 
 No Abaqus was run and no original was opened. The pinned extractor, `PINNED_EXTRACT_SCRIPT_SHA256`,
 `parse_geometry_calibration`, the governed passports, SPEC v1.2, every threshold and every production gate are
@@ -10,8 +10,12 @@ unchanged.
 **History:**
 
 - R7: `7d46a2f`, `ae0fb6a`.
-- R7 R1, after the SUPERVISOR audit: this revision. It closes the remaining frequency gap, replaces the optional shell
-  hint by a fail-closed gate in the real GUI path, and records the pin's line-ending dependence as an open decision.
+- R7 R1, after the SUPERVISOR audit: `fa3a2e3`. It closes the remaining frequency gap, replaces the optional
+  shell hint by a fail-closed gate in the real GUI path, and records the pin's line-ending dependence as an open
+  decision.
+- R7 R2: `f6df6f4`. Re-applying a saved flat / shell registration re-runs the full shell gate against the
+  re-supplied INP (§2, R7 R2).
+- R7 FINAL (2026-10-23): documentation synchronised and integration readiness checked (§9). No code changed.
 
 ## 1. R7-A: frequency records of an extraction package
 
@@ -209,7 +213,7 @@ handled by this path.
 | Synthetic M2 fixtures (single-layer "solid" instances) | flat, so now need a bound FE input. The guided tests supply a generated solid INP bound to the same geometry (`tests/r7_support.py`). The governed builder tests (`test_physical_registration`, `test_registration_uncertainty`) do not use the guided path and are unchanged |
 | Real plate (diagnostic, `runs\r7_r1\real_plate_binding.json`) | V3 INP copy (SHA-256 equal to its manifest) bound to the R6 extraction: 10 201 nodes, max difference 1.5·10⁻⁵ mm, S4R, normals +Z (10 000 / 10 000) → `shell` |
 
-## 3. Files changed (R7 + R7 R1)
+## 3. Files changed (R7, R7 R1, R7 R2)
 
 | File | Change |
 |---|---|
@@ -287,7 +291,8 @@ See R7 R2 below (§8).
   shells are refused.
 - The INP-to-ODB link is not proven by the node match (R2). The provenance needed for it is defined above;
   until then the FE-model identity is `NODES_AND_INP_CONTENT`.
-- The store-gated SP-02 / SP-13 data tests need the original store `D:\Snadwich` and were not run (§6).
+- The store-gated SP-02 / SP-13 data tests need the original store `D:\Snadwich` and other stores, and were not
+  run (§8, §9).
 
 ## 8. R7 R2 test results
 
@@ -315,3 +320,29 @@ unittest.
 
 **Executed:** the store-free SP-02 / SP-13 tests (frozen registration hashes, passports, re-evaluation records) and the
 governed builder and G2d1 tests all pass. `physical_registration.py` and the governed paths are unchanged.
+
+## 9. R7 FINAL (2026-10-23): integration-readiness check
+
+Documentation only; no code, test or extractor change.
+
+| Check | Result |
+|---|---|
+| Git | `fix/r7-shell-modal-safety` = `f6df6f4` before this commit; 4 commits on `origin/main` `aa08ad9`, 0 behind; clean tree; `git merge-tree` into main has no conflict; only `src/`, `tests/` and R7 documentation changed (no M10 / M11 file, no data, no Abaqus output) |
+| Unchanged | `abaqus_scripts/extract_odb.py` and `PINNED_EXTRACT_SCRIPT_SHA256` (`039aa067…`); `physical_registration.py`; SPEC v1.2, passports, DECISIONS, EVIDENCE |
+| R7 profile (`test_r7_shell_modal_safety`) | 41 passed |
+| Guided registration incl. GUI / worker fail-closed (`test_guided_registration`) | 24 run, 23 passed, 1 skipped (store-gated: new SP-13 mesh against the `carbon-project-archive` store) |
+| Physical / SP-02 / SP-13 / uncertainty / G2d1 / registration factory | 145 run, 129 passed, 16 skipped (store-gated: `snadwich`, `carbon-project-archive`, `sumin`) |
+| Loader / extractor suites | 16 passed |
+| Full `python -m unittest discover -s tests` | R7: **2497 tests, OK, 96 skipped**; clean main `aa08ad9`: 2455 tests, OK, 96 skipped. The same skipped set; no test changed status; the 42 additional tests are R7's |
+| Full pytest | R7: 2435 passed, 112 skipped, **1 failed**; main: 2393 passed, 112 skipped, **1 failed**. The same failure on both (§5, a test-order baseline issue; not fixed here) |
+
+- **Not run.** The store-gated real-data regressions (SP-02 / SP-13 reconstruction, production-input and strict-freeze
+  reproductions, archived shapes) need `D:\Snadwich`, the `carbon-project-archive`, `sumin` and the M7 run stores.
+  Originals may not be opened, so these were **not run and are not claimed as passed**.
+- **Merge conflicts.** PR #94 (M10) and PR #95 (M11) also append to `docs/auto_id/CHANGELOG.md` and
+  `docs/auto_id/STATUS.json`. Whichever PR merges second will have a conflict in these two append-only files, resolved
+  by keeping both entries.
+- **Status.** R7 is **not merged**, and PR #96 remains a draft. The physical registration of any specimen is not
+  claimed. The diagnostic path never produces governed or production-ready results (`governed = false`,
+  `production_ready = false`, asserted by the tests). FE_MODEL_IDENTITY = `NODES_AND_INP_CONTENT`: INP–ODB
+  connectivity identity is not proven. OD-R7-1 remains open.

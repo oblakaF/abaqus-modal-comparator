@@ -2069,6 +2069,7 @@
     "open_decisions": [
       "OD-R7-1: PINNED_EXTRACT_SCRIPT_SHA256 is a CRLF hash (LF blob 043e89e1...); re-pin options in R7_SHELL_MODAL_SAFETY.md",
       "extractor root-cause patch depends on the re-pin"
-    ]
+    ],
+    "final_check": "R7 FINAL 2026-10-23: documentation synchronised with R7 R2; 4 commits on main aa08ad9, 0 behind, no merge conflict with main; unittest 2497 OK / 96 skipped (main 2455 / 96, same skips); pytest 1 baseline failure identical on main; store-gated SP-02 / SP-13 real-data tests not run; not merged; PR #96 draft"
   }
 }

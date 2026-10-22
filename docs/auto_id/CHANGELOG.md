@@ -5489,3 +5489,18 @@ first internal provider.
   via Abaqus Python) is defined, not implemented.
 - **Tests:** 41 R7 tests, plus GUI / worker refusal cases.
 - **Unchanged:** non-flat solid registrations, governed paths, the pinned extractor and OD-R7-1.
+
+## 2026-10-23 — R7 FINAL: integration-readiness check of PR #96 (documentation only; not merged)
+
+- **Documents brought in line with the completed R7 R2 scope:**
+  - report header and history: R7 R1 `fa3a2e3`, R7 R2 `f6df6f4`;
+  - files heading;
+  - the GUI guide's re-application rules;
+  - STATUS `final_check`.
+- **Git:** 4 commits on main `aa08ad9`, 0 behind; no conflict with main; no M10 / M11 file and no data.
+- **Tests:**
+  - unittest: R7 2497 OK, 96 skipped; main 2455 OK, 96 skipped; the same skipped set.
+  - pytest: one baseline failure (`test_v12_i5_contract_closure`), identical on main.
+  - The store-gated real-data SP-02 / SP-13 tests were not run.
+- **Unchanged:** the pinned extractor and its hash, `physical_registration.py`, SPEC v1.2, passports, thresholds and
+  production gates. OD-R7-1 open; FE_MODEL_IDENTITY = NODES_AND_INP_CONTENT.
