@@ -5602,3 +5602,25 @@ first internal provider.
   - the axes and origin come from an existing model screenshot or an authorised copy;
   - the Abaqus standard view is not taken as evidence of the physical origin.
 - **Unchanged:** no candidate selected, no registration, status unchanged.
+
+## 2026-10-22 — M11 R6.3: FE coordinate frame and independent scan-calibration audit (diagnostic)
+
+- **FE frame established from the V3 INP and CAE journal:**
+  - Part X −251…50 / Y −270…30;
+  - Instance translation (251, 270, 0) only;
+  - R6 = Assembly frame, X 0–301 / Y 0–300;
+  - S4R node order gives normal +Z (10 000 / 10 000).
+  - The model has **no** physical references, and its mesh is symmetric under the 180° rotations.
+- **FE ↔ physical edges NOT_DETERMINED.** The model cannot determine it. The owner's recognition of picture D does
+  not discriminate because all pictures share the same edge layout. The experimental-axes column of §14.2 depends
+  on the scanner face (A↔D, B↔C).
+- **SCANNER_FACE = HUMAN_CONFIRMATION_PENDING.** The instrument records show the frame is the scanned face; the
+  photograph points to the unmarked face.
+- **Deviations:**
+  - 1 (v range) is independently confirmed by the scanner-angle record: grid aspect 0.775 vs 0.755, similarity rms
+    1.3 mm;
+  - 2 and 3 (edges) are supported and insensitive, but not independently confirmed;
+  - offsets are uncertain to about 1–3 mm.
+- **INP–ODB:** the job records are consistent; mesh identity is not proven, so NODES_AND_INP_CONTENT is unchanged.
+- **Diagnostic MAC blockers** are listed. FE schematic published in `docs/reconciliation/figures/m11_r63/`.
+- **Status unchanged.** No Abaqus, MAC or fitting.

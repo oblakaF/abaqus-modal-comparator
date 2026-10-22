@@ -1067,7 +1067,196 @@ After 1–3, the evidence draft `evidence_r61/evidence_DRAFT_plate_r61.json` can
 
 It would then go through the R7 gate (PR #96, not merged). **The registration is not completed here.**
 
-## 15. What did not change
+## 15. R6.3 (2026-10-22): FE coordinate frame and independent scan calibration audit
+
+Read-only work on:
+
+- the verified V3 copies: S4R INP, CAE journal `SInglePlate1mm.jnl`, replay files, job files `.com` / `.dat` / `.msg` /
+  `.log`, `.svd`, POLYMAX `.unv`;
+- the R6 extraction package.
+
+No Abaqus, no new extraction, no FE solve, no MAC, no frequency fitting, no material estimation. Owner clarification
+(SUPERVISOR, R6.3 §0): the owner recognised the physical edge layout in picture D but **does not know where the
+Abaqus axes lie**. Picture D is therefore **not** selected, accepted or HUMAN-confirmed.
+
+Derived files are in `runs\m11_carbon_plate\r63\`:
+
+- `r63_fe_frame.json`
+- `r63_candidate_edge_map.json`
+- `r63_scan_sensitivity.json`
+- `r63_scan_angle_check.json`
+- the scripts in `tools\r63_*.py`
+
+### 15.1 FE coordinate frame (established from the model files)
+
+[![FE coordinate frame (schematic, not an Abaqus screenshot)](figures/m11_r63/fig_r63_fe_frame.png)](figures/m11_r63/fig_r63_fe_frame.png)
+
+*Figure 15.1 — the FE coordinate frame.*
+
+- It is a Matplotlib schematic drawn from the INP and R6 node coordinates, **not an Abaqus screenshot**.
+- SHA-256 `51c0feb277b6d7e035ea5e73f269df1ee354cbd628ad9f54c830456b2c67c4be`.
+- It contains no personal data, host names or paths.
+
+| Question | Finding | Source |
+|---|---|---|
+| Part or Assembly | The INP Part `CFRP_301x300_SHELL` has nodes at X -251…50, Y -270…30, Z 0. The Instance `CFRP_301x300_SHELL-1` carries **one data line: translation (251, 270, 0)**. The R6 coordinates (X 0–301, Y 0–300) are the **Assembly** frame: R6 = INP Part + translation, max 1.5e-05 mm, all 10 201 labels equal. | INP `962f75f2fd5d…`, R6 `geometry.csv` `8bb5319fd759…` |
+| X = 0, Y = 0 | Assembly corner (0, 0) = Part point (−251, −270). The Part origin (0, 0) lies inside the plate, 50 mm and 30 mm from two edges. | INP, journal |
+| +X, +Y | +X along the 301 mm side, +Y along the 300 mm side; 101 × 101 nodes, uniform 3.01 × 3.00 mm. | INP |
+| +Z normal | S4R element 1 has nodes 1 → 2 → 103 → 102 at (0,0) → (3.01,0) → (3.01,3) → (0,3), counter-clockwise seen from +Z. The right-hand rule gives normal +Z: SPOS on +Z, SNEG on −Z. All 10000 elements have +Z; 0 have −Z. | INP |
+| Instance rotation, reflection, transfer | Translation only. No rotation line, no reflection. The journal records `translate (251, 270, 0)`, then `(0, −300, 0)` and `(0, +300, 0)`: net (251, 270, 0). | INP, journal `223643adb947…` |
+| How the geometry was built | The journal sketches a rectangle (0, 0)–(50, 30), then dimensions it 301 × 300. The vertex (50, 30) stayed fixed and the outline grew to −251 / −270. The Instance was then translated to put that corner at 0, 0. | journal |
+| Physical references in the model | **None.** The only set is `Set-1` (the whole face). There are no surfaces, partitions, datum points, reference points, named edges, holes or attachment points, and no boundary conditions (free-free). The material orientation is GLOBAL, the shell section homogeneous (0.875 mm, 5 Simpson points, middle surface), the density uniform. The replay files contain display commands only (Front / Bottom / Iso views). | INP, journal, `abaqus.rpy*` |
+| Symmetry of the FE model | The node set is invariant under x → 301 − x, y → 300 − y and both (verified). Together with the uniform orthotropic GLOBAL material, the mid-plane-symmetric section and the free-free supports, the FE model is invariant under the three 180° rotations about axes through its centre. | `r63_fe_frame.json` |
+
+**Conclusion.** The FE axes are established **in the model**. The INP and the supporting materials contain **no**
+evidence linking an FE edge or the FE origin to a physical edge 1–4. The origin corner is an artefact of how the sketch
+was dimensioned. A featureless rectangular mesh cannot identify a corner of the real specimen.
+
+### 15.2 FE-to-physical correspondence: candidates A–D and their evidence
+
+Pictures A–D (§14) are physical placements of the FE model on the plate, with the 301 mm side horizontal.
+
+| Picture | Physical edge at FE X = 0 | FE X = 301 | FE Y = 0 | FE Y = 300 | FE +Z (SPOS) points out of | Experimental axes in FE if the scanner was opposite the shaker | … if the scanner was on the shaker side |
+|---|---|---|---|---|---|---|---|
+| **A** | 4 | 2 | 3 | 1 | marked face (towards the shaker) | -X +Y -Z | +X +Y +Z |
+| **B** | 2 | 4 | 1 | 3 | marked face (towards the shaker) | +X -Y -Z | -X -Y +Z |
+| **C** | 4 | 2 | 1 | 3 | unmarked face (away from the shaker) | -X -Y +Z | +X -Y -Z |
+| **D** | 2 | 4 | 3 | 1 | unmarked face (away from the shaker) | +X +Y +Z | -X +Y -Z |
+
+The experimental-axes column of §14.2 holds **only** if the scanner was opposite the shaker. Otherwise the rows A↔D and
+B↔C swap. The set of the four admissible matrices is the same in both cases.
+
+| Item | Supported by FE coordinates | Supported by physical records (HUMAN) | Assumption | What distinguishes the candidates |
+|---|---|---|---|---|
+| All of A–D | X along 301, Y along 300, +Z normal, determinant +1 | 301 × 300; 301 mm horizontal; edges 1 top / 2 right / 3 bottom / 4 left from the shaker side; marks on the shaker side; shaker near edge 3, left of centre (approximate) | The scanner was opposite the shaker; this is needed only for the experimental-axes column | **Only** which physical corner is FE (0, 0) and which face +Z leaves. No FE or physical record fixes either. |
+
+- **The owner's recognition of picture D does not discriminate.** All four pictures show the same physical edge
+  layout, so the recognition confirms only that layout, which was already HUMAN.
+- **No photograph of the plate can close the question.** The FE origin is not a physical feature: the model was
+  sketched with no reference to the specimen and has no physical landmark.
+- **What could close it:**
+  - (i) a record made when the model was built of the intended correspondence. The owner states none exists.
+  - (ii) a **SUPERVISOR convention** that declares one placement and records it as `CONVENTION`, not as a physical or
+    HUMAN fact.
+  - (iii) a future FE model that carries a physical asymmetry, such as the measured edge thicknesses 1–4. Its
+    construction would fix the correspondence.
+- **Property of this model (stated, not computed).** The four admissible exp→FE matrices are related by the exact
+  symmetries of the FE model in §15.1. A diagnostic comparison with this model is therefore mathematically
+  independent of the choice among A–D, apart from the global sign of each mode. This is not used to select anything.
+
+**PHYSICAL_FE_ORIENTATION = NOT_DETERMINED.**
+
+### 15.3 Scanner face
+
+| Level | Finding |
+|---|---|
+| Established by instrument record | The stored frame (`Info/VideoBitmap`) shows the **scanned** face. Three records support this: (1) the 2D video alignment (`Info/VideoSettings`, 13 points) ties the scanner mirror angles to positions in this frame, with residuals ≤ 2.37 px (≈ 0.8 mm); (2) the scanner angles of the 289 points match the reconstructed grid by a similarity transform, rms 1.32 mm (§15.4); (3) the scan head is `PSV-I-680` (`Info/ScanHead`). No stored record names the marked or unmarked face. |
+| Confirmed by the owner (HUMAN) | The marks are on the shaker-facing side. The shaker is near edge 3, left of centre seen from the shaker side (approximate). |
+| Inferred from the photograph | (a) The shaker body is behind the plate: the plate occludes it and the bottom plate edge lies in front of the dark shaker. (b) The shaker appears **right** of centre at ≈ 0.77 of the width, the mirror of the owner's "left of centre" from the shaker side, so the camera looked from the other side. Both point to the face opposite the shaker, i.e. the unmarked face. No numerals are visible, but on its own that is not evidence. |
+| Unknown | No instrument record of the side. |
+
+**SCANNER_FACE = HUMAN_CONFIRMATION_PENDING.** One owner yes/no answer closes it. No photograph showing people or
+equipment labels is published.
+
+### 15.4 Independent audit of the three reconstruction deviations
+
+The scale is 2.964 px/mm in the 1920 × 1080 frame.
+
+**The sum of the offsets and the window equal 301 / 300 mm by construction; this is not used as evidence.**
+
+| Deviation | Independent evidence | Sensitivity | Verdict |
+|---|---|---|---|
+| **1. v range 0..1 instead of the stored −2.4667..1.0** | **Scanner angles (`Info/VideoSettings`):** this uses neither the frame rectangle nor the plate edges. Inverting the alignment model for the 289 points gives a grid aspect (width / height) of 0.7747 in angle space. The reconstruction with v 0..1 gives 0.7553. A similarity fit of angle to reconstruction leaves rms 1.32 mm, max 2.34 mm, and implies a standoff of ≈ 1209 mm. The stored v range would give an aspect of 2.6; a 4:3 u normalisation would give 1.0. Both are contradicted by the angles. **Frame:** the stored u range spans exactly 1920/1080 (ratio 1.0), so v 0..1 gives square pixels; the stored v range gives 3.4667:1. The alignment isotropy is 0.9721. The alignment points lie in v 0.0952–0.8659. | With the stored range the reconstruction fails ("top edge: too few samples"). | **Independently confirmed by an existing source** (the scanner-angle record) for the scale and shape of the grid. The vertical position then follows from the stored v1 = 1.0. Why the stored field holds v0 = −2.4667 is not documented. |
+| **2. Edge search window 220 px instead of 150** | None beyond the image. Two checks: the plate in the frame measures 892.2 × 892.6 px for 301 × 300 mm (px/mm x/y 0.9962); the green edge lines coincide visually with the plate edges. | 150–200 px: the left edge is not found ("too few samples"); no other edge is found instead. 220, 250 and 300 px give the same edges and offsets to 0.01 mm. | **Supported, no independent confirmation.** The value is immaterial at 220 px and above. |
+| **3. Bottom edge on the inverted image, step 8** | None beyond the image. Cross-check: the bottom edge predicted from the top edge plus 300 mm at the horizontal px/mm (square pixels, plate facing the camera) differs from the detected edge by 1.13 mm. | The accepted polarity puts the "bottom edge" at -17.37 mm, with scan points outside the plate: physically impossible. Inverted steps 6, 8, 10 and 12 give the same result within 0.01 mm. Step 16 moves to another feature (bottom offset 1.01 mm). | **Supported, no independent confirmation.** A competing image feature lies ≈ 6 mm away. |
+
+**Credibility of the offsets** (left 56.4 / right 29.19 / bottom 7.02 / top 7.78 mm).
+
+Diagnostic error contributions, not acceptance criteria:
+
+| Contribution | Size |
+|---|---|
+| Edge-line fit | ≤ 0.097 mm rms |
+| Video-to-scanner alignment residual | u ≤ 0.38 mm, v ≤ 0.80 mm |
+| Projective reconstruction vs the per-axis scan model | median 1.29 mm, max 3.23 mm |
+| Angle-to-reconstruction shape | rms 1.32 mm, max 2.34 mm |
+| Bottom-edge cross-check | 1.13 mm |
+
+- Together these indicate offsets **uncertain at the level of 1–3 mm**, comparable to the FE mesh spacing of 3 mm.
+- The left / right asymmetry (56.4 vs 29.2 mm) comes from the image edges and is not checked by any independent
+  record.
+- The UNV metric geometry is **not** a physical calibration and gives no confirmation either way: its grid is nearly
+  square (0.9951), and fitted to the reconstruction it leaves rms 15.04 mm.
+
+**Minimal evidence to close the calibration without a new experiment.** A screenshot from the Polytec PSV software
+opening a **copy** of the `.svd`, with the scan points overlaid on the stored video frame. It shows the
+instrument's own point-to-image mapping, which closes deviation 1 at the source, and lets the edges of deviations 2
+and 3 be judged against the instrument's display. It would contain the laboratory photograph and must not be
+published.
+
+Alternatively, the SUPERVISOR can accept deviations 2 and 3 on the sensitivity evidence above. That is a decision, not
+evidence.
+
+**SCAN_WINDOW_CALIBRATION = DIAGNOSTIC_ONLY.** Deviation 1 is independently confirmed; deviations 2 and 3 are
+supported without independent confirmation.
+
+### 15.5 INP–ODB provenance (limit of the evidence)
+
+Without opening the ODB, the job records in the V3 copies and the R6 package agree.
+
+- **Job and input:** `.com` names job `CFRP_S4R_0875_FreeFree` with input `CFRP_S4R_0875_FreeFree`, format INP. The
+  INP header says "Generated by Abaqus/CAE 2024", and the journal creates and submits this job from `Model-1`.
+- **Timing** (source mtimes in `COPY_MANIFEST_V3.json`, preserved in the copies):
+  - INP written 17:29:17;
+  - input processing 17:29:25–29 (`.log`);
+  - analysis 17:29:29–34;
+  - ODB written 17:29:34.
+- **Model data:**
+  - the heading "CFRP 301x300x0.875, S4R, mesh 3mm" is the same in the INP, `.dat`, `.msg` and the ODB title (R6
+    manifest);
+  - `.dat`: 10 000 elements and 10 201 nodes, `*Element, type=S4R`, elset `ASSEMBLY_CFRP_301X300_SHELL-1_SET-1`;
+  - the `.dat` eigenfrequencies of modes 3–20 equal those read from the ODB (R6 postflight, max difference 0 Hz). This
+    is a record comparison, not fitting.
+- **Not available:** the `.dat` was written with `model=NO`, so no mesh echo. The R6 package holds no ODB element
+  types or connectivity. The `.sim` / `.prt` are binary and need Abaqus tools.
+
+**Status:** the records are consistent with the ODB having been produced by this job from an INP with this name,
+heading, size and element type. **Mesh identity is not proven.** `FE_MODEL_IDENTITY = NODES_AND_INP_CONTENT` is
+unchanged, R7 / PR #96 is not modified, and closing the gap needs option (a) or (b) of R7 R2.
+
+### 15.6 What was closed without the owner, and what remains
+
+| Item | Status after R6.3 | Closed by | Still needed |
+|---|---|---|---|
+| FE frame (Part / Assembly, origin, +X / +Y, +Z normal, Instance) | **Closed** | INP, journal, R6 | — |
+| Physical references inside the FE model | **Closed: none exist** | INP, journal, replay | — |
+| FE ↔ physical edges (A–D) | Not determined; cannot be determined from the model | — | SUPERVISOR convention, or a model with physical asymmetry |
+| Scanner face | Instrument: the frame is the scanned face. Photograph: unmarked face. | VideoSettings, frame | Owner yes / no |
+| Deviation 1 (v range) | **Independently confirmed** (shape and scale) | Scanner angles | Optional: PSV software overlay |
+| Deviations 2, 3 (edges) | Supported, insensitive within the tested range | Sensitivity runs | SUPERVISOR decision, or PSV overlay |
+| INP–ODB mesh identity | Job records consistent; identity not proven | `.com` / `.log` / `.dat` / `.msg`, R6 | R7 R2 option (a) or (b) |
+
+**What prevents a diagnostic MAC.** The first three are hard blockers; the fourth only requires a recorded decision.
+
+1. MAC is not authorised; that is a SUPERVISOR gate.
+2. The R7 shell gate (PR #96) is not merged, and a shell registration needs it.
+3. The evidence record cannot be completed: it needs the axes, `shell_measured_face` and the panel-edge offsets, and
+   no FE↔physical placement is declared. This model's symmetry makes the numerical result independent of the
+   placement, so a SUPERVISOR **convention** plus the SCANNER_FACE answer would be enough.
+4. The scan calibration is diagnostic only: deviations 2 and 3 need a decision.
+
+The INP–ODB identity limit is not a blocker: R7 records it as a warning.
+
+**Verdicts:**
+
+- FE_MODEL_AXES = **ESTABLISHED**
+- FE_TO_PHYSICAL_EDGES = **NOT_DETERMINED**
+- SCANNER_FACE = **HUMAN_CONFIRMATION_PENDING**
+- SCAN_WINDOW_CALIBRATION = **DIAGNOSTIC_ONLY**
+
+M11 stays FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING.
+
+## 16. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.

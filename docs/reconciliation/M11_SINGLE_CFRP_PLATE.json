@@ -1818,5 +1818,554 @@
   "scanner_far_side": "hypothesis; HUMAN confirmation required",
   "nature": "diagnostic illustrations; not an approved physical registration; no candidate selected",
   "status": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING"
+ },
+ "r63_fe_axis_and_scan_audit": {
+  "verdicts": {
+   "FE_MODEL_AXES": "ESTABLISHED",
+   "FE_TO_PHYSICAL_EDGES": "NOT_DETERMINED",
+   "PHYSICAL_FE_ORIENTATION": "NOT_DETERMINED",
+   "SCANNER_FACE": "HUMAN_CONFIRMATION_PENDING",
+   "SCAN_WINDOW_CALIBRATION": "DIAGNOSTIC_ONLY",
+   "FE_MODEL_IDENTITY": "NODES_AND_INP_CONTENT (unchanged; job records consistent)"
+  },
+  "owner_clarification": "owner recognised the edge layout in picture D but does not know the Abaqus axes; D is not selected, accepted or HUMAN_CONFIRMED; all pictures share the same edge layout",
+  "fe_frame": {
+   "sources": {
+    "inp": {
+     "file": "V3 temp_root/CFRP_S4R_0875_FreeFree.inp",
+     "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+    },
+    "cae_journal": {
+     "file": "V3 temp_12sampls_results_Plate/SInglePlate1mm.jnl",
+     "sha256": "223643adb947f51e117b6624bdb5f3d4766fb4f16ebbda133e0fc46f963cf08d"
+    },
+    "r6_geometry": {
+     "file": "odb_extraction_r6/output/geometry.csv",
+     "sha256": "8bb5319fd759f7499dbc207ef960f0552990b9136fadb277f7ab79b56cddfaa2"
+    },
+    "odb_copy_sha256": "7daeb7e35adf6bd6fabe8f9f582859935ca3d8927ae32fcf07a35c38e8c023b8"
+   },
+   "part": {
+    "name": "CFRP_301x300_SHELL",
+    "x_range": [
+     -251.0,
+     50.0
+    ],
+    "y_range": [
+     -270.0,
+     30.0
+    ],
+    "z": 0.0
+   },
+   "instance": {
+    "name": "CFRP_301x300_SHELL-1",
+    "translation": [
+     251.0,
+     270.0,
+     0.0
+    ],
+    "rotation_data_lines": [],
+    "rotation_or_reflection": false
+   },
+   "assembly": {
+    "x_range": [
+     0.0,
+     301.0
+    ],
+    "y_range": [
+     0.0,
+     300.0
+    ]
+   },
+   "r6_coordinates_frame": "Assembly (instance placement applied)",
+   "r6_vs_inp_plus_translation_max_abs_mm": 1.5248437478021515e-05,
+   "r6_labels_equal_inp_labels": true,
+   "elements": 10000,
+   "nodes": 10201,
+   "element_1": {
+    "nodes": [
+     1,
+     2,
+     103,
+     102
+    ],
+    "assembly_xy": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      3.0099950000000035,
+      0.0
+     ],
+     [
+      3.0099950000000035,
+      3.0
+     ],
+     [
+      0.0,
+      3.0
+     ]
+    ]
+   },
+   "normals": {
+    "+Z": 10000,
+    "-Z": 0
+   },
+   "grid": {
+    "nx": 101,
+    "ny": 101
+   },
+   "in_plane_grid_symmetry": {
+    "x -> 301 - x (rotation 180 deg about FE Y through the centre, in-plane part)": true,
+    "y -> 300 - y (rotation 180 deg about FE X)": true,
+    "both (rotation 180 deg about FE Z)": true
+   },
+   "sets_and_surfaces": [
+    "*Nset, nset=Set-1, generate",
+    "*Elset, elset=Set-1, generate"
+   ],
+   "material_orientation": "GLOBAL (journal: MaterialOrientation orientationType=GLOBAL, axis AXIS_3)",
+   "section": "homogeneous shell, thickness 0.875, 5 Simpson points, offset MIDDLE_SURFACE (journal and INP)",
+   "boundary_conditions": "none (free-free; no *Boundary in the INP)",
+   "journal_sketch": "rectangle (0,0)-(50,30) dimensioned to 301 x 300; part spans X -251..50, Y -270..30; instance translated (251,270,0), then (0,-300,0) and (0,+300,0): net (251,270,0)",
+   "journal_physical_references": "none: no partition, datum, reference point, named edge, set other than the whole face, surface, hole or attachment feature"
+  },
+  "candidate_edge_map": {
+   "A": {
+    "FE X=0": "4",
+    "FE X=301": "2",
+    "FE Y=0": "3",
+    "FE Y=300": "1",
+    "FE +Z (SPOS) side": "marked face (towards the shaker)",
+    "experimental_axes_if_scanner_opposite_shaker": [
+     "-X",
+     "+Y",
+     "-Z"
+    ],
+    "experimental_axes_if_scanner_on_shaker_side": [
+     "+X",
+     "+Y",
+     "+Z"
+    ]
+   },
+   "B": {
+    "FE X=0": "2",
+    "FE X=301": "4",
+    "FE Y=0": "1",
+    "FE Y=300": "3",
+    "FE +Z (SPOS) side": "marked face (towards the shaker)",
+    "experimental_axes_if_scanner_opposite_shaker": [
+     "+X",
+     "-Y",
+     "-Z"
+    ],
+    "experimental_axes_if_scanner_on_shaker_side": [
+     "-X",
+     "-Y",
+     "+Z"
+    ]
+   },
+   "C": {
+    "FE X=0": "4",
+    "FE X=301": "2",
+    "FE Y=0": "1",
+    "FE Y=300": "3",
+    "FE +Z (SPOS) side": "unmarked face (away from the shaker)",
+    "experimental_axes_if_scanner_opposite_shaker": [
+     "-X",
+     "-Y",
+     "+Z"
+    ],
+    "experimental_axes_if_scanner_on_shaker_side": [
+     "+X",
+     "-Y",
+     "-Z"
+    ]
+   },
+   "D": {
+    "FE X=0": "2",
+    "FE X=301": "4",
+    "FE Y=0": "3",
+    "FE Y=300": "1",
+    "FE +Z (SPOS) side": "unmarked face (away from the shaker)",
+    "experimental_axes_if_scanner_opposite_shaker": [
+     "+X",
+     "+Y",
+     "+Z"
+    ],
+    "experimental_axes_if_scanner_on_shaker_side": [
+     "-X",
+     "+Y",
+     "-Z"
+    ]
+   }
+  },
+  "candidate_axes_depend_on_scanner_face": "R6.2 table valid if the scanner was opposite the shaker; otherwise A<->D, B<->C",
+  "fe_model_symmetry_property": "the four admissible exp->FE matrices are related by exact symmetries of this FE model; stated, not computed; not used for selection",
+  "scanner_face_evidence": {
+   "instrument_record": "frame = scanned face (2D video alignment, angle-grid similarity, scan head PSV-I-680)",
+   "human": "marks on the shaker side; shaker near edge 3, left of centre from the shaker side",
+   "photographic_inference": [
+    "shaker occluded by the plate",
+    "shaker right of centre (~0.77) in the frame, mirror of the owner's view"
+   ],
+   "unknown": "no instrument record of the side"
+  },
+  "scan_sensitivity": {
+   "base": {
+    "result": "OK",
+    "gaps_mm": {
+     "left": 56.4,
+     "right": 29.19,
+     "bottom": 7.02,
+     "top": 7.78
+    },
+    "window_mm": [
+     215.42,
+     285.2
+    ],
+    "panel_px": [
+     892.2,
+     892.6
+    ],
+    "px_per_mm_x_over_y": 0.9962,
+    "points_inside_plate": true,
+    "scale_unv_over_physical": [
+     1.1656,
+     0.8847
+    ],
+    "px_per_u_v": [
+     1080.0,
+     1080.0
+    ]
+   },
+   "deviation_1_v_range": {
+    "stored_-2.4667..1.0": {
+     "result": "FAILED",
+     "reason": "panel edge 'top': too few edge samples"
+    }
+   },
+   "deviation_2_window": {
+    "150": {
+     "result": "FAILED",
+     "reason": "panel edge 'left': too few edge samples"
+    },
+    "170": {
+     "result": "FAILED",
+     "reason": "panel edge 'left': too few edge samples"
+    },
+    "180": {
+     "result": "FAILED",
+     "reason": "panel edge 'left': too few edge samples"
+    },
+    "190": {
+     "result": "FAILED",
+     "reason": "panel edge 'left': too few edge samples"
+    },
+    "200": {
+     "result": "FAILED",
+     "reason": "panel edge 'left': too few edge samples"
+    },
+    "250": {
+     "result": "OK",
+     "gaps_mm": {
+      "left": 56.4,
+      "right": 29.19,
+      "bottom": 7.02,
+      "top": 7.78
+     },
+     "window_mm": [
+      215.42,
+      285.2
+     ],
+     "panel_px": [
+      892.2,
+      892.6
+     ],
+     "px_per_mm_x_over_y": 0.9962,
+     "points_inside_plate": true,
+     "scale_unv_over_physical": [
+      1.1656,
+      0.8847
+     ],
+     "px_per_u_v": [
+      1080.0,
+      1080.0
+     ]
+    },
+    "300": {
+     "result": "OK",
+     "gaps_mm": {
+      "left": 56.4,
+      "right": 29.19,
+      "bottom": 7.02,
+      "top": 7.78
+     },
+     "window_mm": [
+      215.42,
+      285.2
+     ],
+     "panel_px": [
+      892.2,
+      892.6
+     ],
+     "px_per_mm_x_over_y": 0.9962,
+     "points_inside_plate": true,
+     "scale_unv_over_physical": [
+      1.1656,
+      0.8847
+     ],
+     "px_per_u_v": [
+      1080.0,
+      1080.0
+     ]
+    }
+   },
+   "deviation_3_bottom": {
+    "accepted_polarity_no_inversion": {
+     "result": "OK",
+     "gaps_mm": {
+      "left": 46.1,
+      "right": 36.24,
+      "bottom": -17.37,
+      "top": 7.91
+     },
+     "window_mm": [
+      218.66,
+      309.46
+     ],
+     "panel_px": [
+      906.1,
+      913.0
+     ],
+     "px_per_mm_x_over_y": 0.9892,
+     "points_inside_plate": false,
+     "scale_unv_over_physical": [
+      1.1484,
+      0.8154
+     ],
+     "px_per_u_v": [
+      1080.0,
+      1080.0
+     ]
+    },
+    "inverted_step_6": {
+     "result": "OK",
+     "gaps_mm": {
+      "left": 56.4,
+      "right": 29.18,
+      "bottom": 7.01,
+      "top": 7.78
+     },
+     "window_mm": [
+      215.42,
+      285.2
+     ],
+     "panel_px": [
+      892.2,
+      892.6
+     ],
+     "px_per_mm_x_over_y": 0.9962,
+     "points_inside_plate": true,
+     "scale_unv_over_physical": [
+      1.1657,
+      0.8847
+     ],
+     "px_per_u_v": [
+      1080.0,
+      1080.0
+     ]
+    },
+    "inverted_step_10": {
+     "result": "OK",
+     "gaps_mm": {
+      "left": 56.39,
+      "right": 29.19,
+      "bottom": 7.01,
+      "top": 7.78
+     },
+     "window_mm": [
+      215.42,
+      285.2
+     ],
+     "panel_px": [
+      892.2,
+      892.6
+     ],
+     "px_per_mm_x_over_y": 0.9962,
+     "points_inside_plate": true,
+     "scale_unv_over_physical": [
+      1.1656,
+      0.8847
+     ],
+     "px_per_u_v": [
+      1080.0,
+      1080.0
+     ]
+    },
+    "inverted_step_12": {
+     "result": "OK",
+     "gaps_mm": {
+      "left": 56.39,
+      "right": 29.19,
+      "bottom": 7.0,
+      "top": 7.79
+     },
+     "window_mm": [
+      215.42,
+      285.21
+     ],
+     "panel_px": [
+      892.2,
+      892.6
+     ],
+     "px_per_mm_x_over_y": 0.9962,
+     "points_inside_plate": true,
+     "scale_unv_over_physical": [
+      1.1656,
+      0.8847
+     ],
+     "px_per_u_v": [
+      1080.0,
+      1080.0
+     ]
+    },
+    "inverted_step_16": {
+     "result": "OK",
+     "gaps_mm": {
+      "left": 56.14,
+      "right": 29.34,
+      "bottom": 1.01,
+      "top": 7.94
+     },
+     "window_mm": [
+      215.53,
+      291.04
+     ],
+     "panel_px": [
+      892.1,
+      876.5
+     ],
+     "px_per_mm_x_over_y": 1.0145,
+     "points_inside_plate": true,
+     "scale_unv_over_physical": [
+      1.1651,
+      0.867
+     ],
+     "px_per_u_v": [
+      1080.0,
+      1080.0
+     ]
+    }
+   },
+   "cross_checks": {
+    "frame_px": [
+     1920,
+     1080
+    ],
+    "stored_rectangle": [
+     -0.2222220003604889,
+     -2.4667129516601562,
+     1.555556058883667,
+     1.0
+    ],
+    "u_span_over_frame_aspect": 1.0,
+    "pixel_aspect_if_v_0_1": 1.0,
+    "pixel_aspect_if_v_stored": 3.4667,
+    "alignment_points": 13,
+    "alignment_u_range": [
+     0.13,
+     0.8994
+    ],
+    "alignment_v_range": [
+     0.0952,
+     0.8659
+    ],
+    "alignment_du_per_tan_a": 3.2652,
+    "alignment_dv_per_tan_b": -3.359,
+    "alignment_isotropy_du_dv": 0.9721,
+    "alignment_fit_residual_px": {
+     "u_max": 1.12,
+     "v_max_if_v_0_1": 2.37
+    },
+    "bottom_edge_vs_prediction_from_top_and_width": {
+     "detected_px": 959.92,
+     "predicted_px": 956.56,
+     "difference_mm": 1.13,
+     "note": "square pixels, fronto-parallel plate assumed; a cross-check, not a calibration"
+    },
+    "edge_rms_mm": {
+     "left": 0.097,
+     "right": 0.071,
+     "top": 0.045,
+     "bottom": 0.072
+    }
+   }
+  },
+  "scan_angle_check": {
+   "grid_aspect_width_over_height": {
+    "scanner_angles_tan": 0.7747,
+    "video_reconstruction_mm (v 0..1, plate edges)": 0.7553,
+    "video_px_if_v_stored_-2.4667..1": 2.6,
+    "video_px_if_u_4to3_normalisation": 1.0,
+    "unv_metric": 0.9951
+   },
+   "angle_to_reconstruction_similarity": {
+    "scale_mm_per_tan": 1208.6,
+    "rms_mm": 1.32,
+    "max_mm": 2.34,
+    "implied_standoff_mm": 1209.0
+   },
+   "unv_to_reconstruction_similarity": {
+    "scale": 1.0001,
+    "rms_mm": 15.04,
+    "max_mm": 24.73
+   },
+   "alignment_model": {
+    "cu": [
+     0.54279,
+     3.26524,
+     -0.03011
+    ],
+    "cv": [
+     0.46548,
+     -0.03387,
+     -3.35901
+    ]
+   },
+   "note": "Angle-space aspect assumes the plate roughly normal to the beam and ignores the mirror separation; it checks the grid SHAPE (deviation 1), not the offsets to the edges."
+  },
+  "deviation_verdicts": {
+   "1_v_range": "INDEPENDENTLY_CONFIRMED (scanner-angle record: grid shape and scale); stored v0 unexplained",
+   "2_edge_window_220": "SUPPORTED_NOT_INDEPENDENTLY_CONFIRMED (insensitive >= 220 px)",
+   "3_bottom_inverted": "SUPPORTED_NOT_INDEPENDENTLY_CONFIRMED (cross-check 1.13 mm; competing feature ~6 mm)"
+  },
+  "offset_uncertainty_mm": "about 1-3 (diagnostic estimate, not a criterion)",
+  "minimal_calibration_evidence": "Polytec PSV software screenshot of a copy of the .svd with the scan points overlaid on the stored frame (not to be published)",
+  "inp_odb_provenance": "job .com/.log/.dat/.msg and R6 consistent (name, heading, sizes, S4R, times, eigenfrequencies modes 3-20); mesh identity not proven",
+  "diagnostic_mac_blockers": [
+   "MAC not authorised (SUPERVISOR)",
+   "R7 shell gate PR #96 not merged",
+   "evidence record incomplete: no declared FE-physical placement (convention) and SCANNER_FACE pending",
+   "scan calibration diagnostic only (deviations 2 and 3 need a decision)"
+  ],
+  "published_figure": {
+   "path": "docs/reconciliation/figures/m11_r63/fig_r63_fe_frame.png",
+   "sha256": "51c0feb277b6d7e035ea5e73f269df1ee354cbd628ad9f54c830456b2c67c4be",
+   "nature": "Matplotlib schematic from INP/R6 coordinates; not an Abaqus screenshot"
+  },
+  "status": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING",
+  "not_done": [
+   "Abaqus",
+   "ODB extraction",
+   "FE solve",
+   "MAC",
+   "frequency fitting",
+   "Auto-ID",
+   "LM",
+   "material constants",
+   "registration"
+  ]
  }
 }
