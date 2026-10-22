@@ -1,6 +1,6 @@
 # M11 — Single CFRP plate (frequency diagnostics; analysis only)
 
-**Status: `REVIEW_READY` / outcome `FREQUENCY_DIAGNOSTIC_ONLY`.**
+**Status: `REVIEW_READY` / outcome `FREQUENCY_DIAGNOSTIC_ONLY`.** R6.5 (2026-10-22): **research-only** complex MAC computed (§17), giving `RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING`. There is no pairing and no registration.
 
 - The initial frequency-only review was supplemented by the owner's mass and 20 perimeter thickness readings (§8)
   and verified copies of the LMS/PSV/PolyMAX modal and FRF data (§9): **10 experimental shapes at 289 points**.
@@ -1444,8 +1444,16 @@ The table is for candidate A; B, C and D are identical.
 - The change grows with mode order: 0.1–9.8 % at 1 mm and up to 13.9 %
   at 3 mm.
 - Some modes are insensitive in one direction: mode 13 to Y and mode 14 to X.
-- For two vectors whose relative difference is ε, any normalised shape-correlation measure degrades only at second
-  order, at most about ε² / (1 − ε)². For ε ≤ 0.14 that is ≈ 0.02. This is an analytical bound; no MAC was computed.
+- **Erratum (R6.5, SUPERVISOR).** The R6.4 claim was wrong: it said an FE-field change ε affects any normalised
+  correlation only at second order (≈ ε², ≈ 0.02).
+  - The second-order bound holds only for the FE vector against **its own** perturbed copy.
+  - For MAC between a perturbed FE vector and a **fixed, independent experimental** vector, the change is **first
+    order**. In general |ΔMAC| ≤ sin δ ≤ ε / (1 − ε), where δ is the angle between the two FE vectors.
+  - Counterexample: e = (1, 1)/√2, u = (1, 0), u′ = (cos θ, sin θ) gives MAC 0.5 → (1 + sin 2θ)/2, i.e. +0.138 at
+    θ = 0.14.
+  - **The sensitivity of the experimental–FE MAC cannot be inferred from the relative L2 difference between two FE
+    samplings; it must be measured directly in the pre-declared scenarios** (done in §17.5).
+  - The FE-symmetry results of R6.4 are unchanged.
 - **The nearest-node quantisation itself** (RMS 1.26 mm, max 2.06 mm at the nominal position) is as large as the
   calibration uncertainty under study.
 - Interpolating the FE field with the S4R bilinear shape functions at the point positions would remove the
@@ -1501,7 +1509,260 @@ Outline of a separate research protocol, proposed only:
 
 M11 remains FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING.
 
-## 17. What did not change
+## 17. R6.5 (2026-10-22): research-only experimental–FE complex MAC
+
+**Authorisation (SUPERVISOR R6.5 §0).** A limited research MAC was authorised for the verified M11 plate data and
+the R6 FE modes 7–20 only.
+
+**Status of every number in this section:**
+
+- `RESEARCH_DIAGNOSTIC_ONLY`
+- `COMPUTATIONAL_CONVENTION_ONLY`
+- `NO_ACCEPTED_PHYSICAL_REGISTRATION`
+
+This is not a physical registration, not a governed comparison, not a pairing and not a material statement. Nothing
+is passed to Auto-ID, LM or E1 / E2 / G12.
+
+**Physical registration is NOT confirmed. Every statement about shape similarity below is subject to this.**
+
+### 17.1 Erratum to §16.3
+
+The incorrect second-order statement in §16.3 is corrected in place. In short: an FE-field change ε can change an
+experimental–FE MAC to **first order** (up to ε / (1 − ε)). The sensitivity was therefore measured directly (§17.5),
+not inferred.
+
+### 17.2 Pre-checks (all passed before the first MAC)
+
+| Input | SHA-256 | Verified against |
+|---|---|---|
+| `300by300_plate_only_1mm_261016.svd` | `0a770b1b18f8d119…` | manifest ✓ |
+| `300by300_plate_only_1mm_261016_POLYMAX.unv` | `117c893bafbbeba2…` | manifest ✓ |
+| `CFRP_S4R_0875_FreeFree.inp` | `962f75f2fd5d9e6d…` | manifest ✓ |
+| `geometry.csv` | `8bb5319fd759f749…` | R6 postflight size ✓ |
+| `manifest.json` | `354966dae2126d11…` | R6 postflight size ✓ |
+| `mode_0007.csv` | `9e5c925941cac852…` | R6 postflight size ✓ |
+| `mode_0020.csv` | `3d16786c5000567e…` | R6 postflight size ✓ |
+| `plate_reconstruction_W301xH300.json` | `09be8b8812d4e852…` | derived (recorded) |
+
+FE mode files 0008–0019 were checked the same way: R6 postflight sizes, with the SHA-256 recorded in
+`expected_inputs.json`.
+
+**Experimental:**
+
+- one set `polymax-bravo` with 10 modes, 289 points each;
+- only U3 is present; U1 and U2 are identically zero, i.e. not measured, so the DOF mask is U3;
+- complex shapes are kept as stored; all values finite, no zero vector;
+- point order: the reconstruction `unv_node_ids` equal the UNV geometry order;
+- MeasPoints ↔ UNV parser residual 1.1e-03 (the accepted
+  M2.3 level is 2e-3);
+- missing values are never replaced by zeros; any mismatch is refused.
+
+**FE:**
+
+- 10 201 nodes, Assembly frame; modes 7–20 real (imaginary parts 0);
+- the INP Part nodes plus the translation reproduce R6 to 1.5e-05 mm;
+- the S4R node order gives +Z for all elements;
+- modes 1–6 excluded; no extractor run, no ODB opened.
+
+Using the INP connectivity for interpolation is a **research hypothesis**. FE_MODEL_IDENTITY stays
+`NODES_AND_INP_CONTENT`.
+
+### 17.3 Isolated research code (in the repository) and synthetic tests
+
+`research/m11_r65/` contains:
+
+- `cmac_research.py` (pure functions);
+- `run_m11_r65.py` (runner);
+- `expected_inputs.json` (SHA-256 only, no paths);
+- `test_cmac_research.py` (synthetic only);
+- `README.md`.
+
+It does not use the physical-registration machinery. It creates no `FrozenRegistration`, no `corner_A_marker` and no
+`panel_edges`. Production code is imported read-only (UNV reader, PSV record parser) and not changed. Real inputs
+and outputs stay outside Git.
+
+**18 synthetic tests pass** (`python -m unittest discover -s research/m11_r65`). They cover:
+
+- cMAC of identical and orthogonal shapes;
+- invariance to global phase and scale;
+- the complex part being kept;
+- first-order sensitivity, using the §16.3 counterexample;
+- refusal of zero, NaN and length mismatch;
+- exact bilinear reproduction and node values;
+- linear fields on a distorted quad;
+- refusal outside the mesh (no extrapolation);
+- order and count preservation;
+- refusal of missing, extra and duplicate points;
+- SHA, missing-file and extra-input refusal;
+- A–D invariance on a symmetric model;
+- subspace invariance to basis rotation, and the rank-deficiency refusal;
+- the fixed protocol.
+
+The protocol (scenarios, methods, pairs, secondary diagnostics) was **declared before the first experimental–FE MAC**:
+SHA-256 `74283bde14f6fbf5036276aff2ad7a9eae484a63f0a2c0c5a17e921890dcb48f`, recorded 2026-10-22T17:15:10+08:00. The results carry the same SHA. No scenario was
+added or removed afterwards.
+
+### 17.4 Nominal complex MAC, 10 × 14
+
+[![Nominal cMAC](figures/m11_r65/fig_r65_cmac_nominal.png)](figures/m11_r65/fig_r65_cmac_nominal.png)
+
+*Figure 17.1 — nominal cMAC.*
+
+- Metric: cMAC(e, f) = |eᴴf|² / ((eᴴe)(fᴴf)), with complex experimental e and real FE f (U3, sign per candidate),
+  over the 289 points.
+- No phase optimisation per cell.
+- Geometry: the diagnostic reconstruction (nominal).
+- Computational convention: D (`COMPUTATIONAL_CONVENTION_ONLY`).
+- Frequencies are reference metadata only.
+
+**Bilinear S4R interpolation.** Bold marks the row maximum; this is descriptive, not a pairing.
+
+| Exp (Hz, MPC) | FE 7 | FE 8 | FE 9 | FE 10 | FE 11 | FE 12 | FE 13 | FE 14 | FE 15 | FE 16 | FE 17 | FE 18 | FE 19 | FE 20 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FE Hz (metadata) | 19.1 | 59.9 | 62.0 | 71.8 | 72.2 | 116.6 | 167.5 | 168.6 | 174.8 | 179.9 | 213.2 | 213.9 | 295.8 | 327.9 |
+| 1 (33.4, 0.85) | **0.83** | 0.00 | 0.00 | 0.17 | 0.00 | 0.00 | 0.00 | 0.00 | 0.30 | 0.23 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 2 (55.3, 0.88) | 0.01 | **0.70** | 0.35 | 0.00 | 0.04 | 0.25 | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.05 |
+| 3 (68.1, 0.92) | 0.00 | 0.04 | 0.36 | 0.00 | 0.01 | 0.07 | 0.17 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.39** |
+| 4 (72.0, 0.59) | 0.00 | 0.03 | 0.00 | 0.00 | **0.62** | 0.07 | 0.00 | 0.00 | 0.00 | 0.00 | 0.49 | 0.00 | 0.00 | 0.02 |
+| 5 (80.5, 0.44) | 0.01 | 0.01 | 0.02 | **0.41** | 0.18 | 0.00 | 0.00 | 0.00 | 0.10 | 0.08 | 0.07 | 0.00 | 0.00 | 0.00 |
+| 6 (116.9, 0.95) | 0.00 | 0.00 | 0.01 | 0.00 | 0.00 | **0.49** | 0.00 | 0.00 | 0.00 | 0.00 | 0.18 | 0.00 | 0.00 | 0.00 |
+| 7 (144.6, 0.90) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 | **0.74** | 0.00 | 0.08 | 0.01 | 0.26 | 0.12 | 0.00 |
+| 8 (158.8, 0.92) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.03 | 0.02 | 0.40 | 0.26 | 0.00 | 0.03 | **0.41** | 0.02 |
+| 9 (178.0, 0.86) | 0.01 | 0.00 | 0.00 | 0.03 | 0.00 | 0.00 | 0.01 | 0.02 | 0.08 | **0.21** | 0.02 | 0.01 | 0.02 | 0.01 |
+| 10 (213.2, 0.95) | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.23** | 0.00 | 0.00 | 0.00 |
+
+**Nearest-node matrix:** the full matrix is in the JSON. It differs from the bilinear one by at most
+0.006 (Figure 17.1, right).
+
+### 17.5 Sensitivity to the declared scenarios
+
+[![Sensitivity](figures/m11_r65/fig_r65_sensitivity.png)](figures/m11_r65/fig_r65_sensitivity.png)
+
+*Figure 17.2 — sensitivity to the declared scenarios.* The scenarios are the 59 of R6.4: X / Y ±1, 2, 3 mm, separate
+and combined, and ±0.874° alone and with ±3 mm corner shifts. Both methods were computed in every scenario.
+
+- **Scenario range** (max − min; **not a confidence interval**): at most 0.14 (bilinear) and
+  0.14 (nearest node).
+- **Largest ranges (bilinear):** exp 6–FE 17: 0.14 (nominal 0.18); exp 3–FE 13: 0.12 (nominal 0.17); exp 1–FE 10: 0.11 (nominal 0.17); exp 3–FE 20: 0.10 (nominal 0.39); exp 8–FE 19: 0.09 (nominal 0.41); exp 5–FE 15: 0.09 (nominal 0.10). These are first-order effects, consistent with §17.1.
+- **The descriptive first-ranked FE mode** stays the same in all 59 scenarios for 8 of 10 experimental modes. It
+  changes for **exp 3** (FE 20 vs FE 9) and **exp 8** (FE 19 vs FE 15).
+- **ALT_BOTTOM_EDGE** (the competing bottom-edge feature of R6.3, about 6 mm; an unconfirmed hypothesis kept apart from
+  the ±3 mm range) changes no cell by more than 0.03 (bilinear) / 0.04 (nearest node). It changes no
+  first-ranked FE mode, so **no conclusion here depends on that hypothesis**.
+- No scenario is selected as "best".
+
+### 17.6 Equivalence of A–D
+
+- The nominal and all 59 scenario matrices plus ALT_BOTTOM_EDGE were computed for A, B, C and D with both methods.
+- Maximum |ΔcMAC| against D: **7.3e-08**. For the subspace projections it is
+  8.1e-08. This is single-precision FE data, so there is no defect.
+- The results do not depend on the A–D choice, as predicted by R6.4.
+- D remains `COMPUTATIONAL_CONVENTION_ONLY`. PHYSICAL_FE_ORIENTATION = NOT_DETERMINED and SCANNER_FACE =
+  HUMAN_CONFIRMATION_PENDING are unchanged.
+
+### 17.7 Near-degenerate FE pairs (subspace projections)
+
+[![Subspaces](figures/m11_r65/fig_r65_subspaces.png)](figures/m11_r65/fig_r65_subspaces.png)
+
+*Figure 17.3 — subspace projections.* Each value is the share of ‖e‖² in the orthonormalised two-dimensional FE
+subspace sampled at the 289 points. It is invariant to the choice of basis. Shown are the nominal value and
+[min–max] over the 59 scenarios, bilinear; every experimental mode is shown and none is selected.
+
+| Exp (Hz) | FE 10-11 | FE 13-14 | FE 17-18 | FE 8-9 | FE 15-16 |
+|---|---|---|---|---|---|
+| 1 (33.4) | 0.18 [0.12–0.24] | 0.00 [0.00–0.00] | 0.00 [0.00–0.01] | 0.00 [0.00–0.01] | 0.46 [0.40–0.50] |
+| 2 (55.3) | 0.04 [0.02–0.06] | 0.02 [0.01–0.04] | 0.00 [0.00–0.01] | 0.89 [0.87–0.89] | 0.00 [0.00–0.01] |
+| 3 (68.1) | 0.01 [0.00–0.01] | 0.17 [0.11–0.24] | 0.00 [0.00–0.01] | 0.47 [0.45–0.49] | 0.00 [0.00–0.00] |
+| 4 (72.0) | 0.62 [0.59–0.64] | 0.00 [0.00–0.00] | 0.49 [0.45–0.53] | 0.03 [0.03–0.04] | 0.00 [0.00–0.01] |
+| 5 (80.5) | 0.59 [0.55–0.62] | 0.00 [0.00–0.00] | 0.08 [0.06–0.10] | 0.02 [0.02–0.03] | 0.15 [0.10–0.21] |
+| 6 (116.9) | 0.00 [0.00–0.00] | 0.00 [0.00–0.00] | 0.18 [0.12–0.26] | 0.01 [0.01–0.01] | 0.00 [0.00–0.00] |
+| 7 (144.6) | 0.00 [0.00–0.00] | 0.75 [0.72–0.75] | 0.27 [0.24–0.28] | 0.00 [0.00–0.00] | 0.09 [0.07–0.11] |
+| 8 (158.8) | 0.00 [0.00–0.00] | 0.05 [0.04–0.05] | 0.03 [0.01–0.06] | 0.00 [0.00–0.01] | 0.77 [0.74–0.77] |
+| 9 (178.0) | 0.03 [0.03–0.03] | 0.03 [0.02–0.03] | 0.02 [0.01–0.04] | 0.00 [0.00–0.00] | 0.26 [0.23–0.28] |
+| 10 (213.2) | 0.01 [0.01–0.01] | 0.00 [0.00–0.00] | 0.23 [0.20–0.25] | 0.00 [0.00–0.00] | 0.01 [0.00–0.01] |
+
+- **FE 10–11:** exp 4 (0.62) and exp 5 (0.59) both lie largely in this subspace. Both are strongly complex (MPC 0.59
+  and 0.44). This is consistent with, but not proof of, an experimental pair mixed within the near-degenerate FE pair
+  10–11. No experimental pair is confirmed independently of this MAC, so none is declared.
+- **FE 13–14:** exp 7 (0.75); essentially carried by FE 14 alone (cMAC 0.74).
+- **FE 17–18:** exp 4 (0.49) and exp 10 (0.23); carried by FE 17. Partial only.
+- **Watched FE 8–9:** exp 2 (0.89; FE 8 alone 0.70) and exp 3 (0.47).
+- **Watched FE 15–16:** exp 8 (0.77), exp 1 (0.46) and exp 9 (0.26).
+- Close FE frequencies are not taken as evidence of correspondence with experimental frequencies.
+
+### 17.8 Laser direction and the real-part variant (declared secondary diagnostics)
+
+- **Beam inclination.** The angle relative to the scan-head axis, from the scanner-angle record, is
+  0.3–8.7°, so cos ≥ 0.9886.
+  - The FE modes are pure out-of-plane bending (R6.4: in-plane / out-of-plane ≤ 3e-11). The beam projection therefore
+    reduces to U3·cos θ, with the plate assumed normal to the scan-head axis.
+  - It changes cMAC by at most 0.001.
+  - The U3 approximation is supported for this comparison; the plate attitude itself is not measured.
+- **Real-normalised experimental shapes** (global phase maximising ‖Re‖, experimental data only) differ from the
+  complex primary result by up to 0.10. The largest differences are for exp 4 and exp 5, the two
+  strongly complex modes.
+  - Discarding the imaginary part is therefore **not** neutral here.
+  - Complex MAC remains the primary result.
+
+### 17.9 Scientific interpretation (descriptive; **physical registration NOT confirmed**)
+
+Two most similar FE shapes per experimental mode (bilinear; [min–max] over the 59 scenarios):
+
+| Exp | Hz | MPC | Most similar | Second | First unchanged in | First under ALT_BOTTOM |
+|---|---|---|---|---|---|---|
+| 1 | 33.45 | 0.85 | FE 7: 0.83 [0.80–0.86] | FE 15: 0.30 [0.26–0.33] | 59/59 | FE 7 |
+| 2 | 55.25 | 0.88 | FE 8: 0.70 [0.68–0.71] | FE 9: 0.35 [0.34–0.35] | 59/59 | FE 8 |
+| 3 | 68.10 | 0.92 | FE 20: 0.39 [0.34–0.44] | FE 9: 0.36 [0.35–0.37] | 48/59 | FE 20 |
+| 4 | 71.96 | 0.59 | FE 11: 0.62 [0.58–0.64] | FE 17: 0.49 [0.45–0.53] | 59/59 | FE 11 |
+| 5 | 80.47 | 0.44 | FE 10: 0.41 [0.37–0.43] | FE 11: 0.18 [0.17–0.20] | 59/59 | FE 10 |
+| 6 | 116.90 | 0.95 | FE 12: 0.49 [0.46–0.51] | FE 17: 0.18 [0.11–0.26] | 59/59 | FE 12 |
+| 7 | 144.60 | 0.90 | FE 14: 0.74 [0.71–0.74] | FE 18: 0.26 [0.23–0.27] | 59/59 | FE 14 |
+| 8 | 158.84 | 0.92 | FE 19: 0.41 [0.35–0.45] | FE 15: 0.40 [0.38–0.41] | 40/59 | FE 19 |
+| 9 | 178.04 | 0.86 | FE 16: 0.21 [0.19–0.23] | FE 15: 0.07 [0.06–0.09] | 59/59 | FE 16 |
+| 10 | 213.17 | 0.95 | FE 17: 0.23 [0.20–0.25] | FE 11: 0.01 [0.01–0.01] | 59/59 | FE 17 |
+
+1. **Similar and stable.** These hold in every scenario, with both methods and under ALT_BOTTOM:
+   - **exp 1 ↔ FE 7**: 0.83, range 0.80–0.86; the twist mode of §5, with experiment 33.45 Hz vs FE 19.07 Hz;
+   - **exp 7 ↔ FE 14**: 0.74, range 0.71–0.74;
+   - **exp 2 ↔ FE 8**: 0.70, range 0.68–0.71; 0.89 in the FE 8–9 subspace.
+2. **Partially similar.**
+   - **exp 4 ↔ FE 11**: 0.62, with FE 17 at 0.49. The mode is strongly complex.
+   - **exp 5 ↔ FE 10**: 0.41. The mode is strongly complex; see the 10–11 subspace, §17.7.
+   - **exp 6 ↔ FE 12**: 0.49.
+3. **Unstable.** The first-ranked FE mode depends on the scenario:
+   - **exp 3**: FE 20 at 0.39 vs FE 9 at 0.36;
+   - **exp 8**: FE 19 at 0.41 vs FE 15 at 0.40.
+   These conclusions depend on the unresolved geometric uncertainty and must not be used.
+4. **Not similar** to any FE mode 7–20:
+   - exp 9: at most 0.21–0.23;
+   - exp 10: at most 0.23–0.25.
+
+**Remarks:**
+
+- The FE frequencies come from the template material constants. The frequency differences are recorded as metadata
+  and are **not** interpreted.
+- No pairing status, no accepted correspondence and no orientation, geometry, phase or material choice was made from
+  these values.
+
+### 17.10 Status
+
+**`M11 = RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING`.** All pre-checks, the 18 synthetic tests and the
+A–D equivalence check passed, and the computation completed.
+
+**Unchanged:**
+
+- PHYSICAL_FE_ORIENTATION = NOT_DETERMINED, SCANNER_FACE = HUMAN_CONFIRMATION_PENDING, scan calibration diagnostic,
+  FE_MODEL_IDENTITY = NODES_AND_INP_CONTENT;
+- M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE;
+- SPEC v1.2, the governed gates and thresholds, R7 / PR #96 and PR #94.
+
+The published figures are derived summaries with no raw experimental arrays, photographs or paths:
+
+- `fig_r65_cmac_nominal.png` `1fe706cfee85d9e5…`
+- `fig_r65_sensitivity.png` `1c2f76aaba084293…`
+- `fig_r65_subspaces.png` `8574ab2519036f18…`
+
+## 18. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.

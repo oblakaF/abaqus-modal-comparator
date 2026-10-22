@@ -2068,6 +2068,7 @@
     "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, criteria, gates; originals and earlier copies; M10 branch and PR #94; no FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no fitting",
     "owner_measurements": "2026-10-21: mass 118.37 g, 301 x 300 mm, edge thickness 0.71-0.94 (mean 0.876) mm; HUMAN record",
     "experiment": "D:\\Snadwich\\Plate copied (5 files); PolyMAX Polymax_bravo 10 modes / 289 pt; scan reconstruction with 3 recorded deviations; experimental mode 1 = twist (33.45 Hz)",
-    "registration_state": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING (R6, 2026-10-21)"
+    "registration_state": "RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING (R6.5, 2026-10-22)",
+    "research_mac": "R6.5: research-only complex MAC 10 x 14 (polymax-bravo x FE 7-20), RESEARCH_DIAGNOSTIC_ONLY / COMPUTATIONAL_CONVENTION_ONLY / NO_ACCEPTED_PHYSICAL_REGISTRATION; no pairing, no registration, nothing passed to Auto-ID / LM"
   }
 }

@@ -5642,3 +5642,23 @@ first internal provider.
   - the sampled FE field changes only 2–14 %.
 - **Readiness:** a research, non-governed diagnostic shape comparison may be proposed to the SUPERVISOR. Nothing is
   implemented, no experimental–FE MAC is computed, and the status is unchanged.
+
+## 2026-10-22 — M11 R6.5: research-only experimental–FE complex MAC (RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING)
+
+- **Erratum to R6.4 §16.3.** The MAC change against a fixed experimental vector is first order (up to ε / (1 − ε)),
+  not ε²; the sensitivity is now measured directly.
+- **Pre-checks:** the SHA-256 of all inputs (V3 manifests; R6 postflight sizes and the recorded SHA); polymax-bravo
+  10 × 289 with U3 only, complex as stored; point order and MeasPoints ↔ UNV verified; FE 10 201 nodes, modes 7–20,
+  INP ≡ R6 nodes.
+- **Isolated research code** in `research/m11_r65/` with 18 synthetic tests, and a protocol declared before the
+  first MAC (SHA `74283bde14f6fbf5…`). No production code changed and no registration objects created.
+- **Complex MAC 10 × 14** with nearest node and bilinear S4R interpolation (they differ by ≤ 0.006).
+- **Sensitivity:** 59 scenarios give a range of at most 0.14; ALT_BOTTOM_EDGE changes values by at most
+  0.03 and changes no first-ranked FE mode.
+- **A–D** are equivalent: max |ΔcMAC| 7.3e-08.
+- **Subspaces** of the pairs 10–11, 13–14, 17–18, 8–9 and 15–16 are evaluated.
+- **Descriptive results**, physical registration NOT confirmed:
+  - similar and stable: exp1–FE7 0.83, exp7–FE14 0.74, exp2–FE8 0.70;
+  - unstable: exp 3 and exp 8;
+  - not similar: exp 9 and exp 10.
+- **Not done:** no pairing, Auto-ID, LM or fitting. M8, production calibration and D-077 unchanged.
