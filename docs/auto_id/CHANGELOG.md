@@ -5680,3 +5680,20 @@ first internal provider.
   agrees within 6.6e-08.
 - **Protocol provenance:** local execution log only; not an independently verified preregistration.
 - **Unchanged:** M8, production gates, D-077, SPEC v1.2, R7, PR #94 and PR #96.
+
+## 2026-10-22 — M11 R6.5b: false-positive test fixed (test logic only)
+
+- **Defect:** `tests/test_registration_factory.py::test_no_full_model_contamination` searched the whole serialised
+  FrozenRegistration for substrings. In push run 39757688944 the letters `d11` occurred inside the SHA-256
+  `registration_hash`, a false positive (subtest `token='d11'`).
+- **Fix:** the check now judges the structure.
+  - Every key at every depth is checked, by name and word tokens: D11/Ex/E1/G12/..., stiffness, material,
+    basis_km_hash, material_parameters, model_template, frequency, MAC, pairing.
+  - A string value counts only if it is such a name or embeds a JSON structure containing one.
+  - Hashes, temporary file names and other allowed values no longer trigger it.
+  - The original dataclass-field check is kept.
+- **New synthetic tests:** positive and negative cases, plus the real registration with hashes and temporary paths
+  containing `d11` / `mac`, which must pass, and injected D11 / Ex / basis_km_hash / ... fields, which must be
+  found.
+- **Unchanged:** `registration_factory.py`, the FrozenRegistration format, scientific checks, R6.5 results,
+  statuses, R7, PR #94 and PR #96.
