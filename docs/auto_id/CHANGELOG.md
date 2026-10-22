@@ -5697,3 +5697,17 @@ first internal provider.
   found.
 - **Unchanged:** `registration_factory.py`, the FrozenRegistration format, scientific checks, R6.5 results,
   statuses, R7, PR #94 and PR #96.
+
+## 2026-10-22 — M11 R6.6: controlled FE torsional-stiffness sensitivity (research result RESEARCH_MAC_COMPUTED; physical registration PENDING)
+
+- **Two authorised Abaqus frequency runs** from the verified V3 INP copy. G12 was 10 000 and 15 000 MPa; only the G12
+  field of one line changed and all other bytes are identical. Both completed with 0 warnings and 0 errors; rigid
+  modes are ≤ 0.009 Hz. Shapes were extracted with the pinned extractor (SHA matches) from the new ODBs only.
+- **Twist branch FE 7:** 19.07 → 26.58 → 32.18 Hz, f ∝ G12^0.48, shape unchanged (FE–FE MAC ≥ 0.999). The Rayleigh
+  estimate (w = xy, an upper bound) gives 19.52 / 27.61 / 33.81 Hz.
+- **Other branches:** FE 8, 9, 13, 14 and 20 are G12-independent; FE 10–12 and 17–18 rise by 23–34 %. Baseline FE 19
+  leaves the computed range and a new branch enters at 331 Hz, so mode numbers are not correspondences.
+- **Against the research references (not a pairing):** G12 alone cannot reconcile exp 1, exp 2 and exp 7.
+  Competing explanations are listed. One proposed next experiment: a free-free test without the shaker.
+- **Not done:** no material identification, G12 fitting, Auto-ID or LM. `research/m11_r65` unchanged, statuses
+  unchanged.

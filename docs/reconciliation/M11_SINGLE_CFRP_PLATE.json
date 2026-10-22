@@ -9936,5 +9936,1381 @@
    "R7 / PR #96",
    "PR #94"
   ]
+ },
+ "r66_controlled_g12_sensitivity": {
+  "nature": "controlled FE sensitivity study; not material identification; no G12 derived; no variant declared correct",
+  "statuses": {
+   "research_result": "RESEARCH_MAC_COMPUTED",
+   "physical_registration": "PHYSICAL_REGISTRATION_PENDING"
+  },
+  "preparation": {
+   "source": {
+    "file": "V3 temp_root/CFRP_S4R_0875_FreeFree.inp",
+    "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+   },
+   "baseline_constants": {
+    "E1": 56000.0,
+    "E2": 56000.0,
+    "E3": 8500.0,
+    "nu12": 0.05,
+    "nu13": 0.3,
+    "nu23": 0.3,
+    "G12": 5000.0,
+    "G13": 3000.0,
+    "G23": 3000.0,
+    "density_t_per_mm3": 1.498e-09,
+    "thickness_mm": 0.875,
+    "shell_integration_points": 5
+   },
+   "units": "mm, t (tonne), s, N, MPa: frequencies in Hz (cycles/time)",
+   "mass_g": 118.360725,
+   "free_free": {
+    "supports_or_loads_keywords": [],
+    "free_free": true
+   },
+   "frequency_step": "*Frequency, eigensolver=Lanczos, sim, acoustic coupling=on, normalization=mass | 20, , , , ,",
+   "elastic_line_index": 20238,
+   "variants": {
+    "R66A": {
+     "job": "CFRP_S4R_0875_FreeFree_R66A_G12_10000",
+     "G12": 10000.0,
+     "inp_sha256": "36dce25dc5fb5c7cfd20fcd2a4701df897e9870a219d65744e5159fdbad87a6e",
+     "changed_lines": [
+      20239
+     ],
+     "old_line": "56000.,56000., 8500.,  0.05,   0.3,   0.3, 5000., 3000.",
+     "new_line": "56000.,56000., 8500.,  0.05,   0.3,   0.3,10000., 3000.",
+     "same_bytes_elsewhere": true,
+     "same_length": true,
+     "positive_definite": true
+    },
+    "R66B": {
+     "job": "CFRP_S4R_0875_FreeFree_R66B_G12_15000",
+     "G12": 15000.0,
+     "inp_sha256": "b5a504771a1cc66b359a2191ed3041d019434dcfc9380aaa4e81f4348089204b",
+     "changed_lines": [
+      20239
+     ],
+     "old_line": "56000.,56000., 8500.,  0.05,   0.3,   0.3, 5000., 3000.",
+     "new_line": "56000.,56000., 8500.,  0.05,   0.3,   0.3,15000., 3000.",
+     "same_bytes_elsewhere": true,
+     "same_length": true,
+     "positive_definite": true
+    }
+   },
+   "baseline_positive_definite": true,
+   "sha256_all_but_g12_line": "925648e307037dc8bad38f4bed7639192857021cbc022d6353548fe8593ffcdb"
+  },
+  "job_checks": {
+   "baseline_R6_G12_5000": {
+    "dat_sha256": "f440592598a21bd23dd7fa68f1032ebcd4d0da4d33b48156adc68ec690625de9",
+    "completed_sta": true,
+    "completed_log": true,
+    "msg_counts": {
+     "WARNING MESSAGES DURING USER INPUT PROCESSING": 0,
+     "WARNING MESSAGES DURING ANALYSIS": 0,
+     "ERROR MESSAGES": 0
+    },
+    "frequencies_hz": {
+     "1": -7.64942e-08,
+     "2": -0.00570223,
+     "3": 0.000745097,
+     "4": 0.00923527,
+     "5": -1.82258e-08,
+     "6": -1.5636e-08,
+     "7": 19.072,
+     "8": 59.874,
+     "9": 62.009,
+     "10": 71.85,
+     "11": 72.19,
+     "12": 116.58,
+     "13": 167.49,
+     "14": 168.61,
+     "15": 174.8,
+     "16": 179.9,
+     "17": 213.2,
+     "18": 213.95,
+     "19": 295.78,
+     "20": 327.9
+    },
+    "rigid_modes_1_6_max_hz": 0.00923527,
+    "first_elastic_over_max_rigid": 2065.12641211356
+   },
+   "R66A_G12_10000": {
+    "dat_sha256": "9be2b527f186a314610f2db5a491a4e1f56c0b489058bbb0b9f25f4e418369a5",
+    "completed_sta": true,
+    "completed_log": true,
+    "msg_counts": {
+     "WARNING MESSAGES DURING USER INPUT PROCESSING": 0,
+     "WARNING MESSAGES DURING ANALYSIS": 0,
+     "ERROR MESSAGES": 0
+    },
+    "frequencies_hz": {
+     "1": 1.08589e-08,
+     "2": 2.37248e-08,
+     "3": 5.09556e-07,
+     "4": 0.00828821,
+     "5": -0.000601354,
+     "6": 0.00702173,
+     "7": 26.578,
+     "8": 59.875,
+     "9": 62.015,
+     "10": 80.76,
+     "11": 81.059,
+     "12": 138.17,
+     "13": 167.5,
+     "14": 168.62,
+     "15": 182.93,
+     "16": 188.01,
+     "17": 239.76,
+     "18": 240.42,
+     "19": 327.97,
+     "20": 331.09
+    },
+    "rigid_modes_1_6_max_hz": 0.00828821,
+    "first_elastic_over_max_rigid": 3206.7237678581982,
+    "odb_sha256": "6ef31ee4712328a7956497a778532b5265501d6bc0a7b9f3f0eaeefd7216299c",
+    "inp_sha256": "36dce25dc5fb5c7cfd20fcd2a4701df897e9870a219d65744e5159fdbad87a6e"
+   },
+   "R66B_G12_15000": {
+    "dat_sha256": "d223f9eea97ca1f62dbacca0e8e8b368aa698cb0b1fd24c13459d28a21f09800",
+    "completed_sta": true,
+    "completed_log": true,
+    "msg_counts": {
+     "WARNING MESSAGES DURING USER INPUT PROCESSING": 0,
+     "WARNING MESSAGES DURING ANALYSIS": 0,
+     "ERROR MESSAGES": 0
+    },
+    "frequencies_hz": {
+     "1": 3.75686e-10,
+     "2": 4.97169e-10,
+     "3": -1.28838e-10,
+     "4": -0.00793495,
+     "5": -6.54199e-05,
+     "6": -0.00744264,
+     "7": 32.183,
+     "8": 59.875,
+     "9": 62.017,
+     "10": 88.47,
+     "11": 88.742,
+     "12": 155.81,
+     "13": 167.51,
+     "14": 168.63,
+     "15": 190.61,
+     "16": 195.43,
+     "17": 262.49,
+     "18": 263.09,
+     "19": 327.99,
+     "20": 331.11
+    },
+    "rigid_modes_1_6_max_hz": 0.00793495,
+    "first_elastic_over_max_rigid": 4055.8541641724273,
+    "odb_sha256": "73a28ac723296d65c40b1690159f6c009b6993e400d15428ff704498265c3f9d",
+    "inp_sha256": "b5a504771a1cc66b359a2191ed3041d019434dcfc9380aaa4e81f4348089204b"
+   }
+  },
+  "extractor": {
+   "sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+   "pinned_match": true,
+   "applied_to": "the two new work ODBs only"
+  },
+  "branches": {
+   "geometry_identity": {
+    "5000.0": {
+     "labels_equal": true,
+     "max_coord_diff_mm": 0.0
+    },
+    "10000.0": {
+     "labels_equal": true,
+     "max_coord_diff_mm": 0.0
+    },
+    "15000.0": {
+     "labels_equal": true,
+     "max_coord_diff_mm": 0.0
+    }
+   },
+   "fe_fe_mac": {
+    "10000": [
+     [
+      0.99981,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      4e-05,
+      0.00347,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00133,
+      0.00012
+     ],
+     [
+      0.0,
+      0.0,
+      0.99998,
+      0.0,
+      0.0,
+      0.00092,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00013,
+      0.00139
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.99949,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00247,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99949,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00248,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.00047,
+      0.0,
+      0.0,
+      0.99891,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99993,
+      0.0,
+      0.0,
+      0.0,
+      0.00069,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99993,
+      0.0,
+      0.0,
+      0.0,
+      0.00069,
+      0.0,
+      0.0
+     ],
+     [
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99992,
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.00105,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      3e-05,
+      0.99858,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0001,
+      0.0,
+      0.00012,
+      0.0,
+      0.0,
+      0.0,
+      0.99809,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0001,
+      0.0,
+      0.0,
+      0.0,
+      0.00012,
+      0.0,
+      0.0,
+      0.0,
+      0.99809,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      7e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0013,
+      0.00012,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99926,
+      5e-05
+     ]
+    ],
+    "15000": [
+     [
+      0.99937,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      5e-05,
+      0.00483,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00134,
+      0.00012
+     ],
+     [
+      0.0,
+      0.0,
+      0.99995,
+      0.0,
+      0.0,
+      0.00101,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00013,
+      0.00139
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.99862,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00372,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99862,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.00374,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.00038,
+      0.0,
+      0.0,
+      0.99666,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1e-05,
+      0.0,
+      0.99986,
+      0.0,
+      0.0,
+      0.0,
+      0.00082,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.99986,
+      0.0,
+      0.0,
+      0.0,
+      0.00082,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.9998,
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.00045,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      2e-05,
+      0.99669,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1e-05,
+      0.0,
+      6e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.99481,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1e-05,
+      0.0,
+      0.0,
+      0.0,
+      6e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.99482,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      6e-05,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0013,
+      0.00012,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.99861,
+      8e-05
+     ]
+    ]
+   },
+   "tracking": {
+    "10000": [
+     {
+      "baseline_mode": 7,
+      "variant_mode": 7,
+      "mac": 0.99981,
+      "second_best": 0.00347,
+      "mutual_best": true,
+      "row_max": 0.99981,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 8,
+      "variant_mode": 8,
+      "mac": 1.0,
+      "second_best": 0.00133,
+      "mutual_best": true,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 9,
+      "variant_mode": 9,
+      "mac": 0.99998,
+      "second_best": 0.00139,
+      "mutual_best": true,
+      "row_max": 0.99998,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 10,
+      "variant_mode": 10,
+      "mac": 0.99949,
+      "second_best": 0.00247,
+      "mutual_best": true,
+      "row_max": 0.99949,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 11,
+      "variant_mode": 11,
+      "mac": 0.99949,
+      "second_best": 0.00248,
+      "mutual_best": true,
+      "row_max": 0.99949,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 12,
+      "variant_mode": 12,
+      "mac": 0.99891,
+      "second_best": 0.00047,
+      "mutual_best": true,
+      "row_max": 0.99891,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 13,
+      "variant_mode": 13,
+      "mac": 0.99993,
+      "second_best": 0.00069,
+      "mutual_best": true,
+      "row_max": 0.99993,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 14,
+      "variant_mode": 14,
+      "mac": 0.99993,
+      "second_best": 0.00069,
+      "mutual_best": true,
+      "row_max": 0.99993,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 15,
+      "variant_mode": 15,
+      "mac": 0.99992,
+      "second_best": 1e-05,
+      "mutual_best": true,
+      "row_max": 0.99992,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 16,
+      "variant_mode": 16,
+      "mac": 0.99858,
+      "second_best": 0.00105,
+      "mutual_best": true,
+      "row_max": 0.99858,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 17,
+      "variant_mode": 17,
+      "mac": 0.99809,
+      "second_best": 0.00012,
+      "mutual_best": true,
+      "row_max": 0.99809,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 18,
+      "variant_mode": 18,
+      "mac": 0.99809,
+      "second_best": 0.00012,
+      "mutual_best": true,
+      "row_max": 0.99809,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 19,
+      "variant_mode": 20,
+      "mac": 0.0,
+      "second_best": 0.0,
+      "mutual_best": false,
+      "row_max": 7e-05,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 20,
+      "variant_mode": 19,
+      "mac": 0.99926,
+      "second_best": 0.0013,
+      "mutual_best": true,
+      "row_max": 0.99926,
+      "tracked": true
+     }
+    ],
+    "15000": [
+     {
+      "baseline_mode": 7,
+      "variant_mode": 7,
+      "mac": 0.99937,
+      "second_best": 0.00483,
+      "mutual_best": true,
+      "row_max": 0.99937,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 8,
+      "variant_mode": 8,
+      "mac": 1.0,
+      "second_best": 0.00134,
+      "mutual_best": true,
+      "row_max": 1.0,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 9,
+      "variant_mode": 9,
+      "mac": 0.99995,
+      "second_best": 0.00139,
+      "mutual_best": true,
+      "row_max": 0.99995,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 10,
+      "variant_mode": 10,
+      "mac": 0.99862,
+      "second_best": 0.00372,
+      "mutual_best": true,
+      "row_max": 0.99862,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 11,
+      "variant_mode": 11,
+      "mac": 0.99862,
+      "second_best": 0.00374,
+      "mutual_best": true,
+      "row_max": 0.99862,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 12,
+      "variant_mode": 12,
+      "mac": 0.99666,
+      "second_best": 0.00038,
+      "mutual_best": true,
+      "row_max": 0.99666,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 13,
+      "variant_mode": 13,
+      "mac": 0.99986,
+      "second_best": 0.00082,
+      "mutual_best": true,
+      "row_max": 0.99986,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 14,
+      "variant_mode": 14,
+      "mac": 0.99986,
+      "second_best": 0.00082,
+      "mutual_best": true,
+      "row_max": 0.99986,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 15,
+      "variant_mode": 15,
+      "mac": 0.9998,
+      "second_best": 1e-05,
+      "mutual_best": true,
+      "row_max": 0.9998,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 16,
+      "variant_mode": 16,
+      "mac": 0.99669,
+      "second_best": 0.00045,
+      "mutual_best": true,
+      "row_max": 0.99669,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 17,
+      "variant_mode": 17,
+      "mac": 0.99481,
+      "second_best": 6e-05,
+      "mutual_best": true,
+      "row_max": 0.99481,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 18,
+      "variant_mode": 18,
+      "mac": 0.99482,
+      "second_best": 6e-05,
+      "mutual_best": true,
+      "row_max": 0.99482,
+      "tracked": true
+     },
+     {
+      "baseline_mode": 19,
+      "variant_mode": 20,
+      "mac": 0.0,
+      "second_best": 0.0,
+      "mutual_best": false,
+      "row_max": 6e-05,
+      "tracked": false
+     },
+     {
+      "baseline_mode": 20,
+      "variant_mode": 19,
+      "mac": 0.99861,
+      "second_best": 0.0013,
+      "mutual_best": true,
+      "row_max": 0.99861,
+      "tracked": true
+     }
+    ]
+   },
+   "pairs": {
+    "10-11": {
+     "10000": {
+      "variant_modes": [
+       10,
+       11
+      ],
+      "max_principal_angle_deg": 1.2946,
+      "relative_gap": 0.0037
+     },
+     "15000": {
+      "variant_modes": [
+       10,
+       11
+      ],
+      "max_principal_angle_deg": 2.1316,
+      "relative_gap": 0.00307
+     },
+     "baseline_relative_gap": 0.00473
+    },
+    "13-14": {
+     "10000": {
+      "variant_modes": [
+       13,
+       14
+      ],
+      "max_principal_angle_deg": 0.4858,
+      "relative_gap": 0.00669
+     },
+     "15000": {
+      "variant_modes": [
+       13,
+       14
+      ],
+      "max_principal_angle_deg": 0.6729,
+      "relative_gap": 0.00669
+     },
+     "baseline_relative_gap": 0.00669
+    },
+    "17-18": {
+     "10000": {
+      "variant_modes": [
+       17,
+       18
+      ],
+      "max_principal_angle_deg": 2.5072,
+      "relative_gap": 0.00275
+     },
+     "15000": {
+      "variant_modes": [
+       17,
+       18
+      ],
+      "max_principal_angle_deg": 4.1312,
+      "relative_gap": 0.00229
+     },
+     "baseline_relative_gap": 0.00352
+    },
+    "8-9": {
+     "10000": {
+      "variant_modes": [
+       8,
+       9
+      ],
+      "max_principal_angle_deg": 0.2795,
+      "relative_gap": 0.03574
+     },
+     "15000": {
+      "variant_modes": [
+       8,
+       9
+      ],
+      "max_principal_angle_deg": 0.401,
+      "relative_gap": 0.03577
+     },
+     "baseline_relative_gap": 0.03566
+    },
+    "15-16": {
+     "10000": {
+      "variant_modes": [
+       15,
+       16
+      ],
+      "max_principal_angle_deg": 2.1534,
+      "relative_gap": 0.02777
+     },
+     "15000": {
+      "variant_modes": [
+       15,
+       16
+      ],
+      "max_principal_angle_deg": 3.3091,
+      "relative_gap": 0.02529
+     },
+     "baseline_relative_gap": 0.02918
+    },
+    "19-20": {
+     "note": "not a persisting pair: baseline 19 leaves the computed range and a new branch (variant mode 20, 331.1 Hz) enters from above; baseline 20 is variant 19"
+    }
+   },
+   "branches": {
+    "7": {
+     "variant_mode_A": 7,
+     "variant_mode_B": 7,
+     "f_hz": [
+      19.072,
+      26.578,
+      32.183
+     ],
+     "mac_to_baseline": [
+      0.99981,
+      0.99937
+     ],
+     "ratio_B_over_baseline": 1.6874,
+     "log_slope_dlnf_dlnG12": 0.4763,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "8": {
+     "variant_mode_A": 8,
+     "variant_mode_B": 8,
+     "f_hz": [
+      59.874,
+      59.875,
+      59.875
+     ],
+     "mac_to_baseline": [
+      1.0,
+      1.0
+     ],
+     "ratio_B_over_baseline": 1.0,
+     "log_slope_dlnf_dlnG12": 0.0,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "9": {
+     "variant_mode_A": 9,
+     "variant_mode_B": 9,
+     "f_hz": [
+      62.009,
+      62.015,
+      62.017
+     ],
+     "mac_to_baseline": [
+      0.99998,
+      0.99995
+     ],
+     "ratio_B_over_baseline": 1.0001,
+     "log_slope_dlnf_dlnG12": 0.0001,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "10": {
+     "variant_mode_A": 10,
+     "variant_mode_B": 10,
+     "f_hz": [
+      71.85,
+      80.76,
+      88.47
+     ],
+     "mac_to_baseline": [
+      0.99949,
+      0.99862
+     ],
+     "ratio_B_over_baseline": 1.2313,
+     "log_slope_dlnf_dlnG12": 0.1894,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "11": {
+     "variant_mode_A": 11,
+     "variant_mode_B": 11,
+     "f_hz": [
+      72.19,
+      81.059,
+      88.742
+     ],
+     "mac_to_baseline": [
+      0.99949,
+      0.99862
+     ],
+     "ratio_B_over_baseline": 1.2293,
+     "log_slope_dlnf_dlnG12": 0.1879,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "12": {
+     "variant_mode_A": 12,
+     "variant_mode_B": 12,
+     "f_hz": [
+      116.58,
+      138.17,
+      155.81
+     ],
+     "mac_to_baseline": [
+      0.99891,
+      0.99666
+     ],
+     "ratio_B_over_baseline": 1.3365,
+     "log_slope_dlnf_dlnG12": 0.264,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "13": {
+     "variant_mode_A": 13,
+     "variant_mode_B": 13,
+     "f_hz": [
+      167.49,
+      167.5,
+      167.51
+     ],
+     "mac_to_baseline": [
+      0.99993,
+      0.99986
+     ],
+     "ratio_B_over_baseline": 1.0001,
+     "log_slope_dlnf_dlnG12": 0.0001,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "14": {
+     "variant_mode_A": 14,
+     "variant_mode_B": 14,
+     "f_hz": [
+      168.61,
+      168.62,
+      168.63
+     ],
+     "mac_to_baseline": [
+      0.99993,
+      0.99986
+     ],
+     "ratio_B_over_baseline": 1.0001,
+     "log_slope_dlnf_dlnG12": 0.0001,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "15": {
+     "variant_mode_A": 15,
+     "variant_mode_B": 15,
+     "f_hz": [
+      174.8,
+      182.93,
+      190.61
+     ],
+     "mac_to_baseline": [
+      0.99992,
+      0.9998
+     ],
+     "ratio_B_over_baseline": 1.0904,
+     "log_slope_dlnf_dlnG12": 0.0788,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "16": {
+     "variant_mode_A": 16,
+     "variant_mode_B": 16,
+     "f_hz": [
+      179.9,
+      188.01,
+      195.43
+     ],
+     "mac_to_baseline": [
+      0.99858,
+      0.99669
+     ],
+     "ratio_B_over_baseline": 1.0863,
+     "log_slope_dlnf_dlnG12": 0.0754,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "17": {
+     "variant_mode_A": 17,
+     "variant_mode_B": 17,
+     "f_hz": [
+      213.2,
+      239.76,
+      262.49
+     ],
+     "mac_to_baseline": [
+      0.99809,
+      0.99481
+     ],
+     "ratio_B_over_baseline": 1.2312,
+     "log_slope_dlnf_dlnG12": 0.1893,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "18": {
+     "variant_mode_A": 18,
+     "variant_mode_B": 18,
+     "f_hz": [
+      213.95,
+      240.42,
+      263.09
+     ],
+     "mac_to_baseline": [
+      0.99809,
+      0.99482
+     ],
+     "ratio_B_over_baseline": 1.2297,
+     "log_slope_dlnf_dlnG12": 0.1882,
+     "order_changed": false,
+     "tracked": [
+      true,
+      true
+     ]
+    },
+    "19": {
+     "variant_mode_A": 20,
+     "variant_mode_B": 20,
+     "f_hz": [
+      295.78,
+      null,
+      null
+     ],
+     "mac_to_baseline": [
+      0.0,
+      0.0
+     ],
+     "ratio_B_over_baseline": null,
+     "log_slope_dlnf_dlnG12": null,
+     "order_changed": true,
+     "tracked": [
+      false,
+      false
+     ],
+     "note": "no counterpart among the 14 elastic modes of the variant (FE-FE MAC <= 0.000 with every variant mode): the branch rises above the highest computed mode (> 331.1 Hz); the forced assignment is not a tracking"
+    },
+    "20": {
+     "variant_mode_A": 19,
+     "variant_mode_B": 19,
+     "f_hz": [
+      327.9,
+      327.97,
+      327.99
+     ],
+     "mac_to_baseline": [
+      0.99926,
+      0.99861
+     ],
+     "ratio_B_over_baseline": 1.0003,
+     "log_slope_dlnf_dlnG12": 0.0002,
+     "order_changed": true,
+     "tracked": [
+      true,
+      true
+     ]
+    }
+   },
+   "analytical_twist": {
+    "model": "Kirchhoff orthotropic plate, trial function w = (x - a/2)(y - b/2): strain energy depends on D66 only; Rayleigh quotient f = (1/2pi) sqrt(576 D66 / (rho h a^2 b^2)), D66 = G12 h^3 / 12; an upper bound, no transverse shear (S4R includes it)",
+    "rayleigh_hz": {
+     "5000": 19.52,
+     "10000": 27.606,
+     "15000": 33.81
+    },
+    "sqrt_scaling_of_fe_baseline_hz": {
+     "5000": 19.072,
+     "10000": 26.972,
+     "15000": 33.034
+    }
+   },
+   "untracked_10000": {
+    "baseline_modes_without_counterpart": [
+     19
+    ],
+    "variant_modes_without_counterpart": [
+     20
+    ],
+    "max_mac_of_those_baseline_modes_with_any_variant_mode": [
+     7e-05
+    ]
+   },
+   "untracked_15000": {
+    "baseline_modes_without_counterpart": [
+     19
+    ],
+    "variant_modes_without_counterpart": [
+     20
+    ],
+    "max_mac_of_those_baseline_modes_with_any_variant_mode": [
+     6e-05
+    ]
+   }
+  },
+  "twist_branch": {
+   "f_hz": [
+    19.072,
+    26.578,
+    32.183
+   ],
+   "log_slope": 0.4763,
+   "fe_fe_mac_to_baseline": [
+    0.99981,
+    0.99937
+   ]
+  },
+  "reference_behaviour_not_pairing": {
+   "exp1_33.45_vs_FE7": [
+    -43.0,
+    -20.5,
+    -3.8
+   ],
+   "exp2_55.25_vs_FE8": [
+    8.4,
+    8.4,
+    8.4
+   ],
+   "exp7_144.60_vs_FE14": [
+    16.6,
+    16.6,
+    16.6
+   ]
+  },
+  "conclusion": "the first torsional branch is governed by G12 (f ~ G12^0.48, shape unchanged); G12 also shifts branches 10-12 and 17-18 by up to 34 %; the G12-independent bending branches FE 8 and FE 14 stay 8-17 % above the research references, so G12 alone cannot reconcile them",
+  "competing_explanations": [
+   "real laminate layup (D66/D11 ratio)",
+   "non-uniform thickness",
+   "shaker attachment (not modelled)",
+   "suspension (not modelled)",
+   "unaccepted modal correspondences"
+  ],
+  "proposed_next_experiment": "free-free modal test of the same plate without the shaker (impact or acoustic excitation, documented soft suspension, same PSV grid); proposal only",
+  "published_figure": {
+   "path": "docs/reconciliation/figures/m11_r66/fig_r66_frequency_vs_g12.png",
+   "sha256": "cb93fff9a5a29b01f9c73236de65fb0677df6052f984ef3386edc423670f0169"
+  },
+  "not_done": [
+   "material identification",
+   "G12 fitting",
+   "Auto-ID",
+   "LM",
+   "experimental MAC",
+   "fictitious springs or masses",
+   "changes to research/m11_r65",
+   "re-opening original or earlier ODBs"
+  ]
  }
 }

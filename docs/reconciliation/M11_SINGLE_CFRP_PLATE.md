@@ -1873,12 +1873,215 @@ written before the first experimental–FE MAC was run.
   - the scan calibration is diagnostic.
 - M8, the production gates, D-077 and SPEC v1.2 are unchanged.
 
-## 18. What did not change
+## 18. R6.6 (2026-10-22): controlled FE torsional-stiffness sensitivity
+
+**Authorisation (SUPERVISOR R6.6 §0).** Two controlled Abaqus frequency runs were made in a working directory from
+the verified V3 INP copy.
+
+This is a **sensitivity study**:
+
+- not a material identification;
+- no G12 is derived;
+- no variant is declared correct.
+
+The research statuses are unchanged: **research result `RESEARCH_MAC_COMPUTED`**; **physical registration
+`PHYSICAL_REGISTRATION_PENDING`**.
+
+### 18.1 Preparation and the three models
+
+- **Source:** the verified copy `CFRP_S4R_0875_FreeFree.inp`, SHA-256 `962f75f2fd5d9e6d…` (checked).
+  The two working INPs were created outside Git in `runs\m11_carbon_plate\r66\<job>\`.
+- **Edit:** in each working INP **exactly one line changed** (line 20239, the `*Elastic,
+  type=ENGINEERING CONSTANTS` data line) and **only its G12 field** (`56000.,56000., 8500.,  0.05,   0.3,   0.3, 5000., 3000.` →
+  `56000.,56000., 8500.,  0.05,   0.3,   0.3,10000., 3000.` / `56000.,56000., 8500.,  0.05,   0.3,   0.3,15000., 3000.`).
+  - File length unchanged; every other byte identical (SHA-256 of the file with that line masked:
+    `925648e307037dc8…` in all three).
+- **Model checks:**
+  - free-free: no `*Boundary`, loads, springs, masses, couplings or equations;
+  - units mm, t, s, MPa, so frequencies are in Hz;
+  - mass ρ·h·A = 118.36 g (owner's scale: 118.37 g);
+  - the orthotropic compliance is positive definite in all three models.
+
+| Parameter | Baseline R6 | R6.6-A | R6.6-B |
+|---|---|---|---|
+| Job | `CFRP_S4R_0875_FreeFree` (stored result, not re-run) | `CFRP_S4R_0875_FreeFree_R66A_G12_10000` | `CFRP_S4R_0875_FreeFree_R66B_G12_15000` |
+| **G12, MPa** | **5 000** | **10 000** | **15 000** |
+| E1 / E2 / E3, MPa | 56000 / 56000 / 8500 | same | same |
+| ν12 / ν13 / ν23 | 0.05 / 0.3 / 0.3 | same | same |
+| G13 / G23, MPa | 3000 / 3000 | same | same |
+| Density, t/mm³ | 1.498e-09 | same | same |
+| Shell | S4R, 0.875 mm, 5 Simpson points, 100 × 100 elements, 10 201 nodes | same | same |
+| Step | `*Frequency, eigensolver=Lanczos, sim, acoustic coupling=on, normalization=mass | 20, , , , ,` | same | same |
+| INP SHA-256 | `962f75f2…` | `36dce25dc5fb5c7c…` | `b5a504771a1cc66b…` |
+
+**Runs** (Abaqus 2024, `interactive`, cpus = 1, scratch in the job directory):
+
+- both COMPLETED;
+- `.sta` "THE ANALYSIS HAS COMPLETED SUCCESSFULLY";
+- `.msg` 0 warnings and 0 errors;
+- six rigid modes ≤ 0.008 Hz (baseline
+  0.009 Hz).
+
+**Shapes** were extracted with the pinned extractor, only from the two **new** work ODBs:
+
+- the script SHA-256 `039aa067adeac83e…` equals `PINNED_EXTRACT_SCRIPT_SHA256`, and the pin is unchanged;
+- OD-R7-1 is not bypassed.
+
+**What was not touched:** no original or earlier ODB was opened, and no R6 file was overwritten. The 57 verified
+copies, the R6 work ODB and every R6.5 input were re-checked after the runs: unchanged.
+
+### 18.2 Natural frequencies and branch tracking (FE–FE, not experimental MAC)
+
+Each baseline mode is followed by FE–FE MAC (full U1–U3 at the identical 10 201 nodes), with a one-to-one
+assignment.
+
+[![Frequency vs G12](figures/m11_r66/fig_r66_frequency_vs_g12.png)](figures/m11_r66/fig_r66_frequency_vs_g12.png)
+
+*Figure 18.1 — FE frequency branches against G12.* SHA-256 `cb93fff9a5a29b01…`.
+
+| Baseline FE mode | G12 5 000, Hz | G12 10 000, Hz | G12 15 000, Hz | d ln f / d ln G12 (5 000 → 15 000) | FE–FE MAC to baseline (A / B) | Branch |
+|---|---|---|---|---|---|---|
+| 7 | 19.07 | 26.58 (+39.4 %) | 32.18 (+68.7 %) | 0.476 | 0.9998 / 0.9994 | tracked |
+| 8 | 59.87 | 59.88 (+0.0 %) | 59.88 (+0.0 %) | 0.000 | 1.0000 / 1.0000 | tracked |
+| 9 | 62.01 | 62.02 (+0.0 %) | 62.02 (+0.0 %) | 0.000 | 1.0000 / 1.0000 | tracked |
+| 10 | 71.85 | 80.76 (+12.4 %) | 88.47 (+23.1 %) | 0.189 | 0.9995 / 0.9986 | tracked |
+| 11 | 72.19 | 81.06 (+12.3 %) | 88.74 (+22.9 %) | 0.188 | 0.9995 / 0.9986 | tracked |
+| 12 | 116.58 | 138.17 (+18.5 %) | 155.81 (+33.7 %) | 0.264 | 0.9989 / 0.9967 | tracked |
+| 13 | 167.49 | 167.50 (+0.0 %) | 167.51 (+0.0 %) | 0.000 | 0.9999 / 0.9999 | tracked |
+| 14 | 168.61 | 168.62 (+0.0 %) | 168.63 (+0.0 %) | 0.000 | 0.9999 / 0.9999 | tracked |
+| 15 | 174.80 | 182.93 (+4.7 %) | 190.61 (+9.0 %) | 0.079 | 0.9999 / 0.9998 | tracked |
+| 16 | 179.90 | 188.01 (+4.5 %) | 195.43 (+8.6 %) | 0.075 | 0.9986 / 0.9967 | tracked |
+| 17 | 213.20 | 239.76 (+12.5 %) | 262.49 (+23.1 %) | 0.189 | 0.9981 / 0.9948 | tracked |
+| 18 | 213.95 | 240.42 (+12.4 %) | 263.09 (+23.0 %) | 0.188 | 0.9981 / 0.9948 | tracked |
+| 19 | 295.78 | — (> 331.1; leaves the computed range) | — | — | — | not tracked: no counterpart among variant modes 7–20 (FE–FE MAC ≤ 1e-4) |
+| 20 | 327.90 | 327.97 (+0.0 %) | 327.99 (+0.0 %) | 0.000 | 0.9993 / 0.9986 | tracked (variant mode 19 / 19) |
+
+**Branch preservation:**
+
+- 13 of the 14 elastic branches are tracked in both variants: FE–FE MAC ≥ 0.9948 with the baseline shape,
+  mutual best match, and every other candidate ≤ 0.0048.
+- The mode numbers of branches 7–18 are unchanged.
+- Baseline 20 (327.9 Hz, G12-insensitive) becomes variant mode 19.
+- **Baseline 19 (295.78 Hz) has no counterpart** among the variants' modes 7–20 (FE–FE MAC ≤ 1e-4). Raising G12 can
+  only raise eigenvalues, so this branch has left the computed range (above 331.1 Hz). A **new branch** (variant mode
+  20, 331.1 Hz) entered from above.
+- The ordering therefore changes at the top of the computed range. Mode numbers do **not** imply physical
+  correspondence across the variants.
+
+**Close pairs** (relative frequency gap; largest principal angle between the baseline pair subspace and the tracked
+variant pair subspace):
+
+| Pair | Gap, G12 5 000 | Gap, 10 000 | Gap, 15 000 | Subspace angle A / B |
+|---|---|---|---|---|
+| 8-9 | 3.57 % | 3.57 % | 3.58 % | 0.28° / 0.40° |
+| 10-11 | 0.47 % | 0.37 % | 0.31 % | 1.29° / 2.13° |
+| 13-14 | 0.67 % | 0.67 % | 0.67 % | 0.49° / 0.67° |
+| 15-16 | 2.92 % | 2.78 % | 2.53 % | 2.15° / 3.31° |
+| 17-18 | 0.35 % | 0.27 % | 0.23 % | 2.51° / 4.13° |
+
+- The pairs persist as subspaces: angles ≤ 4.1°.
+- The near-degenerate pairs 10–11 and 17–18 come even closer as G12 grows. Pairs 8–9 and 13–14 are unaffected.
+
+### 18.3 Sensitivity of the first torsional branch (FE 7)
+
+**FE.**
+
+| | G12 5 000 | G12 10 000 | G12 15 000 |
+|---|---|---|---|
+| FE 7, Hz | 19.07 | 26.58 (+39.4 %) | 32.18 (+68.7 %) |
+| √(G12) scaling of FE 7, Hz | 19.07 | 26.97 | 33.03 |
+| Rayleigh estimate, Hz | 19.52 | 27.61 | 33.81 |
+
+- d ln f / d ln G12 = 0.476. A pure √(G12) dependence would give 0.5.
+- The shape is practically unchanged: FE–FE MAC 0.9998 and
+  0.9994.
+
+**Analytical estimate (an approximation, not an exact solution).** It uses a Kirchhoff orthotropic plate with the
+trial function w = (x − a/2)(y − b/2). Its strain energy depends on D66 = G12·h³/12 only. The Rayleigh quotient gives
+f = (1/2π)·√(576·D66 / (ρ·h·a²·b²)) = 19.52 / 27.61 / 33.81 Hz.
+
+- This is an upper bound: the true shape is not exactly xy, and transverse shear is absent from Kirchhoff theory.
+- The FE values lie 2–5 % below it. They also fall below √ scaling as G12 grows, because G13 and G23 stay at 3 000 MPa,
+  so the share of transverse-shear deformation grows.
+
+**Conclusion.**
+
+- The first torsional branch is governed by G12: f ∝ G12^≈0.48 over 5 000–15 000 MPa, with the same shape.
+- Within this model, a torsional stiffness about three times the template value moves FE 7 from 19.07 Hz to
+  32.18 Hz. The research reference is exp 1 at 33.45 Hz. This is reported as model behaviour only, **not as a
+  derived G12**.
+
+### 18.4 Does G12 change only the torsional branch?
+
+**No.** The branches fall into three groups:
+
+| Group | Branches | Change at G12 15 000 | d ln f / d ln G12 |
+|---|---|---|---|
+| Insensitive (cylindrical-bending branches, no twisting curvature) | FE 8, 9, 13, 14, 20 | < 0.03 % | ≈ 0 |
+| Strongly sensitive | FE 10–11, 12, 17–18 | +23 % to +34 % | 0.19–0.26 |
+| Weakly sensitive | FE 15–16 | +9 % | ≈ 0.08 |
+| Leaves the range | FE 19 | > 331 Hz | — |
+
+**Behaviour of the predefined variants against the research references.** These are the R6.5 research cMAC
+correspondences, **not** an accepted pairing, and the frequencies are used only to describe the variants:
+
+- **exp 1** (33.45 Hz; cMAC with FE 7 ≈ 0.83): FE 7 gives 19.07 / 26.58 / 32.18 Hz, so the gap is −43 / −21 / −4 %.
+- **exp 2** (55.25 Hz; cMAC with FE 8 ≈ 0.70): FE 8 stays at 59.87 Hz in all three models, **+8.4 % independent of
+  G12**.
+- **exp 7** (144.60 Hz; cMAC with FE 14 ≈ 0.74): FE 14 stays at 168.6 Hz in all three models, **+16.6 % independent of
+  G12**.
+
+What this shows:
+
+- G12 alone cannot bring all three research references together: the twist branch would need more torsional
+  stiffness, while the two bending branches, which do not depend on G12, are already stiffer than the experiment.
+- Raising G12 also shifts other branches by up to 34 %.
+- The **ratio** of twisting to bending stiffness in the homogeneous template (D66 / D11) therefore does not match
+  the specimen's dynamic behaviour.
+- This is an observation about the model's stiffness distribution. It identifies no parameter and declares no variant
+  correct.
+
+### 18.5 Competing explanations the experiment cannot yet separate
+
+1. **The real laminate layup.** The plate is plain-weave carbon with an unknown stack. Plies at ±45°, or a different
+   fibre volume fraction, raise D66 and lower D11 / D22 together. The homogeneous E1 = E2 template cannot represent
+   that ratio. This is consistent with §18.4, but not shown.
+2. **Non-uniform thickness.** The edge readings are 0.71–0.94 mm, and bending stiffness scales with h³. The thickness
+   distribution inside the plate is unmeasured.
+3. **Shaker attachment.** Its location near edge 3 is approximate. The attachment geometry, mass and stiffness are
+   unknown. Its effect is mode-dependent and is **not modelled**; no fictitious spring or mass was added.
+4. **Suspension.** The free-free suspension is not documented mechanically, and its effect on the elastic modes is
+   unknown. Not modelled.
+5. **Unaccepted modal correspondences.** The R6.5 correspondences are research cMAC only. The physical registration is
+   pending (PHYSICAL_FE_ORIENTATION NOT_DETERMINED, SCANNER_FACE HUMAN_CONFIRMATION_PENDING), and exp 3 and exp 8 are
+   unstable.
+
+### 18.6 One proposed next experiment (proposal only; nothing done)
+
+**A free-free modal test of the same plate without the shaker.**
+
+- **Setup:** the plate on a documented soft suspension; excitation without attachment (an instrumented impact hammer,
+  or acoustic excitation); the same PSV scan grid and analysis (PolyMAX).
+- **Why this one:**
+  - It removes the shaker attachment, the competing explanation that can be tested with the existing equipment and
+    with no destructive step.
+  - If exp 1, 2 and 7 remain at about 33.5 / 55 / 145 Hz, the discrepancy belongs to the specimen's stiffness
+    distribution (layup and thickness, §18.5 items 1–2), and a layup record or section measurement would then be
+    justified.
+  - If they move, the setup contributes and must be modelled from measured attachment data.
+- **What it is not:** no further FE variant and no G12 search is proposed.
+
+**Unchanged:** `research/m11_r65/` and the R6.5 research MAC, SPEC v1.2, governed evidence, physical registrations,
+Auto-ID / LM, production gates, material passports, R7 and PR #94 / #96. No automatic fitting of E1, E2, G12, ν12,
+density or thickness. The Abaqus outputs stay outside Git.
+
+## 19. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.
 - Branch `analysis/m10-sp10-registration-prep` and PR #94.
-- No FE solve, no Auto-ID or LM, no governed MAC, no material change. Until R6.4 no MAC was computed at all;
-  R6.5 computed a research-only complex MAC (§17). Abaqus Python: exactly one authorised extraction run
+- No Auto-ID or LM, no governed MAC, no material change. Until R6.4 no MAC was computed at all;
+  R6.5 computed a research-only complex MAC (§17). FE solves: none until R6.6; R6.6 made exactly two authorised
+  frequency runs (G12 variants, §18) in a working directory, with the pinned extractor applied only to their new ODBs. Abaqus Python: exactly one authorised extraction run
   (R6) on a working copy of `CFRP_S4R_0875_FreeFree.odb`; no other ODB was opened.
 - M8 original gate `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE.
