@@ -946,23 +946,45 @@ shaker position approximate).
 FE Y, white circle = FE origin X = 0, Y = 0, centre text = FE +Z towards or away from the viewer. Same as the table in
 §14.2.
 
+R6.2b: the figure was re-rendered with the same arrows, origins and texts. Only the letters "X" and "Y" moved
+22 mm into the plate, so they no longer cover the edge captions. The R6.2a version had SHA-256 `6454cefa768ae60e…`.
+
 [![The four possible orientations A-D](figures/m11_r62/fig_r62_candidates.png)](figures/m11_r62/fig_r62_candidates.png)
 
-**The plate seen from the scanner side (`fig_r62_view_scanner.png`): not published.**
+**Figure 14.3 — the same plate seen from the scanner side, diagram only** (R6.2b, SUPERVISOR option (b)).
 
-- Its left panel is the stored PSV camera frame, which shows a person and equipment asset labels in the laboratory
-  background.
-- It is withheld pending a decision on a redacted version.
-- It remains in `runs\m11_carbon_plate\r62\`.
-- The owner's question sheet refers to it by name.
+- Mirror of Figure 14.1: edges 2 and 4 swap.
+- The 289 points, the scan window 215.4 × 285.2 mm and the gaps to the edges are as in §14.3.
+- The caption "сторона БЕЗ меток (шейкер — за пластиной)" on the figure is the **hypothesis** of §14.4, which needs
+  HUMAN confirmation. It is not an established fact.
+
+[![The plate seen from the scanner side, diagram only](figures/m11_r62/fig_r62_view_scanner_diagram_only.png)](figures/m11_r62/fig_r62_view_scanner_diagram_only.png)
+
+The file is a pure pixel crop of panel 2b of `fig_r62_view_scanner.png`:
+
+- crop box x 930–1710, y 10–780 px;
+- the pixels are identical to the source region;
+- source SHA-256 `c48278fb8883aead768838fa0921b1e2f19d77bb57664dd0a83c32915ec18a44`.
+
+The PSV camera photograph (panel 2a) is **not published**. It shows a person and equipment asset labels in the
+laboratory background, and it remains only in `runs\m11_carbon_plate\r62\`.
 
 The owner's question sheet: [`M11_R62_OWNER_QUESTIONS.md`](figures/m11_r62/M11_R62_OWNER_QUESTIONS.md).
+
+Revised in R6.2b:
+
+- it refers to the diagram-only scanner figure;
+- the scanner on the far side, facing the unmarked face, is stated as a hypothesis that needs HUMAN confirmation;
+- the owner is not asked to open the original Abaqus model; the answer rests on an existing model screenshot
+  (axis triad and the X = 0, Y = 0 corner) or an authorised copy;
+- the Abaqus standard view is stated not to establish the physical origin.
 
 | File | SHA-256 |
 |---|---|
 | `fig_r62_view_shaker.png` | `7702df3925e5818c4eee1ad4750578741ecc9e7b0d1610e0ea280a970e45546b` |
-| `fig_r62_candidates.png` | `6454cefa768ae60e8f678dc24ae4f338d7d06da62f0ee531e876c59feed4879c` |
-| `M11_R62_OWNER_QUESTIONS.md` | `b761eb0d358b32070b2f195ead8bd11d3bd3bab169c184e4f9c9d98477ac3000` |
+| `fig_r62_view_scanner_diagram_only.png` | `81b2e26f7dcf99a78ded529be209186ebefdb96e83fba3c252a407e0999ae887` |
+| `fig_r62_candidates.png` | `5efc9b8843480cd93715b049942e3f19e2c83f31160ed1adc5dd26efe87669f0` |
+| `M11_R62_OWNER_QUESTIONS.md` | `8f9f2e91c246bbcdb655bab1e49794831ba9acfaf95d8424ae3f95472a71261e` |
 
 ### 14.1 The two views
 

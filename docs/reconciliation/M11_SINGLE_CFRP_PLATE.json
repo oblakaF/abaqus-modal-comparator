@@ -1788,5 +1788,35 @@
   },
   "nature": "diagnostic illustrations; not an approved physical registration; no candidate selected",
   "status": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING"
+ },
+ "r62b_published_figures": {
+  "decision": "SUPERVISOR option (b): publish only the schematic panel 2b of the scanner figure",
+  "directory": "docs/reconciliation/figures/m11_r62/",
+  "published_sha256": {
+   "fig_r62_view_shaker.png": "7702df3925e5818c4eee1ad4750578741ecc9e7b0d1610e0ea280a970e45546b",
+   "fig_r62_view_scanner_diagram_only.png": "81b2e26f7dcf99a78ded529be209186ebefdb96e83fba3c252a407e0999ae887",
+   "fig_r62_candidates.png": "5efc9b8843480cd93715b049942e3f19e2c83f31160ed1adc5dd26efe87669f0",
+   "M11_R62_OWNER_QUESTIONS.md": "8f9f2e91c246bbcdb655bab1e49794831ba9acfaf95d8424ae3f95472a71261e"
+  },
+  "scanner_diagram_crop": {
+   "source": "fig_r62_view_scanner.png",
+   "source_sha256": "c48278fb8883aead768838fa0921b1e2f19d77bb57664dd0a83c32915ec18a44",
+   "crop_box_px": [
+    930,
+    10,
+    1710,
+    780
+   ],
+   "pixels_identical_to_source_region": true,
+   "photo_panel_2a_published": false
+  },
+  "superseded_sha256": {
+   "fig_r62_candidates.png": "6454cefa768ae60e8f678dc24ae4f338d7d06da62f0ee531e876c59feed4879c",
+   "M11_R62_OWNER_QUESTIONS.md": "b761eb0d358b32070b2f195ead8bd11d3bd3bab169c184e4f9c9d98477ac3000"
+  },
+  "candidates_rerender": "same arrows, origins and texts; only the X / Y letters moved 22 mm into the plate",
+  "scanner_far_side": "hypothesis; HUMAN confirmation required",
+  "nature": "diagnostic illustrations; not an approved physical registration; no candidate selected",
+  "status": "FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING"
  }
 }

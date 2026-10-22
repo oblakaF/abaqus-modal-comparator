@@ -5589,3 +5589,16 @@ first internal provider.
   background; it is withheld pending a decision on a redacted version.
 - **Unchanged:** no data or interpretation changed, no candidate selected, no registration built, and the status is
   unchanged.
+
+## 2026-10-22 — M11 R6.2b: diagram-only scanner view published (SUPERVISOR option (b))
+
+- **Scanner view:** `fig_r62_view_scanner_diagram_only.png` is a pure crop of panel 2b, pixel-identical to the
+  source region. The PSV photograph (person, equipment labels) is not published.
+- **Candidates A–D:** re-rendered with the X / Y letters moved off the edge captions; the geometry is unchanged.
+- **Owner question sheet:**
+  - it refers to the diagram-only figure;
+  - the scanner on the far side is a hypothesis that needs HUMAN confirmation;
+  - the owner is not asked to open the original model;
+  - the axes and origin come from an existing model screenshot or an authorised copy;
+  - the Abaqus standard view is not taken as evidence of the physical origin.
+- **Unchanged:** no candidate selected, no registration, status unchanged.
