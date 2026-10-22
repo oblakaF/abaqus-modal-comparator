@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -40,7 +41,8 @@ def _scenarios() -> dict:
     return out
 
 
-# Declared before any experimental-FE MAC was computed (R6.5 §7). Never re-tuned after seeing results.
+# Fixed before the first experimental-FE MAC was computed (R6.5 §7); its SHA-256 and time are recorded in the local
+# execution log only, so it is NOT an independently verified preregistration. Never re-tuned after seeing results.
 PROTOCOL = {
     "schema": SCHEMA,
     "status": list(STATUS),
@@ -74,22 +76,123 @@ class ResearchRefusal(ValueError):
     """The research computation refuses (identity, data or geometry); nothing is computed."""
 
 
+# ----------------------------------------------------------------------------------------------- location guard
+# Original stores of the M11 data: never read, never hashed, never written (R6.5a §1). Further roots can be added.
+DEFAULT_FORBIDDEN_ROOTS = ((r"C:\temp", r"D:\Snadwich", r"I:\Sumin") if os.name == "nt" else ()) + (
+    os.path.join(os.path.expanduser("~"), "Desktop"),)
+
+
+def _norm(path) -> str:
+    """Absolute, lexically normalised, case-folded where the platform is case-insensitive (no filesystem access)."""
+    return os.path.normcase(os.path.normpath(os.path.abspath(os.fspath(path))))
+
+
+def _within(path_n: str, root_n: str) -> bool:
+    return path_n == root_n or path_n.startswith(root_n.rstrip("\\/") + os.sep)
+
+
+def _redirected_component(path_n: str, stop_n: str) -> str | None:
+    """The first existing component between ``stop_n`` and ``path_n`` that is a symbolic link or junction."""
+    current = path_n
+    while True:
+        if os.path.lexists(current) and (os.path.islink(current) or
+                                         (hasattr(os.path, "isjunction") and os.path.isjunction(current))):
+            return current
+        if current == stop_n or _within(stop_n, current):
+            return None
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+
+
+class PathPolicy:
+    """Fail-closed location policy, applied BEFORE any input is read or hashed and before any output is written.
+
+    - ``forbidden_roots``: original stores; never read, hashed or written. The check is lexical, so a forbidden
+      location is refused without touching it.
+    - ``input_roots``: the verified copy and derived work roots that inputs (and the config) may come from.
+    - ``protected_roots``: never written (verified copies, the repository).
+    - ``output_root``: the only place results may be written; it must not hold any input.
+
+    Relative paths and ``..`` are normalised before the check. A symbolic link or junction in any component, a hard
+    link (more than one link to the file) or a real path that differs from the checked path is refused.
+    """
+
+    def __init__(self, input_roots: Sequence, output_root, protected_roots: Sequence = (),
+                 forbidden_roots: Sequence = DEFAULT_FORBIDDEN_ROOTS) -> None:
+        self.forbidden = [_norm(r) for r in forbidden_roots]
+        self.inputs = [_norm(r) for r in input_roots]
+        self.protected = [_norm(r) for r in protected_roots]
+        self.output = _norm(output_root)
+        if not self.inputs:
+            raise ResearchRefusal("no input root declared")
+        for root in self.inputs + [self.output]:
+            for bad in self.forbidden:
+                if _within(root, bad) or _within(bad, root):
+                    raise ResearchRefusal(f"root {root} overlaps the forbidden original store {bad}")
+        for bad in self.protected:
+            if _within(self.output, bad) or _within(bad, self.output):
+                raise ResearchRefusal(f"output root {self.output} overlaps the protected root {bad}")
+        for root in self.inputs:
+            if _within(root, self.output):
+                raise ResearchRefusal(f"input root {root} lies inside the output root")
+        for root in self.inputs + [self.output]:
+            if os.path.lexists(root):
+                hit = _redirected_component(root, os.path.splitdrive(root)[0] + os.sep)
+                if hit is not None:
+                    raise ResearchRefusal(f"root {root} passes through a link or junction ({hit})")
+
+    def check_input(self, path) -> Path:
+        p = _norm(path)
+        for bad in self.forbidden:
+            if _within(p, bad):
+                raise ResearchRefusal(f"{p} lies in a forbidden original store: refused before any access")
+        root = next((r for r in self.inputs if _within(p, r)), None)
+        if root is None:
+            raise ResearchRefusal(f"{p} is outside every declared input root")
+        if _within(p, self.output):
+            raise ResearchRefusal(f"{p} lies in the output root; inputs never come from there")
+        hit = _redirected_component(p, root)
+        if hit is not None:
+            raise ResearchRefusal(f"{p} passes through a link or junction ({hit})")
+        if not os.path.isfile(p):
+            raise ResearchRefusal(f"{p} is not a regular file")
+        if os.stat(p).st_nlink != 1:
+            raise ResearchRefusal(f"{p} is a hard link ({os.stat(p).st_nlink} names): origin cannot be established")
+        if _norm(os.path.realpath(p)) != p:
+            raise ResearchRefusal(f"{p} resolves elsewhere ({os.path.realpath(p)})")
+        return Path(p)
+
+    def check_output_dir(self, path) -> Path:
+        p = _norm(path)
+        for bad in self.forbidden + self.protected:
+            if _within(p, bad):
+                raise ResearchRefusal(f"output {p} lies in a forbidden or protected root ({bad})")
+        if not _within(p, self.output):
+            raise ResearchRefusal(f"output {p} is outside the declared output root {self.output}")
+        hit = _redirected_component(p, self.output)
+        if hit is not None:
+            raise ResearchRefusal(f"output {p} passes through a link or junction ({hit})")
+        return Path(p)
+
+
 # ----------------------------------------------------------------------------------------------- identity
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def verify_identity(paths: Mapping[str, Path], expected: Mapping[str, str]) -> dict:
-    """Every expected input must be supplied and match its SHA-256; extra inputs are refused too."""
+def verify_identity(paths: Mapping[str, Path], expected: Mapping[str, str], policy: PathPolicy) -> dict:
+    """Every expected input must be supplied, lie in an allowed location (checked first, before any read) and match
+    its SHA-256; extra inputs are refused too."""
     missing = sorted(set(expected) - set(paths))
     extra = sorted(set(paths) - set(expected))
     if missing or extra:
         raise ResearchRefusal(f"input set mismatch: missing {missing}, unexpected {extra}")
+    located = {name: policy.check_input(paths[name]) for name in expected}  # all locations before any hashing
     found = {}
     for name, sha in expected.items():
-        p = Path(paths[name])
-        if not p.is_file():
-            raise ResearchRefusal(f"input {name!r} is not a file")
+        p = located[name]
         h = sha256_file(p)
         if h != sha:
             raise ResearchRefusal(f"input {name!r}: SHA-256 {h} differs from the verified {sha}")

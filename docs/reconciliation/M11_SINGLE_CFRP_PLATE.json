@@ -2,13 +2,17 @@
  "schema": "m11/single-cfrp-plate/v1",
  "status": "REVIEW_READY",
  "outcome": "FREQUENCY_DIAGNOSTIC + EXPERIMENTAL_MODE_TYPES (no FE pairing confirmed)",
+ "outcome_stage": "initial review 2026-10-21",
+ "research_result": "RESEARCH_MAC_COMPUTED (R6.5 2026-10-22; QA R6.5a): RESEARCH_DIAGNOSTIC_ONLY, not a modal pairing",
+ "physical_registration": "PHYSICAL_REGISTRATION_PENDING (FE extraction ready since R6; not completed by the research MAC)",
  "labels": [
   "ANALYSIS_ONLY",
   "NOT_GOVERNED_EVIDENCE",
   "NO_MODE_PAIRING_CONFIRMED",
   "NO_FITTING",
-  "NO_MAC"
+  "NO_GOVERNED_MAC"
  ],
+ "labels_note": "until R6.4 the label was NO_MAC; R6.5 computed a research-only complex MAC (not governed, not a pairing)",
  "copies": {
   "models": [
    {
@@ -5939,12 +5943,13 @@
    "COMPUTATIONAL_CONVENTION_ONLY",
    "NO_ACCEPTED_PHYSICAL_REGISTRATION"
   ],
-  "m11_state": "RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING",
+  "research_result": "RESEARCH_MAC_COMPUTED",
+  "physical_registration": "PHYSICAL_REGISTRATION_PENDING",
   "erratum_r64_16_3": "MAC between a perturbed FE vector and a fixed independent experimental vector is first order (|dMAC| <= eps/(1-eps)); sensitivity must be measured in the declared scenarios",
   "protocol": {
    "sha256": "74283bde14f6fbf5036276aff2ad7a9eae484a63f0a2c0c5a17e921890dcb48f",
    "declared_at": "2026-10-22T17:15:10+08:00",
-   "declared_before_first_mac": true
+   "declared_before_first_mac": "LOCAL_EXECUTION_LOG_ONLY: recorded locally before the first MAC; no independent pre-computation record; not an independently verified preregistration (R6.5a)"
   },
   "research_code_sha256": {
    "cmac_research.py": "28cbc3abb7d3d24ff69565fdd2505cbbabed8d886160a425802b82e82c109d54",
@@ -9814,6 +9819,122 @@
    "pairing",
    "registration",
    "orientation / scenario / phase / frequency selection by MAC"
+  ]
+ },
+ "r65a_qa": {
+  "decision": "R6.5 provisionally accepted as research diagnostics; MAC matrices are not an accepted modal pairing",
+  "path_guard": {
+   "implementation": "research/m11_r65/cmac_research.py PathPolicy (location before any read/hash/write)",
+   "refuses": [
+    "original stores (C:\\temp, D:\\Snadwich, I:\\Sumin, Desktop, --forbidden-root)",
+    "outside declared input roots",
+    "relative / '..' traversal (normalised first)",
+    "symbolic link or junction in any component",
+    "hard link",
+    "real path differs",
+    "config outside input roots (checked before reading)",
+    "output outside the output root or in a protected root, original store or repository",
+    "unsafe policies (overlapping roots, repository as input)"
+   ],
+   "live_rerun_equal_to_r65": {
+    "max_abs_mac_diff": 0.0,
+    "max_abs_subspace_diff": 0.0
+   },
+   "live_refusals": 4,
+   "originals_touched": false
+  },
+  "ci": {
+   "workflow": ".github/workflows/tests.yml step 'Run M11 R6.5 research synthetic tests (no real data)'",
+   "tests": 29,
+   "evidence": "CI annotation with the executed test count; log in the artifact",
+   "normative_tests_changed": false
+  },
+  "status_split": {
+   "research_result": "RESEARCH_MAC_COMPUTED",
+   "physical_registration": "PHYSICAL_REGISTRATION_PENDING"
+  },
+  "independent_crosscheck": {
+   "method": "independent plain-Python sums, Gram-Schmidt, brute-force nearest node, structured-grid bilinear; same sources / U3 mask / diagnostic geometry / convention D",
+   "checks": {
+    "nearest_node: exp 1 - FE 7": {
+     "independent": 0.8309501696970192,
+     "r65": 0.8309501696970191,
+     "abs_diff": 1.1102230246251565e-16
+    },
+    "nearest_node: exp 2 - FE 8": {
+     "independent": 0.7029680186974522,
+     "r65": 0.7029680186974525,
+     "abs_diff": 3.3306690738754696e-16
+    },
+    "nearest_node: exp 7 - FE 14": {
+     "independent": 0.7327039696757349,
+     "r65": 0.7327039696757349,
+     "abs_diff": 0.0
+    },
+    "nearest_node: exp 4 in FE 10-11": {
+     "independent": 0.620408559760046,
+     "r65": 0.6204085597600455,
+     "abs_diff": 5.551115123125783e-16
+    },
+    "nearest_node: exp 5 in FE 10-11": {
+     "independent": 0.5854667704491976,
+     "r65": 0.5854667704491979,
+     "abs_diff": 3.3306690738754696e-16
+    },
+    "nearest_node: full 10 x 14 matrix max abs diff": 3.3306690738754696e-16,
+    "bilinear_S4R: exp 1 - FE 7": {
+     "independent": 0.831116814593859,
+     "r65": 0.8311168083125228,
+     "abs_diff": 6.281336228930456e-09
+    },
+    "bilinear_S4R: exp 2 - FE 8": {
+     "independent": 0.6993592419885905,
+     "r65": 0.6993592479308316,
+     "abs_diff": 5.942241143586102e-09
+    },
+    "bilinear_S4R: exp 7 - FE 14": {
+     "independent": 0.7355965698622801,
+     "r65": 0.7355965696136537,
+     "abs_diff": 2.4862634173672404e-10
+    },
+    "bilinear_S4R: exp 4 in FE 10-11": {
+     "independent": 0.6194399020102342,
+     "r65": 0.6194398972446346,
+     "abs_diff": 4.7655996926465605e-09
+    },
+    "bilinear_S4R: exp 5 in FE 10-11": {
+     "independent": 0.5891816480415767,
+     "r65": 0.5891816678137181,
+     "abs_diff": 1.9772141368612495e-08
+    },
+    "bilinear_S4R: full 10 x 14 matrix max abs diff": 6.616540332293752e-08
+   },
+   "script_sha256": "8db1e376050e1802b29971f3a1cfc31a40ef35b3edb130a1f3468aa5f91851b0"
+  },
+  "protocol_provenance": "LOCAL_EXECUTION_LOG_ONLY; not an independently verified preregistration",
+  "research_code_sha256": {
+   "cmac_research.py": "088549942a93546f918e0ef4268a4469666e819e83296b0fbed81a996c8daa72",
+   "expected_inputs.json": "c57e683885b6c3a8f2612fe4ee58c071da2ae0246d1d52a29c006b7616e18a3a",
+   "README.md": "3b3d61e6a52549b4175421e3ed72e901e2017666cb0997e5d5c204785b93cbae",
+   "run_m11_r65.py": "c06f6ec310af610fb7abf9e713103dfcd815203565ad7d6fab188d66b46f951a",
+   "test_cmac_research.py": "e0f0ab30768ec29896418c4f67d990f17abec16abd8de9497b22881d7214dbfa"
+  },
+  "residual_limitations": [
+   "a file copied (not linked) out of an original into an allowed root is detected only by the copy manifests / SHA, not by location",
+   "subst / network mappings not resolved beyond realpath",
+   "Windows-only junction and case tests skipped on the Linux CI runner",
+   "bilinear transfer relies on INP connectivity (NODES_AND_INP_CONTENT)"
+  ],
+  "unchanged": [
+   "scenarios and interpretation of R6.5",
+   "PHYSICAL_FE_ORIENTATION NOT_DETERMINED",
+   "SCANNER_FACE HUMAN_CONFIRMATION_PENDING",
+   "M8 NOT_MET",
+   "production gates",
+   "D-077",
+   "SPEC v1.2",
+   "R7 / PR #96",
+   "PR #94"
   ]
  }
 }

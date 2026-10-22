@@ -2,11 +2,19 @@
 
 RESEARCH_DIAGNOSTIC_ONLY / COMPUTATIONAL_CONVENTION_ONLY / NO_ACCEPTED_PHYSICAL_REGISTRATION.
 
-Usage (paths are supplied outside Git; every input is refused unless its SHA-256 equals expected_inputs.json):
-    python research/m11_r65/run_m11_r65.py --config <inputs.json> --out <work directory>
+Usage (paths are supplied outside Git):
+    python research/m11_r65/run_m11_r65.py --config <inputs.json> --out <dir> \
+        --input-root <verified copy root> --input-root <derived work root> \
+        --protected-root <verified copy root> --output-root <research output root> [--forbidden-root <dir> ...]
 
+Fail-closed location policy (cmac_research.PathPolicy), applied before anything is read, hashed or written:
+- the config and every input must lie in a declared input root, outside the original stores (C:\\temp, D:\\Snadwich,
+  I:\\Sumin, Desktop and any --forbidden-root) and outside the output root, with no link, junction or hard link;
+- only then is each SHA-256 compared with expected_inputs.json;
+- results are written only inside --output-root, never in a protected root (verified copies), the repository or an
+  original store.
 Reads only verified copies and derived files; never opens an ODB, never runs Abaqus; production code is imported
-read-only (UNV reader, PSV record parser) and is not modified. Writes results and figures to --out only.
+read-only (UNV reader, PSV record parser) and is not modified.
 """
 
 from __future__ import annotations
@@ -144,10 +152,22 @@ def subspaces(data, fe_vectors):
     return res
 
 
-def run(config: Path, out: Path) -> dict:
+def make_policy(input_roots, output_root, protected_roots, forbidden_roots) -> R.PathPolicy:
+    """The repository is always protected (never written) and is never an input root."""
+    for root in input_roots:
+        if R._within(R._norm(REPO), R._norm(root)) or R._within(R._norm(root), R._norm(REPO)):
+            raise R.ResearchRefusal(f"input root {root} overlaps the repository")
+    return R.PathPolicy(input_roots, output_root, protected_roots=list(protected_roots) + [REPO],
+                        forbidden_roots=list(R.DEFAULT_FORBIDDEN_ROOTS) + list(forbidden_roots))
+
+
+def run(config: Path, out: Path, policy: R.PathPolicy) -> dict:
+    config = policy.check_input(config)  # location first; the config is read only afterwards
+    out = policy.check_output_dir(out)
     expected = json.loads((HERE / "expected_inputs.json").read_text(encoding="utf-8"))
-    paths = {k: Path(v) for k, v in json.loads(Path(config).read_text(encoding="utf-8")).items()}
-    identity = R.verify_identity(paths, expected)
+    paths = {k: Path(v) for k, v in json.loads(config.read_text(encoding="utf-8")).items()}
+    identity = R.verify_identity(paths, expected, policy)
+    paths = {k: policy.check_input(v) for k, v in paths.items()}
     data = load_inputs(paths)
     nodes_xy = data["xyz"][:, :2]
     transfers = {"nearest_node": R.NearestNode(nodes_xy), "bilinear_S4R": R.BilinearQuadMesh(nodes_xy, data["conn"])}
@@ -243,9 +263,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--config", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--input-root", action="append", required=True, type=Path)
+    ap.add_argument("--protected-root", action="append", default=[], type=Path)
+    ap.add_argument("--output-root", required=True, type=Path)
+    ap.add_argument("--forbidden-root", action="append", default=[], type=Path)
     a = ap.parse_args()
     try:
-        r = run(a.config, a.out)
+        policy = make_policy(a.input_root, a.output_root, a.protected_root, a.forbidden_root)
+        r = run(a.config, a.out, policy)
     except R.ResearchRefusal as exc:
         print(f"REFUSED: {exc}")
         sys.exit(2)

@@ -5662,3 +5662,21 @@ first internal provider.
   - unstable: exp 3 and exp 8;
   - not similar: exp 9 and exp 10.
 - **Not done:** no pairing, Auto-ID, LM or fitting. M8, production calibration and D-077 unchanged.
+
+## 2026-10-22 — M11 R6.5a: QA of the research MAC (research result RESEARCH_MAC_COMPUTED; physical registration PENDING)
+
+- **Fail-closed location policy (`PathPolicy`):** the location of the config and of every input is checked before
+  any read or hash.
+  - Refused: original stores, paths outside the input roots, `..` traversal, symbolic links and junctions, hard links,
+    and paths whose real path differs.
+  - Output only inside the declared output root, never in protected roots or the repository.
+  - A guarded live re-run reproduces R6.5 exactly; 4 live refusals.
+- **CI:** the research synthetic tests (29) run in the existing workflow, with a count annotation; the
+  normative tests are unchanged.
+- **Statuses separated:** the research result is `RESEARCH_MAC_COMPUTED`; the physical registration is
+  `PHYSICAL_REGISTRATION_PENDING`. The stale "no shape data / no MAC" statements are marked with their stage, and the
+  R6.5 entry's combined label is superseded by these two statuses.
+- **Independent cross-check:** exp1–FE7, exp2–FE8, exp7–FE14 and exp4/5 in FE 10–11 are reproduced; the full matrix
+  agrees within 6.6e-08.
+- **Protocol provenance:** local execution log only; not an independently verified preregistration.
+- **Unchanged:** M8, production gates, D-077, SPEC v1.2, R7, PR #94 and PR #96.

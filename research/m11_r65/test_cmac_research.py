@@ -3,6 +3,7 @@
 Run: python -m unittest discover -s research/m11_r65 -v
 """
 import math
+import os
 import sys
 import tempfile
 import unittest
@@ -140,23 +141,158 @@ class PointsAndIdentity(unittest.TestCase):
 
     def test_identity_refusals(self):
         with tempfile.TemporaryDirectory() as d:
-            p = Path(d) / "a.bin"
+            root, out = Path(d) / "copies", Path(d) / "out"
+            root.mkdir()
+            policy = R.PathPolicy([root], out, forbidden_roots=[Path(d) / "originals"])
+            p = root / "a.bin"
             p.write_bytes(b"verified")
             good = R.sha256_file(p)
-            self.assertEqual(R.verify_identity({"a": p}, {"a": good}), {"a": good})
+            self.assertEqual(R.verify_identity({"a": p}, {"a": good}, policy), {"a": good})
             with self.assertRaises(R.ResearchRefusal):
-                R.verify_identity({"a": p}, {"a": "0" * 64})
+                R.verify_identity({"a": p}, {"a": "0" * 64}, policy)
             with self.assertRaises(R.ResearchRefusal):
-                R.verify_identity({}, {"a": good})
+                R.verify_identity({}, {"a": good}, policy)
             with self.assertRaises(R.ResearchRefusal):
-                R.verify_identity({"a": p, "b": p}, {"a": good})
+                R.verify_identity({"a": p, "b": p}, {"a": good}, policy)
             with self.assertRaises(R.ResearchRefusal):
-                R.verify_identity({"a": Path(d) / "missing"}, {"a": good})
+                R.verify_identity({"a": root / "missing"}, {"a": good}, policy)
 
     def test_protocol_is_fixed(self):
         self.assertEqual(len(R.PROTOCOL["scenarios"]), 59)
         self.assertEqual(R.PROTOCOL["fe_modes"], list(range(7, 21)))
-        self.assertEqual(len(R.protocol_sha256()), 64)
+        self.assertEqual(R.protocol_sha256(), "74283bde14f6fbf5036276aff2ad7a9eae484a63f0a2c0c5a17e921890dcb48f")
+
+
+class PathGuard(unittest.TestCase):
+    """R6.5a §1: location is checked before any read or hash; temporary directories only (never real originals)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.orig, self.copies, self.work, self.out = (base / n for n in ("originals", "copies", "work", "out"))
+        for p in (self.orig, self.copies, self.work):
+            p.mkdir()
+        self.secret = self.orig / "data.unv"
+        self.secret.write_bytes(b"original")
+        self.copy = self.copies / "data.unv"
+        self.copy.write_bytes(b"original")  # identical bytes: the SHA-256 alone cannot tell copy from original
+        self.sha = R.sha256_file(self.copy)
+        self.policy = R.PathPolicy([self.copies, self.work], self.out, protected_roots=[self.copies],
+                                   forbidden_roots=[self.orig])
+        self._sha = R.sha256_file
+        self.hashed = []
+
+        def spy(path):
+            self.hashed.append(str(path))
+            return self._sha(path)
+        R.sha256_file = spy
+
+    def tearDown(self):
+        R.sha256_file = self._sha
+        self.tmp.cleanup()
+
+    def refused_without_hashing(self, path):
+        with self.assertRaises(R.ResearchRefusal):
+            R.verify_identity({"x": path}, {"x": self.sha}, self.policy)
+        self.assertEqual(self.hashed, [], "a refused location must never be read or hashed")
+
+    def test_identical_original_is_refused_although_its_sha_matches(self):
+        self.refused_without_hashing(self.secret)
+        self.assertEqual(R.verify_identity({"x": self.copy}, {"x": self.sha}, self.policy), {"x": self.sha})
+
+    def test_relative_and_dotdot_traversal_refused(self):
+        self.refused_without_hashing(self.copies / ".." / "originals" / "data.unv")
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.copies)
+            self.refused_without_hashing(Path("..") / "originals" / "data.unv")
+        finally:
+            os.chdir(cwd)
+
+    def test_outside_every_input_root_refused(self):
+        other = Path(self.tmp.name) / "elsewhere.unv"
+        other.write_bytes(b"original")
+        self.refused_without_hashing(other)
+
+    @unittest.skipUnless(os.name == "nt", "case-insensitive file system")
+    def test_case_variant_of_forbidden_root_refused(self):
+        self.refused_without_hashing(Path(str(self.secret).upper()))
+
+    def test_symbolic_link_to_original_refused(self):
+        link = self.copies / "link.unv"
+        try:
+            os.symlink(self.secret, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links not permitted here")
+        self.refused_without_hashing(link)
+
+    def test_linked_directory_component_refused(self):
+        link = self.copies / "dirlink"
+        try:
+            os.symlink(self.orig, link, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links not permitted here")
+        self.refused_without_hashing(link / "data.unv")
+
+    @unittest.skipUnless(os.name == "nt", "NTFS junction")
+    def test_junction_component_refused(self):
+        import _winapi
+        junction = self.copies / "junction"
+        try:
+            _winapi.CreateJunction(str(self.orig), str(junction))
+        except OSError:
+            self.skipTest("junction not permitted here")
+        self.refused_without_hashing(junction / "data.unv")
+
+    def test_hard_link_refused(self):
+        link = self.copies / "hard.unv"
+        try:
+            os.link(self.secret, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("hard links not permitted here")
+        self.refused_without_hashing(link)
+
+    def test_output_locations(self):
+        self.assertEqual(self.policy.check_output_dir(self.out / "run1"), Path(R._norm(self.out / "run1")))
+        for bad in (self.orig / "res", self.copies / "res", self.work / "res", Path(self.tmp.name) / "res",
+                    self.out / ".." / "copies" / "res"):
+            with self.assertRaises(R.ResearchRefusal):
+                self.policy.check_output_dir(bad)
+
+    def test_unsafe_policies_refused(self):
+        for kwargs in ({"input_roots": [self.orig], "output_root": self.out},
+                       {"input_roots": [Path(self.tmp.name)], "output_root": self.out},       # contains the store
+                       {"input_roots": [self.copies], "output_root": self.orig / "o"},
+                       {"input_roots": [self.copies], "output_root": self.copies / "o",
+                        "protected_roots": [self.copies]},
+                       {"input_roots": [self.out / "in"], "output_root": self.out},
+                       {"input_roots": [], "output_root": self.out}):
+            with self.assertRaises(R.ResearchRefusal):
+                R.PathPolicy(forbidden_roots=[self.orig], **kwargs)
+
+    def test_runner_checks_config_location_before_reading(self):
+        import run_m11_r65 as runner
+        cfg = self.orig / "inputs.json"
+        cfg.write_text("{}", encoding="utf-8")
+        reads = []
+        original = Path.read_text
+
+        def spy(path, *a, **k):
+            reads.append(str(path))
+            return original(path, *a, **k)
+        Path.read_text = spy
+        try:
+            with self.assertRaises(R.ResearchRefusal):
+                runner.run(cfg, self.out / "r", self.policy)
+        finally:
+            Path.read_text = original
+        self.assertFalse(any("inputs.json" in r for r in reads))
+        with self.assertRaises(R.ResearchRefusal):
+            runner.make_policy([runner.REPO], self.out, [], [self.orig])  # the repository is never an input root
+        good_cfg = self.work / "inputs.json"
+        good_cfg.write_text("{}", encoding="utf-8")
+        with self.assertRaises(R.ResearchRefusal):
+            runner.run(good_cfg, self.copies / "r", self.policy)  # output into a verified copy root
 
 
 class CandidateEquivalence(unittest.TestCase):

@@ -1,11 +1,17 @@
 # M11 — Single CFRP plate (frequency diagnostics; analysis only)
 
-**Status: `REVIEW_READY` / outcome `FREQUENCY_DIAGNOSTIC_ONLY`.** R6.5 (2026-10-22): **research-only** complex MAC computed (§17), giving `RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING`. There is no pairing and no registration.
+**Status: `REVIEW_READY`.** The outcome of the initial review (2026-10-21) was `FREQUENCY_DIAGNOSTIC_ONLY`.
+
+- **Research result:** `RESEARCH_MAC_COMPUTED` (R6.5, 2026-10-22, §17; QA R6.5a, §17.11). It is
+  RESEARCH_DIAGNOSTIC_ONLY and not a modal pairing.
+- **Physical registration:** `PHYSICAL_REGISTRATION_PENDING` (FE extraction ready since R6). The research MAC
+  does **not** complete it.
 
 - The initial frequency-only review was supplemented by the owner's mass and 20 perimeter thickness readings (§8)
   and verified copies of the LMS/PSV/PolyMAX modal and FRF data (§9): **10 experimental shapes at 289 points**.
-- The experimental first shape is twist-dominated, but no physical FE registration or experimental/FE MAC pairing
-  exists. Laminate layup, measured interior thickness and the complete shaker/suspension setup remain unknown.
+- The experimental first shape is twist-dominated, but no physical FE registration and no accepted
+  experimental/FE mode pairing exists. A research-only complex MAC was computed in R6.5 (§17); it is not a
+  pairing. Laminate layup, measured interior thickness and the complete shaker/suspension setup remain unknown.
 - No material constant was fitted.
 - No FE solve, Abaqus Python, Auto-ID or LM was run. No original was modified.
 - Nothing here is governed evidence.
@@ -102,7 +108,7 @@ and SP-15 a 520 mm plate. Its identity is UNKNOWN.
 
 | Excel `Sample (2)` column | Header | Source | Status |
 |---|---|---|---|
-| B | Exp freq | LMS text values, identical to `Experiment_Freq_damping_LMS_onlyupdated.xlsx` | experimental frequencies only; no shape data file |
+| B | Exp freq | LMS text values, identical to `Experiment_Freq_damping_LMS_onlyupdated.xlsx` | experimental frequencies only; no shape data file (in the Excel workbook, initial review; the shapes were later found in the LMS/PSV copies, §9) |
 | C, first value | Abaq Freq (shell) | `CFRP_S4R_0875_FreeFree`, modes 7–18 | **12 of 12 exact** |
 | C, second value | "shell (thickness)" | `CFRP_S4R_WEDGE_FreeFree` | 9 of 12 exact; **3 transcription slips**: 19.997 for 18.997, 59.383 for 59.389, 61.483 for 61.438 |
 | D | Abaq Freq (plate) | not in any stored result | probably the first `CFRP_C3D8I_0875` run with E 56 000 (replay history; the twist frequency 19.09 equals the stored 19.10; that mode depends almost only on G12, t and ρ, not on E); it was **overwritten** and is not reproducible |
@@ -1598,9 +1604,11 @@ and outputs stay outside Git.
 - subspace invariance to basis rotation, and the rank-deficiency refusal;
 - the fixed protocol.
 
-The protocol (scenarios, methods, pairs, secondary diagnostics) was **declared before the first experimental–FE MAC**:
-SHA-256 `74283bde14f6fbf5036276aff2ad7a9eae484a63f0a2c0c5a17e921890dcb48f`, recorded 2026-10-22T17:15:10+08:00. The results carry the same SHA. No scenario was
-added or removed afterwards.
+The protocol (scenarios, methods, pairs, secondary diagnostics) was fixed in code. Its SHA-256
+`74283bde14f6fbf5036276aff2ad7a9eae484a63f0a2c0c5a17e921890dcb48f` and time 2026-10-22T17:15:10+08:00 were recorded in a **local execution log** before the
+first experimental–FE MAC was run. There is no independent record from before the first computation, so it is
+**not an independently verified preregistration** (R6.5a, §17.11). The results carry the same SHA, and no
+scenario was added or removed afterwards.
 
 ### 17.4 Nominal complex MAC, 10 × 14
 
@@ -1746,7 +1754,8 @@ Two most similar FE shapes per experimental mode (bilinear; [min–max] over the
 
 ### 17.10 Status
 
-**`M11 = RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING`.** All pre-checks, the 18 synthetic tests and the
+**Research result: `RESEARCH_MAC_COMPUTED`. Physical registration: `PHYSICAL_REGISTRATION_PENDING`.** These
+are two separate statuses; the research MAC does not complete the physical registration. All pre-checks, the 18 synthetic tests and the
 A–D equivalence check passed, and the computation completed.
 
 **Unchanged:**
@@ -1762,11 +1771,114 @@ The published figures are derived summaries with no raw experimental arrays, pho
 - `fig_r65_sensitivity.png` `1c2f76aaba084293…`
 - `fig_r65_subspaces.png` `8574ab2519036f18…`
 
+### 17.11 R6.5a (2026-10-22): QA of the research MAC
+
+**SUPERVISOR decision.** The R6.5 results are provisionally accepted as research diagnostics. The MAC matrices are
+**not** an accepted modal pairing. No new scientific step was taken: no scenario, axis, phase or method was changed.
+
+**1. Protection of the originals (fail-closed location policy).** `verify_identity()` checked only SHA-256, and an
+original and its identical copy have the same SHA-256. `cmac_research.PathPolicy` now checks **location first**:
+
+- **Lexical check, without touching the file system.** The path is made absolute and normalised, with `..` and
+  relative paths resolved and case folded. It is refused if it lies in an original store or outside every declared
+  input root:
+  - the original stores are `C:\temp`, `D:\Snadwich`, `I:\Sumin`, the Desktop and any `--forbidden-root`;
+  - the declared input roots are the verified copy root and the derived work root.
+- **Only then:**
+  - any symbolic link or junction in any path component is refused;
+  - a hard link (more than one name) is refused;
+  - a real path that differs from the checked path is refused;
+  - anything that is not a regular file is refused.
+- **Only after every input has passed is any file hashed.**
+- **The config file** is checked the same way before it is read.
+- **Output** is allowed only inside `--output-root`, and never in an original store, a protected root (verified V3
+  copy, R6 extraction) or the repository.
+- **Unsafe policies are refused:**
+  - a root overlapping an original store;
+  - an output root overlapping a protected root;
+  - an input root inside the output root;
+  - the repository as an input root.
+- **Live run on the verified copies** (output in a separate QA directory): it reproduces R6.5 **exactly**, with
+  maximum difference 0.0 for every MAC and subspace value and the same protocol SHA.
+- **Live refusals**, each with exit 2 and nothing read or written:
+  - output into the V3 copy root;
+  - an output root inside it;
+  - a config in the repository;
+  - a config reached through `..`.
+- **No original was opened, read or hashed in any test or run.** The tests use temporary directories only.
+
+**2. The research tests in CI.**
+
+- **The existing workflow** `.github/workflows/tests.yml` gains a separate step: `python -m unittest discover -s
+  research/m11_r65 -v`. It needs no real data.
+- **Proof that it runs:** the step publishes the number of tests it ran as a CI annotation and fails if no test ran.
+  The log is uploaded with the existing artifact.
+- **Unchanged:** the normative `tests/` suite and its criteria.
+- **Count:** 29 synthetic tests (18 from R6.5 plus 11 path-guard tests). On Windows all of them run, including
+  the symbolic-link, junction and hard-link refusals. On the Linux CI runner the junction and case-folding tests are
+  skipped (Windows-only).
+
+**3. Statuses separated.** The research result is **`RESEARCH_MAC_COMPUTED`**. The physical registration is
+**`PHYSICAL_REGISTRATION_PENDING`**. The research MAC does not complete the physical registration.
+
+- The header, §3 (Excel column B: "no shape data file" refers to the Excel workbook in the initial review; the shapes
+  were later found, §9), §17.10, §18, the JSON labels and STATUS.json are corrected.
+- Historical statements are kept and marked with the stage they belong to.
+
+**4. Independent control of selected values.**
+
+- **Method:** a separate, simple implementation (`runs\m11_carbon_plate\tools\r65a_crosscheck.py`, SHA-256
+  `8db1e376050e1802…`). It uses plain sums, Gram–Schmidt, a brute-force nearest node and structured-grid
+  bilinear interpolation.
+- **It does not use** `cmac()`, `subspace_projection()`, the k-d tree or the Newton inverse.
+- **It uses the same** sources (SHA-256 re-checked), U3 mask, diagnostic geometry and convention D.
+
+| Value | Independent | R6.5 | Difference |
+|---|---|---|---|
+| nearest_node: exp 1 - FE 7 | 0.830950 | 0.830950 | 1.1e-16 |
+| nearest_node: exp 2 - FE 8 | 0.702968 | 0.702968 | 3.3e-16 |
+| nearest_node: exp 7 - FE 14 | 0.732704 | 0.732704 | 0.0e+00 |
+| nearest_node: exp 4 in FE 10-11 | 0.620409 | 0.620409 | 5.6e-16 |
+| nearest_node: exp 5 in FE 10-11 | 0.585467 | 0.585467 | 3.3e-16 |
+| bilinear_S4R: exp 1 - FE 7 | 0.831117 | 0.831117 | 6.3e-09 |
+| bilinear_S4R: exp 2 - FE 8 | 0.699359 | 0.699359 | 5.9e-09 |
+| bilinear_S4R: exp 7 - FE 14 | 0.735597 | 0.735597 | 2.5e-10 |
+| bilinear_S4R: exp 4 in FE 10-11 | 0.619440 | 0.619440 | 4.8e-09 |
+| bilinear_S4R: exp 5 in FE 10-11 | 0.589182 | 0.589182 | 2.0e-08 |
+
+Full 10 × 14 matrix: maximum difference 3.3e-16 (nearest node) and
+6.6e-08 (bilinear). The bilinear difference comes from the
+coordinate rounding in the independent grid lookup. **No discrepancy.**
+
+**5. Provenance of the protocol.** The protocol SHA-256 `74283bde14f6fbf5…` and its time
+2026-10-22T17:15:10+08:00 are recorded in a **local execution log** (`runs\m11_carbon_plate\r65\PROTOCOL_DECLARED.json`),
+written before the first experimental–FE MAC was run.
+
+- No independent record was created before the first computation: the first Git commit containing the protocol came
+  after it.
+- So the protocol is **not** an independently verified preregistration.
+- The 59 scenarios and the R6.5 interpretation are unchanged.
+
+**Residual limitations:**
+
+- The location policy cannot detect a file that was **copied** (not linked) out of an original into an allowed root.
+  That is prevented by the copy manifests and the SHA-256 check against them.
+- The path check is about where a file lies, not about its content history.
+- Drive substitutions (`subst`) and network mappings are not resolved beyond `realpath`.
+- The research tests run in CI on Linux, so the Windows-only junction and case tests run locally only.
+- The bilinear transfer still relies on the INP connectivity as a research hypothesis (NODES_AND_INP_CONTENT).
+- Nothing about the physical registration has changed:
+  - PHYSICAL_FE_ORIENTATION = NOT_DETERMINED;
+  - SCANNER_FACE = HUMAN_CONFIRMATION_PENDING;
+  - the scan calibration is diagnostic.
+- M8, the production gates, D-077 and SPEC v1.2 are unchanged.
+
 ## 18. What did not change
 
 - SPEC, DECISIONS, EVIDENCE, registrations, criteria and gates.
 - Every original and every earlier copy.
 - Branch `analysis/m10-sp10-registration-prep` and PR #94.
-- No FE solve, no Auto-ID or LM, no MAC, no material change. Abaqus Python: exactly one authorised extraction run
+- No FE solve, no Auto-ID or LM, no governed MAC, no material change. Until R6.4 no MAC was computed at all;
+  R6.5 computed a research-only complex MAC (§17). Abaqus Python: exactly one authorised extraction run
   (R6) on a working copy of `CFRP_S4R_0875_FreeFree.odb`; no other ODB was opened.
 - M8 original gate `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE.

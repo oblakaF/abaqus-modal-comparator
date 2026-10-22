@@ -2059,16 +2059,17 @@
   },
   "m11_single_cfrp_plate": {
     "status": "REVIEW_READY",
-    "outcome": "FREQUENCY_DIAGNOSTIC + EXPERIMENTAL_MODE_TYPES (no FE pairing confirmed)",
+    "outcome": "FREQUENCY_DIAGNOSTIC + EXPERIMENTAL_MODE_TYPES (no FE pairing confirmed) [initial review 2026-10-21]",
     "kind": "SUPERVISOR analysis task (2026-10-21), outside the Auto-ID mini-step sequence; no stage started",
     "branch": "analysis/m11-single-carbon-plate",
     "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
     "report": "docs/reconciliation/M11_SINGLE_CFRP_PLATE.md",
-    "summary": "plate 301 x 300, thickness / mass / layup UNKNOWN; four free-free FE jobs (S4R 0.875, S4R wedge, C3D8I, manual fit E30E26); experimental rank 1 33.45 Hz vs 19.07 Hz in the template models (-43 %); if it is the twist mode, D66/(rho h) is about 3.08x the model value (scaling, not identification); no shape data file, no pairing confirmed, no transfer to the sandwich faces",
-    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, criteria, gates; originals and earlier copies; M10 branch and PR #94; no FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no fitting",
+    "summary": "[initial review 2026-10-21; shape data were later found (§9) and a research-only MAC was computed (R6.5)] plate 301 x 300, thickness / mass / layup UNKNOWN; four free-free FE jobs (S4R 0.875, S4R wedge, C3D8I, manual fit E30E26); experimental rank 1 33.45 Hz vs 19.07 Hz in the template models (-43 %); if it is the twist mode, D66/(rho h) is about 3.08x the model value (scaling, not identification); no shape data file, no pairing confirmed, no transfer to the sandwich faces",
+    "unchanged": "[initial review 2026-10-21] SPEC v1.2, DECISIONS, EVIDENCE, registrations, criteria, gates; originals and earlier copies; M10 branch and PR #94; no FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no fitting; since R6.5: a research-only complex MAC was computed (not governed, not a pairing)",
     "owner_measurements": "2026-10-21: mass 118.37 g, 301 x 300 mm, edge thickness 0.71-0.94 (mean 0.876) mm; HUMAN record",
     "experiment": "D:\\Snadwich\\Plate copied (5 files); PolyMAX Polymax_bravo 10 modes / 289 pt; scan reconstruction with 3 recorded deviations; experimental mode 1 = twist (33.45 Hz)",
-    "registration_state": "RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING (R6.5, 2026-10-22)",
-    "research_mac": "R6.5: research-only complex MAC 10 x 14 (polymax-bravo x FE 7-20), RESEARCH_DIAGNOSTIC_ONLY / COMPUTATIONAL_CONVENTION_ONLY / NO_ACCEPTED_PHYSICAL_REGISTRATION; no pairing, no registration, nothing passed to Auto-ID / LM"
+    "registration_state": "PHYSICAL_REGISTRATION_PENDING (FE extraction ready since R6, 2026-10-21; not completed by the R6.5 research MAC)",
+    "research_mac": "R6.5: research-only complex MAC 10 x 14 (polymax-bravo x FE 7-20), RESEARCH_DIAGNOSTIC_ONLY / COMPUTATIONAL_CONVENTION_ONLY / NO_ACCEPTED_PHYSICAL_REGISTRATION; no pairing, no registration, nothing passed to Auto-ID / LM",
+    "research_result": "RESEARCH_MAC_COMPUTED (R6.5, 2026-10-22; QA R6.5a)"
   }
 }

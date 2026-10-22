@@ -18,9 +18,21 @@ jobs:
         run: |
           set -o pipefail
           python -m unittest discover -s tests -v 2>&1 | tee test-results.txt
+      - name: Run M11 R6.5 research synthetic tests (no real data)
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m unittest discover -s research/m11_r65 -v 2>&1 | tee research-test-results.txt
+          count=$(grep -oE '^Ran [0-9]+ test' research-test-results.txt | grep -oE '[0-9]+')
+          skipped=$(grep -cE '\.\.\. skipped' research-test-results.txt || true)
+          echo "::notice title=M11 R6.5 research tests::Ran ${count} research tests (${skipped} skipped on this platform)"
+          test "${count:-0}" -gt 0
       - name: Upload test log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: python-test-results
-          path: test-results.txt
+          path: |
+            test-results.txt
+            research-test-results.txt
