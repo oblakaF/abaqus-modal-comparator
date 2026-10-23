@@ -5432,3 +5432,75 @@ first internal provider.
   NO_GLOBAL_PARAMETER_VALUE (D-077).
 - **Files changed:** `docs/reconciliation/M9_SIX_SPECIMENS.md` (new), `docs/reconciliation/M9_SIX_SPECIMENS.json` (new), STATUS,
   ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-21 — R7 zero-frequency safety and shell mid-surface guard (REVIEW_READY; branch fix/r7-shell-modal-safety)
+
+- **R7-A:**
+  - root cause: the pinned `extract_odb.py` writes `frameValue` (the mode number) as the frequency of a
+    zero-frequency frame;
+  - the script is pinned (governed extraction identity) and is unchanged;
+  - `abaqus_bridge.load_extracted_odb` refuses, per mode, a manifest frequency contradicted by the frame description
+    or EIGFREQ, records why (with the independent value) and substitutes nothing;
+  - an extractor patch is proposed for a re-pin decision.
+- **R7-B:**
+  - new `services/shell_surface.py` (element types and normals from INP text; degenerate-surface detection);
+  - the guided registration refuses a confirmed conventional shell and states the limitation for a degenerate surface
+    of unknown type;
+  - an explicit shell-face field is proposed, not implemented (governed passport schema).
+- **Tests:** 18 new tests. The store-gated SP-02 / SP-13 tests were not run because they need the original
+  `D:\Snadwich`.
+- No Abaqus, no FE solve, no rule, threshold or gate change; no merge.
+
+## 2026-10-21 — R7 R1: corrections after the SUPERVISOR audit (REVIEW_READY; PR #96)
+
+- **R7-A:** the loader checks the mutual consistency of the manifest frequency, the frame description and a reliable
+  (EIGVAL-consistent) EIGFREQ.
+  - A manifest and description that agree while EIGFREQ contradicts them are now refused per mode.
+  - Nothing is substituted; legacy single-record values are unchanged.
+  - R6: modes 1–2 are refused; modes 3–20 load.
+- **OD-R7-1 (open, governed):** the extractor pin `039aa067…` is a CRLF hash; the LF blob is `043e89e1…`. It is
+  recorded as a fact in the tests and the report; the pin is not changed.
+- **R7-B:** the optional element hint is replaced by a fail-closed gate in the real GUI path.
+  - A flat measured surface needs the model's INP, bound node for node.
+  - A bound shell needs `shell_measured_face` consistent with the uniform normal and the axes' Z sign.
+  - Contradictions and mirrored axes are refused.
+  - Saved flat-surface records without a binding are not applied.
+  - `parse_geometry_calibration`, the governed passports, SPEC v1.2, thresholds and gates are unchanged.
+- **Tests:** 31 R7 tests; the guided tests supply a bound solid INP for the synthetic flat instances.
+  - The baseline issue `test_v12_i5_contract_closure` is a cross-class order dependency (unittest alphabetical vs
+    pytest definition order); it is not fixed.
+  - The store-gated SP-02 / SP-13 tests were not run: their inputs are not in V2 / V3, and the originals may not be
+    opened.
+
+## 2026-10-21 — R7 R2: re-application of saved guided registrations is fail-closed (REVIEW_READY; PR #96)
+
+- **Re-verification:** `verify_for_files(..., fe_input=...)` re-runs the complete shell gate for every
+  single-z-level measured surface:
+  - the record must carry the v2 binding, so R7 / R7 R1 records are refused;
+  - the INP must be supplied again, so a recorded `bound = true` alone is refused;
+  - the INP SHA-256 must be the recorded one;
+  - node-for-node binding, element types, normals, `connectivity_sha256`, the saved shell face, the Z sign and the
+    determinant (from the axes and from the registration rotation) are checked again;
+  - the binding must reproduce the record exactly.
+- **Real path:** Apply keeps the INP path; the worker re-reads it before every analysis; dialog reopen uses the located
+  INP.
+- **Provenance (requirement 6):** the node match proves only the INP's nodes; the INP-to-ODB link is NOT proven and is
+  recorded as `fe_model_identity`. The required provenance (an ODB connectivity export after a re-pin, or `odb.jobData`
+  via Abaqus Python) is defined, not implemented.
+- **Tests:** 41 R7 tests, plus GUI / worker refusal cases.
+- **Unchanged:** non-flat solid registrations, governed paths, the pinned extractor and OD-R7-1.
+
+## 2026-10-23 — R7 FINAL: integration-readiness check of PR #96 (documentation only; not merged)
+
+- **Documents brought in line with the completed R7 R2 scope:**
+  - report header and history: R7 R1 `fa3a2e3`, R7 R2 `f6df6f4`;
+  - files heading;
+  - the GUI guide's re-application rules;
+  - STATUS `final_check`.
+- **Git:** 4 commits on main `aa08ad9`, 0 behind; no conflict with main; no M10 / M11 file and no data.
+- **Tests:**
+  - unittest: R7 2497 OK, 96 skipped; main 2455 OK, 96 skipped; the same skipped set.
+  - pytest: one baseline failure (`test_v12_i5_contract_closure`), identical on main.
+  - The store-gated real-data SP-02 / SP-13 tests were not run.
+- **Unchanged:** the pinned extractor and its hash, `physical_registration.py`, SPEC v1.2, passports, thresholds and
+  production gates. OD-R7-1 open; FE_MODEL_IDENTITY = NODES_AND_INP_CONTENT.
