@@ -5504,3 +5504,30 @@ first internal provider.
   - The store-gated real-data SP-02 / SP-13 tests were not run.
 - **Unchanged:** the pinned extractor and its hash, `physical_registration.py`, SPEC v1.2, passports, thresholds and
   production gates. OD-R7-1 open; FE_MODEL_IDENTITY = NODES_AND_INP_CONTENT.
+
+## 2026-10-23 — R7 merged; APP-E2E.1 post-R7 program end-to-end acceptance (REVIEW_READY)
+
+- **R7 integrated:** PR #96 merged into `main` as `fb7063ab1342095e24cf3c239e8c865e4e6a618d`; push CI run 39941547107
+  on it: success. R7 status MERGED, programmatic diagnostics accepted; OD-R7-1 remains open.
+- **CI stabilisation (tests only):**
+  - `test_no_full_model_contamination` is now a structural check instead of a substring search over random hashes.
+    This is the test logic of PR #95 commit `43fe2e7` (same file blob; the same change is in open PR #95). It passed
+    2400 / 2400 repeats; the old check failed 4 / 400.
+  - `test_v12_i5_contract_closure`: the calibration-vs-material test builds the shared campaigns before using them,
+    so it no longer depends on test order.
+- **Program check (`docs/gui/POST_R7_PROGRAM_E2E_ACCEPTANCE.md`):**
+  - clean `RUN_PROGRAM.cmd` launch;
+  - real-window scenarios on verified copies: SP-02 / SP-13 accepted comparisons reproduce their pairs and reports;
+  - the plate without physical registration, a new SP-13 FE geometry and a damaged UNV end in stated diagnostics
+    without pairing or MAC;
+  - diagnostic and comparison PDF / Excel reports were opened again and checked;
+  - R7-A refuses the false rigid-mode frequency records of the real R6 package.
+  Verdict `APP_DIAGNOSTIC_E2E_READY`.
+- **Open:**
+  - P-1: an input change does not clear the shown result; exports stay bound to the analysed inputs; not fixed here.
+  - The store-gated real-data regressions were NOT_RUN.
+- **Tests:** unittest 2501 OK / 96 skipped; pytest 2440 passed / 112 skipped / 0 failed.
+- **Unchanged:**
+  - production code, SPEC v1.2, passports, thresholds, gates, the pinned extractor and its hash, M10 / M11 data;
+  - M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production calibration BLOCKED / NOT_AUTHORISED.
+  - No Abaqus solve or extraction was run.
