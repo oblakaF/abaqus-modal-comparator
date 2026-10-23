@@ -347,6 +347,9 @@ class GuidedRegistrationDialog:
     def clear(self) -> None:
         self.app._guided_registration = None
         self.app._guided_fe_input_path = None
+        check = getattr(self.app, "_check_analysis_inputs", None)
+        if callable(check):  # P-1: a result computed with the cleared registration is no longer active
+            check()
         self._invalidate()  # a build still running never brings a result back
         self._set_status("No guided registration is applied; the next analysis uses automatic geometry registration.")
 

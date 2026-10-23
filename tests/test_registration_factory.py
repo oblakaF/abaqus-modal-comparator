@@ -4,6 +4,7 @@ import copy
 import dataclasses
 import json
 from pathlib import Path
+import re
 import sys
 import tempfile
 import unittest
@@ -273,12 +274,95 @@ class UnambiguousGeometryTests(FactoryFixture):
     def test_no_full_model_contamination(self):
         result = self.unique_result()
         registration = build_frozen_registration(result, calibration=CALIBRATION)
-        encoded = json.dumps(registration.to_dict()).lower()
-        for token in ("d11", "\"ex\"", "basis_km_hash", "stiffness", "material", "mac", "frequency"):
-            with self.subTest(token):
-                self.assertNotIn(token, encoded)
+        self.assertEqual(full_model_contamination(registration.to_dict()), [])
         names = {field.name for field in dataclasses.fields(registration)}
         self.assertFalse({"stiffness", "basis_km_hash", "material_parameters", "model_template"} & names)
+
+    def test_contamination_check_on_the_real_registration_is_not_fooled_by_hashes_or_paths(self):
+        # The former substring search failed when "d11" occurred inside the SHA-256 registration_hash (CI run
+        # 39757688944). Allowed values that merely contain such letters must pass; real fields must not.
+        result = self.unique_result()
+        clean = build_frozen_registration(result, calibration=CALIBRATION).to_dict()
+        for k, value in enumerate(("ad11" + "0" * 60, "0" * 60 + "d11a", "mac0" * 16, "ex" + "f" * 62)):
+            with self.subTest(hash=value):
+                record = copy.deepcopy(clean)
+                record["registration_hash"] = value
+                record["calibration_fingerprint"] = value[::-1]
+                record["experimental_source_identity"]["path"] = str(
+                    Path(tempfile.gettempdir()) / f"tmpd11mac{k}" / "frequency_d11_material.unv")
+                self.assertEqual(full_model_contamination(record), [])
+        for injected in ({"D11": 1.0}, {"Ex": 2.0e5}, {"basis_km_hash": "abc"}, {"stiffness": [[1.0]]},
+                         {"material_parameters": {"E1": 1.0}}, {"frequency_hz": [21.0]}, {"mac_matrix": [[1.0]]}):
+            with self.subTest(injected=injected):
+                record = copy.deepcopy(clean)
+                record["registration_metrics"]["nested"] = [dict(injected)]
+                self.assertNotEqual(full_model_contamination(record), [])
+
+
+FULL_MODEL_KEY_TOKENS = frozenset({
+    "d11", "d12", "d16", "d22", "d26", "d66", "a11", "a22", "a66", "ex", "ey", "ez", "e1", "e2", "e3",
+    "g12", "g13", "g23", "nu12", "nu13", "nu23", "stiffness", "material", "materials", "basis", "km",
+    "frequency", "frequencies", "eigenvalue", "eigenvalues", "mac", "pairing", "pairs"})
+FULL_MODEL_KEYS = frozenset({"basis_km_hash", "material_parameters", "model_template"})
+
+
+def _name_tokens(name: str) -> set:
+    return {t for t in re.split(r"[^a-z0-9]+", name.lower()) if t}
+
+
+def full_model_contamination(record, path: str = "") -> list:
+    """Full-FE-model data inside a serialised registration, judged by STRUCTURE, not by substrings.
+
+    Every dictionary key is checked at every depth: a key whose name, or one of its word tokens, names material,
+    stiffness, basis, frequency or modal-pairing data is reported. A string value is reported only if it IS such a
+    name or carries an embedded JSON object or array that contains one; letters inside a hash, a temporary file
+    name or any other allowed value never count.
+    """
+    found = []
+    if isinstance(record, dict):
+        for key, value in record.items():
+            name = str(key)
+            where = f"{path}/{name}"
+            if name.lower() in FULL_MODEL_KEYS or _name_tokens(name) & FULL_MODEL_KEY_TOKENS:
+                found.append(where)
+            found += full_model_contamination(value, where)
+    elif isinstance(record, (list, tuple)):
+        for k, value in enumerate(record):
+            found += full_model_contamination(value, f"{path}[{k}]")
+    elif isinstance(record, str):
+        text = record.strip()
+        if text.lower() in FULL_MODEL_KEYS or text.lower() in FULL_MODEL_KEY_TOKENS:
+            found.append(f"{path}={text!r}")
+        elif text[:1] in "{[":
+            try:
+                embedded = json.loads(text)
+            except ValueError:
+                embedded = None
+            if isinstance(embedded, (dict, list)):
+                found += full_model_contamination(embedded, f"{path}<json>")
+    return found
+
+
+class FullModelContaminationCheckTests(unittest.TestCase):
+    """Synthetic positive and negative cases of the structural check (no registration needed)."""
+
+    def test_allowed_values_with_suspicious_letters_pass(self):
+        record = {"registration_hash": "81ef36d11c" + "a" * 54, "path": "/tmp/tmpd11xyz/mac_frequency.unv",
+                  "orientation_candidate_id": "geometry-d11mac", "registration_metrics": {"matched_fraction": 1.0,
+                  "mapping_max_residual": 0.0, "experimental_point_count": 15}, "rows": [{"node": "PLATE-1:1"}],
+                  "provenance": "stiffness of the clamp is not modelled"}
+        self.assertEqual(full_model_contamination(record), [])
+
+    def test_forbidden_fields_are_found_at_any_depth(self):
+        for record in ({"D11": 1.0}, {"a": {"b": [{"Ex": 1.0}]}}, {"basis_km_hash": "x"},
+                       {"material_parameters": {}}, {"model_template": "t"}, {"x": {"frequency_hz": 1.0}},
+                       {"mode_pairs": []}, {"mac": 0.9}, {"stiffness_matrix": [[1.0]]}, {"E1": 1.0},
+                       {"x": "material"}, {"x": '{"D66": 3.0}'}, {"x": ["[{\"mac\": 0.9}]"]}):
+            with self.subTest(record=record):
+                self.assertNotEqual(full_model_contamination(record), [])
+
+    def test_report_names_the_location(self):
+        self.assertEqual(full_model_contamination({"a": [{"D11": 1.0}]}), ["/a[0]/D11"])
 
 
 class ConfirmationPolicyTests(FactoryFixture):
