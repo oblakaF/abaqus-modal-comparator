@@ -150,6 +150,13 @@
       "pr": 59,
       "merge_commit": "149debc3172cb4adb3ba6fcc48635b770340783e",
       "status": "ACCEPTED scope READ_ONLY_EXISTING_JOURNALLED_RUNS (D-079); M8 stage IN_PROGRESS; original M8 GATE NOT_MET"
+    },
+    {
+      "stage": "R7 modal-frequency consistency guard and fail-closed diagnostic shell registration",
+      "kind": "program safety fix (not a roadmap stage)",
+      "pr": 96,
+      "merge_commit": "fb7063ab1342095e24cf3c239e8c865e4e6a618d",
+      "status": "MERGED; programmatic diagnostics accepted; OD-R7-1 open"
     }
   ],
   "m1": {
@@ -618,7 +625,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of analysis/m10-sp10-registration-prep (M10 SP-10 registration preparation REVIEW_READY / READY_FOR_HUMAN_CONFIRMATION, not merged); owner answers to Q1-Q8 required before any SP-10 registration. M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
+  "next_action": "STOP: SP-10 physical registration awaits the owner's confirmation (M10 READY_FOR_HUMAN_CONFIRMATION: answers to Q1-Q8, SP-10 ODB extraction for the FE geometry identity as a HUMAN gate, treatment of the 34 doubled point pairs, acceptance of the 260831 one-constant deviation); no SP-10 registration before that. M10 branch updated with main (PR #94 not merged; merging it needs the owner's decision); M11 (PR #95) integration pending. M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production Auto-ID / calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -2075,5 +2082,61 @@
       "260831: acceptance of the one-constant method deviation"
     ],
     "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, passports, frozen observations, criteria, gates, registration services; no FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no frequency pairing; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE"
+  },
+  "r7_shell_modal_safety": {
+    "status": "MERGED",
+    "branch": "fix/r7-shell-modal-safety",
+    "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
+    "report": "docs/reconciliation/R7_SHELL_MODAL_SAFETY.md",
+    "summary": "loader refuses any frequency record contradiction per mode (manifest / description / reliable EIGFREQ), nothing substituted; fail-closed shell gate in the real GUI path: flat measured surface needs a node-for-node bound INP, bound shell needs a consistent shell_measured_face; saved flat records without a binding are not applied; R2: every re-application of a flat / shell registration re-runs the full shell gate against the re-supplied INP (sha, nodes, types, connectivity, normals, face, Z sign, determinant) and must reproduce the recorded v2 binding; INP-to-ODB link recorded as NOT proven",
+    "unchanged": "pinned extract_odb.py and its pin, physical_registration.py, parse_geometry_calibration, governed passports, SPEC v1.2, thresholds, production gates",
+    "revision": "R7 R2 (re-application of saved registrations fail-closed)",
+    "pr": 96,
+    "open_decisions": [
+      "OD-R7-1: PINNED_EXTRACT_SCRIPT_SHA256 is a CRLF hash (LF blob 043e89e1...); re-pin options in R7_SHELL_MODAL_SAFETY.md",
+      "extractor root-cause patch depends on the re-pin"
+    ],
+    "final_check": "R7 FINAL 2026-10-23: documentation synchronised with R7 R2; 4 commits on main aa08ad9, 0 behind, no merge conflict with main; unittest 2497 OK / 96 skipped (main 2455 / 96, same skips); pytest 1 baseline failure identical on main; store-gated SP-02 / SP-13 real-data tests not run; not merged; PR #96 draft",
+    "acceptance": "programmatic diagnostics accepted by the SUPERVISOR (APP-E2E.1 instruction, 2026-10-23); PR #96 merged to main",
+    "main_merge": "fb7063ab1342095e24cf3c239e8c865e4e6a618d",
+    "main_ci": "push run 39941547107 on fb7063a: success (Run unit tests)"
+  },
+  "app_e2e_1_post_r7_program_smoke": {
+    "title": "APP-E2E.1: main stabilisation and end-to-end program check after R7",
+    "status": "REVIEW_READY",
+    "verdict": "APP_DIAGNOSTIC_E2E_READY",
+    "kind": "program acceptance (not a scientific stage; no M8 / M11 step)",
+    "branch": "integration/post-r7-program-smoke",
+    "base": "fb7063ab1342095e24cf3c239e8c865e4e6a618d",
+    "report": "docs/gui/POST_R7_PROGRAM_E2E_ACCEPTANCE.md",
+    "test_fixes": [
+      "test_registration_factory: structural full-model contamination check (test logic of PR #95 commit 43fe2e7, identical blob fa9e241; the same change is in open PR #95)",
+      "test_v12_i5_contract_closure: test_a_calibration_pass_does_not_change_the_material_verdict builds the shared campaigns through FamilyConsistencyTests.reports() before using them (order-independent)"
+    ],
+    "unchanged": "src/, SPEC v1.2, passports, registrations, MAC / registration algorithms, thresholds, production gates, pinned extractor and PINNED_EXTRACT_SCRIPT_SHA256, M10 / M11 data, PR #94 / #95",
+    "abaqus": "0 solves, 0 extractions (every process start refused in the GUI runs)",
+    "open": "OD-R7-1 open; M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production calibration BLOCKED / NOT_AUTHORISED",
+    "results": "RUN_PROGRAM.cmd clean launch: main window, no traceback, closes cleanly; GUI scenarios on verified copies: A1 SP-02 and A2 SP-13 accepted registrations reproduce the accepted strict pairs and the CORE-E2E reports; B1 plate (no physical registration), B2 new SP-13 FE geometry, B3 damaged UNV: stated diagnostics, no pair, no MAC, diagnostic PDF / Excel verified; R7-A refuses the false 1.0 / 2.0 Hz records of the real R6 package; unittest 2501 OK / 96 skipped, pytest 2440 passed / 112 skipped / 0 failed",
+    "open_program_issues": [
+      "P-1: FIXED in APP-E2E.2 (app_e2e_2_p1_stale_results); was: changing an input after an analysis did not clear the shown result (table, cards, enabled exports)"
+    ],
+    "not_run": "store-gated real-data regressions (snadwich, carbon-project-archive, sumin, M7 run A / B stores): NOT_RUN"
+  },
+  "app_e2e_2_p1_stale_results": {
+    "title": "APP-E2E.2: P-1 fixed - a result whose inputs changed is never left active",
+    "status": "REVIEW_READY",
+    "verdict": "APP_E2E_P1_READY_FOR_SUPERVISOR_REVIEW",
+    "kind": "program fix (not a scientific stage)",
+    "branch": "integration/post-r7-program-smoke",
+    "pr": 97,
+    "base": "e0e5768bf9afc74e7aa975974ff9aa3c1290055c",
+    "report": "docs/gui/POST_R7_PROGRAM_E2E_ACCEPTANCE.md section 9",
+    "change": "src/ui_workflow.py: the inputs of a run are recorded at Run and traced; any change of an input that defines the result (FE / experimental file, mode range, modal set, calibration fields, accepted-registration option, guided registration, confirmed orientation) applies the existing reset of a new run (result / cache None, presentation and mode views cleared, exports disabled) and states 'Run the analysis again'; an outcome whose inputs changed while it ran is discarded; workspace, Abaqus command and display preferences keep the result; src/guided_registration_ui.py clear() requests the same check",
+    "tests": "tests/test_app_p1_stale_results.py: 14 tests (11 subtests), real main window, synthetic data; 20 failures on the unfixed code; unittest 2515 OK / 96 skipped (three runs); pytest 2454 passed / 112 skipped / 0 failed",
+    "gui": "real Windows window on verified copies, no process: SP-02 comparison 27/27, SP-13 comparison 21/21, plate FREQUENCY_ONLY_DIAGNOSTIC 29/29 (change, cleared, export disabled, earlier reports kept, new run shown and exported)",
+    "unchanged": "MAC and pairing, physical / guided registration logic, SPEC v1.2, thresholds, Auto-ID and production gates, pinned extractor, M10 / M11 data, PR #94 / #95",
+    "abaqus": "0 solves, 0 extractions",
+    "not_run": "store-gated real-data regressions: NOT_RUN",
+    "open": "P-2, P-3 (not in scope); OD-R7-1 open; M8 GATE NOT_MET"
   }
 }

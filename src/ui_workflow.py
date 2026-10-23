@@ -88,6 +88,22 @@ DIAGNOSTIC_SHAPE_MESSAGE = (
     "No accepted mode pairs.\n"
     "See MAC and frequencies / Manual review for diagnostic candidates."
 )
+# P-1: the inputs that define a computed result (comparison or diagnostic). Changing any of them makes the shown
+# result inactive. The workspace, the Abaqus command and display preferences do not change the result.
+ANALYSIS_INPUT_VARIABLES = (
+    "abaqus_path", "experimental_path", "start_mode", "end_mode", "coordinate_scale_text",
+    "experimental_modal_set_key", "use_governed_registration", "abaqus_model_unit", "experimental_coordinate_unit",
+    "experimental_unit_source", "coordinate_mapping_mode", "custom_coordinate_scale", "camera_scan_coverage",
+    "camera_physical_width", "camera_physical_height", "camera_dimension_unit", "calibration_provenance",
+)
+STALE_RESULT_MESSAGE = (
+    "Inputs changed after the analysis: the previous result is no longer active and cannot be exported. "
+    "Run the analysis again."
+)
+DISCARDED_RESULT_MESSAGE = (
+    "Inputs changed while the analysis was running: its result was discarded and cannot be exported. "
+    "Run the analysis again."
+)
 
 
 CONFIDENT_PAIR_STATUSES = ("Excellent match", "Good match")
@@ -1259,7 +1275,11 @@ def install_responsive_workflow(app_module) -> None:
             return
         values = self._validate()
         if values is None:
+            self._check_analysis_inputs()  # e.g. a registration was set but the run was refused
             return
+        self._watch_analysis_inputs()
+        self._analysis_inputs = self._analysis_input_signature()  # the inputs of the result this run will show
+        self._stale_result_notice = None
         self._analysis_cancel_event = threading.Event()
         self._owned_analysis_process = None
         self._automatic_admissible_pair_count = None
@@ -1282,6 +1302,7 @@ def install_responsive_workflow(app_module) -> None:
     def cancelled(self) -> None:
         self.running = False
         self.progress.stop()
+        self._analysis_inputs = None
         self.result = None
         self.cache = None
         self._clear_result_presentation("Analysis stopped by user.")
@@ -1709,6 +1730,7 @@ def install_responsive_workflow(app_module) -> None:
         self._update_project_indicator()
 
     def on_persistent_change(self, *_args) -> None:
+        self._check_analysis_inputs()  # also a confirmed orientation, which is not a Tk variable
         self._sync_coordinate_mapping()
         self.dirty_tracker.update(self._persistent_snapshot())
         self._update_project_indicator()
@@ -2068,7 +2090,90 @@ def install_responsive_workflow(app_module) -> None:
         if self.running:
             return
         ready = bool(self.abaqus_path.get().strip() and self.experimental_path.get().strip())
-        self._set_analysis_state(AnalysisState.READY if ready else AnalysisState.NO_DATA)
+        self._set_analysis_state(AnalysisState.READY if ready else AnalysisState.NO_DATA,
+                                 getattr(self, "_stale_result_notice", None))
+
+    def analysis_input_signature(self) -> tuple:
+        """P-1: the values of every input that defines the computed result (raw text, so a half-typed entry counts)."""
+        values = []
+        for name in ANALYSIS_INPUT_VARIABLES:
+            variable = getattr(self, name, None)
+            try:  # the raw text, as StringVar.get() reads it, from the variable's own interpreter
+                value = None if variable is None else variable._tk.globalgetvar(variable._name)
+            except tk.TclError:
+                value = None
+            values.append((name, None if value is None else str(value).strip()))
+        guided = getattr(self, "_guided_registration", None)
+        registration = getattr(guided, "registration", None)
+        values.append(("guided_registration", None if guided is None else
+                       getattr(registration, "registration_hash", None) or id(guided)))
+        values.append(("guided_fe_input", str(getattr(self, "_guided_fe_input_path", None) or "")))
+        orientation = getattr(self, "_confirmed_orientation", None)
+        values.append(("confirmed_orientation",
+                       orientation.get("candidate_identity") if isinstance(orientation, Mapping) else None))
+        return tuple(values)
+
+    def watch_analysis_inputs(self) -> None:
+        watched = self.__dict__.setdefault("_watched_analysis_inputs", set())
+        for name in ANALYSIS_INPUT_VARIABLES:
+            variable = getattr(self, name, None)
+            if variable is not None and name not in watched:
+                variable.trace_add("write", self._check_analysis_inputs)
+                watched.add(name)
+
+    def check_analysis_inputs(self, *_args) -> None:
+        """An input of the shown result changed: the result becomes inactive at once. A running analysis, and the
+        completion handlers that show its outcome, are checked by ``finish_with_current_inputs``."""
+        analysed = getattr(self, "_analysis_inputs", None)
+        if analysed is None or self.running or getattr(self, "_completing_analysis", False):
+            return
+        if self._analysis_inputs_changed(analysed):
+            self._invalidate_analysis_result(STALE_RESULT_MESSAGE)
+
+    def analysis_inputs_changed(self, analysed: tuple) -> bool:
+        current = self._analysis_input_signature()
+        if not getattr(self, "available_experimental_modal_sets", None):
+            # The modal-set list of the experimental file is being read (again), or the file has none: the modal set
+            # is compared once the list is known (choosing the same file again keeps a single set selected).
+            current, analysed = (tuple(item for item in values if item[0] != "experimental_modal_set_key")
+                                 for values in (current, analysed))
+        return current != analysed
+
+    def finish_with_current_inputs(self, handler, outcome) -> None:
+        """Show the outcome of a run only if its inputs are still the current ones (compared when the outcome arrives,
+        before the handler echoes the experimental coordinate unit it read); otherwise discard it. The shown result
+        is then bound to the inputs as displayed, including that echo."""
+        analysed = getattr(self, "_analysis_inputs", None)
+        changed = analysed is not None and self._analysis_inputs_changed(analysed)
+        completing = getattr(self, "_completing_analysis", False)
+        self._completing_analysis = True
+        try:
+            handler(self, outcome)
+        finally:
+            self._completing_analysis = completing
+        if completing or getattr(self, "_analysis_inputs", None) is None or getattr(self, "_ui_closing", False):
+            return  # an outer handler decides; or cancelled; or the window is closing
+        if changed:
+            self._invalidate_analysis_result(DISCARDED_RESULT_MESSAGE)
+        else:
+            self._analysis_inputs = self._analysis_input_signature()
+
+    def invalidate_analysis_result(self, message: str) -> None:
+        """The reset of a new run (``start_analysis`` / ``cancelled``) without starting one. Files already exported
+        stay on disk; the next successful analysis shows its result and enables the export again."""
+        self._analysis_inputs = None
+        self.result = None
+        self.cache = None
+        self._automatic_admissible_pair_count = None
+        self._clear_result_presentation(message)
+        self._set_empty_states()
+        for button_name in ("excel_button", "pdf_button", "export_all_button"):
+            button = getattr(self, button_name, None)
+            if button is not None:
+                button.configure(state="disabled")
+        diagnostic_report_ui.disable_report_export(self)
+        self._stale_result_notice = message
+        self._refresh_readiness()
 
     def set_empty_states(self, stopped: bool = False) -> None:
         if not self.table.get_children():
@@ -2366,9 +2471,25 @@ def install_responsive_workflow(app_module) -> None:
     application_class._start = start_analysis
     application_class._request_stop = request_stop
     application_class._cancelled = cancelled
-    application_class._complete = complete
-    application_class._failed = failed
-    application_class._orientation_ambiguous = orientation_ambiguous
+
+    def discarding_stale(handler):
+        """P-1: a run whose inputs changed while it ran never leaves its result (or diagnostic) active."""
+
+        def run(self, outcome) -> None:
+            self._finish_with_current_inputs(handler, outcome)
+
+        run.__name__ = handler.__name__
+        return run
+
+    application_class._complete = discarding_stale(complete)
+    application_class._failed = discarding_stale(failed)
+    application_class._orientation_ambiguous = discarding_stale(orientation_ambiguous)
+    application_class._analysis_input_signature = analysis_input_signature
+    application_class._watch_analysis_inputs = watch_analysis_inputs
+    application_class._check_analysis_inputs = check_analysis_inputs
+    application_class._analysis_inputs_changed = analysis_inputs_changed
+    application_class._finish_with_current_inputs = finish_with_current_inputs
+    application_class._invalidate_analysis_result = invalidate_analysis_result
 
     def export_pdf(self) -> None:
         if self.result is not None:

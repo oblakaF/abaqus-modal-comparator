@@ -34,6 +34,7 @@ from scientific_state import fe_geometry_identity  # noqa: E402
 from services import guided_registration as guided  # noqa: E402
 from services.physical_registration import FEGeometry, build_physical_registration  # noqa: E402
 from test_physical_registration import true_top_ids  # noqa: E402
+from r7_support import synthetic_fe_input, synthetic_inp_text  # noqa: E402
 
 IDENTITY = {"sha256": "a" * 64, "size": 4096}
 
@@ -86,9 +87,14 @@ class _World:
     def evidence(self, **overrides) -> guided.PhysicalEvidence:
         return guided.evidence_from_document(evidence_document(dict(self.frame), **overrides))
 
-    def establish(self, fe=None, evidence=None, identity=None, experimental=None):
+    def establish(self, fe=None, evidence=None, identity=None, experimental=None, fe_input="bound solid"):
+        # R7-B: the synthetic instances are single z levels, so the FE input proving their (solid) element type is
+        # supplied, bound node for node to the same synthetic geometry.
+        if fe_input == "bound solid":
+            fe_input = synthetic_fe_input(fe or self.variant)
         return guided.establish_guided_registration(as_dataset(fe or self.variant), experimental or self.experimental,
-                                                    identity or IDENTITY, evidence or self.evidence())
+                                                    identity or IDENTITY, evidence or self.evidence(),
+                                                    fe_input=fe_input)
 
 
 class GuidedRegistrationTests(_World, unittest.TestCase):
@@ -198,7 +204,8 @@ class GuidedRegistrationTests(_World, unittest.TestCase):
             path = guided.save_guided_registration(result, Path(directory) / "guided.json")
             again = guided.load_guided_registration(path)
             self.assertEqual(again.registration.registration_hash, result.registration.registration_hash)
-            guided.verify_for_files(again, as_dataset(self.variant), self.experimental, IDENTITY)
+            guided.verify_for_files(again, as_dataset(self.variant), self.experimental, IDENTITY,
+                                    fe_input=synthetic_fe_input(self.variant))
             for label, args in (("other experimental content", (as_dataset(self.variant), self.experimental,
                                                                 {"sha256": "c" * 64, "size": 4096})),
                                 ("other FE mesh", (as_dataset(self.reference), self.experimental, IDENTITY))):
@@ -231,7 +238,7 @@ class GuidedRegistrationTests(_World, unittest.TestCase):
 
 
 class WorkerTests(_World, unittest.TestCase):
-    def run_worker(self, active):
+    def run_worker(self, active, with_fe_input=True):
         import main
         import runtime_hardening
 
@@ -242,11 +249,15 @@ class WorkerTests(_World, unittest.TestCase):
             def after(_delay, callback):
                 callback()
 
-        application = SimpleNamespace(root=Root(), _analysis_cancel_event=threading.Event(),
-                                      _owned_analysis_process=None, _set_analysis_stage=lambda *_: None,
-                                      _failed=failures.append, _governed_registration_requested=False,
-                                      _guided_registration=active)
         with tempfile.TemporaryDirectory() as directory:
+            # R7 R2: the flat synthetic surface is re-verified against its FE input before the analysis
+            fe_input_path = Path(directory) / "model.inp"
+            fe_input_path.write_bytes(synthetic_inp_text(self.variant).encode("utf-8"))
+            application = SimpleNamespace(root=Root(), _analysis_cancel_event=threading.Event(),
+                                          _owned_analysis_process=None, _set_analysis_stage=lambda *_: None,
+                                          _failed=failures.append, _governed_registration_requested=False,
+                                          _guided_registration=active,
+                                          _guided_fe_input_path=fe_input_path if with_fe_input else None)
             odb, unv = Path(directory) / "plate.odb", Path(directory) / "test.unv"
             odb.write_bytes(b"stand-in")
             unv.write_bytes(b"x" * IDENTITY["size"])
@@ -266,6 +277,14 @@ class WorkerTests(_World, unittest.TestCase):
         self.assertEqual(set(captured[0]), {"frozen_registration"})
         self.assertEqual(captured[0]["frozen_registration"].registration_hash, result.registration.registration_hash)
         self.assertEqual(str(failures[0]), "stop after comparison")
+
+    def test_an_active_flat_registration_without_its_fe_input_refuses_the_run(self):
+        import runtime_hardening
+
+        captured, failures = self.run_worker(self.establish(), with_fe_input=False)  # R7 R2, real worker path
+        self.assertEqual(captured, [])
+        self.assertIsInstance(failures[0], runtime_hardening.GuidedRegistrationRefused)
+        self.assertIn("fe_input", str(failures[0]))
 
     def test_a_guided_registration_of_other_files_refuses_the_run(self):
         import runtime_hardening
@@ -341,6 +360,13 @@ class DialogTests(_World, unittest.TestCase):
             self.assertEqual(str(dialog.build_button.cget("state")), "normal")
             self.assertEqual(str(dialog.apply_button.cget("state")), "disabled")
             dialog.load_evidence(folder / "evidence.json")
+            # R7-B in the real GUI path: a single-z-level measured surface without the FE input is refused
+            dialog.build()
+            self.assertTrue(pump(lambda: dialog.status.cget("text").startswith("REFUSED")))
+            self.assertIn("(fe_input)", dialog.status.cget("text"))
+            self.assertIsNone(dialog.result)
+            (folder / "model.inp").write_bytes(synthetic_inp_text(self.variant).encode("utf-8"))
+            dialog.locate_fe_input(folder / "model.inp")
             # R2: an unexpected error in the background build (unreadable file, broken CSV, ...) never leaves the
             # dialog blocked, never leaves a registration, and the operation can be retried
             with mock.patch.object(guided, "establish_guided_registration",
@@ -365,6 +391,10 @@ class DialogTests(_World, unittest.TestCase):
             self.assertEqual(started, [True])
             again = GuidedRegistrationDialog(app, loaded)
             self.assertTrue(pump(lambda: again.identity is not None))
+            again.open_saved(saved)  # R7 R2: without its FE input a flat-surface registration is not re-applied
+            self.assertTrue(again.status.cget("text").startswith("SAVED REGISTRATION REFUSED"))
+            self.assertIn("(fe_input)", again.status.cget("text"))
+            again.locate_fe_input(folder / "model.inp")
             again.open_saved(saved)
             self.assertTrue(again.status.cget("text").startswith("OPENED"))
             unv.write_bytes(b"changed experimental content")  # the measurement file changed
@@ -419,6 +449,8 @@ class StaleResultTests(_World, unittest.TestCase):
         self.dialog = GuidedRegistrationDialog(self.app, self.loaded)
         self.addCleanup(lambda: self.dialog.window.winfo_exists() and self.dialog.window.destroy())
         self.assertTrue(self.pump(lambda: self.dialog.identity is not None))
+        (self.folder / "model.inp").write_bytes(synthetic_inp_text(self.variant).encode("utf-8"))
+        self.dialog.locate_fe_input(self.folder / "model.inp")  # R7-B: the single-z-level surface needs the INP
 
     def write(self, name, document):
         (self.folder / name).write_text(json.dumps(document), encoding="utf-8")

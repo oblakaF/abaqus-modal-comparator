@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 import json
 import math
 from pathlib import Path
@@ -56,6 +57,7 @@ from domain.specimen_manifest import (
 )
 from scientific_state import fe_geometry_identity, modal_dataset_geometry_identity
 
+from . import shell_surface
 from .fe_shape_pack import node_set_sha256
 from .physical_registration import (
     PHYSICAL_ORIENTATION_REFERENCES,
@@ -162,14 +164,18 @@ class PhysicalEvidence:
     fe_frame: Mapping[str, Any]  # {"fe_geometry_identity"} and/or {"measured_surface_identity"} / {"geometry_file"}
     provenance: tuple[str, ...] = ()
     reference_geometry_file: Any = None  # pinned ExternalFileReference of an accepted passport
+    shell_face: Optional[shell_surface.ShellFaceStatement] = None  # R7-B guided-only block, None for solids
 
     def document(self) -> dict:
-        return {"schema": EVIDENCE_SCHEMA, "kind": self.kind, "label": self.label,
-                "physical_specimen_id": self.physical_specimen_id,
-                "geometry_calibration": json.loads(json.dumps(self.calibration_document)),
-                "experimental_source": dict(self.experimental_source), "modal_set": self.modal_set,
-                "measured_dofs": list(self.measured_dofs), "point_count": self.point_count,
-                "fe_frame": json.loads(json.dumps(self.fe_frame)), "provenance": list(self.provenance)}
+        document = {"schema": EVIDENCE_SCHEMA, "kind": self.kind, "label": self.label,
+                    "physical_specimen_id": self.physical_specimen_id,
+                    "geometry_calibration": json.loads(json.dumps(self.calibration_document)),
+                    "experimental_source": dict(self.experimental_source), "modal_set": self.modal_set,
+                    "measured_dofs": list(self.measured_dofs), "point_count": self.point_count,
+                    "fe_frame": json.loads(json.dumps(self.fe_frame)), "provenance": list(self.provenance)}
+        if self.shell_face is not None:  # absent for every pre-R7 evidence: its hash is unchanged
+            document["shell_measured_face"] = self.shell_face.document()
+        return document
 
     @property
     def evidence_hash(self) -> str:
@@ -258,6 +264,12 @@ def evidence_from_document(document: Mapping[str, Any]) -> PhysicalEvidence:
     modal_set = document.get("modal_set")
     _require(isinstance(modal_set, str) and modal_set.strip() != "", "modal_set", "the modal set key is required.")
     name = str(source.get("name") or "experimental file")
+    shell_face = None
+    if document.get("shell_measured_face") is not None:  # R7-B: guided-only; parse_geometry_calibration is untouched
+        try:
+            shell_face = shell_surface.parse_shell_face(document["shell_measured_face"])
+        except shell_surface.ShellSurfaceRefusal as error:
+            raise GuidedRegistrationRefusal(error.field, str(error)) from error
     return PhysicalEvidence(
         kind=EVIDENCE_FILE, label=str(document.get("label") or "physical evidence file"),
         physical_specimen_id=document.get("physical_specimen_id"), geometry_calibration=calibration,
@@ -266,7 +278,8 @@ def evidence_from_document(document: Mapping[str, Any]) -> PhysicalEvidence:
         registration_source_identity={"path": name, "size": source["size"], "mtime_ns": None,
                                       "sha256": source["sha256"]},
         modal_set=modal_set, measured_dofs=tuple(dofs), point_count=document.get("point_count"),
-        fe_frame=dict(frame), provenance=tuple(str(item) for item in document.get("provenance") or ()))
+        fe_frame=dict(frame), provenance=tuple(str(item) for item in document.get("provenance") or ()),
+        shell_face=shell_face)
 
 
 def load_evidence_file(path: Path) -> PhysicalEvidence:
@@ -344,8 +357,15 @@ class GuidedRegistration:
 
 def establish_guided_registration(abaqus, experimental, experimental_identity: Mapping[str, Any],
                                   evidence: PhysicalEvidence, *, roots: Optional[Mapping[str, Path]] = None,
-                                  reference_geometry_path: Optional[Path] = None) -> GuidedRegistration:
-    """Build the registration the evidence defines for the loaded FE geometry, or refuse with the reason."""
+                                  reference_geometry_path: Optional[Path] = None,
+                                  fe_input: Optional[shell_surface.FEInputModel] = None) -> GuidedRegistration:
+    """Build the registration the evidence defines for the loaded FE geometry, or refuse with the reason.
+
+    R7-B (fail-closed for flat measured surfaces): when the measured instance is a single z level, ``side`` cannot
+    name a face, so the FE input (INP) of this model is required and must be bound node for node to the loaded FE
+    instance. A bound non-shell proceeds; a bound conventional shell needs the evidence's ``shell_measured_face``
+    (measured face relative to a uniform element normal) consistent with the Z sign of the stated axes.
+    """
     checks: list[str] = []
     calibration = evidence.geometry_calibration
     unit = calibration.calibration.abaqus_unit
@@ -398,12 +418,15 @@ def establish_guided_registration(abaqus, experimental, experimental_identity: M
                       f"nodes, labels and coordinates {_short(loaded['sha256'])}) is identical to {source}; the "
                       f"loaded FE geometry {_short(fe.identity['sha256'])} ({fe.identity['node_count']} nodes) differs "
                       "elsewhere (another node identity: a new registration, the old mapping not reused)")
+    binding, surface_limitation = _shell_gate(fe, evidence, fe_input, unit, axes, checks)
     try:
         registration, surface_ids = register_from_physical_calibration(
             calibration, fe, experimental, evidence.measured_dofs, evidence.registration_source_identity)
     except PhysicalRegistrationRefusal as error:
         raise GuidedRegistrationRefusal(error.field, str(error)) from error
     metrics = registration.to_dict()["registration_metrics"]  # plain JSON values
+    if binding is not None:
+        metrics["fe_input"] = binding
     checks.append(f"measured surface {calibration.measured_surface.fe_instance} {calibration.measured_surface.side}: "
                   f"{len(surface_ids)} FE nodes; measured DOFs {'/'.join(evidence.measured_dofs)}")
     _require(metrics["matched_fraction"] >= MINIMUM_MATCHED_FRACTION, "mapping",
@@ -418,12 +441,68 @@ def establish_guided_registration(abaqus, experimental, experimental_identity: M
                   f"{metrics['mapping_rms_in_abaqus_units']:.3g} {unit} (max "
                   f"{metrics['mapping_max_residual_in_abaqus_units']:.3g} {unit}), axis permutation "
                   f"{metrics['axis_permutation']}, every point on its own FE node")
-    warnings = ()
+    warnings = surface_limitation
     if calibration.uncertainty.missing:
-        warnings = (f"registration uncertainty not available: {', '.join(calibration.uncertainty.missing)}",)
+        warnings += (f"registration uncertainty not available: {', '.join(calibration.uncertainty.missing)}",)
     return GuidedRegistration(registration, evidence.document(), evidence.evidence_hash, dict(fe.identity),
                               {"sha256": experimental_identity["sha256"], "size": experimental_identity["size"]},
                               tuple(checks), warnings, metrics)
+
+
+def _shell_gate(fe, evidence: PhysicalEvidence, fe_input, unit: str, axes: list, checks: list):
+    """R7-B: (bound FE-input record or None, warnings). Refuses a flat measured surface without proof of its element
+    type, a bound shell without a consistent measured-face statement, and any contradiction."""
+    measured = evidence.geometry_calibration.measured_surface
+    try:
+        degenerate = shell_surface.surface_is_degenerate(fe, measured.fe_instance, unit)
+    except PhysicalRegistrationRefusal as error:
+        raise GuidedRegistrationRefusal(error.field, str(error)) from error
+    binding = None
+    if fe_input is not None:
+        try:
+            binding = shell_surface.bind_fe_input(fe_input, fe, measured.fe_instance, unit)
+        except shell_surface.ShellSurfaceRefusal as error:
+            raise GuidedRegistrationRefusal(error.field, str(error)) from error
+        checks.append(f"FE input {binding.file_name} ({_short(binding.fe_input_sha256)}) bound to the loaded instance "
+                      f"{binding.instance}: {binding.node_count} node labels and coordinates identical (max difference "
+                      f"{binding.max_coordinate_difference:.2g}); element types {list(binding.element_types)}")
+    _require(not degenerate or binding is not None, "fe_input",
+             f"the measured surface {measured.fe_instance} is a single z level (max_z and min_z select the same nodes), "
+             "so side cannot name the measured face and a conventional shell is not excluded. Locate the FE input "
+             "(INP) of this model: the registration is refused until its element type is proven (R7, fail-closed).")
+    face = evidence.shell_face
+    if binding is None or binding.kind != "shell":
+        _require(face is None, "shell_measured_face",
+                 "a shell measured face is stated, but the measured instance is not a bound conventional shell.")
+        warnings = ()
+        if degenerate:
+            warnings = (f"measured surface {measured.fe_instance} is a single z level of a bound non-shell instance "
+                        f"(element types {list(binding.element_types)}); side={measured.side} names no physical face",
+                        f"FE model identity: {shell_surface.FE_MODEL_IDENTITY}")
+        return (None if binding is None else binding.to_dict()), warnings
+    _require(face is not None, "shell_measured_face",
+             f"{binding.instance} is a conventional shell ({', '.join(binding.element_types)}): its nodes are the "
+             "mid-surface and side cannot name the measured face. The evidence must state the measured face relative "
+             "to the element normal (shell_measured_face); no registration without it.")
+    _require(face.fe_input_sha256 == binding.fe_input_sha256, "shell_measured_face",
+             f"the statement refers to FE input {_short(face.fe_input_sha256)}, not the bound "
+             f"{_short(binding.fe_input_sha256)}.")
+    _require(face.fe_instance.upper() == binding.instance.upper(), "shell_measured_face",
+             f"the statement is for instance {face.fe_instance}, the measured instance is {binding.instance}.")
+    _require(binding.normal_direction is not None, "shell_measured_face",
+             f"the element normals of {binding.instance} are not uniformly +Z or -Z ({dict(binding.normal_counts)}); "
+             "a measured face cannot be stated against them.")
+    _require(face.normal_direction == binding.normal_direction, "shell_measured_face",
+             f"the statement gives the element normal as {face.normal_direction}; the FE input gives "
+             f"{binding.normal_direction}.")
+    expected = face.experimental_z_in_fe()
+    _require(axes[2] == expected, "orientation.experimental_axes_in_fe",
+             f"the scanner saw the {face.measured_face.replace('_', ' ')} side (normal {face.normal_direction}), so the "
+             f"experimental +z (towards the scanner) must map to {expected}; the stated axes map it to {axes[2]}.")
+    checks.append(f"shell measured face: {face.measured_face} of normal {face.normal_direction} "
+                  f"({binding.normal_counts}) from {face.face_evidence}; experimental +z -> {expected} (consistent)")
+    return ({**binding.to_dict(), "shell_measured_face": face.document()},
+            (f"FE model identity: {shell_surface.FE_MODEL_IDENTITY}",))
 
 
 def _reference_surface(evidence: PhysicalEvidence, roots, reference_geometry_path) -> tuple[dict, str]:
@@ -492,9 +571,75 @@ def load_guided_registration(path: Path) -> GuidedRegistration:
                               tuple(record["checks"]), tuple(record.get("warnings", ())), record.get("metrics", {}))
 
 
+def measured_instance_of(guided: GuidedRegistration) -> Optional[str]:
+    surface = ((guided.evidence.get("geometry_calibration") or {}).get("measured_surface") or {})
+    return surface.get("fe_instance")
+
+
+def load_fe_input_for(guided: GuidedRegistration, path: Optional[Path]) -> Optional[shell_surface.FEInputModel]:
+    """The FE input at ``path`` read for the registration's measured instance (None when no path is given)."""
+    if path is None:
+        return None
+    try:
+        return shell_surface.load_fe_input(Path(path), instance=measured_instance_of(guided))
+    except OSError as error:
+        raise GuidedRegistrationRefusal("fe_input", f"the FE input {path} cannot be read: {error}") from error
+
+
+def _reverify_fe_input(guided: GuidedRegistration, fe, fe_input) -> tuple[str, ...]:
+    """R7 R2: re-run the complete shell gate for a flat measured surface and require the recorded binding exactly."""
+    recorded = guided.metrics.get("fe_input") or {}
+    _require(recorded.get("binding_schema") == shell_surface.BINDING_SCHEMA, "fe_input",
+             "the record of this single-z-level measured surface carries no re-verifiable FE-input binding "
+             f"({shell_surface.BINDING_SCHEMA}); it was made before R7 R2 and is not applied: build it again.")
+    _require(fe_input is not None, "fe_input",
+             f"the FE input {recorded.get('file_name')} ({_short(recorded.get('fe_input_sha256'))}) of this "
+             "registration is not available: locate it (Locate FE input (INP)...). A recorded binding alone is never "
+             "sufficient (R7 R2, fail-closed).")
+    _require(fe_input.sha256 == recorded.get("fe_input_sha256"), "fe_input",
+             f"the located FE input {fe_input.file_name} ({_short(fe_input.sha256)}) is not the one this registration "
+             f"was bound to ({_short(recorded.get('fe_input_sha256'))}).")
+    document = guided.evidence.get("geometry_calibration") or {}
+    surface = document.get("measured_surface") or {}
+    axes = list((document.get("orientation") or {}).get("experimental_axes_in_fe") or ())
+    unit = (document.get("coordinate_calibration") or {}).get("abaqus_unit") or "mm"
+    vectors = {"+X": (1, 0, 0), "-X": (-1, 0, 0), "+Y": (0, 1, 0), "-Y": (0, -1, 0), "+Z": (0, 0, 1), "-Z": (0, 0, -1)}
+    _require(len(axes) == 3 and all(axis in vectors for axis in axes), "orientation.experimental_axes_in_fe",
+             f"the saved axes {axes!r} are not three signed FE axes.")
+    stated = float(np.linalg.det(np.array([vectors[axis] for axis in axes], dtype=float).T))
+    applied = float(np.linalg.det(np.asarray(guided.registration.rotation, dtype=float)))
+    _require(stated > 0.0 and applied > 0.0, "orientation.experimental_axes_in_fe",
+             f"the saved transformation is not right-handed (stated determinant {stated:+.0f}, registration "
+             f"rotation determinant {applied:+.3f}).")
+    shell_face = None
+    if guided.evidence.get("shell_measured_face") is not None:
+        try:
+            shell_face = shell_surface.parse_shell_face(guided.evidence["shell_measured_face"])
+        except shell_surface.ShellSurfaceRefusal as error:
+            raise GuidedRegistrationRefusal(error.field, str(error)) from error
+    saved = SimpleNamespace(geometry_calibration=SimpleNamespace(measured_surface=SimpleNamespace(
+        fe_instance=surface.get("fe_instance"), side=surface.get("side"))), shell_face=shell_face)
+    checks: list[str] = []
+    binding, _ = _shell_gate(fe, saved, fe_input, unit, axes, checks)
+    fresh = {key: binding.get(key) for key in shell_surface.REBINDING_FIELDS}
+    stored = {key: recorded.get(key) for key in shell_surface.REBINDING_FIELDS}
+    _require(fresh == stored, "fe_input",
+             "the FE input binding of the loaded files differs from the recorded one: "
+             + ", ".join(f"{key} {stored[key]!r} -> {fresh[key]!r}" for key in fresh if fresh[key] != stored[key]))
+    _require(binding.get("shell_measured_face") == recorded.get("shell_measured_face"), "shell_measured_face",
+             "the shell measured-face statement differs from the recorded one.")
+    return tuple(checks)
+
+
 def verify_for_files(guided: GuidedRegistration, abaqus, experimental,
-                     experimental_identity: Mapping[str, Any]) -> tuple[str, ...]:
-    """The guided registration may be applied to these loaded files, or raise with the reason."""
+                     experimental_identity: Mapping[str, Any], *,
+                     fe_input: Optional[shell_surface.FEInputModel] = None) -> tuple[str, ...]:
+    """The guided registration may be applied to these loaded files, or raise with the reason.
+
+    R7 R2: for a single-z-level measured surface the model's FE input must be supplied again and pass the complete
+    shell gate of the build (binding, element types, connectivity, normals, shell measured face, Z sign, determinant),
+    reproducing the recorded binding exactly. A recorded ``bound`` flag alone is never sufficient.
+    """
     registration = guided.registration
     try:
         fe_identity = modal_dataset_geometry_identity(abaqus)
@@ -524,8 +669,21 @@ def verify_for_files(guided: GuidedRegistration, abaqus, experimental,
     present = {str(value) for value in np.asarray(abaqus.sorted_modes()[0].node_ids, dtype=object)}
     missing = [node for node in registration.mapped_fe_node_ids if node not in present]
     _require(not missing, "mapped_fe_nodes", f"{len(missing)} mapped FE nodes are absent from the ODB.")
+    instance = measured_instance_of(guided)
+    unit = (((guided.evidence.get("geometry_calibration") or {}).get("coordinate_calibration") or {})
+            .get("abaqus_unit") or "mm")
+    reverified: tuple[str, ...] = ()
+    if instance:
+        fe = fe_geometry_of(abaqus)
+        try:
+            degenerate = shell_surface.surface_is_degenerate(fe, instance, unit)
+        except PhysicalRegistrationRefusal as error:
+            raise GuidedRegistrationRefusal(error.field, str(error)) from error
+        if degenerate:
+            reverified = _reverify_fe_input(guided, fe, fe_input)
     return (f"guided registration {_short(registration.registration_hash)} matches the loaded experimental content, "
-            f"modal set {key!r}, measurement points, measured DOFs and FE geometry {_short(fe_identity['sha256'])}",)
+            f"modal set {key!r}, measurement points, measured DOFs and FE geometry {_short(fe_identity['sha256'])}",
+            ) + reverified
 
 
 def summary_rows(guided: GuidedRegistration) -> list[tuple[str, str]]:
@@ -595,6 +753,11 @@ def evidence_rows(evidence: Optional[PhysicalEvidence]) -> list[tuple[str, str, 
                                   f"{coordinate.get('physical_height')} {coordinate.get('dimension_unit')}; "
                                   f"{coordinate.get('provenance')}", "PROVIDED"),
         ("measured surface", f"{surface.fe_instance} {surface.side}: {surface.label}", "PROVIDED"),
+        ("shell measured face",
+         (f"{evidence.shell_face.measured_face} of normal {evidence.shell_face.normal_direction}, FE input "
+          f"{_short(evidence.shell_face.fe_input_sha256)}: {evidence.shell_face.face_evidence}")
+         if evidence.shell_face is not None else "not stated (required only when the bound FE input is a shell)",
+         "PROVIDED" if evidence.shell_face is not None else "NOT STATED"),
         ("measured DOFs", "/".join(evidence.measured_dofs), "PROVIDED"),
         ("experimental file", "{} {} ({} bytes), modal set {!r}".format(
             evidence.experimental_source.get("name"), _short(evidence.experimental_source.get("sha256")),
