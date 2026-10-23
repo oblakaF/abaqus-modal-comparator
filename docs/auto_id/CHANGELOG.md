@@ -5531,3 +5531,26 @@ first internal provider.
   - production code, SPEC v1.2, passports, thresholds, gates, the pinned extractor and its hash, M10 / M11 data;
   - M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production calibration BLOCKED / NOT_AUTHORISED.
   - No Abaqus solve or extraction was run.
+
+## 2026-10-24 — APP-E2E.2: P-1 fixed, a result whose inputs changed is never left active (REVIEW_READY; PR #97)
+
+- **Behaviour:** after an analysis, changing an input that defines the result makes the shown result inactive at
+  once. This holds for a comparison with MAC and for a FREQUENCY_ONLY_DIAGNOSTIC.
+  - The inputs are: the FE file, the experimental file, the mode range, the modal set, the calibration fields, the
+    accepted-registration option, the guided registration and a confirmed orientation.
+  - Tables, cards, plots and mode views are cleared; the PDF / Excel export is disabled; the status says to run the
+    analysis again.
+  - A result that arrives after its inputs changed is discarded.
+  - Workspace, Abaqus command and display preferences keep the result. Exported files stay on disk.
+- **Code:**
+  - `src/ui_workflow.py`: the existing reset of a new run is reused, and no parallel state is added.
+  - `src/guided_registration_ui.py`: `clear()` requests the same check.
+  - MAC, pairing, registration logic, thresholds and gates are unchanged.
+- **Tests:**
+  - `tests/test_app_p1_stale_results.py`: 14 tests in the real main window. 20 of them fail on the unfixed code.
+  - unittest 2515 OK / 96 skipped, in three runs.
+- **Real Windows window (verified copies, no process):**
+  - SP-02 comparison: 27 / 27;
+  - SP-13 comparison: 21 / 21;
+  - plate diagnostic: 29 / 29.
+- **Not run:** the store-gated real-data regressions remain NOT_RUN. P-2 and P-3 are not in scope.

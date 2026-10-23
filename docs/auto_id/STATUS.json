@@ -2099,8 +2099,25 @@
     "open": "OD-R7-1 open; M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production calibration BLOCKED / NOT_AUTHORISED",
     "results": "RUN_PROGRAM.cmd clean launch: main window, no traceback, closes cleanly; GUI scenarios on verified copies: A1 SP-02 and A2 SP-13 accepted registrations reproduce the accepted strict pairs and the CORE-E2E reports; B1 plate (no physical registration), B2 new SP-13 FE geometry, B3 damaged UNV: stated diagnostics, no pair, no MAC, diagnostic PDF / Excel verified; R7-A refuses the false 1.0 / 2.0 Hz records of the real R6 package; unittest 2501 OK / 96 skipped, pytest 2440 passed / 112 skipped / 0 failed",
     "open_program_issues": [
-      "P-1: changing an input after an analysis does not clear the shown result (table, cards, enabled exports); exports stay bound to the analysed inputs; pre-existing, not fixed here"
+      "P-1: FIXED in APP-E2E.2 (app_e2e_2_p1_stale_results); was: changing an input after an analysis did not clear the shown result (table, cards, enabled exports)"
     ],
     "not_run": "store-gated real-data regressions (snadwich, carbon-project-archive, sumin, M7 run A / B stores): NOT_RUN"
+  },
+  "app_e2e_2_p1_stale_results": {
+    "title": "APP-E2E.2: P-1 fixed - a result whose inputs changed is never left active",
+    "status": "REVIEW_READY",
+    "verdict": "APP_E2E_P1_READY_FOR_SUPERVISOR_REVIEW",
+    "kind": "program fix (not a scientific stage)",
+    "branch": "integration/post-r7-program-smoke",
+    "pr": 97,
+    "base": "e0e5768bf9afc74e7aa975974ff9aa3c1290055c",
+    "report": "docs/gui/POST_R7_PROGRAM_E2E_ACCEPTANCE.md section 9",
+    "change": "src/ui_workflow.py: the inputs of a run are recorded at Run and traced; any change of an input that defines the result (FE / experimental file, mode range, modal set, calibration fields, accepted-registration option, guided registration, confirmed orientation) applies the existing reset of a new run (result / cache None, presentation and mode views cleared, exports disabled) and states 'Run the analysis again'; an outcome whose inputs changed while it ran is discarded; workspace, Abaqus command and display preferences keep the result; src/guided_registration_ui.py clear() requests the same check",
+    "tests": "tests/test_app_p1_stale_results.py: 14 tests (11 subtests), real main window, synthetic data; 20 failures on the unfixed code; unittest 2515 OK / 96 skipped (three runs); pytest 2454 passed / 112 skipped / 0 failed",
+    "gui": "real Windows window on verified copies, no process: SP-02 comparison 27/27, SP-13 comparison 21/21, plate FREQUENCY_ONLY_DIAGNOSTIC 29/29 (change, cleared, export disabled, earlier reports kept, new run shown and exported)",
+    "unchanged": "MAC and pairing, physical / guided registration logic, SPEC v1.2, thresholds, Auto-ID and production gates, pinned extractor, M10 / M11 data, PR #94 / #95",
+    "abaqus": "0 solves, 0 extractions",
+    "not_run": "store-gated real-data regressions: NOT_RUN",
+    "open": "P-2, P-3 (not in scope); OD-R7-1 open; M8 GATE NOT_MET"
   }
 }

@@ -12,6 +12,10 @@ No Abaqus solve, no ODB extraction and no Auto-ID / LM fitting were run. No orig
 **Verdict: `APP_DIAGNOSTIC_E2E_READY`**, with one open program defect (P-1, §6) and the regressions listed as not run
 (§5, §7).
 
+**APP-E2E.2 (2026-10-24): P-1 is fixed** (§9). An input change now makes the shown result inactive at once and
+disables its export. Verdict of that step: `APP_E2E_P1_READY_FOR_SUPERVISOR_REVIEW`. Sections 1–8 are the APP-E2E.1
+record as delivered; only the P-1 status is updated in them.
+
 ## 1. Checked state
 
 | Item | Value |
@@ -54,7 +58,7 @@ No Abaqus solve, no ODB extraction and no Auto-ID / LM fitting were run. No orig
 | Input selection | **PASS** for the input fields and modal-set discovery (offered sets: `Polymax_bravo — 10 modes`, `Best — 12 modes`, `bravo-1`). The file dialogs themselves were not clicked: paths are set in the fields the Browse buttons fill |
 | Loading / error states | **PASS**: progress, FREQUENCY_ONLY_DIAGNOSTIC, DIAGNOSTIC (experimental file not usable), accepted-registration availability with the reason when unavailable |
 | No hang after a failed analysis | **PASS**: damaged UNV ends in 0.2 s with `running = False`; FE modes stay viewable |
-| Results cleared after the inputs change | **FAIL (P-1, §6)**: the previous result stays on screen |
+| Results cleared after the inputs change | **FAIL (P-1, §6)** in APP-E2E.1: the previous result stays on screen. **Fixed in APP-E2E.2 (§9)** |
 
 - **How it was verified.** The GUI was checked from window captures (PrintWindow), read by the agent, and from the
   widget state. It was not looked at by a human operator.
@@ -120,12 +124,10 @@ of its own inputs. A report is therefore never labelled with the new input. What
 
 ### Program
 
-- **P-1 (open, medium; pre-existing on `main`, not from R7).** After an analysis, changing the experimental file
-  (A1) or the FE input (B1) does not clear the shown result. The table, the metric cards and the enabled export
-  buttons stay as they were, while the status reads "Ready to analyze." No wrong report can be produced (§5), and the
-  next Analyze clears everything, but the screen can be read as belonging to the new files.
-  - **Fix:** the input-path change should clear the result presentation and disable exports, with a reproducing test.
-  - **Not fixed here:** this stage authorises test and documentation fixes only.
+- **P-1 (FIXED in APP-E2E.2, §9; medium; pre-existing on `main`, not from R7).** After an analysis, changing the
+  experimental file (A1) or the FE input (B1) did not clear the shown result. The table, the metric cards and the
+  enabled export buttons stayed as they were, while the status read "Ready to analyze." No wrong report could be
+  produced (§5), and the next Analyze cleared everything, but the screen could be read as belonging to the new files.
 - **P-2 (minor).** With a mode range that starts at 1, the near-zero rigid modes 3–6 of the plate appear in the
   diagnostic FE list with their true values (≈ 2e-4 – 2e-3 Hz). They never become a nearest-frequency row. The
   Files tab says rigid and near-zero modes are excluded automatically. In the comparison path this holds (A1 excluded
@@ -182,9 +184,120 @@ The diagnostic mode of the application is **practically usable**:
 - the R7 guards act on real and synthetic data.
 
 The one program defect found (P-1) affects what the screen shows after an input change, not any computed or exported
-result. It should be fixed in a separate, authorised program step.
+result. It should be fixed in a separate, authorised program step. (It was fixed in APP-E2E.2, §9.)
 
 Not covered here: the store-gated real-data regressions (`NOT_RUN`), and any human visual inspection of the GUI.
 
 Local evidence: the work root's `runs/post_r7_smoke` holds the scripts, logs, screenshots, `results.json` per scenario,
 reports and `export_verification.json`. It is machine-local and not in Git.
+
+## 9. APP-E2E.2 (2026-10-24): P-1 fixed
+
+**Verdict: `APP_E2E_P1_READY_FOR_SUPERVISOR_REVIEW`.**
+
+### Behaviour
+
+After an analysis, a change of any input that defines the computed result makes the shown result inactive at
+once. This holds for an established comparison (pairs and MAC) and for a FREQUENCY_ONLY_DIAGNOSTIC or an
+unusable-experiment diagnostic.
+
+- **What is cleared:** the comparison table, the metric cards, the plots and the mode views (FE and experimental).
+- **What is disabled:** the PDF / Excel / export-all buttons. The Reports menu answers "Run the analysis first".
+- **What the user sees:** the status and the cleared panels say *"Inputs changed after the analysis: the previous
+  result is no longer active and cannot be exported. Run the analysis again."*
+- **What is kept:** reports already written stay on disk. The next successful analysis shows its result and enables
+  the export again.
+
+**The inputs that count:**
+
+- the FE file and the experimental file;
+- the first and last mode;
+- the modal set;
+- the calibration fields: the model and experimental units, the unit source, the mapping mode, the custom scale, the
+  camera-grid dimensions and coverage, and the provenance;
+- the accepted-registration option, the applied guided registration and its FE input, and a confirmed orientation.
+
+**Not counted** (the result is kept): the workspace, the Abaqus command and display preferences. Choosing the same
+experimental file again also keeps the result when it has a single modal set. When it has several sets, the set must
+be chosen again, so the result becomes inactive.
+
+**Other paths:**
+
+- **Changes during a run.** An outcome whose inputs changed while it ran is discarded when it arrives: *"Inputs
+  changed while the analysis was running: its result was discarded …"*. An input changed and restored before the end
+  keeps the result.
+- **Projects and registrations.** A new project, opening another project, confirming an orientation and clearing a
+  guided registration all make the shown result inactive.
+- **Unchanged:** MAC, mode pairing, physical / guided registration logic, the pinned extractor, SPEC, thresholds and
+  gates. The worker still receives exactly the values validated at Run.
+
+### Implementation (existing state machinery, no parallel state)
+
+- **Where:** `src/ui_workflow.py`, the final owner of `_start`, `_complete`, `_failed`, `_orientation_ambiguous`,
+  `_cancelled` and `_refresh_readiness`.
+- **At Run:** `_start` records the input signature of the run, the raw values of the variables above, and traces
+  them.
+- **On a change:** the trace and `_on_persistent_change` call `_check_analysis_inputs`. On a difference,
+  `_invalidate_analysis_result` applies the same reset as a new Run or a Stop:
+  - `result` and `cache` are set to `None`;
+  - `_clear_result_presentation` and `_set_empty_states` run;
+  - the export buttons are disabled and `disable_report_export` runs;
+  - the notice is kept by `_refresh_readiness`.
+- **When the outcome arrives:** the three completion handlers compare the signature with the current inputs, before
+  `_populate` echoes the experimental coordinate unit it read into the unit fields. Afterwards the shown result is
+  bound to the displayed inputs, including that echo.
+- **While the modal-set list is re-read:** the modal set is compared only once the list is known. Re-choosing the
+  same file first clears the set key.
+- **Guided registration:** `src/guided_registration_ui.py` `clear()` asks for the same check (one call).
+
+### Verification
+
+| Check | Environment | Result |
+|---|---|---|
+| New regression tests `tests/test_app_p1_stale_results.py` (real main window, synthetic data, real completion handlers) | Windows, Python 3.14.6 | **14 passed** (+11 subtests) |
+| The same tests on the unfixed code (`e0e5768`) | same | **20 failed, 5 passed**. Every P-1 case fails; only the controls pass (settings that do not change the result, an input restored during the run, a cancelled run) |
+| GUI / worker / project / guided registration / diagnostic export / R7 / G2c / G2d-1 / polymax / idle state / responsive suites | same | 273 passed, 4 skipped (store-gated) |
+| Full `python -m unittest discover -s tests`, three consecutive runs | same | **2515 OK, 96 skipped**, each run |
+| Full pytest | same | **2454 passed** (+2932 subtests), **0 failed**, 112 skipped |
+| GitHub Actions on the PR #97 head | Linux, Python 3.11 | see PR #97 |
+
+**Real Windows window.** The checks ran in the real main window, on verified copies, with every process start
+refused.
+
+| Scenario | Change, then new run | Result |
+|---|---|---|
+| SP-02 accepted comparison (CORE-E2E copies) | Experimental file → SP-13 UNV (V2); then the SP-02 UNV, set `bravo-1` and the accepted registration again | **27 / 27 PASS** |
+| SP-13 accepted comparison (V2 UNV) | Last mode 30 → 29. A new run is not possible without a new extraction (Abaqus) | **21 / 21 PASS** |
+| CFRP plate FREQUENCY_ONLY_DIAGNOSTIC (R6 + V3) | FE input → T4 extraction bundle; then a new run on it | **29 / 29 PASS** |
+
+What the window checks showed:
+
+- **SP-02:**
+  - after the change: no result, no mode views, no pair rows, MAC card "—", exports disabled, Reports menu "Not ready
+    yet", earlier reports kept;
+  - after the new run: the accepted pairs R1–R3 reproduced (MAC within 1e-9), new PDF / Excel written.
+- **SP-13:** cleared immediately, export disabled, earlier reports kept.
+- **Plate:**
+  - the diagnostic export is cleared and disabled;
+  - the new run's frequencies come from the new FE input (58.145 / 144.70 / 161.04 Hz);
+  - its diagnostic PDF / Excel were written, and the earlier reports kept.
+- **First plate run:** 28 / 29. A harness tolerance (1e-6) was tighter than the 5-digit frequency printed in the
+  manifest. It is kept beside the final run.
+
+**Found and fixed during verification:**
+
+- **Completion echo.** The first implementation also reacted to the completion's own echo of the experimental
+  coordinate unit (`_populate`). This would have discarded every new result; the new tests found it.
+- **Multiple Tk windows.** Tk variables are read through their own interpreter. With several Tk windows in one
+  process, `root.globalgetvar` read nothing.
+- **Test teardown.** One full unittest run aborted with "Tcl_AsyncDelete: async handler deleted by the wrong
+  thread". The new tests had left background discovery / pre-check threads holding a window. The test teardown now
+  joins those threads, destroys the window and collects garbage on the main thread. The three following full runs
+  are clean.
+
+### Still open
+
+- **Program:** P-2 and P-3 (unchanged, not in scope).
+- **Not run:** the store-gated real-data regressions remain `NOT_RUN` (§7).
+- **Scientific:** OD-R7-1 is open; M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production calibration
+  BLOCKED / NOT_AUTHORISED.
