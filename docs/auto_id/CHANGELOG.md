@@ -5433,6 +5433,100 @@ first internal provider.
 - **Files changed:** `docs/reconciliation/M9_SIX_SPECIMENS.md` (new), `docs/reconciliation/M9_SIX_SPECIMENS.json` (new), STATUS,
   ROADMAP, CHANGELOG. **Abaqus run count:** 0.
 
+## 2026-10-20 — M9 ACCEPTED
+
+- **M9 six-specimen scientific reconciliation:** ACCEPTED (PR #93, merge `aa08ad9`). Erratum recorded in M10 §10:
+  SP-10 FE rows 10–12 are reproducible (see below).
+
+## 2026-10-20 — M10 SP-10 physical registration preparation (REVIEW_READY; READY_FOR_HUMAN_CONFIRMATION)
+
+- **Branch:** `analysis/m10-sp10-registration-prep` from `aa08ad9` (SUPERVISOR analysis task; outside the Auto-ID
+  mini-step sequence).
+- **Report:** `docs/reconciliation/M10_SP10_REGISTRATION_PREP.md` (+ JSON); data, figures and tools in
+  `runs\m10_sp10` (not committed).
+- **Copies:** 17 of 17 SP-10 copies verified against the manifests before and after the work.
+- **Reconstruction:**
+  - the scan geometry of 260831 (121 pt, Bravo) and 260911 b (323 pt, Bestttt) is reconstructed on the panel with
+    the unchanged M2.3 code;
+  - in 260831 the accepted constants fit the shaker contour as the bottom edge, so a diagnostic variant
+    (`EDGE_CLUSTER_MIN_SHARE` 0.25) is recorded.
+- **Orientation:**
+  - from the frames: the same labelled face in both sessions; 260911 b rotated 90° clockwise as seen by the scanner;
+    "b-top" on edge A–D;
+  - by frame aspect: the label edge is the 520 mm edge (ruler confirmation requested);
+  - eight orientation candidates, none confirmed; the SP-02 convention (T0) contradicts the frame aspect.
+- **Evidence drafts:** guided-evidence drafts with the orientation, measured face and FE frame unfilled; the existing
+  parser refuses them.
+- **Blockers:**
+  - owner statements Q1–Q8;
+  - an SP-10 ODB extraction (HUMAN gate);
+  - 34 point pairs 0.56 mm apart in 260911 b share FE nodes (the CORE-E2E-C rule is unchanged).
+- **M9 erratum:** SP-10 FE rows 10–12 are reproducible from step 2 `SP_10_MODAL_FREE` (25 modes) of
+  `SP10nemash63000` / `SP10_NEW_E1=E2_NSM_DENSITY`. The M9 inventory read only the first eigenvalue table.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, registrations, passports, frozen observations, criteria, gates and
+  registration services. No FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no frequency pairing. M8
+  `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE (D-077).
+- **Files changed:** `docs/reconciliation/M10_SP10_REGISTRATION_PREP.md` (new),
+  `docs/reconciliation/M10_SP10_REGISTRATION_PREP.json` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-21 — R7 zero-frequency safety and shell mid-surface guard (REVIEW_READY; branch fix/r7-shell-modal-safety)
+
+- **R7-A:**
+  - root cause: the pinned `extract_odb.py` writes `frameValue` (the mode number) as the frequency of a
+    zero-frequency frame;
+  - the script is pinned (governed extraction identity) and is unchanged;
+  - `abaqus_bridge.load_extracted_odb` refuses, per mode, a manifest frequency contradicted by the frame description
+    or EIGFREQ, records why (with the independent value) and substitutes nothing;
+  - an extractor patch is proposed for a re-pin decision.
+- **R7-B:**
+  - new `services/shell_surface.py` (element types and normals from INP text; degenerate-surface detection);
+  - the guided registration refuses a confirmed conventional shell and states the limitation for a degenerate surface
+    of unknown type;
+  - an explicit shell-face field is proposed, not implemented (governed passport schema).
+- **Tests:** 18 new tests. The store-gated SP-02 / SP-13 tests were not run because they need the original
+  `D:\Snadwich`.
+- No Abaqus, no FE solve, no rule, threshold or gate change; no merge.
+
+## 2026-10-21 — R7 R1: corrections after the SUPERVISOR audit (REVIEW_READY; PR #96)
+
+- **R7-A:** the loader checks the mutual consistency of the manifest frequency, the frame description and a reliable
+  (EIGVAL-consistent) EIGFREQ.
+  - A manifest and description that agree while EIGFREQ contradicts them are now refused per mode.
+  - Nothing is substituted; legacy single-record values are unchanged.
+  - R6: modes 1–2 are refused; modes 3–20 load.
+- **OD-R7-1 (open, governed):** the extractor pin `039aa067…` is a CRLF hash; the LF blob is `043e89e1…`. It is
+  recorded as a fact in the tests and the report; the pin is not changed.
+- **R7-B:** the optional element hint is replaced by a fail-closed gate in the real GUI path.
+  - A flat measured surface needs the model's INP, bound node for node.
+  - A bound shell needs `shell_measured_face` consistent with the uniform normal and the axes' Z sign.
+  - Contradictions and mirrored axes are refused.
+  - Saved flat-surface records without a binding are not applied.
+  - `parse_geometry_calibration`, the governed passports, SPEC v1.2, thresholds and gates are unchanged.
+- **Tests:** 31 R7 tests; the guided tests supply a bound solid INP for the synthetic flat instances.
+  - The baseline issue `test_v12_i5_contract_closure` is a cross-class order dependency (unittest alphabetical vs
+    pytest definition order); it is not fixed.
+  - The store-gated SP-02 / SP-13 tests were not run: their inputs are not in V2 / V3, and the originals may not be
+    opened.
+
+## 2026-10-21 — R7 R2: re-application of saved guided registrations is fail-closed (REVIEW_READY; PR #96)
+
+- **Re-verification:** `verify_for_files(..., fe_input=...)` re-runs the complete shell gate for every
+  single-z-level measured surface:
+  - the record must carry the v2 binding, so R7 / R7 R1 records are refused;
+  - the INP must be supplied again, so a recorded `bound = true` alone is refused;
+  - the INP SHA-256 must be the recorded one;
+  - node-for-node binding, element types, normals, `connectivity_sha256`, the saved shell face, the Z sign and the
+    determinant (from the axes and from the registration rotation) are checked again;
+  - the binding must reproduce the record exactly.
+- **Real path:** Apply keeps the INP path; the worker re-reads it before every analysis; dialog reopen uses the located
+  INP.
+- **Provenance (requirement 6):** the node match proves only the INP's nodes; the INP-to-ODB link is NOT proven and is
+  recorded as `fe_model_identity`. The required provenance (an ODB connectivity export after a re-pin, or `odb.jobData`
+  via Abaqus Python) is defined, not implemented.
+- **Tests:** 41 R7 tests, plus GUI / worker refusal cases.
+- **Unchanged:** non-flat solid registrations, governed paths, the pinned extractor and OD-R7-1.
+
 ## 2026-10-21 — M11 single CFRP plate (REVIEW_READY; FREQUENCY_DIAGNOSTIC_ONLY; analysis only)
 
 - **Branch:** `analysis/m11-single-carbon-plate` from `aa08ad9` (SUPERVISOR analysis task; outside the Auto-ID
@@ -5712,6 +5806,48 @@ first internal provider.
 - **Not done:** no material identification, G12 fitting, Auto-ID or LM. `research/m11_r65` unchanged, statuses
   unchanged.
 
+## 2026-10-23 — R7 FINAL: integration-readiness check of PR #96 (documentation only; not merged)
+
+- **Documents brought in line with the completed R7 R2 scope:**
+  - report header and history: R7 R1 `fa3a2e3`, R7 R2 `f6df6f4`;
+  - files heading;
+  - the GUI guide's re-application rules;
+  - STATUS `final_check`.
+- **Git:** 4 commits on main `aa08ad9`, 0 behind; no conflict with main; no M10 / M11 file and no data.
+- **Tests:**
+  - unittest: R7 2497 OK, 96 skipped; main 2455 OK, 96 skipped; the same skipped set.
+  - pytest: one baseline failure (`test_v12_i5_contract_closure`), identical on main.
+  - The store-gated real-data SP-02 / SP-13 tests were not run.
+- **Unchanged:** the pinned extractor and its hash, `physical_registration.py`, SPEC v1.2, passports, thresholds and
+  production gates. OD-R7-1 open; FE_MODEL_IDENTITY = NODES_AND_INP_CONTENT.
+
+## 2026-10-23 — R7 merged; APP-E2E.1 post-R7 program end-to-end acceptance (REVIEW_READY)
+
+- **R7 integrated:** PR #96 merged into `main` as `fb7063ab1342095e24cf3c239e8c865e4e6a618d`; push CI run 39941547107
+  on it: success. R7 status MERGED, programmatic diagnostics accepted; OD-R7-1 remains open.
+- **CI stabilisation (tests only):**
+  - `test_no_full_model_contamination` is now a structural check instead of a substring search over random hashes.
+    This is the test logic of PR #95 commit `43fe2e7` (same file blob; the same change is in open PR #95). It passed
+    2400 / 2400 repeats; the old check failed 4 / 400.
+  - `test_v12_i5_contract_closure`: the calibration-vs-material test builds the shared campaigns before using them,
+    so it no longer depends on test order.
+- **Program check (`docs/gui/POST_R7_PROGRAM_E2E_ACCEPTANCE.md`):**
+  - clean `RUN_PROGRAM.cmd` launch;
+  - real-window scenarios on verified copies: SP-02 / SP-13 accepted comparisons reproduce their pairs and reports;
+  - the plate without physical registration, a new SP-13 FE geometry and a damaged UNV end in stated diagnostics
+    without pairing or MAC;
+  - diagnostic and comparison PDF / Excel reports were opened again and checked;
+  - R7-A refuses the false rigid-mode frequency records of the real R6 package.
+  Verdict `APP_DIAGNOSTIC_E2E_READY`.
+- **Open:**
+  - P-1: an input change does not clear the shown result; exports stay bound to the analysed inputs; not fixed here.
+  - The store-gated real-data regressions were NOT_RUN.
+- **Tests:** unittest 2501 OK / 96 skipped; pytest 2440 passed / 112 skipped / 0 failed.
+- **Unchanged:**
+  - production code, SPEC v1.2, passports, thresholds, gates, the pinned extractor and its hash, M10 / M11 data;
+  - M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production calibration BLOCKED / NOT_AUTHORISED.
+  - No Abaqus solve or extraction was run.
+
 ## 2026-10-23 — M11 R6.7: independent E1/E2 modal sensitivity (research result RESEARCH_MAC_COMPUTED; physical registration PENDING)
 
 - **Two authorised Abaqus frequency runs** from the verified V3 INP copy: E1 −10 % (50 400 MPa) and E2 −10 %, each a
@@ -5728,3 +5864,47 @@ first internal provider.
 - **Correction:** the R6.6 §18.3 wording now calls the Kirchhoff Rayleigh estimate an analytical reference, not a
   strict upper bound for S4R. The Figure 18.1 legend is corrected and regenerated; the R6.6 numbers are unchanged.
 - **Not done:** no identification, fitting, Auto-ID, LM or pairing. R6.5 and R6.6 results unchanged.
+
+## 2026-10-24 — APP-E2E.2: P-1 fixed, a result whose inputs changed is never left active (REVIEW_READY; PR #97)
+
+- **Behaviour:** after an analysis, changing an input that defines the result makes the shown result inactive at
+  once. This holds for a comparison with MAC and for a FREQUENCY_ONLY_DIAGNOSTIC.
+  - The inputs are: the FE file, the experimental file, the mode range, the modal set, the calibration fields, the
+    accepted-registration option, the guided registration and a confirmed orientation.
+  - Tables, cards, plots and mode views are cleared; the PDF / Excel export is disabled; the status says to run the
+    analysis again.
+  - A result that arrives after its inputs changed is discarded.
+  - Workspace, Abaqus command and display preferences keep the result. Exported files stay on disk.
+- **Code:**
+  - `src/ui_workflow.py`: the existing reset of a new run is reused, and no parallel state is added.
+  - `src/guided_registration_ui.py`: `clear()` requests the same check.
+  - MAC, pairing, registration logic, thresholds and gates are unchanged.
+- **Tests:**
+  - `tests/test_app_p1_stale_results.py`: 14 tests in the real main window. 20 of them fail on the unfixed code.
+  - unittest 2515 OK / 96 skipped, in three runs.
+- **Real Windows window (verified copies, no process):**
+  - SP-02 comparison: 27 / 27;
+  - SP-13 comparison: 21 / 21;
+  - plate diagnostic: 29 / 29.
+- **Not run:** the store-gated real-data regressions remain NOT_RUN. P-2 and P-3 are not in scope.
+
+## 2026-10-24 — M11 integration: branch merged with main; final statuses RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING / FE_SENSITIVITY_RESEARCH_ONLY (REVIEW_READY; PR #95)
+
+- **Merge:** `origin/main` `aa7d922` (M9, M10, R7, APP-E2E.1–2) merged into `analysis/m11-single-carbon-plate`.
+  Conflicts were only in ROADMAP, STATUS and CHANGELOG (both sides appended); both histories are kept.
+  - `tests/test_registration_factory.py` is the same file on both sides (the PR #95 fix already in main), so it is not
+    applied twice.
+- **Final statuses of M11 (R6.1–R6.7):**
+  - `RESEARCH_MAC_COMPUTED`: a research-only complex MAC (R6.5); it is not a pairing.
+  - `PHYSICAL_REGISTRATION_PENDING`.
+  - `FE_SENSITIVITY_RESEARCH_ONLY`: the FE frequency sensitivities to G12, E1 and E2 (R6.6, R6.7) are sensitivities
+    of the model, with no material identification.
+  - The earlier `FREQUENCY_DIAGNOSTIC_ONLY` describes only the initial review.
+- **Not claimed:** no accepted experimental / FE mode pair; no confirmed MAC; no established physical orientation of the plate; no identified E1, E2 or G12; no transfer to the sandwich panels; no production Auto-ID readiness.
+- **Editorial synchronisation:**
+  - the M11 report header, the JSON summary, the ROADMAP line and the STATUS entry now carry the final statuses and
+    the record of the authorised Abaqus work (R6 extraction; R6.6 / R6.7 frequency runs);
+  - STATUS records the merges already on main: PR #97 `2f314bc` and PR #94 `aa7d922`. These are facts only; M10
+    stays READY_FOR_HUMAN_CONFIRMATION.
+- **Unchanged:** production code, MAC, registration, Auto-ID, thresholds and governed gates. M8 GATE `NOT_MET`;
+  D-077 `NO_GLOBAL_PARAMETER_VALUE`; production Auto-ID / calibration NOT_AUTHORISED. No new computation.

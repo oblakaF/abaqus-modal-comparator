@@ -2,9 +2,16 @@
  "schema": "m11/single-cfrp-plate/v1",
  "status": "REVIEW_READY",
  "outcome": "FREQUENCY_DIAGNOSTIC + EXPERIMENTAL_MODE_TYPES (no FE pairing confirmed)",
- "outcome_stage": "initial review 2026-10-21",
+ "outcome_stage": "initial review 2026-10-21 (superseded: see final_statuses)",
  "research_result": "RESEARCH_MAC_COMPUTED (R6.5 2026-10-22; QA R6.5a): RESEARCH_DIAGNOSTIC_ONLY, not a modal pairing",
  "physical_registration": "PHYSICAL_REGISTRATION_PENDING (FE extraction ready since R6; not completed by the research MAC)",
+ "fe_sensitivity": "FE_SENSITIVITY_RESEARCH_ONLY (R6.6 G12, R6.7 E1 / E2; sensitivities of the FE model, no material identification)",
+ "final_statuses": [
+  "RESEARCH_MAC_COMPUTED",
+  "PHYSICAL_REGISTRATION_PENDING",
+  "FE_SENSITIVITY_RESEARCH_ONLY"
+ ],
+ "not_claimed": "no accepted experimental / FE mode pair; no confirmed MAC; no established physical orientation of the plate; no identified E1, E2 or G12; no transfer to the sandwich panels; no production Auto-ID readiness",
  "labels": [
   "ANALYSIS_ONLY",
   "NOT_GOVERNED_EVIDENCE",

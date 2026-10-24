@@ -21,6 +21,7 @@ import numpy as np
 from reviewed_core import experimental_measurement_masks
 from scientific_state import modal_dataset_geometry_identity
 from services import guided_registration as guided
+from services import shell_surface
 from services.archived_sensitivity_evidence import fresh_content_identity
 
 
@@ -31,6 +32,7 @@ class GuidedRegistrationDialog:
         self.result: Optional[guided.GuidedRegistration] = None
         self.identity: Optional[dict] = None
         self.reference_path: Optional[Path] = None
+        self.fe_input_path: Optional[Path] = None  # R7-B: the INP of this model (flat / shell measured surfaces)
         # R3: every change of the inputs (evidence, reference geometry, opened record, Clear) and every build starts a
         # new generation; a background build delivers its result only if its generation is still the current one
         self._generation = 0
@@ -63,6 +65,7 @@ class GuidedRegistrationDialog:
         self.locate_button = ttk.Button(buttons, text="Locate reference FE geometry file...", command=self.locate,
                                         state="disabled")
         self.locate_button.pack(side="left", padx=6)
+        ttk.Button(buttons, text="Locate FE input (INP)...", command=self.locate_fe_input).pack(side="left")
         self.fields = self._tree(evidence_box, ("field", "value", "status"), 7, (170, 820, 110))
         result_box = ttk.LabelFrame(body, text="Checks and registration", padding=6)
         result_box.pack(fill="both", expand=True, pady=(6, 0))
@@ -135,7 +138,9 @@ class GuidedRegistrationDialog:
                  ("Experimental points / modes", f"{len(modes[0].node_ids)} points, {len(modes)} modes, modal set "
                                                  f"{experimental.metadata.get('modal_set_key')!r}, measured {dofs}"),
                  ("Experimental SHA-256", "hashing..." if self.identity is None else
-                  f"{self.identity['sha256']} ({self.identity['size']} bytes)")]
+                  f"{self.identity['sha256']} ({self.identity['size']} bytes)"),
+                 ("FE input (INP)", str(self.fe_input_path) if self.fe_input_path is not None else
+                  "not located (required when the measured surface is a single z level, e.g. a shell)")]
         self._fill(self.files, rows)
 
     def _hash_experimental_file(self) -> None:
@@ -228,6 +233,17 @@ class GuidedRegistrationDialog:
         self._set_status(f"Reference FE geometry: {chosen} (its SHA-256 is checked when building). Press Check and "
                          "build again.")
 
+    def locate_fe_input(self, path: Optional[Path] = None) -> None:
+        chosen = path or filedialog.askopenfilename(title="FE input file of this model (INP)", parent=self.window,
+                                                    filetypes=[("Abaqus input", "*.inp"), ("All files", "*.*")])
+        if not chosen:
+            return  # cancelled: nothing changes
+        self.fe_input_path = Path(chosen)
+        self._invalidate()
+        self._show_files()
+        self._set_status(f"FE input: {chosen}. It is bound to the loaded FE instance node for node when building. "
+                         "Press Check and build again.")
+
     # ------------------------------------------------------------------ build / apply / save / open
     def build(self) -> None:
         if self.evidence is None or self.identity is None:
@@ -235,12 +251,15 @@ class GuidedRegistrationDialog:
         generation = self._invalidate()  # never a stale or partial registration while (or after) building
         self.build_button.configure(state="disabled")
         self._set_status("Checking the evidence and building the registration...")
-        evidence, identity, reference = self.evidence, self.identity, self.reference_path
+        evidence, identity, reference, fe_input_path = self.evidence, self.identity, self.reference_path,             self.fe_input_path
 
         def work():
             try:
+                fe_input = None if fe_input_path is None else shell_surface.load_fe_input(
+                    fe_input_path, instance=evidence.geometry_calibration.measured_surface.fe_instance)
                 result = guided.establish_guided_registration(self.loaded.abaqus, self.loaded.experimental, identity,
-                                                              evidence, reference_geometry_path=reference)
+                                                              evidence, reference_geometry_path=reference,
+                                                              fe_input=fe_input)
             except Exception as error:  # noqa: BLE001  (a refusal or an unexpected error: shown, never swallowed)
                 self._calls.put(lambda error=error: self._built(None, error, generation))
                 return
@@ -286,6 +305,8 @@ class GuidedRegistrationDialog:
         if self.result is None:
             return
         self.app._guided_registration = self.result
+        # R7 R2: the FE input is re-read and re-verified with the registration before every analysis
+        self.app._guided_fe_input_path = self.fe_input_path
         self.app.status.set("Guided physical registration set; the analysis runs again with it.")
         self.window.destroy()
         self.app._start()
@@ -316,7 +337,8 @@ class GuidedRegistrationDialog:
         self._invalidate()  # the shown result is replaced only by a record verified against the current files
         try:
             result = guided.load_guided_registration(Path(chosen))
-            guided.verify_for_files(result, self.loaded.abaqus, self.loaded.experimental, self.identity)
+            guided.verify_for_files(result, self.loaded.abaqus, self.loaded.experimental, self.identity,
+                                    fe_input=guided.load_fe_input_for(result, self.fe_input_path))
         except Exception as error:  # noqa: BLE001  (a refusal or an unreadable file: shown, never applied)
             self._show_failure(error, "SAVED REGISTRATION REFUSED", "")
             return
@@ -324,6 +346,10 @@ class GuidedRegistrationDialog:
 
     def clear(self) -> None:
         self.app._guided_registration = None
+        self.app._guided_fe_input_path = None
+        check = getattr(self.app, "_check_analysis_inputs", None)
+        if callable(check):  # P-1: a result computed with the cleared registration is no longer active
+            check()
         self._invalidate()  # a build still running never brings a result back
         self._set_status("No guided registration is applied; the next analysis uses automatic geometry registration.")
 

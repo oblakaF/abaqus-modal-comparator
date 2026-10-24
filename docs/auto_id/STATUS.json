@@ -150,6 +150,27 @@
       "pr": 59,
       "merge_commit": "149debc3172cb4adb3ba6fcc48635b770340783e",
       "status": "ACCEPTED scope READ_ONLY_EXISTING_JOURNALLED_RUNS (D-079); M8 stage IN_PROGRESS; original M8 GATE NOT_MET"
+    },
+    {
+      "stage": "R7 modal-frequency consistency guard and fail-closed diagnostic shell registration",
+      "kind": "program safety fix (not a roadmap stage)",
+      "pr": 96,
+      "merge_commit": "fb7063ab1342095e24cf3c239e8c865e4e6a618d",
+      "status": "MERGED; programmatic diagnostics accepted; OD-R7-1 open"
+    },
+    {
+      "stage": "APP-E2E.1-2 post-R7 program acceptance and stale-result fix (P-1)",
+      "kind": "program acceptance / fix (not a roadmap stage)",
+      "pr": 97,
+      "merge_commit": "2f314bc965fd735fbfa683754e56515b0e4fc827",
+      "status": "MERGED"
+    },
+    {
+      "stage": "M10 SP-10 physical registration preparation (documentation)",
+      "kind": "analysis documentation (not a roadmap stage)",
+      "pr": 94,
+      "merge_commit": "aa7d92247d690d500513b4169b425bf98ce8e0c6",
+      "status": "MERGED; outcome READY_FOR_HUMAN_CONFIRMATION (no physical registration accepted)"
     }
   ],
   "m1": {
@@ -618,7 +639,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of analysis/m11-single-carbon-plate (M11 REVIEW_READY, not merged) and of analysis/m10-sp10-registration-prep (PR #94). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
+  "next_action": "STOP: SUPERVISOR / owner decision on merging PR #95 (M11 REVIEW_READY: RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING / FE_SENSITIVITY_RESEARCH_ONLY; documented research, no material characterisation). SP-10 physical registration awaits the owner's confirmation (M10 READY_FOR_HUMAN_CONFIRMATION: Q1-Q8); the plate's physical registration is PHYSICAL_REGISTRATION_PENDING. M8 stage IN_PROGRESS, original M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production Auto-ID / calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -2042,7 +2063,7 @@
     "note": "the top-level status refers to current_ministep; the M8 stage is not ACCEPTED"
   },
   "m9_six_specimen_reconciliation": {
-    "status": "REVIEW_READY",
+    "status": "ACCEPTED",
     "kind": "SUPERVISOR analysis task (2026-10-20), outside the Auto-ID mini-step sequence; no stage started",
     "branch": "analysis/m9-six-specimens",
     "base": "9e1921e2b5234afee6fac9c0c9f4f9c92ae443c2",
@@ -2055,11 +2076,39 @@
       "SP-04": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE",
       "SP-05": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE"
     },
-    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates; no FE solve, no Abaqus Python, no LM; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE"
+    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates; no FE solve, no Abaqus Python, no LM; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE",
+    "acceptance": "SUPERVISOR: M9 ACCEPTED (task M10, 2026-10-20); PR #93 merged",
+    "merge_commit": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
+    "erratum": "M10 (2026-10-20): SP-10 FE rows 10-12 ARE reproducible from step 2 SP_10_MODAL_FREE (25 modes) of SP10nemash63000 / SP10_NEW_E1=E2_NSM_DENSITY; see docs/reconciliation/M10_SP10_REGISTRATION_PREP.md §10"
+  },
+  "m10_sp10_registration_prep": {
+    "status": "MERGED",
+    "outcome": "READY_FOR_HUMAN_CONFIRMATION",
+    "kind": "SUPERVISOR analysis task (2026-10-20), outside the Auto-ID mini-step sequence; no stage started",
+    "branch": "analysis/m10-sp10-registration-prep",
+    "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
+    "report": "docs/reconciliation/M10_SP10_REGISTRATION_PREP.md",
+    "summary": "scan geometry of SP-10 sessions 260831 (121 pt, Bravo) and 260911b (323 pt, Bestttt) reconstructed on the panel with the accepted M2.3 method (260831 with a recorded one-constant diagnostic deviation); same labelled face in both sessions, 260911b rotated 90 deg clockwise (label, b-top); label edge = 520 mm by frame aspect (ruler confirmation requested); 8 orientation candidates, none confirmed; evidence drafts unfilled; no registration built",
+    "blockers": [
+      "owner statements Q1-Q8",
+      "SP-10 ODB extraction for the FE geometry identity (HUMAN gate)",
+      "260911b: 34 point pairs 0.56 mm apart share FE nodes (CORE-E2E-C refuses)",
+      "260831: acceptance of the one-constant method deviation"
+    ],
+    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, passports, frozen observations, criteria, gates, registration services; no FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no frequency pairing; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE",
+    "pr": 94,
+    "main_merge": "aa7d92247d690d500513b4169b425bf98ce8e0c6"
   },
   "m11_single_cfrp_plate": {
     "status": "REVIEW_READY",
-    "outcome": "FREQUENCY_DIAGNOSTIC + EXPERIMENTAL_MODE_TYPES (no FE pairing confirmed) [initial review 2026-10-21]",
+    "outcome": "RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING / FE_SENSITIVITY_RESEARCH_ONLY (final, R6.1-R6.7; integration 2026-10-24)",
+    "final_statuses": {
+      "research_result": "RESEARCH_MAC_COMPUTED",
+      "physical_registration": "PHYSICAL_REGISTRATION_PENDING",
+      "fe_sensitivity": "FE_SENSITIVITY_RESEARCH_ONLY"
+    },
+    "not_claimed": "no accepted experimental / FE mode pair; no confirmed MAC; no established physical orientation of the plate; no identified E1, E2 or G12; no transfer to the sandwich panels; no production Auto-ID readiness",
+    "initial_outcome": "FREQUENCY_DIAGNOSTIC + EXPERIMENTAL_MODE_TYPES (no FE pairing confirmed) [initial review 2026-10-21] [initial review 2026-10-21; superseded by R6.5-R6.7]",
     "kind": "SUPERVISOR analysis task (2026-10-21), outside the Auto-ID mini-step sequence; no stage started",
     "branch": "analysis/m11-single-carbon-plate",
     "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
@@ -2072,6 +2121,66 @@
     "research_mac": "R6.5: research-only complex MAC 10 x 14 (polymax-bravo x FE 7-20), RESEARCH_DIAGNOSTIC_ONLY / COMPUTATIONAL_CONVENTION_ONLY / NO_ACCEPTED_PHYSICAL_REGISTRATION; no pairing, no registration, nothing passed to Auto-ID / LM",
     "research_result": "RESEARCH_MAC_COMPUTED (R6.5, 2026-10-22; QA R6.5a)",
     "r66": "R6.6 (2026-10-22): two authorised Abaqus frequency runs, G12 10 000 / 15 000 MPa, all else identical; FE 7 19.07 -> 26.58 -> 32.18 Hz; sensitivity study only, no material identification; statuses unchanged",
-    "r67": "R6.7 (2026-10-23): two authorised Abaqus frequency runs, E1 -10 % / E2 -10 %, all else identical; FE 13 pure E1, FE 14 pure E2, FE 7 insensitive; pairs 8-9 and 15-16 rotate; sensitivity matrix only, no material identification; statuses unchanged"
+    "r67": "R6.7 (2026-10-23): two authorised Abaqus frequency runs, E1 -10 % / E2 -10 %, all else identical; FE 13 pure E1, FE 14 pure E2, FE 7 insensitive; pairs 8-9 and 15-16 rotate; sensitivity matrix only, no material identification; statuses unchanged",
+    "pr": 95,
+    "integration": "branch merged with main aa7d922 on 2026-10-24 (SUPERVISOR M11 INTEGRATION); PR #95 not merged; documented research, not a characterisation of the carbon material"
+  },
+  "r7_shell_modal_safety": {
+    "status": "MERGED",
+    "branch": "fix/r7-shell-modal-safety",
+    "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
+    "report": "docs/reconciliation/R7_SHELL_MODAL_SAFETY.md",
+    "summary": "loader refuses any frequency record contradiction per mode (manifest / description / reliable EIGFREQ), nothing substituted; fail-closed shell gate in the real GUI path: flat measured surface needs a node-for-node bound INP, bound shell needs a consistent shell_measured_face; saved flat records without a binding are not applied; R2: every re-application of a flat / shell registration re-runs the full shell gate against the re-supplied INP (sha, nodes, types, connectivity, normals, face, Z sign, determinant) and must reproduce the recorded v2 binding; INP-to-ODB link recorded as NOT proven",
+    "unchanged": "pinned extract_odb.py and its pin, physical_registration.py, parse_geometry_calibration, governed passports, SPEC v1.2, thresholds, production gates",
+    "revision": "R7 R2 (re-application of saved registrations fail-closed)",
+    "pr": 96,
+    "open_decisions": [
+      "OD-R7-1: PINNED_EXTRACT_SCRIPT_SHA256 is a CRLF hash (LF blob 043e89e1...); re-pin options in R7_SHELL_MODAL_SAFETY.md",
+      "extractor root-cause patch depends on the re-pin"
+    ],
+    "final_check": "R7 FINAL 2026-10-23: documentation synchronised with R7 R2; 4 commits on main aa08ad9, 0 behind, no merge conflict with main; unittest 2497 OK / 96 skipped (main 2455 / 96, same skips); pytest 1 baseline failure identical on main; store-gated SP-02 / SP-13 real-data tests not run; not merged; PR #96 draft",
+    "acceptance": "programmatic diagnostics accepted by the SUPERVISOR (APP-E2E.1 instruction, 2026-10-23); PR #96 merged to main",
+    "main_merge": "fb7063ab1342095e24cf3c239e8c865e4e6a618d",
+    "main_ci": "push run 39941547107 on fb7063a: success (Run unit tests)"
+  },
+  "app_e2e_1_post_r7_program_smoke": {
+    "title": "APP-E2E.1: main stabilisation and end-to-end program check after R7",
+    "status": "MERGED",
+    "verdict": "APP_DIAGNOSTIC_E2E_READY",
+    "kind": "program acceptance (not a scientific stage; no M8 / M11 step)",
+    "branch": "integration/post-r7-program-smoke",
+    "base": "fb7063ab1342095e24cf3c239e8c865e4e6a618d",
+    "report": "docs/gui/POST_R7_PROGRAM_E2E_ACCEPTANCE.md",
+    "test_fixes": [
+      "test_registration_factory: structural full-model contamination check (test logic of PR #95 commit 43fe2e7, identical blob fa9e241; the same change is in open PR #95)",
+      "test_v12_i5_contract_closure: test_a_calibration_pass_does_not_change_the_material_verdict builds the shared campaigns through FamilyConsistencyTests.reports() before using them (order-independent)"
+    ],
+    "unchanged": "src/, SPEC v1.2, passports, registrations, MAC / registration algorithms, thresholds, production gates, pinned extractor and PINNED_EXTRACT_SCRIPT_SHA256, M10 / M11 data, PR #94 / #95",
+    "abaqus": "0 solves, 0 extractions (every process start refused in the GUI runs)",
+    "open": "OD-R7-1 open; M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production calibration BLOCKED / NOT_AUTHORISED",
+    "results": "RUN_PROGRAM.cmd clean launch: main window, no traceback, closes cleanly; GUI scenarios on verified copies: A1 SP-02 and A2 SP-13 accepted registrations reproduce the accepted strict pairs and the CORE-E2E reports; B1 plate (no physical registration), B2 new SP-13 FE geometry, B3 damaged UNV: stated diagnostics, no pair, no MAC, diagnostic PDF / Excel verified; R7-A refuses the false 1.0 / 2.0 Hz records of the real R6 package; unittest 2501 OK / 96 skipped, pytest 2440 passed / 112 skipped / 0 failed",
+    "open_program_issues": [
+      "P-1: FIXED in APP-E2E.2 (app_e2e_2_p1_stale_results); was: changing an input after an analysis did not clear the shown result (table, cards, enabled exports)"
+    ],
+    "not_run": "store-gated real-data regressions (snadwich, carbon-project-archive, sumin, M7 run A / B stores): NOT_RUN",
+    "main_merge": "2f314bc965fd735fbfa683754e56515b0e4fc827"
+  },
+  "app_e2e_2_p1_stale_results": {
+    "title": "APP-E2E.2: P-1 fixed - a result whose inputs changed is never left active",
+    "status": "MERGED",
+    "verdict": "APP_E2E_P1_READY_FOR_SUPERVISOR_REVIEW",
+    "kind": "program fix (not a scientific stage)",
+    "branch": "integration/post-r7-program-smoke",
+    "pr": 97,
+    "base": "e0e5768bf9afc74e7aa975974ff9aa3c1290055c",
+    "report": "docs/gui/POST_R7_PROGRAM_E2E_ACCEPTANCE.md section 9",
+    "change": "src/ui_workflow.py: the inputs of a run are recorded at Run and traced; any change of an input that defines the result (FE / experimental file, mode range, modal set, calibration fields, accepted-registration option, guided registration, confirmed orientation) applies the existing reset of a new run (result / cache None, presentation and mode views cleared, exports disabled) and states 'Run the analysis again'; an outcome whose inputs changed while it ran is discarded; workspace, Abaqus command and display preferences keep the result; src/guided_registration_ui.py clear() requests the same check",
+    "tests": "tests/test_app_p1_stale_results.py: 14 tests (11 subtests), real main window, synthetic data; 20 failures on the unfixed code; unittest 2515 OK / 96 skipped (three runs); pytest 2454 passed / 112 skipped / 0 failed",
+    "gui": "real Windows window on verified copies, no process: SP-02 comparison 27/27, SP-13 comparison 21/21, plate FREQUENCY_ONLY_DIAGNOSTIC 29/29 (change, cleared, export disabled, earlier reports kept, new run shown and exported)",
+    "unchanged": "MAC and pairing, physical / guided registration logic, SPEC v1.2, thresholds, Auto-ID and production gates, pinned extractor, M10 / M11 data, PR #94 / #95",
+    "abaqus": "0 solves, 0 extractions",
+    "not_run": "store-gated real-data regressions: NOT_RUN",
+    "open": "P-2, P-3 (not in scope); OD-R7-1 open; M8 GATE NOT_MET",
+    "main_merge": "2f314bc965fd735fbfa683754e56515b0e4fc827"
   }
 }

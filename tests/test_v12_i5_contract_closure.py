@@ -365,8 +365,8 @@ class QuestionContractTests(_Bundles):
         self.assertNotEqual(record.identity["campaign_hash"], material_campaign.definition.campaign_hash)
 
     def test_a_calibration_pass_does_not_change_the_material_verdict(self):
+        before = FamilyConsistencyTests.reports()[(0.02, 1.12)]  # builds the shared campaigns: order-independent
         campaign = FamilyConsistencyTests.campaigns[(0.02, 1.12)]
-        before = FamilyConsistencyTests.reports()[(0.02, 1.12)]
         inputs, item = self.bundle()
         self.assertTrue(self.output(inputs, item).released)  # a RELEASED calibration of one specimen
         after = json.loads(json.dumps(build_campaign_report(

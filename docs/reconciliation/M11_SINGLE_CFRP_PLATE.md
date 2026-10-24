@@ -1,11 +1,18 @@
-# M11 — Single CFRP plate (frequency diagnostics; analysis only)
+# M11 — Single CFRP plate (frequency diagnostics, research MAC and FE sensitivity; analysis only)
 
-**Status: `REVIEW_READY`.** The outcome of the initial review (2026-10-21) was `FREQUENCY_DIAGNOSTIC_ONLY`.
+**Status: `REVIEW_READY`.** Final statuses (R6.1–R6.7; integration 2026-10-24): `RESEARCH_MAC_COMPUTED`, `PHYSICAL_REGISTRATION_PENDING`,
+`FE_SENSITIVITY_RESEARCH_ONLY`. The initial review (2026-10-21) ended at `FREQUENCY_DIAGNOSTIC_ONLY`; that description is
+superseded by R6.5–R6.7, which add research results but no scientific mode pairing. M11 is a documented research
+study, not a characterisation of the carbon material.
 
 - **Research result:** `RESEARCH_MAC_COMPUTED` (R6.5, 2026-10-22, §17; QA R6.5a, §17.11). It is
   RESEARCH_DIAGNOSTIC_ONLY and not a modal pairing.
 - **Physical registration:** `PHYSICAL_REGISTRATION_PENDING` (FE extraction ready since R6). The research MAC
   does **not** complete it.
+- **FE sensitivity:** `FE_SENSITIVITY_RESEARCH_ONLY` (R6.6 G12, §18; R6.7 E1 / E2, §19). They are sensitivities of
+  the FE model; no material property is identified.
+- **Not claimed:** an accepted experimental / FE mode pair, a confirmed MAC, an established physical orientation of
+  the plate, identified E1 / E2 / G12, a transfer to the sandwich panels, or production Auto-ID readiness.
 
 - The initial frequency-only review was supplemented by the owner's mass and 20 perimeter thickness readings (§8)
   and verified copies of the LMS/PSV/PolyMAX modal and FRF data (§9): **10 experimental shapes at 289 points**.
@@ -13,7 +20,11 @@
   experimental/FE mode pairing exists. A research-only complex MAC was computed in R6.5 (§17); it is not a
   pairing. Laminate layup, measured interior thickness and the complete shaker/suspension setup remain unknown.
 - No material constant was fitted.
-- No FE solve, Abaqus Python, Auto-ID or LM was run. No original was modified.
+- Abaqus ran only under explicit authorisation, on working copies of the verified V3 files:
+  - one Abaqus Python extraction (R6, §12);
+  - two controlled frequency runs for G12 (R6.6, §18);
+  - two controlled frequency runs for E1 / E2 (R6.7, §19).
+  No Auto-ID or LM was run. No original was modified.
 - Nothing here is governed evidence.
 
 Work data, figures and tools: `D:\git\abaqus-modal-comparator-work\runs\m11_carbon_plate`; machine summary

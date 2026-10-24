@@ -27,7 +27,7 @@ from services.modal_data_viewer import (
     LoadedModalData,
     attach_loaded_data,
 )
-from services.guided_registration import GuidedRegistrationRefusal, verify_for_files
+from services.guided_registration import GuidedRegistrationRefusal, load_fe_input_for, verify_for_files
 from services.new_odb_comparison import (
     GeometryReuseRefusal,
     bind_registration_by_fe_geometry,
@@ -279,7 +279,9 @@ def install_runtime_hardening(app_module) -> None:
                 try:
                     identity = fresh_content_identity(Path(resolved_experiment),
                                                       cancel=getattr(self, "_analysis_cancel_event", None))
-                    verify_for_files(guided, abaqus_data, experiment_data, identity)
+                    # R7 R2: a flat / shell measured surface is re-verified against its FE input every time
+                    verify_for_files(guided, abaqus_data, experiment_data, identity,
+                                     fe_input=load_fe_input_for(guided, getattr(self, "_guided_fe_input_path", None)))
                 except SensitivityCheckCancelled as error:
                     raise AnalysisCancelled("Analysis stopped by user.") from error
                 except (GuidedRegistrationRefusal, AcceptedReferenceRefusal) as error:
