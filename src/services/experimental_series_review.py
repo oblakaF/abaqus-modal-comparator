@@ -71,15 +71,38 @@ def series_identity(path: Path, modal_set: Optional[str], cancel=None) -> Series
     return SeriesIdentity(content["sha256"], int(content["size"]), str(modal_set or ""), Path(path).name)
 
 
+_ENTRY_TEXT = {SET: ("series_key", "status", "experiment_id", "reason", "information_source", "recorded_at"),
+               WITHDRAWN: ("series_key", "reason", "information_source", "recorded_at")}
+
+
+def _damaged(store: Path, what: str) -> SeriesReviewError:
+    return SeriesReviewError(f"the review log {store} is damaged ({what}). It is left unchanged: no note can be read or "
+                             "recorded until the file is repaired or moved away by a person.")
+
+
 def _read(store: Path) -> dict:
+    """The whole log, checked entry by entry; a damaged log raises SeriesReviewError and is never rewritten."""
     try:
         data = json.loads(Path(store).read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {"schema": SCHEMA, "entries": []}
-    except (OSError, ValueError) as error:
+    except OSError as error:
         raise SeriesReviewError(f"the review log {store} cannot be read: {error}") from error
-    if data.get("schema") != SCHEMA or not isinstance(data.get("entries"), list):
-        raise SeriesReviewError(f"{store} is not a {SCHEMA} log.")
+    except ValueError as error:  # invalid JSON or text encoding
+        raise _damaged(store, f"not valid JSON: {error}") from error
+    if not isinstance(data, dict):
+        raise _damaged(store, f"the top level is a {type(data).__name__}, not an object")
+    if data.get("schema") != SCHEMA:
+        raise _damaged(store, f"schema {data.get('schema')!r} instead of {SCHEMA!r}")
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        raise _damaged(store, "'entries' is not a list")
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict) or entry.get("action") not in _ENTRY_TEXT:
+            raise _damaged(store, f"entry {index} is not a SET / WITHDRAWN record")
+        missing = [key for key in _ENTRY_TEXT[entry["action"]] if not isinstance(entry.get(key), str)]
+        if missing:
+            raise _damaged(store, f"entry {index} lacks {', '.join(missing)}")
     return data
 
 

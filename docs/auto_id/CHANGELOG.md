@@ -5947,3 +5947,21 @@ first internal provider.
 - **Unchanged:** MAC, pairing, registrations, QC thresholds, SPEC v1.2, Auto-ID and production gates, the pinned
   extractor. M8 GATE `NOT_MET`; D-077 `NO_GLOBAL_PARAMETER_VALUE`; production Auto-ID BLOCKED / NOT_AUTHORISED. No
   Abaqus, no LM.
+
+## 2026-10-25 — APP-E2E.3 address fixes: stale series dialog, damaged review log (REVIEW_READY)
+
+- **Stale dialog.** *Review series...* belongs to the series it was opened for. After a change of the experimental
+  file or the modal set:
+  - it shows STALE and disables Mark / Withdraw;
+  - a press is refused again at the moment of writing;
+  - it never records for, or shows its note as, another series.
+  The same series selected again makes it current again.
+- **Damaged log.** `experimental_series_review` checks the log structure on every read: JSON, top-level object,
+  schema, entries list, SET / WITHDRAWN records with their text fields.
+  - A damaged log is a clear `SeriesReviewError` that names the problem; read, mark and withdraw are refused, and the
+    file is never rewritten or replaced.
+  - The identification also states any unexpected error instead of waiting.
+- **Tests:** 5 new tests; 11 of the new cases fail on `301b721`. unittest 2534 OK / 96 skipped (two runs); pytest
+  2473 passed / 112 skipped / 0 failed.
+- **Real window:** 9 / 9 PASS on verified copies.
+- **Unchanged:** the other algorithms, the GUI, scientific statuses and criteria. No Abaqus, no LM.

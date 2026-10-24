@@ -18,6 +18,9 @@ from typing import Optional
 from services import experimental_series_review as review
 
 MARKED_COLOUR = "#9a4d00"
+STALE_DIALOG = ("STALE: the experimental file or the modal set changed after this dialog was opened. Nothing is "
+                "recorded for the earlier series here. Close this dialog and open Review series... again for the "
+                "series now selected.")
 
 
 def store_of(app) -> Path:
@@ -73,6 +76,8 @@ def schedule_identification(app) -> None:
             results.put((identity, review.active_mark(store, identity), ""))
         except review.SeriesReviewError as error:
             results.put((None, None, f"Experimental series review: not available ({error})."))
+        except Exception as error:  # noqa: BLE001  (never leave the GUI waiting for an answer that cannot come)
+            results.put((None, None, f"Experimental series review: not available (unexpected error: {error})."))
 
     def poll() -> None:  # the same pattern as the modal-set discovery: the GUI thread collects the answer
         if generation != app._series_generation or getattr(app, "_ui_closing", False):
@@ -123,10 +128,42 @@ def open_series_review_dialog(app) -> Optional[tk.Toplevel]:
     buttons = ttk.Frame(body)
     buttons.grid(row=10, column=0, columnspan=2, sticky="e")
 
+    def stale() -> bool:
+        """The dialog belongs to the series it was opened for; another file, content or modal set makes it stale."""
+        selected = getattr(app, "_series_identity", None)
+        return selected is None or selected.key != identity.key
+
     def refresh_current() -> None:
-        current.set(review.mark_text(app._series_mark))
+        if stale():
+            current.set(STALE_DIALOG)
+            return
+        try:  # the note of THIS series only, never another series' note
+            current.set(review.mark_text(review.active_mark(store_of(app), identity)))
+        except review.SeriesReviewError as error:
+            current.set(f"Not available: {error}")
+
+    def watch() -> None:
+        if not window.winfo_exists():
+            return
+        state = "disabled" if stale() else "normal"
+        if str(window.mark_button.cget("state")) != state:
+            window.mark_button.configure(state=state)
+            window.withdraw_button.configure(state=state)
+            refresh_current()
+        window.after(250, watch)
+
+    def refused_as_stale() -> bool:
+        if not stale():
+            return False
+        refresh_current()
+        window.mark_button.configure(state="disabled")
+        window.withdraw_button.configure(state="disabled")
+        messagebox.showwarning("Experimental series review", STALE_DIALOG, parent=window)
+        return True
 
     def mark() -> None:
+        if refused_as_stale():
+            return
         try:
             review.mark_setup_under_review(store_of(app), identity, reason=fields["reason"].get(),
                                            source=fields["source"].get(), experiment_id=fields["experiment_id"].get(),
@@ -138,6 +175,8 @@ def open_series_review_dialog(app) -> Optional[tk.Toplevel]:
         refresh_current()
 
     def withdraw() -> None:
+        if refused_as_stale():
+            return
         try:
             review.withdraw_mark(store_of(app), identity, reason=fields["reason"].get(), source=fields["source"].get())
             _show(app, identity, review.active_mark(store_of(app), identity))
@@ -152,4 +191,7 @@ def open_series_review_dialog(app) -> Optional[tk.Toplevel]:
     window.withdraw_button.pack(side="left", padx=8)
     ttk.Button(buttons, text="Close", command=window.destroy).pack(side="left")
     window.fields = fields
+    window.current_text = current
+    window.identity = identity
+    window.after(250, watch)
     return window

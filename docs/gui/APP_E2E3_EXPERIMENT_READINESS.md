@@ -87,6 +87,31 @@ withdraws it.
   - It is not a gate, and it is not an Auto-ID scheme.
   - SP-02, SP-13 and SP-08 are not declared unreliable.
 
+### Address fixes after the SUPERVISOR review (2026-10-25)
+
+**A stale dialog never records for another series.**
+
+- The *Review series...* dialog belongs to the series it was opened for (content SHA-256 + size + modal set).
+- When the experimental file or the modal set changes afterwards, the dialog:
+  - shows **STALE** with the reason;
+  - disables Mark and Withdraw;
+  - refuses a press anyway: the check is made again at the moment of writing.
+- It never writes a note for the earlier identity, and it never shows that series' note as the note of the new one.
+  It reads only its own series' note.
+- If the same series is selected again (same content and set), the dialog becomes current again.
+
+**A damaged log is a clear error.**
+
+- The log is checked on every read:
+  - valid JSON;
+  - an object with the schema;
+  - `entries` a list of SET / WITHDRAWN records with their text fields.
+- Anything else raises an error that names the problem and says the file is left unchanged. Reading, marking and
+  withdrawing are all refused, and the file is never rewritten or replaced automatically; a person repairs or moves
+  it.
+- The series identification also turns any unexpected error into a stated message, so the Files tab never waits
+  forever.
+
 ## Plate suspension observation (M11 §21)
 
 **The observation (owner).** With a changed suspension, the plate's first experimental resonance appeared near 19 Hz
@@ -130,6 +155,15 @@ The M11 statuses are unchanged.
   consecutive full runs are clean.
 
 **Not run:** the store-gated real-data regressions (original stores).
+
+**Address fixes (2026-10-25):**
+
+| Check | Environment | Result |
+|---|---|---|
+| New tests: damaged log (8 forms), stale dialog after a file change, stale dialog after a modal-set change, the same series again, no hang with a damaged log | Windows, Python 3.14.6 | all pass; `tests/test_app_e2e3_experiment_readiness.py` 19 passed (+13 subtests), three runs |
+| The same tests on `301b721` | same | 11 failed, 2 passed (the passing ones are the controls) |
+| Full unittest / full pytest | same | unittest **2534 OK, 96 skipped** (two runs, no Tcl abort); pytest **2473 passed, 112 skipped, 0 failed** |
+| Real window, verified copies (V3 plate UNV, V2 SP-13 UNV), clean profile, every process refused | Windows 10 | 9 / 9 PASS. A damaged log gives a clear message in 0.2 s and is not rewritten. A dialog opened for the plate turns STALE after switching to SP-13, its buttons are disabled, and a forced press records nothing. With the plate selected again, the note is recorded for exactly the plate series |
 
 ## Limits
 

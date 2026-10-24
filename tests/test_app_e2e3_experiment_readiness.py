@@ -170,6 +170,34 @@ class SeriesReviewTests(_Files):
         with self.assertRaises(review.SeriesReviewError):
             review.withdraw_mark(self.store, identity, reason="again", source="owner")
 
+    def test_a_damaged_log_is_a_clear_error_and_is_never_rewritten(self):
+        identity = self.identity()
+        damaged = {
+            "invalid JSON": b"{ not json",
+            "invalid text encoding": b"\xff\xfe\x00 garbage",
+            "a JSON list": json.dumps([1, 2]).encode(),
+            "another schema": json.dumps({"schema": "x", "entries": []}).encode(),
+            "entries not a list": json.dumps({"schema": review.SCHEMA, "entries": {}}).encode(),
+            "an entry not an object": json.dumps({"schema": review.SCHEMA, "entries": [1]}).encode(),
+            "an unknown action": json.dumps({"schema": review.SCHEMA, "entries": [{"action": "X"}]}).encode(),
+            "a SET entry without its reason": json.dumps({"schema": review.SCHEMA, "entries": [
+                {"action": "SET", "series_key": identity.key, "status": "SETUP_UNDER_REVIEW", "experiment_id": "e",
+                 "information_source": "s", "recorded_at": "t"}]}).encode(),
+        }
+        self.store.parent.mkdir(parents=True, exist_ok=True)
+        for case, content in damaged.items():
+            with self.subTest(case=case):
+                self.store.write_bytes(content)
+                for action in (lambda: review.active_mark(self.store, identity),
+                               lambda: self.mark(identity),
+                               lambda: review.withdraw_mark(self.store, identity, reason="r", source="s")):
+                    with self.assertRaises(review.SeriesReviewError) as caught:
+                        action()
+                    self.assertIn("damaged", str(caught.exception))
+                    self.assertIn("left unchanged", str(caught.exception))
+                self.assertEqual(self.store.read_bytes(), content)  # never rewritten
+                self.assertEqual([p.name for p in self.store.parent.iterdir()], [self.store.name])  # no temp file
+
     def test_the_experimental_file_is_only_read(self):
         before = _fingerprint(self.unv)
         identity = self.identity()
@@ -287,6 +315,88 @@ class SeriesReviewWindowTests(_Window):
                   and application._series_identity.sha256 != hashlib.sha256(self.unv.read_bytes()).hexdigest())
         self.assertEqual(application.series_review_text.get(), review.NO_MARK)
         self.assertIsNone(getattr(application, "_analysis_inputs", None))  # never an analysis input
+
+
+class SeriesReviewSafetyTests(_Window):
+    def identified(self, application, path, modal_set=None):
+        application.experimental_path.set(str(path))
+        self.wait(lambda: application._modal_set_discovery_state != "loading")
+        if modal_set is not None:
+            application.experimental_modal_set_key.set(modal_set)
+        self.wait(lambda: application._series_identity is not None)
+        return application._series_identity
+
+    def filled_dialog(self, application):
+        import series_review_ui
+
+        window = series_review_ui.open_series_review_dialog(application)
+        self.addCleanup(lambda: window.winfo_exists() and window.destroy())
+        window.fields["experiment_id"].set("PLATE session 1")
+        window.fields["reason"].set("suspension changed")
+        window.fields["source"].set("owner")
+        return window
+
+    def assert_nothing_recorded_for_the_old_series(self, application, window, warnings):
+        import series_review_ui
+
+        enabled = str(window.mark_button.cget("state")) == "normal"
+        window.mark_button.invoke()  # a disabled button does nothing; an enabled one is refused when pressed
+        window.withdraw_button.invoke()
+        self.assertFalse(self.store.exists() and json.loads(self.store.read_text(encoding="utf-8"))["entries"])
+        self.assertFalse(application.series_review_text.get().startswith(review.SETUP_UNDER_REVIEW))
+        self.assertEqual(window.current_text.get(), series_review_ui.STALE_DIALOG)
+        if enabled:
+            self.assertTrue(warnings.called and series_review_ui.STALE_DIALOG in str(warnings.call_args))
+        self.pump(0.6)
+        self.assertEqual(str(window.mark_button.cget("state")), "disabled")
+        self.assertEqual(str(window.withdraw_button.cget("state")), "disabled")
+
+    def test_a_dialog_never_records_for_an_earlier_file(self):
+        application = self.application()
+        self.identified(application, self.unv)
+        window = self.filled_dialog(application)
+        other = S.write_experiment(self.folder / "repeat.unv", S.E0 * 1.02, S.G0)
+        with mock.patch("tkinter.messagebox.showwarning") as warnings:
+            application.experimental_path.set(str(other))  # the next series is still being identified
+            self.assert_nothing_recorded_for_the_old_series(application, window, warnings)
+            self.wait(lambda: application._series_identity is not None)  # and once the new series is known
+            warnings.reset_mock()
+            self.assert_nothing_recorded_for_the_old_series(application, window, warnings)
+        self.assertEqual(application.series_review_text.get(), review.NO_MARK)
+
+    def test_a_dialog_never_records_for_another_modal_set(self):
+        application = self.application()
+        first = self.identified(application, self.unv)
+        window = self.filled_dialog(application)
+        with mock.patch("tkinter.messagebox.showwarning") as warnings:
+            application.experimental_modal_set_key.set("another-set")
+            self.wait(lambda: application._series_identity is not None)
+            self.assertNotEqual(application._series_identity.key, first.key)
+            self.assert_nothing_recorded_for_the_old_series(application, window, warnings)
+
+    def test_the_same_series_selected_again_keeps_the_dialog_usable(self):
+        application = self.application()
+        self.identified(application, self.unv)
+        window = self.filled_dialog(application)
+        application.experimental_path.set(str(self.unv))  # the same file again: identified again, same series
+        self.wait(lambda: application._series_identity is not None and application._modal_set_discovery_state
+                  != "loading")
+        self.wait(lambda: application._series_identity is not None)
+        self.pump(0.6)
+        window.mark_button.invoke()
+        self.assertTrue(application.series_review_text.get().startswith(review.SETUP_UNDER_REVIEW))
+        self.assertEqual(len(json.loads(self.store.read_text(encoding="utf-8"))["entries"]), 1)
+
+    def test_a_damaged_log_never_leaves_the_identification_waiting(self):
+        self.store.parent.mkdir(parents=True, exist_ok=True)
+        self.store.write_text(json.dumps([1, 2]), encoding="utf-8")
+        before = self.store.read_bytes()
+        application = self.application()
+        application.experimental_path.set(str(self.unv))
+        self.wait(lambda: "not available" in application.series_review_text.get(), seconds=20)
+        self.assertIn("damaged", application.series_review_text.get())
+        self.assertIsNone(application._series_identity)
+        self.assertEqual(self.store.read_bytes(), before)
 
 
 class ScalingTabTests(_Window):

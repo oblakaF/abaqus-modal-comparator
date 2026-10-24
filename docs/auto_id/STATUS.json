@@ -2207,6 +2207,7 @@
     "abaqus": "0 solves, 0 extractions, no LM",
     "tests": "tests/test_app_e2e3_experiment_readiness.py 14 (P-2 / P-3 tests fail on 5fc8f82); unittest 2529 OK / 96 skipped (three runs); pytest 2468 passed / 112 skipped / 0 failed; test_guided_registration teardown joins its dialog threads (latent Tcl_AsyncDelete hazard)",
     "gui": "RUN_PROGRAM.cmd clean launch; real window on verified copies, every process refused: SP-02 accepted comparison 20/20, plate diagnostic with the note 29/29, damaged UNV 12/12; 11. Scaling 4/4 at Tk scaling 1.33 / 2.0",
-    "not_run": "store-gated real-data regressions: NOT_RUN"
+    "not_run": "store-gated real-data regressions: NOT_RUN",
+    "address_fixes": "2026-10-25 after SUPERVISOR review: a Review series... dialog opened for one series turns STALE (buttons disabled, a press refused, nothing written, never shows its note for another series) when the file or the modal set changes; a damaged review log (invalid JSON, wrong structure or entries) is a clear SeriesReviewError, refuses read / mark / withdraw and is never rewritten; the identification never waits forever. Tests 19 (11 fail on 301b721); unittest 2534 OK / 96 skipped (two runs); pytest 2473 passed / 112 skipped / 0 failed; real window 9/9 PASS"
   }
 }
