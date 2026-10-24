@@ -625,7 +625,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of analysis/m9-six-specimens (M9 reconciliation REVIEW_READY, not merged). M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
+  "next_action": "STOP: SP-10 physical registration awaits the owner's confirmation (M10 READY_FOR_HUMAN_CONFIRMATION: answers to Q1-Q8, SP-10 ODB extraction for the FE geometry identity as a HUMAN gate, treatment of the 34 doubled point pairs, acceptance of the 260831 one-constant deviation); no SP-10 registration before that. M10 branch updated with main (PR #94 not merged; merging it needs the owner's decision); M11 (PR #95) integration pending. M8 stage IN_PROGRESS, original M8 GATE NOT_MET; production Auto-ID / calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -2049,7 +2049,7 @@
     "note": "the top-level status refers to current_ministep; the M8 stage is not ACCEPTED"
   },
   "m9_six_specimen_reconciliation": {
-    "status": "REVIEW_READY",
+    "status": "ACCEPTED",
     "kind": "SUPERVISOR analysis task (2026-10-20), outside the Auto-ID mini-step sequence; no stage started",
     "branch": "analysis/m9-six-specimens",
     "base": "9e1921e2b5234afee6fac9c0c9f4f9c92ae443c2",
@@ -2062,7 +2062,26 @@
       "SP-04": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE",
       "SP-05": "DIAGNOSTIC_ONLY / Auto-ID MISSING_EVIDENCE"
     },
-    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates; no FE solve, no Abaqus Python, no LM; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE"
+    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, frozen observations, criteria, gates; no FE solve, no Abaqus Python, no LM; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE",
+    "acceptance": "SUPERVISOR: M9 ACCEPTED (task M10, 2026-10-20); PR #93 merged",
+    "merge_commit": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
+    "erratum": "M10 (2026-10-20): SP-10 FE rows 10-12 ARE reproducible from step 2 SP_10_MODAL_FREE (25 modes) of SP10nemash63000 / SP10_NEW_E1=E2_NSM_DENSITY; see docs/reconciliation/M10_SP10_REGISTRATION_PREP.md §10"
+  },
+  "m10_sp10_registration_prep": {
+    "status": "REVIEW_READY",
+    "outcome": "READY_FOR_HUMAN_CONFIRMATION",
+    "kind": "SUPERVISOR analysis task (2026-10-20), outside the Auto-ID mini-step sequence; no stage started",
+    "branch": "analysis/m10-sp10-registration-prep",
+    "base": "aa08ad9e73d150bfa8b62d4bb3fa2d59fc9f10d7",
+    "report": "docs/reconciliation/M10_SP10_REGISTRATION_PREP.md",
+    "summary": "scan geometry of SP-10 sessions 260831 (121 pt, Bravo) and 260911b (323 pt, Bestttt) reconstructed on the panel with the accepted M2.3 method (260831 with a recorded one-constant diagnostic deviation); same labelled face in both sessions, 260911b rotated 90 deg clockwise (label, b-top); label edge = 520 mm by frame aspect (ruler confirmation requested); 8 orientation candidates, none confirmed; evidence drafts unfilled; no registration built",
+    "blockers": [
+      "owner statements Q1-Q8",
+      "SP-10 ODB extraction for the FE geometry identity (HUMAN gate)",
+      "260911b: 34 point pairs 0.56 mm apart share FE nodes (CORE-E2E-C refuses)",
+      "260831: acceptance of the one-constant method deviation"
+    ],
+    "unchanged": "SPEC v1.2, DECISIONS, EVIDENCE, registrations, passports, frozen observations, criteria, gates, registration services; no FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no frequency pairing; M8 original gate NOT_MET; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE"
   },
   "r7_shell_modal_safety": {
     "status": "MERGED",

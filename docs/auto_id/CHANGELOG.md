@@ -5433,6 +5433,43 @@ first internal provider.
 - **Files changed:** `docs/reconciliation/M9_SIX_SPECIMENS.md` (new), `docs/reconciliation/M9_SIX_SPECIMENS.json` (new), STATUS,
   ROADMAP, CHANGELOG. **Abaqus run count:** 0.
 
+## 2026-10-20 — M9 ACCEPTED
+
+- **M9 six-specimen scientific reconciliation:** ACCEPTED (PR #93, merge `aa08ad9`). Erratum recorded in M10 §10:
+  SP-10 FE rows 10–12 are reproducible (see below).
+
+## 2026-10-20 — M10 SP-10 physical registration preparation (REVIEW_READY; READY_FOR_HUMAN_CONFIRMATION)
+
+- **Branch:** `analysis/m10-sp10-registration-prep` from `aa08ad9` (SUPERVISOR analysis task; outside the Auto-ID
+  mini-step sequence).
+- **Report:** `docs/reconciliation/M10_SP10_REGISTRATION_PREP.md` (+ JSON); data, figures and tools in
+  `runs\m10_sp10` (not committed).
+- **Copies:** 17 of 17 SP-10 copies verified against the manifests before and after the work.
+- **Reconstruction:**
+  - the scan geometry of 260831 (121 pt, Bravo) and 260911 b (323 pt, Bestttt) is reconstructed on the panel with
+    the unchanged M2.3 code;
+  - in 260831 the accepted constants fit the shaker contour as the bottom edge, so a diagnostic variant
+    (`EDGE_CLUSTER_MIN_SHARE` 0.25) is recorded.
+- **Orientation:**
+  - from the frames: the same labelled face in both sessions; 260911 b rotated 90° clockwise as seen by the scanner;
+    "b-top" on edge A–D;
+  - by frame aspect: the label edge is the 520 mm edge (ruler confirmation requested);
+  - eight orientation candidates, none confirmed; the SP-02 convention (T0) contradicts the frame aspect.
+- **Evidence drafts:** guided-evidence drafts with the orientation, measured face and FE frame unfilled; the existing
+  parser refuses them.
+- **Blockers:**
+  - owner statements Q1–Q8;
+  - an SP-10 ODB extraction (HUMAN gate);
+  - 34 point pairs 0.56 mm apart in 260911 b share FE nodes (the CORE-E2E-C rule is unchanged).
+- **M9 erratum:** SP-10 FE rows 10–12 are reproducible from step 2 `SP_10_MODAL_FREE` (25 modes) of
+  `SP10nemash63000` / `SP10_NEW_E1=E2_NSM_DENSITY`. The M9 inventory read only the first eigenvalue table.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, registrations, passports, frozen observations, criteria, gates and
+  registration services. No FE solve, no Abaqus Python, no Auto-ID / LM, no MAC, no frequency pairing. M8
+  `IN_PROGRESS`, original M8 GATE `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED;
+  NO_GLOBAL_PARAMETER_VALUE (D-077).
+- **Files changed:** `docs/reconciliation/M10_SP10_REGISTRATION_PREP.md` (new),
+  `docs/reconciliation/M10_SP10_REGISTRATION_PREP.json` (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
 ## 2026-10-21 — R7 zero-frequency safety and shell mid-surface guard (REVIEW_READY; branch fix/r7-shell-modal-safety)
 
 - **R7-A:**
