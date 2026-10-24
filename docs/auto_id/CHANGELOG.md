@@ -5527,6 +5527,285 @@ first internal provider.
 - **Tests:** 41 R7 tests, plus GUI / worker refusal cases.
 - **Unchanged:** non-flat solid registrations, governed paths, the pinned extractor and OD-R7-1.
 
+## 2026-10-21 — M11 single CFRP plate (REVIEW_READY; FREQUENCY_DIAGNOSTIC_ONLY; analysis only)
+
+- **Branch:** `analysis/m11-single-carbon-plate` from `aa08ad9` (SUPERVISOR analysis task; outside the Auto-ID
+  mini-step sequence).
+- **Report:** `docs/reconciliation/M11_SINGLE_CFRP_PLATE.md` (+ JSON); work data in `runs\m11_carbon_plate`.
+- **Sources and copies:**
+  - `C:\temp\12 sampls\results\Plate` (CAE, journal);
+  - four plate jobs in `C:\temp`;
+  - the updated `results sadwich.xlsx` (new sheet `Sample (2)`, "Plate 301x300 1mm") and
+    `Experiment_Freq_damping_LMS_onlyupdated.xlsx`;
+  - copied to `external_models\v3_20261021` and `excel_copies\20261021`: 48 files, SHA-256 verified before, after
+    and again at the end.
+- **Findings:**
+  - thickness, mass, weave, layup and test setup are UNKNOWN;
+  - Excel column C = `CFRP_S4R_0875_FreeFree` (exact) / `CFRP_S4R_WEDGE_FreeFree` (3 transcription slips);
+    column D is an overwritten C3D8I run;
+  - experimental rank 1 is 33.45 Hz against 19.07 Hz in the template models; if it is the twist mode,
+    D66/(ρh) is about 3.08 times the model value (scaling, not identification);
+  - no shape file and no pairing confirmed; nothing transferred to the sandwich faces.
+- **Unchanged:** SPEC v1.2, DECISIONS, EVIDENCE, registrations, criteria, gates; originals and earlier copies; M10
+  branch and PR #94. No FE solve, Abaqus Python, Auto-ID / LM, MAC or fitting. M8 original GATE `NOT_MET`;
+  production calibration BLOCKED / NOT_AUTHORISED; NO_GLOBAL_PARAMETER_VALUE (D-077).
+- **Files changed:** `docs/reconciliation/M11_SINGLE_CFRP_PLATE.md` (new), `docs/reconciliation/M11_SINGLE_CFRP_PLATE.json`
+  (new), STATUS, ROADMAP, CHANGELOG. **Abaqus run count:** 0.
+
+## 2026-10-21 — M11 addendum: owner's plate measurements
+
+- The owner's measurement sheet is recorded as a HUMAN record, not governed evidence; the photograph is in the work
+  directory only.
+- **Plate:** mass 118.37 g, 301 × 300 mm. Thickness: 20 edge readings (5 per side), 0.71–0.94 mm, mean 0.876 mm;
+  side means 0.880 / 0.816 / 0.882 / 0.926 mm.
+- **Model inputs confirmed:** the stored models' mass (118.36 g) and 0.875 mm are these measurements, and the wedge
+  model uses the extreme side means.
+- **Twist-mode scaling:** with the measured thickness, the equivalent G12 is 13–19 GPa if rank 1 is the twist mode.
+  No fitting.
+- **Still open:** the edge assignment of the rows, the instrument, the interior thickness, the layup, the test setup
+  and the shape file.
+
+## 2026-10-21 — M11 addendum 2: plate experiment files and experimental mode types
+
+- **Owner's answers** (HUMAN record): the row-to-edge mapping, seen from the shaker side; a caliper with 0.01 mm
+  resolution plus an electronic one; plain carbon, plies unknown; the experiment folder `D:\Snadwich\Plate`.
+- **Copies:** `D:\Snadwich\Plate` copied to `external_models\v3_20261021\Plate\snadwich_Plate` (5 files, SHA-256
+  verified).
+- **Modal data:** PolyMAX `Polymax_bravo`, 10 modes, 289 points, Z only; the frequencies equal Excel and LMS.
+- **Scan reconstruction:** done with the M2.3 code and three recorded deviations (an anomalous stored frame rectangle,
+  a wider edge search, the bottom edge with inverted polarity). Residual 1.29 / 3.23 mm, misalignment 0.87°.
+- **Experimental mode types** (no FE, no MAC):
+  - mode 1 (33.45 Hz) is the twist mode, so D66/(ρh) is about 3.1 times the model value (not a constant);
+  - modes 2 and 3 are separate bending patterns in the two directions: the plate is orthotropic or non-uniform in
+    bending.
+- **Not done:** the FE pairing by MAC still needs an ODB extraction (authorisation) and the registration.
+- **Missed-low-mode check** (raw PSV FRFs; experimental data only):
+  - no elastic mode below 33.45 Hz;
+  - the peaks at 9.06 Hz and 15.6 Hz are a rigid translation and a rigid rocking (ODS);
+  - those rigid modes lie at 27–47 % of the first elastic frequency, so the free-free idealisation is not verified
+    and the twist scaling stays conditional.
+
+## 2026-10-21 — M11 addendum 3: plate photographs (copies pending) and the twist-gap assessment (corrected R4)
+
+- **Photographs:** SUPERVISOR's visual assessment recorded as a HUMAN statement (visible face plain weave about 0/90°;
+  back face, plies and layup UNKNOWN). `M11_plate_photos_verified.zip` was absent from
+  `owner_records\incoming`, so copies and SHA-256 are PENDING.
+- **R4 correction of §10.2** (supersedes the `1c42e84` assessment):
+  - withdrawn: the corner placement of the 1-D translation stiffness. Control: one corner spring of 384 N/m gives
+    about 24.0 Hz in the rigid subspace, not 9.06 Hz;
+  - withdrawn: 33.2 Hz as a bound;
+  - withdrawn: the D66 ×2.9–3.2 figures as frequency evidence.
+- **R4 findings** (4-DOF Ritz and A–B–D; parametric, template constants; no FE, no fitting):
+  - a single point attachment as the main cause is not supported by the measured mode-1 shape (rigid content 1.6 %
+    measured, against 31–70 % needed);
+  - four equal corner supports remain open: they are consistent with the ODS ratio 15.6 / 9.06 ≈ √3; not a bound;
+  - the hidden-face 45° ply is parametric only: the B-reduced D66* gives a frequency ratio of 1.39–1.43 against the
+    required 1.754 under the template constants;
+  - the unknown interior thickness is not excluded (an interior of 0.95–1.0 mm gives ×1.13–1.22).
+- **Result:** no cause is established; experimental facts, model assumptions and hypotheses are separated in §10.2.
+- No Abaqus run, no constant inferred, no criterion or status changed.
+
+## 2026-10-21 — M11 R5: photographs verified, rocking directions, support-model shape check
+
+- **Photographs:**
+  - `M11_plate_photos_verified.zip` (found in `owner_records\`, not `incoming\`) was extracted to a new folder;
+    both JPEGs match the SHA-256 manifest;
+  - recorded as HUMAN supporting evidence outside git;
+  - confirmed visually: the photographed face is plain weave with tows about 0/90° to the edges; the edge photo does
+    not resolve the plies;
+  - not established: the scanned face, the back face, the plies and the thickness.
+- **Rocking near 15.6 Hz** (FRF / ODS only): the tilt axis rotates between 15.0 and 16.25 Hz, which suggests two close
+  rocking responses about 0.3 Hz apart. They are not separable: 0.3125 Hz resolution, single reference, coherence
+  0.67–0.77, ODS rather than poles.
+- **Four-corner-support model:** not contradicted, not confirmed.
+  - partial agreement: the translation has a residual tilt;
+  - the rocking pair is consistent;
+  - the twist shape does not discriminate support from material;
+  - the other modes are unchecked without FE shapes.
+- **New in the report:** the data needed for a diagnostic physical registration and MAC (§11.4).
+- No FE solve, no Abaqus Python, no ODB extraction, no fitting, no status change.
+
+## 2026-10-21 — M11 R6: authorised FE extraction (FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING)
+
+- **Run:** one authorised Abaqus Python run of the unchanged `abaqus_scripts/extract_odb.py` (`openOdb` readOnly) on a
+  level-C working copy of `CFRP_S4R_0875_FreeFree.odb`.
+  - The original was not accessed.
+  - The V3 copy and the working copy kept SHA-256 `7daeb7e3…`.
+  - No FE solve, no job; no solver artefacts.
+- **Output (outside git, comparator format 2):** geometry of 10201 mid-surface nodes and modes 1–20 (U1/U2/U3).
+  The elastic frequencies 7–20 equal the `.dat` exactly.
+- **Shell diagnostic:** `max_z` and `min_z` select the same 10201 nodes, and all normals point to +Z. The
+  measured face can only be stated through the Z sign of the axes, and `side` is not cross-checked against it. This
+  is recorded as a blocker with a proposed separate fix; no rule was changed.
+- **Geometric candidates:** 8, all with each point on its own node (≤ 2.06 mm), so geometry does not discriminate.
+  Within each H301 / H300 group they are symmetry-equivalent for this model. Nothing was chosen by MAC.
+- **Pending:** the owner's face and edge statements, SUPERVISOR acceptance of the reconstruction deviations, and the
+  shell-side rule.
+
+## 2026-10-21 — M11 R6.1: owner orientation and shaker evidence (FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING)
+
+- **Owner archives:** `M11_R6_owner_orientation_evidence.zip` and `M11_shaker_location_owner_evidence.zip` were
+  verified against their SHA-256 manifests and extracted outside git as HUMAN supporting evidence.
+- **Closed (HUMAN):**
+  - FE X = 301 mm, Y = 300 mm;
+  - 301 mm horizontal in the test, so the 300-horizontal candidates are excluded;
+  - thickness rows 1 top / 2 right / 3 bottom / 4 left (shaker view).
+- **Supported, not established:** the scanner saw the face opposite the shaker (PSV frame occlusion).
+- **Open:** FE axis signs and origin, FE +Z relative to a face, the shell-face field (R7 design), and SUPERVISOR's
+  decision on the three reconstruction deviations (justifications in §13.4).
+- **Shaker:** not at a corner (bottom edge, left of the midline in the shaker view). The corner-spring scenarios are
+  not a model of the experiment; the four-corner strap model remains a hypothesis; the frequencies are not proof.
+- **Evidence draft:** only confirmed fields are filled; the existing parser refuses it.
+- No code change, no Abaqus, no MAC, no fitting.
+
+## 2026-10-22 — M11 R6.2: final orientation scheme (FE_EXTRACTION_READY / PHYSICAL_REGISTRATION_PENDING)
+
+- **Figures and owner sheet** (outside git): a shaker-side and a scanner-side view of the plate (the scanner view on
+  the stored PSV frame with the 289 points), four candidate pictures A–D, and a two-question owner sheet.
+- **Candidate table:** for A–D, the experimental axes in FE, determinant +1, the FE axes and origin corner in the
+  shaker view, the side of the shell normal, the scanned face relative to the normal, and the scan-window offsets.
+- **Reconstruction check:** all 289 points lie inside the plate and the gaps close 301 / 300 mm. The reconstruction
+  stays diagnostic: the three deviations are not accepted.
+- **Status split:** proven / supported (scanner saw the unmarked face; shaker right of centre in the scanner view) /
+  unknown (A–D).
+- **Minimum confirmations:** the owner picks A–D and confirms the scanned face; the SUPERVISOR decides on the
+  deviations. Nothing needs re-measuring.
+- No Abaqus, MAC or fitting; no orientation chosen; no registration built.
+
+## 2026-10-22 — M11 R6.2a: R6.2 schematic figures published for visual review
+
+- **Published** in `docs/reconciliation/figures/m11_r62/` as byte-identical copies, with GitHub previews in §14.0 of
+  the M11 report and SHA-256 recorded:
+  - the shaker-side view;
+  - the candidates A–D;
+  - the owner's question sheet.
+- **Not published:** the scanner-side figure. Its PSV camera frame shows a person and equipment asset labels in the
+  background; it is withheld pending a decision on a redacted version.
+- **Unchanged:** no data or interpretation changed, no candidate selected, no registration built, and the status is
+  unchanged.
+
+## 2026-10-22 — M11 R6.2b: diagram-only scanner view published (SUPERVISOR option (b))
+
+- **Scanner view:** `fig_r62_view_scanner_diagram_only.png` is a pure crop of panel 2b, pixel-identical to the
+  source region. The PSV photograph (person, equipment labels) is not published.
+- **Candidates A–D:** re-rendered with the X / Y letters moved off the edge captions; the geometry is unchanged.
+- **Owner question sheet:**
+  - it refers to the diagram-only figure;
+  - the scanner on the far side is a hypothesis that needs HUMAN confirmation;
+  - the owner is not asked to open the original model;
+  - the axes and origin come from an existing model screenshot or an authorised copy;
+  - the Abaqus standard view is not taken as evidence of the physical origin.
+- **Unchanged:** no candidate selected, no registration, status unchanged.
+
+## 2026-10-22 — M11 R6.3: FE coordinate frame and independent scan-calibration audit (diagnostic)
+
+- **FE frame established from the V3 INP and CAE journal:**
+  - Part X −251…50 / Y −270…30;
+  - Instance translation (251, 270, 0) only;
+  - R6 = Assembly frame, X 0–301 / Y 0–300;
+  - S4R node order gives normal +Z (10 000 / 10 000).
+  - The model has **no** physical references, and its mesh is symmetric under the 180° rotations.
+- **FE ↔ physical edges NOT_DETERMINED.** The model cannot determine it. The owner's recognition of picture D does
+  not discriminate because all pictures share the same edge layout. The experimental-axes column of §14.2 depends
+  on the scanner face (A↔D, B↔C).
+- **SCANNER_FACE = HUMAN_CONFIRMATION_PENDING.** The instrument records show the frame is the scanned face; the
+  photograph points to the unmarked face.
+- **Deviations:**
+  - 1 (v range) is independently confirmed by the scanner-angle record: grid aspect 0.775 vs 0.755, similarity rms
+    1.3 mm;
+  - 2 and 3 (edges) are supported and insensitive, but not independently confirmed;
+  - offsets are uncertain to about 1–3 mm.
+- **INP–ODB:** the job records are consistent; mesh identity is not proven, so NODES_AND_INP_CONTENT is unchanged.
+- **Diagnostic MAC blockers** are listed. FE schematic published in `docs/reconciliation/figures/m11_r63/`.
+- **Status unchanged.** No Abaqus, MAC or fitting.
+
+## 2026-10-22 — M11 R6.4: FE modal symmetry and scan-mapping sensitivity (diagnostic; no MAC)
+
+- **FE symmetry, checked on the R6 modes themselves:** elastic modes 7–20 are exactly symmetric or antisymmetric
+  under the three 180° rotations. The largest residual is 1.8e-07 (single precision); a negative control gives
+  0.03–0.10.
+- **Adjacent subspaces** are invariant. The near-degenerate pairs 10–11, 13–14 and 17–18 lie in different FE classes
+  and should be treated as subspaces; 8–9 and 15–16 share a class and should be watched.
+- **Candidates A–D** are exactly equivalent at the 289 points: symmetric nodes at 100 % of points in 59 scenarios;
+  the sampled U3 is identical up to sign. D is labelled only `COMPUTATIONAL_CONVENTION_ONLY`; the physical
+  orientation is NOT_DETERMINED.
+- **Mapping sensitivity:**
+  - every point stays on the plate; RMS 1.1–1.3 mm, max ≤ 2.09 mm; no repeated nodes;
+  - the existing limits pass in every scenario but cannot detect 1–3 mm;
+  - node assignment is unstable: 27–52 % reassigned at 1 mm, 100 % at 3 mm;
+  - the sampled FE field changes only 2–14 %.
+- **Readiness:** a research, non-governed diagnostic shape comparison may be proposed to the SUPERVISOR. Nothing is
+  implemented, no experimental–FE MAC is computed, and the status is unchanged.
+
+## 2026-10-22 — M11 R6.5: research-only experimental–FE complex MAC (RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING)
+
+- **Erratum to R6.4 §16.3.** The MAC change against a fixed experimental vector is first order (up to ε / (1 − ε)),
+  not ε²; the sensitivity is now measured directly.
+- **Pre-checks:** the SHA-256 of all inputs (V3 manifests; R6 postflight sizes and the recorded SHA); polymax-bravo
+  10 × 289 with U3 only, complex as stored; point order and MeasPoints ↔ UNV verified; FE 10 201 nodes, modes 7–20,
+  INP ≡ R6 nodes.
+- **Isolated research code** in `research/m11_r65/` with 18 synthetic tests, and a protocol declared before the
+  first MAC (SHA `74283bde14f6fbf5…`). No production code changed and no registration objects created.
+- **Complex MAC 10 × 14** with nearest node and bilinear S4R interpolation (they differ by ≤ 0.006).
+- **Sensitivity:** 59 scenarios give a range of at most 0.14; ALT_BOTTOM_EDGE changes values by at most
+  0.03 and changes no first-ranked FE mode.
+- **A–D** are equivalent: max |ΔcMAC| 7.3e-08.
+- **Subspaces** of the pairs 10–11, 13–14, 17–18, 8–9 and 15–16 are evaluated.
+- **Descriptive results**, physical registration NOT confirmed:
+  - similar and stable: exp1–FE7 0.83, exp7–FE14 0.74, exp2–FE8 0.70;
+  - unstable: exp 3 and exp 8;
+  - not similar: exp 9 and exp 10.
+- **Not done:** no pairing, Auto-ID, LM or fitting. M8, production calibration and D-077 unchanged.
+
+## 2026-10-22 — M11 R6.5a: QA of the research MAC (research result RESEARCH_MAC_COMPUTED; physical registration PENDING)
+
+- **Fail-closed location policy (`PathPolicy`):** the location of the config and of every input is checked before
+  any read or hash.
+  - Refused: original stores, paths outside the input roots, `..` traversal, symbolic links and junctions, hard links,
+    and paths whose real path differs.
+  - Output only inside the declared output root, never in protected roots or the repository.
+  - A guarded live re-run reproduces R6.5 exactly; 4 live refusals.
+- **CI:** the research synthetic tests (29) run in the existing workflow, with a count annotation; the
+  normative tests are unchanged.
+- **Statuses separated:** the research result is `RESEARCH_MAC_COMPUTED`; the physical registration is
+  `PHYSICAL_REGISTRATION_PENDING`. The stale "no shape data / no MAC" statements are marked with their stage, and the
+  R6.5 entry's combined label is superseded by these two statuses.
+- **Independent cross-check:** exp1–FE7, exp2–FE8, exp7–FE14 and exp4/5 in FE 10–11 are reproduced; the full matrix
+  agrees within 6.6e-08.
+- **Protocol provenance:** local execution log only; not an independently verified preregistration.
+- **Unchanged:** M8, production gates, D-077, SPEC v1.2, R7, PR #94 and PR #96.
+
+## 2026-10-22 — M11 R6.5b: false-positive test fixed (test logic only)
+
+- **Defect:** `tests/test_registration_factory.py::test_no_full_model_contamination` searched the whole serialised
+  FrozenRegistration for substrings. In push run 39757688944 the letters `d11` occurred inside the SHA-256
+  `registration_hash`, a false positive (subtest `token='d11'`).
+- **Fix:** the check now judges the structure.
+  - Every key at every depth is checked, by name and word tokens: D11/Ex/E1/G12/..., stiffness, material,
+    basis_km_hash, material_parameters, model_template, frequency, MAC, pairing.
+  - A string value counts only if it is such a name or embeds a JSON structure containing one.
+  - Hashes, temporary file names and other allowed values no longer trigger it.
+  - The original dataclass-field check is kept.
+- **New synthetic tests:** positive and negative cases, plus the real registration with hashes and temporary paths
+  containing `d11` / `mac`, which must pass, and injected D11 / Ex / basis_km_hash / ... fields, which must be
+  found.
+- **Unchanged:** `registration_factory.py`, the FrozenRegistration format, scientific checks, R6.5 results,
+  statuses, R7, PR #94 and PR #96.
+
+## 2026-10-22 — M11 R6.6: controlled FE torsional-stiffness sensitivity (research result RESEARCH_MAC_COMPUTED; physical registration PENDING)
+
+- **Two authorised Abaqus frequency runs** from the verified V3 INP copy. G12 was 10 000 and 15 000 MPa; only the G12
+  field of one line changed and all other bytes are identical. Both completed with 0 warnings and 0 errors; rigid
+  modes are ≤ 0.009 Hz. Shapes were extracted with the pinned extractor (SHA matches) from the new ODBs only.
+- **Twist branch FE 7:** 19.07 → 26.58 → 32.18 Hz, f ∝ G12^0.48, shape unchanged (FE–FE MAC ≥ 0.999). The Rayleigh
+  estimate (w = xy, an upper bound) gives 19.52 / 27.61 / 33.81 Hz.
+- **Other branches:** FE 8, 9, 13, 14 and 20 are G12-independent; FE 10–12 and 17–18 rise by 23–34 %. Baseline FE 19
+  leaves the computed range and a new branch enters at 331 Hz, so mode numbers are not correspondences.
+- **Against the research references (not a pairing):** G12 alone cannot reconcile exp 1, exp 2 and exp 7.
+  Competing explanations are listed. One proposed next experiment: a free-free test without the shaker.
+- **Not done:** no material identification, G12 fitting, Auto-ID or LM. `research/m11_r65` unchanged, statuses
+  unchanged.
+
 ## 2026-10-23 — R7 FINAL: integration-readiness check of PR #96 (documentation only; not merged)
 
 - **Documents brought in line with the completed R7 R2 scope:**
@@ -5569,6 +5848,23 @@ first internal provider.
   - M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production calibration BLOCKED / NOT_AUTHORISED.
   - No Abaqus solve or extraction was run.
 
+## 2026-10-23 — M11 R6.7: independent E1/E2 modal sensitivity (research result RESEARCH_MAC_COMPUTED; physical registration PENDING)
+
+- **Two authorised Abaqus frequency runs** from the verified V3 INP copy: E1 −10 % (50 400 MPa) and E2 −10 %, each a
+  single field of the `*Elastic` line; all other bytes identical.
+  - Both completed with 0 warnings and 0 errors, 14 elastic modes each.
+  - Shapes extracted with the pinned extractor from the new ODBs only.
+  - Material axis 1 = Assembly X, axis 2 = Assembly Y (GLOBAL orientation); fibre directions not evidenced.
+- **Sensitivity matrix of the model** (FE–FE tracking, no forced assignment):
+  - FE 13 pure E1 (s 0.50) and FE 14 pure E2 (s 0.50);
+  - FE 10 / 17 mainly E1, FE 11 / 18 mainly E2, FE 12 / 19 both;
+  - the twist branch FE 7 is insensitive (s 0.0085);
+  - the same-class pairs 8–9 and 15–16 keep their subspace but rotate when E1 ≠ E2 (pair eigenvalues only);
+  - FE 20 is not established (it mixes beyond the computed range).
+- **Correction:** the R6.6 §18.3 wording now calls the Kirchhoff Rayleigh estimate an analytical reference, not a
+  strict upper bound for S4R. The Figure 18.1 legend is corrected and regenerated; the R6.6 numbers are unchanged.
+- **Not done:** no identification, fitting, Auto-ID, LM or pairing. R6.5 and R6.6 results unchanged.
+
 ## 2026-10-24 — APP-E2E.2: P-1 fixed, a result whose inputs changed is never left active (REVIEW_READY; PR #97)
 
 - **Behaviour:** after an analysis, changing an input that defines the result makes the shown result inactive at
@@ -5591,3 +5887,24 @@ first internal provider.
   - SP-13 comparison: 21 / 21;
   - plate diagnostic: 29 / 29.
 - **Not run:** the store-gated real-data regressions remain NOT_RUN. P-2 and P-3 are not in scope.
+
+## 2026-10-24 — M11 integration: branch merged with main; final statuses RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING / FE_SENSITIVITY_RESEARCH_ONLY (REVIEW_READY; PR #95)
+
+- **Merge:** `origin/main` `aa7d922` (M9, M10, R7, APP-E2E.1–2) merged into `analysis/m11-single-carbon-plate`.
+  Conflicts were only in ROADMAP, STATUS and CHANGELOG (both sides appended); both histories are kept.
+  - `tests/test_registration_factory.py` is the same file on both sides (the PR #95 fix already in main), so it is not
+    applied twice.
+- **Final statuses of M11 (R6.1–R6.7):**
+  - `RESEARCH_MAC_COMPUTED`: a research-only complex MAC (R6.5); it is not a pairing.
+  - `PHYSICAL_REGISTRATION_PENDING`.
+  - `FE_SENSITIVITY_RESEARCH_ONLY`: the FE frequency sensitivities to G12, E1 and E2 (R6.6, R6.7) are sensitivities
+    of the model, with no material identification.
+  - The earlier `FREQUENCY_DIAGNOSTIC_ONLY` describes only the initial review.
+- **Not claimed:** no accepted experimental / FE mode pair; no confirmed MAC; no established physical orientation of the plate; no identified E1, E2 or G12; no transfer to the sandwich panels; no production Auto-ID readiness.
+- **Editorial synchronisation:**
+  - the M11 report header, the JSON summary, the ROADMAP line and the STATUS entry now carry the final statuses and
+    the record of the authorised Abaqus work (R6 extraction; R6.6 / R6.7 frequency runs);
+  - STATUS records the merges already on main: PR #97 `2f314bc` and PR #94 `aa7d922`. These are facts only; M10
+    stays READY_FOR_HUMAN_CONFIRMATION.
+- **Unchanged:** production code, MAC, registration, Auto-ID, thresholds and governed gates. M8 GATE `NOT_MET`;
+  D-077 `NO_GLOBAL_PARAMETER_VALUE`; production Auto-ID / calibration NOT_AUTHORISED. No new computation.
