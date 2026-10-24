@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import copy
+import gc
 import json
 import os
 from pathlib import Path
@@ -37,6 +38,15 @@ from test_physical_registration import true_top_ids  # noqa: E402
 from r7_support import synthetic_fe_input, synthetic_inp_text  # noqa: E402
 
 IDENTITY = {"sha256": "a" * 64, "size": 4096}
+
+
+def _join_background_threads() -> None:
+    """The dialog's hashing / build threads hold the dialog (and its Tk variables): they end before the window is
+    destroyed, so no Tk object is ever released on another thread ("Tcl_AsyncDelete ... wrong thread")."""
+    deadline = time.monotonic() + 60
+    for thread in threading.enumerate():
+        if thread is not threading.main_thread() and thread.daemon:
+            thread.join(max(0.0, deadline - time.monotonic()))
 
 
 def mesh_variant(fe: FEGeometry) -> FEGeometry:
@@ -322,7 +332,9 @@ class DialogTests(_World, unittest.TestCase):
         except tk.TclError as error:
             self.skipTest(f"no display: {error}")
         root.withdraw()
+        self.addCleanup(gc.collect)  # the dialog's Tk objects are freed on the main thread
         self.addCleanup(root.destroy)
+        self.addCleanup(_join_background_threads)  # runs first: hashing / build threads hold the dialog
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             unv = folder / "synthetic.unv"
@@ -426,6 +438,7 @@ class StaleResultTests(_World, unittest.TestCase):
         except tk.TclError as error:
             self.skipTest(f"no display: {error}")
         self.root.withdraw()
+        self.addCleanup(gc.collect)  # the dialog's Tk objects are freed on the main thread
         self.addCleanup(self.root.destroy)
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -448,6 +461,7 @@ class StaleResultTests(_World, unittest.TestCase):
                                    _start=lambda: self.started.append(True), _guided_registration=None)
         self.dialog = GuidedRegistrationDialog(self.app, self.loaded)
         self.addCleanup(lambda: self.dialog.window.winfo_exists() and self.dialog.window.destroy())
+        self.addCleanup(_join_background_threads)  # runs first: hashing / build threads hold the dialog
         self.assertTrue(self.pump(lambda: self.dialog.identity is not None))
         (self.folder / "model.inp").write_bytes(synthetic_inp_text(self.variant).encode("utf-8"))
         self.dialog.locate_fe_input(self.folder / "model.inp")  # R7-B: the single-z-level surface needs the INP

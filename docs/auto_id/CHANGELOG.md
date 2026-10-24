@@ -5908,3 +5908,42 @@ first internal provider.
     stays READY_FOR_HUMAN_CONFIRMATION.
 - **Unchanged:** production code, MAC, registration, Auto-ID, thresholds and governed gates. M8 GATE `NOT_MET`;
   D-077 `NO_GLOBAL_PARAMETER_VALUE`; production Auto-ID / calibration NOT_AUTHORISED. No new computation.
+
+## 2026-10-25 — APP-E2E.3: preparation for repeat experiments; P-2, P-3; SETUP_UNDER_REVIEW (REVIEW_READY)
+
+- **Branch:** `fix/app-e2e3-experiment-readiness` from `main` `5fc8f82`. Not merged.
+- **M11 records synchronised:** PR #95 merged as `5fc8f82` (STATUS `MERGED`, `main_merges`, ROADMAP). The owner's
+  suspension observation is recorded as test-condition information (M11 §21, STATUS `test_condition_note`):
+  - first experimental resonance near 19 Hz with another suspension instead of about 33 Hz; FE 7 at 19.07 Hz;
+  - no mode correspondence is established and no mode is excluded.
+  Scientific conclusions are unchanged.
+- **P-2:** FE rigid-body modes are separate diagnostic records in the frequency-only diagnostic, the mode viewer and
+  the diagnostic PDF / Excel. The criterion is the comparator's own (six-vector rigid-body shape projection,
+  residual <= 0.02), with no frequency threshold.
+  - Nearest-frequency rows use elastic modes only.
+  - Nothing is removed, and experimental mode 1 is never excluded.
+  - The classification is computed in the worker, or reused from the comparison's quality control.
+- **P-3:** in 11. Scaling:
+  - text wraps to the real pane width, with no 280 px column from a hidden tab;
+  - the label texts moved out of the frame titles;
+  - the tab scrolls when the panes need more height, and the sashes keep every control visible.
+  Checked at Tk scaling 1.33 / 2.0 and at 1680 x 1000 / the minimum window.
+- **SETUP_UNDER_REVIEW** (`services/experimental_series_review.py`, `series_review_ui.py`): a person's note on one
+  experimental series.
+  - The series is identified by content SHA-256 + size + modal set; the reason, the source and the experiment id are
+    mandatory.
+  - The log is append-only and per user.
+  - The note is shown in 1. Files and in the diagnostic export.
+  - It changes no data, frequency, shape, MAC, pairing, criterion, registration or status, and it is not a gate.
+- **Tests:**
+  - `tests/test_app_e2e3_experiment_readiness.py` (14); the P-2 / P-3 tests fail on `5fc8f82`;
+  - unittest 2529 OK / 96 skipped in three runs; pytest 2468 passed / 112 skipped / 0 failed;
+  - the `test_guided_registration` teardown joins its dialog threads (a latent Tcl_AsyncDelete hazard).
+- **Windows GUI on verified copies (no process):**
+  - RUN_PROGRAM.cmd launches cleanly;
+  - SP-02 accepted comparison 20 / 20;
+  - plate diagnostic with the note 29 / 29;
+  - damaged UNV 12 / 12.
+- **Unchanged:** MAC, pairing, registrations, QC thresholds, SPEC v1.2, Auto-ID and production gates, the pinned
+  extractor. M8 GATE `NOT_MET`; D-077 `NO_GLOBAL_PARAMETER_VALUE`; production Auto-ID BLOCKED / NOT_AUTHORISED. No
+  Abaqus, no LM.

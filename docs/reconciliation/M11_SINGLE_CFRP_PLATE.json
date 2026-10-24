@@ -11,6 +11,7 @@
   "PHYSICAL_REGISTRATION_PENDING",
   "FE_SENSITIVITY_RESEARCH_ONLY"
  ],
+ "test_condition_note": "2026-10-25, owner: with a changed suspension the first experimental resonance appeared near 19 Hz instead of about 33 Hz (FE 7: 19.07 Hz). Information on the test conditions only: no mode correspondence is established, no experimental mode is excluded, the series polymax-bravo stays as recorded; a repeat measurement is a new, separate series (report section 21)",
  "not_claimed": "no accepted experimental / FE mode pair; no confirmed MAC; no established physical orientation of the plate; no identified E1, E2 or G12; no transfer to the sandwich panels; no production Auto-ID readiness",
  "labels": [
   "ANALYSIS_ONLY",

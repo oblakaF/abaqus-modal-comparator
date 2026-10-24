@@ -674,6 +674,8 @@ def install_responsive_workflow(app_module) -> None:
             root, SETTLED_RESIZE_MS, self._apply_responsive_layout
         )
         root.bind("<Configure>", self._schedule_responsive_layout, add="+")
+        # P-3: a tab shown for the first time gets its text wrapped to its real width
+        self.tabs.bind("<<NotebookTabChanged>>", lambda _event: self._schedule_responsive_layout(), add="+")
         root.after_idle(self._apply_responsive_layout)
         root.protocol("WM_DELETE_WINDOW", self._close_requested)
         if self._session_recovered:
@@ -788,7 +790,8 @@ def install_responsive_workflow(app_module) -> None:
         self.end_mode_spinbox.pack(side="left")
         mode_help = ttk.Label(
             analysis,
-            text="Rigid and near-zero modes are excluded automatically; experimental modes are detected from the measurement file.",
+            text="Rigid-body FE modes (by their shape) are excluded from the comparison and listed separately as "
+                 "diagnostic records; every experimental mode is kept and detected from the measurement file.",
             style="Secondary.TLabel",
             justify="left",
         )
@@ -2260,7 +2263,8 @@ def install_responsive_workflow(app_module) -> None:
                 wrap = int(widget.cget("wraplength"))
             except (tk.TclError, ValueError):
                 wrap = 0
-            if wrap > 0 and widget not in self._responsive_wrap_labels:
+            if wrap > 0 and widget not in self._responsive_wrap_labels \
+                    and not getattr(widget, "_wraps_to_pane", False):  # P-3: a pane-wrapped label keeps its own wrap
                 self._responsive_wrap_labels.append(widget)
         frames = []
         for widget in _walk(self.root):
@@ -2353,6 +2357,8 @@ def install_responsive_workflow(app_module) -> None:
         for label in self._responsive_wrap_labels:
             try:
                 container_width = int(label.master.winfo_width())
+                if container_width <= 1 or getattr(label, "_wraps_to_pane", False):
+                    continue  # P-3: a hidden tab not yet laid out (width 1) would otherwise wrap to a narrow column
                 wrap = text_wrap_width(container_width, mode)
                 current_wrap = label.cget("wraplength")
                 if current_wrap == "" or int(current_wrap) != wrap:

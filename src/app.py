@@ -369,16 +369,34 @@ class ModalComparatorApp:
         """G1: frequency-scaling diagnostics of the matched pairs (diagnostic only; never a material property).
 
         Its own tab: the comparison-table tab has no vertical room left at the minimum window size."""
-        # G2c: G1 and the archived sensitivity evidence share the tab; both tables shrink instead of being cut off
-        self.scaling_panes = ttk.Panedwindow(self.scaling_tab, orient="vertical")
-        self.scaling_panes.pack(fill="both", expand=True)
-        scaling = ttk.LabelFrame(self.scaling_panes, text=f"Frequency scaling diagnostic — {SCALING_LABELS}",
-                                 padding=8)
+        # G2c: G1 and the archived sensitivity evidence share the tab; both tables shrink instead of being cut off.
+        # P-3: when the window (or a 150 % display) leaves less height than the panes need, the tab scrolls instead
+        self.scaling_tab.columnconfigure(0, weight=1)
+        self.scaling_tab.rowconfigure(0, weight=1)
+        self.scaling_canvas = tk.Canvas(self.scaling_tab, highlightthickness=0, borderwidth=0)
+        self.scaling_vscroll = ttk.Scrollbar(self.scaling_tab, orient="vertical", command=self.scaling_canvas.yview)
+        self.scaling_canvas.configure(yscrollcommand=self.scaling_vscroll.set)
+        self.scaling_canvas.grid(row=0, column=0, sticky="nsew")
+        self.scaling_vscroll.grid(row=0, column=1, sticky="ns")
+        self.scaling_panes = ttk.Panedwindow(self.scaling_canvas, orient="vertical")
+        self._scaling_window = self.scaling_canvas.create_window((0, 0), window=self.scaling_panes, anchor="nw")
+        self.scaling_canvas.bind("<Configure>", lambda _event: self._fit_scaling_tab(), add="+")
+        self.root.bind_all("<MouseWheel>", self._scroll_scaling_tab, add="+")
+        # P-3: a frame title never wraps, so the labels are a wrapped line inside the frame
+        scaling = ttk.LabelFrame(self.scaling_panes, text="Frequency scaling diagnostic", padding=8)
         self.scaling_panes.add(scaling, weight=3)
-        ttk.Label(scaling, text=SCALING_CAVEAT, wraplength=1100, justify="left").pack(anchor="w")
+        self._scaling_g1_frame = scaling
+        scaling.bind("<Configure>", lambda _event: self._schedule_scaling_fit(), add="+")
+        self.scaling_labels = ttk.Label(scaling, text=SCALING_LABELS, wraplength=1100, justify="left")
+        self.scaling_labels.pack(anchor="w", fill="x")
+        self._wrap_to_width(scaling, self.scaling_labels)
+        self.scaling_caveat = ttk.Label(scaling, text=SCALING_CAVEAT, wraplength=1100, justify="left")
+        self.scaling_caveat.pack(anchor="w", fill="x")
+        self._wrap_to_width(scaling, self.scaling_caveat)
         self.scaling_summary = ttk.Label(scaling, text="Frequency-scaling diagnostic: no comparison result yet.",
                                          wraplength=1100, justify="left")
-        self.scaling_summary.pack(anchor="w", pady=(4, 4))
+        self.scaling_summary.pack(anchor="w", fill="x", pady=(4, 4))
+        self._wrap_to_width(scaling, self.scaling_summary)
         scaling_columns = ("fe", "em", "ff", "ef", "mac", "ratio", "square", "log", "direction", "category",
                            "status", "warnings")
         scaling_titles = ("FE mode", "Exp. mode", "FE, Hz", "Exp., Hz", "MAC", "f_exp/f_FE", "(f_exp/f_FE)^2",
@@ -402,6 +420,11 @@ class ModalComparatorApp:
         self.scaling_yscroll.grid(row=0, column=1, sticky="ns")
         self.scaling_xscroll.grid(row=1, column=0, sticky="ew")
         self._build_sensitivity_evidence()
+        self.evidence_panes.bind("<Configure>", lambda _event: self._schedule_scaling_fit(), add="+")
+        for label in (self.scaling_labels, self.scaling_caveat, self.scaling_summary, self.sensitivity_labels,
+                      self.sensitivity_status, self.what_if_labels, self.what_if_status):
+            label.bind("<Configure>", lambda _event: self._schedule_scaling_fit(), add="+")
+        self.tabs.bind("<<NotebookTabChanged>>", lambda _event: self._schedule_scaling_fit(), add="+")
 
     def _build_sensitivity_evidence(self) -> None:
         """G2c: recorded CARBON-5A sensitivities of the accepted SP-02 / SP-13 models (display only).
@@ -412,9 +435,12 @@ class ModalComparatorApp:
         # G2d-2: the archived evidence and the E_in what-if sit side by side below G1
         self.evidence_panes = ttk.Panedwindow(self.scaling_panes, orient="horizontal")
         self.scaling_panes.add(self.evidence_panes, weight=3)
-        evidence = ttk.LabelFrame(self.evidence_panes, padding=8,
-                                  text=f"Archived sensitivity evidence (SP-02 / SP-13) — {sensitivity_evidence.LABEL_TEXT}")
+        evidence = ttk.LabelFrame(self.evidence_panes, padding=8, text="Archived sensitivity evidence (SP-02 / SP-13)")
         self.evidence_panes.add(evidence, weight=1)
+        self.sensitivity_labels = ttk.Label(evidence, text=sensitivity_evidence.LABEL_TEXT, wraplength=500,
+                                            justify="left")
+        self.sensitivity_labels.pack(anchor="w", fill="x")
+        self._wrap_to_width(evidence, self.sensitivity_labels)
         actions = ttk.Frame(evidence)
         actions.pack(fill="x", pady=(4, 4))
         self.sensitivity_button = ttk.Button(actions, text="Check archived sensitivities",
@@ -562,9 +588,11 @@ class ModalComparatorApp:
         self._what_if_evidence = None
         self.what_if_change = tk.StringVar(value="0.0")
         frame = ttk.LabelFrame(self.evidence_panes, padding=8,
-                               text="E_in what-if, SP-02 / SP-13 (archived local sensitivities) — "
-                                    f"{what_if.LABEL_TEXT}")
+                               text="E_in what-if, SP-02 / SP-13 (archived local sensitivities)")
         self.evidence_panes.add(frame, weight=1)
+        self.what_if_labels = ttk.Label(frame, text=what_if.LABEL_TEXT, wraplength=500, justify="left")
+        self.what_if_labels.pack(anchor="w", fill="x")
+        self._wrap_to_width(frame, self.what_if_labels)
         controls = ttk.Frame(frame)
         controls.pack(fill="x")
         ttk.Label(controls, text="E_in change, % (−5 … +5):").pack(side="left")
@@ -601,9 +629,58 @@ class ModalComparatorApp:
         self.what_if_change.trace_add("write", lambda *_: self._update_e_what_if())
         self._set_what_if_evidence(None)
 
+    def _schedule_scaling_fit(self) -> None:
+        if not getattr(self, "_scaling_fit_pending", False):
+            self._scaling_fit_pending = True
+            self.root.after_idle(self._fit_scaling_tab)
+
+    def _fit_scaling_tab(self) -> None:
+        """P-3: the panes fill the tab; when they need more height than the tab has, they keep their requested height
+        and the tab scrolls. The sash never makes a pane smaller than its content requests."""
+        self._scaling_fit_pending = False
+        try:
+            canvas, panes = self.scaling_canvas, self.scaling_panes
+            width, available = max(1, canvas.winfo_width()), max(1, canvas.winfo_height())
+            top = self._scaling_g1_frame.winfo_reqheight()
+            bottom = self.evidence_panes.winfo_reqheight()
+            needed = top + bottom + 8
+            height = max(available, needed)
+            if (width, height) != getattr(self, "_scaling_fitted", None):
+                self._scaling_fitted = (width, height)
+                canvas.itemconfigure(self._scaling_window, width=width, height=height)
+                canvas.configure(scrollregion=(0, 0, width, height))
+            sash = panes.sashpos(0)
+            low, high = top, max(top, height - bottom - 8)
+            if not low <= sash <= high:
+                panes.sashpos(0, min(max(sash, low), high))
+            # the evidence and the what-if side by side: neither narrower than its row of controls
+            row_width = self.evidence_panes.winfo_width()
+            left = self.sensitivity_button.master.winfo_reqwidth() + 24
+            right = self.what_if_spinbox.master.winfo_reqwidth() + 24
+            if row_width > 1:
+                sash = self.evidence_panes.sashpos(0)
+                if row_width >= left + right and not left <= sash <= row_width - right:
+                    self.evidence_panes.sashpos(0, min(max(sash, left), row_width - right))
+        except (tk.TclError, AttributeError):
+            pass
+
+    def _scroll_scaling_tab(self, event) -> None:
+        try:
+            widget = self.root.winfo_containing(event.x_root, event.y_root)
+            if isinstance(widget, (ttk.Treeview, tk.Text)):
+                return  # tables and text areas scroll themselves
+            while widget is not None and widget is not self.scaling_canvas:
+                widget = getattr(widget, "master", None)
+            if widget is None or not self.scaling_vscroll.winfo_ismapped():
+                return
+            self.scaling_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        except (tk.TclError, AttributeError):
+            pass
+
     @staticmethod
     def _wrap_to_width(frame, label) -> None:
-        """Wrap a label to the current width of its (resizable) pane."""
+        """Wrap a label to the current width of its (resizable) pane (the window-wide responsive wrap leaves it)."""
+        label._wraps_to_pane = True
         frame.bind("<Configure>", lambda event: label.configure(wraplength=max(200, event.width - 30)), add="+")
 
     def _set_what_if_evidence(self, evidence) -> None:

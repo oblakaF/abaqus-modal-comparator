@@ -19,8 +19,8 @@ TABLE_COLUMN_SPECS = (
 )
 
 MODE_RANGE_HELP = (
-    "Default 6–15; rigid/near-zero modes are excluded automatically and "
-    "experimental modes are detected from Testlab."
+    "Default 6–15; rigid-body FE modes (by their shape) are excluded from the comparison and listed separately as "
+    "diagnostic records; every experimental mode is kept and detected from Testlab."
 )
 
 WORKFLOW_TEXT = (
