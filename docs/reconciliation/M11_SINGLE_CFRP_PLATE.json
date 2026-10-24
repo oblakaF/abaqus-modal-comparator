@@ -251,17 +251,17 @@
   "excel": [
    {
     "file": "results sadwich.xlsx",
-    "source": "C:\\Users\\VadimKrysko\\Desktop\\results sadwich.xlsx",
+    "source": "C:\\Users\\<LOCAL_USER>\\Desktop\\results sadwich.xlsx",
     "sha256": "3d7e803b03de634def64ace4d90b3da982934dd47f4d8c373eeea6129429b0a5"
    },
    {
     "file": "Experiment_Freq_damping_LMS_onlyupdated.xlsx",
-    "source": "C:\\Users\\VadimKrysko\\Desktop\\Experiment_Freq_damping_LMS_onlyupdated.xlsx",
+    "source": "C:\\Users\\<LOCAL_USER>\\Desktop\\Experiment_Freq_damping_LMS_onlyupdated.xlsx",
     "sha256": "6bbf65ab1bfdb060cf6493dfc15b53dd830a59ca3a2b5eb32e99a45264173412"
    },
    {
     "file": "Образцы_трекер_Abaqus.xlsx",
-    "source": "C:\\Users\\VadimKrysko\\Desktop\\Образцы_трекер_Abaqus.xlsx",
+    "source": "C:\\Users\\<LOCAL_USER>\\Desktop\\Образцы_трекер_Abaqus.xlsx",
     "sha256": "917fae267a539dd020cc1b80653ed6ee39e3616f791a99c85fc39aac8a737929"
    }
   ],
