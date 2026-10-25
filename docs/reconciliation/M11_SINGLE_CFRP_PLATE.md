@@ -2300,3 +2300,23 @@ hypothetical supports, springs or masses. The Abaqus outputs stay outside Git.
 - Abaqus Python: the R6 extraction on a working copy of `CFRP_S4R_0875_FreeFree.odb`, and the pinned extractor
   applied only to the four new work ODBs of R6.6 and R6.7. No other ODB was opened.
 - M8 original gate `NOT_MET`; production calibration BLOCKED / NOT_AUTHORISED; D-077 NO_GLOBAL_PARAMETER_VALUE.
+
+## 21. Addendum (2026-10-25): the suspension (information on the test conditions)
+
+**The observation (owner, 2026-10-25).** With a changed suspension, the plate's first experimental resonance appeared
+near **19 Hz** instead of about **33 Hz**. The FE template's first elastic mode is FE 7 at 19.07 Hz.
+
+**How it is recorded.** This is information on the **test conditions only**:
+
+- It does **not** establish that the 33 Hz record and the 19 Hz record are the same mode, nor which experimental mode
+  corresponds to FE 7. No mode pairing follows from it.
+- No experimental mode is excluded. The existing series `polymax-bravo` (experimental mode 1 at 33.45 Hz) stays as
+  recorded, and the research MAC of R6.5 is unchanged.
+- A repeat measurement is a new, separate series. Its files do not overwrite the earlier ones, and it is not
+  accepted automatically.
+- In the comparator, a person can mark a series `SETUP_UNDER_REVIEW` (APP-E2E.3,
+  `docs/gui/APP_E2E3_EXPERIMENT_READINESS.md`). This note changes no data, frequency, shape, MAC or status.
+- SP-02, SP-13 and SP-08 are not declared unreliable by this observation.
+
+The statuses are unchanged: `RESEARCH_MAC_COMPUTED`, `PHYSICAL_REGISTRATION_PENDING`, `FE_SENSITIVITY_RESEARCH_ONLY`.
+No material property is identified; M8 GATE `NOT_MET`; D-077 `NO_GLOBAL_PARAMETER_VALUE`.

@@ -134,6 +134,10 @@ def install_polymax_ui(app_module) -> None:
             self.experimental_modal_set_combo,
             "readonly",
         )
+        # APP-E2E.3: a person's SETUP_UNDER_REVIEW note of exactly this series (never an analysis input)
+        import series_review_ui
+
+        series_review_ui.build_series_review_row(self, source, 6)
 
     def set_modal_set_key(self, key: str) -> None:
         self._suppress_modal_set_dirty = True

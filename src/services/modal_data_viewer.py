@@ -29,6 +29,7 @@ FE = "FE"
 EXPERIMENTAL = "EXPERIMENTAL"
 
 FE_MODE = "FE_MODE"
+FE_RIGID_BODY_MODE = "FE_RIGID_BODY_MODE"
 FITTED_MODE = "FITTED_EXPERIMENTAL_MODE"
 FRF_PEAK_SNAPSHOT = "FRF_PEAK_RESPONSE_SNAPSHOT"
 UNCLASSIFIED = "UNCLASSIFIED_EXPERIMENTAL_RECORD"
@@ -46,6 +47,10 @@ COMPONENT_TEXT = {
     EXPERIMENTAL: {"normal": "Out-of-plane (normal to the best-fit plane)", "magnitude": "Magnitude",
                    "x": "X (measurement axes)", "y": "Y (measurement axes)", "z": "Z (measurement axes)"},
 }
+# P-2: the comparator's own rigid-body criterion (quality_control: six-vector rigid-body subspace projection of the
+# mode shape, residual fraction <= RIGID_SHAPE_RESIDUAL_THRESHOLD). No frequency threshold is used.
+RIGID_RESIDUALS_KEY = "rigid_body_residual_fraction_by_mode"
+RIGID_BODY_METHOD = "six-vector rigid-body subspace projection of the mode shape"
 MINIMUM_SPATIAL_POINTS = 3
 DISPLAY_GRID_THRESHOLD = 5000  # above this many nodes the field is averaged on a display grid
 DISPLAY_GRID_CELLS = 220
@@ -130,7 +135,8 @@ class ViewerMode:
     def label(self) -> str:
         prefix = "FE mode" if self.role == FE else (
             "FRF peak" if self.classification == FRF_PEAK_SNAPSHOT else "Experimental mode")
-        return f"{prefix} {self.number} — {self.frequency_hz:.3f} Hz"
+        suffix = " — rigid-body (diagnostic)" if self.classification == FE_RIGID_BODY_MODE else ""
+        return f"{prefix} {self.number} — {self.frequency_hz:.3f} Hz{suffix}"
 
     def to_dict(self) -> dict:
         return {"role": self.role, "number": self.number, "frequency_hz": self.frequency_hz,
@@ -152,13 +158,53 @@ def _quality(mode) -> dict:
     return out
 
 
+def rigid_body_threshold() -> float:
+    from quality_control import RIGID_SHAPE_RESIDUAL_THRESHOLD
+
+    return float(RIGID_SHAPE_RESIDUAL_THRESHOLD)
+
+
+def classify_rigid_body_fe_modes(dataset) -> dict[int, float]:
+    """P-2: the rigid-body residual fraction of every FE mode, by the comparator's own quality-control criterion.
+
+    Computed once (off the GUI thread, by the analysis worker) and recorded in the dataset metadata under the key the
+    comparison's quality control uses; a recorded value is reused. Nothing is removed from the dataset."""
+    from quality_control import _rigid_body_residual_fraction
+
+    recorded = recorded_rigid_residuals(dataset)
+    if recorded is not None and all(int(mode.number) in recorded for mode in dataset.modes):
+        return recorded
+    residuals = {int(mode.number): float(_rigid_body_residual_fraction(mode)) for mode in dataset.modes}
+    dataset.metadata[RIGID_RESIDUALS_KEY] = residuals
+    return residuals
+
+
+def recorded_rigid_residuals(dataset) -> Optional[dict[int, float]]:
+    """The recorded rigid-body residuals (never computed here, so the GUI thread never projects large models)."""
+    recorded = (getattr(dataset, "metadata", None) or {}).get(RIGID_RESIDUALS_KEY)
+    if not isinstance(recorded, Mapping):
+        return None
+    return {int(number): float(value) for number, value in recorded.items()}
+
+
+def rigid_body_text(residual: float) -> str:
+    return (f"rigid-body mode by {RIGID_BODY_METHOD} (residual {residual:.2g} <= {rigid_body_threshold():g}, the "
+            "comparator's criterion); a diagnostic record, not an elastic mode")
+
+
 def viewer_modes(dataset, role: str) -> list[ViewerMode]:
     if dataset is None:
         return []
     modes = []
+    residuals = recorded_rigid_residuals(dataset) if role == FE else None
+    threshold = rigid_body_threshold() if residuals else None
     for mode in dataset.sorted_modes():
         if role == FE:
-            classification, text = FE_MODE, FE_SOURCE_TEXT
+            residual = None if residuals is None else residuals.get(int(mode.number))
+            if residual is not None and residual <= threshold:
+                classification, text = FE_RIGID_BODY_MODE, rigid_body_text(residual)
+            else:
+                classification, text = FE_MODE, FE_SOURCE_TEXT
         else:
             classification, text = experimental_classification(mode, dataset.metadata)
         available, reason = spatial_status(mode)

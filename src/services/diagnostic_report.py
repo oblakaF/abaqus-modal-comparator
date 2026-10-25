@@ -91,13 +91,30 @@ class DiagnosticReport:
         return NOT_COMPUTED
 
 
+def _fe_classification(entry, classified: bool) -> str:
+    if entry.classification == viewer.FE_RIGID_BODY_MODE:
+        return "RIGID-BODY (diagnostic record, not an elastic mode): " + entry.source_text
+    return "elastic FE mode" if classified else "not classified (rigid-body check not recorded)"
+
+
 def _fe_rows(abaqus) -> tuple[list[dict], Optional[tuple[float, float]]]:
+    classified = viewer.recorded_rigid_residuals(abaqus) is not None
     rows = [{"mode": entry.number, "frequency_hz": entry.frequency_hz, "points": entry.point_count,
              "components": "/".join({"x": "U1", "y": "U2", "z": "U3"}[axis] for axis in entry.axes) or "none",
-             "shape": "spatial view available" if entry.spatial_available else entry.spatial_reason}
+             "shape": "spatial view available" if entry.spatial_available else entry.spatial_reason,
+             "classification": _fe_classification(entry, classified),
+             "rigid_body": entry.classification == viewer.FE_RIGID_BODY_MODE}
             for entry in viewer.viewer_modes(abaqus, viewer.FE)]
-    hz = [row["frequency_hz"] for row in rows]
+    hz = [row["frequency_hz"] for row in rows if not row["rigid_body"]]  # P-2: the elastic FE range
     return rows, ((min(hz), max(hz)) if hz else None)
+
+
+def _rigid_note(fe_rows) -> str:
+    rigid = [str(row["mode"]) for row in fe_rows if row["rigid_body"]]
+    if not rigid:
+        return ""
+    return (f"; rigid-body FE modes {', '.join(rigid)} listed as diagnostic records (shape projection, the "
+            "comparator's criterion), the range is that of the elastic modes")
 
 
 def _range_note(frequency: float, fe_range) -> str:
@@ -158,8 +175,25 @@ def _measured_dofs(experimental) -> str:
     return "/".join(names[axis] for axis in axes) or "none"
 
 
+def _series_review(exp_file: dict, experimental, store: Optional[Path]) -> tuple[Optional[dict], str]:
+    """The person's SETUP_UNDER_REVIEW note of exactly this series (content hash and modal set), if any."""
+    from services import experimental_series_review as review
+
+    if exp_file.get("sha256") is None:
+        return None, "not checked: the experimental file content could not be identified"
+    identity = review.SeriesIdentity(exp_file["sha256"], int(exp_file["size"]),
+                                     str((experimental.metadata or {}).get("modal_set_key") or "")
+                                     if experimental is not None else "")
+    try:
+        mark = review.active_mark(store or review.default_store(), identity)
+    except review.SeriesReviewError as error:
+        return None, f"not available: {error}"
+    return mark, review.mark_text(mark)
+
+
 def build_diagnostic_report(loaded, *, abaqus_path: Optional[Path] = None, experimental_path: Optional[Path] = None,
-                            images: Sequence[tuple[Path, str]] = (), cancel=None) -> DiagnosticReport:
+                            images: Sequence[tuple[Path, str]] = (), cancel=None,
+                            series_review_store: Optional[Path] = None) -> DiagnosticReport:
     """The report of one analysis's loaded data (no comparison result); every value comes from the backend objects."""
     from services.guided_registration import REQUIRED_EVIDENCE
 
@@ -167,6 +201,7 @@ def build_diagnostic_report(loaded, *, abaqus_path: Optional[Path] = None, exper
     abaqus_path = Path(abaqus_path or getattr(loaded, "abaqus_path", None) or abaqus.source_path)
     experimental_path = experimental_path or getattr(loaded, "experimental_path", None)
     fe_file, exp_file = _identity_of(abaqus_path, cancel), _identity_of(experimental_path, cancel)
+    series_mark, series_text = _series_review(exp_file, experimental, series_review_store)
     try:
         geometry = dict(modal_dataset_geometry_identity(abaqus))
     except ValueError as error:
@@ -188,11 +223,12 @@ def build_diagnostic_report(loaded, *, abaqus_path: Optional[Path] = None, exper
         ("Abaqus step", str(metadata.get("step_name") or "not recorded")),
         ("FE geometry identity", f"{geometry.get('sha256')} ({geometry.get('node_count')} nodes)"),
         ("FE modes extracted", f"{len(fe_rows)}" + (f" ({fe_range[0]:.3f}–{fe_range[1]:.3f} Hz)" if fe_range
-                                                    else "")),
+                                                    else "") + _rigid_note(fe_rows)),
         ("Experimental file", str(experimental_path) if experimental_path else "not recorded"),
         ("Experimental size / SHA-256", f"{exp_file['size']} bytes / {exp_file['sha256']}" + (
             f" ({exp_file['note']})" if exp_file["note"] else "")),
         ("Experimental source", exp_source),
+        ("Experimental series review", series_text),
         ("Modal set", experimental_rows[0]["modal_set"] if experimental_rows else "none"),
         ("Experimental records", str(len(experimental_rows))),
         ("Measured DOFs", _measured_dofs(experimental)),
@@ -224,7 +260,10 @@ def build_diagnostic_report(loaded, *, abaqus_path: Optional[Path] = None, exper
         "Not established: the physical registration, any mode pair, any MAC and any shape correspondence.",
         "Needed for a physical comparison: the independent physical evidence listed under 'What is needed'.",
         "No material constant is identified or implied by this report.",
-    )
+    ) + ((f"The experimental series is marked {series_mark['status']} by a person (experiment "
+          f"{series_mark['experiment_id']}: {series_mark['reason']}); the test setup may have influenced it. This is a "
+          "note on the test conditions only: no frequency, shape or status above is changed by it.",)
+         if series_mark is not None else ())
     provenance = {
         "schema": SCHEMA, "status": status, "registration": loaded.registration,
         "fe_file": fe_file, "experimental_file": exp_file, "fe_geometry_identity": geometry,
@@ -234,6 +273,7 @@ def build_diagnostic_report(loaded, *, abaqus_path: Optional[Path] = None, exper
         "experimental_metadata": {k: (experimental.metadata.get(k) if experimental is not None else None)
                                   for k in ("modal_set_key", "modal_set_name", "mode_source", "frf_channel_count")},
         "frequency_only_diagnostic": None if diagnostic is None else diagnostic.status,
+        "experimental_series_review": series_mark,
         "mac": NOT_COMPUTED, "mode_pairs": "NONE", "orientation": "NOT CHOSEN",
         "generated_by": "services.diagnostic_report from the loaded analysis data; no Abaqus, no new computation",
     }
@@ -297,7 +337,8 @@ def _sections(report: DiagnosticReport) -> list[tuple[str, list[str]]]:
     needed = [line for text in report.needed for line in wrap(text, "- ")]
     fe = [f"{'FE mode':>8}  {'Frequency, Hz':>14}  {'Points':>9}  {'Components':<11} Shape information"]
     fe += [f"{row['mode']:>8}  {row['frequency_hz']:>14.4f}  {row['points']:>9}  {row['components']:<11} "
-           f"{row['shape']}"[:width] for row in report.fe_rows]
+           f"{'RIGID-BODY (diagnostic record, not elastic)' if row.get('rigid_body') else row['shape']}"[:width]
+           for row in report.fe_rows]
     if report.fe_range_hz:
         fe.append(f"Extracted FE frequency range: {report.fe_range_hz[0]:.4f} – {report.fe_range_hz[1]:.4f} Hz")
     exp = [f"{'Record':>6}  {'Frequency, Hz':>14}  Classification / warnings"]
@@ -417,9 +458,10 @@ def write_diagnostic_xlsx(report: DiagnosticReport, destination: Path) -> Path:
                 *(("Conclusion", text) for text in report.conclusions), *(("Limit", text) for text in LIMITS)]
         _table(summary, ("Item", "Value"), rows, start_row=4, widths=(30, 140))
         fe = book.create_sheet("FE Modes")
-        _table(fe, ("FE mode", "Frequency, Hz", "Points", "Components with data", "Shape information"),
-               [(r["mode"], r["frequency_hz"], r["points"], r["components"], r["shape"]) for r in report.fe_rows],
-               widths=(10, 16, 12, 22, 60))
+        _table(fe, ("FE mode", "Frequency, Hz", "Points", "Components with data", "Shape information",
+                    "Classification"),
+               [(r["mode"], r["frequency_hz"], r["points"], r["components"], r["shape"], r["classification"])
+                for r in report.fe_rows], widths=(10, 16, 12, 22, 60, 70))
         experimental = book.create_sheet("Experimental Data")
         _table(experimental, ("Record", "Frequency, Hz", "Classification", "Source", "Modal set", "Points",
                               "Diagnostic warnings"),

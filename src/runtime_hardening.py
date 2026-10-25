@@ -23,9 +23,11 @@ from services.archived_sensitivity_evidence import (
 from services.modal_data_viewer import (
     AMBIGUOUS,
     ESTABLISHED,
+    RIGID_RESIDUALS_KEY,
     ExperimentalDataUnavailable,
     LoadedModalData,
     attach_loaded_data,
+    classify_rigid_body_fe_modes,
 )
 from services.guided_registration import GuidedRegistrationRefusal, load_fe_input_for, verify_for_files
 from services.new_odb_comparison import (
@@ -248,6 +250,7 @@ def install_runtime_hardening(app_module) -> None:
                 # The FE data stay available for viewing; the experimental limitation is stated, never hidden.
                 loaded.experimental_error = str(error)
                 loaded.reason = f"the experimental file gave no usable modal or FRF data: {error}"
+                classify_rigid_body_fe_modes(abaqus_data)  # P-2: rigid-body FE modes shown as diagnostic records
                 raise ExperimentalDataUnavailable(
                     f"The experimental file could not be used ({error}). The extracted FE frequencies and mode "
                     "shapes remain available in 3. Mode shapes > Individual modes."
@@ -346,6 +349,10 @@ def install_runtime_hardening(app_module) -> None:
                 result.warnings.insert(0, reuse.warning())
             loaded.registration = ESTABLISHED
             loaded.reason = "the comparator established the physical registration; see the gated comparison"
+            quality = (getattr(getattr(result, "abaqus", None), "metadata", None) or {}).get("quality_control") or {}
+            recorded = quality.get(RIGID_RESIDUALS_KEY)
+            if isinstance(recorded, dict):  # P-2: the comparison's own rigid-body record, shown in the viewer
+                abaqus_data.metadata.setdefault(RIGID_RESIDUALS_KEY, dict(recorded))
             try:
                 result.loaded_modal_data = loaded
             except AttributeError:

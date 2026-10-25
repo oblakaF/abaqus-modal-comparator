@@ -28,6 +28,7 @@ import numpy as np
 
 from domain.experiment_fixture import ExperimentFixture, load_experiment_fixture_manifest
 from domain.registration import RegistrationMismatchError
+from quality_control import RIGID_SHAPE_RESIDUAL_THRESHOLD
 from reviewed_core import frequency_error_percent
 from scientific_state import modal_dataset_geometry_identity
 from services import archived_sensitivity_evidence as evidence
@@ -50,6 +51,9 @@ FREQUENCY_ONLY_STATEMENT = (
     "FREQUENCY_ONLY_DIAGNOSTIC: the physical orientation is not established, so no orientation was chosen and no MAC "
     "was computed. MAC and the physical modal correspondence are NOT verified; the nearest-frequency columns describe "
     "frequency proximity only and are not mode pairs.")
+RIGID_BODY_CRITERION = (
+    f"rigid-body by six-vector rigid-body shape projection, residual <= {RIGID_SHAPE_RESIDUAL_THRESHOLD:g} (the "
+    "comparator's quality-control criterion; no frequency threshold)")
 
 
 class GeometryReuseRefusal(AcceptedReferenceRefusal):
@@ -189,6 +193,9 @@ class FrequencyOnlyDiagnostic:
     rows: tuple[FrequencyOnlyRow, ...]
     statement: str = FREQUENCY_ONLY_STATEMENT
     experimental_source: str = "curve-fitted modal set (PolyMAX)"
+    # P-2: FE rigid-body modes (mode, frequency, rigid-body residual), kept as separate diagnostic records; they are
+    # never elastic modes and never nearest-frequency candidates
+    rigid_fe_modes: tuple[tuple[int, float, float], ...] = ()
 
     @property
     def provisional_experimental(self) -> bool:
@@ -212,14 +219,22 @@ class FrequencyOnlyDiagnostic:
             "experimental_frequency_source": self.experimental_source,
             "mac": "NOT_COMPUTED", "mode_pairs": "NONE (physical modal correspondence not verified)",
             "fe_modes": [{"mode": n, "frequency_hz": f} for n, f in self.fe_modes],
+            "rigid_body_fe_modes": [{"mode": n, "frequency_hz": f, "rigid_body_residual_fraction": r}
+                                    for n, f, r in self.rigid_fe_modes],
+            "rigid_body_criterion": RIGID_BODY_CRITERION,
             "experimental_modes": [{"mode": n, "frequency_hz": f} for n, f in self.experimental_modes],
             "nearest_frequency_rows": [row.__dict__ for row in self.rows],
         }
 
     def text_lines(self) -> list[str]:
         lines = [FREQUENCY_ONLY, "=" * 80, self.statement, "", f"Why: {self.reason}", ""]
-        lines.extend(["EXTRACTED ABAQUS FREQUENCIES", "-" * 80])
+        lines.extend(["EXTRACTED ABAQUS FREQUENCIES" + (" (elastic modes; rigid-body modes listed separately)"
+                                                        if self.rigid_fe_modes else ""), "-" * 80])
         lines.extend(f"FE mode {n}: {f:.4f} Hz" for n, f in self.fe_modes)
+        if self.rigid_fe_modes:
+            lines.extend(["", f"FE RIGID-BODY MODES (diagnostic records, not elastic modes; {RIGID_BODY_CRITERION})",
+                          "-" * 80])
+            lines.extend(f"FE mode {n}: {f:.6g} Hz (rigid-body residual {r:.2g})" for n, f, r in self.rigid_fe_modes)
         if self.provisional_experimental:
             lines.extend(["", "EXPERIMENTAL FRF RESONANCE-PEAK CANDIDATES (dataset 58; PROVISIONAL, not validated "
                           "fitted modes)", "-" * 80])
@@ -244,11 +259,19 @@ class FrequencyOnlyDiagnostic:
 
 
 def frequency_only_diagnostic(abaqus, experimental, reason: str) -> FrequencyOnlyDiagnostic:
-    """Frequencies of both datasets and, per experimental mode, the two nearest FE frequencies (no shapes used)."""
+    """Frequencies of both datasets and, per experimental mode, the two nearest elastic FE frequencies.
 
-    from services.modal_data_viewer import experimental_frequency_source
+    No experimental shape is used and every experimental mode is kept. The FE shapes are used only to separate the
+    FE rigid-body modes by the comparator's own criterion (P-2); those stay listed as diagnostic records."""
 
-    fe = tuple((int(m.number), float(m.frequency_hz)) for m in abaqus.sorted_modes())
+    from services.modal_data_viewer import classify_rigid_body_fe_modes, experimental_frequency_source, \
+        rigid_body_threshold
+
+    residuals = classify_rigid_body_fe_modes(abaqus)
+    threshold = rigid_body_threshold()
+    every = tuple((int(m.number), float(m.frequency_hz)) for m in abaqus.sorted_modes())
+    rigid = tuple((n, f, residuals[n]) for n, f in every if residuals.get(n, 1.0) <= threshold)
+    fe = tuple((n, f) for n, f in every if residuals.get(n, 1.0) > threshold)
     exp = tuple((int(m.number), float(m.frequency_hz)) for m in experimental.sorted_modes())
     rows = []
     for number, hz in exp:
@@ -262,7 +285,8 @@ def frequency_only_diagnostic(abaqus, experimental, reason: str) -> FrequencyOnl
             None if following is None else following[0], None if following is None else following[1],
             None if following is None else frequency_error_percent(following[1], hz)))
     return FrequencyOnlyDiagnostic(FREQUENCY_ONLY, reason, fe, exp, tuple(rows),
-                                   experimental_source=experimental_frequency_source(experimental))
+                                   experimental_source=experimental_frequency_source(experimental),
+                                   rigid_fe_modes=rigid)
 
 
 def frequency_only_table_rows(diagnostic: FrequencyOnlyDiagnostic) -> list[tuple[str, ...]]:
