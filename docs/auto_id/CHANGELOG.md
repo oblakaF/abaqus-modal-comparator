@@ -5965,3 +5965,26 @@ first internal provider.
   2473 passed / 112 skipped / 0 failed.
 - **Real window:** 9 / 9 PASS on verified copies.
 - **Unchanged:** the other algorithms, the GUI, scientific statuses and criteria. No Abaqus, no LM.
+
+## 2026-10-25 — APP-E2E.3 merged into main (PR #98); post-merge closeout
+
+- **Stage:** APP-E2E.3, program change outside the Auto-ID mini-step sequence. **Status:** `MERGED`.
+- **Merge:** PR #98, `fix/app-e2e3-experiment-readiness` (head `091e01c`) into `main` as
+  `907508087aac1ae7049bc33a0d780898e2298582` (parents `5fc8f82`, `091e01c`).
+- **CI:** main push run [`40189308678`](https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/40189308678) — success; branch push run `40134814676` — success.
+- **Closeout branch:** `docs/app-e2e3-post-merge-closeout` from `9075080`. Files changed: `docs/auto_id/STATUS.json`
+  (`main_merges`, `app_e2e_3_experiment_readiness` `MERGED`, `next_action`), `docs/auto_id/ROADMAP.md`,
+  `docs/auto_id/CHANGELOG.md`. Scientific behaviour changed: NO.
+- **Post-merge check (local Windows main, fast-forward `5fc8f82` → `9075080`, untracked files untouched):**
+  - `test_app_e2e3_experiment_readiness` 19 OK; `test_r7_shell_modal_safety` 41 OK; `test_app_p1_stale_results`
+    14 OK; `test_guided_registration` 24 OK / 1 skipped (store-gated);
+  - full unittest without `test_g2_eigfreq_precision`: 2518 OK / 96 skipped. That module (16 tests) reads
+    machine-local `-work` data and is `NOT_RUN` here;
+  - `RUN_PROGRAM.cmd`: the main window opens and closes cleanly;
+  - all 11 tabs open without a Tk error; 1. Files shows *Series review* and *Review series...*; 11. Scaling has short
+    frame titles, wrapped governance texts and a scrollable tab. Isolated profile, no data loaded, no process started.
+- **Abaqus:** 0 solves, 0 extractions; no LM, no Auto-ID.
+- **Not run:** store-gated real-data regressions; GUI on the verified data copies (machine-local `-work`).
+- **Unchanged:** SPEC v1.2, DECISIONS, MAC, pairing, registrations, QC criteria and thresholds, the pinned extractor.
+  M8 GATE `NOT_MET`; D-077 `NO_GLOBAL_PARAMETER_VALUE`; production Auto-ID / calibration BLOCKED / NOT_AUTHORISED.
+- **Next gate:** SUPERVISOR review of this closeout (no PR, no merge).
