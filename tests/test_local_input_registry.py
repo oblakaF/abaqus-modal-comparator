@@ -201,11 +201,12 @@ class ServiceTests(_Folder):
                 with self.assertRaises(registry.RegistryError) as raised:
                     registry.add_entry(self.store, registry.EXPERIMENTAL, self.unv)
                 self.assert_registry_kept(before, raised.exception)
-        blocked = self.folder / "blocked"
-        blocked.write_bytes(b"a file where the profile folder should be")
-        with self.assertRaisesRegex(registry.RegistryError, "could not be saved"):  # the folder cannot be created
-            registry.add_entry(blocked / "profile" / registry.STORE_NAME, registry.FE, self.odb)
-        self.assertEqual(blocked.read_bytes(), b"a file where the profile folder should be")
+        # the profile folder cannot be created (a new profile; the same on Windows and POSIX)
+        new_profile = self.folder / "new_profile"
+        with mock.patch.object(registry.Path, "mkdir", side_effect=PermissionError(13, "denied")):
+            with self.assertRaisesRegex(registry.RegistryError, "could not be saved: .*denied"):
+                registry.add_entry(new_profile / registry.STORE_NAME, registry.FE, self.odb)
+        self.assertFalse(new_profile.exists())
 
     def test_default_store_is_the_per_user_profile(self):
         with mock.patch.object(Path, "home", return_value=self.folder / "home"):
