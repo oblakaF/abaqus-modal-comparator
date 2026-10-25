@@ -308,7 +308,8 @@ class RegistryWindowTests(_App):
         self.store.write_bytes(b"[1, 2, 3]")
         dialog = self.dialog(application)
         self.assertIn("damaged", dialog.message.get())
-        for button in (dialog.add_fe_button, dialog.add_experimental_button, dialog.use_button, dialog.remove_button):
+        for button in (dialog.add_fe_button, dialog.add_experimental_button, dialog.use_button, dialog.inspect_button,
+                       dialog.remove_button):
             self.assertEqual(str(button.cget("state")), "disabled")
         self.assertEqual(dialog.tree.get_children(), ())
         self.assertEqual(self.store.read_bytes(), b"[1, 2, 3]")

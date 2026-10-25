@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+import queue
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from app import APP_TITLE
+from services import local_fe_preview as fe_preview
 from services import local_input_registry as registry
 
 
@@ -104,17 +107,20 @@ class InputRegistryDialog:
         self.add_experimental_button = ttk.Button(buttons, text="Add experimental file...",
                                                   command=lambda: self.add(registry.EXPERIMENTAL))
         self.use_button = ttk.Button(buttons, text="Use in 1. Files", command=self.use_selected)
+        self.inspect_button = ttk.Button(buttons, text="Inspect FE modes...", command=self.inspect_selected)
         self.remove_button = ttk.Button(buttons, text="Remove from registry", command=self.remove_selected)
         for column, button in enumerate((self.add_fe_button, self.add_experimental_button, self.use_button,
-                                         self.remove_button)):
+                                         self.inspect_button, self.remove_button)):
             button.grid(row=0, column=column, padx=(0, 6))
-        ttk.Button(buttons, text="Close", command=window.destroy).grid(row=0, column=5, sticky="e")
-        buttons.columnconfigure(4, weight=1)
+        ttk.Button(buttons, text="Close", command=window.destroy).grid(row=0, column=6, sticky="e")
+        buttons.columnconfigure(5, weight=1)
+        self.previews: list = []
         self.refresh()
 
     def _set_enabled(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
-        for button in (self.add_fe_button, self.add_experimental_button, self.use_button, self.remove_button):
+        for button in (self.add_fe_button, self.add_experimental_button, self.use_button, self.inspect_button,
+                       self.remove_button):
             button.configure(state=state)
 
     def refresh(self, select: str = "") -> bool:
@@ -185,6 +191,27 @@ class InputRegistryDialog:
         self.message.set(f"'{entry['label']}' is now the {field} file on 1. Files. Nothing was loaded or run; "
                          "check the other inputs and press Run when ready.")
 
+    def inspect_selected(self):
+        """Open a read-only view of the FE modes of the selected extracted package (APP-DATA.2)."""
+        entry = self.selected()
+        if entry is None:
+            return None
+        if entry["kind"] != registry.FE:
+            self.message.set("Inspect FE modes works on an FE entry (an extracted manifest.json).")
+            return None
+        try:
+            path = registry.usable_path(entry)
+        except registry.RegistryError as error:
+            messagebox.showwarning("Inspect FE modes", str(error), parent=self.window)
+            self.refresh(select=entry["id"])
+            return None
+        if path.suffix.lower() == ".odb":
+            messagebox.showinfo("Inspect FE modes", fe_preview.ODB_NEEDS_PACKAGE, parent=self.window)
+            return None
+        preview = FePreviewWindow(self.app.root, entry["label"], path)
+        self.previews.append(preview)
+        return preview
+
     def remove_selected(self) -> None:
         entry = self.selected()
         if entry is None:
@@ -200,6 +227,118 @@ class InputRegistryDialog:
             return
         self.refresh()
         self.message.set(f"Removed '{entry['label']}' from the registry; the file was not touched.")
+
+
+def _read_fe_package(path, cancel: threading.Event, results: queue.Queue) -> None:
+    """Worker of FePreviewWindow: reads the package and posts the outcome. It never touches a Tk object."""
+    try:
+        results.put(("ok", fe_preview.preview_fe_package(path, cancel_event=cancel)))
+    except fe_preview.AnalysisCancelled:
+        results.put(("cancelled", None))
+    except fe_preview.FePreviewError as error:
+        results.put(("error", str(error)))
+    except Exception as error:  # noqa: BLE001  (any other failure is stated, the window never waits forever)
+        results.put(("error", f"The extracted package cannot be read: {error}"))
+
+
+class FePreviewWindow:
+    """A read-only list of the FE modes that ``load_extracted_odb`` loads from one extracted package.
+
+    The package is read on a background thread; the window polls for the outcome, so the main window stays usable.
+    Closing the window cancels the reading and an outcome that arrives afterwards is discarded.
+    """
+
+    POLL_MS = 100
+
+    def __init__(self, root, label: str, path: Path) -> None:
+        self.path = Path(path)
+        self.preview = None
+        self.error = None
+        self.closed = False
+        self.cancel = threading.Event()
+        self.results: queue.Queue = queue.Queue()
+        window = self.window = tk.Toplevel(root)
+        window.title(f"FE modes — {label}")
+        window.minsize(640, 380)
+        window.columnconfigure(0, weight=1)
+        window.rowconfigure(3, weight=1)
+        window.protocol("WM_DELETE_WINDOW", self.close)
+        ttk.Label(window, text=fe_preview.NOTE, wraplength=700, justify="left").grid(
+            row=0, column=0, sticky="ew", padx=12, pady=(12, 4))
+        self.source = tk.StringVar(value=f"Extracted package: {self.path}")
+        ttk.Label(window, textvariable=self.source, wraplength=700, justify="left").grid(
+            row=1, column=0, sticky="ew", padx=12)
+        self.status = tk.StringVar(value="Reading the extracted package... The main window stays usable.")
+        ttk.Label(window, textvariable=self.status, wraplength=700, justify="left").grid(
+            row=2, column=0, sticky="ew", padx=12, pady=4)
+        table = ttk.Frame(window)
+        table.grid(row=3, column=0, sticky="nsew", padx=12)
+        table.columnconfigure(0, weight=1)
+        table.rowconfigure(0, weight=1)
+        self.tree = ttk.Treeview(table, columns=("mode", "frequency", "source", "nodes"), show="headings", height=10)
+        for column, title, width, stretch in (("mode", "FE mode", 70, False), ("frequency", "Frequency, Hz", 120, False),
+                                              ("source", "Frequency source", 300, True), ("nodes", "Nodes", 80, False)):
+            self.tree.heading(column, text=title)
+            self.tree.column(column, width=width, stretch=stretch)
+        scroll = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.warnings = tk.Text(window, height=5, wrap="word")
+        self.warnings.grid(row=4, column=0, sticky="ew", padx=12, pady=6)
+        self.warnings.configure(state="disabled")
+        ttk.Button(window, text="Close", command=self.close).grid(row=5, column=0, sticky="e", padx=12, pady=(0, 12))
+        self.thread = threading.Thread(target=_read_fe_package, args=(self.path, self.cancel, self.results),
+                                       daemon=True, name="fe-preview")
+        self.thread.start()
+        self._job = window.after(self.POLL_MS, self._poll)
+
+    def _poll(self) -> None:
+        self._job = None
+        if self.closed or not self.window.winfo_exists():  # closed, or destroyed with its parent
+            self.closed = True
+            self.cancel.set()
+            return
+        try:
+            kind, value = self.results.get_nowait()
+        except queue.Empty:
+            self._job = self.window.after(self.POLL_MS, self._poll)
+            return
+        self._show(kind, value)
+
+    def _set_warnings(self, lines) -> None:
+        self.warnings.configure(state="normal")
+        self.warnings.delete("1.0", "end")
+        self.warnings.insert("1.0", "\n".join(lines) if lines else "No diagnostic messages from the loader.")
+        self.warnings.configure(state="disabled")
+
+    def _show(self, kind: str, value) -> None:
+        if kind == "ok":
+            self.preview = value
+            self.source.set(f"FE source: {value.fe_source}\nExtracted package: {value.manifest_path}"
+                            + (f"\nStep: {value.step_name}" if value.step_name else ""))
+            for mode in value.modes:
+                self.tree.insert("", "end", values=(mode.number, fe_preview.frequency_text(mode),
+                                                    fe_preview.source_text(mode), mode.node_count))
+            self.status.set(fe_preview.summary(value) + ".")
+            self._set_warnings(value.warnings)
+        else:
+            self.error = value or "The reading was cancelled."
+            self.status.set("No FE modes can be shown.")
+            self._set_warnings([self.error])
+
+    def close(self) -> None:
+        """Cancel the reading (if any) and close; a later outcome is discarded."""
+        self.closed = True
+        self.cancel.set()
+        if self._job is not None:
+            try:
+                self.window.after_cancel(self._job)
+            except tk.TclError:
+                pass
+            self._job = None
+        if self.window.winfo_exists():
+            self.window.destroy()
 
 
 def _open_input_registry(self) -> None:
