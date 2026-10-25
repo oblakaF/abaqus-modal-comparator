@@ -178,6 +178,13 @@
       "pr": 95,
       "merge_commit": "5fc8f82bb3092a7e91f67cb2cbbee938dd939cb3",
       "status": "MERGED; RESEARCH_MAC_COMPUTED / PHYSICAL_REGISTRATION_PENDING / FE_SENSITIVITY_RESEARCH_ONLY (no material characterisation)"
+    },
+    {
+      "stage": "APP-E2E.3 preparation for repeat experiments (P-2, P-3, SETUP_UNDER_REVIEW)",
+      "kind": "program change (not a roadmap stage)",
+      "pr": 98,
+      "merge_commit": "907508087aac1ae7049bc33a0d780898e2298582",
+      "status": "MERGED; main CI push run 40189308678 success"
     }
   ],
   "m1": {
@@ -646,7 +653,7 @@
       "merge_commit": "ee22e3389127a49ada2bc4d887fc757bcea9d69d"
     }
   },
-  "next_action": "STOP: SUPERVISOR review of APP-E2E.3 (branch fix/app-e2e3-experiment-readiness, REVIEW_READY; not merged). Repeat measurements of SP-13 and other specimens are new, separate series; SETUP_UNDER_REVIEW is a person's note only. SP-10 physical registration awaits the owner's confirmation (M10 Q1-Q8); the plate's physical registration is PHYSICAL_REGISTRATION_PENDING. M8 stage IN_PROGRESS, original M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production Auto-ID / calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
+  "next_action": "STOP: APP-E2E.3 MERGED (PR #98, merge 9075080; main CI push run 40189308678 success); SUPERVISOR review of the post-merge documentation closeout (branch docs/app-e2e3-post-merge-closeout; no PR). Repeat measurements of SP-13 and other specimens are new, separate series; SETUP_UNDER_REVIEW is a person's note only. SP-10 physical registration awaits the owner's confirmation (M10 Q1-Q8); the plate's physical registration is PHYSICAL_REGISTRATION_PENDING. M8 stage IN_PROGRESS, original M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production Auto-ID / calibration execution BLOCKED / NOT_AUTHORISED; no campaign run, no LM, no new FE solves",
   "m5": {
     "branch": "auto-id/m5",
     "base": "8f405c3fd3d2a5dbdb958f5560ec536497fa6bad",
@@ -2194,7 +2201,13 @@
   },
   "app_e2e_3_experiment_readiness": {
     "title": "APP-E2E.3: preparation for repeat experiments (P-2, P-3, SETUP_UNDER_REVIEW)",
-    "status": "REVIEW_READY",
+    "status": "MERGED",
+    "verdict": "APP_E2E3_ADDRESS_PASS",
+    "pr": 98,
+    "head": "091e01c59f53d5363b596db27fd7ea1a1ab2c2f4",
+    "main_merge": "907508087aac1ae7049bc33a0d780898e2298582",
+    "main_ci": "push run 40189308678 success (https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/40189308678); branch push run 40134814676 success",
+    "post_merge_check": "2026-10-25, local main fast-forwarded 5fc8f82 -> 9075080 (untracked files untouched): test_app_e2e3_experiment_readiness 19 OK, test_r7_shell_modal_safety 41 OK, test_app_p1_stale_results 14 OK, test_guided_registration 24 OK / 1 skipped (store-gated); full unittest without test_g2_eigfreq_precision 2518 OK / 96 skipped (that module, 16 tests, reads machine-local -work data: NOT_RUN); RUN_PROGRAM.cmd window opens and closes cleanly; all 11 tabs open without a Tk error; 1. Files shows Series review and Review series...; 11. Scaling frame titles short, governance texts wrapped, tab scrollable; isolated profile, no data loaded, no process started",
     "kind": "program change (not a scientific stage)",
     "branch": "fix/app-e2e3-experiment-readiness",
     "base": "5fc8f82bb3092a7e91f67cb2cbbee938dd939cb3",
