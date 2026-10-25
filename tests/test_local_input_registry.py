@@ -161,6 +161,52 @@ class ServiceTests(_Folder):
         self.assertTrue(opened)  # the registry file itself was read
         self.assertFalse(data_files & set(opened), sorted(data_files & set(opened)))
 
+    def saved_registry(self):
+        """A registry with one FE entry on disk; returns (its bytes, the entry)."""
+        entry, _ = registry.add_entry(self.store, registry.FE, self.odb, "Plate FE")
+        return self.store.read_bytes(), entry
+
+    def assert_registry_kept(self, before: bytes, error: registry.RegistryError) -> None:
+        self.assertIn("could not be saved", str(error))
+        self.assertIn("left as it was; nothing was added or removed", str(error))
+        self.assertEqual(self.store.read_bytes(), before)  # the previous JSON, byte for byte
+        self.assertEqual(sorted(p.name for p in self.store.parent.iterdir()), [registry.STORE_NAME])  # no temp file
+        json.loads(before)  # still a valid registry
+        self.assertEqual(len(registry.list_entries(self.store)), 1)
+
+    def test_a_failed_replace_on_add_keeps_the_registry(self):
+        before, _ = self.saved_registry()
+        with mock.patch.object(registry.os, "replace", side_effect=PermissionError(13, "Access is denied")):
+            with self.assertRaises(registry.RegistryError) as raised:
+                registry.add_entry(self.store, registry.EXPERIMENTAL, self.unv, "Session")
+        self.assertIn("Access is denied", str(raised.exception))
+        self.assert_registry_kept(before, raised.exception)
+
+    def test_a_failed_replace_on_remove_keeps_the_registry(self):
+        before, entry = self.saved_registry()
+        with mock.patch.object(registry.os, "replace", side_effect=OSError(28, "No space left on device")):
+            with self.assertRaises(registry.RegistryError) as raised:
+                registry.remove_entry(self.store, entry["id"])
+        self.assert_registry_kept(before, raised.exception)
+        self.assertEqual(registry.list_entries(self.store), [entry])
+
+    def test_folder_temporary_file_and_write_failures_are_registry_errors(self):
+        before, _ = self.saved_registry()
+        failures = {
+            "temporary file": mock.patch.object(registry.tempfile, "mkstemp", side_effect=PermissionError(13, "denied")),
+            "writing": mock.patch.object(registry.json, "dump", side_effect=OSError(28, "No space left on device")),
+        }
+        for name, patcher in failures.items():
+            with self.subTest(failure=name), patcher:
+                with self.assertRaises(registry.RegistryError) as raised:
+                    registry.add_entry(self.store, registry.EXPERIMENTAL, self.unv)
+                self.assert_registry_kept(before, raised.exception)
+        blocked = self.folder / "blocked"
+        blocked.write_bytes(b"a file where the profile folder should be")
+        with self.assertRaisesRegex(registry.RegistryError, "could not be saved"):  # the folder cannot be created
+            registry.add_entry(blocked / "profile" / registry.STORE_NAME, registry.FE, self.odb)
+        self.assertEqual(blocked.read_bytes(), b"a file where the profile folder should be")
+
     def test_default_store_is_the_per_user_profile(self):
         with mock.patch.object(Path, "home", return_value=self.folder / "home"):
             self.assertEqual(registry.default_store(),
@@ -295,6 +341,32 @@ class RegistryWindowTests(_App):
         self.assertEqual(registry.list_entries(self.store), [])
         self.assertTrue(self.other_odb.is_file())
         self.assertIn("the file was not touched", dialog.message.get())
+
+    def test_a_failed_save_is_shown_and_the_registry_is_kept(self):
+        application = self.application()
+        dialog = self.dialog(application)
+        entry = self.add(registry.FE, self.other_odb, "Other FE")
+        before = self.store.read_bytes()
+        dialog.refresh(select=entry["id"])
+        denied = PermissionError(13, "Access is denied")
+        with mock.patch.object(registry.os, "replace", side_effect=denied), \
+                mock.patch("tkinter.filedialog.askopenfilename", return_value=str(self.other_unv)), \
+                mock.patch("tkinter.simpledialog.askstring", return_value="Other session"), \
+                mock.patch("tkinter.messagebox.askyesno", return_value=True), \
+                mock.patch("tkinter.messagebox.showerror") as shown:
+            dialog.add(registry.EXPERIMENTAL)
+            dialog.refresh(select=entry["id"])
+            dialog.remove_selected()
+        add_message, remove_message = (call.args[1] for call in shown.call_args_list)
+        self.assertIn("could not be saved", add_message)
+        self.assertIn("Nothing was added", add_message)
+        self.assertIn("could not be saved", remove_message)
+        self.assertIn("left as it was", remove_message)
+        self.assertNotIn("Removed", dialog.message.get())
+        self.assertEqual(self.store.read_bytes(), before)
+        self.assertEqual(sorted(p.name for p in self.store.parent.iterdir()), [registry.STORE_NAME])
+        self.assertEqual(dialog.tree.get_children(), (entry["id"],))  # the dialog still lists the kept entry
+        self.assertEqual(str(dialog.add_fe_button.cget("state")), "normal")
 
 
 if __name__ == "__main__":

@@ -87,16 +87,31 @@ def _read(store: Path) -> dict:
 
 
 def _write(store: Path, data: dict) -> None:
+    """Replace the registry atomically. Any file-system failure (folder, temporary file, writing, the replace) is a
+    RegistryError; the previous registry is then left as it was and the temporary file is removed."""
     store = Path(store)
-    store.parent.mkdir(parents=True, exist_ok=True)
-    handle, temporary = tempfile.mkstemp(prefix=".local_input_registry_", suffix=".json", dir=str(store.parent))
+    temporary = None
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+        store.parent.mkdir(parents=True, exist_ok=True)
+        handle, temporary = tempfile.mkstemp(prefix=".local_input_registry_", suffix=".json", dir=str(store.parent))
+        try:
+            stream = os.fdopen(handle, "w", encoding="utf-8")
+        except OSError:
+            os.close(handle)
+            raise
+        with stream:
             json.dump(data, stream, indent=2, ensure_ascii=False)
         os.replace(temporary, store)  # atomic: the registry is never half written
+        temporary = None
+    except OSError as error:
+        raise RegistryError(f"The input file registry {store} could not be saved: {error}. The registry is left as it "
+                            "was; nothing was added or removed.") from error
     finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass  # a leftover temporary file never replaces the registry; the original error is reported
 
 
 def _same_file_key(path) -> str:
