@@ -1,16 +1,21 @@
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+import fast_cache
 from fast_cache import (
     _ANALYSIS_PIPELINE_VERSION,
     _CACHE_VERSION,
+    _UNV_IMPORTER_VERSION,
     _clone_dataset,
+    _unv_cache_key,
     _user_cache_path,
 )
 from modal_core import ModalDataset, ModeShape
@@ -29,6 +34,20 @@ class FastCacheSafetyTests(unittest.TestCase):
         self.assertNotIn("2026.10.01.1-dataset55-zero-filled-dofs", _CACHE_VERSION)
         self.assertNotIn("2026.09.16.3-residual-record-classification", _CACHE_VERSION)
         self.assertNotIn("2026.09.16.2-exp-only-dataset58", _CACHE_VERSION)
+
+    def test_unv_importer_version_is_part_of_the_unv_key_only(self):
+        # APP-IMPORT-2414: pyuff's positional dataset-2414 normal modes are now imported, so UNV results cached
+        # before that fix are not served. The marker is kept out of _CACHE_VERSION (the extracted-ODB identity).
+        self.assertEqual(_UNV_IMPORTER_VERSION, "2026.10.26.1-dataset2414-positional-layout")
+        self.assertNotIn(_UNV_IMPORTER_VERSION, _CACHE_VERSION)
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "scan.unv"
+            source.write_text("synthetic", encoding="utf-8")
+            key = _unv_cache_key(source, None, None, None)
+            with patch.object(fast_cache, "_UNV_IMPORTER_VERSION", "an-earlier-importer"):
+                self.assertNotEqual(_unv_cache_key(source, None, None, None), key)
+            with patch.object(fast_cache, "_UNV_IMPORTER_VERSION", _UNV_IMPORTER_VERSION):
+                self.assertEqual(_unv_cache_key(source, None, None, None), key)
 
     def test_cache_version_contains_schema_fingerprint(self):
         self.assertTrue(_CACHE_VERSION.startswith("modal-cache-v5-"))

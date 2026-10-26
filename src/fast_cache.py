@@ -67,6 +67,14 @@ _CACHE_VERSION = (
     f"modal-cache-v5-{_ANALYSIS_PIPELINE_VERSION}-" + _schema_fingerprint()
 )
 
+# A UNV-importer change that does not concern the FE/ODB side (for example
+# APP-IMPORT-2414: normal modes read from pyuff's positional dataset-2414
+# layout, which an older parse returned as FRF-only data or no modes) is marked
+# here instead of in _CACHE_VERSION, so the extracted-ODB cache keeps its
+# identity. Old UNV entries stay on disk but are no longer looked up. Bump this
+# by hand whenever the UNV import result for an unchanged file changes.
+_UNV_IMPORTER_VERSION = "2026.10.26.1-dataset2414-positional-layout"
+
 
 def _atomic_pickle_dump(value: Any, destination: Path, compressed: bool) -> None:
     destination = Path(destination)
@@ -164,6 +172,7 @@ def _unv_cache_key(
     del target_frequencies, target_count
     payload = {
         "version": _CACHE_VERSION,
+        "unv_importer": _UNV_IMPORTER_VERSION,
         "source": _file_signature(file_path),
         "modal_set": None if modal_set is None else str(modal_set),
     }

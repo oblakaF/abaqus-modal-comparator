@@ -217,7 +217,78 @@ def _safe_mode_55(dataset: Dict[str, Any], geometry, index: int) -> ModeShape:
     return mode
 
 
+# Dataset 2414 as read by pyuff (2.5.x) for analysis types other than 5. pyuff names records 10-13 only for frequency
+# response; for every other analysis type it returns them by position (record10_field1 ... record13_field6) and the
+# nodal values as data_at_node. Their meaning is fixed by the dataset-2414 definition (I-DEAS File Formats Reference,
+# reproduced in pyuff's get_structure_2414): record 10 field 6 is the mode number; record 12 holds time, frequency,
+# eigenvalue, modal mass, viscous damping, hysteretic damping; the frequency, modal mass and damping fields are defined
+# for normal modes (analysis type 2). For complex eigenvalue analyses (3, 7) record 12 carries no frequency, only the
+# complex eigenvalue in record 13: such records are refused, never given a derived frequency. Record 15 holds NVALDC
+# values per node in the order X, Y, Z (, Rx, Ry, Rz); complex data as (real, imaginary) pairs.
+_POSITIONAL_2414_SHAPE_KEYS = ("x", "y", "z", "r1", "r2", "r3", "d1", "d2", "d3", "d", "data", "values")
+_2414_TRANSLATION_VALUES = {2: 3, 3: 6}  # data characteristic -> NVALDC (3 DOF / 6 DOF global vector)
+_2414_REAL_TYPES, _2414_COMPLEX_TYPES = (2, 4), (5, 6)
+POSITIONAL_2414_LAYOUT = "dataset 2414 records 10-15 read by position (UNV 2414 definition)"
+
+
+def _is_positional_2414(dataset: Dict[str, Any]) -> bool:
+    return "data_at_node" in dataset and "record10_field6" in dataset and not any(
+        dataset.get(name) is not None for name in _POSITIONAL_2414_SHAPE_KEYS + ("mode_number", "frequency"))
+
+
+def _positional_2414_fields(dataset: Dict[str, Any]) -> Dict[str, Any]:
+    """The named fields of a positional (pyuff generic) normal-mode record; ValueError when it is not one."""
+    analysis_type = _scalar_int(dataset.get("analysis_type"), -1)
+    where = f"Dataset 2414 record {dataset.get('analysis_dataset_label')!r} (analysis type {analysis_type})"
+    if analysis_type in (3, 7):
+        raise ValueError(f"{where}: complex eigenvalue data define no frequency in dataset 2414 record 12 (only the "
+                         "complex eigenvalue in record 13); no frequency is derived from it, so the record is not "
+                         "imported.")
+    if analysis_type != 2:
+        raise ValueError(f"{where}: only normal-mode records (analysis type 2) are read from the positional record "
+                         "layout.")
+    if _scalar_int(dataset.get("dataset_location"), 0) != 1:
+        raise ValueError(f"{where}: the values are not data at nodes (dataset location "
+                         f"{dataset.get('dataset_location')!r}).")
+    data_type = _scalar_int(dataset.get("data_type"), 0)
+    if data_type not in _2414_REAL_TYPES + _2414_COMPLEX_TYPES:
+        raise ValueError(f"{where}: data type {data_type} is not a real or complex floating-point type.")
+    characteristic = _scalar_int(dataset.get("data_characteristic"), 0)
+    count = _scalar_int(dataset.get("number_of_data_values_for_the_data_component"), 0)
+    if _2414_TRANSLATION_VALUES.get(characteristic) != count:
+        raise ValueError(f"{where}: data characteristic {characteristic} with {count} values per node is not a 3 or "
+                         "6 DOF global translation vector.")
+    nodes = universal_reader._as_array(dataset.get("node_nums"), dtype=int)
+    rows = list(dataset.get("data_at_node") or ())
+    if len(nodes) == 0 or len(rows) != len(nodes):
+        raise ValueError(f"{where}: {len(rows)} nodal value rows for {len(nodes)} nodes.")
+    width = 2 * count if data_type in _2414_COMPLEX_TYPES else count
+    vectors = np.zeros((len(nodes), 3), dtype=complex)
+    for row_index, row in enumerate(rows):
+        values = np.asarray(row, dtype=float).reshape(-1)
+        if values.size != width or not np.all(np.isfinite(values)):
+            raise ValueError(f"{where}: node {int(nodes[row_index])} has {values.size} values; {width} finite values "
+                             "are required.")
+        components = values[0::2] + 1j * values[1::2] if data_type in _2414_COMPLEX_TYPES else values
+        vectors[row_index] = components[:3]  # X, Y, Z (rotations, if any, follow)
+    if not np.any(np.abs(vectors)):
+        raise ValueError(f"{where}: the translational shape is zero at every node; it is not imported as a mode.")
+    mode_number = _scalar_int(dataset.get("record10_field6"), 0)
+    if mode_number < 1:
+        raise ValueError(f"{where}: record 10 field 6 (mode number) is {dataset.get('record10_field6')!r}.")
+    frequency = _scalar(dataset.get("record12_field2"), None)
+    if frequency is None or not np.isfinite(np.real(frequency)) or float(np.real(frequency)) <= 0.0:
+        raise ValueError(f"{where}: record 12 field 2 (frequency) is {dataset.get('record12_field2')!r}.")
+    return {"node_nums": nodes, "x": vectors[:, 0], "y": vectors[:, 1], "z": vectors[:, 2],
+            "mode_number": mode_number, "frequency": float(np.real(frequency)),
+            "modal_mass": dataset.get("record12_field4"), "viscous_damping": dataset.get("record12_field5"),
+            "hysteretic_damping": dataset.get("record12_field6")}
+
+
 def _safe_mode_2414(dataset: Dict[str, Any], geometry, index: int) -> ModeShape:
+    positional = _is_positional_2414(dataset)
+    if positional:
+        dataset = {**dataset, **_positional_2414_fields(dataset)}
     node_numbers = universal_reader._as_array(
         _first(dataset, ("node_nums", "node_numbers", "nodes")), dtype=int
     )
@@ -279,6 +350,11 @@ def _safe_mode_2414(dataset: Dict[str, Any], geometry, index: int) -> ModeShape:
             "mode_source": "curve-fitted modal dataset",
         },
     )
+    if positional:
+        mode.metadata["dataset_2414_layout"] = POSITIONAL_2414_LAYOUT
+        # As for dataset 55: a component written as zeros at every node is not proof of a measured channel; it is
+        # measured only when this mode's own vector carries energy in it. The values themselves are unchanged.
+        measured = _inferred_measurement_mask(vectors) & measured
     mode.measured_dofs = measured
     return mode
 

@@ -368,5 +368,29 @@ class PolymaxModalSetTests(unittest.TestCase):
         self.assertEqual([mode.frequency_hz for mode in second.modes], [10.0])
 
 
+class RealFileDataset2414ClassificationTests(unittest.TestCase):
+    """APP-IMPORT-2414: a dataset-2414 file written and read by pyuff keeps the structural classification."""
+
+    def test_real_pyuff_file_classification_matches_the_in_memory_records(self):
+        import universal_hardening
+
+        sys.path.insert(0, str(ROOT / "tests"))
+        from test_universal_hardening import write_2414_unv
+
+        universal_hardening.install_universal_hardening()
+        with tempfile.TemporaryDirectory() as directory:
+            path = write_2414_unv(Path(directory) / "records.unv", [
+                {"analysis_type": 2, "mode": 1, "frequency": 25.0},
+                {"analysis_type": 5, "mode": 2, "frequency": 25.0, "name": "Frequency response"},
+                {"analysis_type": 0, "mode": 3, "frequency": 35.0, "name": "Legacy modal result"}])
+            result = universal_reader.load_universal_modal_file(path)
+        audits = result.metadata["dataset_2414_record_classifications"]
+        self.assertEqual([item["classification"] for item in audits], ["physical", "non_modal", "ambiguous"])
+        self.assertEqual(result.metadata["excluded_dataset_2414_record_indices"], [2])
+        self.assertEqual(result.metadata["ambiguous_dataset_2414_record_indices"], [3])
+        self.assertEqual([(mode.number, mode.frequency_hz) for mode in result.modes], [(1, 25.0)])
+        self.assertEqual(result.modes[0].metadata["record_classification"], "physical")
+
+
 if __name__ == "__main__":
     unittest.main()
