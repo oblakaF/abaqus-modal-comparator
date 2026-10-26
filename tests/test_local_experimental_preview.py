@@ -105,6 +105,38 @@ class ServiceTests(_Folder):
         self.assertEqual(list(chosen.excluded_non_modal), expected["excluded_non_modal_labels"])
         self.assertEqual(len(chosen.excluded_non_modal), 1)
 
+    def assert_importer_classification(self, records, loaded, dataset_type):
+        """Each row carries the importer's own record classification; nothing else changes."""
+        self.assertEqual([(r.number, r.frequency_hz) for r in records],
+                         [(int(m.number), float(m.frequency_hz)) for m in loaded.modes])
+        for record, mode in zip(records, loaded.modes):
+            self.assertEqual(record.record_classification, mode.metadata["record_classification"])
+            self.assertEqual(record.record_classification_reason, mode.metadata["record_classification_reason"])
+            index = mode.metadata[f"dataset_{dataset_type}_record_index"]
+            self.assertEqual(record.record_reference, f"dataset {dataset_type} record {index}")
+            self.assertEqual(record.classification, viewer.experimental_classification(mode, loaded.metadata)[0])
+
+    def test_unambiguous_and_ambiguous_dataset_55_records(self):
+        ambiguous = _mode("Processing", 2, 20.0)
+        ambiguous.pop("analysis_type")  # the importer preserves it as ambiguous
+        datasets = [_geometry(), _mode("Processing", 1, 10.0), ambiguous]
+        path = self.fake_file("ambiguous55.unv")
+        with mock.patch.object(universal_reader, "_read_universal_datasets", return_value=datasets):
+            preview = preview_service.preview_experimental_file(path)
+            loaded = universal_reader.load_universal_modal_file(path, modal_set="processing")
+        physical, unclear = preview.sets[0].records
+        self.assert_importer_classification(preview.sets[0].records, loaded, 55)
+        self.assertEqual((physical.record_classification, physical.ambiguous), ("physical", False))
+        self.assertEqual(physical.label, f"{physical.source_text} — dataset 55 record 1 (physical, importer)")
+        self.assertTrue(unclear.ambiguous)
+        self.assertTrue(unclear.label.startswith(f"{preview_service.AMBIGUOUS} — dataset 55 record 2, not a "
+                                                 "confirmed fitted mode: "))
+        self.assertIn(unclear.record_classification_reason, unclear.label)
+        self.assertNotIn("curve-fitted", unclear.label)  # never shown as a confirmed fitted mode
+        warning = next(w for w in preview.sets[0].warnings if "preserved as ambiguous" in w)
+        self.assertTrue(warning.lower().startswith(unclear.record_reference))  # the row names the warning's record
+        self.assertIn(f"1 record {preview_service.AMBIGUOUS}", preview_service.summary(preview))
+
     def test_dataset_2414_without_dataset_55(self):
         datasets = [_geometry(), _mode_2414(1, 25.0, analysis_type=3),
                     _mode_2414(2, 25.0, analysis_type=5, name="Frequency response"),
@@ -112,8 +144,16 @@ class ServiceTests(_Folder):
         path = self.fake_file("records.unv")
         with mock.patch.object(universal_reader, "_read_universal_datasets", return_value=datasets):
             preview = preview_service.preview_experimental_file(path)
+            loaded = universal_reader.load_universal_modal_file(path)
         self.assertEqual(preview.kind, preview_service.DATASET_2414)
         self.assertEqual(self.records(preview.sets[0]), [(1, 25.0), (3, 35.0)])
+        self.assert_importer_classification(preview.sets[0].records, loaded, 2414)
+        physical, unclear = preview.sets[0].records
+        self.assertEqual(physical.label, f"{physical.source_text} — dataset 2414 record 1 (physical, importer)")
+        self.assertTrue(unclear.label.startswith(f"{preview_service.AMBIGUOUS} — dataset 2414 record 3, not a "
+                                                 "confirmed fitted mode: "))
+        warning = next(w for w in preview.sets[0].warnings if "preserved as ambiguous" in w)
+        self.assertTrue(warning.lower().startswith(unclear.record_reference))
         self.assertEqual([(i, c, inc) for i, c, inc, _ in preview.record_classifications],
                          [(1, "physical", True), (2, "non_modal", False), (3, "ambiguous", True)])
         self.assertTrue(any("preserved as ambiguous" in w for w in preview.sets[0].warnings))
@@ -227,6 +267,35 @@ class PreviewWindowTests(_App):
         self.assertTrue(rows)
         self.assertEqual({row[2] for row in rows}, {preview_service.PROVISIONAL})
         self.assertIn("FRF data (dataset 58)", window.details.get("1.0", "end"))
+
+    def test_ambiguous_records_are_shown_as_ambiguous_in_the_table(self):
+        application = self.application()
+        dialog = self.dialog(application)
+        ambiguous55 = _mode("Processing", 2, 20.0)
+        ambiguous55.pop("analysis_type")
+        cases = {
+            "dataset 55": ([_geometry(), _mode("Processing", 1, 10.0), ambiguous55], 55, (1, 2)),
+            "dataset 2414": ([_geometry(), _mode_2414(1, 25.0, analysis_type=3),
+                              _mode_2414(2, 25.0, analysis_type=5, name="Frequency response"),
+                              _mode_2414(3, 35.0, analysis_type=None, name="Legacy modal result")], 2414, (1, 3)),
+        }
+        for name, (datasets, dataset_type, (clear_index, unclear_index)) in cases.items():
+            with self.subTest(case=name):
+                path = self.folder / f"ambiguous_{dataset_type}.unv"
+                path.write_text(f"synthetic records {dataset_type}", encoding="utf-8")
+                with mock.patch.object(universal_reader, "_read_universal_datasets", return_value=datasets):
+                    window = self.inspect(dialog, registry.EXPERIMENTAL, path, name)
+                    self.wait(window)
+                self.assertIsNone(window.error)
+                labels = [str(window.tree.item(i)["values"][2]) for i in window.tree.get_children()]
+                self.assertEqual(len(labels), 2)
+                self.assertIn(f"dataset {dataset_type} record {clear_index} (physical, importer)", labels[0])
+                self.assertFalse(labels[0].startswith(preview_service.AMBIGUOUS))
+                self.assertTrue(labels[1].startswith(f"{preview_service.AMBIGUOUS} — dataset {dataset_type} record "
+                                                     f"{unclear_index}, not a confirmed fitted mode"))
+                details = window.details.get("1.0", "end")
+                self.assertIn(f"Dataset {dataset_type} record {unclear_index} was preserved as ambiguous", details)
+                self.assertIn(f"1 record {preview_service.AMBIGUOUS}", window.status.get())
 
     def test_entries_that_cannot_be_inspected(self):
         application = self.application()

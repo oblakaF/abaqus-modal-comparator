@@ -24,6 +24,17 @@ experimental data...**. A separate window opens and shows:
   excluded, with the reason);
 - **for FRF-only data:** the FRF channel count. Every peak-derived record is labelled
   **PROVISIONAL — NOT A VALIDATED FITTED MODE**.
+- **the importer's classification of each record** (dataset 55 and dataset 2414), from the mode's
+  `record_classification`, `record_classification_reason` and record index:
+  - a record the importer classified as physical shows its source and, for example,
+    "dataset 55 record 1 (physical, importer)";
+  - a record the importer preserved as ambiguous shows **AMBIGUOUS (importer) — dataset 55 record 2, not a
+    confirmed fitted mode: <reason>**. It is never presented as an unambiguously confirmed fitted mode;
+  - "dataset NN record K" is the wording of the importer's warning ("Dataset NN record K was preserved as
+    ambiguous: ..."), which is listed below the table;
+  - the status line counts the ambiguous records.
+
+  The classification, frequencies, shapes and number of records are the importer's and are not changed.
 
 The window states that it is a view only. Nothing is compared with an FE model, no modal set is selected for an
 analysis, no mode is excluded or paired, and no MAC is computed.

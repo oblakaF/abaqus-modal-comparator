@@ -31,6 +31,7 @@ DATASET_55 = "DATASET_55_MODAL_SETS"
 DATASET_2414 = "DATASET_2414_MODES"
 FRF_58 = "FRF_DATASET_58"
 PROVISIONAL = "PROVISIONAL — NOT A VALIDATED FITTED MODE"
+AMBIGUOUS = "AMBIGUOUS (importer)"
 NOTE = ("A view of the experimental data in this file only. Nothing is compared with an FE model, no modal set is "
         "selected for an analysis, no mode is excluded or paired and no MAC is computed.")
 KIND_TEXT = {
@@ -59,14 +60,29 @@ class PreviewRecord:
     point_count: int
     measured_dof_count: int
     damping_ratio: Optional[float] = None
+    # the importer's own classification of the record (dataset 55 / 2414), as recorded in the mode metadata
+    record_classification: str = ""
+    record_classification_reason: str = ""
+    record_reference: str = ""  # "dataset 55 record 2": the wording of the importer's warnings
 
     @property
     def provisional(self) -> bool:
         return self.classification == viewer.FRF_PEAK_SNAPSHOT
 
     @property
+    def ambiguous(self) -> bool:
+        return self.record_classification == "ambiguous"
+
+    @property
     def label(self) -> str:
-        return PROVISIONAL if self.provisional else self.source_text
+        if self.provisional:
+            return PROVISIONAL
+        if self.ambiguous:  # never shown as an unambiguously confirmed fitted mode
+            return (f"{AMBIGUOUS} — {self.record_reference or 'record'}, not a confirmed fitted mode: "
+                    f"{self.record_classification_reason or 'see the importer warning'}")
+        if self.record_classification and self.record_reference:
+            return f"{self.source_text} — {self.record_reference} ({self.record_classification}, importer)"
+        return self.source_text
 
 
 @dataclass(frozen=True)
@@ -102,9 +118,18 @@ def _record(mode, dataset_metadata) -> PreviewRecord:
     measured = getattr(mode, "measured_dofs", None)
     dofs = int(np.count_nonzero(measured)) if measured is not None else int(np.asarray(mode.vectors).size)
     damping = getattr(mode, "damping_ratio", None)
+    info = dict(getattr(mode, "metadata", {}) or {})
+    reference = ""
+    for dataset_type in (55, 2414):
+        index = info.get(f"dataset_{dataset_type}_record_index")
+        if index is not None:
+            reference = f"dataset {dataset_type} record {index}"
     return PreviewRecord(number=int(mode.number), frequency_hz=float(mode.frequency_hz), classification=classification,
                          source_text=text, point_count=len(mode.node_ids), measured_dof_count=dofs,
-                         damping_ratio=None if damping is None else float(damping))
+                         damping_ratio=None if damping is None else float(damping),
+                         record_classification=str(info.get("record_classification") or ""),
+                         record_classification_reason=str(info.get("record_classification_reason") or ""),
+                         record_reference=reference)
 
 
 def _set_from(dataset, key="", display_name="", processing_name="") -> PreviewSet:
@@ -188,4 +213,7 @@ def summary(preview: ExperimentalPreview) -> str:
         head = f"{len(preview.sets[0].records)} dataset-2414 record(s) loaded"
     else:
         head = f"{len(preview.sets[0].records)} FRF peak-derived record(s), {PROVISIONAL}"
+    ambiguous = sum(1 for item in preview.sets for record in item.records if record.ambiguous)
+    if ambiguous:
+        head += f"; {ambiguous} record{'s' if ambiguous != 1 else ''} {AMBIGUOUS}"
     return head + f"; dataset types {', '.join(str(x) for x in preview.dataset_types) or 'none'}"
