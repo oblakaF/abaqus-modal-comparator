@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from app import APP_TITLE
+from services import local_experimental_preview as experimental_preview
 from services import local_fe_preview as fe_preview
 from services import local_input_registry as registry
 
@@ -108,19 +109,21 @@ class InputRegistryDialog:
                                                   command=lambda: self.add(registry.EXPERIMENTAL))
         self.use_button = ttk.Button(buttons, text="Use in 1. Files", command=self.use_selected)
         self.inspect_button = ttk.Button(buttons, text="Inspect FE modes...", command=self.inspect_selected)
+        self.inspect_experimental_button = ttk.Button(buttons, text="Inspect experimental data...",
+                                                      command=self.inspect_experimental_selected)
         self.remove_button = ttk.Button(buttons, text="Remove from registry", command=self.remove_selected)
         for column, button in enumerate((self.add_fe_button, self.add_experimental_button, self.use_button,
-                                         self.inspect_button, self.remove_button)):
+                                         self.inspect_button, self.inspect_experimental_button, self.remove_button)):
             button.grid(row=0, column=column, padx=(0, 6))
-        ttk.Button(buttons, text="Close", command=window.destroy).grid(row=0, column=6, sticky="e")
-        buttons.columnconfigure(5, weight=1)
+        ttk.Button(buttons, text="Close", command=window.destroy).grid(row=0, column=7, sticky="e")
+        buttons.columnconfigure(6, weight=1)
         self.previews: list = []
         self.refresh()
 
     def _set_enabled(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
         for button in (self.add_fe_button, self.add_experimental_button, self.use_button, self.inspect_button,
-                       self.remove_button):
+                       self.inspect_experimental_button, self.remove_button):
             button.configure(state=state)
 
     def refresh(self, select: str = "") -> bool:
@@ -209,6 +212,24 @@ class InputRegistryDialog:
             messagebox.showinfo("Inspect FE modes", fe_preview.ODB_NEEDS_PACKAGE, parent=self.window)
             return None
         preview = FePreviewWindow(self.app.root, entry["label"], path)
+        self.previews.append(preview)
+        return preview
+
+    def inspect_experimental_selected(self):
+        """Open a read-only view of the experimental data of the selected UNV / UFF / LMS entry (APP-DATA.3)."""
+        entry = self.selected()
+        if entry is None:
+            return None
+        if entry["kind"] != registry.EXPERIMENTAL:
+            self.message.set("Inspect experimental data works on an experimental entry (UNV / UFF / LMS).")
+            return None
+        try:
+            path = registry.usable_path(entry)  # also refuses an LMS project without its companion UNV / UFF
+        except registry.RegistryError as error:
+            messagebox.showwarning("Inspect experimental data", str(error), parent=self.window)
+            self.refresh(select=entry["id"])
+            return None
+        preview = ExperimentalPreviewWindow(self.app.root, entry["label"], path)
         self.previews.append(preview)
         return preview
 
@@ -329,6 +350,163 @@ class FePreviewWindow:
 
     def close(self) -> None:
         """Cancel the reading (if any) and close; a later outcome is discarded."""
+        self.closed = True
+        self.cancel.set()
+        if self._job is not None:
+            try:
+                self.window.after_cancel(self._job)
+            except tk.TclError:
+                pass
+            self._job = None
+        if self.window.winfo_exists():
+            self.window.destroy()
+
+
+def _read_experimental_file(path, cancel: threading.Event, results: queue.Queue) -> None:
+    """Worker of ExperimentalPreviewWindow: reads the file and posts the outcome. It never touches a Tk object."""
+    try:
+        results.put(("ok", experimental_preview.preview_experimental_file(path, cancel_event=cancel)))
+    except experimental_preview.PreviewCancelled:
+        results.put(("cancelled", None))
+    except experimental_preview.ExperimentalPreviewError as error:
+        results.put(("error", str(error)))
+    except Exception as error:  # noqa: BLE001  (any other failure is stated, the window never waits forever)
+        results.put(("error", f"The experimental file cannot be read: {error}"))
+
+
+class ExperimentalPreviewWindow:
+    """A read-only view of the experimental data of one UNV / UFF / LMS file, read with the comparator's importer.
+
+    Each fitted dataset-55 modal set is shown on its own (chosen in the list for viewing only: nothing in the main
+    window changes); dataset 2414 records with their classification; FRF peak-derived records marked PROVISIONAL.
+    The file is read on a background thread; the importer reads a file in one call, so closing the window discards
+    the outcome but does not interrupt a read in progress.
+    """
+
+    POLL_MS = 100
+
+    def __init__(self, root, label: str, path: Path) -> None:
+        self.path = Path(path)
+        self.preview = None
+        self.error = None
+        self.closed = False
+        self.cancel = threading.Event()
+        self.results: queue.Queue = queue.Queue()
+        window = self.window = tk.Toplevel(root)
+        window.title(f"Experimental data — {label}")
+        window.minsize(720, 460)
+        window.columnconfigure(0, weight=1)
+        window.rowconfigure(4, weight=1)
+        window.protocol("WM_DELETE_WINDOW", self.close)
+        ttk.Label(window, text=experimental_preview.NOTE, wraplength=780, justify="left").grid(
+            row=0, column=0, sticky="ew", padx=12, pady=(12, 4))
+        self.status = tk.StringVar(value="Reading the experimental file... The main window stays usable.")
+        ttk.Label(window, textvariable=self.status, wraplength=780, justify="left").grid(
+            row=1, column=0, sticky="ew", padx=12, pady=4)
+        chooser = ttk.Frame(window)
+        chooser.grid(row=2, column=0, sticky="ew", padx=12)
+        ttk.Label(chooser, text="Modal set (view only):").grid(row=0, column=0, padx=(0, 6))
+        self.set_choice = tk.StringVar(value="")
+        self.set_box = ttk.Combobox(chooser, textvariable=self.set_choice, state="disabled", width=70)
+        self.set_box.grid(row=0, column=1, sticky="ew")
+        self.set_box.bind("<<ComboboxSelected>>", lambda _event: self._show_set())
+        chooser.columnconfigure(1, weight=1)
+        self.set_note = tk.StringVar(value="")
+        ttk.Label(window, textvariable=self.set_note, wraplength=780, justify="left").grid(
+            row=3, column=0, sticky="ew", padx=12, pady=4)
+        table = ttk.Frame(window)
+        table.grid(row=4, column=0, sticky="nsew", padx=12)
+        table.columnconfigure(0, weight=1)
+        table.rowconfigure(0, weight=1)
+        self.tree = ttk.Treeview(table, columns=("number", "frequency", "record", "points", "dofs"), show="headings",
+                                 height=9)
+        for column, title, width, stretch in (("number", "No.", 50, False), ("frequency", "Frequency, Hz", 110, False),
+                                              ("record", "Record", 380, True), ("points", "Points", 70, False),
+                                              ("dofs", "Measured DOFs", 110, False)):
+            self.tree.heading(column, text=title)
+            self.tree.column(column, width=width, stretch=stretch)
+        scroll = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.details = tk.Text(window, height=8, wrap="word")
+        self.details.grid(row=5, column=0, sticky="ew", padx=12, pady=6)
+        self.details.configure(state="disabled")
+        ttk.Button(window, text="Close", command=self.close).grid(row=6, column=0, sticky="e", padx=12, pady=(0, 12))
+        self.thread = threading.Thread(target=_read_experimental_file, args=(self.path, self.cancel, self.results),
+                                       daemon=True, name="experimental-preview")
+        self.thread.start()
+        self._job = window.after(self.POLL_MS, self._poll)
+
+    def _poll(self) -> None:
+        self._job = None
+        if self.closed or not self.window.winfo_exists():  # closed, or destroyed with its parent
+            self.closed = True
+            self.cancel.set()
+            return
+        try:
+            kind, value = self.results.get_nowait()
+        except queue.Empty:
+            self._job = self.window.after(self.POLL_MS, self._poll)
+            return
+        self._show(kind, value)
+
+    def _set_details(self, lines) -> None:
+        self.details.configure(state="normal")
+        self.details.delete("1.0", "end")
+        self.details.insert("1.0", "\n".join(lines))
+        self.details.configure(state="disabled")
+
+    def _file_lines(self) -> list:
+        preview = self.preview
+        lines = [f"Selected file: {preview.selected_path}"]
+        if preview.source_path != preview.selected_path:
+            lines.append(f"Read from: {preview.source_path} (the companion UNV / UFF of the LMS project)")
+        lines.append(f"Data: {experimental_preview.KIND_TEXT[preview.kind]}")
+        lines.append(f"Dataset types: {', '.join(str(x) for x in preview.dataset_types) or 'none'}; "
+                     f"geometry nodes: {preview.geometry_node_count}")
+        lines.extend(preview.details)
+        if preview.record_classifications:
+            lines.append("Dataset 2414 record classification (importer):")
+            lines.extend(f"  record {index}: {classification}, {'included' if included else 'excluded'} — {reason}"
+                         for index, classification, included, reason in preview.record_classifications)
+        return lines
+
+    def _show_set(self) -> None:
+        preview = self.preview
+        if preview is None or not preview.sets:
+            return
+        index = max(0, self.set_box.current())
+        chosen = preview.sets[index]
+        self.tree.delete(*self.tree.get_children())
+        for record in chosen.records:
+            self.tree.insert("", "end", values=(record.number, f"{record.frequency_hz:.6g}", record.label,
+                                                record.point_count, record.measured_dof_count))
+        note = [f"{chosen.title}." + (f" Processing: {chosen.processing_name}." if chosen.processing_name else "")]
+        if chosen.excluded_residual:
+            note.append(f"Excluded residual records: {'; '.join(chosen.excluded_residual)}.")
+        if chosen.excluded_non_modal:
+            note.append(f"Excluded non-modal records: {'; '.join(chosen.excluded_non_modal)}.")
+        self.set_note.set(" ".join(note))
+        warnings = [f"Importer warning: {text}" for text in chosen.warnings]
+        self._set_details(self._file_lines() + warnings)
+
+    def _show(self, kind: str, value) -> None:
+        if kind != "ok":
+            self.error = value or "The reading was cancelled."
+            self.status.set("No experimental data can be shown.")
+            self._set_details([self.error])
+            return
+        self.preview = value
+        self.status.set(experimental_preview.summary(value) + ".")
+        self.set_box.configure(values=[item.title for item in value.sets],
+                               state="readonly" if len(value.sets) > 1 else "disabled")
+        if value.sets:
+            self.set_box.current(0)
+        self._show_set()
+
+    def close(self) -> None:
+        """Close the view. A read in progress finishes in the background and its outcome is discarded."""
         self.closed = True
         self.cancel.set()
         if self._job is not None:
