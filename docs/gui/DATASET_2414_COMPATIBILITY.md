@@ -105,6 +105,28 @@ The mode records `dataset_2414_layout = "dataset 2414 records 10-15 read by posi
 
 The regressions, CI and the Windows check are in the task report.
 
+## Results cached before the fix (`src/fast_cache.py`)
+
+The installed importer caches parsed UNV files (`fast_cache`, `%LOCALAPPDATA%\AbaqusModalComparator\cache`). The
+UNV cache key held the file signature, the modal set and `_CACHE_VERSION`, not the importer code. A file with
+positional 2414 records **and** dataset-58 FRFs that was parsed before this fix (as FRF-derived data) would have been
+served again from that cache.
+
+- **The fix.** `_unv_cache_key` now also holds `_UNV_IMPORTER_VERSION`
+  (`2026.10.26.1-dataset2414-positional-layout`). An entry written before the fix has a different key, so it is no
+  longer looked up, and the file is parsed again by the current importer. The import algorithm is not changed.
+- **Unchanged:**
+  - `_CACHE_VERSION`, and with it the extracted-ODB cache key and its entries;
+  - the format of a cache entry;
+  - old cache files: none is deleted.
+
+| Check | Result |
+|---|---|
+| `tests/test_fast_cache.py` | 8 OK, of which 4 new |
+| What the new tests cover | a pre-fix entry (an FRF-only reading of a real pyuff 2414 file, at the pre-fix key) is served under the pre-fix key (control), and ignored now: the file is parsed again, both modes are returned and the old file stays byte for byte; a new entry is reused from disk without a parse; the extracted-ODB key and the reuse of an ODB entry are unchanged |
+| `tests/test_fast_cache_safety.py` | 6 OK, of which 1 new: the marker is in the UNV key only, not in `_CACHE_VERSION` |
+| The new tests against the `fast_cache.py` of `b1ea5bf` | the pre-fix entry is served (0 parses): 2 fail; the control and the ODB identity pass |
+
 ## Limits
 
 - **An ambiguous positional record is not imported.** The loader of `universal_reader` builds a 2414 mode only for a
@@ -117,11 +139,10 @@ The regressions, CI and the Windows check are in the task report.
   - pyuff's positional reader expects one line per node in record 15. A file that wraps more than six values per
     node over several lines (complex 6 DOF data written by another program) is not read correctly by pyuff.
   - Neither is changed here; the checks above refuse a record whose node values do not match NVALDC.
-- **Earlier parse results stay in the cache.** The installed importer caches parsed UNV files
-  (`fast_cache`, `%LOCALAPPDATA%\AbaqusModalComparator\cache`). The cache key holds the file signature and the
-  cache version, not the importer code. A file with positional 2414 records **and** dataset-58 FRFs that was parsed
-  before this fix (as FRF-derived data) can return the old result from the cache until the cache is cleared or its
-  version is raised. `fast_cache.py` is outside this change.
+- **Old UNV cache files are not removed.** After the update every UNV file is parsed once again, and the old entries
+  stay in the cache folder unused; the UNV cache has no clean-up of its own. They can be deleted by hand.
+- **The importer marker is set by hand.** A later change of the UNV import result needs a new
+  `_UNV_IMPORTER_VERSION`; nothing detects such a change automatically.
 - **Not tested on a Simcenter Testlab export.** The files here are written by pyuff, following the dataset-2414
   definition.
 - **Unchanged:**
