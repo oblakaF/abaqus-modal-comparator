@@ -160,6 +160,26 @@ class ServiceTests(_Folder):
         self.assertEqual({r.classification for r in preview.sets[0].records}, {viewer.FITTED_MODE})
         self.assertIn("used dataset 2414", preview_service.KIND_TEXT[preview.kind])  # not "no fitted modes"
 
+    def test_a_real_pyuff_dataset_2414_file(self):
+        from test_universal_hardening import write_2414_unv
+
+        path = write_2414_unv(self.folder / "real_2414.unv", [
+            {"analysis_type": 2, "mode": 7, "frequency": 23.5, "label": 1},
+            {"analysis_type": 3, "mode": 8, "frequency": 41.25, "label": 2},
+            {"analysis_type": 5, "mode": 9, "frequency": 25.0, "label": 3, "name": "Frequency response"}])
+        before = fingerprint(path)
+        preview = preview_service.preview_experimental_file(path)
+        self.assertEqual(preview.kind, preview_service.DATASET_2414)
+        record, = preview.sets[0].records
+        self.assertEqual((record.number, record.frequency_hz, record.point_count, record.measured_dof_count),
+                         (7, 23.5, 3, 9))
+        self.assertEqual(record.label, f"{record.source_text} — dataset 2414 record 1 (physical, importer)")
+        self.assertTrue(any("(analysis type 3): complex eigenvalue data define no frequency" in w
+                            for w in preview.sets[0].warnings))
+        self.assertEqual([(i, c, inc) for i, c, inc, _ in preview.record_classifications],
+                         [(1, "physical", True), (2, "physical", True), (3, "non_modal", False)])
+        self.assertEqual(fingerprint(path), before)
+
     def test_frf_only_dataset_58_records_are_provisional(self):
         uff = F.write_frf_only(self.folder / "frf_only.uff")
         before = fingerprint(uff)
