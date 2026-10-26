@@ -8,15 +8,24 @@ accepts is shown unchanged, and no mode is excluded, renumbered, classified or p
 
 It is a view only: not a physical registration, not a mode pairing; no MAC is computed and nothing is compared with
 an experiment. Abaqus is never started; a plain ``.odb`` needs an existing extracted package. The files are only read.
+
+APP-DATA.5: ``render_fe_mode_shape`` draws one loaded mode on its own FE nodes and coordinates with
+``services.modal_data_viewer.render_viewer_mode`` (role FE: the drawing of the main window's individual-mode viewer,
+unchanged). Every loaded mode can be drawn, rigid-body or elastic; nothing is classified or excluded here. Points on
+one line get no out-of-plane view (the same rule as the experimental shape view of APP-DATA.4).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+import threading
+from typing import Any, Optional
 
 from abaqus_bridge import AnalysisCancelled, FREQUENCY_SOURCE_HISTORY, load_extracted_odb
+from modal_core import ModalDataset
+from services import modal_data_viewer as viewer
+from services.local_experimental_preview import _collinear  # one rule for "points on one line" in both views
 
 NOTE = ("A view of the FE modes of an extracted package only. It is not a physical registration and not a mode "
         "pairing: no MAC is computed, nothing is compared with an experiment and no mode is excluded.")
@@ -45,6 +54,8 @@ class FePreview:
     step_name: str
     modes: tuple
     warnings: tuple
+    # the loader's dataset (its modes in the order of ``modes``), kept for the shape view only
+    dataset: Any = field(default=None, compare=False, repr=False)
 
     @property
     def mode_numbers(self) -> list:
@@ -90,7 +101,7 @@ def preview_fe_package(path, cancel_event=None) -> FePreview:
                                  node_count=len(mode.node_ids), note=str(info.get("frequency_history_note") or "")))
     return FePreview(manifest_path=path, fe_source=str(metadata.get("odb_path") or path),
                      step_name=str(metadata.get("step_name") or ""), modes=tuple(modes),
-                     warnings=tuple(_warnings(metadata)))
+                     warnings=tuple(_warnings(metadata)), dataset=dataset)
 
 
 def frequency_text(mode: PreviewMode) -> str:
@@ -101,6 +112,63 @@ def source_text(mode: PreviewMode) -> str:
     if mode.frequency_source == FREQUENCY_SOURCE_HISTORY:
         return "EIGFREQ history"
     return mode.frequency_source + (f" ({mode.note})" if mode.note else "")
+
+
+SHAPE_COMPONENTS = viewer.COMPONENTS
+COMPONENT_TEXT = viewer.COMPONENT_TEXT[viewer.FE]
+_RENDER_LOCK = threading.Lock()  # one matplotlib figure at a time
+
+
+class FeShapeUnavailable(ValueError):
+    """No spatial view of the FE mode can be drawn; the reason is stated and nothing is created."""
+
+
+@dataclass(frozen=True)
+class FeShapeView:
+    image_path: Path
+    index: int  # the mode's position in the package's loaded modes
+    mode: PreviewMode
+    component: str
+    points_shown: int
+    lines: tuple  # the caption: mode, frequency and its source, what is drawn
+
+
+def _check(cancel_event) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise AnalysisCancelled("The FE mode view was closed.")
+
+
+def render_fe_mode_shape(preview: FePreview, index: int, component: str, directory,
+                         cancel_event=None) -> FeShapeView:
+    """Draw loaded mode ``index`` of ``preview`` on its own FE nodes with the main window's viewer (read-only)."""
+    if component not in SHAPE_COMPONENTS:
+        raise ValueError(f"unknown component {component!r}; choose one of {', '.join(SHAPE_COMPONENTS)}.")
+    dataset = preview.dataset
+    if dataset is None or not 0 <= int(index) < len(preview.modes) or len(dataset.modes) != len(preview.modes):
+        raise FeShapeUnavailable("The mode is not in the loaded data of this package.")
+    row, mode = preview.modes[index], dataset.modes[index]
+    if (int(mode.number), float(mode.frequency_hz)) != (row.number, row.frequency_hz):
+        raise FeShapeUnavailable("The mode does not match the loaded data of this package.")
+    available, reason = viewer.spatial_status(mode)
+    if not available:
+        raise FeShapeUnavailable(f"No spatial view of this mode: {reason}")
+    if component == "normal" and _collinear(mode.coordinates):
+        raise FeShapeUnavailable("The FE nodes lie on one line: no best-fit plane and no normal to it are defined, "
+                                 "so no out-of-plane view is drawn. Choose U1, U2, U3 or magnitude.")
+    _check(cancel_event)
+    # The loaded mode itself, alone in a dataset: the drawing cannot pick another mode of the package.
+    single = ModalDataset(dataset.source_name, dataset.source_path, [mode], metadata=dict(dataset.metadata or {}))
+    with _RENDER_LOCK:
+        path, _ = viewer.render_viewer_mode(single, viewer.FE, int(mode.number), component, Path(directory))
+    _check(cancel_event)
+    lines = [f"FE mode {row.number} — {frequency_text(row)} Hz; frequency source: {source_text(row) or 'not recorded'}.",
+             f"Shown: {COMPONENT_TEXT[component]} on {row.node_count} FE nodes at their own coordinates (extracted "
+             "package). No experiment, mapping or MAC.",
+             "Every loaded mode can be viewed: rigid-body and elastic modes are not classified or excluded here."]
+    mode_warnings = [text for text in preview.warnings if text.startswith(f"Mode {row.number}:")]
+    lines.extend(f"Loader: {text}" for text in mode_warnings)
+    return FeShapeView(image_path=Path(path), index=int(index), mode=row, component=component,
+                       points_shown=row.node_count, lines=tuple(lines))
 
 
 def summary(preview: Optional[FePreview]) -> str:
