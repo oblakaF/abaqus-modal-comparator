@@ -66,6 +66,51 @@ def write_package(folder: Path, modes, *, history=None, geometry=True, start=Non
     return path
 
 
+def write_shape_package(folder: Path, nodes, modes, *, history=None, digits: int = 4) -> Path:
+    """An extracted package (format 2) with given nodes [(label, x, y, z)] and modes [(number, Hz, U (N x 3))]."""
+    folder.mkdir(parents=True, exist_ok=True)
+    rows = ["instance,node_label,x,y,z"] + [f"PART-1,{n},{x!r},{y!r},{z!r}" for n, x, y, z in nodes]
+    (folder / "geometry.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    entries = []
+    for number, frequency, vectors in modes:
+        name = f"mode_{number:04d}.csv"
+        rows = ["instance,node_label,u1_real,u2_real,u3_real,u1_imag,u2_imag,u3_imag"]
+        rows += [f"PART-1,{n},{float(u[0])!r},{float(u[1])!r},{float(u[2])!r},0,0,0"
+                 for (n, *_), u in zip(nodes, vectors)]
+        (folder / name).write_text("\n".join(rows) + "\n", encoding="utf-8")
+        entries.append({"mode": number, "frequency_hz": frequency, "file": name, "frame_index": number,
+                        "description": described(frequency, digits)})
+    numbers = [m[0] for m in modes]
+    manifest = {"format_version": 2, "geometry_file": "geometry.csv", "step_name": "Frequency",
+                "odb_path": "D:/synthetic/shape_model.odb", "start_mode": min(numbers), "end_mode": max(numbers),
+                "modes": entries}
+    if history is not None:
+        manifest["history"] = history
+    path = folder / "manifest.json"
+    path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    return path
+
+
+def plate_modes(nodes):
+    """Six rigid-body frames (U1, U2, U3 translations; rotations about X, Y, Z) and three elastic plate modes."""
+    import numpy as np
+
+    xy = np.array([(x, y) for _, x, y, _ in nodes])
+    x, y = xy[:, 0] / 0.4, xy[:, 1] / 0.3
+    zero, one = np.zeros(len(nodes)), np.ones(len(nodes))
+    rigid = [(one, zero, zero), (zero, one, zero), (zero, zero, one), (zero, zero, y), (zero, zero, -x),
+             (-y, x, zero)]
+    modes = [(n, f, np.column_stack(u)) for n, (f, u) in enumerate(zip(RIGID, rigid), 1)]
+    elastic = [np.sin(np.pi * x) * np.sin(np.pi * y), np.sin(2 * np.pi * x) * np.sin(np.pi * y),
+               np.sin(np.pi * x) * np.sin(2 * np.pi * y)]
+    modes += [(7 + k, f, np.column_stack([zero, zero, w])) for k, (f, w) in enumerate(zip((19.07, 33.52, 60.11),
+                                                                                       elastic))]
+    return modes
+
+
+PLATE_NODES = [(10 * j + i + 1, 0.1 * i, 0.1 * j, 0.0) for j in range(4) for i in range(5)]  # 5 x 4, 0.4 x 0.3 m
+
+
 def fingerprint(folder: Path) -> dict:
     return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(folder.iterdir()) if p.is_file()}
 
@@ -191,6 +236,105 @@ class ServiceTests(_Folder):
         cancel.set()
         with self.assertRaises(fe_preview.AnalysisCancelled):
             fe_preview.preview_fe_package(self.plate("cancel"), cancel_event=cancel)
+
+
+class FeShapeServiceTests(_Folder):
+    """APP-DATA.5: one loaded FE mode drawn on its own nodes by services.modal_data_viewer (role FE)."""
+
+    def drawn(self, preview, index, component):
+        """The view, and the one-mode dataset handed to the main window's viewer (render_viewer_mode, role FE)."""
+        from services import modal_data_viewer as viewer
+
+        with mock.patch.object(viewer, "render_viewer_mode", wraps=viewer.render_viewer_mode) as render:
+            view = fe_preview.render_fe_mode_shape(preview, index, component, self.folder / "views")
+        (dataset, role, number, drawn_component, _directory), _ = render.call_args
+        self.assertEqual((role, drawn_component), (viewer.FE, component))
+        mode, = dataset.modes
+        self.assertEqual(number, mode.number)
+        self.assertEqual(view.image_path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+        return view, mode
+
+    def images(self):
+        views = self.folder / "views"
+        return sorted(p.name for p in views.rglob("*.png")) if views.exists() else []
+
+    def assert_loaded_mode(self, drawn, loaded):
+        import numpy as np
+
+        self.assertEqual((drawn.number, drawn.frequency_hz), (loaded.number, loaded.frequency_hz))
+        np.testing.assert_array_equal(drawn.vectors, loaded.vectors)  # the loader's values, unchanged
+        np.testing.assert_array_equal(drawn.coordinates, loaded.coordinates)
+        self.assertEqual(list(drawn.node_ids), list(loaded.node_ids))
+        self.assertEqual(drawn.metadata, loaded.metadata)
+
+    def test_every_loaded_mode_rigid_or_elastic_is_drawn_on_its_own_nodes(self):
+        manifest = write_shape_package(self.folder / "plate", PLATE_NODES, plate_modes(PLATE_NODES))
+        before = fingerprint(manifest.parent)
+        preview = fe_preview.preview_fe_package(manifest)
+        loaded = abaqus_bridge.load_extracted_odb(manifest).modes
+        self.assertEqual(preview.mode_numbers, list(range(1, 10)))
+        for index in range(9):  # the six rigid-body frames and the first elastic mode too: nothing is excluded
+            view, drawn = self.drawn(preview, index, "magnitude")
+            self.assert_loaded_mode(drawn, loaded[index])
+            self.assertEqual((view.index, view.mode, view.points_shown), (index, preview.modes[index], 20))
+            self.assertIn(f"FE mode {preview.modes[index].number} — {fe_preview.frequency_text(preview.modes[index])}"
+                          " Hz; frequency source: ", view.lines[0])
+            self.assertIn("rigid-body and elastic modes are not classified or excluded", view.lines[2])
+        self.assertEqual(fingerprint(manifest.parent), before)
+
+    def test_each_component_of_the_selected_mode(self):
+        preview = fe_preview.preview_fe_package(write_shape_package(self.folder / "c", PLATE_NODES,
+                                                                    plate_modes(PLATE_NODES)))
+        for component, text in (("normal", "Out-of-plane"), ("magnitude", "Magnitude |U|"), ("x", "U1"),
+                                ("y", "U2"), ("z", "U3")):
+            view, _ = self.drawn(preview, 7, component)
+            self.assertEqual(view.component, component)
+            self.assertIn(f"Shown: {text}", view.lines[1])
+        with self.assertRaisesRegex(ValueError, "unknown component"):
+            fe_preview.render_fe_mode_shape(preview, 7, "ur1", self.folder / "views")
+
+    def test_frequency_source_and_loader_diagnostics_are_kept(self):
+        history = [{"name": "EIGFREQ", "data": [[7, 19.07032], [8, 33.51981], [9, 60.11042]]}]
+        manifest = write_shape_package(self.folder / "eig", PLATE_NODES, plate_modes(PLATE_NODES)[6:],
+                                       history=history, digits=3)
+        preview = fe_preview.preview_fe_package(manifest)
+        view, drawn = self.drawn(preview, 1, "normal")
+        self.assertEqual(drawn.frequency_hz, 33.51981)  # the loader's EIGFREQ history value, unchanged
+        self.assertEqual(view.lines[0], "FE mode 8 — 33.5198 Hz; frequency source: EIGFREQ history.")
+        diagnosed = fe_preview.FePreview(preview.manifest_path, preview.fe_source, preview.step_name, preview.modes,
+                                         ("Mode 8: EIGFREQ not used for the consistency check (synthetic).",
+                                          "Mode 9: other."), dataset=preview.dataset)
+        view, _ = self.drawn(diagnosed, 1, "normal")
+        self.assertEqual(view.lines[3:], ("Loader: Mode 8: EIGFREQ not used for the consistency check (synthetic).",))
+
+    def test_insufficient_or_degenerate_geometry_is_refused_with_the_reason(self):
+        import numpy as np
+
+        two = [(1, 0.0, 0.0, 0.0), (2, 0.3, 0.0, 0.0)]
+        preview = fe_preview.preview_fe_package(write_shape_package(
+            self.folder / "two", two, [(1, 21.0, np.array([[0.0, 0.0, 1.0], [0.0, 0.0, -1.0]]))]))
+        with self.assertRaisesRegex(fe_preview.FeShapeUnavailable, "needs at least 3 measured points"):
+            fe_preview.render_fe_mode_shape(preview, 0, "magnitude", self.folder / "views")
+        line = [(n, 0.05 * n, 0.0, 0.0) for n in range(1, 7)]
+        bending = np.column_stack([np.zeros(6), np.zeros(6), np.sin(np.linspace(0.2, 2.9, 6))])
+        preview = fe_preview.preview_fe_package(write_shape_package(self.folder / "line", line,
+                                                                    [(1, 25.0, bending)]))
+        with self.assertRaisesRegex(fe_preview.FeShapeUnavailable, "lie on one line: no best-fit plane"):
+            fe_preview.render_fe_mode_shape(preview, 0, "normal", self.folder / "views")
+        self.assertEqual(self.images(), [])  # no arbitrary normal, no picture
+        for component in ("z", "magnitude"):  # the FE values along the line are still drawn
+            self.drawn(preview, 0, component)
+
+    def test_a_mode_not_in_the_package_and_a_cancel_draw_nothing(self):
+        preview = fe_preview.preview_fe_package(write_shape_package(self.folder / "cancel_shape", PLATE_NODES,
+                                                                    plate_modes(PLATE_NODES)))
+        with self.assertRaisesRegex(fe_preview.FeShapeUnavailable, "not in the loaded data"):
+            fe_preview.render_fe_mode_shape(preview, len(preview.modes), "normal", self.folder / "views")
+        cancel = threading.Event()
+        cancel.set()
+        with self.assertRaises(fe_preview.AnalysisCancelled):
+            fe_preview.render_fe_mode_shape(preview, 0, "normal", self.folder / "views", cancel_event=cancel)
+        self.assertEqual(self.images(), [])
 
 
 class PreviewWindowTests(_App):
