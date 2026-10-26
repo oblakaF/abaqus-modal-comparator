@@ -272,19 +272,6 @@ def _measured_text(mode, mask: Optional[np.ndarray]) -> str:
     return text
 
 
-COLLINEAR_TOLERANCE = 1.0e-6  # second singular value of the centred points, relative to the first
-
-
-def _collinear(coordinates) -> bool:
-    """Whether the points span no plane (the out-of-plane direction would be arbitrary)."""
-    points = np.asarray(coordinates, dtype=float)
-    points = points[np.all(np.isfinite(points), axis=1)]
-    if len(points) < 3:
-        return True
-    spread = np.linalg.svd(points - points.mean(axis=0), compute_uv=False)
-    return bool(spread[0] <= 0.0 or spread[1] <= COLLINEAR_TOLERANCE * spread[0])
-
-
 def render_record_shape(preview_set: PreviewSet, index: int, component: str, directory,
                         cancel_event=None) -> ShapeView:
     """Draw record ``index`` of ``preview_set`` on its measured points with the main window's viewer (read-only)."""
@@ -321,7 +308,7 @@ def render_record_shape(preview_set: PreviewSet, index: int, component: str, dir
     available, reason = viewer.spatial_status(shown)
     if not available:
         raise ShapeViewUnavailable(f"No spatial view of this record: {reason}")
-    if component == "normal" and _collinear(shown.coordinates):
+    if component == "normal" and not viewer.out_of_plane_available(shown):  # the viewer's own rule (APP-DATA.6)
         raise ShapeViewUnavailable("The drawn points lie on one line: no best-fit plane and no normal to it are "
                                    "defined, so no out-of-plane view is drawn. Choose X, Y, Z or magnitude.")
     _check(cancel_event)

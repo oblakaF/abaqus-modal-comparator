@@ -61,6 +61,7 @@ class _Pane:
         _follow_width(self.info)
         self.image = ttk.Label(self.frame, text=EMPTY_TEXT, anchor="center", justify="center")
         self.image.pack(fill="both", expand=True, pady=(6, 4))
+        _follow_width(self.image)  # APP-DATA.6: a refusal reason shown instead of a view is wrapped, never cut off
         self._fit_job = None
         self._fitted_size = None
         self.image.bind("<Configure>", self._schedule_fit, add="+")

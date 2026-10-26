@@ -45,6 +45,28 @@ The pane shows the imported records with their source:
 FRF peaks are never turned into governed experimental modal evidence. Their frequencies are labelled **PROVISIONAL**
 wherever they appear.
 
+### Points on one line (APP-DATA.6, 2026-10-26)
+
+The out-of-plane component is the projection on the normal of the best-fit plane of the points. When the points lie
+on one line, that plane, and so its normal, is not defined. In both panes:
+
+- **No arbitrary normal.** The out-of-plane view is not drawn. The pane says why: "no out-of-plane view — the points
+  lie on one line: no best-fit plane and no normal to it are defined …".
+- **The previous picture goes at once.** It never stays under the message.
+- **The message is readable in full.** A reason shown in place of a view is wrapped to the width of the pane.
+  Before this change a long reason was cut off.
+- **Other components stay available.** Magnitude and X / Y / Z (U1 / U2 / U3) are still drawn on the same points.
+- **The rule.** The points are on one line when the second singular value of the centred points is at most 1e-6 of
+  the first, or when there are fewer than three points. The rule is computed on the points the normal would use:
+  finite coordinates and values.
+  - It is `services.modal_data_viewer.collinear_points` / `out_of_plane_available`.
+  - The registry previews use the same rule (*Inspect experimental data* → View selected mode shape, and *Inspect
+    FE modes* → View selected FE mode shape; APP-DATA.4 / APP-DATA.5).
+- **Unchanged:**
+  - planar and three-dimensional point sets get their normal as before;
+  - fewer than three responding points keep the previous "no spatial view" message;
+  - FRF snapshots stay PROVISIONAL.
+
 ### Save diagnostic output…
 
 Writes these files to a chosen folder:
