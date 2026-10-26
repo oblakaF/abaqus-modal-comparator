@@ -25,7 +25,6 @@ from typing import Any, Optional
 from abaqus_bridge import AnalysisCancelled, FREQUENCY_SOURCE_HISTORY, load_extracted_odb
 from modal_core import ModalDataset
 from services import modal_data_viewer as viewer
-from services.local_experimental_preview import _collinear  # one rule for "points on one line" in both views
 
 NOTE = ("A view of the FE modes of an extracted package only. It is not a physical registration and not a mode "
         "pairing: no MAC is computed, nothing is compared with an experiment and no mode is excluded.")
@@ -152,7 +151,7 @@ def render_fe_mode_shape(preview: FePreview, index: int, component: str, directo
     available, reason = viewer.spatial_status(mode)
     if not available:
         raise FeShapeUnavailable(f"No spatial view of this mode: {reason}")
-    if component == "normal" and _collinear(mode.coordinates):
+    if component == "normal" and not viewer.out_of_plane_available(mode):  # the viewer's own rule (APP-DATA.6)
         raise FeShapeUnavailable("The FE nodes lie on one line: no best-fit plane and no normal to it are defined, "
                                  "so no out-of-plane view is drawn. Choose U1, U2, U3 or magnitude.")
     _check(cancel_event)

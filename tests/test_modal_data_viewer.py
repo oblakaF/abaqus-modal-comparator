@@ -174,6 +174,88 @@ class ExperimentalViewerTests(_Files):
         self.assertTrue(all(sets[1].display_name in e.source_text for e in entries))
 
 
+def fe_line(count: int = 8) -> ModalDataset:
+    """FE modes of a beam whose nodes lie on one line (U3 bending, U1 axial)."""
+    x = np.linspace(0.0, 0.35, count)
+    coordinates = np.column_stack([x, np.zeros(count), np.zeros(count)])
+    bending = np.column_stack([np.zeros(count), np.zeros(count), np.sin(np.pi * x / 0.35)])
+    axial = np.column_stack([np.cos(np.pi * x / 0.35), np.zeros(count), np.zeros(count)])
+    return ModalDataset("FE", Path("beam.odb"), [ModeShape(1, 41.0, np.arange(1, count + 1), coordinates, bending),
+                                                 ModeShape(2, 97.0, np.arange(1, count + 1), coordinates, axial)])
+
+
+class CollinearNormalTests(_Files):
+    """APP-DATA.6: no arbitrary normal for points on one line; the other components and planar data are unchanged."""
+
+    def test_the_geometric_rule(self):
+        line = np.column_stack([np.linspace(0.0, 1.0, 5), np.zeros(5), np.zeros(5)])
+        self.assertTrue(viewer.collinear_points(line))
+        self.assertTrue(viewer.collinear_points(line @ np.array([[0.6, 0.8, 0.0], [0.8, -0.6, 0.0], [0, 0, 1]])))
+        plate = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]])
+        self.assertFalse(viewer.collinear_points(plate))
+        bent = line.copy()
+        bent[2, 1] = 1.0e-8  # second singular value ~ 1e-8 of the first: within the 1e-6 rule, still a line
+        self.assertTrue(viewer.collinear_points(bent))
+        bent[2, 1] = 1.0e-4  # beyond the rule: a (thin) plane
+        self.assertFalse(viewer.collinear_points(bent))
+        self.assertTrue(viewer.collinear_points(line[:2]))  # fewer than three points span no plane
+        self.assertTrue(viewer.collinear_points(np.vstack([line[:2], [[np.nan, 1.0, 0.0]]])))  # finite points only
+        self.assertEqual(viewer.COLLINEAR_TOLERANCE, 1.0e-6)
+
+    def test_fe_nodes_on_one_line_have_no_out_of_plane_view(self):
+        beam = fe_line()
+        self.assertTrue(all(entry.spatial_available for entry in viewer.viewer_modes(beam, viewer.FE)))
+        for number in (1, 2):
+            with self.assertRaises(ValueError) as caught:
+                viewer.render_viewer_mode(beam, viewer.FE, number, "normal", self.folder / "views")
+            self.assertIn(f"FE mode {number} — ", str(caught.exception))
+            self.assertIn("no out-of-plane view — the points lie on one line", str(caught.exception))
+            with self.assertRaisesRegex(ValueError, "No out-of-plane component: the points lie on one line"):
+                viewer.component_values(viewer.mode_by_number(beam, number), "normal")
+        self.assertFalse((self.folder / "views").exists() and any((self.folder / "views").iterdir()))
+        for component in ("magnitude", "x", "y", "z"):  # the other components stay available on the line
+            path, entry = viewer.render_viewer_mode(beam, viewer.FE, 1, component, self.folder / "views")
+            self.assertTrue(path.exists() and path.stat().st_size > 1000, component)
+        np.testing.assert_allclose(viewer.component_values(beam.modes[0], "z"), beam.modes[0].vectors[:, 2])
+
+    def test_experimental_points_on_one_line_keep_their_labels(self):
+        experimental = load_unv(F.write_frf_only(self.folder / "line.uff", points=5))  # the first grid row: y = 0
+        entry = viewer.viewer_modes(experimental, viewer.EXPERIMENTAL)[0]
+        self.assertEqual(entry.classification, viewer.FRF_PEAK_SNAPSHOT)  # PROVISIONAL snapshot, as before
+        self.assertTrue(entry.spatial_available)
+        self.assertIn("PROVISIONAL", viewer.experimental_frequency_source(experimental))
+        with self.assertRaises(ValueError) as caught:
+            viewer.render_viewer_mode(experimental, viewer.EXPERIMENTAL, entry.number, "normal", self.folder)
+        self.assertIn(f"{entry.label()}: no out-of-plane view — the points lie on one line", str(caught.exception))
+        for component in ("magnitude", "z"):
+            path, _ = viewer.render_viewer_mode(experimental, viewer.EXPERIMENTAL, entry.number, component,
+                                                self.folder / "views")
+            self.assertTrue(path.exists())
+
+    def test_planar_and_three_dimensional_geometry_keep_their_normal(self):
+        mode = viewer.mode_by_number(self.fe, 5)  # the synthetic plate, as in the tests above
+        self.assertTrue(viewer.out_of_plane_available(mode))
+        np.testing.assert_allclose(np.abs(viewer.component_values(mode, "normal")), np.abs(mode.vectors[:, 2]))
+        tilted = ModeShape(5, mode.frequency_hz, mode.node_ids, mode.coordinates @ np.array(
+            [[1.0, 0.0, 0.0], [0.0, 0.8, 0.6], [0.0, -0.6, 0.8]]), mode.vectors @ np.array(
+            [[1.0, 0.0, 0.0], [0.0, 0.8, 0.6], [0.0, -0.6, 0.8]]))  # the same plate, rotated in space
+        np.testing.assert_allclose(np.abs(viewer.component_values(tilted, "normal")), np.abs(mode.vectors[:, 2]),
+                                   atol=1.0e-9)
+        rng = np.random.default_rng(5)
+        cloud = rng.uniform(0.0, 1.0, (40, 3))  # a three-dimensional point cloud: its best-fit plane, as before
+        solid = ModalDataset("FE", Path("solid.odb"), [ModeShape(1, 30.0, np.arange(40), cloud, rng.normal(size=(40, 3)))])
+        self.assertTrue(viewer.out_of_plane_available(solid.modes[0]))
+        path, _ = viewer.render_viewer_mode(solid, viewer.FE, 1, "normal", self.folder / "views")
+        self.assertTrue(path.exists())
+
+    def test_fewer_than_three_points_keep_the_previous_refusal(self):
+        experimental = load_unv(F.write_frf_only(self.folder / "two_points.uff", points=2))
+        entry = viewer.viewer_modes(experimental, viewer.EXPERIMENTAL)[0]
+        with self.assertRaises(ValueError) as caught:
+            viewer.render_viewer_mode(experimental, viewer.EXPERIMENTAL, entry.number, "normal", self.folder)
+        self.assertIn("no spatial view — only 2 point(s)", str(caught.exception))
+
+
 class InventoryTests(_Files):
     def test_inventory_and_saved_package_state_what_is_not_correlated(self):
         experimental = load_unv(self.frf_path)
@@ -444,6 +526,33 @@ class WindowTests(_Files):
             callback()
         self.assertIsNotNone(pane.photo)
         self.assertTrue(pane.image_path.name.startswith("fe_0005"), pane.image_path)
+
+    def test_points_on_one_line_state_why_and_never_keep_the_previous_picture(self):  # APP-DATA.6
+        application = self.application()
+        error = ambiguity()
+        error.loaded_modal_data = self.loaded(load_unv(self.frf_path))  # a plate: both panes show a picture
+        application._failed(error)
+        panel = application.mode_viewer
+        self.assertIsNotNone(panel.fe.photo)
+        self.assertIsNotNone(panel.experimental.photo)
+        line = load_unv(F.write_frf_only(self.folder / "line.uff", points=5))
+        panel.set_data(viewer.LoadedModalData(fe_line(), line, directory=self.folder / "views",
+                                              registration=viewer.AMBIGUOUS), "points on one line")
+        self.root.update()
+        for pane in (panel.fe, panel.experimental):  # the default component is the out-of-plane one
+            self.assertIsNone(pane.photo)
+            self.assertIsNone(pane.image_path)
+            self.assertIn("no out-of-plane view — the points lie on one line", pane.image.cget("text"))
+            self.assertGreater(int(str(pane.image.cget("wraplength"))), 0)  # the reason is wrapped, not cut off
+        self.assertIn("NOT a validated fitted mode shape", panel.experimental.info.cget("text"))  # still PROVISIONAL
+        for pane, label in ((panel.fe, "U3"), (panel.experimental, "Z (measurement axes)")):
+            pane.component.set(label)
+            pane.render()
+            self.assertIsNotNone(pane.photo)  # the same points, another component
+        panel.fe.component.set(viewer.COMPONENT_TEXT[viewer.FE]["normal"])
+        panel.fe.render()
+        self.assertIsNone(panel.fe.photo)  # the U3 picture does not stay under the refusal
+        self.assertIsNone(panel.fe.image_path)
 
     def test_save_diagnostic_output(self):
         application = self.application()

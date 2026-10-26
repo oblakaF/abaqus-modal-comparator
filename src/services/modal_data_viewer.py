@@ -54,6 +54,11 @@ RIGID_BODY_METHOD = "six-vector rigid-body subspace projection of the mode shape
 MINIMUM_SPATIAL_POINTS = 3
 DISPLAY_GRID_THRESHOLD = 5000  # above this many nodes the field is averaged on a display grid
 DISPLAY_GRID_CELLS = 220
+# APP-DATA.6: points span no plane when the second singular value of the centred points is at most this fraction of
+# the first (the rule of the APP-DATA.4/5 previews); their out-of-plane direction would be arbitrary.
+COLLINEAR_TOLERANCE = 1.0e-6
+NO_PLANE_REASON = ("the points lie on one line: no best-fit plane and no normal to it are defined, so no out-of-plane "
+                   "view is drawn; magnitude and the X / Y / Z (U1 / U2 / U3) components can still be viewed")
 
 
 def _new_figure(figsize) -> Figure:
@@ -225,6 +230,21 @@ def _phase_aligned(vectors: np.ndarray) -> np.ndarray:
     return vectors
 
 
+def collinear_points(coordinates) -> bool:
+    """Whether the points span no plane (fewer than three, or all on one line within COLLINEAR_TOLERANCE)."""
+    points = np.asarray(coordinates, dtype=float)
+    points = points[np.all(np.isfinite(points), axis=1)]
+    if len(points) < 3:
+        return True
+    spread = np.linalg.svd(points - points.mean(axis=0), compute_uv=False)
+    return bool(spread[0] <= 0.0 or spread[1] <= COLLINEAR_TOLERANCE * spread[0])
+
+
+def out_of_plane_available(mode) -> bool:
+    """Whether the points the out-of-plane component is computed on (finite coordinates and values) span a plane."""
+    return not collinear_points(np.asarray(mode.coordinates, dtype=float)[_finite_points(mode)])
+
+
 def _plane_basis(coordinates: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     center = coordinates.mean(axis=0)
     _, _, vt = np.linalg.svd(coordinates - center, full_matrices=False)
@@ -245,8 +265,9 @@ def component_values(mode, component: str) -> np.ndarray:
     aligned = _phase_aligned(vectors)
     if component == "normal":
         finite = _finite_points(mode)
-        _, _, normal = _plane_basis(coordinates[finite]) if np.count_nonzero(finite) >= 3 else (None, None,
-                                                                                                np.eye(3)[2])
+        if collinear_points(coordinates[finite]):  # never an arbitrary normal
+            raise ValueError(f"No out-of-plane component: {NO_PLANE_REASON}.")
+        _, _, normal = _plane_basis(coordinates[finite])
         return np.real(aligned @ normal)
     return np.real(aligned[:, "xyz".index(component)])
 
@@ -323,6 +344,8 @@ def render_viewer_mode(dataset, role: str, number: int, component: str, director
     entry = next(item for item in viewer_modes(dataset, role) if item.number == int(number))
     if not entry.spatial_available:
         raise ValueError(f"{entry.label()}: no spatial view — {entry.spatial_reason}")
+    if component == "normal" and not out_of_plane_available(mode):
+        raise ValueError(f"{entry.label()}: no out-of-plane view — {NO_PLANE_REASON}.")
     if role == FE:
         title, note = f"Abaqus FE mode {entry.number} — {entry.frequency_hz:.3f} Hz", ""
     elif entry.classification == FRF_PEAK_SNAPSHOT:
