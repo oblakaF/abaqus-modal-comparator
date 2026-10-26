@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 import queue
+import shutil
+import tempfile
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
+
+from PIL import Image, ImageTk
 
 from app import APP_TITLE
 from services import local_experimental_preview as experimental_preview
@@ -380,16 +384,19 @@ class ExperimentalPreviewWindow:
     Each fitted dataset-55 modal set is shown on its own (chosen in the list for viewing only: nothing in the main
     window changes); dataset 2414 records with their classification; FRF peak-derived records marked PROVISIONAL.
     The file is read on a background thread; the importer reads a file in one call, so closing the window discards
-    the outcome but does not interrupt a read in progress.
+    the outcome but does not interrupt a read in progress. APP-DATA.4: View selected mode shape draws the selected
+    record of the set shown in a ModeShapeWindow, which follows the selection and is cleared when the set changes.
     """
 
     POLL_MS = 100
 
     def __init__(self, root, label: str, path: Path) -> None:
         self.path = Path(path)
+        self.label = label
         self.preview = None
         self.error = None
         self.closed = False
+        self.shape_window = None  # APP-DATA.4: the shape of the selected record (ModeShapeWindow)
         self.cancel = threading.Event()
         self.results: queue.Queue = queue.Queue()
         window = self.window = tk.Toplevel(root)
@@ -429,10 +436,16 @@ class ExperimentalPreviewWindow:
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.grid(row=0, column=0, sticky="nsew")
         scroll.grid(row=0, column=1, sticky="ns")
+        self.tree.bind("<<TreeviewSelect>>", lambda _event: self._selection_changed(), add="+")
         self.details = tk.Text(window, height=8, wrap="word")
         self.details.grid(row=5, column=0, sticky="ew", padx=12, pady=6)
         self.details.configure(state="disabled")
-        ttk.Button(window, text="Close", command=self.close).grid(row=6, column=0, sticky="e", padx=12, pady=(0, 12))
+        buttons = ttk.Frame(window)
+        buttons.grid(row=6, column=0, sticky="ew", padx=12, pady=(0, 12))
+        self.shape_button = ttk.Button(buttons, text="View selected mode shape", command=self.view_selected_shape,
+                                       state="disabled")
+        self.shape_button.pack(side="left")
+        ttk.Button(buttons, text="Close", command=self.close).pack(side="right")
         self.thread = threading.Thread(target=_read_experimental_file, args=(self.path, self.cancel, self.results),
                                        daemon=True, name="experimental-preview")
         self.thread.start()
@@ -479,9 +492,14 @@ class ExperimentalPreviewWindow:
         index = max(0, self.set_box.current())
         chosen = preview.sets[index]
         self.tree.delete(*self.tree.get_children())
-        for record in chosen.records:
-            self.tree.insert("", "end", values=(record.number, f"{record.frequency_hz:.6g}", record.label,
-                                                record.point_count, record.measured_dof_count))
+        for position, record in enumerate(chosen.records):  # the row id is the record's position in its set
+            self.tree.insert("", "end", iid=str(position), values=(
+                record.number, f"{record.frequency_hz:.6g}", record.label, record.point_count,
+                record.measured_dof_count))
+        self.shape_button.configure(state="disabled")
+        if self._shape_open():  # a shape of the previous set is never left on screen
+            self.shape_window.clear(f"The modal set changed to {chosen.title}. Select a record and press "
+                                    "View selected mode shape.")
         note = [f"{chosen.title}." + (f" Processing: {chosen.processing_name}." if chosen.processing_name else "")]
         if chosen.excluded_residual:
             note.append(f"Excluded residual records: {'; '.join(chosen.excluded_residual)}.")
@@ -505,10 +523,46 @@ class ExperimentalPreviewWindow:
             self.set_box.current(0)
         self._show_set()
 
+    # -------------------------------------------------------------- APP-DATA.4: the shape of the selected record
+    def _shape_open(self) -> bool:
+        return self.shape_window is not None and not self.shape_window.closed
+
+    def _selected_record(self):
+        """(set, position) of the selected row in the set shown, or None."""
+        if self.preview is None or not self.preview.sets:
+            return None
+        selection = self.tree.selection()
+        if not selection:
+            return None
+        chosen = self.preview.sets[max(0, self.set_box.current())]
+        position = int(selection[0])
+        return (chosen, position) if 0 <= position < len(chosen.records) else None
+
+    def _selection_changed(self) -> None:
+        selected = self._selected_record()
+        self.shape_button.configure(state="normal" if selected is not None else "disabled")
+        if self._shape_open():  # an open shape view follows the selection; nothing stale stays on screen
+            if selected is None:
+                if self.shape_window.request is not None:  # keep a message already shown (a set change)
+                    self.shape_window.clear("No record is selected.")
+            else:
+                self.shape_window.show(*selected)
+
+    def view_selected_shape(self):
+        selected = self._selected_record()
+        if selected is None:
+            return None
+        if not self._shape_open():
+            self.shape_window = ModeShapeWindow(self.window, self.label)
+        self.shape_window.show(*selected)
+        return self.shape_window
+
     def close(self) -> None:
         """Close the view. A read in progress finishes in the background and its outcome is discarded."""
         self.closed = True
         self.cancel.set()
+        if self.shape_window is not None:
+            self.shape_window.close()
         if self._job is not None:
             try:
                 self.window.after_cancel(self._job)
@@ -517,6 +571,171 @@ class ExperimentalPreviewWindow:
             self._job = None
         if self.window.winfo_exists():
             self.window.destroy()
+
+
+def _draw_record_shape(request, cancel: threading.Event, results: queue.Queue) -> None:
+    """Worker of ModeShapeWindow: draws one record and posts the outcome. It never touches a Tk object."""
+    generation, preview_set, position, component, directory = request
+    try:
+        outcome = ("ok", experimental_preview.render_record_shape(preview_set, position, component, directory,
+                                                                  cancel_event=cancel))
+    except experimental_preview.PreviewCancelled:
+        outcome = ("cancelled", None)
+    except experimental_preview.ShapeViewUnavailable as error:
+        outcome = ("unavailable", str(error))
+    except Exception as error:  # noqa: BLE001  (stated in the window, which never waits forever)
+        outcome = ("error", f"The view could not be drawn: {error}")
+    if cancel.is_set():  # the window was closed while drawing: nothing is left behind
+        shutil.rmtree(Path(directory).parent, ignore_errors=True)
+    results.put((generation, *outcome))
+
+
+class ModeShapeWindow:
+    """APP-DATA.4: the shape of one experimental record, drawn on its own measured points (read-only).
+
+    The record is the row selected in the experimental data view, in the set shown there; the drawing is
+    services.modal_data_viewer's (as in 3. Mode shapes > Individual modes). It runs on a background thread and the
+    outcome is posted back through a queue polled on the Tk thread; a newer request supersedes an older one, so a
+    slow drawing never shows a stale record. Closing the window discards any drawing in progress.
+    """
+
+    POLL_MS = 100
+    MAX_IMAGE = (760, 560)
+
+    def __init__(self, parent, label: str) -> None:
+        self.closed = False
+        self.generation = 0
+        self.shown = None  # the ShapeView on screen, or None
+        self.message = ""
+        self.photo = None
+        self.request = None  # (set, position) of the record asked for
+        self.threads: list = []
+        self.cancel = threading.Event()
+        self.results: queue.Queue = queue.Queue()
+        self.folder = Path(tempfile.mkdtemp(prefix="abaqus_modal_shape_view_"))  # rendered images; removed on close
+        self._job = None
+        window = self.window = tk.Toplevel(parent)
+        window.title(f"Mode shape — {label}")
+        window.minsize(640, 520)
+        window.columnconfigure(0, weight=1)
+        window.rowconfigure(2, weight=1)
+        window.protocol("WM_DELETE_WINDOW", self.close)
+        self.banner = tk.StringVar(value="")
+        self.banner_label = tk.Label(window, textvariable=self.banner, fg="#8a1f11", wraplength=760, justify="left",
+                                     font=("TkDefaultFont", 10, "bold"))
+        self.banner_label.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 2))
+        controls = ttk.Frame(window)
+        controls.grid(row=1, column=0, sticky="ew", padx=12, pady=4)
+        ttk.Label(controls, text="Component:").pack(side="left", padx=(0, 6))
+        self.component_labels = {experimental_preview.COMPONENT_TEXT[key]: key
+                                 for key in experimental_preview.SHAPE_COMPONENTS}
+        self.component = tk.StringVar(value=experimental_preview.COMPONENT_TEXT["normal"])
+        self.component_box = ttk.Combobox(controls, textvariable=self.component, state="readonly", width=40,
+                                          values=list(self.component_labels))
+        self.component_box.pack(side="left")
+        self.component_box.bind("<<ComboboxSelected>>", lambda _event: self._draw(), add="+")
+        self.image = ttk.Label(window, text="", anchor="center", justify="center")
+        self.image.grid(row=2, column=0, sticky="nsew", padx=12, pady=4)
+        self.caption = tk.StringVar(value="")
+        ttk.Label(window, textvariable=self.caption, wraplength=760, justify="left").grid(
+            row=3, column=0, sticky="ew", padx=12, pady=4)
+        ttk.Button(window, text="Close", command=self.close).grid(row=4, column=0, sticky="e", padx=12, pady=(0, 12))
+
+    def component_key(self) -> str:
+        return self.component_labels.get(self.component.get(), "normal")
+
+    def show(self, preview_set, position: int) -> None:
+        if self.closed:
+            return
+        self.request = (preview_set, int(position))
+        self._draw()
+
+    def clear(self, message: str) -> None:
+        """Nothing is shown (the set changed, no record is selected); a drawing in progress is discarded."""
+        if self.closed:
+            return
+        self.generation += 1
+        self.request = None
+        self.banner.set("")
+        self.caption.set("")
+        self._show_text(message)
+
+    def _draw(self) -> None:
+        if self.closed or self.request is None:
+            return
+        self.generation += 1
+        preview_set, position = self.request
+        record = preview_set.records[position]
+        # The previous image goes at once: the new record is never shown under the old picture.
+        self.banner.set(record.label if (record.provisional or record.ambiguous) else "")
+        self.caption.set("")
+        self._show_text(f"Drawing record {record.number} ({record.frequency_hz:.6g} Hz) ...")
+        request = (self.generation, preview_set, position, self.component_key(),
+                   self.folder / f"view_{self.generation}")
+        thread = threading.Thread(target=_draw_record_shape, args=(request, self.cancel, self.results), daemon=True,
+                                  name="experimental-mode-shape")
+        self.threads.append(thread)
+        thread.start()
+        if self._job is None:
+            self._job = self.window.after(self.POLL_MS, self._poll)
+
+    def _poll(self) -> None:
+        self._job = None
+        if self.closed or not self.window.winfo_exists():  # closed, or destroyed with its parent
+            self.close()
+            return
+        while True:
+            try:
+                generation, kind, value = self.results.get_nowait()
+            except queue.Empty:
+                break
+            if generation == self.generation:
+                self._outcome(kind, value)
+            elif kind == "ok":  # superseded: its image is never shown
+                shutil.rmtree(value.image_path.parent, ignore_errors=True)
+        if any(thread.is_alive() for thread in self.threads) or not self.results.empty():
+            self._job = self.window.after(self.POLL_MS, self._poll)
+        self.threads = [thread for thread in self.threads if thread.is_alive()]
+
+    def _outcome(self, kind: str, value) -> None:
+        if kind != "ok":
+            self.caption.set("")
+            self._show_text(value or "The drawing was cancelled.")
+            return
+        try:
+            with Image.open(value.image_path) as source:
+                picture = source.copy()
+            picture.thumbnail(self.MAX_IMAGE, Image.Resampling.LANCZOS)
+            self.photo = ImageTk.PhotoImage(picture, master=self.image)
+        except Exception as error:  # noqa: BLE001
+            self._show_text(f"Could not display the view: {error}")
+            return
+        self.shown, self.message = value, ""
+        self.image.configure(image=self.photo, text="")
+        self.caption.set("\n".join(value.lines))
+
+    def _show_text(self, text: str) -> None:
+        self.shown, self.message, self.photo = None, text, None
+        self.image.configure(image="", text=text)
+
+    def close(self) -> None:
+        """Close the view; a drawing in progress finishes in the background and its outcome is discarded."""
+        if self.closed:
+            return
+        self.closed = True
+        self.cancel.set()
+        if self._job is not None:
+            try:
+                self.window.after_cancel(self._job)
+            except tk.TclError:
+                pass
+            self._job = None
+        try:
+            if self.window.winfo_exists():
+                self.window.destroy()
+        except tk.TclError:
+            pass
+        shutil.rmtree(self.folder, ignore_errors=True)
 
 
 def _open_input_registry(self) -> None:

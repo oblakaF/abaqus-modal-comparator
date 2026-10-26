@@ -14,17 +14,24 @@ The view uses the comparator's own importer, unchanged:
 
 Nothing is chosen, merged, excluded, renumbered or paired with an FE model; no MAC is computed. The files are only
 read. The importer reads a file in one call, so a cancel takes effect between files / sets, not inside a read.
+
+APP-DATA.4: ``render_record_shape`` draws one record of one set on its own measured points with
+``services.modal_data_viewer.render_viewer_mode`` (the drawing, phase alignment and normalisation of the main window's
+individual-mode viewer, unchanged). Only the points where the chosen component is a measured DOF of the record are
+drawn; a component the importer did not record as measured is refused with its reason, and no value is created.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+import threading
+from typing import Any, Optional
 
 import numpy as np
 
 import universal_reader
+from modal_core import ModalDataset, ModeShape
 from services import modal_data_viewer as viewer
 
 DATASET_55 = "DATASET_55_MODAL_SETS"
@@ -94,6 +101,8 @@ class PreviewSet:
     excluded_residual: tuple  # labels of residual records the importer excluded
     excluded_non_modal: tuple  # labels of non-modal records the importer excluded
     warnings: tuple
+    # the importer's dataset of this set (its modes in the order of ``records``), kept for the shape view only
+    dataset: Any = field(default=None, compare=False, repr=False)
 
     @property
     def title(self) -> str:
@@ -138,7 +147,7 @@ def _set_from(dataset, key="", display_name="", processing_name="") -> PreviewSe
                       records=tuple(_record(mode, metadata) for mode in dataset.modes),
                       excluded_residual=tuple(str(x) for x in metadata.get("excluded_residual_labels") or ()),
                       excluded_non_modal=tuple(str(x) for x in metadata.get("excluded_non_modal_labels") or ()),
-                      warnings=tuple(str(x) for x in metadata.get("import_warnings") or ()))
+                      warnings=tuple(str(x) for x in metadata.get("import_warnings") or ()), dataset=dataset)
 
 
 def _check(cancel_event) -> None:
@@ -217,3 +226,114 @@ def summary(preview: ExperimentalPreview) -> str:
     if ambiguous:
         head += f"; {ambiguous} record{'s' if ambiguous != 1 else ''} {AMBIGUOUS}"
     return head + f"; dataset types {', '.join(str(x) for x in preview.dataset_types) or 'none'}"
+
+
+# ----------------------------------------------------------------------------- APP-DATA.4: one record's shape
+
+SHAPE_COMPONENTS = viewer.COMPONENTS
+COMPONENT_TEXT = viewer.COMPONENT_TEXT[viewer.EXPERIMENTAL]
+_RENDER_LOCK = threading.Lock()  # one matplotlib figure at a time, as in the main window's viewer
+
+
+class ShapeViewUnavailable(ValueError):
+    """No spatial view of the record can be drawn; the reason is stated and nothing is created."""
+
+
+@dataclass(frozen=True)
+class ShapeView:
+    image_path: Path
+    set_title: str
+    index: int  # the record's position in its set
+    record: PreviewRecord
+    component: str
+    points_shown: int
+    lines: tuple  # the caption: classification, record, what is drawn, measured components
+
+
+def _measured_mask(mode) -> Optional[np.ndarray]:
+    """The importer's measured-DOF mask of the record (points x X, Y, Z), or None when it recorded none."""
+    measured = getattr(mode, "measured_dofs", None)
+    if measured is None:
+        return None
+    mask = np.asarray(measured, dtype=bool)
+    return mask if mask.shape == np.asarray(mode.vectors).shape else None
+
+
+def _measured_text(mode, mask: Optional[np.ndarray]) -> str:
+    if mask is None:
+        axes = viewer.measured_axes(mode)
+        return (f"Measured DOFs are not recorded by the importer; components with data: "
+                f"{', '.join(a.upper() for a in axes) or 'none'}.")
+    measured = [axis.upper() for axis, used in zip("xyz", mask.any(axis=0)) if used]
+    missing = [axis.upper() for axis, used in zip("xyz", mask.any(axis=0)) if not used]
+    text = f"Measured components (importer): {', '.join(measured) or 'none'}."
+    if missing:
+        text += f" Not measured: {', '.join(missing)} — not drawn as measured; no values are created."
+    return text
+
+
+COLLINEAR_TOLERANCE = 1.0e-6  # second singular value of the centred points, relative to the first
+
+
+def _collinear(coordinates) -> bool:
+    """Whether the points span no plane (the out-of-plane direction would be arbitrary)."""
+    points = np.asarray(coordinates, dtype=float)
+    points = points[np.all(np.isfinite(points), axis=1)]
+    if len(points) < 3:
+        return True
+    spread = np.linalg.svd(points - points.mean(axis=0), compute_uv=False)
+    return bool(spread[0] <= 0.0 or spread[1] <= COLLINEAR_TOLERANCE * spread[0])
+
+
+def render_record_shape(preview_set: PreviewSet, index: int, component: str, directory,
+                        cancel_event=None) -> ShapeView:
+    """Draw record ``index`` of ``preview_set`` on its measured points with the main window's viewer (read-only)."""
+    if component not in SHAPE_COMPONENTS:
+        raise ValueError(f"unknown component {component!r}; choose one of {', '.join(SHAPE_COMPONENTS)}.")
+    dataset = preview_set.dataset
+    if dataset is None or not 0 <= int(index) < len(preview_set.records) or len(dataset.modes) != len(
+            preview_set.records):
+        raise ShapeViewUnavailable("The record is not in the loaded data of this set.")
+    record, mode = preview_set.records[index], dataset.modes[index]
+    if (int(mode.number), float(mode.frequency_hz)) != (record.number, record.frequency_hz):
+        raise ShapeViewUnavailable("The record does not match the loaded data of this set.")
+    mask = _measured_mask(mode)
+    points = len(mode.node_ids)
+    if component in ("x", "y", "z"):
+        axis = "xyz".index(component)
+        if mask is not None:
+            keep = mask[:, axis]
+            if not keep.any():
+                raise ShapeViewUnavailable(f"{COMPONENT_TEXT[component]} is not a measured component of this record "
+                                           "(the importer recorded no measured DOF in it); no view is drawn and no "
+                                           "value is created.")
+        elif component not in viewer.measured_axes(mode):
+            raise ShapeViewUnavailable(f"{COMPONENT_TEXT[component]} holds no data in this record; no view is drawn "
+                                       "and no value is created.")
+        else:
+            keep = np.ones(points, dtype=bool)
+    else:
+        keep = mask.any(axis=1) if mask is not None else np.ones(points, dtype=bool)
+    # Only the record's own measured points, with their imported values: a subset, never a new value.
+    shown = ModeShape(number=mode.number, frequency_hz=mode.frequency_hz, node_ids=mode.node_ids[keep],
+                      coordinates=mode.coordinates[keep], vectors=np.asarray(mode.vectors)[keep],
+                      damping_ratio=mode.damping_ratio, modal_mass=mode.modal_mass, metadata=dict(mode.metadata))
+    available, reason = viewer.spatial_status(shown)
+    if not available:
+        raise ShapeViewUnavailable(f"No spatial view of this record: {reason}")
+    if component == "normal" and _collinear(shown.coordinates):
+        raise ShapeViewUnavailable("The drawn points lie on one line: no best-fit plane and no normal to it are "
+                                   "defined, so no out-of-plane view is drawn. Choose X, Y, Z or magnitude.")
+    _check(cancel_event)
+    single = ModalDataset(dataset.source_name, dataset.source_path, [shown], metadata=dict(dataset.metadata or {}))
+    with _RENDER_LOCK:
+        path, _ = viewer.render_viewer_mode(single, viewer.EXPERIMENTAL, shown.number, component, Path(directory))
+    _check(cancel_event)
+    lines = (record.label,  # the row's own wording: PROVISIONAL, AMBIGUOUS (importer) or the fitted-mode source
+             f"Record {index + 1} of {preview_set.title}: experimental record {record.number}, "
+             f"{record.frequency_hz:.6g} Hz.",
+             f"Shown: {COMPONENT_TEXT[component]} on {int(np.count_nonzero(keep))} of {points} points, at their own "
+             "measured coordinates. No FE model, mapping or MAC.",
+             _measured_text(mode, mask))
+    return ShapeView(image_path=Path(path), set_title=preview_set.title, index=int(index), record=record,
+                     component=component, points_shown=int(np.count_nonzero(keep)), lines=lines)

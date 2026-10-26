@@ -19,12 +19,15 @@ import time
 import unittest
 from unittest import mock
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
 import main  # noqa: E402,F401  (the installed importer chain, as in the application)
 import universal_reader  # noqa: E402
+from modal_core import ModalDataset, ModeShape  # noqa: E402
 from services import local_experimental_preview as preview_service  # noqa: E402
 from services import local_input_registry as registry  # noqa: E402
 from services import modal_data_viewer as viewer  # noqa: E402
@@ -222,6 +225,159 @@ class ServiceTests(_Folder):
         with self.assertRaises(preview_service.PreviewCancelled):
             preview_service.preview_experimental_file(S.write_experiment(self.folder / "c.unv", S.E0, S.G0),
                                                       cancel_event=cancel)
+
+
+def geometry_4():
+    return {"type": 2411, "node_nums": np.array([1, 2, 3, 4]), "x": np.array([0.0, 1.0, 0.0, 1.0]),
+            "y": np.array([0.0, 0.0, 1.0, 1.0]), "z": np.zeros(4)}
+
+
+def mode_55_4(number, frequency, ambiguous=False):
+    """A dataset-55 record on four points (Z only); without its analysis type the importer keeps it ambiguous."""
+    record = _mode("Processing", number, frequency)
+    record.update(node_nums=np.array([1, 2, 3, 4]), r1=np.zeros(4), r2=np.zeros(4),
+                  r3=np.array([1.0, -0.5, 0.25, -1.0]) * number)
+    if ambiguous:
+        record.pop("analysis_type")
+    return record
+
+
+class ShapeViewServiceTests(_Folder):
+    """APP-DATA.4: one record of one set drawn on its own measured points by services.modal_data_viewer."""
+
+    def drawn(self, preview_set, index, component):
+        """The view, and the one-mode dataset handed to the main window's viewer (render_viewer_mode)."""
+        with mock.patch.object(viewer, "render_viewer_mode", wraps=viewer.render_viewer_mode) as render:
+            view = preview_service.render_record_shape(preview_set, index, component, self.folder / "views")
+        (dataset, role, number, drawn_component, _directory), _ = render.call_args
+        self.assertEqual((role, drawn_component), (viewer.EXPERIMENTAL, component))
+        mode, = dataset.modes
+        self.assertEqual(number, mode.number)
+        self.assertTrue(view.image_path.is_file())
+        self.assertEqual(view.image_path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+        return view, mode
+
+    def assert_same_record(self, drawn, loaded, keep=None):
+        keep = np.ones(len(loaded.node_ids), bool) if keep is None else np.asarray(keep)
+        self.assertEqual((drawn.number, drawn.frequency_hz), (loaded.number, loaded.frequency_hz))
+        np.testing.assert_array_equal(drawn.vectors, np.asarray(loaded.vectors)[keep])  # as imported, a subset only
+        np.testing.assert_array_equal(drawn.coordinates, np.asarray(loaded.coordinates)[keep])
+        self.assertEqual(list(drawn.node_ids), list(np.asarray(loaded.node_ids)[keep]))
+
+    def images(self):
+        return sorted(p.name for p in (self.folder / "views").rglob("*.png")) if (self.folder / "views").exists() \
+            else []
+
+    def test_the_selected_record_of_the_selected_set_is_drawn(self):
+        unv = S.write_experiment(self.folder / "two.unv", S.E0, S.G0, sets=(("PolyMAX bravo", 4), ("PolyMAX alpha", 6)))
+        before = fingerprint(unv)
+        preview = preview_service.preview_experimental_file(unv)
+        for set_index, record_index in ((1, 2), (0, 3), (1, 0)):
+            chosen = preview.sets[set_index]
+            view, drawn = self.drawn(chosen, record_index, "normal")
+            loaded = universal_reader.load_universal_modal_file(unv, modal_set=chosen.key).modes[record_index]
+            self.assert_same_record(drawn, loaded)
+            self.assertEqual((view.set_title, view.index, view.record), (chosen.title, record_index,
+                                                                        chosen.records[record_index]))
+            self.assertIn(f"Record {record_index + 1} of {chosen.title}", view.lines[1])
+            self.assertIn(chosen.display_name, view.lines[0])  # the set's own name, never another set's
+        self.assertEqual(fingerprint(unv), before)
+
+    def test_components_that_are_not_measured_are_refused_and_never_created(self):
+        preview = preview_service.preview_experimental_file(S.write_experiment(self.folder / "z.unv", S.E0, S.G0))
+        chosen = preview.sets[0]
+        for component in ("x", "y"):
+            with self.assertRaisesRegex(preview_service.ShapeViewUnavailable, "not a measured component"):
+                preview_service.render_record_shape(chosen, 0, component, self.folder / "views")
+        self.assertEqual(self.images(), [])
+        for component in ("normal", "magnitude", "z"):
+            view, drawn = self.drawn(chosen, 0, component)
+            self.assertEqual(view.points_shown, 63)
+            self.assertIn("Measured components (importer): Z. Not measured: X, Y — not drawn as measured", view.lines[3])
+        with self.assertRaisesRegex(ValueError, "unknown component"):
+            preview_service.render_record_shape(chosen, 0, "rx", self.folder / "views")
+
+    def test_only_the_points_where_a_component_is_measured_are_drawn(self):
+        coordinates = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [2.0, 0.0, 0.0],
+                                [2.0, 1.0, 0.0]])
+        vectors = np.array([[0.5, 0.0, 1.0], [0.25, 0.0, -1.0], [0.0, 0.0, 0.5], [-0.5, 0.0, 0.25], [0.75, 0.0, 0.0],
+                            [0.0, 0.0, 0.0]], dtype=complex)
+        mode = ModeShape(1, 12.0, np.arange(1, 7), coordinates, vectors, metadata={"dataset_type": 55})
+        mode.measured_dofs = np.array([[1, 0, 1], [1, 0, 1], [0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]], dtype=bool)
+        chosen = preview_service._set_from(ModalDataset("synthetic", self.folder / "s.unv", [mode]), "s", "Set S")
+        x_view, x_drawn = self.drawn(chosen, 0, "x")
+        self.assert_same_record(x_drawn, mode, mode.measured_dofs[:, 0])
+        self.assertEqual(x_view.points_shown, 4)
+        self.assertIn("on 4 of 6 points", x_view.lines[2])
+        normal_view, normal_drawn = self.drawn(chosen, 0, "normal")
+        self.assert_same_record(normal_drawn, mode, mode.measured_dofs.any(axis=1))  # point 6 measured nothing
+        self.assertIn("Not measured: Y", normal_view.lines[3])
+        with self.assertRaisesRegex(preview_service.ShapeViewUnavailable, "Y \\(measurement axes\\) is not a measured"):
+            preview_service.render_record_shape(chosen, 0, "y", self.folder / "views")
+
+    def test_imported_dataset_2414_normal_modes(self):
+        from test_universal_hardening import write_2414_unv
+
+        path = write_2414_unv(self.folder / "real_2414.unv", [
+            {"analysis_type": 2, "mode": 7, "frequency": 23.5, "label": 1},
+            {"analysis_type": 2, "mode": 9, "frequency": 47.25, "label": 2},
+            {"analysis_type": 2, "mode": 11, "frequency": 60.0, "label": 3, "values": [
+                np.array([0.0, 0.0, 0.0, 0.0, 0.5 * k, -0.0625 * k]) for k in (1, 2, 3)]}])
+        preview = preview_service.preview_experimental_file(path)
+        chosen = preview.sets[0]
+        loaded = universal_reader.load_universal_modal_file(path).modes
+        view, drawn = self.drawn(chosen, 1, "magnitude")
+        self.assert_same_record(drawn, loaded[1])
+        self.assertIn("dataset 2414 record 2 (physical, importer)", view.lines[0])
+        self.assertIn("Measured components (importer): X, Y, Z.", view.lines[3])
+        with self.assertRaisesRegex(preview_service.ShapeViewUnavailable, "X \\(measurement axes\\) is not a measured"):
+            preview_service.render_record_shape(chosen, 2, "x", self.folder / "views")  # Z only, written as zeros
+        self.assert_same_record(self.drawn(chosen, 2, "z")[1], loaded[2])
+
+    def test_frf_records_are_drawn_provisional(self):
+        preview = preview_service.preview_experimental_file(F.write_frf_only(self.folder / "frf.uff"))
+        chosen = preview.sets[0]
+        view, drawn = self.drawn(chosen, 1, "normal")
+        self.assert_same_record(drawn, universal_reader.load_universal_modal_file(self.folder / "frf.uff").modes[1])
+        self.assertEqual(view.lines[0], preview_service.PROVISIONAL)
+        self.assertTrue(view.record.provisional)
+
+    def test_ambiguous_records_keep_their_warning(self):
+        datasets = [geometry_4(), mode_55_4(1, 10.0), mode_55_4(2, 20.0, ambiguous=True)]
+        path = self.fake_file("ambiguous.unv")
+        with mock.patch.object(universal_reader, "_read_universal_datasets", return_value=datasets):
+            preview = preview_service.preview_experimental_file(path)
+        view, _ = self.drawn(preview.sets[0], 1, "normal")
+        self.assertTrue(view.lines[0].startswith(f"{preview_service.AMBIGUOUS} — dataset 55 record 2, not a "
+                                                 "confirmed fitted mode"))
+        self.assertTrue(view.record.ambiguous)
+        clear, _ = self.drawn(preview.sets[0], 0, "normal")
+        self.assertIn("dataset 55 record 1 (physical, importer)", clear.lines[0])
+
+    def test_points_on_one_line_have_no_out_of_plane_view(self):
+        line = np.column_stack([np.linspace(0.0, 0.3, 6), np.zeros(6), np.zeros(6)])
+        vectors = np.column_stack([np.zeros(6), np.zeros(6), np.sin(np.linspace(0.0, np.pi, 6)) + 0.1]).astype(complex)
+        mode = ModeShape(1, 31.5, np.arange(1, 7), line, vectors, metadata={"dataset_type": 55})
+        mode.measured_dofs = np.column_stack([np.zeros(6, bool), np.zeros(6, bool), np.ones(6, bool)])
+        chosen = preview_service._set_from(ModalDataset("synthetic", self.folder / "l.unv", [mode]), "l", "Line")
+        with self.assertRaisesRegex(preview_service.ShapeViewUnavailable, "lie on one line: no best-fit plane"):
+            preview_service.render_record_shape(chosen, 0, "normal", self.folder / "views")
+        self.assertEqual(self.images(), [])
+        for component in ("z", "magnitude"):  # the measured values along the line are still drawn
+            self.assert_same_record(self.drawn(chosen, 0, component)[1], mode)
+
+    def test_no_spatial_view_is_stated_and_nothing_is_drawn(self):
+        two_points = preview_service.preview_experimental_file(F.write_frf_only(self.folder / "two.uff", points=2))
+        with self.assertRaisesRegex(preview_service.ShapeViewUnavailable, "needs at least 3 measured points"):
+            preview_service.render_record_shape(two_points.sets[0], 0, "normal", self.folder / "views")
+        chosen = preview_service.preview_experimental_file(S.write_experiment(self.folder / "c.unv", S.E0, S.G0)).sets[0]
+        with self.assertRaisesRegex(preview_service.ShapeViewUnavailable, "not in the loaded data"):
+            preview_service.render_record_shape(chosen, len(chosen.records), "normal", self.folder / "views")
+        cancel = threading.Event()
+        cancel.set()
+        with self.assertRaises(preview_service.PreviewCancelled):
+            preview_service.render_record_shape(chosen, 0, "normal", self.folder / "views", cancel_event=cancel)
+        self.assertEqual(self.images(), [])
 
 
 class PreviewWindowTests(_App):
