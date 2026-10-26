@@ -56,8 +56,10 @@ In the frequency diagnostic:
 
 - **Writing:** a temporary file next to the target is renamed into place, so no partial file is left. A file open in
   another program, or a folder that is not writable, is reported and the export can be repeated.
-- **Save As:** cancel writes nothing. A different typed extension gets the correct one appended, and an existing file
-  is never replaced without confirmation.
+- **Save As:** the dialog opens in `Documents\Abaqus Modal Comparator Reports` (APP-UX.1,
+  [REPORT_EXPORT_DIRECTORY.md](REPORT_EXPORT_DIRECTORY.md)); any other place can be chosen. Cancel writes nothing. A
+  different typed extension gets the correct one appended, and an existing file is never replaced without
+  confirmation.
 - **Concurrency:** one export runs at a time. A new analysis started during an export does not change the report
   (snapshot), and the user is told.
 
