@@ -17,7 +17,8 @@ Switching keeps every input, the result, the selected expert tab and the project
 project as changed).
 
 Home has four areas, two per row on a wide window and one per row on a narrow one. The page scrolls when the window
-is short.
+is short. Below them, a fifth, read-only area shows specimen passports from the accepted specimen catalogue
+(APP-CATALOG.1, full width; see `APP_CATALOG1_HOME.md`).
 
 | Area | Shows | Actions |
 |---|---|---|
@@ -25,6 +26,7 @@ is short.
 | 2 Analysis readiness | checklist: Abaqus results, experiment, modal set, Abaqus, units, FE modes (see below); one verdict: *Ready* / *Not ready yet. Still needed: …* / *Wait* / *running* | **Run analysis**, **Stop** |
 | 3 Results | plain-language state of the last analysis, with the values of the metric cards of 2. Comparison table | **Frequencies and pairs** (2.), **Mode shapes** (3.), **MAC matrix** (4.) |
 | 4 Material properties | material constants: *Not determined* (production Auto-ID `NOT_AUTHORISED`); the identification evidence loaded in this session (records, historical or bound); the Auto-ID selection | **Open the expert Auto-ID section** (9., page 0) |
+| 5 Specimen catalogue (APP-CATALOG.1) | the passport of the specimen chosen in its list, read from `docs/auto_id/specimen_catalog.json`; choosing changes no input or analysis state | specimen list |
 
 ## One program, not two
 
