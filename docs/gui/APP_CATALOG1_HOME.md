@@ -44,8 +44,9 @@ width of Home and scrolls with it.
 |---|---|
 | Recorded value vs calculated value | Every mass carries the qualifier the spec gives it: *recorded*, *recorded in the spec as the real value*, *recorded in the spec as a calculated value*. The program calculates no mass. |
 | Nominal vs recorded thickness | *Nominal face* is "nominal stock thickness, not a measurement". *Total thickness* is "recorded total sandwich thickness, not a face-sheet thickness". |
-| Material properties vs FE template constants | FE constants are shown by status only: "FE input values (ASSUMED/TEMPLATE), not measured or identified material properties". No constant value (E1, G12, …) is shown. |
-| Raw FRF vs governed fitted modes | Raw FRF is "measured response functions, not fitted modes". A PolyMAX export is either "governed fixture set …" or "not governed (not a confirmed modal set)". |
+| Material properties vs FE template constants | FE constants are shown by status only: "FE input values (ASSUMED/TEMPLATE): FE constants with this status are not measured or identified elastic constants". No constant value (E1, G12, …) is shown. |
+| Raw FRF vs PolyMAX modal fits | Raw FRF is "measured response functions, not fitted modes". A PolyMAX export is a "PolyMAX modal fit", governed or not; *not governed* never means that no modal fit exists. |
+| Governed set vs other sets of one PolyMAX export | Every **Modal set** row carries its own status (see below). |
 | Existing ODB vs governed FE model | *Governed FE model* is the forward model of the catalogue or "none recorded". The listed INP/ODB files are separate. The section says that an existing INP or ODB is not a governed FE model. |
 | Historical vs physical registration | *Physical registration* and *Legacy registration* are separate rows, each with the catalogue's status. |
 | Catalogue acceptance vs specimen validation | "The catalogue is ACCEPTED as the inventory of the specimen records. That does not mean that every specimen is scientifically validated." Each specimen keeps its own status codes. |
@@ -53,6 +54,24 @@ width of Home and scrolls with it.
 - **Unknown values.** An unknown or `null` value is shown as **Неизвестно (unknown)**, never as zero. A missing mass,
   thickness or dimension is never derived from the others.
 - **Values derived by the catalogue itself** keep its `DERIVED` note (core mass per area, core grade).
+- **Modal-set status (APP-CATALOG.1-F2).** Each **Modal set** row of a PolyMAX export ends with one of:
+  - **GOVERNED SET:** the set the catalogue names in `governed_set`, with the catalogue's qualifier. Example:
+    "GOVERNED SET: Bravo (1) (active fixture SP02/bravo-1-physical)".
+  - **Not the governed set of this file:** another PolyMAX modal fit in the same file, for example *Bravo* and
+    *Processing* next to *Bravo (1)*.
+  - **Not governed:** a PolyMAX modal fit of a file for which the catalogue records no governed set (for example
+    SP-08).
+  - **Status not assigned:** the catalogue marks the file as governed, but its `governed_set` text does not name
+    exactly one listed set. No set is then marked as governed, and the *Data* row says why.
+
+  How `governed_set` is matched:
+  - by exact set name, with or without one trailing qualifier in parentheses;
+  - similar names are never merged: *Bravo* is not *Bravo (1)*;
+  - a text that would name both, or a set name listed twice, is ambiguous.
+- **FREQUENCY_ONLY is kept.** SP-13 260909 *Bravo (1)* is the frozen FREQUENCY_ONLY fixture
+  `SP13/260909-bravo-1`. Its row says "FREQUENCY_ONLY: frequencies only, no confirmed mode-shape (MAC) comparison",
+  and the *Data* row says "FREQUENCY_ONLY: no confirmed MAC comparison". The 260909 series is never presented as a
+  confirmed MAC comparison.
 - **Two series of one specimen stay apart.** SP-13 260909 and 260910 a are separate sections. The active set *Best*
   (`SP13/best-physical`) belongs to 260910 a only.
 - **SP-15** keeps its AMBIGUOUS identity and unknown dimensions, masses and stock. Nothing is taken from SP-12.
@@ -100,14 +119,23 @@ area 1.
 
 ## Validation
 
-- **`tests/test_app_catalog1_home.py`** (25 tests). Service tests on the real catalogue (read-only) and on synthetic
+- **`tests/test_app_catalog1_home.py`** (33 tests; 8 added by APP-CATALOG.1-F2). Service tests on the real catalogue (read-only) and on synthetic
   damaged inputs:
   - the 14 records, and SP-14 absent;
   - SP-02, SP-13, SP-12, SP-15;
   - each distinction in the table above;
   - unknown never zero, and nothing computed;
   - damaged catalogues and records;
-  - only the catalogue file is read, and its hash is unchanged.
+  - only the catalogue file is read, and its hash is unchanged;
+  - F2 modal-set statuses:
+    - SP-02 *Bravo (1)* against *Bravo* and *Processing*;
+    - SP-13 260909 *Bravo (1)* with FREQUENCY_ONLY;
+    - SP-13 260910 a *Best* against *Processing*;
+    - SP-08 ungoverned PolyMAX sets;
+    - similar names;
+    - an ambiguous, unmatched or missing `governed_set`;
+  - every other passport field unchanged: a digest of all rows except *Modal set*, the PolyMAX *Data* rows and the
+    FE-constant rows equals the one of commit `9db16c2`.
 
   Home tests on the real main window:
   - the list;

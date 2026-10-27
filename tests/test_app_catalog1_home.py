@@ -9,7 +9,8 @@ These tests use the real catalogue, read-only, and check:
   - a recorded value against a value the spec records as calculated;
   - nominal against recorded thickness;
   - template FE constants against material properties;
-  - raw FRF against governed fitted modes;
+  - raw FRF against governed fitted modes, and the governed set of a PolyMAX export against its other sets
+    (APP-CATALOG.1-F2: "Bravo" is never "Bravo (1)", an ambiguous name marks no set, FREQUENCY_ONLY is kept);
   - an existing ODB against a governed FE model;
   - a historical against a physical registration;
 - unknown values are shown as unknown, never as zero, and nothing missing is computed;
@@ -151,7 +152,8 @@ class ControlSpecimenTests(unittest.TestCase):
         fitted = [rows(s) for title, s in passport.items() if title.startswith("Experimental data ")
                   and "dataset 55" in rows(s)["Data"]]
         self.assertEqual(len(fitted), 1)
-        self.assertIn("governed fixture set Bravo (1) (active fixture SP02/bravo-1-physical)", fitted[0]["Data"])
+        self.assertIn("PolyMAX modal fit; governed set Bravo (1)", fitted[0]["Data"])
+        self.assertIn("GOVERNED SET: Bravo (1) (active fixture SP02/bravo-1-physical)", fitted[0]["Modal set"])
 
     def test_sp13_passport_keeps_the_two_series_apart(self):
         passport = sections("SP-13")
@@ -181,7 +183,8 @@ class ControlSpecimenTests(unittest.TestCase):
                 self.assertIn("SP13_a_", found["Source"])  # the 260910 a files
         best = [found for found in series.values() if "Modal set" in found and "Best" in found["Modal set"]]
         self.assertEqual(len(best), 1)
-        self.assertIn("SP13/best-physical", best[0]["Data"])
+        self.assertIn("PolyMAX modal fit; governed set Best", best[0]["Data"])
+        self.assertIn("SP13/best-physical", best[0]["Modal set"])
         self.assertIn("Best: 12 modes", best[0]["Modal set"])
         frozen = [found for title, found in series.items() if title.endswith("260909") and "Modal set" in found]
         self.assertIn("FREQUENCY_ONLY", frozen[0]["Data"])
@@ -252,7 +255,8 @@ class DistinctionTests(unittest.TestCase):
             materials = rows(sections(specimen_id)["Materials"])
             for key in ("Face FE constants", "Core FE constants"):
                 self.assertIn("ASSUMED/TEMPLATE", materials[key])
-                self.assertIn("not measured or identified material properties", materials[key])
+                self.assertIn("FE constants with this status are not measured or identified elastic constants",
+                              materials[key])
             text = all_texts(specimen_id)
             self.assertNotRegex(text, r"\b(52000|2580|4500)\b")  # no template value is shown as a property
             self.assertNotRegex(text, r"\d\s*(GPa|MPa)\b")
@@ -285,6 +289,136 @@ class DistinctionTests(unittest.TestCase):
         identity = rows(sections("SP-02")["Identity and status"])
         self.assertEqual(identity["Identification status"], "NEEDS_GOVERNANCE")
         self.assertIn("production Auto-ID is not authorised", identity[""])
+
+
+# APP-CATALOG.1-F2: digest of every passport field F2 does not touch (all rows except Modal set, the PolyMAX Data
+# rows and the FE-constant rows), taken from the passports of commit 9db16c2 on the accepted catalogue
+UNCHANGED_FIELDS = (1013, "3377b0809aa39c861a88cb7e3742f6c98c2cf3158a4c5414f5adda5d1447ceba")
+
+
+def polymax(sets, governed=True, governed_set=None) -> dict:
+    return {"session": "s", "dataset": "PolyMAX fitted modes (dataset 55)", "governed": governed,
+            "governed_set": governed_set, "fitted_sets": [{"set": name, "mode_count": 1, "frequencies_hz": [10.0],
+                                                           "testlab_project": "p"} for name in sets]}
+
+
+def statuses(experiment) -> dict:
+    return {item["set"]: V.modal_set_status(experiment, item["set"])[0] for item in experiment["fitted_sets"]}
+
+
+def catalogue_experiment(specimen_id: str, session: str) -> dict:
+    entry = V.load_catalogue().entry(specimen_id)
+    return next(item for item in entry["experiments"] if item["session"].startswith(session)
+                and item.get("fitted_sets"))
+
+
+def modal_rows(specimen_id: str, session: str) -> dict:
+    """set name -> its Modal set row, and "Data", for the PolyMAX section of one session."""
+    for title, section in sections(specimen_id).items():
+        found = [text for caption, text in section.rows if caption == "Modal set"]
+        if title.endswith(f"session {session}") and found:
+            result = {text.split(":")[0]: text for text in found}
+            result["Data"] = rows(section)["Data"]
+            return result
+    raise AssertionError((specimen_id, session))
+
+
+class GovernedSetTests(unittest.TestCase):
+    def test_sp02_bravo_1_is_the_governed_set_not_bravo_or_processing(self):
+        experiment = catalogue_experiment("SP-02", "260803")
+        self.assertEqual(statuses(experiment), {"Bravo (1)": V.GOVERNED, "Bravo": V.OTHER, "Processing": V.OTHER})
+        found = modal_rows("SP-02", "260803 retry (Testlab project SP02_..._260715)")
+        self.assertIn("GOVERNED SET: Bravo (1) (active fixture SP02/bravo-1-physical)", found["Bravo (1)"])
+        for name in ("Bravo", "Processing"):
+            self.assertNotIn("GOVERNED SET", found[name])
+            self.assertIn("PolyMAX modal fit, not the governed set of this file (that is Bravo (1))", found[name])
+        self.assertNotIn("FREQUENCY_ONLY", found["Bravo (1)"])
+
+    def test_sp13_260909_bravo_1_stays_frequency_only(self):
+        experiment = catalogue_experiment("SP-13", "260909")
+        self.assertEqual(statuses(experiment), {"Bravo (1)": V.GOVERNED, "re": V.OTHER, "Bravo": V.OTHER,
+                                                "Processing": V.OTHER})
+        found = modal_rows("SP-13", "260909")
+        self.assertIn("frozen FREQUENCY_ONLY fixture SP13/260909-bravo-1", found["Bravo (1)"])
+        self.assertIn("FREQUENCY_ONLY: frequencies only, no confirmed mode-shape (MAC) comparison",
+                      found["Bravo (1)"])
+        self.assertIn("(FREQUENCY_ONLY: no confirmed MAC comparison)", found["Data"])
+        for title, section in sections("SP-13").items():  # neither 260909 section offers shape or MAC as usable
+            if title.endswith("session 260909"):
+                usable = rows(section)["Usable now"] + rows(section)["After governance"]
+                self.assertNotIn("MAC", usable)
+                self.assertNotIn("shape", usable)
+
+    def test_sp13_260910_a_best_is_the_governed_set_not_processing(self):
+        experiment = catalogue_experiment("SP-13", "260910 a")
+        self.assertEqual(statuses(experiment), {"Best": V.GOVERNED, "Processing": V.OTHER})
+        found = modal_rows("SP-13", "260910 a")
+        self.assertIn("GOVERNED SET: Best (active fixture SP13/best-physical", found["Best"])
+        self.assertNotIn("FREQUENCY_ONLY", found["Best"] + found["Data"])
+        self.assertIn("not the governed set of this file (that is Best)", found["Processing"])
+
+    def test_sp08_ungoverned_sets_are_still_polymax_modal_fits(self):
+        experiment = catalogue_experiment("SP-08", "260828")
+        self.assertEqual(set(statuses(experiment).values()), {V.NOT_GOVERNED})
+        found = modal_rows("SP-08", "260828")
+        self.assertEqual(len(found) - 1, 6)
+        self.assertEqual(found["Data"], "PolyMAX fitted modes (dataset 55): PolyMAX modal fit; not governed (no "
+                                        "governed fixture in the catalogue)")
+        for name, text in found.items():
+            if name != "Data":
+                self.assertTrue(text.endswith("— PolyMAX modal fit, not governed (the catalogue records no governed "
+                                              "set for this file)"), text)
+
+    def test_similar_names_are_never_merged(self):
+        cases = (  # (governed_set, listed sets, expected governed set)
+            ("Bravo (1) (active fixture X)", ["Bravo (1)", "Bravo", "Processing"], "Bravo (1)"),
+            ("Bravo (frozen fixture X)", ["Bravo (1)", "Bravo"], "Bravo"),
+            ("Bravo", ["Bravo (1)", "Bravo"], "Bravo"),
+            ("Bravo (1)", ["Bravo (1)", "Processing"], "Bravo (1)"),
+        )
+        for governed_set, names, expected in cases:
+            experiment = polymax(names, governed_set=governed_set)
+            self.assertEqual(V.governed_set_match(experiment), (expected, ""), governed_set)
+            self.assertEqual([n for n, status in statuses(experiment).items() if status == V.GOVERNED], [expected])
+
+    def test_an_ambiguous_or_missing_governed_set_marks_no_set(self):
+        cases = (  # (governed_set, listed sets, words of the reason)
+            ("Bravo (1)", ["Bravo (1)", "Bravo"], "matches more than one listed set (Bravo, Bravo (1))"),
+            ("Best (fixture X)", ["Best", "Best"], "matches more than one listed set (Best)"),
+            ("Alpha (fixture X)", ["Bravo (1)", "Bravo"], "matches no listed set"),
+            (None, ["Bravo (1)", "Bravo"], "the catalogue names no governed set"),
+            ("  ", ["Bravo (1)"], "the catalogue names no governed set"),
+        )
+        for governed_set, names, reason in cases:
+            experiment = polymax(names, governed_set=governed_set)
+            match, why = V.governed_set_match(experiment)
+            self.assertIsNone(match, governed_set)
+            self.assertIn(reason, why)
+            self.assertEqual(set(statuses(experiment).values()), {V.UNASSIGNED}, governed_set)
+            built = [text for section in V.experiment_sections({"experiments": [experiment]})
+                     for caption, text in section.rows if caption in ("Data", "Modal set")]
+            self.assertTrue(all("GOVERNED SET" not in text for text in built))
+            self.assertIn("no set is marked as governed", built[0])
+            self.assertTrue(all("status not assigned" in text for text in built[1:]))
+
+    def test_template_wording_is_exact_and_not_absolute(self):
+        for specimen_id in V.load_catalogue().ids:
+            text = all_texts(specimen_id)
+            self.assertNotIn("for any specimen", text)
+            self.assertNotIn("not a confirmed modal set", text)  # not governed is not "no modal fit"
+
+    def test_every_other_passport_field_is_unchanged(self):
+        catalogue, kept = V.load_catalogue(), []
+        for specimen_id in catalogue.ids:
+            for section in V.passport_sections(catalogue.entry(specimen_id), catalogue):
+                kept.append([specimen_id, section.title, section.note])
+                for caption, text in section.rows:
+                    if caption in ("Modal set", "Face FE constants", "Core FE constants") or (
+                            caption == "Data" and "dataset 55" in text):
+                        continue
+                    kept.append([specimen_id, section.title, caption, text])
+        digest = hashlib.sha256(json.dumps(kept, ensure_ascii=False).encode("utf-8")).hexdigest()
+        self.assertEqual((len(kept), digest), UNCHANGED_FIELDS)
 
 
 class DamagedCatalogueTests(unittest.TestCase):

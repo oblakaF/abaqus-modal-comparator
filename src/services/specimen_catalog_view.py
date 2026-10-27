@@ -36,8 +36,8 @@ SCOPE_TEXT = (
     "scientifically validated: the status of each specimen is given below."
 )
 TEMPLATE_TEXT = (
-    "FE input values (ASSUMED/TEMPLATE), not measured or identified material properties; no measured material "
-    "property exists for any specimen"
+    "FE input values (ASSUMED/TEMPLATE): FE constants with this status are not measured or identified elastic "
+    "constants"
 )
 
 
@@ -320,21 +320,84 @@ def _mass_section(entry: dict) -> PassportSection:
                                                   "calculates no mass, and a missing value stays unknown.")
 
 
+GOVERNED, OTHER, NOT_GOVERNED, UNASSIGNED = "governed", "other", "not_governed", "unassigned"
+
+
+def _strip_qualifier(name: str) -> str:
+    """``governed_set`` without one trailing "( ... )" qualifier: "Bravo (1) (active fixture X)" -> "Bravo (1)"."""
+    name = name.rstrip()
+    if not name.endswith(")"):
+        return name
+    depth = 0
+    for index in range(len(name) - 1, -1, -1):
+        depth += {")": 1, "(": -1}.get(name[index], 0)
+        if depth == 0:
+            return name[:index].rstrip()
+    return name
+
+
+def governed_set_match(experiment: dict) -> tuple[Optional[str], str]:
+    """(the listed set the catalogue names as governed, or None; why none).
+
+    The ``governed_set`` text is matched by exact name, with or without its trailing qualifier. Similar names are
+    never merged ("Bravo" is not "Bravo (1)"). When both readings name a listed set, the match is ambiguous and no
+    set is marked."""
+    if not experiment.get("governed"):
+        return None, "not governed"
+    recorded = experiment.get("governed_set")
+    names = [str(_dict(item).get("set")) for item in _list(experiment.get("fitted_sets"))]
+    if not isinstance(recorded, str) or not recorded.strip():
+        return None, "the catalogue names no governed set"
+    readings = {recorded.strip(), _strip_qualifier(recorded)}
+    matches = sorted({name for name in names if name in readings})
+    if len(matches) == 1 and names.count(matches[0]) == 1:
+        return matches[0], ""
+    if matches:
+        return None, f"the governed set \"{recorded}\" matches more than one listed set ({', '.join(matches)})"
+    return None, f"the governed set \"{recorded}\" matches no listed set"
+
+
+def _frequency_only(experiment: dict) -> bool:
+    return "FREQUENCY_ONLY" in " ".join([str(experiment.get("governed_set") or "")]
+                                        + [str(item) for item in _list(experiment.get("usable_now"))])
+
+
+def modal_set_status(experiment: dict, name: str) -> tuple[str, str]:
+    """(status key, words) of one listed set of a PolyMAX export."""
+    governed, reason = governed_set_match(experiment)
+    if not experiment.get("governed"):
+        return NOT_GOVERNED, "PolyMAX modal fit, not governed (the catalogue records no governed set for this file)"
+    if governed is None:
+        return UNASSIGNED, f"status not assigned: {reason}"
+    if name != governed:
+        return OTHER, f"PolyMAX modal fit, not the governed set of this file (that is {governed})"
+    words = f"GOVERNED SET: {experiment['governed_set']}"
+    if _frequency_only(experiment):
+        words += "; FREQUENCY_ONLY: frequencies only, no confirmed mode-shape (MAC) comparison"
+    return GOVERNED, words
+
+
 def _experiment_rows(experiment: dict, catalogue: Optional[CatalogueView]) -> list[tuple[str, str]]:
     dataset = str(experiment.get("dataset") or UNKNOWN_TEXT)
     fitted = "dataset 55" in dataset or "PolyMAX" in dataset
-    if fitted:
-        kind = ("governed fixture set " + str(experiment.get("governed_set") or "(not named)")
-                if experiment.get("governed") else "not governed (not a confirmed modal set)")
-    else:
+    if not fitted:
         kind = "measured response functions, not fitted modes"
+    elif not experiment.get("governed"):
+        kind = "PolyMAX modal fit; not governed (no governed fixture in the catalogue)"
+    else:
+        governed, reason = governed_set_match(experiment)
+        kind = (f"PolyMAX modal fit; governed set {governed}" if governed is not None
+                else f"PolyMAX modal fit; governed, but {reason}: no set is marked as governed")
+        if governed is not None and _frequency_only(experiment):
+            kind += " (FREQUENCY_ONLY: no confirmed MAC comparison)"
     rows = [("Data", f"{dataset}: {kind}")]
     for item in _list(experiment.get("fitted_sets")):
         item = _dict(item)
         frequencies = _list(item.get("frequencies_hz"))
         span = f", {number(frequencies[0])} … {number(frequencies[-1])} Hz" if frequencies else ""
+        _status, words = modal_set_status(experiment, str(item.get("set")))
         rows.append(("Modal set", f"{text(item.get('set'))}: {text(item.get('mode_count'))} modes{span}"
-                                  f" (Testlab project {text(item.get('testlab_project'))})"))
+                                  f" (Testlab project {text(item.get('testlab_project'))}) — {words}"))
     if experiment.get("points") is not None:
         rows.append(("Points", number(experiment["points"])))
     band = experiment.get("frequency_range_hz")
