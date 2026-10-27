@@ -56,7 +56,15 @@ Home owns no data and starts nothing of its own.
   not block the run. Amber … = wait. Blue ℹ = information.
 - **No Abaqus for an `.odb`.** This is a warning, not a block: the run can reuse modes already extracted into the
   output workspace, and an extracted `manifest.json` needs no Abaqus.
-- **Frequency-only diagnostic.** Home states that no mode pairs and no MAC were computed. **MAC matrix** is disabled.
+- **Two diagnostics, two explanations.** Home tells them apart with the rule of the diagnostic report: the loaded
+  data of the analysis have an experimental dataset or not. No new classification is made.
+  - *Frequency-only diagnostic* (`FREQUENCY_ONLY_DIAGNOSTIC`): the physical orientation could not be established; no
+    mode pairs and no MAC. **Frequencies and pairs** and **Mode shapes** are enabled, **MAC matrix** is disabled.
+  - *Experimental data not usable* (`ExperimentalDataUnavailable`): the experimental file gave no usable modal or FRF
+    data, with the reason the window has for it. Only the FE frequencies and mode shapes exist. Only **Mode shapes**
+    is enabled.
+- **Reading files before Run.** Choosing an experimental file reads its list of fitted modal sets (the existing
+  modal-set discovery). The analysis itself runs only on **Run analysis**.
 - **Material properties.** Home never shows a material property value. The constants are stated as *Not
   determined*, whatever evidence is loaded. Evidence is named as evidence (historical or bound to a model), never as
   an identified value.
@@ -91,7 +99,7 @@ Home owns no data and starts nothing of its own.
   - Run on Home and the input locking;
   - the result summary and the navigation;
   - a stale result removed;
-  - the frequency-only diagnostic;
+  - the frequency-only diagnostic and the unusable experimental file, each with its own explanation;
   - a new project;
   - material status and evidence;
   - the layout at several window sizes and interface scales.

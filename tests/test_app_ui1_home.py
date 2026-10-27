@@ -31,6 +31,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 import synthetic_plate_support as S  # noqa: E402
 import home_dashboard as H  # noqa: E402
+from services import modal_data_viewer as viewer  # noqa: E402
+from ui_policy import AnalysisState  # noqa: E402
 from test_app_p1_stale_results import STALE, _App  # noqa: E402
 
 TAB_ATTRIBUTES = ("input_tab", "table_tab", "shape_tab", "plot_tab", "frf_tab", "cmif_tab", "advanced_tab",
@@ -110,6 +112,9 @@ class SwitchTests(_Home):
 class SourceAndReadinessTests(_Home):
     def test_files_chosen_on_home_are_the_files_of_1_files(self):
         application, home = self.home()
+        subtitle = [str(w.cget("text")) for w in home.cards["sources"].grid_slaves(row=1, column=0)][0]
+        self.assertIn("reads its list of fitted modal sets", subtitle)  # the modal-set discovery reads the file
+        self.assertNotIn("Nothing is read", subtitle)
         odb = self.folder / "chosen.odb"
         odb.write_bytes(b"synthetic ODB stand-in; never opened")
         with mock.patch("tkinter.filedialog.askopenfilename", return_value=str(odb)):
@@ -235,9 +240,39 @@ class ResultTests(_Home):
         self.diagnostic(application)
         home = self.refreshed(application)
         self.assertIn(H.DIAGNOSTIC_TEXT, str(home.result_text.cget("text")))
+        self.assertNotIn("experimental file gave no usable", str(home.result_text.cget("text")))
+        self.assertEqual(H.diagnostic_kind(application), H.FREQUENCY_ONLY)
         self.assertEqual(self.result_values(home), ["Mode pairs", "none", "MAC", "not computed"])
         self.assertEqual(str(home.result_buttons["mac"].cget("state")), "disabled")
         self.assertEqual(str(home.result_buttons["frequencies"].cget("state")), "normal")
+        self.assertEqual(str(home.result_buttons["shapes"].cget("state")), "normal")
+
+    def test_an_unusable_experimental_file_is_explained_as_such(self):
+        """ExperimentalDataUnavailable: no orientation question arises; only the FE data are available."""
+        application, home = self.home()
+        self.start(application)
+        error = viewer.ExperimentalDataUnavailable("The experimental file could not be used")
+        error.loaded_modal_data = viewer.LoadedModalData(self.fe, None, experimental_error="no modal vectors or FRFs",
+                                                         directory=self.folder / "views")
+        application._failed(error)
+        self.assertEqual(application.analysis_state, AnalysisState.DIAGNOSTIC)
+        home = self.refreshed(application)
+        text = str(home.result_text.cget("text"))
+        self.assertNotIn("orientation", text)  # not the frequency-only explanation
+        self.assertNotIn(H.DIAGNOSTIC_TEXT, text)
+        self.assertIn("no modal vectors or FRFs", text)  # the reason the window has for this file
+        self.assertIn(H.EXPERIMENT_UNUSABLE_TEXT.format(reason="no modal vectors or FRFs"), text)
+        self.assertEqual(H.diagnostic_kind(application), H.EXPERIMENT_UNUSABLE)
+        self.assertEqual(self.result_values(home),
+                         ["Experimental data", "not usable", "Mode pairs", "none", "MAC", "not computed"])
+        states = {key: str(button.cget("state")) for key, button in home.result_buttons.items()}
+        self.assertEqual(states, {"frequencies": "disabled", "shapes": "normal", "mac": "disabled"})
+        home.result_buttons["shapes"].invoke()  # the FE modes, in 3. Mode shapes
+        self.assertEqual(application.tabs.select(), str(application.shape_tab))
+        application.experimental_path.set(str(self.other_unv))  # an input changes: the diagnostic leaves Home
+        home = self.refreshed(application)
+        self.assertIn(STALE, str(home.result_text.cget("text")))
+        self.assertEqual(self.result_values(home), [])
 
     def test_a_new_project_clears_the_result_on_home(self):
         application, home = self.home()

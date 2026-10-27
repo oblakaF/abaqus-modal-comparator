@@ -29,6 +29,7 @@ from __future__ import annotations
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
+from typing import Optional
 
 from ui_policy import AnalysisState, EM_DASH, LayoutMode, responsive_layout_width, select_layout_mode
 
@@ -52,6 +53,11 @@ DIAGNOSTIC_TEXT = (
     "Frequency-only diagnostic: the physical orientation of the measurement could not be established, so no mode "
     "pairs and no MAC were computed. The FE and measured frequencies can be compared side by side only."
 )
+EXPERIMENT_UNUSABLE_TEXT = (
+    "No comparison: the experimental file gave no usable modal or FRF data, so nothing can be compared. Only the FE "
+    "frequencies and mode shapes are available (3. Mode shapes). Reason: {reason}"
+)
+FREQUENCY_ONLY, EXPERIMENT_UNUSABLE = "frequency_only", "experiment_unusable"
 
 
 def _get(variable, default: str = "") -> str:
@@ -157,6 +163,30 @@ def readiness_verdict(app) -> tuple[str, str]:
     return OK, "Ready: the analysis can be run."
 
 
+def diagnostic_kind(app) -> Optional[str]:
+    """The kind of the diagnostic shown, read from the loaded data of that analysis with the rule of the diagnostic
+    report (no new classification): no experimental dataset = the experimental file was not usable
+    (ExperimentalDataUnavailable); otherwise FREQUENCY_ONLY_DIAGNOSTIC (physical orientation not established)."""
+    loaded = getattr(app, "_diagnostic_export_source", None)
+    if loaded is None:
+        return None
+    return EXPERIMENT_UNUSABLE if getattr(loaded, "experimental", None) is None else FREQUENCY_ONLY
+
+
+def result_links(app) -> set[str]:
+    """The result views that show something for the result on display ("frequencies", "shapes", "mac")."""
+    if getattr(app, "running", False):
+        return set()
+    if getattr(app, "result", None) is not None:
+        return {"frequencies", "shapes", "mac"}
+    kind = diagnostic_kind(app)
+    if kind == FREQUENCY_ONLY:
+        return {"frequencies", "shapes"}  # the frequencies side by side; each file's modes separately; no MAC
+    if kind == EXPERIMENT_UNUSABLE:
+        return {"shapes"}  # the FE modes only: no frequency comparison, no MAC
+    return set()
+
+
 def result_summary(app) -> tuple[str, str, list[tuple[str, str]]]:
     """(state, plain text, [(caption, value)]) of the result shown in the expert tabs."""
     state = getattr(app, "analysis_state", AnalysisState.NO_DATA)
@@ -174,7 +204,12 @@ def result_summary(app) -> tuple[str, str, list[tuple[str, str]]]:
                         "(geometry) was established. Open the frequencies, the mode shapes or the MAC below."), values
         return INFO, ("Analysis complete, but the scientific acceptance checks were not satisfied: there are no "
                       "admissible mode pairs. See the details in Expert mode."), values
-    if getattr(app, "_diagnostic_export_source", None) is not None:
+    kind = diagnostic_kind(app)
+    if kind == EXPERIMENT_UNUSABLE:
+        reason = str(getattr(app._diagnostic_export_source, "experimental_error", None) or "not stated")
+        return INFO, EXPERIMENT_UNUSABLE_TEXT.format(reason=reason), [
+            ("Experimental data", "not usable"), ("Mode pairs", "none"), ("MAC", "not computed")]
+    if kind == FREQUENCY_ONLY:
         return INFO, DIAGNOSTIC_TEXT, [("Mode pairs", "none"), ("MAC", "not computed")]
     if state is AnalysisState.ERROR:
         return NEEDED, _get(app.status) or "The analysis could not be completed.", []
@@ -274,8 +309,9 @@ class HomeDashboard:
 
     def _build_sources(self) -> None:
         app = self.app
-        card = self._card("sources", "1  Source data", "The two result files to compare. Nothing is read or run "
-                                                         "until you press Run analysis.")
+        card = self._card("sources", "1  Source data", "The two result files to compare. Choosing an experimental "
+                                                         "file reads its list of fitted modal sets; the analysis "
+                                                         "runs only when you press Run analysis.")
         self.source_rows = {}
         for index, (kind, caption, command) in enumerate((("fe", "Abaqus results", app._choose_abaqus),
                                                           ("experimental", "Simcenter experiment",
@@ -503,12 +539,9 @@ class HomeDashboard:
                 row=row, column=0, sticky="nw", padx=(0, 12), pady=1)
             ttk.Label(self.result_values, text=value.replace("\n", "   |   ")).grid(row=row, column=1, sticky="w",
                                                                                  pady=1)
-        comparison = getattr(app, "result", None) is not None
-        diagnostic = getattr(app, "_diagnostic_export_source", None) is not None
-        available = (comparison or diagnostic) and not getattr(app, "running", False)
+        links = result_links(app)
         for key, button in self.result_buttons.items():
-            enabled = available and (key != "mac" or comparison)
-            button.configure(state="normal" if enabled else "disabled")
+            button.configure(state="normal" if key in links else "disabled")
 
     def open_auto_id(self) -> None:
         app = self.app
