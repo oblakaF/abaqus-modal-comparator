@@ -373,6 +373,7 @@ class WindowTests(_Files):
         with mock.patch.object(ui_workflow, "load_recovery_preferences", return_value=disabled), \
                 mock.patch.object(ui_workflow, "discover_abaqus_installations", return_value=()):
             application = main.app.ModalComparatorApp(root)
+            application._show_expert()  # APP-UI.1: the window opens on Home; these are expert-tab checks
         application.mode_viewer.threaded = False  # deterministic rendering in tests
         application._post_to_ui = lambda callback: callback() or True
         application.mode_viewer.post = application._post_to_ui

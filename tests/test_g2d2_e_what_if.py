@@ -176,6 +176,7 @@ class TkTests(unittest.TestCase):
         with mock.patch.object(ui_workflow, "load_recovery_preferences", return_value=disabled), \
                 mock.patch.object(ui_workflow, "discover_abaqus_installations", return_value=()):
             application = main.app.ModalComparatorApp(root)
+            application._show_expert()  # APP-UI.1: the window opens on Home; these are expert-tab checks
         result = test_core.ModalCoreTests("test_export_excel_base_writes_the_documented_sheets_and_values").synthetic_result()
         with tempfile.TemporaryDirectory() as directory:
             application.cache = Path(directory)

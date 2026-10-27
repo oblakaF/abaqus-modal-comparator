@@ -707,6 +707,7 @@ class TkIntegrationTests(unittest.TestCase):
         with mock.patch.object(ui_workflow, "load_recovery_preferences", return_value=disabled), \
                 mock.patch.object(ui_workflow, "discover_abaqus_installations", return_value=()):
             application = main.app.ModalComparatorApp(root)
+            application._show_expert()  # APP-UI.1: the window opens on Home; these are expert-tab checks
         return root, application, main
 
     @staticmethod

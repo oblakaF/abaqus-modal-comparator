@@ -200,6 +200,7 @@ class IntegrationTests(unittest.TestCase):
         with mock.patch.object(ui_workflow, "load_recovery_preferences", return_value=disabled), \
                 mock.patch.object(ui_workflow, "discover_abaqus_installations", return_value=()):
             application = main.app.ModalComparatorApp(root)
+            application._show_expert()  # APP-UI.1: the window opens on Home; these are expert-tab checks
         self.assertIn("no comparison result yet", application.scaling_summary.cget("text"))
         result = synthetic_result()
         with tempfile.TemporaryDirectory() as directory:
@@ -234,6 +235,7 @@ class IntegrationTests(unittest.TestCase):
         with mock.patch.object(ui_workflow, "load_recovery_preferences", return_value=disabled), \
                 mock.patch.object(ui_workflow, "discover_abaqus_installations", return_value=()):
             application = main.app.ModalComparatorApp(root)
+            application._show_expert()  # APP-UI.1: the window opens on Home; these are expert-tab checks
         table = application.scaling_table
         self.assertEqual(str(application.scaling_xscroll.cget("orient")), "horizontal")
         self.assertEqual(str(application.scaling_yscroll.cget("orient")), "vertical")
