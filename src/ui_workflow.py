@@ -670,6 +670,7 @@ def install_responsive_workflow(app_module) -> None:
         self._sync_coordinate_mapping()
         self._set_empty_states()
         self._refresh_readiness()
+        self._build_home()
         self._resize_settler = SettledCallback(
             root, SETTLED_RESIZE_MS, self._apply_responsive_layout
         )
@@ -686,6 +687,44 @@ def install_responsive_workflow(app_module) -> None:
                 root.after_idle(self._show_recovery_notice)
         else:
             self._reset_dirty()
+
+    def build_home(self) -> None:
+        """APP-UI.1: the Home screen in the window's middle row and the Home / Expert mode switch in the header.
+        Expert mode is the unchanged notebook with all 11 tabs; switching keeps every input and result."""
+        from home_dashboard import EXPERT, HOME, HomeDashboard
+
+        self.home_view_mode = tk.StringVar(master=self.root, value=HOME)
+        self.home = HomeDashboard(self, self.root)
+        switch = ttk.Frame(self.header)
+        for value, text in ((HOME, "Home"), (EXPERT, "Expert mode (all 11 tabs)")):
+            ttk.Radiobutton(switch, text=text, value=value, variable=self.home_view_mode, style="Toolbutton",
+                            command=lambda: self._show_view(self.home_view_mode.get())).pack(side="left")
+        switch.pack(side="left", anchor="w")  # a fixed place, whatever the project name beside it
+        self.home_view_switch = switch
+        self._show_view(HOME)
+
+    def show_view(self, view: str) -> None:
+        from home_dashboard import HOME
+
+        home = getattr(self, "home", None)
+        if home is None:
+            return
+        self.home_view_mode.set(view)
+        if view == HOME:
+            self.tabs.grid_remove()
+            home.frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
+            home.refresh()
+        else:
+            home.frame.grid_remove()
+            self.tabs.grid()
+            self._schedule_responsive_layout()
+
+    def show_expert(self, tab=None) -> None:
+        from home_dashboard import EXPERT
+
+        self._show_view(EXPERT)
+        if tab is not None:
+            self.tabs.select(tab)
 
     def build_mode_viewer(self) -> None:
         """3. Mode shapes: the gated pair view, or the FE and experimental modes separately (no registration)."""
@@ -2459,6 +2498,9 @@ def install_responsive_workflow(app_module) -> None:
     application_class.__init__ = workflow_init
     application_class._build_input = build_input
     application_class._build_mode_viewer = build_mode_viewer
+    application_class._build_home = build_home
+    application_class._show_view = show_view
+    application_class._show_expert = show_expert
     application_class._show_shape_view = show_shape_view
     application_class._show_loaded_modal_data = show_loaded_modal_data
     application_class._finish_pending_close = finish_pending_close

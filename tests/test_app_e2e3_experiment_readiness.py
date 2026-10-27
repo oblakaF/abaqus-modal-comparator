@@ -264,6 +264,7 @@ class _Window(_Files):
         with mock.patch.object(ui_workflow, "load_recovery_preferences", return_value=disabled), \
                 mock.patch.object(ui_workflow, "discover_abaqus_installations", return_value=()):
             application = main.app.ModalComparatorApp(root)
+            application._show_expert()  # APP-UI.1: the window opens on Home; these are expert-tab checks
         application._series_review_store = self.store
         application.mode_viewer.threaded = False
         if size:

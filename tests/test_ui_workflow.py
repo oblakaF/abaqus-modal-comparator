@@ -618,6 +618,8 @@ class TkRuntimeSmokeTests(unittest.TestCase):
             self.assertEqual(root.minsize(), minimum_window_size())
             self.assertEqual(int(root.grid_rowconfigure(1)["weight"]), 1)
             self.assertEqual(int(root.grid_columnconfigure(0)["weight"]), 1)
+            self.assertEqual(application.home_view_mode.get(), "home")  # APP-UI.1: the window opens on Home
+            application._show_expert()
             self.assertEqual(application.tabs.winfo_manager(), "grid")
             self.assertEqual(set(application.tabs.grid_info()["sticky"]), set("nsew"))
             self.assertEqual(int(application.input_tab.grid_rowconfigure(0)["weight"]), 1)
