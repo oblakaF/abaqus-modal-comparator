@@ -22,7 +22,7 @@ is short.
 | Area | Shows | Actions |
 |---|---|---|
 | 1 Source data | the chosen Abaqus results and Simcenter experiment: file name, kind (extracted `manifest.json` needs no Abaqus; an `.odb` is extracted with Abaqus), folder | **Choose...** for each file; **Modal set** list; **All settings...** (opens 1. Files) |
-| 2 Analysis readiness | checklist: Abaqus results, experiment, modal set, Abaqus, units, Abaqus mode range; one verdict: *Ready* / *Not ready yet. Still needed: …* / *Wait* / *running* | **Run analysis**, **Stop** |
+| 2 Analysis readiness | checklist: Abaqus results, experiment, modal set, Abaqus, units, FE modes (see below); one verdict: *Ready* / *Not ready yet. Still needed: …* / *Wait* / *running* | **Run analysis**, **Stop** |
 | 3 Results | plain-language state of the last analysis, with the values of the metric cards of 2. Comparison table | **Frequencies and pairs** (2.), **Mode shapes** (3.), **MAC matrix** (4.) |
 | 4 Material properties | material constants: *Not determined* (production Auto-ID `NOT_AUTHORISED`); the identification evidence loaded in this session (records, historical or bound); the Auto-ID selection | **Open the expert Auto-ID section** (9., page 0) |
 
@@ -63,6 +63,18 @@ Home owns no data and starts nothing of its own.
   - *Experimental data not usable* (`ExperimentalDataUnavailable`): the experimental file gave no usable modal or FRF
     data, with the reason the window has for it. Only the FE frequencies and mode shapes exist. Only **Mode shapes**
     is enabled.
+- **FE modes (APP-UI.1-F1).** The row names the FE modes the input actually provides.
+  - **`.odb`:** the mode range of 1. Files is the range Abaqus extracts when the analysis runs ("6 to 15: the modes to
+    extract from the .odb").
+  - **`manifest.json`:** an extracted input is loaded completely (`abaqus_bridge.load_or_extract_odb`, unchanged), so
+    the range field does not apply. Home reads only the manifest's own mode list (a small JSON file; no geometry or
+    mode file, at most 2 MB) and names its mode numbers. Example: "Extracted modes listed in manifest.json: 7–30 (24
+    modes). The mode range of 1. Files (6 to 15) applies to an .odb extraction only".
+  - **Mode numbers with gaps** are shown as separate runs (`6–8, 10, 12–13`), never as one range.
+  - **Damaged or incomplete manifest:** a manifest that cannot be read, has no valid mode list or lists no mode gets a
+    warning naming the problem, without a range.
+  - **Refresh:** the row follows every change of the FE file, and of the manifest itself.
+  - **Unchanged:** the field and its meaning in Expert mode.
 - **Reading files before Run.** Choosing an experimental file reads its list of fitted modal sets (the existing
   modal-set discovery). The analysis itself runs only on **Run analysis**.
 - **Material properties.** Home never shows a material property value. The constants are stated as *Not
@@ -121,3 +133,6 @@ Home owns no data and starts nothing of its own.
 - **Display scaling.** Windows display scaling other than 100 % was not tried on this computer (the interface scale
   80–125 % was).
 - **Language.** Home is in English, like the rest of the program.
+- **Known observation O-1 (APP-REAL.1, not changed).** During the last analysis stage ("6/6 Report data generation")
+  the window does not repaint until the stage ends. Home then shows the finished result. This is earlier behaviour of
+  the analysis, not of Home.

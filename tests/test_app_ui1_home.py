@@ -18,6 +18,7 @@ input, result and the project state. Home uses the window's own handlers and sta
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 import time
@@ -137,7 +138,7 @@ class SourceAndReadinessTests(_Home):
         application, home = self.home()
         rows = self.texts(home.check_rows)
         self.assertEqual([row[1] for row in rows],
-                         ["Abaqus results", "Experiment", "Modal set", "Abaqus", "Units", "Abaqus modes"])
+                         ["Abaqus results", "Experiment", "Modal set", "Abaqus", "Units", "FE modes"])
         self.assertEqual(rows[0][0], H.MARKS[H.OK])
         self.assertTrue(str(home.verdict.cget("text")).startswith(H.MARKS[H.OK] + "  Ready"))
         self.assertEqual(str(home.run_button.cget("state")), "normal")
@@ -204,6 +205,103 @@ class SourceAndReadinessTests(_Home):
         self.assertEqual(str(home.run_button.cget("state")), "normal")
         self.assertEqual(str(home.source_rows["fe"][2].cget("state")), "normal")
         self.assertEqual(str(home.modal_set_combo.cget("state")), "readonly")
+
+
+def write_manifest(folder: Path, modes, text=None) -> Path:
+    """An extraction manifest.json with only its mode list (no geometry or mode file: Home never reads them)."""
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "manifest.json"
+    if text is None:
+        text = json.dumps({"format_version": 2, "geometry_file": "geometry.csv", "start_mode": 6, "end_mode": 15,
+                           "modes": [{"mode": m, "file": f"mode_{m:04d}.csv", "frequency_hz": 10.0 * m}
+                                     for m in modes]})
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+class FeModeRowTests(_Home):
+    """APP-UI.1-F1: an extracted manifest.json is compared with every mode it lists; the mode-range field of 1. Files
+    applies to an .odb extraction only, so Home never shows that field as the compared FE modes of a manifest."""
+
+    def row(self, application):
+        home = self.refreshed(application)
+        return self.texts(home.check_rows)[5]
+
+    def application_6_15(self):
+        application, _home = self.home()
+        application.start_mode.set(6)
+        application.end_mode.set(15)
+        return application
+
+    def test_a_manifest_7_30_with_the_fields_at_6_15_shows_7_30(self):
+        application = self.application_6_15()
+        manifest = write_manifest(self.folder / "sp13", range(7, 31))
+        with mock.patch("abaqus_bridge.load_extracted_odb", side_effect=AssertionError("no FE data is loaded")):
+            application.abaqus_path.set(str(manifest))
+            mark, caption, text = self.row(application)
+        self.assertEqual((mark, caption), (H.MARKS[H.INFO], "FE modes"))
+        self.assertIn("Extracted modes listed in manifest.json: 7–30 (24 modes)", text)
+        self.assertIn("The mode range of 1. Files (6 to 15) applies to an .odb extraction only", text)
+        self.assertNotIn("6 to 15:", text)  # never presented as the compared modes
+        self.assertEqual((application.start_mode.get(), application.end_mode.get()), (6, 15))  # Expert mode unchanged
+
+    def test_an_odb_shows_the_extraction_range(self):
+        application = self.application_6_15()
+        self.assertTrue(application.abaqus_path.get().endswith(".odb"))
+        self.assertEqual(self.row(application)[2], "6 to 15: the modes to extract from the .odb when the analysis runs.")
+
+    def test_a_manifest_6_15(self):
+        application = self.application_6_15()
+        application.abaqus_path.set(str(write_manifest(self.folder / "sp02", range(6, 16))))
+        self.assertIn("listed in manifest.json: 6–15 (10 modes)", self.row(application)[2])
+
+    def test_non_consecutive_mode_numbers_are_not_shown_as_one_range(self):
+        application = self.application_6_15()
+        application.abaqus_path.set(str(write_manifest(self.folder / "gaps", (13, 6, 7, 8, 10, 12, 7))))
+        text = self.row(application)[2]
+        self.assertIn("listed in manifest.json: 6–8, 10, 12–13 (6 modes)", text)
+        self.assertNotIn("6–13", text)
+        self.assertEqual(H.mode_number_text([5]), "5")
+        self.assertEqual(H.mode_number_text([7, 9]), "7, 9")
+
+    def test_a_damaged_or_incomplete_manifest_gets_no_invented_range(self):
+        application = self.application_6_15()
+        cases = (("not json", "{ broken", "the file is not a readable JSON extraction manifest"),
+                 ("no mode list", json.dumps({"format_version": 2}), "the file has no valid list of extracted modes"),
+                 ("bad entry", json.dumps({"modes": [{"mode": "x"}]}), "the file is not a readable JSON extraction manifest"),
+                 ("entry without number", json.dumps({"modes": [{"file": "m.csv"}]}), "the file has no valid list of extracted modes"),
+                 ("empty list", json.dumps({"modes": []}), "the file lists no extracted mode"))
+        for index, (name, content, reason) in enumerate(cases):
+            with self.subTest(name):
+                application.abaqus_path.set(str(write_manifest(self.folder / f"bad{index}", (), text=content)))
+                mark, _caption, text = self.row(application)
+                self.assertEqual(mark, H.MARKS[H.WARN])
+                self.assertIn(f"could not be read from manifest.json: {reason}", text)
+                self.assertNotRegex(text, r"\d+–\d+")  # no range
+                self.assertNotIn("6 to 15", text)
+        too_large = write_manifest(self.folder / "large", range(6, 16))
+        with mock.patch.object(H, "MANIFEST_READ_LIMIT", 10):
+            application.abaqus_path.set(str(too_large))
+            self.assertIn("too large to be read here", self.row(application)[2])
+        application.abaqus_path.set(str(self.folder / "missing" / "manifest.json"))
+        self.assertEqual(self.row(application)[2], "Shown once the extraction manifest.json is found.")
+
+    def test_the_row_follows_a_change_of_the_fe_source(self):
+        application = self.application_6_15()
+        sp13 = write_manifest(self.folder / "a", range(7, 31))
+        sp02 = write_manifest(self.folder / "b", range(6, 16))
+        application.abaqus_path.set(str(sp13))
+        self.assertIn("7–30", self.row(application)[2])
+        application.abaqus_path.set(str(sp02))
+        self.assertIn("6–15 (10 modes)", self.row(application)[2])
+        write_manifest(self.folder / "b", (6, 7, 9))  # the same file rewritten: read again, not a stale cache
+        self.assertIn("6–7, 9 (3 modes)", self.row(application)[2])
+        application.abaqus_path.set(str(self.folder / "plate.odb"))
+        self.assertIn("6 to 15: the modes to extract from the .odb", self.row(application)[2])
+        application.end_mode.set(20)  # the field itself still drives an .odb extraction
+        self.assertIn("6 to 20: the modes to extract from the .odb", self.row(application)[2])
+        application.abaqus_path.set("")
+        self.assertEqual(self.row(application)[2], "Mode range 6 to 20: used when an .odb is extracted.")
 
 
 class ResultTests(_Home):

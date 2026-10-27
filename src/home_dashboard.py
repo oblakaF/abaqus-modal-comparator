@@ -26,6 +26,7 @@ property value is shown: this version identifies none.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
@@ -130,6 +131,70 @@ def abaqus_state(app) -> tuple[str, str]:
                   "> 1. Files and analysis.")
 
 
+MANIFEST_READ_LIMIT = 2_000_000  # bytes: Home reads the mode list of a small manifest.json only, never a mode file
+_manifest_modes_cache: dict = {}
+
+
+def manifest_mode_numbers(path: Path) -> tuple[Optional[list[int]], str]:
+    """(mode numbers listed in an extraction manifest.json, problem). Only the manifest's own mode list is read; no
+    geometry or mode file is opened. Cached per file state, so Home does not read it again on every refresh."""
+    try:
+        stat = path.stat()
+    except OSError as error:
+        return None, f"the file cannot be read ({error.__class__.__name__})"
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    if key not in _manifest_modes_cache:
+        _manifest_modes_cache.clear()
+        _manifest_modes_cache[key] = _read_manifest_modes(path, stat.st_size)
+    return _manifest_modes_cache[key]
+
+
+def _read_manifest_modes(path: Path, size: int) -> tuple[Optional[list[int]], str]:
+    if size > MANIFEST_READ_LIMIT:
+        return None, "the file is too large to be read here"
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        entries = manifest["modes"]
+        numbers = sorted({int(entry["mode"]) for entry in entries})
+    except (OSError, UnicodeDecodeError, ValueError):
+        return None, "the file is not a readable JSON extraction manifest"
+    except (KeyError, TypeError):
+        return None, "the file has no valid list of extracted modes"
+    if not numbers:
+        return None, "the file lists no extracted mode"
+    return numbers, ""
+
+
+def mode_number_text(numbers: list[int]) -> str:
+    """Sorted mode numbers as runs: 6–15; 6–8, 10, 12–13 (a gap is never shown as one continuous range)."""
+    runs, first = [], numbers[0]
+    for previous, number in zip(numbers, numbers[1:] + [None]):
+        if number is None or number != previous + 1:  # the run ends at ``previous``
+            runs.append(str(first) if first == previous else f"{first}–{previous}")
+            first = number
+    return ", ".join(runs)
+
+
+def fe_mode_row(app) -> tuple[str, str, str]:
+    """(state, caption, text) of the FE modes: the extraction range of an .odb, the listed modes of a manifest."""
+    path_text = _get(getattr(app, "abaqus_path", None))
+    field = f"{_get(app.start_mode, '?')} to {_get(app.end_mode, '?')}"
+    path = Path(path_text)
+    if path_text and path.name.lower() == "manifest.json":
+        if not path.is_file():
+            return INFO, "FE modes", "Shown once the extraction manifest.json is found."
+        numbers, problem = manifest_mode_numbers(path)
+        if numbers is None:
+            return WARN, "FE modes", (f"The extracted mode numbers could not be read from manifest.json: {problem}. "
+                                      "The analysis reports what it can load.")
+        count = f"{len(numbers)} mode{'s' if len(numbers) != 1 else ''}"
+        return INFO, "FE modes", (f"Extracted modes listed in manifest.json: {mode_number_text(numbers)} ({count}). "
+                                  f"The mode range of 1. Files ({field}) applies to an .odb extraction only.")
+    if path_text and path.suffix.lower() == ".odb":
+        return INFO, "FE modes", f"{field}: the modes to extract from the .odb when the analysis runs."
+    return INFO, "FE modes", f"Mode range {field}: used when an .odb is extracted."
+
+
 def readiness_rows(app) -> list[tuple[str, str, str]]:
     """(state, caption, text) rows of the readiness checklist."""
     rows = []
@@ -144,7 +209,7 @@ def readiness_rows(app) -> list[tuple[str, str, str]]:
     rows.append((state, "Abaqus", text))
     rows.append((INFO, "Units", f"Abaqus model in {_get(app.abaqus_model_unit, '?')}, experiment in "
                                 f"{_get(app.experimental_coordinate_unit, '?')}: you confirm them when you press Run."))
-    rows.append((INFO, "Abaqus modes", f"{_get(app.start_mode, '?')} to {_get(app.end_mode, '?')}"))
+    rows.append(fe_mode_row(app))
     return rows
 
 
