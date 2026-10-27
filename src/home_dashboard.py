@@ -7,6 +7,10 @@ The Home screen shows four areas:
 - results;
 - material properties.
 
+Below them, APP-CATALOG.1 adds a fifth, read-only area: the passport of one physical specimen from the accepted
+specimen catalogue (``services.specimen_catalog_view``). Choosing a specimen there only shows its passport. It
+selects no file, modal set or registration and changes no analysis state.
+
 It owns no data and starts no computation of its own. Every action calls the existing handlers of the main window:
 
 - file choice: ``_choose_abaqus`` / ``_choose_experiment``;
@@ -32,6 +36,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Optional
 
+from services import specimen_catalog_view as catalogue_view
 from ui_policy import AnalysisState, EM_DASH, LayoutMode, responsive_layout_width, select_layout_mode
 
 HOME, EXPERT = "home", "expert"
@@ -59,6 +64,12 @@ EXPERIMENT_UNUSABLE_TEXT = (
     "frequencies and mode shapes are available (3. Mode shapes). Reason: {reason}"
 )
 FREQUENCY_ONLY, EXPERIMENT_UNUSABLE = "frequency_only", "experiment_unusable"
+CATALOGUE_SUBTITLE = (
+    "The recorded facts of a real specimen, from the accepted specimen catalogue. Viewing a passport selects no "
+    "file, modal set or registration and changes nothing in the analysis; the catalogue and the input file registry "
+    "(File menu) are separate."
+)
+CATALOGUE_PROMPT = "Choose a specimen to view its passport."
 
 
 def _get(variable, default: str = "") -> str:
@@ -348,6 +359,7 @@ class HomeDashboard:
         self._build_readiness()
         self._build_results()
         self._build_material()
+        self._build_catalogue()
         self._layout(2)
         self.frame.bind("<Destroy>", self._cancel_jobs, add="+")
         for name in WATCHED_VARIABLES:
@@ -460,6 +472,76 @@ class HomeDashboard:
         ttk.Button(card, text="Open the expert Auto-ID section", command=self.open_auto_id).grid(
             row=6, column=0, columnspan=3, sticky="w", pady=(10, 0))
 
+    def _build_catalogue(self) -> None:
+        card = self._card("catalogue", "5  Specimen catalogue / Паспорт образца", CATALOGUE_SUBTITLE)
+        card.columnconfigure(1, weight=1)
+        self.catalogue = catalogue_view.load_catalogue()
+        self.catalogue_choices = {catalogue_view.choice_text(entry): entry["specimen_id"]
+                                  for entry in self.catalogue.specimens}
+        ttk.Label(card, text="Specimen", style="MetricCaption.TLabel").grid(row=2, column=0, sticky="w",
+                                                                           padx=(0, 10))
+        self.specimen_choice = tk.StringVar(master=self.app.root, value="")  # Home's own: no window state
+        self.specimen_combo = ttk.Combobox(card, textvariable=self.specimen_choice, state="readonly", width=44,
+                                           values=tuple(self.catalogue_choices))
+        self.specimen_combo.grid(row=2, column=1, sticky="w")
+        self.specimen_combo.bind("<<ComboboxSelected>>", lambda _event: self.show_passport(), add="+")
+        self.specimen_combo.bind("<MouseWheel>", self._combo_wheel)  # the wheel scrolls Home, never the choice
+        self.catalogue_message = self._wrap(ttk.Label(card, text="", justify="left"), card)
+        self.catalogue_message.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        self.passport = ttk.Frame(card)
+        self.passport.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(4, 0))
+        self.passport.columnconfigure(1, weight=1)
+        if self.catalogue.problem:
+            self.specimen_combo.configure(state="disabled")
+            self.catalogue_message.configure(
+                text=f"{MARKS[WARN]}  The specimen catalogue cannot be shown: {self.catalogue.problem} "
+                     f"({short_path(self.catalogue.path)}). The rest of the program is not affected.",
+                foreground=COLOURS[WARN])
+        else:
+            self._catalogue_message(CATALOGUE_PROMPT)
+
+    def _catalogue_message(self, text: str) -> None:
+        self.catalogue_message.configure(
+            text=f"{MARKS[INFO]}  {len(self.catalogue.specimens)} specimens in the catalogue "
+                 f"({self.catalogue.header.get('status') or 'status unknown'}). {text}", foreground=COLOURS[INFO])
+
+    def show_passport(self, specimen_id: Optional[str] = None) -> None:
+        """Show one passport (from the list, or ``specimen_id``); reads the loaded catalogue only."""
+        if specimen_id is None:
+            specimen_id = self.catalogue_choices.get(self.specimen_choice.get())
+        entry = self.catalogue.entry(specimen_id) if specimen_id else None
+        card = self.cards["catalogue"]
+        for child in self.passport.winfo_children():
+            child.destroy()
+        self._wrapped = [(label, owner) for label, owner in self._wrapped if label.winfo_exists()]
+        if entry is None:
+            return
+        choice = catalogue_view.choice_text(entry)
+        if self.specimen_choice.get() != choice:
+            self.specimen_choice.set(choice)
+        self._catalogue_message(f"Passport of {entry['specimen_id']}, as recorded in {self.catalogue.path.name} "
+                                "(read only).")
+        row = 0
+        for section in catalogue_view.passport_sections(entry, self.catalogue):
+            ttk.Label(self.passport, text=section.title, style="Section.TLabel").grid(
+                row=row, column=0, columnspan=2, sticky="w", pady=(10, 2))
+            row += 1
+            if section.note:
+                self._wrap(ttk.Label(self.passport, text=section.note, style="Secondary.TLabel", justify="left"),
+                           card).grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 2))
+                row += 1
+            for caption, value in section.rows:
+                ttk.Label(self.passport, text=caption, style="MetricCaption.TLabel").grid(
+                    row=row, column=0, sticky="nw", padx=(0, 10), pady=1)
+                self._wrap(ttk.Label(self.passport, text=value, justify="left"), card).grid(
+                    row=row, column=1, sticky="ew", pady=1)
+                row += 1
+        self._schedule_rewrap()
+
+    def _combo_wheel(self, event) -> str:
+        self._wheel(event)
+        return "break"
+
     # ------------------------------------------------------------------------------------------------ layout
 
     def _canvas_resized(self, event) -> None:
@@ -485,6 +567,8 @@ class HomeDashboard:
             row, column = divmod(index, columns)
             self.cards[key].grid(row=row, column=column, sticky="nsew", padx=(0 if column == 0 else 6, 0),
                                  pady=(0, 8))
+        self.cards["catalogue"].grid(row=len(order) // columns, column=0, columnspan=columns, sticky="nsew",
+                                     pady=(0, 8))  # the specimen passport: the full width, below the four areas
 
     def _rewrap(self, card, width: int) -> bool:
         """Each wrapped label wraps at the card's right edge, from where its column starts. False when a label is not

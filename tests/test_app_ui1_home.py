@@ -423,12 +423,13 @@ class LayoutTests(_Home):
             home._canvas_resized(SimpleNamespace(width=width))
             placed = {key: (int(card.grid_info()["row"]), int(card.grid_info()["column"]))
                       for key, card in home.cards.items()}
-            if columns == 2:
+            if columns == 2:  # APP-CATALOG.1: the specimen passport takes the full width below the four areas
                 self.assertEqual(placed, {"sources": (0, 0), "readiness": (0, 1), "results": (1, 0),
-                                          "material": (1, 1)})
+                                          "material": (1, 1), "catalogue": (2, 0)})
             else:
                 self.assertEqual(placed, {"sources": (0, 0), "readiness": (1, 0), "results": (2, 0),
-                                          "material": (3, 0)})
+                                          "material": (3, 0), "catalogue": (4, 0)})
+            self.assertEqual(int(home.cards["catalogue"].grid_info()["columnspan"]), columns)
 
     def test_interface_scale_and_window_sizes_keep_home_usable(self):
         application, home = self.home()
