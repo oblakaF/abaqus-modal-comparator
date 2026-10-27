@@ -57,8 +57,16 @@ its SHA-256 is computed in 1 MiB blocks.
 | `NOT_AN_INPUT` | the source itself is not an input (INP, CAE, SVD, …) | blocked; **Locate** is disabled |
 
 - **Size and name** are shown for a source without reference as a hint only, never as proof of identity.
-- **A changed file.** If the file changes or disappears between the check and **Use**, it is not used; the user
-  locates it again.
+- **Checked again before Use (APP-CATALOG.2-F1).**
+  - **A `BYTE_VERIFIED` file** gets its full SHA-256 computed again just before **Use**, and compared with the
+    reference of the source. Size and modification time are not trusted: other bytes with the same size and the
+    same time are found too.
+  - **On any other outcome** (another SHA-256 or size, a deleted file, a read error) **Use** is refused. The check
+    becomes `HASH_MISMATCH`, `FILE_MISSING` or `UNREADABLE`, so `BYTE_VERIFIED` no longer stands and **Use** is
+    disabled. The message asks to locate the file again, and no field of the program changes.
+  - **A file without reference** (`NOT_VERIFIED_NO_REFERENCE`) has nothing to hash against. If its size or time
+    changed since **Locate**, it is refused before the warning; otherwise the warning and the explicit confirmation
+    stay as before. It is never called verified.
 - **Byte identity is not a scientific confirmation.** Every `BYTE_VERIFIED` message says so. A verified file
   confirms neither the FE-experiment pairing, the modal set, the registration nor the orientation.
 
@@ -101,7 +109,7 @@ every variable is equal.
 
 ## Validation
 
-- **`tests/test_app_catalog2_home.py`** (22 tests, synthetic files; the accepted catalogue is checked unchanged after
+- **`tests/test_app_catalog2_home.py`** (27 tests, 5 added by F1, synthetic files; the accepted catalogue is checked unchanged after
   every check test).
   - Sources:
     - SP-02 (PolyMAX reference SHA, ODB without SHA, INP/CAE/JNL/SVD not inputs);
@@ -119,14 +127,19 @@ every variable is equal.
     - not-an-input sources;
     - a zip member through its extracted copy, the ZIP refused, and the 260909 member refused for 260910 a;
     - block-wise read-only hashing;
-    - a changed file.
+    - a changed file;
+    - F1: the full re-hash before use (unchanged, other bytes with the same size and time, another size, deleted,
+      read error, no reference).
   - Home on the real main window:
     - nothing changes before **Use**;
     - **Use** sets only its field;
     - the old result becomes inactive (P-1);
     - confirmation of an unverified FE file, declined and accepted;
     - mismatch, missing file and cancel change nothing;
-    - a changed file is refused;
+    - F1: an unchanged verified file is hashed once more and used. Other bytes with the same size and restored
+      time, another size, a deleted file and a read error are refused: BYTE_VERIFIED is withdrawn, and FE/UNV, modal
+      set, result, project state and status are unchanged. A file without reference is not hashed and keeps its
+      warning (declined, refused after a change, accepted);
     - **Use** equals the Browse contract;
     - locking during an analysis;
     - registry and Run patched to fail; no process (patched).
@@ -143,8 +156,10 @@ every variable is equal.
 
 ## Limits
 
-- **Hashing time.** Hashing runs on the window's thread. Only files whose size equals the reference size are hashed;
-  the largest recorded reference is about 40 MB.
+- **Hashing time.** Hashing runs on the window's thread, at **Locate** and again at **Use**. Only files whose size
+  equals the reference size are hashed; the largest recorded reference is about 40 MB.
+- **Between the re-hash and the read.** The file is checked again at **Use**. A change made after **Use** (before
+  the analysis reads it) is outside this check, as for any file chosen with **Browse**.
 - **No hash for large ODB files.** The catalogue records no SHA-256 for its large ODB files, so these can only be used
   as `NOT_VERIFIED_NO_REFERENCE`.
 - **No ZIP extraction.** A ZIP member must be extracted by the user.

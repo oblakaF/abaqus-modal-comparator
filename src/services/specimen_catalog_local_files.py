@@ -11,6 +11,9 @@ SHA-256 is computed in blocks, never by loading the whole file. The result is on
   can be used only after a separate warning is confirmed, and it is never called verified.
 - ``FILE_MISSING`` / ``UNREADABLE`` / ``UNSUPPORTED_TYPE`` / ``NOT_AN_INPUT``: the file cannot be used.
 
+Before a BYTE_VERIFIED file is used, ``recheck_before_use`` computes its full SHA-256 again (APP-CATALOG.2-F1): a
+file whose bytes changed after it was located is refused, even with the same size and modification time.
+
 Nothing here sets an input of the program, chooses a modal set or registration, or starts anything.
 """
 
@@ -124,6 +127,37 @@ def check_local_file(source: CatalogueSource, path) -> LocalCheck:
                                                "through the catalogue.", size, mtime, digest)
     return LocalCheck(BYTE_VERIFIED, file, f"The SHA-256 of {file.name} equals the reference of {target} "
                                            f"({digest[:12]}…). {IDENTITY_NOTE}", size, mtime, digest)
+
+
+def recheck_before_use(source: CatalogueSource, check: LocalCheck) -> LocalCheck:
+    """APP-CATALOG.2-F1: check a BYTE_VERIFIED file again, in full, just before it is used.
+
+    The size and modification time are not trusted: the complete SHA-256 is computed again and compared with the
+    catalogue reference of ``source``. Anything but a match (other bytes, another size, a missing or unreadable file)
+    returns a check that cannot be used, so the earlier BYTE_VERIFIED no longer stands."""
+    if check.status != BYTE_VERIFIED or source.sha256 is None or check.path is None:
+        return check
+    file, again = check.path, "Locate the file again; the fields of the program are unchanged."
+    try:
+        stat = file.stat()
+    except OSError:
+        return LocalCheck(FILE_MISSING, file, f"{file.name} is no longer there since it was located. {again}")
+    if not file.is_file():
+        return LocalCheck(FILE_MISSING, file, f"{file.name} is no longer a file since it was located. {again}")
+    if source.size_bytes is not None and stat.st_size != source.size_bytes:
+        return LocalCheck(HASH_MISMATCH, file, f"{file.name} changed since it was located: it has {stat.st_size} "
+                                               f"bytes, the reference has {source.size_bytes}. {again}",
+                          stat.st_size, stat.st_mtime_ns)
+    try:
+        digest = sha256_of(file)
+    except OSError as error:
+        return LocalCheck(UNREADABLE, file, f"{file.name} could not be read again before use "
+                                            f"({error.__class__.__name__}). {again}", stat.st_size, stat.st_mtime_ns)
+    if digest != source.sha256:
+        return LocalCheck(HASH_MISMATCH, file, f"{file.name} changed since it was located: its SHA-256 is now "
+                                               f"{digest[:12]}…, the reference is {source.sha256[:12]}…. {again}",
+                          stat.st_size, stat.st_mtime_ns, digest)
+    return LocalCheck(BYTE_VERIFIED, file, check.message, stat.st_size, stat.st_mtime_ns, digest)
 
 
 def unchanged_since(check: LocalCheck) -> bool:

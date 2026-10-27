@@ -9,7 +9,9 @@ file's SHA-256 for that source (the accepted catalogue itself is never changed).
   input, a zip member checked through its extracted copy;
 - on the real main window: nothing changes before an explicit Use; Use sets exactly one field, as Browse does; the
   old result becomes inactive through P-1; no modal set, registration, MAC, project or registry change of its own; no
-  process and no analysis.
+  process and no analysis;
+- APP-CATALOG.2-F1: a BYTE_VERIFIED file is hashed again in full just before Use; other bytes (even with the same size
+  and modification time), another size, a deleted file or a read error refuse the Use and withdraw BYTE_VERIFIED.
 """
 
 from __future__ import annotations
@@ -62,6 +64,17 @@ def recording(entry_value: dict, file_name: str, local: Path) -> dict:
             reference.update(sha256=_sha(local), size_bytes=local.stat().st_size)
             return entry_value
     raise AssertionError(file_name)
+
+
+def flip_one_byte_keeping_size_and_time(path: Path) -> None:
+    """Other bytes, the same size and the same modification time (what a size/time check cannot see)."""
+    stat = path.stat()
+    data = bytearray(path.read_bytes())
+    data[len(data) // 2] ^= 0xFF
+    path.write_bytes(bytes(data))
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    after = path.stat()
+    assert (after.st_size, after.st_mtime_ns) == (stat.st_size, stat.st_mtime_ns)
 
 
 class _Folder(unittest.TestCase):
@@ -241,6 +254,29 @@ class LocalCheckTests(_Folder):
         self.assertEqual(digest, _sha(local))
         self.assertTrue(reads and all(size == 4096 for size in reads))
 
+    def test_recheck_before_use_hashes_the_whole_file_again(self):
+        local = self.write("copies/SP02_polymax_retry_260803.unv", b"verified bytes " * 500)
+        item = source(recording(entry("SP-02"), "SP02_polymax_retry_260803.unv", local),
+                      "SP02_polymax_retry_260803.unv")
+        check = L.check_local_file(item, local)
+        self.assertEqual(L.recheck_before_use(item, check).status, L.BYTE_VERIFIED)
+        flip_one_byte_keeping_size_and_time(local)
+        self.assertTrue(L.unchanged_since(check))  # size and time cannot see the change ...
+        again = L.recheck_before_use(item, check)  # ... the full SHA-256 does
+        self.assertEqual(again.status, L.HASH_MISMATCH)
+        self.assertFalse(again.usable)
+        self.assertIn("changed since it was located", again.message)
+        local.write_bytes(b"verified bytes " * 501)
+        self.assertEqual(L.recheck_before_use(item, check).status, L.HASH_MISMATCH)
+        local.unlink()
+        self.assertEqual(L.recheck_before_use(item, check).status, L.FILE_MISSING)
+        local.write_bytes(b"verified bytes " * 500)
+        with mock.patch.object(L, "sha256_of", side_effect=PermissionError("locked")):
+            self.assertEqual(L.recheck_before_use(item, check).status, L.UNREADABLE)
+        no_reference = L.check_local_file(source(entry("SP-02"), "SP02_Modal_V02.odb"),
+                                          self.write("SP02_Modal_V02.odb", b"odb"))
+        self.assertIs(L.recheck_before_use(source(entry("SP-02"), "SP02_Modal_V02.odb"), no_reference), no_reference)
+
     def test_a_changed_file_must_be_checked_again(self):
         local = self.write("SP02_Modal_V02.odb", b"x" * 100)
         check = L.check_local_file(source(entry("SP-02"), "SP02_Modal_V02.odb"), local)
@@ -384,17 +420,94 @@ class HomeLocalFileTests(_Home):
         home.use_local_file(V.EXPERIMENTAL_SIDE)
         self.assertEqual(self.inputs(application), before)
 
-    def test_a_file_changed_after_its_check_is_not_used(self):
-        application, home = self.home()
-        before = self.inputs(application)
+    # -------------------------------------------------------------------------------- APP-CATALOG.2-F1
+
+    def project_state(self, application):
+        return self.inputs(application) + (application.dirty_tracker.dirty, application.status.get())
+
+    def verified(self, application, home):
         self.pick(home, "SP-02", "SP02_polymax_retry_260803.unv")
         self.locate(home, self.unv)
         self.assertEqual(home.local_check.status, L.BYTE_VERIFIED)
+        return self.project_state(application)
+
+    def assert_refused(self, application, home, before, status):
+        self.assertEqual(self.project_state(application), before)  # FE/UNV, modal set, result, project, status
+        self.assertEqual(home.local_check.status, status)
+        self.assertFalse(home.local_check.usable)  # BYTE_VERIFIED no longer stands
+        self.assertEqual(self.states(home), ("normal", "disabled", "disabled"))  # Locate again, no Use
+        text = str(home.local_status.cget("text"))
+        self.assertIn(f"Not used: {status}", text)
+        self.assertIn("Locate the file again", text)
+        self.assertNotIn("BYTE_VERIFIED", text)
+
+    def test_an_unchanged_verified_file_is_hashed_again_and_used(self):
+        application, home = self.home()
+        self.verified(application, home)
+        with mock.patch.object(L, "sha256_of", wraps=L.sha256_of) as hashed:
+            home.use_local_file(V.EXPERIMENTAL_SIDE)
+        self.root.update()
+        hashed.assert_called_once_with(self.unv)  # the full SHA-256 again, just before Use
+        self.assertEqual(application.experimental_path.get(), str(self.unv))
+        self.assertEqual(home.local_check.status, L.BYTE_VERIFIED)
+
+    def test_other_bytes_with_the_same_size_and_time_are_refused(self):
+        application, home = self.home()
+        self.established(application)
+        home = self.refreshed(application)
+        before = self.verified(application, home)
+        flip_one_byte_keeping_size_and_time(self.unv)
+        self.assertTrue(L.unchanged_since(home.local_check))  # what the earlier size/time check would accept
+        home.use_local_file(V.EXPERIMENTAL_SIDE)
+        self.root.update()
+        self.assert_refused(application, home, before, L.HASH_MISMATCH)
+        self.assert_active_comparison(application)  # the result stays as it was
+        home.use_local_file(V.EXPERIMENTAL_SIDE)  # a second press does nothing either
+        self.assertEqual(self.project_state(application), before)
+
+    def test_another_size_or_a_deleted_file_is_refused(self):
+        application, home = self.home()
+        original = self.unv.read_bytes()
+        before = self.verified(application, home)
         with open(self.unv, "ab") as stream:
             stream.write(b"\n")
         home.use_local_file(V.EXPERIMENTAL_SIDE)
-        self.assertEqual(self.inputs(application), before)
+        self.assert_refused(application, home, before, L.HASH_MISMATCH)
+        self.unv.write_bytes(original)
+        before = self.verified(application, home)
+        self.unv.unlink()
+        home.use_local_file(V.EXPERIMENTAL_SIDE)
+        self.assert_refused(application, home, before, L.FILE_MISSING)
+
+    def test_a_read_error_before_use_is_refused(self):
+        application, home = self.home()
+        before = self.verified(application, home)
+        with mock.patch.object(L, "sha256_of", side_effect=PermissionError("locked by another program")):
+            home.use_local_file(V.EXPERIMENTAL_SIDE)
+        self.assert_refused(application, home, before, L.UNREADABLE)
+
+    def test_a_file_without_reference_keeps_its_warning_and_is_not_hashed(self):
+        application, home = self.home()
+        before = self.project_state(application)
+        self.pick(home, "SP-02", "SP02_Modal_V02.odb")
+        self.locate(home, self.odb)
+        self.assertEqual(home.local_check.status, L.NOT_VERIFIED_NO_REFERENCE)
+        with mock.patch.object(L, "sha256_of", side_effect=AssertionError("no reference: nothing to hash")), \
+                mock.patch.object(H.messagebox, "askyesno", return_value=False) as asked:
+            home.use_local_file(V.FE_SIDE)
+        asked.assert_called_once()
+        self.assertEqual(self.project_state(application), before)
+        with open(self.odb, "ab") as stream:  # changed after Locate: refused before any warning
+            stream.write(b"more")
+        with mock.patch.object(H.messagebox, "askyesno", side_effect=AssertionError("no warning")):
+            home.use_local_file(V.FE_SIDE)
+        self.assertEqual(self.project_state(application), before)
         self.assertIn("changed or disappeared since it was checked", str(home.local_status.cget("text")))
+        self.locate(home, self.odb)
+        with mock.patch.object(H.messagebox, "askyesno", return_value=True):
+            home.use_local_file(V.FE_SIDE)
+        self.assertEqual(application.abaqus_path.get(), str(self.odb))
+        self.assertIn("NOT byte-verified (confirmed by you)", str(home.local_status.cget("text")))
 
     def test_use_is_exactly_the_browse_contract(self):
         """Use changes the window as setting the field with its Browse button does: no modal set, registration, MAC,

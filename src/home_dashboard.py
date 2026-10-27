@@ -670,6 +670,11 @@ class HomeDashboard:
                                                      ("All files", "*.*")])
         if not path:
             return  # cancelled: the previous check (if any) stays
+        self.local_check = self._busy(lambda: local_files.check_local_file(source, path))
+        self._show_check()
+
+    def _busy(self, work):
+        """``work()`` with the wait cursor (hashing a file runs on the window's thread)."""
         root = self.app.root
         try:
             root.configure(cursor="watch")
@@ -677,13 +682,12 @@ class HomeDashboard:
         except tk.TclError:
             pass
         try:
-            self.local_check = local_files.check_local_file(source, path)
+            return work()
         finally:
             try:
                 root.configure(cursor="")
             except tk.TclError:
                 pass
-        self._show_check()
 
     def use_local_file(self, side: str) -> None:
         """Set one field of 1. Files to the checked file, as its Browse button does; nothing else."""
@@ -694,7 +698,14 @@ class HomeDashboard:
         if self._analysis_locked():
             self._show_check("An analysis is running: the inputs cannot change now.", WARN)
             return
-        if not local_files.unchanged_since(check):
+        if check.status == local_files.BYTE_VERIFIED:  # F1: the full SHA-256 again, size and time are not trusted
+            fresh = self._busy(lambda: local_files.recheck_before_use(source, check))
+            if fresh.status != local_files.BYTE_VERIFIED:
+                self.local_check = fresh  # the earlier BYTE_VERIFIED no longer stands: Use is disabled
+                self._show_check(f"Not used: {fresh.status}: {fresh.message}", NEEDED)
+                return
+            check = self.local_check = fresh
+        elif not local_files.unchanged_since(check):  # no reference: only its size and time can be compared
             self.local_check = None
             self._show_check(f"{check.path.name} changed or disappeared since it was checked: locate it again. The "
                              "fields of the program are unchanged.", NEEDED)
