@@ -234,6 +234,7 @@ class GuiTests(_Case):
     def run_export(self, app, ui, kind, filename, **patches):
         shown = []
         with mock.patch.object(ui.filedialog, "asksaveasfilename", return_value=filename), \
+                mock.patch.object(Path, "home", return_value=self.folder), \
                 mock.patch.object(ui.messagebox, "showinfo", side_effect=lambda *a: shown.append(("info",) + a)), \
                 mock.patch.object(ui.messagebox, "showerror", side_effect=lambda *a: shown.append(("error",) + a)), \
                 mock.patch.object(ui.messagebox, "askyesno", return_value=patches.get("replace", False)), \

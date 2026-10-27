@@ -14,6 +14,7 @@ from tkinter import filedialog, messagebox
 from typing import Optional
 
 from services import diagnostic_report as report_service
+from services import report_directory
 
 KINDS = {"pdf": (".pdf", "PDF document", "Save diagnostic PDF report", "modal_diagnostic_report.pdf",
                  report_service.write_diagnostic_pdf),
@@ -52,7 +53,7 @@ def enable_diagnostic_export(app, loaded) -> None:
 def _destination(kind: str) -> Optional[Path]:
     suffix, label, title, initial, _ = KINDS[kind]
     chosen = filedialog.asksaveasfilename(title=title, defaultextension=suffix, initialfile=initial,
-                                          filetypes=[(label, f"*{suffix}")])
+                                          filetypes=[(label, f"*{suffix}")], **report_directory.save_dialog_options())
     if not chosen:
         return None  # cancelled
     path = Path(chosen)

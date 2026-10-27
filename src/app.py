@@ -20,6 +20,7 @@ from frequency_scaling import LABEL_TEXT as SCALING_LABELS, CAVEAT as SCALING_CA
 from frequency_scaling import frequency_scaling_diagnostic, table_rows as scaling_table_rows
 from modal_core import ComparisonResult, ModePairResult, compare_modal_datasets
 from services import archived_sensitivity_evidence as sensitivity_evidence
+from services import report_directory
 from services import sensitivity_what_if as what_if
 from reporting import (
     export_excel,
@@ -1070,7 +1071,8 @@ class ModalComparatorApp:
         if self.result is None or self.cache is None:
             return
         destination = filedialog.asksaveasfilename(title="Save Excel report", defaultextension=".xlsx",
-            initialfile="modal_comparison_report.xlsx", filetypes=[("Excel workbook", "*.xlsx")])
+            initialfile="modal_comparison_report.xlsx", **report_directory.save_dialog_options(),
+            filetypes=[("Excel workbook", "*.xlsx")])
         if destination:
             try:
                 export_excel(self.result, Path(destination), self.cache / "report_images")
@@ -1082,7 +1084,8 @@ class ModalComparatorApp:
         if self.result is None or self.cache is None:
             return
         destination = filedialog.asksaveasfilename(title="Save PDF report", defaultextension=".pdf",
-            initialfile="modal_comparison_report.pdf", filetypes=[("PDF document", "*.pdf")])
+            initialfile="modal_comparison_report.pdf", **report_directory.save_dialog_options(),
+            filetypes=[("PDF document", "*.pdf")])
         if destination:
             try:
                 export_pdf(self.result, Path(destination), self.cache / "report_images")
