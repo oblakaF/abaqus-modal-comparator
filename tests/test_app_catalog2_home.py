@@ -306,7 +306,10 @@ class HomeLocalFileTests(_Home):
 
     def home(self):
         with mock.patch.object(V, "CATALOGUE_PATH", self.test_catalogue):
-            return super().home()
+            application, home = super().home()
+        home.open_research_archive()  # APP-WORKSPACE.2-F1: the archive is opened explicitly
+        self.root.update()
+        return application, home
 
     def pick(self, home, specimen_id, file_name):
         home.show_passport(specimen_id)

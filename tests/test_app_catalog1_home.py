@@ -471,6 +471,14 @@ class DamagedCatalogueTests(unittest.TestCase):
 # ------------------------------------------------------------------------------------------------ Home
 
 class HomeCatalogueTests(_Home):
+    def home(self):
+        """APP-WORKSPACE.2-F1: the catalogue (research archive) is shown only after its explicit Open action."""
+        application, home = super().home()
+        self.assertFalse(home.cards["catalogue"].winfo_manager())
+        home.open_research_archive()
+        self.root.update()
+        return application, home
+
     def choose(self, home, specimen_id):
         text = next(value for value in home.specimen_combo.cget("values") if value.startswith(specimen_id + " "))
         home.specimen_choice.set(text)
