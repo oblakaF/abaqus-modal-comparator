@@ -13,11 +13,27 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install -r requirements.txt
+      - name: Install the new interface dependency (PySide6, offscreen Qt)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+          python -m pip install -r requirements-new-gui.txt
       - name: Run unit tests
         shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+          NEW_GUI_REQUIRE_QT: "1"
         run: |
           set -o pipefail
           python -m unittest discover -s tests -v 2>&1 | tee test-results.txt
+      - name: Check that the new interface Qt tests ran (not skipped)
+        shell: bash
+        run: |
+          ran=$(grep -cE '^test_.* \(test_new_gui1_qt\..*\) \.\.\. ok$' test-results.txt || true)
+          skipped=$(grep -cE '\(test_new_gui1_qt\..*\) \.\.\. skipped' test-results.txt || true)
+          echo "::notice title=NEW-GUI.1 Qt tests::${ran} passed offscreen, ${skipped} skipped"
+          test "${ran:-0}" -gt 0
+          test "${skipped:-0}" -eq 0
       - name: Run M11 R6.5 research synthetic tests (no real data)
         if: always()
         shell: bash
