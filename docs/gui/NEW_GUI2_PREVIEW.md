@@ -43,8 +43,20 @@ How the service behaves:
 - **No new layer and no new algorithm.** The service replaces no function itself; it only calls the existing
   installs.
 - **Idempotent.** Each install keeps its own `_INSTALLED` flag, so a second call changes nothing.
-- **Order guarded.** If some layers were installed out of this order, the call is refused (`ImporterOrderError`) and
-  installs nothing more, because the chained FRF layers would then differ from the application's.
+- **Order guarded on the functions themselves (NEW-GUI.2-F1).**
+  - The first version checked only the layers' `_INSTALLED` flags. Those say which layers ran, not in which order:
+    with cmif_validation installed before cmif_separation, all five flags are set, but the FRF chain is reversed.
+  - `chain_problems()` now compares, before and after installing, every function the layers replace with the chain
+    that the application's order gives for the layers installed so far. Those functions are:
+    - `universal_reader.load_universal_modal_file`;
+    - `universal_reader._modes_from_frf_datasets`;
+    - the six hardening functions;
+    - `abaqus_bridge.load_extracted_odb`.
+  - It also checks the predecessor each layer saved: `universal_hardening._ORIGINAL_LOAD`,
+    `cmif_separation._ORIGINAL_MODES_FROM_FRF`, `cmif_validation._ORIGINAL_MODES_FROM_FRF` and the two
+    `fast_cache._ORIGINAL_*` references.
+  - Any difference is refused (`ImporterOrderError`, naming each wrong link) and nothing more is installed. This
+    covers a reversed order, a layer installed out of turn, and a function replaced after a correct installation.
 - **Nothing written at install.** The fast cache creates its folder and files only when a file is read.
 
 `src/main.py` now calls `ensure_application_importers()` where it used to call the five installs. The rest of its
@@ -197,11 +209,16 @@ services' own output.
 
 ## Tests
 
-- **`tests/test_importer_runtime.py`** (8 tests):
+- **`tests/test_importer_runtime.py`** (11 tests):
   - the order and that the service defines no layer;
   - `main.py` calls the shared function before the remaining initialisation;
   - same owners as `import main`, without `main` or Tkinter, and no file written by installing;
   - a foreign order is refused;
+  - F1, each in a separate process:
+    - cmif_validation installed before cmif_separation is refused although all five layers are installed, and the
+      three wrong links are named;
+    - a function replaced after a correct installation is refused;
+    - the chain matches after `ensure` (also after a partial installation) and after `import main`;
   - the same previews as `import main` from memory and disk;
   - the cached FE loader is used even when the preview module is imported first;
   - late binding.
@@ -213,18 +230,51 @@ services' own output.
   - `InspectSlot` stale, failed and cancelled reads;
   - importing the model reads, installs and writes nothing;
   - a read in a fresh process creates the cache only then and loads no old program.
-- **`tests/test_new_gui2_qt.py`** (14 tests, Qt offscreen):
+- **`tests/test_new_gui2_qt.py`** (16 tests, Qt offscreen):
   - empty start without reading or cache; choosing does not read;
   - the FE table; the `.odb` message; separate, non-selectable set tables; FRF provisional;
   - the window stays usable while reading;
   - replaced, cleared or closed during a read: the read is discarded;
   - a new file shows nothing of the old one;
   - English only;
-  - panels and a long file name add no width.
+  - panels and a long file name add no width;
+  - F1: every table column is reachable in a 900 × 680 window at 150 %, with a table scroll bar only when the
+    columns do not fit, and none in a wide window;
+  - F1: glyphs of the English text and of a Cyrillic file name. This test needs a font database, so it skips on
+    `offscreen` under Windows, with the reason, and runs with `QT_QPA_PLATFORM=windows`.
 - **`tests/test_new_gui1_workspace.py`**: the allowed modules and files of `src/new_gui` now include the three
   services and the two new modules.
 - **CI.** The NEW-GUI.2 Qt tests run in the unit-test step with `NEW_GUI_REQUIRE_QT=1`, where a missing PySide6 is
   an error, not a skip.
+
+## Readability on Windows (NEW-GUI.2-F1, 2026-10-29)
+
+- **The □□□ screenshot.** It came from a check snapshot taken on Qt's `offscreen` platform under Windows. That
+  platform has an empty font database (0 families, default font "Sans Serif" unresolved), so every glyph is drawn
+  as a box.
+  - The real `windows` platform has 250 families and resolves the default font to Segoe UI 9 pt.
+  - It is not a defect of the interface, its fonts or its encoding, and nothing was changed for it.
+  - Offscreen snapshots are not used as visual evidence.
+- **The check.**
+  - Real `windows` platform.
+  - Captured from the Windows screen (ImageGrab of the window rectangle).
+  - Cyrillic-named, byte-identical copies of verified inputs: `КЭ_пакет_SP04\manifest.json` and
+    `Образец_SP02_эксперимент.unv`.
+  - Windows at 150 % (native); 100 % and 125 % through Qt scaling on the same platform (`QT_ENABLE_HIGHDPI_SCALING=0`,
+    `QT_SCALE_FACTOR=1` / `1.25`).
+  - Windows of 900 × 680 and 1366 × 768 pixels, before and after Inspect file.
+- **Result.**
+  - No missing glyph in any state, including the Cyrillic names in the cards and the path fields.
+  - No page-level horizontal scroll bar.
+  - Every row of every table is shown.
+- **Defect found and fixed.**
+  - In a 900 × 680 window at 150 % the experimental tables need about 550 px, but only 301 px were available.
+    Points, Measured DOFs and Damping were cut off with no way to reach them, and the FE header "Frequency source" was
+    cut.
+  - Now the status column (the FE frequency source) takes the free width, but never less than its header.
+  - When the columns do not fit, the table scrolls horizontally per pixel, and its height includes that scroll bar.
+  - Where the columns fit, no scroll bar is shown: 100 % and 125 % at 1366 × 768, 100 % at 900 × 680, and 150 % at
+    1366 × 768.
 
 ## Not in this stage
 
@@ -242,8 +292,6 @@ services' own output.
   can replace or clear the file to stop the read.
 - **Late cancellation.** Cancellation is checked by the services between steps. A read that is cancelled late still
   finishes in the background, and its outcome is discarded.
-- **Outdated NEW-GUI.1 sentence.** `docs/gui/NEW_GUI1_SHELL.md` still says that the new interface imports no
-  importer layer. That was true for NEW-GUI.1; this document replaces that statement for NEW-GUI.2.
 - **`application_layers.install_application_layers`** (used by some tests) still calls the same five installs itself,
   followed by two more. It is outside this stage's files. Its order is the same, and the shared function accepts the
   layers it installed.

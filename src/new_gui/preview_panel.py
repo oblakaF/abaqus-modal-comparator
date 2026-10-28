@@ -27,9 +27,36 @@ def _label(text: str = "", name: str = "") -> QLabel:
     return label
 
 
+class PreviewTable(QTableWidget):
+    """A read-only table as tall as its rows, whose every column stays reachable (NEW-GUI.2-F1).
+
+    The numeric columns are as wide as their contents. The status column (the FE frequency source) takes the free
+    width, but never less than its header. When the columns do not fit, as in a narrow window, the table, and not
+    the page, scrolls horizontally, and its height includes that scroll bar."""
+
+    def status_minimum(self) -> int:
+        header = self.horizontalHeader()
+        return header.fontMetrics().horizontalAdvance(self.horizontalHeaderItem(STATUS_COLUMN).text()) + 24
+
+    def fit(self) -> None:
+        header = self.horizontalHeader()
+        others = sum(header.sectionSize(c) for c in range(self.columnCount()) if c != STATUS_COLUMN)
+        header.resizeSection(STATUS_COLUMN, max(self.status_minimum(), self.viewport().width() - others))
+        bar = self.horizontalScrollBar()
+        overflow = header.length() > self.viewport().width()
+        height = (header.sizeHint().height() + self.verticalHeader().length() + 2 * self.frameWidth() + 2
+                  + (bar.sizeHint().height() if overflow else 0))
+        if self.height() != height:
+            self.setFixedHeight(height)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.fit()
+
+
 def section_table(section: Section) -> QTableWidget:
-    """A read-only table of one section, as tall as its rows (the page scrolls, not the table)."""
-    table = QTableWidget(len(section.rows), len(section.headers))
+    """A read-only table of one section, as tall as its rows (the page scrolls vertically, not the table)."""
+    table = PreviewTable(len(section.rows), len(section.headers))
     table.setObjectName("previewTable")
     table.setHorizontalHeaderLabels(list(section.headers))
     table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -47,14 +74,15 @@ def section_table(section: Section) -> QTableWidget:
             table.setItem(row, column, item)
     header = table.horizontalHeader()
     for column in range(len(section.headers)):
-        header.setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch if column == STATUS_COLUMN
+        header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed if column == STATUS_COLUMN
                                     else QHeaderView.ResizeMode.ResizeToContents)
+    header.setStretchLastSection(False)
     table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-    table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # only when the columns do not fit
+    table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
     table.resizeRowsToContents()
-    height = header.sizeHint().height() + table.verticalHeader().length() + 2 * table.frameWidth() + 2
-    table.setFixedHeight(height)
     table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    table.fit()
     return table
 
 

@@ -85,6 +85,10 @@ request.
 
 - **Separation from the existing program.** The new GUI does not import `src/main.py`, Home, Tkinter or any
   `install_*` layer, and it adds no layer.
+  - *Superseded by NEW-GUI.2 for the importer:* to read a file, the new GUI now calls
+    `services.importer_runtime.ensure_application_importers()`. That function, called by `src/main.py` as well,
+    installs the five existing process-level importer layers in the application's order. The new GUI itself still
+    defines and names no `install_*` layer. See `docs/gui/NEW_GUI2_PREVIEW.md`.
 - **Allowed project imports.** It imports only `services.local_input_registry`, `services.specimen_catalog_view`,
   `services.workspace_context` and `universal_reader.resolve_testlab_file`, the same LMS companion rule that
   `check_file` uses.
@@ -144,7 +148,9 @@ The smoke used the existing Tkinter program as LEGACY_GUI and this window as NEW
   - An unreadable status record gives `UNKNOWN`, and Auto-ID stays `NOT_AUTHORISED`.
 - **Nothing changed.** User files (SHA-256 and modification time), the catalogue and the registry are unchanged.
 - **Separation.**
-  - Imports are limited to the allowed services, and no `install_*` name is used.
+  - Imports are limited to the allowed services, and no `install_*` name is used. Since NEW-GUI.2 the allowed
+    services also include `services.importer_runtime`, `services.local_fe_preview` and
+    `services.local_experimental_preview`.
   - A fresh Python process that imports the model loads neither `main`, `home_dashboard` nor `tkinter`.
   - PySide6 is not in `requirements.txt`.
 

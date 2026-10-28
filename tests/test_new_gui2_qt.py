@@ -36,6 +36,7 @@ except ImportError as error:  # pragma: no cover - depends on the environment
                             "new interface tests (CI sets NEW_GUI_REQUIRE_QT=1 and runs them)")
 
 from new_gui import preview_model as pm  # noqa: E402
+from new_gui import preview_panel  # noqa: E402
 from new_gui import window as window_module  # noqa: E402
 from new_gui import workspace_state as ws  # noqa: E402
 from services import local_experimental_preview as xp  # noqa: E402
@@ -314,6 +315,79 @@ class LayoutTests(_Window):
         for table in w.findChildren(QTableWidget):
             self.assertFalse(table.verticalScrollBar().isVisible())  # every row is shown; the page scrolls
             self.assertEqual(table.height(), table.maximumHeight())
+
+    def assert_tables_readable(self):
+        for table in self.window.findChildren(QTableWidget):
+            if not table.isVisible():
+                continue
+            header = table.horizontalHeader()
+            bar = table.horizontalScrollBar()
+            with self.subTest(columns=table.columnCount(), viewport=table.viewport().width()):
+                self.assertLessEqual(header.length(), table.viewport().width() + bar.maximum())  # every column
+                self.assertEqual(bar.isVisible(), header.length() > table.viewport().width())  # only when needed
+                status = header.sectionSize(preview_panel.STATUS_COLUMN)
+                text = table.horizontalHeaderItem(preview_panel.STATUS_COLUMN).text()
+                self.assertGreaterEqual(status, header.fontMetrics().horizontalAdvance(text))  # header not cut
+                self.assertGreaterEqual(table.viewport().height(), table.verticalHeader().length())  # every row
+                self.assertFalse(table.verticalScrollBar().isVisible())
+
+    def test_every_column_is_reachable_in_a_narrow_window_and_no_scroll_bar_in_a_wide_one(self):
+        # NEW-GUI.2-F1: a 900 x 680 window at 150 % cut Points, Measured DOFs and Damping off with no scroll bar
+        w = self.window
+        self.inspect(ws.FE, self.manifest)
+        self.inspect(ws.EXPERIMENTAL, self.two_sets)
+        w.resize(600, 453)  # 900 x 680 physical pixels at 150 %
+        self.app.processEvents()
+        self.app.processEvents()
+        self.assertTrue(any(t.horizontalScrollBar().isVisible() for t in w.findChildren(QTableWidget)))
+        self.assert_tables_readable()
+        for kind, panel in w.panels.items():  # the tables scroll themselves and never widen the page
+            self.assertLessEqual(panel.minimumSizeHint().width(), w.cards[kind].minimumSizeHint().width())
+        w.resize(1600, 900)
+        self.app.processEvents()
+        self.app.processEvents()
+        self.assert_tables_readable()
+        self.assertFalse(any(t.horizontalScrollBar().isVisible() for t in w.findChildren(QTableWidget)))
+
+
+class GlyphTests(_Window):
+    """Every visible character can be drawn by the widget's font (no empty boxes). The Qt ``offscreen`` platform on
+    Windows has no font database at all, so every glyph is a box there: these tests then skip, and they run on the
+    real platform (``QT_QPA_PLATFORM=windows``) or wherever a font database exists."""
+
+    def setUp(self):
+        from PySide6.QtGui import QFontDatabase
+
+        if not QFontDatabase.families():
+            self.skipTest(f"the Qt platform {QApplication.platformName()!r} has no font database (offscreen on "
+                          "Windows); run with QT_QPA_PLATFORM=windows to check glyphs")
+        super().setUp()
+
+    def test_english_text_and_a_cyrillic_file_name_have_glyphs(self):
+        from PySide6.QtGui import QFontMetrics
+        from PySide6.QtWidgets import QAbstractButton, QLineEdit
+
+        cyrillic = Path(self._own.name) / "Образец_пластина_эксперимент.unv"
+        cyrillic.write_bytes(self.frf.read_bytes())
+        panel = self.inspect(ws.EXPERIMENTAL, cyrillic)
+        self.inspect(ws.FE, self.manifest)
+        self.assertEqual(self.window.cards[ws.EXPERIMENTAL].file_name.text(), cyrillic.name)
+        self.assertEqual([f.text() for f in panel.path_fields], [str(cyrillic)])
+        missing = set()
+        widgets = (self.window.findChildren(QLabel) + self.window.findChildren(QAbstractButton)
+                   + self.window.findChildren(QLineEdit))
+        for widget in widgets:
+            if widget.isVisible():
+                metrics = QFontMetrics(widget.font())
+                missing |= {(ch, widget.text()[:40]) for ch in widget.text()
+                            if not ch.isspace() and not metrics.inFontUcs4(ord(ch))}
+        for table in self.window.findChildren(QTableWidget):
+            metrics = QFontMetrics(table.font())
+            for r in range(table.rowCount()):
+                for c in range(table.columnCount()):
+                    text = table.item(r, c).text()
+                    missing |= {(ch, text[:40]) for ch in text if not ch.isspace() and not metrics.inFontUcs4(ord(ch))}
+        self.assertEqual(missing, set())
 
 
 if __name__ == "__main__":

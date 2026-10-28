@@ -55,6 +55,34 @@ elif mode == "order":
     except Exception as error:
         print(json.dumps({"error": type(error).__name__, "installed": list(installed_layers())}))
     raise SystemExit(0)
+elif mode in ("reversed-cmif", "replaced-after"):
+    import universal_reader
+    from universal_hardening import install_universal_hardening
+    from universal_frf_review import install_frf_review
+    from cmif_separation import install_cmif_separation
+    from cmif_validation import install_cmif_validation
+    from fast_cache import install_fast_cache
+    if mode == "reversed-cmif":  # cmif_validation before cmif_separation: all five flags are set
+        order = (install_universal_hardening, install_frf_review, install_cmif_validation, install_cmif_separation,
+                 install_fast_cache)
+    else:
+        order = (install_universal_hardening, install_frf_review, install_cmif_separation, install_cmif_validation,
+                 install_fast_cache)
+    for install in order:
+        install()
+    if mode == "replaced-after":  # a function replaced after a correct installation
+        universal_reader._modes_from_frf_datasets = lambda datasets, geometry: ([], {})
+    from services.importer_runtime import chain_problems, ensure_application_importers, installed_layers
+    before = (universal_reader._modes_from_frf_datasets, universal_reader.load_universal_modal_file)
+    try:
+        ensure_application_importers()
+        error = ""
+    except Exception as caught:
+        error = type(caught).__name__ + ": " + str(caught)
+    after = (universal_reader._modes_from_frf_datasets, universal_reader.load_universal_modal_file)
+    print(json.dumps({"error": error, "installed": list(installed_layers()), "problems": chain_problems(),
+                      "unchanged": before == after}))
+    raise SystemExit(0)
 elif mode != "none":
     from services.importer_runtime import ensure_application_importers, installed_layers
     ensure_application_importers()
@@ -153,7 +181,8 @@ class OrderTests(unittest.TestCase):
         source = Path(importer_runtime.__file__).read_text(encoding="utf-8")
         tree = ast.parse(source)
         defined = [node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.ClassDef))]
-        self.assertEqual(defined, ["ImporterOrderError", "installed_layers", "ensure_application_importers"])
+        self.assertEqual(defined, ["ImporterOrderError", "installed_layers", "_name", "_base", "_expected", "_actual",
+                                   "chain_problems", "ensure_application_importers"])
         assigned = [target for node in ast.walk(tree) if isinstance(node, ast.Assign) for target in node.targets
                     if isinstance(target, ast.Attribute)]
         self.assertEqual(assigned, [])  # it replaces no module attribute itself
@@ -182,6 +211,45 @@ class ProcessTests(_Folder):
     def test_a_foreign_order_is_refused_and_nothing_more_is_installed(self):
         refused = run_child(self.cache("order"), "order")
         self.assertEqual(refused, {"error": "ImporterOrderError", "installed": ["install_fast_cache"]})
+
+    def test_cmif_validation_before_cmif_separation_is_refused_although_all_five_are_installed(self):
+        # NEW-GUI.2-F1: the _INSTALLED flags alone do not show this; the function chain does
+        refused = run_child(self.cache("reversed"), "reversed-cmif")
+        self.assertEqual(refused["installed"], list(ORDER))  # every flag is set
+        self.assertTrue(refused["error"].startswith("ImporterOrderError: "), refused["error"])
+        self.assertEqual(refused["problems"], [
+            "universal_reader._modes_from_frf_datasets is cmif_separation._reviewed_modes_from_frf, "
+            "expected cmif_validation._validated_modes_from_frf",
+            "cmif_separation._ORIGINAL_MODES_FROM_FRF is cmif_validation._validated_modes_from_frf, "
+            "expected universal_frf_review.modes_from_frf_datasets",
+            "cmif_validation._ORIGINAL_MODES_FROM_FRF is universal_frf_review.modes_from_frf_datasets, "
+            "expected cmif_separation._reviewed_modes_from_frf"])
+        self.assertTrue(refused["unchanged"])  # the refusal replaces nothing
+
+    def test_a_function_replaced_after_a_correct_installation_is_refused(self):
+        refused = run_child(self.cache("replaced"), "replaced-after")
+        self.assertTrue(refused["error"].startswith("ImporterOrderError: "), refused["error"])
+        self.assertEqual(len(refused["problems"]), 1)
+        self.assertTrue(refused["problems"][0].startswith("universal_reader._modes_from_frf_datasets is "
+                                                          "__main__.<lambda>, expected cmif_validation."))
+        self.assertTrue(refused["unchanged"])
+
+    def test_the_chain_matches_after_ensure_and_after_import_main(self):
+        code = ("import sys, json; sys.path.insert(0, sys.argv[1]); mode = sys.argv[2]\n"
+                "if mode == 'main':\n    import main\n"
+                "from services import importer_runtime as r\n"
+                "first = r.chain_problems()\n"
+                "for _, _, install in r.IMPORTER_LAYERS[:3]:\n    install()\n"
+                "partial = r.chain_problems()\n"
+                "r.ensure_application_importers(); r.ensure_application_importers()\n"
+                "print(json.dumps([first, partial, r.chain_problems()]))")
+        for mode in ("ensure", "main"):
+            with self.subTest(mode=mode):
+                done = subprocess.run([sys.executable, "-c", code, str(ROOT / "src"), mode], capture_output=True,
+                                      text=True, timeout=300,
+                                      env=dict(os.environ, LOCALAPPDATA=str(self.cache(mode)), MPLBACKEND="Agg"))
+                self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+                self.assertEqual(json.loads(done.stdout.strip().splitlines()[-1]), [[], [], []])
 
     def test_same_previews_as_import_main_and_from_memory_and_disk_cache(self):
         inputs = self.folder / "inputs"
