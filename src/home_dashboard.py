@@ -16,6 +16,18 @@ specimen, locates a local copy with the standard file dialog, and the copy is ch
 (``services.specimen_catalog_local_files``). Only an explicit **Use as FE input** / **Use as experimental input** sets
 one field of 1. Files, exactly as its Browse button does (the variable's existing traces react).
 
+APP-WORKSPACE.2 adds *Current workspace* between the four areas and the passport. It shows the state of the program
+through the headless model ``services.workspace_context``:
+
+- a working specimen, chosen explicitly there (Home's own choice, separate from the passport's);
+- the FE and experimental files and the modal set currently set in the program;
+- the state of the analysis result;
+- the registration that result applied, and the production Auto-ID block.
+
+The registration kind is never inferred: a result records the hash of the registration it applied, not its basis,
+so that is shown as UNKNOWN (the catalogue record of the hash is reference only). Choosing a working specimen
+changes no input and runs nothing.
+
 It owns no data and starts no computation of its own. Every action calls the existing handlers of the main window:
 
 - file choice: ``_choose_abaqus`` / ``_choose_experiment``;
@@ -43,6 +55,7 @@ from typing import Optional
 
 from services import specimen_catalog_local_files as local_files
 from services import specimen_catalog_view as catalogue_view
+from services import workspace_context as workspace
 from ui_policy import AnalysisState, EM_DASH, LayoutMode, responsive_layout_width, select_layout_mode
 
 HOME, EXPERT = "home", "expert"
@@ -86,6 +99,23 @@ NO_REFERENCE_WARNING = (
     "at all.\n\nUse it as the {field} file anyway? It will not be called verified, and no modal set, registration or "
     "FE-experiment pairing is chosen."
 )
+WORKSPACE_SUBTITLE = (
+    "The specimen you are working on, with the files, modal set, result and registration currently set in the "
+    "program. Choosing the working specimen changes no input and runs nothing; the passport below is chosen "
+    "separately."
+)
+NO_WORKING_SPECIMEN = "(no working specimen)"
+# the result records of a frozen registration the analysis applied: (metadata key, how it was applied)
+APPLIED_REGISTRATION_RECORDS = (
+    ("governed_registration", "the accepted physical registration option"),
+    ("geometry_verified_registration", "reuse by FE geometry identity"),
+    ("guided_physical_registration", "the guided physical registration"),
+)
+REGISTRATION_STATES = {
+    workspace.RegistrationKind.PHYSICAL: INFO, workspace.RegistrationKind.LEGACY_REPLAY: WARN,
+    workspace.RegistrationKind.INCOMPLETE: WARN, workspace.RegistrationKind.NONE: INFO,
+    workspace.RegistrationKind.UNKNOWN: WARN,
+}
 
 
 def _get(variable, default: str = "") -> str:
@@ -345,6 +375,148 @@ def material_summary(app) -> list[tuple[str, str, str]]:
     ]
 
 
+def selected_modal_set_name(app) -> tuple[Optional[str], str]:
+    """(the PolyMAX name of the selected modal set, or None; why it is not known).
+
+    The name is the ``display_name`` of the one discovered set whose key is the selected key; the formatted text of
+    the choice list is never parsed. No selection gives (None, ""); anything ambiguous gives (None, reason)."""
+    key = _get(getattr(app, "experimental_modal_set_key", None))
+    if not key:
+        return None, ""
+    sets = list(getattr(app, "available_experimental_modal_sets", []) or [])
+    matches = [item for item in sets if getattr(item, "key", None) == key]
+    if len(matches) != 1:
+        return None, "the selected modal set could not be identified unambiguously in the discovered sets"
+    name = getattr(matches[0], "display_name", None)
+    if not isinstance(name, str) or not name.strip():
+        return None, "the selected modal set has no recorded name"
+    if sum(1 for item in sets if getattr(item, "display_name", None) == name) != 1:
+        return None, f"the file holds more than one set named \"{name}\""
+    return name, ""
+
+
+def workspace_result(app) -> tuple[workspace.ResultState, str]:
+    """(the result state for the workspace, a note). Pairs and MAC only for a successful result on display."""
+    state = getattr(app, "analysis_state", AnalysisState.NO_DATA)
+    if not isinstance(state, AnalysisState):
+        state = AnalysisState.NO_DATA
+    result = getattr(app, "result", None)
+    notice = str(getattr(app, "_stale_result_notice", None) or "")
+    if getattr(app, "running", False) or state in (AnalysisState.RUNNING, AnalysisState.STOPPING):
+        return workspace.ResultState(AnalysisState.RUNNING if state is not AnalysisState.STOPPING else state), ""
+    if state is AnalysisState.SUCCESS and result is not None:
+        pairs = list(getattr(result, "pairs", None) or [])
+        return workspace.ResultState(AnalysisState.SUCCESS, len(pairs),
+                                     any(getattr(pair, "mac", None) is not None for pair in pairs)), ""
+    if state is AnalysisState.SUCCESS:  # no result on display: nothing of a former one is carried over
+        state = AnalysisState.NO_DATA
+    return workspace.ResultState(state), notice
+
+
+def applied_registration(app) -> tuple[Optional[str], str, bool]:
+    """(the hash of the frozen registration the result on display applied, how it was applied, conflicting).
+
+    Read from the result's own records; the basis of the registration is not recorded there."""
+    result = getattr(app, "result", None)
+    if result is None or getattr(app, "analysis_state", None) is not AnalysisState.SUCCESS:
+        return None, "no analysis result is on display", False
+    metadata = getattr(result, "metadata", None) or {}
+    found = [(label, record.get("registration_hash")) for key, label in APPLIED_REGISTRATION_RECORDS
+             if isinstance(record := metadata.get(key), dict)]
+    hashes = {digest for _label, digest in found if isinstance(digest, str) and digest.strip()}
+    if not found:
+        return None, ("the result applied no frozen registration (automatic geometry alignment or registration "
+                      "only)"), False
+    labels = ", ".join(label for label, _digest in found)
+    if len(hashes) != 1 or len(found) != 1:
+        return None, f"the result records conflicting or incomplete registrations ({labels})", True
+    return hashes.pop(), labels, False
+
+
+def _file_row(source: "workspace.SourceSelection", context: "workspace.WorkspaceContext",
+              caption: str) -> tuple[str, str, str]:
+    if not source.selected:
+        return NEEDED, caption, "Not chosen."
+    text = source.path
+    if context.specimen_known:
+        text += (f"\nThe file name is one recorded for {context.specimen_id} in the catalogue (name only: the file "
+                 "is not verified by this)." if source.catalogue_name_match
+                 else f"\nThe file name is not one recorded for {context.specimen_id} in the catalogue.")
+    return INFO, caption, text
+
+
+def _registration_row(context: "workspace.WorkspaceContext", how: str, conflicting: bool) -> tuple[str, str, str]:
+    registration = context.registration
+    kind = workspace.RegistrationKind.UNKNOWN if conflicting else registration.kind
+    digest = registration.registration_hash
+    short = f"{digest[:12]}…" if digest else ""
+    if kind is workspace.RegistrationKind.NONE:
+        text = f"NONE: no registration is applied ({how})."
+    elif conflicting:
+        text = f"UNKNOWN: {how}."
+    elif kind is workspace.RegistrationKind.UNKNOWN:
+        text = (f"UNKNOWN: registration {short} was applied by {how}, but its basis is not recorded, so no binding "
+                "to this working set is confirmed.")
+    else:
+        text = f"{kind.value} (as stated): registration {short or 'without a hash'}."
+        if registration.stated_physical_hash_recorded_in_catalogue:
+            text += (" The catalogue records this hash as the physical registration of the working specimen "
+                     "(cross-reference only, not a verification of the data).")
+    reference = registration.catalogue_reference
+    if reference is not None:
+        text += (f"\nCatalogue (reference only): {context.specimen_id} records this hash as {reference.kind.value} "
+                 f"({reference.status_text}).")
+    for issue in registration.issues:
+        if not issue.startswith("no registration basis is stated"):  # said above in plain words
+            text += f"\n{issue[:1].upper()}{issue[1:]}."
+    return REGISTRATION_STATES[kind], "Registration", text
+
+
+def workspace_rows(context: "workspace.WorkspaceContext", modal_set_note: str = "", result_note: str = "",
+                   registration_how: str = "", registration_conflict: bool = False) -> list[tuple[str, str, str]]:
+    """(state, caption, text) rows of the Current workspace panel; every value comes from ``context``."""
+    if context.catalogue_problem:
+        specimen = (WARN, "Working specimen", f"UNKNOWN: the specimen catalogue cannot be used "
+                                              f"({context.catalogue_problem}).")
+    elif context.requested_specimen_id is None:
+        specimen = (INFO, "Working specimen", "None chosen. Choosing one changes no input and runs nothing.")
+    elif not context.specimen_known:
+        specimen = (WARN, "Working specimen", f"UNKNOWN: {context.requested_specimen_id} is not in the catalogue.")
+    else:
+        specimen = (INFO, "Working specimen", f"{context.specimen_id}: type {context.specimen_type}, family "
+                                              f"{context.family_id} (accepted catalogue).")
+    modal = context.modal_set
+    if modal_set_note:
+        modal_row = (WARN, "Modal set", f"{workspace.ModalSetStatus.NOT_CHECKED.value}: {modal_set_note}.")
+    elif modal.status is workspace.ModalSetStatus.NOT_SELECTED:
+        modal_row = (INFO, "Modal set", "NOT_SELECTED: no modal set is selected.")
+    elif modal.catalogue_set is not None:  # found by the set name in a file of the same name: names only
+        modal_row = (INFO, "Modal set", f"{modal.name}: catalogue status {modal.status.value} ({modal.reason}). "
+                                        f"Matched by the set name and the file name "
+                                        f"({modal.catalogue_set.source_name}) only; the file content is not verified "
+                                        "by this.")
+    else:
+        modal_row = (WARN, "Modal set", f"{modal.name}: {modal.status.value} ({modal.reason}).")
+    result = context.result
+    if result.state is AnalysisState.SUCCESS:
+        pairs = "number of pairs unknown" if result.pair_count is None else f"{result.pair_count} admissible mode pairs"
+        analysis = f"SUCCESS: {pairs}; MAC {'shown' if result.mac_shown else 'not shown'}."
+    else:
+        analysis = f"{result.state.value.upper()}: no mode pairs and no MAC on display."
+    if result_note:
+        analysis += f"\n{result_note}"
+    auto_id = context.production_auto_id
+    return [
+        specimen,
+        _file_row(context.fe_source, context, "FE file"),
+        _file_row(context.experimental_source, context, "Experimental file"),
+        modal_row,
+        (OK if result.state is AnalysisState.SUCCESS else INFO, "Analysis", analysis),
+        _registration_row(context, registration_how or "no analysis result is on display", registration_conflict),
+        (NEEDED, "Production Auto-ID", f"{auto_id.status}: blocked. {auto_id.reason}"),
+    ]
+
+
 class HomeDashboard:
     """The Home screen; ``app`` is the main window (ModalComparatorApp)."""
 
@@ -376,6 +548,7 @@ class HomeDashboard:
         self._build_results()
         self._build_material()
         self._build_catalogue()
+        self._build_workspace()  # placed above the passport; built after it to share the loaded catalogue
         self._layout(2)
         self.frame.bind("<Destroy>", self._cancel_jobs, add="+")
         for name in WATCHED_VARIABLES:
@@ -516,6 +689,63 @@ class HomeDashboard:
                 foreground=COLOURS[WARN])
         else:
             self._catalogue_message(CATALOGUE_PROMPT)
+
+    def _build_workspace(self) -> None:
+        """APP-WORKSPACE.2: the working specimen (Home's own choice) and the state of the program, read only."""
+        card = self._card("workspace", "Current workspace", WORKSPACE_SUBTITLE)
+        card.columnconfigure(1, weight=0)
+        card.columnconfigure(2, weight=1)
+        ttk.Label(card, text="Choose", style="MetricCaption.TLabel").grid(row=2, column=0, columnspan=2, sticky="w",
+                                                                         padx=(0, 10))
+        self.working_specimen_choices = {catalogue_view.choice_text(entry): entry["specimen_id"]
+                                         for entry in self.catalogue.specimens}
+        self.working_specimen_id: Optional[str] = None
+        self.working_specimen_choice = tk.StringVar(master=self.app.root, value=NO_WORKING_SPECIMEN)  # Home's own
+        self.working_specimen_combo = ttk.Combobox(
+            card, textvariable=self.working_specimen_choice, width=44,
+            state="disabled" if self.catalogue.problem else "readonly",
+            values=(NO_WORKING_SPECIMEN,) + tuple(self.working_specimen_choices))
+        self.working_specimen_combo.grid(row=2, column=2, sticky="w")
+        self.working_specimen_combo.bind("<<ComboboxSelected>>", lambda _event: self.choose_working_specimen(),
+                                         add="+")
+        self.working_specimen_combo.bind("<MouseWheel>", self._combo_wheel)
+        self.workspace_rows = []
+        for row in range(7):
+            mark = ttk.Label(card, text="", width=2)
+            caption = ttk.Label(card, text="", style="MetricCaption.TLabel")
+            text = self._wrap(ttk.Label(card, text="", justify="left"), card)
+            mark.grid(row=row + 3, column=0, sticky="nw", pady=2)
+            caption.grid(row=row + 3, column=1, sticky="nw", padx=(0, 10), pady=2)
+            text.grid(row=row + 3, column=2, sticky="ew", pady=2)
+            self.workspace_rows.append((mark, caption, text))
+        self.workspace_context = None
+
+    def choose_working_specimen(self, specimen_id: Optional[str] = None) -> None:
+        """Set the working specimen (from the list, or ``specimen_id``); no input of the program changes."""
+        if specimen_id is None:
+            specimen_id = self.working_specimen_choices.get(self.working_specimen_choice.get())
+        entry = self.catalogue.entry(specimen_id) if specimen_id and not self.catalogue.problem else None
+        self.working_specimen_id = entry["specimen_id"] if entry is not None else None
+        choice = catalogue_view.choice_text(entry) if entry is not None else NO_WORKING_SPECIMEN
+        if self.working_specimen_choice.get() != choice:
+            self.working_specimen_choice.set(choice)
+        self._refresh_workspace()
+
+    def _refresh_workspace(self) -> None:
+        app = self.app
+        modal_set, modal_set_note = selected_modal_set_name(app)
+        result, result_note = workspace_result(app)
+        digest, how, conflicting = applied_registration(app)
+        self.workspace_context = workspace.build_workspace_context(
+            self.working_specimen_id, fe_path=_get(app.abaqus_path) or None,
+            experimental_path=_get(app.experimental_path) or None, modal_set=modal_set,
+            registration_hash=digest, result=result, catalogue_view=self.catalogue)
+        rows = workspace_rows(self.workspace_context, modal_set_note, result_note, how, conflicting)
+        for (mark, caption, text), (state, title, value) in zip(self.workspace_rows, rows):
+            mark.configure(text=MARKS[state], foreground=COLOURS[state])
+            caption.configure(text=title)
+            text.configure(text=value)
+        self._schedule_rewrap()
 
     def _catalogue_message(self, text: str) -> None:
         self.catalogue_message.configure(
@@ -749,8 +979,11 @@ class HomeDashboard:
             row, column = divmod(index, columns)
             self.cards[key].grid(row=row, column=column, sticky="nsew", padx=(0 if column == 0 else 6, 0),
                                  pady=(0, 8))
-        self.cards["catalogue"].grid(row=len(order) // columns, column=0, columnspan=columns, sticky="nsew",
-                                     pady=(0, 8))  # the specimen passport: the full width, below the four areas
+        below = len(order) // columns
+        self.cards["workspace"].grid(row=below, column=0, columnspan=columns, sticky="nsew",
+                                     pady=(0, 8))  # the current workspace: the full width, below the four areas
+        self.cards["catalogue"].grid(row=below + 1, column=0, columnspan=columns, sticky="nsew",
+                                     pady=(0, 8))  # the specimen passport: the full width, below the workspace
 
     def _rewrap(self, card, width: int) -> bool:
         """Each wrapped label wraps at the card's right edge, from where its column starts. False when a label is not
@@ -847,6 +1080,7 @@ class HomeDashboard:
                                  (self.modal_set_combo, "readonly")):  # as the same controls on 1. Files
                 widget.configure(state="disabled" if locked else idle)
             self._refresh_results()
+            self._refresh_workspace()
             self._refresh_local_buttons()  # locked while an analysis runs, like the other input controls
             for (mark, caption, text), (state, title, value) in zip(self.material_rows, material_summary(app)):
                 mark.configure(text=MARKS[state], foreground=COLOURS[state])
