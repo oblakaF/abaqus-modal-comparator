@@ -52,8 +52,10 @@ The launcher uses the same `.venv` and also installs PySide6 from `requirements-
 does not need. Without the launcher, run `python -m pip install -r requirements-new-gui.txt`, then
 `python -m new_gui` with `src` on `PYTHONPATH`.
 
-In this first stage the window only lets you choose your own FE results file and experimental file, shows what was
-chosen and opens the read-only research archive on request. It runs no analysis. See `docs/gui/NEW_GUI1_SHELL.md`.
+The window lets you choose your own FE results file and experimental file, shows what was chosen and opens the
+read-only research archive on request (`docs/gui/NEW_GUI1_SHELL.md`). Since NEW-GUI.2, **Inspect file** reads a chosen
+file with the same importer chain as the existing program: both call `services.importer_runtime`. It shows the
+imported modes, frequencies, modal sets and warnings (`docs/gui/NEW_GUI2_PREVIEW.md`). It runs no analysis.
 
 ## Input procedure
 

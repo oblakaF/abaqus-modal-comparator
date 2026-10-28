@@ -45,8 +45,8 @@ KIND_HELP = {
 
 NOT_CHOSEN = "Not chosen"
 CHOSEN_NOT_CHECKED = "File chosen; content not checked"
-CHOSEN_NOTE = ("Only the file's existence and type were checked. Its content is not read and it is not imported, "
-               "so this is not a statement that the data are ready for analysis.")
+CHOSEN_NOTE = ("Only the file's existence and type were checked. Its content is read only when you click Inspect "
+               "file, and choosing it is not a statement that the data are ready for analysis.")
 ANALYSIS_NOT_RUN = "Analysis not run"
 ANALYSIS_NOTE = ("This interface does not run an analysis yet. No frequency, MAC value or mode pair has been computed, "
                  "and nothing is assigned automatically.")

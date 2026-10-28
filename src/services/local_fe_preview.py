@@ -22,7 +22,8 @@ from pathlib import Path
 import threading
 from typing import Any, Optional
 
-from abaqus_bridge import AnalysisCancelled, FREQUENCY_SOURCE_HISTORY, load_extracted_odb
+import abaqus_bridge
+from abaqus_bridge import AnalysisCancelled, FREQUENCY_SOURCE_HISTORY
 from modal_core import ModalDataset
 from services import modal_data_viewer as viewer
 
@@ -31,6 +32,12 @@ NOTE = ("A view of the FE modes of an extracted package only. It is not a physic
 ODB_NEEDS_PACKAGE = ("This entry is an Abaqus .odb. Its modes can be viewed only from an existing extracted package "
                      "(manifest.json with its CSV files): add that manifest.json to the registry. Abaqus is not started "
                      "for a preview.")
+
+
+def load_extracted_odb(manifest_path, cancel_event=None):
+    """``abaqus_bridge.load_extracted_odb`` as installed when the package is read (with the fast cache once
+    ``services.importer_runtime.ensure_application_importers`` ran), whatever was imported first (NEW-GUI.2)."""
+    return abaqus_bridge.load_extracted_odb(manifest_path, cancel_event=cancel_event)
 
 
 class FePreviewError(ValueError):
