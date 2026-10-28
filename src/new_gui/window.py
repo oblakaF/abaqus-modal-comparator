@@ -3,14 +3,21 @@
 A side navigation (Workspace, Analysis, Status), a workspace with the FE and experimental sources, clear empty
 states, and the research archive behind its own command. The window shows the state of
 ``new_gui.workspace_state``; it runs no analysis and computes nothing.
+
+NEW-GUI.2: **Inspect file** reads the chosen file of one side in a background thread
+(``new_gui.preview_model.run_read``) and shows the read content in that side's ``PreviewPanel``. Replacing or
+clearing the file, or closing the window, cancels the read; an outcome that is not the current read of the current
+file is discarded, never shown.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+import threading
+import time
 from typing import Callable, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QGuiApplication, QKeySequence, QPalette
 from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
@@ -18,6 +25,8 @@ from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFileDial
 
 from new_gui import APP_NAME, STAGE
 from new_gui.archive_dialog import ArchiveDialog
+from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
+from new_gui.preview_panel import PreviewPanel
 from new_gui.workspace_state import (ANALYSIS_NOTE, ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE,
                                      KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
                                      scientific_status)
@@ -47,6 +56,11 @@ QScrollArea { border: none; }
 #badge { border-radius: 10px; padding: 2px 10px; background: #e4e7eb; color: #3e4c59; }
 #badge[state="chosen"] { background: #fff4d6; color: #7a5200; }
 #badge[state="blocked"] { background: #fde8e8; color: #9b1c1c; }
+#badge[state="read"] { background: #e3f4e8; color: #1e6b37; }
+#sectionTitle { font-weight: 600; }
+#warnings { color: #7a4b00; }
+QTableWidget { background: #ffffff; border: 1px solid #d9dee5; gridline-color: #e4e7eb; }
+QHeaderView::section { background: #eef1f5; border: none; border-right: 1px solid #d9dee5; padding: 4px 6px; }
 #error { color: #b42318; }
 #fileName { font-weight: 600; }
 QLineEdit { background: #ffffff; border: 1px solid #c4cdd5; border-radius: 4px; padding: 4px 6px; }
@@ -136,6 +150,9 @@ class SourceCard(QFrame):
         grid.setHorizontalSpacing(10)
         grid.addWidget(_label("File", wrap=False), 0, 0, Qt.AlignmentFlag.AlignTop)
         self.file_name = _label("", "fileName")  # the name stays readable when a long path is cut off
+        # A long name without spaces cannot wrap: it never widens the page (NEW-GUI.2); the tooltip holds it in full.
+        self.file_name.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.file_name.setMinimumWidth(0)
         grid.addWidget(self.file_name, 0, 1)
         grid.addWidget(_label("Path", wrap=False), 1, 0)
         self.path = QLineEdit()
@@ -156,28 +173,45 @@ class SourceCard(QFrame):
         self.choose_button = QPushButton()
         self.choose_button.setObjectName("primary")
         self.choose_button.clicked.connect(lambda: window.choose_file(kind))
+        self.inspect_button = QPushButton(INSPECT)
+        self.inspect_button.setObjectName("inspect")
+        self.inspect_button.setToolTip("Read the chosen file's modal data with the analysis importer and show them "
+                                       "below. Nothing is compared or selected.")
+        self.inspect_button.clicked.connect(lambda: window.inspect_file(kind))
         self.clear_button = QPushButton("Clear")
         self.clear_button.clicked.connect(lambda: window.clear_file(kind))
         buttons.addWidget(self.choose_button)
+        buttons.addWidget(self.inspect_button)
         buttons.addWidget(self.clear_button)
         buttons.addStretch(1)
         layout.addLayout(buttons)
 
-    def show_state(self, workspace: Workspace, message: str) -> None:
+    def show_state(self, workspace: Workspace, message: str, slot: Optional[InspectSlot] = None) -> None:
         choice = workspace.choice(self.kind)
-        self.badge.setText(choice.status)
-        self.badge.setProperty("state", "chosen" if choice.chosen else "empty")
+        state = slot.state if slot is not None and choice.chosen else IDLE
+        self.badge.setText(STATE_TEXT[state] if state != IDLE else choice.status)
+        self.badge.setProperty("state", {READ: "read", FAILED: "blocked"}.get(state, "chosen" if choice.chosen
+                                                                               else "empty"))
         _restyle(self.badge)
         self.file_name.setText(choice.path.name if choice.chosen else "—")
+        self.file_name.setToolTip(choice.path.name if choice.chosen else "")
         self.path.setText(str(choice.path) if choice.chosen else "")
         self.path.setToolTip(str(choice.path) if choice.chosen else "")
         self.path.setCursorPosition(len(self.path.text()))  # a long path shows its end: folder and file name
         self.file_type.setText(choice.file_type if choice.chosen else "—")
-        self.note.setVisible(choice.chosen)
+        self.note.setVisible(choice.chosen and state == IDLE)
         self.error.setText(message)
         self.error.setVisible(bool(message))
         self.choose_button.setText("Replace file..." if choice.chosen else "Choose file...")
         self.clear_button.setEnabled(choice.chosen)
+        self.inspect_button.setEnabled(choice.chosen and state != READING)
+        self.inspect_button.setText("Inspect again" if state in (READ, FAILED) else INSPECT)
+
+
+class _ReadBridge(QObject):
+    """Carries a read's outcome from its worker thread to the window's thread (a queued signal)."""
+
+    done = Signal(object)
 
 
 class MainWindow(QMainWindow):
@@ -193,6 +227,11 @@ class MainWindow(QMainWindow):
         self._archive_path = archive_path
         self.archive_dialog: Optional[ArchiveDialog] = None
         self.status_rows = scientific_status(status_path)
+        self.slots = {kind: InspectSlot() for kind in KINDS}
+        self.discarded = 0  # outcomes of cancelled or stale reads, never shown
+        self._threads: list[threading.Thread] = []
+        self._bridge = _ReadBridge(self)
+        self._bridge.done.connect(self._read_done)
 
         central = QWidget()
         root = QHBoxLayout(central)
@@ -291,6 +330,9 @@ class MainWindow(QMainWindow):
         for kind in KINDS:
             self.sources.addWidget(self.cards[kind], 1, Qt.AlignmentFlag.AlignTop)
         layout.addLayout(self.sources)
+        self.panels = {kind: PreviewPanel(kind) for kind in KINDS}  # full width: the tables need it
+        for kind in KINDS:
+            layout.addWidget(self.panels[kind])
         layout.addStretch(1)
         return page
 
@@ -335,7 +377,10 @@ class MainWindow(QMainWindow):
     def _build_menu(self) -> None:
         menu = self.menuBar().addMenu("&File")
         for text, shortcut, slot in (("Choose FE file...", "Ctrl+1", lambda: self.choose_file(FE)),
-                                     ("Choose experimental file...", "Ctrl+2", lambda: self.choose_file(EXPERIMENTAL))):
+                                     ("Choose experimental file...", "Ctrl+2", lambda: self.choose_file(EXPERIMENTAL)),
+                                     ("Inspect FE file", "Ctrl+Shift+1", lambda: self.inspect_file(FE)),
+                                     ("Inspect experimental file", "Ctrl+Shift+2",
+                                      lambda: self.inspect_file(EXPERIMENTAL))):
             action = QAction(text, self)
             action.setShortcut(QKeySequence(shortcut))
             action.triggered.connect(slot)
@@ -379,8 +424,11 @@ class MainWindow(QMainWindow):
             path = self._ask_path(kind, str(current.path.parent) if current.chosen else "")
         if path is None or not str(path).strip():  # the dialog was cancelled: nothing changes
             return ""
+        before = self.workspace
         self.workspace, message = self.workspace.choose(kind, path)
         self.messages[kind] = message
+        if self.workspace is not before and not message:  # a new or replaced file: the old preview is gone
+            self.slots[kind].reset()
         self.refresh()
         if message:
             self.statusBar().showMessage("File not accepted.", 8000)
@@ -389,7 +437,56 @@ class MainWindow(QMainWindow):
     def clear_file(self, kind: str) -> None:
         self.workspace = self.workspace.clear(kind)
         self.messages[kind] = ""
+        self.slots[kind].reset()
         self.refresh()
+
+    def inspect_file(self, kind: str) -> bool:
+        """Read the chosen file of ``kind`` in a background thread; returns False when nothing is started."""
+        choice = self.workspace.choice(kind)
+        if not choice.chosen or self.slots[kind].state == READING:
+            return False
+        token, cancel_event = self.slots[kind].start(choice.path)
+        worker = threading.Thread(target=self._read, args=(kind, choice.path, token, cancel_event),
+                                  name=f"new-gui-read-{kind}", daemon=True)
+        self._threads = [thread for thread in self._threads if thread.is_alive()] + [worker]
+        worker.start()
+        self.refresh()
+        self.statusBar().showMessage(f"{KIND_TITLE[kind]}: reading...", 4000)  # short: the name is in the card
+        return True
+
+    def _read(self, kind: str, path: Path, token: int, cancel_event: threading.Event) -> None:
+        outcome = run_read(kind, path, token, cancel_event)  # worker thread: no widget is touched here
+        try:
+            self._bridge.done.emit(outcome)
+        except RuntimeError:  # the window is already gone
+            pass
+
+    def _read_done(self, outcome: Outcome) -> None:
+        if not self.slots[outcome.kind].finish(outcome):
+            self.discarded += 1  # a cancelled or stale read: the current state is kept
+            return
+        self.refresh()
+        if not outcome.cancelled:
+            self.statusBar().showMessage(f"{KIND_TITLE[outcome.kind]}: "
+                                         + ("content not read" if outcome.error else "content read"), 8000)
+
+    def reading(self) -> bool:
+        return (any(slot.state == READING for slot in self.slots.values())
+                or any(thread.is_alive() for thread in self._threads))
+
+    def wait_for_reads(self, timeout: float = 120.0) -> bool:
+        """Process events until no read is running (tests and checks); returns whether every read ended."""
+        end = time.monotonic() + timeout
+        while self.reading() and time.monotonic() < end:
+            QApplication.processEvents()
+            time.sleep(0.02)
+        QApplication.processEvents()
+        return not self.reading()
+
+    def closeEvent(self, event) -> None:
+        for slot in self.slots.values():  # running reads are cancelled and their outcomes discarded
+            slot.reset()
+        super().closeEvent(event)
 
     def _label_changed(self, text: str) -> None:
         self.workspace = self.workspace.with_label(text)
@@ -418,7 +515,8 @@ class MainWindow(QMainWindow):
     def refresh(self) -> None:
         self.empty_state.setVisible(self.workspace.empty)
         for kind, card in self.cards.items():
-            card.show_state(self.workspace, self.messages[kind])
+            card.show_state(self.workspace, self.messages[kind], self.slots[kind])
+            self.panels[kind].show_slot(self.slots[kind], self.workspace.choice(kind).chosen)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

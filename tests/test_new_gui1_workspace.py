@@ -320,11 +320,14 @@ def _imports(path: Path) -> set[str]:
 
 class SeparationTests(unittest.TestCase):
     PROJECT_MODULES = {"services.local_input_registry", "services.specimen_catalog_view",
-                       "services.workspace_context", "universal_reader", "services"}
+                       "services.workspace_context", "universal_reader", "services",
+                       # NEW-GUI.2: the shared importer chain and the read-only preview services
+                       "services.importer_runtime", "services.local_fe_preview", "services.local_experimental_preview"}
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))
-        self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "archive_dialog.py", "window.py",
+        self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "archive_dialog.py",
+                                                   "preview_model.py", "preview_panel.py", "window.py",
                                                    "workspace_state.py"])
         stdlib = set(sys.stdlib_module_names) | {"__future__"}
         for path in files:

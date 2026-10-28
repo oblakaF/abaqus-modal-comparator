@@ -1,18 +1,12 @@
-from universal_hardening import install_universal_hardening
-from universal_frf_review import install_frf_review
-from cmif_separation import install_cmif_separation
-from cmif_validation import install_cmif_validation
-from fast_cache import install_fast_cache
+from services.importer_runtime import ensure_application_importers
 from performance_tuning import install_performance_tuning
 from reporting_hardening import install_reporting_hardening
 from amplitude_correlation import install_amplitude_correlation
 from metrics_normalization import install_metrics_normalization
 
-install_universal_hardening()
-install_frf_review()
-install_cmif_separation()
-install_cmif_validation()
-install_fast_cache()
+# The importer chain (universal_hardening, frf_review, cmif_separation, cmif_validation, fast_cache), in this
+# order; the new interface installs the same chain with the same function.
+ensure_application_importers()
 install_performance_tuning()
 install_reporting_hardening()
 install_amplitude_correlation()
