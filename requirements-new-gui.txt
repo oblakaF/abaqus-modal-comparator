@@ -1,0 +1,3 @@
+# The new interface (NEW-GUI.1, src/new_gui) only; the existing program does not need it.
+# Install after requirements.txt:  python -m pip install -r requirements-new-gui.txt
+PySide6-Essentials>=6.8,<7

@@ -40,6 +40,21 @@ RUN_PROGRAM.cmd
 
 The launcher creates a local `.venv` environment and installs the required packages. The first launch can take several minutes.
 
+### New interface preview (NEW-GUI.1)
+
+A separate PySide6 (Qt) window is being built next to the existing program. Start it with:
+
+```text
+RUN_NEW_GUI.cmd
+```
+
+The launcher uses the same `.venv` and also installs PySide6 from `requirements-new-gui.txt`, which the existing program
+does not need. Without the launcher, run `python -m pip install -r requirements-new-gui.txt`, then
+`python -m new_gui` with `src` on `PYTHONPATH`.
+
+In this first stage the window only lets you choose your own FE results file and experimental file, shows what was
+chosen and opens the read-only research archive on request. It runs no analysis. See `docs/gui/NEW_GUI1_SHELL.md`.
+
 ## Input procedure
 
 1. Select the Abaqus `*.odb` file.
