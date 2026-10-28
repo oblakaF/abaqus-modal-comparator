@@ -135,6 +135,11 @@ Home owns no data and starts nothing of its own.
 - **Display scaling.** Windows display scaling other than 100 % was not tried on this computer (the interface scale
   80–125 % was).
 - **Language.** Home is in English, like the rest of the program.
-- **Known observation O-1 (APP-REAL.1, not changed).** During the last analysis stage ("6/6 Report data generation")
-  the window does not repaint until the stage ends. Home then shows the finished result. This is earlier behaviour of
-  the analysis, not of Home.
+- **Known observation O-1 (APP-REAL.1; major block mitigated by APP-UI.2-O1).** While the status read
+  "6/6 Report data generation" the window did not repaint, then Home showed the finished result. This was earlier
+  behaviour of the analysis, not of Home.
+  - **Cause.** The worker's stage 6 takes milliseconds. The pause was the completion on the GUI thread (28.8 s for
+    SP-02): the manual-review table classified the rigid-body FE modes there twice (24.2 s).
+  - **Fix.** The table now reuses the checked classification of the comparison's own quality control (SP-02: largest
+    GUI pause 28.5 s → 3.8 s). A pause of about 4–5 s remains: plots and mode-viewer preparation on the GUI thread.
+    See `APP_UI2_PROGRESS.md`.

@@ -20,7 +20,7 @@ from reviewed_core import (
     experimental_measurement_masks,
     frequency_error_percent,
 )
-from quality_control import _detect_rigid_modes
+from quality_control import RIGID_SHAPE_RESIDUAL_THRESHOLD, _detect_rigid_modes
 from coordinate_calibration import legacy_project_calibration
 from polymax_ui import experimental_mode_source_label
 
@@ -251,15 +251,77 @@ def build_manual_pair(
     return pair
 
 
-def _all_elastic_abaqus_modes(result: ComparisonResult):
-    """Return the Abaqus modes retained after rigid-body filtering.
+QUALITY_CONTROL_RIGID_METHOD = "six-vector rigid-body subspace projection"
 
-    Mirrors quality_control.compare_modal_datasets_with_quality_control, which
-    already ran this same filter on this dataset to build *result*: a failure
-    here indicates a real bug, not an expected input shape, so it is left to
-    propagate rather than silently substituting unfiltered (possibly rigid)
-    modes into the manual-review candidate list.
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _quality_controlled_elastic_modes(result: ComparisonResult):
+    """The FE modes retained by the comparison's own rigid-body quality control, or None.
+
+    compare_modal_datasets_with_quality_control classifies every FE mode once
+    (on the analysis worker) and records the residual of each mode, the
+    excluded modes, the method and the threshold in
+    metadata["quality_control"] of the filtered dataset that becomes
+    result.abaqus. The record is used only when it is complete and agrees with
+    the current criterion and with this exact FE set: the same method and
+    threshold, every recorded mode either present here and retained by the
+    threshold or absent here and excluded by it, no other mode, the recorded
+    first elastic frequency, and the mode numbers this comparison was computed
+    on. Anything else returns None, and the classification is computed again.
     """
+    dataset = getattr(result, "abaqus", None)
+    metadata = getattr(dataset, "metadata", None)
+    quality = metadata.get("quality_control") if isinstance(metadata, dict) else None
+    if not isinstance(quality, dict):
+        return None
+    threshold = quality.get("rigid_shape_residual_threshold")
+    if (quality.get("rigid_mode_method") != QUALITY_CONTROL_RIGID_METHOD or not _is_number(threshold)
+            or threshold != RIGID_SHAPE_RESIDUAL_THRESHOLD):
+        return None
+    residuals = quality.get("rigid_body_residual_fraction_by_mode")
+    excluded = quality.get("excluded_abaqus_modes")
+    modes = list(getattr(dataset, "modes", None) or [])
+    if not isinstance(residuals, dict) or not isinstance(excluded, list) or not modes:
+        return None
+    numbers = [mode.number for mode in modes]
+    if not all(isinstance(number, int) and not isinstance(number, bool)
+               for number in [*numbers, *excluded, *residuals]):
+        return None
+    if not all(_is_number(value) for value in residuals.values()):
+        return None
+    present, removed = set(numbers), set(excluded)
+    if (len(present) != len(numbers) or len(removed) != len(excluded) or present & removed
+            or present | removed != set(residuals)):
+        return None
+    if any(residuals[number] <= RIGID_SHAPE_RESIDUAL_THRESHOLD for number in present):
+        return None  # the same comparison as _detect_rigid_modes: a retained mode is not <= the threshold
+    if not all(residuals[number] <= RIGID_SHAPE_RESIDUAL_THRESHOLD for number in removed):
+        return None
+    if quality.get("first_elastic_frequency_hz") != min(mode.frequency_hz for mode in modes):
+        return None
+    if list(getattr(result, "abaqus_mode_numbers", None) or []) != [mode.number for mode in dataset.sorted_modes()]:
+        return None
+    return sorted(modes, key=lambda mode: mode.frequency_hz)
+
+
+def _all_elastic_abaqus_modes(result: ComparisonResult):
+    """Return the Abaqus modes retained after rigid-body filtering, in frequency order.
+
+    quality_control.compare_modal_datasets_with_quality_control already ran
+    this filter on the analysis worker to build *result*, and its checked
+    record is reused (APP-UI.2-O1: classifying again here took ~12 s per call
+    on the GUI thread for SP-02). Without a trustworthy record the same
+    _detect_rigid_modes runs as before. A failure there indicates a real bug,
+    not an expected input shape, so it is left to propagate rather than
+    silently substituting unfiltered (possibly rigid) modes into the
+    manual-review candidate list.
+    """
+    retained = _quality_controlled_elastic_modes(result)
+    if retained is not None:
+        return retained
     _, retained, _, _ = _detect_rigid_modes(result.abaqus)
     return retained
 
