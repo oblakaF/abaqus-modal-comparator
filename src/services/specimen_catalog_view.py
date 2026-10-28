@@ -511,3 +511,141 @@ def choice_text(entry: dict) -> str:
     """The text of one specimen in the selection list."""
     kind = {"sandwich": "sandwich", "bare_plate": "bare plate"}.get(entry.get("type"), text(entry.get("type")))
     return f"{entry['specimen_id']}  ({kind}, {text(entry.get('family_id'))})"
+
+
+# ------------------------------------------------------------------------------------------------ APP-CATALOG.2 sources
+
+FE_SIDE, EXPERIMENTAL_SIDE = "fe", "experimental"
+EXPERIMENTAL_SUFFIXES = (".unv", ".uff")
+NOT_AN_INPUT = {  # suffix -> why a recorded file is not a direct input of the comparison
+    ".inp": "an Abaqus input deck, not modal results",
+    ".cae": "an Abaqus/CAE model database, not modal results",
+    ".jnl": "an Abaqus/CAE journal, not modal results",
+    ".x_t": "CAD geometry, not modal results",
+    ".sldprt": "CAD geometry, not modal results",
+    ".svd": "a PSV camera-frame file (geometry record), not modal or FRF data",
+    ".zip": "an archive; a member must be extracted by the user first",
+}
+
+
+@dataclass(frozen=True)
+class CatalogueSource:
+    """One file reference of a specimen record, as a possible local input. Nothing here was read from the file."""
+
+    key: str
+    side: str  # FE_SIDE or EXPERIMENTAL_SIDE
+    label: str
+    session: str
+    data_kind: str
+    reference: dict  # the catalogue record: store, relative_path, zip_member, size_bytes, sha256, role
+    file_name: str  # the file to locate: the zip member, else the file of relative_path
+    suffix: str
+    sha256: Optional[str]  # full reference SHA-256 of that file (of the member for a zip member), or None
+    size_bytes: Optional[int]
+    loadable: bool
+    reason: str  # why it is not loadable ("" when loadable)
+    status: str  # the catalogue's status of the data (governance, usability)
+    identity: str  # the specimen's identity confidence
+
+
+def _reference_file(reference: dict) -> tuple[str, str]:
+    member = reference.get("zip_member")
+    name = str(member) if member else str(reference.get("relative_path") or "").replace("\\", "/").split("/")[-1]
+    return name, Path(name).suffix.lower()
+
+
+def _full_sha(value: Any) -> Optional[str]:
+    return value.lower() if isinstance(value, str) and len(value) == 64 and all(
+        c in "0123456789abcdefABCDEF" for c in value) else None
+
+
+def _experiment_status(experiment: dict) -> str:
+    dataset = str(experiment.get("dataset") or UNKNOWN_TEXT)
+    if not ("dataset 55" in dataset or "PolyMAX" in dataset):
+        words = "raw FRF (measured response functions), not fitted modes"
+    elif not experiment.get("governed"):
+        words = "PolyMAX modal fit, not governed (the catalogue records no governed set for this file)"
+    else:
+        governed, reason = governed_set_match(experiment)
+        if governed is None:
+            words = f"PolyMAX modal fit; governed, but {reason}: no set is marked as governed"
+        else:
+            words = f"PolyMAX modal fit; governed set {experiment.get('governed_set')}"
+            if _frequency_only(experiment):
+                words += "; FREQUENCY_ONLY: no confirmed mode-shape (MAC) comparison"
+    return f"{words}. Usable now (catalogue): {text(experiment.get('usable_now'))}"
+
+
+def _source(entry: dict, key: str, side: str, label: str, session: str, data_kind: str, reference: dict,
+            status: str) -> CatalogueSource:
+    name, suffix = _reference_file(reference)
+    if side == FE_SIDE:
+        loadable = suffix == ".odb"
+        reason = "" if loadable else (f"{name} is {NOT_AN_INPUT.get(suffix, 'not an FE modal result file')}; the FE "
+                                      "input of the program is an .odb (or an extracted manifest.json chosen in 1. "
+                                      "Files)")
+    else:
+        loadable = suffix in EXPERIMENTAL_SUFFIXES
+        reason = "" if loadable else (f"{name} is {NOT_AN_INPUT.get(suffix, 'not a .unv / .uff file')}; the "
+                                      "experimental input of the program is a .unv / .uff file")
+    size = reference.get("size_bytes")
+    return CatalogueSource(key, side, label, session, data_kind, dict(reference), name, suffix,
+                           _full_sha(reference.get("sha256")), size if isinstance(size, int) else None, loadable,
+                           reason, status, text(_dict(entry.get("identity")).get("confidence")))
+
+
+def local_sources(entry: dict) -> tuple[CatalogueSource, ...]:
+    """The FE and experimental file references of one specimen record, in catalogue order.
+
+    Each session and data set stays a separate source (SP-13 260909 and 260910 a are never merged). Files that are not
+    direct inputs (INP, CAE, journal, CAD, camera frame) are listed with the reason and are not loadable."""
+    sources = []
+    for index, experiment in enumerate(item for item in _list(entry.get("experiments")) if isinstance(item, dict)):
+        session, dataset = text(experiment.get("session")), text(experiment.get("dataset"))
+        status = _experiment_status(experiment)
+        for field_name, label in (("source", "data set"), ("video_frame_source", "camera frame")):
+            reference = _dict(experiment.get(field_name))
+            if reference.get("relative_path"):
+                kind = dataset if field_name == "source" else "PSV camera frame (.svd)"
+                sources.append(_source(entry, f"experiment-{index}-{field_name}", EXPERIMENTAL_SIDE, label, session,
+                                       kind, reference, status if field_name == "source" else
+                                       "geometry record of the session; not modal or FRF data"))
+    assets = _dict(entry.get("fe_assets"))
+    model = assets.get("governed_forward_model")
+    fe_status = text(assets.get("status")) + ("" if isinstance(model, dict) else "; no governed FE model recorded")
+    for group in ("store", "elsewhere"):
+        for index, item in enumerate(_list(assets.get(group))):
+            reference = _dict(item)
+            if reference.get("relative_path"):
+                where = "FE file" if group == "store" else "FE file outside the store"
+                sources.append(_source(entry, f"fe-{group}-{index}", FE_SIDE, where, "", text(reference.get("role")),
+                                       reference, fe_status))
+    return tuple(sources)
+
+
+def source_choice_text(source: CatalogueSource) -> str:
+    """The text of one source in the selection list."""
+    side = "FE" if source.side == FE_SIDE else "Experiment"
+    session = f" · {source.session}" if source.session else ""
+    note = "" if source.loadable else " · not an input"
+    return f"{side}{session} · {source.data_kind} · {source.file_name}{note}"
+
+
+def source_lines(source: CatalogueSource, catalogue: Optional[CatalogueView] = None) -> list[tuple[str, str]]:
+    """(caption, text) rows describing a source before any local file is chosen."""
+    rows = [("Source", f"{'FE' if source.side == FE_SIDE else 'experimental'} {source.label}"
+                       + (f", session {source.session}" if source.session else "") + f": {source.data_kind}"),
+            ("Catalogue path", file_reference(source.reference, catalogue))]
+    if not source.loadable:
+        rows.append(("Reference SHA-256", "not used: this file is not an input of the program"))
+    elif source.sha256:
+        rows.append(("Reference SHA-256", f"recorded ({source.sha256[:12]}…): a located copy can be byte-verified"))
+    else:
+        rows.append(("Reference SHA-256", "none in the catalogue: a located copy cannot be byte-verified"))
+    rows.append(("Data status", source.status))
+    if source.identity == "AMBIGUOUS":
+        rows.append(("Identity", "AMBIGUOUS: the link of this specimen record to a physical specimen is not "
+                                 "established"))
+    if not source.loadable:
+        rows.append(("Not an input", source.reason))
+    return rows

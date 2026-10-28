@@ -11,6 +11,11 @@ Below them, APP-CATALOG.1 adds a fifth, read-only area: the passport of one phys
 specimen catalogue (``services.specimen_catalog_view``). Choosing a specimen there only shows its passport. It
 selects no file, modal set or registration and changes no analysis state.
 
+APP-CATALOG.2 adds *Local source selection* to that area: the user picks one FE or experimental source of the
+specimen, locates a local copy with the standard file dialog, and the copy is checked against the catalogue
+(``services.specimen_catalog_local_files``). Only an explicit **Use as FE input** / **Use as experimental input** sets
+one field of 1. Files, exactly as its Browse button does (the variable's existing traces react).
+
 It owns no data and starts no computation of its own. Every action calls the existing handlers of the main window:
 
 - file choice: ``_choose_abaqus`` / ``_choose_experiment``;
@@ -33,9 +38,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 from typing import Optional
 
+from services import specimen_catalog_local_files as local_files
 from services import specimen_catalog_view as catalogue_view
 from ui_policy import AnalysisState, EM_DASH, LayoutMode, responsive_layout_width, select_layout_mode
 
@@ -70,6 +76,16 @@ CATALOGUE_SUBTITLE = (
     "(File menu) are separate."
 )
 CATALOGUE_PROMPT = "Choose a specimen to view its passport."
+LOCAL_SOURCE_PROMPT = (
+    "Choose one recorded source, then Locate local file... to check your own copy against the catalogue. Only Use as "
+    "FE input / Use as experimental input changes a field of 1. Files; nothing is loaded or run."
+)
+CHECK_STATES = {local_files.BYTE_VERIFIED: OK, local_files.NOT_VERIFIED_NO_REFERENCE: WARN}
+NO_REFERENCE_WARNING = (
+    "The catalogue records no SHA-256 for {name}, so {file} cannot be byte-verified: it may not be the recorded file "
+    "at all.\n\nUse it as the {field} file anyway? It will not be called verified, and no modal set, registration or "
+    "FE-experiment pairing is chosen."
+)
 
 
 def _get(variable, default: str = "") -> str:
@@ -488,8 +504,9 @@ class HomeDashboard:
         self.specimen_combo.bind("<MouseWheel>", self._combo_wheel)  # the wheel scrolls Home, never the choice
         self.catalogue_message = self._wrap(ttk.Label(card, text="", justify="left"), card)
         self.catalogue_message.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        self._build_local_sources(card)
         self.passport = ttk.Frame(card)
-        self.passport.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(4, 0))
+        self.passport.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(4, 0))
         self.passport.columnconfigure(1, weight=1)
         if self.catalogue.problem:
             self.specimen_combo.configure(state="disabled")
@@ -514,6 +531,7 @@ class HomeDashboard:
         for child in self.passport.winfo_children():
             child.destroy()
         self._wrapped = [(label, owner) for label, owner in self._wrapped if label.winfo_exists()]
+        self._set_local_sources(entry)
         if entry is None:
             return
         choice = catalogue_view.choice_text(entry)
@@ -541,6 +559,170 @@ class HomeDashboard:
     def _combo_wheel(self, event) -> str:
         self._wheel(event)
         return "break"
+
+    # ------------------------------------------------------------------------------------------------ local sources
+
+    def _build_local_sources(self, card) -> None:
+        """APP-CATALOG.2: one recorded source, a located local copy, its check, and the explicit Use buttons."""
+        self.local_frame = ttk.Frame(card)
+        self.local_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        self.local_frame.columnconfigure(1, weight=1)
+        ttk.Label(self.local_frame, text="Local source selection", style="Section.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w")
+        self.local_prompt = self._wrap(ttk.Label(self.local_frame, text="", style="Secondary.TLabel",
+                                                 justify="left"), card)
+        self.local_prompt.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        ttk.Label(self.local_frame, text="Source", style="MetricCaption.TLabel").grid(row=2, column=0, sticky="w",
+                                                                                      padx=(0, 10))
+        self.source_choice = tk.StringVar(master=self.app.root, value="")  # Home's own: no window state
+        self.source_combo = ttk.Combobox(self.local_frame, textvariable=self.source_choice, state="disabled",
+                                         width=90)
+        self.source_combo.grid(row=2, column=1, sticky="w")
+        self.source_combo.bind("<<ComboboxSelected>>", lambda _event: self.select_source(), add="+")
+        self.source_combo.bind("<MouseWheel>", self._combo_wheel)
+        self.source_info = ttk.Frame(self.local_frame)
+        self.source_info.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self.source_info.columnconfigure(1, weight=1)
+        buttons = ttk.Frame(self.local_frame)
+        buttons.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))  # a fixed place, above the details
+        self.locate_button = ttk.Button(buttons, text="Locate local file...", command=self.locate_local_file)
+        self.use_fe_button = ttk.Button(buttons, text="Use as FE input",
+                                        command=lambda: self.use_local_file(catalogue_view.FE_SIDE))
+        self.use_experiment_button = ttk.Button(buttons, text="Use as experimental input",
+                                                command=lambda: self.use_local_file(catalogue_view.EXPERIMENTAL_SIDE))
+        for column, button in enumerate((self.locate_button, self.use_fe_button, self.use_experiment_button)):
+            button.grid(row=0, column=column, sticky="w", padx=(0, 8))
+        self.local_status = self._wrap(ttk.Label(self.local_frame, text="", justify="left"), card)
+        self.local_status.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        self.local_sources: tuple = ()
+        self.local_source = None
+        self.local_check = None
+        self._set_local_sources(None)
+
+    def _set_local_sources(self, entry: Optional[dict]) -> None:
+        self.local_sources = catalogue_view.local_sources(entry) if entry is not None else ()
+        self.local_choices = {catalogue_view.source_choice_text(source): source for source in self.local_sources}
+        self.source_choice.set("")
+        self.source_combo.configure(values=tuple(self.local_choices),
+                                    state="readonly" if self.local_sources else "disabled")
+        if entry is None:
+            prompt = "Choose a specimen first."
+        elif not self.local_sources:
+            prompt = f"No FE or experimental source is recorded for {entry['specimen_id']} in the catalogue."
+        else:
+            prompt = LOCAL_SOURCE_PROMPT
+        self.local_prompt.configure(text=prompt)
+        self._show_source(None)
+
+    def select_source(self, source=None) -> None:
+        """Show one source (from the list, or ``source``); a new source drops the previous file check."""
+        if source is None:
+            source = self.local_choices.get(self.source_choice.get())
+        elif self.source_choice.get() != catalogue_view.source_choice_text(source):
+            self.source_choice.set(catalogue_view.source_choice_text(source))
+        self._show_source(source)
+
+    def _show_source(self, source) -> None:
+        self.local_source, self.local_check = source, None
+        card = self.cards["catalogue"]
+        for child in self.source_info.winfo_children():
+            child.destroy()
+        self._wrapped = [(label, owner) for label, owner in self._wrapped if label.winfo_exists()]
+        if source is not None:
+            for row, (caption, value) in enumerate(catalogue_view.source_lines(source, self.catalogue)):
+                ttk.Label(self.source_info, text=caption, style="MetricCaption.TLabel").grid(
+                    row=row, column=0, sticky="nw", padx=(0, 10), pady=1)
+                self._wrap(ttk.Label(self.source_info, text=value, justify="left"), card).grid(
+                    row=row, column=1, sticky="ew", pady=1)
+        self._show_check("" if source is None or source.loadable else "This file cannot be used as an input.")
+        self._schedule_rewrap()
+
+    def _show_check(self, text: str = "", state: Optional[str] = None) -> None:
+        check = self.local_check
+        if check is not None and not text:
+            state = CHECK_STATES.get(check.status, NEEDED)
+            text = f"{check.status}: {check.message}"
+        state = state or INFO
+        self.local_status.configure(text=f"{MARKS[state]}  {text}" if text else "", foreground=COLOURS[state])
+        self._refresh_local_buttons()
+
+    def _analysis_locked(self) -> bool:
+        return getattr(self.app, "analysis_state", None) in (AnalysisState.RUNNING, AnalysisState.STOPPING)
+
+    def _refresh_local_buttons(self) -> None:
+        source, check, locked = self.local_source, self.local_check, self._analysis_locked()
+        usable = check is not None and check.usable and not locked
+        self.locate_button.configure(state="normal" if source is not None and source.loadable and not locked
+                                     else "disabled")
+        self.use_fe_button.configure(state="normal" if usable and source.side == catalogue_view.FE_SIDE
+                                     else "disabled")
+        self.use_experiment_button.configure(
+            state="normal" if usable and source.side == catalogue_view.EXPERIMENTAL_SIDE else "disabled")
+
+    def locate_local_file(self) -> None:
+        """The user names the file in the standard dialog; only that file is checked (read-only)."""
+        source = self.local_source
+        if source is None or not source.loadable or self._analysis_locked():
+            return
+        patterns = " ".join(f"*{suffix}" for suffix in local_files.allowed_suffixes(source))
+        path = filedialog.askopenfilename(parent=self.app.root, title=f"Locate your local copy of {source.file_name}",
+                                          filetypes=[(f"{source.file_name} ({patterns})", patterns),
+                                                     ("All files", "*.*")])
+        if not path:
+            return  # cancelled: the previous check (if any) stays
+        self.local_check = self._busy(lambda: local_files.check_local_file(source, path))
+        self._show_check()
+
+    def _busy(self, work):
+        """``work()`` with the wait cursor (hashing a file runs on the window's thread)."""
+        root = self.app.root
+        try:
+            root.configure(cursor="watch")
+            root.update_idletasks()
+        except tk.TclError:
+            pass
+        try:
+            return work()
+        finally:
+            try:
+                root.configure(cursor="")
+            except tk.TclError:
+                pass
+
+    def use_local_file(self, side: str) -> None:
+        """Set one field of 1. Files to the checked file, as its Browse button does; nothing else."""
+        source, check = self.local_source, self.local_check
+        if source is None or check is None or not check.usable or side != source.side:
+            return
+        field = "Abaqus results" if side == catalogue_view.FE_SIDE else "Experimental results"
+        if self._analysis_locked():
+            self._show_check("An analysis is running: the inputs cannot change now.", WARN)
+            return
+        if check.status == local_files.BYTE_VERIFIED:  # F1: the full SHA-256 again, size and time are not trusted
+            fresh = self._busy(lambda: local_files.recheck_before_use(source, check))
+            if fresh.status != local_files.BYTE_VERIFIED:
+                self.local_check = fresh  # the earlier BYTE_VERIFIED no longer stands: Use is disabled
+                self._show_check(f"Not used: {fresh.status}: {fresh.message}", NEEDED)
+                return
+            check = self.local_check = fresh
+        elif not local_files.unchanged_since(check):  # no reference: only its size and time can be compared
+            self.local_check = None
+            self._show_check(f"{check.path.name} changed or disappeared since it was checked: locate it again. The "
+                             "fields of the program are unchanged.", NEEDED)
+            return
+        if check.needs_confirmation and not messagebox.askyesno(
+                "Use a file that cannot be byte-verified",
+                NO_REFERENCE_WARNING.format(name=source.file_name, file=check.path.name, field=field),
+                icon="warning", default="no", parent=self.app.root):
+            self._show_check(f"Not used: {check.path.name} was not confirmed. The fields of the program are "
+                             "unchanged.", INFO)
+            return
+        variable = self.app.abaqus_path if side == catalogue_view.FE_SIDE else self.app.experimental_path
+        variable.set(str(check.path))  # what the Browse button of that field does; the existing traces react to it
+        kind = "byte-verified" if check.status == local_files.BYTE_VERIFIED else "NOT byte-verified (confirmed by you)"
+        self._show_check(f"{check.path.name} ({kind}) is now the {field} file on 1. Files. Nothing was loaded or run; "
+                         "no modal set, registration or FE-experiment pairing was chosen. "
+                         f"{local_files.IDENTITY_NOTE}", CHECK_STATES[check.status])
 
     # ------------------------------------------------------------------------------------------------ layout
 
@@ -665,6 +847,7 @@ class HomeDashboard:
                                  (self.modal_set_combo, "readonly")):  # as the same controls on 1. Files
                 widget.configure(state="disabled" if locked else idle)
             self._refresh_results()
+            self._refresh_local_buttons()  # locked while an analysis runs, like the other input controls
             for (mark, caption, text), (state, title, value) in zip(self.material_rows, material_summary(app)):
                 mark.configure(text=MARKS[state], foreground=COLOURS[state])
                 caption.configure(text=title)
