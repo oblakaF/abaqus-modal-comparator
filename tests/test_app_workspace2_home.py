@@ -1,8 +1,16 @@
-"""APP-WORKSPACE.2: the Current workspace panel of Home (real main window, synthetic data, no process).
+"""APP-WORKSPACE.2 / F1: the Current workspace panel of Home (real main window, synthetic data, no process).
 
-The panel shows the program's own state through ``services.workspace_context``. Its working specimen is chosen
-separately from the passport, Locate -> Verify -> Use is unchanged, nothing is run, a registration hash is never
-taken as PHYSICAL, and production Auto-ID stays NOT_AUTHORISED.
+The panel shows the user's own data through ``services.workspace_context``. It does not depend on the laboratory
+archive:
+
+- with no file chosen, it is an empty workspace that asks for the two files;
+- any FE / UNV / UFF file is a workspace, with an optional label of the user's;
+- nothing of the archive (modal-set status, registration, scientific status) is attributed to the data, not even to a
+  new measurement of an archived specimen;
+- the archive (SP-01 ... SP-15) is shown only after Open research archive...
+
+Locate -> Verify -> Use is unchanged, nothing is run, a registration hash is never taken as PHYSICAL, and production
+Auto-ID stays NOT_AUTHORISED.
 """
 
 from __future__ import annotations
@@ -32,8 +40,8 @@ from test_app_ui1_home import _Home  # noqa: E402
 
 SP02_PHYSICAL = "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c"
 SP02_LEGACY = "9bf736d3650b491f8abf5f1a9abd60f6616639fa5f2f8811a896c5a04fbdc164"
-CAPTIONS = ["Working specimen", "FE file", "Experimental file", "Modal set", "Analysis", "Registration",
-            "Production Auto-ID"]
+CAPTIONS = ["FE file", "Experimental file", "Modal set", "Analysis", "Registration", "Production Auto-ID"]
+ARCHIVE_WORDS = ("GOVERNED", "catalogue", "Catalogue", "PHYSICAL", "OTHER", "NOT_GOVERNED")  # attributions
 
 
 def _sha(path: Path) -> str:
@@ -61,6 +69,9 @@ class _Workspace(_Home):
     def rows(self, home):
         return {caption: (mark, text) for mark, caption, text in self.texts(home.workspace_rows)}
 
+    def all_text(self, home):
+        return " ".join(text for _mark, text in self.rows(home).values())
+
     def inputs(self, application):
         return (application.abaqus_path.get(), application.experimental_path.get(),
                 application.experimental_modal_set_key.get(), application.experimental_modal_set_display.get(),
@@ -75,80 +86,143 @@ class _Workspace(_Home):
         application.result.metadata.update(records)
         return self.refreshed(application)
 
+    def shown(self, widget):
+        return bool(widget.winfo_manager())
 
-class PanelTests(_Workspace):
-    def test_the_panel_sits_between_the_four_areas_and_the_passport(self):
-        _application, home = self.home()
-        titles = {key: [str(child.cget("text")) for child in card.winfo_children()
-                        if child.winfo_class() == "TLabel"][0] for key, card in home.cards.items()}
-        self.assertEqual(titles["workspace"], "Current workspace")
-        self.assertEqual(titles["catalogue"], "5  Specimen catalogue / Паспорт образца")  # unchanged
-        self.assertEqual(int(home.cards["workspace"].grid_info()["row"]) + 1,
-                         int(home.cards["catalogue"].grid_info()["row"]))
 
-    def test_the_initial_state_is_shown_without_guessing(self):
-        _application, home = self.home()
+class EmptyAndArbitraryDataTests(_Workspace):
+    def test_an_empty_start_asks_for_the_two_files_and_lists_no_specimen(self):
+        application, home = self.home()
+        application.abaqus_path.set("")
+        application.experimental_path.set("")
+        home = self.refreshed(application)
+        self.assertTrue(self.shown(home.workspace_empty))
+        self.assertFalse(self.shown(home.workspace_details))
+        self.assertIn("No data loaded yet. Choose an FE results file", str(home.workspace_empty_text.cget("text")))
+        self.assertEqual([str(button.cget("text")) for button in (home.workspace_choose_fe,
+                                                                  home.workspace_choose_experiment)],
+                         ["Choose FE file...", "Choose experimental file..."])
+        self.assertFalse(self.shown(home.cards["catalogue"]))  # no SP list by default
+        self.assertFalse(home.research_archive_open)
+        self.assertEqual(str(home.archive_button.cget("text")), "Open research archive...")
+        workspace_text = " ".join(str(child.cget("text")) for child in home.cards["workspace"].winfo_children()
+                                  if child.winfo_class() == "TLabel")
+        self.assertNotIn("SP-0", workspace_text)
+        with mock.patch.object(application, "_choose_abaqus") as chooser:  # the same handler as 1. Files
+            home.workspace_choose_fe.configure(command=application._choose_abaqus)
+            home.workspace_choose_fe.invoke()
+        chooser.assert_called_once()
+
+    def test_any_files_make_a_workspace_without_an_archive_record(self):
+        application, home = self.home()
+        fe = self.copies / "my_plate_model.odb"
+        fe.write_bytes(b"a user's own ODB stand-in; never opened")
+        experiment = S.write_experiment(self.copies / "bench_test_0428.unv", S.E0 * 0.97, S.G0)
+        application.abaqus_path.set(str(fe))
+        application.experimental_path.set(str(experiment))
+        self.settle(application)
+        home = self.refreshed(application)
+        self.assertTrue(self.shown(home.workspace_details))
+        self.assertFalse(self.shown(home.workspace_empty))
         rows = self.rows(home)
         self.assertEqual(list(rows), CAPTIONS)
-        self.assertEqual(home.working_specimen_choice.get(), H.NO_WORKING_SPECIMEN)
-        self.assertIn("None chosen", rows["Working specimen"][1])
-        self.assertIn(str(self.folder / "plate.odb"), rows["FE file"][1])  # the program's own field
-        self.assertIn(str(self.fitted_path), rows["Experimental file"][1])
-        self.assertNotIn("recorded for", rows["FE file"][1])  # no specimen: no catalogue name comparison
-        self.assertTrue(rows["Analysis"][1].startswith(("READY", "NO_DATA")))
-        self.assertTrue(rows["Registration"][1].startswith("NONE: no registration is applied"))
+        self.assertEqual(rows["FE file"][1], str(fe))  # the path only: no archive comparison of the name
+        self.assertEqual(rows["Experimental file"][1], str(experiment))
+        self.assertTrue(rows["Registration"][1].startswith("NONE"))
         self.assertTrue(rows["Production Auto-ID"][1].startswith("NOT_AUTHORISED: blocked."))
-        self.assertEqual(rows["Production Auto-ID"][0], H.MARKS[H.NEEDED])
+        self.assertFalse(any(word in self.all_text(home) for word in ARCHIVE_WORDS[:2]))
+        self.assertEqual(home.workspace_context.requested_specimen_id, None)  # never an archive specimen
 
-
-class SeparationTests(_Workspace):
-    def test_the_working_specimen_and_the_passport_are_separate_choices(self):
+    def test_the_specimen_name_is_an_optional_label_only(self):
         application, home = self.home()
-        self.established(application)
-        home = self.refreshed(application)
-        before, passport = self.inputs(application), self.passport_state(home)
+        before = self.inputs(application)
+        self.assertEqual(home.specimen_name.get(), "")
         with mock.patch.object(application, "_start", side_effect=AssertionError("analysis started")):
-            home.working_specimen_choice.set(V.choice_text(home.catalogue.entry("SP-02")))
-            home.working_specimen_combo.event_generate("<<ComboboxSelected>>")
+            home.specimen_name.set("SP-02")  # an archive name typed by the user is still only a label
             self.root.update()
-        self.assertEqual(home.working_specimen_id, "SP-02")
-        self.assertEqual(self.inputs(application), before)  # no field of the analysis changed
-        self.assertEqual(self.passport_state(home), passport)  # the passport stays as it was (none shown)
-        self.assertIn("SP-02: type sandwich, family old-T300-plain-0.45", self.rows(home)["Working specimen"][1])
-        home.show_passport("SP-13")  # viewing a passport is another action
-        self.root.update()
-        self.assertEqual(home.working_specimen_id, "SP-02")
-        self.assertEqual(home.working_specimen_choice.get(), V.choice_text(home.catalogue.entry("SP-02")))
         self.assertEqual(self.inputs(application), before)
-        home.choose_working_specimen("SP-15")
-        self.assertEqual(home.specimen_choice.get(), V.choice_text(home.catalogue.entry("SP-13")))  # untouched
-        home.working_specimen_choice.set(H.NO_WORKING_SPECIMEN)
-        home.choose_working_specimen()
-        self.assertIsNone(home.working_specimen_id)
-        self.assertIn("None chosen", self.rows(home)["Working specimen"][1])
+        self.assertIsNone(home.workspace_context.requested_specimen_id)
+        self.assertFalse(home.workspace_context.specimen_known)
+        label = H.workspace_rows(home.workspace_context, specimen_name=home.specimen_name.get())[0]
+        self.assertEqual(label, (H.INFO, "Specimen", "SP-02 (your label; not looked up in any archive)."))
+        self.assertEqual(H.workspace_rows(home.workspace_context)[0][2], "Unnamed (a name is optional).")
 
-    def test_use_from_the_passport_updates_the_panel_and_runs_nothing(self):
+
+class NewSeriesTests(_Workspace):
+    def test_a_new_measurement_of_sp02_gets_nothing_from_the_archive(self):
         application, home = self.home()
-        home.choose_working_specimen("SP-02")
+        series = S.write_experiment(self.copies / "SP02_remeasured_2026-10-28.unv", S.E0 * 1.02, S.G0)
+        application.experimental_path.set(str(series))
+        self.settle(application)
+        home.specimen_name.set("SP-02")
+        self.established(application)
+        home = self.with_registration_records(application, geometry_verified_registration={
+            "registration_hash": SP02_PHYSICAL})
+        rows = self.rows(home)
+        self.assertEqual(rows["Experimental file"][1], str(series))  # not an error, not "unknown"
+        self.assertTrue(rows["Analysis"][1].startswith("SUCCESS"))
+        registration = rows["Registration"][1]
+        self.assertTrue(registration.startswith("UNKNOWN: registration 9b63f6c89133… was applied"), registration)
+        for word in ARCHIVE_WORDS:
+            self.assertNotIn(word, self.all_text(home), word)  # no old modal set, registration or status
+        self.assertEqual(rows["Registration"][0], H.MARKS[H.WARN])
+        self.assertIsNone(home.workspace_context.registration.catalogue_reference)
+
+    def test_even_the_archived_file_name_gets_no_archive_status(self):
+        application, home = self.home()
+        application.experimental_path.set(str(self.unv))  # the name the archive records for SP-02
+        self.settle(application)
+        home.specimen_name.set("SP-02")
+        home = self.refreshed(application)
+        self.assertNotEqual(home.workspace_context.modal_set.status, W.ModalSetStatus.GOVERNED)
+        for word in ARCHIVE_WORDS:
+            self.assertNotIn(word, self.all_text(home), word)
+        modal = self.rows(home)["Modal set"][1]
+        if not modal.startswith(("NOT_SELECTED", "NOT_CHECKED")):
+            self.assertIn("It is not compared with the research archive", modal)
+
+
+class ArchiveTests(_Workspace):
+    def test_the_research_archive_is_opened_only_by_its_explicit_action(self):
+        application, home = self.home()
+        before, rows = self.inputs(application), self.rows(home)
+        self.assertFalse(self.shown(home.cards["catalogue"]))
+        home.archive_button.invoke()
+        self.root.update()
+        self.assertTrue(home.research_archive_open)
+        self.assertTrue(self.shown(home.cards["catalogue"]))
+        self.assertEqual(int(home.cards["catalogue"].grid_info()["row"]),
+                         int(home.cards["workspace"].grid_info()["row"]) + 1)
+        self.assertEqual(len(home.specimen_combo.cget("values")), 14)  # the archive data are unchanged
+        self.assertEqual(str(home.archive_button.cget("text")), "Close research archive")
+        self.assertEqual((self.inputs(application), self.rows(home)), (before, rows))  # opening changes nothing
+        home.show_passport("SP-13")
+        self.root.update()
+        self.assertEqual((self.inputs(application), self.rows(home)), (before, rows))  # a passport: no workspace
+        home.archive_button.invoke()
+        self.root.update()
+        self.assertFalse(self.shown(home.cards["catalogue"]))
+        self.assertEqual(home.specimen_choice.get(), V.choice_text(home.catalogue.entry("SP-13")))  # kept, hidden
+
+    def test_locate_verify_use_from_the_archive_updates_the_workspace_and_runs_nothing(self):
+        application, home = self.home()
+        home.open_research_archive()
         home.show_passport("SP-02")
         item = next(item for item in home.local_sources if item.file_name == "SP02_polymax_retry_260803.unv")
         home.select_source(item)
         with mock.patch.object(H.filedialog, "askopenfilename", return_value=str(self.unv)):
             home.locate_local_file()
         self.assertEqual(home.local_check.status, L.BYTE_VERIFIED)
-        self.assertNotIn(str(self.unv), self.rows(home)["Experimental file"][1])  # Locate / Verify change nothing
+        self.assertNotEqual(self.rows(home)["Experimental file"][1], str(self.unv))  # Locate / Verify: nothing
         with mock.patch.object(application, "_start", side_effect=AssertionError("analysis started")):
             home.use_local_file(V.EXPERIMENTAL_SIDE)
             self.root.update()
         self.assertEqual(application.experimental_path.get(), str(self.unv))
         home = self.refreshed(application)
-        rows = self.rows(home)
-        self.assertIn(str(self.unv), rows["Experimental file"][1])
-        self.assertIn("is one recorded for SP-02 in the catalogue (name only: the file is not verified by this)",
-                      rows["Experimental file"][1])
+        self.assertEqual(self.rows(home)["Experimental file"][1], str(self.unv))
         self.assertFalse(application.running)
-        self.assertNotIn("SUCCESS", rows["Analysis"][1])
-        self.assertTrue(rows["Registration"][1].startswith("NONE"))
+        for word in ARCHIVE_WORDS:  # a verified archive file still gets no archive status in the workspace
+            self.assertNotIn(word, self.all_text(home), word)
 
 
 class ResultTests(_Workspace):
@@ -182,27 +256,6 @@ class ResultTests(_Workspace):
 
 
 class RegistrationTests(_Workspace):
-    def test_a_registration_hash_from_the_result_is_unknown_never_physical(self):
-        application, home = self.home()
-        self.established(application)
-        home.choose_working_specimen("SP-02")
-        home = self.with_registration_records(application, geometry_verified_registration={
-            "registration_hash": SP02_PHYSICAL, "specimen": "SP02"})
-        mark, text = self.rows(home)["Registration"]
-        self.assertTrue(text.startswith("UNKNOWN: registration 9b63f6c89133… was applied by reuse by FE geometry "
-                                        "identity, but its basis is not recorded"), text)
-        self.assertIn("no binding to this working set is confirmed", text)
-        self.assertIn("Catalogue (reference only): SP-02 records this hash as PHYSICAL", text)
-        self.assertNotIn("PHYSICAL (as stated)", text)
-        self.assertEqual(mark, H.MARKS[H.WARN])
-        self.assertIs(home.workspace_context.registration.kind, W.RegistrationKind.UNKNOWN)
-        self.assertFalse(home.workspace_context.registration.stated_physical_hash_recorded_in_catalogue)
-        home.choose_working_specimen("SP-13")  # another specimen: the hash is not attributed to it
-        text = self.rows(home)["Registration"][1]
-        self.assertTrue(text.startswith("UNKNOWN"))
-        self.assertNotIn("Catalogue (reference only)", text)
-        self.assertIn("The registration is not recorded in the catalogue for this specimen.", text)
-
     def test_conflicting_or_missing_registration_records(self):
         application, home = self.home()
         self.established(application)
@@ -236,11 +289,14 @@ class RegistrationTests(_Workspace):
             texts[kind] = text
         self.assertEqual(len(set(texts.values())), 5)
         self.assertIn("cross-reference only, not a verification of the data", texts[W.RegistrationKind.PHYSICAL])
-        self.assertNotIn("cross-reference", texts[W.RegistrationKind.LEGACY_REPLAY])
         self.assertNotEqual(H.REGISTRATION_STATES[W.RegistrationKind.PHYSICAL], H.OK)  # never a green "verified"
+        user = W.build_workspace_context(None, registration_hash=SP02_PHYSICAL, catalogue_view=catalogue)
+        text = H.workspace_rows(user, registration_how="a test")[5][2]  # the user's data: no archive words
+        self.assertTrue(text.startswith("UNKNOWN"))
+        self.assertNotIn("catalogue", text.lower())
 
 
-class ModalSetAndUnknownTests(_Workspace):
+class ModalSetTests(_Workspace):
     def test_the_modal_set_name_comes_from_the_discovered_set_object(self):
         def app(key, *sets):
             return SimpleNamespace(experimental_modal_set_key=SimpleNamespace(get=lambda: key),
@@ -253,45 +309,15 @@ class ModalSetAndUnknownTests(_Workspace):
         self.assertIn("could not be identified", H.selected_modal_set_name(app("other", bravo))[1])
         twin = SimpleNamespace(key="bravo-1-abc", display_name="Bravo (1)")
         self.assertIn("more than one set named", H.selected_modal_set_name(app("bravo-1", bravo, twin))[1])
-        self.assertIn("no recorded name",
-                      H.selected_modal_set_name(app("x", SimpleNamespace(key="x", display_name=" ")))[1])
-        context = W.build_workspace_context("SP-02", catalogue_view=V.load_catalogue())
-        row = H.workspace_rows(context, modal_set_note="the selected modal set could not be identified")[3]
-        self.assertEqual(row, (H.WARN, "Modal set", "NOT_CHECKED: the selected modal set could not be identified."))
-
-    def test_a_catalogue_modal_set_status_is_never_shown_as_confirmed(self):
-        context = W.build_workspace_context("SP-02", experimental_path=r"D:\x\SP02_polymax_retry_260803.unv",
+        context = W.build_workspace_context(None, experimental_path=r"D:\x\SP02_polymax_retry_260803.unv",
                                             modal_set="Bravo (1)", catalogue_view=V.load_catalogue())
-        self.assertIs(context.modal_set.status, W.ModalSetStatus.GOVERNED)
         state, caption, text = H.workspace_rows(context)[3]
-        self.assertEqual((state, caption), (H.INFO, "Modal set"))  # never a green confirmation from names
-        self.assertTrue(text.startswith("Bravo (1): catalogue status GOVERNED"), text)
-        self.assertIn("Matched by the set name and the file name (SP02_polymax_retry_260803.unv) only; the file "
-                      "content is not verified by this.", text)
-        wrong = W.build_workspace_context("SP-02", experimental_path=r"D:\x\SP02_polymax_retry_260803.unv",
-                                          modal_set="Bravo (2)", catalogue_view=V.load_catalogue())
-        self.assertEqual(H.workspace_rows(wrong)[3][:2], (H.WARN, "Modal set"))
-        self.assertIn("NOT_IN_CATALOGUE", H.workspace_rows(wrong)[3][2])
-
-    def test_the_real_modal_set_of_a_non_catalogue_file_is_not_given_a_catalogue_status(self):
-        _application, home = self.home()
-        home.choose_working_specimen("SP-02")
-        text = self.rows(home)["Modal set"][1]
-        self.assertNotIn("GOVERNED", text.split(":")[1] if ":" in text else text)
-        self.assertIsNot(home.workspace_context.modal_set.status, W.ModalSetStatus.GOVERNED)
-
-    def test_unknown_specimen_and_unusable_catalogue(self):
-        _application, home = self.home()
-        home.choose_working_specimen("SP-99")
-        self.assertIsNone(home.working_specimen_id)
-        context = W.build_workspace_context("SP-99", catalogue_view=V.load_catalogue())
-        self.assertIn("UNKNOWN: SP-99 is not in the catalogue", H.workspace_rows(context)[0][2])
-        with mock.patch.object(V, "CATALOGUE_PATH", self.folder / "missing.json"):
-            application, home = _Home.home(self)
-        self.assertEqual(str(home.working_specimen_combo.cget("state")), "disabled")
-        rows = self.rows(home)
-        self.assertIn("UNKNOWN: the specimen catalogue cannot be used", rows["Working specimen"][1])
-        self.assertTrue(rows["Production Auto-ID"][1].startswith("NOT_AUTHORISED"))
+        self.assertEqual((state, caption), (H.INFO, "Modal set"))
+        self.assertEqual(text, "Bravo (1): selected in the experimental file. It is not compared with the research "
+                               "archive, so no archive status is given to it.")
+        unresolved = H.workspace_rows(context, modal_set_note="the selected modal set could not be identified")[3]
+        self.assertEqual(unresolved, (H.WARN, "Modal set",
+                                      "NOT_CHECKED: the selected modal set could not be identified."))
 
 
 class BlockAndSwitchTests(_Workspace):
@@ -299,7 +325,7 @@ class BlockAndSwitchTests(_Workspace):
         application, home = self.home()
         states = [self.rows(home)["Production Auto-ID"]]
         self.established(application)
-        home.choose_working_specimen("SP-02")
+        home.specimen_name.set("SP-02")
         home = self.with_registration_records(application, geometry_verified_registration={
             "registration_hash": SP02_PHYSICAL})
         states.append(self.rows(home)["Production Auto-ID"])
@@ -307,17 +333,17 @@ class BlockAndSwitchTests(_Workspace):
             self.assertEqual(mark, H.MARKS[H.NEEDED])
             self.assertTrue(text.startswith("NOT_AUTHORISED: blocked. NO_TRUSTED_AUTHORISATION_SOURCE"), text)
 
-    def test_home_and_expert_switching_keeps_the_working_specimen(self):
+    def test_home_and_expert_switching_keeps_the_workspace(self):
         application, home = self.home()
         self.established(application)
-        home.choose_working_specimen("SP-02")
-        before = (self.inputs(application), self.rows(home))
+        home.specimen_name.set("my plate")
+        before = (self.inputs(application), self.rows(home), home.research_archive_open)
         for view in (H.EXPERT, H.HOME, H.EXPERT, H.HOME):
             application._show_view(view)
             self.root.update()
         home = self.refreshed(application)
-        self.assertEqual(home.working_specimen_id, "SP-02")
-        self.assertEqual((self.inputs(application), self.rows(home)), before)
+        self.assertEqual(home.specimen_name.get(), "my plate")
+        self.assertEqual((self.inputs(application), self.rows(home), home.research_archive_open), before)
         self.assertEqual(len(application.tabs.tabs()), 11)
 
 

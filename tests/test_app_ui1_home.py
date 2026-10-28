@@ -420,17 +420,23 @@ class LayoutTests(_Home):
         scaling = float(self.root.tk.call("tk", "scaling"))
         for width, columns in ((int(2000 * scaling / (96 / 72)), 2), (int(600 * scaling / (96 / 72)), 1),
                                (int(2000 * scaling / (96 / 72)), 2)):
-            home._canvas_resized(SimpleNamespace(width=width))
-            placed = {key: (int(card.grid_info()["row"]), int(card.grid_info()["column"]))
-                      for key, card in home.cards.items()}
-            if columns == 2:  # APP-WORKSPACE.2 / APP-CATALOG.1: the workspace, then the passport, full width
-                self.assertEqual(placed, {"sources": (0, 0), "readiness": (0, 1), "results": (1, 0),
-                                          "material": (1, 1), "workspace": (2, 0), "catalogue": (3, 0)})
-            else:
-                self.assertEqual(placed, {"sources": (0, 0), "readiness": (1, 0), "results": (2, 0),
-                                          "material": (3, 0), "workspace": (4, 0), "catalogue": (5, 0)})
-            self.assertEqual(int(home.cards["workspace"].grid_info()["columnspan"]), columns)
-            self.assertEqual(int(home.cards["catalogue"].grid_info()["columnspan"]), columns)
+            for archive_open in (False, True, False):  # APP-WORKSPACE.2-F1: the archive only when opened
+                home.toggle_research_archive(archive_open)
+                home._canvas_resized(SimpleNamespace(width=width))
+                placed = {key: (int(card.grid_info()["row"]), int(card.grid_info()["column"]))
+                          for key, card in home.cards.items() if card.winfo_manager()}
+                if columns == 2:  # APP-WORKSPACE.2 / APP-CATALOG.1: the workspace, then the passport, full width
+                    expected = {"sources": (0, 0), "readiness": (0, 1), "results": (1, 0), "material": (1, 1),
+                                "workspace": (2, 0), "catalogue": (3, 0)}
+                else:
+                    expected = {"sources": (0, 0), "readiness": (1, 0), "results": (2, 0), "material": (3, 0),
+                                "workspace": (4, 0), "catalogue": (5, 0)}
+                if not archive_open:
+                    del expected["catalogue"]
+                self.assertEqual(placed, expected)
+                self.assertEqual(int(home.cards["workspace"].grid_info()["columnspan"]), columns)
+                if archive_open:
+                    self.assertEqual(int(home.cards["catalogue"].grid_info()["columnspan"]), columns)
 
     def test_interface_scale_and_window_sizes_keep_home_usable(self):
         application, home = self.home()

@@ -19,14 +19,18 @@ one field of 1. Files, exactly as its Browse button does (the variable's existin
 APP-WORKSPACE.2 adds *Current workspace* between the four areas and the passport. It shows the state of the program
 through the headless model ``services.workspace_context``:
 
-- a working specimen, chosen explicitly there (Home's own choice, separate from the passport's);
+- the user's own data, with an optional label of the user's (never looked up in any archive);
 - the FE and experimental files and the modal set currently set in the program;
 - the state of the analysis result;
 - the registration that result applied, and the production Auto-ID block.
 
-The registration kind is never inferred: a result records the hash of the registration it applied, not its basis,
-so that is shown as UNKNOWN (the catalogue record of the hash is reference only). Choosing a working specimen
-changes no input and runs nothing.
+With no file chosen it shows an empty workspace that asks for the two files. Any supported FE / UNV / UFF file is a
+workspace, whether or not the laboratory archive records it, and nothing of the archive (modal-set status,
+registration, scientific status) is attributed to it (APP-WORKSPACE.2-F1). The registration kind is never inferred:
+a result records the hash of the registration it applied, not its basis, so that is shown as UNKNOWN.
+
+The specimen catalogue (the research archive of SP-01 ... SP-15) is not shown by default: only the explicit
+**Open research archive...** shows it, and its data are unchanged.
 
 It owns no data and starts no computation of its own. Every action calls the existing handlers of the main window:
 
@@ -100,11 +104,15 @@ NO_REFERENCE_WARNING = (
     "FE-experiment pairing is chosen."
 )
 WORKSPACE_SUBTITLE = (
-    "The specimen you are working on, with the files, modal set, result and registration currently set in the "
-    "program. Choosing the working specimen changes no input and runs nothing; the passport below is chosen "
-    "separately."
+    "The data you are working with: the FE and experimental files, the modal set, the analysis result and its "
+    "registration, as currently set in the program. No laboratory archive record is needed."
 )
-NO_WORKING_SPECIMEN = "(no working specimen)"
+EMPTY_WORKSPACE_TEXT = (
+    "No data loaded yet. Choose an FE results file (an Abaqus .odb or an extracted manifest.json) and an "
+    "experimental file (a Simcenter Testlab .unv / .uff) to start."
+)
+SPECIMEN_NAME_HINT = "Optional: your own label for this data. It is not looked up in any archive."
+OPEN_ARCHIVE_TEXT, CLOSE_ARCHIVE_TEXT = "Open research archive...", "Close research archive"
 # the result records of a frozen registration the analysis applied: (metadata key, how it was applied)
 APPLIED_REGISTRATION_RECORDS = (
     ("governed_registration", "the accepted physical registration option"),
@@ -467,19 +475,27 @@ def _registration_row(context: "workspace.WorkspaceContext", how: str, conflicti
         text += (f"\nCatalogue (reference only): {context.specimen_id} records this hash as {reference.kind.value} "
                  f"({reference.status_text}).")
     for issue in registration.issues:
-        if not issue.startswith("no registration basis is stated"):  # said above in plain words
-            text += f"\n{issue[:1].upper()}{issue[1:]}."
+        if issue.startswith("no registration basis is stated"):  # said above in plain words
+            continue
+        if context.requested_specimen_id is None and "catalogue" in issue:
+            continue  # the user's data is not compared with the archive at all
+        text += f"\n{issue[:1].upper()}{issue[1:]}."
     return REGISTRATION_STATES[kind], "Registration", text
 
 
 def workspace_rows(context: "workspace.WorkspaceContext", modal_set_note: str = "", result_note: str = "",
-                   registration_how: str = "", registration_conflict: bool = False) -> list[tuple[str, str, str]]:
-    """(state, caption, text) rows of the Current workspace panel; every value comes from ``context``."""
-    if context.catalogue_problem:
+                   registration_how: str = "", registration_conflict: bool = False,
+                   specimen_name: str = "") -> list[tuple[str, str, str]]:
+    """(state, caption, text) rows of the Current workspace panel; every value comes from ``context``.
+
+    Home builds the context of the user's data without an archive specimen (``specimen_id`` None): the user's
+    optional ``specimen_name`` is a label only, so nothing of the archive is attributed to the data."""
+    if context.requested_specimen_id is None:
+        specimen = (INFO, "Specimen", f"{specimen_name.strip()} (your label; not looked up in any archive)."
+                    if specimen_name.strip() else "Unnamed (a name is optional).")
+    elif context.catalogue_problem:
         specimen = (WARN, "Working specimen", f"UNKNOWN: the specimen catalogue cannot be used "
                                               f"({context.catalogue_problem}).")
-    elif context.requested_specimen_id is None:
-        specimen = (INFO, "Working specimen", "None chosen. Choosing one changes no input and runs nothing.")
     elif not context.specimen_known:
         specimen = (WARN, "Working specimen", f"UNKNOWN: {context.requested_specimen_id} is not in the catalogue.")
     else:
@@ -490,6 +506,9 @@ def workspace_rows(context: "workspace.WorkspaceContext", modal_set_note: str = 
         modal_row = (WARN, "Modal set", f"{workspace.ModalSetStatus.NOT_CHECKED.value}: {modal_set_note}.")
     elif modal.status is workspace.ModalSetStatus.NOT_SELECTED:
         modal_row = (INFO, "Modal set", "NOT_SELECTED: no modal set is selected.")
+    elif context.requested_specimen_id is None:  # the user's data: no archive status is looked up or given
+        modal_row = (INFO, "Modal set", f"{modal.name}: selected in the experimental file. It is not compared with "
+                                        "the research archive, so no archive status is given to it.")
     elif modal.catalogue_set is not None:  # found by the set name in a file of the same name: names only
         modal_row = (INFO, "Modal set", f"{modal.name}: catalogue status {modal.status.value} ({modal.reason}). "
                                         f"Matched by the set name and the file name "
@@ -691,56 +710,79 @@ class HomeDashboard:
             self._catalogue_message(CATALOGUE_PROMPT)
 
     def _build_workspace(self) -> None:
-        """APP-WORKSPACE.2: the working specimen (Home's own choice) and the state of the program, read only."""
+        """APP-WORKSPACE.2 / F1: the user's own data, independent of the laboratory archive; read only."""
+        app = self.app
         card = self._card("workspace", "Current workspace", WORKSPACE_SUBTITLE)
-        card.columnconfigure(1, weight=0)
-        card.columnconfigure(2, weight=1)
-        ttk.Label(card, text="Choose", style="MetricCaption.TLabel").grid(row=2, column=0, columnspan=2, sticky="w",
-                                                                         padx=(0, 10))
-        self.working_specimen_choices = {catalogue_view.choice_text(entry): entry["specimen_id"]
-                                         for entry in self.catalogue.specimens}
-        self.working_specimen_id: Optional[str] = None
-        self.working_specimen_choice = tk.StringVar(master=self.app.root, value=NO_WORKING_SPECIMEN)  # Home's own
-        self.working_specimen_combo = ttk.Combobox(
-            card, textvariable=self.working_specimen_choice, width=44,
-            state="disabled" if self.catalogue.problem else "readonly",
-            values=(NO_WORKING_SPECIMEN,) + tuple(self.working_specimen_choices))
-        self.working_specimen_combo.grid(row=2, column=2, sticky="w")
-        self.working_specimen_combo.bind("<<ComboboxSelected>>", lambda _event: self.choose_working_specimen(),
-                                         add="+")
-        self.working_specimen_combo.bind("<MouseWheel>", self._combo_wheel)
+        card.columnconfigure(0, weight=1)
+        self.workspace_empty = ttk.Frame(card)  # shown while no file is chosen
+        self.workspace_empty.grid(row=2, column=0, columnspan=3, sticky="ew")
+        self.workspace_empty.columnconfigure(0, weight=1)
+        self.workspace_empty_text = self._wrap(ttk.Label(self.workspace_empty, text=f"{MARKS[INFO]}  "
+                                                         f"{EMPTY_WORKSPACE_TEXT}", foreground=COLOURS[INFO],
+                                                         justify="left"), card)
+        self.workspace_empty_text.grid(row=0, column=0, sticky="ew")
+        choose = ttk.Frame(self.workspace_empty)
+        choose.grid(row=1, column=0, sticky="w", pady=(8, 0))
+        self.workspace_choose_fe = ttk.Button(choose, text="Choose FE file...", command=app._choose_abaqus)
+        self.workspace_choose_experiment = ttk.Button(choose, text="Choose experimental file...",
+                                                      command=app._choose_experiment)
+        self.workspace_choose_fe.grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.workspace_choose_experiment.grid(row=0, column=1, sticky="w")
+        self.workspace_details = ttk.Frame(card)  # shown once a file is chosen, whatever the archive records
+        self.workspace_details.grid(row=3, column=0, columnspan=3, sticky="ew")
+        self.workspace_details.columnconfigure(2, weight=1)
+        ttk.Label(self.workspace_details, text="Specimen name", style="MetricCaption.TLabel").grid(
+            row=0, column=1, sticky="w", padx=(0, 10), pady=2)
+        self.specimen_name = tk.StringVar(master=app.root, value="")  # Home's own label: no window state
+        name = ttk.Frame(self.workspace_details)
+        name.grid(row=0, column=2, sticky="ew", pady=2)
+        self.specimen_name_entry = ttk.Entry(name, textvariable=self.specimen_name, width=32)
+        self.specimen_name_entry.grid(row=0, column=0, sticky="w")
+        ttk.Label(name, text=SPECIMEN_NAME_HINT, style="Secondary.TLabel").grid(row=0, column=1, sticky="w",
+                                                                               padx=(8, 0))
         self.workspace_rows = []
-        for row in range(7):
-            mark = ttk.Label(card, text="", width=2)
-            caption = ttk.Label(card, text="", style="MetricCaption.TLabel")
-            text = self._wrap(ttk.Label(card, text="", justify="left"), card)
-            mark.grid(row=row + 3, column=0, sticky="nw", pady=2)
-            caption.grid(row=row + 3, column=1, sticky="nw", padx=(0, 10), pady=2)
-            text.grid(row=row + 3, column=2, sticky="ew", pady=2)
+        for row in range(6):  # FE file, experimental file, modal set, analysis, registration, production Auto-ID
+            mark = ttk.Label(self.workspace_details, text="", width=2)
+            caption = ttk.Label(self.workspace_details, text="", style="MetricCaption.TLabel")
+            text = self._wrap(ttk.Label(self.workspace_details, text="", justify="left"), card)
+            mark.grid(row=row + 1, column=0, sticky="nw", pady=2)
+            caption.grid(row=row + 1, column=1, sticky="nw", padx=(0, 10), pady=2)
+            text.grid(row=row + 1, column=2, sticky="ew", pady=2)
             self.workspace_rows.append((mark, caption, text))
+        self.research_archive_open = False
+        self.archive_button = ttk.Button(card, text=OPEN_ARCHIVE_TEXT, command=self.toggle_research_archive)
+        self.archive_button.grid(row=4, column=0, columnspan=3, sticky="w", pady=(10, 0))
         self.workspace_context = None
+        self.specimen_name.trace_add("write", lambda *_args: self._refresh_workspace())
 
-    def choose_working_specimen(self, specimen_id: Optional[str] = None) -> None:
-        """Set the working specimen (from the list, or ``specimen_id``); no input of the program changes."""
-        if specimen_id is None:
-            specimen_id = self.working_specimen_choices.get(self.working_specimen_choice.get())
-        entry = self.catalogue.entry(specimen_id) if specimen_id and not self.catalogue.problem else None
-        self.working_specimen_id = entry["specimen_id"] if entry is not None else None
-        choice = catalogue_view.choice_text(entry) if entry is not None else NO_WORKING_SPECIMEN
-        if self.working_specimen_choice.get() != choice:
-            self.working_specimen_choice.set(choice)
-        self._refresh_workspace()
+    def toggle_research_archive(self, show: Optional[bool] = None) -> None:
+        """Show or hide the research archive (the laboratory specimen catalogue); it is never shown by default."""
+        self.research_archive_open = (not self.research_archive_open) if show is None else bool(show)
+        self.archive_button.configure(text=CLOSE_ARCHIVE_TEXT if self.research_archive_open else OPEN_ARCHIVE_TEXT)
+        columns, self._columns = self._columns, None
+        self._layout(columns or 2)
+        self._schedule_rewrap()
+
+    def open_research_archive(self) -> None:
+        self.toggle_research_archive(True)
 
     def _refresh_workspace(self) -> None:
         app = self.app
+        loaded = bool(_get(app.abaqus_path) or _get(app.experimental_path))
+        if loaded:
+            self.workspace_empty.grid_remove()
+            self.workspace_details.grid()
+        else:
+            self.workspace_details.grid_remove()
+            self.workspace_empty.grid()
         modal_set, modal_set_note = selected_modal_set_name(app)
         result, result_note = workspace_result(app)
         digest, how, conflicting = applied_registration(app)
-        self.workspace_context = workspace.build_workspace_context(
-            self.working_specimen_id, fe_path=_get(app.abaqus_path) or None,
-            experimental_path=_get(app.experimental_path) or None, modal_set=modal_set,
-            registration_hash=digest, result=result, catalogue_view=self.catalogue)
-        rows = workspace_rows(self.workspace_context, modal_set_note, result_note, how, conflicting)
+        self.workspace_context = workspace.build_workspace_context(  # the user's data: no archive specimen
+            None, fe_path=_get(app.abaqus_path) or None, experimental_path=_get(app.experimental_path) or None,
+            modal_set=modal_set, registration_hash=digest, result=result, catalogue_view=self.catalogue)
+        rows = workspace_rows(self.workspace_context, modal_set_note, result_note, how, conflicting,
+                              specimen_name=self.specimen_name.get())[1:]  # the name has its own entry
         for (mark, caption, text), (state, title, value) in zip(self.workspace_rows, rows):
             mark.configure(text=MARKS[state], foreground=COLOURS[state])
             caption.configure(text=title)
@@ -982,8 +1024,9 @@ class HomeDashboard:
         below = len(order) // columns
         self.cards["workspace"].grid(row=below, column=0, columnspan=columns, sticky="nsew",
                                      pady=(0, 8))  # the current workspace: the full width, below the four areas
-        self.cards["catalogue"].grid(row=below + 1, column=0, columnspan=columns, sticky="nsew",
-                                     pady=(0, 8))  # the specimen passport: the full width, below the workspace
+        if getattr(self, "research_archive_open", False):  # F1: only after Open research archive...
+            self.cards["catalogue"].grid(row=below + 1, column=0, columnspan=columns, sticky="nsew",
+                                         pady=(0, 8))  # the specimen passport: the full width, below the workspace
 
     def _rewrap(self, card, width: int) -> bool:
         """Each wrapped label wraps at the card's right edge, from where its column starts. False when a label is not
@@ -993,7 +1036,7 @@ class HomeDashboard:
             if owner is card:
                 try:
                     if not label.winfo_ismapped():
-                        placed = False
+                        placed = placed and not self._shown(label, card)  # a hidden part is not waited for
                         continue
                     offset = max(0, label.winfo_rootx() - card.winfo_rootx())
                     wrap = max(160, width - offset - 30)
@@ -1002,6 +1045,16 @@ class HomeDashboard:
                 except tk.TclError:
                     pass
         return placed
+
+    @staticmethod
+    def _shown(label, card) -> bool:
+        """True when ``label`` and every container up to ``card`` are placed (so it is only waiting for layout)."""
+        widget = label
+        while widget is not None and widget is not card:
+            if not widget.winfo_manager():
+                return False
+            widget = widget.master
+        return True
 
     def _schedule_rewrap(self) -> None:
         """After the layout has settled (a resize, a new text, Home shown again), never during it."""
@@ -1016,7 +1069,8 @@ class HomeDashboard:
         try:
             if not self.frame.winfo_ismapped():
                 return  # Home is hidden: wrapped when it is shown again (refresh)
-            placed = [self._rewrap(card, card.winfo_width()) for card in self.cards.values()]
+            placed = [self._rewrap(card, card.winfo_width()) for card in self.cards.values()
+                      if card.winfo_manager()]  # a closed research archive is not laid out
         except tk.TclError:
             return
         if not all(placed):
