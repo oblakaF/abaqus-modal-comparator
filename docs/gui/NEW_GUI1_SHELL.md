@@ -174,7 +174,10 @@ The smoke used the existing Tkinter program as LEGACY_GUI and this window as NEW
   `requirements-new-gui.txt`.
 - It runs the suite with `QT_QPA_PLATFORM=offscreen` and `NEW_GUI_REQUIRE_QT=1`. Without that variable, the Qt
   tests skip with an explicit reason when PySide6 is missing; with it, a missing PySide6 is an error.
-- A separate step fails when no Qt test passed or any was skipped.
+- A separate step runs the Qt tests on their own. It fails unless at least 18 ran and the result line is a plain
+  `OK` (none skipped).
+  - It replaced a first check that counted the `... ok` lines of the whole log. That check counted only 13 of 18 in
+    CI run 40712738887, because Qt messages written to the same stream can break those lines.
 
 ## Limits
 

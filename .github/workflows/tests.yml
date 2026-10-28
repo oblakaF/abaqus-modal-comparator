@@ -26,14 +26,19 @@ jobs:
         run: |
           set -o pipefail
           python -m unittest discover -s tests -v 2>&1 | tee test-results.txt
-      - name: Check that the new interface Qt tests ran (not skipped)
+      - name: Check that the new interface Qt tests run offscreen (none skipped)
+        if: always()
         shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+          NEW_GUI_REQUIRE_QT: "1"
         run: |
-          ran=$(grep -cE '^test_.* \(test_new_gui1_qt\..*\) \.\.\. ok$' test-results.txt || true)
-          skipped=$(grep -cE '\(test_new_gui1_qt\..*\) \.\.\. skipped' test-results.txt || true)
-          echo "::notice title=NEW-GUI.1 Qt tests::${ran} passed offscreen, ${skipped} skipped"
-          test "${ran:-0}" -gt 0
-          test "${skipped:-0}" -eq 0
+          set -o pipefail
+          python -m unittest discover -s tests -p "test_new_gui1_qt.py" 2>&1 | tee qt-test-results.txt
+          ran=$(grep -oE '^Ran [0-9]+ test' qt-test-results.txt | grep -oE '[0-9]+')
+          echo "::notice title=NEW-GUI.1 Qt tests::Ran ${ran} Qt tests offscreen; result line: $(grep -E '^(OK|FAILED)' qt-test-results.txt)"
+          test "${ran:-0}" -ge 18
+          grep -qxE 'OK' qt-test-results.txt  # plain OK: no test skipped
       - name: Run M11 R6.5 research synthetic tests (no real data)
         if: always()
         shell: bash
@@ -51,4 +56,5 @@ jobs:
           name: python-test-results
           path: |
             test-results.txt
+            qt-test-results.txt
             research-test-results.txt
