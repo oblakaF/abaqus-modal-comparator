@@ -8,6 +8,10 @@ NEW-GUI.2: **Inspect file** reads the chosen file of one side in a background th
 (``new_gui.preview_model.run_read``) and shows the read content in that side's ``PreviewPanel``. Replacing or
 clearing the file, or closing the window, cancels the read; an outcome that is not the current read of the current
 file is discarded, never shown.
+
+NEW-GUI.3: below each content panel, a ``ShapePanel`` draws one chosen FE mode or experimental record of the read
+preview with the services' own drawing. It is reset whenever its preview goes (file replaced or cleared, Inspect
+again, window closed).
 """
 
 from __future__ import annotations
@@ -27,6 +31,7 @@ from new_gui import APP_NAME, STAGE
 from new_gui.archive_dialog import ArchiveDialog
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
+from new_gui.shape_panel import ShapePanel
 from new_gui.workspace_state import (ANALYSIS_NOTE, ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE,
                                      KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
                                      scientific_status)
@@ -331,8 +336,10 @@ class MainWindow(QMainWindow):
             self.sources.addWidget(self.cards[kind], 1, Qt.AlignmentFlag.AlignTop)
         layout.addLayout(self.sources)
         self.panels = {kind: PreviewPanel(kind) for kind in KINDS}  # full width: the tables need it
+        self.shape_panels = {kind: ShapePanel(kind) for kind in KINDS}  # NEW-GUI.3: below each content panel
         for kind in KINDS:
             layout.addWidget(self.panels[kind])
+            layout.addWidget(self.shape_panels[kind])
         layout.addStretch(1)
         return page
 
@@ -474,18 +481,24 @@ class MainWindow(QMainWindow):
         return (any(slot.state == READING for slot in self.slots.values())
                 or any(thread.is_alive() for thread in self._threads))
 
+    def busy(self) -> bool:
+        """A read or a shape drawing is still running."""
+        return self.reading() or any(panel.busy() for panel in self.shape_panels.values())
+
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
-        """Process events until no read is running (tests and checks); returns whether every read ended."""
+        """Process events until no read or drawing is running (tests and checks); returns whether all ended."""
         end = time.monotonic() + timeout
-        while self.reading() and time.monotonic() < end:
+        while self.busy() and time.monotonic() < end:
             QApplication.processEvents()
             time.sleep(0.02)
         QApplication.processEvents()
-        return not self.reading()
+        return not self.busy()
 
     def closeEvent(self, event) -> None:
         for slot in self.slots.values():  # running reads are cancelled and their outcomes discarded
             slot.reset()
+        for panel in self.shape_panels.values():  # and so are running drawings
+            panel.cancel()
         super().closeEvent(event)
 
     def _label_changed(self, text: str) -> None:
@@ -517,6 +530,9 @@ class MainWindow(QMainWindow):
         for kind, card in self.cards.items():
             card.show_state(self.workspace, self.messages[kind], self.slots[kind])
             self.panels[kind].show_slot(self.slots[kind], self.workspace.choice(kind).chosen)
+            slot = self.slots[kind]
+            self.shape_panels[kind].set_preview(slot.preview if slot.state == READ
+                                                and self.workspace.choice(kind).chosen else None)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
