@@ -13,7 +13,9 @@ It is the state a future GUI shows, built from:
 
 Registrations are kept apart: PHYSICAL (SPEC section 11 physical registration), LEGACY_REPLAY (replay of an archived
 historical registration; not SPEC section 11 evidence), INCOMPLETE (no physical reference), NONE (no registration in
-use) and UNKNOWN (a registration whose basis cannot be established). A kind is never upgraded.
+use) and UNKNOWN (a registration whose basis is not stated or cannot be established; a hash alone is UNKNOWN even
+when the catalogue records it as physical). A kind is never upgraded, and a catalogue record of the same hash is
+reference information only: it is never a verification that the registration applies to the selected files.
 
 The model computes no scientific quantity and changes no scientific rule.
 """
@@ -194,16 +196,25 @@ class ModalSetState:
 
 @dataclass(frozen=True)
 class RegistrationState:
+    """The registration the session states it uses, with the catalogue record of the same hash for reference.
+
+    ``kind`` is the stated basis only: a hash without a stated basis is UNKNOWN, whatever the catalogue records for
+    it. ``catalogue_reference`` is reference information: it says what the catalogue records under that hash for
+    this specimen, never that the registration is in use, applies to the selected FE / experimental files or was
+    verified against them (that is done only by the comparison's own registration binding)."""
+
     kind: RegistrationKind
     registration_hash: Optional[str] = None
-    catalogue_match: Optional[CatalogueRegistration] = None
+    catalogue_reference: Optional[CatalogueRegistration] = None
     issues: tuple[str, ...] = ()
 
     @property
-    def physical_confirmed_by_catalogue(self) -> bool:
-        """PHYSICAL in use and the same hash is the catalogue's physical registration of this specimen."""
-        return (self.kind is RegistrationKind.PHYSICAL and self.catalogue_match is not None
-                and self.catalogue_match.kind is RegistrationKind.PHYSICAL and not self.issues)
+    def stated_physical_hash_recorded_in_catalogue(self) -> bool:
+        """A cross-reference only: the stated basis is PHYSICAL and its hash is the catalogue's physical registration
+        record of this specimen, with no issue. Not a physical verification of the data and not a statement that the
+        registration applies to the selected FE / experimental files."""
+        return (self.kind is RegistrationKind.PHYSICAL and self.catalogue_reference is not None
+                and self.catalogue_reference.kind is RegistrationKind.PHYSICAL and not self.issues)
 
 
 @dataclass(frozen=True)
@@ -300,24 +311,25 @@ def _registration_state(record: Optional[SpecimenRecord], basis: Optional[Regist
         raise WorkspaceContextError(f"registration basis must be a RegistrationBasisStatus, not {basis!r}")
     if registration_hash is not None and (not isinstance(registration_hash, str) or not registration_hash.strip()):
         raise WorkspaceContextError("registration hash must be a non-empty string or None")
-    match = None
+    reference = None
     if record is not None and registration_hash:
-        match = next((item for item in record.registrations if item.registration_hash == registration_hash), None)
+        reference = next((item for item in record.registrations if item.registration_hash == registration_hash), None)
     if basis is None and not registration_hash:
         return RegistrationState(RegistrationKind.NONE)
-    if basis is None:  # a hash without a stated basis: the catalogue's own kind, or UNKNOWN
-        kind = match.kind if match is not None else RegistrationKind.UNKNOWN
-        issues = () if match is not None else ("the registration is not recorded in the catalogue for this specimen",)
-        return RegistrationState(kind, registration_hash, match, issues)
-    kind = RegistrationKind(basis.value)
     issues = []
-    if match is not None and match.kind is not kind:
-        issues.append(f"the catalogue records this registration as {match.kind.value}, not {kind.value}")
-    if registration_hash and match is None:
+    if registration_hash and reference is None:
         issues.append("the registration is not recorded in the catalogue for this specimen")
+    if basis is None:  # a hash alone never establishes the registration in use, not even a catalogue PHYSICAL one
+        issues.insert(0, "no registration basis is stated: the registration in use is UNKNOWN"
+                         + (f" (the catalogue records this hash as {reference.kind.value}; reference only)"
+                            if reference is not None else ""))
+        return RegistrationState(RegistrationKind.UNKNOWN, registration_hash, reference, tuple(issues))
+    kind = RegistrationKind(basis.value)
+    if reference is not None and reference.kind is not kind:
+        issues.append(f"the catalogue records this registration as {reference.kind.value}, not {kind.value}")
     if kind is RegistrationKind.PHYSICAL and not registration_hash:
         issues.append("a PHYSICAL registration without a registration hash cannot be matched to the catalogue")
-    return RegistrationState(kind, registration_hash, match, tuple(issues))
+    return RegistrationState(kind, registration_hash, reference, tuple(issues))
 
 
 def _modal_set_state(record: Optional[SpecimenRecord], name: Optional[str],

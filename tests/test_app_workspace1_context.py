@@ -160,48 +160,98 @@ class ModalSetTests(unittest.TestCase):
 class RegistrationTests(unittest.TestCase):
     def test_no_registration(self):
         state = context("SP-02").registration
-        self.assertEqual((state.kind, state.registration_hash, state.catalogue_match, state.issues),
+        self.assertEqual((state.kind, state.registration_hash, state.catalogue_reference, state.issues),
                          (W.RegistrationKind.NONE, None, None, ()))
-        self.assertFalse(state.physical_confirmed_by_catalogue)
+        self.assertFalse(state.stated_physical_hash_recorded_in_catalogue)
         self.assertIn("registration", context("SP-02").missing)
 
-    def test_physical_registration_confirmed_by_the_catalogue(self):
+    def test_a_hash_without_a_basis_is_unknown_even_when_the_catalogue_records_it_as_physical(self):
+        for specimen_id, digest, recorded in (("SP-02", SP02_PHYSICAL, W.RegistrationKind.PHYSICAL),
+                                              ("SP-13", SP13_PHYSICAL, W.RegistrationKind.PHYSICAL),
+                                              ("SP-02", SP02_LEGACY, W.RegistrationKind.LEGACY_REPLAY)):
+            state = context(specimen_id, registration_hash=digest).registration
+            self.assertEqual(state.kind, W.RegistrationKind.UNKNOWN, (specimen_id, digest))
+            self.assertEqual(state.catalogue_reference.kind, recorded)  # kept as reference information only
+            self.assertIn("no registration basis is stated", state.issues[0])
+            self.assertIn("reference only", state.issues[0])
+            self.assertFalse(state.stated_physical_hash_recorded_in_catalogue)
+        unrecorded = context("SP-02", registration_hash="0" * 64).registration
+        self.assertEqual((unrecorded.kind, unrecorded.catalogue_reference), (W.RegistrationKind.UNKNOWN, None))
+        self.assertEqual(len(unrecorded.issues), 2)
+
+    def test_a_hash_of_another_specimen_is_not_attributed(self):
+        for basis in (None, RegistrationBasisStatus.PHYSICAL):
+            state = context("SP-01", registration_basis=basis, registration_hash=SP02_PHYSICAL).registration
+            self.assertIsNone(state.catalogue_reference)  # SP-02's record is not looked up for SP-01
+            self.assertFalse(state.stated_physical_hash_recorded_in_catalogue)
+            self.assertIn("not recorded in the catalogue for this specimen", " ".join(state.issues))
+        self.assertEqual(context("SP-01", registration_hash=SP02_PHYSICAL).registration.kind,
+                         W.RegistrationKind.UNKNOWN)
+        crossed = context("SP-13", registration_basis=RegistrationBasisStatus.PHYSICAL,
+                          registration_hash=SP02_PHYSICAL).registration
+        self.assertIsNone(crossed.catalogue_reference)
+        self.assertFalse(crossed.stated_physical_hash_recorded_in_catalogue)
+
+    def test_an_explicit_physical_basis_is_only_a_catalogue_cross_reference(self):
         for specimen_id, digest in (("SP-02", SP02_PHYSICAL), ("SP-13", SP13_PHYSICAL)):
             state = context(specimen_id, registration_basis=RegistrationBasisStatus.PHYSICAL,
                             registration_hash=digest).registration
-            self.assertEqual(state.kind, W.RegistrationKind.PHYSICAL)
-            self.assertTrue(state.physical_confirmed_by_catalogue, specimen_id)
+            self.assertEqual((state.kind, state.issues), (W.RegistrationKind.PHYSICAL, ()))
+            self.assertTrue(state.stated_physical_hash_recorded_in_catalogue, specimen_id)
+        names = {name for name in dir(W.RegistrationState) if not name.startswith("_")}
+        self.assertFalse({name for name in names if any(word in name for word in ("verif", "confirm", "appl"))},
+                         names)  # nothing reads as a physical verification or as applicability to the data
+
+    def test_the_registration_is_never_said_to_apply_to_the_selected_files(self):
+        # SP-02's physical registration stated with SP-13's FE and experimental files: the catalogue cross-reference
+        # holds, but nothing in the context relates it to these files, and the files do not match SP-02's records
+        state = context("SP-02", fe_path=r"D:\x\SP13_modal.odb", experimental_path=r"D:\x\SP13_a_polymax.unv",
+                        modal_set="Bravo (1)", registration_basis=RegistrationBasisStatus.PHYSICAL,
+                        registration_hash=SP02_PHYSICAL)
+        self.assertTrue(state.registration.stated_physical_hash_recorded_in_catalogue)
+        self.assertFalse(state.fe_source.catalogue_name_match)
+        self.assertFalse(state.experimental_source.catalogue_name_match)
+        self.assertEqual(state.modal_set.status, W.ModalSetStatus.NOT_CHECKED)
+        self.assertEqual(state.registration, context("SP-02", registration_basis=RegistrationBasisStatus.PHYSICAL,
+                                                     registration_hash=SP02_PHYSICAL).registration)  # files ignored
+        self.assertIn("never that the registration is in use, applies to the selected FE / experimental files",
+                      " ".join(W.RegistrationState.__doc__.split()))
 
     def test_legacy_replay_is_kept_apart_and_never_upgraded(self):
         replay = context("SP-02", registration_basis=RegistrationBasisStatus.LEGACY_REPLAY,
                          registration_hash=SP02_LEGACY).registration
         self.assertEqual(replay.kind, W.RegistrationKind.LEGACY_REPLAY)
-        self.assertEqual(replay.catalogue_match.kind, W.RegistrationKind.LEGACY_REPLAY)
+        self.assertEqual(replay.catalogue_reference.kind, W.RegistrationKind.LEGACY_REPLAY)
         self.assertEqual(replay.issues, ())
-        self.assertFalse(replay.physical_confirmed_by_catalogue)
-        by_hash = context("SP-02", registration_hash=SP02_LEGACY).registration
-        self.assertEqual(by_hash.kind, W.RegistrationKind.LEGACY_REPLAY)  # the catalogue's own kind
+        self.assertFalse(replay.stated_physical_hash_recorded_in_catalogue)
         claimed = context("SP-02", registration_basis=RegistrationBasisStatus.PHYSICAL,
                           registration_hash=SP02_LEGACY).registration
+        self.assertEqual(claimed.kind, W.RegistrationKind.PHYSICAL)  # as stated, with the contradiction reported
         self.assertIn("records this registration as LEGACY_REPLAY, not PHYSICAL", claimed.issues[0])
-        self.assertFalse(claimed.physical_confirmed_by_catalogue)  # a legacy replay is never physical
+        self.assertFalse(claimed.stated_physical_hash_recorded_in_catalogue)  # a legacy replay is never physical
         downgraded = context("SP-02", registration_basis=RegistrationBasisStatus.LEGACY_REPLAY,
                              registration_hash=SP02_PHYSICAL).registration
         self.assertEqual(downgraded.kind, W.RegistrationKind.LEGACY_REPLAY)
-        self.assertTrue(downgraded.issues)
+        self.assertIn("records this registration as PHYSICAL, not LEGACY_REPLAY", downgraded.issues[0])
+
+    def test_the_five_kinds_stay_distinct(self):
+        kinds = {
+            context("SP-02", registration_basis=RegistrationBasisStatus.PHYSICAL,
+                    registration_hash=SP02_PHYSICAL).registration.kind,
+            context("SP-02", registration_basis=RegistrationBasisStatus.LEGACY_REPLAY,
+                    registration_hash=SP02_LEGACY).registration.kind,
+            context("SP-01", registration_basis=RegistrationBasisStatus.INCOMPLETE).registration.kind,
+            context("SP-02").registration.kind,
+            context("SP-02", registration_hash=SP02_PHYSICAL).registration.kind,
+        }
+        self.assertEqual(kinds, set(W.RegistrationKind))
 
     def test_incomplete_and_unrecorded_registrations(self):
         incomplete = context("SP-01", registration_basis=RegistrationBasisStatus.INCOMPLETE).registration
         self.assertEqual((incomplete.kind, incomplete.issues), (W.RegistrationKind.INCOMPLETE, ()))
         no_hash = context("SP-02", registration_basis=RegistrationBasisStatus.PHYSICAL).registration
-        self.assertFalse(no_hash.physical_confirmed_by_catalogue)
+        self.assertFalse(no_hash.stated_physical_hash_recorded_in_catalogue)
         self.assertIn("without a registration hash", no_hash.issues[0])
-        other_specimen = context("SP-01", registration_basis=RegistrationBasisStatus.PHYSICAL,
-                                 registration_hash=SP02_PHYSICAL).registration
-        self.assertIsNone(other_specimen.catalogue_match)
-        self.assertFalse(other_specimen.physical_confirmed_by_catalogue)
-        unknown = context("SP-02", registration_hash="0" * 64).registration
-        self.assertEqual(unknown.kind, W.RegistrationKind.UNKNOWN)
 
     def test_a_malformed_registration_is_refused(self):
         with self.assertRaises(W.WorkspaceContextError):
@@ -243,7 +293,12 @@ class ScientificBlockTests(unittest.TestCase):
     def test_production_auto_id_stays_not_authorised_in_every_state(self):
         from services.guarded_execution import PRODUCTION_AUTHORITY
 
-        states = [self.best_case(), self.best_case("SP-13", SP13_PHYSICAL), context("SP-99"), context(None)]
+        states = [self.best_case(), self.best_case("SP-13", SP13_PHYSICAL), context("SP-99"), context(None),
+                  context("SP-02", registration_hash=SP02_PHYSICAL),  # a hash alone (UNKNOWN)
+                  context("SP-02", registration_basis=RegistrationBasisStatus.LEGACY_REPLAY,
+                          registration_hash=SP02_LEGACY),
+                  context("SP-01", registration_basis=RegistrationBasisStatus.PHYSICAL,
+                          registration_hash=SP02_PHYSICAL)]
         states += [context(sid) for sid in catalog.load_catalogue().ids]
         for state in states:
             status = state.production_auto_id
