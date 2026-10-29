@@ -16,9 +16,14 @@ Analysis page runs the existing frequency-only diagnostic of the read FE results
 set: FREQUENCY_ONLY_DIAGNOSTIC. Its nearest FE frequencies show frequency proximity only and are not established
 mode pairs. No physical registration, MAC or Auto-ID is run.
 
+NEW-GUI.5 (``docs/gui/NEW_GUI5_REGISTRATION.md``): on the user's explicit command (Check reference registration),
+the Analysis page checks with the existing service whether an accepted archived physical registration applies to the
+read FE results and the modal set chosen for the frequency diagnostic. The registration is not applied: no MAC, mode
+pair or orientation is made, and modal identity is not established.
+
 Start it with ``RUN_NEW_GUI.cmd`` or ``python -m new_gui`` (with ``src`` on the path). PySide6 is installed from
 ``requirements-new-gui.txt``, separately from ``requirements.txt``.
 """
 
 APP_NAME = "Abaqus–Simcenter Modal Comparator"
-STAGE = "NEW-GUI.4 preview"
+STAGE = "NEW-GUI.5 preview"

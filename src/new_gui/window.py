@@ -19,6 +19,11 @@ experimental modal set, the explicit command Run frequency diagnostic calls the 
 background thread (FREQUENCY_ONLY_DIAGNOSTIC). Its nearest FE frequencies show frequency proximity only and are not
 established mode pairs; no physical registration, MAC or Auto-ID is run. A replaced or cleared file, Inspect again,
 another set or a closed window cancels it and discards its outcome.
+
+NEW-GUI.5: below it, a ``RegistrationCheckPanel`` checks, only on the explicit command Check reference registration,
+whether an accepted archived physical registration applies to the read FE results and the modal set chosen for the
+frequency diagnostic (the existing service ``bind_registration_by_fe_geometry``). The registration is not applied:
+no MAC, mode pair or orientation is made. It is cancelled and discarded like the diagnostic.
 """
 
 from __future__ import annotations
@@ -39,6 +44,7 @@ from new_gui.archive_dialog import ArchiveDialog
 from new_gui.diagnostic_panel import DiagnosticPanel
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
+from new_gui.registration_check_panel import RegistrationCheckPanel
 from new_gui.shape_panel import ShapePanel
 from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
                                      scientific_status)
@@ -261,6 +267,7 @@ class MainWindow(QMainWindow):
         self.status_text = _label(f"{ANALYSIS_NOT_RUN} · Production Auto-ID {self.status_rows[0].value}", wrap=False)
         self.statusBar().addPermanentWidget(self.status_text)
         self.diagnostic.changed.connect(self._analysis_changed)
+        self.diagnostic.set_combo.currentIndexChanged.connect(self._registration_inputs)  # the one shared set choice
         self.setMinimumSize(560, 420)
         self._fit_to_screen()
         self.show_page(0)
@@ -353,10 +360,13 @@ class MainWindow(QMainWindow):
 
     def _build_analysis_page(self) -> QWidget:
         page, layout = self._page("Analysis", "A frequency diagnostic of the read FE results and one experimental "
-                                              "modal set. No geometric registration, MAC or mode pairing.")
+                                              "modal set, and a check of archived physical registrations. No "
+                                              "registration is applied; no MAC or mode pairing.")
         self.diagnostic = DiagnosticPanel()  # NEW-GUI.4
         self.analysis_badge = self.diagnostic.badge
         layout.addWidget(self.diagnostic)
+        self.registration = RegistrationCheckPanel()  # NEW-GUI.5: uses the diagnostic's set choice
+        layout.addWidget(self.registration)
         layout.addStretch(1)
         return page
 
@@ -477,9 +487,9 @@ class MainWindow(QMainWindow):
                 or any(thread.is_alive() for thread in self._threads))
 
     def busy(self) -> bool:
-        """A read, a shape drawing or the frequency diagnostic is still running."""
+        """A read, a shape drawing, the frequency diagnostic or the registration check is still running."""
         return (self.reading() or any(panel.busy() for panel in self.shape_panels.values())
-                or self.diagnostic.busy())
+                or self.diagnostic.busy() or self.registration.busy())
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
         """Process events until no read or drawing is running (tests and checks); returns whether all ended."""
@@ -496,6 +506,7 @@ class MainWindow(QMainWindow):
         for panel in self.shape_panels.values():  # and so are running drawings
             panel.cancel()
         self.diagnostic.cancel()  # and the frequency diagnostic
+        self.registration.cancel()  # and the registration check
         super().closeEvent(event)
 
     def _analysis_changed(self) -> None:
@@ -524,8 +535,10 @@ class MainWindow(QMainWindow):
                                           "them with Inspect file and view single mode shapes. On the Analysis page, "
                                           "Run frequency diagnostic compares the frequencies of one experimental "
                                           "modal set with the FE frequencies, only when you click it. The nearest "
-                                          "FE frequencies are not established mode pairs. No physical registration, "
-                                          "MAC or Auto-ID is run.")
+                                          "FE frequencies are not established mode pairs. Check reference "
+                                          "registration only checks whether an accepted archived physical "
+                                          "registration applies to the read data; it is not applied. No MAC or "
+                                          "Auto-ID is run.")
 
     # ---------------------------------------------------------------------------------------------- display
 
@@ -536,6 +549,11 @@ class MainWindow(QMainWindow):
             self.panels[kind].show_slot(self.slots[kind], self.workspace.choice(kind).chosen)
             self.shape_panels[kind].set_preview(self._read_preview(kind))
         self.diagnostic.set_inputs(self._read_preview(FE), self._read_preview(EXPERIMENTAL))
+        self._registration_inputs()
+
+    def _registration_inputs(self) -> None:
+        self.registration.set_inputs(self.diagnostic.fe_preview, self.diagnostic.experimental_preview,
+                                     self.diagnostic.chosen_set_index())
 
     def _read_preview(self, kind: str):
         """The preview of the chosen file of ``kind`` when it was read, else None."""
