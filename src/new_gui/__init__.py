@@ -11,9 +11,13 @@ shows the imported modes, frequencies, modal sets and warnings. It runs no analy
 NEW-GUI.3 (``docs/gui/NEW_GUI3_SHAPES.md``): after Inspect file, one chosen FE mode or experimental record is drawn
 on its own coordinates with the existing services' drawing. Nothing is compared, paired or overlaid.
 
+NEW-GUI.4 (``docs/gui/NEW_GUI4_FREQUENCY.md``): the Analysis page runs, on request, the existing frequency-only
+diagnostic of the read FE results and one chosen experimental modal set: FREQUENCY_ONLY_DIAGNOSTIC, with no
+geometric registration, MAC or mode pair.
+
 Start it with ``RUN_NEW_GUI.cmd`` or ``python -m new_gui`` (with ``src`` on the path). PySide6 is installed from
 ``requirements-new-gui.txt``, separately from ``requirements.txt``.
 """
 
 APP_NAME = "Abaqus–Simcenter Modal Comparator"
-STAGE = "NEW-GUI.3 preview"
+STAGE = "NEW-GUI.4 preview"
