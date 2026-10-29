@@ -66,6 +66,37 @@ physical registration (SP-02, SP-13) applies exactly to the read FE results and 
 diagnostic (`docs/gui/NEW_GUI5_REGISTRATION.md`). The registration is not applied: no MAC, mode pair or orientation is
 made, and modal identity is not established. A refusal does not mean that your experiment is physically wrong.
 
+Since NEW-GUI.6 (`docs/gui/NEW_GUI6_SCIENTIFIC_WORKBENCH.md`), the Analysis page has a scientific workbench. Use it in
+this order:
+
+1. Choose and inspect the FE results and the experimental file on the Workspace page.
+2. Choose the experimental modal set on the Analysis page.
+3. Optionally run the frequency diagnostic.
+4. Click **Check reference registration**.
+5. Only when the check verifies an archived physical registration for exactly these data, click **Run verified modal
+   comparison**. It verifies the registration again and runs the project's comparator (`modal_core.compare_modal_datasets`)
+   with that frozen registration. No automatic orientation search runs.
+
+The result shows:
+
+- the comparator's mode pairs: signed frequency error, MAC on the registered measured DOFs, coverage, order changes
+  and close modes;
+- the full MAC matrix and the unpaired and rejected modes;
+- the warnings and the registration provenance;
+- the drawing of the pair chosen in the table: FE and experimental shapes on the same registered points, and their
+  amplitude correlation.
+
+Without a verified registration (for example the new ROTATED series of 2026-10-29), the shapes stay unpaired
+independent views and no MAC exists. **Export report...** writes either the verified comparison report (Excel, PDF and
+a JSON record with the sources' SHA-256) or the diagnostic report, into a folder you choose.
+
+The **Materials** page shows the project's existing material records, read-only. It separates material
+identification, specimen engineering calibration and model input or diagnostic estimates. It runs no Auto-ID and
+creates no material value.
+
+**File > Choose a known new experimental source...** offers the three fitted working sources of the 2026-10-29
+delivery. They are checked against `docs/experimental/new_exp_20261029/SOURCE_PROVENANCE.csv` and by SHA-256.
+
 ## Input procedure
 
 1. Select the Abaqus `*.odb` file.

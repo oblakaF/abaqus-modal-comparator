@@ -156,6 +156,17 @@ class ResultTests(_Window):
         self.window.show_page(window_module.MATERIALS_PAGE)
         self.assertEqual(self.window.materials.relevance_badge.text(), mm.NO_GLOBAL_VALUE)
 
+    def test_a_report_message_goes_with_its_result(self):
+        self.compared()
+        with reporting_restored():
+            self.assertTrue(self.workbench.export())
+            self.assertTrue(self.window.wait_for_reads(120))
+        self.app.processEvents()
+        self.assertTrue(self.workbench.export_status.text())
+        self.choose_set(1)
+        self.assertEqual(self.workbench.export_status.text(), "")
+        self.assertFalse(self.workbench.export_status.isVisible())
+
     def test_the_verified_report_is_written_only_into_the_chosen_folder(self):
         self.compared()
         self.answer = ""  # a cancelled folder choice writes nothing

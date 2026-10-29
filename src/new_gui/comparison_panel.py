@@ -337,6 +337,8 @@ class ComparisonPanel(QFrame):
     def _reset(self) -> None:
         self.slot.reset()
         self._forget_images()
+        if not self._exporting:
+            self.export_message = ""  # the message of a written report belongs to the result that is gone
         self._refresh()
 
     def _forget_images(self) -> None:
