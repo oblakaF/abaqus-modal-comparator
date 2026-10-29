@@ -23,6 +23,11 @@ Nothing is read again by the GUI, the read datasets are not changed, and no thre
 The pairs are the comparator's numerical assignment by its admissibility gates. They are not Auto-ID observations:
 their scientific use for Auto-ID is not assessed here.
 
+NEW-GUI.6-F1: ``compare`` also receives the identities recorded when the files were read (``sources``). The FE
+manifest is hashed again and the experimental file's fresh SHA-256 (from the service) is compared with them; a file
+changed since it was read is refused before the comparator runs. The outcome keeps these identities: an export states
+them, never a hash taken later.
+
 One heavy operation at a time: the comparison shares the lock of the frequency diagnostic and the registration check
 (NEW-GUI.4/5). ``ComparisonSlot`` keeps the current request; a replaced or cleared file, Inspect again, another modal
 set, a new registration check or a closed window cancels it and its outcome is discarded. A request cancelled while
@@ -119,8 +124,28 @@ def unavailable(fe_preview, experimental_preview, set_index: Optional[int], regi
 # ---------------------------------------------------------------------------------------------- the comparator
 
 
+def check_sources(fe_preview, sources: Optional[dict], experimental_now: Optional[dict] = None,
+                  cancel_event: Optional[threading.Event] = None) -> dict:
+    """The read identities, confirmed against the files now; raises ``ComparisonRefused`` when one changed."""
+    from new_gui import preview_model as pm
+
+    sources = dict(sources or {})
+    fe_read, experimental_read = sources.get("fe"), sources.get("experimental")
+    if fe_read is not None:
+        fe_now = pm.file_identity(fe_preview.manifest_path, cancel_event)
+        if fe_now is None or fe_now["sha256"] != fe_read["sha256"]:
+            raise ComparisonRefused(f"the FE manifest {fe_preview.manifest_path} is not the file that was read "
+                                    f"(SHA-256 {fe_read['sha256'][:12]}… when read); Inspect it again.")
+    if experimental_read is not None and experimental_now is not None \
+            and experimental_now["sha256"] != experimental_read["sha256"]:
+        raise ComparisonRefused(f"the experimental file is not the file that was read (SHA-256 "
+                                f"{experimental_read['sha256'][:12]}… when read, {experimental_now['sha256'][:12]}… "
+                                "now); Inspect it again.")
+    return {"fe": fe_read, "experimental": experimental_read}
+
+
 def compare(fe_preview, experimental_preview, set_index: int, registration_hash: Optional[str],
-            cancel_event: Optional[threading.Event] = None):
+            cancel_event: Optional[threading.Event] = None, sources: Optional[dict] = None):
     """Verify the registration again and run the scientific comparator; returns (bound registration, result)."""
     if rm.set_is_provisional(experimental_preview, set_index):
         raise ComparisonRefused(PROVISIONAL_BLOCK)
@@ -128,6 +153,7 @@ def compare(fe_preview, experimental_preview, set_index: int, registration_hash:
     if registration_hash is not None and bound.registration.registration_hash != registration_hash:
         raise ComparisonRefused(f"the verified registration is now {bound.registration.registration_hash[:12]}…, not "
                                 f"the {registration_hash[:12]}… the check showed; check the registration again.")
+    check_sources(fe_preview, sources, bound.experimental, cancel_event)
     if cancel_event is not None and cancel_event.is_set():
         raise ComparisonCancelled()
     from modal_core import compare_modal_datasets  # the reviewed quality-control facade (runtime_contracts)
@@ -149,13 +175,14 @@ class ComparisonOutcome:
     result: Any = None  # modal_core.ComparisonResult, as returned
     view: Any = None  # ComparisonView
     mac_image: bytes = b""
+    sources: Any = None  # {"fe", "experimental"}: the identities recorded when the files were read (or None)
     refusal: str = ""
     error: str = ""
     cancelled: bool = False
 
 
 def run_compare(fe_preview, experimental_preview, set_index: int, registration_hash: Optional[str], token: int,
-                cancel_event: threading.Event) -> ComparisonOutcome:
+                cancel_event: threading.Event, sources: Optional[dict] = None) -> ComparisonOutcome:
     """``compare`` and its display wording as an outcome; every failure becomes a message (worker thread)."""
     from services.new_odb_comparison import AcceptedReferenceRefusal
 
@@ -163,7 +190,8 @@ def run_compare(fe_preview, experimental_preview, set_index: int, registration_h
         with rm.SERVICE_LOCK:
             if cancel_event.is_set():  # cancelled while waiting: the comparator never runs
                 return ComparisonOutcome(token, cancelled=True)
-            bound, result = compare(fe_preview, experimental_preview, set_index, registration_hash, cancel_event)
+            bound, result = compare(fe_preview, experimental_preview, set_index, registration_hash, cancel_event,
+                                    sources)
         if cancel_event.is_set():
             return ComparisonOutcome(token, cancelled=True)
         view = comparison_view(result, bound, fe_preview, experimental_preview, set_index)
@@ -179,7 +207,9 @@ def run_compare(fe_preview, experimental_preview, set_index: int, registration_h
                                               f"{error}).")
     if cancel_event.is_set():  # the comparator does not stop midway: a late cancellation discards its result
         return ComparisonOutcome(token, cancelled=True)
-    return ComparisonOutcome(token, bound=bound, result=result, view=view, mac_image=mac_image)
+    return ComparisonOutcome(token, bound=bound, result=result, view=view, mac_image=mac_image,
+                             sources={"fe": (sources or {}).get("fe"),
+                                      "experimental": (sources or {}).get("experimental")})
 
 
 class ComparisonSlot:

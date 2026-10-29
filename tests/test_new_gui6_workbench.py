@@ -54,6 +54,7 @@ from new_gui import comparison_model as cm  # noqa: E402
 from new_gui import diagnostic_model as dm  # noqa: E402
 from new_gui import known_sources as ks  # noqa: E402
 from new_gui import materials_model as mm  # noqa: E402
+from new_gui import preview_model as pm  # noqa: E402
 from new_gui import registration_check_model as rm  # noqa: E402
 from new_gui import report_export as rx  # noqa: E402
 from services import new_odb_comparison as service  # noqa: E402
@@ -95,16 +96,24 @@ class _Comparison(WorldCase):
         own = tempfile.TemporaryDirectory()
         self.addCleanup(own.cleanup)
         self.own = Path(own.name)
+        # NEW-GUI.6-F1: the identities Inspect file records when it reads the files
+        self.sources = {"fe": pm.file_identity(self.odb), "experimental": pm.file_identity(self.unv)}
 
     @contextlib.contextmanager
     def changed_unv(self, content: bytes):
         """The experimental file with other content, restored before the world checks that nothing changed."""
-        original = self.unv.read_bytes()
-        self.unv.write_bytes(content(original))
+        with self.changed(self.unv, content):
+            yield
+
+    @contextlib.contextmanager
+    def changed(self, path: Path, content):
+        """A world file with other content, restored before the world checks that nothing changed."""
+        original = path.read_bytes()
+        path.write_bytes(content(original))
         try:
             yield
         finally:
-            self.unv.write_bytes(original)
+            path.write_bytes(original)
 
     def previews(self, fe=None, source=None, datasets=None):
         source = source or self.unv
@@ -113,10 +122,12 @@ class _Comparison(WorldCase):
                                                           other_set(source, self.fe)]
         return fe_preview(self.odb, fe), experimental_preview(source, datasets)
 
-    def run_compare(self, fe_prev=None, exp_prev=None, set_index=0, registration="default", cancel=None):
+    def run_compare(self, fe_prev=None, exp_prev=None, set_index=0, registration="default", cancel=None,
+                    sources="default"):
         registration = self.registration if registration == "default" else registration
+        sources = self.sources if sources == "default" else sources
         return cm.run_compare(fe_prev or self.fe_preview, exp_prev or self.exp_preview, set_index, registration, 1,
-                              cancel or threading.Event())
+                              cancel or threading.Event(), sources)
 
 
 class VerifiedComparisonTests(_Comparison):
@@ -265,6 +276,21 @@ class RefusalTests(_Comparison):
 
     def test_another_modal_set_is_refused(self):
         self.assert_refused_before_the_comparator(self.compare_without_comparator(set_index=1), "set-b")
+
+    def test_an_fe_manifest_changed_since_it_was_read_is_refused_before_the_comparator(self):
+        with self.changed(self.odb, lambda data: data + b"#"):
+            outcome = self.compare_without_comparator()
+        self.assert_refused_before_the_comparator(outcome, "is not the file that was read")
+
+    def test_an_experimental_file_other_than_the_one_read_is_refused(self):
+        # the read data came from other bytes than the (accepted) file on disk now
+        sources = dict(self.sources, experimental=dict(self.sources["experimental"], sha256="0" * 64))
+        self.assert_refused_before_the_comparator(self.compare_without_comparator(sources=sources),
+                                                  "is not the file that was read")
+
+    def test_the_outcome_keeps_the_identities_recorded_at_the_read(self):
+        outcome = self.run_compare()
+        self.assertEqual(outcome.sources, self.sources)
 
     def test_another_registration_than_the_checked_one_is_refused(self):
         self.assert_refused_before_the_comparator(self.compare_without_comparator(registration="0" * 64),
@@ -422,7 +448,7 @@ class ReportTests(_Comparison):
         before = fingerprint(self.world.root)
         with reporting_restored():
             written = rx.export_verified(outcome.result, outcome.bound, outcome.view, self.fe_preview,
-                                         self.exp_preview, 0, self.folder)
+                                         self.exp_preview, 0, self.folder, sources=outcome.sources)
         self.assertEqual(sorted(p.suffix for p in written), [".json", ".pdf", ".xlsx"])
         self.assertEqual(sorted(p.name for p in self.folder.iterdir()), sorted(p.name for p in written))
         self.assertEqual(fingerprint(self.world.root), before)
@@ -430,6 +456,8 @@ class ReportTests(_Comparison):
         self.assertEqual(record["status"], cm.PAIRS_FOUND)
         self.assertEqual(record["registration"]["registration_hash"], self.registration)
         self.assertEqual(record["experimental_source"]["sha256"], outcome.bound.experimental["sha256"])
+        self.assertEqual(record["fe_source"]["sha256"], self.sources["fe"]["sha256"])  # the identity of the read
+        self.assertTrue(record["fe_source"]["unchanged_at_export"])
         self.assertEqual([(p["fe_mode"], p["experimental_mode"], p["mac"]) for p in record["pairs"]],
                          [(p.abaqus_mode, p.experimental_mode, p.mac) for p in outcome.result.pairs])
         self.assertEqual({p["auto_id_use"] for p in record["pairs"]}, {cm.AUTO_ID_USE})
@@ -439,17 +467,38 @@ class ReportTests(_Comparison):
         workbook = load_workbook(next(p for p in written if p.suffix == ".xlsx"))
         self.assertIn("Mode Comparison", workbook.sheetnames)
 
+    def export(self, outcome, sources="outcome"):
+        return rx.export_verified(outcome.result, outcome.bound, outcome.view, self.fe_preview, self.exp_preview, 0,
+                                  self.folder, sources=outcome.sources if sources == "outcome" else sources)
+
     def test_a_file_changed_since_the_comparison_is_refused(self):
         outcome = self.run_compare()
-        with self.changed_unv(lambda data: data + b"x"), self.assertRaises(rx.ExportRefused):
-            rx.export_verified(outcome.result, outcome.bound, outcome.view, self.fe_preview, self.exp_preview, 0,
-                               self.folder)
+        for path in (self.unv, self.odb):
+            with self.subTest(file=path.name), self.changed(path, lambda data: data + b"x"):
+                with self.assertRaisesRegex(rx.ExportRefused, "changed since it was read"):
+                    self.export(outcome)
+        self.assertEqual(list(self.folder.iterdir()), [])
+
+    def test_without_identities_recorded_at_the_read_no_provenance_is_claimed(self):
+        outcome = self.run_compare()
+        for sources in (None, {"fe": None, "experimental": self.sources["experimental"]},
+                        {"fe": self.sources["fe"], "experimental": None}):
+            with self.subTest(sources=sources), self.assertRaisesRegex(rx.ExportRefused, "not recorded"):
+                self.export(outcome, sources)
+        self.assertEqual(list(self.folder.iterdir()), [])
+
+    def test_a_changed_file_is_never_given_the_hash_of_the_read(self):
+        # the report states the identity recorded at the read; a file that differs now is refused, not re-hashed
+        outcome = self.run_compare()
+        with self.changed(self.odb, lambda data: data[:-1] + b"#"):  # same size, other content
+            with self.assertRaises(rx.ExportRefused):
+                self.export(outcome)
         self.assertEqual(list(self.folder.iterdir()), [])
 
     def test_the_diagnostic_report_has_no_mac_and_no_pair(self):
         diagnostic = dm.run_diagnostic(self.fe_preview, self.exp_preview, 1, 1, threading.Event()).diagnostic
         written = rx.export_diagnostic(self.fe_preview, self.exp_preview, 1, diagnostic, "refused: test",
-                                       self.folder)
+                                       self.folder, sources=self.sources)
         self.assertEqual(sorted(p.suffix for p in written), [".pdf", ".xlsx"])
         from openpyxl import load_workbook
 
@@ -458,13 +507,22 @@ class ReportTests(_Comparison):
         self.assertIn("NOT_COMPUTED", texts)
         self.assertNotIn("Excellent match", texts)
         with self.assertRaises(rx.ExportRefused):
-            rx.export_diagnostic(self.fe_preview, self.exp_preview, 1, None, "", self.folder)
+            rx.export_diagnostic(self.fe_preview, self.exp_preview, 1, None, "", self.folder, sources=self.sources)
+
+    def test_the_diagnostic_report_of_changed_or_unconfirmed_files_is_refused(self):
+        diagnostic = dm.run_diagnostic(self.fe_preview, self.exp_preview, 1, 1, threading.Event()).diagnostic
+        with self.changed_unv(lambda data: data + b"x"), self.assertRaises(rx.ExportRefused):
+            rx.export_diagnostic(self.fe_preview, self.exp_preview, 1, diagnostic, "", self.folder,
+                                 sources=self.sources)
+        with self.assertRaises(rx.ExportRefused):
+            rx.export_diagnostic(self.fe_preview, self.exp_preview, 1, diagnostic, "", self.folder, sources=None)
+        self.assertEqual(list(self.folder.iterdir()), [])
 
     def test_a_missing_folder_is_refused(self):
         outcome = self.run_compare()
         with self.assertRaises(rx.ExportRefused):
             rx.export_verified(outcome.result, outcome.bound, outcome.view, self.fe_preview, self.exp_preview, 0,
-                               self.folder / "missing")
+                               self.folder / "missing", sources=outcome.sources)
 
 
 class MaterialsTests(unittest.TestCase):
@@ -496,13 +554,22 @@ class MaterialsTests(unittest.TestCase):
         self.assertEqual(rows["E1"].unit, "MPa")
         self.assertEqual(rows["nu12"].unit, "—")
 
-    def test_records_relate_only_through_a_verified_fixture(self):
+    def test_no_record_is_attributed_to_the_read_data(self):
+        # NEW-GUI.6-F1: a verified registration proves the geometry, source and set, not the FE model's identity
         self.assertEqual(mm.current_relevance(self.view, None, False).status, mm.NOT_AVAILABLE)
         rotated = mm.current_relevance(self.view, None, True)  # e.g. the SP-13 ROTATED series: no verified fixture
         self.assertEqual(rotated.status, mm.NOT_AVAILABLE)
         self.assertIn("not transferred", rotated.text)
-        self.assertEqual(mm.current_relevance(self.view, "SP02/bravo-1-physical", True).status, mm.NO_GLOBAL_VALUE)
-        self.assertEqual(mm.current_relevance(self.view, "SP99/other", True).status, mm.NOT_AVAILABLE)
+        self.assertEqual(rotated.historical, "")
+        for fixture in ("SP02/bravo-1-physical", "SP13/best-physical", "SP99/other"):
+            with self.subTest(fixture=fixture):
+                relevance = mm.current_relevance(self.view, fixture, True)
+                self.assertEqual(relevance.status, mm.NOT_AVAILABLE)
+                self.assertIn("No material record is attributed to the read data", relevance.text)
+        sp02 = mm.current_relevance(self.view, "SP02/bravo-1-physical", True)
+        self.assertIn("not a result of the read FE model", sp02.historical)
+        self.assertIn("SP02_Modal_V02.inp SHA-256 574ae78a897f", sp02.historical)  # the record's own FE input
+        self.assertIn(mm.NO_GLOBAL_VALUE, sp02.historical)  # D-077 shown unchanged, as history
 
     def test_a_record_that_does_not_match_its_pinned_hash_is_not_shown(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -521,6 +588,51 @@ class MaterialsTests(unittest.TestCase):
         before = fingerprint(ROOT / "docs" / "auto_id")
         mm.load_material_evidence()
         self.assertEqual(fingerprint(ROOT / "docs" / "auto_id"), before)
+
+
+class MaterialBindingTests(_Comparison):
+    def test_another_fe_model_with_the_same_geometry_gets_no_material_binding(self):
+        # Other frequencies (another material) on the same mesh: the registration applies, the M7 record does not.
+        other = with_frequencies(self.fe, {m.number: 1.2 * m.frequency_hz for m in self.fe.sorted_modes()})
+        fe_prev, exp_prev = self.previews(fe=other)
+        check = rm.run_check(fe_prev, exp_prev, 0, 1, threading.Event())
+        self.assertIsNotNone(check.view)  # the applicability check passes on the geometry
+        self.assertEqual(check.view.fixture_id, "SP02/bravo-1-physical")
+        relevance = mm.current_relevance(mm.load_material_evidence(), check.view.fixture_id, True)
+        self.assertEqual(relevance.status, mm.NOT_AVAILABLE)
+        self.assertNotIn(mm.NO_GLOBAL_VALUE, relevance.text)  # nothing of M7 is stated for the read FE model
+        self.assertIn("not a result of the read FE model", relevance.historical)
+
+
+class ReadIdentityTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.unv = F.write_frf_only(self.root / "frf.uff")
+
+    def test_the_read_records_the_identity_of_the_file_read(self):
+        from new_gui import workspace_state as ws
+
+        outcome = pm.run_read(ws.EXPERIMENTAL, self.unv, 1, threading.Event())
+        self.assertEqual(outcome.identity, pm.file_identity(self.unv))
+        self.assertEqual(outcome.identity["size"], self.unv.stat().st_size)
+
+    def test_a_file_changed_during_the_read_gets_no_identity(self):
+        from new_gui import workspace_state as ws
+
+        real = pm.read_preview
+
+        def read_and_change(kind, path, cancel_event=None):
+            preview = real(kind, path, cancel_event)
+            with open(path, "ab") as stream:  # another program writes while the file is read
+                stream.write(b"\n")
+            return preview
+
+        with mock.patch.object(pm, "read_preview", side_effect=read_and_change):
+            outcome = pm.run_read(ws.EXPERIMENTAL, self.unv, 1, threading.Event())
+        self.assertIsNotNone(outcome.preview)
+        self.assertIsNone(outcome.identity)
 
 
 class KnownSourceTests(unittest.TestCase):

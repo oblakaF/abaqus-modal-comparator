@@ -15,6 +15,11 @@ in a fixed order. ``ensure_application_reporting`` installs exactly those layers
 idempotent) and then checks the final owners the program's runtime contract names; any other owner is refused. No
 layer is added. It touches only the report functions of ``reporting`` and ``advanced_metrics``.
 
+NEW-GUI.6-F1: an export states the identities recorded when the files were read (``sources``), after confirming
+that the FE manifest and the experimental file on disk still have them. A missing identity (not recorded, or the file
+changed during the read) or a changed file refuses the export: a later hash is never attributed to data read earlier,
+and no report claims a provenance that cannot be confirmed.
+
 Files are written only into the folder the user chose, with time-stamped names (nothing is replaced), each through a
 temporary file in that folder that is renamed into place. The read data, the source files and the project's records
 are never written.
@@ -109,22 +114,33 @@ def _folder(folder) -> Path:
     return folder
 
 
-def _identity(path: Path, cancel=None) -> dict:
-    from services.archived_sensitivity_evidence import AcceptedReferenceRefusal, fresh_content_identity
-
-    try:
-        found = fresh_content_identity(Path(path), cancel)
-    except AcceptedReferenceRefusal as error:
-        return {"path": str(path), "size": None, "sha256": None, "note": f"not available: {error}"}
-    return {"path": str(path), "size": found["size"], "sha256": found["sha256"], "note": ""}
-
-
 def _number(value):
     try:
         number = float(value)
     except (TypeError, ValueError):
         return None
     return number if number == number and abs(number) != float("inf") else None
+
+
+def confirmed_sources(fe_preview, experimental_preview, sources: Optional[dict], cancel=None) -> tuple:
+    """(FE identity, experimental identity) recorded at the read and unchanged on disk now; else ``ExportRefused``."""
+    from new_gui import preview_model as pm
+
+    sources = dict(sources or {})
+    confirmed = []
+    for key, path in (("fe", fe_preview.manifest_path), ("experimental", experimental_preview.source_path)):
+        read = sources.get(key)
+        name = "FE manifest" if key == "fe" else "experimental file"
+        if read is None:
+            raise ExportRefused(f"the {name}'s identity was not recorded when it was read, so the report's provenance "
+                                "cannot be confirmed; Inspect the file again.")
+        now = pm.file_identity(path, cancel)
+        if now is None or now["sha256"] != read["sha256"] or now["size"] != read["size"]:
+            raise ExportRefused(f"the {name} {path} changed since it was read (SHA-256 {read['sha256'][:12]}… when "
+                                "read); the report is not written for data that no longer match the file. Inspect "
+                                "it again.")
+        confirmed.append({**read, "unchanged_at_export": True})
+    return tuple(confirmed)
 
 
 def verified_record(result, bound, view, fe_preview, experimental_preview, set_index: int, fe_file: dict,
@@ -149,8 +165,12 @@ def verified_record(result, bound, view, fe_preview, experimental_preview, set_i
     return {
         "schema": SCHEMA, "created": datetime.now().isoformat(timespec="seconds"),
         "status": view.status, "statement": view.statement,
-        "fe_source": {**fe_file, "kind": "extracted FE package (manifest.json); the ODB itself was not read"},
-        "experimental_source": {**experimental_file, "selected_path": str(experimental_preview.selected_path)},
+        "fe_source": {**fe_file, "kind": "extracted FE package (manifest.json); the ODB itself was not read",
+                      "identity_basis": "SHA-256 of manifest.json recorded when it was read, unchanged at export; the "
+                                        "package's CSV files are not hashed"},
+        "experimental_source": {**experimental_file, "selected_path": str(experimental_preview.selected_path),
+                                "identity_basis": "SHA-256 recorded when it was read, equal to the file the "
+                                                  "registration was verified on, unchanged at export"},
         "modal_set": {"index": set_index + 1, "title": dm.set_title(experimental_preview, set_index),
                       "key": (experimental_preview.sets[set_index].dataset.metadata or {}).get("modal_set_key")},
         "registration": bound.provenance(),
@@ -174,15 +194,14 @@ def verified_record(result, bound, view, fe_preview, experimental_preview, set_i
 
 
 def export_verified(result, bound, view, fe_preview, experimental_preview, set_index: int, folder,
-                    cancel=None) -> tuple:
+                    cancel=None, sources: Optional[dict] = None) -> tuple:
     """Write the comparison report (xlsx, pdf) and its JSON record into ``folder``; returns the written paths."""
     folder = _folder(folder)
     with _EXPORT:
-        fe_file = _identity(fe_preview.manifest_path, cancel)
-        experimental_file = _identity(experimental_preview.source_path, cancel)
+        fe_file, experimental_file = confirmed_sources(fe_preview, experimental_preview, sources, cancel)
         if experimental_file["sha256"] != bound.experimental["sha256"]:
             raise ExportRefused("the experimental file is not the one the comparison verified (SHA-256 "
-                                f"{str(experimental_file['sha256'])[:12]}… now); run the comparison again.")
+                                f"{str(experimental_file['sha256'])[:12]}… when read); run the comparison again.")
         ensure_application_reporting()
         import reporting
 
@@ -204,7 +223,7 @@ def export_verified(result, bound, view, fe_preview, experimental_preview, set_i
 
 
 def export_diagnostic(fe_preview, experimental_preview, set_index: int, diagnostic, registration_reason: str,
-                      folder, cancel=None) -> tuple:
+                      folder, cancel=None, sources: Optional[dict] = None) -> tuple:
     """Write the CORE-E2E-D diagnostic report (pdf, xlsx) of the frequency diagnostic shown; no MAC, no pair."""
     from services import diagnostic_report as dr
     from services.modal_data_viewer import NOT_ESTABLISHED, LoadedModalData
@@ -213,6 +232,7 @@ def export_diagnostic(fe_preview, experimental_preview, set_index: int, diagnost
     if diagnostic is None:
         raise ExportRefused("run the frequency diagnostic first: the diagnostic report states its result.")
     with _EXPORT:
+        confirmed_sources(fe_preview, experimental_preview, sources, cancel)  # the report hashes the files again
         loaded = LoadedModalData(abaqus=fe_preview.dataset, experimental=experimental_preview.sets[set_index].dataset,
                                  registration=NOT_ESTABLISHED, reason=registration_reason,
                                  frequency_diagnostic=diagnostic, abaqus_path=Path(fe_preview.manifest_path),
@@ -225,5 +245,5 @@ def export_diagnostic(fe_preview, experimental_preview, set_index: int, diagnost
         return tuple(Path(path) for path in written)
 
 
-__all__ = ["EXPORT", "ExportRefused", "FINAL_OWNERS", "REPORT_LAYERS", "ReportRuntimeError",
+__all__ = ["EXPORT", "ExportRefused", "confirmed_sources", "FINAL_OWNERS", "REPORT_LAYERS", "ReportRuntimeError",
            "ensure_application_reporting", "export_diagnostic", "export_verified", "verified_record"]

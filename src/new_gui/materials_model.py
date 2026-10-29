@@ -22,10 +22,15 @@ The integrity of the M7 result records is checked against the canonical content 
 (``domain.identification_run.canonical_hash``); a record that does not match is shown as NOT VERIFIED and its values
 are not shown.
 
-``current_relevance`` says what applies to the data read in the workspace. Records are related to the current data
-only through the archived fixture the registration service verified (SHA-256 of the experimental file, FE geometry,
-modal set): never by a specimen name, a file name or a frequency. Without a verified fixture the answer is
-NOT_AVAILABLE, and archived results are not transferred to another series.
+``current_relevance`` says what applies to the data read in the workspace (NEW-GUI.6-F1). A governed material record
+belongs to its own forward model: the M7 records name, per specimen, the FE input (INP file and SHA-256) of their
+forward-model manifest. A verified archived registration proves only the FE geometry identity, the experimental source
+and the modal set; another FE model with the same mesh (other materials, other INP) passes it too. The read FE package
+records no content identity of its ODB or INP, and neither geometry, MAC nor frequency proximity proves an FE model's
+identity. So no material record is attributed to the read data: the answer is always NOT_AVAILABLE. When the verified
+fixture is one the M7 records use, the historical M7 / D-077 result is named with its own provenance (its forward
+model and FE input), explicitly not as a result of the read FE model. D-077, its formal refusal and the historical
+diagnostic values are shown unchanged.
 """
 
 from __future__ import annotations
@@ -105,6 +110,7 @@ class MaterialsView:
     fixtures: tuple  # archived fixture ids the governed M7 records are bound to
     problems: tuple  # records that could not be read or verified (their values are not shown)
     notes: tuple
+    fixture_models: tuple = ()  # (fixture id, its M7 forward model and FE input), the records' own provenance
 
     def of(self, klass: str) -> tuple:
         return tuple(row for row in self.rows if row.klass == klass)
@@ -137,20 +143,24 @@ def _model_form(robustness) -> str:
     return f"LOO range {float(robustness['range_percent_of_p_hat']):.3g} % of p̂"
 
 
-def _campaign_bindings(root: Path, run: str) -> tuple[str, tuple]:
-    """'SP02 (SP02/bravo-1-physical, FE INP SP02_Modal_V02.inp 574ae78a…); ...' and the fixture ids."""
+def _campaign_bindings(root: Path, run: str) -> tuple[str, tuple, tuple]:
+    """'SP02 (SP02/bravo-1-physical, FE INP SP02_Modal_V02.inp 574ae78a…); ...', the fixture ids and, per fixture, its
+    forward model and FE input."""
     from domain.campaign_definition import load_campaign_definition
     from domain.forward_model_manifest import load_forward_model_manifest
 
     raw, _ = _read(root, CAMPAIGNS[run])
     load_campaign_definition(root / CAMPAIGNS[run])  # the governed loader validates the definition
-    parts, fixtures = [], []
+    parts, fixtures, models = [], [], []
     for member in raw.get("specimens") or ():
         manifest = load_forward_model_manifest(root / member["forward_model"])
         inp = manifest.model_input
         fixtures.append(str(member["fixture_id"]))
         parts.append(f"{member['label']} ({member['fixture_id']}; FE input {inp.file_name} {inp.sha256[:8]}…)")
-    return "; ".join(parts), tuple(fixtures)
+        models.append((str(member["fixture_id"]), f"forward model {manifest.forward_model_id} "
+                                                  f"({member['forward_model']}), FE input {inp.file_name} SHA-256 "
+                                                  f"{inp.sha256[:12]}…"))
+    return "; ".join(parts), tuple(fixtures), tuple(models)
 
 
 def _verdict_rows(result: dict, run: str, bound: str, source: str, klass: str, formal: str) -> list:
@@ -187,7 +197,7 @@ def load_material_evidence(repo_root: Optional[Path] = None) -> MaterialsView:
     from domain.identification_run import canonical_hash
 
     root = REPO_ROOT if repo_root is None else Path(repo_root)
-    rows, problems, fixtures, formal = [], [], (), NOT_AVAILABLE
+    rows, problems, fixtures, models, formal = [], [], (), (), NOT_AVAILABLE
     try:
         correction, correction_sha = _read(root, CORRECTION)
         interpretation = correction["corrected_interpretation"]
@@ -207,12 +217,13 @@ def load_material_evidence(repo_root: Optional[Path] = None) -> MaterialsView:
                     problems.append(f"{relative}: content does not match the hash pinned by {CORRECTION}; NOT "
                                     "VERIFIED, its values are not shown.")
                     continue
-                bound, run_fixtures = _campaign_bindings(root, run)
+                bound, run_fixtures, run_models = _campaign_bindings(root, run)
             except (OSError, ValueError, KeyError, TypeError) as error:
                 problems.append(f"{relative}: not readable ({error}).")
                 continue
             results[run] = (result, sha, relative, bound, entry)
             fixtures = tuple(dict.fromkeys(fixtures + run_fixtures))
+            models = tuple(dict.fromkeys(models + run_models))
     if "RUN_A" in results:  # the governed material-identification question (SPEC v1.2 §11: RUN_B is diagnostic)
         result, sha, relative, bound, entry = results["RUN_A"]
         family = entry["family_consistency"]
@@ -236,7 +247,8 @@ def load_material_evidence(repo_root: Optional[Path] = None) -> MaterialsView:
     notes = (ACCURACY_NOTE,
              "Records are related to the read data only through the archived fixture the registration service "
              "verified; never by a name, a file name or a frequency.")
-    return MaterialsView(rows=tuple(rows), formal_output=formal, fixtures=fixtures, problems=tuple(problems),
+    return MaterialsView(rows=tuple(rows), formal_output=formal, fixtures=fixtures, fixture_models=models,
+                         problems=tuple(problems),
                          notes=notes)
 
 
@@ -326,6 +338,12 @@ def _diagnostics(root: Path, results: dict, interpretation: dict, correction_sha
 class Relevance:
     status: str
     text: str
+    historical: str = ""  # the historical record of the verified fixture, with its own provenance (never the read data's)
+
+
+NOT_BOUND = ("The read FE package records no content identity of its ODB or INP, and neither the FE geometry, the "
+             "experimental source, MAC nor frequency proximity proves that the read FE results are a governed record's "
+             "forward model. No material record is attributed to the read data.")
 
 
 def current_relevance(view: MaterialsView, verified_fixture: Optional[str], data_read: bool) -> Relevance:
@@ -339,13 +357,16 @@ def current_relevance(view: MaterialsView, verified_fixture: Optional[str], data
             "transferred to them by name, file name or frequency, and no material value is derived from the "
             "frequencies."))
     if verified_fixture in view.fixtures:
-        return Relevance(view.formal_output, (
-            f"The read data are the verified archived fixture {verified_fixture}, a member of the governed M7 campaign "
-            f"of the SP-02 / SP-13 family. Its material-identification result is {view.formal_output} (D-077): no "
-            "material value is identified. Specimen engineering calibration: NOT_AVAILABLE."))
+        models = "; ".join(model for fixture, model in view.fixture_models if fixture == verified_fixture)
+        return Relevance(NOT_AVAILABLE, (
+            f"The archived registration {verified_fixture} applies to the read data's FE geometry, experimental source "
+            f"and modal set only. {NOT_BOUND}"), historical=(
+            f"Historical record, with its own provenance and not a result of the read FE model: the governed M7 "
+            f"campaign of the SP-02 / SP-13 family used the fixture {verified_fixture} with its {models}. Its "
+            f"material-identification result is {view.formal_output} (D-077): no material value is identified."))
     return Relevance(NOT_AVAILABLE, (
-        f"The verified archived fixture {verified_fixture} is not bound to any governed material record; no material "
-        "result applies to the read data."))
+        f"The archived registration {verified_fixture} applies to the read data's FE geometry, experimental source and "
+        f"modal set only, and no governed material record uses it. {NOT_BOUND}"))
 
 
 __all__ = ["CLASSES", "CLASS_NOTE", "CLASS_TITLE", "EvidenceRow", "HEADERS", "MaterialsView", "Relevance",

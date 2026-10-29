@@ -154,7 +154,10 @@ class ResultTests(_Window):
                       self.window.diagnostic.summary_values["MAC"].text())
         self.assertIn(cm.PAIRS_FOUND, self.window.status_text.text())
         self.window.show_page(window_module.MATERIALS_PAGE)
-        self.assertEqual(self.window.materials.relevance_badge.text(), mm.NO_GLOBAL_VALUE)
+        materials = self.window.materials  # NEW-GUI.6-F1: the registration does not bind the FE model to M7
+        self.assertEqual(materials.relevance_badge.text(), mm.NOT_AVAILABLE)
+        self.assertTrue(materials.historical.isVisible())
+        self.assertIn("not a result of the read FE model", materials.historical.text())
 
     def test_a_report_message_goes_with_its_result(self):
         self.compared()
@@ -199,6 +202,73 @@ class _SlowComparison:
         self.started.set()
         self.release.wait(30)
         return self.real(*args)
+
+
+class _SlowExport:
+    """An export that waits until released (a deterministic delay)."""
+
+    def __init__(self, real):
+        self.started, self.release = threading.Event(), threading.Event()
+        self.real = real
+
+    def __call__(self, *args, **kwargs):
+        self.started.set()
+        self.release.wait(30)
+        return self.real(*args, **kwargs)
+
+
+class ExportProvenanceTests(_Window):
+    def slow_export(self):
+        from new_gui import report_export as rx
+
+        slow = _SlowExport(rx.export_verified)
+        patcher = mock.patch.object(rx, "export_verified", slow)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(slow.release.set)
+        return slow
+
+    def test_a_report_finished_after_the_inputs_changed_is_announced_as_earlier_data(self):
+        import json
+        from new_gui import comparison_panel as cp
+
+        for change in (lambda: self.choose_set(1), lambda: self.window.choose_file(ws.FE, str(self.other_odb))):
+            with self.subTest(change=change), reporting_restored():
+                for item in self.reports.iterdir():
+                    item.unlink()
+                self.compared()
+                read_fe = self.window.slots[ws.FE].identity
+                slow = self.slow_export()
+                self.assertTrue(self.workbench.export())
+                self.assertTrue(slow.started.wait(30))
+                change()
+                self.app.processEvents()
+                self.assertEqual(self.workbench.export_status.text(), cp.EARLIER_RUNNING)
+                slow.release.set()
+                self.assertTrue(self.window.wait_for_reads(120))
+                self.app.processEvents()
+                text = self.workbench.export_status.text()
+                self.assertTrue(text.startswith(cp.EARLIER_DONE), text)
+                written = sorted(self.reports.iterdir())
+                self.assertEqual([p.suffix for p in written], [".json", ".pdf", ".xlsx"])  # kept, not removed
+                record = json.loads(written[0].read_text(encoding="utf-8"))
+                self.assertEqual(record["fe_source"]["sha256"], read_fe["sha256"])  # the earlier data's own source
+                self.window.clear_file(ws.FE)
+                self.window.clear_file(ws.EXPERIMENTAL)
+
+    def test_a_file_changed_on_disk_after_the_comparison_is_not_exported(self):
+        self.compared()
+        original = self.odb.read_bytes()
+        self.odb.write_bytes(original + b"#")
+        try:
+            with reporting_restored():
+                self.assertTrue(self.workbench.export())
+                self.assertTrue(self.window.wait_for_reads(120))
+        finally:
+            self.odb.write_bytes(original)
+        self.app.processEvents()
+        self.assertIn("changed since it was read", self.workbench.export_status.text())
+        self.assertEqual(list(self.reports.iterdir()), [])
 
 
 class StaleTests(_Window):

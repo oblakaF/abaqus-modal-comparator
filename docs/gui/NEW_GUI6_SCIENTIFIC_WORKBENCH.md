@@ -1,6 +1,7 @@
 # NEW-GUI.6 — scientific workbench of the new interface
 
-Status: REVIEW_READY (2026-10-29), not accepted.
+Status: REVIEW_READY (2026-10-29), not accepted. NEW-GUI.6-F1 (traceability of the material records and of the
+export) is described in its own section below; the sections above it describe the behaviour after F1.
 
 Branch `feature/new-gui6-scientific-workbench`. It was made from `feature/new-gui5-registration-readiness` at `f9bff49`
 (PR #120 open), with `origin/main` `249ac5e` (PR #119) merged into it by a normal merge (`65fdecb`). The PR #120 branch
@@ -82,10 +83,18 @@ frequency.
 
 - **Integrity.** The M7 result records are checked against the canonical hashes pinned by D-076. A changed record is
   NOT VERIFIED and its values are not shown.
-- **"For the data read now".** Records are related to the read data only through the archived fixture the
-  registration service verified (SP02/bravo-1-physical, SP13/best-physical), giving NO_GLOBAL_PARAMETER_VALUE.
-  Otherwise the answer is NOT_AVAILABLE; this applies to the new ROTATED series. Nothing is related by a name, a file
-  name or a frequency.
+- **"For the data read now" (F1).** Always **NOT_AVAILABLE**: no material record is attributed to the read data.
+  - A governed record belongs to its own forward model. Each M7 record names its FE input: SP02_Modal_V02.inp
+    `574ae78a…` for SP-02 and the SP-13 physical forward model's INP.
+  - A verified archived registration proves only the FE geometry identity, the experimental source and the modal set.
+    Another FE model with the same mesh (other materials, other INP) passes it too.
+  - The read FE package records no content identity of its ODB or INP. Geometry, MAC and frequency proximity do not
+    prove an FE model's identity.
+- **Historical record.** When the verified fixture is one the M7 records use (SP02/bravo-1-physical,
+  SP13/best-physical), the page names the historical M7 / D-077 result separately, with its own forward model and FE
+  input, as "not a result of the read FE model". D-077, its formal refusal NO_GLOBAL_PARAMETER_VALUE and the
+  historical diagnostic values are shown unchanged.
+- **No transfer.** Nothing is related by a name, a file name or a frequency.
 - **Not shown.** The frozen SP13 REAL-4 artefacts under `analysis/` (git-ignored, HISTORICAL_NOT_REVALIDATED) are
   not read.
 - **The ±10 % wish.** The owner's engineering wish does not change the IDENTIFIED / WIDE / NOT_IDENTIFIABLE limits, the
@@ -110,13 +119,23 @@ Inspect file still reads it. Without the folder `D:\Snadwich\New  EXP results` t
 
 | Result shown | Files (time-stamped, never replacing a file) |
 |---|---|
-| Verified comparison | `verified_modal_comparison_<stamp>.xlsx` / `.pdf` from the program's comparison report writers, and `.json`. The JSON holds the FE / experimental sources with fresh SHA-256, the modal set, the registration provenance, the pairs with MAC and signed errors, the MAC matrix, the unpaired modes, the gates, the warnings, the status, the suitability statements and the limits |
+| Verified comparison | `verified_modal_comparison_<stamp>.xlsx` / `.pdf` from the program's comparison report writers, and `.json`. The JSON holds the FE / experimental sources with the SHA-256 recorded when they were read (confirmed unchanged at export), the modal set, the registration provenance, the pairs with MAC and signed errors, the MAC matrix, the unpaired modes, the gates, the warnings, the status, the suitability statements and the limits |
 | No verified comparison, frequency diagnostic shown | `modal_diagnostic_report_<stamp>.pdf` / `.xlsx` (CORE-E2E-D): MAC NOT_COMPUTED, no pairs |
 
 - **Where files go.** Only the folder chosen in the dialog, which starts in the APP-UX.1 report folder. A cancelled
   choice writes nothing.
-- **Changed files.** Before writing, the experimental file is identified again; a file changed since the comparison is
-  refused.
+- **Changed files (F1).**
+  - Inspect file records the SHA-256 and size of the file it read: the FE `manifest.json`, or the experimental file the
+    importer read.
+  - A comparison confirms both against the files on disk before the comparator runs.
+  - An export confirms them again before writing. The verified report and the diagnostic report are both refused when
+    an identity was not recorded (or the file changed during the read) or when a file changed since.
+  - A later hash is never attributed to data read earlier.
+  - The FE package's CSV files are not hashed.
+- **An export belongs to its inputs (F1).** When the inputs change while an export runs:
+  - the page says a report of the earlier data is being written;
+  - when it ends, the files are announced as a report of the EARLIER data, never as one of the data now shown;
+  - the files are kept, with their own recorded identities.
 - **Pair images** are drawn into a temporary folder of each request, read into memory and the folder removed.
 
 ## Results on real data (2026-10-29)
@@ -174,7 +193,8 @@ SHA-256 alone, whatever FE is read.
 
 **Materials page.**
 
-- **SP-02 and SP-13 (verified fixtures):** "For the data read now" = NO_GLOBAL_PARAMETER_VALUE (D-077).
+- **SP-02 and SP-13 (verified fixtures):** before F1 "For the data read now" was NO_GLOBAL_PARAMETER_VALUE
+  (D-077). After F1 it is NOT_AVAILABLE, with the historical M7 / D-077 record named separately.
 - **ROTATED series:** NOT_AVAILABLE ("not transferred by name, file name or frequency").
 - **Records:** the M7 result records match their pinned canonical hashes, and no record is NOT VERIFIED.
 
@@ -237,7 +257,7 @@ Windows 10, screen scaling 150 % (DPI 144). Each run used an isolated `LOCALAPPD
 - **SP-02, set 1.** Diagnostic, then check verified, then verified comparison: 6 pairs, the first pair drawn (three
   images). Row 3 of the table draws FE 10 / Exp 4; choosing it again draws nothing.
 - **Diagnostics and export.** MAC table 9 × 9 with the pairs marked, then the diagnostics tabs and the export (xlsx,
-  pdf, json). The Materials page shows NO_GLOBAL_PARAMETER_VALUE.
+  pdf, json). The Materials page showed NO_GLOBAL_PARAMETER_VALUE (before F1; see NEW-GUI.6-F1).
 - **SP-02, set 2.** The result, the images and the summary go at once ("not computed" / "none"). The check refuses,
   the comparison stays disabled, and the diagnostic export is written.
 - **SP-13 `best`.** 5 pairs; MAC table 24 × 12; export.
@@ -270,7 +290,7 @@ fix.
   - A click on the table row for FE mode 10 drew COMPUTED PAIR FE 10 / Exp 4.
   - **Export report...** used the native folder dialog. It opened in `Documents\Abaqus Modal Comparator Reports`, and
     the files were written into the chosen folder.
-- **Materials.** NO_GLOBAL_PARAMETER_VALUE.
+- **Materials.** NO_GLOBAL_PARAMETER_VALUE (before F1; see NEW-GUI.6-F1).
 - **Sizes.** 900×680, 1366×768, 1350×1020 and 2049×1152 physical: no page scroll bar.
 - **Known sources (Ctrl+3).** Three entries; SP-13 ROTATED chosen and only its path set ("File chosen; content not
   checked"). Then Inspect, the check refused with the SHA-256 reason, the comparison disabled, the frequency
@@ -308,3 +328,66 @@ fix.
 - **Last display fixes.** The cleared report message came after the full suite and both smokes. The note under the
   registration check came after the full suite and the launcher smoke. Both are covered by tests, and the targeted
   tests ran after them.
+
+## NEW-GUI.6-F1 — traceability of the material records and of the export (2026-10-29)
+
+Base `2ab012f`.
+
+### 1. Materials: exact binding
+
+- **No record for the read data.** `current_relevance` never attributes a material record to the read data: for the
+  current data the status is always NOT_AVAILABLE. The earlier version attributed the M7 result as soon as the
+  archived registration was verified. A verified registration proves only the geometry, the experimental source and
+  the modal set, not the FE model.
+- **Historical record.** It is shown separately (`Relevance.historical`, Materials page) with its own forward model and
+  FE input, as "not a result of the read FE model".
+- **Unchanged.** D-077, NO_GLOBAL_PARAMETER_VALUE and the historical values. MAC and frequency are not used.
+- **Test** (`MaterialBindingTests`): an FE model with the same mesh and other frequencies passes the registration check
+  (SP02/bravo-1-physical) and gets no material binding.
+
+### 2. Export: protection against stale results
+
+- **Identity at the read.** `preview_model.run_read` records the SHA-256 and size of the file read (FE `manifest.json`;
+  the experimental file the importer read). A file changed during the read gets no identity.
+- **Check at the comparison.** `comparison_model.compare(..., sources)` confirms both against the disk before the
+  comparator runs (refusal: "is not the file that was read"); the outcome keeps them.
+- **Check at the export.** `report_export.confirmed_sources` confirms them again before writing, for the verified and
+  the diagnostic report. An identity not recorded, or a file changed since the read, refuses the export. A later hash
+  is never written for earlier data.
+- **Export and inputs.** `comparison_panel`: an export belongs to the input epoch it started in. A change while it runs
+  shows "A report of the earlier data is still being written…". When it ends, the files are announced as a report of
+  the EARLIER data; they are kept, and their JSON states the identities of those earlier data.
+- **Writing.** Atomic writing and the protection of the source files are unchanged.
+
+### Tests and CI
+
+- **New deterministic tests:**
+  - the binding test above;
+  - an FE manifest changed after the read (refusal before the comparator);
+  - an experimental file other than the one read;
+  - export without identities or with a file changed on disk;
+  - the diagnostic export of changed files;
+  - a file changed during the read;
+  - a delayed export (released gate) with a set change and with a replaced FE file;
+  - the GUI export of a file changed on disk.
+- **Reproduction.** Every new test fails on `2ab012f` (7 run: 1 failure, 6 errors).
+- **Runs:**
+  - NEW-GUI.6 tests: 69 (1 skipped);
+  - NEW-GUI.2/4/5/6: 117 OK;
+  - full suite: **3004 OK, 98 skipped**; `test_g2_eigfreq_precision` (16) NOT_RUN.
+
+### Windows smoke F1 (in-process, Qt platform `windows`, 150 %, isolated LOCALAPPDATA): PASS
+
+- **Read identities.** For SP-02 and SP-13 they equal the files' SHA-256. The comparison outcome keeps them, and the
+  export JSON states them (`unchanged_at_export: true`).
+- **Materials after the verified check.** NOT_AVAILABLE, with the historical M7 record visible.
+- **SP-02 delayed export.** The set was changed during the export: "earlier data" while running and at the end. The
+  three files were written and kept; the JSON names the earlier set (`bravo-1`) and the read FE identity.
+- **ROTATED SP-13 / SP-10 / plate.** Check Not confirmed, comparison disabled, no MAC, Materials NOT_AVAILABLE without
+  a historical record.
+- **Inputs.** Unchanged (SHA-256, size, mtime).
+
+### Limits
+
+The FE package's CSV files are not hashed; only `manifest.json` is. A changed CSV with an unchanged manifest is not
+detected.

@@ -635,9 +635,18 @@ class MainWindow(QMainWindow):
     def _registration_inputs(self) -> None:
         inputs = (self.diagnostic.fe_preview, self.diagnostic.experimental_preview, self.diagnostic.chosen_set_index())
         self.registration.set_inputs(*inputs)
-        self.comparison.set_inputs(*inputs)  # a change removes the comparison and its drawings
+        identities = {"fe": self._read_identity(FE), "experimental": self._read_identity(EXPERIMENTAL)}
+        self.comparison.set_inputs(*inputs, identities)  # a change removes the comparison and its drawings
         self._registration_changed()
         self._analysis_changed()
+
+    def _read_identity(self, kind: str):
+        """The identity of the file read for the shown preview of ``kind`` (None when not read or not confirmed)."""
+        slot = self.slot_of(kind)
+        return slot.identity if self._read_preview(kind) is not None else None
+
+    def slot_of(self, kind: str) -> InspectSlot:
+        return self.slots[kind]
 
     def _read_preview(self, kind: str):
         """The preview of the chosen file of ``kind`` when it was read, else None."""

@@ -67,6 +67,8 @@ class MaterialsPanel(QWidget):
         inner.addWidget(self.relevance_badge, 0, Qt.AlignmentFlag.AlignLeft)
         self.relevance = _label("", "")
         inner.addWidget(self.relevance)
+        self.historical = _label("", "hint")  # NEW-GUI.6-F1: a historical record, named with its own provenance
+        inner.addWidget(self.historical)
         layout.addWidget(card)
         self.classes_box = QWidget()
         self.classes_layout = QVBoxLayout(self.classes_box)
@@ -93,12 +95,15 @@ class MaterialsPanel(QWidget):
             self._refresh_relevance()
 
     def _refresh_relevance(self) -> None:
+        historical = ""
         if self.evidence is None:
             status, text = mm.NOT_AVAILABLE, (self.error or "The project's material records are read when this "
                                               "page is shown.")
         else:
             relevance = mm.current_relevance(self.evidence, self.verified_fixture, self.data_read)
-            status, text = relevance.status, relevance.text
+            status, text, historical = relevance.status, relevance.text, relevance.historical
+        self.historical.setText(historical)
+        self.historical.setVisible(bool(historical))
         self.relevance_badge.setText(status)
         self.relevance_badge.setProperty("state", "blocked")
         _restyle(self.relevance_badge)

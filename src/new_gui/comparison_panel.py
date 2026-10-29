@@ -19,6 +19,11 @@ exactly the current FE results, experimental file and modal set; the comparison 
 cancels a running comparison and removes the shown result, images included. Export report... writes the verified
 comparison's report, or without one the diagnostic report of the frequency diagnostic shown, into a folder the user
 chooses (``new_gui.report_export``).
+
+NEW-GUI.6-F1: the identities of the files recorded when they were read (``set_inputs(..., identities)``) go with a
+comparison and an export, which refuse when a file changed since. An export belongs to the inputs it was started for
+(an input epoch): when the inputs change while it runs, its end is reported as a report of the earlier data, never as
+one of the data now shown; a report it wrote keeps its own provenance and is not removed.
 """
 
 from __future__ import annotations
@@ -47,6 +52,9 @@ EXPORT_HINT = ("Writes the verified comparison report (Excel, PDF and a JSON rec
                "without a verified comparison, the diagnostic report of the frequency diagnostic shown (no MAC, no "
                "mode pairs). Only into the folder you choose; nothing else is written.")
 NEED_RESULT = "Run the frequency diagnostic or the verified comparison first: the report states their result."
+EARLIER_RUNNING = ("A report of the earlier data is still being written; it does not describe the data now shown.")
+EARLIER_DONE = ("Report of the EARLIER data (the inputs changed while it was written). It describes those data and "
+                "their recorded file identities, not the data now shown:")
 
 
 def _label(text: str = "", name: str = "", wrap: bool = True) -> QLabel:
@@ -173,6 +181,8 @@ class ComparisonPanel(QFrame):
         self.registration_view: Optional[rm.RegistrationView] = None
         self.registration_refusal = ""
         self.diagnostic = None  # the frequency diagnostic shown for the current inputs (for the diagnostic report)
+        self.identities: dict = {"fe": None, "experimental": None}  # recorded when the files were read
+        self.epoch = 0  # NEW-GUI.6-F1: the state of the inputs; an export belongs to the epoch it started in
         self.slot = cm.ComparisonSlot()
         self.discarded = 0  # outcomes of cancelled or stale requests, never shown
         self.images: dict[int, cm.PairImages] = {}
@@ -302,14 +312,17 @@ class ComparisonPanel(QFrame):
 
     # ------------------------------------------------------------------------------------------ inputs
 
-    def set_inputs(self, fe_preview, experimental_preview, set_index: Optional[int]) -> None:
-        """The read previews and the chosen set; any change removes the result, its images included."""
+    def set_inputs(self, fe_preview, experimental_preview, set_index: Optional[int], identities=None) -> None:
+        """The read previews, the chosen set and the identities of the files read; any change removes the result,
+        its images included."""
         for kind, preview in ((FE, fe_preview), (EXPERIMENTAL, experimental_preview)):
             self.shapes[kind].set_preview(preview)
+        identities = dict(identities or {"fe": None, "experimental": None})
         if (fe_preview is self.fe_preview and experimental_preview is self.experimental_preview
-                and set_index == self.set_index):
+                and set_index == self.set_index and identities == self.identities):
             return
         self.fe_preview, self.experimental_preview, self.set_index = fe_preview, experimental_preview, set_index
+        self.identities = identities
         self.diagnostic = None
         self._reset()
 
@@ -337,8 +350,8 @@ class ComparisonPanel(QFrame):
     def _reset(self) -> None:
         self.slot.reset()
         self._forget_images()
-        if not self._exporting:
-            self.export_message = ""  # the message of a written report belongs to the result that is gone
+        self.epoch += 1  # a running export now belongs to earlier data
+        self.export_message = (EARLIER_RUNNING if self._exporting else "")  # a report's message goes with its data
         self._refresh()
 
     def _forget_images(self) -> None:
@@ -358,7 +371,7 @@ class ComparisonPanel(QFrame):
         request = (self.fe_preview, self.experimental_preview, self.set_index, self.registration_view.registration)
         token, cancel_event = self.slot.start(request)
         self._forget_images()
-        self._start(self._work, (*request, token, cancel_event), "new-gui-comparison")
+        self._start(self._work, (*request, token, cancel_event, dict(self.identities)), "new-gui-comparison")
         self._refresh()
         return True
 
@@ -367,8 +380,9 @@ class ComparisonPanel(QFrame):
         self._threads = [thread for thread in self._threads if thread.is_alive()] + [worker]
         worker.start()
 
-    def _work(self, fe_preview, experimental_preview, set_index, registration, token, cancel_event) -> None:
-        outcome = cm.run_compare(fe_preview, experimental_preview, set_index, registration, token, cancel_event)
+    def _work(self, fe_preview, experimental_preview, set_index, registration, token, cancel_event, sources) -> None:
+        outcome = cm.run_compare(fe_preview, experimental_preview, set_index, registration, token, cancel_event,
+                                 sources)
         try:
             self._bridge.compared.emit(outcome)
         except RuntimeError:  # the panel is already gone
@@ -464,33 +478,36 @@ class ComparisonPanel(QFrame):
         if kind == "verified":
             outcome = self.slot.outcome
             args = (kind, (outcome.result, outcome.bound, outcome.view, self.fe_preview, self.experimental_preview,
-                           self.set_index, folder))
+                           self.set_index, folder), {"sources": outcome.sources})
         else:
             reason = (f"no archived physical registration applies: {self.registration_refusal}"
                       if self.registration_refusal else dm.REASON)
             args = (kind, (self.fe_preview, self.experimental_preview, self.set_index, self.diagnostic, reason,
-                           folder))
+                           folder), {"sources": dict(self.identities)})
         self._exporting = True
         self.export_message = "Writing the report..."
-        self._start(self._export_work, args, "new-gui-export")
+        self._start(self._export_work, (*args, self.epoch), "new-gui-export")
         self._refresh()
         return True
 
-    def _export_work(self, kind: str, args: tuple) -> None:
+    def _export_work(self, kind: str, args: tuple, options: dict, epoch: int) -> None:
+        writer = rx.export_verified if kind == "verified" else rx.export_diagnostic
         try:
-            written = rx.export_verified(*args) if kind == "verified" else rx.export_diagnostic(*args)
+            written = writer(*args, **options)
             message = (("Verified comparison report" if kind == "verified" else "Diagnostic report (no MAC, no mode "
                         "pairs)") + " written:\n" + "\n".join(str(path) for path in written))
         except Exception as error:  # noqa: BLE001  (refusals, unwritable folders, writer errors)
             message = f"The report was not written ({type(error).__name__}: {error})."
         try:
-            self._bridge.exported.emit(message)
+            self._bridge.exported.emit((message, epoch))
         except RuntimeError:
             pass
 
-    def _exported(self, message: str) -> None:
+    def _exported(self, done) -> None:
+        message, epoch = done
         self._exporting = False
-        self.export_message = message
+        # a report started for other inputs is announced as such: its files keep their own provenance
+        self.export_message = message if epoch == self.epoch else f"{EARLIER_DONE}\n{message}"
         self._refresh()
 
     # ------------------------------------------------------------------------------------------ display
