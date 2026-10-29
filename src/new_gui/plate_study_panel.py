@@ -121,7 +121,12 @@ class PlateStudyPanel(QWidget):
         self.shapes[FE].set_preview(fe_preview)
         self.shapes[EXPERIMENTAL].set_preview(experimental_preview)
         inputs = (fe_preview, fe_identity, experimental_preview, experimental_identity, set_index)
-        if all(a is b or a == b for a, b in zip(inputs, self.inputs)):
+        # PLATE-ONLY-R1-F1: a preview is compared by object, never by value: Inspect file again (even of the same
+        # path) gives a new preview, and the earlier result and its export status are removed
+        same = (fe_preview is self.inputs[0] and experimental_preview is self.inputs[2]
+                and fe_identity == self.inputs[1] and experimental_identity == self.inputs[3]
+                and set_index == self.inputs[4])
+        if same:
             return
         self.inputs = inputs
         self.slot.reset()
@@ -184,9 +189,9 @@ class PlateStudyPanel(QWidget):
         if not folder:
             return False
         try:
-            written = psm.export_report(view, folder)
+            written = psm.export_report(view, folder)  # confirms the files read before writing
             self.export_message = "Plate study report written:\n" + "\n".join(str(p) for p in written)
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError) as error:  # ExportRefused is a ValueError: nothing was written
             self.export_message = f"The report was not written ({error})."
         self._refresh()
         return True
@@ -237,23 +242,27 @@ class PlateStudyPanel(QWidget):
         if view is not None:
             self.result_layout.addWidget(_label(f"FE package: {view.member}", ""))
             self.result_layout.addWidget(_label(f"Registration: {view.registration}", "warnings"))
-            self._table("experiment", "Experimental records (every record; descriptive invariants)",
-                        ("Record", "Mode", "Hz", "MPC", "Measured", "Points", "Rigid plane", "Saddle", "Dome",
-                         "Classification"), view.experimental_rows, 9, (4, 9))
+            self._table("experiment", "MEASURED experimental records (every record; descriptive invariants)",
+                        ("Record", "Mode", "Measured Hz", "MPC", "Measured DOF", "Points", "Rigid plane", "Saddle",
+                         "Dome", "Classification"), view.experimental_rows, 9, (4, 9))
             self._table("geometry", "Scan geometry", ("Item", "Value"), view.geometry, 1)
-            self._table("frequency", "Frequencies — nearest FE frequency is NOT a mode pair (frequency only)",
-                        ("Exp mode", "Exp Hz", "Nearest FE mode", "FE Hz", "Difference (%)", "MAC", "Note"),
-                        view.frequency_rows, 6, (5, 6))
+            self._table("frequency", "Measured frequencies against the CANDIDATE FE model's frequencies — the "
+                        "nearest FE frequency is NOT a mode pair (frequency only)",
+                        ("Exp mode", "Measured Hz", "Nearest candidate FE mode", "Candidate FE Hz",
+                         "Difference (%)", "MAC", "Note"), view.frequency_rows, 6, (5, 6))
             self._table("family", "FE family of the plate (CANDIDATE_FE_REFERENCE; SHA-256 verified)",
                         ("Member", "Description", "Status", "Changed", "Files"), view.family_rows, 4, (0, 1, 2, 4))
-            self._table("sensitivity", "FE branch sensitivities s = Δ ln f / Δ ln p (secants; FE-to-FE tracking)",
-                        ("Branch", "FE Hz", "s E1", "s E2", "s G12", "Cluster", "Tracking"), view.sensitivity_rows,
-                        6, (0, 5, 6))
+            self._table("sensitivity", "Sensitivities of the CANDIDATE FE model's branches s = Δ ln f / Δ ln p "
+                        "(secants; FE-to-FE tracking)",
+                        ("Branch", "Candidate FE Hz", "s E1", "s E2", "s G12", "Cluster", "Tracking"),
+                        view.sensitivity_rows, 6, (0, 5, 6))
             self._table("clusters", "Close FE pairs (3 % trigger; confirm_cluster)", ("Pair", "Status", "Reason"),
                         view.cluster_rows, 2, (0, 1, 2))
-            self._table("design", "Which parameters could be distinguished — HYPOTHETICAL pairing (design study, M5)",
-                        ("Case", "Parameters", "Terms", "Rank status", "sd (ln)", "Refusal"), view.design_rows, 5,
-                        (0, 1, 3, 5))
+            self._table("design", "HYPOTHETICAL distinguishability of parameters (design study, M5) — conditional, "
+                        "not the real accuracy",
+                        ("Case", "Parameters", "Terms", "Rank status", "Conditional sd (ln), provisional Σ_setup",
+                         "Refusal"), view.design_rows, 5, (0, 1, 3, 5))
+            self.result_layout.addWidget(_label(psm.CONDITIONAL_NOTE, "warnings"))
             self._table("outcomes", "Parameter outcomes now", ("Parameter", "Outcome", "Reason"), view.outcome_rows,
                         2, (0, 1, 2))
             self.result_layout.addWidget(_label("Missing for an identification:\n" + "\n".join(

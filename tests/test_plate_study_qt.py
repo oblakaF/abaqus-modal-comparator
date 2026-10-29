@@ -181,5 +181,99 @@ class PlateStudyPageTests(_PlateWindow):
             ps.request_iteration()
 
 
+class InputTraceabilityTests(_PlateWindow):
+    """PLATE-ONLY-R1-F1: a file changed after Inspect file is never given the result of the content read earlier."""
+
+    def run_study(self):
+        self.assertTrue(self.panel.run())
+        self.assertTrue(self.window.wait_for_reads(120))
+        self.app.processEvents()
+
+    def snapshot(self):
+        return {p.name: p.read_bytes() for p in self.reports.iterdir()}
+
+    def test_a_file_changed_after_inspect_refuses_the_study_before_any_computation(self):
+        for name in ("plate.unv", "base/manifest.json"):
+            with self.subTest(file=name):
+                self.read()
+                path = self.files[name]
+                original = path.read_bytes()
+                path.write_bytes(original + b" changed on disk")
+                try:
+                    with mock.patch.object(ps, "experimental_summary",
+                                           side_effect=AssertionError("no computation")):
+                        self.run_study()
+                    self.assertIsNone(self.panel.view)
+                    self.assertEqual(self.panel.slot.state, psm.FAILED)
+                    self.assertIn("changed since Inspect file read it", self.panel.status.text())
+                    self.assertIn("Inspect it again", self.panel.status.text())
+                    self.assertEqual(path.read_bytes(), original + b" changed on disk")  # the source is not touched
+                finally:
+                    path.write_bytes(original)
+                self.window.clear_file(ws.FE)
+                self.window.clear_file(ws.EXPERIMENTAL)
+
+    def test_a_file_changed_after_the_study_refuses_the_export_and_keeps_earlier_reports(self):
+        for name in ("plate.unv", "base/manifest.json"):
+            with self.subTest(file=name):
+                self.read()
+                self.run_study()
+                self.assertIsNotNone(self.panel.view)
+                existing = set(self.snapshot())
+                self.assertTrue(self.panel.export())  # unchanged files: the export passes
+                earlier = self.snapshot()
+                self.assertEqual(sorted(Path(k).suffix for k in set(earlier) - existing), [".json", ".md"])
+                path = self.files[name]
+                original = path.read_bytes()
+                path.write_bytes(original + b" changed on disk")
+                try:
+                    self.assertTrue(self.panel.export())
+                    self.assertIn("The report was not written", self.panel.export_status.text())
+                    self.assertIn("changed since it was read", self.panel.export_status.text())
+                    self.assertEqual(self.snapshot(), earlier)  # no new file, earlier reports byte-identical
+                    self.assertEqual([p.name for p in self.reports.iterdir() if p.name.startswith(".~")], [])
+                finally:
+                    path.write_bytes(original)
+                self.window.clear_file(ws.FE)
+                self.window.clear_file(ws.EXPERIMENTAL)
+
+    def test_inspect_again_of_the_same_files_removes_the_result_and_its_export_status(self):
+        self.read()
+        self.run_study()
+        self.assertTrue(self.panel.export())
+        self.assertTrue(self.panel.export_status.text().startswith("Plate study report written"))
+        for kind in (ws.FE, ws.EXPERIMENTAL):  # the same paths, read again
+            self.assertTrue(self.window.inspect_file(kind))
+        self.assertTrue(self.window.wait_for_reads(120))
+        self.window.diagnostic.set_combo.setCurrentIndex(1)
+        self.app.processEvents()
+        self.assertIsNone(self.panel.view)
+        self.assertEqual(self.panel.export_status.text(), "")
+        self.assertFalse(self.panel.export_button.isEnabled())
+        self.run_study()  # the unchanged files pass again
+        self.assertIsNotNone(self.panel.view)
+
+    def test_a_new_preview_equal_in_value_still_resets(self):
+        self.read()
+        self.run_study()
+        fe, fe_id, exp, exp_id, index = self.panel.inputs
+        import dataclasses
+
+        self.panel.set_inputs(dataclasses.replace(fe), fe_id, exp, exp_id, index)  # equal value, another read
+        self.assertIsNone(self.panel.view)
+
+    def test_the_conditional_figures_are_never_shown_as_the_real_accuracy(self):
+        self.read()
+        self.run_study()
+        texts = " ".join(label.text() for label in self.panel.findChildren(type(self.panel.why)))
+        self.assertIn("NOT the expected accuracy of the real experiment", texts)
+        self.assertIn("real uncertainty of the plate's effective properties is UNKNOWN", texts)
+        self.assertIn("engineering goal, not an achieved result", texts)
+        header = self.panel.tables["design"].horizontalHeaderItem(4).text()
+        self.assertIn("Conditional", header)
+        self.assertEqual(self.panel.view.record["real_uncertainty_of_effective_properties"], "UNKNOWN")
+        self.assertEqual({o[1] for o in self.panel.view.outcome_rows}, {ps.NOT_IDENTIFIABLE})
+
+
 if __name__ == "__main__":
     unittest.main()

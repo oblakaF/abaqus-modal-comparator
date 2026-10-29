@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -77,9 +77,18 @@ Limits:
 
 ## 5. Frequency comparison (FREQUENCY_ONLY; no pair)
 
-The nearest FE frequency of the S4R baseline for each record:
+Four kinds of numbers appear in this report and are never mixed:
 
-| Record | Nearest FE mode | Difference |
+| Kind | Meaning |
+|---|---|
+| Measured frequencies | The fitted records of the working source |
+| FE frequencies | The **candidate** FE model of the M11 plate (CANDIDATE_FE_REFERENCE), not a model confirmed for this plate |
+| Hypothetical distinguishability | A design study as if pairs were confirmed (§7) |
+| Uncertainty of the effective properties | Unknown today (§8) |
+
+For each **measured** record, the nearest frequency of the **candidate** S4R baseline:
+
+| Record | Nearest candidate FE mode | Difference |
 |---|---|---|
 | 1 | FE 7 | +2.4 % |
 | 2 | FE 8 | +9.6 % |
@@ -122,11 +131,13 @@ Branches are tracked with `branch_tracker.track_branches` (MAC ≥ 0.90). Close 
   Σ s_D ≈ 0.50–0.53 per term (secants; 0.5 for derivatives).
 - **Not SPEC S4.** These are research secants (−10 % for E, × 2 for G12), not SPEC §6 S4 central ±5 %.
 
-## 7. Identifiability (HYPOTHETICAL_PAIRING design study, M5)
+## 7. Hypothetical distinguishability (HYPOTHETICAL_PAIRING design study, M5)
 
-Assumptions: Σ_setup 0.3 % PROVISIONAL; Σ_meas NOT_AVAILABLE.
+This is **not** an accuracy of the real experiment. The study asks which parameters the candidate FE model's
+sensitivities could separate **if** the listed terms were confirmed mode pairs. The sd values below are
+**conditional**: they use the provisional Σ_setup 0.3 % (Σ_meas NOT_AVAILABLE) and assume pairs that do not exist.
 
-| Case | Status | sd (ln) |
+| Case | Status | Conditional sd (ln), provisional Σ_setup |
 |---|---|---|
 | all 9 tracked terms: D (D11 = D22) + D66 | FULL_RANK | 0.30 %, 0.54 % |
 | all 9 terms: D11, D22, D66 (research; SPEC v1.1 §5.2 blocks E1 ≠ E2 without traceable axes) | FULL_RANK | 0.44 %, 0.44 %, 0.54 % |
@@ -152,8 +163,16 @@ verdicts (SYNTHETIC_GATE):
 
 A research estimate would be a RESEARCH_CANDIDATE_ONLY with its assumptions, never a material constant.
 
-**±10 %.** The statistical part on D is small if pairs are confirmed (≈ 0.3–0.6 % in ln D). E_eff = 12(1 − ν12ν21)·D/h³,
-so the thickness contributes 3·cv_h:
+**Real uncertainty: unknown.** The real uncertainty of the plate's effective properties is not known today:
+- there is no registration and no confirmed pair;
+- there is no thickness or mass record of this plate;
+- Σ_meas is NOT_AVAILABLE;
+- the suspension and the model form are not assessed.
+
+The conditional 0.30–0.54 % of §7 are **not** the expected accuracy of the real experiment.
+
+**The ±10 % target is an engineering goal, not an achieved result.** What it would need follows from the plate model.
+E_eff = 12(1 − ν12ν21)·D/h³, so the thickness alone contributes 3·cv_h:
 
 | Thickness cv | Contribution in E / G |
 |---|---|
@@ -163,9 +182,11 @@ so the thickness contributes 3·cv_h:
 | 5 % | 15 % |
 | 8.2 % (the M11 edge readings of another plate, illustrative only) | 24 % |
 
-- **D.** About ±10 % is plausible once pairs are confirmed and the model form holds.
-- **E / G.** About ±10 % needs a measured thickness map with spatial cv ≲ 3 %, plus the suspension and model-form
-  checks.
+- **D.** About ±10 % may become reachable once pairs are confirmed and the suspension and model form hold. This is
+  not shown yet.
+- **E / G.** About ±10 % would at least need a measured thickness map with spatial cv ≲ 3 %, plus the suspension and
+  model-form checks.
+- **Now.** Every material parameter of this plate stays NOT_IDENTIFIABLE.
 - **Frequency vs stiffness.** A 5 % frequency error is about 10 % in stiffness (f ∝ √D).
 
 ## 9. Program
@@ -217,6 +238,62 @@ so the thickness contributes 3·cv_h:
 6. **Optional Stage-A affine basis.** *MATRIX GENERATE, 4 jobs; balanced plate only. Abaqus, HUMAN gate.
 7. **Campaign.** A declared campaign (question, τ_mf, Σ, bounds, solve budget) and the bounded LM with branch tracking.
    Separate HUMAN authorisation.
+
+## 11. PLATE-ONLY-R1-F1 — traceability of the inputs and notation (2026-10-30)
+
+### Input checks
+
+The page uses the NEW-GUI.6-F1 checks.
+
+- **Before Run plate study.** `plate_study_model.confirm_inputs` identifies the FE manifest and the experimental file
+  again. It uses `preview_model.file_identity`: a fresh SHA-256 and size, no re-import. Both are compared with the
+  identities recorded by Inspect file. A missing or different identity refuses the study before any computation, with
+  "changed since Inspect file read it … Inspect it again".
+- **Before Export plate report.** `report_export.confirmed_sources` checks the identities the study used. A changed
+  file refuses the export: nothing is written, and earlier reports stay byte-identical. A later content is never given
+  the result of the content read earlier.
+- **Inspect file again, even of the same paths.** It removes the previous result and its export status. Previews are
+  compared by object, never by value; a new read is always a new preview.
+
+### Notation
+
+In the GUI, the exported report and this document, these are named apart:
+- measured frequencies;
+- the candidate FE model's frequencies;
+- the hypothetical distinguishability and its conditional sd (provisional Σ_setup);
+- the real, unknown uncertainty.
+
+The ±10 % target is an engineering goal; every material parameter stays NOT_IDENTIFIABLE.
+
+### Tests
+
+New tests `tests/test_plate_study_qt.py::InputTraceabilityTests`:
+- the UNV or the FE manifest changed after Inspect, before Run: refused, nothing computed, the source untouched;
+- the UNV or the FE manifest changed after Run, before Export: refused, no new file, earlier reports byte-identical;
+- Inspect again of the same paths resets the result and the export status, and the unchanged files pass;
+- a new preview equal in value still resets;
+- the conditional figures are never shown as the real accuracy.
+
+Four of the five fail on `54f5b8f` (six failures with subtests). The re-Inspect test also passed before, because the
+read resets the inputs while it runs.
+
+**Full suite.** 3034 OK, 98 skipped; `test_g2_eigfreq_precision` (16) NOT_RUN.
+
+### Windows smoke F1: PASS
+
+Conditions: Qt platform `windows`, 150 %, isolated LOCALAPPDATA, **isolated copies** of the plate UNV and the FE
+package. The originals were only copied; they are unchanged.
+
+1. **The UNV copy changed after Inspect, before Run.** Refused (InputsChanged), nothing computed, no report.
+2. **Inspect again, then Run plate study** (6.2 s):
+   - NOT_READY_FOR_IDENTIFICATION, FREQUENCY_ONLY, 11 measured records;
+   - the column "Conditional sd (ln), provisional Σ_setup" and the conditional note shown;
+   - every outcome NOT_IDENTIFIABLE;
+   - the export wrote JSON and Markdown.
+3. **The FE manifest copy changed after Run, before Export.** "The report was not written (… changed since it was
+   read …)"; the earlier reports are byte-identical.
+4. **Inspect again of the same paths.** The result and its export status are gone.
+5. **Close.** No task left.
 
 ## Not changed
 

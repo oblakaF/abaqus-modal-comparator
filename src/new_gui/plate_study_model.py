@@ -16,6 +16,19 @@ which refuses: the page has no working command for it.
 
 The study shares the heavy-operation lock of NEW-GUI.4–6; a replaced or cleared file cancels it and discards its
 outcome.
+
+PLATE-ONLY-R1-F1 — traceability of the inputs (the NEW-GUI.6-F1 checks):
+
+- before Run plate study, the FE manifest and the experimental file on disk are identified again
+  (``preview_model.file_identity``, a fresh SHA-256 and size, no re-import) and compared with the identities recorded
+  by Inspect file; a missing or different identity refuses the study before any computation (``InputsChanged``);
+- before Export plate report, ``report_export.confirmed_sources`` checks them again against the identities the study
+  used; a changed file refuses the export and writes nothing, so a later content is never given the result of the
+  content read earlier.
+
+Notation: measured experimental frequencies, FE frequencies of the candidate model, the HYPOTHETICAL distinguishability
+of parameters and its CONDITIONAL sd (provisional Σ_setup 0.3 %) are kept apart from the real uncertainty of the
+effective properties, which is UNKNOWN: no material parameter of this plate is identifiable now.
 """
 
 from __future__ import annotations
@@ -47,6 +60,37 @@ NEED_EXPERIMENT = ("Read the plate's working source on the Workspace page (File 
                    "source... > PLATE-300x300x1mm).")
 NEED_FE = "Read an FE package of the plate's FE family on the Workspace page (for example the M11 S4R extraction)."
 NEED_SET = "Choose the modal set on the Analysis page."
+CONDITIONAL_NOTE = (
+    "HYPOTHETICAL distinguishability only: the sd values are CONDITIONAL — they assume that the listed terms were "
+    "confirmed mode pairs and use the provisional Σ_setup 0.3 % (Σ_meas NOT_AVAILABLE). They are NOT the expected "
+    "accuracy of the real experiment. The real uncertainty of the plate's effective properties is UNKNOWN (no "
+    "registration, no confirmed pair, no thickness or mass record of this plate, suspension and model form not "
+    "assessed). The ±10 % target is an engineering goal, not an achieved result. Every material parameter of this "
+    "plate is NOT_IDENTIFIABLE now.")
+
+
+class InputsChanged(ValueError):
+    """A file read by Inspect file is not the same on disk any more; the study is not computed."""
+
+
+def confirm_inputs(fe_preview, fe_identity, experimental_preview, experimental_identity, cancel_event=None) -> dict:
+    """The identities recorded by Inspect file, confirmed against the files on disk now (fresh SHA-256 and size; no
+    re-import). Raises ``InputsChanged`` when one is missing or different."""
+    from new_gui import preview_model as pm
+
+    sources = {}
+    for key, path, recorded, name in (("fe", fe_preview.manifest_path, fe_identity, "FE manifest"),
+                                      ("experimental", experimental_preview.source_path, experimental_identity,
+                                       "experimental file")):
+        if recorded is None:
+            raise InputsChanged(f"the {name}'s identity was not recorded when it was read; Inspect it again.")
+        now = pm.file_identity(path, cancel_event)
+        if now is None or now["sha256"] != recorded["sha256"] or now["size"] != recorded["size"]:
+            raise InputsChanged(f"the {name} {path} changed since Inspect file read it (SHA-256 "
+                                f"{recorded['sha256'][:12]}…, {recorded['size']} bytes when read); the study is not "
+                                "computed on data that no longer match the file. Inspect it again.")
+        sources[key] = dict(recorded)
+    return sources
 IDLE, RUNNING, DONE, FAILED = "idle", "running", "done", "failed"
 
 
@@ -100,6 +144,9 @@ class PlateStudyView:
     limits: tuple
     plan: tuple
     record: Any = None  # the JSON-ready record of the study (the report states it)
+    fe_source: Optional[Path] = None  # the FE manifest the study read
+    experimental_source: Optional[Path] = None  # the experimental file the study read
+    sources: Any = None  # {"fe", "experimental"}: the identities confirmed before the study
 
 
 @dataclass(frozen=True)
@@ -124,6 +171,7 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
                                              frequency_only_diagnostic)
 
     ps.require_working_source(experimental_identity["sha256"])
+    sources = confirm_inputs(fe_preview, fe_identity, experimental_preview, experimental_identity, cancel_event)
     member = member_of(fe_identity)
     if member is None:
         raise ps.PlateStudyRefusal("the FE package is not a member of the plate's FE family.")
@@ -186,8 +234,14 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
         "experiment": [r.__dict__ for r in summary.records], "frequency_only": diagnostic.to_dict(),
         "fe_family": [dict(zip(("member", "description", "status", "changed", "files"), r)) for r in family_rows],
         "sensitivity_basis": ps.SECANT, "d_sensitivity": d_sens,
-        "design_studies": [dict(zip(("label", "parameters", "terms", "status", "sd_ln", "refusal"), r))
+        "design_studies": [dict(zip(("label", "parameters", "terms", "status", "conditional_sd_ln", "refusal"), r))
                            for r in design_rows],
+        "design_studies_note": CONDITIONAL_NOTE,
+        "frequencies": {"measured": "the experimental records of the working source (fitted dataset 55)",
+                        "fe": "the candidate FE model (CANDIDATE_FE_REFERENCE), not a model confirmed for this plate"},
+        "real_uncertainty_of_effective_properties": "UNKNOWN",
+        "engineering_target_10_percent": "an engineering goal, not an achieved result",
+        "sources_confirmed_before_study": sources,
         "readiness": readiness.status, "missing": list(readiness.missing),
         "outcomes": [{"parameter": o.parameter, "outcome": o.outcome, "reasons": list(o.reasons)}
                      for o in readiness.outcomes],
@@ -217,7 +271,9 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
         outcome_rows=tuple((o.parameter, o.outcome, "; ".join(o.reasons[:2]) + (" …" if len(o.reasons) > 2 else ""))
                            for o in readiness.outcomes),
         missing=readiness.missing, identity=tuple((a, b, c) for a, b, c in ps.IDENTITY_EVIDENCE),
-        limits=tuple(ps.FE_LIMITS) + tuple(summary.limits), plan=tuple(ps.ITERATION_PLAN), record=record)
+        limits=tuple(ps.FE_LIMITS) + tuple(summary.limits), plan=tuple(ps.ITERATION_PLAN), record=record,
+        fe_source=Path(fe_preview.manifest_path), experimental_source=Path(experimental_preview.source_path),
+        sources=sources)
 
 
 def run_study(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index: int, token: int,
@@ -239,15 +295,31 @@ def run_study(fe_preview, fe_identity, experimental_preview, experimental_identi
 
 
 def export_report(view: PlateStudyView, folder) -> tuple:
-    """Write the study's JSON record and a Markdown summary into ``folder`` (time-stamped; atomic; no replacement)."""
+    """Write the study's JSON record and a Markdown summary into ``folder`` (time-stamped; atomic; no replacement).
+
+    The files the study read are confirmed first (``report_export.confirmed_sources``): a changed file refuses the
+    export (``report_export.ExportRefused``) and nothing is written.
+    """
+    from types import SimpleNamespace
+
+    from new_gui import report_export as rx
+
     folder = Path(folder)
     if not folder.is_dir():
         raise ValueError(f"{folder} is not an existing folder.")
+    if view.sources is None or view.fe_source is None or view.experimental_source is None:
+        raise rx.ExportRefused("the study recorded no source identities; run it again.")
+    confirmed = rx.confirmed_sources(SimpleNamespace(manifest_path=view.fe_source),
+                                     SimpleNamespace(source_path=view.experimental_source), view.sources)
+    view.record["sources_confirmed_at_export"] = {"fe": confirmed[0], "experimental": confirmed[1]}
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     lines = [f"# {TITLE}", "", f"Status: **{view.status}** — RESEARCH_ONLY; no material value.", "",
              f"FE member: {view.member}", "", f"Registration: {view.registration}", "", "## Experimental records", "",
-             "| Record | Mode | Hz | MPC | Saddle | Dome |", "|---|---|---|---|---|---|"]
+             "| Record | Mode | Measured Hz | MPC | Saddle | Dome |", "|---|---|---|---|---|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[7]} | {r[8]} |" for r in view.experimental_rows]
+    lines += ["", "## Hypothetical distinguishability (conditional; not the real accuracy)", "", CONDITIONAL_NOTE,
+              "", "| Case | Parameters | Terms | Rank | Conditional sd (ln) |", "|---|---|---|---|---|"]
+    lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} |" for r in view.design_rows]
     lines += ["", "## Parameter outcomes", "", "| Parameter | Outcome | Reason |", "|---|---|---|"]
     lines += [f"| {a} | {b} | {c} |" for a, b, c in view.outcome_rows]
     lines += ["", "## Missing", ""] + [f"- {m}" for m in view.missing] + ["", "## Plan", ""] + list(view.plan)
