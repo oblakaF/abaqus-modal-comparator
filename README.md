@@ -40,7 +40,7 @@ RUN_PROGRAM.cmd
 
 The launcher creates a local `.venv` environment and installs the required packages. The first launch can take several minutes.
 
-### New interface preview (NEW-GUI.1)
+### New interface preview (NEW-GUI)
 
 A separate PySide6 (Qt) window is being built next to the existing program. Start it with:
 
@@ -55,7 +55,12 @@ does not need. Without the launcher, run `python -m pip install -r requirements-
 The window lets you choose your own FE results file and experimental file, shows what was chosen and opens the
 read-only research archive on request (`docs/gui/NEW_GUI1_SHELL.md`). Since NEW-GUI.2, **Inspect file** reads a chosen
 file with the same importer chain as the existing program: both call `services.importer_runtime`. It shows the
-imported modes, frequencies, modal sets and warnings (`docs/gui/NEW_GUI2_PREVIEW.md`). It runs no analysis.
+imported modes, frequencies, modal sets and warnings (`docs/gui/NEW_GUI2_PREVIEW.md`); Inspect file itself runs no
+analysis. Since NEW-GUI.3, one chosen FE mode or experimental record can be drawn on its own coordinates
+(`docs/gui/NEW_GUI3_SHAPES.md`). Since NEW-GUI.4, the Analysis page runs a frequency-only diagnostic of the read FE
+results and one chosen experimental modal set, only when you click **Run frequency diagnostic**
+(`docs/gui/NEW_GUI4_FREQUENCY.md`). Its result is FREQUENCY_ONLY_DIAGNOSTIC: the nearest FE frequencies show
+frequency proximity only and are not established mode pairs. No physical registration, MAC or Auto-ID is run.
 
 ## Input procedure
 

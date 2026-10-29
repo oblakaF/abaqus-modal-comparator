@@ -3,8 +3,8 @@
 First launch is an empty workspace with the archive closed; FE and experimental files of any plate are chosen
 through the file dialog (replaced by a stub), replaced, cancelled, cleared and refused with a visible reason; the
 label "SP-02" links nothing to the archive; the archive opens only on its command, read-only, and a missing or
-damaged archive does not block the window; the analysis page states that no analysis was run and offers no action;
-no user file is changed.
+damaged archive does not block the window; the analysis page states that no analysis was run and offers only one
+action, Run frequency diagnostic (NEW-GUI.4), disabled at an empty start; no user file is changed.
 
 PySide6 comes from ``requirements-new-gui.txt``. Without it these tests are skipped with that reason, except when
 ``NEW_GUI_REQUIRE_QT=1`` (set in CI), where a missing PySide6 is an error, so the tests really run there.

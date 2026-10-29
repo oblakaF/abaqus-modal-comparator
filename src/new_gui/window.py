@@ -2,7 +2,8 @@
 
 A side navigation (Workspace, Analysis, Status), a workspace with the FE and experimental sources, clear empty
 states, and the research archive behind its own command. The window shows the state of
-``new_gui.workspace_state``; it runs no analysis and computes nothing.
+``new_gui.workspace_state`` and computes nothing itself: reading a file, drawing a shape and the frequency
+diagnostic are the existing services' work, and each runs only on the user's explicit command.
 
 NEW-GUI.2: **Inspect file** reads the chosen file of one side in a background thread
 (``new_gui.preview_model.run_read``) and shows the read content in that side's ``PreviewPanel``. Replacing or
@@ -14,8 +15,10 @@ preview with the services' own drawing. It is reset whenever its preview goes (f
 again, window closed).
 
 NEW-GUI.4: the Analysis page holds a ``DiagnosticPanel``: once both files are read and the user has chosen an
-experimental modal set, Run frequency diagnostic calls the existing frequency-only service in a background thread.
-A replaced or cleared file, Inspect again, another set or a closed window cancels it and discards its outcome.
+experimental modal set, the explicit command Run frequency diagnostic calls the existing frequency-only service in a
+background thread (FREQUENCY_ONLY_DIAGNOSTIC). Its nearest FE frequencies show frequency proximity only and are not
+established mode pairs; no physical registration, MAC or Auto-ID is run. A replaced or cleared file, Inspect again,
+another set or a closed window cancels it and discards its outcome.
 """
 
 from __future__ import annotations
@@ -517,8 +520,12 @@ class MainWindow(QMainWindow):
         return self.archive_dialog
 
     def _about(self) -> None:
-        QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n{STAGE}\n\nChoose your FE results and experimental data. "
-                                          "This preview runs no analysis.")
+        QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n{STAGE}\n\nChoose your FE results and experimental data, read "
+                                          "them with Inspect file and view single mode shapes. On the Analysis page, "
+                                          "Run frequency diagnostic compares the frequencies of one experimental "
+                                          "modal set with the FE frequencies, only when you click it. The nearest "
+                                          "FE frequencies are not established mode pairs. No physical registration, "
+                                          "MAC or Auto-ID is run.")
 
     # ---------------------------------------------------------------------------------------------- display
 
