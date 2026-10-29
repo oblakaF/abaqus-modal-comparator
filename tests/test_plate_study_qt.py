@@ -146,6 +146,17 @@ class PlateStudyPageTests(_PlateWindow):
         self.assertTrue(self.panel.export())
         self.assertEqual(sorted(p.suffix for p in self.reports.iterdir()), [".json", ".md"])
 
+    def test_the_result_adds_no_width_to_the_page(self):
+        # A long status in a badge (which never wraps) widened the page at 900 × 680 physical (Windows smoke).
+        self.read()
+        before = self.panel.minimumSizeHint().width()
+        self.panel.run()
+        self.assertTrue(self.window.wait_for_reads(120))
+        self.app.processEvents()
+        self.assertIsNotNone(self.panel.view)
+        self.assertLessEqual(self.panel.minimumSizeHint().width(), before)
+        self.assertTrue(self.panel.mode_line.text().startswith("Comparison: FREQUENCY_ONLY"))
+
     def test_the_m11_session_is_refused_as_the_experiment(self):
         self.read("m11.unv")
         self.assertFalse(self.panel.run_button.isEnabled())

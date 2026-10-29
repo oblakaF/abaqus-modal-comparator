@@ -156,7 +156,7 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
             sensitivity_rows.append((row.row_id, _f(row.baseline_hz, 3), *[_f(row.sensitivity.get(p)) for p in
                                                                           ("E1", "E2", "G12")],
                                      "+".join(row.cluster) if row.cluster else "—",
-                                     "; ".join(f"{k}: {v[3][:40]}" for k, v in row.tracked.items()
+                                     "; ".join(f"{k}: {v[3].split(':')[0]}" for k, v in row.tracked.items()
                                                if v is not None and v[3] not in ("TRACKED", "TRACKED_CLUSTER"))
                                      or "tracked in every variant"))
         cluster_rows = tuple((" / ".join(ids), status, "; ".join(reasons)) for ids, status, reasons in table.clusters)

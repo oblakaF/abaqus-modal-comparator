@@ -74,6 +74,8 @@ class PlateStudyPanel(QWidget):
         inner.addWidget(_label(psm.TITLE, "cardTitle"))
         self.badge = _label(psm.NOT_RUN, "badge", wrap=False)
         inner.addWidget(self.badge, 0, Qt.AlignmentFlag.AlignLeft)
+        self.mode_line = _label("", "")  # the comparison mode, on its own wrapping line (a badge never wraps)
+        inner.addWidget(self.mode_line)
         inner.addWidget(_label(psm.NOTE, "hint"))
         self.why = _label("", "hint")
         inner.addWidget(self.why)
@@ -216,8 +218,12 @@ class PlateStudyPanel(QWidget):
         self.why.setVisible(bool(reasons))
         view = self.view
         self.export_button.setEnabled(view is not None)
-        self.badge.setText(view.status if view is not None else ("Computing..." if state == psm.RUNNING
-                                                                 else psm.NOT_RUN))
+        readiness = view.status.split(" / ")[-1] if view is not None else None
+        self.badge.setText(readiness if view is not None else ("Computing..." if state == psm.RUNNING
+                                                               else psm.NOT_RUN))
+        self.mode_line.setText(f"Comparison: {view.status.split(' / ')[0]} — no registration, no MAC, no mode pair"
+                               if view is not None else "")
+        self.mode_line.setVisible(view is not None)
         self.badge.setProperty("state", "chosen" if view is not None else "empty")
         _restyle(self.badge)
         outcome = self.slot.outcome
