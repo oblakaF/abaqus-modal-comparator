@@ -126,16 +126,26 @@ def unavailable(fe_preview, experimental_preview, set_index: Optional[int], regi
 
 def check_sources(fe_preview, sources: Optional[dict], experimental_now: Optional[dict] = None,
                   cancel_event: Optional[threading.Event] = None) -> dict:
-    """The read identities, confirmed against the files now; raises ``ComparisonRefused`` when one changed."""
-    from new_gui import preview_model as pm
+    """The read identities, confirmed against the files now; raises ``ComparisonRefused`` when one changed.
 
+    PLATE-ONLY-R2-F1: when the read identities are given, the FE identity must cover the whole extracted package
+    (manifest, geometry and mode files) and every file must be unchanged (``services.fe_package_identity``)."""
+    from new_gui import preview_model as pm
+    from services import fe_package_identity as fpi
+
+    given = sources is not None
     sources = dict(sources or {})
     fe_read, experimental_read = sources.get("fe"), sources.get("experimental")
-    if fe_read is not None:
-        fe_now = pm.file_identity(fe_preview.manifest_path, cancel_event)
-        if fe_now is None or fe_now["sha256"] != fe_read["sha256"]:
-            raise ComparisonRefused(f"the FE manifest {fe_preview.manifest_path} is not the file that was read "
-                                    f"(SHA-256 {fe_read['sha256'][:12]}… when read); Inspect it again.")
+    if given or fe_read is not None:
+        try:
+            pm.confirm_fe_identity(fe_preview.manifest_path, fe_read, cancel_event)
+        except fpi.PackageIdentityRefused as refusal:
+            if refusal.kind == fpi.CANCELLED:
+                raise ComparisonCancelled() from refusal
+            raise ComparisonRefused(f"the FE package {fe_preview.manifest_path}: {refusal}") from refusal
+        except fpi.PackageChanged as changed:
+            raise ComparisonRefused(f"{changed}; the comparison is not run on data that no longer match the "
+                                    "files. Inspect it again.") from changed
     if experimental_read is not None and experimental_now is not None \
             and experimental_now["sha256"] != experimental_read["sha256"]:
         raise ComparisonRefused(f"the experimental file is not the file that was read (SHA-256 "

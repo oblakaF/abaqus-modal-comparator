@@ -39,6 +39,7 @@ from new_gui import workspace_state as ws  # noqa: E402
 from services import local_input_registry as registry  # noqa: E402
 from services import plate_study as ps  # noqa: E402
 from test_new_gui5_registration import experimental_preview, fe_preview  # noqa: E402
+from test_new_gui5_registration import write_fe_package  # noqa: E402
 from test_plate_study import BASE, plate_dataset  # noqa: E402
 
 
@@ -60,8 +61,13 @@ class _PlateWindow(unittest.TestCase):
                            ("g/manifest.json", "G12"), ("base.inp", "inp")):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
+            if path.name == "manifest.json":  # a real extracted package: its files' identity is recorded (R2-F1)
+                write_fe_package(path.parent, text)
+            else:
+                path.write_text(text, encoding="utf-8")
             files[name] = path
+        for name in ("base/mode_0007.csv", "base/geometry.csv"):  # files of the baseline FE package (R2-F1)
+            files[name] = self.root / name
         self.files = files
         datasets = {"base": plate_dataset(**BASE),
                     "e1": plate_dataset(BASE["D11"] * 0.9, BASE["D22"], BASE["D66"]),
@@ -195,7 +201,7 @@ class InputTraceabilityTests(_PlateWindow):
         return {p.name: p.read_bytes() for p in self.reports.iterdir()}
 
     def test_a_file_changed_after_inspect_refuses_the_study_before_any_computation(self):
-        for name in ("plate.unv", "base/manifest.json"):
+        for name in ("plate.unv", "base/manifest.json", "base/mode_0007.csv", "base/geometry.csv"):
             with self.subTest(file=name):
                 self.read()
                 path = self.files[name]
@@ -216,7 +222,7 @@ class InputTraceabilityTests(_PlateWindow):
                 self.window.clear_file(ws.EXPERIMENTAL)
 
     def test_a_file_changed_after_the_study_refuses_the_export_and_keeps_earlier_reports(self):
-        for name in ("plate.unv", "base/manifest.json"):
+        for name in ("plate.unv", "base/manifest.json", "base/mode_0007.csv", "base/geometry.csv"):
             with self.subTest(file=name):
                 self.read()
                 self.run_study()
@@ -294,6 +300,38 @@ class InputTraceabilityTests(_PlateWindow):
                         "## Applicability of the initial FE model to the 261027 test (NOT_VERIFIED)",
                         "## Orientation chain (nothing chosen by MAC, frequency or shape)"):
             self.assertIn(heading, markdown)
+
+    def test_the_series_difference_and_the_thickness_are_never_shown_as_established(self):
+        # PLATE-ONLY-R2-F1: a suspected setup dependence (not a result), the ambiguous reading, an illustrative 3 × CV
+        self.read()
+        self.run_study()
+        view = self.panel.view
+        applicability = self.panel.tables["applicability"]
+        states = {applicability.item(r, 0).text(): applicability.item(r, 1).text()
+                  for r in range(applicability.rowCount())}
+        self.assertEqual(states["series difference: mode identity"], ps.MODE_IDENTITY_NOT_VERIFIED)
+        self.assertEqual(states["series difference: cause"], ps.SETUP_DEPENDENCE_SUSPECTED)
+        thickness = self.panel.tables["thickness"]
+        rows = {thickness.item(r, 0).text(): (thickness.item(r, 1).text(), thickness.item(r, 2).text())
+                for r in range(thickness.rowCount())}
+        self.assertIn("0.84 as transcribed, could be read 0.81", rows["ambiguous reading"][0])
+        self.assertTrue(rows["3 × CV_edges"][1].startswith("ILLUSTRATIVE"))
+        self.assertEqual(rows["real uncertainty of E / G"][1], "UNKNOWN")
+        self.assertEqual(rows["thickness map of the whole plate"][1], "NOT_MEASURED")
+        budget = self.panel.tables["budget"]
+        line = next(r for r in range(budget.rowCount()) if budget.item(r, 0).text().startswith("thickness"))
+        self.assertEqual(budget.item(line, 1).text(), "—")  # no established thickness contribution
+        self.assertEqual(budget.item(line, 2).text(), "24.5 % (illustrative)")
+        self.assertEqual(view.record["thickness"]["real_uncertainty_of_e_g"], "UNKNOWN")
+        self.assertEqual(view.record["difference_between_the_series"]["cross_series_mode_pairs"], "none")
+        self.assertFalse(view.record["difference_between_the_series"]["sigma_setup_repeat"])
+        self.assertTrue(self.panel.export())
+        markdown = next(self.reports.glob("*.md")).read_text(encoding="utf-8")
+        record = next(self.reports.glob("*.json")).read_text(encoding="utf-8")
+        self.assertIn("## Thickness (edge readings only; the real uncertainty of E / G is UNKNOWN)", markdown)
+        self.assertIn(ps.SESSION_DIFFERENCE, markdown)
+        for text in (markdown, record):
+            self.assertNotIn("SETUP_SENSITIVE", text)
 
     def test_a_new_preview_equal_in_value_still_resets(self):
         self.read()

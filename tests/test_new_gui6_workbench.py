@@ -97,7 +97,9 @@ class _Comparison(WorldCase):
         self.addCleanup(own.cleanup)
         self.own = Path(own.name)
         # NEW-GUI.6-F1: the identities Inspect file records when it reads the files
-        self.sources = {"fe": pm.file_identity(self.odb), "experimental": pm.file_identity(self.unv)}
+        # PLATE-ONLY-R2-F1: the FE identity covers the whole extracted package (manifest, geometry, mode files)
+        self.sources = {"fe": pm.fe_package_identity(self.package), "experimental": pm.file_identity(self.unv)}
+        self.mode_file = self.package.with_name("mode_0007.csv")
 
     @contextlib.contextmanager
     def changed_unv(self, content: bytes):
@@ -120,7 +122,7 @@ class _Comparison(WorldCase):
         fe = fe or self.fe
         datasets = datasets if datasets is not None else [experimental_dataset(source, self.fe),
                                                           other_set(source, self.fe)]
-        return fe_preview(self.odb, fe), experimental_preview(source, datasets)
+        return fe_preview(self.package, fe), experimental_preview(source, datasets)
 
     def run_compare(self, fe_prev=None, exp_prev=None, set_index=0, registration="default", cancel=None,
                     sources="default"):
@@ -278,9 +280,15 @@ class RefusalTests(_Comparison):
         self.assert_refused_before_the_comparator(self.compare_without_comparator(set_index=1), "set-b")
 
     def test_an_fe_manifest_changed_since_it_was_read_is_refused_before_the_comparator(self):
-        with self.changed(self.odb, lambda data: data + b"#"):
+        with self.changed(self.package, lambda data: data.replace(b'"Frequency"', b'"Frequencz"')):
             outcome = self.compare_without_comparator()
-        self.assert_refused_before_the_comparator(outcome, "is not the file that was read")
+        self.assert_refused_before_the_comparator(outcome, "manifest.json changed")
+
+    def test_an_fe_mode_file_changed_since_it_was_read_is_refused_before_the_comparator(self):
+        # PLATE-ONLY-R2-F1: a mode CSV of the package, not only its manifest
+        with self.changed(self.mode_file, lambda data: data + b"# other\n"):
+            outcome = self.compare_without_comparator()
+        self.assert_refused_before_the_comparator(outcome, "mode 7 (mode_0007.csv) changed")
 
     def test_an_experimental_file_other_than_the_one_read_is_refused(self):
         # the read data came from other bytes than the (accepted) file on disk now
@@ -473,7 +481,7 @@ class ReportTests(_Comparison):
 
     def test_a_file_changed_since_the_comparison_is_refused(self):
         outcome = self.run_compare()
-        for path in (self.unv, self.odb):
+        for path in (self.unv, self.mode_file, self.package):
             with self.subTest(file=path.name), self.changed(path, lambda data: data + b"x"):
                 with self.assertRaisesRegex(rx.ExportRefused, "changed since it was read"):
                     self.export(outcome)
@@ -490,7 +498,7 @@ class ReportTests(_Comparison):
     def test_a_changed_file_is_never_given_the_hash_of_the_read(self):
         # the report states the identity recorded at the read; a file that differs now is refused, not re-hashed
         outcome = self.run_compare()
-        with self.changed(self.odb, lambda data: data[:-1] + b"#"):  # same size, other content
+        with self.changed(self.mode_file, lambda data: data[:-1] + b"#"):  # same size, other content
             with self.assertRaises(rx.ExportRefused):
                 self.export(outcome)
         self.assertEqual(list(self.folder.iterdir()), [])

@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -330,7 +330,7 @@ measurements of 27.10.2026; the plate is taken as unchanged since then, which is
 |---|---|---|---|---|
 | Mass | 118.37 g | by 2026-10-21 (owner's sheet, M11 §8; day not stated); before the 261027 session | scale; instrument not stated | not stated; record resolution 0.01 g |
 | Plan | 301 × 300 mm (x × y; FE X = 301 mm) | as above | instrument not stated (M11 §13.6) | not stated; record resolution 1 mm |
-| Thickness | 20 perimeter readings, 5 per edge, 0.71–0.94 mm; mean 0.876, spatial sd 0.071 mm (cv 8.2 %); edge means 1: 0.880, 2: 0.816, 3: 0.882, 4: 0.926 mm | as above | caliper of 0.01 mm resolution and an electronic caliper (M11 §8.1); about 4.5–6.5 mm from the edge; **the interior is not measured** | gauge uncertainty not stated; spatial scatter as given (D-052: not divided by √N) |
+| Thickness | 20 perimeter readings, 5 per edge, 0.71–0.94 mm; mean 0.876, spatial sd 0.071 mm (cv 8.2 %); edge means 1: 0.880, 2: 0.816, 3: 0.882, 4: 0.926 mm | as above | caliper of 0.01 mm resolution and an electronic caliper (M11 §8.1); about 4.5–6.5 mm from the edge; **the interior is not measured** | gauge uncertainty not stated; spatial scatter as given (D-052: not divided by √N). R2-F1: edge 2, reading 3 is 0.84 as transcribed or 0.81 (M11 §8), kept, not resolved (§13.3) |
 | Areal mass | 1.3109 kg/m² | derived | mass / (x · y) | from the records above |
 
 - **Edge labels.** Edges 1 top, 2 right, 3 bottom and 4 left are seen from the shaker side of the 261016 mounting
@@ -352,7 +352,7 @@ consistent only within the record's resolution; no new criterion is used.
 | Material axes | NOT_VERIFIED | one orthotropic material on the global axes | fibre and weave directions not evidenced (SPEC v1.1 §5.2) |
 | Suspension | NOT_VERIFIED | free-free | rubber bands and strings at two upper points along the nodal line of the first mode. The auxiliary FRF has peaks at 3.44, 10.31 and 12.5 Hz (PROVISIONAL, probably the suspension); the highest is 0.67 of record 1. SPEC §15 asks for a soft suspension; softness is not demonstrated |
 | Excitation | UNKNOWN | none | not stated in the lab note. SPEC §15 needs the shaker attachment mass in the model, or non-contact excitation |
-| Setup sensitivity | SETUP_SENSITIVE | — | §12.4: on the same plate the 261016 setup put the lowest twist-class record at 33.45 Hz, and the 261027 setup at 18.63 Hz |
+| Setup sensitivity | ~~SETUP_SENSITIVE~~ R2-F1: MODE_IDENTITY_NOT_VERIFIED and SETUP_DEPENDENCE_SUSPECTED (§13.2) | — | measured: record 1 at 33.45 Hz (261016) and 18.63 Hz (261027); the cause is not established |
 | Registration | PHYSICAL_REGISTRATION_NOT_VERIFIED | FE X = 301 mm edge, +Z shell normal | §12.5 |
 | Mode correspondence | NOT_ESTABLISHED | 19.07 Hz (first elastic FE mode) | 18.6307 Hz (record 1): +2.4 %. Proximity and a common shape class are **not** a mode pair |
 
@@ -387,7 +387,8 @@ The higher records of both sessions have almost no quadratic content: these frac
 
 1. **Record 1 in both sessions is a twist about the scan-grid axes.** On the same specimen it lies at 33.45 Hz with
    four corner straps and an attached shaker stinger (261016, M11 §13.3), and at 18.63 Hz with the two-point
-   suspension (261027): a factor of 0.56. The lowest twist-class record is therefore strongly setup-sensitive.
+   suspension (261027), a ratio of 0.56. *(R2 concluded "strongly setup-sensitive"; R2-F1 withdraws this: the same
+   mode is not verified and the cause is not established; a setup dependence is only suspected, §13.2.)*
    - This is not a Σ_setup repeat (D-053): the protocol, suspension and grid differ.
    - It does not show that 261027 is free-free.
 2. **Records 2–3 mix the same two quadratic patterns** (saddle on the grid diagonals, and dome) in different
@@ -419,13 +420,14 @@ The higher records of both sessions have almost no quadratic content: these frac
 | Route | Needs | Status now |
 |---|---|---|
 | **D11 = D22 (balanced D), D66** | Frequencies of confirmed pairs and the areal mass, f² ∝ D / (ρh). No thickness | The areal mass is known (1.3109 kg/m², archived) and equals the initial model's (1.3108 kg/m²). Still missing: registration, confirmed pairs, the suspension check |
-| **E1, E2, G12 (equivalent homogeneous)** | D and h³: E = 12(1 − ν12ν21)·D / h³ (D-052) | `effective_moduli_from_d` is prepared and exact; it is applied to no value. With the 20 perimeter readings the thickness alone gives 3·cv = **24 %** in ln E / ln G12. The ±10 % engineering goal is not reachable for E / G on this thickness record; an interior thickness map is needed |
+| **E1, E2, G12 (equivalent homogeneous)** | D and h³: E = 12(1 − ν12ν21)·D / h³ (D-052) | `effective_moduli_from_d` is prepared and exact; it is applied to no value. With the 20 perimeter readings 3·cv = 24 % in ln E / ln G12 (R2-F1: illustrative only, not the real uncertainty, which is UNKNOWN; §13.3). The ±10 % goal for E / G cannot be judged on edge readings alone; a thickness map of the whole plate is needed |
 
 - **The initial model's constants.** E 56 000, G12 5 000 MPa and h 0.875 mm give D11 = D22 = 3 134 N·mm and
   D66 = 279.1 N·mm (`plate_d`). These are the **starting point** of a future authorised iteration, not measurements
   or estimates.
 - **The uncertainty budget** (`specimen_budget`):
-  - thickness 24.5 % (perimeter scatter, interior unknown);
+  - thickness 24.5 % (perimeter scatter, interior unknown); R2-F1: illustrative only, the established value is UNKNOWN
+    (§13.3);
   - mass: the scale uncertainty is not stated and is not invented;
   - the statistical part, the setup and the model form are NOT_AVAILABLE until confirmed pairs exist.
 - **Unchanged from R1.** The conditional design-study figures of §7 are unchanged and stay conditional. The real
@@ -499,6 +501,135 @@ copies of the plate UNV, the M11 UNV and the FE package. The originals are uncha
      right after the first column, and the long texts are elided with a tooltip. A regression test was added.
 4. **M11 file as the experiment.** Refused.
 5. **Close.** No task left.
+
+## 13. PLATE-ONLY-R2-F1 — package identity, the two series and the thickness (2026-10-30)
+
+Research only, non-normative. No SPEC, decision, status, evidence, frozen record, registration or criterion changed.
+No Abaqus, solver, FE computation, LM or Auto-ID was run. No sandwich data were used. Every material parameter stays
+NOT_IDENTIFIABLE. Where §12 said otherwise, this section replaces it; §12 is kept as the R2 record.
+
+### 13.1 The identity of the whole extracted FE package
+
+**R1 / NEW-GUI.6-F1 hashed only `manifest.json`.** A changed geometry or mode CSV was not detected.
+
+**New service: `src/services/fe_package_identity.py`.** It uses the actual format read by
+`abaqus_bridge.load_extracted_odb`:
+- `manifest.json`;
+- its `geometry_file` (format 2 and later);
+- the `modes[].file` of every entry the loader keeps. An entry the loader refuses (contradicting frequency records)
+  is not read and is not a dependency; the loader's own selection functions are used. For the plate baseline this is
+  19 files: the geometry and 18 modes. Modes 1–2 are refused by the loader.
+
+**How it works:**
+- The manifest is hashed and parsed from the same bytes.
+- Every dependency is hashed with a streaming SHA-256 (`fresh_content_identity`: chunked, cancellable; a file that
+  changes while it is hashed is refused). No mode shape is imported again.
+- **Refusals.** A missing file, an unreadable file, a cancellation and an invalid dependency path are refused
+  separately. An invalid path is an absolute path, a drive, `..` or a path that resolves outside the package folder.
+- **ODB.** The ODB named in the manifest is never read. The identity states `odb_sha256: null` and the declared ODB
+  path; a package hash is never presented as the ODB's, and an `.odb` gets no package identity.
+
+**Where it is checked:**
+
+| Step | Check |
+|---|---|
+| Inspect file (`preview_model.run_read`, FE) | The package's files are listed (size, mtime) before the read and hashed after it. If any file changed during the read, or the package cannot be identified, no identity is recorded. The manifest's path, size and SHA-256 stay at the top level; the whole package is under `"package"` |
+| Verified comparison (`comparison_model.check_sources`) | The package is confirmed file by file before the comparator runs |
+| Report export (`report_export.confirmed_sources`; verified and diagnostic reports) | The same, before anything is written. The report's `identity_basis` now names the package's files and says that it is not the ODB's hash |
+| Plate Study, before Run and before Export | The same, in `confirm_inputs` and `export_report` |
+
+A refusal names the file, for example "mode 7 (mode_0007.csv) changed", "geometry (geometry.csv) changed",
+"manifest.json changed" or "… cannot be identified now".
+
+**Test fixtures.** The NEW-GUI.5 / 6 world tests used the world's `.odb` file as the FE "manifest"; the plate tests
+used text files. Since an ODB's hash must not stand for a package, both now read a small real extracted package
+(`write_fe_package`). What the tests check is unchanged.
+
+### 13.2 The two experimental series
+
+The measured values and the descriptive twist indicators are kept: record 1 is at 18.6307 Hz in 261027 and at
+33.4491 Hz in 261016; the uv fractions are 0.988 and 0.947. The R2 state `SETUP_SENSITIVE` (§12.3, §12.4) is
+withdrawn, together with "the setup changed … by a factor 0.56" and "strongly setup-sensitive".
+
+| Aspect | State | Meaning |
+|---|---|---|
+| series difference: mode identity | `MODE_IDENTITY_NOT_VERIFIED` | Whether the two records are the same mode is not verified: no registration and no MAC between the series. No cross-series mode pair |
+| series difference: cause | `SETUP_DEPENDENCE_SUSPECTED` | The cause of the difference is not established. A dependence on the test setup (suspension, shaker attachment) is suspected, not proven. Not a Σ_setup repeat (D-053) |
+
+The report states them together as `SETUP_DEPENDENCE_SUSPECTED / MODE_IDENTITY_NOT_VERIFIED`.
+
+### 13.3 Thickness and its uncertainty
+
+- **The 20 archived edge readings are kept** unchanged (M11 §8; by 2026-10-21).
+- **The ambiguous reading.** Edge 2, reading 3 is 0.84 mm as transcribed and could be read 0.81 mm (M11 §8). The
+  owner read it as 0.84 (M11 §8.1); that is a reading of the same sheet, not an independent re-measurement. The
+  record keeps the transcription, shows both readings and does not choose a new value. The sheet and the
+  transcription are not changed.
+
+| Item | Value | Status |
+|---|---|---|
+| Observed edge scatter | mean 0.8760 / 0.8745 mm; sd 0.0714 / 0.0725 mm; CV_edges 8.2 % / 8.3 % (as transcribed / with 0.81) | OBSERVED (edges only) |
+| 3 × CV_edges | 24.5 % / 24.9 % in ln E / ln G12 | ILLUSTRATIVE: not the real uncertainty |
+| Thickness map of the whole plate | not measured; the interior is unknown | NOT_MEASURED |
+| Real uncertainty of E / G | unknown | UNKNOWN |
+| ±10 % target | an engineering goal | NOT_ACHIEVED |
+
+- **The budget** (`specimen_budget`) no longer gives the thickness an established contribution. Its value is "—",
+  and 24.5 % appears only in a separate "Illustrative" column. The R2 lines "3·cv = 24 %" and "thickness 24.5 %"
+  (§12.6) are read as this illustration.
+- **±10 % for E / G** cannot be judged on the edge readings alone. It stays an engineering goal, not an achieved
+  result.
+
+### 13.4 Program, tests and checks
+
+**Changed files:**
+- **Service:** `src/services/fe_package_identity.py` (new) and `src/services/plate_study.py` (the series states,
+  `THICKNESS_READING_AMBIGUITY`, `thickness_variants`, `thickness_rows`, the illustrative budget column).
+- **New GUI:** `preview_model`, `comparison_model`, `report_export`, `plate_study_model`, `plate_study_panel`. The
+  Plate Study page gains a "Thickness" table, two series rows in the applicability table, an "Illustrative" budget
+  column and a series section in the exported report.
+
+**New tests:**
+- `tests/test_fe_package_identity.py` (13):
+  - an unchanged package is confirmed;
+  - one mode CSV changed, the geometry CSV changed, a file deleted, and another manifest with the same CSV files are
+    each refused;
+  - fewer modes read is refused;
+  - a mode the loader refuses is not a dependency;
+  - invalid paths are refused, and a cancellation is a cancellation;
+  - the ODB is never read and gets no package identity;
+  - Inspect file records the package, and records nothing when a CSV changes during the read.
+- `tests/test_new_gui6_workbench.py`: a changed mode CSV refuses the verified comparison, and both CSV and manifest
+  changes refuse the export.
+- `tests/test_plate_study.py`: the ambiguous reading, the illustrative figure, the series as a suspicion.
+- `tests/test_plate_study_qt.py`: Run and Export are refused after a mode CSV or geometry CSV change; the page and the
+  report show the series states, the thickness table and the illustrative budget.
+
+On `636b73e` the Plate Study Run and Export pass with a changed mode or geometry CSV (the defect reproduced); the
+other new tests fail because their functions do not exist there.
+
+**Tests.**
+- Targeted (FE package identity, NEW-GUI.1 / 2 / 4 / 5 / 6, Plate Study): 228 OK, 1 skipped.
+- **Full suite:** 3061 OK, 98 skipped. `test_g2_eigfreq_precision` (16) is NOT_RUN: it reads `-work` data.
+
+**Windows smoke R2-F1: PASS.** Conditions: Qt `windows`, 150 % (DPI 96 × DPR 1.5), isolated LOCALAPPDATA, isolated
+copies of the plate UNV and the FE package. The originals are unchanged.
+
+1. **Unchanged package.** Inspect recorded 19 package files and `odb_sha256: null`. The study ran in 6.5 s:
+   - NOT_READY_FOR_IDENTIFICATION;
+   - the series rows MODE_IDENTITY_NOT_VERIFIED and SETUP_DEPENDENCE_SUSPECTED;
+   - the thickness table;
+   - the budget "— / 24.5 % (illustrative)";
+   - no "SETUP_SENSITIVE" anywhere; every outcome NOT_IDENTIFIABLE.
+
+   The export was written; the report carries the series section and the thickness section.
+2. **A mode CSV changed after the study** (same size, one digit). The export was refused: "mode 9 (mode_0009.csv)
+   changed". The earlier reports are byte-identical.
+3. **Inspect again.** The changed CSV is read with a new package identity under the same manifest, and the earlier
+   result is removed.
+4. **The CSV changed again after Inspect.** Run plate study is refused before any computation.
+5. **The restored package.** Its identity equals the first one; the study passes.
+6. **Close.** No task left.
 
 ## Not changed
 

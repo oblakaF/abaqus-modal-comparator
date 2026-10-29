@@ -129,6 +129,17 @@ THICKNESS_READINGS_MM = {  # rows = edges 1 top, 2 right, 3 bottom, 4 left, seen
     1: (0.94, 0.92, 0.94, 0.89, 0.71), 2: (0.79, 0.82, 0.84, 0.81, 0.82), 3: (0.74, 0.89, 0.94, 0.92, 0.92),
     4: (0.93, 0.94, 0.93, 0.92, 0.91)}
 SHEET_SHA256 = "df5339cd90fe8d114ad8c62c2e76c13bdb14c91c39d96ccac9b2a9b06bf1caaf"  # photograph, work directory only
+# PLATE-ONLY-R2-F1: one reading of the sheet is ambiguous (M11 §8). The archived record keeps it as transcribed; the
+# other reading is shown beside it and no value is chosen without an independent confirmation (the sheet and the
+# transcription are never changed).
+THICKNESS_READING_AMBIGUITY = {
+    "edge": 2, "reading": 3, "transcribed_mm": 0.84, "alternative_mm": 0.81,
+    "source": "M11 §8: the transcription reads 0.84, which could also be read 0.81",
+    "owner_reading": "the owner read it as 0.84 (M11 §8.1): a reading of the same sheet, not an independent "
+                     "re-measurement",
+    "kept": "the transcribed 0.84; the ambiguity is not resolved and no other value is chosen without an independent "
+            "confirmation",
+}
 
 
 def thickness_statistics(readings: Mapping[int, Sequence[float]] = THICKNESS_READINGS_MM) -> dict:
@@ -138,6 +149,16 @@ def thickness_statistics(readings: Mapping[int, Sequence[float]] = THICKNESS_REA
     return {"n": int(values.size), "mean": float(values.mean()), "sd": sd, "cv": sd / float(values.mean()),
             "min": float(values.min()), "max": float(values.max()),
             "side_means": {side: float(np.mean(row)) for side, row in readings.items()}}
+
+
+def thickness_variants() -> dict:
+    """The edge statistics with the ambiguous reading as transcribed and as its alternative (both shown; none
+    chosen)."""
+    item = THICKNESS_READING_AMBIGUITY
+    alternative = {edge: tuple(item["alternative_mm"] if (edge, k) == (item["edge"], item["reading"]) else value
+                               for k, value in enumerate(row, start=1))
+                   for edge, row in THICKNESS_READINGS_MM.items()}
+    return {"as transcribed": thickness_statistics(), "alternative reading": thickness_statistics(alternative)}
 
 
 def areal_mass_kg_m2(mass_g: float = SPECIMEN_MASS_G, plan_mm: Sequence[float] = SPECIMEN_PLAN_MM) -> float:
@@ -166,10 +187,12 @@ SPECIMEN_RECORD = (
     ArchivedMeasurement(
         "thickness", f"{_T['n']} perimeter readings, 5 per edge, {_T['min']:.2f}–{_T['max']:.2f} mm; mean "
         f"{_T['mean']:.3f} mm, spatial sd {_T['sd']:.3f} mm (cv {100 * _T['cv']:.1f} %); edge means "
-        + ", ".join(f"{side}: {mean:.3f}" for side, mean in _T["side_means"].items()) + " mm",
+        + ", ".join(f"{side}: {mean:.3f}" for side, mean in _T["side_means"].items()) + " mm; edge 2, reading 3: "
+        "0.84 as transcribed, could be read 0.81 (M11 §8; kept, not resolved)",
         MEASURED, "caliper of 0.01 mm resolution and an electronic caliper (owner, M11 §8.1); about 4.5–6.5 mm from "
         "the edge, the low 0.71 / 0.74 about 0.5 mm from it; the interior is NOT measured",
-        "gauge uncertainty not stated; spatial scatter cv as given (D-052: not divided by √N)",
+        "gauge uncertainty not stated; observed edge scatter only (D-052: not divided by √N); with the reading 0.81 "
+        "the mean is 0.8745 mm",
         "M11 §8, §8.1, §13.1 (transcription plate_measurements_20261021.json)"),
     ArchivedMeasurement("areal mass", f"{areal_mass_kg_m2():.4f} kg/m²", "derived from the mass and plan above",
                         "mass / (x · y)", "from the mass and plan records (instrument uncertainties not stated)",
@@ -871,9 +894,9 @@ def plate_readiness(registration_verified: bool, confirmed_pairs: Sequence[str] 
     missing.append("family consistency NOT_AVAILABLE for a single plate (D-044 blocks PRODUCTION verdicts)")
     reasons = tuple(missing)
     thickness = (() if interior_thickness_measured else (
-        f"E = 12 (1 − ν12 ν21) D / h³ (D-052): the thickness is known only at the perimeter ({_T['n']} archived "
-        f"readings, cv {100 * _T['cv']:.1f} % ⇒ about {300 * _T['cv']:.0f} % in ln E / ln G12 from the thickness "
-        "alone); the interior is not measured",))
+        f"E = 12 (1 − ν12 ν21) D / h³ (D-052): the thickness is known only at the edges ({_T['n']} archived "
+        f"readings, observed cv {100 * _T['cv']:.1f} %); there is no thickness map of the whole plate, so the real "
+        f"uncertainty of E / G is UNKNOWN (3 × CV_edges ≈ {300 * _T['cv']:.0f} % is illustrative only)",))
     outcomes = [parameter_outcome(p, reasons=reasons) for p in ("D11=D22 (balanced D)", "D66")]
     outcomes.append(parameter_outcome("D11, D22 separately", reasons=(
         "E1 ≠ E2 MUST NOT be enabled without traceable warp / fill orientation (SPEC v1.1 §5.2)",) + reasons
@@ -888,8 +911,9 @@ def plate_readiness(registration_verified: bool, confirmed_pairs: Sequence[str] 
 @dataclass(frozen=True)
 class BudgetLine:
     source: str
-    ln_sd: Optional[float]
+    ln_sd: Optional[float]  # an established contribution only; None when it is not known
     note: str
+    illustrative_ln_sd: Optional[float] = None  # PLATE-ONLY-R2-F1: an illustration, never the real uncertainty
 
 
 def uncertainty_budget(statistical_sd_ln: Optional[float], thickness_cv: Optional[float],
@@ -917,13 +941,41 @@ def uncertainty_budget(statistical_sd_ln: Optional[float], thickness_cv: Optiona
 
 
 def specimen_budget() -> tuple:
-    """The budget with the archived record of this specimen: the perimeter thickness scatter and the mass record."""
-    return uncertainty_budget(None, _T["cv"], thickness_note=(
-        f"{_T['n']} archived perimeter readings (2026-10-21), cv {100 * _T['cv']:.1f} %; the interior is not "
-        "measured, so the plate's thickness field is not known; gauge uncertainty not stated"), mass_note=(
+    """The budget with the archived record of this specimen. PLATE-ONLY-R2-F1: the edge scatter gives only an
+    illustrative 3 × CV_edges; the real thickness contribution to E / G is UNKNOWN (no map of the whole plate)."""
+    variants = thickness_variants()
+    cvs = [v["cv"] for v in variants.values()]
+    lines = list(uncertainty_budget(None, None, thickness_note=(
+        f"UNKNOWN: no thickness map of the whole plate. Observed edge scatter ({_T['n']} archived readings, "
+        f"2026-10-21): cv {100 * cvs[0]:.1f} % as transcribed, {100 * cvs[1]:.1f} % with the reading 0.81. "
+        f"3 × CV_edges = {300 * cvs[0]:.1f} % ({300 * cvs[1]:.1f} %) is ILLUSTRATIVE, not the real uncertainty of "
+        "E / G; gauge uncertainty not stated"), mass_note=(
         f"archived mass {SPECIMEN_MASS_G} g (2026-10-21); the scale uncertainty is not stated (the record's "
         f"resolution {MASS_RESOLUTION_G} g is {100 * MASS_RESOLUTION_G / SPECIMEN_MASS_G:.3f} %); a D estimate "
-        "uses the areal mass and needs no thickness"))
+        "uses the areal mass and needs no thickness")))
+    lines[1] = BudgetLine(lines[1].source, None, lines[1].note, illustrative_ln_sd=3.0 * cvs[0])
+    return tuple(lines)
+
+
+def thickness_rows() -> tuple:
+    """(item, value, status) of the thickness record for the page and the report (PLATE-ONLY-R2-F1)."""
+    v = thickness_variants()
+    t, a = v["as transcribed"], v["alternative reading"]
+    item = THICKNESS_READING_AMBIGUITY
+    return (
+        ("edge readings (archived)", f"{t['n']} at the edges, {t['min']:.2f}–{t['max']:.2f} mm; {MEASURED}", ARCHIVED),
+        ("ambiguous reading", f"edge {item['edge']}, reading {item['reading']}: {item['transcribed_mm']} as "
+         f"transcribed, could be read {item['alternative_mm']} ({item['source']}); {item['owner_reading']}",
+         "AMBIGUOUS: kept as transcribed, not resolved"),
+        ("observed edge scatter", f"mean {t['mean']:.4f} / {a['mean']:.4f} mm, sd {t['sd']:.4f} / {a['sd']:.4f} mm, "
+         f"CV_edges {100 * t['cv']:.1f} % / {100 * a['cv']:.1f} % (as transcribed / with 0.81)",
+         "OBSERVED (edges only)"),
+        ("3 × CV_edges", f"{300 * t['cv']:.1f} % / {300 * a['cv']:.1f} % in ln E / ln G12",
+         "ILLUSTRATIVE: not the real uncertainty"),
+        ("thickness map of the whole plate", "not measured (the interior is unknown)", "NOT_MEASURED"),
+        ("real uncertainty of E / G", "unknown", "UNKNOWN"),
+        ("±10 % target", "an engineering goal", "NOT_ACHIEVED"),
+    )
 
 
 def effective_moduli_from_d(d11: float, d22: float, d66: float, h: float, nu12: float) -> dict:
@@ -958,7 +1010,11 @@ TEST_261027 = {
 }
 TEST_261016 = "four corner straps and a shaker stinger near the bottom edge (HUMAN, M11 §13.3)"
 # PLATE-ONLY-R2 research (grid_saddle_split of record 1 in each session; review folder PLATE_ONLY_R2_REVIEW)
-SESSION_TWIST = {"261027": (18.6307, 0.988), "261016": (33.4491, 0.947)}
+SESSION_TWIST = {"261027": (18.6307, 0.988), "261016": (33.4491, 0.947)}  # (measured Hz, uv fraction) of record 1
+# PLATE-ONLY-R2-F1: the difference of the two series is a suspicion, never an established effect of the setup
+SETUP_DEPENDENCE_SUSPECTED = "SETUP_DEPENDENCE_SUSPECTED"
+MODE_IDENTITY_NOT_VERIFIED = "MODE_IDENTITY_NOT_VERIFIED"
+SESSION_DIFFERENCE = f"{SETUP_DEPENDENCE_SUSPECTED} / {MODE_IDENTITY_NOT_VERIFIED}"
 
 
 @dataclass(frozen=True)
@@ -1021,11 +1077,16 @@ def fe_applicability(member: FEMember, fe_plan_mm: Optional[Sequence[float]] = N
                                      "SPEC §15: the shaker attachment mass in the model, or non-contact excitation"))
     (f27, uv27), (f16, uv16) = SESSION_TWIST["261027"], SESSION_TWIST["261016"]
     checks.append(ApplicabilityCheck(
-        "setup sensitivity (same specimen)", "—", f"261016: {TEST_261016}; 261027: the two-point suspension",
-        "SETUP_SENSITIVE",
-        f"record 1 of both sessions is a twist about its scan-grid axes (uv fraction {uv27} at {f27} Hz and {uv16} at "
-        f"{f16} Hz): on the same plate the setup changed the lowest twist-class record by a factor {f27 / f16:.2f}. "
-        "Descriptive only: not a mode pair, not a Σ_setup repeat (D-053)"))
+        "series difference: mode identity", "—", f"record 1 measured at {f27} Hz (261027) and {f16} Hz (261016)",
+        MODE_IDENTITY_NOT_VERIFIED,
+        f"measured: record 1 at {f27} Hz in 261027 and at {f16} Hz in 261016; descriptively both are twists about "
+        f"their own scan grid (uv fraction {uv27} and {uv16}). Whether they are the same mode is NOT verified (no "
+        "registration, no MAC between the series). No cross-series mode pair"))
+    checks.append(ApplicabilityCheck(
+        "series difference: cause", "—", f"261016: {TEST_261016}; 261027: the two-point suspension",
+        SETUP_DEPENDENCE_SUSPECTED,
+        "the cause of the difference is NOT established: a dependence on the test setup (suspension, shaker "
+        "attachment) is suspected, not proven. Not a Σ_setup repeat (D-053)"))
     checks.append(ApplicabilityCheck(
         "registration", "FE X = 301 mm edge, +Z shell normal", "scan rotated 45°; face and edges unknown",
         NOT_VERIFIED, "scanner → plate (261027) open; plate → FE: candidates A–D, the owner's choice pending "
@@ -1094,7 +1155,8 @@ ITERATION_PLAN = (
     "6. Optional: the Stage-A affine basis (*MATRIX GENERATE, 4 jobs) for a balanced plate (D11 = D22) — Abaqus: "
     "separate HUMAN gate.",
     "7. Only then a declared campaign (question, τ_mf, Σ, bounds) and the bounded LM with branch tracking — LM / "
-    "campaign: separate HUMAN authorisation. The D route needs the areal mass only; E / G add 3·cv_h (D-052).",
+    "campaign: separate HUMAN authorisation. The D route needs the areal mass only; E / G add the thickness "
+    "contribution (D-052), which needs a thickness map of the whole plate.",
 )
 
 

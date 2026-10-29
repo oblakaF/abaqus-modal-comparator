@@ -255,6 +255,8 @@ class PlateStudyPanel(QWidget):
                         "measurements of 27.10", ("Quantity", "Value", "Recorded", "Method", "Uncertainty", "Status"),
                         view.specimen_rows, 4, (0, 1, 2, 3, 4, 5), capped=(1, 2, 3, 5))
             self.result_layout.addWidget(_label(view.record.get("specimen_record_note", ""), "hint"))
+            self._table("thickness", "Thickness: edge readings only — the real uncertainty of E / G is UNKNOWN",
+                        ("Item", "Value", "Status"), view.thickness_rows, 1, (0, 1, 2), capped=(0, 2))
             self._table("experiment", "MEASURED experimental records (every record; descriptive invariants)",
                         ("Record", "Mode", "Measured Hz", "MPC", "Measured DOF", "Points", "Rigid plane", "Saddle",
                          "Dome", "Classification", "Saddle on grid axes (uv)", "Saddle on grid diagonals (u²−v²)"),
@@ -286,7 +288,8 @@ class PlateStudyPanel(QWidget):
             self._table("outcomes", "Parameter outcomes now", ("Parameter", "Outcome", "Reason"), view.outcome_rows,
                         2, (0, 1, 2))
             self._table("budget", "Uncertainty budget of ln E / ln G12 with the archived record (no estimate exists)",
-                        ("Source", "ln sd", "Note"), view.budget_rows, 2, (0, 2))
+                        ("Source", "Established ln sd", "Illustrative", "Note"), view.budget_rows, 3, (0, 2, 3),
+                        capped=(0,))
             self.result_layout.addWidget(_label("Missing for an identification:\n" + "\n".join(
                 f"• {line}" for line in view.missing), "warnings"))
             self.result_layout.addWidget(_label("Plan before a first authorised iterative campaign:\n" + "\n".join(

@@ -80,8 +80,10 @@ class InputsChanged(ValueError):
 
 def confirm_inputs(fe_preview, fe_identity, experimental_preview, experimental_identity, cancel_event=None) -> dict:
     """The identities recorded by Inspect file, confirmed against the files on disk now (fresh SHA-256 and size; no
-    re-import). Raises ``InputsChanged`` when one is missing or different."""
+    re-import). Raises ``InputsChanged`` when one is missing or different. PLATE-ONLY-R2-F1: the FE side is the whole
+    extracted package (manifest, geometry and mode files), file by file."""
     from new_gui import preview_model as pm
+    from services import fe_package_identity as fpi
 
     sources = {}
     for key, path, recorded, name in (("fe", fe_preview.manifest_path, fe_identity, "FE manifest"),
@@ -89,6 +91,20 @@ def confirm_inputs(fe_preview, fe_identity, experimental_preview, experimental_i
                                        "experimental file")):
         if recorded is None:
             raise InputsChanged(f"the {name}'s identity was not recorded when it was read; Inspect it again.")
+        if key == "fe":
+            try:
+                pm.confirm_fe_identity(path, recorded, cancel_event)
+            except fpi.PackageIdentityRefused as refusal:
+                if refusal.kind == fpi.CANCELLED:
+                    raise
+                raise InputsChanged(f"the FE package {path} cannot be confirmed ({refusal}); Inspect it "
+                                    "again.") from refusal
+            except fpi.PackageChanged as changed:
+                raise InputsChanged(f"the FE package {path} changed since Inspect file read it ("
+                                    + "; ".join(changed.differences) + "); the study is not computed on data that no "
+                                    "longer match the files. Inspect it again.") from changed
+            sources[key] = dict(recorded)
+            continue
         now = pm.file_identity(path, cancel_event)
         if now is None or now["sha256"] != recorded["sha256"] or now["size"] != recorded["size"]:
             raise InputsChanged(f"the {name} {path} changed since Inspect file read it (SHA-256 "
@@ -96,6 +112,8 @@ def confirm_inputs(fe_preview, fe_identity, experimental_preview, experimental_i
                                 "computed on data that no longer match the file. Inspect it again.")
         sources[key] = dict(recorded)
     return sources
+
+
 IDLE, RUNNING, DONE, FAILED = "idle", "running", "done", "failed"
 
 
@@ -156,6 +174,7 @@ class PlateStudyView:
     applicability_rows: tuple = ()  # the initial FE model against the record and the 261027 test
     orientation_rows: tuple = ()  # scanner → plate → FE
     budget_rows: tuple = ()
+    thickness_rows: tuple = ()  # PLATE-ONLY-R2-F1: edge readings, the ambiguous reading, observed vs illustrative
 
 
 @dataclass(frozen=True)
@@ -249,6 +268,15 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
         "orientation_chain": [o.__dict__ for o in ps.ORIENTATION_CHAIN],
         "orientation_notes": list(ps.ORIENTATION_NOTES),
         "uncertainty_budget": [line.__dict__ for line in budget],
+        "thickness": {"rows": [dict(zip(("item", "value", "status"), r)) for r in ps.thickness_rows()],
+                      "ambiguous_reading": ps.THICKNESS_READING_AMBIGUITY,
+                      "readings_mm": {str(k): list(v) for k, v in ps.THICKNESS_READINGS_MM.items()},
+                      "real_uncertainty_of_e_g": "UNKNOWN",
+                      "three_cv_edges": "ILLUSTRATIVE, not the real uncertainty"},
+        "difference_between_the_series": {"state": ps.SESSION_DIFFERENCE,
+                                          "measured_record_1": {k: {"hz": v[0], "uv_fraction": v[1]}
+                                                                for k, v in ps.SESSION_TWIST.items()},
+                                          "cross_series_mode_pairs": "none", "sigma_setup_repeat": False},
         "initial_model_d_n_mm": {"values": ps.plate_d(member.parameters),
                                  "note": "the initial model's assumed constants, not an estimate"},
         "experimental_source": experimental_identity,
@@ -302,8 +330,10 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
                             for m in ps.SPECIMEN_RECORD),
         applicability_rows=tuple((c.aspect, c.state, c.fe, c.test, c.note) for c in applicability),
         orientation_rows=tuple((o.link, o.state, o.known, o.open) for o in ps.ORIENTATION_CHAIN),
-        budget_rows=tuple((line.source, "—" if line.ln_sd is None else f"{100 * line.ln_sd:.1f} %", line.note)
-                          for line in budget))
+        budget_rows=tuple((line.source, "—" if line.ln_sd is None else f"{100 * line.ln_sd:.1f} %",
+                           "—" if line.illustrative_ln_sd is None else f"{100 * line.illustrative_ln_sd:.1f} % "
+                           "(illustrative)", line.note) for line in budget),
+        thickness_rows=tuple(ps.thickness_rows()))
 
 
 def run_study(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index: int, token: int,
@@ -354,6 +384,15 @@ def export_report(view: PlateStudyView, folder) -> tuple:
     lines += ["", "## Applicability of the initial FE model to the 261027 test (NOT_VERIFIED)", "",
               "| Aspect | State | FE model | Specimen / test | Note |", "|---|---|---|---|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} |" for r in view.applicability_rows]
+    series = view.record.get("difference_between_the_series") or {}
+    lines += ["", f"## Difference between the series: {series.get('state', '')}", "",
+              "Measured record 1: " + "; ".join(f"{k}: {v['hz']} Hz (uv fraction {v['uv_fraction']})"
+                                               for k, v in (series.get("measured_record_1") or {}).items())
+              + ". The same mode is not verified and the cause is not established (a setup dependence is suspected, "
+              "not proven); no cross-series mode pair; not a Σ_setup repeat (D-053)."]
+    lines += ["", "## Thickness (edge readings only; the real uncertainty of E / G is UNKNOWN)", "",
+              "| Item | Value | Status |", "|---|---|---|"]
+    lines += [f"| {a} | {b} | {c} |" for a, b, c in view.thickness_rows]
     lines += ["", "## Orientation chain (nothing chosen by MAC, frequency or shape)", "",
               "| Link | State | Known | Open |", "|---|---|---|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} |" for r in view.orientation_rows]

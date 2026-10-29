@@ -317,7 +317,9 @@ class SpecimenR2Tests(unittest.TestCase):
         self.assertEqual(checks["excitation"].state, "UNKNOWN")
         self.assertEqual(checks["registration"].state, ps.NOT_VERIFIED)
         self.assertIn("0.67 of record 1", checks["suspension"].note)
-        self.assertIn("not a Σ_setup repeat", checks["setup sensitivity (same specimen)"].note)
+        self.assertEqual(checks["series difference: mode identity"].state, "MODE_IDENTITY_NOT_VERIFIED")
+        self.assertEqual(checks["series difference: cause"].state, "SETUP_DEPENDENCE_SUSPECTED")
+        self.assertIn("Not a Σ_setup repeat", checks["series difference: cause"].note)
         e30 = next(m for m in ps.PLATE_FE_FAMILY if m.member_id == "E30E26")
         self.assertEqual({c.aspect: c.state for c in ps.fe_applicability(e30, (301.0, 300.0))}["mass"], "DIFFERS")
         other = {c.aspect: c.state for c in ps.fe_applicability(base, (0.3, 0.3))}
@@ -342,13 +344,15 @@ class SpecimenR2Tests(unittest.TestCase):
     def test_e_and_g_need_the_interior_thickness_while_d_needs_the_areal_mass_only(self):
         outcomes = {o.parameter: o for o in ps.plate_readiness(registration_verified=False).outcomes}
         moduli = outcomes["E1_eff, E2_eff, G12_eff"].reasons[0]
-        self.assertIn("perimeter", moduli)
-        self.assertIn("24 %", moduli)
-        self.assertNotIn("perimeter", " ".join(outcomes["D66"].reasons))
+        self.assertIn("known only at the edges", moduli)
+        self.assertIn("24 % is illustrative only", moduli)
+        self.assertIn("real uncertainty of E / G is UNKNOWN", moduli)
+        self.assertNotIn("known only at the edges", " ".join(outcomes["D66"].reasons))
         measured = {o.parameter: o for o in ps.plate_readiness(False, interior_thickness_measured=True).outcomes}
-        self.assertNotIn("perimeter", measured["E1_eff, E2_eff, G12_eff"].reasons[0])
+        self.assertNotIn("known only at the edges", measured["E1_eff, E2_eff, G12_eff"].reasons[0])
         budget = {line.source.split(" ")[0]: line for line in ps.specimen_budget()}
-        self.assertAlmostEqual(budget["thickness"].ln_sd, 3 * ps.thickness_statistics()["cv"], places=12)
+        self.assertIsNone(budget["thickness"].ln_sd)  # R2-F1: never an established contribution
+        self.assertAlmostEqual(budget["thickness"].illustrative_ln_sd, 3 * ps.thickness_statistics()["cv"], places=12)
         self.assertIsNone(budget["mass"].ln_sd)  # the scale uncertainty is not stated: never invented (D-052)
         self.assertIn("needs no thickness", budget["mass"].note)
         self.assertIsNone(ps.plate_d(ps.PLATE_FE_FAMILY[5].parameters))  # the wedge: no uniform thickness
@@ -387,7 +391,56 @@ class SpecimenR2Tests(unittest.TestCase):
         self.assertIn("No orientation is chosen by MAC, frequency or shape", notes)
         self.assertIn("none is chosen", notes)
         self.assertIn("edge 2", notes)
-        self.assertIn("not a mode pair", ps.fe_applicability(ps.PLATE_FE_FAMILY[0])[-2].note)
+        self.assertIn("NOT a mode pair", ps.fe_applicability(ps.PLATE_FE_FAMILY[0], None, 18.6307, 19.072)[-1].note)
+
+    def test_the_ambiguous_thickness_reading_is_shown_and_never_resolved(self):
+        # PLATE-ONLY-R2-F1: M11 §8 reads 0.84 or 0.81; the record keeps the transcription and shows both
+        self.assertEqual(ps.THICKNESS_READINGS_MM[2], (0.79, 0.82, 0.84, 0.81, 0.82))  # the 20 readings, unchanged
+        self.assertEqual(sum(len(row) for row in ps.THICKNESS_READINGS_MM.values()), 20)
+        item = ps.THICKNESS_READING_AMBIGUITY
+        self.assertEqual((item["edge"], item["reading"], item["transcribed_mm"], item["alternative_mm"]),
+                         (2, 3, 0.84, 0.81))
+        self.assertIn("not an independent re-measurement", item["owner_reading"])
+        self.assertIn("not resolved", item["kept"])
+        variants = ps.thickness_variants()
+        self.assertAlmostEqual(variants["as transcribed"]["mean"], 0.876, places=6)
+        self.assertAlmostEqual(variants["alternative reading"]["mean"], 0.8745, places=6)
+        self.assertEqual(variants["as transcribed"], ps.thickness_statistics())
+        thickness = next(m for m in ps.SPECIMEN_RECORD if m.quantity == "thickness")
+        self.assertIn("0.84 as transcribed, could be read 0.81", thickness.value)
+        rows = {r[0]: r for r in ps.thickness_rows()}
+        self.assertTrue(rows["ambiguous reading"][2].startswith("AMBIGUOUS"))
+
+    def test_the_illustrative_thickness_figure_is_never_the_real_uncertainty(self):
+        rows = {r[0]: r for r in ps.thickness_rows()}
+        self.assertIn("8.2 % / 8.3 %", rows["observed edge scatter"][1])
+        self.assertIn("24.5 % / 24.9 %", rows["3 × CV_edges"][1])
+        self.assertTrue(rows["3 × CV_edges"][2].startswith("ILLUSTRATIVE"))
+        self.assertEqual(rows["thickness map of the whole plate"][2], "NOT_MEASURED")
+        self.assertEqual(rows["real uncertainty of E / G"][1:], ("unknown", "UNKNOWN"))
+        self.assertEqual(rows["±10 % target"][2], "NOT_ACHIEVED")
+        thickness = next(line for line in ps.specimen_budget() if line.source.startswith("thickness"))
+        self.assertIsNone(thickness.ln_sd)
+        self.assertTrue(thickness.note.startswith("UNKNOWN: no thickness map of the whole plate"))
+        self.assertIn("ILLUSTRATIVE, not the real uncertainty", thickness.note)
+
+    def test_the_difference_of_the_two_series_is_a_suspicion_not_a_result(self):
+        # PLATE-ONLY-R2-F1: the measured values stay; no established setup effect, no cross-series pair, no Σ_setup
+        checks = {c.aspect: c for c in ps.fe_applicability(ps.PLATE_FE_FAMILY[0], (301.0, 300.0), 18.6307, 19.072)}
+        identity, cause = checks["series difference: mode identity"], checks["series difference: cause"]
+        self.assertEqual((identity.state, cause.state), (ps.MODE_IDENTITY_NOT_VERIFIED, ps.SETUP_DEPENDENCE_SUSPECTED))
+        self.assertEqual(ps.SESSION_DIFFERENCE, "SETUP_DEPENDENCE_SUSPECTED / MODE_IDENTITY_NOT_VERIFIED")
+        for text in ("18.6307 Hz in 261027", "33.4491 Hz in 261016", "uv fraction 0.988 and 0.947",
+                     "same mode is NOT verified", "No cross-series mode pair"):
+            self.assertIn(text, identity.note)
+        for text in ("cause of the difference is NOT established", "suspected, not proven",
+                     "Not a Σ_setup repeat (D-053)"):
+            self.assertIn(text, cause.note)
+        everything = " ".join(f"{c.aspect} {c.state} {c.note}" for c in checks.values())
+        for forbidden in ("SETUP_SENSITIVE", "the setup changed", "setup-sensitive"):
+            self.assertNotIn(forbidden, everything)
+        self.assertEqual(ps.SESSION_TWIST, {"261027": (18.6307, 0.988), "261016": (33.4491, 0.947)})  # kept
+        self.assertEqual(ps.plate_readiness(registration_verified=False).confirmed_pairs, ())
 
 
 class FileTests(unittest.TestCase):

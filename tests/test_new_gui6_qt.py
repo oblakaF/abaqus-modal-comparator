@@ -119,7 +119,7 @@ class StartTests(_Window):
         self.assertEqual(sorted(p.suffix for p in self.reports.iterdir()), [".pdf", ".xlsx"])
 
     def test_frf_records_are_never_compared(self):
-        self.inspect(ws.FE, self.odb)
+        self.inspect(ws.FE, self.package)
         self.inspect(ws.EXPERIMENTAL, self.frf)
         self.choose_set(0)
         self.assertFalse(self.workbench.run_button.isEnabled())
@@ -258,14 +258,15 @@ class ExportProvenanceTests(_Window):
 
     def test_a_file_changed_on_disk_after_the_comparison_is_not_exported(self):
         self.compared()
-        original = self.odb.read_bytes()
-        self.odb.write_bytes(original + b"#")
+        mode_file = self.package.with_name("mode_0007.csv")  # PLATE-ONLY-R2-F1: a file of the package
+        original = mode_file.read_bytes()
+        mode_file.write_bytes(original + b"#")
         try:
             with reporting_restored():
                 self.assertTrue(self.workbench.export())
                 self.assertTrue(self.window.wait_for_reads(120))
         finally:
-            self.odb.write_bytes(original)
+            mode_file.write_bytes(original)
         self.app.processEvents()
         self.assertIn("changed since it was read", self.workbench.export_status.text())
         self.assertEqual(list(self.reports.iterdir()), [])

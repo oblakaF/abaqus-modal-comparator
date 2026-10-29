@@ -20,6 +20,10 @@ that the FE manifest and the experimental file on disk still have them. A missin
 changed during the read) or a changed file refuses the export: a later hash is never attributed to data read earlier,
 and no report claims a provenance that cannot be confirmed.
 
+PLATE-ONLY-R2-F1: the FE identity is the whole extracted package (``services.fe_package_identity``: the manifest and
+every geometry and mode file the loader read); a changed, missing or added file refuses the export. The ODB is never
+read and its hash is never stated as the package's.
+
 Files are written only into the folder the user chose, with time-stamped names (nothing is replaced), each through a
 temporary file in that folder that is renamed into place. The read data, the source files and the project's records
 are never written.
@@ -126,6 +130,8 @@ def confirmed_sources(fe_preview, experimental_preview, sources: Optional[dict],
     """(FE identity, experimental identity) recorded at the read and unchanged on disk now; else ``ExportRefused``."""
     from new_gui import preview_model as pm
 
+    from services import fe_package_identity as fpi
+
     sources = dict(sources or {})
     confirmed = []
     for key, path in (("fe", fe_preview.manifest_path), ("experimental", experimental_preview.source_path)):
@@ -134,6 +140,14 @@ def confirmed_sources(fe_preview, experimental_preview, sources: Optional[dict],
         if read is None:
             raise ExportRefused(f"the {name}'s identity was not recorded when it was read, so the report's provenance "
                                 "cannot be confirmed; Inspect the file again.")
+        if key == "fe":  # PLATE-ONLY-R2-F1: the whole extracted package, file by file
+            try:
+                pm.confirm_fe_identity(path, read, cancel)
+            except (fpi.PackageChanged, fpi.PackageIdentityRefused) as refusal:
+                raise ExportRefused(f"{refusal}; the report is not written for data that no longer match the files. "
+                                    "Inspect it again.") from refusal
+            confirmed.append({**read, "unchanged_at_export": True})
+            continue
         now = pm.file_identity(path, cancel)
         if now is None or now["sha256"] != read["sha256"] or now["size"] != read["size"]:
             raise ExportRefused(f"the {name} {path} changed since it was read (SHA-256 {read['sha256'][:12]}… when "
@@ -166,8 +180,9 @@ def verified_record(result, bound, view, fe_preview, experimental_preview, set_i
         "schema": SCHEMA, "created": datetime.now().isoformat(timespec="seconds"),
         "status": view.status, "statement": view.statement,
         "fe_source": {**fe_file, "kind": "extracted FE package (manifest.json); the ODB itself was not read",
-                      "identity_basis": "SHA-256 of manifest.json recorded when it was read, unchanged at export; the "
-                                        "package's CSV files are not hashed"},
+                      "identity_basis": "SHA-256 of manifest.json and of every geometry and mode file the loader "
+                                        "read, recorded when they were read and unchanged at export; not the ODB's "
+                                        "hash"},
         "experimental_source": {**experimental_file, "selected_path": str(experimental_preview.selected_path),
                                 "identity_basis": "SHA-256 recorded when it was read, equal to the file the "
                                                   "registration was verified on, unchanged at export"},
