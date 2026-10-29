@@ -8,8 +8,10 @@ value of a record, with the record's own status, and is placed in one of three c
   only governed records are the M7 campaign of the SP-02 / SP-13 family: each parameter's M5 verdict
   (``m5_verdict.verdicts`` of the result records) and the formal output of the D-076 correction (D-077):
   ``NO_GLOBAL_PARAMETER_VALUE``. No material value is identified, so none is shown in this class.
-- **SPECIMEN_ENGINEERING_CALIBRATION** — a released model-specific calibration (SPEC v1.2 §3a). The committed records
-  are searched for the calibration record's schema; none exists, so the class is ``NOT_AVAILABLE``.
+- **Specimen engineering calibration** — a released model-specific calibration (SPEC v1.2 §3a). Its class name is
+  the campaign schema's own question name (``domain.campaign_definition.SCIENTIFIC_QUESTIONS``); it is not repeated
+  here, and no calibration gate or output service is imported. The committed records are searched for the
+  calibration record's schema; none exists, so the class is ``NOT_AVAILABLE``.
 - **MODEL_INPUT / DIAGNOSTIC_ESTIMATE** — the governed FE models' ``*Elastic, ENGINEERING CONSTANTS`` (the source
   constants pinned to their INP SHA-256) and the historical diagnostic estimates of M7 (the RUN_A optimizer candidate,
   the RUN_B compensation test, the D-076 per-specimen diagnostics), each with its labels
@@ -34,6 +36,8 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
+from domain.campaign_definition import MATERIAL_IDENTIFICATION, SCIENTIFIC_QUESTIONS
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORRECTION = "docs/auto_id/audit_corrections/M7_FAMILY_CONSISTENCY_CORRECTION.json"
 PER_SPECIMEN = "docs/auto_id/audit_corrections/M7_PER_SPECIMEN_DIAGNOSTICS.json"
@@ -42,8 +46,8 @@ CAMPAIGNS = {"RUN_A": "docs/auto_id/campaigns/M7_RUN_A.campaign.json",
 CALIBRATION_SCHEMA_PREFIX = "auto-id/specimen-engineering-calibration/"
 RECORDS_ROOT = "docs/auto_id"
 
-MATERIAL_IDENTIFICATION = "MATERIAL_IDENTIFICATION"
-SPECIMEN_CALIBRATION = "SPECIMEN_ENGINEERING_CALIBRATION"
+# the second scientific question of the campaign schema (SPEC v1.2 §1 B), named by its owner
+SPECIMEN_CALIBRATION = next(question for question in SCIENTIFIC_QUESTIONS if question != MATERIAL_IDENTIFICATION)
 MODEL_INPUT = "MODEL_INPUT"
 DIAGNOSTIC_ESTIMATE = "DIAGNOSTIC_ESTIMATE"
 CLASSES = (MATERIAL_IDENTIFICATION, SPECIMEN_CALIBRATION, MODEL_INPUT, DIAGNOSTIC_ESTIMATE)

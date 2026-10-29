@@ -129,7 +129,7 @@ class Availability:
 
 def availability(source: KnownSource, root: Path = DEFAULT_ROOT) -> Availability:
     """Whether the file exists under ``root`` with the declared size (no content is read)."""
-    path = Path(root) / PureWindowsPath(source.relative_path)
+    path = Path(root).joinpath(*PureWindowsPath(source.relative_path).parts)  # the same on Windows and Linux
     try:
         size = path.stat().st_size if path.is_file() else None
     except OSError:

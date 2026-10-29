@@ -47,6 +47,9 @@ class _Bridge(QObject):
     done = Signal(object)
 
 
+NEXT_STEP = ("NEW-GUI.6: this check applies nothing. Run verified modal comparison below verifies the registration "
+             "again and only then applies it to compute MAC and the comparator's mode pairs.")
+
 FIELDS = (("Specimen and fixture", lambda v: f"{v.specimen} — {v.fixture_id}"),
           ("Modal set chosen", lambda v: v.selected_set),
           ("Archived modal set", lambda v: v.archived_modal_set),
@@ -97,6 +100,8 @@ class RegistrationCheckPanel(QFrame):
         layout.addWidget(self.status)
         self.warning = _label(rm.WARNING, "warnings")
         layout.addWidget(self.warning)
+        self.next_step = _label(NEXT_STEP, "hint")
+        layout.addWidget(self.next_step)
         self.details = QWidget()
         grid = QGridLayout(self.details)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -199,7 +204,7 @@ class RegistrationCheckPanel(QFrame):
                              rm.FAILED: outcome.error if outcome is not None else ""}.get(state, ""))
         self.status.setVisible(state in (rm.RUNNING, rm.FAILED))
         view = self.view
-        for widget in (self.warning, self.details, self.checks, self.limits):
+        for widget in (self.warning, self.next_step, self.details, self.checks, self.limits):
             widget.setVisible(view is not None)
         for caption, value in FIELDS:
             self.fields[caption].setText(value(view) if view is not None else "")

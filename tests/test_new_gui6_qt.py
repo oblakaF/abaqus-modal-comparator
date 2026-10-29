@@ -70,6 +70,7 @@ class _Window(_Gui5Window):
     def compared(self):
         self.verified()
         self.assertTrue(self.workbench.run_button.isEnabled())
+        self.assertTrue(self.panel.next_step.isVisible())  # the check applies nothing; the comparison below does
         self.click(self.workbench.run_button)
         self.assertEqual(self.workbench.slot.state, cm.DONE, self.workbench.status.text())
 
@@ -87,6 +88,17 @@ class StartTests(_Window):
         self.assertFalse(w.details.isVisible())
         self.assertIsNone(w.pair_table)
         self.assertFalse(self.window.busy())
+
+    def test_a_disabled_command_does_not_look_enabled(self):
+        # The primary style (blue) must not hide the disabled state of Run verified modal comparison.
+        button = self.workbench.run_button
+        self.assertFalse(button.isEnabled())
+        self.window.show_page(1)
+        self.app.processEvents()
+        image = button.grab().toImage()
+        colour = image.pixelColor(image.width() // 2, 3)
+        self.assertNotEqual(colour.name(), "#2563eb")
+        self.assertLess(abs(colour.red() - colour.blue()), 40)  # grey, not the primary blue
 
     def test_without_a_verified_registration_no_mac_and_the_diagnostic_report(self):
         self.ready(1)  # another set: the check refuses it
@@ -268,6 +280,9 @@ class RemovedResultTests(_Window):
                 self.assertIsNone(self.workbench.pair_table)
                 self.assertFalse(self.workbench.views.isTabEnabled(0))
                 self.assertNotIn(cm.PAIRS_FOUND, self.window.status_text.text())
+                summary = self.window.diagnostic.summary_values  # the summary never keeps the removed result
+                self.assertNotIn("computed on the registered", summary["MAC"].text())
+                self.assertNotIn(cm.PAIRS_FOUND, summary["Mode pairs"].text())
                 self.window.clear_file(ws.FE)
                 self.window.clear_file(ws.EXPERIMENTAL)
 

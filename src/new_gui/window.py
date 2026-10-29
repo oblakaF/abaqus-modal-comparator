@@ -101,6 +101,7 @@ QPushButton:hover { border-color: #2563eb; }
 QPushButton:disabled { color: #9aa5b1; border-color: #e4e7eb; }
 QPushButton#primary { background: #2563eb; border-color: #2563eb; color: #ffffff; }
 QPushButton#primary:hover { background: #1d4ed8; }
+QPushButton#primary:disabled { background: #e4e7eb; border-color: #e4e7eb; color: #9aa5b1; }
 QStatusBar { background: #e9edf2; color: #3e4c59; }
 QMenuBar { background: #ffffff; border-bottom: 1px solid #d9dee5; }
 QMenuBar::item:selected, QMenu::item:selected { background: #2563eb; color: #ffffff; }
@@ -560,6 +561,7 @@ class MainWindow(QMainWindow):
         view = self.diagnostic.view
         self.comparison.set_diagnostic(self.diagnostic.slot.outcome.diagnostic if view is not None else None)
         compared = self.comparison.view
+        self.diagnostic.show_summary_values()  # never a removed comparison's MAC or pairs
         if compared is not None:  # the summary states the verified comparison, not only the frequency diagnostic
             self.diagnostic.summary_values["MAC"].setText(
                 "computed on the registered measured DOFs only (see Verified modal comparison)")

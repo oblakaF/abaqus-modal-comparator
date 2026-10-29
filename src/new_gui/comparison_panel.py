@@ -568,7 +568,7 @@ class ComparisonPanel(QFrame):
         self.tables.pop("pairs", None)
         if view is None:
             self.pairs_layout.addWidget(_label("No verified comparison: no mode pairs and no MAC are shown. The "
-                                               "frequency diagnostic above is frequency proximity only.", "hint"))
+                                               "frequency diagnostic is frequency proximity only.", "hint"))
             return
         if not view.pair_rows:
             self.pairs_layout.addWidget(_label(cm.NO_PAIR_TEXT, ""))
