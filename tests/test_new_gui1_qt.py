@@ -3,8 +3,9 @@
 First launch is an empty workspace with the archive closed; FE and experimental files of any plate are chosen
 through the file dialog (replaced by a stub), replaced, cancelled, cleared and refused with a visible reason; the
 label "SP-02" links nothing to the archive; the archive opens only on its command, read-only, and a missing or
-damaged archive does not block the window; the analysis page states that no analysis was run and offers only one
-action, Run frequency diagnostic (NEW-GUI.4), disabled at an empty start; no user file is changed.
+damaged archive does not block the window; the analysis page states that no analysis was run and offers only two
+actions, Run frequency diagnostic (NEW-GUI.4) and Check reference registration (NEW-GUI.5), both disabled at an empty
+start; no user file is changed.
 
 PySide6 comes from ``requirements-new-gui.txt``. Without it these tests are skipped with that reason, except when
 ``NEW_GUI_REQUIRE_QT=1`` (set in CI), where a missing PySide6 is an error, so the tests really run there.
@@ -285,22 +286,24 @@ class ArchiveTests(_Window):
 
 
 class NothingComputedTests(_Window):
-    def test_the_analysis_page_offers_only_the_diagnostic_command_and_the_status_page_none(self):
-        # NEW-GUI.4 (authorised change of this NEW-GUI.1 test): the Analysis page has exactly one command, Run
-        # frequency diagnostic, disabled until both files are read and a modal set is chosen; nothing is computed
-        # before it is clicked. tests/test_new_gui4_qt.py checks when it becomes available and what a click gives.
+    def test_the_analysis_page_offers_only_its_two_commands_and_the_status_page_none(self):
+        # NEW-GUI.4 / NEW-GUI.5 (authorised changes of this NEW-GUI.1 test): the Analysis page has exactly two
+        # commands, Run frequency diagnostic and Check reference registration, disabled until both files are read and
+        # a modal set is chosen; nothing is computed before a click. tests/test_new_gui4_qt.py and
+        # tests/test_new_gui5_qt.py check when they become available and what a click gives.
         w = self.window
         analysis, status = w.stack.widget(1).widget(), w.stack.widget(2).widget()
         buttons = analysis.findChildren(QPushButton)
-        self.assertEqual([button.text() for button in buttons], ["Run frequency diagnostic"])
-        self.assertFalse(buttons[0].isEnabled())
+        self.assertEqual([button.text() for button in buttons],
+                         ["Run frequency diagnostic", "Check reference registration"])
+        self.assertFalse(any(button.isEnabled() for button in buttons))
         self.assertEqual(status.findChildren(QPushButton), [])
         texts = " ".join(_texts(analysis))
         self.assertIn("Analysis not run", texts)
         self.assertIn("No frequency, MAC value or mode pair has been computed", texts)
         self.click_choose(ws.FE, str(self.odb))  # choosing files computes nothing and enables nothing
         self.click_choose(ws.EXPERIMENTAL, str(self.unv))
-        self.assertFalse(buttons[0].isEnabled())
+        self.assertFalse(any(button.isEnabled() for button in buttons))
         self.assertFalse(w.busy())
         self.assertEqual(w.analysis_badge.text(), "Analysis not run")
         self.assertIn("No frequency, MAC value or mode pair has been computed", " ".join(_texts(analysis)))

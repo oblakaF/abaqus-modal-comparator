@@ -329,8 +329,10 @@ class SeparationTests(unittest.TestCase):
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))
         self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "archive_dialog.py",
-                                                   "diagnostic_model.py", "diagnostic_panel.py", "preview_model.py", "preview_panel.py", "shape_model.py",
-                                                   "shape_panel.py", "window.py", "workspace_state.py"])
+                                                   "diagnostic_model.py", "diagnostic_panel.py", "preview_model.py", "preview_panel.py",
+                                                   "registration_check_model.py", "registration_check_panel.py",
+                                                   "shape_model.py", "shape_panel.py", "window.py",
+                                                   "workspace_state.py"])
         stdlib = set(sys.stdlib_module_names) | {"__future__"}
         for path in files:
             for name in _imports(path):

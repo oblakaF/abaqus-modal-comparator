@@ -61,6 +61,10 @@ analysis. Since NEW-GUI.3, one chosen FE mode or experimental record can be draw
 results and one chosen experimental modal set, only when you click **Run frequency diagnostic**
 (`docs/gui/NEW_GUI4_FREQUENCY.md`). Its result is FREQUENCY_ONLY_DIAGNOSTIC: the nearest FE frequencies show
 frequency proximity only and are not established mode pairs. No physical registration, MAC or Auto-ID is run.
+Since NEW-GUI.5, **Check reference registration** checks, only when you click it, whether an accepted archived
+physical registration (SP-02, SP-13) applies exactly to the read FE results and the modal set chosen for the frequency
+diagnostic (`docs/gui/NEW_GUI5_REGISTRATION.md`). The registration is not applied: no MAC, mode pair or orientation is
+made, and modal identity is not established. A refusal does not mean that your experiment is physically wrong.
 
 ## Input procedure
 
