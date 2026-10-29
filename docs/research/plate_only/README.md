@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -25,7 +25,9 @@ FE computation or Auto-ID was run.
 
 ## 2. Is it the M11 plate?
 
-**NOT_ESTABLISHED.**
+> **Superseded by PLATE-ONLY-R2 (§12.1):** the owner confirmed the identity on 2026-10-30 (HUMAN_CONFIRMED). The R1 assessment below is kept as history.
+
+**R1: NOT_ESTABLISHED.**
 
 | What suggests it | What is missing |
 |---|---|
@@ -58,9 +60,11 @@ The M11 measurements (mass 118.37 g, plan 301 × 300 mm, 20 edge thickness readi
 - **Unknown.** The face shown, the plate edge along each scanner axis, the reference of the 45° turn and the
   excitation. The lab's 45° turn is **not** an FE rotation.
 
-## 4. FE models of the plate (CANDIDATE_FE_REFERENCE)
+## 4. FE models of the plate (CANDIDATE_FE_REFERENCE in R1)
 
-All FE models are M11 models of the M11 plate; none is a confirmed model of this specimen.
+> **PLATE-ONLY-R2 (§12.3):** the M11 plate is this specimen, so the S4R baseline is the **initial FE model** of the specimen (`INITIAL_FE_MODEL_OF_THE_SPECIMEN`). Its applicability to the 261027 test is checked apart and is `APPLICABILITY_NOT_VERIFIED`.
+
+R1: all FE models are M11 models of the M11 plate; none is a confirmed model of this specimen.
 
 | Member | Content | Files (SHA-256 verified) | Elastic modes, Hz |
 |---|---|---|---|
@@ -157,15 +161,15 @@ verdicts (SYNTHETIC_GATE):
 **Now: no.** Every parameter is **NOT_IDENTIFIABLE**:
 
 - there is no confirmed pair, because there is no registration;
-- the plate identity is NOT_ESTABLISHED, and this plate has no own FE model;
-- this plate has no thickness or mass record;
+- R1: the plate identity was NOT_ESTABLISHED; R2: HUMAN_CONFIRMED, and the M11 model is the initial model, its applicability to the 261027 test NOT_VERIFIED (§12.3);
+- R1: no thickness or mass record; R2: the archived M11 record is attached, with the thickness only at the perimeter (§12.2);
 - family consistency is NOT_AVAILABLE for one plate, which blocks PRODUCTION verdicts (D-044).
 
 A research estimate would be a RESEARCH_CANDIDATE_ONLY with its assumptions, never a material constant.
 
 **Real uncertainty: unknown.** The real uncertainty of the plate's effective properties is not known today:
 - there is no registration and no confirmed pair;
-- there is no thickness or mass record of this plate;
+- the thickness is known only at the perimeter (R2: archived record, §12.2);
 - Σ_meas is NOT_AVAILABLE;
 - the suspension and the model form are not assessed.
 
@@ -180,7 +184,7 @@ E_eff = 12(1 − ν12ν21)·D/h³, so the thickness alone contributes 3·cv_h:
 | 2 % | 6 % |
 | 3.3 % | **10 %** |
 | 5 % | 15 % |
-| 8.2 % (the M11 edge readings of another plate, illustrative only) | 24 % |
+| 8.2 % (the 20 archived perimeter readings; R1: another plate, R2: this specimen) | 24 % |
 
 - **D.** About ±10 % may become reachable once pairs are confirmed and the suspension and model form hold. This is
   not shown yet.
@@ -293,6 +297,207 @@ package. The originals were only copied; they are unchanged.
 3. **The FE manifest copy changed after Run, before Export.** "The report was not written (… changed since it was
    read …)"; the earlier reports are byte-identical.
 4. **Inspect again of the same paths.** The result and its export status are gone.
+5. **Close.** No task left.
+
+## 12. PLATE-ONLY-R2 — the confirmed specimen, its archived record, the initial FE model and the orientation (2026-10-30)
+
+Research only, non-normative. No SPEC, decision, status, evidence, frozen record, registration or criterion changed.
+No Abaqus, FE computation, LM, Auto-ID or iterative calibration was run. Every material parameter stays
+NOT_IDENTIFIABLE.
+
+### 12.1 Specimen identity: HUMAN_CONFIRMED
+
+| Item | Content |
+|---|---|
+| Statement | The physical plate of the experimental series 261016 (M11) and 261027 ROTATED is one and the same specimen |
+| By, date | the owner, 2026-10-30 |
+| Provenance | the owner's supplement to the PLATE-ONLY-R2 task. This is a HUMAN record, not governed evidence |
+| Scope | physical identity of the specimen only. The 2026-10-18 retry FRF file of the delivery is not named in the statement and is not used |
+| Not established by it | a mode pair or a mode correspondence between the sessions or with the FE model; the registration of either scan; the applicability of the M11 FE model to the 261027 test; that the plate was unchanged between the archived measurements and 27.10 |
+
+The confirmation is final; no further confirmation of the identity is requested. The M11 file 261016 stays history
+as an experimental source: it never replaces the 261027 working source.
+
+In the service: `PLATE_IDENTITY = HUMAN_CONFIRMED`, `IDENTITY_RECORD`, `IDENTITY_EVIDENCE`. The R1 request for an
+identity statement (`IDENTITY_NEEDED`) is removed.
+
+### 12.2 The archived record of the specimen
+
+The M11 measurements now belong to this specimen. They keep their date, method and uncertainty. They are **not**
+measurements of 27.10.2026; the plate is taken as unchanged since then, which is not verified.
+
+| Quantity | Value | Recorded | Method | Uncertainty |
+|---|---|---|---|---|
+| Mass | 118.37 g | by 2026-10-21 (owner's sheet, M11 §8; day not stated); before the 261027 session | scale; instrument not stated | not stated; record resolution 0.01 g |
+| Plan | 301 × 300 mm (x × y; FE X = 301 mm) | as above | instrument not stated (M11 §13.6) | not stated; record resolution 1 mm |
+| Thickness | 20 perimeter readings, 5 per edge, 0.71–0.94 mm; mean 0.876, spatial sd 0.071 mm (cv 8.2 %); edge means 1: 0.880, 2: 0.816, 3: 0.882, 4: 0.926 mm | as above | caliper of 0.01 mm resolution and an electronic caliper (M11 §8.1); about 4.5–6.5 mm from the edge; **the interior is not measured** | gauge uncertainty not stated; spatial scatter as given (D-052: not divided by √N) |
+| Areal mass | 1.3109 kg/m² | derived | mass / (x · y) | from the records above |
+
+- **Edge labels.** Edges 1 top, 2 right, 3 bottom and 4 left are seen from the shaker side of the 261016 mounting
+  (M11 §13.1).
+- **Sheet photograph.** SHA-256 `df5339cd…`; the photograph is in the work directory only.
+
+### 12.3 The initial FE model and its applicability to the 261027 test
+
+The M11 S4R model (`S4R_0875_BASELINE`) is the **initial FE model of the same specimen**
+(`INITIAL_FE_MODEL_OF_THE_SPECIMEN`). Its controlled variants and the other three models are models of the same
+specimen too. The applicability check (`fe_applicability`) states `APPLICABILITY_NOT_VERIFIED`. A value is called
+consistent only within the record's resolution; no new criterion is used.
+
+| Aspect | State | FE model | Specimen / test |
+|---|---|---|---|
+| Plan | CONSISTENT_WITH_THE_RECORD | 301 × 300 | 301 × 300 mm |
+| Mass | CONSISTENT_WITH_THE_RECORD | 118.36 g (ρ·h·A; ρ was set from this mass) | 118.37 g |
+| Thickness | NOT_VERIFIED | uniform 0.875 mm | perimeter mean 0.876 mm, cv 8.2 %, edge means 0.816–0.926 mm; interior unknown |
+| Material axes | NOT_VERIFIED | one orthotropic material on the global axes | fibre and weave directions not evidenced (SPEC v1.1 §5.2) |
+| Suspension | NOT_VERIFIED | free-free | rubber bands and strings at two upper points along the nodal line of the first mode. The auxiliary FRF has peaks at 3.44, 10.31 and 12.5 Hz (PROVISIONAL, probably the suspension); the highest is 0.67 of record 1. SPEC §15 asks for a soft suspension; softness is not demonstrated |
+| Excitation | UNKNOWN | none | not stated in the lab note. SPEC §15 needs the shaker attachment mass in the model, or non-contact excitation |
+| Setup sensitivity | SETUP_SENSITIVE | — | §12.4: on the same plate the 261016 setup put the lowest twist-class record at 33.45 Hz, and the 261027 setup at 18.63 Hz |
+| Registration | PHYSICAL_REGISTRATION_NOT_VERIFIED | FE X = 301 mm edge, +Z shell normal | §12.5 |
+| Mode correspondence | NOT_ESTABLISHED | 19.07 Hz (first elastic FE mode) | 18.6307 Hz (record 1): +2.4 %. Proximity and a common shape class are **not** a mode pair |
+
+**Consequence.** The model is the right starting point: its geometry and mass are the specimen's. It is not yet
+shown to represent the 261027 test. That needs:
+- the excitation of 261027;
+- an FE variant with the two-point suspension, and the attachment if a shaker was used. This is an Abaqus job and
+  needs a separate HUMAN gate.
+
+### 12.4 Shapes of the two sessions of the same plate (descriptive)
+
+`grid_saddle_split` (new, descriptive) splits the saddle fraction about each scan's **own grid**:
+- uv has its nodal lines along the grid axes;
+- u² − v² has them along the grid diagonals.
+
+It relates a shape to its measurement grid only. It does not relate it to the plate edges or the FE axes, chooses no
+orientation and pairs nothing. The grid lies at 45.2° in the 261027 camera frame and at 89.4° in the 261016 frame.
+
+| Session | Record | Hz | MPC | Saddle uv | Saddle u² − v² | Dome |
+|---|---|---|---|---|---|---|
+| 261027 | 1 | 18.6307 | 0.918 | **0.988** | 0.000 | 0.000 |
+| 261027 | 2 | 54.6193 | 0.987 | 0.000 | 0.541 | 0.427 |
+| 261027 | 3 | 63.4950 | 0.927 | 0.000 | 0.388 | 0.318 |
+| 261027 | 4 | 66.8467 | 0.903 | 0.000 | 0.172 | 0.240 |
+| 261016 | 1 | 33.4491 | 0.848 | **0.947** | 0.002 | 0.000 |
+| 261016 | 2 | 55.2538 | 0.876 | 0.011 | 0.804 | 0.155 |
+| 261016 | 3 | 68.1022 | 0.921 | 0.000 | 0.185 | 0.764 |
+
+The higher records of both sessions have almost no quadratic content: these fractions say nothing about them.
+
+**Observations.** These are descriptions, not pairs.
+
+1. **Record 1 in both sessions is a twist about the scan-grid axes.** On the same specimen it lies at 33.45 Hz with
+   four corner straps and an attached shaker stinger (261016, M11 §13.3), and at 18.63 Hz with the two-point
+   suspension (261027): a factor of 0.56. The lowest twist-class record is therefore strongly setup-sensitive.
+   - This is not a Σ_setup repeat (D-053): the protocol, suspension and grid differ.
+   - It does not show that 261027 is free-free.
+2. **Records 2–3 mix the same two quadratic patterns** (saddle on the grid diagonals, and dome) in different
+   proportions in the two sessions.
+   - 261027 records 2 and 3 are near one-direction bending (u² − v² ≈ dome).
+   - 261016 records 2 and 3 are near the saddle and the dome.
+   - This is the behaviour of the near-degenerate bending pair FE 8 / 9 (§6), whose shapes rotate with small changes.
+     Such records can enter an estimate only as one confirmed cluster term, never as two single rows.
+3. **Item 5 of R2.** The proximity of 18.6307 Hz and 19.07 Hz, and the common twist class, confirm no mode pair. No
+   registration and no MAC exist.
+
+### 12.5 Physical orientation: the chain scanner → plate → FE
+
+| Link | State | Known | Open |
+|---|---|---|---|
+| scanner (261027 ROTATED) → plate | PHYSICAL_REGISTRATION_NOT_VERIFIED | grid 17 × 17 at about 45° in the camera frame; the lab turned the plate 45° clockwise as viewed from the Polytec; distance 1.15 m; the Polytec node numbering changes with the rotation | the reference of the 45° turn; the face towards the Polytec; which numbered edge lies along each grid side; the scan-to-edge offsets (the delivery has no camera frame of the plate session) |
+| plate → FE (M11 model, same specimen) | PENDING (owner's choice A–D) | FE X = 301 mm, Y = 300 mm; edges 1–4, their thickness rows and the marked face (M11 §13.1); candidates A–D (M11 §14.2) | which of A–D (M11 §14.5), hence FE +Z against a physical face. Because the specimen is the same, this link is shared with M11 |
+| scanner (261016) → plate | HISTORY_ONLY | diagnostic reconstruction W301xH300 with three deviations not accepted (M11 §13.4) | not transferable: another session, grid and node numbering |
+
+- **No choice is made.** No orientation is chosen by MAC, frequency or shape.
+- **Candidates.** The two open links leave 8 maps of the 261027 scan axes into the FE axes (4 in-plane turns × 2
+  faces).
+- **Why the registration still matters for a balanced D.** The edge means of the same plate differ: 0.816 mm on
+  edge 2 and 0.926 mm on edge 4, about 13 %. With D ∝ h³ the plate is not physically symmetric. The near-degenerate
+  bending pair, and any later E1 ≠ E2, therefore depend on the registration.
+
+### 12.6 Preparation of the effective stiffnesses
+
+| Route | Needs | Status now |
+|---|---|---|
+| **D11 = D22 (balanced D), D66** | Frequencies of confirmed pairs and the areal mass, f² ∝ D / (ρh). No thickness | The areal mass is known (1.3109 kg/m², archived) and equals the initial model's (1.3108 kg/m²). Still missing: registration, confirmed pairs, the suspension check |
+| **E1, E2, G12 (equivalent homogeneous)** | D and h³: E = 12(1 − ν12ν21)·D / h³ (D-052) | `effective_moduli_from_d` is prepared and exact; it is applied to no value. With the 20 perimeter readings the thickness alone gives 3·cv = **24 %** in ln E / ln G12. The ±10 % engineering goal is not reachable for E / G on this thickness record; an interior thickness map is needed |
+
+- **The initial model's constants.** E 56 000, G12 5 000 MPa and h 0.875 mm give D11 = D22 = 3 134 N·mm and
+  D66 = 279.1 N·mm (`plate_d`). These are the **starting point** of a future authorised iteration, not measurements
+  or estimates.
+- **The uncertainty budget** (`specimen_budget`):
+  - thickness 24.5 % (perimeter scatter, interior unknown);
+  - mass: the scale uncertainty is not stated and is not invented;
+  - the statistical part, the setup and the model form are NOT_AVAILABLE until confirmed pairs exist.
+- **Unchanged from R1.** The conditional design-study figures of §7 are unchanged and stay conditional. The real
+  uncertainty of the effective properties is still **unknown**.
+- **Readiness** (`plate_readiness`): NOT_READY_FOR_IDENTIFICATION.
+  - The identity line is gone, and the archived record is present.
+  - A new line states APPLICABILITY_NOT_VERIFIED.
+  - Every outcome is NOT_IDENTIFIABLE. E / G name the perimeter-only thickness as the first reason.
+
+**Data still open** (none of it concerns the identity):
+1. For 261027: the face towards the Polytec and which numbered edge is at the top, for example a photograph of the
+   mounted plate from the Polytec side. Alternatively, confirmation that the 45° turn started from the 261016
+   mounting without turning the plate over.
+2. The owner's choice of picture A–D (M11 §14.5).
+3. The 261027 excitation: a shaker (point, stinger) or non-contact.
+4. The suspension points and band lengths, for an FE suspension variant.
+5. For E / G only: an interior thickness map.
+6. The scan-to-edge offsets: a camera frame of the plate session.
+
+### 12.7 Program, tests and checks
+
+**Service** (`src/services/plate_study.py`):
+- `IDENTITY_RECORD`, `SPECIMEN_RECORD`, `thickness_statistics`, `areal_mass_kg_m2`;
+- `fe_applicability`, `ORIENTATION_CHAIN` / `ORIENTATION_NOTES`, `grid_saddle_split` (also in each experimental
+  record);
+- `specimen_budget`, `effective_moduli_from_d`, `plate_d`;
+- the updated `plate_readiness`, `FE_LIMITS` and `ITERATION_PLAN`.
+- `request_iteration` still always refuses.
+
+**New GUI, Plate Study page.** It shows:
+- the identity, with its provenance and limits;
+- the archived record, with its date and the note "NOT new measurements of 27.10.2026";
+- the applicability table, with the state next to the aspect;
+- the orientation chain and its notes;
+- the uncertainty budget;
+- two descriptive grid columns in the experimental table.
+
+The labels read "initial FE model" instead of "candidate". The exported JSON (`plate-only-r2/study/v1`) and the
+Markdown carry the same sections.
+
+**Tests.** 39 in the two plate files; in R1-F1 there were 30.
+- `tests/test_plate_study.py::SpecimenR2Tests` (7):
+  - identity and provenance; nothing asks for the identity again;
+  - archived record with its date, method and uncertainty, never 27.10;
+  - FE applicability apart;
+  - 18.63 / 19.07 Hz never a pair;
+  - D needs the areal mass only and E / G the thickness;
+  - the grid split;
+  - open orientation.
+- `RealPlateTests`: record 1 of both sessions and the FE plan and mass on the real data.
+- `tests/test_plate_study_qt.py`: the page, the export and the visible State columns.
+
+The R1 assertion of identity NOT_ESTABLISHED is replaced by HUMAN_CONFIRMED, and the M11 file is still refused.
+
+**Full suite.** 3043 OK, 98 skipped; `test_g2_eigfreq_precision` (16) NOT_RUN: it reads `-work` data. The nine new tests fail on `45e0f7c`.
+
+**Windows smoke R2: PASS.** Conditions: Qt `windows`, 150 % (DPI 96 × DPR 1.5), isolated LOCALAPPDATA, isolated
+copies of the plate UNV, the M11 UNV and the FE package. The originals are unchanged.
+
+1. **Run plate study** (7.0 s):
+   - NOT_READY_FOR_IDENTIFICATION, FREQUENCY_ONLY, every frequency row "NOT a mode pair";
+   - identity HUMAN_CONFIRMED;
+   - archived record "by 2026-10-21", with the note "NOT new measurements of 27.10.2026";
+   - applicability: plan and mass consistent; thickness, axes and suspension NOT_VERIFIED; excitation UNKNOWN;
+     mode correspondence NOT_ESTABLISHED (+2.4 %);
+   - orientation open;
+   - every outcome NOT_IDENTIFIABLE; the gate is disabled.
+2. **Export.** JSON and Markdown with the R2 sections.
+3. **Window sizes.** No page scroll bar at 1366 × 768 or 900 × 680.
+   - Found and fixed in the smoke: the State and Value columns were pushed out of view by long texts. They now come
+     right after the first column, and the long texts are elided with a tooltip. A regression test was added.
+4. **M11 file as the experiment.** Refused.
 5. **Close.** No task left.
 
 ## Not changed

@@ -5,7 +5,9 @@ recorded when Inspect file read them. On a synthetic plate family (temporary fil
 source and the family members): the study shows every experimental record, the frequency-only table (never a pair),
 the FE sensitivities, the design studies and NOT_IDENTIFIABLE outcomes; the iteration gate stays disabled; a replaced
 file removes the result; the report is written only into the chosen folder. Another experimental file (for example
-the M11 session) is refused with the reason.
+the M11 session) is refused with the reason. PLATE-ONLY-R2: the page shows the confirmed specimen identity, the
+archived record with its date, the initial FE model's applicability (NOT_VERIFIED) and the open orientation chain, and
+the report states them.
 """
 
 from __future__ import annotations
@@ -252,6 +254,46 @@ class InputTraceabilityTests(_PlateWindow):
         self.assertFalse(self.panel.export_button.isEnabled())
         self.run_study()  # the unchanged files pass again
         self.assertIsNotNone(self.panel.view)
+
+    def test_the_page_shows_the_confirmed_specimen_and_the_open_checks(self):
+        # PLATE-ONLY-R2: identity HUMAN_CONFIRMED with its provenance; the archived record with its date (never a
+        # measurement of 27.10); the initial FE model's applicability NOT_VERIFIED; the orientation candidates open
+        self.read()
+        self.run_study()
+        view = self.panel.view
+        texts = " ".join(label.text() for label in self.panel.findChildren(type(self.panel.why)))
+        self.assertIn(f"Specimen identity: {ps.HUMAN_CONFIRMED}", texts)
+        self.assertNotIn("NOT_ESTABLISHED)", texts)
+        self.assertIn("NOT measurements of 27.10", texts)
+        self.assertIn("NOT new measurements of 27.10.2026", texts)
+        specimen = self.panel.tables["specimen"]
+        self.assertEqual(specimen.rowCount(), len(ps.SPECIMEN_RECORD))
+        self.assertTrue(all("2026-10-21" in specimen.item(r, 2).text() for r in range(3)))
+        self.assertLessEqual(specimen.columnWidth(1), 280)  # the value column never pushes the date out of view
+        applicability = self.panel.tables["applicability"]
+        states = {applicability.item(r, 0).text(): applicability.item(r, 1).text()
+                  for r in range(applicability.rowCount())}
+        self.assertEqual(states["suspension"], "NOT_VERIFIED")
+        self.assertEqual(states["mode correspondence"], "NOT_ESTABLISHED")
+        for key in ("applicability", "orientation"):  # the state is visible without scrolling the table (smoke R2)
+            table = self.panel.tables[key]
+            self.assertLessEqual(table.columnViewportPosition(1) + table.columnWidth(1), table.viewport().width(), key)
+        self.assertIn(ps.APPLICABILITY_NOT_VERIFIED, texts)
+        self.assertEqual(self.panel.tables["orientation"].rowCount(), len(ps.ORIENTATION_CHAIN))
+        self.assertIn("No orientation is chosen by MAC, frequency or shape", texts)
+        self.assertGreater(self.panel.tables["budget"].rowCount(), 0)
+        self.assertEqual(self.panel.tables["experiment"].columnCount(), 12)
+        self.assertEqual(view.record["plate_identity"], ps.HUMAN_CONFIRMED)
+        self.assertEqual(view.record["identity_record"]["date"], "2026-10-30")
+        self.assertEqual(view.record["fe_applicability"]["status"], ps.APPLICABILITY_NOT_VERIFIED)
+        self.assertEqual({o[1] for o in view.outcome_rows}, {ps.NOT_IDENTIFIABLE})
+        self.assertTrue(self.panel.export())
+        markdown = next(self.reports.glob("*.md")).read_text(encoding="utf-8")
+        for heading in (f"## Specimen identity: {ps.HUMAN_CONFIRMED}",
+                        "## Archived record of this specimen (not measurements of 27.10)",
+                        "## Applicability of the initial FE model to the 261027 test (NOT_VERIFIED)",
+                        "## Orientation chain (nothing chosen by MAC, frequency or shape)"):
+            self.assertIn(heading, markdown)
 
     def test_a_new_preview_equal_in_value_still_resets(self):
         self.read()

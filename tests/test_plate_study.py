@@ -10,7 +10,11 @@ and the verdicts, SYNTHETIC_GATE):
 - thickness at measured mass is exactly collinear with the common D scale (rank deficient);
 - an unverified registration refuses every verdict; one frequency cannot give two parameters;
 - the first experimental record and the first elastic FE mode are kept;
-- the M11 session never replaces the ROTATED working source, and no M11 measurement is attached to the new plate;
+- the M11 session never replaces the ROTATED working source as an experimental file;
+- PLATE-ONLY-R2: the specimen identity is HUMAN_CONFIRMED (owner, 2026-10-30) with its provenance and limits; the
+  archived M11 measurements are attached with their date, method and uncertainty (never as measurements of 27.10);
+  the initial FE model's applicability to the 261027 test is checked apart and NOT_VERIFIED; frequency proximity
+  (18.6307 / 19.07 Hz) never makes a pair; the orientation candidates stay open;
 - a research candidate carries its labels and assumptions; the iteration gate always refuses.
 
 With the read-only originals present (the work archive and the 2026-10-29 delivery), the real plate data are checked
@@ -220,10 +224,9 @@ class ExperimentAndSourceTests(unittest.TestCase):
         for sha in ("117c893bafbb" + "0" * 52, ps.AUXILIARY_FRF_SHA256, "f" * 64):
             with self.subTest(sha=sha[:12]), self.assertRaises(ps.PlateStudyRefusal):
                 ps.require_working_source(sha)
-        self.assertEqual(ps.PLATE_IDENTITY, "NOT_ESTABLISHED")
-        readiness = ps.plate_readiness(registration_verified=True, confirmed_pairs=("E1",))
-        self.assertTrue(any("NOT attached" in line for line in readiness.missing))
-        self.assertTrue(all(member.status == ps.CANDIDATE_FE_REFERENCE for member in ps.PLATE_FE_FAMILY))
+        # PLATE-ONLY-R2: the specimen is the same, but the M11 session stays history as an experimental file
+        self.assertEqual(ps.PLATE_IDENTITY, ps.HUMAN_CONFIRMED)
+        self.assertEqual(ps.classify_source("117c893bafbb" + "0" * 52), ps.HISTORY)
 
 
 class OutcomeAndGateTests(unittest.TestCase):
@@ -256,6 +259,135 @@ class OutcomeAndGateTests(unittest.TestCase):
         thickness = next(line for line in lines if line.source.startswith("thickness"))
         self.assertAlmostEqual(thickness.ln_sd, 0.09)  # D ∝ h³: a 3 % thickness cv is 9 % in E
         self.assertIsNone(next(line for line in lines if line.source.startswith("mass")).ln_sd)
+
+
+class SpecimenR2Tests(unittest.TestCase):
+    """PLATE-ONLY-R2: the owner's confirmation of the specimen identity (2026-10-30) and what follows from it."""
+
+    def test_the_identity_is_human_confirmed_with_its_provenance_and_limits(self):
+        record = ps.IDENTITY_RECORD
+        self.assertEqual((ps.PLATE_IDENTITY, record["status"], record["by"], record["date"]),
+                         (ps.HUMAN_CONFIRMED, ps.HUMAN_CONFIRMED, "owner", "2026-10-30"))
+        self.assertIn("261016", record["statement"])
+        self.assertIn("261027", record["statement"])
+        self.assertFalse(record["governed_evidence"])
+        limits = " ".join(record["does_not_establish"])
+        for item in ("mode pair", "registration", "applicability", "unchanged"):
+            self.assertIn(item, limits)
+        self.assertTrue(ps.IDENTITY_EVIDENCE[0][2].startswith(ps.HUMAN_CONFIRMED))
+        # the identity is final: nothing asks for it again
+        self.assertFalse(hasattr(ps, "IDENTITY_NEEDED"))
+        readiness = ps.plate_readiness(registration_verified=False)
+        self.assertFalse(any("identity" in line for line in readiness.missing))
+        self.assertFalse(any("identity with the M11" in line or "statement" in line for line in ps.ITERATION_PLAN))
+        self.assertTrue(any("identity of the plate" in line for line in ps.plate_readiness(
+            False, plate_identity="NOT_ESTABLISHED").missing))
+
+    def test_the_archived_measurements_keep_their_date_method_and_uncertainty(self):
+        by = {m.quantity: m for m in ps.SPECIMEN_RECORD}
+        self.assertEqual(set(by), {"mass", "plan", "thickness", "areal mass"})
+        for quantity in ("mass", "plan", "thickness"):
+            with self.subTest(quantity=quantity):
+                self.assertIn("2026-10-21", by[quantity].recorded)
+                self.assertIn("before the 261027 session", by[quantity].recorded)
+                self.assertEqual(by[quantity].status, ps.ARCHIVED)
+                self.assertIn("not stated", by[quantity].uncertainty)
+        for item in ps.SPECIMEN_RECORD:
+            self.assertNotIn("27.10", item.recorded)  # never a measurement of the 27.10 session
+        self.assertIn("NOT new measurements of 27.10.2026", ps.SPECIMEN_RECORD_NOTE)
+        self.assertEqual(by["mass"].value, "118.37 g")
+        self.assertIn("0.01 mm", by["thickness"].method)
+        self.assertIn("interior is NOT measured", by["thickness"].method)
+        stats = ps.thickness_statistics()
+        self.assertEqual(stats["n"], 20)
+        self.assertAlmostEqual(stats["mean"], 0.876, places=6)
+        self.assertAlmostEqual(stats["cv"], 0.0815, delta=5e-4)
+        self.assertAlmostEqual(stats["side_means"][2], 0.816, places=6)
+        self.assertAlmostEqual(stats["side_means"][4], 0.926, places=6)
+        self.assertAlmostEqual(ps.areal_mass_kg_m2(), 1.31085, delta=5e-5)
+
+    def test_the_initial_fe_model_is_checked_apart_for_the_new_test(self):
+        self.assertTrue(all(member.status == ps.INITIAL_FE_MODEL for member in ps.PLATE_FE_FAMILY))
+        base = ps.PLATE_FE_FAMILY[0]
+        checks = {c.aspect: c for c in ps.fe_applicability(base, (301.0, 300.0), 18.6307, 19.072)}
+        self.assertEqual(checks["plan"].state, ps.CONSISTENT)
+        self.assertEqual(checks["mass"].state, ps.CONSISTENT)  # 118.36 g against 118.37 g (the record's last digit)
+        for aspect in ("thickness", "material axes", "suspension"):
+            self.assertEqual(checks[aspect].state, "NOT_VERIFIED", aspect)
+        self.assertEqual(checks["excitation"].state, "UNKNOWN")
+        self.assertEqual(checks["registration"].state, ps.NOT_VERIFIED)
+        self.assertIn("0.67 of record 1", checks["suspension"].note)
+        self.assertIn("not a Σ_setup repeat", checks["setup sensitivity (same specimen)"].note)
+        e30 = next(m for m in ps.PLATE_FE_FAMILY if m.member_id == "E30E26")
+        self.assertEqual({c.aspect: c.state for c in ps.fe_applicability(e30, (301.0, 300.0))}["mass"], "DIFFERS")
+        other = {c.aspect: c.state for c in ps.fe_applicability(base, (0.3, 0.3))}
+        self.assertEqual((other["plan"], other["mass"]), ("DIFFERS", "DIFFERS"))
+        self.assertEqual({c.aspect: c.state for c in ps.fe_applicability(base)}["plan"], "UNKNOWN")
+        readiness = ps.plate_readiness(registration_verified=False)
+        self.assertTrue(any(line.startswith(ps.APPLICABILITY_NOT_VERIFIED) for line in readiness.missing))
+        verified = ps.plate_readiness(registration_verified=False, fe_applicability_verified=True)
+        self.assertFalse(any(line.startswith(ps.APPLICABILITY_NOT_VERIFIED) for line in verified.missing))
+
+    def test_the_proximity_of_18_63_and_19_07_hz_never_makes_a_mode_pair(self):
+        checks = {c.aspect: c for c in ps.fe_applicability(ps.PLATE_FE_FAMILY[0], (301.0, 300.0), 18.6307, 19.072)}
+        correspondence = checks["mode correspondence"]
+        self.assertEqual(correspondence.state, "NOT_ESTABLISHED")
+        self.assertIn("NOT a mode pair", correspondence.note)
+        self.assertIn("+2.4 %", correspondence.note)
+        readiness = ps.plate_readiness(registration_verified=False)
+        self.assertEqual(readiness.confirmed_pairs, ())
+        self.assertTrue(any("18.6307 Hz and 19.07 Hz confirms none" in line for line in readiness.missing))
+        self.assertEqual({o.outcome for o in readiness.outcomes}, {ps.NOT_IDENTIFIABLE})
+
+    def test_e_and_g_need_the_interior_thickness_while_d_needs_the_areal_mass_only(self):
+        outcomes = {o.parameter: o for o in ps.plate_readiness(registration_verified=False).outcomes}
+        moduli = outcomes["E1_eff, E2_eff, G12_eff"].reasons[0]
+        self.assertIn("perimeter", moduli)
+        self.assertIn("24 %", moduli)
+        self.assertNotIn("perimeter", " ".join(outcomes["D66"].reasons))
+        measured = {o.parameter: o for o in ps.plate_readiness(False, interior_thickness_measured=True).outcomes}
+        self.assertNotIn("perimeter", measured["E1_eff, E2_eff, G12_eff"].reasons[0])
+        budget = {line.source.split(" ")[0]: line for line in ps.specimen_budget()}
+        self.assertAlmostEqual(budget["thickness"].ln_sd, 3 * ps.thickness_statistics()["cv"], places=12)
+        self.assertIsNone(budget["mass"].ln_sd)  # the scale uncertainty is not stated: never invented (D-052)
+        self.assertIn("needs no thickness", budget["mass"].note)
+        self.assertIsNone(ps.plate_d(ps.PLATE_FE_FAMILY[5].parameters))  # the wedge: no uniform thickness
+        for member in ps.PLATE_FE_FAMILY[:5]:
+            with self.subTest(member=member.member_id):
+                d = ps.plate_d(member.parameters)
+                e = ps.effective_moduli_from_d(d["D11"], d["D22"], d["D66"], member.parameters["h"],
+                                               member.parameters["nu12"])
+                for name in ("E1", "E2", "G12"):
+                    self.assertAlmostEqual(e[name] / member.parameters[name], 1.0, places=12)
+
+    def test_the_grid_saddle_split_relates_a_shape_to_its_own_grid_only(self):
+        u, v = np.meshgrid(np.linspace(-1, 1, 17), np.linspace(-1, 1, 17))
+        twist = (u * v).ravel()
+        angle = math.radians(45)
+        grid = np.column_stack([u.ravel(), v.ravel()]) @ np.array([[math.cos(angle), math.sin(angle)],
+                                                                   [-math.sin(angle), math.cos(angle)]])
+        coordinates = np.column_stack([grid, np.zeros(len(grid))])
+        on_axes, on_diagonals = ps.grid_saddle_split(coordinates, twist, 45.0)
+        self.assertGreater(on_axes, 0.999)
+        self.assertLess(on_diagonals, 1e-6)
+        swapped = ps.grid_saddle_split(coordinates, twist, 0.0)  # the same shape in the camera axes
+        self.assertGreater(swapped[1], 0.999)
+        self.assertAlmostEqual(sum(swapped), ps.shape_invariants(coordinates, twist)[1], places=9)
+        record = ps.experimental_summary(plate_dataset(**BASE), "0" * 64).records[0]
+        self.assertIsNotNone(record.saddle_on_grid_axes)
+        self.assertAlmostEqual(record.saddle_on_grid_axes + record.saddle_on_grid_diagonals, record.saddle_fraction,
+                               places=9)
+
+    def test_the_orientation_chain_keeps_every_candidate_open(self):
+        states = [link.state for link in ps.ORIENTATION_CHAIN]
+        self.assertEqual(states[0], ps.NOT_VERIFIED)
+        self.assertTrue(states[1].startswith("PENDING"))
+        self.assertEqual(states[2], "HISTORY_ONLY")
+        notes = " ".join(ps.ORIENTATION_NOTES)
+        self.assertIn("No orientation is chosen by MAC, frequency or shape", notes)
+        self.assertIn("none is chosen", notes)
+        self.assertIn("edge 2", notes)
+        self.assertIn("not a mode pair", ps.fe_applicability(ps.PLATE_FE_FAMILY[0])[-2].note)
 
 
 class FileTests(unittest.TestCase):
@@ -304,6 +436,28 @@ class RealPlateTests(unittest.TestCase):
         for member in ps.PLATE_FE_FAMILY:
             with self.subTest(member=member.member_id):
                 self.assertEqual({c.state for c in ps.verify_member(member)}, {"VERIFIED"})
+
+    def test_record_1_of_both_sessions_of_the_same_specimen(self):
+        # PLATE-ONLY-R2 research, reproduced: the twist class about each scan grid (descriptive; not a pair)
+        from new_gui import preview_model as pm
+        from new_gui import workspace_state as ws
+
+        m11 = (ps.WORK_ROOT / "external_models/v3_20261021/Plate/snadwich_Plate"
+               / "300by300_plate_only_1mm_261016_POLYMAX.unv")
+        if not m11.is_file():
+            self.skipTest("the verified M11 copy is not here")
+        for key, path in (("261027", DELIVERY.joinpath(*Path(ps.WORKING_SOURCE.replace("\\", "/")).parts)),
+                          ("261016", m11)):
+            with self.subTest(session=key):
+                read = pm.run_read(ws.EXPERIMENTAL, path, 1, threading.Event())
+                first = ps.experimental_summary(read.preview.sets[0].dataset, read.identity["sha256"]).records[0]
+                hz, uv = ps.SESSION_TWIST[key]
+                self.assertAlmostEqual(first.frequency_hz, hz, places=3)
+                self.assertAlmostEqual(first.saddle_on_grid_axes, uv, delta=1e-3)
+        manifest = ps.WORK_ROOT.joinpath(*Path(ps.PLATE_FE_FAMILY[0].manifest.relative).parts)
+        fe = pm.read_preview(ws.FE, manifest, threading.Event()).dataset
+        checks = {c.aspect: c.state for c in ps.fe_applicability(ps.PLATE_FE_FAMILY[0], ps.fe_plan(fe))}
+        self.assertEqual((checks["plan"], checks["mass"]), (ps.CONSISTENT, ps.CONSISTENT))
 
 
 if __name__ == "__main__":

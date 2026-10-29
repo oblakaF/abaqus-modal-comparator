@@ -4,8 +4,8 @@ The page works on the files read in the Workspace and the identities recorded wh
 
 - the experimental file must be the plate's working source, recognised by its SHA-256 only
   (``services.plate_study.classify_source``); the M11 session and the auxiliary FRF file never replace it;
-- the FE file must be a member of the plate's FE family (``PLATE_FE_FAMILY``) by the SHA-256 of its manifest: a
-  CANDIDATE_FE_REFERENCE, never a confirmed model of this specimen.
+- the FE file must be a member of the plate's FE family (``PLATE_FE_FAMILY``) by the SHA-256 of its manifest: the
+  INITIAL FE model of this specimen (M11), whose applicability to the 261027 test is checked apart and NOT_VERIFIED.
 
 On the explicit command Run plate study the service computes, with the project's existing services: the experimental
 summary (every record), the frequency-only diagnostic (proximity only, never a pair), the archived registration check
@@ -26,9 +26,14 @@ PLATE-ONLY-R1-F1 — traceability of the inputs (the NEW-GUI.6-F1 checks):
   used; a changed file refuses the export and writes nothing, so a later content is never given the result of the
   content read earlier.
 
-Notation: measured experimental frequencies, FE frequencies of the candidate model, the HYPOTHETICAL distinguishability
+Notation: measured experimental frequencies, FE frequencies of the initial model, the HYPOTHETICAL distinguishability
 of parameters and its CONDITIONAL sd (provisional Σ_setup 0.3 %) are kept apart from the real uncertainty of the
 effective properties, which is UNKNOWN: no material parameter of this plate is identifiable now.
+
+PLATE-ONLY-R2 — the specimen (owner, 2026-10-30): the identity of the plate of 261016 (M11) and 261027 is
+HUMAN_CONFIRMED, so the page shows the archived M11 measurements as the record of this specimen (with their date,
+method and uncertainty; not measurements of 27.10), the applicability of the initial FE model to the 261027 test and
+the orientation chain. None of it is a mode pair, a registration or a material value.
 """
 
 from __future__ import annotations
@@ -64,7 +69,7 @@ CONDITIONAL_NOTE = (
     "HYPOTHETICAL distinguishability only: the sd values are CONDITIONAL — they assume that the listed terms were "
     "confirmed mode pairs and use the provisional Σ_setup 0.3 % (Σ_meas NOT_AVAILABLE). They are NOT the expected "
     "accuracy of the real experiment. The real uncertainty of the plate's effective properties is UNKNOWN (no "
-    "registration, no confirmed pair, no thickness or mass record of this plate, suspension and model form not "
+    "registration, no confirmed pair, thickness known only at the perimeter, suspension and model form not "
     "assessed). The ±10 % target is an engineering goal, not an achieved result. Every material parameter of this "
     "plate is NOT_IDENTIFIABLE now.")
 
@@ -147,6 +152,10 @@ class PlateStudyView:
     fe_source: Optional[Path] = None  # the FE manifest the study read
     experimental_source: Optional[Path] = None  # the experimental file the study read
     sources: Any = None  # {"fe", "experimental"}: the identities confirmed before the study
+    specimen_rows: tuple = ()  # PLATE-ONLY-R2: the archived record of this specimen
+    applicability_rows: tuple = ()  # the initial FE model against the record and the 261027 test
+    orientation_rows: tuple = ()  # scanner → plate → FE
+    budget_rows: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -226,10 +235,23 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
                                 "—" if study.sd_ln is None else ", ".join(f"{100 * v:.2f} %" for v in study.sd_ln),
                                 "; ".join(study.refusal_reasons) or "—"))
     readiness = ps.plate_readiness(registration_verified=False)
+    fe_elastic = ps.elastic_modes(fe_preview.dataset)
+    applicability = ps.fe_applicability(member, ps.fe_plan(fe_preview.dataset),
+                                        summary.records[0].frequency_hz if summary.records else None,
+                                        float(fe_elastic[0].frequency_hz) if fe_elastic else None)
+    budget = ps.specimen_budget()
     record = {
-        "schema": "plate-only-r1/study/v1", "created": datetime.now().isoformat(timespec="seconds"),
-        "labels": [ps.RESEARCH_ONLY, ps.CANDIDATE_FE_REFERENCE, ps.FREQUENCY_ONLY], "specimen": ps.SPECIMEN,
-        "series": ps.SERIES, "plate_identity": ps.PLATE_IDENTITY, "experimental_source": experimental_identity,
+        "schema": "plate-only-r2/study/v1", "created": datetime.now().isoformat(timespec="seconds"),
+        "labels": [ps.RESEARCH_ONLY, ps.INITIAL_FE_MODEL, ps.FREQUENCY_ONLY], "specimen": ps.SPECIMEN,
+        "series": ps.SERIES, "plate_identity": ps.PLATE_IDENTITY, "identity_record": ps.IDENTITY_RECORD,
+        "specimen_record": [m.__dict__ for m in ps.SPECIMEN_RECORD], "specimen_record_note": ps.SPECIMEN_RECORD_NOTE,
+        "fe_applicability": {"status": ps.APPLICABILITY_NOT_VERIFIED, "checks": [c.__dict__ for c in applicability]},
+        "orientation_chain": [o.__dict__ for o in ps.ORIENTATION_CHAIN],
+        "orientation_notes": list(ps.ORIENTATION_NOTES),
+        "uncertainty_budget": [line.__dict__ for line in budget],
+        "initial_model_d_n_mm": {"values": ps.plate_d(member.parameters),
+                                 "note": "the initial model's assumed constants, not an estimate"},
+        "experimental_source": experimental_identity,
         "fe_member": member.member_id, "fe_manifest": fe_identity, "registration": registration,
         "experiment": [r.__dict__ for r in summary.records], "frequency_only": diagnostic.to_dict(),
         "fe_family": [dict(zip(("member", "description", "status", "changed", "files"), r)) for r in family_rows],
@@ -238,7 +260,8 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
                            for r in design_rows],
         "design_studies_note": CONDITIONAL_NOTE,
         "frequencies": {"measured": "the experimental records of the working source (fitted dataset 55)",
-                        "fe": "the candidate FE model (CANDIDATE_FE_REFERENCE), not a model confirmed for this plate"},
+                        "fe": "the initial FE model of this specimen (M11); its applicability to the 261027 test is "
+                              "NOT_VERIFIED"},
         "real_uncertainty_of_effective_properties": "UNKNOWN",
         "engineering_target_10_percent": "an engineering goal, not an achieved result",
         "sources_confirmed_before_study": sources,
@@ -251,7 +274,8 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
         status=f"{ps.FREQUENCY_ONLY} / {readiness.status}", member=f"{member.member_id} ({member.status})",
         experimental_rows=tuple((str(r.position), str(r.mode), _f(r.frequency_hz), _f(r.mpc, 3),
                                  r.measured_components, str(r.points), _f(r.rigid_plane_fraction, 3),
-                                 _f(r.saddle_fraction, 3), _f(r.dome_fraction, 3), r.classification)
+                                 _f(r.saddle_fraction, 3), _f(r.dome_fraction, 3), r.classification,
+                                 _f(r.saddle_on_grid_axes, 3), _f(r.saddle_on_grid_diagonals, 3))
                                 for r in summary.records),
         geometry=(("Points", str(summary.point_count)),
                   ("Span (m)", " × ".join(f"{v:.4f}" for v in summary.span_m[:2])),
@@ -273,7 +297,13 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
         missing=readiness.missing, identity=tuple((a, b, c) for a, b, c in ps.IDENTITY_EVIDENCE),
         limits=tuple(ps.FE_LIMITS) + tuple(summary.limits), plan=tuple(ps.ITERATION_PLAN), record=record,
         fe_source=Path(fe_preview.manifest_path), experimental_source=Path(experimental_preview.source_path),
-        sources=sources)
+        sources=sources,
+        specimen_rows=tuple((m.quantity, m.value, m.recorded, m.method, m.uncertainty, m.status)
+                            for m in ps.SPECIMEN_RECORD),
+        applicability_rows=tuple((c.aspect, c.state, c.fe, c.test, c.note) for c in applicability),
+        orientation_rows=tuple((o.link, o.state, o.known, o.open) for o in ps.ORIENTATION_CHAIN),
+        budget_rows=tuple((line.source, "—" if line.ln_sd is None else f"{100 * line.ln_sd:.1f} %", line.note)
+                          for line in budget))
 
 
 def run_study(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index: int, token: int,
@@ -314,7 +344,20 @@ def export_report(view: PlateStudyView, folder) -> tuple:
     view.record["sources_confirmed_at_export"] = {"fe": confirmed[0], "experimental": confirmed[1]}
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     lines = [f"# {TITLE}", "", f"Status: **{view.status}** — RESEARCH_ONLY; no material value.", "",
-             f"FE member: {view.member}", "", f"Registration: {view.registration}", "", "## Experimental records", "",
+             f"FE member: {view.member}", "", f"Registration: {view.registration}", "",
+             f"## Specimen identity: {view.record.get('plate_identity')}", ""]
+    lines += [f"- {a}: {b} ({c})" for a, b, c in view.identity]
+    lines += ["", "## Archived record of this specimen (not measurements of 27.10)", "",
+              view.record.get("specimen_record_note", ""), "", "| Quantity | Value | Recorded | Method | Uncertainty |",
+              "|---|---|---|---|---|"]
+    lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} |" for r in view.specimen_rows]
+    lines += ["", "## Applicability of the initial FE model to the 261027 test (NOT_VERIFIED)", "",
+              "| Aspect | State | FE model | Specimen / test | Note |", "|---|---|---|---|---|"]
+    lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} |" for r in view.applicability_rows]
+    lines += ["", "## Orientation chain (nothing chosen by MAC, frequency or shape)", "",
+              "| Link | State | Known | Open |", "|---|---|---|---|"]
+    lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} |" for r in view.orientation_rows]
+    lines += ["", "## Experimental records", "",
              "| Record | Mode | Measured Hz | MPC | Saddle | Dome |", "|---|---|---|---|---|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[7]} | {r[8]} |" for r in view.experimental_rows]
     lines += ["", "## Hypothetical distinguishability (conditional; not the real accuracy)", "", CONDITIONAL_NOTE,

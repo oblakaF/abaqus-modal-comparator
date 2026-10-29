@@ -7,6 +7,11 @@ FE branch sensitivities, the hypothetical design studies, every parameter's outc
 FE and experimental shapes are viewed independently (unpaired). The iterative estimation button is always disabled:
 it is not authorised. Export plate report... writes the study's JSON and Markdown into a folder the user chooses.
 No material value of any specimen is shown on this page.
+
+PLATE-ONLY-R2: the result also shows the specimen identity (HUMAN_CONFIRMED by the owner on 2026-10-30, with its
+provenance and limits), the archived record of this specimen (M11 measurements of 2026-10-21, never measurements of
+27.10), the applicability of the initial FE model to the 261027 test (NOT_VERIFIED), the orientation chain (nothing
+chosen) and the uncertainty budget with the archived record.
 """
 
 from __future__ import annotations
@@ -206,12 +211,12 @@ class PlateStudyPanel(QWidget):
                 widget.deleteLater()
         self.tables = {}
 
-    def _table(self, key, title, headers, rows, stretch, text_columns=()) -> None:
+    def _table(self, key, title, headers, rows, stretch, text_columns=(), capped=()) -> None:
         self.result_layout.addWidget(_label(title, "sectionTitle"))
         if not rows:
             self.result_layout.addWidget(_label("None.", "hint"))
             return
-        table = DiagnosticTable(headers, rows, stretch, (), text_columns)
+        table = DiagnosticTable(headers, rows, stretch, capped, text_columns)
         self.tables[key] = table
         self.result_layout.addWidget(table)
 
@@ -240,21 +245,36 @@ class PlateStudyPanel(QWidget):
         self._clear()
         self.result_card.setVisible(view is not None)
         if view is not None:
+            from services import plate_study as ps
+
             self.result_layout.addWidget(_label(f"FE package: {view.member}", ""))
             self.result_layout.addWidget(_label(f"Registration: {view.registration}", "warnings"))
+            self._table("identity", f"Specimen identity: {view.record.get('plate_identity')} (owner, 2026-10-30; "
+                        "physical identity only)", ("Evidence", "Content", "Weight"), view.identity, 1, (0, 1, 2))
+            self._table("specimen", "Archived record of this specimen (M11 measurements, 2026-10-21) — NOT "
+                        "measurements of 27.10", ("Quantity", "Value", "Recorded", "Method", "Uncertainty", "Status"),
+                        view.specimen_rows, 4, (0, 1, 2, 3, 4, 5), capped=(1, 2, 3, 5))
+            self.result_layout.addWidget(_label(view.record.get("specimen_record_note", ""), "hint"))
             self._table("experiment", "MEASURED experimental records (every record; descriptive invariants)",
                         ("Record", "Mode", "Measured Hz", "MPC", "Measured DOF", "Points", "Rigid plane", "Saddle",
-                         "Dome", "Classification"), view.experimental_rows, 9, (4, 9))
+                         "Dome", "Classification", "Saddle on grid axes (uv)", "Saddle on grid diagonals (u²−v²)"),
+                        view.experimental_rows, 9, (4, 9))
             self._table("geometry", "Scan geometry", ("Item", "Value"), view.geometry, 1)
-            self._table("frequency", "Measured frequencies against the CANDIDATE FE model's frequencies — the "
-                        "nearest FE frequency is NOT a mode pair (frequency only)",
-                        ("Exp mode", "Measured Hz", "Nearest candidate FE mode", "Candidate FE Hz",
+            self._table("frequency", "Measured frequencies against the INITIAL FE model's frequencies (M11, same "
+                        "specimen) — the nearest FE frequency is NOT a mode pair (frequency only)",
+                        ("Exp mode", "Measured Hz", "Nearest initial FE mode", "Initial FE Hz",
                          "Difference (%)", "MAC", "Note"), view.frequency_rows, 6, (5, 6))
-            self._table("family", "FE family of the plate (CANDIDATE_FE_REFERENCE; SHA-256 verified)",
+            self._table("applicability", f"Applicability of the initial FE model to the 261027 test: "
+                        f"{ps.APPLICABILITY_NOT_VERIFIED}", ("Aspect", "State", "FE model", "Specimen / test", "Note"),
+                        view.applicability_rows, 4, (0, 1, 2, 3, 4), capped=(2, 3))
+            self._table("orientation", "Orientation chain — nothing is chosen by MAC, frequency or shape",
+                        ("Link", "State", "Known", "Open"), view.orientation_rows, 3, (0, 1, 2, 3), capped=(0, 2))
+            self.result_layout.addWidget(_label("\n".join(f"• {line}" for line in ps.ORIENTATION_NOTES), "hint"))
+            self._table("family", "FE family of the specimen (INITIAL FE model and variants; SHA-256 verified)",
                         ("Member", "Description", "Status", "Changed", "Files"), view.family_rows, 4, (0, 1, 2, 4))
-            self._table("sensitivity", "Sensitivities of the CANDIDATE FE model's branches s = Δ ln f / Δ ln p "
+            self._table("sensitivity", "Sensitivities of the INITIAL FE model's branches s = Δ ln f / Δ ln p "
                         "(secants; FE-to-FE tracking)",
-                        ("Branch", "Candidate FE Hz", "s E1", "s E2", "s G12", "Cluster", "Tracking"),
+                        ("Branch", "Initial FE Hz", "s E1", "s E2", "s G12", "Cluster", "Tracking"),
                         view.sensitivity_rows, 6, (0, 5, 6))
             self._table("clusters", "Close FE pairs (3 % trigger; confirm_cluster)", ("Pair", "Status", "Reason"),
                         view.cluster_rows, 2, (0, 1, 2))
@@ -265,11 +285,10 @@ class PlateStudyPanel(QWidget):
             self.result_layout.addWidget(_label(psm.CONDITIONAL_NOTE, "warnings"))
             self._table("outcomes", "Parameter outcomes now", ("Parameter", "Outcome", "Reason"), view.outcome_rows,
                         2, (0, 1, 2))
+            self._table("budget", "Uncertainty budget of ln E / ln G12 with the archived record (no estimate exists)",
+                        ("Source", "ln sd", "Note"), view.budget_rows, 2, (0, 2))
             self.result_layout.addWidget(_label("Missing for an identification:\n" + "\n".join(
                 f"• {line}" for line in view.missing), "warnings"))
-            self._table("identity", "Is it the M11 plate? (identity NOT_ESTABLISHED)", ("Evidence", "Content",
-                                                                                      "Weight"), view.identity, 1,
-                        (0, 1, 2))
             self.result_layout.addWidget(_label("Plan before a first authorised iterative campaign:\n" + "\n".join(
                 view.plan), "hint"))
             self.result_layout.addWidget(_label("Limits:\n" + "\n".join(f"• {line}" for line in view.limits),

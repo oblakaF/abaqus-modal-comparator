@@ -8,16 +8,20 @@ without a separate authorisation (``request_iteration``).
 
 What the module does, each time with the project's existing services and rules (no new threshold):
 
-- **Sources.** The working source is identified by its SHA-256 (``classify_source``). The M11 session 261016 is
-  history only; that it is the same physical plate is not established (``PLATE_IDENTITY``), so no M11 measurement
-  (mass, plan, thickness) is attached to this plate.
+- **Sources.** The working source is identified by its SHA-256 (``classify_source``). The M11 session 261016 stays
+  history only as an experimental source: it never replaces the working source.
+- **Specimen (PLATE-ONLY-R2).** The owner confirmed on 2026-10-30 that the plate of the series 261016 (M11) and
+  261027 ROTATED is one and the same specimen (``PLATE_IDENTITY`` HUMAN_CONFIRMED, ``IDENTITY_RECORD``; physical
+  identity only). The archived M11 measurements of mass, plan and perimeter thickness are therefore attached to this
+  specimen with their date, method and uncertainty (``SPECIMEN_RECORD``); they are not measurements of 27.10.
 - **Experiment** (``experimental_summary``): every record of the fitted set, record 1 included; phase collinearity
   (``services.experimental_qc``), measured components, the scan geometry and descriptive shape invariants (rigid-plane
   fraction, saddle and dome curvature fractions, invariant under in-plane rotation). Close groups are the existing
   cluster triggers (3 %): a trigger only.
 - **FE family** (``PLATE_FE_FAMILY``): the M11 S4R model and its four controlled variants (R6.6 G12, R6.7 E1 / E2),
-  with the SHA-256 of INP, ODB and extraction, and three earlier models with frequencies only. All of them are
-  ``CANDIDATE_FE_REFERENCE``: a model of the M11 plate, not a confirmed model of this specimen.
+  with the SHA-256 of INP, ODB and extraction, and three earlier models with frequencies only. All of them model this
+  specimen (``INITIAL_FE_MODEL``): the S4R baseline is the initial model, but its applicability to the 261027 test
+  (suspension, excitation, registration) is checked separately (``fe_applicability``) and is NOT_VERIFIED.
 - **Comparison.** ``services.new_odb_comparison.frequency_only_diagnostic`` (frequency proximity only, never a mode
   pair) and ``bind_registration_by_fe_geometry`` (the archived registrations; no orientation is chosen by MAC or
   frequency). Without a verified registration the status is ``PHYSICAL_REGISTRATION_NOT_VERIFIED``.
@@ -38,6 +42,12 @@ What the module does, each time with the project's existing services and rules (
   NOT_IDENTIFIABLE otherwise, with the reasons.
 - **Uncertainty budget** (``uncertainty_budget``): the statistical part, thickness (D ∝ E·h³), mass, setup and
   model form kept separate; a frequency error of x % is not an x % parameter error.
+- **Orientation** (``ORIENTATION_CHAIN``): scanner → physical plate (261027, open) and physical plate → FE (shared
+  with M11 now that the specimen is the same; candidates A–D, open). No orientation is chosen by MAC, frequency or
+  shape. ``grid_saddle_split`` describes a shape relative to its own scan grid only.
+
+The proximity of record 1 (18.6307 Hz) and the first elastic FE mode (19.07 Hz), or their common twist class, never
+confirms a mode pair: no registration and no MAC exist.
 """
 
 from __future__ import annotations
@@ -55,7 +65,10 @@ RESEARCH_ONLY = "RESEARCH_ONLY"
 SURROGATE = "SURROGATE"
 HYPOTHETICAL_PAIRING = "HYPOTHETICAL_PAIRING"
 NOT_A_MATERIAL_PROPERTY = "NOT_A_MATERIAL_PROPERTY"
-CANDIDATE_FE_REFERENCE = "CANDIDATE_FE_REFERENCE"
+INITIAL_FE_MODEL = "INITIAL_FE_MODEL_OF_THE_SPECIMEN"  # M11 model of this specimen; applicability checked apart
+APPLICABILITY_NOT_VERIFIED = "APPLICABILITY_NOT_VERIFIED"
+HUMAN_CONFIRMED = "HUMAN_CONFIRMED"
+ARCHIVED = "ARCHIVED_RECORD_OF_THE_SAME_SPECIMEN"
 FREQUENCY_ONLY = "FREQUENCY_ONLY"
 NOT_VERIFIED = "PHYSICAL_REGISTRATION_NOT_VERIFIED"
 NOT_READY = "NOT_READY_FOR_IDENTIFICATION"
@@ -78,23 +91,94 @@ AUXILIARY = "AUXILIARY_FRF_CHECK_ONLY"
 HISTORY = "M11_HISTORY_ONLY"
 UNKNOWN_SOURCE = "NOT_A_PLATE_STUDY_SOURCE"
 
-PLATE_IDENTITY = "NOT_ESTABLISHED"
+# PLATE-ONLY-R2: the owner's statement of 2026-10-30 (a HUMAN record in non-normative documentation; not governed
+# evidence). It is final: no further confirmation of the identity is requested.
+PLATE_IDENTITY = HUMAN_CONFIRMED
+IDENTITY_RECORD = {
+    "status": HUMAN_CONFIRMED,
+    "statement": "The physical plate of the experimental series 261016 (M11) and 261027 ROTATED is one and the same "
+                 "specimen.",
+    "by": "owner", "date": "2026-10-30", "provenance": "the owner's supplement to PLATE-ONLY-R2 (2026-10-30)",
+    "scope": "physical identity of the specimen only; the 2026-10-18 retry FRF file of the delivery is not named "
+             "and is not used",
+    "does_not_establish": (
+        "a mode pair or a mode correspondence between the sessions or with the FE model",
+        "the physical registration of either scan",
+        "the applicability of the M11 FE model to the 261027 suspension, excitation and registration",
+        "that the plate was unchanged between the archived measurements and 27.10.2026"),
+    "governed_evidence": False,
+}
 IDENTITY_EVIDENCE = (
-    ("file names", "the 261016 and 261027 files carry the same plate description", "SUGGESTS, does not prove"),
+    ("owner statement 2026-10-30 (PLATE-ONLY-R2)", IDENTITY_RECORD["statement"],
+     f"{HUMAN_CONFIRMED}: physical identity only"),
+    ("file names", "the 261016 and 261027 files carry the same plate description", "consistent; not needed"),
     ("owner note 2026-10-25 (M11 §21)", "with a changed suspension the first resonance appeared near 19 Hz instead "
-     "of about 33 Hz", "information on the test conditions; not a statement of identity"),
+     "of about 33 Hz", "information on the test conditions"),
     ("frequencies", "several higher fitted frequencies are within about 1 % between the sessions",
-     "not evidence of physical identity (frequency proximity is never identity)"),
-    ("mass, plan, thickness of the tested plate", "not recorded for the 261027 session", "MISSING"),
-    ("marks, photographs, serial", "none for the 261027 session", "MISSING"),
+     "never evidence of identity or of a mode pair"),
+    ("not established by the identity", "; ".join(IDENTITY_RECORD["does_not_establish"]), "OPEN: checked apart"),
 )
-IDENTITY_NEEDED = (
-    "a lab or owner statement that the 261027 plate is the M11 plate (or not)",
-    "its mass, plan dimensions and a thickness map (9+ points, SPEC v1.1 §5 / §15) measured for this plate",
-    "a photograph of the mounted plate with a corner mark and the face shown to the scanner",
+
+# The archived measurements of this specimen (M11 §2, §8, §8.1): one owner's sheet, received 2026-10-21.
+MEASURED = "by 2026-10-21 (owner's sheet, M11 §8; day not stated); before the 261027 session"
+SPECIMEN_MASS_G = 118.37
+MASS_RESOLUTION_G = 0.01  # the last digit of the record (not an instrument uncertainty)
+SPECIMEN_PLAN_MM = (301.0, 300.0)  # x × y; FE X = the 301 mm edge (HUMAN, M11 §13.1)
+PLAN_RESOLUTION_MM = 1.0  # the last digit of the record
+THICKNESS_READINGS_MM = {  # rows = edges 1 top, 2 right, 3 bottom, 4 left, seen from the shaker side in 261016
+    1: (0.94, 0.92, 0.94, 0.89, 0.71), 2: (0.79, 0.82, 0.84, 0.81, 0.82), 3: (0.74, 0.89, 0.94, 0.92, 0.92),
+    4: (0.93, 0.94, 0.93, 0.92, 0.91)}
+SHEET_SHA256 = "df5339cd90fe8d114ad8c62c2e76c13bdb14c91c39d96ccac9b2a9b06bf1caaf"  # photograph, work directory only
+
+
+def thickness_statistics(readings: Mapping[int, Sequence[float]] = THICKNESS_READINGS_MM) -> dict:
+    """Mean, spatial sd (n − 1) and cv of the perimeter readings, and the side means (D-052: never divided by √N)."""
+    values = np.array([v for row in readings.values() for v in row], dtype=float)
+    sd = float(values.std(ddof=1))
+    return {"n": int(values.size), "mean": float(values.mean()), "sd": sd, "cv": sd / float(values.mean()),
+            "min": float(values.min()), "max": float(values.max()),
+            "side_means": {side: float(np.mean(row)) for side, row in readings.items()}}
+
+
+def areal_mass_kg_m2(mass_g: float = SPECIMEN_MASS_G, plan_mm: Sequence[float] = SPECIMEN_PLAN_MM) -> float:
+    return mass_g * 1e-3 / (plan_mm[0] * plan_mm[1] * 1e-6)
+
+
+@dataclass(frozen=True)
+class ArchivedMeasurement:
+    quantity: str
+    value: str
+    recorded: str
+    method: str
+    uncertainty: str
+    source: str
+    status: str = ARCHIVED
+
+
+_T = thickness_statistics()
+SPECIMEN_RECORD = (
+    ArchivedMeasurement("mass", f"{SPECIMEN_MASS_G:.2f} g", MEASURED, "scale; the instrument is not stated",
+                        f"not stated; the record's resolution is {MASS_RESOLUTION_G} g",
+                        f"M11 §2, §8 (sheet photograph SHA-256 {SHEET_SHA256[:12]}…)"),
+    ArchivedMeasurement("plan", f"{SPECIMEN_PLAN_MM[0]:.0f} × {SPECIMEN_PLAN_MM[1]:.0f} mm (x × y; FE X = 301 mm)",
+                        MEASURED, "the instrument is not stated (M11 §13.6)",
+                        f"not stated; the record's resolution is {PLAN_RESOLUTION_MM:.0f} mm", "M11 §2, §8, §13.1"),
+    ArchivedMeasurement(
+        "thickness", f"{_T['n']} perimeter readings, 5 per edge, {_T['min']:.2f}–{_T['max']:.2f} mm; mean "
+        f"{_T['mean']:.3f} mm, spatial sd {_T['sd']:.3f} mm (cv {100 * _T['cv']:.1f} %); edge means "
+        + ", ".join(f"{side}: {mean:.3f}" for side, mean in _T["side_means"].items()) + " mm",
+        MEASURED, "caliper of 0.01 mm resolution and an electronic caliper (owner, M11 §8.1); about 4.5–6.5 mm from "
+        "the edge, the low 0.71 / 0.74 about 0.5 mm from it; the interior is NOT measured",
+        "gauge uncertainty not stated; spatial scatter cv as given (D-052: not divided by √N)",
+        "M11 §8, §8.1, §13.1 (transcription plate_measurements_20261021.json)"),
+    ArchivedMeasurement("areal mass", f"{areal_mass_kg_m2():.4f} kg/m²", "derived from the mass and plan above",
+                        "mass / (x · y)", "from the mass and plan records (instrument uncertainties not stated)",
+                        "derived", "DERIVED_FROM_THE_ARCHIVED_RECORD"),
 )
-M11_MEASUREMENTS_NOT_ATTACHED = ("mass 118.37 g, plan 301 × 300 mm and 20 edge thickness readings (mean 0.876 mm) "
-                                 "belong to the M11 plate; they are NOT attached to PLATE-300x300x1mm")
+SPECIMEN_RECORD_NOTE = (
+    "Archived measurements of the same physical specimen (identity HUMAN_CONFIRMED by the owner on 2026-10-30), "
+    "recorded for the M11 session by 2026-10-21. They are NOT new measurements of 27.10.2026; the plate is taken as "
+    "unchanged since then, which is not verified.")
 
 
 def classify_source(sha256: str) -> str:
@@ -144,7 +228,7 @@ class FEMember:
     dat: Optional[FEFile] = None
     variant_of: Optional[str] = None  # the baseline member it differs from by one field
     changed: Optional[str] = None  # the changed parameter
-    status: str = CANDIDATE_FE_REFERENCE
+    status: str = INITIAL_FE_MODEL
 
 
 _S4R = {"E1": 56000.0, "E2": 56000.0, "E3": 8500.0, "nu12": 0.05, "nu13": 0.3, "nu23": 0.3, "G12": 5000.0,
@@ -202,11 +286,13 @@ PLATE_FE_FAMILY = (
              dat=FEFile(f"{_V3}/E30E26.dat", "e24129e25e44969e5c49f0354ee1281813bab883a7b88bfe2d2a6399cb4471f3")),
 )
 FE_LIMITS = (
-    "Every member models the M11 plate (plan 301 × 300, mass 118.36 g): a CANDIDATE_FE_REFERENCE for "
-    "PLATE-300x300x1mm, not a confirmed model of it (identity NOT_ESTABLISHED).",
+    "Every member models this specimen (the M11 plate; identity HUMAN_CONFIRMED on 2026-10-30): plan 301 × 300, "
+    "mass 118.36 g. The S4R baseline is the INITIAL FE model; its applicability to the 261027 test (suspension, "
+    "excitation, registration) is NOT_VERIFIED (fe_applicability).",
     "One homogeneous orthotropic material on global axes, no *Orientation: material axis 1 = FE X (301 mm). The "
     "fibre and weave directions of the real plate are not evidenced, so E1 / E2 are model directions.",
-    "Free-free without suspension, shaker or attachment; the test used rubber bands and strings at two points.",
+    "Free-free without suspension, shaker or attachment; the 261027 test used rubber bands and strings at two upper "
+    "points, and its excitation is not stated.",
     "INP → ODB: the records are consistent (job name, heading, timing, element type, eigenvalues), but mesh "
     "identity is not proven (M11 §15.5).",
 )
@@ -291,6 +377,8 @@ class ExperimentalRecord:
     saddle_fraction: float
     dome_fraction: float
     classification: str
+    saddle_on_grid_axes: Optional[float] = None  # uv: nodal lines along the scan-grid axes (grid_saddle_split)
+    saddle_on_grid_diagonals: Optional[float] = None  # u² − v²: nodal lines along the scan-grid diagonals
 
 
 @dataclass(frozen=True)
@@ -334,6 +422,24 @@ def shape_invariants(coordinates: np.ndarray, out_of_plane: np.ndarray) -> tuple
     return rigid, saddle, dome
 
 
+def grid_saddle_split(coordinates: np.ndarray, out_of_plane: np.ndarray, grid_angle_deg: float) -> tuple[float, float]:
+    """The saddle energy fractions about the shape's OWN scan grid: (uv, u² − v²) in the grid axes (u, v).
+
+    uv has its nodal lines along the grid axes, u² − v² along the grid diagonals; their sum is the saddle fraction of
+    ``shape_invariants``. It relates a shape to the measurement grid only: it relates nothing to the plate edges or the
+    FE axes, chooses no orientation and pairs nothing (PLATE-ONLY-R2, descriptive).
+    """
+    xy = np.asarray(coordinates, dtype=float)[:, :2]
+    xy = (xy - xy.mean(axis=0)) / max(np.ptp(xy, axis=0).max(), 1e-12)
+    angle = math.radians(grid_angle_deg)
+    uv = xy @ np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
+    u, v = uv[:, 0], uv[:, 1]
+    w = _aligned_real(out_of_plane)
+    q, _ = np.linalg.qr(np.column_stack([np.ones(len(u)), u, v, u * u - v * v, 2 * u * v, u * u + v * v]))
+    energy = float(w @ w) or 1.0
+    return float((q[:, 4] @ w) ** 2) / energy, float((q[:, 3] @ w) ** 2) / energy
+
+
 def _grid(coordinates: np.ndarray) -> tuple[float, float]:
     xy = np.asarray(coordinates, dtype=float)[:, :2]
     distances = np.linalg.norm(xy[:, None, :] - xy[None, :, :], axis=2)
@@ -351,19 +457,21 @@ def experimental_summary(dataset, source_sha256: str) -> ExperimentalSummary:
 
     modes = dataset.sorted_modes()
     fitted = "55" in str((dataset.metadata or {}).get("mode_source") or "")
+    coordinates = np.asarray(modes[0].coordinates, dtype=float)
+    centred = coordinates - coordinates.mean(axis=0)
+    normal = np.linalg.svd(centred, full_matrices=False)[2][2]
+    spacing, angle = _grid(coordinates)
     records = []
     for position, mode in enumerate(modes, start=1):
         vectors = np.asarray(mode.vectors)
         measured = [k for k in range(3) if np.any(np.abs(vectors[:, k]) > 0)]
         mpc = _phase_collinearity(vectors[:, measured]) if measured else None
         rigid, saddle, dome = shape_invariants(mode.coordinates, vectors[:, 2])
+        on_axes, on_diagonals = grid_saddle_split(mode.coordinates, vectors[:, 2], angle)
         records.append(ExperimentalRecord(position, int(mode.number), float(mode.frequency_hz), mpc,
                                           "".join("XYZ"[k] for k in measured), len(vectors), rigid, saddle, dome,
-                                          "FITTED (dataset 55)" if fitted else "PROVISIONAL FRF (dataset 58)"))
-    coordinates = np.asarray(modes[0].coordinates, dtype=float)
-    centred = coordinates - coordinates.mean(axis=0)
-    normal = np.linalg.svd(centred, full_matrices=False)[2][2]
-    spacing, angle = _grid(coordinates)
+                                          "FITTED (dataset 55)" if fitted else "PROVISIONAL FRF (dataset 58)",
+                                          on_axes, on_diagonals))
     triggers = cluster_triggers([TriggerRow(f"E{r.mode}", r.frequency_hz, r.frequency_hz) for r in records])
     return ExperimentalSummary(
         source_sha256=source_sha256, source_role=classify_source(source_sha256),
@@ -422,7 +530,7 @@ class SensitivityTable:
     rows: tuple
     clusters: tuple  # (row ids, status, reasons)
     basis: str = SECANT
-    labels: tuple = (RESEARCH_ONLY, CANDIDATE_FE_REFERENCE)
+    labels: tuple = (RESEARCH_ONLY, INITIAL_FE_MODEL)
 
     def matrix(self, parameters: Sequence[str], rows: Optional[Sequence[str]] = None) -> tuple:
         """(row ids, S) for rows with every parameter available."""
@@ -738,34 +846,41 @@ class Readiness:
 
 
 def plate_readiness(registration_verified: bool, confirmed_pairs: Sequence[str] = (),
-                    specimen_measurements: bool = False, plate_identity: str = PLATE_IDENTITY,
-                    material_axes_traceable: bool = False) -> Readiness:
+                    specimen_record: Optional[Sequence[ArchivedMeasurement]] = SPECIMEN_RECORD,
+                    plate_identity: str = PLATE_IDENTITY, material_axes_traceable: bool = False,
+                    fe_applicability_verified: bool = False, interior_thickness_measured: bool = False) -> Readiness:
     """Whether an identification of this plate could start, and each parameter's outcome now (no computation)."""
     missing = []
     if not registration_verified:
         missing.append(f"{NOT_VERIFIED}: the face scanned, the plate edge along each scanner axis and the reference of "
-                       "the 45° turn are needed (independent evidence, never MAC or frequency)")
+                       "the 45° turn are needed (independent evidence, never MAC, frequency or shape)")
     if not confirmed_pairs:
         missing.append("no confirmed experimental / FE mode pair (needs the registration, MAC ≥ 0.80 on measured DOFs, "
-                       "branch tracking)")
-    if not specimen_measurements:
-        missing.append("mass, plan and a thickness map (9+ points) of THIS plate; " + M11_MEASUREMENTS_NOT_ATTACHED)
-    if plate_identity != "ESTABLISHED":
-        missing.append("plate identity with the M11 FE model's plate NOT_ESTABLISHED: the FE family is a "
-                       "CANDIDATE_FE_REFERENCE")
-    missing.append("an FE model of this plate's own suspension (two strings at upper points) is not available; "
-                   "free-free is assumed in every FE member")
-    missing.append("Σ_meas NOT_AVAILABLE for PolyMAX (D-069); Σ_setup 0.3 % PROVISIONAL; no repeat of this panel")
+                       "branch tracking); the proximity of 18.6307 Hz and 19.07 Hz confirms none")
+    if plate_identity not in (HUMAN_CONFIRMED, "ESTABLISHED"):
+        missing.append("the identity of the plate with the M11 FE model's plate is not established")
+    quantities = {item.quantity for item in specimen_record or ()}
+    if not {"mass", "plan", "thickness"} <= quantities:
+        missing.append("mass, plan and thickness of this specimen are not recorded")
+    if not fe_applicability_verified:
+        missing.append(f"{APPLICABILITY_NOT_VERIFIED}: the initial FE model (M11, free-free) is not checked against "
+                       "the 261027 suspension (rubber bands and strings at two upper points) and excitation (not "
+                       "stated); an FE variant with the suspension is an Abaqus job (separate HUMAN gate)")
+    missing.append("Σ_meas NOT_AVAILABLE for PolyMAX (D-069); Σ_setup 0.3 % PROVISIONAL; no repeat of this panel "
+                   "under one protocol (261016 and 261027 differ in suspension and grid: not a D-053 repeat)")
     missing.append("family consistency NOT_AVAILABLE for a single plate (D-044 blocks PRODUCTION verdicts)")
     reasons = tuple(missing)
+    thickness = (() if interior_thickness_measured else (
+        f"E = 12 (1 − ν12 ν21) D / h³ (D-052): the thickness is known only at the perimeter ({_T['n']} archived "
+        f"readings, cv {100 * _T['cv']:.1f} % ⇒ about {300 * _T['cv']:.0f} % in ln E / ln G12 from the thickness "
+        "alone); the interior is not measured",))
     outcomes = [parameter_outcome(p, reasons=reasons) for p in ("D11=D22 (balanced D)", "D66")]
     outcomes.append(parameter_outcome("D11, D22 separately", reasons=(
         "E1 ≠ E2 MUST NOT be enabled without traceable warp / fill orientation (SPEC v1.1 §5.2)",) + reasons
         if not material_axes_traceable else reasons))
     outcomes.append(parameter_outcome("D12", reasons=("D12 only when the full system is FULL_RANK at rcond 1e-3 "
                                                       "(D-051); ν12 0.05 fixed otherwise",) + reasons))
-    outcomes.append(parameter_outcome("E1_eff, E2_eff, G12_eff", reasons=(
-        "E = 12 (1 − ν12 ν21) D / h³ needs the thickness of this plate (D-052)",) + reasons))
+    outcomes.append(parameter_outcome("E1_eff, E2_eff, G12_eff", reasons=thickness + reasons))
     status = NOT_READY if missing else "READY_FOR_AUTHORISATION"
     return Readiness(status, tuple(confirmed_pairs), reasons, tuple(outcomes))
 
@@ -779,7 +894,8 @@ class BudgetLine:
 
 def uncertainty_budget(statistical_sd_ln: Optional[float], thickness_cv: Optional[float],
                        mass_rel_sd: Optional[float] = None, setup_sd_ln: Optional[float] = None,
-                       model_form_half_range_ln: Optional[float] = None) -> tuple:
+                       model_form_half_range_ln: Optional[float] = None, thickness_note: str = "",
+                       mass_note: str = "") -> tuple:
     """Separate contributions to ln E_eff (or ln G12_eff) from a D estimate: E ∝ D / h³ at fixed ν (D-052).
 
     A frequency error of x % is not an x % stiffness error: f ∝ √D, so x % in f is about 2x % in D.
@@ -789,9 +905,9 @@ def uncertainty_budget(statistical_sd_ln: Optional[float], thickness_cv: Optiona
                         PROVISIONAL_SETUP),
              BudgetLine("thickness (D ∝ h³ ⇒ 3·cv_h; spatial sd, not divided by √N)",
                         None if thickness_cv is None else 3.0 * thickness_cv,
-                        "NOT_AVAILABLE: no thickness record of this plate" if thickness_cv is None else ""),
+                        thickness_note or ("NOT_AVAILABLE: no thickness record" if thickness_cv is None else "")),
              BudgetLine("mass (areal mass in the frequency: 1·σ_m)", mass_rel_sd,
-                        "NOT_AVAILABLE: no mass record of this plate" if mass_rel_sd is None else ""),
+                        mass_note or ("NOT_AVAILABLE: no mass record" if mass_rel_sd is None else "")),
              BudgetLine("experimental conditions (suspension, attachment)", setup_sd_ln,
                         "NOT_AVAILABLE: no repeat of this panel; Σ_setup 0.3 % is PROVISIONAL" if setup_sd_ln is None
                         else ""),
@@ -800,13 +916,177 @@ def uncertainty_budget(statistical_sd_ln: Optional[float], thickness_cv: Optiona
     return tuple(lines)
 
 
+def specimen_budget() -> tuple:
+    """The budget with the archived record of this specimen: the perimeter thickness scatter and the mass record."""
+    return uncertainty_budget(None, _T["cv"], thickness_note=(
+        f"{_T['n']} archived perimeter readings (2026-10-21), cv {100 * _T['cv']:.1f} %; the interior is not "
+        "measured, so the plate's thickness field is not known; gauge uncertainty not stated"), mass_note=(
+        f"archived mass {SPECIMEN_MASS_G} g (2026-10-21); the scale uncertainty is not stated (the record's "
+        f"resolution {MASS_RESOLUTION_G} g is {100 * MASS_RESOLUTION_G / SPECIMEN_MASS_G:.3f} %); a D estimate "
+        "uses the areal mass and needs no thickness"))
+
+
+def effective_moduli_from_d(d11: float, d22: float, d66: float, h: float, nu12: float) -> dict:
+    """E1, E2, G12 of the equivalent homogeneous plate from D11, D22, D66 (N·mm) and h (mm): the exact inverse of
+    D11 = E1 h³ / (12 (1 − ν12 ν21)), D22 = E2 h³ / (12 (1 − ν12 ν21)), D66 = G12 h³ / 12 with ν21 = ν12 E2 / E1.
+    Prepared for a later, authorised estimate; it is applied to no value here (D-052: h³ stays explicit)."""
+    a = nu12 * nu12 * d22 / d11  # ν12 ν21 (E2 / E1 = D22 / D11)
+    return {"E1": 12.0 * (1.0 - a) * d11 / h ** 3, "E2": 12.0 * (1.0 - a) * d22 / h ** 3,
+            "G12": 12.0 * d66 / h ** 3}
+
+
+def plate_d(parameters: Mapping[str, float]) -> Optional[dict]:
+    """D11, D22, D66 (N·mm) of an FE member's assumed constants (model inputs, not measurements or estimates); None
+    for a member without one uniform thickness."""
+    if not math.isfinite(parameters.get("h", float("nan"))):
+        return None
+    a = parameters["nu12"] ** 2 * parameters["E2"] / parameters["E1"]
+    h3 = parameters["h"] ** 3
+    return {"D11": parameters["E1"] * h3 / (12 * (1 - a)), "D22": parameters["E2"] * h3 / (12 * (1 - a)),
+            "D66": parameters["G12"] * h3 / 12}
+
+
+# ----------------------------------------------------------------------------- applicability and orientation (R2)
+
+CONSISTENT = "CONSISTENT_WITH_THE_RECORD"
+TEST_261027 = {
+    "rotation": "45° clockwise as viewed from the Polytec system (lab note); not an FE rotation",
+    "suspension": "rubber bands and strings at two upper points along the nodal line of the first mode (lab note); "
+                  "stiffness, lengths and exact points are not recorded",
+    "excitation": "not stated in the lab note (shaker attachment or non-contact excitation unknown)",
+    "low_frf_peaks_hz": (3.44, 10.31, 12.5),  # auxiliary FRF (PROVISIONAL), probably the suspension
+}
+TEST_261016 = "four corner straps and a shaker stinger near the bottom edge (HUMAN, M11 §13.3)"
+# PLATE-ONLY-R2 research (grid_saddle_split of record 1 in each session; review folder PLATE_ONLY_R2_REVIEW)
+SESSION_TWIST = {"261027": (18.6307, 0.988), "261016": (33.4491, 0.947)}
+
+
+@dataclass(frozen=True)
+class ApplicabilityCheck:
+    aspect: str
+    fe: str
+    test: str
+    state: str
+    note: str
+
+
+def fe_plan(dataset) -> tuple:
+    """The in-plane extent (x, y) of an FE dataset's geometry, in its own units."""
+    xy = np.asarray(dataset.sorted_modes()[0].coordinates, dtype=float)[:, :2]
+    return tuple(float(v) for v in np.ptp(xy, axis=0))
+
+
+def fe_applicability(member: FEMember, fe_plan_mm: Optional[Sequence[float]] = None,
+                     first_record_hz: Optional[float] = None, first_fe_hz: Optional[float] = None) -> tuple:
+    """The initial FE model against the archived record of this specimen and the 261027 test (no computation).
+
+    Only the record's resolution is used to call a value consistent; nothing here is a new criterion. The model is not
+    applicable to the 261027 test until the suspension, excitation and registration are checked.
+    """
+    p = member.parameters
+    h = p.get("h", float("nan"))
+    checks = []
+    if fe_plan_mm is None:
+        checks.append(ApplicabilityCheck("plan", "—", "301 × 300 mm", "UNKNOWN", "the FE geometry was not read"))
+    else:
+        plan = tuple(float(v) for v in fe_plan_mm[:2])
+        ok = all(abs(a - b) <= PLAN_RESOLUTION_MM for a, b in zip(plan, SPECIMEN_PLAN_MM))
+        checks.append(ApplicabilityCheck("plan", " × ".join(f"{v:g}" for v in plan) + " (FE units)",
+                                         "301 × 300 mm (archived)", CONSISTENT if ok else "DIFFERS",
+                                         f"within the record's resolution {PLAN_RESOLUTION_MM:.0f} mm" if ok else
+                                         "the FE plan is not the specimen's"))
+        if math.isfinite(h):
+            mass = p["rho"] * h * plan[0] * plan[1] * 1e6  # t/mm³ · mm · mm² → g
+            ok = abs(mass - SPECIMEN_MASS_G) <= MASS_RESOLUTION_G
+            checks.append(ApplicabilityCheck(
+                "mass", f"{mass:.2f} g (ρ·h·A)", f"{SPECIMEN_MASS_G} g (archived)", CONSISTENT if ok else "DIFFERS",
+                "the model's ρ was set from this mass at h 0.875 mm (M11 §2)" if ok else
+                f"{100 * (mass / SPECIMEN_MASS_G - 1):+.2f} % against the record"))
+    checks.append(ApplicabilityCheck(
+        "thickness", f"uniform {h:.3f} mm" if math.isfinite(h) else "nodal thickness",
+        f"perimeter mean {_T['mean']:.3f} mm, cv {100 * _T['cv']:.1f} %, edge means "
+        f"{min(_T['side_means'].values()):.3f}–{max(_T['side_means'].values()):.3f} mm", "NOT_VERIFIED",
+        "the interior is not measured; uniform thickness is an assumption (the wedge member is one alternative)"))
+    checks.append(ApplicabilityCheck("material axes", "one orthotropic material on the global axes",
+                                     "fibre and weave directions not evidenced", "NOT_VERIFIED",
+                                     "E1 ≠ E2 is blocked without traceable axes (SPEC v1.1 §5.2)"))
+    ratio = (f"; the highest is {max(TEST_261027['low_frf_peaks_hz']) / first_record_hz:.2f} of record 1"
+             if first_record_hz else "")
+    checks.append(ApplicabilityCheck(
+        "suspension", "free-free (no springs, masses or strings)", TEST_261027["suspension"], "NOT_VERIFIED",
+        "SPEC §15 asks for a soft suspension; the auxiliary FRF has peaks at "
+        + ", ".join(f"{v:g}" for v in TEST_261027["low_frf_peaks_hz"]) + " Hz (PROVISIONAL, probably the "
+        f"suspension){ratio}: softness is not demonstrated and the effect is not quantified"))
+    checks.append(ApplicabilityCheck("excitation", "none", TEST_261027["excitation"], "UNKNOWN",
+                                     "SPEC §15: the shaker attachment mass in the model, or non-contact excitation"))
+    (f27, uv27), (f16, uv16) = SESSION_TWIST["261027"], SESSION_TWIST["261016"]
+    checks.append(ApplicabilityCheck(
+        "setup sensitivity (same specimen)", "—", f"261016: {TEST_261016}; 261027: the two-point suspension",
+        "SETUP_SENSITIVE",
+        f"record 1 of both sessions is a twist about its scan-grid axes (uv fraction {uv27} at {f27} Hz and {uv16} at "
+        f"{f16} Hz): on the same plate the setup changed the lowest twist-class record by a factor {f27 / f16:.2f}. "
+        "Descriptive only: not a mode pair, not a Σ_setup repeat (D-053)"))
+    checks.append(ApplicabilityCheck(
+        "registration", "FE X = 301 mm edge, +Z shell normal", "scan rotated 45°; face and edges unknown",
+        NOT_VERIFIED, "scanner → plate (261027) open; plate → FE: candidates A–D, the owner's choice pending "
+        "(M11 §14.5); see the orientation chain"))
+    if first_record_hz and first_fe_hz:
+        checks.append(ApplicabilityCheck(
+            "mode correspondence", f"{first_fe_hz:.2f} Hz (first elastic FE mode)", f"{first_record_hz:.4f} Hz "
+            "(record 1)", "NOT_ESTABLISHED", f"{100 * (first_fe_hz / first_record_hz - 1):+.1f} %: frequency "
+            "proximity and a common shape class are NOT a mode pair (no registration, no MAC)"))
+    return tuple(checks)
+
+
+@dataclass(frozen=True)
+class OrientationLink:
+    link: str
+    known: str
+    open: str
+    state: str
+
+
+ORIENTATION_CHAIN = (
+    OrientationLink(
+        "scanner (261027 ROTATED) → physical plate",
+        "scan grid 17 × 17 at about 45° in the camera frame; the lab turned the plate 45° clockwise as viewed from the "
+        "Polytec; distance 1.15 m; the Polytec node numbering changes with the rotation (lab note)",
+        "the reference orientation of the 45° turn; the face towards the Polytec (marked or unmarked); which numbered "
+        "edge lies along each grid side; the scan-to-edge offsets (no camera frame of this plate in the delivery)",
+        NOT_VERIFIED),
+    OrientationLink(
+        "physical plate → FE model (M11, same specimen)",
+        "FE X = 301 mm edge, Y = 300 mm edge; edges 1–4 with their thickness rows and the marked face (HUMAN, "
+        "M11 §13.1); four candidates A–D of the FE axes (M11 §14.2)",
+        "which of A–D (one picture chosen by the owner, M11 §14.5), hence FE +Z against a physical face; this link "
+        "is shared with M11 because the specimen is the same",
+        "PENDING (owner's choice A–D)"),
+    OrientationLink(
+        "scanner (261016, M11) → physical plate",
+        "diagnostic reconstruction W301xH300 with three deviations not accepted (M11 §13.4, §14.3)",
+        "not transferable to 261027: another session, grid and node numbering", "HISTORY_ONLY"),
+)
+_EDGES = _T["side_means"]
+ORIENTATION_NOTES = (
+    "No orientation is chosen by MAC, frequency or shape; every candidate stays open until independent evidence "
+    "closes it.",
+    "Together the two open links leave 8 maps of the 261027 scan axes into the FE axes (the proper symmetries of a "
+    "square: 4 in-plane turns × 2 faces); none is chosen.",
+    f"Why it matters even for a balanced D: the edge means {min(_EDGES.values()):.3f} (edge "
+    f"{min(_EDGES, key=_EDGES.get)}) and {max(_EDGES.values()):.3f} mm (edge {max(_EDGES, key=_EDGES.get)}) differ by "
+    f"about {100 * (max(_EDGES.values()) / min(_EDGES.values()) - 1):.0f} %; with D ∝ h³ the plate is not physically "
+    "symmetric, so the near-degenerate bending pair and a later E1 ≠ E2 depend on the registration.",
+)
+
+
 ITERATION_PLAN = (
-    "1. Close the specimen record: mass, plan, thickness map (9+ points), photographs with a corner mark, and the "
-    "owner / lab statement of identity with the M11 plate (or a separate FE model of this plate).",
-    "2. Close the physical registration with independent evidence: face scanned, plate edge along each scanner axis, "
-    "reference of the 45° turn, scan scale; then the existing guided-registration service records it.",
-    "3. Build an FE model of THIS plate (measured plan, thickness and mass; free-free and, as a separate variant, the "
-    "two-string suspension) — an Abaqus job: separate HUMAN authorisation.",
+    "1. Specimen record: identity HUMAN_CONFIRMED (owner, 2026-10-30); the archived mass, plan and 20 perimeter "
+    "thickness readings (2026-10-21) are attached. Still open, for E / G only: an interior thickness map.",
+    "2. Close the physical registration with independent evidence: for 261027 the face towards the Polytec, the "
+    "numbered edge along each grid side (or the reference of the 45° turn) and the scan scale; for the FE side the "
+    "owner's picture A–D (M11 §14.5); then the existing guided-registration service records it.",
+    "3. Check the initial FE model against the 261027 test: the excitation, and an FE variant with the two-point "
+    "suspension (and a shaker attachment if one was used) — an Abaqus job: separate HUMAN authorisation.",
     "4. Run the existing comparator with the registration: confirmed pairs MAC ≥ 0.80 on measured DOFs, families, "
     "clusters; freeze the FIT / HOLDOUT rows before any fit.",
     "5. SPEC §6 S4 sensitivities: central ±5 % in ln p for D (balanced E1 = E2) and G12 (2·n_p = 4 jobs) and the "
@@ -814,7 +1094,7 @@ ITERATION_PLAN = (
     "6. Optional: the Stage-A affine basis (*MATRIX GENERATE, 4 jobs) for a balanced plate (D11 = D22) — Abaqus: "
     "separate HUMAN gate.",
     "7. Only then a declared campaign (question, τ_mf, Σ, bounds) and the bounded LM with branch tracking — LM / "
-    "campaign: separate HUMAN authorisation.",
+    "campaign: separate HUMAN authorisation. The D route needs the areal mass only; E / G add 3·cv_h (D-052).",
 )
 
 
@@ -834,10 +1114,12 @@ ITERATION_GATE = IterationGate()
 
 
 def request_iteration(authorisation: Optional[object] = None) -> None:
-    """Always refuses in PLATE-ONLY-R1: no real optimisation, FE solve or campaign is run (owner, PLATE-ONLY-R1 §7)."""
+    """Always refuses in PLATE-ONLY-R1 / R2: no real optimisation, FE solve or campaign is run (owner, PLATE-ONLY-R1
+    §7; PLATE-ONLY-R2 item 6)."""
     raise IterationNotAuthorised(
-        f"{ITERATION_NOT_AUTHORISED}: the iterative estimation needs {ITERATION_GATE.required}; PLATE-ONLY-R1 does not "
-        "run it" + ("" if authorisation is None else " (an authorisation object is not accepted in this stage)") + ".")
+        f"{ITERATION_NOT_AUTHORISED}: the iterative estimation needs {ITERATION_GATE.required}; PLATE-ONLY-R1 / R2 do "
+        "not run it" + ("" if authorisation is None else " (an authorisation object is not accepted in this stage)")
+        + ".")
 
 
 __all__ = [name for name in dir() if not name.startswith("_")]
