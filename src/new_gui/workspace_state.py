@@ -11,7 +11,8 @@ specimen label. It starts empty: no file, no specimen, no project, no registrati
   the reason. A cancelled dialog changes nothing.
 - **The label is only a label.** It is never looked up in the research archive: typing "SP-02" gives no archive
   record, modal-set status or registration.
-- **Nothing is computed.** No analysis is run here: no frequency, MAC or mode pair exists.
+- **Nothing is computed.** No analysis is run here: no frequency, MAC or mode pair exists. (NEW-GUI.4: the
+  frequency diagnostic is run only by its own command on the Analysis page, by ``new_gui.diagnostic_model``.)
 - **The research archive is separate.** It is read only on request, through ``services.specimen_catalog_view``. A
   missing or damaged archive gives a problem text, never an error that stops the program. Reading it changes no
   workspace value.
@@ -48,8 +49,8 @@ CHOSEN_NOT_CHECKED = "File chosen; content not checked"
 CHOSEN_NOTE = ("Only the file's existence and type were checked. Its content is read only when you click Inspect "
                "file, and choosing it is not a statement that the data are ready for analysis.")
 ANALYSIS_NOT_RUN = "Analysis not run"
-ANALYSIS_NOTE = ("This interface does not run an analysis yet. No frequency, MAC value or mode pair has been computed, "
-                 "and nothing is assigned automatically.")
+ANALYSIS_NOTE = ("No frequency, MAC value or mode pair has been computed. A frequency diagnostic runs only when you "
+                 "click Run frequency diagnostic, and nothing is assigned automatically.")
 EMPTY_TEXT = ("No data selected yet. Choose an FE results file and an experimental file to start. "
               "Nothing is loaded or analysed automatically.")
 LABEL_HINT = ("Optional. Your own name for this data. It is not looked up in the research archive, so it links the "

@@ -2,7 +2,8 @@
 
 A side navigation (Workspace, Analysis, Status), a workspace with the FE and experimental sources, clear empty
 states, and the research archive behind its own command. The window shows the state of
-``new_gui.workspace_state``; it runs no analysis and computes nothing.
+``new_gui.workspace_state`` and computes nothing itself: reading a file, drawing a shape and the frequency
+diagnostic are the existing services' work, and each runs only on the user's explicit command.
 
 NEW-GUI.2: **Inspect file** reads the chosen file of one side in a background thread
 (``new_gui.preview_model.run_read``) and shows the read content in that side's ``PreviewPanel``. Replacing or
@@ -12,6 +13,12 @@ file is discarded, never shown.
 NEW-GUI.3: below each content panel, a ``ShapePanel`` draws one chosen FE mode or experimental record of the read
 preview with the services' own drawing. It is reset whenever its preview goes (file replaced or cleared, Inspect
 again, window closed).
+
+NEW-GUI.4: the Analysis page holds a ``DiagnosticPanel``: once both files are read and the user has chosen an
+experimental modal set, the explicit command Run frequency diagnostic calls the existing frequency-only service in a
+background thread (FREQUENCY_ONLY_DIAGNOSTIC). Its nearest FE frequencies show frequency proximity only and are not
+established mode pairs; no physical registration, MAC or Auto-ID is run. A replaced or cleared file, Inspect again,
+another set or a closed window cancels it and discards its outcome.
 """
 
 from __future__ import annotations
@@ -29,11 +36,11 @@ from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFileDial
 
 from new_gui import APP_NAME, STAGE
 from new_gui.archive_dialog import ArchiveDialog
+from new_gui.diagnostic_panel import DiagnosticPanel
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
 from new_gui.shape_panel import ShapePanel
-from new_gui.workspace_state import (ANALYSIS_NOTE, ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE,
-                                     KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
+from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
                                      scientific_status)
 
 PAGES = ("Workspace", "Analysis", "Status")
@@ -253,6 +260,7 @@ class MainWindow(QMainWindow):
         self._build_menu()
         self.status_text = _label(f"{ANALYSIS_NOT_RUN} · Production Auto-ID {self.status_rows[0].value}", wrap=False)
         self.statusBar().addPermanentWidget(self.status_text)
+        self.diagnostic.changed.connect(self._analysis_changed)
         self.setMinimumSize(560, 420)
         self._fit_to_screen()
         self.show_page(0)
@@ -344,24 +352,11 @@ class MainWindow(QMainWindow):
         return page
 
     def _build_analysis_page(self) -> QWidget:
-        page, layout = self._page("Analysis", "The comparison of FE and experimental modes.")
-        card, inner = _card()
-        head = QHBoxLayout()
-        head.addWidget(_label("Result", "cardTitle"), 1)
-        head.addStretch(1)
-        self.analysis_badge = _label(ANALYSIS_NOT_RUN, "badge", wrap=False)
-        head.addWidget(self.analysis_badge)
-        inner.addLayout(head)
-        inner.addWidget(_label(ANALYSIS_NOTE))
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        for row, (caption, value) in enumerate((("Frequencies", "not computed"), ("MAC", "not computed"),
-                                                ("Mode pairs", "none"))):
-            grid.addWidget(_label(caption, wrap=False), row, 0)
-            grid.addWidget(_label(value, "hint"), row, 1)
-        grid.setColumnStretch(1, 1)
-        inner.addLayout(grid)
-        layout.addWidget(card)
+        page, layout = self._page("Analysis", "A frequency diagnostic of the read FE results and one experimental "
+                                              "modal set. No geometric registration, MAC or mode pairing.")
+        self.diagnostic = DiagnosticPanel()  # NEW-GUI.4
+        self.analysis_badge = self.diagnostic.badge
+        layout.addWidget(self.diagnostic)
         layout.addStretch(1)
         return page
 
@@ -482,8 +477,9 @@ class MainWindow(QMainWindow):
                 or any(thread.is_alive() for thread in self._threads))
 
     def busy(self) -> bool:
-        """A read or a shape drawing is still running."""
-        return self.reading() or any(panel.busy() for panel in self.shape_panels.values())
+        """A read, a shape drawing or the frequency diagnostic is still running."""
+        return (self.reading() or any(panel.busy() for panel in self.shape_panels.values())
+                or self.diagnostic.busy())
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
         """Process events until no read or drawing is running (tests and checks); returns whether all ended."""
@@ -499,7 +495,11 @@ class MainWindow(QMainWindow):
             slot.reset()
         for panel in self.shape_panels.values():  # and so are running drawings
             panel.cancel()
+        self.diagnostic.cancel()  # and the frequency diagnostic
         super().closeEvent(event)
+
+    def _analysis_changed(self) -> None:
+        self.status_text.setText(f"{self.diagnostic.status_text} · Production Auto-ID {self.status_rows[0].value}")
 
     def _label_changed(self, text: str) -> None:
         self.workspace = self.workspace.with_label(text)
@@ -520,8 +520,12 @@ class MainWindow(QMainWindow):
         return self.archive_dialog
 
     def _about(self) -> None:
-        QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n{STAGE}\n\nChoose your FE results and experimental data. "
-                                          "This preview runs no analysis.")
+        QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n{STAGE}\n\nChoose your FE results and experimental data, read "
+                                          "them with Inspect file and view single mode shapes. On the Analysis page, "
+                                          "Run frequency diagnostic compares the frequencies of one experimental "
+                                          "modal set with the FE frequencies, only when you click it. The nearest "
+                                          "FE frequencies are not established mode pairs. No physical registration, "
+                                          "MAC or Auto-ID is run.")
 
     # ---------------------------------------------------------------------------------------------- display
 
@@ -530,9 +534,13 @@ class MainWindow(QMainWindow):
         for kind, card in self.cards.items():
             card.show_state(self.workspace, self.messages[kind], self.slots[kind])
             self.panels[kind].show_slot(self.slots[kind], self.workspace.choice(kind).chosen)
-            slot = self.slots[kind]
-            self.shape_panels[kind].set_preview(slot.preview if slot.state == READ
-                                                and self.workspace.choice(kind).chosen else None)
+            self.shape_panels[kind].set_preview(self._read_preview(kind))
+        self.diagnostic.set_inputs(self._read_preview(FE), self._read_preview(EXPERIMENTAL))
+
+    def _read_preview(self, kind: str):
+        """The preview of the chosen file of ``kind`` when it was read, else None."""
+        slot = self.slots[kind]
+        return slot.preview if slot.state == READ and self.workspace.choice(kind).chosen else None
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
