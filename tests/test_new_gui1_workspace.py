@@ -329,7 +329,9 @@ class SeparationTests(unittest.TestCase):
                        # and the read-only loaders of the governed material records
                        "services.report_directory", "services.archived_sensitivity_evidence",
                        "services.modal_data_viewer", "domain.campaign_definition", "domain.forward_model_manifest",
-                       "domain.identification_run"}
+                       "domain.identification_run",
+                       # PLATE-ONLY-R1: the research plate study service (no fit, no FE solve)
+                       "services.plate_study"}
     # NEW-GUI.6: the scientific comparator and the program's own final drawing / report owners, each only in the one
     # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
     SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
@@ -342,7 +344,8 @@ class SeparationTests(unittest.TestCase):
                                                    "comparison_model.py", "comparison_panel.py",
                                                    "diagnostic_model.py", "diagnostic_panel.py", "known_sources.py",
                                                    "known_sources_dialog.py", "materials_model.py",
-                                                   "materials_panel.py", "preview_model.py", "preview_panel.py",
+                                                   "materials_panel.py", "plate_study_model.py",
+                                                   "plate_study_panel.py", "preview_model.py", "preview_panel.py",
                                                    "registration_check_model.py", "registration_check_panel.py",
                                                    "report_export.py", "shape_model.py", "shape_panel.py",
                                                    "window.py", "workspace_state.py"])

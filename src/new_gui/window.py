@@ -32,6 +32,10 @@ writes the result's report into a folder the user chooses. The frequency diagnos
 workbench. A Materials page shows the project's existing material records, read-only and classified, and File > Choose
 a known new experimental source... offers the three working sources of the provenance map (the path only; Inspect
 file still reads it).
+
+PLATE-ONLY-R1: a Plate Study page (``PlateStudyPanel``), the research study of one free-free CFRP plate's effective
+bending stiffness on the files read in the Workspace (the plate's working source and a member of its FE family, by
+SHA-256). It fits nothing, releases no material value and cannot start the iterative estimation (not authorised).
 """
 
 from __future__ import annotations
@@ -53,6 +57,7 @@ from new_gui.comparison_panel import WIDE_CONTENT, ComparisonPanel
 from new_gui.diagnostic_panel import DiagnosticPanel
 from new_gui.known_sources_dialog import KnownSourcesDialog
 from new_gui.materials_panel import SUBTITLE as MATERIALS_SUBTITLE, MaterialsPanel
+from new_gui.plate_study_panel import PlateStudyPanel
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
 from new_gui.registration_check_panel import RegistrationCheckPanel
@@ -60,8 +65,9 @@ from new_gui.shape_panel import ShapePanel
 from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
                                      scientific_status)
 
-PAGES = ("Workspace", "Analysis", "Status", "Materials")
+PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study")
 MATERIALS_PAGE = 3
+PLATE_PAGE = 4
 KNOWN_SOURCES = "Choose a known new experimental source..."
 DIALOG_TITLES = {FE: "Choose the FE results file", EXPERIMENTAL: "Choose the experimental data file"}
 OPEN_ARCHIVE = "Open research archive..."
@@ -251,7 +257,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self, *, ask_path: Optional[Callable[[str, str], str]] = None,
                  archive_path: Optional[Path] = None, status_path: Optional[Path] = None,
-                 ask_folder: Optional[Callable[[], str]] = None, known_root: Optional[Path] = None):
+                 ask_folder: Optional[Callable[[], str]] = None, known_root: Optional[Path] = None,
+                 plate_family_root: Optional[Path] = None):
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} — {STAGE}")
         self.workspace = Workspace()
@@ -260,6 +267,7 @@ class MainWindow(QMainWindow):
         self._archive_path = archive_path
         self._ask_folder = ask_folder
         self._known_root = known_root
+        self._plate_family_root = plate_family_root
         self.known_dialog: Optional[KnownSourcesDialog] = None
         self.archive_dialog: Optional[ArchiveDialog] = None
         self.status_rows = scientific_status(status_path)
@@ -281,6 +289,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self._scroll(self._build_analysis_page()))
         self.stack.addWidget(self._scroll(self._build_status_page()))
         self.stack.addWidget(self._scroll(self._build_materials_page()))
+        self.stack.addWidget(self._scroll(self._build_plate_page()))
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()
@@ -402,6 +411,15 @@ class MainWindow(QMainWindow):
         self.comparison = ComparisonPanel(ask_folder=self._ask_folder)  # NEW-GUI.6: the verified comparison
         layout.addWidget(self.comparison)
         layout.addWidget(self.diagnostic.result_card)  # the long frequency tables follow the workbench
+        layout.addStretch(1)
+        return page
+
+    def _build_plate_page(self) -> QWidget:
+        page, layout = self._page("Plate Study", "Research study of one free-free CFRP plate (PLATE-300x300x1mm): "
+                                                 "frequencies, independent shapes, registration status, FE "
+                                                 "sensitivities and readiness. No fit and no material value.")
+        self.plate = PlateStudyPanel(ask_folder=self._ask_folder, family_root=self._plate_family_root)
+        layout.addWidget(self.plate)
         layout.addStretch(1)
         return page
 
@@ -534,7 +552,8 @@ class MainWindow(QMainWindow):
     def busy(self) -> bool:
         """A read, a shape drawing, the frequency diagnostic or the registration check is still running."""
         return (self.reading() or any(panel.busy() for panel in self.shape_panels.values())
-                or self.diagnostic.busy() or self.registration.busy() or self.comparison.busy())
+                or self.diagnostic.busy() or self.registration.busy() or self.comparison.busy()
+                or self.plate.busy())
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
         """Process events until no read or drawing is running (tests and checks); returns whether all ended."""
@@ -553,6 +572,7 @@ class MainWindow(QMainWindow):
         self.diagnostic.cancel()  # and the frequency diagnostic
         self.registration.cancel()  # and the registration check
         self.comparison.cancel()  # and the verified comparison, its drawings included
+        self.plate.cancel()  # and the plate study
         super().closeEvent(event)
 
     def _analysis_changed(self) -> None:
@@ -637,6 +657,7 @@ class MainWindow(QMainWindow):
         self.registration.set_inputs(*inputs)
         identities = {"fe": self._read_identity(FE), "experimental": self._read_identity(EXPERIMENTAL)}
         self.comparison.set_inputs(*inputs, identities)  # a change removes the comparison and its drawings
+        self.plate.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
         self._registration_changed()
         self._analysis_changed()
 
