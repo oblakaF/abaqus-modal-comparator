@@ -175,6 +175,15 @@ class PlateStudyView:
     orientation_rows: tuple = ()  # scanner → plate → FE
     budget_rows: tuple = ()
     thickness_rows: tuple = ()  # PLATE-ONLY-R2-F1: edge readings, the ambiguous reading, observed vs illustrative
+    chain_rows: tuple = ()  # PLATE-WORKBENCH-RC1: UNV → specimen → scan → FE → registration → pairs → estimation
+    registration_rows: tuple = ()  # (link, fact, value, provenance, source)
+    registration_missing: tuple = ()  # (fact, reason)
+    registration_status: str = ""
+    instrument_rows: tuple = ()  # (item, content, provenance) found in the delivered sources
+    target_rows: tuple = ()  # the ±10 % goal split into its parts
+    campaign_rows: tuple = ()  # (phase, jobs, prerequisite, content)
+    campaign_lines: tuple = ()
+    spectrum_png: bytes = b""  # measured and FE frequencies, two independent rows (no pairs)
 
 
 @dataclass(frozen=True)
@@ -259,8 +268,22 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
                                         summary.records[0].frequency_hz if summary.records else None,
                                         float(fe_elastic[0].frequency_hz) if fe_elastic else None)
     budget = ps.specimen_budget()
+    from services import plate_registration_readiness as rr
+    from services import plate_workbench as pw
+
+    measured_components = summary.records[0].measured_components if summary.records else ""
+    registration_readiness = rr.evaluate(rr.real_261027_evidence(), dataset.sorted_modes()[0].coordinates,
+                               measured_components, ps.fe_plan(fe_preview.dataset))
+    chain = pw.workbench_chain(True, registration_readiness)  # the sources were confirmed above
+    first_fe = float(fe_elastic[0].frequency_hz) if fe_elastic else None
+    first_record = summary.records[0].frequency_hz if summary.records else None
+    target = pw.target_breakdown(first_record, first_fe)
+    specification, campaign = pw.campaign_specification(), pw.campaign_budget()
+    spectrum = pw.render_spectrum([r.frequency_hz for r in summary.records],
+                                  [float(m.frequency_hz) for m in fe_elastic],
+                                  f"Measured ({ps.WORKING_SET})", f"Initial FE ({member.member_id})")
     record = {
-        "schema": "plate-only-r2/study/v1", "created": datetime.now().isoformat(timespec="seconds"),
+        "schema": "plate-workbench-rc1/study/v1", "created": datetime.now().isoformat(timespec="seconds"),
         "labels": [ps.RESEARCH_ONLY, ps.INITIAL_FE_MODEL, ps.FREQUENCY_ONLY], "specimen": ps.SPECIMEN,
         "series": ps.SERIES, "plate_identity": ps.PLATE_IDENTITY, "identity_record": ps.IDENTITY_RECORD,
         "specimen_record": [m.__dict__ for m in ps.SPECIMEN_RECORD], "specimen_record_note": ps.SPECIMEN_RECORD_NOTE,
@@ -268,6 +291,19 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
         "orientation_chain": [o.__dict__ for o in ps.ORIENTATION_CHAIN],
         "orientation_notes": list(ps.ORIENTATION_NOTES),
         "uncertainty_budget": [line.__dict__ for line in budget],
+        "workbench_chain": [dict(zip(("link", "status", "source", "blocking"), r)) for r in chain],
+        "registration_readiness": {
+            "status": registration_readiness.status, "frozen": registration_readiness.frozen,
+            "mac_computed": registration_readiness.mac_computed,
+            "facts": [dict(zip(("key", "value", "provenance", "source"), f))
+                      for f in registration_readiness.scan_to_plate.facts + registration_readiness.plate_to_fe.facts],
+            "missing": [dict(zip(("fact", "reason"), m)) for m in registration_readiness.missing],
+            "checks": [dict(zip(("check", "state", "detail"), c)) for c in registration_readiness.checks],
+            "instrument_records": [dict(zip(("item", "content", "provenance"), n)) for n in rr.INSTRUMENT_NOTES]},
+        "target_10_percent": [dict(zip(("part", "value", "status", "note"), r)) for r in target],
+        "fe_campaign": {"specification": specification,
+                        "budget": [dict(zip(("phase", "jobs", "prerequisite", "content"), r)) for r in campaign],
+                        "template": pw.campaign_template()},
         "thickness": {"rows": [dict(zip(("item", "value", "status"), r)) for r in ps.thickness_rows()],
                       "ambiguous_reading": ps.THICKNESS_READING_AMBIGUITY,
                       "readings_mm": {str(k): list(v) for k, v in ps.THICKNESS_READINGS_MM.items()},
@@ -333,7 +369,15 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
         budget_rows=tuple((line.source, "—" if line.ln_sd is None else f"{100 * line.ln_sd:.1f} %",
                            "—" if line.illustrative_ln_sd is None else f"{100 * line.illustrative_ln_sd:.1f} % "
                            "(illustrative)", line.note) for line in budget),
-        thickness_rows=tuple(ps.thickness_rows()))
+        thickness_rows=tuple(ps.thickness_rows()), chain_rows=chain,
+        registration_rows=tuple((link.link, key, "—" if value is None else str(value), provenance, source)
+                                for link in (registration_readiness.scan_to_plate, registration_readiness.plate_to_fe)
+                                for key, value, provenance, source in link.facts),
+        registration_missing=registration_readiness.missing, registration_status=registration_readiness.status,
+        instrument_rows=tuple(rr.INSTRUMENT_NOTES), target_rows=target,
+        campaign_rows=tuple((phase, str(jobs), pre, content) for phase, jobs, pre, content in campaign),
+        campaign_lines=tuple(f"{key}: {value}" for key, value in specification.items()
+                             if isinstance(value, str)), spectrum_png=spectrum)
 
 
 def run_study(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index: int, token: int,
@@ -396,6 +440,18 @@ def export_report(view: PlateStudyView, folder) -> tuple:
     lines += ["", "## Orientation chain (nothing chosen by MAC, frequency or shape)", "",
               "| Link | State | Known | Open |", "|---|---|---|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} |" for r in view.orientation_rows]
+    lines += ["", f"## Physical registration readiness: {view.registration_status}", "",
+              "| Link | Fact | Value | Provenance | Source |", "|---|---|---|---|---|"]
+    lines += [f"| {a} | {b} | {c} | {d} | {e} |" for a, b, c, d, e in view.registration_rows]
+    lines += ["", "Missing or refused:", ""] + [f"- {key}: {reason}" for key, reason in view.registration_missing]
+    lines += ["", "## Workbench chain", "", "| Link | Status | Source | Blocking |", "|---|---|---|---|"]
+    lines += [f"| {a} | {b} | {c} | {d} |" for a, b, c, d in view.chain_rows]
+    lines += ["", "## The ±10 % goal, part by part (no part is a material accuracy)", "",
+              "| Part | Value | Status | Note |", "|---|---|---|---|"]
+    lines += [f"| {a} | {b} | {c} | {d} |" for a, b, c, d in view.target_rows]
+    lines += ["", "## Prepared FE campaign (NOT authorised; nothing run)", "",
+              "| Phase | Jobs | Prerequisite | Content |", "|---|---|---|---|"]
+    lines += [f"| {a} | {b} | {c} | {d} |" for a, b, c, d in view.campaign_rows]
     lines += ["", "## Experimental records", "",
              "| Record | Mode | Measured Hz | MPC | Saddle | Dome |", "|---|---|---|---|---|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[7]} | {r[8]} |" for r in view.experimental_rows]

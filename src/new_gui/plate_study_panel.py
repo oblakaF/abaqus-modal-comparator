@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (QBoxLayout, QFileDialog, QFrame, QLabel, QPushBut
 
 from new_gui import plate_study_model as psm
 from new_gui.diagnostic_panel import DiagnosticTable
-from new_gui.shape_panel import ShapePanel
+from new_gui.shape_panel import ImageView, ShapePanel
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
 
@@ -68,6 +68,7 @@ class PlateStudyPanel(QWidget):
         self._bridge = _Bridge(self)
         self._bridge.done.connect(self._done)
         self.tables: dict[str, DiagnosticTable] = {}
+        self.spectrum: Optional[ImageView] = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
@@ -210,6 +211,7 @@ class PlateStudyPanel(QWidget):
                 widget.setParent(None)
                 widget.deleteLater()
         self.tables = {}
+        self.spectrum = None  # PLATE-WORKBENCH-RC1: the spectra image of the shown result
 
     def _table(self, key, title, headers, rows, stretch, text_columns=(), capped=()) -> None:
         self.result_layout.addWidget(_label(title, "sectionTitle"))
@@ -249,6 +251,9 @@ class PlateStudyPanel(QWidget):
 
             self.result_layout.addWidget(_label(f"FE package: {view.member}", ""))
             self.result_layout.addWidget(_label(f"Registration: {view.registration}", "warnings"))
+            self._table("chain", "Workbench chain: Source UNV → Physical specimen → Scan orientation → FE model → "
+                        "Registration → Mode pairs → Parameter estimation", ("Link", "Status", "Source", "Blocking"),
+                        view.chain_rows, 3, (0, 1, 2, 3), capped=(1, 2))
             self._table("identity", f"Specimen identity: {view.record.get('plate_identity')} (owner, 2026-10-30; "
                         "physical identity only)", ("Evidence", "Content", "Weight"), view.identity, 1, (0, 1, 2))
             self._table("specimen", "Archived record of this specimen (M11 measurements, 2026-10-21) — NOT "
@@ -266,12 +271,26 @@ class PlateStudyPanel(QWidget):
                         "specimen) — the nearest FE frequency is NOT a mode pair (frequency only)",
                         ("Exp mode", "Measured Hz", "Nearest initial FE mode", "Initial FE Hz",
                          "Difference (%)", "MAC", "Note"), view.frequency_rows, 6, (5, 6))
+            self.result_layout.addWidget(_label("Measured and FE spectra (frequency only, NOT mode pairs)",
+                                                "sectionTitle"))
+            self.spectrum = ImageView()
+            self.spectrum.setObjectName("plateSpectrum")
+            self.spectrum.set_image(view.spectrum_png)
+            self.result_layout.addWidget(self.spectrum)
             self._table("applicability", f"Applicability of the initial FE model to the 261027 test: "
                         f"{ps.APPLICABILITY_NOT_VERIFIED}", ("Aspect", "State", "FE model", "Specimen / test", "Note"),
                         view.applicability_rows, 4, (0, 1, 2, 3, 4), capped=(2, 3))
             self._table("orientation", "Orientation chain — nothing is chosen by MAC, frequency or shape",
                         ("Link", "State", "Known", "Open"), view.orientation_rows, 3, (0, 1, 2, 3), capped=(0, 2))
             self.result_layout.addWidget(_label("\n".join(f"• {line}" for line in ps.ORIENTATION_NOTES), "hint"))
+            self._table("registration", f"Physical registration readiness: {view.registration_status} (no "
+                        "orientation from MAC, frequency or shape; nothing frozen)",
+                        ("Link", "Fact", "Value", "Provenance", "Source"), view.registration_rows, 4,
+                        (0, 1, 2, 3, 4), capped=(0, 2))
+            self.result_layout.addWidget(_label("Missing or refused for a physical registration:\n" + "\n".join(
+                f"• {key}: {reason}" for key, reason in view.registration_missing), "warnings"))
+            self._table("instrument", "Instrument records found in the delivered files",
+                        ("Item", "Content", "Provenance"), view.instrument_rows, 1, (0, 1, 2))
             self._table("family", "FE family of the specimen (INITIAL FE model and variants; SHA-256 verified)",
                         ("Member", "Description", "Status", "Changed", "Files"), view.family_rows, 4, (0, 1, 2, 4))
             self._table("sensitivity", "Sensitivities of the INITIAL FE model's branches s = Δ ln f / Δ ln p "
@@ -287,6 +306,11 @@ class PlateStudyPanel(QWidget):
             self.result_layout.addWidget(_label(psm.CONDITIONAL_NOTE, "warnings"))
             self._table("outcomes", "Parameter outcomes now", ("Parameter", "Outcome", "Reason"), view.outcome_rows,
                         2, (0, 1, 2))
+            self._table("target", "The ±10 % goal, part by part — no part is a material accuracy",
+                        ("Part", "Value", "Status", "Note"), view.target_rows, 3, (0, 1, 2, 3), capped=(0,))
+            self._table("campaign", "Prepared FE campaign — NOT authorised, nothing run (jobs per phase)",
+                        ("Phase", "Jobs", "Prerequisite", "Content"), view.campaign_rows, 3, (0, 2, 3), capped=(0, 2))
+            self.result_layout.addWidget(_label("\n".join(f"• {line}" for line in view.campaign_lines), "hint"))
             self._table("budget", "Uncertainty budget of ln E / ln G12 with the archived record (no estimate exists)",
                         ("Source", "Established ln sd", "Illustrative", "Note"), view.budget_rows, 3, (0, 2, 3),
                         capped=(0,))

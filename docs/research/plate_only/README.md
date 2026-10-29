@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, see §14). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -630,6 +630,24 @@ copies of the plate UNV and the FE package. The originals are unchanged.
 4. **The CSV changed again after Inspect.** Run plate study is refused before any computation.
 5. **The restored package.** Its identity equals the first one; the study passes.
 6. **Close.** No task left.
+
+## 14. PLATE-WORKBENCH-RC1 (2026-10-30)
+
+See [`PLATE_WORKBENCH_RC1.md`](PLATE_WORKBENCH_RC1.md). In short:
+- **Integration.** NEW-GUI.6 and the Plate Study are integrated on `integration/plate-workbench-rc1`, made from
+  `origin/main`.
+- **Instrument records found.** The physical-registration audit of 261027 found:
+  - SI scale, measured distance 1.15 m;
+  - +Z DOF towards the Polytec;
+  - a force reference channel;
+  - the plate `.svd`, named by the PSV export but not delivered.
+- **Verdict.** `PHYSICAL_REGISTRATION_NOT_VERIFIED`. Seven independent facts are missing, and no FrozenRegistration
+  was created.
+- **New services:**
+  - `plate_registration_readiness` (evidence with provenance, no orientation from numbers, no MAC without a frozen
+    registration);
+  - `plate_workbench` (the chain, the ±10 % parts, the prepared FE campaign and its budget, the spectra chart).
+- **Template.** `plate_campaign_template_rc1.json` is the campaign template; nothing was run.
 
 ## Not changed
 

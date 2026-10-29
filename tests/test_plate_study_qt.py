@@ -333,6 +333,41 @@ class InputTraceabilityTests(_PlateWindow):
         for text in (markdown, record):
             self.assertNotIn("SETUP_SENSITIVE", text)
 
+    def test_the_workbench_chain_registration_readiness_target_and_campaign(self):
+        # PLATE-WORKBENCH-RC1: the chain with its blocks, the registration refused with the exact missing facts, the
+        # spectra (no pairs), the ±10 % parts and the prepared (not authorised) campaign
+        self.read()
+        self.run_study()
+        view = self.panel.view
+        chain = self.panel.tables["chain"]
+        status = {chain.item(r, 0).text(): chain.item(r, 1).text() for r in range(chain.rowCount())}
+        self.assertEqual(list(status), ["Source UNV", "Physical specimen", "Scan orientation", "FE model",
+                                        "Registration", "Mode pairs", "Parameter estimation"])
+        self.assertEqual(status["Registration"], "PHYSICAL_REGISTRATION_NOT_VERIFIED")
+        self.assertEqual((status["Mode pairs"], status["Parameter estimation"]), ("BLOCKED", "BLOCKED"))
+        self.assertLessEqual(chain.columnViewportPosition(1) + chain.columnWidth(1), chain.viewport().width())
+        texts = " ".join(label.text() for label in self.panel.findChildren(type(self.panel.why)))
+        for key in ("scanned_face", "grid_plus_u_edge", "fe_origin_corner"):
+            self.assertIn(key, texts)
+        self.assertEqual(view.record["registration_readiness"]["status"], "PHYSICAL_REGISTRATION_NOT_VERIFIED")
+        self.assertFalse(view.record["registration_readiness"]["mac_computed"])
+        self.assertFalse(view.record["registration_readiness"]["frozen"])
+        self.assertIsNotNone(self.panel.spectrum.source)  # the spectra image is shown
+        target = self.panel.tables["target"]
+        self.assertEqual(target.item(0, 2).text(), "DIAGNOSTIC_ONLY")
+        self.assertEqual(target.item(target.rowCount() - 1, 2).text(), "NOT_ACHIEVED")
+        self.assertEqual(self.panel.tables["campaign"].rowCount(), 4)
+        self.assertEqual(view.record["fe_campaign"]["specification"]["status"], "PREPARED_NOT_AUTHORISED")
+        self.assertFalse(self.panel.gate_button.isEnabled())
+        self.assertEqual(self.panel.tables["experiment"].item(0, 0).text(), "1")  # the first record is kept
+        self.assertEqual({o[1] for o in view.outcome_rows}, {ps.NOT_IDENTIFIABLE})
+        self.assertTrue(self.panel.export())
+        markdown = next(self.reports.glob("*.md")).read_text(encoding="utf-8")
+        for heading in ("## Physical registration readiness: PHYSICAL_REGISTRATION_NOT_VERIFIED",
+                        "## Workbench chain", "## The ±10 % goal, part by part",
+                        "## Prepared FE campaign (NOT authorised; nothing run)"):
+            self.assertIn(heading, markdown)
+
     def test_a_new_preview_equal_in_value_still_resets(self):
         self.read()
         self.run_study()
