@@ -24,6 +24,14 @@ NEW-GUI.5: below it, a ``RegistrationCheckPanel`` checks, only on the explicit c
 whether an accepted archived physical registration applies to the read FE results and the modal set chosen for the
 frequency diagnostic (the existing service ``bind_registration_by_fe_geometry``). The registration is not applied:
 no MAC, mode pair or orientation is made. It is cancelled and discarded like the diagnostic.
+
+NEW-GUI.6: below it, the ``ComparisonPanel`` workbench: when the check verified an archived registration for exactly
+the current data, Run verified modal comparison verifies it again and runs the project's scientific comparator with
+that frozen registration, shows the pairs, the MAC matrix, the warnings and the pair drawings, and Export report...
+writes the result's report into a folder the user chooses. The frequency diagnostic's result card follows the
+workbench. A Materials page shows the project's existing material records, read-only and classified, and File > Choose
+a known new experimental source... offers the three working sources of the provenance map (the path only; Inspect
+file still reads it).
 """
 
 from __future__ import annotations
@@ -41,7 +49,10 @@ from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFileDial
 
 from new_gui import APP_NAME, STAGE
 from new_gui.archive_dialog import ArchiveDialog
+from new_gui.comparison_panel import WIDE_CONTENT, ComparisonPanel
 from new_gui.diagnostic_panel import DiagnosticPanel
+from new_gui.known_sources_dialog import KnownSourcesDialog
+from new_gui.materials_panel import SUBTITLE as MATERIALS_SUBTITLE, MaterialsPanel
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
 from new_gui.registration_check_panel import RegistrationCheckPanel
@@ -49,7 +60,9 @@ from new_gui.shape_panel import ShapePanel
 from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
                                      scientific_status)
 
-PAGES = ("Workspace", "Analysis", "Status")
+PAGES = ("Workspace", "Analysis", "Status", "Materials")
+MATERIALS_PAGE = 3
+KNOWN_SOURCES = "Choose a known new experimental source..."
 DIALOG_TITLES = {FE: "Choose the FE results file", EXPERIMENTAL: "Choose the experimental data file"}
 OPEN_ARCHIVE = "Open research archive..."
 NARROW_WIDTH = 760  # below this content width the two source cards are stacked
@@ -236,13 +249,17 @@ class MainWindow(QMainWindow):
     """The new interface's main window. ``ask_path(kind, start)`` returns a chosen path or "" (tests replace it)."""
 
     def __init__(self, *, ask_path: Optional[Callable[[str, str], str]] = None,
-                 archive_path: Optional[Path] = None, status_path: Optional[Path] = None):
+                 archive_path: Optional[Path] = None, status_path: Optional[Path] = None,
+                 ask_folder: Optional[Callable[[], str]] = None, known_root: Optional[Path] = None):
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} — {STAGE}")
         self.workspace = Workspace()
         self.messages = {kind: "" for kind in KINDS}
         self._ask_path = ask_path or self._dialog_path
         self._archive_path = archive_path
+        self._ask_folder = ask_folder
+        self._known_root = known_root
+        self.known_dialog: Optional[KnownSourcesDialog] = None
         self.archive_dialog: Optional[ArchiveDialog] = None
         self.status_rows = scientific_status(status_path)
         self.slots = {kind: InspectSlot() for kind in KINDS}
@@ -255,12 +272,14 @@ class MainWindow(QMainWindow):
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        root.addWidget(self._build_sidebar())
+        self.sidebar = self._build_sidebar()
+        root.addWidget(self.sidebar)
         self.stack = QStackedWidget()
         self.stack.setObjectName("content")
         self.stack.addWidget(self._scroll(self._build_workspace_page()))
         self.stack.addWidget(self._scroll(self._build_analysis_page()))
         self.stack.addWidget(self._scroll(self._build_status_page()))
+        self.stack.addWidget(self._scroll(self._build_materials_page()))
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()
@@ -268,6 +287,8 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.status_text)
         self.diagnostic.changed.connect(self._analysis_changed)
         self.diagnostic.set_combo.currentIndexChanged.connect(self._registration_inputs)  # the one shared set choice
+        self.registration.changed.connect(self._registration_changed)
+        self.comparison.changed.connect(self._analysis_changed)
         self.setMinimumSize(560, 420)
         self._fit_to_screen()
         self.show_page(0)
@@ -350,6 +371,15 @@ class MainWindow(QMainWindow):
         for kind in KINDS:
             self.sources.addWidget(self.cards[kind], 1, Qt.AlignmentFlag.AlignTop)
         layout.addLayout(self.sources)
+        known = QHBoxLayout()
+        self.known_button = QPushButton(KNOWN_SOURCES)
+        self.known_button.setObjectName("knownSourcesButton")
+        self.known_button.setToolTip("The three fitted working sources of the 2026-10-29 delivery, checked against the "
+                                     "provenance map. Only the path is set; nothing is read until Inspect file.")
+        self.known_button.clicked.connect(self.open_known_sources)
+        known.addWidget(self.known_button)
+        known.addStretch(1)
+        layout.addLayout(known)
         self.panels = {kind: PreviewPanel(kind) for kind in KINDS}  # full width: the tables need it
         self.shape_panels = {kind: ShapePanel(kind) for kind in KINDS}  # NEW-GUI.3: below each content panel
         for kind in KINDS:
@@ -360,13 +390,24 @@ class MainWindow(QMainWindow):
 
     def _build_analysis_page(self) -> QWidget:
         page, layout = self._page("Analysis", "A frequency diagnostic of the read FE results and one experimental "
-                                              "modal set, and a check of archived physical registrations. No "
-                                              "registration is applied; no MAC or mode pairing.")
+                                              "modal set, a check of archived physical registrations and, only with "
+                                              "a verified registration, the scientific comparison of the mode shapes "
+                                              "(MAC and mode pairs).")
         self.diagnostic = DiagnosticPanel()  # NEW-GUI.4
         self.analysis_badge = self.diagnostic.badge
         layout.addWidget(self.diagnostic)
         self.registration = RegistrationCheckPanel()  # NEW-GUI.5: uses the diagnostic's set choice
         layout.addWidget(self.registration)
+        self.comparison = ComparisonPanel(ask_folder=self._ask_folder)  # NEW-GUI.6: the verified comparison
+        layout.addWidget(self.comparison)
+        layout.addWidget(self.diagnostic.result_card)  # the long frequency tables follow the workbench
+        layout.addStretch(1)
+        return page
+
+    def _build_materials_page(self) -> QWidget:
+        page, layout = self._page("Materials / Scientific evidence", MATERIALS_SUBTITLE)
+        self.materials = MaterialsPanel()  # NEW-GUI.6: read-only; the records are read when the page is shown
+        layout.addWidget(self.materials)
         layout.addStretch(1)
         return page
 
@@ -390,6 +431,7 @@ class MainWindow(QMainWindow):
         menu = self.menuBar().addMenu("&File")
         for text, shortcut, slot in (("Choose FE file...", "Ctrl+1", lambda: self.choose_file(FE)),
                                      ("Choose experimental file...", "Ctrl+2", lambda: self.choose_file(EXPERIMENTAL)),
+                                     (KNOWN_SOURCES, "Ctrl+3", self.open_known_sources),
                                      ("Inspect FE file", "Ctrl+Shift+1", lambda: self.inspect_file(FE)),
                                      ("Inspect experimental file", "Ctrl+Shift+2",
                                       lambda: self.inspect_file(EXPERIMENTAL))):
@@ -422,6 +464,8 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------------------------------- actions
 
     def show_page(self, index: int) -> None:
+        if index == MATERIALS_PAGE:
+            self.materials.load()  # the project's material records are read on first show, not at start-up
         self.stack.setCurrentIndex(index)
         self.nav.button(index).setChecked(True)
 
@@ -489,7 +533,7 @@ class MainWindow(QMainWindow):
     def busy(self) -> bool:
         """A read, a shape drawing, the frequency diagnostic or the registration check is still running."""
         return (self.reading() or any(panel.busy() for panel in self.shape_panels.values())
-                or self.diagnostic.busy() or self.registration.busy())
+                or self.diagnostic.busy() or self.registration.busy() or self.comparison.busy())
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
         """Process events until no read or drawing is running (tests and checks); returns whether all ended."""
@@ -507,10 +551,31 @@ class MainWindow(QMainWindow):
             panel.cancel()
         self.diagnostic.cancel()  # and the frequency diagnostic
         self.registration.cancel()  # and the registration check
+        self.comparison.cancel()  # and the verified comparison, its drawings included
         super().closeEvent(event)
 
     def _analysis_changed(self) -> None:
-        self.status_text.setText(f"{self.diagnostic.status_text} · Production Auto-ID {self.status_rows[0].value}")
+        if not hasattr(self, "comparison"):
+            return
+        view = self.diagnostic.view
+        self.comparison.set_diagnostic(self.diagnostic.slot.outcome.diagnostic if view is not None else None)
+        compared = self.comparison.view
+        if compared is not None:  # the summary states the verified comparison, not only the frequency diagnostic
+            self.diagnostic.summary_values["MAC"].setText(
+                "computed on the registered measured DOFs only (see Verified modal comparison)")
+            self.diagnostic.summary_values["Mode pairs"].setText(
+                f"{compared.status}: {len(compared.pair_rows)} pair(s), the comparator's assignment")
+        shown = self.comparison.status_text or self.diagnostic.status_text
+        self.status_text.setText(f"{shown} · Production Auto-ID {self.status_rows[0].value}")
+
+    def _registration_changed(self) -> None:
+        if not hasattr(self, "comparison"):
+            return
+        registration = self.registration.view
+        self.comparison.set_registration(registration, self.registration.refusal_text)
+        self.materials.set_context(registration.fixture_id if registration is not None else None,
+                                   self.diagnostic.fe_preview is not None
+                                   and self.diagnostic.experimental_preview is not None)
 
     def _label_changed(self, text: str) -> None:
         self.workspace = self.workspace.with_label(text)
@@ -530,6 +595,18 @@ class MainWindow(QMainWindow):
         self.archive_dialog.show()
         return self.archive_dialog
 
+    def open_known_sources(self) -> KnownSourcesDialog:
+        """The known new working sources; a chosen, verified one only sets the experimental file's path."""
+        self.known_dialog = KnownSourcesDialog(self, self._known_root)
+        self.known_dialog.accepted.connect(self._known_source_chosen)
+        self.known_dialog.open()
+        return self.known_dialog
+
+    def _known_source_chosen(self) -> None:
+        if self.known_dialog is not None and self.known_dialog.chosen_path is not None:
+            self.choose_file(EXPERIMENTAL, str(self.known_dialog.chosen_path))
+            self.show_page(0)
+
     def _about(self) -> None:
         QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n{STAGE}\n\nChoose your FE results and experimental data, read "
                                           "them with Inspect file and view single mode shapes. On the Analysis page, "
@@ -537,7 +614,9 @@ class MainWindow(QMainWindow):
                                           "modal set with the FE frequencies, only when you click it. The nearest "
                                           "FE frequencies are not established mode pairs. Check reference "
                                           "registration only checks whether an accepted archived physical "
-                                          "registration applies to the read data; it is not applied. No MAC or "
+                                          "registration applies to the read data. Only when it is verified, Run "
+                                          "verified modal comparison runs the scientific comparator with it (MAC "
+                                          "and mode pairs). The Materials page shows existing records only. No "
                                           "Auto-ID is run.")
 
     # ---------------------------------------------------------------------------------------------- display
@@ -552,8 +631,11 @@ class MainWindow(QMainWindow):
         self._registration_inputs()
 
     def _registration_inputs(self) -> None:
-        self.registration.set_inputs(self.diagnostic.fe_preview, self.diagnostic.experimental_preview,
-                                     self.diagnostic.chosen_set_index())
+        inputs = (self.diagnostic.fe_preview, self.diagnostic.experimental_preview, self.diagnostic.chosen_set_index())
+        self.registration.set_inputs(*inputs)
+        self.comparison.set_inputs(*inputs)  # a change removes the comparison and its drawings
+        self._registration_changed()
+        self._analysis_changed()
 
     def _read_preview(self, kind: str):
         """The preview of the chosen file of ``kind`` when it was read, else None."""
@@ -564,3 +646,5 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         narrow = self.stack.width() < NARROW_WIDTH
         self.sources.setDirection(QBoxLayout.Direction.TopToBottom if narrow else QBoxLayout.Direction.LeftToRight)
+        # the window's own new width (the stack is laid out only later): the content is the width beside the sidebar
+        self.comparison.set_narrow(event.size().width() - self.sidebar.sizeHint().width() < WIDE_CONTENT)

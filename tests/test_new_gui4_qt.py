@@ -327,7 +327,7 @@ class LayoutTests(_Window):
         w = self.window
         for width in (1366, 900, 600):
             w.resize(width, 680)
-            for _ in range(3):
+            for _ in range(5):  # NEW-GUI.6: the workbench below the diagnostic adds layout passes after a resize
                 self.app.processEvents()
             with self.subTest(width=width):
                 for key, table in self.panel.tables.items():

@@ -58,6 +58,8 @@ FIELDS = (("Specimen and fixture", lambda v: f"{v.specimen} — {v.fixture_id}")
 class RegistrationCheckPanel(QFrame):
     """One card: the inputs it uses, the command, and the verified registration or the service's refusal."""
 
+    changed = Signal()  # NEW-GUI.6: the shown state changed (the verified comparison follows it)
+
     def __init__(self):
         super().__init__()
         self.setObjectName("card")
@@ -207,6 +209,12 @@ class RegistrationCheckPanel(QFrame):
         self.refusal.setText(f"Not confirmed by the service: {outcome.refusal}" if refused else "")
         self.refusal.setVisible(refused)
         self.refusal_note.setVisible(refused)
+        self.changed.emit()
+
+    @property
+    def refusal_text(self) -> str:
+        outcome = self.slot.outcome
+        return outcome.refusal if self.slot.state == rm.REFUSED and outcome is not None else ""
 
 
 __all__ = ["RegistrationCheckPanel"]

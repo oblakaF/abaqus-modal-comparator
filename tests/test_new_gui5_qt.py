@@ -141,9 +141,14 @@ class AvailabilityTests(_Window):
         self.assertFalse(panel.warning.isVisible())
         self.assertFalse(self.window.diagnostic.result_card.isVisible())  # neither command ran
         analysis = self.window.stack.widget(1).widget()
+        # NEW-GUI.6 (authorised): the workbench's commands and its unpaired shape views follow; the analysis commands
+        # still share one set choice (the shape views' own choices only choose what is drawn, unpaired).
         self.assertEqual([b.text() for b in analysis.findChildren(QPushButton)],
-                         ["Run frequency diagnostic", "Check reference registration"])  # no second set choice
-        self.assertEqual(len(analysis.findChildren(type(self.window.diagnostic.set_combo))), 1)
+                         ["Run frequency diagnostic", "Check reference registration", "Run verified modal comparison",
+                          "Export report...", "Show shape", "Show shape"])  # no second set choice
+        shape_views = self.window.comparison.shapes.values()
+        self.assertEqual(len([combo for combo in analysis.findChildren(type(self.window.diagnostic.set_combo))
+                              if not any(view.isAncestorOf(combo) for view in shape_views)]), 1)
 
 
 class ResultTests(_Window):

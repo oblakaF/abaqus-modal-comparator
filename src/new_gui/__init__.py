@@ -21,9 +21,16 @@ the Analysis page checks with the existing service whether an accepted archived 
 read FE results and the modal set chosen for the frequency diagnostic. The registration is not applied: no MAC, mode
 pair or orientation is made, and modal identity is not established.
 
+NEW-GUI.6 (``docs/gui/NEW_GUI6_SCIENTIFIC_WORKBENCH.md``): after the check verified an archived registration for
+exactly the read data, Run verified modal comparison verifies it again and runs the project's scientific comparator
+with that frozen registration: the comparator's pairs, MAC on the registered measured DOFs, warnings and the pair
+drawings. Without a verified registration the shapes stay unpaired and no MAC exists. The Materials page shows the
+project's existing material records, classified and read-only. Export report... writes the verified comparison or
+the diagnostic report into a folder the user chooses. No Auto-ID, identification or FE computation is run.
+
 Start it with ``RUN_NEW_GUI.cmd`` or ``python -m new_gui`` (with ``src`` on the path). PySide6 is installed from
 ``requirements-new-gui.txt``, separately from ``requirements.txt``.
 """
 
 APP_NAME = "Abaqus–Simcenter Modal Comparator"
-STAGE = "NEW-GUI.5 preview"
+STAGE = "NEW-GUI.6 preview"
