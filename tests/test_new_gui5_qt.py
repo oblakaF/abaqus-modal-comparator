@@ -46,7 +46,7 @@ from services import local_input_registry as registry  # noqa: E402
 import frf_unv_support as F  # noqa: E402
 from test_g2d1_governed_registration import experimental_dataset  # noqa: E402
 from test_new_gui5_registration import (WorldCase, experimental_preview, fe_preview, fingerprint,  # noqa: E402
-                                        other_set)
+                                        other_set, write_fe_package)
 from test_new_odb_comparison import new_odb_dataset  # noqa: E402
 
 
@@ -62,15 +62,14 @@ class _Window(WorldCase):
         self.addCleanup(own.cleanup)
         self.own = Path(own.name)
         (self.own / "cache").mkdir()
-        self.other_odb = self.odb.with_name("SP02_moved_model.odb")
-        self.other_odb.write_bytes(b"another FE result on a moved mesh " * 100)
+        self.other_odb = write_fe_package(self.own / "SP02_moved_extraction", "moved")  # another FE package
         self.frf = F.write_frf_only(self.own / "frf_only.uff")
         self.before = fingerprint(self.world.root)
         real_read = pm.read_preview
 
         def read(kind, path, cancel_event=None):  # the World's datasets as Inspect file returns them
             path = Path(path)
-            if path == self.odb:
+            if path == self.package:
                 return fe_preview(path, self.fe)
             if path == self.other_odb:
                 return fe_preview(path, new_odb_dataset(path, self.fe, shift=0.5))
@@ -113,7 +112,7 @@ class _Window(WorldCase):
         self.app.processEvents()
 
     def ready(self, set_index=0, fe=None):
-        self.inspect(ws.FE, fe or self.odb)
+        self.inspect(ws.FE, fe or self.package)
         self.inspect(ws.EXPERIMENTAL, self.unv)
         self.choose_set(set_index)
 
@@ -125,7 +124,7 @@ class AvailabilityTests(_Window):
             self.assertEqual(panel.badge.text(), "Not checked")
             self.assertFalse(panel.run_button.isEnabled())
             self.assertEqual(panel.why_unavailable.text().splitlines(), [dm.NEED_FE, dm.NEED_EXPERIMENTAL])
-            self.inspect(ws.FE, self.odb)
+            self.inspect(ws.FE, self.package)
             self.inspect(ws.EXPERIMENTAL, self.unv)
             self.assertFalse(panel.run_button.isEnabled())
             self.assertEqual(panel.why_unavailable.text(), dm.NEED_SET)
@@ -141,9 +140,14 @@ class AvailabilityTests(_Window):
         self.assertFalse(panel.warning.isVisible())
         self.assertFalse(self.window.diagnostic.result_card.isVisible())  # neither command ran
         analysis = self.window.stack.widget(1).widget()
+        # NEW-GUI.6 (authorised): the workbench's commands and its unpaired shape views follow; the analysis commands
+        # still share one set choice (the shape views' own choices only choose what is drawn, unpaired).
         self.assertEqual([b.text() for b in analysis.findChildren(QPushButton)],
-                         ["Run frequency diagnostic", "Check reference registration"])  # no second set choice
-        self.assertEqual(len(analysis.findChildren(type(self.window.diagnostic.set_combo))), 1)
+                         ["Run frequency diagnostic", "Check reference registration", "Run verified modal comparison",
+                          "Export report...", "Show shape", "Show shape"])  # no second set choice
+        shape_views = self.window.comparison.shapes.values()
+        self.assertEqual(len([combo for combo in analysis.findChildren(type(self.window.diagnostic.set_combo))
+                              if not any(view.isAncestorOf(combo) for view in shape_views)]), 1)
 
 
 class ResultTests(_Window):
@@ -197,7 +201,7 @@ class ResultTests(_Window):
         self.assertIn("is not the accepted SP02 FE geometry", self.panel.refusal.text())
 
     def test_frf_records_stay_provisional_and_are_refused(self):
-        self.inspect(ws.FE, self.odb)
+        self.inspect(ws.FE, self.package)
         self.inspect(ws.EXPERIMENTAL, self.frf)
         self.choose_set(0)
         self.assertTrue(self.panel.provisional.isVisible())

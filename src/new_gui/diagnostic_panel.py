@@ -375,12 +375,17 @@ class DiagnosticPanel(QWidget):
         self.badge.setProperty("state", "chosen" if view is not None else "empty")
         _restyle(self.badge)
         self.summary_note.setText(view.statement if view is not None else ANALYSIS_NOTE)
+        self.show_summary_values()
+        self.changed.emit()
+
+    def show_summary_values(self) -> None:
+        """The summary of the frequency diagnostic (NEW-GUI.6: also restores it when a verified comparison goes)."""
+        view = self.view
         values = ((f"{dm.STATUS}: {len(view.experimental_rows)} experimental, {len(view.fe_rows)} elastic FE and "
                    f"{len(view.rigid_rows)} rigid-body FE frequencies", dm.NOT_COMPUTED, dm.MODE_PAIRS)
                   if view is not None else ("not computed", "not computed", "none"))
         for caption, value in zip(("Frequencies", "MAC", "Mode pairs"), values):
             self.summary_values[caption].setText(value)
-        self.changed.emit()
 
 
 __all__ = ["DiagnosticPanel", "DiagnosticTable"]

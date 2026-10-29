@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -34,6 +35,22 @@ from services import new_odb_comparison as service  # noqa: E402
 from test_g2c_archived_sensitivity_evidence import World  # noqa: E402
 from test_g2d1_governed_registration import experimental_dataset, fe_dataset  # noqa: E402
 from test_new_odb_comparison import new_odb_dataset  # noqa: E402
+
+
+def write_fe_package(folder: Path, label: str = "SP02") -> Path:
+    """A minimal extracted FE package (manifest.json, geometry.csv, one mode file) standing for the FE file Inspect
+    file reads. PLATE-ONLY-R2-F1: the read records the identity of these files, never an ODB's; ``read_preview`` is
+    replaced in these tests, so the package's content is not the dataset the read returns."""
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "geometry.csv").write_text("instance,node_label,x,y,z\nPART-1,1,0,0,0\n", encoding="utf-8")
+    (folder / "mode_0007.csv").write_text("instance,node_label,u1_real,u2_real,u3_real,u1_imag,u2_imag,u3_imag\n"
+                                          f"PART-1,1,0,0,1,0,0,0\n# {label}\n", encoding="utf-8")
+    manifest = {"format_version": 2, "geometry_file": "geometry.csv", "step_name": "Frequency",
+                "odb_path": f"{label}.odb (not read)",
+                "modes": [{"mode": 7, "frequency_hz": 10.0, "file": "mode_0007.csv", "frame_index": 7}]}
+    path = folder / "manifest.json"
+    path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    return path
 
 
 def fingerprint(folder: Path) -> dict:
@@ -69,6 +86,9 @@ class WorldCase(unittest.TestCase):
         self.world = World(directory.name)
         self.odb, self.unv = self.world.files["SP02"]
         self.fe = fe_dataset(self.odb)
+        packages = tempfile.TemporaryDirectory()  # outside the world: the world stays unchanged
+        self.addCleanup(packages.cleanup)
+        self.package = write_fe_package(Path(packages.name) / "SP02_extraction")  # the FE file Inspect file reads
         stack = contextlib.ExitStack()
         self.addCleanup(stack.close)
         stack.enter_context(self.world.pins())
@@ -78,7 +98,7 @@ class WorldCase(unittest.TestCase):
 
     def previews(self, fe=None, source=None, datasets=None):
         source = source or self.unv
-        return (fe_preview(self.odb, fe or self.fe),
+        return (fe_preview(self.package, fe or self.fe),
                 experimental_preview(source, datasets or [experimental_dataset(source, self.fe),
                                                           other_set(source, self.fe)]))
 
