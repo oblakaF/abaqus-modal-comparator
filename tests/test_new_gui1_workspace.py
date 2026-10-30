@@ -324,15 +324,31 @@ class SeparationTests(unittest.TestCase):
                        # NEW-GUI.2: the shared importer chain and the read-only preview services
                        "services.importer_runtime", "services.local_fe_preview", "services.local_experimental_preview",
                        # NEW-GUI.4: the existing frequency-only diagnostic service
-                       "services.new_odb_comparison"}
+                       "services.new_odb_comparison",
+                       # NEW-GUI.6: the report folder rule, fresh file identities, the diagnostic report's loaded data,
+                       # and the read-only loaders of the governed material records
+                       "services.report_directory", "services.archived_sensitivity_evidence",
+                       "services.modal_data_viewer", "domain.campaign_definition", "domain.forward_model_manifest",
+                       "domain.identification_run",
+                       # PLATE-ONLY-R1: the research plate study service (no fit, no FE solve)
+                       "services.plate_study"}
+    # NEW-GUI.6: the scientific comparator and the program's own final drawing / report owners, each only in the one
+    # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
+    SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
+                                                  "numpy"},
+                          "report_export.py": {"reporting"}}
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))
         self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "archive_dialog.py",
-                                                   "diagnostic_model.py", "diagnostic_panel.py", "preview_model.py", "preview_panel.py",
+                                                   "comparison_model.py", "comparison_panel.py",
+                                                   "diagnostic_model.py", "diagnostic_panel.py", "known_sources.py",
+                                                   "known_sources_dialog.py", "materials_model.py",
+                                                   "materials_panel.py", "plate_study_model.py",
+                                                   "plate_study_panel.py", "preview_model.py", "preview_panel.py",
                                                    "registration_check_model.py", "registration_check_panel.py",
-                                                   "shape_model.py", "shape_panel.py", "window.py",
-                                                   "workspace_state.py"])
+                                                   "report_export.py", "shape_model.py", "shape_panel.py",
+                                                   "window.py", "workspace_state.py"])
         stdlib = set(sys.stdlib_module_names) | {"__future__"}
         for path in files:
             for name in _imports(path):
@@ -340,7 +356,7 @@ class SeparationTests(unittest.TestCase):
                     top = name.split(".")[0]
                     if top in stdlib or top in ("PySide6", "new_gui"):
                         continue
-                    self.assertIn(name, self.PROJECT_MODULES)
+                    self.assertIn(name, self.PROJECT_MODULES | self.SCIENTIFIC_MODULES.get(path.name, set()))
 
     def test_no_tkinter_program_no_install_layer_and_no_solver(self):
         forbidden = ("main", "home_dashboard", "tkinter", "subprocess", "abaqus_bridge", "modal_core",
@@ -348,6 +364,8 @@ class SeparationTests(unittest.TestCase):
         for path in sorted(NEW_GUI.glob("*.py")):
             for name in _imports(path):
                 with self.subTest(module=path.name, imported=name):
+                    if path.name == "comparison_model.py" and name == "modal_core":
+                        continue  # NEW-GUI.6: the reviewed comparator facade, called with a frozen registration
                     self.assertNotIn(name.split(".")[-1], forbidden)
                     self.assertFalse(name.split(".")[-1].startswith("install_"))
             tree = ast.parse(path.read_text(encoding="utf-8"))

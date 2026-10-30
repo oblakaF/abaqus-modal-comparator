@@ -11,6 +11,18 @@ frequencies, modal sets, record classifications and warnings are the services' o
   project's companion. Several dataset-55 modal sets are shown separately; none is chosen and nothing is merged. FRF
   peak-derived records (dataset 58) are PROVISIONAL, not validated fitted modes.
 
+NEW-GUI.6-F1: ``run_read`` records the identity (SHA-256 and size) of the file it read: the FE package's
+``manifest.json`` or the experimental file the importer read (``source_path``). The file is hashed after the read;
+when it is the chosen file and its size or modification time changed during the read, no identity is recorded
+(the read data cannot be tied to one content). A comparison and an export compare this identity with the file on
+disk and refuse when it changed; a later hash is never attributed to data read earlier.
+
+PLATE-ONLY-R2-F1: for the FE side the identity covers the whole extracted package (``services.fe_package_identity``):
+``manifest.json``, its geometry file and every mode file the loader reads, each with a streaming SHA-256, under
+``"package"`` (the manifest's own path, size and SHA-256 stay at the top level). The package's files are listed before
+the read; when any of them changed during the read, or the package cannot be identified (a missing file, an invalid
+dependency path, a cancellation), no identity is recorded. The ODB is never read and never hashed here.
+
 ``InspectSlot`` keeps the read of one side. A replaced or cleared file resets it, cancels the read and discards that
 read's outcome, so a stale result is never shown. The modules are imported, and the importer chain installed, only
 when a file is read, so an empty start reads nothing and creates no cache.
@@ -56,6 +68,7 @@ class Outcome:
     preview: Any = None
     error: str = ""
     cancelled: bool = False
+    identity: Any = None  # NEW-GUI.6-F1: {"path", "size", "sha256"} of the file read, or None when unconfirmed
 
 
 def read_preview(kind: str, path, cancel_event: Optional[threading.Event] = None):
@@ -78,9 +91,63 @@ def read_preview(kind: str, path, cancel_event: Optional[threading.Event] = None
     return local_experimental_preview.preview_experimental_file(path, cancel_event=cancel_event)
 
 
+def _stat(path) -> Optional[tuple]:
+    try:
+        found = Path(path).stat()
+    except OSError:
+        return None
+    return found.st_size, found.st_mtime_ns
+
+
+def file_identity(path, cancel_event: Optional[threading.Event] = None) -> Optional[dict]:
+    """SHA-256 and size of ``path`` read now (no cache), or None when it cannot be read or changes while read."""
+    from services.archived_sensitivity_evidence import fresh_content_identity
+
+    try:
+        found = fresh_content_identity(Path(path), cancel_event)
+    except Exception:  # noqa: BLE001  (unreadable, changed while read, cancelled: no identity is invented)
+        return None
+    return {"path": str(path), "size": int(found["size"]), "sha256": str(found["sha256"])}
+
+
+def fe_package_identity(manifest, cancel_event: Optional[threading.Event] = None,
+                        before: Optional[dict] = None) -> Optional[dict]:
+    """The FE read's identity: the manifest's path, size and SHA-256 and, under ``"package"``, every file the loader
+    reads; None when the package cannot be identified or (with ``before``) changed since the snapshot."""
+    from services import fe_package_identity as fpi
+
+    try:
+        package = fpi.identify(manifest, cancel_event)
+    except Exception:  # noqa: BLE001  (missing, invalid, changed while read, cancelled: no identity is invented)
+        return None
+    if before is not None and not fpi.unchanged_since(package, before):
+        return None
+    return {"path": str(manifest), "size": package["manifest"]["size"], "sha256": package["manifest"]["sha256"],
+            "package": package}
+
+
+def confirm_fe_identity(manifest, recorded: Optional[dict], cancel_event: Optional[threading.Event] = None) -> dict:
+    """The FE package identified again and equal, file by file, to the identity ``recorded`` at the read; raises
+    ``fe_package_identity.PackageChanged`` or ``PackageIdentityRefused`` (missing record, cancellation). No import."""
+    from services import fe_package_identity as fpi
+
+    return fpi.confirm(manifest, (recorded or {}).get("package"), cancel_event)
+
+
+def read_file(kind: str, preview) -> Path:
+    """The file whose content a preview holds: the FE manifest or the experimental file the importer read."""
+    return Path(preview.manifest_path if kind == FE else preview.source_path)
+
+
 def run_read(kind: str, path, token: int, cancel_event: threading.Event) -> Outcome:
     """``read_preview`` as an outcome; every failure becomes a message, never an exception (worker thread)."""
     path = Path(path)
+    before = _stat(path)
+    package_before = None
+    if kind == FE:
+        from services import fe_package_identity as fpi
+
+        package_before = fpi.stat_snapshot(path)  # the package's files as they are before the read
     try:
         preview = read_preview(kind, path, cancel_event)
     except PreviewRefused as error:
@@ -93,7 +160,14 @@ def run_read(kind: str, path, token: int, cancel_event: threading.Event) -> Outc
         return Outcome(kind, path, token, error=f"The file could not be read ({type(error).__name__}: {error}).")
     if cancel_event.is_set():
         return Outcome(kind, path, token, cancelled=True)
-    return Outcome(kind, path, token, preview=preview)
+    read = read_file(kind, preview)
+    if kind == FE:
+        identity = fe_package_identity(read, cancel_event, package_before) if read == path else None
+        return Outcome(kind, path, token, preview=preview, identity=identity)
+    identity = file_identity(read, cancel_event)
+    if identity is not None and read == path and _stat(path) != before:
+        identity = None  # the chosen file changed during the read: the data cannot be tied to one content
+    return Outcome(kind, path, token, preview=preview, identity=identity)
 
 
 class InspectSlot:
@@ -104,6 +178,7 @@ class InspectSlot:
         self.state = IDLE
         self.path: Optional[Path] = None
         self.preview: Any = None
+        self.identity: Any = None  # NEW-GUI.6-F1: the identity of the file read (Outcome.identity)
         self.message = ""
         self.cancel_event: Optional[threading.Event] = None
 
@@ -120,6 +195,7 @@ class InspectSlot:
             self.cancel_event.set()
         self.token += 1
         self.state, self.path, self.preview, self.message, self.cancel_event = IDLE, None, None, "", None
+        self.identity = None
 
     def finish(self, outcome: Outcome) -> bool:
         """Show ``outcome`` only when it is the read now running for the same file; returns whether it was taken."""
@@ -132,7 +208,7 @@ class InspectSlot:
         if outcome.error:
             self.state, self.message = FAILED, outcome.error
         else:
-            self.state, self.preview = READ, outcome.preview
+            self.state, self.preview, self.identity = READ, outcome.preview, outcome.identity
         return True
 
 

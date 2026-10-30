@@ -291,11 +291,14 @@ class NothingComputedTests(_Window):
         # commands, Run frequency diagnostic and Check reference registration, disabled until both files are read and
         # a modal set is chosen; nothing is computed before a click. tests/test_new_gui4_qt.py and
         # tests/test_new_gui5_qt.py check when they become available and what a click gives.
+        # NEW-GUI.6 (authorised): the workbench adds Run verified modal comparison and Export report..., and the two
+        # unpaired independent shape views their Show shape; all are disabled at start (tests/test_new_gui6_qt.py).
         w = self.window
         analysis, status = w.stack.widget(1).widget(), w.stack.widget(2).widget()
         buttons = analysis.findChildren(QPushButton)
         self.assertEqual([button.text() for button in buttons],
-                         ["Run frequency diagnostic", "Check reference registration"])
+                         ["Run frequency diagnostic", "Check reference registration", "Run verified modal comparison",
+                          "Export report...", "Show shape", "Show shape"])
         self.assertFalse(any(button.isEnabled() for button in buttons))
         self.assertEqual(status.findChildren(QPushButton), [])
         texts = " ".join(_texts(analysis))

@@ -1,0 +1,117 @@
+{
+  "schema": "plate-campaign-template/v1",
+  "specimen": "PLATE-300x300x1mm",
+  "series": "NEXP29/PLATE300-1MM/S261027-ROTATED",
+  "authorisation": {
+    "owner_decision": null,
+    "date": null,
+    "solve_budget": null
+  },
+  "registration": {
+    "frozen_registration_hash": null,
+    "evidence_status": "PHYSICAL_REGISTRATION_NOT_VERIFIED"
+  },
+  "base_model": {
+    "member": "S4R_0875_BASELINE",
+    "inp_sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+    "extraction_manifest_sha256": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+    "mesh": "S4R, 100 × 100, h 0.875",
+    "boundary": "free-free (baseline)"
+  },
+  "jobs": [
+    {
+      "phase": "1a. FE applicability (no registration needed)",
+      "count": 4,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null
+    },
+    {
+      "phase": "1b. optional: boundary-condition history",
+      "count": 2,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null
+    },
+    {
+      "phase": "2. SPEC §6 S4 central sensitivities",
+      "count": 4,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null
+    },
+    {
+      "phase": "3. linearity repeat",
+      "count": 4,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null
+    },
+    {
+      "phase": "4. bounded LM",
+      "count": 12,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null
+    }
+  ],
+  "applicability_jobs": [
+    {
+      "job": "PLATE_RC1_P1_B_TWO_BAND_SOFT",
+      "variant": "B. two-band suspension (261027)",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_B_TWO_BAND_STIFF",
+      "variant": "B. two-band suspension (261027)",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_C_FOUR_BAND_SOFT",
+      "variant": "C. four-band historical suspension (261016)",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_C_FOUR_BAND_STIFF",
+      "variant": "C. four-band historical suspension (261016)",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_D_SENSOR_MASS",
+      "variant": "D. force sensor / attachment",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_E_WEDGE",
+      "variant": "E. thickness / model form",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    }
+  ],
+  "fit_terms": null,
+  "holdout_terms": null,
+  "result": null
+}
