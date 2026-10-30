@@ -120,6 +120,12 @@ PRIORITY-1–4 for PLATE (261027), SP-13 (261028) and SP-10 (261029). It reads t
 The tables are archived snapshots: they are tied to your Workspace files only when the SHA-256 match. Every value is
 RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY.
 
+**Portable Windows build** (WINDOWS PORTABLE RC1, `docs/gui/WINDOWS_PORTABLE_RC1.md`): the folder
+`AbaqusModalComparator_RC1` holds `AbaqusModalComparator.exe`, the new interface frozen with its libraries and
+reference files. It starts with no Python or VS Code installation and starts no Abaqus. Measurement, FE and solver
+files are not included; you choose them in the program. The build is made by
+`packaging/portable_rc1/build_portable.py`.
+
 ## Input procedure
 
 1. Select the Abaqus `*.odb` file.
