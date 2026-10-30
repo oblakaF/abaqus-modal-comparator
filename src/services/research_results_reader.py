@@ -348,7 +348,11 @@ def load_local_record(path) -> LocalRecord:
 # ----------------------------------------------------------------------------- the Workspace link
 
 def workspace_link(specimen: str, experimental_identity, fe_identity) -> tuple:
-    """(verified, text) — the snapshot is tied to the Workspace inputs only by their SHA-256."""
+    """(verified, text) — the snapshot is tied to the Workspace inputs only by their SHA-256.
+
+    Both identities are needed: a specimen without a research FE package (SP-10) is never verified, even when the
+    experimental file matches, because its FE identity cannot be confirmed.
+    """
     spec = SPECIMENS[specimen]
     exp_sha = (experimental_identity or {}).get("sha256")
     fe_sha = (fe_identity or {}).get("sha256")
@@ -356,13 +360,17 @@ def workspace_link(specimen: str, experimental_identity, fe_identity) -> tuple:
     if exp_sha != spec.experiment_sha256:
         reasons.append("the experimental file read in the Workspace is " + (f"{exp_sha[:12]}…" if exp_sha else "none")
                        + f", not the series' {spec.experiment_sha256[:12]}…")
-    if spec.fe_manifest_sha256 and fe_sha != spec.fe_manifest_sha256:
+    elif not spec.fe_manifest_sha256:
+        reasons.append(f"the experimental SHA-256 matches the series' {spec.experiment_sha256[:12]}…")
+    if not spec.fe_manifest_sha256:
+        reasons.append(f"the FE identity is not confirmed: {specimen} has no research FE package to compare with"
+                       + (f" (the FE manifest read in the Workspace is {fe_sha[:12]}…)" if fe_sha else ""))
+    elif fe_sha != spec.fe_manifest_sha256:
         reasons.append("the FE manifest read in the Workspace is " + (f"{fe_sha[:12]}…" if fe_sha else "none")
                        + f", not the research FE package's {spec.fe_manifest_sha256[:12]}…")
     if reasons:
         return False, NOT_VERIFIED_BANNER + ": " + "; ".join(reasons)
-    return True, VERIFIED_BANNER + (" (experimental file only: SP-10 has no FE package)" if not
-                                    spec.fe_manifest_sha256 else "")
+    return True, VERIFIED_BANNER
 
 
 __all__ = ["LABELS", "LocalRecord", "MacMatrix", "NOT_VERIFIED_BANNER", "RecordRefused", "SNAPSHOT_FILES",

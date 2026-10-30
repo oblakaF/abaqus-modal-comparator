@@ -18,6 +18,8 @@ on the page's first show, not at start-up.
 - **Workspace link banner.**
   - The archived tables are said to belong to the Workspace inputs only when the experimental file read there has
     the series' SHA-256, and the FE manifest has the research FE package's SHA-256 (PLATE, SP-13).
+  - SP-10 has no research FE package, so it is never verified. When its experimental file matches, the banner says
+    so, and that the FE identity is not confirmed.
   - Otherwise the banner reads **ARCHIVED RESEARCH SNAPSHOT — NOT VERIFIED FOR CURRENT WORKSPACE INPUTS**, and the
     tables stay viewable.
 - **Mode matching — every experimental mode** (11 / 12 / 12 rows), from
@@ -65,13 +67,13 @@ on the page's first show, not at start-up.
 
 ## Tests and Windows acceptance
 
-- **Tests:** `tests/test_priority5_research_results.py` (10 tests) covers:
+- **Tests:** `tests/test_priority5_research_results.py` (14 tests) covers:
   - the 35 rows, exact frequencies, S0 / H1 / H2 from the file, unchanged statuses, rank 3 / 1.83 and 2 / 2.35;
   - the same digest for LF and CRLF checkouts;
   - refusal of a changed or damaged CSV and of a damaged, mis-sized, non-finite, out-of-range or foreign JSON;
   - the page with and without a record;
   - no confirmed-MAC wording;
-  - the SHA-256 link to the Workspace;
+  - the SHA-256 link to the Workspace (PLATE and SP-13 verified only by both SHA-256; SP-10 never verified);
   - no process started when the page opens;
   - switching specimens and scenarios.
 - The NEW-GUI.1 separation and start-up tests now include the new modules. The page shows no archived text before

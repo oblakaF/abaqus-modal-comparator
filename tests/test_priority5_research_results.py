@@ -164,7 +164,46 @@ class WorkspaceLinkTests(unittest.TestCase):
         self.assertFalse(rr.workspace_link("PLATE", {"sha256": spec.experiment_sha256}, {"sha256": "1" * 64})[0])
         self.assertTrue(rr.workspace_link("PLATE", {"sha256": spec.experiment_sha256},
                                           {"sha256": spec.fe_manifest_sha256})[0])
-        self.assertTrue(rr.workspace_link("SP-10", {"sha256": rr.SPECIMENS["SP-10"].experiment_sha256}, None)[0])
+
+    def test_plate_and_sp13_are_verified_only_by_both_matching_sha256(self):
+        for key in ("PLATE", "SP-13"):
+            spec = rr.SPECIMENS[key]
+            verified, text = rr.workspace_link(key, {"sha256": spec.experiment_sha256},
+                                               {"sha256": spec.fe_manifest_sha256})
+            self.assertTrue(verified, key)
+            self.assertEqual(text, rr.VERIFIED_BANNER)
+            for exp, fe in ((spec.experiment_sha256, None), ("3" * 64, spec.fe_manifest_sha256)):
+                verified, text = rr.workspace_link(key, {"sha256": exp}, {"sha256": fe} if fe else None)
+                self.assertFalse(verified, key)
+                self.assertTrue(text.startswith(rr.NOT_VERIFIED_BANNER))
+
+    def test_sp10_matching_experiment_without_fe_is_not_verified(self):
+        spec = rr.SPECIMENS["SP-10"]
+        verified, text = rr.workspace_link("SP-10", {"sha256": spec.experiment_sha256}, None)
+        self.assertFalse(verified)
+        self.assertTrue(text.startswith(rr.NOT_VERIFIED_BANNER + ": "))
+        self.assertNotIn(rr.VERIFIED_BANNER, text)
+        self.assertIn(f"the experimental SHA-256 matches the series' {spec.experiment_sha256[:12]}…", text)
+        self.assertIn("the FE identity is not confirmed: SP-10 has no research FE package", text)
+
+    def test_sp10_matching_experiment_with_another_fe_is_not_verified(self):
+        spec = rr.SPECIMENS["SP-10"]
+        verified, text = rr.workspace_link("SP-10", {"sha256": spec.experiment_sha256}, {"sha256": "4" * 64})
+        self.assertFalse(verified)
+        self.assertTrue(text.startswith(rr.NOT_VERIFIED_BANNER + ": "))
+        self.assertIn("the experimental SHA-256 matches", text)
+        self.assertIn("the FE identity is not confirmed", text)
+        self.assertIn("the FE manifest read in the Workspace is 444444444444…", text)
+
+    def test_sp10_other_experiment_is_not_verified(self):
+        spec = rr.SPECIMENS["SP-10"]
+        for fe in (None, {"sha256": "4" * 64}):
+            verified, text = rr.workspace_link("SP-10", {"sha256": "5" * 64}, fe)
+            self.assertFalse(verified)
+            self.assertTrue(text.startswith(rr.NOT_VERIFIED_BANNER + ": "))
+            self.assertIn(f"is 555555555555…, not the series' {spec.experiment_sha256[:12]}…", text)
+            self.assertNotIn("matches", text)
+            self.assertIn("the FE identity is not confirmed", text)
 
 
 try:
