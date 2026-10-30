@@ -97,6 +97,17 @@ creates no material value.
 **File > Choose a known new experimental source...** offers the three fitted working sources of the 2026-10-29
 delivery. They are checked against `docs/experimental/new_exp_20261029/SOURCE_PROVENANCE.csv` and by SHA-256.
 
+**Research Results** (PRIORITY-5A, `docs/gui/PRIORITY5_RESEARCH_RESULTS.md`) shows the archived research results of
+PRIORITY-1–4 for PLATE (261027), SP-13 (261028) and SP-10 (261029). It reads them only; nothing is computed or started.
+- **Mode matching:** every experimental mode, with the published statuses.
+- **Research MAC matrices:** shown from a local `matching_record.json` that you choose, checked by its structure and
+  SHA-256. They are never a confirmed MAC.
+- **PLATE FE sensitivities:** E1, E2, G12 with the rank of the sensitivity matrix.
+- **Inverse parameter study:** S0, H1, H2 with their real Abaqus checks.
+
+The tables are archived snapshots: they are tied to your Workspace files only when the SHA-256 match. Every value is
+RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY.
+
 ## Input procedure
 
 1. Select the Abaqus `*.odb` file.

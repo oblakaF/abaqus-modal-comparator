@@ -331,7 +331,9 @@ class SeparationTests(unittest.TestCase):
                        "services.modal_data_viewer", "domain.campaign_definition", "domain.forward_model_manifest",
                        "domain.identification_run",
                        # PLATE-ONLY-R1: the research plate study service (no fit, no FE solve)
-                       "services.plate_study"}
+                       "services.plate_study",
+                       # PRIORITY-5A: the archived research results reader (no computation, no solver)
+                       "services.research_results_reader"}
     # NEW-GUI.6: the scientific comparator and the program's own final drawing / report owners, each only in the one
     # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
     SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
@@ -347,7 +349,8 @@ class SeparationTests(unittest.TestCase):
                                                    "materials_panel.py", "plate_study_model.py",
                                                    "plate_study_panel.py", "preview_model.py", "preview_panel.py",
                                                    "registration_check_model.py", "registration_check_panel.py",
-                                                   "report_export.py", "shape_model.py", "shape_panel.py",
+                                                   "report_export.py", "research_results_model.py",
+                                                   "research_results_panel.py", "shape_model.py", "shape_panel.py",
                                                    "window.py", "workspace_state.py"])
         stdlib = set(sys.stdlib_module_names) | {"__future__"}
         for path in files:

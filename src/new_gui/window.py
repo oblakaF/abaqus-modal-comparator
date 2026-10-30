@@ -61,13 +61,15 @@ from new_gui.plate_study_panel import PlateStudyPanel
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
 from new_gui.registration_check_panel import RegistrationCheckPanel
+from new_gui.research_results_panel import ResearchResultsPanel
 from new_gui.shape_panel import ShapePanel
 from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
                                      scientific_status)
 
-PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study")
+PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study", "Research Results")
 MATERIALS_PAGE = 3
 PLATE_PAGE = 4
+RESEARCH_PAGE = 5  # PRIORITY-5A: archived research results, read on the page's first show
 KNOWN_SOURCES = "Choose a known new experimental source..."
 DIALOG_TITLES = {FE: "Choose the FE results file", EXPERIMENTAL: "Choose the experimental data file"}
 OPEN_ARCHIVE = "Open research archive..."
@@ -290,6 +292,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self._scroll(self._build_status_page()))
         self.stack.addWidget(self._scroll(self._build_materials_page()))
         self.stack.addWidget(self._scroll(self._build_plate_page()))
+        self.stack.addWidget(self._scroll(self._build_research_page()))
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()
@@ -423,6 +426,15 @@ class MainWindow(QMainWindow):
         layout.addStretch(1)
         return page
 
+    def _build_research_page(self) -> QWidget:
+        page, layout = self._page("Research Results", "The archived results of the real modal matching, the FE "
+                                                      "parameter sensitivities and the inverse parameter study "
+                                                      "(PRIORITY-1–4): viewing only, nothing is computed.")
+        self.research = ResearchResultsPanel()
+        layout.addWidget(self.research)
+        layout.addStretch(1)
+        return page
+
     def _build_materials_page(self) -> QWidget:
         page, layout = self._page("Materials / Scientific evidence", MATERIALS_SUBTITLE)
         self.materials = MaterialsPanel()  # NEW-GUI.6: read-only; the records are read when the page is shown
@@ -483,6 +495,8 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------------------------------- actions
 
     def show_page(self, index: int) -> None:
+        if index == RESEARCH_PAGE:
+            self.research.load()  # the archived snapshot is read on first show, not at start-up
         if index == MATERIALS_PAGE:
             self.materials.load()  # the project's material records are read on first show, not at start-up
         self.stack.setCurrentIndex(index)
@@ -658,6 +672,7 @@ class MainWindow(QMainWindow):
         identities = {"fe": self._read_identity(FE), "experimental": self._read_identity(EXPERIMENTAL)}
         self.comparison.set_inputs(*inputs, identities)  # a change removes the comparison and its drawings
         self.plate.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
+        self.research.set_workspace(identities["experimental"], identities["fe"])  # SHA-256 link only
         self._registration_changed()
         self._analysis_changed()
 
