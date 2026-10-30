@@ -54,7 +54,8 @@ on the page's first show, not at start-up.
 ## Architecture
 
 - `src/services/research_results_reader.py` (no Qt) reads and checks the archive.
-  - Each file must have its recorded SHA-256; a changed or damaged file refuses the snapshot with the reason.
+  - Each file must have its recorded SHA-256, taken over the committed content with LF line ends (the same on a
+    Windows CRLF checkout and on Linux); a changed or damaged file refuses the snapshot with the reason.
   - It also validates the local record, links to the Workspace by SHA-256, and computes the rank of the table.
 - `src/new_gui/research_results_model.py` (no Qt) formats the rows and texts. `src/new_gui/research_results_panel.py`
   is the page.
@@ -64,8 +65,9 @@ on the page's first show, not at start-up.
 
 ## Tests and Windows acceptance
 
-- **Tests:** `tests/test_priority5_research_results.py` (9 tests) covers:
+- **Tests:** `tests/test_priority5_research_results.py` (10 tests) covers:
   - the 35 rows, exact frequencies, S0 / H1 / H2 from the file, unchanged statuses, rank 3 / 1.83 and 2 / 2.35;
+  - the same digest for LF and CRLF checkouts;
   - refusal of a changed or damaged CSV and of a damaged, mis-sized, non-finite, out-of-range or foreign JSON;
   - the page with and without a record;
   - no confirmed-MAC wording;

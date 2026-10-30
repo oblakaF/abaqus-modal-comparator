@@ -41,24 +41,25 @@ STATUSES = ("MATCH_CONFIRMED", "CANDIDATE_ONLY", "AMBIGUOUS_CLUSTER", "NO_MATCH"
 MAX_RECORD_BYTES = 20 * 1024 * 1024
 RCOND = 1e-3
 
-# (published path, SHA-256, research commit) of every archived file the page reads
+# (published path, SHA-256 of the committed content with LF line ends, research commit) of every archived file: a
+# Windows checkout writes CRLF, so the content is hashed with CRLF read as LF (the same digest on every platform)
 SNAPSHOT_FILES = {
     "PLATE_MATCHING": ("docs/research/real_modal_matching_202610/PLATE_MODAL_MATCHING.csv",
-                       "4a335f1240e387e7459f5ad4abbcabc7ae80623eca31fbea397815b2fe781234", "1dd29d5"),
+                       "c9b1ea6e3c77d41b1ed91cb23ad45167e92253fdab20350036e66cd2c04f906e", "1dd29d5"),
     "SP13_MATCHING": ("docs/research/real_modal_matching_202610/SP13_MODAL_MATCHING.csv",
-                      "9b25517a41fcc5dfec9ebb84370c5b6ab52462e1c1746195c68ca73819182874", "1dd29d5"),
+                      "b82dc6314df77b2dd18cf4ded8a162dbce310f0aec93b78b92ab10829ca50919", "1dd29d5"),
     "SP10_MATCHING": ("docs/research/real_modal_matching_202610/SP10_MODAL_MATCHING.csv",
-                      "bf185280d7bae4f10584febbb071662ecec06e47fce05a949760da9ace775805", "1dd29d5"),
+                      "037c95a37ae6acac2e4451ad05056524cd2e6f0428011d65ba63364fc35690cc", "1dd29d5"),
     "SENSITIVITIES": ("docs/research/plate_s4_central/CENTRAL_SENSITIVITIES.csv",
-                      "50136be13b38021251feb9c8f4fb74cfb052801bbeeba99e9b7f3efd90864ee8", "e42649a"),
+                      "5cba4070ee7beb1e55b0ef61e95d33c115acc68e0be90a6c43d960d5687c7c4e", "e42649a"),
     "SCENARIOS": ("docs/research/plate_inverse_r1/PLATE_INVERSE_SCENARIOS.csv",
-                  "57d5ab473b6b07dda8831087ef2568bedd6b28d3ba6b14cb3b5fab8928f28310", "77a57ae"),
+                  "8848bb9c0bd0eaee516d5bb196a8cf08d30b7bd6eb97328cafb9144fe6a01a4f", "77a57ae"),
     "FE_VS_LM": ("docs/research/plate_inverse_fe_r1/REAL_FE_VS_LM.csv",
-                 "32e117317a85ac2b9aa5efb3a5963bfb49905249b3f44ffea7cc14b3cbc03882", "f19fc93"),
+                 "c1982d8178edc96ae65597f17fb2455bbcb38af5df30dd4a493ae41001a260fa", "f19fc93"),
     "FE_VS_EXPERIMENT": ("docs/research/plate_inverse_fe_r1/REAL_FE_VS_EXPERIMENT.csv",
-                         "2263e60c65dc71f147e8a5cdc67d79e8062fb48a58e326c09c14994fd6006dbb", "f19fc93"),
+                         "b75a85aa39f17b2105d5b045655754c16d50be45c79d5dae4e1d241faab18769", "f19fc93"),
     "FE_TRACKING": ("docs/research/plate_inverse_fe_r1/REAL_FE_BRANCH_TRACKING.csv",
-                    "6bae20208e599f88811f91653690048162c9ae75b682eba352f1568faafb48ec", "f19fc93"),
+                    "ef9c268db936b8e5f4b313c0f9c4460060394451085ebf3fbd452fb1e3c85559", "f19fc93"),
 }
 
 
@@ -168,7 +169,7 @@ def _read(key: str, root: Path) -> list:
     path = root / relative
     if not path.is_file():
         raise SnapshotRefused(f"{relative} is missing")
-    data = path.read_bytes()
+    data = path.read_bytes().replace(b"\r\n", b"\n")  # the committed (LF) form, whatever the checkout wrote
     digest = hashlib.sha256(data).hexdigest()
     if digest != expected:
         raise SnapshotRefused(f"{relative}: SHA-256 {digest[:12]}… is not the archived {expected[:12]}… — the file "

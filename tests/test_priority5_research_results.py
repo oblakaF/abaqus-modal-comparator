@@ -92,6 +92,16 @@ class SnapshotTests(unittest.TestCase):
         s0 = rm.scenario_view(self.snapshot, "S0")
         self.assertEqual(s0["declared"][0][2], "18.63088")
 
+    def test_the_digest_does_not_depend_on_the_line_ends_of_the_checkout(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for name, ending in (("lf", b"\n"), ("crlf", b"\r\n")):
+                root = Path(folder) / name
+                for relative, _sha, _commit in rr.SNAPSHOT_FILES.values():
+                    (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                    text = (ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
+                    (root / relative).write_bytes(text.replace(b"\n", ending))
+                self.assertEqual(len(rr.load_snapshot(root).matching["SP-10"]), 12, name)
+
     def test_a_changed_or_damaged_csv_refuses_the_snapshot(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
