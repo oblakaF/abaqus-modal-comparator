@@ -57,6 +57,8 @@ def evidence(**changes) -> list:
         "scan_window_offsets_mm": F("scan_window_offsets_mm", {"-u": 20.0, "+u": 21.0, "-v": 10.0, "+v": 10.0},
                                     rr.MEASURED, "PSV video frame (synthetic)"),
         "scan_scale": F("scan_scale", {"mm_per_unit": 1000.0}, rr.INSTRUMENT_RECORD, "dataset 164"),
+        "scan_metric_geometry": F("scan_metric_geometry", "scanner angles and distance", rr.INSTRUMENT_RECORD,
+                                  "PSV scanner angles (synthetic)"),
         "measured_dof": F("measured_dof", "+Z", rr.INSTRUMENT_RECORD, "dataset 58"),
         "fe_x_along_edges": F("fe_x_along_edges", "1/3", rr.HUMAN_CONFIRMED, "M11 §13.1"),
         "fe_origin_corner": F("fe_origin_corner", (2, 3), rr.MEASURED, "FE with measured asymmetry (synthetic)"),
@@ -154,6 +156,43 @@ class RefusalTests(unittest.TestCase):
         readiness = rr.evaluate(evidence(), self.coordinates, "Z", (0.3, 0.3))
         self.assert_missing(readiness, "FE plan against the specimen")
 
+    def test_a_wrong_scale_a_missing_metric_and_a_window_off_the_plate_are_refused(self):
+        for scale in (0.0, -1000.0, float("nan"), None):
+            with self.subTest(scale=scale):
+                readiness = self.evaluate(scan_scale=F("scan_scale", {"mm_per_unit": scale}, rr.INSTRUMENT_RECORD,
+                                                       "x"))
+                self.assert_missing(readiness, "scan scale", "positive, finite")
+        readiness = self.evaluate(scan_metric_geometry=F("scan_metric_geometry", "UNV grid", rr.CANDIDATE, "UNV"))
+        self.assert_missing(readiness, "scan_metric_geometry", "CANDIDATE")
+        outside = self.evaluate(scan_window_offsets_mm=F("scan_window_offsets_mm",
+                                                         {"-u": 45.0, "+u": -4.0, "-v": 10.0, "+v": 10.0},
+                                                         rr.MEASURED, "x"))
+        self.assert_missing(outside, "scan window", "outside the plate")
+
+    def test_a_relative_fact_never_becomes_an_absolute_one(self):
+        # the owner's "same face" carries the reference series' face over: a candidate stays a candidate
+        same = F("same_face_as_261016", "same", rr.HUMAN_CONFIRMED, "owner")
+        for reference, complete in ((F("scanned_face_261016", "unmarked", rr.CANDIDATE, "photograph"), False),
+                                    (F("scanned_face_261016", "unmarked", rr.HUMAN_CONFIRMED, "owner"), True)):
+            with self.subTest(reference=reference.provenance):
+                face = F("scanned_face", "unmarked", rr.DERIVED, "same face",
+                         derived_from=("same_face_as_261016", "scanned_face_261016"))
+                readiness = self.evaluate(scanned_face=face, same_face_as_261016=same, scanned_face_261016=reference)
+                self.assertEqual(readiness.status == rr.COMPLETE, complete, readiness.missing)
+                if not complete:
+                    self.assert_missing(readiness, "scanned_face", "rests on scanned_face_261016 (CANDIDATE)")
+        alone = self.evaluate(scanned_face=F("scanned_face", "the same as before", rr.DERIVED, "owner",
+                                             derived_from=("same_face_as_261016",)), same_face_as_261016=same)
+        self.assert_missing(alone, "scanned face", "not a physical face")  # "same" names no face
+
+    def test_test_conditions_are_never_registration_evidence(self):
+        conditions = [F(f"condition_{i}", c.value, rr.HUMAN_CONFIRMED, c.source)
+                      for i, c in enumerate(ps.EXPERIMENT_CONDITIONS)]
+        base = rr.evaluate(rr.real_261027_evidence())
+        more = rr.evaluate(list(rr.real_261027_evidence()) + conditions)
+        self.assertEqual(more.missing, base.missing)
+        self.assertEqual(more.status, rr.REGISTRATION_NOT_VERIFIED)
+
     def test_an_unknown_provenance_is_rejected(self):
         with self.assertRaises(ValueError):
             F("scanned_face", "marked", "PHOTO_GUESS", "x")
@@ -163,13 +202,26 @@ class RealSeriesTests(unittest.TestCase):
     def test_the_real_261027_series_stays_not_verified_and_invents_nothing(self):
         readiness = rr.evaluate(rr.real_261027_evidence())
         self.assertEqual(readiness.status, rr.REGISTRATION_NOT_VERIFIED)
-        self.assertEqual({key for key, _reason in readiness.missing},
-                         {"scanned_face", "grid_plus_u_edge", "grid_plus_v_edge", "rotation_reference",
-                          "scan_window_offsets_mm", "fe_origin_corner", "fe_normal_face"})
+        reasons = dict(readiness.missing)
+        self.assertEqual(set(reasons), {"scanned_face", "grid_plus_v_edge", "scan_window_offsets_mm",
+                                        "scan_metric_geometry", "fe_origin_corner", "fe_normal_face"})
+        # every open fact names the candidate it rests on: the 261016 evidence is carried over, never raised
+        self.assertIn("rests on scanned_face_261016 (CANDIDATE)", reasons["scanned_face"])
+        self.assertIn("rests on scanned_face_261016 (CANDIDATE)", reasons["grid_plus_v_edge"])
+        self.assertIn("rests on window_offsets_261016 (CANDIDATE)", reasons["scan_window_offsets_mm"])
+        self.assertIn("rests on metric_reconstruction_261016 (CANDIDATE)", reasons["scan_metric_geometry"])
         facts = {fact.key: fact for fact in rr.real_261027_evidence()}
-        for key in ("scanned_face", "grid_plus_u_edge", "grid_plus_v_edge", "scan_window_offsets_mm",
-                    "fe_origin_corner", "fe_normal_face"):
-            self.assertIsNone(facts[key].value, key)  # no physical value is invented
+        for key in ("fe_origin_corner", "fe_normal_face"):
+            self.assertIsNone(facts[key].value, key)  # no FE corner or face is invented
+        self.assertEqual(facts["scanned_face_261016"].provenance, rr.CANDIDATE)  # SCANNER_FACE pending (M11 §15.3)
+        self.assertEqual(facts["same_face_as_261016"].provenance, rr.HUMAN_CONFIRMED)
+        self.assertEqual(facts["same_points_as_261016"].provenance, rr.HUMAN_CONFIRMED)
+        self.assertEqual((facts["grid_plus_u_edge"].value, facts["grid_plus_u_edge"].provenance), (1, rr.DERIVED))
+        self.assertNotIn("grid_plus_u_edge", reasons)  # derived from independent facts only
+        self.assertNotIn("rotation_reference", reasons)
+        self.assertEqual({key for key, *_rest in readiness.supporting} & {"same_face_as_261016",
+                                                                         "point_map_261016_261027"},
+                         {"same_face_as_261016", "point_map_261016_261027"})
         self.assertEqual(facts["scan_scale"].provenance, rr.INSTRUMENT_RECORD)
         self.assertEqual(facts["measured_dof"].provenance, rr.INSTRUMENT_RECORD)
         self.assertEqual(facts["fe_x_along_edges"].provenance, rr.HUMAN_CONFIRMED)
@@ -181,13 +233,18 @@ class RealSeriesTests(unittest.TestCase):
 class WorkbenchTests(unittest.TestCase):
     def test_the_chain_blocks_pairs_and_estimation_without_a_frozen_registration(self):
         real = pw.workbench_chain(True, rr.evaluate(rr.real_261027_evidence()))
-        self.assertEqual([row[0] for row in real], ["Source UNV", "Physical specimen", "Scan orientation", "FE model",
+        self.assertEqual([row[0] for row in real], ["Source UNV", "Physical specimen",
+                                                    "Test conditions and scan orientation", "FE model",
                                                     "Registration", "Mode pairs", "Parameter estimation"])
+        self.assertTrue(all(len(row) == len(pw.CHAIN_COLUMNS) == 6 for row in real))
         status = {row[0]: row[1] for row in real}
         self.assertEqual(status["Physical specimen"], ps.HUMAN_CONFIRMED)
         self.assertEqual(status["Registration"], rr.REGISTRATION_NOT_VERIFIED)
         self.assertEqual((status["Mode pairs"], status["Parameter estimation"]), (pw.BLOCKED, pw.BLOCKED))
-        self.assertTrue(all(row[3] for row in real))  # every link states its blocking reason (or "—")
+        self.assertTrue(all(row[4] and row[5] for row in real))  # every link: blocking reason (or "—"), diagnostics
+        conditions = next(row for row in real if row[0].startswith("Test conditions"))
+        self.assertTrue(conditions[1].startswith(ps.HUMAN_CONFIRMED_SETUP_CHANGE))
+        self.assertIn(rr.LINK_OPEN, conditions[1])  # the setup change never closes the scan link
         coordinates, _truth = synthetic_scan()
         complete = rr.evaluate(evidence(), coordinates, "Z", (301.0, 300.0))
         status = {row[0]: row[1] for row in pw.workbench_chain(True, complete)}
@@ -200,7 +257,10 @@ class WorkbenchTests(unittest.TestCase):
 
     def test_the_10_percent_breakdown_turns_nothing_into_a_material_accuracy(self):
         rows = {row[0].split(" (")[0]: row for row in pw.target_breakdown(18.6307, 19.072)}
-        self.assertEqual(rows["frequency error"][1:3], ("+2.37 %", "DIAGNOSTIC_ONLY"))
+        self.assertEqual(rows["frequency error"][1:3], ("+2.37 %", "FREQUENCY_ONLY_DIAGNOSTIC"))
+        self.assertIn("does not prove", rows["frequency error"][3])
+        self.assertEqual(rows["experimental registration"][2], rr.REGISTRATION_NOT_VERIFIED)
+        self.assertIn("two rubber bands", rows["suspension"][3])
         self.assertIn("not a material accuracy", rows["frequency error"][3])
         self.assertEqual(rows["shape identity"][2], "NOT_ESTABLISHED")
         self.assertEqual(rows["uncertainty of D"][2], "UNKNOWN")
@@ -220,8 +280,20 @@ class WorkbenchTests(unittest.TestCase):
         for lock in ("no frozen physical registration → no campaign", "D-044", "M8 GATE NOT_MET",
                      "D-077 NO_GLOBAL_PARAMETER_VALUE", "SPEC §6 S5"):
             self.assertIn(lock, stops)
-        self.assertEqual([jobs for _p, jobs, _r, _c in pw.campaign_budget()], [4, 4, 4, 12])
-        self.assertEqual([jobs for _p, jobs, _r, _c in pw.campaign_budget(include_d12=True)], [4, 6, 6, 12])
+        self.assertEqual([jobs for _p, jobs, _r, _c in pw.campaign_budget()], [4, 2, 4, 4, 12])
+        self.assertEqual([jobs for _p, jobs, _r, _c in pw.campaign_budget(include_d12=True)], [4, 2, 6, 6, 12])
+        variants = {v["variant"]: v for v in pw.APPLICABILITY_VARIANTS}
+        self.assertEqual(list(variants), ["A", "B", "C", "D", "E"])
+        self.assertIn("never a material identification from 33.4491 Hz", variants["C"]["purpose"])
+        self.assertIn("never from 18.6307 or 33.4491 Hz", " ".join(variants["B"]["values"]["assumptions"]))
+        jobs = pw.applicability_jobs()
+        self.assertEqual(len(jobs), 6)
+        for job in jobs:  # every future job is fully specified and not authorised
+            for key in ("source_inp", "changed", "fixed", "expected_outputs", "fe_mode_identity", "stop",
+                        "authorisation"):
+                self.assertTrue(job[key], (job["job"], key))
+            self.assertIn("not given", job["authorisation"])
+            self.assertIn("no experimental MAC", job["fe_mode_identity"])
         template = pw.campaign_template()
         self.assertIsNone(template["authorisation"]["owner_decision"])
         self.assertIsNone(template["registration"]["frozen_registration_hash"])

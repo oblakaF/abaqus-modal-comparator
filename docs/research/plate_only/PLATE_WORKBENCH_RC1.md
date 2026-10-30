@@ -1,6 +1,6 @@
 # PLATE-WORKBENCH-RC1 — integrated workbench and physical registration preparation of the single plate
 
-**Status: REVIEW_READY (2026-10-30). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; final correction §9). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, frozen registration or scientific gate. No Abaqus, solver, LM, Auto-ID, FE computation or iterative
 estimation was run. No sandwich data were used in the new work.
 
@@ -82,7 +82,7 @@ The full scenario was run on read-only copies of the real files (§8):
 | face towards the Polytec | NOT_VERIFIED | no record; the camera frame is in the undelivered `.svd` |
 | physical edge along the grid's +u / +v | NOT_VERIFIED | no record links edges 1–4 to the scan frame |
 | reference and direction of the 45° turn | NOT_VERIFIED | direction stated (lab note), reference position not; the grid angle 45.24° fixes nothing mod 90° |
-| scan window relative to the edges | NOT_VERIFIED | grid 277.7 × 277.0 mm against the 301 × 300 mm plate; how the ≈ 23 mm margins split is unknown |
+| scan window relative to the edges | NOT_VERIFIED | grid 277.7 × 277.0 mm against the 301 × 300 mm plate; how the ≈ 23 mm margins split is unknown. **Superseded (§9.3):** the UNV grid is a representation, not a physical window |
 | scale | INSTRUMENT_RECORD | SI metres, measured distance 1.15 m |
 | measured DOF | INSTRUMENT_RECORD | +Z of the scan frame, pointing from the plate towards the Polytec |
 
@@ -132,7 +132,7 @@ NOT_VERIFIED. No physical coordinate is invented.
   computed.
 - **Real series.** `real_261027_evidence()` records today's sources. Result: NOT_VERIFIED, missing `scanned_face`,
   `grid_plus_u_edge`, `grid_plus_v_edge`, `rotation_reference`, `scan_window_offsets_mm`, `fe_origin_corner`,
-  `fe_normal_face`.
+  `fe_normal_face`. **Superseded by §9.4** (six facts, each naming the candidate it rests on).
 
 **The facts that would close it** (none concerns the identity):
 1. Which face faced the Polytec on 27.10, and which numbered edge lies towards the grid's +u and +v (figure 03). A
@@ -267,7 +267,248 @@ Every material parameter of this plate is NOT_IDENTIFIABLE. The iterative-estima
   - close.
 - **LEGACY_GUI (`RUN_PROGRAM.cmd`):** window "Abaqus–Simcenter Modal Comparator" in 3.8 s, closed, exit 0.
 
+## 9. Final correction (2026-10-30)
+
+This section corrects the RC1 interpretation of the test conditions and completes the review. Earlier sections are
+kept as written; where §9 supersedes them, they say so.
+
+### 9.1 Owner clarification — suspension and rotation, 2026-10-30
+
+| Fact | 261016 | 261027 |
+|---|---|---|
+| Physical specimen | the same | the same |
+| Suspension | 4 rubber bands | 2 rubber bands |
+| Orientation | original | turned 45° |
+| Measured physical points | the same | the same |
+| Measured face | the same | the same |
+| First record | 33.4491 Hz | 18.6307 Hz |
+| Role | history (`HISTORY_ONLY`) | primary experiment for M11 (`PRIMARY_EXPERIMENT_FOR_M11_RESEARCH`) |
+
+- **Provenance.** Every row is `HUMAN_CONFIRMED` (owner, 2026-10-30). The first records are `INSTRUMENT_RECORD`.
+- **The earlier picture of the setup was wrong.** An earlier paraphrase had the suspension the same in both series.
+  The owner's clarification takes precedence.
+  - In this branch the code already separated the setups ("four corner straps" against "two upper points").
+  - The correction adds the owner's band counts, the roles of the two series and the provenance of each fact.
+  - Only the current interpretation in non-normative material changes; no primary measurement is altered.
+- **The laboratory note, checked in the original.** `Read me.txt` (SHA-256 `4c03624a…`, read only) states:
+  - "the plate was rotated 45° clockwise as viewed from the Polytec system";
+  - "suspended using rubber bands and strings attached to two upper points along the nodal line of the first mode";
+  - the node numbering changes when the plate is rotated;
+  - the Z distance was previously left at the default 1 m; this time it was measured as 1.15 m.
+
+  These facts keep their own provenance, `LAB_RECORD`, and are not mixed with the owner's confirmation.
+- **Statuses.**
+  - `HUMAN_CONFIRMED_SETUP_CHANGE`: four rubber bands became two, and the plate was turned 45°.
+  - `OWNER_EXPLANATION_OF_FREQUENCY_CHANGE`: the two-band suspension is freer.
+- **Not established.**
+  - The separate numerical contributions of the suspension and of the turn.
+  - That record 1 of the two series is the same elastic mode.
+  - Any band stiffness derived from 33.4491 → 18.6307 Hz.
+  - A Σ_setup repeat: the configuration was changed on purpose (not a D-053 repeat).
+  - That 261016 was wrong.
+  - The absolute measured face: "the same face" is a relative fact.
+  - Any registration evidence.
+- **Single source.** The service `plate_study.EXPERIMENT_CONDITIONS` holds these facts; the GUI and the export read
+  them from there.
+
+### 9.2 Link of the two scans (instrument geometry only)
+
+`plate_registration_readiness.series_link` compares the two scan geometries. It uses only the point ids and the grid
+axes; no mode, frequency or MAC enters.
+
+**Inputs** (read only):
+- 261016 PSV export `6d66eafe…`; its POLYMAX file `117c893b…` has the same geometry;
+- 261027 `76db80ae…`.
+
+**Result.**
+
+| Item | Result | Status |
+|---|---|---|
+| Same physical points | owner, 2026-10-30 | `SAME_PHYSICAL_POINTS_HUMAN_CONFIRMED` |
+| Point ids | both 1–289 on a 17 × 17 grid; 289 of 289 ids are kept by one proper grid symmetry (the identity) | DERIVED |
+| Point-to-point map | id k ↔ id k | `POINT_TO_POINT_MAPPING_DERIVED`, not instrument-verified (needs the scanner angles and camera frames of both sessions; the 261027 `.svd` is not delivered) |
+| Turn of the grid | −44.17° in the scan frame, i.e. clockwise as viewed from the Polytec (+Z towards it) | DERIVED. It agrees with the laboratory note (45° clockwise) and the owner (45°). The ids fix the turn modulo 360°, not only modulo 90° |
+| Mirror relation | does not fit (no id kept) | consistent with the same face; says nothing about which face |
+| UNV pitch ratio | 1.120 (z = −1 m default in 261016, −1.15 m measured in 261027) | a representation, not a physical scale |
+
+The scan-frame numbering changes with the turn, as the laboratory note says, but on the plate each id stays with its
+point. Different UNV ids for the same physical points would never make the plate another specimen: the service then
+refuses the map and asks for the instrument records.
+
+### 9.3 Correction: the 261027 UNV grid is not the physical window
+
+M11 §15.4 found that the PSV UNV metric geometry is not a physical calibration:
+- the 261016 UNV grid is near-square (aspect 0.9951);
+- the scanner angles of the same points give an aspect of 0.7747;
+- the diagnostic reconstruction gives 215.42 × 285.20 mm.
+
+The 261027 UNV grid is again near-square (277.7 × 277.0 mm). With the owner's same points, the physical 261027 window
+is the 261016 one (diagnostic, about 215.4 × 285.2 mm), not 277.7 × 277.0 mm. §3.2's window row is superseded.
+
+The service now has a separate fact `scan_metric_geometry`: the scan coordinates must be physical positions, not a grid
+representation. `scan_scale` stays an instrument record of units and distance only.
+
+### 9.4 Physical registration of 261027 now
+
+| Fact | Value | Provenance | State |
+|---|---|---|---|
+| `rotation_reference` | the 261016 position, turned 45° clockwise | DERIVED from the owner's 45° and the id-preserving turn | **closed** |
+| `grid_plus_u_edge` | edge 1 | DERIVED: the 261016 grid +u pointed up (`.svd` video alignment, M11 §14.2) to edge 1 (top, M11 §13.1); id k ↔ id k keeps it | **closed** |
+| `scan_scale`, `measured_dof`, `fe_x_along_edges` | SI, 1.15 m; +Z towards the Polytec; X along 1 / 3 | INSTRUMENT_RECORD / HUMAN_CONFIRMED | closed |
+| `scanned_face` | unmarked (the 261016 face) | DERIVED, rests on `scanned_face_261016` (CANDIDATE: SCANNER_FACE = HUMAN_CONFIRMATION_PENDING, M11 §15.3) | open |
+| `grid_plus_v_edge` | 2 if the unmarked face was scanned, 4 if the marked | DERIVED, rests on the same candidate | open |
+| `scan_window_offsets_mm` | −u 7.02, +u 7.78, −v 29.19, +v 56.4 mm (the 261016 offsets) | DERIVED, rests on `window_offsets_261016` (CANDIDATE: DIAGNOSTIC_ONLY reconstruction) | open |
+| `scan_metric_geometry` | the 261016 physical positions of the same points | DERIVED, rests on `metric_reconstruction_261016` (CANDIDATE) | open |
+| `fe_origin_corner`, `fe_normal_face` | — | CANDIDATE (A–D); the M11 model has no landmark | open |
+
+**Verdict:** `PHYSICAL_REGISTRATION_NOT_VERIFIED` (unchanged). No FrozenRegistration was created, no MAC computed and
+no orientation chosen by numbers. The relative facts carry the 261016 evidence over and never raise it.
+
+**What would close the open facts**, from records that already exist (`CLOSING_EVIDENCE`):
+1. **`scanned_face` and `grid_plus_v_edge`:** the 261016 SCANNER_FACE answer (M11 §15.3: did the laser see the face
+   without marks? one yes / no). The owner's same-face statement then carries it to 261027. This asks for the absolute
+   face, not for a second confirmation of the same face.
+2. **`scan_window_offsets_mm` and `scan_metric_geometry`:** any one of:
+   - a PSV screenshot of a copy of the 261016 `.svd` with the points on the video frame;
+   - the SUPERVISOR's decision on deviations 2 and 3 (M11 §15.4);
+   - the 261027 `.svd` itself.
+3. **`fe_origin_corner` and `fe_normal_face`:** either an FE model built with a measured asymmetry, or a SUPERVISOR
+   convention recorded as CONVENTION_ONLY. A convention never becomes a physical registration.
+
+### 9.5 Abaqus M11
+
+M11 `S4R_0875_BASELINE` is the idealised free-free FE base of this study. Record 1 of 261027 (18.6307 Hz) against FE 7
+(19.072 Hz) gives +2.37 %, `FREQUENCY_ONLY_DIAGNOSTIC`. This is consistent with a freer suspension. It does not show:
+- that the two are the same mode;
+- that M11 is physically validated;
+- a material accuracy;
+- an orientation.
+
+Applicability to the test (two bands, the force sensor) is NOT_VERIFIED.
+
+### 9.6 Program changes (no new GUI, no new service family)
+
+- **`plate_study`:**
+  - `EXPERIMENT_CONDITIONS` and `conditions()`;
+  - `NOT_ESTABLISHED_BY_THE_CONDITIONS` and `CONDITIONS_CORRECTION`;
+  - the roles of the two series;
+  - the applicability rows "suspension" and "series difference: cause"
+    (`HUMAN_CONFIRMED_SETUP_CHANGE / OWNER_EXPLANATION_OF_FREQUENCY_CHANGE`);
+  - the orientation chain and the plan.
+- **`plate_registration_readiness`:**
+  - `series_link` and `grid_indices`;
+  - the recorded link `SERIES_LINK_261016_261027`, with its inputs by SHA-256;
+  - the new fact `scan_metric_geometry`;
+  - a refusal of a non-positive or non-finite scale;
+  - a refusal of a window off the plate (negative offset);
+  - the "rests on" list for every non-independent derivation;
+  - the supporting facts in the result;
+  - `CLOSING_EVIDENCE`.
+- **`plate_workbench`:**
+  - the chain has six columns: link, status, confirmation, source, missing and blocking, diagnostics available. The
+    third link is "Test conditions and scan orientation";
+  - the ±10 % parts gain "experimental registration", and the frequency row is `FREQUENCY_ONLY_DIAGNOSTIC`;
+  - `APPLICABILITY_VARIANTS` and `applicability_jobs()`.
+- **Plate Study page and export:**
+  - the conditions table;
+  - the link of the two scans;
+  - what would close the registration;
+  - the six-column chain;
+  - record schema `plate-workbench-rc1/study/v2`.
+
+### 9.7 FE applicability variants (prepared; 0 Abaqus solves)
+
+| Variant | Jobs | Role | Confirmed | Assumed / future sensitivity |
+|---|---|---|---|---|
+| A free-free | — (exists) | reference | M11 package identity | no support |
+| B two-band (261027) | `PLATE_RC1_P1_B_TWO_BAND_SOFT`, `…_STIFF` | applicability | 2 bands (owner); two upper points on the nodal line (laboratory note) | band stiffness, length and points not recorded: from the owner or the laboratory, or a RESEARCH_RANGE declared before the run; never from 18.6307 or 33.4491 Hz |
+| C four-band (261016) | `PLATE_RC1_P1_C_FOUR_BAND_SOFT`, `…_STIFF` | boundary-condition history only | 4 bands (owner); four corner straps (M11 §13.3) | as B; never a material identification from 33.4491 Hz; no claim that the bands change a mode before the shapes are identified |
+| D force sensor | `PLATE_RC1_P1_D_SENSOR_MASS` | applicability | a force reference channel | the sensor's point and mass: needed before the job |
+| E thickness / model form | `PLATE_RC1_P1_E_WEDGE` (source `S4R_WEDGE`) | applicability | 20 edge readings | interior thickness not measured; the wedge is a model form, never an invented map |
+
+Each job records:
+- the source INP and its SHA-256;
+- the changed and the fixed values;
+- the expected outputs (`.odb`, `.dat`, `.msg`, `.sta` and the extraction package; the extraction is its own Abaqus
+  Python gate);
+- the FE-to-FE mode identity (`track_branches`, `confirm_cluster`, rigid modes separated, no experimental MAC);
+- the stop rules;
+- "authorisation not given".
+
+**Budget:**
+
+| Phase | Jobs | Prerequisite |
+|---|---|---|
+| 1a. Applicability: B ×2, D ×1, E ×1 | 4 | band data or a declared research range; the sensor's point and mass |
+| 1b. Optional history: C ×2 | 2 | phase 1a |
+| 2. SPEC §6 S4 central ±5 % | 4 (6 with D12) | frozen registration and confirmed pairs |
+| 3. ±2.5 % repeat | 4 (6 with D12) | phase 2 |
+| 4. Bounded LM | ≤ 12 | FIT / HOLDOUT frozen; owner authorisation |
+
+The template `plate_campaign_template_rc1.json` was regenerated from the service.
+
+### 9.8 Tests and checks (final correction)
+
+**New tests:**
+- **`tests/test_plate_rc1_owner_clarification.py`** (12 tests):
+  - the conditions of both series and their roles;
+  - 33.4491 Hz never a target;
+  - the explanation stays an explanation;
+  - the provenance of every fact, with the laboratory note never passing for the owner;
+  - a convention or a relative fact never closes the registration;
+  - `series_link`: a kept-id turn is DERIVED in both senses and INSTRUMENT_VERIFIED only on both records; the owner's
+    statement is kept apart from the map; mirrored, relabelled or missing ids are refused;
+  - the recorded link, reproduced from the real files where present (skipped elsewhere);
+  - gates: M8, D-077, the iteration refused, no registration written, no `install_*` layer.
+- **`tests/test_plate_registration_readiness.py`** gains:
+  - wrong scale, missing metric and a window off the plate are refused;
+  - a relative fact never becomes an absolute one;
+  - test conditions are never registration evidence;
+  - the real series now has six open facts, each naming its candidate;
+  - the six-column chain; the applicability jobs.
+- **`tests/test_plate_study_qt.py`** gains the conditions table with its provenance.
+
+**Updated expectations:**
+- the chain link names;
+- the "series difference: cause" state;
+- `FREQUENCY_ONLY_DIAGNOSTIC`;
+- the budget 4 / 2 / 4 / 4 / 12.
+
+**Test results:**
+- Targeted: 379 OK, 2 skipped. Covered: NEW-GUI.1–6 (Workspace, Preview, Shapes, Diagnostic, Registration and
+  Analysis Qt, Workbench), FE package identity, APP-E2E.3, R7 shell modal safety, Plate Study and its Qt page,
+  registration readiness and the owner clarification. Skipped:
+  - the glyph test (offscreen has no font database);
+  - the real archived comparisons (`NEW_GUI6_REAL_INPUTS` not set).
+- **Full unittest:** 3092 OK, 98 skipped (isolated LOCALAPPDATA).
+- **Full pytest:** 3029 passed, 114 skipped, 3641 subtests passed. The one warning is the existing collection warning
+  for `TestRun` in `src/domain/specimen.py`.
+- `test_g2_eigfreq_precision` (16) is NOT_RUN: it reads `-work` data.
+
+**Windows smoke: PASS.**
+- **`RUN_NEW_GUI.cmd`** (native dialogs, UI Automation, isolated copies):
+  - start in 3.0 s; `Polymax_bravo` with 11 records; FREQUENCY_ONLY_DIAGNOSTIC;
+  - the registration check refused and the comparison unavailable;
+  - Plate Study:
+    - four and two rubber bands, "turned 45° from the 261016 position";
+    - "clockwise" as LAB_RECORD; the owner as the source;
+    - HISTORY_ONLY and PRIMARY_EXPERIMENT;
+    - SAME_PHYSICAL_POINTS and POINT_TO_POINT_MAPPING_DERIVED;
+    - 18.6307 / 19.0722;
+    - 2 × BLOCKED; the gate disabled;
+  - no page scroll at 900 × 680 or 1366 × 768;
+  - exit 0, no process left.
+- **In-process** (Qt `windows`, DPI 96 × DPR 1.5, isolated copies):
+  - FE mode 7 (19.0722 Hz) and record 1 (18.6307 Hz) shown, unpaired;
+  - the six-column chain and the state columns visible;
+  - export;
+  - export refused after a UNV, a mode CSV and a manifest change, with the earlier reports unchanged;
+  - Run refused after a geometry CSV change;
+  - the originals unchanged.
+- **LEGACY_GUI (`RUN_PROGRAM.cmd`):** window in 4.1 s, closed, exit 0.
+
 ## Not changed
 
 SPEC, DECISIONS, STATUS, EVIDENCE, frozen registrations, scientific gates and criteria, M8 / D-077, the 5 / 8 %
-limits, every original file and every other branch. No new `install_*` layer.
+limits, every original file and every other branch. No new `install_*` layer. Abaqus solves in the final correction:
+0.

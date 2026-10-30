@@ -310,7 +310,8 @@ class InputTraceabilityTests(_PlateWindow):
         states = {applicability.item(r, 0).text(): applicability.item(r, 1).text()
                   for r in range(applicability.rowCount())}
         self.assertEqual(states["series difference: mode identity"], ps.MODE_IDENTITY_NOT_VERIFIED)
-        self.assertEqual(states["series difference: cause"], ps.SETUP_DEPENDENCE_SUSPECTED)
+        self.assertEqual(states["series difference: cause"],
+                         f"{ps.HUMAN_CONFIRMED_SETUP_CHANGE} / {ps.OWNER_EXPLANATION}")
         thickness = self.panel.tables["thickness"]
         rows = {thickness.item(r, 0).text(): (thickness.item(r, 1).text(), thickness.item(r, 2).text())
                 for r in range(thickness.rowCount())}
@@ -341,22 +342,24 @@ class InputTraceabilityTests(_PlateWindow):
         view = self.panel.view
         chain = self.panel.tables["chain"]
         status = {chain.item(r, 0).text(): chain.item(r, 1).text() for r in range(chain.rowCount())}
-        self.assertEqual(list(status), ["Source UNV", "Physical specimen", "Scan orientation", "FE model",
-                                        "Registration", "Mode pairs", "Parameter estimation"])
+        self.assertEqual(list(status), ["Source UNV", "Physical specimen", "Test conditions and scan orientation",
+                                        "FE model", "Registration", "Mode pairs", "Parameter estimation"])
+        self.assertEqual(chain.columnCount(), 6)
         self.assertEqual(status["Registration"], "PHYSICAL_REGISTRATION_NOT_VERIFIED")
         self.assertEqual((status["Mode pairs"], status["Parameter estimation"]), ("BLOCKED", "BLOCKED"))
         self.assertLessEqual(chain.columnViewportPosition(1) + chain.columnWidth(1), chain.viewport().width())
         texts = " ".join(label.text() for label in self.panel.findChildren(type(self.panel.why)))
-        for key in ("scanned_face", "grid_plus_u_edge", "fe_origin_corner"):
+        for key in ("scanned_face", "grid_plus_v_edge", "scan_metric_geometry", "fe_origin_corner",
+                    "rests on scanned_face_261016 (CANDIDATE)", "SCANNER_FACE answer"):
             self.assertIn(key, texts)
         self.assertEqual(view.record["registration_readiness"]["status"], "PHYSICAL_REGISTRATION_NOT_VERIFIED")
         self.assertFalse(view.record["registration_readiness"]["mac_computed"])
         self.assertFalse(view.record["registration_readiness"]["frozen"])
         self.assertIsNotNone(self.panel.spectrum.source)  # the spectra image is shown
         target = self.panel.tables["target"]
-        self.assertEqual(target.item(0, 2).text(), "DIAGNOSTIC_ONLY")
+        self.assertEqual(target.item(0, 2).text(), "FREQUENCY_ONLY_DIAGNOSTIC")
         self.assertEqual(target.item(target.rowCount() - 1, 2).text(), "NOT_ACHIEVED")
-        self.assertEqual(self.panel.tables["campaign"].rowCount(), 4)
+        self.assertEqual(self.panel.tables["campaign"].rowCount(), 5)
         self.assertEqual(view.record["fe_campaign"]["specification"]["status"], "PREPARED_NOT_AUTHORISED")
         self.assertFalse(self.panel.gate_button.isEnabled())
         self.assertEqual(self.panel.tables["experiment"].item(0, 0).text(), "1")  # the first record is kept
@@ -365,8 +368,42 @@ class InputTraceabilityTests(_PlateWindow):
         markdown = next(self.reports.glob("*.md")).read_text(encoding="utf-8")
         for heading in ("## Physical registration readiness: PHYSICAL_REGISTRATION_NOT_VERIFIED",
                         "## Workbench chain", "## The ±10 % goal, part by part",
-                        "## Prepared FE campaign (NOT authorised; nothing run)"):
+                        "## Prepared FE campaign (NOT authorised; nothing run)",
+                        "## Test conditions (owner clarification, 2026-10-30)",
+                        "## Link of the scans 261016 → 261027 (instrument geometry only)"):
             self.assertIn(heading, markdown)
+
+    def test_the_owner_clarification_of_the_test_conditions_is_shown_with_its_provenance(self):
+        # RC1 final correction (owner, 2026-10-30): two and four rubber bands, the 45° turn, the same plate, points and
+        # face; each fact with its provenance (owner, laboratory note, instrument, derivation); from the service only
+        self.read()
+        self.run_study()
+        view = self.panel.view
+        table = self.panel.tables["conditions"]
+        rows = {(table.item(r, 0).text(), table.item(r, 1).text()): (table.item(r, 2).text(), table.item(r, 3).text(),
+                                                                     table.item(r, 4).text())
+                for r in range(table.rowCount())}
+        self.assertEqual(rows[("261016", "suspension")][:2], ("four rubber bands", ps.HUMAN_CONFIRMED))
+        self.assertEqual(rows[("261027", "suspension")][:2], ("two rubber bands", ps.HUMAN_CONFIRMED))
+        self.assertEqual(rows[("261027", "orientation")][:2], ("turned 45° from the 261016 position",
+                                                                ps.HUMAN_CONFIRMED))
+        self.assertEqual(rows[("261027", "direction of the turn")][1], ps.LAB_RECORD)
+        self.assertIn("owner, 2026-10-30", rows[("261027", "suspension")][2])
+        self.assertIn(ps.PRIMARY_EXPERIMENT, rows[("261027", "role")][2])
+        self.assertIn(ps.HISTORY_ONLY, rows[("261016", "role")][2])
+        self.assertIn(ps.SAME_POINTS, rows[("both", "measured points")][2])
+        self.assertEqual(table.rowCount(), len(ps.EXPERIMENT_CONDITIONS))
+        self.assertLessEqual(table.columnViewportPosition(3) + table.columnWidth(3), table.viewport().width())
+        series = self.panel.tables["series"]
+        states = {series.item(r, 0).text(): series.item(r, 2).text() for r in range(series.rowCount())}
+        self.assertEqual(states["point-to-point map"], "POINT_TO_POINT_MAPPING_DERIVED")
+        self.assertEqual(view.record["experiment_conditions"]["roles"],
+                         {"261016": ps.HISTORY_ONLY, "261027": ps.PRIMARY_EXPERIMENT})
+        texts = " ".join(label.text() for label in self.panel.findChildren(type(self.panel.why)))
+        self.assertIn("An earlier paraphrase of the test conditions (the same suspension in both series) was wrong",
+                      texts)
+        self.assertIn("primary experiment (two rubber bands, turned 45°)", texts)
+        self.assertFalse(self.panel.gate_button.isEnabled())
 
     def test_a_new_preview_equal_in_value_still_resets(self):
         self.read()

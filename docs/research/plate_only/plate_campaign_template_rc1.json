@@ -20,8 +20,15 @@
   },
   "jobs": [
     {
-      "phase": "1. FE applicability (no registration needed)",
+      "phase": "1a. FE applicability (no registration needed)",
       "count": 4,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null
+    },
+    {
+      "phase": "1b. optional: boundary-condition history",
+      "count": 2,
       "inp_sha256": null,
       "odb_sha256": null,
       "extraction_package_sha256": null
@@ -46,6 +53,62 @@
       "inp_sha256": null,
       "odb_sha256": null,
       "extraction_package_sha256": null
+    }
+  ],
+  "applicability_jobs": [
+    {
+      "job": "PLATE_RC1_P1_B_TWO_BAND_SOFT",
+      "variant": "B. two-band suspension (261027)",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_B_TWO_BAND_STIFF",
+      "variant": "B. two-band suspension (261027)",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_C_FOUR_BAND_SOFT",
+      "variant": "C. four-band historical suspension (261016)",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_C_FOUR_BAND_STIFF",
+      "variant": "C. four-band historical suspension (261016)",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_D_SENSOR_MASS",
+      "variant": "D. force sensor / attachment",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
+    },
+    {
+      "job": "PLATE_RC1_P1_E_WEDGE",
+      "variant": "E. thickness / model form",
+      "declared_values": null,
+      "inp_sha256": null,
+      "odb_sha256": null,
+      "extraction_package_sha256": null,
+      "authorised": null
     }
   ],
   "fit_terms": null,

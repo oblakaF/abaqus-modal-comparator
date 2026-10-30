@@ -12,6 +12,9 @@ PLATE-ONLY-R2: the result also shows the specimen identity (HUMAN_CONFIRMED by t
 provenance and limits), the archived record of this specimen (M11 measurements of 2026-10-21, never measurements of
 27.10), the applicability of the initial FE model to the 261027 test (NOT_VERIFIED), the orientation chain (nothing
 chosen) and the uncertainty budget with the archived record.
+
+PLATE-WORKBENCH-RC1 final correction: the test conditions of both series (owner, 2026-10-30; laboratory note;
+instrument) and the link of the two scans, from the services.
 """
 
 from __future__ import annotations
@@ -251,9 +254,17 @@ class PlateStudyPanel(QWidget):
 
             self.result_layout.addWidget(_label(f"FE package: {view.member}", ""))
             self.result_layout.addWidget(_label(f"Registration: {view.registration}", "warnings"))
-            self._table("chain", "Workbench chain: Source UNV → Physical specimen → Scan orientation → FE model → "
-                        "Registration → Mode pairs → Parameter estimation", ("Link", "Status", "Source", "Blocking"),
-                        view.chain_rows, 3, (0, 1, 2, 3), capped=(1, 2))
+            self._table("chain", "Workbench chain: Source UNV → Physical specimen → Test conditions and scan "
+                        "orientation → FE model → Registration → Mode pairs → Parameter estimation",
+                        ("Link", "Status", "Confirmation", "Source", "Missing and blocking", "Diagnostics available"),
+                        view.chain_rows, 4, (0, 1, 2, 3, 4, 5), capped=(0, 1, 2, 3, 5))
+            self._table("conditions", "Test conditions: 261016 (HISTORY_ONLY, four rubber bands) and 261027 (the "
+                        "primary experiment, two rubber bands, turned 45°)",
+                        ("Series", "Item", "Value", "Provenance", "Source / status"), view.conditions_rows, 2,
+                        (0, 1, 2, 3, 4), capped=(1, 3, 4))
+            self.result_layout.addWidget(_label(ps.CONDITIONS_CORRECTION + "\nNot established by the conditions:\n"
+                                                + "\n".join(f"• {item}" for item in
+                                                            ps.NOT_ESTABLISHED_BY_THE_CONDITIONS), "warnings"))
             self._table("identity", f"Specimen identity: {view.record.get('plate_identity')} (owner, 2026-10-30; "
                         "physical identity only)", ("Evidence", "Content", "Weight"), view.identity, 1, (0, 1, 2))
             self._table("specimen", "Archived record of this specimen (M11 measurements, 2026-10-21) — NOT "
@@ -279,16 +290,21 @@ class PlateStudyPanel(QWidget):
             self.result_layout.addWidget(self.spectrum)
             self._table("applicability", f"Applicability of the initial FE model to the 261027 test: "
                         f"{ps.APPLICABILITY_NOT_VERIFIED}", ("Aspect", "State", "FE model", "Specimen / test", "Note"),
-                        view.applicability_rows, 4, (0, 1, 2, 3, 4), capped=(2, 3))
+                        view.applicability_rows, 4, (0, 1, 2, 3, 4), capped=(1, 2, 3))  # long states elide
             self._table("orientation", "Orientation chain — nothing is chosen by MAC, frequency or shape",
                         ("Link", "State", "Known", "Open"), view.orientation_rows, 3, (0, 1, 2, 3), capped=(0, 2))
             self.result_layout.addWidget(_label("\n".join(f"• {line}" for line in ps.ORIENTATION_NOTES), "hint"))
+            self._table("series", "Link of the scans 261016 → 261027 — instrument geometry only (no mode, frequency "
+                        "or MAC)", ("Item", "Value", "State"), view.series_rows, 1, (0, 1, 2), capped=(0, 2))
             self._table("registration", f"Physical registration readiness: {view.registration_status} (no "
                         "orientation from MAC, frequency or shape; nothing frozen)",
                         ("Link", "Fact", "Value", "Provenance", "Source"), view.registration_rows, 4,
                         (0, 1, 2, 3, 4), capped=(0, 2))
             self.result_layout.addWidget(_label("Missing or refused for a physical registration:\n" + "\n".join(
                 f"• {key}: {reason}" for key, reason in view.registration_missing), "warnings"))
+            closing = view.record.get("registration_readiness", {}).get("closing_evidence", ())
+            self.result_layout.addWidget(_label("What would close them (from the existing records):\n" + "\n".join(
+                f"• {item['facts']}: {item['evidence']}" for item in closing), "hint"))
             self._table("instrument", "Instrument records found in the delivered files",
                         ("Item", "Content", "Provenance"), view.instrument_rows, 1, (0, 1, 2))
             self._table("family", "FE family of the specimen (INITIAL FE model and variants; SHA-256 verified)",

@@ -34,6 +34,13 @@ PLATE-ONLY-R2 — the specimen (owner, 2026-10-30): the identity of the plate of
 HUMAN_CONFIRMED, so the page shows the archived M11 measurements as the record of this specimen (with their date,
 method and uncertainty; not measurements of 27.10), the applicability of the initial FE model to the 261027 test and
 the orientation chain. None of it is a mode pair, a registration or a material value.
+
+PLATE-WORKBENCH-RC1 final correction — the owner's clarification of the test conditions (2026-10-30): the page shows
+the conditions of both series from ``plate_study.EXPERIMENT_CONDITIONS`` (261016: four rubber bands, the original
+position, HISTORY_ONLY; 261027: two rubber bands, turned 45°, the same plate, points and measured face, the primary
+experiment for M11), each with its provenance (the owner, the laboratory note, the instrument, a derivation), and the
+link of the two scans (``plate_registration_readiness.SERIES_LINK_261016_261027``). No fact is kept on the page
+itself.
 """
 
 from __future__ import annotations
@@ -55,9 +62,10 @@ EXPORT = "Export plate report..."
 GATE = "Run iterative estimation (not authorised)"
 NOT_RUN = "Not run"
 RUNNING_TEXT = "Computing the plate study (no fit, no FE solve)..."
-NOTE = ("Research only. One specimen: PLATE-300x300x1mm, series NEXP29/PLATE300-1MM/S261027-ROTATED. No sandwich and "
-        "no other specimen's result is used or shown. Frequencies close to each other are not mode pairs; nothing is "
-        "fitted and no material value is produced.")
+NOTE = ("Research only. One specimen: PLATE-300x300x1mm, series NEXP29/PLATE300-1MM/S261027-ROTATED — the primary "
+        "experiment (two rubber bands, turned 45°), chosen by the owner for the free-free M11 FE model; 261016 (four "
+        "rubber bands, 33.4491 Hz) is history only. No sandwich and no other specimen's result is used or shown. "
+        "Frequencies close to each other are not mode pairs; nothing is fitted and no material value is produced.")
 GATE_NOTE = ("The iterative estimation is prepared but NOT AUTHORISED: it needs a separate, explicit owner "
              "authorisation naming the FE model, the parameters, the solve budget and the campaign definition. This "
              "page cannot start it.")
@@ -184,6 +192,8 @@ class PlateStudyView:
     campaign_rows: tuple = ()  # (phase, jobs, prerequisite, content)
     campaign_lines: tuple = ()
     spectrum_png: bytes = b""  # measured and FE frequencies, two independent rows (no pairs)
+    conditions_rows: tuple = ()  # RC1 final correction: (series, item, value, provenance, source / status)
+    series_rows: tuple = ()  # (item, value, state): the link of the 261016 and 261027 scans
 
 
 @dataclass(frozen=True)
@@ -277,13 +287,24 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
     chain = pw.workbench_chain(True, registration_readiness)  # the sources were confirmed above
     first_fe = float(fe_elastic[0].frequency_hz) if fe_elastic else None
     first_record = summary.records[0].frequency_hz if summary.records else None
-    target = pw.target_breakdown(first_record, first_fe)
+    target = pw.target_breakdown(first_record, first_fe, registration_readiness.status)
+    link = rr.SERIES_LINK_261016_261027
+    series_rows = (("261016 → 261027 points", link["same_points"], "the owner (2026-10-30)"),
+                   ("point-to-point map", f"id k ↔ id k ({link['ids_preserved']} of {link['points']}; grid "
+                    f"{link['symmetry']})", link["status"]),
+                   ("turn of the scan grid", f"{link['turn_deg']}°: {link['sense']}", "DERIVED; the laboratory note "
+                    "(45° clockwise) agrees"),
+                   ("mirror relation", "does not fit", "consistent with the same measured face (which face: open)"),
+                   ("UNV grids", " / ".join(f"{k}: {v[0]:.4f} × {v[1]:.4f} m at z {link['unv_z_m'][k]} m"
+                                            for k, v in link["unv_grid_span_m"].items()),
+                    "representations, not a physical calibration (M11 §15.4)")) + tuple(
+        (f"note {i}", note, "") for i, note in enumerate(rr.SERIES_LINK_NOTES, 1))
     specification, campaign = pw.campaign_specification(), pw.campaign_budget()
     spectrum = pw.render_spectrum([r.frequency_hz for r in summary.records],
                                   [float(m.frequency_hz) for m in fe_elastic],
                                   f"Measured ({ps.WORKING_SET})", f"Initial FE ({member.member_id})")
     record = {
-        "schema": "plate-workbench-rc1/study/v1", "created": datetime.now().isoformat(timespec="seconds"),
+        "schema": "plate-workbench-rc1/study/v2", "created": datetime.now().isoformat(timespec="seconds"),
         "labels": [ps.RESEARCH_ONLY, ps.INITIAL_FE_MODEL, ps.FREQUENCY_ONLY], "specimen": ps.SPECIMEN,
         "series": ps.SERIES, "plate_identity": ps.PLATE_IDENTITY, "identity_record": ps.IDENTITY_RECORD,
         "specimen_record": [m.__dict__ for m in ps.SPECIMEN_RECORD], "specimen_record_note": ps.SPECIMEN_RECORD_NOTE,
@@ -291,7 +312,12 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
         "orientation_chain": [o.__dict__ for o in ps.ORIENTATION_CHAIN],
         "orientation_notes": list(ps.ORIENTATION_NOTES),
         "uncertainty_budget": [line.__dict__ for line in budget],
-        "workbench_chain": [dict(zip(("link", "status", "source", "blocking"), r)) for r in chain],
+        "experiment_conditions": {"facts": [c.__dict__ for c in ps.EXPERIMENT_CONDITIONS],
+                                  "correction": ps.CONDITIONS_CORRECTION,
+                                  "not_established": list(ps.NOT_ESTABLISHED_BY_THE_CONDITIONS),
+                                  "roles": {"261016": ps.HISTORY_ONLY, "261027": ps.PRIMARY_EXPERIMENT}},
+        "series_link": {"result": link, "inputs": rr.SERIES_LINK_INPUTS, "notes": list(rr.SERIES_LINK_NOTES)},
+        "workbench_chain": [dict(zip(pw.CHAIN_COLUMNS, r)) for r in chain],
         "registration_readiness": {
             "status": registration_readiness.status, "frozen": registration_readiness.frozen,
             "mac_computed": registration_readiness.mac_computed,
@@ -299,10 +325,14 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
                       for f in registration_readiness.scan_to_plate.facts + registration_readiness.plate_to_fe.facts],
             "missing": [dict(zip(("fact", "reason"), m)) for m in registration_readiness.missing],
             "checks": [dict(zip(("check", "state", "detail"), c)) for c in registration_readiness.checks],
+            "supporting_facts": [dict(zip(("key", "value", "provenance", "source"), f))
+                                 for f in registration_readiness.supporting],
+            "closing_evidence": [dict(zip(("facts", "evidence"), c)) for c in rr.CLOSING_EVIDENCE],
             "instrument_records": [dict(zip(("item", "content", "provenance"), n)) for n in rr.INSTRUMENT_NOTES]},
         "target_10_percent": [dict(zip(("part", "value", "status", "note"), r)) for r in target],
         "fe_campaign": {"specification": specification,
                         "budget": [dict(zip(("phase", "jobs", "prerequisite", "content"), r)) for r in campaign],
+                        "applicability_jobs": list(pw.applicability_jobs()),
                         "template": pw.campaign_template()},
         "thickness": {"rows": [dict(zip(("item", "value", "status"), r)) for r in ps.thickness_rows()],
                       "ambiguous_reading": ps.THICKNESS_READING_AMBIGUITY,
@@ -370,14 +400,20 @@ def compute(fe_preview, fe_identity, experimental_preview, experimental_identity
                            "—" if line.illustrative_ln_sd is None else f"{100 * line.illustrative_ln_sd:.1f} % "
                            "(illustrative)", line.note) for line in budget),
         thickness_rows=tuple(ps.thickness_rows()), chain_rows=chain,
-        registration_rows=tuple((link.link, key, "—" if value is None else str(value), provenance, source)
-                                for link in (registration_readiness.scan_to_plate, registration_readiness.plate_to_fe)
-                                for key, value, provenance, source in link.facts),
+        registration_rows=tuple((part.link, key, "—" if value is None else str(value), provenance, source)
+                                for part in (registration_readiness.scan_to_plate, registration_readiness.plate_to_fe)
+                                for key, value, provenance, source in part.facts) + tuple(
+            ("supporting (261016 and relative facts)", key, "—" if value is None else str(value), provenance, source)
+            for key, value, provenance, source in registration_readiness.supporting),
         registration_missing=registration_readiness.missing, registration_status=registration_readiness.status,
         instrument_rows=tuple(rr.INSTRUMENT_NOTES), target_rows=target,
         campaign_rows=tuple((phase, str(jobs), pre, content) for phase, jobs, pre, content in campaign),
         campaign_lines=tuple(f"{key}: {value}" for key, value in specification.items()
-                             if isinstance(value, str)), spectrum_png=spectrum)
+                             if isinstance(value, str)), spectrum_png=spectrum,
+        conditions_rows=tuple((c.series, c.item, c.value, c.provenance, c.source + (f" — {c.status}" if c.status else
+                                                                                   ""))
+                              for c in ps.EXPERIMENT_CONDITIONS),
+        series_rows=series_rows)
 
 
 def run_study(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index: int, token: int,
@@ -429,11 +465,21 @@ def export_report(view: PlateStudyView, folder) -> tuple:
               "| Aspect | State | FE model | Specimen / test | Note |", "|---|---|---|---|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} |" for r in view.applicability_rows]
     series = view.record.get("difference_between_the_series") or {}
+    conditions = view.record.get("experiment_conditions") or {}
+    lines += ["", "## Test conditions (owner clarification, 2026-10-30)", "", conditions.get("correction", ""), "",
+              "| Series | Item | Value | Provenance | Source |", "|---|---|---|---|---|"]
+    lines += [f"| {a} | {b} | {c} | {d} | {e} |" for a, b, c, d, e in view.conditions_rows]
+    lines += ["", "Not established by the conditions:", ""] + [f"- {item}" for item in
+                                                              conditions.get("not_established", ())]
+    lines += ["", "## Link of the scans 261016 → 261027 (instrument geometry only)", "", "| Item | Value | State |",
+              "|---|---|---|"]
+    lines += [f"| {a} | {b} | {c} |" for a, b, c in view.series_rows]
     lines += ["", f"## Difference between the series: {series.get('state', '')}", "",
               "Measured record 1: " + "; ".join(f"{k}: {v['hz']} Hz (uv fraction {v['uv_fraction']})"
                                                for k, v in (series.get("measured_record_1") or {}).items())
-              + ". The same mode is not verified and the cause is not established (a setup dependence is suspected, "
-              "not proven); no cross-series mode pair; not a Σ_setup repeat (D-053)."]
+              + ". The setup change is HUMAN_CONFIRMED (four → two rubber bands, 45° turn) and the owner explains "
+              "the lower frequency by the freer suspension; the separate contributions are not determined and the "
+              "same mode is not verified; no cross-series mode pair; not a Σ_setup repeat (D-053)."]
     lines += ["", "## Thickness (edge readings only; the real uncertainty of E / G is UNKNOWN)", "",
               "| Item | Value | Status |", "|---|---|---|"]
     lines += [f"| {a} | {b} | {c} |" for a, b, c in view.thickness_rows]
@@ -444,8 +490,12 @@ def export_report(view: PlateStudyView, folder) -> tuple:
               "| Link | Fact | Value | Provenance | Source |", "|---|---|---|---|---|"]
     lines += [f"| {a} | {b} | {c} | {d} | {e} |" for a, b, c, d, e in view.registration_rows]
     lines += ["", "Missing or refused:", ""] + [f"- {key}: {reason}" for key, reason in view.registration_missing]
-    lines += ["", "## Workbench chain", "", "| Link | Status | Source | Blocking |", "|---|---|---|---|"]
-    lines += [f"| {a} | {b} | {c} | {d} |" for a, b, c, d in view.chain_rows]
+    lines += ["", "What would close them (from the existing records):", ""] + [
+        f"- {item['facts']}: {item['evidence']}"
+        for item in view.record.get("registration_readiness", {}).get("closing_evidence", ())]
+    lines += ["", "## Workbench chain", "", "| Link | Status | Confirmation | Source | Missing and blocking | "
+              "Diagnostics available |", "|---|---|---|---|---|---|"]
+    lines += ["| " + " | ".join(row) + " |" for row in view.chain_rows]
     lines += ["", "## The ±10 % goal, part by part (no part is a material accuracy)", "",
               "| Part | Value | Status | Note |", "|---|---|---|---|"]
     lines += [f"| {a} | {b} | {c} | {d} |" for a, b, c, d in view.target_rows]

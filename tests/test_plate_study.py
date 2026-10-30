@@ -318,8 +318,10 @@ class SpecimenR2Tests(unittest.TestCase):
         self.assertEqual(checks["registration"].state, ps.NOT_VERIFIED)
         self.assertIn("0.67 of record 1", checks["suspension"].note)
         self.assertEqual(checks["series difference: mode identity"].state, "MODE_IDENTITY_NOT_VERIFIED")
-        self.assertEqual(checks["series difference: cause"].state, "SETUP_DEPENDENCE_SUSPECTED")
+        self.assertEqual(checks["series difference: cause"].state,
+                         "HUMAN_CONFIRMED_SETUP_CHANGE / OWNER_EXPLANATION_OF_FREQUENCY_CHANGE")
         self.assertIn("Not a Σ_setup repeat", checks["series difference: cause"].note)
+        self.assertIn("two rubber bands", checks["suspension"].test)  # RC1 final correction (owner, 2026-10-30)
         e30 = next(m for m in ps.PLATE_FE_FAMILY if m.member_id == "E30E26")
         self.assertEqual({c.aspect: c.state for c in ps.fe_applicability(e30, (301.0, 300.0))}["mass"], "DIFFERS")
         other = {c.aspect: c.state for c in ps.fe_applicability(base, (0.3, 0.3))}
@@ -425,16 +427,21 @@ class SpecimenR2Tests(unittest.TestCase):
         self.assertIn("ILLUSTRATIVE, not the real uncertainty", thickness.note)
 
     def test_the_difference_of_the_two_series_is_a_suspicion_not_a_result(self):
-        # PLATE-ONLY-R2-F1: the measured values stay; no established setup effect, no cross-series pair, no Σ_setup
+        # PLATE-ONLY-R2-F1: the measured values stay; no established setup effect, no cross-series pair, no Σ_setup.
+        # RC1 final correction: the setup change is HUMAN_CONFIRMED, the cause is the owner's explanation only
         checks = {c.aspect: c for c in ps.fe_applicability(ps.PLATE_FE_FAMILY[0], (301.0, 300.0), 18.6307, 19.072)}
         identity, cause = checks["series difference: mode identity"], checks["series difference: cause"]
-        self.assertEqual((identity.state, cause.state), (ps.MODE_IDENTITY_NOT_VERIFIED, ps.SETUP_DEPENDENCE_SUSPECTED))
-        self.assertEqual(ps.SESSION_DIFFERENCE, "SETUP_DEPENDENCE_SUSPECTED / MODE_IDENTITY_NOT_VERIFIED")
+        self.assertEqual((identity.state, cause.state), (ps.MODE_IDENTITY_NOT_VERIFIED,
+                                                         f"{ps.HUMAN_CONFIRMED_SETUP_CHANGE} / {ps.OWNER_EXPLANATION}"))
+        self.assertEqual(ps.SESSION_DIFFERENCE, "HUMAN_CONFIRMED_SETUP_CHANGE / OWNER_EXPLANATION_OF_FREQUENCY_CHANGE"
+                                                " / MODE_IDENTITY_NOT_VERIFIED")
         for text in ("18.6307 Hz in 261027", "33.4491 Hz in 261016", "uv fraction 0.988 and 0.947",
                      "same mode is NOT verified", "No cross-series mode pair"):
             self.assertIn(text, identity.note)
-        for text in ("cause of the difference is NOT established", "suspected, not proven",
-                     "Not a Σ_setup repeat (D-053)"):
+        for text in ("four → two rubber bands, 45° turn", "the owner explains the lower frequency",
+                     "contributions of the suspension and the turn are NOT determined",
+                     "no measure of the band stiffness", "Not a Σ_setup repeat (D-053)",
+                     "261016 is not declared wrong"):
             self.assertIn(text, cause.note)
         everything = " ".join(f"{c.aspect} {c.state} {c.note}" for c in checks.values())
         for forbidden in ("SETUP_SENSITIVE", "the setup changed", "setup-sensitive"):

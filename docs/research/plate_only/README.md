@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, see §14). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -648,6 +648,15 @@ See [`PLATE_WORKBENCH_RC1.md`](PLATE_WORKBENCH_RC1.md). In short:
     registration);
   - `plate_workbench` (the chain, the ±10 % parts, the prepared FE campaign and its budget, the spectra chart).
 - **Template.** `plate_campaign_template_rc1.json` is the campaign template; nothing was run.
+- **Final correction (owner, 2026-10-30; RC1 §9).**
+  - Test conditions: 261016 had four rubber bands, 261027 two, and the plate was turned 45°. The plate, the measured
+    points and the measured face are the same. 261027 is the primary experiment for M11; 261016 is history only.
+  - The earlier picture of the setup as identical was wrong; only the interpretation is corrected.
+  - The two scans keep every point id under a −44.17° (clockwise) grid turn: `POINT_TO_POINT_MAPPING_DERIVED`.
+  - The UNV grid is a representation, not the physical window.
+  - Six registration facts stay open, each resting on a 261016 candidate or on A–D. The verdict is unchanged:
+    `PHYSICAL_REGISTRATION_NOT_VERIFIED`.
+  - FE applicability variants A–E are prepared; 0 Abaqus solves were run.
 
 ## Not changed
 

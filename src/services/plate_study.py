@@ -68,7 +68,9 @@ NOT_A_MATERIAL_PROPERTY = "NOT_A_MATERIAL_PROPERTY"
 INITIAL_FE_MODEL = "INITIAL_FE_MODEL_OF_THE_SPECIMEN"  # M11 model of this specimen; applicability checked apart
 APPLICABILITY_NOT_VERIFIED = "APPLICABILITY_NOT_VERIFIED"
 HUMAN_CONFIRMED = "HUMAN_CONFIRMED"
-ARCHIVED = "ARCHIVED_RECORD_OF_THE_SAME_SPECIMEN"
+INSTRUMENT_RECORD = "INSTRUMENT_RECORD"
+DERIVED = "DERIVED"
+ARCHIVED ="ARCHIVED_RECORD_OF_THE_SAME_SPECIMEN"
 FREQUENCY_ONLY = "FREQUENCY_ONLY"
 NOT_VERIFIED = "PHYSICAL_REGISTRATION_NOT_VERIFIED"
 NOT_READY = "NOT_READY_FOR_IDENTIFICATION"
@@ -314,8 +316,9 @@ FE_LIMITS = (
     "excitation, registration) is NOT_VERIFIED (fe_applicability).",
     "One homogeneous orthotropic material on global axes, no *Orientation: material axis 1 = FE X (301 mm). The "
     "fibre and weave directions of the real plate are not evidenced, so E1 / E2 are model directions.",
-    "Free-free without suspension, shaker or attachment; the 261027 test used rubber bands and strings at two upper "
-    "points, and its excitation is not stated.",
+    "Free-free without suspension, shaker or attachment: the idealised free plate, the FE base of this study. The "
+    "261027 test (the primary experiment) hung on two rubber bands with strings at two upper points (owner; laboratory "
+    "note), the 261016 test on four rubber bands with a shaker stinger; the 261027 force sensor's point is unknown.",
     "INP → ODB: the records are consistent (job name, heading, timing, element type, eigenvalues), but mesh "
     "identity is not proven (M11 §15.5).",
 )
@@ -887,10 +890,12 @@ def plate_readiness(registration_verified: bool, confirmed_pairs: Sequence[str] 
         missing.append("mass, plan and thickness of this specimen are not recorded")
     if not fe_applicability_verified:
         missing.append(f"{APPLICABILITY_NOT_VERIFIED}: the initial FE model (M11, free-free) is not checked against "
-                       "the 261027 suspension (rubber bands and strings at two upper points) and excitation (not "
-                       "stated); an FE variant with the suspension is an Abaqus job (separate HUMAN gate)")
+                       "the 261027 suspension (two rubber bands, strings at two upper points) and excitation (force "
+                       "sensor, point unknown); an FE variant with the suspension is an Abaqus job (separate HUMAN "
+                       "gate)")
     missing.append("Σ_meas NOT_AVAILABLE for PolyMAX (D-069); Σ_setup 0.3 % PROVISIONAL; no repeat of this panel "
-                   "under one protocol (261016 and 261027 differ in suspension and grid: not a D-053 repeat)")
+                   "under one protocol (261016 and 261027 differ on purpose: four → two rubber bands and a 45° turn; "
+                   "not a D-053 repeat)")
     missing.append("family consistency NOT_AVAILABLE for a single plate (D-044 blocks PRODUCTION verdicts)")
     reasons = tuple(missing)
     thickness = (() if interior_thickness_measured else (
@@ -1001,20 +1006,113 @@ def plate_d(parameters: Mapping[str, float]) -> Optional[dict]:
 # ----------------------------------------------------------------------------- applicability and orientation (R2)
 
 CONSISTENT = "CONSISTENT_WITH_THE_RECORD"
+
+# PLATE-WORKBENCH-RC1 final correction: the owner's clarification of the test conditions (2026-10-30). It takes
+# precedence over earlier paraphrases of the setup in non-normative material; no primary measurement changes and no
+# normative decision changes. The laboratory's note (Read me.txt) keeps its own documentary provenance.
+OWNER_2026_10_30 = "owner, 2026-10-30"
+LAB_RECORD = "LAB_RECORD"  # the testing laboratory's written note: documentary, not the owner's confirmation
+READ_ME = ("Read me.txt (laboratory note of the ROTATED delivery)",
+           "4c03624a7591f71bb59189c2bb96a146d6eddcf89904ed5ae58781762047723e")
+HUMAN_CONFIRMED_SETUP_CHANGE = "HUMAN_CONFIRMED_SETUP_CHANGE"
+OWNER_EXPLANATION = "OWNER_EXPLANATION_OF_FREQUENCY_CHANGE"
+HISTORY_ONLY = "HISTORY_ONLY"
+PRIMARY_EXPERIMENT = "PRIMARY_EXPERIMENT_FOR_M11_RESEARCH"
+SAME_POINTS = "SAME_PHYSICAL_POINTS_HUMAN_CONFIRMED"
+SAME_FACE = "SAME_MEASURED_FACE_HUMAN_CONFIRMED"  # relative: which face it is is a separate fact
+
+
+@dataclass(frozen=True)
+class ConditionFact:
+    series: str  # "261016", "261027" or "both"
+    item: str
+    value: str
+    provenance: str  # HUMAN_CONFIRMED (owner), LAB_RECORD, INSTRUMENT_RECORD or DERIVED
+    source: str
+    status: str = ""
+
+
+_LAB = f"{READ_ME[0]}, SHA-256 {READ_ME[1][:12]}…"
+EXPERIMENT_CONDITIONS = (
+    ConditionFact("both", "specimen", "the same physical plate (PLATE-300x300x1mm)", HUMAN_CONFIRMED,
+                  OWNER_2026_10_30),
+    ConditionFact("both", "measured points", "the same physical points", HUMAN_CONFIRMED, OWNER_2026_10_30,
+                  SAME_POINTS),
+    ConditionFact("both", "measured face", "the same face of the plate (which face is not stated)", HUMAN_CONFIRMED,
+                  OWNER_2026_10_30, SAME_FACE),
+    ConditionFact("both", "setup change", "four rubber bands → two rubber bands, and the plate turned 45°",
+                  HUMAN_CONFIRMED, OWNER_2026_10_30, HUMAN_CONFIRMED_SETUP_CHANGE),
+    ConditionFact("both", "why the first frequency is lower", "the two-band suspension is freer than the four-band "
+                  "one (the owner's physical explanation; its numerical share is not determined)", HUMAN_CONFIRMED,
+                  OWNER_2026_10_30, OWNER_EXPLANATION),
+    ConditionFact("261016", "role", "a separate historical measurement; 33.4491 Hz is never a fitting target",
+                  HUMAN_CONFIRMED, OWNER_2026_10_30, HISTORY_ONLY),
+    ConditionFact("261016", "suspension", "four rubber bands", HUMAN_CONFIRMED, OWNER_2026_10_30),
+    ConditionFact("261016", "orientation", "the original position (before the 45° turn); the 301 mm edges horizontal",
+                  HUMAN_CONFIRMED, f"{OWNER_2026_10_30}; M11 §13.1"),
+    ConditionFact("261016", "excitation", "shaker stinger near the bottom edge, left of centre seen from the shaker "
+                  "side (approximate)", HUMAN_CONFIRMED, "owner, 2026-10-21 (M11 §13.1, §13.3)"),
+    ConditionFact("261016", "first record", "33.4491 Hz (Polymax_bravo, 10 records)", INSTRUMENT_RECORD,
+                  "300by300_plate_only_1mm_261016_POLYMAX.unv (M11 §9)"),
+    ConditionFact("261016", "scan distance", "the PSV default 1 m; the real distance was not measured", LAB_RECORD,
+                  _LAB),
+    ConditionFact("261027", "role", "the primary experiment for the free-free M11 FE model", HUMAN_CONFIRMED,
+                  OWNER_2026_10_30, PRIMARY_EXPERIMENT),
+    ConditionFact("261027", "suspension", "two rubber bands", HUMAN_CONFIRMED, OWNER_2026_10_30),
+    ConditionFact("261027", "suspension detail", "rubber bands and strings attached to two upper points along the "
+                  "nodal line of the first mode; stiffness, lengths and exact points not recorded", LAB_RECORD, _LAB),
+    ConditionFact("261027", "orientation", "turned 45° from the 261016 position", HUMAN_CONFIRMED, OWNER_2026_10_30),
+    ConditionFact("261027", "direction of the turn", "clockwise as viewed from the Polytec system", LAB_RECORD, _LAB),
+    ConditionFact("261027", "turn of the scan grid", "−44.17°: clockwise as viewed from the Polytec; every point id "
+                  "kept (289 of 289)", DERIVED, "series_link of the 261016 and 261027 UNV geometries "
+                  "(plate_registration_readiness)"),
+    ConditionFact("261027", "excitation", "a force reference channel (dataset 58 'Force * Velocity'); the sensor's "
+                  "point and mass are not recorded", INSTRUMENT_RECORD, WORKING_SOURCE),
+    ConditionFact("261027", "first record", "18.6307 Hz (Polymax_bravo, 11 records)", INSTRUMENT_RECORD,
+                  WORKING_SOURCE),
+    ConditionFact("261027", "scan distance", "1.15 m, measured (the PSV export places the points at z = −1.15 m)",
+                  LAB_RECORD, _LAB),
+)
+NOT_ESTABLISHED_BY_THE_CONDITIONS = (
+    "the separate numerical contributions of the suspension and of the 45° turn to the change of the frequencies",
+    "that record 1 of 261016 (33.4491 Hz) and record 1 of 261027 (18.6307 Hz) are the same elastic mode",
+    "a band stiffness from 33.4491 → 18.6307 Hz: the difference is not a quantitative measure of the suspension",
+    "a Σ_setup repeat: the configuration was changed on purpose (not a D-053 repeat)",
+    "that the 261016 experiment was wrong: it stays a valid measurement under its own conditions",
+    "the absolute face towards the Polytec: 'the same face' is a relative fact",
+    "any geometric registration: test conditions are never registration evidence",
+)
+CONDITIONS_CORRECTION = (
+    "An earlier paraphrase of the test conditions (the same suspension in both series) was wrong. The owner's "
+    "clarification of 2026-10-30 takes precedence: four rubber bands in 261016, two in 261027, the plate turned 45°, "
+    "the same plate, points and measured face. Only the current interpretation in non-normative material is "
+    "corrected; the primary measurements are unchanged.")
+
+
+def conditions(series: str) -> dict:
+    """{item: ConditionFact} of one series (and the facts common to both)."""
+    return {fact.item: fact for fact in EXPERIMENT_CONDITIONS if fact.series in (series, "both")}
+
+
 TEST_261027 = {
-    "rotation": "45° clockwise as viewed from the Polytec system (lab note); not an FE rotation",
-    "suspension": "rubber bands and strings at two upper points along the nodal line of the first mode (lab note); "
-                  "stiffness, lengths and exact points are not recorded",
-    "excitation": "not stated in the lab note (shaker attachment or non-contact excitation unknown)",
+    "rotation": "45° from the 261016 position (owner), clockwise as viewed from the Polytec system (laboratory "
+                "note); not an FE rotation",
+    "suspension": "two rubber bands (owner, 2026-10-30) with strings at two upper points along the nodal line of the "
+                  "first mode (laboratory note); stiffness, lengths and exact points are not recorded",
+    "excitation": "a force reference channel; the sensor's point and attachment are not recorded (shaker attachment "
+                  "or other excitation unknown)",
     "low_frf_peaks_hz": (3.44, 10.31, 12.5),  # auxiliary FRF (PROVISIONAL), probably the suspension
 }
-TEST_261016 = "four corner straps and a shaker stinger near the bottom edge (HUMAN, M11 §13.3)"
+TEST_261016 = ("four rubber bands (owner, 2026-10-30; the four corner straps of the PSV frame, M11 §13.3) and a "
+               "shaker stinger near the bottom edge (HUMAN, M11 §13.3)")
 # PLATE-ONLY-R2 research (grid_saddle_split of record 1 in each session; review folder PLATE_ONLY_R2_REVIEW)
 SESSION_TWIST = {"261027": (18.6307, 0.988), "261016": (33.4491, 0.947)}  # (measured Hz, uv fraction) of record 1
-# PLATE-ONLY-R2-F1: the difference of the two series is a suspicion, never an established effect of the setup
+# PLATE-ONLY-R2-F1: the difference of the two series is never an established effect of the setup. RC1 final
+# correction: the setup change itself is HUMAN_CONFIRMED and the owner explains the lower frequency by the freer
+# suspension; the numerical contribution and the mode identity stay open.
 SETUP_DEPENDENCE_SUSPECTED = "SETUP_DEPENDENCE_SUSPECTED"
 MODE_IDENTITY_NOT_VERIFIED = "MODE_IDENTITY_NOT_VERIFIED"
-SESSION_DIFFERENCE = f"{SETUP_DEPENDENCE_SUSPECTED} / {MODE_IDENTITY_NOT_VERIFIED}"
+SESSION_DIFFERENCE = f"{HUMAN_CONFIRMED_SETUP_CHANGE} / {OWNER_EXPLANATION} / {MODE_IDENTITY_NOT_VERIFIED}"
 
 
 @dataclass(frozen=True)
@@ -1070,9 +1168,10 @@ def fe_applicability(member: FEMember, fe_plan_mm: Optional[Sequence[float]] = N
              if first_record_hz else "")
     checks.append(ApplicabilityCheck(
         "suspension", "free-free (no springs, masses or strings)", TEST_261027["suspension"], "NOT_VERIFIED",
-        "SPEC §15 asks for a soft suspension; the auxiliary FRF has peaks at "
+        "two bands instead of four: closer to free by the owner's explanation, not demonstrated. SPEC §15 asks for a "
+        "soft suspension; the auxiliary FRF has peaks at "
         + ", ".join(f"{v:g}" for v in TEST_261027["low_frf_peaks_hz"]) + " Hz (PROVISIONAL, probably the "
-        f"suspension){ratio}: softness is not demonstrated and the effect is not quantified"))
+        f"suspension){ratio}: the effect is not quantified"))
     checks.append(ApplicabilityCheck("excitation", "none", TEST_261027["excitation"], "UNKNOWN",
                                      "SPEC §15: the shaker attachment mass in the model, or non-contact excitation"))
     (f27, uv27), (f16, uv16) = SESSION_TWIST["261027"], SESSION_TWIST["261016"]
@@ -1083,10 +1182,12 @@ def fe_applicability(member: FEMember, fe_plan_mm: Optional[Sequence[float]] = N
         f"their own scan grid (uv fraction {uv27} and {uv16}). Whether they are the same mode is NOT verified (no "
         "registration, no MAC between the series). No cross-series mode pair"))
     checks.append(ApplicabilityCheck(
-        "series difference: cause", "—", f"261016: {TEST_261016}; 261027: the two-point suspension",
-        SETUP_DEPENDENCE_SUSPECTED,
-        "the cause of the difference is NOT established: a dependence on the test setup (suspension, shaker "
-        "attachment) is suspected, not proven. Not a Σ_setup repeat (D-053)"))
+        "series difference: cause", "—", f"261016: {TEST_261016}; 261027: two rubber bands, turned 45°",
+        f"{HUMAN_CONFIRMED_SETUP_CHANGE} / {OWNER_EXPLANATION}",
+        "the setup change is HUMAN_CONFIRMED (four → two rubber bands, 45° turn; owner, 2026-10-30) and the owner "
+        "explains the lower frequency by the freer suspension. The separate contributions of the suspension and the "
+        "turn are NOT determined, and the difference is no measure of the band stiffness. Not a Σ_setup repeat "
+        "(D-053); 261016 is not declared wrong"))
     checks.append(ApplicabilityCheck(
         "registration", "FE X = 301 mm edge, +Z shell normal", "scan rotated 45°; face and edges unknown",
         NOT_VERIFIED, "scanner → plate (261027) open; plate → FE: candidates A–D, the owner's choice pending "
@@ -1110,10 +1211,12 @@ class OrientationLink:
 ORIENTATION_CHAIN = (
     OrientationLink(
         "scanner (261027 ROTATED) → physical plate",
-        "scan grid 17 × 17 at about 45° in the camera frame; the lab turned the plate 45° clockwise as viewed from the "
-        "Polytec; distance 1.15 m; the Polytec node numbering changes with the rotation (lab note)",
-        "the reference orientation of the 45° turn; the face towards the Polytec (marked or unmarked); which numbered "
-        "edge lies along each grid side; the scan-to-edge offsets (no camera frame of this plate in the delivery)",
+        "the same plate, points and measured face as 261016, turned 45° from it (owner, 2026-10-30); every point id "
+        "kept under a −44.17° (clockwise) turn of the grid (DERIVED; the laboratory note agrees); hence the grid +u "
+        "points to edge 1 (DERIVED); distance 1.15 m",
+        "which face is towards the Polytec (the 261016 face is only supported: SCANNER_FACE pending), hence the edge "
+        "along +v (2 or 4); the window offsets and the physical metric (only the 261016 diagnostic reconstruction; "
+        "the UNV grid is a representation)",
         NOT_VERIFIED),
     OrientationLink(
         "physical plate → FE model (M11, same specimen)",
@@ -1124,8 +1227,9 @@ ORIENTATION_CHAIN = (
         "PENDING (owner's choice A–D)"),
     OrientationLink(
         "scanner (261016, M11) → physical plate",
-        "diagnostic reconstruction W301xH300 with three deviations not accepted (M11 §13.4, §14.3)",
-        "not transferable to 261027: another session, grid and node numbering", "HISTORY_ONLY"),
+        "diagnostic reconstruction W301xH300 with three deviations not accepted (M11 §13.4, §14.3); edge 1 at the top",
+        "the reference of 261027 through the owner's same points and face: what it lacks (SCANNER_FACE, deviations 2 "
+        "and 3) 261027 lacks too", "HISTORY_ONLY"),
 )
 _EDGES = _T["side_means"]
 ORIENTATION_NOTES = (
@@ -1143,11 +1247,12 @@ ORIENTATION_NOTES = (
 ITERATION_PLAN = (
     "1. Specimen record: identity HUMAN_CONFIRMED (owner, 2026-10-30); the archived mass, plan and 20 perimeter "
     "thickness readings (2026-10-21) are attached. Still open, for E / G only: an interior thickness map.",
-    "2. Close the physical registration with independent evidence: for 261027 the face towards the Polytec, the "
-    "numbered edge along each grid side (or the reference of the 45° turn) and the scan scale; for the FE side the "
-    "owner's picture A–D (M11 §14.5); then the existing guided-registration service records it.",
-    "3. Check the initial FE model against the 261027 test: the excitation, and an FE variant with the two-point "
-    "suspension (and a shaker attachment if one was used) — an Abaqus job: separate HUMAN authorisation.",
+    "2. Close the physical registration with independent evidence: through the owner's same points and face, the "
+    "261016 SCANNER_FACE answer and the 261016 scan calibration (M11 §15.3, §15.4) close the 261027 scan link; for "
+    "the FE side an FE model with a measured asymmetry or a SUPERVISOR convention (M11 §15.2); then the existing "
+    "guided-registration service records it.",
+    "3. Check the initial FE model against the 261027 test: an FE variant with the two-band suspension and the force "
+    "sensor's mass at its point — Abaqus jobs: separate HUMAN authorisation (plate_workbench.applicability_jobs).",
     "4. Run the existing comparator with the registration: confirmed pairs MAC ≥ 0.80 on measured DOFs, families, "
     "clusters; freeze the FIT / HOLDOUT rows before any fit.",
     "5. SPEC §6 S4 sensitivities: central ±5 % in ln p for D (balanced E1 = E2) and G12 (2·n_p = 4 jobs) and the "
