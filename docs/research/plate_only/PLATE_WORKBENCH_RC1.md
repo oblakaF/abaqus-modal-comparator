@@ -507,6 +507,28 @@ The template `plate_campaign_template_rc1.json` was regenerated from the service
   - the originals unchanged.
 - **LEGACY_GUI (`RUN_PROGRAM.cmd`):** window in 4.1 s, closed, exit 0.
 
+## 10. FC1 (2026-10-30): fail-closed scan-window offsets
+
+**Defect.** `_window()` checked the four offsets −u, +u, −v, +v only for a negative value. A NaN offset passed that
+check and the plan-closure comparison, so a synthetic evidence set reached `EVIDENCE_COMPLETE_NOT_FROZEN` with a
+transform (fail-open).
+
+**Fix.** `_offsets()` accepts four real, finite, non-negative numbers of mm. Anything else is `REFUSED` with the exact
+key and reason:
+- NaN or ±Infinity;
+- a missing key or None;
+- a string, a bool or a list;
+- a negative value;
+- a value that is not a mapping at all.
+
+The status is then `PHYSICAL_REGISTRATION_NOT_VERIFIED` with no transform. Unchanged: the orientation algorithm, the
+tolerances, the scientific criteria and the real 261027 evidence (still `PHYSICAL_REGISTRATION_NOT_VERIFIED`, six
+facts open).
+
+**Test.** `test_every_offset_must_be_a_finite_non_negative_number` covers every offset with every invalid kind, plus
+positive controls (float, int, numpy). It fails on the previous service (NaN reached the complete status; a string
+raised an exception) and passes now.
+
 ## Not changed
 
 SPEC, DECISIONS, STATUS, EVIDENCE, frozen registrations, scientific gates and criteria, M8 / D-077, the 5 / 8 %

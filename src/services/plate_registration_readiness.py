@@ -313,21 +313,41 @@ def _scale(value) -> Optional[float]:
     return scale if math.isfinite(scale) and scale > 0 else None
 
 
+OFFSET_KEYS = ("-u", "+u", "-v", "+v")
+
+
+def _offsets(value) -> tuple[Optional[dict], str]:
+    """({key: mm}, "") for four real, finite, non-negative offsets, else (None, the exact reason)."""
+    if not isinstance(value, Mapping):
+        return None, f"the offsets {value!r} are not a mapping of the four keys −u, +u, −v, +v in mm"
+    checked = {}
+    for key in OFFSET_KEYS:
+        if key not in value or value[key] is None:
+            return None, f"the offset {key} is missing: the offsets need the four keys −u, +u, −v, +v in mm"
+        item = value[key]
+        if isinstance(item, (bool, np.bool_)) or not isinstance(item, (int, float, np.integer, np.floating)):
+            return None, f"the offset {key} = {item!r} is not a number of mm"
+        number = float(item)
+        if not math.isfinite(number):
+            return None, f"the offset {key} = {number!r} is not finite"
+        if number < 0:
+            return None, f"the offset {key} = {number!r} is negative: it puts measured points outside the plate"
+        checked[key] = number
+    return checked, ""
+
+
 def _window(facts: Mapping[str, Fact], rotation: np.ndarray, coordinates: np.ndarray) -> tuple:
     """The scan window placed in Φ by the offsets; it must close the plate plan to the record's resolution and lie
-    on the plate (no negative offset)."""
+    on the plate. Fail-closed (FC1): each offset must be a real, finite, non-negative number of mm, else REFUSED."""
     angle, u, v = grid_axes(coordinates)
     scale = _scale(facts["scan_scale"].value)
     xy = coordinates[:, :2] - coordinates[:, :2].mean(axis=0)
     su, sv = xy @ u * scale, xy @ v * scale
-    offsets = dict(facts["scan_window_offsets_mm"].value or {})
-    try:
-        width_u = su.max() - su.min() + float(offsets["-u"]) + float(offsets["+u"])
-        width_v = sv.max() - sv.min() + float(offsets["-v"]) + float(offsets["+v"])
-    except (KeyError, TypeError, ValueError):
-        return ("scan window", "REFUSED", "the offsets need the four keys −u, +u, −v, +v in mm"), None
-    if any(float(offsets[key]) < 0 for key in ("-u", "+u", "-v", "+v")):
-        return ("scan window", "REFUSED", f"a negative offset {offsets} puts measured points outside the plate"), None
+    offsets, reason = _offsets(facts["scan_window_offsets_mm"].value)
+    if offsets is None:
+        return ("scan window", "REFUSED", reason), None
+    width_u = su.max() - su.min() + offsets["-u"] + offsets["+u"]
+    width_v = sv.max() - sv.min() + offsets["-v"] + offsets["+v"]
     u_phi, v_phi = rotation[:, 0], rotation[:, 1]
     length_u = PLATE_MM[0] if abs(u_phi[0]) > 0.5 else PLATE_MM[1]
     length_v = PLATE_MM[0] if abs(v_phi[0]) > 0.5 else PLATE_MM[1]

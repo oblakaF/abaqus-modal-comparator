@@ -169,6 +169,39 @@ class RefusalTests(unittest.TestCase):
                                                          rr.MEASURED, "x"))
         self.assert_missing(outside, "scan window", "outside the plate")
 
+    def test_every_offset_must_be_a_finite_non_negative_number(self):
+        # FC1: a NaN offset passed the < 0 check and the closure comparison and gave EVIDENCE_COMPLETE (fail-open)
+        good = {"-u": 20.0, "+u": 21.0, "-v": 10.0, "+v": 10.0}
+        bad = (("NaN", float("nan"), "not finite"), ("+Infinity", float("inf"), "not finite"),
+               ("-Infinity", float("-inf"), "not finite"), ("numpy NaN", np.float64("nan"), "not finite"),
+               ("None", None, "missing"), ("string", "10.0", "not a number"), ("bool", True, "not a number"),
+               ("list", [10.0], "not a number"), ("negative", -0.5, "negative"))
+        for key in ("-u", "+u", "-v", "+v"):
+            for label, value, text in bad + (("absent", ..., "missing"),):
+                with self.subTest(key=key, value=label):
+                    offsets = dict(good)
+                    if value is ...:
+                        offsets.pop(key)
+                    else:
+                        offsets[key] = value
+                    readiness = self.evaluate(scan_window_offsets_mm=F("scan_window_offsets_mm", offsets,
+                                                                       rr.MEASURED, "x"))
+                    self.assert_missing(readiness, "scan window", text)
+                    self.assertIn(key, dict(readiness.missing)["scan window"])
+                    self.assertFalse(rr.mac_permitted(readiness, frozen_registration=object()))
+        for value in (None, "20, 21, 10, 10", [20.0, 21.0, 10.0, 10.0]):
+            with self.subTest(offsets=value):
+                readiness = self.evaluate(scan_window_offsets_mm=F("scan_window_offsets_mm", value, rr.MEASURED, "x"))
+                self.assert_missing(readiness, "scan window", "not a mapping")
+        # positive controls: finite offsets of any real type keep the full positive path
+        for offsets in (good, {"-u": 20, "+u": 21, "-v": 10, "+v": 10},
+                        {k: np.float64(v) for k, v in good.items()}):
+            with self.subTest(offsets=offsets):
+                readiness = self.evaluate(scan_window_offsets_mm=F("scan_window_offsets_mm", offsets, rr.MEASURED,
+                                                                   "x"))
+                self.assertEqual(readiness.status, rr.COMPLETE, readiness.missing)
+                self.assertIsNotNone(readiness.transform)
+
     def test_a_relative_fact_never_becomes_an_absolute_one(self):
         # the owner's "same face" carries the reference series' face over: a candidate stays a candidate
         same = F("same_face_as_261016", "same", rr.HUMAN_CONFIRMED, "owner")
