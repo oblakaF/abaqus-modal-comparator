@@ -391,7 +391,7 @@ class KnownSourceDialogTests(_Window):
         self.app.processEvents()
         self.assertEqual(dialog.list.count(), 3)
         self.assertFalse(dialog.use_button.isEnabled())
-        self.assertIn("None of the known sources is on this computer", dialog.message.text())
+        self.assertIn("None of the known sources is in this folder", dialog.message.text())
         dialog.reject()
         self.inspect(ws.EXPERIMENTAL, self.unv)  # the ordinary choice of one's own file
         self.assertIsNotNone(self.window._read_preview(ws.EXPERIMENTAL))

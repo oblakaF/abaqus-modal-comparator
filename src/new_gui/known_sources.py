@@ -10,6 +10,11 @@ relative path has the same series identity, size and SHA-256, its status's leadi
 ``NEW_WORKING_SOURCE`` and its dataset list holds the fitted modal-set dataset 55. A file is used only when it exists
 under the chosen root and its size and fresh SHA-256 are the declared ones.
 
+WINDOWS-RC1-A: the folder is portable. ``DEFAULT_ROOT`` is only the first suggestion; the user may choose another
+folder in the dialog (never a scan of the disks). The chosen folder is either the delivery folder (holding
+``SPname_files_ROTATED_261028``) or that subfolder itself. A file found there is still used only with the declared size
+and a fresh SHA-256: a matching name is never evidence of the source.
+
 Nothing is loaded at start-up and nothing is read before the user asks. Choosing an entry only puts its path into the
 workspace's experimental slot: the user still clicks Inspect file. No registration, FE model or material record is
 assigned from a specimen identifier: there is no accepted physical registration of these ROTATED series, and SP-10
@@ -127,15 +132,26 @@ class Availability:
     text: str
 
 
+def locate(source: KnownSource, root: Path) -> Path:
+    """Where the declared file would lie under ``root``: the delivery folder, or the declared subfolder itself (when
+    ``root`` is named like it). Only a place to look; the size and SHA-256 decide."""
+    parts = PureWindowsPath(source.relative_path).parts  # the same on Windows and Linux
+    root = Path(root)
+    path = root.joinpath(*parts)
+    if not path.is_file() and len(parts) > 1 and root.name.lower() == parts[-2].lower():
+        return root / parts[-1]
+    return path
+
+
 def availability(source: KnownSource, root: Path = DEFAULT_ROOT) -> Availability:
     """Whether the file exists under ``root`` with the declared size (no content is read)."""
-    path = Path(root).joinpath(*PureWindowsPath(source.relative_path).parts)  # the same on Windows and Linux
+    path = locate(source, root)
     try:
         size = path.stat().st_size if path.is_file() else None
     except OSError:
         size = None
     if size is None:
-        return Availability(source, path, MISSING, "Not available on this computer")
+        return Availability(source, path, MISSING, "Not found in the chosen folder")
     if size != source.size_bytes:
         return Availability(source, path, CHANGED, f"Size {size} bytes differs from the declared {source.size_bytes}")
     return Availability(source, path, AVAILABLE, "Available (size matches; SHA-256 is checked when chosen)")
@@ -161,4 +177,4 @@ def find(series_id: str) -> Optional[KnownSource]:
 
 
 __all__ = ["AVAILABLE", "Availability", "CHANGED", "DEFAULT_ROOT", "KNOWN_SOURCES", "KnownSource", "MISSING",
-           "ProvenanceMismatch", "availability", "confirmed_sources", "find", "verify"]
+           "ProvenanceMismatch", "availability", "confirmed_sources", "find", "locate", "verify"]

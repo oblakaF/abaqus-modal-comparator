@@ -15,6 +15,11 @@ chosen) and the uncertainty budget with the archived record.
 
 PLATE-WORKBENCH-RC1 final correction: the test conditions of both series (owner, 2026-10-30; laboratory note;
 instrument) and the link of the two scans, from the services.
+
+WINDOWS-RC1-A: the FE archive root (``family_root`` of ``plate_study_model.run_study``) is shown and can be chosen
+by the user (Choose FE archive folder...). Each member's files are still verified by their recorded SHA-256 when the
+study runs (``plate_study.verify_member``); a member not found there is MISSING, never assumed. Changing the root
+discards the earlier result and its export status.
 """
 
 from __future__ import annotations
@@ -59,10 +64,12 @@ class PlateStudyPanel(QWidget):
 
     changed = Signal()
 
-    def __init__(self, ask_folder: Optional[Callable[[], str]] = None, family_root: Optional[Path] = None):
+    def __init__(self, ask_folder: Optional[Callable[[], str]] = None, family_root: Optional[Path] = None,
+                 ask_family_root: Optional[Callable[[str], str]] = None):
         super().__init__()
         self.inputs = (None, None, None, None, None)  # FE preview, FE identity, exp preview, exp identity, set index
         self.family_root = family_root
+        self._ask_family_root = ask_family_root or self._dialog_family_root
         self.slot = psm.PlateSlot()
         self.discarded = 0
         self.export_message = ""
@@ -102,6 +109,16 @@ class PlateStudyPanel(QWidget):
             self.buttons.addWidget(button, 0, Qt.AlignmentFlag.AlignLeft)
         inner.addLayout(self.buttons)
         inner.addWidget(_label(psm.GATE_NOTE, "warnings"))
+        root_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)  # WINDOWS-RC1-A: the FE archive root
+        self.root_label = _label("", "hint")
+        root_row.addWidget(self.root_label, 1)
+        self.root_button = QPushButton("Choose FE archive folder...")
+        self.root_button.setObjectName("plateFamilyRoot")
+        self.root_button.setToolTip("The folder that holds the FE family of the plate (the files are verified by "
+                                    "their recorded SHA-256 when the study runs; nothing is computed).")
+        self.root_button.clicked.connect(lambda: self.choose_family_root())
+        root_row.addWidget(self.root_button, 0, Qt.AlignmentFlag.AlignTop)
+        inner.addLayout(root_row)
         self.status = _label("", "hint")
         inner.addWidget(self.status)
         self.export_status = _label("", "hint")
@@ -144,6 +161,28 @@ class PlateStudyPanel(QWidget):
 
     def unavailable(self) -> tuple:
         return psm.unavailable(*self.inputs)
+
+    def current_family_root(self) -> Path:
+        from services import plate_study as ps
+
+        return Path(self.family_root) if self.family_root is not None else ps.WORK_ROOT
+
+    def _dialog_family_root(self, start: str) -> str:
+        return QFileDialog.getExistingDirectory(self, "Choose the FE archive folder of the plate", start)
+
+    def choose_family_root(self, folder: Optional[str] = None) -> bool:
+        """Use another FE archive root (asked when not given). A new root discards the earlier result and export
+        status; a cancelled choice or the same folder changes nothing."""
+        folder = folder if folder is not None else self._ask_family_root(str(self.current_family_root()))
+        if not folder or not str(folder).strip() or self.slot.state == psm.RUNNING:
+            return False
+        if Path(folder) == self.current_family_root():
+            return False
+        self.family_root = Path(folder)
+        self.slot.reset()
+        self.export_message = ""
+        self._refresh()
+        return True
 
     def run(self) -> bool:
         if self.unavailable() or self.slot.state == psm.RUNNING:
@@ -229,6 +268,10 @@ class PlateStudyPanel(QWidget):
         reasons = self.unavailable()
         state = self.slot.state
         self.run_button.setEnabled(not reasons and state != psm.RUNNING)
+        root = self.current_family_root()
+        self.root_label.setText(f"FE archive folder: {root}" + ("" if root.is_dir() else " — not found on this "
+                                "computer: the FE variants will be MISSING (the study still runs on the read files)"))
+        self.root_button.setEnabled(state != psm.RUNNING)
         self.why.setText("\n".join(reasons))
         self.why.setVisible(bool(reasons))
         view = self.view

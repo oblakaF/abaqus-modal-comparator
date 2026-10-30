@@ -99,7 +99,7 @@ class ArbitraryPlateTests(_Files):
         self.assertEqual(workspace.experimental.path, self.unv.resolve())
         for kind in ws.KINDS:
             self.assertEqual(workspace.choice(kind).status, "File chosen; content not checked")
-        self.assertEqual(workspace.fe.file_type, "Abaqus output database (.odb)")
+        self.assertEqual(workspace.fe.file_type, "Abaqus output database (.odb) — not viewable in this interface")
         self.assertEqual(workspace.experimental.file_type, "Universal file (.unv)")
         self.assertEqual(workspace.analysis, ws.ANALYSIS_NOT_RUN)
 
