@@ -97,6 +97,18 @@ creates no material value.
 **File > Choose a known new experimental source...** offers the three fitted working sources of the 2026-10-29
 delivery. They are checked against `docs/experimental/new_exp_20261029/SOURCE_PROVENANCE.csv` and by SHA-256.
 
+**Working from other folders (WINDOWS-RC1-A, `docs/gui/WINDOWS_RC1_A.md`):**
+- In the known-sources dialog, **Choose folder...** points to the delivery folder wherever it lies, or to its
+  `SPname_files_ROTATED_261028` subfolder. A file is used only with its declared size and SHA-256; a missing or changed
+  file is refused with the reason.
+- On the Plate Study page, **Choose FE archive folder...** sets the folder that holds the plate's FE family. Each
+  member is verified there by its recorded SHA-256, and a member not found is shown as MISSING. A new folder discards
+  the earlier study result.
+- **FE input.** The new interface views an extracted FE package: choose its `manifest.json`, with the CSV files
+  beside it.
+  - An Abaqus `.odb` cannot be viewed in this version of the new interface, and choosing one starts no Abaqus.
+  - `RUN_PROGRAM.cmd` keeps its own ODB route.
+
 **Research Results** (PRIORITY-5A, `docs/gui/PRIORITY5_RESEARCH_RESULTS.md`) shows the archived research results of
 PRIORITY-1–4 for PLATE (261027), SP-13 (261028) and SP-10 (261029). It reads them only; nothing is computed or started.
 - **Mode matching:** every experimental mode, with the published statuses.

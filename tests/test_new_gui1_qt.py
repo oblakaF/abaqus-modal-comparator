@@ -154,7 +154,8 @@ class ChooseFilesTests(_Window):
         w = self.window
         self.assertEqual(self.asked, [(ws.FE, ""), (ws.EXPERIMENTAL, "")])
         self.assertFalse(w.empty_state.isVisible())
-        for kind, path, kind_text in ((ws.FE, self.odb, "Abaqus output database (.odb)"),
+        for kind, path, kind_text in ((ws.FE, self.odb, "Abaqus output database (.odb) — not viewable in this "
+                                                        "interface"),  # WINDOWS-RC1-A
                                       (ws.EXPERIMENTAL, self.unv, "Universal file (.unv)")):
             card = w.cards[kind]
             with self.subTest(kind=kind):

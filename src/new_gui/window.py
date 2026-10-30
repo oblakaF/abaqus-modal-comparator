@@ -63,8 +63,8 @@ from new_gui.preview_panel import PreviewPanel
 from new_gui.registration_check_panel import RegistrationCheckPanel
 from new_gui.research_results_panel import ResearchResultsPanel
 from new_gui.shape_panel import ShapePanel
-from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
-                                     scientific_status)
+from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, DIALOG_FILTERS, EMPTY_TEXT, EXPERIMENTAL, FE,
+                                     KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, ODB_NOTE, Workspace, scientific_status)
 
 PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study", "Research Results")
 MATERIALS_PAGE = 3
@@ -207,6 +207,8 @@ class SourceCard(QFrame):
         layout.addLayout(grid)
         self.note = _label(CHOSEN_NOTE, "hint")
         layout.addWidget(self.note)
+        self.odb_note = _label(ODB_NOTE, "warnings")  # WINDOWS-RC1-A: an .odb is not viewable here; nothing starts
+        layout.addWidget(self.odb_note)
         self.error = _label("", "error")
         layout.addWidget(self.error)
         buttons = QHBoxLayout()
@@ -240,6 +242,7 @@ class SourceCard(QFrame):
         self.path.setCursorPosition(len(self.path.text()))  # a long path shows its end: folder and file name
         self.file_type.setText(choice.file_type if choice.chosen else "—")
         self.note.setVisible(choice.chosen and state == IDLE)
+        self.odb_note.setVisible(self.kind == FE and choice.chosen and choice.path.suffix.lower() == ".odb")
         self.error.setText(message)
         self.error.setVisible(bool(message))
         self.choose_button.setText("Replace file..." if choice.chosen else "Choose file...")
@@ -635,8 +638,14 @@ class MainWindow(QMainWindow):
         """The known new working sources; a chosen, verified one only sets the experimental file's path."""
         self.known_dialog = KnownSourcesDialog(self, self._known_root)
         self.known_dialog.accepted.connect(self._known_source_chosen)
+        self.known_dialog.finished.connect(self._known_folder_kept)
         self.known_dialog.open()
         return self.known_dialog
+
+    def _known_folder_kept(self, _result=0) -> None:
+        """WINDOWS-RC1-A: the folder the user chose in the dialog is offered again for the rest of the session."""
+        if self.known_dialog is not None:
+            self._known_root = self.known_dialog.root
 
     def _known_source_chosen(self) -> None:
         if self.known_dialog is not None and self.known_dialog.chosen_path is not None:
