@@ -21,8 +21,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 DELIVERY = Path(r"D:\Snadwich\New  EXP results")
 WORK = Path(r"D:\git\abaqus-modal-comparator-work")
-SCRATCH_INPUTS = Path(r"C:\Users\VadimKrysko\AppData\Local\Temp\claude\d--git-abaqus-modal-comparator"
-                      r"\a3589f4a-43dd-41df-99f2-6a9dd3de2870\scratchpad\rc1_inputs")
+SP13_DATA = WORK / "audit_package" / "stage" / "Abaqus_Modal_Comparator_AUDIT_SP02_SP13" / "data" / "SP13"
 PROVENANCE = REPO / "docs" / "experimental" / "new_exp_20261029" / "SOURCE_PROVENANCE.csv"
 
 SERIES = {
@@ -32,8 +31,27 @@ SERIES = {
 }
 FE_PACKAGES = {  # the specimen's own extracted packages (read-only)
     "PLATE": WORK / "runs" / "m11_carbon_plate" / "odb_extraction_r6" / "output" / "manifest.json",
-    "SP13": SCRATCH_INPUTS / "SP13" / "fe_extraction" / "manifest.json",
+    "SP13": SP13_DATA / "extraction_M4_modes_7_30" / "manifest.json",
 }
+FE_MANIFEST_SHA256 = {  # every input is refused on another content (PRIORITY-2: fail-closed inputs)
+    "PLATE": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+    "SP13": "91c360b4f603b3261bc5306051dbd15807996af4c40764168f69ceafbc285038",
+}
+SP13_REGISTERED_UNV = (SP13_DATA / "SP13_a_polymax.unv",
+                       "f268023583972f0a9c1660bc60631587e8f3330e4fb7495e52d8310906af39fe")
+
+
+class InputRefused(ValueError):
+    """An input file is missing or is not the expected content (SHA-256); nothing is computed on it."""
+
+
+def verified(path: Path, expected_sha256: str) -> Path:
+    if not Path(path).is_file():
+        raise InputRefused(f"{path} is missing")
+    digest = sha256(path)
+    if digest != expected_sha256:
+        raise InputRefused(f"{Path(path).name}: SHA-256 {digest[:12]}… is not the expected {expected_sha256[:12]}…")
+    return Path(path)
 SP10_DAT = WORK / "external_models" / "v2_20261019" / "SP-10" / "temp_root"
 SP10_MODELS = ("SP10_NEW_E1=E2_NSM_DENSITY", "SP10nemash63000", "SP10newmash", "SP10_new_E_NSM_DENS")
 
@@ -72,6 +90,9 @@ def read_experimental(key: str) -> Experimental:
     series, set_name, count = SERIES[key]
     row = provenance_rows()[series]
     path = DELIVERY.joinpath(*PureWindowsPath(row["relative_path"]).parts)
+    verified(path, row["sha256"].lower())  # refused on any other content
+    if path.stat().st_size != int(row["size_bytes"]):
+        raise InputRefused(f"{path.name}: size differs from SOURCE_PROVENANCE.csv")
     digest = sha256(path)
     preview = local_experimental_preview.preview_experimental_file(path)
     chosen = [s for s in preview.sets if set_name in (s.display_name, s.processing_name, s.key)]
@@ -90,7 +111,7 @@ def read_fe(key: str):
     from services import local_fe_preview
 
     ensure_application_importers()
-    preview = local_fe_preview.preview_fe_package(FE_PACKAGES[key])
+    preview = local_fe_preview.preview_fe_package(verified(FE_PACKAGES[key], FE_MANIFEST_SHA256[key]))
     return preview
 
 

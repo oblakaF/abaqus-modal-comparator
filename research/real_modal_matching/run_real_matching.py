@@ -155,7 +155,7 @@ def plate_research_mac(experimental_modes, fe_modes):
 
 
 SP13_REGISTRATION = REPO / "docs" / "registrations" / "SP13_frozen_registration.json"
-SP13_REGISTERED_UNV = I.SCRATCH_INPUTS / "SP13" / "SP13_a_polymax.unv"
+SP13_REGISTERED_UNV = I.SP13_REGISTERED_UNV[0]
 
 
 def sp13_registration_vectors(fe_dataset, fe_modes):
@@ -444,7 +444,7 @@ def main(out: Path) -> dict:
     reg_ids, sp13_fe, reg_hash = sp13_registration_vectors(fe["SP13"].dataset, sp13_modes)
     sp13_exp = [R.order_by_reference(list(m.node_ids), exp_z(m), reg_ids) for m in exps["SP13"].modes]
     sp13_mac = R.cmac_matrix(sp13_exp, sp13_fe)
-    prev_a = lep.preview_experimental_file(SP13_REGISTERED_UNV)
+    prev_a = lep.preview_experimental_file(I.verified(*I.SP13_REGISTERED_UNV))
     set_a = [s for s in prev_a.sets if s.key.lower() == "best" or s.display_name.lower() == "best"][0]
     ma = list(set_a.dataset.sorted_modes())
     control = R.cmac_matrix([R.order_by_reference(list(m.node_ids), exp_z(m), reg_ids) for m in ma], sp13_fe)
