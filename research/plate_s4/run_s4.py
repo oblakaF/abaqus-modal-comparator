@@ -75,9 +75,15 @@ def now() -> str:
     return dt.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-# ----------------------------------------------------------------------------- prepare
+# ----------------------------------------------------------------------------- prepare (generic; reused by PRIORITY-4)
 
-def prepare() -> dict:
+def prepare_jobs(jobs_root: Path, jobs, record_name: str, keep_width: bool = True) -> dict:
+    """Copies of the baseline INP, each changing only fields of the one *Elastic line.
+
+    ``jobs``: sequence of (job, {parameter: (value, field text)}). Every other line is checked byte-equal; the
+    parsed constants must be exactly the requested ones (the others the baseline's); an existing INP of another
+    content is never overwritten. ``keep_width`` refuses a field of another width (S4); PRIORITY-4 values such as
+    41952.8 need one more character, which free-format Abaqus input accepts."""
     if sha256(BASE_INP) != BASE.inp.sha256:
         raise Refused(f"baseline INP {BASE_INP.name} is not {BASE.inp.sha256[:12]}…")
     if sha256(BASE_MANIFEST) != BASE.manifest.sha256:
@@ -90,86 +96,105 @@ def prepare() -> dict:
     index = hits[0]
     record = {"base_inp": str(BASE_INP), "base_inp_sha256": BASE.inp.sha256, "elastic_line_index": index,
               "baseline_line": BASELINE_LINE, "jobs": {}}
-    JOBS_ROOT.mkdir(parents=True, exist_ok=True)
-    for job, parameter, value, text in JOBS:
+    jobs_root.mkdir(parents=True, exist_ok=True)
+    names = [job for job, _c in jobs]
+    if len(set(names)) != len(names):
+        raise Refused("job names are not unique")
+    baseline = ps.parse_inp_material(raw.decode("ascii", "replace"))
+    for job, changes in jobs:
         fields = BASELINE_LINE.split(",")
-        old = fields[FIELD[parameter]]
-        if len(text) != len(old):
-            raise Refused(f"{job}: field width changes")
-        fields[FIELD[parameter]] = text
+        for parameter, (_value, text) in changes.items():
+            if keep_width and len(text) != len(fields[FIELD[parameter]]):
+                raise Refused(f"{job}: field width changes")
+            fields[FIELD[parameter]] = text
         new_line = ",".join(fields)
         eol = lines[index][len(BASELINE_LINE):]
         new_lines = list(lines)
         new_lines[index] = new_line.encode("ascii") + eol
         content = b"\n".join(new_lines)
         changed = [i for i, (a, b) in enumerate(zip(lines, new_lines)) if a != b]
-        if changed != [index] or len(content) != len(raw):
+        if changed != [index] or len(new_lines) != len(lines) or (keep_width and len(content) != len(raw)):
             raise Refused(f"{job}: more than the elastic line would change")
         parsed = ps.parse_inp_material(content.decode("ascii", "replace"))
-        expected = {**{k: v for k, v in BASELINE.items()}, parameter: value}
-        if any(abs(parsed[k] - expected[k]) > 1e-9 for k in ("E1", "E2", "G12")):
+        expected = {**baseline, **{k: v for k, (v, _t) in changes.items()}}
+        if set(parsed) != set(expected) or any(abs(parsed[k] - expected[k]) > 1e-9 * max(1.0, abs(expected[k]))
+                                               for k in expected):
             raise Refused(f"{job}: parsed constants {parsed} are not {expected}")
-        nu12, e1, e2 = parsed["nu12"], parsed["E1"], parsed["E2"]
-        if not abs(nu12) < math.sqrt(e1 / e2):
+        if not abs(parsed["nu12"]) < math.sqrt(parsed["E1"] / parsed["E2"]):
             raise Refused(f"{job}: not positive definite")
-        folder = JOBS_ROOT / job
+        folder = jobs_root / job
         folder.mkdir(exist_ok=True)
         target = folder / f"{job}.inp"
         if target.exists() and target.read_bytes() != content:
             raise Refused(f"{target} exists with another content: not overwritten")
         target.write_bytes(content)
-        record["jobs"][job] = {"parameter": parameter, "value": value, "ratio": value / BASELINE[parameter],
-                               "inp": str(target), "inp_sha256": sha256(target), "changed_line_index": index,
-                               "old_line": BASELINE_LINE, "new_line": new_line,
-                               "every_other_byte_equal": True, "parsed": {k: parsed.get(k) for k in ("E1", "E2", "G12",
-                                                                                                "nu12", "rho", "h")}}
-    (JOBS_ROOT / "s4_prepare.json").write_text(json.dumps(record, indent=1), encoding="utf-8")
+        entry = {"changes": {k: v for k, (v, _t) in changes.items()}, "inp": str(target),
+                 "inp_sha256": sha256(target), "changed_line_index": index, "old_line": BASELINE_LINE,
+                 "new_line": new_line, "every_other_line_equal": True,
+                 "parsed": {k: parsed.get(k) for k in ("E1", "E2", "E3", "nu12", "nu13", "nu23", "G12", "G13", "G23",
+                                                       "rho", "h")}}
+        if len(changes) == 1:  # the S4 record fields
+            (parameter, (value, _t)), = changes.items()
+            entry.update(parameter=parameter, value=value, ratio=value / BASELINE[parameter],
+                         every_other_byte_equal=True)
+        record["jobs"][job] = entry
+    (jobs_root / record_name).write_text(json.dumps(record, indent=1), encoding="utf-8")
     return record
 
 
-# ----------------------------------------------------------------------------- solve (at most six)
+def prepare() -> dict:
+    return prepare_jobs(JOBS_ROOT, [(job, {parameter: (value, text)}) for job, parameter, value, text in JOBS],
+                        "s4_prepare.json")
+
+
+# ----------------------------------------------------------------------------- solve (generic; never a hidden repeat)
 
 RUNS_CSV = JOBS_ROOT / "SOLVER_RUNS.csv"
 RUN_FIELDS = ["attempt", "job", "parameter", "value", "inp_sha256", "started", "finished", "exit_code",
               "sta_completed", "odb_sha256", "seconds", "note"]
 
 
-def _runs() -> list:
-    if not RUNS_CSV.exists():
+def _runs(runs_csv: Path = None) -> list:
+    runs_csv = runs_csv or RUNS_CSV
+    if not runs_csv.exists():
         return []
-    with open(RUNS_CSV, newline="", encoding="utf-8") as stream:
+    with open(runs_csv, newline="", encoding="utf-8") as stream:
         return list(csv.DictReader(stream))
 
 
-def _write_runs(rows) -> None:
-    with open(RUNS_CSV, "w", newline="", encoding="utf-8") as stream:
+def _write_runs(rows, runs_csv: Path = None) -> None:
+    with open(runs_csv or RUNS_CSV, "w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=RUN_FIELDS)
         writer.writeheader()
         writer.writerows(rows)
 
 
-def solve() -> list:
-    prep = json.loads((JOBS_ROOT / "s4_prepare.json").read_text(encoding="utf-8"))
+def solve_jobs(jobs_root: Path, record_name: str, max_solves: int, runs_csv: Path) -> list:
+    """Each job once: the attempt is logged BEFORE the solver starts; an attempted job (completed or failed) is never
+    run again here, an existing ODB is never overwritten, and attempt max_solves + 1 is refused."""
+    prep = json.loads((jobs_root / record_name).read_text(encoding="utf-8"))
     if not ABAQUS.is_file():
         raise Refused(f"{ABAQUS} not found")
-    rows = _runs()
-    done = {r["job"] for r in rows if r["sta_completed"] == "True"}
-    for job, parameter, value, _text in JOBS:
-        if job in done:
-            continue
-        if len(rows) >= MAX_SOLVES:
-            raise Refused(f"the authorised {MAX_SOLVES} solves are used up; {job} is not run")
-        folder = JOBS_ROOT / job
+    rows = _runs(runs_csv)
+    attempted = {r["job"] for r in rows}
+    for job, entry in prep["jobs"].items():
+        if job in attempted:
+            continue  # completed, or failed: a failed job needs a new authorisation, never a silent repeat
+        if len(rows) >= max_solves:
+            raise Refused(f"the authorised {max_solves} solves are used up; {job} is not run")
+        folder = jobs_root / job
         inp = folder / f"{job}.inp"
-        if sha256(inp) != prep["jobs"][job]["inp_sha256"]:
+        if sha256(inp) != entry["inp_sha256"]:
             raise Refused(f"{job}: INP changed since prepare")
         if (folder / f"{job}.odb").exists():
             raise Refused(f"{job}: an ODB already exists; it is not overwritten")
-        row = {"attempt": len(rows) + 1, "job": job, "parameter": parameter, "value": value,
-               "inp_sha256": prep["jobs"][job]["inp_sha256"], "started": now(), "finished": "", "exit_code": "",
-               "sta_completed": "", "odb_sha256": "", "seconds": "", "note": "started"}
+        changes = entry.get("changes") or {entry["parameter"]: entry["value"]}
+        row = {"attempt": len(rows) + 1, "job": job, "parameter": "; ".join(changes),
+               "value": "; ".join(f"{v:g}" for v in changes.values()), "inp_sha256": entry["inp_sha256"],
+               "started": now(), "finished": "", "exit_code": "", "sta_completed": "", "odb_sha256": "", "seconds": "",
+               "note": "started"}
         rows.append(row)
-        _write_runs(rows)  # the attempt is recorded before the solver starts
+        _write_runs(rows, runs_csv)  # the attempt is recorded before the solver starts
         (folder / "scratch").mkdir(exist_ok=True)
         t0 = dt.datetime.now()
         with open(folder / "abaqus_console.log", "w", encoding="utf-8", errors="replace") as log:
@@ -183,23 +208,26 @@ def solve() -> list:
                     "odb_sha256": sha256(odb) if odb.exists() else "",
                     "seconds": round((dt.datetime.now() - t0).total_seconds(), 1),
                     "note": "completed" if completed and code == 0 else "FAILED: no result is substituted"})
-        _write_runs(rows)
+        _write_runs(rows, runs_csv)
     return rows
 
 
-# ----------------------------------------------------------------------------- extract
+def solve() -> list:
+    return solve_jobs(JOBS_ROOT, "s4_prepare.json", MAX_SOLVES, RUNS_CSV)
 
-def extract() -> dict:
+
+# ----------------------------------------------------------------------------- extract (generic)
+
+def extract_jobs(jobs_root: Path, runs_csv: Path, record_name: str) -> dict:
     if sha256(EXTRACTOR) != EXTRACTOR_SHA256:
         raise Refused("the pinned extractor changed")
     out = {}
-    rows = {r["job"]: r for r in _runs()}
-    for job, *_rest in JOBS:
-        row = rows.get(job)
-        if row is None or row["sta_completed"] != "True":
+    for row in _runs(runs_csv):
+        job = row["job"]
+        if row["sta_completed"] != "True":
             out[job] = "NOT_SOLVED"
             continue
-        folder = JOBS_ROOT / job
+        folder = jobs_root / job
         odb = folder / f"{job}.odb"
         if sha256(odb) != row["odb_sha256"]:
             raise Refused(f"{job}: ODB changed since the solve")
@@ -212,8 +240,12 @@ def extract() -> dict:
                                    "--output", "extraction", "--start-mode", "1", "--end-mode", "20"], cwd=folder,
                                   stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL).returncode
         out[job] = "EXTRACTED" if code == 0 and (target / "manifest.json").exists() else f"FAILED exit {code}"
-    (JOBS_ROOT / "s4_extract.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    (jobs_root / record_name).write_text(json.dumps(out, indent=1), encoding="utf-8")
     return out
+
+
+def extract() -> dict:
+    return extract_jobs(JOBS_ROOT, RUNS_CSV, "s4_extract.json")
 
 
 # ----------------------------------------------------------------------------- analyse
