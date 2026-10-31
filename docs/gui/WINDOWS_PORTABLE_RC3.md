@@ -240,3 +240,82 @@ found; it was corrected and tested before `c98fc36`.
 the screen. Alone it passes, and the rerun with nothing else on the screen is OK.
 
 **CI:** `c98fc36`, run 41211309129, success.
+
+## RC3-F2 — the corrected build (PRIORITY-8-F2)
+
+**Built from code commit `d2e2b3e`** (branch `fix/generic-single-plate-rc3-f2`) with `packaging/portable_rc3_f2`.
+
+- It is a separate folder and ZIP.
+- The RC1, RC2, RC3 and RC3-F1 desktop copies have the same SHA-256 before and after the build; this build never
+  writes them (`PROTECTED_DESKTOP`, test).
+- The build's own checks passed: the archived research files, the synthetic demonstration CONVERGED, and nothing
+  forbidden in the build.
+
+| Item | Value |
+|---|---|
+| Commit | `d2e2b3e8eb9757fea0b100602e7fccc321a050fb` (clean tree) |
+| Folder | `C:\Users\VadimKrysko\Desktop\AbaqusModalComparator_RC3_F2\` — 720 files, 243 028 652 bytes |
+| EXE | `AbaqusModalComparator.exe`, 17 515 503 bytes, SHA-256 `84ed095e821fbe5c02890cc013688aaf7eb4ec3625b345661a9187867bf71626` |
+| ZIP | `C:\Users\VadimKrysko\Desktop\AbaqusModalComparator_RC3_F2.zip`, 105 602 957 bytes, SHA-256 `2f12f095e1d5ee3f4511c12960b6006f2487662c4d83d6adbffd8460f73278c5` |
+| RC1 / RC2 / RC3 / RC3-F1 (unchanged) | ZIP `e1c34b0d…` / `3c07d0b9…` / `a32f7a11…` / `afee5e44…`; EXE `c3fc0576…` / `175e7b1a…` / `68fefa36…` / `9e990df9…` |
+
+### F2 acceptance
+
+**The F2 route.** Two runs:
+
+1. `RUN_NEW_GUI.cmd` of `d2e2b3e`;
+2. the RC3-F2 EXE, unpacked from the desktop ZIP into
+   `D:\git\abaqus-modal-comparator-work\research\PRIORITY8_F2_REVIEW\release d2e2b3e\Copied to another place\`,
+   started directly.
+
+**Conditions:**
+
+- 150 % scaling, native dialogs, UI Automation;
+- isolated LOCALAPPDATA;
+- for the EXE: a clean environment and `AMC_OPEN_AUDIT`.
+
+Only the synthetic demonstration is used. Study files and reports are written in the run's folder.
+
+**Pressing three buttons.** **Apply measurements**, **Apply identifiers and set-up** and **Evaluate the evidence** are
+pressed through UI Automation (InvokePattern by object name). **Apply measurements** lies below the visible part of
+the long measurements page, which the mouse-wheel helper could not scroll to.
+
+| Step | RUN_NEW_GUI.cmd | EXE |
+|---|---|---|
+| Demonstration: offline **CONVERGED** 51 975.2 / 4 305.13 MPa, 5 FIT / 3 HOLDOUT, D values shown; export with `offline_terms` CSV; saved | yes | yes |
+| Thickness reading 1 changed (2.18 → 2.28 mm), applied: step 7 **stale**, banner **Offline candidate STALE — NOT CURRENT** naming the passport, no parameters, no D values, no offline table; diagnostics **Results: CURRENT**, 12 rows | yes | yes |
+| Export after the change: `offline_result` null, `results_state.offline` STALE, `not_current_results` STALE, no `offline_terms` CSV, Markdown NOT CURRENT, approved values NOT_AVAILABLE | yes | yes |
+| Saved and reopened: still STALE, D hidden | yes | yes |
+| The saved current study reopened: CURRENT, CONVERGED, D shown | yes | yes |
+| FIXED ν12 changed (0.30), applied: STALE, D hidden; export as above | yes | yes |
+| `physical_specimen_id` changed, applied: STALE, D hidden | yes | yes |
+| Declaration imported again: candidate cleared, kept in `superseded` ("the declared observation set was replaced") | yes | yes |
+| Evidence evaluated again: candidate kept in `superseded` ("the registration evidence was changed") | yes | yes |
+| New physical study: **Run offline research study** disabled, **PHYSICAL_OFFLINE_FIT_BLOCKED** | yes | yes |
+| No Abaqus process; closed, exit 0 | yes | yes |
+
+**Open-file record of the EXE (1312 files):**
+
+- none from the repository, an installed Python, a `.venv` or the user's cache;
+- reference files only from the portable `docs` (the demonstration).
+
+**Evidence** (in `D:\git\abaqus-modal-comparator-work\research\PRIORITY8_F2_REVIEW\`):
+
+- `gui smoke cmd 3\`;
+- `release d2e2b3e\smoke run\`: `f2_smoke.json`, `open_audit.log`, the studies, the reports and screenshots `01`–`04`.
+
+**Earlier attempts:**
+
+- cmd run 1 stopped at the first screenshot (the system Python had no Pillow);
+- cmd run 2 stopped at **Apply measurements** (outside the view, see above).
+
+Neither concerns the program.
+
+### F2 tests and CI
+
+**Tests:**
+
+- targeted: workbench (47), RC3-F2 packaging (3), RC3-F1 packaging (3) — all pass;
+- full suite: 3232 tests, OK, 98 skipped (the same categories). It ran with nothing else on the screen.
+
+**CI:** `d2e2b3e`, run 41217874525, success. The final documentation commit is checked by a further CI run (see the report).
