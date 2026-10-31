@@ -281,6 +281,8 @@ class PhysicalReviewPanel(QWidget):
         that does not verify) or CHECKING (a reopened dossier being verified)."""
         if self.record is None:
             return "NONE", ""
+        if self.refusal is not None:  # PRIORITY-9-F1: a later build was refused; the shown review is not current
+            return "STALE", f"the latest build was refused ({self.refusal[1]})"
         if self.origin == FILE:
             reopened = self.reopened or {}
             if not reopened:
@@ -415,7 +417,8 @@ class PhysicalReviewPanel(QWidget):
     def _fail(self, refusal: pr.ReviewRefused) -> None:
         """A refused build keeps the review shown before (it is STALE or NOT_CURRENT, never lost)."""
         self.refusal = (refusal.state, str(refusal))
-        self._say(f"Not built — {refusal.state}: {refusal}")
+        text = str(refusal)
+        self._say(f"Not built — {text}" if text.startswith(refusal.state) else f"Not built — {refusal.state}: {text}")
         self._refresh()
 
     def _take(self, record: dict, origin: str, inputs, key) -> None:

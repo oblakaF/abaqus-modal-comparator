@@ -636,6 +636,20 @@ class F1PanelTests(_ReviewWindow):
         self.assertEqual(self.panel.freshness()[0], "STALE")
         self.assertIn("Not built", self.panel.message.text())
 
+    def test_a_refused_build_never_leaves_an_earlier_review_shown_as_verified(self):
+        # the F1 smoke: a current review stayed "Sources: SOURCES_VERIFIED" after a build refused for one source
+        self.window.workbench.study = demo_study()
+        self.assertTrue(self.panel.build_from_study())
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(self.panel.freshness()[0], "CURRENT")
+        self.assertFalse(self.panel.build_from_workspace())  # nothing read in the Workspace: refused at once
+        self.assertEqual(self.panel.freshness()[0], "STALE")
+        sources = self.panel.state_labels["sources"][1].text()
+        self.assertTrue(sources.startswith("Sources (stored, NOT CURRENT): SOURCE_NOT_VERIFIED"), sources)
+        self.assertNotIn(pr.SOURCES_VERIFIED, sources)
+        self.assertFalse(self.panel.export_button.isEnabled())
+        self.assertNotIn("SOURCE_NOT_VERIFIED: SOURCE_NOT_VERIFIED", self.panel.message.text())
+
 
 REAL = Path(r"D:\git\abaqus-modal-comparator-work\research\INTEGRATION_RC1_REVIEW\moved inputs")
 REAL_UNV = REAL / "EXP delivery copy" / "SPname_files_ROTATED_261028" / "300by300_plate_only_1mm_ROTATED_Polytec_261027.unv"
