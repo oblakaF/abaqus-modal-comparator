@@ -400,6 +400,8 @@ class PanelTests(unittest.TestCase):
         self.assertEqual([tabs.tabText(i) for i in range(3)], ["A. Current PLATE Study", "B. New Single Plate",
                                                                "C. Physical Readiness"])
         self.assertEqual(tabs.tabToolTip(2), "C. Physical Readiness Review")
+        # the smoke found "7. Report _export": "&" is doubled, so it is shown and never a mnemonic
+        self.assertEqual(self.panel.step_buttons.button(6).text(), "7. Report && export")
         self.assertFalse(self.panel.export_button.isEnabled())
         self.assertFalse(self.panel.build_from_workspace())  # nothing read in the Workspace
         self.assertIn("SOURCE_NOT_VERIFIED", " ".join(w.text() for w in self.panel.findChildren(QLabel)))

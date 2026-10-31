@@ -150,7 +150,7 @@ class PhysicalReviewPanel(QWidget):
             page_layout.addStretch(1)
             self.bodies.append(body)
             self.pages.addWidget(page)
-            button = QPushButton(title)
+            button = QPushButton(title.replace("&", "&&"))  # "&" is shown, not a mnemonic
             button.setObjectName(f"prStep{index + 1}")
             button.setCheckable(True)
             self.step_buttons.addButton(button, index)
