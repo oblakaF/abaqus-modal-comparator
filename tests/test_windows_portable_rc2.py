@@ -86,6 +86,7 @@ class PortableRc2PackagingTests(unittest.TestCase):
             root = Path(folder)
             (root / "_internal" / "numpy").mkdir(parents=True)
             (root / "_internal" / "numpy" / "table.dat").write_bytes(b"library data")
+            (root / "_internal" / "numpy" / "sample.npz").write_bytes(b"library sample data")  # as matplotlib's
             (root / "_internal" / "lib").mkdir()
             (root / "_internal" / "lib" / "manifest.json").write_text("{}", encoding="utf-8")  # a library's own
             (root / "docs").mkdir()

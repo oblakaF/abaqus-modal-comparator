@@ -46,8 +46,9 @@ DOC_SUFFIXES = {".json", ".csv", ".md", ".txt", ".sha256"}
 DOC_MAX_BYTES = 2_000_000
 # Never in the build: measurements, FE models and results, solver scratch (they are chosen by the user).
 FORBIDDEN_SUFFIXES = {".odb", ".unv", ".uff", ".lms", ".svd", ".inp", ".sta", ".msg", ".prt", ".com", ".sim", ".res",
-                      ".fil", ".mdl", ".stt", ".cae", ".jnl", ".rpy", ".lck", ".023", ".abq", ".pac", ".sel", ".npz"}
+                      ".fil", ".mdl", ".stt", ".cae", ".jnl", ".rpy", ".lck", ".023", ".abq", ".pac", ".sel"}
 SOLVER_DAT_ROOTS = ("docs",)  # an Abaqus .dat is refused where data live; libraries ship their own .dat files
+DATA_ROOT_ONLY = {".dat", ".npz"}  # an FE shape pack (.npz) too; matplotlib ships its own sample .npz files
 # the files of an extracted FE package (the SP-10 package of PRIORITY-6 is 3.1 GB): chosen by the user, never shipped
 PACKAGE_FILE = re.compile(r"^(manifest\.json|geometry\.csv|mode_\d{4}\.csv)$", re.IGNORECASE)
 TRACKED_ROOTS = ("src", "docs", "packaging", "requirements-new-gui.txt")
@@ -112,7 +113,7 @@ def check_contents(folder: Path) -> None:
             continue
         suffix = path.suffix.lower()
         top = path.relative_to(folder).parts[0]
-        if (suffix in FORBIDDEN_SUFFIXES or (suffix == ".dat" and top in SOLVER_DAT_ROOTS)
+        if (suffix in FORBIDDEN_SUFFIXES or (suffix in DATA_ROOT_ONLY and top in SOLVER_DAT_ROOTS)
                 or (top in SOLVER_DAT_ROOTS and PACKAGE_FILE.match(path.name))):
             bad.append(str(path.relative_to(folder)))
     if bad:
