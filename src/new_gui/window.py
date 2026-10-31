@@ -590,7 +590,7 @@ class MainWindow(QMainWindow):
         """A read, a shape drawing, the frequency diagnostic or the registration check is still running."""
         return (self.reading() or any(panel.busy() for panel in self.shape_panels.values())
                 or self.diagnostic.busy() or self.registration.busy() or self.comparison.busy()
-                or self.plate.busy() or self.workbench.busy())
+                or self.plate.busy() or self.workbench.busy() or self.review.busy())
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
         """Process events until no read or drawing is running (tests and checks); returns whether all ended."""
@@ -611,6 +611,7 @@ class MainWindow(QMainWindow):
         self.comparison.cancel()  # and the verified comparison, its drawings included
         self.plate.cancel()  # and the plate study
         self.workbench.cancel()  # and the single-plate workbench's drawings
+        self.review.cancel()  # and the physical readiness review's background check (PRIORITY-9-F1)
         super().closeEvent(event)
 
     def _analysis_changed(self) -> None:

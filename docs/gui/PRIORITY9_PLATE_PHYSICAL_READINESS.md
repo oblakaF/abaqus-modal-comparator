@@ -177,3 +177,105 @@ The test results, the Windows smoke and the RC4 build are in `WINDOWS_PORTABLE_R
 - The frozen registrations and the historical results of PRIORITY-1–8.
 - S0 / H1 / H2, M8, D-077 and the scientific thresholds.
 - RC1–RC3-F2.
+
+## 7. PRIORITY-9-F1 — integrity of the sources and of a saved dossier
+
+Branch `fix/plate-physical-readiness-rc4-f1`, from `adaa71a`. The scientific content of PRIORITY-9 is unchanged.
+
+### Defects in RC4
+
+- `sources_state` accepted any audit in which every present row of an experimental source or FE manifest verified.
+  - An audit missing one of them (built elsewhere, or edited) gave **SOURCES_VERIFIED**.
+  - Two experimental files were not refused.
+  - A document whose recorded SHA-256 was never hashed on disk could count as verified.
+- `reopened_state` called a reopened dossier **CURRENT** when its existing paths hashed correctly.
+  - One source was enough.
+  - The stored scientific statuses were trusted, so a manual edit of the JSON stayed CURRENT.
+- A study-B review did not check that the study's diagnostics belonged to its linked sources and modal set.
+
+### Sources
+
+**Requirement.** A physical plate needs **exactly one** experimental source and **exactly one** FE manifest. Each must
+be hashed on disk now (`on_disk_sha256`) and equal its recorded SHA-256, and also the archived one for M11-261027.
+
+**Refused states.** No document of the dossier may be CHANGED, MISSING, FOREIGN or NOT_READ_ON_DISK.
+
+**Contradictions:**
+
+- **study B:** the diagnostics were computed for other sources or another modal set (their recorded input
+  fingerprint), or the study links no modal set;
+- **Workspace:** the file read is not the file whose SHA-256 was recorded.
+
+**Consequences:**
+
+- Otherwise the state is **SOURCE_NOT_VERIFIED**, with each reason in the dossier (`sources.reasons`) and on the page.
+- READY_FOR_OWNER_REVIEW is then not given, and the export is refused.
+- Two experimental files or two FE manifests refuse the review. Any problem refuses the M11-261027 review.
+
+**What is hashed.** The UNV, the FE `manifest.json` and an optional INP. The FE package is never hashed as a whole.
+
+### A saved dossier
+
+**Content integrity.** A new dossier carries `integrity.content_sha256`: the SHA-256 of its canonical JSON (sorted keys)
+without this field. It detects an accidental or manual change of the saved content. It is not a signature and no proof
+of authorship.
+
+**Reopening:**
+
+1. Every recorded document is hashed on disk again. Exactly one experimental source and one FE manifest must verify;
+   one source is not enough.
+2. The content must match its integrity SHA-256.
+3. The stored source state must be SOURCES_VERIFIED.
+
+If any step fails, the dossier is **NOT_CURRENT** with the reasons.
+
+**Recomputation (M11-261027).** When the three steps pass, the dossier is recomputed from its verified files:
+
+- the UNV and the FE package are read again, and only the manifest is hashed;
+- the INP and the owner documents are hashed again.
+
+A recomputation equal to the stored dossier (all but `created` and `integrity`) is **CURRENT — REVALIDATED**. Any
+difference, for example an edited status with a fresh integrity record, is NOT_CURRENT.
+
+**RECORD_NOT_REVALIDATED.** Other dossiers stay at RECORD_NOT_REVALIDATED: their sources and content verify, but their
+statuses are the stored ones. This covers:
+
+- study B (the study is not in the file);
+- the synthetic demonstration;
+- an RC4 dossier without an integrity record (not rewritten).
+
+They are shown with "(stored, not revalidated)" and are not exported as current.
+
+### Interface
+
+- Building, reopening (hashing, reading, recomputing) and exporting run in the background, so the window stays
+  responsive.
+- A refused build keeps the review shown before. It becomes STALE, never lost, and the sources line shows the refusal,
+  never the stored "verified".
+- The state labels say "(stored, NOT CURRENT)" or "(stored, not revalidated)" whenever the review is not current.
+
+### Tests
+
+**`tests/test_plate_physical_review.py`: 34 tests** (24 kept and adapted, 10 new; item 8 extends the real-file test):
+
+1. only the UNV → SOURCE_NOT_VERIFIED, not READY, export refused, the M11 review refused;
+2. only the FE manifest → SOURCE_NOT_VERIFIED, also from an audit without the FE row;
+3. both correct sources → SOURCES_VERIFIED; a recorded SHA-256 not hashed on disk is NOT_READ and refused;
+4. duplicated sources, a changed content and a file read that is not the recorded one are refused;
+5. diagnostics of another modal set → SOURCE_NOT_VERIFIED, export refused;
+6. a saved dossier with one source, or with the FE row removed → NOT_CURRENT; with both → RECORD_NOT_REVALIDATED, never
+   CURRENT from the stored statuses;
+7. a manual status edit → MODIFIED_AFTER_SAVE, NOT_CURRENT, export refused; a dossier without an integrity record →
+   RECORD_NOT_REVALIDATED; a recomputation that differs → NOT_CURRENT; an equal one → REVALIDATED;
+8. the real M11-261027 copies: SOURCES_VERIFIED; saved, reopened and revalidated from the files → CURRENT — REVALIDATED
+   (the real-file test, skipped where the copies are absent);
+9. the synthetic demonstration keeps SYNTHETIC_DEMONSTRATION_ONLY and is RECORD_NOT_REVALIDATED when reopened;
+10. no registration, MAC or mode pair; the registrations are unchanged.
+
+The panel test shows an incomplete source with its reason, refuses the export (nothing written) and keeps the earlier
+review after a refused build.
+
+**The fixtures.** The M11 test documents now state their on-disk SHA-256 explicitly: a recorded SHA-256 alone is no
+longer a verification. A foreign INP now refuses the M11 review; before, it gave a dossier marked SOURCE_NOT_VERIFIED.
+
+**Packaging.** `tests/test_windows_portable_rc4_f1.py` (3) checks the separate RC4-F1 packaging (RC1–RC4 unchanged).

@@ -94,6 +94,15 @@ VERIFIED = "VERIFIED_SHA256"
 FOREIGN = "FOREIGN — not the recorded source"
 CHANGED = "CHANGED_SINCE_READ"
 MISSING = "MISSING_ON_DISK"
+NOT_READ = "NOT_READ_ON_DISK"  # PRIORITY-9-F1: a document whose SHA-256 was not computed from the file now
+REQUIRED_ROLES = (EXPERIMENTAL, FE_MANIFEST)
+# PRIORITY-9-F1: the states of a reopened dossier
+CURRENT = "CURRENT"
+REVALIDATED = "CURRENT — REVALIDATED (recomputed from the verified sources)"
+NOT_REVALIDATED = "RECORD_NOT_REVALIDATED"
+NOT_CURRENT = "NOT_CURRENT"
+INTEGRITY_METHOD = ("SHA-256 of the canonical JSON of the dossier (sorted keys) without this field: it detects an "
+                    "accidental or manual change of the saved content; it is not a signature and no proof of authorship")
 RECORDED = "RECORDED_BY_SHA256 — interpretation NOT_CONFIRMED"
 RECORDED_GENERIC = "RECORDED_BY_SHA256 (no archived reference)"
 
@@ -289,6 +298,12 @@ def inputs_from_workspace(fe_preview, fe_identity, experimental_preview, experim
                             "in B. New Single Plate.")
     exp_path = getattr(experimental_preview, "source_path", None) or _experimental_identity_path(experimental_identity)
     fe_path = getattr(fe_preview, "manifest_path", None) or _experimental_identity_path(fe_identity)
+    for role, preview_path, identity in ((EXPERIMENTAL, exp_path, experimental_identity), (FE_MANIFEST, fe_path,
+                                                                                          fe_identity)):
+        recorded = _experimental_identity_path(identity)
+        if recorded and preview_path and Path(recorded).resolve() != Path(preview_path).resolve():
+            raise ReviewRefused(f"SOURCE_NOT_VERIFIED: the {role} read ({preview_path}) is not the file whose SHA-256 "
+                                f"was recorded ({recorded}); Inspect it again")
     docs = [document(EXPERIMENTAL, exp_path, "Workspace (Inspect file)", "the measured modal records and the scan "
                      "geometry (instrument record)", exp_sha),
             document(FE_MANIFEST, fe_path, "Workspace (Inspect file)", "the FE modes and geometry of M11", fe_sha)]
@@ -355,7 +370,27 @@ def inputs_from_study(study: wb.Study, documents: Sequence[SourceDocument] = ())
                         tuple(diagnostics.get("fe_rigid_excluded", ())),
                         tuple(map(tuple, diagnostics.get("scan_points_m", ()) or ())), "Z",
                         tuple(diagnostics["fe_extent_mm"]) if diagnostics.get("fe_extent_mm") else None,
-                        tuple(study.evidence), tuple(applicability), study)
+                        tuple(study.evidence), tuple(applicability), study,
+                        {"source_problems": tuple(diagnostics_problems(study))})
+
+
+def diagnostics_problems(study: wb.Study) -> list:
+    """PRIORITY-9-F1: the diagnostics of a physical study must belong to its linked sources and modal set (the
+    fingerprint recorded when they were computed), not to an earlier state of the study."""
+    if study.synthetic:
+        return []
+    out = []
+    if study.modal_set is None:
+        out.append("no modal set is linked to the study")
+    recorded = (study.diagnostics or {}).get("inputs")
+    now = wb.input_fingerprint(study)
+    if recorded is None:
+        out.append("the study's diagnostics record no inputs (an earlier study file): run them again")
+    elif {k: recorded.get(k) for k in now} != now:
+        differ = [k for k in now if recorded.get(k) != now[k]]
+        out.append("the study's diagnostics were computed for other inputs (" + ", ".join(differ) + "): run them "
+                   "again on the linked sources and modal set")
+    return out
 
 
 def with_document(inputs: ReviewInputs, doc: SourceDocument) -> ReviewInputs:
@@ -402,9 +437,9 @@ def audit_sources(inputs: ReviewInputs) -> tuple:
         want = expected.get(d.role)
         if inputs.kind == wb.SYNTHETIC_DEMO and not d.path:
             state = "SYNTHETIC_DECLARATION — no file"
-        elif d.on_disk_sha256 is None and d.path:
-            state = MISSING
-        elif d.on_disk_sha256 is not None and d.on_disk_sha256 != d.sha256:
+        elif d.on_disk_sha256 is None:  # PRIORITY-9-F1: a recorded SHA-256 alone is never a verification
+            state = MISSING if d.path else NOT_READ
+        elif d.on_disk_sha256 != d.sha256:
             state = CHANGED
         elif d.role == OWNER_DOCUMENT:
             state = RECORDED
@@ -413,7 +448,8 @@ def audit_sources(inputs: ReviewInputs) -> tuple:
         else:
             state = VERIFIED if d.sha256 == want else FOREIGN
         rows.append({"role": d.role, "path": d.path, "sha256": d.sha256, "size": d.size, "origin": d.origin,
-                     "supports": d.supports, "expected_sha256": want, "state": state})
+                     "supports": d.supports, "expected_sha256": want, "state": state,
+                     "on_disk_sha256": d.on_disk_sha256})
     if profile.archive:
         if FE_INP not in present:
             rows.append({"role": FE_INP, "path": None, "sha256": None, "size": None, "origin": "—",
@@ -431,14 +467,38 @@ def audit_sources(inputs: ReviewInputs) -> tuple:
     return tuple(rows)
 
 
-def sources_state(audit: Sequence[Mapping[str, Any]], kind: str) -> str:
+def source_problems(audit: Sequence[Mapping[str, Any]], kind: str, extra: Sequence[str] = ()) -> list:
+    """PRIORITY-9-F1: why the sources of a physical plate are not verified (empty when they are): exactly one
+    experimental source and exactly one FE manifest, each hashed on disk now with its recorded SHA-256 (and the
+    archived one where the profile has it); no CHANGED / MISSING / FOREIGN / unread document; ``extra`` are the
+    contradictions found elsewhere (diagnostics of other inputs)."""
+    if kind == wb.SYNTHETIC_DEMO:
+        return []
+    out = []
+    for role in REQUIRED_ROLES:
+        present = [r for r in audit if r["role"] == role and r.get("sha256")]
+        if not present:
+            out.append(f"no {role} is linked: exactly one is required")
+            continue
+        if len(present) > 1:
+            out.append(f"{len(present)} {role} sources ({', '.join(str(r['sha256'])[:12] + '…' for r in present)}): "
+                       "exactly one is required")
+            continue
+        row = present[0]
+        if row["state"] not in (VERIFIED, RECORDED_GENERIC):
+            out.append(f"{role} {row.get('path') or '—'}: {row['state']}")
+        elif row.get("on_disk_sha256") != row["sha256"]:
+            out.append(f"{role} {row.get('path') or '—'}: not hashed on disk with its recorded SHA-256")
+    for row in audit:
+        if row["role"] not in REQUIRED_ROLES and row["state"] in (FOREIGN, CHANGED, MISSING, NOT_READ):
+            out.append(f"{row['role']} {row.get('path') or '—'}: {row['state']}")
+    return out + list(extra)
+
+
+def sources_state(audit: Sequence[Mapping[str, Any]], kind: str, extra: Sequence[str] = ()) -> str:
     if kind == wb.SYNTHETIC_DEMO:
         return "SYNTHETIC_INPUTS"
-    required = [r for r in audit if r["role"] in (EXPERIMENTAL, FE_MANIFEST)]
-    ok = (VERIFIED, RECORDED_GENERIC)
-    bad = [r for r in audit if r["state"] in (FOREIGN, CHANGED, MISSING)]
-    return SOURCES_VERIFIED if required and all(r["state"] in ok for r in required) and not bad else \
-        SOURCE_NOT_VERIFIED
+    return SOURCE_NOT_VERIFIED if source_problems(audit, kind, extra) else SOURCES_VERIFIED
 
 
 # ----------------------------------------------------------------------------- evidence chains A and B
@@ -929,11 +989,17 @@ def build_review(inputs: ReviewInputs) -> dict:
     """The JSON-ready dossier of one plate (deterministic apart from ``created``)."""
     profile = inputs.profile
     audit = audit_sources(inputs)
-    source_state = sources_state(audit, inputs.kind)
+    extra = tuple((inputs.extra or {}).get("source_problems", ()))
+    problems = source_problems(audit, inputs.kind, extra)
+    source_state = sources_state(audit, inputs.kind, extra)
+    duplicated = [p for p in problems if "exactly one is required" in p and not p.startswith("no ")]
+    if duplicated:  # PRIORITY-9-F1: two experimental files or two FE manifests are a contradiction, never a review
+        raise ReviewRefused("SOURCE_NOT_VERIFIED: " + "; ".join(duplicated))
     if profile.archive:
-        refused = [r for r in audit if r["role"] in (EXPERIMENTAL, FE_MANIFEST) and r["state"] != VERIFIED]
-        if refused:
-            raise ReviewRefused("SOURCE_NOT_VERIFIED: " + "; ".join(f"{r['role']}: {r['state']}" for r in refused))
+        refused = [r for r in audit if r["role"] in REQUIRED_ROLES and r["state"] != VERIFIED]
+        if refused or problems:
+            raise ReviewRefused("SOURCE_NOT_VERIFIED: " + "; ".join(
+                [f"{r['role']}: {r['state']}" for r in refused] + [p for p in problems if not refused]))
         if inputs.modal_set != profile.modal_set or len(inputs.records) != profile.records:
             raise ReviewRefused(f"SOURCE_NOT_VERIFIED: the modal set must be {profile.modal_set} with "
                                 f"{profile.records} records (read: {inputs.modal_set}, {len(inputs.records)})")
@@ -983,7 +1049,7 @@ def build_review(inputs: ReviewInputs) -> dict:
         "state_notes": [OWNER_REVIEW_NOTE, "No registration, mode pair, MAC, FIT / HOLDOUT set, fit or material value "
                         "is created by this review."],
         "scientific_status": SCIENTIFIC_STATUS,
-        "sources": {"audit": list(audit), "state": source_state, "archive": snapshot_note,
+        "sources": {"audit": list(audit), "state": source_state, "reasons": problems, "archive": snapshot_note,
                     "archive_files": [dict(zip(("file", "sha256", "state"), r)) for r in archive_check()]
                     if profile.archive else []},
         "evidence": {"registration": registration, "rows": list(evidence_rows), "open_facts": list(
@@ -1003,15 +1069,43 @@ def build_review(inputs: ReviewInputs) -> dict:
                                                    "nothing exists. No value is derived from a frequency."},
         "modal_evidence": modal, "observability": observe, "sensitivity_reuse": list(reuse),
         "fe_applicability_plan": applicability,
-        "blocking": _blocking(states, evidence_rows, inputs),
+        "blocking": _blocking(states, evidence_rows, inputs, problems),
     }
-    return record
+    return with_integrity(record)
 
 
-def _blocking(states, evidence_rows, inputs) -> list:
+def _canonical(record: Mapping[str, Any], drop=("integrity",)) -> Any:
+    return json.loads(json.dumps({k: v for k, v in record.items() if k not in drop}, ensure_ascii=False, default=str))
+
+
+def content_digest(record: Mapping[str, Any]) -> str:
+    """The canonical SHA-256 of a dossier's content (sorted keys, without the ``integrity`` field)."""
+    return _digest(_canonical(record))
+
+
+def with_integrity(record: dict) -> dict:
+    """PRIORITY-9-F1: the dossier with the SHA-256 of its own content (a check of the saved content, not a
+    signature and no proof of authorship)."""
+    out = dict(record)
+    out["integrity"] = {"content_sha256": content_digest(record), "method": INTEGRITY_METHOD}
+    return out
+
+
+INTACT, MODIFIED, NO_INTEGRITY = "INTACT", "MODIFIED_AFTER_SAVE", "NO_INTEGRITY_RECORD"
+
+
+def integrity_state(record: Mapping[str, Any]) -> str:
+    stored = (record.get("integrity") or {}).get("content_sha256") if isinstance(record.get("integrity"), Mapping) \
+        else None
+    if not stored:
+        return NO_INTEGRITY
+    return INTACT if stored == content_digest(record) else MODIFIED
+
+
+def _blocking(states, evidence_rows, inputs, problems=()) -> list:
     out = []
     if states["sources"] == SOURCE_NOT_VERIFIED:
-        out.append("the sources are not verified by SHA-256")
+        out.append("the sources are not verified by SHA-256: " + ("; ".join(problems) or "see the source audit"))
     for fact in open_facts(evidence_rows):
         out.append(f"open registration fact: {fact}")
     out.append("no accepted physical registration: no MAC, no mode pair, no FIT / HOLDOUT")
@@ -1043,15 +1137,80 @@ def verify_on_disk(record: Mapping[str, Any]) -> list:
 
 
 def reopened_state(record: Mapping[str, Any]) -> dict:
-    """The state of a reopened dossier: the documents verified on disk now. A changed or missing experimental file or
-    FE manifest makes it NOT_CURRENT (SOURCE_NOT_VERIFIED); the stored statuses are never trusted otherwise."""
+    """The state of a reopened dossier, never taken from its stored statuses (PRIORITY-9-F1):
+
+    - every recorded document is hashed on disk again; a physical dossier needs exactly one experimental source and
+      exactly one FE manifest, both verified (one source is not enough);
+    - the content must match its integrity SHA-256 (an edit after saving is detected);
+    - then the dossier is at best RECORD_NOT_REVALIDATED: its scientific statuses are the stored ones until they are
+      recomputed from the verified sources (``revalidate``).
+
+    ``revalidable`` says whether a recomputation is possible (the M11-261027 profile, whose inputs are its files)."""
     checks = verify_on_disk(record)
-    required = [c for c in checks if c[0] in (EXPERIMENTAL, FE_MANIFEST)]
-    bad = [c for c in checks if c[2] != VERIFIED]
-    current = (record.get("identity", {}).get("kind") == wb.SYNTHETIC_DEMO or bool(required)) and not bad
-    return {"checks": checks, "current": current,
-            "state": "CURRENT" if current else f"NOT_CURRENT — {SOURCE_NOT_VERIFIED}",
-            "reasons": [f"{role} {path}: {state}" for role, path, state in bad]}
+    synthetic = (record.get("identity") or {}).get("kind") == wb.SYNTHETIC_DEMO
+    reasons = []
+    if not synthetic:
+        for role in REQUIRED_ROLES:
+            found = [c for c in checks if c[0] == role]
+            if len(found) != 1:
+                reasons.append(f"{role}: {len(found)} recorded with a path (exactly one is required)")
+    reasons += [f"{role} {path}: {state}" for role, path, state in checks if state != VERIFIED]
+    integrity = integrity_state(record)
+    if integrity == MODIFIED:
+        reasons.append("the saved content does not match its integrity SHA-256: it was changed after it was saved")
+    if not synthetic and (record.get("states") or {}).get("sources") != SOURCES_VERIFIED:
+        reasons.append(f"the dossier was saved with the sources {(record.get('states') or {}).get('sources')}")
+    if reasons:
+        state = f"{NOT_CURRENT} — {MODIFIED if integrity == MODIFIED else SOURCE_NOT_VERIFIED}"
+    else:
+        state = NOT_REVALIDATED
+    note = ("saved without an integrity record (an earlier version): its content cannot be checked"
+            if integrity == NO_INTEGRITY else "")
+    revalidable = (not reasons and integrity == INTACT
+                   and (record.get("identity") or {}).get("profile") == M11_261027.key)
+    return {"checks": checks, "current": False, "integrity": integrity, "state": state, "reasons": reasons,
+            "note": note, "revalidable": revalidable}
+
+
+def revalidation_inputs(record: Mapping[str, Any], read_preview, file_identity, cancel_event=None) -> ReviewInputs:
+    """The M11-261027 inputs of a saved dossier read again from its recorded files (``read_preview(role, path,
+    cancel_event)`` with ``role`` EXPERIMENTAL or FE_MANIFEST, and ``file_identity(path, cancel_event)``, are the
+    program's existing readers, given by the caller). Only the FE
+    manifest is hashed, never the whole FE package. Refuses (``ReviewRefused``) what cannot be read."""
+    if (record.get("identity") or {}).get("profile") != M11_261027.key:
+        raise ReviewRefused("only an M11-261027 dossier is recomputed from its files", NOT_REVALIDATED)
+    audit = (record.get("sources") or {}).get("audit") or []
+    paths = {role: [r["path"] for r in audit if r["role"] == role and r.get("path")] for role in REQUIRED_ROLES}
+    if any(len(v) != 1 for v in paths.values()):
+        raise ReviewRefused("the dossier does not record exactly one experimental file and one FE manifest")
+    exp_path, fe_path = paths[EXPERIMENTAL][0], paths[FE_MANIFEST][0]
+    exp = read_preview(EXPERIMENTAL, exp_path, cancel_event)
+    fe = read_preview(FE_MANIFEST, fe_path, cancel_event)
+    names = [s.display_name for s in exp.sets]
+    if record["identity"].get("modal_set") not in names:
+        raise ReviewRefused(f"the modal set {record['identity'].get('modal_set')} is not in {exp_path}")
+    inp = next((r["path"] for r in audit if r["role"] == FE_INP and r.get("path")), None)
+    owners = tuple(document(OWNER_DOCUMENT, r["path"], r["origin"], r["supports"])
+                   for r in audit if r["role"] == OWNER_DOCUMENT and r.get("path"))
+    return inputs_from_workspace(fe, file_identity(fe_path, cancel_event), exp, file_identity(exp_path, cancel_event),
+                                 names.index(record["identity"]["modal_set"]), documents=owners, inp_path=inp)
+
+
+def revalidate(record: Mapping[str, Any], inputs: ReviewInputs) -> dict:
+    """Recompute the dossier from ``inputs`` (the verified sources read again) and compare it with the stored one
+    (all content but ``created`` and ``integrity``). Equal: CURRENT — REVALIDATED, with the recomputed dossier;
+    otherwise NOT_CURRENT with the differing sections. Nothing is written."""
+    try:
+        fresh = build_review(inputs)
+    except ReviewRefused as refusal:
+        return {"state": f"{NOT_CURRENT} — {refusal.state}", "current": False, "reasons": [str(refusal)],
+                "record": None}
+    old, new = _canonical(record, ("integrity", "created")), _canonical(fresh, ("integrity", "created"))
+    differ = sorted(k for k in set(old) | set(new) if old.get(k) != new.get(k))
+    if differ:
+        return {"state": f"{NOT_CURRENT} — the stored dossier differs from a recomputation", "current": False,
+                "reasons": [f"differs in: {', '.join(differ)}"], "record": None}
+    return {"state": REVALIDATED, "current": True, "reasons": [], "record": fresh}
 
 
 def save_review(record: Mapping[str, Any], path) -> Path:
@@ -1143,6 +1302,13 @@ def export_dossier(record: Mapping[str, Any], folder, current_fingerprint: Optio
         raise ExportRefused(f"{folder} is inside the program folder {REPO}: choose a folder outside it")
     if current_fingerprint is not None and review_state(record, current_fingerprint) != "CURRENT":
         raise ExportRefused("the review was built for other inputs (STALE): build it again before exporting")
+    if integrity_state(record) != INTACT:  # PRIORITY-9-F1
+        raise ExportRefused(f"the dossier's content is {integrity_state(record)}: build it again before exporting")
+    if (record.get("identity") or {}).get("kind") != wb.SYNTHETIC_DEMO and \
+            (record.get("states") or {}).get("sources") != SOURCES_VERIFIED:
+        raise ExportRefused("the sources are not verified (" + "; ".join(
+            (record.get("sources") or {}).get("reasons") or ["SOURCE_NOT_VERIFIED"]) + "): the dossier is not exported "
+            "as a current one")
     bad = [c for c in verify_on_disk(record) if c[2] != VERIFIED]
     if bad:
         raise ExportRefused("a source changed or is missing on disk: " + "; ".join(f"{r} {p}: {s}" for r, p, s in bad))

@@ -24,6 +24,7 @@ from services import generic_plate_workbench as wb  # noqa: E402
 from services import plate_physical_review as pr  # noqa: E402
 from services import plate_registration_readiness as rr  # noqa: E402
 from services import plate_study as ps  # noqa: E402
+from services import research_results_reader as rrr  # noqa: E402
 
 DEMO = ROOT / "docs" / "examples" / "generic_single_plate_demo"
 EXP = (18.6307, 54.6193, 63.495, 66.8467, 74.2149, 112.2655, 145.9357, 157.8508, 169.1849, 180.1363, 191.6019)
@@ -38,10 +39,11 @@ SIX = ("scanned_face", "grid_plus_v_edge", "scan_window_offsets_mm", "scan_metri
 
 
 def m11_inputs(facts=None, documents=None, **changes) -> pr.ReviewInputs:
-    """The M11-261027 review inputs with the recorded identities (no file is read)."""
+    """The M11-261027 review inputs with the recorded identities. No file is read: ``on_disk_sha256`` stands for the
+    SHA-256 hashed on disk now (PRIORITY-9-F1: a recorded SHA-256 alone is never a verification)."""
     docs = documents if documents is not None else (
-        pr.SourceDocument(pr.EXPERIMENTAL, "", UNV_SHA, 421096, "test", "records"),
-        pr.SourceDocument(pr.FE_MANIFEST, "", MANIFEST_SHA, 1, "test", "FE modes"))
+        pr.SourceDocument(pr.EXPERIMENTAL, "", UNV_SHA, 421096, "test", "records", UNV_SHA),
+        pr.SourceDocument(pr.FE_MANIFEST, "", MANIFEST_SHA, 1, "test", "FE modes", MANIFEST_SHA))
     inputs = pr.ReviewInputs(pr.M11_261027, tuple(docs), wb.PHYSICAL, "Polymax_bravo",
                              tuple({"number": i + 1, "hz": f, "admissible": True} for i, f in enumerate(EXP)),
                              tuple({"number": i + 7, "hz": f} for i, f in enumerate(FE)), (3, 4, 5, 6), (), "Z",
@@ -101,8 +103,8 @@ class IdentityTests(unittest.TestCase):
                 pr.inputs_from_workspace(object(), fe_id, object(), exp_id, 0)
             self.assertEqual(caught.exception.state, pr.SOURCE_NOT_VERIFIED)
             self.assertIn(word, str(caught.exception))
-        foreign = (pr.SourceDocument(pr.EXPERIMENTAL, "", SP13_SHA, 1, "test", "x"),
-                   pr.SourceDocument(pr.FE_MANIFEST, "", MANIFEST_SHA, 1, "test", "y"))
+        foreign = (pr.SourceDocument(pr.EXPERIMENTAL, "", SP13_SHA, 1, "test", "x", SP13_SHA),
+                   pr.SourceDocument(pr.FE_MANIFEST, "", MANIFEST_SHA, 1, "test", "y", MANIFEST_SHA))
         with self.assertRaises(pr.ReviewRefused):
             pr.build_review(m11_inputs(documents=foreign))
         with self.assertRaises(pr.ReviewRefused):  # another modal set
@@ -248,13 +250,15 @@ class ModalAndObservabilityTests(unittest.TestCase):
                             if r["existing_result"].startswith("±2.5 %")))
 
     def test_no_transfer_of_sensitivities_to_another_fe_model(self):
-        docs = m11_inputs().documents + (pr.SourceDocument(pr.FE_INP, "", "d" * 64, 1, "test", "INP"),)
-        record = pr.build_review(m11_inputs(documents=docs))
-        s4 = [r for r in record["sensitivity_reuse"] if r["existing_result"].startswith("PRIORITY-2 M11_S4_")]
+        docs = m11_inputs().documents + (pr.SourceDocument(pr.FE_INP, "", "d" * 64, 1, "test", "INP", "d" * 64),)
+        with self.assertRaises(pr.ReviewRefused) as caught:  # PRIORITY-9-F1: a foreign INP refuses the M11 review
+            pr.build_review(m11_inputs(documents=docs))
+        self.assertIn("FOREIGN", str(caught.exception))
+        s4 = [r for r in pr.sensitivity_reuse(m11_inputs(documents=docs), False)
+              if r["existing_result"].startswith("PRIORITY-2 M11_S4_")]
         self.assertTrue(all("not applicable" in r["reuse_status"] for r in s4))
-        self.assertTrue(all("NOT the current FE model" in r["valid_for"] for r in record["observability"]["fe_only"]))
-        self.assertEqual(record["states"]["sources"], pr.SOURCE_NOT_VERIFIED)  # a foreign INP is no M11 source
-        self.assertEqual(record["states"]["review_package"], pr.SOURCE_NOT_VERIFIED)
+        observe = pr.observability(m11_inputs(documents=docs), rrr.load_snapshot(ROOT), False)
+        self.assertTrue(all("NOT the current FE model" in r["valid_for"] for r in observe["fe_only"]))
 
     def test_s0_h1_h2_stay_hypotheses(self):
         hypotheses = {h["scenario"]: h for h in self.record["observability"]["hypotheses"]}
@@ -324,8 +328,9 @@ class DossierTests(unittest.TestCase):
         self.assertEqual(audit[pr.OWNER_DOCUMENT]["state"], pr.RECORDED)
         self.assertEqual(record["evidence"]["open_facts"], pr.build_review(m11_inputs())["evidence"]["open_facts"])
         saved = pr.save_review(record, self.dir / "review.json")
-        checks = pr.reopened_state(pr.open_review(saved))["checks"]
-        self.assertEqual(checks, [(pr.OWNER_DOCUMENT, str(document), pr.VERIFIED)])
+        reopened = pr.reopened_state(pr.open_review(saved))
+        self.assertEqual(reopened["checks"], [(pr.OWNER_DOCUMENT, str(document), pr.VERIFIED)])
+        self.assertFalse(reopened["current"])  # the test sources have no file: never current when reopened
         document.write_text("changed", encoding="utf-8")
         out = self.dir / "out"
         out.mkdir()
@@ -367,6 +372,161 @@ class DossierTests(unittest.TestCase):
             pr.inputs_from_study(wb.new_study())
 
 
+# ----------------------------------------------------------------------------- PRIORITY-9-F1: sources and saved dossiers
+
+def physical_study(folder: Path, experimental=True, fe=True, other_set=False) -> wb.Study:
+    """A physical study of another plate whose two linked files are real files of ``folder`` (hashed now), with
+    diagnostics computed for them and its modal set (``other_set``: the diagnostics belong to another modal set)."""
+    sources = {}
+    for role, on in (("experimental", experimental), ("fe", fe)):
+        if on:
+            path = folder / f"{role}.dat"
+            path.write_text(f"{role} file of PLATE-Z", encoding="utf-8")
+            sources[role] = wb.SourceRecord(role, str(path), hashlib.sha256(path.read_bytes()).hexdigest(),
+                                            path.stat().st_size)
+    study = wb.new_study()
+    study = replace(study, passport=replace(study.passport, physical_specimen_id="PLATE-Z-400x250",
+                                            test_run_id="RUN-Z1"),
+                    sources=sources, modal_set={"names": ["Set Z", "set-z"], "records": 3})
+    diagnostics = wb.modal_diagnostics([{"number": i + 1, "hz": hz} for i, hz in enumerate((20.0, 55.0, 80.0))],
+                                       [{"number": i + 7, "hz": hz} for i, hz in enumerate((21.0, 57.0, 83.0))])
+    if other_set:
+        study = wb.set_diagnostics(replace(study, modal_set={"names": ["Set Y", "set-y"], "records": 3}), diagnostics)
+        return replace(study, modal_set={"names": ["Set Z", "set-z"], "records": 3})
+    return wb.set_diagnostics(study, diagnostics)
+
+
+class F1SourceTests(unittest.TestCase):
+    """PRIORITY-9-F1: exactly one experimental source and one FE manifest, hashed on disk now, are required."""
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.dir = Path(folder.name)
+
+    def test_1_only_the_unv_is_not_verified(self):
+        record = pr.build_review(pr.inputs_from_study(physical_study(self.dir, fe=False)))
+        self.assertEqual(record["states"]["sources"], pr.SOURCE_NOT_VERIFIED)
+        self.assertNotEqual(record["states"]["review_package"], pr.READY_FOR_OWNER_REVIEW)
+        self.assertIn(f"no {pr.FE_MANIFEST} is linked: exactly one is required", record["sources"]["reasons"])
+        with self.assertRaises(pr.ExportRefused):
+            pr.export_dossier(record, self.dir)
+        with self.assertRaises(pr.ReviewRefused) as caught:  # the M11 review is refused outright
+            pr.build_review(m11_inputs(documents=m11_inputs().documents[:1]))
+        self.assertEqual(caught.exception.state, pr.SOURCE_NOT_VERIFIED)
+
+    def test_2_only_the_fe_manifest_is_not_verified(self):
+        record = pr.build_review(pr.inputs_from_study(physical_study(self.dir, experimental=False)))
+        self.assertEqual(record["states"]["sources"], pr.SOURCE_NOT_VERIFIED)
+        self.assertIn(f"no {pr.EXPERIMENTAL} is linked: exactly one is required", record["sources"]["reasons"])
+        with self.assertRaises(pr.ReviewRefused):
+            pr.build_review(m11_inputs(documents=m11_inputs().documents[1:]))
+        audit = [r for r in pr.audit_sources(m11_inputs()) if r["role"] == pr.EXPERIMENTAL]
+        self.assertEqual(pr.sources_state(audit, wb.PHYSICAL), pr.SOURCE_NOT_VERIFIED)  # an audit without the FE row
+
+    def test_3_both_correct_sources_are_verified(self):
+        record = pr.build_review(pr.inputs_from_study(physical_study(self.dir)))
+        self.assertEqual(record["states"]["sources"], pr.SOURCES_VERIFIED)
+        self.assertEqual(record["states"]["review_package"], pr.READY_FOR_OWNER_REVIEW)
+        self.assertEqual(record["sources"]["reasons"], [])
+        self.assertEqual(pr.build_review(m11_inputs())["states"]["sources"], pr.SOURCES_VERIFIED)
+        # a recorded SHA-256 that was not hashed on disk now is never a verification
+        unread = (replace(m11_inputs().documents[0], on_disk_sha256=None), m11_inputs().documents[1])
+        with self.assertRaises(pr.ReviewRefused) as caught:
+            pr.build_review(m11_inputs(documents=unread))
+        self.assertIn(pr.NOT_READ, str(caught.exception))
+
+    def test_4_duplicated_or_contradictory_sources_are_refused(self):
+        docs = m11_inputs().documents
+        with self.assertRaises(pr.ReviewRefused) as caught:
+            pr.build_review(m11_inputs(documents=docs + (docs[0],)))
+        self.assertIn("exactly one is required", str(caught.exception))
+        study = physical_study(self.dir)
+        inputs = pr.inputs_from_study(study)
+        with self.assertRaises(pr.ReviewRefused):
+            pr.build_review(replace(inputs, documents=inputs.documents + (inputs.documents[1],)))
+        changed = (replace(docs[0], on_disk_sha256="0" * 64), docs[1])  # another content at the path now
+        with self.assertRaises(pr.ReviewRefused):
+            pr.build_review(m11_inputs(documents=changed))
+        # the file read in the Workspace is not the file whose SHA-256 was recorded
+        exp_preview = mock.Mock(source_path=str(self.dir / "a.unv"))
+        fe_preview = mock.Mock(manifest_path=str(self.dir / "manifest.json"))
+        with self.assertRaises(pr.ReviewRefused) as caught:
+            pr.inputs_from_workspace(fe_preview, {"sha256": MANIFEST_SHA, "path": str(self.dir / "manifest.json")},
+                                     exp_preview, {"sha256": UNV_SHA, "path": str(self.dir / "b.unv")}, 0)
+        self.assertIn("is not the file whose SHA-256 was recorded", str(caught.exception))
+
+    def test_5_diagnostics_of_another_modal_set_are_not_current(self):
+        record = pr.build_review(pr.inputs_from_study(physical_study(self.dir, other_set=True)))
+        self.assertEqual(record["states"]["sources"], pr.SOURCE_NOT_VERIFIED)
+        self.assertNotEqual(record["states"]["review_package"], pr.READY_FOR_OWNER_REVIEW)
+        self.assertTrue(any("computed for other inputs (modal_set)" in r for r in record["sources"]["reasons"]))
+        with self.assertRaises(pr.ExportRefused):
+            pr.export_dossier(record, self.dir)
+
+    def test_6_a_saved_dossier_with_one_source_is_not_current(self):
+        one = pr.build_review(pr.inputs_from_study(physical_study(self.dir, fe=False)))
+        state = pr.reopened_state(pr.open_review(pr.save_review(one, self.dir / "one.json")))
+        self.assertFalse(state["current"])
+        self.assertTrue(state["state"].startswith(pr.NOT_CURRENT))
+        self.assertTrue(any("0 recorded with a path" in r for r in state["reasons"]))
+        (self.dir / "both").mkdir()
+        both = pr.build_review(pr.inputs_from_study(physical_study(self.dir / "both")))
+        state = pr.reopened_state(both)
+        self.assertEqual(state["state"], pr.NOT_REVALIDATED)  # both verify, but the statuses are the stored ones
+        self.assertFalse(state["current"])
+        stripped = pr.with_integrity({**both, "sources": {**both["sources"], "audit": [
+            r for r in both["sources"]["audit"] if r["role"] != pr.FE_MANIFEST]}})
+        self.assertFalse(pr.reopened_state(stripped)["current"])
+        self.assertTrue(pr.reopened_state(stripped)["state"].startswith(pr.NOT_CURRENT))
+
+    def test_7_a_manual_status_edit_is_detected(self):
+        record = pr.build_review(pr.inputs_from_study(physical_study(self.dir, fe=False)))
+        saved = pr.save_review(record, self.dir / "review.json")
+        data = json.loads(saved.read_text(encoding="utf-8"))
+        data["states"]["sources"] = pr.SOURCES_VERIFIED
+        data["states"]["review_package"] = pr.READY_FOR_OWNER_REVIEW
+        saved.write_text(json.dumps(data), encoding="utf-8")
+        state = pr.reopened_state(pr.open_review(saved))
+        self.assertEqual(state["integrity"], pr.MODIFIED)
+        self.assertFalse(state["current"])
+        self.assertIn(pr.MODIFIED, state["state"])
+        with self.assertRaises(pr.ExportRefused):
+            pr.export_dossier(data, self.dir)
+        # a dossier without an integrity record (RC4) is never more than RECORD_NOT_REVALIDATED
+        old = {k: v for k, v in pr.build_review(pr.inputs_from_study(physical_study(self.dir))).items()
+               if k != "integrity"}
+        state = pr.reopened_state(old)
+        self.assertEqual((state["integrity"], state["state"], state["current"]), (pr.NO_INTEGRITY, pr.NOT_REVALIDATED,
+                                                                                 False))
+        # a recomputation that differs from the stored statuses is NOT_CURRENT (even with a fresh integrity record)
+        stored = pr.with_integrity({**pr.build_review(m11_inputs()), "states": {
+            **pr.build_review(m11_inputs())["states"], "registration": rr.COMPLETE}})
+        check = pr.revalidate(stored, m11_inputs())
+        self.assertFalse(check["current"])
+        self.assertIn("states", check["reasons"][0])
+        self.assertEqual(pr.revalidate(pr.build_review(m11_inputs()), m11_inputs())["state"], pr.REVALIDATED)
+
+    def test_9_the_synthetic_demonstration_keeps_its_own_status(self):
+        record = pr.build_review(pr.inputs_from_study(demo_study()))
+        self.assertEqual(record["states"]["sources"], "SYNTHETIC_INPUTS")
+        self.assertEqual(record["states"]["review_package"], pr.SYNTHETIC_ONLY)
+        self.assertEqual(pr.integrity_state(record), pr.INTACT)
+        state = pr.reopened_state(record)
+        self.assertEqual(state["state"], pr.NOT_REVALIDATED)
+        self.assertFalse(state["current"])
+
+    def test_10_no_registration_mac_or_pair_is_created(self):
+        before = tree_digest(ROOT / "docs" / "registrations")
+        for record in (pr.build_review(m11_inputs()), pr.build_review(pr.inputs_from_study(physical_study(self.dir)))):
+            modal = record["modal_evidence"]
+            self.assertEqual((modal["pairs"], modal["mac"], modal["fit_holdout"]), ([], "NOT_COMPUTED", "NOT_DECLARED"))
+            self.assertNotEqual(record["states"]["registration"], "FROZEN")
+            self.assertEqual(record["states"]["mode_pairs"], pr.MODE_PAIRS_NOT_CONFIRMED)
+            pr.reopened_state(record)
+        self.assertEqual(tree_digest(ROOT / "docs" / "registrations"), before)
+
+
 # ----------------------------------------------------------------------------- tab C in the window
 
 try:
@@ -377,7 +537,7 @@ except ImportError:  # pragma: no cover
 
 
 @unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
-class PanelTests(unittest.TestCase):
+class _ReviewWindow(unittest.TestCase):
     def setUp(self):
         from new_gui import window as wm
 
@@ -395,6 +555,9 @@ class PanelTests(unittest.TestCase):
         self.addCleanup(self.window.close)
         self.panel = self.window.review
 
+
+@unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
+class PanelTests(_ReviewWindow):
     def test_tab_c_keeps_a_and_b_and_shows_nothing_before_use(self):
         tabs = self.window.plate_tabs
         self.assertEqual([tabs.tabText(i) for i in range(3)], ["A. Current PLATE Study", "B. New Single Plate",
@@ -418,6 +581,7 @@ class PanelTests(unittest.TestCase):
         with mock.patch("subprocess.Popen") as popen, mock.patch("subprocess.run") as run:
             self.window.workbench.study = demo_study()
             self.assertTrue(self.panel.build_from_study())
+            self.assertTrue(self.panel.wait_idle())
             popen.assert_not_called()
             run.assert_not_called()
         self.assertEqual(self.panel.freshness()[0], "CURRENT")
@@ -425,6 +589,8 @@ class PanelTests(unittest.TestCase):
         self.assertIn("questions", self.panel.tables)
         self.assertTrue(self.panel.save_review(str(self.dir / "review.json")))
         self.assertTrue(self.panel.export(str(self.dir)))
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(len(self.panel.last_export), 8)
         study = self.window.workbench.study
         thicker = tuple(replace(r, thickness=replace(r.thickness, value=r.thickness.value + 0.1))
                         for r in study.passport.thickness)
@@ -435,8 +601,40 @@ class PanelTests(unittest.TestCase):
         self.assertFalse(self.panel.export_button.isEnabled())
         self.assertFalse(self.panel.export(str(self.dir)))
         self.assertTrue(self.panel.open_review(str(self.dir / "review.json")))
-        self.assertEqual(self.panel.freshness()[0], "CURRENT")  # a synthetic review: no file to verify
+        self.assertTrue(self.panel.wait_idle())
+        # PRIORITY-9-F1: a reopened synthetic review is shown but its statuses are the stored ones (no recomputation)
+        self.assertEqual(self.panel.freshness()[0], pr.NOT_REVALIDATED)
         self.assertIn("modal", self.panel.tables)
+        self.assertFalse(self.panel.export_button.isEnabled())
+        self.assertIn("(stored, not revalidated)", self.panel.state_labels["review_package"][1].text())
+
+
+@unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
+class F1PanelTests(_ReviewWindow):
+    def test_incomplete_sources_are_shown_with_their_reason_and_never_exported(self):
+        folder = self.dir / "inputs"
+        folder.mkdir()
+        self.window.workbench.study = physical_study(folder, fe=False)
+        self.assertTrue(self.panel.build_from_study())
+        self.assertTrue(self.panel.wait_idle())
+        labels = {k: label.text() for k, (_caption, label) in self.panel.state_labels.items()}
+        self.assertEqual(labels["sources"], f"Sources: {pr.SOURCE_NOT_VERIFIED}")
+        self.assertNotIn(pr.READY_FOR_OWNER_REVIEW, labels["review_package"])
+        self.assertFalse(self.panel.reasons_line.isHidden())
+        self.assertIn(f"no {pr.FE_MANIFEST} is linked", self.panel.reasons_line.text())
+        self.assertTrue(self.panel.export(str(self.dir)))  # started; refused in the background, nothing written
+        self.assertTrue(self.panel.wait_idle())
+        self.assertIn("Not exported (nothing written)", self.panel.export_label.text())
+        self.assertEqual([p for p in self.dir.iterdir() if p.name.startswith("physical_readiness")], [])
+        # a refused build keeps the review shown before (never lost)
+        shown = self.panel.record
+        self.window.workbench.study = replace(self.window.workbench.study, passport=replace(
+            self.window.workbench.study.passport, physical_specimen_id=""))
+        self.assertTrue(self.panel.build_from_study())
+        self.assertTrue(self.panel.wait_idle())
+        self.assertIs(self.panel.record, shown)
+        self.assertEqual(self.panel.freshness()[0], "STALE")
+        self.assertIn("Not built", self.panel.message.text())
 
 
 REAL = Path(r"D:\git\abaqus-modal-comparator-work\research\INTEGRATION_RC1_REVIEW\moved inputs")
@@ -462,6 +660,16 @@ class RealInputsTests(unittest.TestCase):
         self.assertAlmostEqual(record["modal_evidence"]["rows"][0]["frequency_hz"], 18.6307, places=4)
         fe7 = next(r for r in record["modal_evidence"]["rows"] if r["record"] == "FE7")
         self.assertAlmostEqual(fe7["frequency_hz"], 19.07217, places=4)
+        # PRIORITY-9-F1 (8): saved and reopened, it is recomputed from its two verified files and equals the stored one
+        with tempfile.TemporaryDirectory() as folder:
+            saved = pr.save_review(record, Path(folder) / "review.json")
+            reopened = pr.open_review(saved)
+            state = pr.reopened_state(reopened)
+            self.assertTrue(state["revalidable"], state)
+            kinds = {pr.EXPERIMENTAL: ws.EXPERIMENTAL, pr.FE_MANIFEST: ws.FE}
+            again = pr.revalidation_inputs(reopened, lambda role, path, cancel: pm.read_preview(kinds[role], path, cancel),
+                                           lambda path, cancel: pm.file_identity(path, cancel))
+            self.assertEqual(pr.revalidate(reopened, again)["state"], pr.REVALIDATED)
 
 
 if __name__ == "__main__":

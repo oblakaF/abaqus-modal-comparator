@@ -10,15 +10,24 @@ Seven sections: the source audit, the evidence chains A / B, the owner's questio
 observability (FE-only rank apart from the experimental readiness), the FE applicability plan and the report /
 export. Nothing here creates a registration, a mode pair, a MAC, a FIT / HOLDOUT set or a fit, and nothing starts
 Abaqus, a solver, an LM or Auto-ID. A review built for other inputs is STALE: its tables are not shown as current and
-it is not exported (the RC3-F2 rule). A reopened review is CURRENT only when its sources verify on disk again.
+it is not exported (the RC3-F2 rule).
+
+PRIORITY-9-F1: the sources are complete only with exactly one experimental file and one FE manifest, each hashed on
+disk again; otherwise the review says SOURCE_NOT_VERIFIED with the reason and is not exported. Hashing, reading and
+recomputing run in the background (only the FE manifest is hashed, never the whole FE package). A refused build keeps
+the review shown before (STALE). A reopened dossier is CURRENT only when it is recomputed from its verified sources and
+equals the stored one (M11-261027); otherwise it is RECORD_NOT_REVALIDATED (sources and content verify, statuses
+stored) or NOT_CURRENT (a source missing, changed or replaced, one source only, or content changed after saving).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+import threading
+import time
 from typing import Callable, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFileDialog, QFrame, QGridLayout, QLabel, QPushButton,
                                QSizePolicy, QStackedWidget, QVBoxLayout, QWidget)
 
@@ -60,6 +69,10 @@ def _card(title: str) -> tuple:
     return card, layout
 
 
+class _Bridge(QObject):
+    done = Signal(object)
+
+
 def _cell(value) -> str:
     if value is None or value == "":
         return "—"
@@ -73,8 +86,16 @@ class PhysicalReviewPanel(QWidget):
 
     def __init__(self, study_source: Optional[Callable[[], wb.Study]] = None,
                  ask_folder: Optional[Callable[[], str]] = None, ask_open: Optional[Callable[[], str]] = None,
-                 ask_save: Optional[Callable[[], str]] = None, ask_file: Optional[Callable[[str], str]] = None):
+                 ask_save: Optional[Callable[[], str]] = None, ask_file: Optional[Callable[[str], str]] = None,
+                 readers: Optional[tuple] = None):
         super().__init__()
+        self._readers = readers or self._default_readers()  # (read_preview, file_identity) for a recomputation
+        self._bridge = _Bridge(self)
+        self._bridge.done.connect(self._done)
+        self._token = 0
+        self._threads: list = []
+        self._cancel_event: Optional[threading.Event] = None
+        self.running: Optional[str] = None
         self._study_source = study_source or (lambda: None)
         self._ask_folder = ask_folder or self._dialog_folder
         self._ask_open = ask_open or self._dialog_open
@@ -108,6 +129,9 @@ class PhysicalReviewPanel(QWidget):
             label.setObjectName(f"prState_{key}")
             self.state_labels[key] = (caption, label)
             head_layout.addWidget(label)
+        self.reasons_line = _label("", "error")  # PRIORITY-9-F1: why the sources are not verified
+        self.reasons_line.setObjectName("prSourceReasons")
+        head_layout.addWidget(self.reasons_line)
         self.freshness_line = _label("", "error")
         self.freshness_line.setObjectName("prFreshness")
         head_layout.addWidget(self.freshness_line)
@@ -251,14 +275,22 @@ class PhysicalReviewPanel(QWidget):
                 tuple(d.sha256 for d in self.owner_documents))
 
     def freshness(self) -> tuple:
-        """(state, reason) of the shown review: CURRENT, STALE (built for other inputs) or NOT_CURRENT (a reopened
-        review whose sources do not verify on disk)."""
+        """(state, reason) of the shown review: CURRENT (built now from the inputs present, or a reopened dossier
+        recomputed from its verified sources), RECORD_NOT_REVALIDATED (a reopened dossier whose sources and content
+        verify but whose statuses are the stored ones), STALE (built for other inputs), NOT_CURRENT (a reopened dossier
+        that does not verify) or CHECKING (a reopened dossier being verified)."""
         if self.record is None:
             return "NONE", ""
         if self.origin == FILE:
-            state = (self.reopened or {}).get("state", "NOT_CURRENT")
-            return ("CURRENT", "") if state == "CURRENT" else ("NOT_CURRENT", "; ".join(
-                (self.reopened or {}).get("reasons", ())) or "its sources do not verify on disk")
+            reopened = self.reopened or {}
+            if not reopened:
+                return "CHECKING", "the reopened dossier is being verified"
+            if reopened.get("current"):
+                return "CURRENT", ""
+            if reopened.get("state") == pr.NOT_REVALIDATED:
+                return pr.NOT_REVALIDATED, "; ".join(x for x in (reopened.get("note"), reopened.get("why")) if x) or \
+                    "its scientific statuses are the stored ones; build it again to recompute them"
+            return "NOT_CURRENT", "; ".join(reopened.get("reasons", ())) or "its sources do not verify on disk"
         now = self._workspace_key() if self.origin == WORKSPACE else self._study_key()
         if now != self.built_with:
             what = ("the Workspace files, the modal set or the evidence documents changed" if self.origin == WORKSPACE
@@ -266,41 +298,122 @@ class PhysicalReviewPanel(QWidget):
             return "STALE", what
         return "CURRENT", ""
 
+    # ------------------------------------------------------------------------------------------ background work
+
+    def _start(self, label: str, work: Callable[[threading.Event], object], finish: Callable[[object], None]) -> None:
+        """Run ``work`` (hashing, reading, recomputing) off the interface thread; ``finish`` gets its result or the
+        exception it raised. A newer command or ``cancel`` discards an older outcome."""
+        self._token += 1
+        token, cancel_event = self._token, threading.Event()
+        self._cancel_event = cancel_event
+        self.running = label
+
+        def run():
+            try:
+                outcome = work(cancel_event)
+            except Exception as error:  # noqa: BLE001  (shown to the user; nothing is kept)
+                outcome = error
+            try:
+                self._bridge.done.emit((token, finish, outcome))
+            except RuntimeError:
+                pass
+
+        thread = threading.Thread(target=run, daemon=True, name="new-gui-physical-review")
+        self._threads = [t for t in self._threads if t.is_alive()] + [thread]
+        self._say(label)
+        self._refresh()
+        thread.start()
+
+    def _done(self, payload) -> None:
+        token, finish, outcome = payload
+        if token != self._token:
+            return  # an older command's outcome: discarded
+        self.running = None
+        self._cancel_event = None
+        finish(outcome)
+
+    def busy(self) -> bool:
+        return self.running is not None or any(t.is_alive() for t in self._threads)
+
+    def cancel(self) -> None:
+        self._token += 1
+        if self._cancel_event is not None:
+            self._cancel_event.set()
+        self.running = None
+
+    def wait_idle(self, timeout: float = 120.0) -> bool:
+        """Process events until no background work runs (tests and checks)."""
+        from PySide6.QtWidgets import QApplication
+
+        end = time.monotonic() + timeout
+        while self.busy() and time.monotonic() < end:
+            QApplication.processEvents()
+            time.sleep(0.02)
+        QApplication.processEvents()
+        return not self.busy()
+
     # ------------------------------------------------------------------------------------------ commands
 
     def build_from_workspace(self) -> bool:
+        """Build the M11-261027 review from the Workspace files (in the background: the files are hashed again)."""
         self.activate()
-        try:
-            inputs = pr.inputs_from_workspace(*self.inputs, documents=tuple(self.owner_documents),
-                                              inp_path=self.inp_path)
-            record = pr.build_review(inputs)
-        except pr.ReviewRefused as refusal:
-            self._fail(refusal)
+        if self.busy():
             return False
-        self._take(record, WORKSPACE, inputs, self._workspace_key())
-        self._say("The review of PLATE-300x300x1mm 261027 and M11 was built from the Workspace files (verified by "
-                  "SHA-256).")
+        fe_preview, fe_identity, exp_preview, exp_identity, set_index = self.inputs
+        if exp_preview is None or fe_preview is None or not exp_identity or not fe_identity:
+            self._fail(pr.ReviewRefused("SOURCE_NOT_VERIFIED: read both the experimental file of PLATE 261027 and the "
+                                        "M11 FE package on the Workspace page first (exactly one of each)"))
+            return False
+        inputs, documents, inp, key = self.inputs, tuple(self.owner_documents), self.inp_path, self._workspace_key()
+
+        def work(_cancel):
+            review_inputs = pr.inputs_from_workspace(*inputs, documents=documents, inp_path=inp)
+            return review_inputs, pr.build_review(review_inputs)
+
+        def finish(outcome):
+            if isinstance(outcome, pr.ReviewRefused):
+                self._fail(outcome)
+            elif isinstance(outcome, Exception):
+                self._fail(pr.ReviewRefused(f"{type(outcome).__name__}: {outcome}", "NOT_BUILT"))
+            else:
+                self._take(outcome[1], WORKSPACE, outcome[0], key)
+                self._say("The review of PLATE-300x300x1mm 261027 and M11 was built from the Workspace files (each "
+                          "hashed on disk again).")
+
+        self._start("Building the review (the sources are hashed on disk again)...", work, finish)
         return True
 
     def build_from_study(self) -> bool:
+        """Build the review of study B (in the background: its linked files are hashed again)."""
         self.activate()
+        if self.busy():
+            return False
         study = self._study_source()
         if study is None:
             self._say("No study in B. New Single Plate.")
             return False
-        try:
-            inputs = pr.inputs_from_study(study, tuple(self.owner_documents))
-            record = pr.build_review(inputs)
-        except pr.ReviewRefused as refusal:
-            self._fail(refusal)
-            return False
-        self._take(record, STUDY, inputs, self._study_key())
-        self._say(f"The review of {record['identity']['specimen']} was built from study B.")
+        documents, key = tuple(self.owner_documents), self._study_key()
+
+        def work(_cancel):
+            review_inputs = pr.inputs_from_study(study, documents)
+            return review_inputs, pr.build_review(review_inputs)
+
+        def finish(outcome):
+            if isinstance(outcome, pr.ReviewRefused):
+                self._fail(outcome)
+            elif isinstance(outcome, Exception):
+                self._fail(pr.ReviewRefused(f"{type(outcome).__name__}: {outcome}", "NOT_BUILT"))
+            else:
+                self._take(outcome[1], STUDY, outcome[0], key)
+                verified = outcome[1]["states"]["sources"]
+                self._say(f"The review of {outcome[1]['identity']['specimen']} was built from study B — sources "
+                          f"{verified}.")
+
+        self._start("Building the review of study B (its linked files are hashed again)...", work, finish)
         return True
 
     def _fail(self, refusal: pr.ReviewRefused) -> None:
-        self.record, self.origin, self.built_with, self.review_inputs, self.reopened = None, None, None, None, None
-        self.export_message = ""
+        """A refused build keeps the review shown before (it is STALE or NOT_CURRENT, never lost)."""
         self.refusal = (refusal.state, str(refusal))
         self._say(f"Not built — {refusal.state}: {refusal}")
         self._refresh()
@@ -338,9 +451,11 @@ class PhysicalReviewPanel(QWidget):
         return True
 
     def export(self, folder: Optional[str] = None) -> bool:
+        """Export a CURRENT dossier only (built now, or reopened and recomputed); the sources are hashed again in the
+        background before anything is written."""
         self.activate()
         state, reason = self.freshness()
-        if self.record is None or state != "CURRENT":
+        if self.record is None or state != "CURRENT" or self.busy():
             self.export_message = ("Not exported: " + (f"the review is {state} ({reason})" if self.record is not None
                                                       else "no review is built"))
             self._refresh()
@@ -348,15 +463,18 @@ class PhysicalReviewPanel(QWidget):
         folder = folder if folder is not None else self._ask_folder()
         if not folder:
             return False
-        try:
-            written = pr.export_dossier(self.record, folder)
-        except (pr.ExportRefused, OSError) as error:
-            self.export_message = f"Not exported (nothing written): {error}"
+        record = self.record
+
+        def finish(outcome):
+            if isinstance(outcome, Exception):
+                self.export_message = f"Not exported (nothing written): {outcome}"
+            else:
+                self.last_export = outcome
+                self.export_message = "Dossier written:\n" + "\n".join(str(p) for p in outcome)
             self._refresh()
-            return False
-        self.last_export = written
-        self.export_message = "Dossier written:\n" + "\n".join(str(p) for p in written)
-        self._refresh()
+
+        self._start("Exporting the dossier (the sources are hashed again first)...",
+                    lambda _cancel: pr.export_dossier(record, folder), finish)
         return True
 
     def save_review(self, path: Optional[str] = None) -> bool:
@@ -368,11 +486,17 @@ class PhysicalReviewPanel(QWidget):
         if not path:
             return False
         pr.save_review(self.record, path)
-        self._say(f"Review saved: {path}")
+        self._say(f"Review saved: {path} (content SHA-256 {self.record.get('integrity', {}).get('content_sha256', '—')[:12]}…; "
+                  "a check of the content, not a signature).")
         return True
 
     def open_review(self, path: Optional[str] = None) -> bool:
+        """Open a saved dossier: in the background its sources are hashed again (both are required), its content is
+        checked against its integrity SHA-256 and, for M11-261027, it is recomputed from the verified files. The stored
+        statuses are never taken as current otherwise."""
         self.activate()
+        if self.busy():
+            return False
         path = path if path is not None else self._ask_open()
         if not path:
             return False
@@ -381,13 +505,45 @@ class PhysicalReviewPanel(QWidget):
         except pr.ReviewRefused as refusal:
             self._say(f"Not opened — {refusal}")
             return False
-        self.record, self.origin, self.review_inputs, self.built_with = record, FILE, None, None
-        self.reopened = pr.reopened_state(record)
+        self.record, self.origin, self.review_inputs, self.built_with, self.reopened = record, FILE, None, None, None
         self.export_message = ""
         self.refusal = None
-        self._say(f"Review opened: {path}. Its sources were verified on disk again: {self.reopened['state']}.")
-        self._refresh()
+        readers = self._readers
+
+        def work(cancel):
+            state = pr.reopened_state(record)
+            if not state["revalidable"]:
+                if state["state"] == pr.NOT_REVALIDATED:
+                    state["why"] = ("its scientific statuses are the stored ones: only an M11-261027 dossier is "
+                                    "recomputed from its files; build the review again to recompute it")
+                return state, None
+            inputs = pr.revalidation_inputs(record, readers[0], readers[1], cancel)
+            check = pr.revalidate(record, inputs)
+            state.update(current=check["current"], state=check["state"], reasons=check["reasons"])
+            return state, check.get("record")
+
+        def finish(outcome):
+            if isinstance(outcome, Exception):
+                self.reopened = {"checks": [], "current": False, "state": f"{pr.NOT_CURRENT} — {outcome}",
+                                 "reasons": [str(outcome)]}
+            else:
+                self.reopened = outcome[0]
+            self._say(f"Review opened: {path}. {self.reopened['state']}.")
+            self._refresh()
+
+        self._start("Verifying the reopened dossier (sources hashed again, content checked, recomputed)...", work,
+                    finish)
         return True
+
+    @staticmethod
+    def _default_readers() -> tuple:
+        """The program's existing readers for a recomputation (only the FE manifest is hashed, never the package)."""
+        from new_gui import preview_model as pm
+        from new_gui import workspace_state as ws
+
+        kinds = {pr.EXPERIMENTAL: ws.EXPERIMENTAL, pr.FE_MANIFEST: ws.FE}
+        return (lambda role, path, cancel: pm.read_preview(kinds[role], path, cancel),
+                lambda path, cancel: pm.file_identity(path, cancel))
 
     # ------------------------------------------------------------------------------------------ display
 
@@ -416,11 +572,14 @@ class PhysicalReviewPanel(QWidget):
         record = self.record
         state, reason = self.freshness()
         refusal = self.refusal
+        busy = self.busy()
         if record is None:
-            self.identity_line.setText("No review built yet." if not refusal else f"Refused: {refusal[1]}")
+            self.identity_line.setText(self.running if busy else "No review built yet." if not refusal
+                                       else f"Refused: {refusal[1]}")
             for key, (caption, label) in self.state_labels.items():
-                label.setText(f"{caption}: {pr.SOURCE_NOT_VERIFIED}" if refusal and key == "sources" else "")
+                label.setText(f"{caption}: {refusal[0]}" if refusal and key == "sources" else "")
                 label.setVisible(bool(refusal and key == "sources"))
+            self.reasons_line.setVisible(False)
             self.freshness_line.setVisible(False)
             self.export_button.setEnabled(False)
             self.export_label.setText(self.export_message)
@@ -429,16 +588,30 @@ class PhysicalReviewPanel(QWidget):
         self.identity_line.setText(f"Specimen {i['specimen']} · series {i['series']} · modal set {i['modal_set']} · FE "
                                    f"{i['fe_model']} · experimental {str(i['experimental_sha256'])[:12]}… · FE "
                                    f"manifest {str(i['fe_manifest_sha256'])[:12]}… · built from {self.origin}")
-        for key, (caption, label) in self.state_labels.items():
-            label.setText(f"{caption}: {record['states'][key]}")
-            label.setVisible(True)
         current = state == "CURRENT"
-        self.freshness_line.setText("" if current else f"Review {state} — NOT CURRENT: {reason}. Its tables are not "
-                                    "shown and it is not exported; build it again.")
+        shown = current or state == pr.NOT_REVALIDATED
+        qualifier = "" if current else " (stored, not revalidated)" if shown else " (stored, NOT CURRENT)"
+        for key, (caption, label) in self.state_labels.items():
+            value = record["states"][key]
+            if key == "sources" and refusal and not current:  # the latest refusal, never the stored "verified"
+                value = f"{refusal[0]} — {refusal[1]}"
+            label.setText(f"{caption}{qualifier}: {value}")
+            label.setVisible(True)
+        reasons = (record.get("sources") or {}).get("reasons") or []
+        self.reasons_line.setText("Sources not verified: " + "; ".join(reasons) if reasons else "")
+        self.reasons_line.setVisible(bool(reasons))
+        if state == pr.NOT_REVALIDATED:
+            banner = (f"{pr.NOT_REVALIDATED}: {reason}. The sources and the content verify; the statuses are those "
+                      "stored and are not exported as current.")
+        elif state == "CHECKING":
+            banner = "Verifying the reopened dossier..."
+        else:
+            banner = f"Review {state} — NOT CURRENT: {reason}. Its tables are not shown and it is not exported; "                      "build it again."
+        self.freshness_line.setText("" if current else banner)
         self.freshness_line.setVisible(not current)
-        self.export_button.setEnabled(current)
+        self.export_button.setEnabled(current and not busy)
         self.export_label.setText(self.export_message)
-        if not current:
+        if not shown:
             return
         self._show_sources(record, self.bodies[0])
         self._show_evidence(record, self.bodies[1])
