@@ -139,8 +139,9 @@ The science lives in three services without Qt. The panel only edits and shows. 
    - consistent sources (physical study);
    - diagnostics with admissible records;
    - complete evidence;
-   - the owner's decision `ADMISSIBLE_FOR_RESEARCH_COMPUTATION` (HUMAN_CONFIRMED with its reference; SYNTHETIC only in
-     a synthetic study), recorded by the program, never made by it;
+   - the owner's decision `ADMISSIBLE_FOR_RESEARCH_COMPUTATION`:
+     - SYNTHETIC in the synthetic demonstration;
+     - **for a physical plate, blocked since PRIORITY-8-F1 (§9)**;
    - a sensitivity table of this FE model and specimen with every used row tracked;
    - a declared observation set: FIT / HOLDOUT, parameters, start, bounds, σ with provenance, `holdout_declared`;
    - FIT terms ≥ parameters;
@@ -195,13 +196,17 @@ Every value is labelled **SYNTHETIC_DEMONSTRATION — NOT A PHYSICAL EXPERIMENT*
 - the sensitivity plan;
 - save, reopen and export.
 
-**Works only after the owner's separate decisions and inputs.** The offline research study needs all of these:
+**Blocked for a physical plate since PRIORITY-8-F1 (§9): the offline research study.** It would need all of these,
+and the program cannot verify any of them from an imported file:
 
-- an admissible-registration decision;
-- a sensitivity table of the plate's own FE model (Abaqus solves under their own HUMAN gate);
-- a declared observation set.
+- an accepted frozen registration of the plate;
+- the owner's decision tied to it and to the linked SHA-256;
+- admissible pairs from the verified comparator;
+- the branch-tracking evidence of the sensitivity table.
 
-**Blocked:**
+Enabling it needs a new owner decision. The synthetic demonstration still runs.
+
+**Also blocked:**
 
 - a frozen registration;
 - the verified MAC comparison of a new plate (only the existing archived registrations SP-02 / SP-13 apply);
@@ -303,6 +308,104 @@ The full results are in `WINDOWS_PORTABLE_RC3.md`.
 - **Units.** The FE geometry of a package is taken in mm, as everywhere in the project.
 - **Diagnostics run synchronously.** They are fast for plate-sized packages. A 1.7 M-node package (SP-10) is not a
   single-plate case.
-- **The registration decision.** The program records the owner's decision from a declaration file and never checks
-  who made it. Its provenance and reference are shown everywhere the result is.
+- **The registration decision.** A decision declared in a file is accepted only in the synthetic demonstration. For a
+  physical plate the offline fit is blocked (§9).
 - **No new frozen registration.** A new plate therefore never reaches a verified MAC comparison in this version.
+
+## 9. PRIORITY-8-F1 corrections
+
+Branch `fix/generic-single-plate-rc3-f1`, from `8da0521`. Three confirmed defects of RC3 are corrected. The
+architecture, the historical data and the scientific rules are unchanged.
+
+### F1.1 — results belong to their inputs
+
+**The fingerprint.** Every result records the inputs it was computed from:
+
+- the diagnostics record the linked files' SHA-256, the modal set and, in a synthetic study, the synthetic inputs'
+  SHA-256;
+- the offline candidate records the diagnostics' inputs and the SHA-256 of the imported sensitivity table and
+  declaration.
+
+**`results_state`** gives one of five states:
+
+- **CURRENT** only when both hold:
+  - the results were computed from the linked sources;
+  - those sources are confirmed now: read in the Workspace with the same SHA-256 and modal set, or verified on disk
+    when nothing is read.
+- **STALE:** the results were computed for other files, another set, another table or declaration, or an earlier
+  study file records no inputs.
+- **CHANGED** or **MISSING:** the state of the sources now.
+- **NOT_CHECKED:** the sources are neither read nor verified.
+
+**A result that is not CURRENT:**
+
+- is not shown as a result, and the panel says why;
+- is exported under `not_current_results`, never as the result of the current inputs: no frequency rows, no offline
+  terms, and the Markdown says NOT CURRENT;
+- does not count as a done step.
+
+**History.**
+
+- Linking new sources or running new diagnostics moves the earlier results to `superseded`, a record saved with the
+  study.
+- The history is kept.
+
+**Reopening a study.**
+
+- The recorded files are checked at once by SHA-256: the experimental file and the FE `manifest.json` only. The
+  package's mode files are never hashed, so the 3.1 GB SP-10 package is not read again.
+- A moved file with the same SHA-256 can still be chosen (**Choose a moved source file...**).
+
+**A defect found by the F1 smoke.** In RC3 the buttons **New study** and **Choose a moved source file...** were connected
+directly to methods with an optional argument. Qt's `clicked(bool)` then passed `False` as that argument:
+
+- **New study** raised "unknown study kind False" and kept the earlier study;
+- **Choose a moved source file...** never opened its dialog.
+
+Both are now wrapped, with a regression test that clicks the buttons themselves.
+
+### F1.2 — the physical offline gate
+
+An imported `HUMAN_CONFIRMED` string is no longer accepted as the owner's decision for a physical plate. The physical
+offline fit is **blocked** with the reason `PHYSICAL_OFFLINE_FIT_BLOCKED`, shown in the gate and in the readiness.
+
+**Why it cannot be checked now.** A verifiable chain would need all of these:
+
+- an accepted frozen registration of this plate tied to the linked SHA-256 (none exists; freezing one is a separate
+  owner decision);
+- admissible pairs from the verified comparator on it;
+- the FE branch-tracking evidence (FE-to-FE MAC of every variant) of the sensitivity table.
+
+Defining that chain is a new owner decision. The synthetic demonstration (SYNTHETIC decision, SYNTHETIC study only)
+still runs. No candidate becomes a material value: `release_material_values` always refuses.
+
+### F1.3 — units
+
+**Sensitivity table.** Each parameter states its unit:
+
+- MPa, GPa and Pa are converted to MPa;
+- a missing or other unit (for example `ksi` or `mpa`) is refused.
+
+**Declaration.** It states `unit` for the start and the bounds, converted the same way. The demonstration's
+declarations now state `"unit": "MPa"`.
+
+**Control values.** D11 / D66 / D12 are tested against hand-computed values. With E = 60 000 MPa, G12 = 5 000 MPa,
+ν12 = 0.2 and h = 2 mm:
+
+- D11 = 41 666.667 N·mm;
+- D12 = 8 333.333 N·mm;
+- D66 = 3 333.333 N·mm.
+
+Without a FIXED ν12, D11 and D12 are NOT_AVAILABLE.
+
+### Tests and build
+
+**Tests:**
+
+- `tests/test_generic_single_plate_workbench.py`: 38 tests, 11 of them new (F1.1: 7, the buttons included; F1.2: 2;
+  F1.3: 2);
+- `tests/test_windows_portable_rc3_f1.py`: 3 tests.
+
+**Build.** The corrected portable build is `AbaqusModalComparator_RC3_F1` (`packaging/portable_rc3_f1`). It is made
+apart from RC3, whose EXE and ZIP are not replaced. The RC1, RC2 and RC3 packaging are unchanged (test). See
+`WINDOWS_PORTABLE_RC3.md`, RC3-F1.

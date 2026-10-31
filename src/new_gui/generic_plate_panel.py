@@ -180,6 +180,7 @@ class GenericPlatePanel(QWidget):
         self.tables: dict = {}
         self.last_export: list = []
         self.study_path: Optional[Path] = None
+        self.disk: dict = {}  # PRIORITY-8-F1: role → (VERIFIED / CHANGED / MISSING, detail) of the linked files
         self.active = False  # nothing is evaluated or shown before the page is first shown or used
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -194,7 +195,8 @@ class GenericPlatePanel(QWidget):
         self.step_line.setObjectName("workbenchSteps")
         head_layout.addWidget(self.step_line)
         buttons = QVBoxLayout()  # buttons in a column: no page width
-        for text, slot, name in (("New study", self.new_study, "wbNew"),
+        # PRIORITY-8-F1: a method with an optional argument is wrapped, so the clicked(bool) argument never reaches it
+        for text, slot, name in (("New study", lambda: self.new_study(), "wbNew"),
                                  ("New synthetic demo study", lambda: self.new_study(wb.SYNTHETIC_DEMO), "wbNewDemo"),
                                  ("Open study...", lambda: self.open_study(), "wbOpen"),
                                  ("Save study...", lambda: self.save_study(), "wbSave")):
@@ -301,7 +303,7 @@ class GenericPlatePanel(QWidget):
         row = QVBoxLayout()  # buttons in a column: no page width
         for text, slot, name in (("Link the Workspace inputs", self.link_inputs, "wbLink"),
                                  ("Verify recorded sources", self.verify_sources, "wbVerify"),
-                                 ("Choose a moved source file...", self.relocate, "wbRelocate"),
+                                 ("Choose a moved source file...", lambda: self.relocate(), "wbRelocate"),
                                  ("Load synthetic inputs...", lambda: self.load_synthetic_inputs(), "wbSynthetic")):
             button = QPushButton(text)
             button.setObjectName(name)
@@ -386,6 +388,9 @@ class GenericPlatePanel(QWidget):
         run.setObjectName("wbDiagnostics")
         run.clicked.connect(self.run_diagnostics)
         inner.addWidget(run, 0, Qt.AlignmentFlag.AlignLeft)
+        self.results_label = _label("", "warnings")  # PRIORITY-8-F1: CURRENT / STALE / CHANGED / MISSING
+        self.results_label.setObjectName("wbResultsState")
+        inner.addWidget(self.results_label)
         self.diagnostics_body = QVBoxLayout()
         inner.addLayout(self.diagnostics_body)
         layout.addWidget(card)
@@ -469,6 +474,7 @@ class GenericPlatePanel(QWidget):
         self.active = True
         self.study = wb.new_study(kind)
         self.study_path = None
+        self.disk = {}
         self.last_export = []
         self._fill_forms()
         self._say("A new synthetic demonstration study (never a physical experiment)." if kind == wb.SYNTHETIC_DEMO
@@ -596,13 +602,15 @@ class GenericPlatePanel(QWidget):
         except wb.StudyRefused as error:
             self._say(str(error))
             return False
+        self.disk = {}
         self._say("The Workspace inputs are linked to this study by SHA-256.")
         self._refresh()
         return True
 
     def verify_sources(self) -> dict:
         self.active = True
-        out = {role: wb.verify_source(self.study, role) for role in ("experimental", "fe")}
+        out = wb.disk_status(self.study)  # the recorded files only (never the FE package's mode files)
+        self.disk = out
         self.messages["verify"] = "\n".join(f"{role}: {state} — {detail}" for role, (state, detail) in out.items())
         self._refresh()
         return out
@@ -618,6 +626,8 @@ class GenericPlatePanel(QWidget):
         except wb.StudyRefused as error:
             self._say(f"Not relocated: {error}")
             return False
+        self.disk = wb.disk_status(self.study)
+        self.messages["verify"] = "\n".join(f"{r}: {state} — {detail}" for r, (state, detail) in self.disk.items())
         self._say(f"The {role} source was found at its new location with the recorded SHA-256.")
         self._refresh()
         return True
@@ -737,9 +747,13 @@ class GenericPlatePanel(QWidget):
             return False
         self.study_path = Path(path)
         self.last_export = []
+        self.disk = wb.disk_status(self.study)  # PRIORITY-8-F1: checked at once by SHA-256 (small files only)
+        self.messages["verify"] = "\n".join(f"{r}: {state} — {detail}" for r, (state, detail) in self.disk.items())
         self._fill_forms()
-        self._say(f"Study opened: {path}. The registration status is recomputed from the evidence; verify the sources "
-                  "by SHA-256 on step 2.")
+        freshness = self.freshness()
+        self._say(f"Study opened: {path}. The registration status is recomputed from the evidence; the recorded "
+                  f"sources are checked by SHA-256: results {freshness['state']}"
+                  + (f" ({'; '.join(freshness['reasons'])})" if freshness["reasons"] else "") + ".")
         self._refresh()
         return True
 
@@ -750,13 +764,18 @@ class GenericPlatePanel(QWidget):
             return False
         evidence = wb.evidence_result(self.study)
         try:
-            self.last_export = wb.export_report(self.study, folder, evidence, self.readiness(evidence))
+            self.last_export = wb.export_report(self.study, folder, evidence, self.readiness(evidence),
+                                                self.freshness())
             self.study = self.study.logged("report exported", str(folder))
             self.messages["export"] = "Report written:\n" + "\n".join(str(p) for p in self.last_export)
         except (OSError, ValueError) as error:
             self.messages["export"] = f"The report was not written ({error})."
         self._refresh()
         return bool(self.last_export)
+
+    def freshness(self) -> dict:
+        """PRIORITY-8-F1: whether the stored results belong to the inputs of now (Workspace or disk check)."""
+        return wb.results_state(self.study, self.current_sources(), self.disk)
 
     def readiness(self, evidence=None) -> wb.Readiness:
         evidence = evidence or wb.evidence_result(self.study)
@@ -787,14 +806,16 @@ class GenericPlatePanel(QWidget):
 
     def step_states(self, evidence, ready, states, sources) -> list:
         p, s = self.study.passport, self.study
+        fresh = self.freshness()
         return [
             DONE if p.physical_specimen_id and p.test_run_id else WAITING,
             DONE if (s.synthetic and s.diagnostics) or (not s.synthetic and sources.get("consistent")) else WAITING,
             DONE if next(c for c in ready.checks if c.name == "geometry and mass").state == wb.PASS else WAITING,
             "evidence complete — not frozen" if evidence.status == gev.COMPLETE else BLOCKED_TEXT,
-            DONE if s.diagnostics else WAITING,
+            (DONE if fresh["current"] else fresh["state"].lower()) if s.diagnostics else WAITING,
             ready.status if ready.status != wb.NOT_READY else "not ready",
-            DONE if s.offline_result else (BLOCKED_TEXT if states["gate"] else "ready to run"),
+            (DONE if fresh["offline_current"] else str(fresh["offline"]).lower()) if s.offline_result
+            else (BLOCKED_TEXT if states["gate"] else "ready to run"),
             DONE if self.last_export or self.study_path else WAITING,
         ]
 
@@ -804,7 +825,7 @@ class GenericPlatePanel(QWidget):
         if not self.active:  # before the first show: no evaluated text (as the other research pages)
             for label in (self.study_line, self.step_line, self.inputs_label, self.sources_label, self.derived_label,
                           self.evidence_label, self.readiness_status, self.gate_label, self.export_label,
-                          self.history_label):
+                          self.history_label, self.results_label):
                 label.setText("")
             return
         s = self.study
@@ -849,7 +870,11 @@ class GenericPlatePanel(QWidget):
         self._clear(self.diagnostics_body)
         for key in ("proximity", "fe", "groups"):
             self.tables.pop(key, None)
-        diag = s.diagnostics
+        fresh = self.freshness()
+        self.results_label.setText(f"Results: {fresh['state']}" + (
+            f" — NOT CURRENT: {'; '.join(fresh['reasons'])}. They are {wb.NOT_CURRENT_NOTE}; run the diagnostics on "
+            "the current inputs." if s.diagnostics and not fresh["current"] else ""))
+        diag = s.diagnostics if fresh["current"] else None  # never shown as current when they are not
         if diag:
             if diag.get("source") == "SYNTHETIC":
                 self.diagnostics_body.addWidget(_label(wb.SYNTHETIC_LABEL, "warnings"))
@@ -872,7 +897,7 @@ class GenericPlatePanel(QWidget):
                 "Close groups (3 % trigger): " + ("; ".join("/".join(g) for g in diag["experimental_close_groups"]
                                                            + diag["fe_close_groups"]) or "none") +
                 ". Pairs: none — " + diag["note"], "hint"))
-        else:
+        elif not s.diagnostics:
             self.diagnostics_body.addWidget(_label("Not run.", "hint"))
         # step 6
         self.readiness_status.setText(f"{ready.status} · {ready.scientific_status}")
@@ -892,7 +917,11 @@ class GenericPlatePanel(QWidget):
                                 if states["gate"] else "All conditions are met: the offline research study may run.")
         self._clear(self.offline_body)
         self.tables.pop("offline", None)
-        result = s.offline_result
+        result = s.offline_result if fresh["offline_current"] else None
+        if s.offline_result and result is None:
+            self.offline_body.addWidget(_label(
+                f"Offline candidate {fresh['offline']} — NOT CURRENT: it belongs to other inputs, sensitivities or "
+                f"declaration; it is {wb.NOT_CURRENT_NOTE}.", "error"))
         if result:
             self.offline_body.addWidget(_label(" / ".join(result["labels"]), "warnings"))
             self.offline_body.addWidget(_label(

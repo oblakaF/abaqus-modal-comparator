@@ -50,6 +50,16 @@ SCIENTIFIC_STATUS = ("M8 GATE NOT_MET · D-077 NO_GLOBAL_PARAMETER_VALUE · prod
 MIN_THICKNESS_POINTS = 9  # SPEC v1.1 §5 (t prior from 9+ points)
 PROXIMITY_ONLY = "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR"
 ROLES = ("FIXED", "INITIAL")
+# PRIORITY-8-F1: whether the stored results belong to the inputs of now
+CURRENT, STALE, CHANGED, MISSING, NOT_CHECKED = "CURRENT", "STALE", "CHANGED", "MISSING", "NOT_CHECKED"
+PHYSICAL_DECISION_NOT_VERIFIABLE = (
+    "PHYSICAL_OFFLINE_FIT_BLOCKED: an imported HUMAN_CONFIRMED statement cannot be verified by this program. A "
+    "physical fit would need an accepted frozen registration of this plate tied to the linked SHA-256 (none exists: "
+    "freezing one is a separate owner decision), admissible pairs from the verified comparator on it and the FE "
+    "branch-tracking evidence (FE-to-FE MAC of every variant) of the sensitivity table. Until a new owner decision "
+    "defines that chain, the physical offline fit stays blocked; the synthetic demonstration is not affected.")
+NOT_CURRENT_NOTE = ("results computed for other or unverified inputs: kept in the study's record, never shown or "
+                    "exported as results of the current inputs")
 
 UNITS = {
     "length": {"mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4},  # → mm
@@ -300,6 +310,7 @@ class Study:
     offline_result: Optional[Mapping[str, Any]] = None
     history: tuple = ()  # (utc, action, detail)
     created: str = ""
+    superseded: tuple = ()  # PRIORITY-8-F1: results of earlier inputs, kept as a record (never current)
 
     def __post_init__(self) -> None:
         if self.kind not in (PHYSICAL, SYNTHETIC_DEMO):
@@ -359,17 +370,104 @@ def link_sources(study: Study, experimental_identity, fe_identity, modal_set) ->
             sources[role] = SourceRecord(role, str(identity.get("path", "")), identity["sha256"], identity.get("size"))
     if not sources:
         raise StudyRefused("no file is read in the Workspace: read the FE results and the experimental file first")
-    out = replace(study, sources=sources, modal_set=modal_set, diagnostics=None, declaration=None, offline_result=None)
+    out = retire_results(study, "the sources were linked again")
+    out = replace(out, sources=sources, modal_set=modal_set, diagnostics=None, declaration=None, offline_result=None)
     return out.logged("sources linked", "; ".join(f"{r} {s.sha256[:12]}…" for r, s in sources.items())
                       + (f"; set {modal_set['names'][0]}" if modal_set else "; no modal set"))
 
 
+def input_fingerprint(study: Study) -> dict:
+    """The inputs results are computed from: the linked files' SHA-256 and the modal set (physical), or nothing more
+    (synthetic: the synthetic inputs' SHA-256 is added by their diagnostics)."""
+    return {"experimental": (study.sources.get("experimental") or SourceRecord("", "", "")).sha256 or None,
+            "fe": (study.sources.get("fe") or SourceRecord("", "", "")).sha256 or None,
+            "modal_set": dict(study.modal_set) if study.modal_set else None}
+
+
+def retire_results(study: Study, reason: str) -> Study:
+    """Keep the present results as a record of earlier inputs (``superseded``) before they are replaced."""
+    if not study.diagnostics and not study.offline_result:
+        return study
+    entry = {"retired": _now(), "reason": reason,
+             "inputs": (study.diagnostics or {}).get("inputs"),
+             "diagnostics_summary": {"experimental": len((study.diagnostics or {}).get("experimental", [])),
+                                     "fe_elastic": len((study.diagnostics or {}).get("fe_elastic", []))},
+             "offline_result": study.offline_result}
+    return replace(study, superseded=study.superseded + (entry,))
+
+
 def set_diagnostics(study: Study, diagnostics: Mapping[str, Any]) -> Study:
-    """New diagnostics replace the old ones; the declaration (it takes its frequencies from them) and an earlier
-    offline result are removed and must be loaded / run again."""
-    out = replace(study, diagnostics=dict(diagnostics), declaration=None, offline_result=None)
+    """New diagnostics replace the old ones (kept as a record); the declaration (it takes its frequencies from them)
+    and an earlier offline result must be loaded / run again. The diagnostics record the inputs they belong to."""
+    out = retire_results(study, "new diagnostics")
+    data = dict(diagnostics)
+    data["inputs"] = {**input_fingerprint(study), "synthetic_inputs": diagnostics.get("synthetic_inputs_sha256")}
+    out = replace(out, diagnostics=data, declaration=None, offline_result=None)
     return out.logged("modal diagnostics", f"{diagnostics.get('source')}: {len(diagnostics.get('experimental', []))} "
                       f"EXP, {len(diagnostics.get('fe_elastic', []))} elastic FE")
+
+
+def disk_status(study: Study) -> dict:
+    """role → (VERIFIED / CHANGED / MISSING, detail) of every linked file at its recorded path. Only the recorded
+    file is hashed: the experimental file and the FE manifest.json (never the FE package's mode files)."""
+    return {role: verify_source(study, role) for role in study.sources}
+
+
+def results_state(study: Study, workspace: Optional[Mapping[str, Any]] = None,
+                  disk: Optional[Mapping[str, tuple]] = None) -> dict:
+    """{"state", "reasons", "offline"}: whether the stored diagnostics (and offline result) belong to the inputs of
+    now. CURRENT only when they were computed from the linked sources AND those sources are confirmed now — read in
+    the Workspace with the same SHA-256 and modal set, or verified on disk when nothing is read. Otherwise STALE
+    (computed for other inputs), CHANGED / MISSING (the sources now) or NOT_CHECKED."""
+    reasons = []
+    diagnostics = study.diagnostics or {}
+    recorded = diagnostics.get("inputs")
+    if study.synthetic:
+        state = CURRENT if diagnostics else NOT_CHECKED
+    elif not study.sources:
+        state = NOT_CHECKED
+        reasons.append("no source is linked")
+    else:
+        fingerprint = input_fingerprint(study)
+        workspace, disk = workspace or {}, disk or {}
+        changed = [k for k in ("experimental", "fe", "modal_set") if workspace.get(k) == "CHANGED"]
+        missing = [r for r, (s, _d) in disk.items() if s == "MISSING"]
+        changed_disk = [r for r, (s, _d) in disk.items() if s == "CHANGED"]
+        if diagnostics and recorded is not None and {k: recorded.get(k) for k in fingerprint} != fingerprint:
+            state = STALE
+            reasons.append("the results were computed for other files or another modal set")
+        elif diagnostics and recorded is None:
+            state = STALE
+            reasons.append("the results record no inputs (an earlier study file): run the diagnostics again")
+        elif changed:
+            state = CHANGED
+            reasons.append("read in the Workspace now: " + ", ".join(f"{k} CHANGED" for k in changed))
+        elif workspace.get("consistent"):
+            state = CURRENT
+        elif missing:
+            state = MISSING
+            reasons.append("not found at the recorded path: " + ", ".join(missing))
+        elif changed_disk:
+            state = CHANGED
+            reasons.append("another content at the recorded path: " + ", ".join(changed_disk))
+        elif disk and all(s == "VERIFIED" for s, _d in disk.values()) and set(disk) == set(study.sources):
+            state = CURRENT
+            reasons.append("the recorded files are verified on disk by their SHA-256 (not read in the Workspace)")
+        else:
+            state = NOT_CHECKED
+            reasons.append("the sources are neither read in the Workspace nor verified on disk")
+    offline = study.offline_result
+    offline_state = None
+    if offline:
+        made_for = offline.get("inputs") or {}
+        same = (made_for.get("diagnostics") == recorded and made_for.get("sensitivities") ==
+                (study.sensitivities or {}).get("file_sha256") and made_for.get("declaration") ==
+                (study.declaration or {}).get("file_sha256"))
+        offline_state = state if same else STALE
+        if not same:
+            reasons.append("the offline result was computed for other diagnostics, sensitivities or declaration")
+    return {"state": state, "offline": offline_state, "reasons": reasons,
+            "current": state == CURRENT, "offline_current": offline_state == CURRENT}
 
 
 def source_status(study: Study, experimental_identity, fe_identity, modal_set) -> dict:
@@ -521,8 +619,10 @@ def load_synthetic_inputs(source, study: Study) -> dict:
     except (KeyError, TypeError, ValueError) as error:
         raise StudyRefused(f"the synthetic inputs are incomplete: {error}") from error
     out = modal_diagnostics(experimental, fe_modes, [int(m) for m in data.get("fe_rigid", [])], "SYNTHETIC")
+    canonical = json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")
     out.update(modal_set={"names": ["SYNTHETIC", "synthetic"], "records": len(experimental)}, fe_extent_mm=extent,
-               scan_points_m=points, labels=[SYNTHETIC_LABEL])
+               scan_points_m=points, labels=[SYNTHETIC_LABEL],
+               synthetic_inputs_sha256=hashlib.sha256(canonical).hexdigest())
     return out
 
 
@@ -601,11 +701,14 @@ def readiness(study: Study, evidence: ev.EvidenceResult, current_sources: Option
                         evidence.status + ("" if evidence.status == ev.COMPLETE else
                                            f": {len(evidence.missing)} open item(s)")))
     decision = ((study.declaration or {}).get("data") or {}).get("registration_decision") or {}
-    decided = (decision.get("status") == "ADMISSIBLE_FOR_RESEARCH_COMPUTATION" and str(decision.get("reference") or "")
-               and decision.get("provenance") == (SYNTHETIC if study.synthetic else HUMAN_CONFIRMED))
-    checks.append(Check("registration decision (owner)", PASS if decided else BLOCKED,
-                        (f"{decision.get('reference')} ({decision.get('provenance')}; recorded, not made here)"
-                         if decided else "no owner decision is recorded; this program never makes one")))
+    if study.synthetic:
+        decided = (decision.get("status") == "ADMISSIBLE_FOR_RESEARCH_COMPUTATION"
+                   and str(decision.get("reference") or "") and decision.get("provenance") == SYNTHETIC)
+        checks.append(Check("registration decision (owner)", PASS if decided else BLOCKED,
+                            (f"{decision.get('reference')} (SYNTHETIC; declared for the demonstration)" if decided
+                             else "no synthetic registration decision is declared")))
+    else:  # PRIORITY-8-F1: a declared HUMAN_CONFIRMED string is not a verifiable decision
+        checks.append(Check("registration decision (owner)", BLOCKED, PHYSICAL_DECISION_NOT_VERIFIABLE))
     checks.append(Check("admissible mode pairs", PASS if declaration_state[0] == PASS else BLOCKED,
                         "only declared pairs on an admissible registration; no pair from frequency proximity"))
     groups = diagnostics.get("experimental_close_groups", []) + diagnostics.get("fe_close_groups", [])
@@ -693,6 +796,7 @@ def study_to_dict(study: Study, evidence: Optional[ev.EvidenceResult] = None) ->
                          "note": "recomputed from the evidence when the study is opened; never a frozen registration"},
         "sensitivities": study.sensitivities, "declaration": study.declaration,
         "diagnostics": study.diagnostics, "offline_result": study.offline_result,
+        "superseded": list(study.superseded),
         "approved_material_values": {"status": NOT_AVAILABLE,
                                      "reason": "no value passes the scientific criteria of a release (" +
                                                SCIENTIFIC_STATUS + ")"},
@@ -716,8 +820,9 @@ def study_from_dict(data: Mapping[str, Any]) -> Study:
                   sources=sources, modal_set=data.get("modal_set"), evidence=evidence,
                   sensitivities=data.get("sensitivities"), declaration=data.get("declaration"),
                   diagnostics=data.get("diagnostics"), offline_result=data.get("offline_result"),
-                  history=tuple(tuple(h) for h in data.get("history") or ()), created=data.get("created", ""))
-    return study.logged("opened", "registration recomputed from the evidence")
+                  history=tuple(tuple(h) for h in data.get("history") or ()), created=data.get("created", ""),
+                  superseded=tuple(data.get("superseded") or ()))
+    return study.logged("opened", "registration recomputed from the evidence; sources to be verified by SHA-256")
 
 
 def save_study(study: Study, path, evidence: Optional[ev.EvidenceResult] = None) -> Path:
@@ -750,20 +855,36 @@ def _csv(rows: Sequence[Sequence[Any]]) -> str:
     return out.getvalue()
 
 
-def export_report(study: Study, folder, evidence: ev.EvidenceResult, ready: Readiness) -> list:
-    """Markdown, JSON and CSV tables into ``folder``; returns the files written. No approved material value."""
+def export_report(study: Study, folder, evidence: ev.EvidenceResult, ready: Readiness,
+                  freshness: Optional[Mapping[str, Any]] = None) -> list:
+    """Markdown, JSON and CSV tables into ``folder``; returns the files written. No approved material value.
+
+    PRIORITY-8-F1: only results of the current inputs (``results_state``) are reported as results; the others are
+    written apart, as NOT CURRENT, with the reason (never as the result of the current inputs)."""
+    freshness = dict(freshness or results_state(study))
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     base = f"single_plate_{(study.passport.physical_specimen_id or 'study').replace(' ', '_')}_{stamp}"
     data = study_to_dict(study, evidence)
+    data["results_state"] = freshness
+    if not freshness["current"] or not freshness.get("offline_current", True) and study.offline_result:
+        data["not_current_results"] = {"state": freshness["state"], "offline_state": freshness.get("offline"),
+                                       "reasons": freshness["reasons"], "note": NOT_CURRENT_NOTE,
+                                       "diagnostics": None if freshness["current"] else study.diagnostics,
+                                       "offline_result": None if freshness.get("offline_current") else
+                                       study.offline_result}
+        if not freshness["current"]:
+            data["diagnostics"] = None
+        if not freshness.get("offline_current"):
+            data["offline_result"] = None
     data["readiness"] = {"status": ready.status, "checks": [asdict(c) for c in ready.checks],
                          "reasons": list(ready.reasons), "sensitivity_plan": list(ready.sensitivity_plan)}
     written = []
     path = folder / f"{base}.json"
     path.write_text(json.dumps(data, indent=1, ensure_ascii=False, default=str), encoding="utf-8")
     written.append(path)
-    diag = study.diagnostics or {}
+    diag = (study.diagnostics or {}) if freshness["current"] else {}
     tables = {
         "frequencies": [("EXP", "f_EXP (Hz)", "nearest FE", "f_FE (Hz)", "Δf (%)", "second FE", "Δf (%)", "status")] +
                        [(f"EXP{r['exp']}", f"{r['f_exp_hz']:.4f}",
@@ -776,7 +897,7 @@ def export_report(study: Study, folder, evidence: ev.EvidenceResult, ready: Read
                      [(r.position, r.thickness.value, r.thickness.unit, r.thickness.provenance, r.method,
                        r.thickness.source) for r in study.passport.thickness],
     }
-    if study.offline_result:
+    if study.offline_result and freshness.get("offline_current"):
         tables["offline_terms"] = [("term", "role", "f_EXP (Hz)", "f_model (Hz)", "residual (σ)")] + [
             (t["term"], t["role"], t["f_exp_hz"], t["f_model_hz"], t["residual"])
             for t in study.offline_result.get("terms", [])]
@@ -785,12 +906,14 @@ def export_report(study: Study, folder, evidence: ev.EvidenceResult, ready: Read
         path.write_text(_csv(rows), encoding="utf-8")
         written.append(path)
     path = folder / f"{base}.md"
-    path.write_text(markdown_report(study, evidence, ready), encoding="utf-8")
+    path.write_text(markdown_report(study, evidence, ready, freshness), encoding="utf-8")
     written.append(path)
     return written
 
 
-def markdown_report(study: Study, evidence: ev.EvidenceResult, ready: Readiness) -> str:
+def markdown_report(study: Study, evidence: ev.EvidenceResult, ready: Readiness,
+                    freshness: Optional[Mapping[str, Any]] = None) -> str:
+    freshness = dict(freshness or results_state(study))
     p = study.passport
     lines = [f"# Single-plate research study — {p.physical_specimen_id or 'unnamed specimen'}", ""]
     if study.synthetic:
@@ -820,9 +943,12 @@ def markdown_report(study: Study, evidence: ev.EvidenceResult, ready: Readiness)
     lines += ["", "## Physical registration evidence", "", f"Status: **{evidence.status}** (never frozen here; no MAC).",
               ""] + [f"- missing / refused: {k} — {why}" for k, why in evidence.missing] + \
              [f"- check: {c[0]} — {c[1]} — {c[2]}" for c in evidence.checks]
-    diag = study.diagnostics
+    diag = study.diagnostics if freshness["current"] else None
     lines += ["", "## Modal diagnostics (frequency proximity only, never pairs)", ""]
-    if diag:
+    if study.diagnostics and not freshness["current"]:
+        lines.append(f"**{freshness['state']} — NOT CURRENT:** {'; '.join(freshness['reasons'])}. The stored "
+                     f"diagnostics are {NOT_CURRENT_NOTE}.")
+    elif diag:
         lines += ["| EXP | f_EXP (Hz) | nearest FE | Δf (%) | second | Δf (%) |", "|---|---|---|---|---|---|"]
         for r in diag.get("proximity", []):
             n, s = r.get("nearest"), r.get("second")
@@ -835,13 +961,20 @@ def markdown_report(study: Study, evidence: ev.EvidenceResult, ready: Readiness)
     lines += ["", f"## Readiness: {ready.status}", ""] + [f"- {c.name}: {c.state} — {c.detail}" for c in ready.checks]
     lines += ["", "Sensitivity plan (nothing is run here):", ""] + [f"- {x}" for x in ready.sensitivity_plan]
     lines += ["", "## Offline research study", ""]
-    result = study.offline_result
-    if result:
+    result = study.offline_result if freshness.get("offline_current") else None
+    if study.offline_result and not result:
+        lines.append(f"**{freshness.get('offline')} — NOT CURRENT:** the stored offline candidate belongs to other "
+                     f"inputs; it is {NOT_CURRENT_NOTE}.")
+    elif result:
         lines += [f"Status: {result.get('status')} — {' / '.join(result.get('labels', []))}", ""]
         lines += [f"- {k}: {v}" for k, v in (result.get("candidate") or {}).items()]
         lines += [f"- limit: {x}" for x in result.get("limits", [])]
     else:
         lines.append("Not run.")
+    if study.superseded:
+        lines += ["", "## Earlier results (superseded, not current)", ""] + [
+            f"- {e.get('retired')}: {e.get('reason')} — offline candidate "
+            + ("present" if e.get("offline_result") else "none") for e in study.superseded]
     lines += ["", "## Approved material values", "", f"{NOT_AVAILABLE}: {SCIENTIFIC_STATUS}.", "",
               "## History", ""] + [f"- {h[0]} {h[1]} {h[2] if len(h) > 2 else ''}" for h in study.history]
     return "\n".join(lines) + "\n"
@@ -853,5 +986,6 @@ __all__ = ["BLOCKED", "CLAIMS", "Check", "Claim", "Constant", "NOT_AVAILABLE", "
            "diagnostics_from_previews", "evidence_result", "export_report", "link_sources", "modal_diagnostics",
            "modal_set_of", "new_study", "open_study", "readiness", "relocate_source", "save_study",
            "sensitivity_plan", "source_status", "study_from_dict", "study_to_dict", "set_diagnostics",
-           "load_synthetic_inputs", "thickness_readiness",
+           "load_synthetic_inputs", "thickness_readiness", "results_state", "disk_status", "input_fingerprint",
+           "retire_results", "CURRENT", "STALE", "CHANGED", "MISSING", "NOT_CHECKED",
            "thickness_summary", "verify_source"]

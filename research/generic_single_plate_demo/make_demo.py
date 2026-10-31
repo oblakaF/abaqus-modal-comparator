@@ -102,7 +102,7 @@ def main() -> None:
     roles = {1: "FIT", 2: "FIT", 3: "FIT", 4: "HOLDOUT", 5: "FIT", 6: "FIT", 7: "HOLDOUT", 8: "HOLDOUT"}
     declaration = {"schema": "amc/declared-observations/v1", "kind": SYNTH,
                    "specimen": {"physical_specimen_id": SPECIMEN}, "registration_decision": decision,
-                   "parameters": ["E_in_plane", "G12"], "start": dict(BASELINE),
+                   "parameters": ["E_in_plane", "G12"], "unit": "MPa", "start": dict(BASELINE),
                    "bounds": {"E_in_plane": [25000.0, 100000.0], "G12": [2250.0, 9000.0]},
                    "sigma_ln": {"value": 0.003, "provenance": "Σ_setup 0.3 % PROVISIONAL (synthetic scale)"},
                    "holdout_declared": True,

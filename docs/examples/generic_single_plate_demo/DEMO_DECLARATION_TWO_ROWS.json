@@ -15,6 +15,7 @@
   "E_in_plane",
   "G12"
  ],
+ "unit": "MPa",
  "start": {
   "E_in_plane": 50000.0,
   "G12": 4500.0

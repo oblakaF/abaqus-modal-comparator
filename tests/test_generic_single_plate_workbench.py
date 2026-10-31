@@ -472,8 +472,9 @@ except ImportError:  # pragma: no cover
     HAVE_QT = False
 
 
-@unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
-class PanelTests(unittest.TestCase):
+class _PanelWindow(unittest.TestCase):
+    """The window with the workbench (shared set-up of the panel tests)."""
+
     def setUp(self):
         from new_gui import window as wm
 
@@ -491,6 +492,9 @@ class PanelTests(unittest.TestCase):
         self.addCleanup(self.window.close)
         self.panel = self.window.workbench
 
+
+@unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
+class PanelTests(_PanelWindow):
     def test_the_page_keeps_study_a_and_shows_nothing_before_use(self):
         self.assertIs(self.window.plate_tabs.widget(0), self.window.plate)
         self.assertEqual(self.window.plate_tabs.tabText(1), "B. New Single Plate")
@@ -582,6 +586,249 @@ class PanelTests(unittest.TestCase):
         self.panel.set_inputs(fe_dataset(), fe_id, exp_preview(), dict(exp_id, sha256="2" * 64), 0)
         self.assertIn("experimental CHANGED", self.panel.sources_label.text())
         self.assertFalse(self.panel.run_diagnostics())
+
+
+# ----------------------------------------------------------------------------- PRIORITY-8-F1 regressions
+
+class F1FreshnessTests(unittest.TestCase):
+    """F1.1: results of other or unverified inputs are never current; the history and earlier results are kept."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.dir = Path(directory.name)
+        self.unv = self.dir / "plate.unv"
+        self.unv.write_bytes(b"synthetic experimental file")
+        self.manifest = self.dir / "manifest.json"
+        self.manifest.write_bytes(b"{}")
+        (self.dir / "mode_0007.csv").write_bytes(b"large mode file, never hashed by the disk check")
+        self.exp_id = {"path": str(self.unv), "sha256": wb.file_sha256(self.unv), "size": 27}
+        self.fe_id = {"path": str(self.manifest), "sha256": wb.file_sha256(self.manifest), "size": 2}
+        self.set_a = {"names": ["polymax_a", "a"], "records": 4}
+        study = wb.link_sources(plate_600(), self.exp_id, self.fe_id, self.set_a)
+        self.study = wb.set_diagnostics(study, wb.diagnostics_from_previews(exp_preview(), 0, fe_dataset()))
+
+    def status(self, exp=None, fe=None, modal_set="same"):
+        return wb.source_status(self.study, exp if exp is not None else self.exp_id, fe if fe is not None else
+                                self.fe_id, self.set_a if modal_set == "same" else modal_set)
+
+    def test_current_only_for_the_same_files_and_set(self):
+        self.assertEqual(wb.results_state(self.study, self.status())["state"], wb.CURRENT)
+        for case, status in (("experimental", self.status(exp=dict(self.exp_id, sha256="9" * 64))),
+                             ("fe", self.status(fe=dict(self.fe_id, sha256="8" * 64))),
+                             ("modal set", self.status(modal_set={"names": ["polymax_b", "b"], "records": 4}))):
+            with self.subTest(changed=case):
+                state = wb.results_state(self.study, status)
+                self.assertEqual(state["state"], wb.CHANGED)
+                self.assertFalse(state["current"])
+        self.assertEqual(wb.results_state(self.study)["state"], wb.NOT_CHECKED)  # nothing read, nothing verified
+
+    def test_results_of_other_inputs_are_stale_and_kept_as_a_record(self):
+        from dataclasses import replace
+
+        other = replace(self.study, diagnostics=dict(self.study.diagnostics,
+                                                     inputs=dict(self.study.diagnostics["inputs"], fe="7" * 64)))
+        self.assertEqual(wb.results_state(other, self.status())["state"], wb.STALE)
+        legacy = replace(self.study, diagnostics={k: v for k, v in self.study.diagnostics.items() if k != "inputs"})
+        self.assertEqual(wb.results_state(legacy, self.status())["state"], wb.STALE)  # an earlier study file
+        history = len(self.study.history)
+        relinked = wb.link_sources(self.study, dict(self.exp_id, sha256="6" * 64), self.fe_id, self.set_a)
+        self.assertIsNone(relinked.diagnostics)
+        self.assertEqual(len(relinked.superseded), 1)
+        self.assertEqual(relinked.superseded[0]["inputs"]["experimental"], self.exp_id["sha256"])
+        self.assertGreater(len(relinked.history), history)  # the history is kept
+
+    def test_reopening_checks_the_recorded_files_on_disk(self):
+        path = wb.save_study(self.study, self.dir / "study.json")
+        study = wb.open_study(path)
+        with mock.patch.object(wb, "file_sha256", wraps=wb.file_sha256) as hashed:
+            disk = wb.disk_status(study)
+        self.assertEqual(sorted(Path(c.args[0]).name for c in hashed.call_args_list), ["manifest.json", "plate.unv"])
+        self.assertEqual({r: s for r, (s, _d) in disk.items()}, {"experimental": "VERIFIED", "fe": "VERIFIED"})
+        self.assertEqual(wb.results_state(study, None, disk)["state"], wb.CURRENT)
+        self.unv.write_bytes(b"synthetic experimental file, changed")
+        self.assertEqual(wb.results_state(study, None, wb.disk_status(study))["state"], wb.CHANGED)
+        moved = self.dir / "moved" / "plate.unv"
+        moved.parent.mkdir()
+        moved.write_bytes(b"synthetic experimental file")
+        self.unv.unlink()
+        self.assertEqual(wb.results_state(study, None, wb.disk_status(study))["state"], wb.MISSING)
+        relocated = wb.relocate_source(study, "experimental", str(moved))  # a moved file with the same SHA-256
+        self.assertEqual(wb.results_state(relocated, None, wb.disk_status(relocated))["state"], wb.CURRENT)
+
+    def test_an_offline_candidate_of_other_inputs_is_not_current(self):
+        from dataclasses import replace
+
+        demo = demo_ready()
+        evidence = wb.evidence_result(demo)
+        states = off.states(demo, evidence)
+        demo = replace(demo, offline_result=off.run_offline_study(demo, evidence, states["sensitivities"],
+                                                                  states["declaration"]))
+        self.assertTrue(wb.results_state(demo)["offline_current"])
+        other = replace(demo, offline_result=dict(demo.offline_result, inputs=dict(demo.offline_result["inputs"],
+                                                                                   declaration="5" * 64)))
+        state = wb.results_state(other)
+        self.assertEqual(state["offline"], wb.STALE)
+        self.assertFalse(state["offline_current"])
+
+    def test_the_export_never_reports_stale_results_as_current(self):
+        from dataclasses import replace
+
+        stale = replace(self.study, offline_result={"status": "CONVERGED", "candidate": {"G12": {"value": 1.0}},
+                                                    "terms": [{"term": "EXP1 ↔ FE7", "role": "FIT", "f_exp_hz": 1,
+                                                               "f_model_hz": 1, "residual": 0}],
+                                                    "inputs": {"diagnostics": None}})
+        freshness = wb.results_state(stale, self.status(exp=dict(self.exp_id, sha256="9" * 64)))
+        evidence = wb.evidence_result(stale)
+        written = wb.export_report(stale, self.dir / "report", evidence, wb.readiness(stale, evidence), freshness)
+        data = json.loads(next(p for p in written if p.suffix == ".json").read_text(encoding="utf-8"))
+        self.assertIsNone(data["diagnostics"])
+        self.assertIsNone(data["offline_result"])
+        self.assertEqual(data["not_current_results"]["state"], wb.CHANGED)
+        self.assertIsNotNone(data["not_current_results"]["offline_result"])  # kept apart, as a record
+        self.assertFalse(any(p.name.endswith("_offline_terms.csv") for p in written))
+        frequencies = next(p for p in written if p.name.endswith("_frequencies.csv")).read_text(encoding="utf-8")
+        self.assertEqual(len(frequencies.strip().splitlines()), 1)  # the header only
+        md = next(p for p in written if p.suffix == ".md").read_text(encoding="utf-8")
+        self.assertIn("NOT CURRENT", md)
+        self.assertNotIn("Status: CONVERGED", md)
+
+
+class F1PhysicalGateTests(unittest.TestCase):
+    """F1.2: an imported HUMAN_CONFIRMED string never opens the physical offline fit; the demo still runs."""
+
+    def physical(self):
+        from dataclasses import replace
+
+        demo = demo_ready()
+        study = replace(demo, kind=wb.PHYSICAL, declaration=None, offline_result=None)
+        raw = json.loads((DEMO / "DEMO_DECLARATION.json").read_text(encoding="utf-8"))
+        raw.update(kind="PHYSICAL", registration_decision={
+            "status": off.ADMISSIBLE, "provenance": "HUMAN_CONFIRMED", "reference": "OWNER-DECISION-001",
+            "decided_by": "owner", "date": "2026-11-01"})
+        return study, raw
+
+    def test_a_declared_human_decision_does_not_open_the_physical_fit(self):
+        study, raw = self.physical()
+        sensitivities = json.loads((DEMO / "DEMO_SENSITIVITIES.json").read_text(encoding="utf-8"))
+        sensitivities["kind"] = "PHYSICAL"
+        sens = off.load_sensitivities(sensitivities, study)
+        decl = off.load_declaration(raw, study, sens)
+        reasons = off.gate(study, wb.evidence_result(study), sens, decl, {"consistent": True})
+        self.assertIn(wb.PHYSICAL_DECISION_NOT_VERIFIABLE, reasons)
+        with self.assertRaises(off.OfflineRefused):
+            off.run_offline_study(study, wb.evidence_result(study), sens, decl, {"consistent": True})
+        ready = wb.readiness(study, wb.evidence_result(study))
+        owner = next(c for c in ready.checks if c.name == "registration decision (owner)")
+        self.assertEqual(owner.state, wb.BLOCKED)
+        self.assertIn("PHYSICAL_OFFLINE_FIT_BLOCKED", owner.detail)
+
+    def test_the_synthetic_demonstration_still_runs(self):
+        demo = demo_ready()
+        evidence = wb.evidence_result(demo)
+        states = off.states(demo, evidence)
+        self.assertEqual(states["gate"], [])
+        self.assertEqual(off.run_offline_study(demo, evidence, states["sensitivities"], states["declaration"])
+                         ["status"], "CONVERGED")
+
+
+class F1UnitTests(unittest.TestCase):
+    """F1.3: modulus units are converted to MPa or refused; D11, D66, D12 against hand-computed values."""
+
+    def setUp(self):
+        self.study = demo_study()
+        self.sens = json.loads((DEMO / "DEMO_SENSITIVITIES.json").read_text(encoding="utf-8"))
+        self.decl = json.loads((DEMO / "DEMO_DECLARATION.json").read_text(encoding="utf-8"))
+
+    def test_gpa_and_pa_are_converted_and_other_units_refused(self):
+        gpa = copy.deepcopy(self.sens)
+        gpa["parameters"] = {"E_in_plane": {"baseline": 50.0, "unit": "GPa"}, "G12": {"baseline": 4.5e9, "unit": "Pa"}}
+        loaded = off.load_sensitivities(gpa, self.study)
+        self.assertAlmostEqual(loaded["parameters"]["E_in_plane"], 50000.0)
+        self.assertAlmostEqual(loaded["parameters"]["G12"], 4500.0)
+        self.assertEqual(loaded["units"], {"E_in_plane": "MPa", "G12": "MPa"})
+        for unit in ("ksi", None, "mpa"):
+            bad = copy.deepcopy(self.sens)
+            bad["parameters"]["G12"]["unit"] = unit
+            if unit is None:
+                bad["parameters"]["G12"].pop("unit")
+            with self.subTest(unit=unit), self.assertRaises(off.OfflineRefused):
+                off.load_sensitivities(bad, self.study)
+        sens = off.load_sensitivities(self.sens, self.study)
+        decl = dict(self.decl, unit="GPa", start={"E_in_plane": 50.0, "G12": 4.5},
+                    bounds={"E_in_plane": [25.0, 100.0], "G12": [2.25, 9.0]})
+        loaded = off.load_declaration(decl, self.study, sens)
+        self.assertAlmostEqual(loaded["start"]["E_in_plane"], 50000.0)
+        self.assertEqual(loaded["bounds"]["G12"], [2250.0, 9000.0])
+        missing = dict(self.decl)
+        missing.pop("unit")
+        with self.assertRaises(off.OfflineRefused):
+            off.load_declaration(missing, self.study, sens)
+
+    def test_bending_stiffness_against_control_values(self):
+        from dataclasses import replace
+
+        thickness = tuple(wb.ThicknessReading(f"P{i}", q("length", 2.0, "mm", "SYNTHETIC")) for i in range(9))
+        nu = wb.Constant("nu12", q("ratio", 0.2, "1", "SYNTHETIC"), "FIXED")
+        study = replace(self.study, passport=replace(self.study.passport, thickness=thickness, constants=(nu,)))
+        d = off.derived_bending(study, {"E_in_plane": 60000.0, "G12": 5000.0})
+        # D11 = E h³ / (12 (1 − ν²)) = 60000 · 8 / (12 · 0.96); D12 = ν D11; D66 = G h³ / 12 = 5000 · 8 / 12  (N·mm)
+        self.assertAlmostEqual(d["D11_Nmm"], 41666.6666667, places=6)
+        self.assertAlmostEqual(d["D12_Nmm"], 8333.3333333, places=6)
+        self.assertAlmostEqual(d["D66_Nmm"], 3333.3333333, places=6)
+        no_nu = replace(study, passport=replace(study.passport, constants=()))
+        d = off.derived_bending(no_nu, {"E_in_plane": 60000.0, "G12": 5000.0})
+        self.assertEqual((d["D11_Nmm"], d["D12_Nmm"]), ("NOT_AVAILABLE", "NOT_AVAILABLE"))
+        self.assertAlmostEqual(d["D66_Nmm"], 3333.3333333, places=6)
+
+
+@unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
+class F1PanelTests(_PanelWindow):
+    """F1.1 / F1.2 in the panel: a reopened study's sources are checked at once; stale results are not shown."""
+
+    def test_the_buttons_never_pass_their_checked_state_as_an_argument(self):
+        from PySide6.QtWidgets import QPushButton
+
+        asked = []
+        self.panel._ask_file = lambda title: asked.append(title) or ""
+        self.panel.study = wb.new_study(wb.SYNTHETIC_DEMO)
+        self.panel.findChild(QPushButton, "wbNew").click()  # clicked(bool) must not become the study kind
+        self.app.processEvents()
+        self.assertEqual(self.panel.study.kind, wb.PHYSICAL)
+        self.panel.findChild(QPushButton, "wbRelocate").click()  # nor the path of a moved source
+        self.app.processEvents()
+        self.assertEqual(asked, ["Choose the moved experimental source"])
+
+    def test_reopening_shows_missing_sources_and_hides_the_results(self):
+        from new_gui.shape_panel import ShapePanel
+
+        patcher = mock.patch.object(ShapePanel, "set_preview")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        unv = self.dir / "x.unv"
+        unv.write_bytes(b"x")
+        manifest = self.dir / "manifest.json"
+        manifest.write_bytes(b"{}")
+        exp_id = {"path": str(unv), "sha256": wb.file_sha256(unv), "size": 1}
+        fe_id = {"path": str(manifest), "sha256": wb.file_sha256(manifest), "size": 2}
+        self.panel.set_inputs(fe_dataset(), fe_id, exp_preview(), exp_id, 0)
+        self.assertTrue(self.panel.link_inputs())
+        self.assertTrue(self.panel.run_diagnostics())
+        self.assertIn("proximity", self.panel.tables)
+        self.assertTrue(self.panel.save_study(str(self.dir / "s.json")))
+        self.panel.set_inputs(None, None, None, None, None)  # nothing read: only the disk check remains
+        self.assertTrue(self.panel.open_study(str(self.dir / "s.json")))
+        self.assertIn("results CURRENT", self.panel.message.text())
+        self.assertIn("proximity", self.panel.tables)
+        unv.unlink()
+        self.assertTrue(self.panel.open_study(str(self.dir / "s.json")))
+        self.assertIn("results MISSING", self.panel.message.text())
+        self.assertNotIn("proximity", self.panel.tables)
+        self.assertIn("NOT CURRENT", self.panel.results_label.text())
+        self.assertIn("5. Diagnostics: missing", self.panel.step_line.text().replace("5. Modal Diagnostics",
+                                                                                     "5. Diagnostics"))
+        self.assertFalse(self.panel.run_button.isEnabled())
+        self.assertIn("PHYSICAL_OFFLINE_FIT_BLOCKED", self.panel.gate_label.text())
 
 
 if __name__ == "__main__":

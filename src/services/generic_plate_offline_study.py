@@ -45,6 +45,14 @@ RESULT_LABELS = ("DIAGNOSTIC_OPTIMIZER_CANDIDATE", "NOT_A_RELEASE_VALUE", "NOT_A
                  "LOG_LINEAR_APPROXIMATION")
 FROZEN_TOLERANCE = 1.0e-4  # relative: the table's baseline against the FE package read
 MAX_FILE_BYTES = 5 * 1024 * 1024
+MODULUS_UNITS = {"MPa": 1.0, "GPa": 1000.0, "Pa": 1.0e-6}  # PRIORITY-8-F1: → MPa; any other unit is refused
+
+
+def _to_mpa(value: float, unit, what: str) -> float:
+    if unit not in MODULUS_UNITS:
+        raise OfflineRefused(f"{what}: the unit {unit!r} is not one of {tuple(MODULUS_UNITS)} (stated explicitly; "
+                             "nothing is assumed)")
+    return value * MODULUS_UNITS[unit]
 
 
 class OfflineRefused(ValueError):
@@ -113,7 +121,8 @@ def load_sensitivities(source, study: wb.Study) -> dict:
     if not parameters or set(parameters) - set(PARAMETERS):
         raise OfflineRefused(f"parameters {sorted(parameters)}: only {PARAMETERS} (E1 ≠ E2 needs a traceable warp / "
                              "fill orientation, SPEC v1.1 §5.2)")
-    baseline = {p: _positive((v or {}).get("baseline"), f"baseline of {p}") for p, v in parameters.items()}
+    baseline = {p: _to_mpa(_positive((v or {}).get("baseline"), f"baseline of {p}"), (v or {}).get("unit"),
+                           f"baseline of {p}") for p, v in parameters.items()}
     solved = data.get("solved_range_relative")
     if not (isinstance(solved, list) and len(solved) == 2 and 0 < _positive(solved[0], "solved range") < 1
             < _positive(solved[1], "solved range")):
@@ -140,7 +149,8 @@ def load_sensitivities(source, study: wb.Study) -> dict:
     if not str(data.get("provenance") or "").strip() or not str(data.get("method") or "").strip():
         raise OfflineRefused("the table states no method and provenance")
     return {"sha256": digest, "fe_model": model, "specimen": specimen, "kind": data.get("kind", "PHYSICAL"),
-            "parameters": baseline, "units": {p: (v or {}).get("unit", "MPa") for p, v in parameters.items()},
+            "parameters": baseline, "units": {p: "MPa" for p in parameters},
+            "units_read": {p: (v or {}).get("unit") for p, v in parameters.items()},
             "solved_range_relative": [float(solved[0]), float(solved[1])], "method": data["method"],
             "provenance": data["provenance"], "rows": {str(k): v for k, v in rows.items()}}
 
@@ -163,13 +173,16 @@ def load_declaration(source, study: wb.Study, sensitivities: Optional[Mapping[st
     parameters = list(data.get("parameters") or ())
     if not parameters or set(parameters) - set(PARAMETERS) or len(set(parameters)) != len(parameters):
         raise OfflineRefused(f"parameters {parameters}: a subset of {PARAMETERS}")
-    start = {p: _positive((data.get("start") or {}).get(p), f"start of {p}") for p in parameters}
+    unit = data.get("unit")  # PRIORITY-8-F1: the unit of start and bounds, stated explicitly
+    start = {p: _to_mpa(_positive((data.get("start") or {}).get(p), f"start of {p}"), unit, "start / bounds")
+             for p in parameters}
     bounds = {}
     for p in parameters:
         pair = (data.get("bounds") or {}).get(p)
         if not (isinstance(pair, list) and len(pair) == 2):
             raise OfflineRefused(f"the bounds of {p} are not [lower, upper]")
-        low, high = _positive(pair[0], f"lower bound of {p}"), _positive(pair[1], f"upper bound of {p}")
+        low = _to_mpa(_positive(pair[0], f"lower bound of {p}"), unit, "start / bounds")
+        high = _to_mpa(_positive(pair[1], f"upper bound of {p}"), unit, "start / bounds")
         if not low < start[p] < high:
             raise OfflineRefused(f"the start of {p} is not strictly inside its bounds")
         bounds[p] = (low, high)
@@ -239,6 +252,8 @@ def gate(study: wb.Study, evidence: ev.EvidenceResult, sensitivities: Optional[M
          declaration: Optional[Mapping[str, Any]], current_sources: Optional[Mapping[str, Any]] = None) -> list:
     """Every reason the offline study cannot start (empty: it may start)."""
     reasons = []
+    if not study.synthetic:  # PRIORITY-8-F1: no verifiable owner decision exists for a physical plate
+        reasons.append(wb.PHYSICAL_DECISION_NOT_VERIFIABLE)
     if fe_identity(study) is None:
         reasons.append("no identified FE model: link the FE package read in the Workspace")
     if not study.synthetic and not (current_sources or {}).get("consistent"):
@@ -350,7 +365,11 @@ def run_offline_study(study: wb.Study, evidence: ev.EvidenceResult, sensitivitie
                "The pairs are the declared ones (" + declaration["registration_decision"].get("reference", "") +
                "); MAC is not a term of the objective."]
     labels = list(RESULT_LABELS) + ([wb.SYNTHETIC_LABEL] if study.synthetic else [])
-    return {"status": lm.status.value, "labels": labels, "refusal": lm.refusal, "evaluations": lm.solves,
+    made_for = {"diagnostics": (study.diagnostics or {}).get("inputs"),  # PRIORITY-8-F1: the inputs of this result
+                "sensitivities": (study.sensitivities or {}).get("file_sha256"),
+                "declaration": (study.declaration or {}).get("file_sha256")}
+    return {"inputs": made_for, "status": lm.status.value, "labels": labels, "refusal": lm.refusal,
+            "evaluations": lm.solves,
             "iterations": lm.iterations, "objective": lm.objective, "parameters": names, "candidate": candidate,
             "fixed": fixed, "extrapolation": extrapolation, "terms": terms, "derived": derived, "limits": limits,
             "sensitivities_sha256": sensitivities["sha256"], "declaration_sha256": declaration["sha256"],
