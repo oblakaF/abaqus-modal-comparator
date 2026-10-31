@@ -548,16 +548,22 @@ class PanelTests(unittest.TestCase):
         self.assertFalse(self.panel.apply_measurements())  # refused with the reason, the study unchanged
         self.assertIn("positive", self.panel.message.text())
 
-    def test_no_step_widens_the_plate_page(self):
-        self.window.resize(900, 680)
-        self.window.show_page(self.wm.PLATE_PAGE)
-        self.window.plate_tabs.setCurrentIndex(1)
-        self.assertTrue(self.panel.open_study(str(DEMO / "DEMO_STUDY.json")))
-        self.app.processEvents()
-        limit = self.window.plate.minimumSizeHint().width()  # the page's width before PRIORITY-8 (study A)
-        self.assertLessEqual(self.panel.minimumSizeHint().width(), limit)
-        for index in range(self.panel.tabs.count()):
-            self.assertLessEqual(self.panel.tabs.widget(index).minimumSizeHint().width(), limit, index)
+    def test_the_layout_choices_that_keep_the_page_narrow(self):
+        """Font-independent: the step buttons stand in two columns over one page at a time, and no row of buttons
+        is laid out side by side (the page width itself is checked by the Windows GUI smoke at 900 × 680)."""
+        from PySide6.QtWidgets import QHBoxLayout, QPushButton, QStackedWidget
+
+        self.assertIsInstance(self.panel.tabs, QStackedWidget)
+        self.assertEqual(self.panel.tabs.count(), 8)
+        grid = self.panel.step_buttons.button(0).parentWidget().layout().itemAt(1).layout()
+        self.assertEqual(grid.columnCount(), 2)
+        for index in range(8):
+            row, column, _rows, _columns = grid.getItemPosition(grid.indexOf(self.panel.step_buttons.button(index)))
+            self.assertEqual((row, column), (index // 2, index % 2))
+        for layout in self.panel.findChildren(QHBoxLayout):
+            buttons = [layout.itemAt(i).widget() for i in range(layout.count())
+                       if isinstance(layout.itemAt(i).widget(), QPushButton)]
+            self.assertLessEqual(len(buttons), 1, [b.text() for b in buttons])
 
     def test_the_link_follows_the_workspace(self):
         from new_gui.shape_panel import ShapePanel
