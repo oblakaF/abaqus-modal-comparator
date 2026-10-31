@@ -13,10 +13,11 @@ from __future__ import annotations
 from typing import Optional
 
 from services import research_results_reader as rr
+from services import sp10_fe_research as sf
 
 TITLE = "Research Results"
-SUBTITLE = ("Archived research results of PRIORITY-1–4 for three specimens: viewing only. Nothing is computed, no "
-            "solver is started.")
+SUBTITLE = ("Archived research results of PRIORITY-1–4 and PRIORITY-6 for three specimens: viewing only. Nothing is "
+            "computed from shapes, no solver is started.")
 LABELS_LINE = "RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY"
 SCIENTIFIC_STATUS = ("Scientific status (unchanged): M8 GATE NOT_MET · D-077 NO_GLOBAL_PARAMETER_VALUE · production "
                      "Auto-ID BLOCKED · 261027 PHYSICAL_REGISTRATION_NOT_VERIFIED. No row below is a confirmed mode "
@@ -33,9 +34,15 @@ STATUS_MEANING = (
 SPECIMEN_NOTES = {
     "PLATE": "MAC basis: " + rr.SPECIMENS["PLATE"].mac_basis + ".",
     "SP-13": "MAC basis: " + rr.SPECIMENS["SP-13"].mac_basis + ".",
-    "SP-10": "No extracted SP-10 FE package: FE frequencies come from the .dat files of its own models only, so every "
-             "row is FE_SHAPES_UNAVAILABLE and no MAC exists.",
+    "SP-10": "Historical PRIORITY-1 table, archived and unchanged. At the time of PRIORITY-1 no SP-10 FE package was "
+             "extracted: its FE frequencies came from the .dat files of its own models only (FE7–FE15), so every row "
+             "is FE_SHAPES_UNAVAILABLE and no MAC exists. These statuses describe the FE shapes available then, not "
+             "the current state of SP-10: see B. Updated SP-10 FE Results — PRIORITY-6 below.",
 }
+SP10_HISTORICAL_HEADING = "A. Historical PRIORITY-1 — prior research (FE7–FE15, archived, unchanged)"
+SP10_MAC_NOTE = ("The line above is the PRIORITY-1 state. PRIORITY-6 has since extracted the FE shapes of SP-10, but "
+                 "SP-10 261029 has no physical registration (PHYSICAL_REGISTRATION_NOT_VERIFIED): no FE↔EXP MAC is "
+                 "computed and no mode pair exists.")
 MAC_WARNING = ("NOT A CONFIRMED MAC — research / hypothetical shape agreement under an unverified registration. It "
                "never sets a pair, an orientation or a parameter.")
 SP10_MAC = "MAC NOT_AVAILABLE — FE shapes not extracted"
@@ -70,6 +77,97 @@ SCENARIO_LIMITS = {
           "outside the solved ±5 %; two frequencies for two parameters: the small error holds by construction.",
 }
 PLATE_ONLY = "The FE parameter sensitivities and the inverse parameter study exist only for PLATE."
+
+# ----------------------------------------------------------------------------- PRIORITY-7: SP-10 FE results of PRIORITY-6
+SP10_TITLE = "B. Updated SP-10 FE Results — PRIORITY-6"
+SP10_STATUS = ("RESEARCH_ONLY / FREQUENCY_ONLY_DIAGNOSTIC / NOT_A_MATERIAL_PROPERTY · SP-10 261029 "
+               + sf.REGISTRATION_STATUS)
+SP10_RANGE_NOTE = ("FE7–FE15 is the range of PRIORITY-1. PRIORITY-6 added FE16–FE25, ten modes beyond that range "
+                   "(226.947–457.613 Hz; FE15 itself is 220.044 Hz). The frequencies are the ODB's EIGFREQ history; "
+                   "each equals the job's .dat to its printed five significant digits.")
+SP10_FE_HEADERS = ("FE №", "f_FE (Hz)", "Step", "Shape extracted", "Source", "Status")
+SP10_DIAGNOSTIC_HEADERS = ("EXP №", "f_EXP (Hz)", "Nearest FE", "f_FE (Hz)", "Δf (%)", "Second candidate", "Δf (%)",
+                           "Status")
+SP10_DIAGNOSTIC_NOTE = ("Every experimental record of polymax_bravo (12, the f_EXP of the historical table) against the "
+                        "19 FE frequencies of PRIORITY-6, nearest by |Δf|, Δf (%) = 100 × (f_FE − f_EXP) / f_EXP. "
+                        "A nearest frequency is not a modal correspondence: no MAC, registration, orientation, "
+                        "assignment or permutation is made.")
+SP10_LIMITS = ("Limits: no physical registration of SP-10 exists, so its FE and experimental shapes can only be viewed "
+               "independently (Workspace, Analysis: UNPAIRED SHAPES). No E1 / E2 / G12 or other material value comes "
+               "from these frequencies. The extracted package (about 3.1 GB) is not part of the program; this page "
+               "never reads it.")
+
+
+def _thousands(number: int) -> str:
+    return f"{number:,}".replace(",", " ")
+
+
+def sp10_identity_lines(results: sf.Sp10FeResults) -> tuple:
+    instances = ", ".join(f"{name} {_thousands(count)}" for name, count in sorted(results.instances.items()))
+    lines = [f"FE model: {results.model} · modal step {results.step} · {len(results.fe_modes)} elastic modes "
+             f"FE{results.fe_modes[0].number}–FE{results.fe_modes[-1].number}, "
+             f"{results.fe_modes[0].frequency_hz:.3f}–{results.fe_modes[-1].frequency_hz:.3f} Hz",
+             f"ODB SHA-256: {results.odb_sha256}",
+             f"FE manifest SHA-256: {results.fe_manifest_sha256}",
+             f"Geometry: {_thousands(results.nodes)} nodes ({instances})",
+             f"Shapes: extracted in PRIORITY-6 for every mode (package {results.package_bytes / 1e9:.2f} GB, outside "
+             f"the program) · extractor SHA-256 {results.extractor_sha256[:12]}…",
+             f"Experimental series: {sf.SERIES} · modal set {sf.MODAL_SET}, {sf.EXPERIMENTAL_RECORDS} records · "
+             f"experimental file SHA-256 {sf.EXPERIMENT_SHA256[:12]}…"]
+    lines += [f"Source: {path} · SHA-256 {sha[:12]}… · research commit {commit}"
+              for path, sha, commit in results.files.values()]
+    return tuple(lines)
+
+
+def sp10_fe_rows(results: sf.Sp10FeResults) -> tuple:
+    return tuple((f"FE{m.number}", f"{m.frequency_hz:.4f}", results.step, f"yes — {m.shape_file}",
+                  f"ODB EIGFREQ history (.dat {m.dat_hz:g})",
+                  "added in PRIORITY-6 (FE16–FE25)" if m.added else "PRIORITY-1 range (FE7–FE15)")
+                 for m in results.fe_modes)
+
+
+def sp10_added_rows(results: sf.Sp10FeResults) -> tuple:
+    return tuple(i for i, m in enumerate(results.fe_modes) if m.added)
+
+
+def _signed(value: float) -> str:
+    return f"{value:+.2f}"
+
+
+def sp10_diagnostic_rows(rows) -> tuple:
+    out = []
+    for r in rows:
+        notes = [sf.PROXIMITY_ONLY]
+        if r.group:
+            notes.append(f"close group {r.group}")
+        if r.nearest_in_added_range:
+            notes.append(f"FE{r.nearest.fe} added in PRIORITY-6")
+        out.append((f"EXP{r.exp_no}", f"{r.f_exp_hz:.4f}", f"FE{r.nearest.fe}", f"{r.nearest.frequency_hz:.4f}",
+                    _signed(r.nearest.df_percent), f"FE{r.second.fe}" if r.second else "—",
+                    _signed(r.second.df_percent) if r.second else "—", " · ".join(notes)))
+    return tuple(out)
+
+
+def sp10_group_rows(rows) -> tuple:
+    """Row indices of the close groups (highlighted)."""
+    return tuple(i for i, r in enumerate(rows) if r.group)
+
+
+def sp10_focus_lines(rows) -> tuple:
+    """EXP11 and EXP12: FE frequencies that came into the available range with PRIORITY-6."""
+    lines = []
+    for r in rows:
+        if r.exp_no in (11, 12):
+            lines.append(f"EXP{r.exp_no} {r.f_exp_hz:.4f} Hz → nearest FE{r.nearest.fe} {r.nearest.frequency_hz:.4f} Hz "
+                         f"({_signed(r.nearest.df_percent)} %): FE{r.nearest.fe} is in the range added by PRIORITY-6; "
+                         f"PRIORITY-1 had no FE frequency within 15 %. {sf.PROXIMITY_ONLY}.")
+    return tuple(lines)
+
+
+def sp10_group_lines() -> tuple:
+    return tuple(f"Close group: {'/'.join(f'EXP{e}' for e in exps)} near the FE spectrum "
+                 f"{'/'.join(f'FE{f}' for f in fes)} — no automatic assignment or permutation"
+                 for exps, fes in sf.CLOSE_GROUPS)
 
 
 def _f(value, digits: int = 4) -> str:
@@ -166,5 +264,7 @@ def record_lines(record: rr.LocalRecord) -> tuple:
     return (f"Local research record: {record.path}", f"SHA-256 of the record read: {record.sha256}") + record.checks
 
 
-__all__ = ["LOAD_RECORD", "MAC_WARNING", "TITLE", "ambiguous_rows", "cell_text", "identity_lines", "mac_view",
-           "matching_rows", "rank_lines", "record_lines", "scenario_rows", "scenario_view", "sensitivity_rows"]
+__all__ = ["LOAD_RECORD", "MAC_WARNING", "SP10_TITLE", "TITLE", "ambiguous_rows", "cell_text", "identity_lines",
+           "mac_view", "matching_rows", "rank_lines", "record_lines", "scenario_rows", "scenario_view",
+           "sensitivity_rows", "sp10_diagnostic_rows", "sp10_fe_rows", "sp10_focus_lines", "sp10_group_lines",
+           "sp10_group_rows", "sp10_identity_lines"]

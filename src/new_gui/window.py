@@ -681,9 +681,23 @@ class MainWindow(QMainWindow):
         identities = {"fe": self._read_identity(FE), "experimental": self._read_identity(EXPERIMENTAL)}
         self.comparison.set_inputs(*inputs, identities)  # a change removes the comparison and its drawings
         self.plate.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
-        self.research.set_workspace(identities["experimental"], identities["fe"])  # SHA-256 link only
+        self.research.set_workspace(identities["experimental"], identities["fe"],  # SHA-256 link only
+                                    self._research_context(*inputs))
         self._registration_changed()
         self._analysis_changed()
+
+    @staticmethod
+    def _research_context(fe_preview, experimental_preview, set_index) -> dict:
+        """PRIORITY-7: what the Research Results page compares with the PRIORITY-6 sources besides the SHA-256 — the
+        modal set chosen for the frequency diagnostic and the FE modes read (no data is read again)."""
+        modal_set = None
+        sets = experimental_preview.sets if experimental_preview is not None else ()
+        if set_index is not None and 0 <= set_index < len(sets):
+            chosen = sets[set_index]
+            modal_set = {"names": (chosen.display_name, chosen.key), "records": len(chosen.records)}
+        return {"modal_set": modal_set,
+                "fe_modes": tuple((m.number, m.frequency_hz) for m in fe_preview.modes) if fe_preview else (),
+                "fe_step": fe_preview.step_name if fe_preview is not None else None}
 
     def _read_identity(self, kind: str):
         """The identity of the file read for the shown preview of ``kind`` (None when not read or not confirmed)."""

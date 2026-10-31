@@ -120,6 +120,21 @@ PRIORITY-1–4 for PLATE (261027), SP-13 (261028) and SP-10 (261029). It reads t
 The tables are archived snapshots: they are tied to your Workspace files only when the SHA-256 match. Every value is
 RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY.
 
+**SP-10 FE results** (PRIORITY-7, `docs/gui/PRIORITY7_SP10_RC2.md`). For SP-10, Research Results shows two separate
+groups:
+- **A. Historical PRIORITY-1:** the archived table, unchanged. Its FE_SHAPES_UNAVAILABLE statuses describe the state
+  at that time.
+- **B. Updated SP-10 FE Results — PRIORITY-6:**
+  - the FE7–FE25 frequencies of `SP10_NEW_E1=E2_NSM_DENSITY`, whose shapes were extracted in PRIORITY-6;
+  - a frequency-only diagnostic of EXP1–EXP12, marked FREQUENCY_PROXIMITY_ONLY — NOT A CONFIRMED MODE PAIR.
+
+Both come from small archived records. The 3.1 GB extracted package is never read there: choose its `manifest.json`
+on the Workspace page to view the shapes. The page compares the SHA-256 of the files read in the Workspace with the
+PRIORITY-6 sources. A match is not a registration: SP-10 261029 stays PHYSICAL_REGISTRATION_NOT_VERIFIED.
+
+**Portable Windows build RC2** (`docs/gui/WINDOWS_PORTABLE_RC2.md`): the folder `AbaqusModalComparator_RC2`, built by
+`packaging/portable_rc2/build_portable.py` from the program with the SP-10 integration. RC1 below is unchanged.
+
 **Portable Windows build** (WINDOWS PORTABLE RC1, `docs/gui/WINDOWS_PORTABLE_RC1.md`): the folder
 `AbaqusModalComparator_RC1` holds `AbaqusModalComparator.exe`, the new interface frozen with its libraries and
 reference files. It starts with no Python or VS Code installation and starts no Abaqus. Measurement, FE and solver
