@@ -256,7 +256,7 @@ They are shown with "(stored, not revalidated)" and are not exported as current.
 
 ### Tests
 
-**`tests/test_plate_physical_review.py`: 34 tests** (24 kept and adapted, 10 new; item 8 extends the real-file test):
+**`tests/test_plate_physical_review.py`: 35 tests** (24 kept and adapted, 11 new; item 8 extends the real-file test):
 
 1. only the UNV → SOURCE_NOT_VERIFIED, not READY, export refused, the M11 review refused;
 2. only the FE manifest → SOURCE_NOT_VERIFIED, also from an audit without the FE row;
@@ -272,8 +272,15 @@ They are shown with "(stored, not revalidated)" and are not exported as current.
 9. the synthetic demonstration keeps SYNTHETIC_DEMONSTRATION_ONLY and is RECORD_NOT_REVALIDATED when reopened;
 10. no registration, MAC or mode pair; the registrations are unchanged.
 
-The panel test shows an incomplete source with its reason, refuses the export (nothing written) and keeps the earlier
-review after a refused build.
+The panel tests check three things:
+
+- an incomplete source is shown with its reason, and the export is refused with nothing written;
+- the earlier review is kept after a refused build;
+- a refused build never leaves an earlier review shown as verified.
+
+**A defect found by the F1 Windows smoke and corrected with a test.** After a build refused for one missing source, a
+reopened and revalidated review stayed labelled "Sources: SOURCES_VERIFIED". A refused build now makes the shown review
+STALE: the review is kept, its sources line shows the refusal and nothing is exported.
 
 **The fixtures.** The M11 test documents now state their on-disk SHA-256 explicitly: a recorded SHA-256 alone is no
 longer a verification. A foreign INP now refuses the M11 review; before, it gave a dossier marked SOURCE_NOT_VERIFIED.
