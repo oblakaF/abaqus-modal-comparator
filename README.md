@@ -132,6 +132,32 @@ Both come from small archived records. The 3.1 GB extracted package is never rea
 on the Workspace page to view the shapes. The page compares the SHA-256 of the files read in the Workspace with the
 PRIORITY-6 sources. A match is not a registration: SP-10 261029 stays PHYSICAL_REGISTRATION_NOT_VERIFIED.
 
+**Single-plate research workbench** (PRIORITY-8, `docs/gui/GENERIC_SINGLE_PLATE_WORKBENCH_RC3.md`). The Plate Study page
+has two tabs:
+- **A. Current PLATE Study:** the accepted study of PLATE-300x300x1mm, unchanged.
+- **B. New Single Plate — Research Workbench:** a research study of any single rectangular CFRP plate without a core,
+  in eight steps:
+  1. **Specimen & Test Setup:** its own identifiers.
+  2. **FE and Experimental Inputs:** the files read in the Workspace, linked by SHA-256.
+  3. **Measurements & Geometry:** with units and provenance.
+  4. **Physical Registration Evidence:** a complete set is never a registration.
+  5. **Modal Diagnostics:** frequency proximity only, never pairs.
+  6. **Parameter Observability:** NOT_READY_FOR_IDENTIFICATION with the reasons.
+  7. **Offline Research Study:** only with a sensitivity table of this FE model, a declared observation set and the
+     owner's registration decision. The result is a DIAGNOSTIC_OPTIMIZER_CANDIDATE, not a material property.
+  8. **Report & Save:** the study JSON, reopened with its sources checked; a Markdown / JSON / CSV report.
+
+To start:
+1. Read the plate's files on the Workspace page and choose the modal set on the Analysis page.
+2. Open Plate Study > B and click **New study**.
+3. Fill the steps in order.
+
+`docs/examples/generic_single_plate_demo/DEMO_STUDY.json` (**Open study...**) is a SYNTHETIC demonstration of another
+plate (420 × 260 mm) that goes through every step, the offline study included. It is never a physical experiment.
+
+**Portable Windows build RC3** (`docs/gui/WINDOWS_PORTABLE_RC3.md`): the folder `AbaqusModalComparator_RC3`, built by
+`packaging/portable_rc3/build_portable.py`. RC1 and RC2 are unchanged.
+
 **Portable Windows build RC2** (`docs/gui/WINDOWS_PORTABLE_RC2.md`): the folder `AbaqusModalComparator_RC2`, built by
 `packaging/portable_rc2/build_portable.py` from the program with the SP-10 integration. RC1 below is unchanged.
 

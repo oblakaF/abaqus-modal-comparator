@@ -49,7 +49,7 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QGuiApplication, QKeySequence, QPalette
 from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
-                               QStackedWidget, QVBoxLayout, QWidget)
+                               QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
 
 from new_gui import APP_NAME, STAGE
 from new_gui.archive_dialog import ArchiveDialog
@@ -57,6 +57,7 @@ from new_gui.comparison_panel import WIDE_CONTENT, ComparisonPanel
 from new_gui.diagnostic_panel import DiagnosticPanel
 from new_gui.known_sources_dialog import KnownSourcesDialog
 from new_gui.materials_panel import SUBTITLE as MATERIALS_SUBTITLE, MaterialsPanel
+from new_gui.generic_plate_panel import GenericPlatePanel, TITLE as GENERIC_TITLE
 from new_gui.plate_study_panel import PlateStudyPanel
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
@@ -421,11 +422,19 @@ class MainWindow(QMainWindow):
         return page
 
     def _build_plate_page(self) -> QWidget:
-        page, layout = self._page("Plate Study", "Research study of one free-free CFRP plate (PLATE-300x300x1mm): "
-                                                 "frequencies, independent shapes, registration status, FE "
-                                                 "sensitivities and readiness. No fit and no material value.")
+        page, layout = self._page("Plate Study", "Research studies of single CFRP plates: A. the current study of "
+                                                 "PLATE-300x300x1mm; B. the workbench of a new single plate of any "
+                                                 "size. No material value.")
         self.plate = PlateStudyPanel(ask_folder=self._ask_folder, family_root=self._plate_family_root)
-        layout.addWidget(self.plate)
+        self.workbench = GenericPlatePanel()  # PRIORITY-8: B. New Single Plate — Research Workbench
+        self.plate_tabs = QTabWidget()
+        self.plate_tabs.setObjectName("plateTabs")
+        self.plate_tabs.setDocumentMode(True)
+        self.plate_tabs.addTab(self.plate, "A. Current PLATE Study")
+        self.plate_tabs.addTab(self.workbench, "B. New Single Plate")  # short: both tabs fit at 900 × 680
+        self.plate_tabs.setTabToolTip(1, GENERIC_TITLE)
+        self.plate_tabs.currentChanged.connect(lambda index: self.workbench.activate() if index == 1 else None)
+        layout.addWidget(self.plate_tabs)
         layout.addStretch(1)
         return page
 
@@ -570,7 +579,7 @@ class MainWindow(QMainWindow):
         """A read, a shape drawing, the frequency diagnostic or the registration check is still running."""
         return (self.reading() or any(panel.busy() for panel in self.shape_panels.values())
                 or self.diagnostic.busy() or self.registration.busy() or self.comparison.busy()
-                or self.plate.busy())
+                or self.plate.busy() or self.workbench.busy())
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
         """Process events until no read or drawing is running (tests and checks); returns whether all ended."""
@@ -590,6 +599,7 @@ class MainWindow(QMainWindow):
         self.registration.cancel()  # and the registration check
         self.comparison.cancel()  # and the verified comparison, its drawings included
         self.plate.cancel()  # and the plate study
+        self.workbench.cancel()  # and the single-plate workbench's drawings
         super().closeEvent(event)
 
     def _analysis_changed(self) -> None:
@@ -681,6 +691,7 @@ class MainWindow(QMainWindow):
         identities = {"fe": self._read_identity(FE), "experimental": self._read_identity(EXPERIMENTAL)}
         self.comparison.set_inputs(*inputs, identities)  # a change removes the comparison and its drawings
         self.plate.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
+        self.workbench.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
         self.research.set_workspace(identities["experimental"], identities["fe"],  # SHA-256 link only
                                     self._research_context(*inputs))
         self._registration_changed()

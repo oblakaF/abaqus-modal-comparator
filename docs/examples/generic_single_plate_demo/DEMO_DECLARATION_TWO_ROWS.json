@@ -1,0 +1,55 @@
+{
+ "schema": "amc/declared-observations/v1",
+ "kind": "SYNTHETIC",
+ "specimen": {
+  "physical_specimen_id": "DEMO-SPB-420x260"
+ },
+ "registration_decision": {
+  "status": "ADMISSIBLE_FOR_RESEARCH_COMPUTATION",
+  "provenance": "SYNTHETIC",
+  "reference": "SYNTHETIC-DECISION-DEMO-001 (declared for the demonstration only)",
+  "decided_by": "synthetic",
+  "date": "2026-11-01"
+ },
+ "parameters": [
+  "E_in_plane",
+  "G12"
+ ],
+ "start": {
+  "E_in_plane": 50000.0,
+  "G12": 4500.0
+ },
+ "bounds": {
+  "E_in_plane": [
+   25000.0,
+   100000.0
+  ],
+  "G12": [
+   2250.0,
+   9000.0
+  ]
+ },
+ "sigma_ln": {
+  "value": 0.003,
+  "provenance": "Σ_setup 0.3 % PROVISIONAL (synthetic scale)"
+ },
+ "holdout_declared": false,
+ "observations": [
+  {
+   "exp": 2,
+   "fe": [
+    8
+   ],
+   "role": "FIT",
+   "basis": "SYNTHETIC declared pair"
+  },
+  {
+   "exp": 8,
+   "fe": [
+    14
+   ],
+   "role": "FIT",
+   "basis": "SYNTHETIC declared pair"
+  }
+ ]
+}

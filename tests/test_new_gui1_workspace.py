@@ -344,7 +344,8 @@ class SeparationTests(unittest.TestCase):
         files = sorted(NEW_GUI.glob("*.py"))
         self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "archive_dialog.py",
                                                    "comparison_model.py", "comparison_panel.py",
-                                                   "diagnostic_model.py", "diagnostic_panel.py", "known_sources.py",
+                                                   "diagnostic_model.py", "diagnostic_panel.py",
+                                                   "generic_plate_panel.py", "known_sources.py",
                                                    "known_sources_dialog.py", "materials_model.py",
                                                    "materials_panel.py", "plate_study_model.py",
                                                    "plate_study_panel.py", "preview_model.py", "preview_panel.py",

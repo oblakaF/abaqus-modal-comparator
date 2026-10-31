@@ -1,0 +1,120 @@
+{
+ "schema": "amc/fe-sensitivity-table/v1",
+ "kind": "SYNTHETIC",
+ "fe_model": {
+  "name": "DEMO-SPB-FE v1 (S4R, free-free, synthetic)",
+  "manifest_sha256": "dad64d844f15c59ceaf4d5ce0f8f347ba938ee236c33ea3ccfeb41feb7cb7827"
+ },
+ "specimen": {
+  "physical_specimen_id": "DEMO-SPB-420x260",
+  "design_id": "DEMO-DESIGN-SPB"
+ },
+ "parameters": {
+  "E_in_plane": {
+   "baseline": 50000.0,
+   "unit": "MPa"
+  },
+  "G12": {
+   "baseline": 4500.0,
+   "unit": "MPa"
+  }
+ },
+ "method": "SYNTHETIC central ±5 % sensitivities (declared; no Abaqus solve)",
+ "provenance": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+ "solved_range_relative": [
+  0.95,
+  1.05
+ ],
+ "rows": [
+  {
+   "fe_mode": 7,
+   "f_baseline_hz": 34.2,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.08,
+    "G12": 0.42
+   }
+  },
+  {
+   "fe_mode": 8,
+   "f_baseline_hz": 52.6,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.45,
+    "G12": 0.05
+   }
+  },
+  {
+   "fe_mode": 9,
+   "f_baseline_hz": 71.1,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.31,
+    "G12": 0.19
+   }
+  },
+  {
+   "fe_mode": 10,
+   "f_baseline_hz": 88.4,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.43,
+    "G12": 0.07
+   }
+  },
+  {
+   "fe_mode": 11,
+   "f_baseline_hz": 96.8,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.14,
+    "G12": 0.36
+   }
+  },
+  {
+   "fe_mode": 12,
+   "f_baseline_hz": 121.3,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.39,
+    "G12": 0.11
+   }
+  },
+  {
+   "fe_mode": 13,
+   "f_baseline_hz": 139.7,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.26,
+    "G12": 0.24
+   }
+  },
+  {
+   "fe_mode": 14,
+   "f_baseline_hz": 162.2,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.45,
+    "G12": 0.05
+   }
+  },
+  {
+   "fe_mode": 15,
+   "f_baseline_hz": 186.5,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.22,
+    "G12": 0.28
+   }
+  },
+  {
+   "fe_mode": 16,
+   "f_baseline_hz": 192.1,
+   "tracked": true,
+   "s": {
+    "E_in_plane": 0.33,
+    "G12": 0.17
+   }
+  }
+ ]
+}

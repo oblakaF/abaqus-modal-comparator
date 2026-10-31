@@ -1,0 +1,385 @@
+{
+ "schema": "amc/generic-single-plate-study/v1",
+ "kind": "SYNTHETIC_DEMO",
+ "created": "2026-11-01T00:00:00Z",
+ "labels": [
+  "RESEARCH_ONLY",
+  "NOT_A_MATERIAL_PROPERTY",
+  "SYNTHETIC_DEMONSTRATION — NOT A PHYSICAL EXPERIMENT"
+ ],
+ "passport": {
+  "design_id": "DEMO-DESIGN-SPB",
+  "physical_specimen_id": "DEMO-SPB-420x260",
+  "test_run_id": "DEMO-RUN-001",
+  "measurement_date": "2026-11-01 (synthetic)",
+  "measurement_method": "synthetic declared values",
+  "length": {
+   "kind": "length",
+   "value": 420.0,
+   "unit": "mm",
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "method": "synthetic",
+   "uncertainty": 0.5,
+   "uncertainty_basis": "synthetic declared resolution",
+   "note": ""
+  },
+  "width": {
+   "kind": "length",
+   "value": 260.0,
+   "unit": "mm",
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "method": "synthetic",
+   "uncertainty": 0.5,
+   "uncertainty_basis": "synthetic declared resolution",
+   "note": ""
+  },
+  "mass": {
+   "kind": "mass",
+   "value": 372.4,
+   "unit": "g",
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "method": "synthetic",
+   "uncertainty": 0.05,
+   "uncertainty_basis": "synthetic declared resolution",
+   "note": ""
+  },
+  "density": {
+   "kind": "density",
+   "value": null,
+   "unit": "",
+   "provenance": "NOT_AVAILABLE",
+   "source": "",
+   "method": "",
+   "uncertainty": null,
+   "uncertainty_basis": "",
+   "note": ""
+  },
+  "thickness": [
+   {
+    "position": "top-left",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.18,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "position": "top-centre",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.21,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "position": "top-right",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.2,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "position": "middle-left",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.23,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "position": "middle-centre",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.19,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "position": "middle-right",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.22,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "position": "bottom-left",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.2,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "position": "bottom-centre",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.21,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "position": "bottom-right",
+    "method": "synthetic micrometer",
+    "thickness": {
+     "kind": "length",
+     "value": 2.17,
+     "unit": "mm",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   }
+  ],
+  "claims": {
+   "material_orientation": {
+    "value": "warp along the 420 mm edges 1/3",
+    "provenance": "SYNTHETIC",
+    "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)"
+   },
+   "layup": {
+    "value": "8 plies plain weave, synthetic",
+    "provenance": "SYNTHETIC",
+    "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)"
+   },
+   "suspension": {
+    "value": "free-free on two soft elastic cords",
+    "provenance": "SYNTHETIC",
+    "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)"
+   },
+   "measured_face": {
+    "value": "marked",
+    "provenance": "SYNTHETIC",
+    "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)"
+   },
+   "instrument_axes": {
+    "value": "scan +u towards edge 2, +v towards edge 1",
+    "provenance": "SYNTHETIC",
+    "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)"
+   },
+   "measured_dofs": {
+    "value": "Z",
+    "provenance": "SYNTHETIC",
+    "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)"
+   },
+   "fe_model_version": {
+    "value": "DEMO-SPB-FE v1 (S4R, free-free, synthetic)",
+    "provenance": "SYNTHETIC",
+    "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)"
+   },
+   "excitation": {
+    "value": "synthetic",
+    "provenance": "SYNTHETIC",
+    "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)"
+   }
+  },
+  "constants": [
+   {
+    "name": "nu12",
+    "role": "FIXED",
+    "quantity": {
+     "kind": "ratio",
+     "value": 0.05,
+     "unit": "1",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "name": "E_in_plane",
+    "role": "INITIAL",
+    "quantity": {
+     "kind": "modulus",
+     "value": 50000.0,
+     "unit": "MPa",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   },
+   {
+    "name": "G12",
+    "role": "INITIAL",
+    "quantity": {
+     "kind": "modulus",
+     "value": 4500.0,
+     "unit": "MPa",
+     "provenance": "SYNTHETIC",
+     "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+     "method": "synthetic",
+     "uncertainty": null,
+     "uncertainty_basis": "",
+     "note": ""
+    }
+   }
+  ]
+ },
+ "sources": {
+  "fe": {
+   "role": "fe",
+   "path": "SYNTHETIC: no FE package (DEMO-SPB-FE v1 (S4R, free-free, synthetic))",
+   "sha256": "dad64d844f15c59ceaf4d5ce0f8f347ba938ee236c33ea3ccfeb41feb7cb7827",
+   "size": null
+  }
+ },
+ "modal_set": null,
+ "evidence": [
+  {
+   "key": "scanned_face",
+   "value": "marked",
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "grid_plus_u_edge",
+   "value": 2,
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "grid_plus_v_edge",
+   "value": 1,
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "scan_window_offsets_mm",
+   "value": {
+    "-u": 10.0,
+    "+u": 10.0,
+    "-v": 10.0,
+    "+v": 10.0
+   },
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "scan_scale",
+   "value": {
+    "mm_per_unit": 1000.0
+   },
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "scan_metric_geometry",
+   "value": true,
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "measured_dof",
+   "value": "Z",
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "fe_x_along_edges",
+   "value": "1/3",
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "fe_origin_corner",
+   "value": [
+    3,
+    4
+   ],
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  },
+  {
+   "key": "fe_normal_face",
+   "value": "marked",
+   "provenance": "SYNTHETIC",
+   "source": "PRIORITY-8 synthetic demonstration (research/generic_single_plate_demo/make_demo.py)",
+   "derived_from": []
+  }
+ ],
+ "history": [
+  [
+   "2026-11-01T00:00:00Z",
+   "created",
+   "SYNTHETIC_DEMO by make_demo.py"
+  ]
+ ]
+}
