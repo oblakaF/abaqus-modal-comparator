@@ -188,9 +188,21 @@ Page and window (Qt offscreen):
 **Also run.** `test_priority6_sp10_fe_shapes` (8), `test_priority5_research_results` (14), `test_windows_portable_rc1`
 (4) and `test_new_gui1_qt` all pass.
 
-**Full suite.** The first full run found two failures in `test_new_gui1_qt`: the new card had archived text
-("SP-10", "PHYSICAL…") in hidden labels at start-up. The card's texts are now set on the page's first show, and a
-regression test was added. See §6 for the GUI run and `WINDOWS_PORTABLE_RC2.md` for the final numbers.
+**Full suite, first run.** It found two failures in `test_new_gui1_qt`. The new card had archived text ("SP-10",
+"PHYSICAL…") in hidden labels at start-up, and the page subtitle named SP-10. The card's texts are now set on the
+page's first show, and the subtitle names no specimen. A regression test was added.
+
+**Full suite, rerun on the final code.** 3174 tests, OK, 98 skipped:
+
+- about 94 need data stores that are not configured;
+- 2 need the Abaqus integration;
+- 1 needs `NEW_GUI6_REAL_INPUTS`;
+- 1 needs the offscreen font database.
+
+**CI:**
+
+- `377c9e8`: run 41191708764, success;
+- `192de01` (RC2 packaging fix): run 41191851188, success.
 
 ## 6. Windows GUI smoke before packaging (RUN_NEW_GUI.cmd)
 
