@@ -251,7 +251,8 @@ Every value is labelled **SYNTHETIC_DEMONSTRATION — NOT A PHYSICAL EXPERIMENT*
     - the demo through the panel without any process started;
     - a physical study without inputs;
     - the link following the Workspace;
-    - no widening of the page.
+    - the layout choices that keep the page narrow (font-independent: two columns of step buttons, no buttons side
+      by side). The real width is checked by the Windows smoke.
 
 `tests/test_windows_portable_rc3.py` has 5 tests.
 
@@ -264,7 +265,37 @@ The full results are in `WINDOWS_PORTABLE_RC3.md`.
 
 ## 7. Windows GUI smoke (RUN_NEW_GUI.cmd)
 
-See `WINDOWS_PORTABLE_RC3.md` §Acceptance for the final numbers of both runs (`RUN_NEW_GUI.cmd` and the portable EXE).
+`RUN_NEW_GUI.cmd` on the final code and the portable EXE ran the same route. The table is in
+`WINDOWS_PORTABLE_RC3.md` §Acceptance.
+
+**Real moved copies.** The PLATE files were used as a new physical study:
+
+- statements and values without provenance are refused;
+- the passport is applied;
+- both SHA-256 match;
+- EXP1–EXP11 and FE7… are shown, with **Pairs: none**;
+- the evidence is NOT_VERIFIED and the readiness NOT_READY;
+- the offline study is disabled, with the reasons;
+- the report is exported, and the study is saved and reopened;
+- after a file change: CHANGED, and the diagnostics are refused.
+
+**The synthetic demo:** CONVERGED at 51 975 / 4 305 MPa, labelled.
+
+**Also checked:**
+
+- a cancelled read of the 3.1 GB package;
+- SP-02 VERIFIED_COMPARISON and its export;
+- Plate Study A;
+- PLATE, S0 / H1 / H2, SP-13 and SP-10;
+- 900 × 680 and 1366 × 768;
+- no Abaqus process.
+
+**Corrections found by these runs:**
+
+- step tabs are replaced by two columns of step buttons, so no tab hides behind scroll arrows;
+- the "&" in step titles is shown, not used as a mnemonic;
+- the claim provenance lists are named for UI Automation;
+- the tab label "B. New Single Plate" is short, with the full title as its tooltip and in the section.
 
 ## 8. Limits
 
