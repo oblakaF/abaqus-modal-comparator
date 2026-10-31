@@ -1,0 +1,1817 @@
+{
+  "schema": "amc/plate-physical-readiness/v1",
+  "created": "2026-10-31T17:13:48+00:00",
+  "labels": [
+    "RESEARCH_ONLY",
+    "NOT_A_MATERIAL_PROPERTY",
+    "NO_REGISTRATION_CREATED",
+    "NO_MAC_COMPUTED"
+  ],
+  "identity": {
+    "profile": "M11-261027",
+    "specimen": "PLATE-300x300x1mm",
+    "series": "NEXP29/PLATE300-1MM/S261027-ROTATED",
+    "modal_set": "Polymax_bravo",
+    "fe_model": "Abaqus M11 S4R_0875_BASELINE",
+    "experimental_sha256": "76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+    "fe_manifest_sha256": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+    "inp_sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+    "kind": "PHYSICAL"
+  },
+  "fingerprint": "2029ab4eb8138b27c84f434ec171a3c7fb645f6f9fda212672455d93d142f786",
+  "states": {
+    "sources": "SOURCES_VERIFIED",
+    "registration": "PHYSICAL_REGISTRATION_NOT_VERIFIED",
+    "mode_pairs": "MODE_PAIRS_NOT_CONFIRMED",
+    "identification": "NOT_READY_FOR_IDENTIFICATION",
+    "review_package": "READY_FOR_OWNER_REVIEW"
+  },
+  "state_notes": [
+    "READY_FOR_OWNER_REVIEW means that the package for an owner decision is complete; it is not a scientific acceptance, a registration or a permission to identify",
+    "No registration, mode pair, MAC, FIT / HOLDOUT set, fit or material value is created by this review."
+  ],
+  "scientific_status": "M8 GATE NOT_MET · D-077 NO_GLOBAL_PARAMETER_VALUE · production Auto-ID BLOCKED · no material value is released here",
+  "sources": {
+    "audit": [
+      {
+        "role": "experimental UNV",
+        "path": "D:\\git\\abaqus-modal-comparator-work\\research\\INTEGRATION_RC1_REVIEW\\moved inputs\\EXP delivery copy\\SPname_files_ROTATED_261028\\300by300_plate_only_1mm_ROTATED_Polytec_261027.unv",
+        "sha256": "76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+        "size": 421096,
+        "origin": "Workspace (Inspect file)",
+        "supports": "the measured modal records and the scan geometry (instrument record)",
+        "expected_sha256": "76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "role": "FE manifest.json",
+        "path": "D:\\git\\abaqus-modal-comparator-work\\research\\INTEGRATION_RC1_REVIEW\\moved inputs\\FE package copy\\manifest.json",
+        "sha256": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+        "size": 27786,
+        "origin": "Workspace (Inspect file)",
+        "supports": "the FE modes and geometry of M11",
+        "expected_sha256": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "role": "FE input (INP)",
+        "path": "D:\\git\\abaqus-modal-comparator-work\\research\\INTEGRATION_RC1_REVIEW\\moved inputs\\FE archive copy\\external_models\\v3_20261021\\Plate\\temp_root\\CFRP_S4R_0875_FreeFree.inp",
+        "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+        "size": 871611,
+        "origin": "chosen by the user (hashed only, never run)",
+        "supports": "the FE model's input (geometry, material, no physical landmark)",
+        "expected_sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "role": "PSV project (.svd)",
+        "path": null,
+        "sha256": null,
+        "size": null,
+        "origin": "—",
+        "supports": "the camera frame and the physical scan geometry of 261027 (300by300_plate_only_1mm_ROTATED_261027.svd)",
+        "expected_sha256": null,
+        "state": "NOT_AVAILABLE (not delivered; not needed to view the existing diagnostics)"
+      }
+    ],
+    "state": "SOURCES_VERIFIED",
+    "archive": "the PRIORITY-1–4 archive, each file read with its recorded SHA-256",
+    "archive_files": [
+      {
+        "file": "docs/research/plate_s4_central/SOLVER_RUNS.csv",
+        "sha256": "9449807bb3ac6859ed5c8467c03b4d2257aa4f6bec549d49a88426120e93eb1a",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/plate_s4_central/BRANCH_TRACKING.csv",
+        "sha256": "c021b311ed0271a57208fbc629c569c45eded06990f5d1b60552770d02e4dd92",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/plate_s4_central/RESULTS.md",
+        "sha256": "22a6fa5e5f9a2819e39f4897340f325b0304fb080394ef88820cf887e10630cf",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/real_modal_matching_202610/PLATE_FE_SENSITIVITY.csv",
+        "sha256": "4538ea35948455aaf2ccc45c83677d05ebef7943fe38ffd92cce98824e10f628",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/real_modal_matching_202610/RESULTS.md",
+        "sha256": "730bf2ff1cfbb66b84183743216988d86d1e46586d926f064f3f3d4a69a59501",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/plate_inverse_fe_r1/REAL_FE_SOLVER_RUNS.csv",
+        "sha256": "22ffe74ceebde9db3f778c5b0148854cbd7d7fed3a92df331d286f405a7f02d4",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/plate_inverse_fe_r1/RESULTS.md",
+        "sha256": "de254ab8ea56838a5de1f4ecc97b5a263ea612dbeb9030f37d7380ec6cef8c38",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/plate_inverse_r1/PLATE_INVERSE_RESULTS.md",
+        "sha256": "b8da5189a82c23f1a96e8a94eb1d74d661ea75db92b615e0e765f96ddcf6418c",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/plate_only/PLATE_WORKBENCH_RC1.md",
+        "sha256": "ca1c8bb4065270555f08fc97b06713bf9d8064bb685ac34633806a2d322f76ca",
+        "state": "VERIFIED_SHA256"
+      },
+      {
+        "file": "docs/research/real_modal_matching_202610/PLATE_MODAL_MATCHING.csv",
+        "sha256": "c9b1ea6e3c77d41b1ed91cb23ad45167e92253fdab20350036e66cd2c04f906e",
+        "state": "read by research_results_reader with this SHA-256"
+      },
+      {
+        "file": "docs/research/real_modal_matching_202610/SP13_MODAL_MATCHING.csv",
+        "sha256": "b82dc6314df77b2dd18cf4ded8a162dbce310f0aec93b78b92ab10829ca50919",
+        "state": "read by research_results_reader with this SHA-256"
+      },
+      {
+        "file": "docs/research/real_modal_matching_202610/SP10_MODAL_MATCHING.csv",
+        "sha256": "037c95a37ae6acac2e4451ad05056524cd2e6f0428011d65ba63364fc35690cc",
+        "state": "read by research_results_reader with this SHA-256"
+      },
+      {
+        "file": "docs/research/plate_s4_central/CENTRAL_SENSITIVITIES.csv",
+        "sha256": "5cba4070ee7beb1e55b0ef61e95d33c115acc68e0be90a6c43d960d5687c7c4e",
+        "state": "read by research_results_reader with this SHA-256"
+      },
+      {
+        "file": "docs/research/plate_inverse_r1/PLATE_INVERSE_SCENARIOS.csv",
+        "sha256": "8848bb9c0bd0eaee516d5bb196a8cf08d30b7bd6eb97328cafb9144fe6a01a4f",
+        "state": "read by research_results_reader with this SHA-256"
+      },
+      {
+        "file": "docs/research/plate_inverse_fe_r1/REAL_FE_VS_LM.csv",
+        "sha256": "c1982d8178edc96ae65597f17fb2455bbcb38af5df30dd4a493ae41001a260fa",
+        "state": "read by research_results_reader with this SHA-256"
+      },
+      {
+        "file": "docs/research/plate_inverse_fe_r1/REAL_FE_VS_EXPERIMENT.csv",
+        "sha256": "b75a85aa39f17b2105d5b045655754c16d50be45c79d5dae4e1d241faab18769",
+        "state": "read by research_results_reader with this SHA-256"
+      },
+      {
+        "file": "docs/research/plate_inverse_fe_r1/REAL_FE_BRANCH_TRACKING.csv",
+        "sha256": "ef9c268db936b8e5f4b313c0f9c4460060394451085ebf3fbd452fb1e3c85559",
+        "state": "read by research_results_reader with this SHA-256"
+      }
+    ]
+  },
+  "evidence": {
+    "registration": "PHYSICAL_REGISTRATION_NOT_VERIFIED",
+    "rows": [
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "the measured face (absolute)",
+        "fact": "scanned_face",
+        "value": "unmarked (the 261016 face)",
+        "provenance": "DERIVED",
+        "source": "the owner's same face carries the 261016 candidate over; it does not establish which face",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "same_face_as_261016, scanned_face_261016",
+        "status": "OPEN",
+        "blocking_reason": "DERIVED: not independent evidence (the face of the plate towards the scanner (marked or unmarked)); rests on scanned_face_261016 (CANDIDATE)"
+      },
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "+u of the scan grid against edges 1–4",
+        "fact": "grid_plus_u_edge",
+        "value": "1",
+        "provenance": "DERIVED",
+        "source": "the 261016 grid +u pointed up to edge 1; id k ↔ id k keeps it on the plate",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "point_map_261016_261027, scan_axes_261016, top_edge_261016",
+        "status": "ESTABLISHED",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "+v of the scan grid against edges 1–4",
+        "fact": "grid_plus_v_edge",
+        "value": "2",
+        "provenance": "DERIVED",
+        "source": "the 261016 grid +v pointed to the scanner's left: edge 2 if the unmarked face was scanned, edge 4 if the marked one",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "point_map_261016_261027, scan_axes_261016, scanned_face",
+        "status": "OPEN",
+        "blocking_reason": "DERIVED: not independent evidence (the physical edge (1–4) the scan grid's +v axis points to); rests on scanned_face_261016 (CANDIDATE)"
+      },
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "the turn and its physical reference",
+        "fact": "rotation_reference",
+        "value": "the 261016 position, turned 45° clockwise as viewed from the Polytec",
+        "provenance": "DERIVED",
+        "source": "the owner (45° from the 261016 position) and the id-preserving grid turn (clockwise); the laboratory note agrees",
+        "source_sha256": "Read me.txt (laboratory note of the ROTATED delivery): 4c03624a7591f71bb59189c2bb96a146d6eddcf89904ed5ae58781762047723e; 300by300_plate_only_1mm_261016.unv: 6d66eafe6558e22614b8068046a1c0454c1c96e3e713a3fad6e3ab72781d48e6; 300by300_plate_only_1mm_ROTATED_Polytec_261027.unv: 76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+        "dependencies": "turn_from_261016, point_map_261016_261027",
+        "status": "ESTABLISHED",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "the metric geometry of the measured points",
+        "fact": "scan_metric_geometry",
+        "value": "the 261016 physical positions of the same points",
+        "provenance": "DERIVED",
+        "source": "the 261027 UNV grid (277.7 × 277.0) is a representation, not a physical calibration (M11 §15.4)",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "point_map_261016_261027, metric_reconstruction_261016",
+        "status": "OPEN",
+        "blocking_reason": "DERIVED: not independent evidence (the scan coordinates are physical positions on the plate (the instrument's scanner angles and distance, or a camera frame), not only a grid representation); rests on metric_reconstruction_261016 (CANDIDATE)"
+      },
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "the position of the scan window on the plate",
+        "fact": "scan_window_offsets_mm",
+        "value": "-u 7.02, +u 7.78, -v 29.19, +v 56.4",
+        "provenance": "DERIVED",
+        "source": "the 261016 offsets, carried over by the same points",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "point_map_261016_261027, window_offsets_261016",
+        "status": "OPEN",
+        "blocking_reason": "DERIVED: not independent evidence (the distances from the scan window to the physical edges (−u, +u, −v, +v)); rests on window_offsets_261016 (CANDIDATE)"
+      },
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "the scale",
+        "fact": "scan_scale",
+        "value": "mm_per_unit 1000.0, units m (dataset 164 METRIC_ABS_(SI)), distance_m 1.15",
+        "provenance": "INSTRUMENT_RECORD",
+        "source": "300by300_plate_only_1mm_ROTATED_261027.unv (PSV export of the .svd; dataset 151 / 164 / 2411 / 58); the 1.15 m distance was measured by the lab (Read me.txt). Units and distance only: see scan_metric_geometry",
+        "source_sha256": "300by300_plate_only_1mm_ROTATED_261027.unv (PSV export): d3bc99e9d0fd8261fd878b83fc8eec8b27206cec23eeea240d2a3cd7712b9878; Read me.txt (laboratory note of the ROTATED delivery): 4c03624a7591f71bb59189c2bb96a146d6eddcf89904ed5ae58781762047723e",
+        "dependencies": "—",
+        "status": "ESTABLISHED",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "the measured DOF",
+        "fact": "measured_dof",
+        "value": "+Z of the scan frame (response direction 3 in all 867 dataset-58 records); the points lie at z = −1.15 m, so +Z points from the plate towards the scanner",
+        "provenance": "INSTRUMENT_RECORD",
+        "source": "300by300_plate_only_1mm_ROTATED_261027.unv (PSV export of the .svd; dataset 151 / 164 / 2411 / 58)",
+        "source_sha256": "300by300_plate_only_1mm_ROTATED_261027.unv (PSV export): d3bc99e9d0fd8261fd878b83fc8eec8b27206cec23eeea240d2a3cd7712b9878",
+        "dependencies": "—",
+        "status": "ESTABLISHED",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "B. physical plate → FE model",
+        "topic": "the physical direction of FE X",
+        "fact": "fe_x_along_edges",
+        "value": "1/3",
+        "provenance": "HUMAN_CONFIRMED",
+        "source": "M11 §13.1: FE X = the 301 mm dimension",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "ESTABLISHED",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "B. physical plate → FE model",
+        "topic": "the physical corner at FE (0, 0)",
+        "fact": "fe_origin_corner",
+        "value": "—",
+        "provenance": "CANDIDATE",
+        "source": "M11 §14.2 / §15.2: candidates A–D; the FE model has no physical landmark, so no record can fix it (PHYSICAL_FE_ORIENTATION = NOT_DETERMINED)",
+        "source_sha256": "CFRP_S4R_0875_FreeFree.inp: 962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+        "dependencies": "—",
+        "status": "OPEN",
+        "blocking_reason": "CANDIDATE: not independent evidence (the physical corner at FE (0, 0))"
+      },
+      {
+        "chain": "B. physical plate → FE model",
+        "topic": "the face the shell normal (+Z) leaves",
+        "fact": "fe_normal_face",
+        "value": "—",
+        "provenance": "CANDIDATE",
+        "source": "M11 §15.2: follows from the origin corner; not determined",
+        "source_sha256": "CFRP_S4R_0875_FreeFree.inp: 962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+        "dependencies": "—",
+        "status": "OPEN",
+        "blocking_reason": "CANDIDATE: not independent evidence (the physical face the S4R normal (+Z) leaves)"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "same_points_as_261016",
+        "value": "the same physical measured points",
+        "provenance": "HUMAN_CONFIRMED",
+        "source": "owner, 2026-10-30 (PLATE-WORKBENCH-RC1 final correction)",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "SUPPORTING — independent",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "same_face_as_261016",
+        "value": "the same measured face (relative: which face is not stated)",
+        "provenance": "HUMAN_CONFIRMED",
+        "source": "owner, 2026-10-30 (PLATE-WORKBENCH-RC1 final correction)",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "SUPPORTING — independent",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "turn_from_261016",
+        "value": "turned 45° from the 261016 position",
+        "provenance": "HUMAN_CONFIRMED",
+        "source": "owner, 2026-10-30 (PLATE-WORKBENCH-RC1 final correction)",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "SUPPORTING — independent",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "scan_geometry_261016",
+        "value": "289 points, 17 × 17 grid, ids 1–289",
+        "provenance": "INSTRUMENT_RECORD",
+        "source": "300by300_plate_only_1mm_261016.unv (6d66eafe6558…)",
+        "source_sha256": "300by300_plate_only_1mm_261016.unv: 6d66eafe6558e22614b8068046a1c0454c1c96e3e713a3fad6e3ab72781d48e6",
+        "dependencies": "—",
+        "status": "SUPPORTING — independent",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "scan_geometry_261027",
+        "value": "289 points, 17 × 17 grid, ids 1–289",
+        "provenance": "INSTRUMENT_RECORD",
+        "source": "300by300_plate_only_1mm_ROTATED_Polytec_261027.unv (76db80aed1b4…)",
+        "source_sha256": "300by300_plate_only_1mm_ROTATED_Polytec_261027.unv: 76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+        "dependencies": "—",
+        "status": "SUPPORTING — independent",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "point_map_261016_261027",
+        "value": "id k ↔ id k (289 of 289 ids preserved by the grid identity); grid turn -44.17°, clockwise as viewed from the scanner (+Z towards it)",
+        "provenance": "DERIVED",
+        "source": "series_link of the two scan geometries: POINT_TO_POINT_MAPPING_DERIVED (not instrument-verified: the 261027 .svd is not delivered); the laboratory note's 45° clockwise agrees",
+        "source_sha256": "300by300_plate_only_1mm_261016.unv: 6d66eafe6558e22614b8068046a1c0454c1c96e3e713a3fad6e3ab72781d48e6; 300by300_plate_only_1mm_ROTATED_Polytec_261027.unv: 76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+        "dependencies": "same_points_as_261016, scan_geometry_261016, scan_geometry_261027",
+        "status": "SUPPORTING — DERIVED from independent facts",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "scan_axes_261016",
+        "value": "scan +y up and +x right in the camera frame; the grid +u is +y (0.58° tilt)",
+        "provenance": "INSTRUMENT_RECORD",
+        "source": "261016 .svd video alignment (M11 §14.2, §14.4, §15.3)",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "SUPPORTING — independent",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "top_edge_261016",
+        "value": "1",
+        "provenance": "HUMAN_CONFIRMED",
+        "source": "M11 §13.1: edge 1 at the top in the 261016 test (owner's sketch)",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "SUPPORTING — independent",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "scanned_face_261016",
+        "value": "unmarked",
+        "provenance": "CANDIDATE",
+        "source": "M11 §13.2 / §15.3: supported by the PSV frame (the shaker is behind the plate, mirrored), SCANNER_FACE = HUMAN_CONFIRMATION_PENDING",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "SUPPORTING — CANDIDATE: not evidence by itself",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "window_offsets_261016",
+        "value": "-u 7.02, +u 7.78, -v 29.19, +v 56.4",
+        "provenance": "CANDIDATE",
+        "source": "M11 §14.2 / §15.4: the 261016 diagnostic reconstruction W301xH300 (SCAN_WINDOW_CALIBRATION = DIAGNOSTIC_ONLY: deviation 1 confirmed by the scanner angles, deviations 2 and 3 only supported)",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "SUPPORTING — CANDIDATE: not evidence by itself",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "supporting (relative facts and the 261016 reference)",
+        "topic": "relative or reference fact",
+        "fact": "metric_reconstruction_261016",
+        "value": "scanner angles and camera frame: window ≈ 215.4 × 285.2 mm",
+        "provenance": "CANDIDATE",
+        "source": "M11 §14.3 / §15.4 (DIAGNOSTIC_ONLY)",
+        "source_sha256": "NOT_AVAILABLE (a statement or report reference; no file hash is recorded)",
+        "dependencies": "—",
+        "status": "SUPPORTING — CANDIDATE: not evidence by itself",
+        "blocking_reason": "—"
+      },
+      {
+        "chain": "A. scanner → physical plate",
+        "topic": "the UNV grid of 261027 (a representation)",
+        "fact": "unv_grid_261027",
+        "value": "277.7 × 277.0 mm at z -1.15 m",
+        "provenance": "INSTRUMENT_RECORD",
+        "source": "300by300_plate_only_1mm_ROTATED_Polytec_261027.unv",
+        "source_sha256": "300by300_plate_only_1mm_ROTATED_Polytec_261027.unv: 76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+        "dependencies": "—",
+        "status": "REPRESENTATION — NOT the physical window",
+        "blocking_reason": "the PSV UNV grid is a representation, not a physical calibration (M11 §15.4); it never closes scan_window_offsets_mm or scan_metric_geometry"
+      },
+      {
+        "chain": "B. physical plate → FE model",
+        "topic": "the existing FE model geometry",
+        "fact": "fe_model_geometry",
+        "value": "X 0–301, Y 0–300, Z 0 mm; S4R, 3 mm mesh; normal +Z; uniform h 0.875 mm",
+        "provenance": "ESTABLISHED_IN_THE_MODEL",
+        "source": "CFRP_S4R_0875_FreeFree.inp and the R6 extraction",
+        "source_sha256": "CFRP_S4R_0875_FreeFree.inp: 962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3; manifest.json: 354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+        "dependencies": "—",
+        "status": "MODEL RECORD — not physical evidence",
+        "blocking_reason": "the model has no physical landmark"
+      },
+      {
+        "chain": "B. physical plate → FE model",
+        "topic": "a measured geometric asymmetry that tells the orientations apart",
+        "fact": "fe_measured_asymmetry",
+        "value": "none in M11 (homogeneous, uniform thickness): candidates A–D are symmetry-equivalent; measured edge means 0.816–0.926 mm exist only in the specimen record",
+        "provenance": "NOT_AVAILABLE",
+        "source": "M11 §15.2; plate_study.SPECIMEN_RECORD",
+        "source_sha256": "NOT_AVAILABLE",
+        "dependencies": "—",
+        "status": "NOT_AVAILABLE",
+        "blocking_reason": "no FE variant carries a measured asymmetry; A–D are not chosen by MAC, frequency or shape"
+      }
+    ],
+    "open_facts": [
+      "scanned_face",
+      "grid_plus_v_edge",
+      "scan_metric_geometry",
+      "scan_window_offsets_mm",
+      "fe_origin_corner",
+      "fe_normal_face"
+    ],
+    "checks": [
+      {
+        "check": "FE plan against the specimen",
+        "state": "CONSISTENT",
+        "detail": "FE (301.0, 300.0) mm, specimen (301.0, 300.0) mm"
+      },
+      {
+        "check": "measured DOF",
+        "state": "CONSISTENT",
+        "detail": "out-of-plane Z only: compatible with the S4R mid-surface normal"
+      }
+    ],
+    "closing_evidence": [
+      {
+        "facts": "scanned_face, grid_plus_v_edge",
+        "evidence": "the 261016 SCANNER_FACE answer (M11 §15.3: did the laser see the face without marks? one yes / no); the owner's same face then carries it to 261027. This is the absolute face, not a second confirmation of the same face"
+      },
+      {
+        "facts": "scan_window_offsets_mm, scan_metric_geometry",
+        "evidence": "the 261016 scan calibration: the PSV screenshot of a copy of the 261016 .svd with the points on the video frame, or the SUPERVISOR's decision on deviations 2 and 3 (M11 §15.4); or the 261027 .svd itself"
+      },
+      {
+        "facts": "fe_origin_corner, fe_normal_face",
+        "evidence": "an FE model built with a measured asymmetry (for example the edge thicknesses) or a SUPERVISOR convention recorded as CONVENTION_ONLY (M11 §15.2); a convention never becomes a physical registration"
+      }
+    ],
+    "rules": [
+      "MEASURED, INSTRUMENT_RECORD and HUMAN_CONFIRMED are independent evidence; DERIVED only when everything it rests on is; CANDIDATE, CONVENTION_ONLY and NOT_VERIFIED never are",
+      "a relative fact (the same face, the same points) carries the reference series' evidence over and never raises it",
+      "the UNV grid is a representation, not the physical window; a diagnostic reconstruction is not a measured geometry; the candidates A–D are not physical facts"
+    ]
+  },
+  "test_conditions": [
+    {
+      "series": "both",
+      "item": "specimen",
+      "value": "the same physical plate (PLATE-300x300x1mm)",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": ""
+    },
+    {
+      "series": "both",
+      "item": "measured points",
+      "value": "the same physical points",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": "SAME_PHYSICAL_POINTS_HUMAN_CONFIRMED"
+    },
+    {
+      "series": "both",
+      "item": "measured face",
+      "value": "the same face of the plate (which face is not stated)",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": "SAME_MEASURED_FACE_HUMAN_CONFIRMED"
+    },
+    {
+      "series": "both",
+      "item": "setup change",
+      "value": "four rubber bands → two rubber bands, and the plate turned 45°",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": "HUMAN_CONFIRMED_SETUP_CHANGE"
+    },
+    {
+      "series": "both",
+      "item": "why the first frequency is lower",
+      "value": "the two-band suspension is freer than the four-band one (the owner's physical explanation; its numerical share is not determined)",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": "OWNER_EXPLANATION_OF_FREQUENCY_CHANGE"
+    },
+    {
+      "series": "261016",
+      "item": "role",
+      "value": "a separate historical measurement; 33.4491 Hz is never a fitting target",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": "HISTORY_ONLY"
+    },
+    {
+      "series": "261016",
+      "item": "suspension",
+      "value": "four rubber bands",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": ""
+    },
+    {
+      "series": "261016",
+      "item": "orientation",
+      "value": "the original position (before the 45° turn); the 301 mm edges horizontal",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30; M11 §13.1",
+      "status": ""
+    },
+    {
+      "series": "261016",
+      "item": "excitation",
+      "value": "shaker stinger near the bottom edge, left of centre seen from the shaker side (approximate)",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-21 (M11 §13.1, §13.3)",
+      "status": ""
+    },
+    {
+      "series": "261016",
+      "item": "first record",
+      "value": "33.4491 Hz (Polymax_bravo, 10 records)",
+      "provenance": "INSTRUMENT_RECORD",
+      "source": "300by300_plate_only_1mm_261016_POLYMAX.unv (M11 §9)",
+      "status": ""
+    },
+    {
+      "series": "261016",
+      "item": "scan distance",
+      "value": "the PSV default 1 m; the real distance was not measured",
+      "provenance": "LAB_RECORD",
+      "source": "Read me.txt (laboratory note of the ROTATED delivery), SHA-256 4c03624a7591…",
+      "status": ""
+    },
+    {
+      "series": "261027",
+      "item": "role",
+      "value": "the primary experiment for the free-free M11 FE model",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": "PRIMARY_EXPERIMENT_FOR_M11_RESEARCH"
+    },
+    {
+      "series": "261027",
+      "item": "suspension",
+      "value": "two rubber bands",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": ""
+    },
+    {
+      "series": "261027",
+      "item": "suspension detail",
+      "value": "rubber bands and strings attached to two upper points along the nodal line of the first mode; stiffness, lengths and exact points not recorded",
+      "provenance": "LAB_RECORD",
+      "source": "Read me.txt (laboratory note of the ROTATED delivery), SHA-256 4c03624a7591…",
+      "status": ""
+    },
+    {
+      "series": "261027",
+      "item": "orientation",
+      "value": "turned 45° from the 261016 position",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30",
+      "status": ""
+    },
+    {
+      "series": "261027",
+      "item": "direction of the turn",
+      "value": "clockwise as viewed from the Polytec system",
+      "provenance": "LAB_RECORD",
+      "source": "Read me.txt (laboratory note of the ROTATED delivery), SHA-256 4c03624a7591…",
+      "status": ""
+    },
+    {
+      "series": "261027",
+      "item": "turn of the scan grid",
+      "value": "−44.17°: clockwise as viewed from the Polytec; every point id kept (289 of 289)",
+      "provenance": "DERIVED",
+      "source": "series_link of the 261016 and 261027 UNV geometries (plate_registration_readiness)",
+      "status": ""
+    },
+    {
+      "series": "261027",
+      "item": "excitation",
+      "value": "a force reference channel (dataset 58 'Force * Velocity'); the sensor's point and mass are not recorded",
+      "provenance": "INSTRUMENT_RECORD",
+      "source": "SPname_files_ROTATED_261028\\300by300_plate_only_1mm_ROTATED_Polytec_261027.unv",
+      "status": ""
+    },
+    {
+      "series": "261027",
+      "item": "first record",
+      "value": "18.6307 Hz (Polymax_bravo, 11 records)",
+      "provenance": "INSTRUMENT_RECORD",
+      "source": "SPname_files_ROTATED_261028\\300by300_plate_only_1mm_ROTATED_Polytec_261027.unv",
+      "status": ""
+    },
+    {
+      "series": "261027",
+      "item": "scan distance",
+      "value": "1.15 m, measured (the PSV export places the points at z = −1.15 m)",
+      "provenance": "LAB_RECORD",
+      "source": "Read me.txt (laboratory note of the ROTATED delivery), SHA-256 4c03624a7591…",
+      "status": ""
+    }
+  ],
+  "not_established": [
+    "the separate numerical contributions of the suspension and of the 45° turn to the change of the frequencies",
+    "that record 1 of 261016 (33.4491 Hz) and record 1 of 261027 (18.6307 Hz) are the same elastic mode",
+    "a band stiffness from 33.4491 → 18.6307 Hz: the difference is not a quantitative measure of the suspension",
+    "a Σ_setup repeat: the configuration was changed on purpose (not a D-053 repeat)",
+    "that the 261016 experiment was wrong: it stays a valid measurement under its own conditions",
+    "the absolute face towards the Polytec: 'the same face' is a relative fact",
+    "any geometric registration: test conditions are never registration evidence"
+  ],
+  "applicability_facts": [
+    {
+      "key": "suspension_points",
+      "question": "the actual attachment points of the two suspensions",
+      "value": "two upper points along the nodal line of the first mode; the exact points are not recorded",
+      "provenance": "LAB_RECORD",
+      "source": "Read me.txt (laboratory note of the ROTATED delivery) (4c03624a7591…)",
+      "state": "NOT_RECORDED"
+    },
+    {
+      "key": "suspension_bands",
+      "question": "the length and known characteristics of the two rubber bands and strings",
+      "value": "two rubber bands (owner, 2026-10-30); stiffness and lengths not recorded",
+      "provenance": "HUMAN_CONFIRMED",
+      "source": "owner, 2026-10-30; the laboratory note",
+      "state": "NOT_RECORDED"
+    },
+    {
+      "key": "force_sensor",
+      "question": "the place, mass and attachment of the force sensor",
+      "value": "a force reference channel exists (dataset 58 'Force * Velocity'); the point, mass and attachment are not recorded",
+      "provenance": "INSTRUMENT_RECORD",
+      "source": "PSV export (d3bc99e9d0fd…)",
+      "state": "NOT_RECORDED"
+    },
+    {
+      "key": "thickness_map",
+      "question": "the real thickness of the plate, including a possible non-uniformity inside it",
+      "value": "20 perimeter readings 0.71–0.94 mm (2026-10-21); the interior is not measured; edge means differ by about 13 % (edge 2 against edge 4)",
+      "provenance": "MEASURED (perimeter only)",
+      "source": "M11 §8, §8.1 (plate_study.SPECIMEN_RECORD)",
+      "state": "NOT_MEASURED_INSIDE"
+    }
+  ],
+  "owner_evidence_request": {
+    "questions": [
+      {
+        "group": "A. The face of the plate",
+        "id": "A1",
+        "question": "Which absolute physical face of the plate faced the Polytec in the 261016 series: the face with the marking or the face without it?",
+        "closes": [
+          "scanned_face",
+          "grid_plus_v_edge"
+        ],
+        "acceptable_evidence": "one answer (marked / unmarked) with its source; the owner's same-face statement then carries it to 261027. 'The same face as in 261016' is relative and does not answer it",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      },
+      {
+        "group": "A. The face of the plate",
+        "id": "A2",
+        "question": "Which source document or confirmation establishes that face (for example a photograph of the mounted plate from the Polytec side with the marking visible, a laboratory record, the owner's own observation)?",
+        "closes": [
+          "scanned_face",
+          "grid_plus_v_edge"
+        ],
+        "acceptable_evidence": "the document is chosen in Source Audit; it is recorded by SHA-256 and its reading is confirmed by the owner",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      },
+      {
+        "group": "B. The physical scan geometry",
+        "id": "B1",
+        "question": "Which of these existing materials is available: (a) the original 300by300_plate_only_1mm_ROTATED_261027.svd; (b) a PSV screenshot of 261016 with the points on the video frame; (c) the original scanner angles and the camera frame / scale; (d) other independently measured coordinates of the points?",
+        "closes": [
+          "scan_window_offsets_mm",
+          "scan_metric_geometry"
+        ],
+        "acceptable_evidence": "any one of (a)–(d); if none is available, both facts stay NOT_VERIFIED (the 277.7 × 277.0 mm UNV grid and the diagnostic 261016 reconstruction are never the physical window)",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      },
+      {
+        "group": "C. The FE orientation",
+        "id": "C1",
+        "question": "Is there a measured physical landmark that ties FE (0, 0) to a specific corner of the plate?",
+        "closes": [
+          "fe_origin_corner",
+          "fe_normal_face"
+        ],
+        "acceptable_evidence": "a measured landmark recorded with its source",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      },
+      {
+        "group": "C. The FE orientation",
+        "id": "C2",
+        "question": "If there is none: should a geometrically founded FE variant with a measured asymmetry (for example the measured edge thicknesses) be prepared? Naming a corner by agreement alone stays CONVENTION_ONLY and is never physical evidence.",
+        "closes": [
+          "fe_origin_corner",
+          "fe_normal_face"
+        ],
+        "acceptable_evidence": "an owner decision to prepare such a variant (its FE runs need their own authorisation)",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      },
+      {
+        "group": "D. The applicability of the model",
+        "id": "D1",
+        "question": "Please state the actual attachment points of the two suspensions. Recorded now: two upper points along the nodal line of the first mode; the exact points are not recorded.",
+        "closes": [
+          "suspension_points"
+        ],
+        "acceptable_evidence": "a measurement or record with its source; never derived from a measured or FE frequency",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      },
+      {
+        "group": "D. The applicability of the model",
+        "id": "D2",
+        "question": "Please state the length and known characteristics of the two rubber bands and strings. Recorded now: two rubber bands (owner, 2026-10-30); stiffness and lengths not recorded.",
+        "closes": [
+          "suspension_bands"
+        ],
+        "acceptable_evidence": "a measurement or record with its source; never derived from a measured or FE frequency",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      },
+      {
+        "group": "D. The applicability of the model",
+        "id": "D3",
+        "question": "Please state the place, mass and attachment of the force sensor. Recorded now: a force reference channel exists (dataset 58 'Force * Velocity'); the point, mass and attachment are not recorded.",
+        "closes": [
+          "force_sensor"
+        ],
+        "acceptable_evidence": "a measurement or record with its source; never derived from a measured or FE frequency",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      },
+      {
+        "group": "D. The applicability of the model",
+        "id": "D4",
+        "question": "Please state the real thickness of the plate, including a possible non-uniformity inside it. Recorded now: 20 perimeter readings 0.71–0.94 mm (2026-10-21); the interior is not measured; edge means differ by about 13 % (edge 2 against edge 4).",
+        "closes": [
+          "thickness_map"
+        ],
+        "acceptable_evidence": "a measurement or record with its source; never derived from a measured or FE frequency",
+        "answer": null,
+        "answer_provenance": null,
+        "evidence_document": null,
+        "evidence_document_sha256": null
+      }
+    ],
+    "instructions": "Answer each question with its source; leave a question empty when nothing exists. No value is derived from a frequency."
+  },
+  "modal_evidence": {
+    "rows": [
+      {
+        "kind": "EXP",
+        "record": "EXP1",
+        "frequency_hz": 18.630678,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE7 19.0722 Hz",
+        "difference_percent": 2.37,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE7 0.905; next FE15 0.338 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: CANDIDATE_ONLY (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP2",
+        "frequency_hz": 54.619271,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE8 59.8742 Hz",
+        "difference_percent": 9.621,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE9 0.605; next FE8 0.566 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: AMBIGUOUS_CLUSTER (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP3",
+        "frequency_hz": 63.495024,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE9 62.0092 Hz",
+        "difference_percent": -2.34,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE20 0.309; next FE11 0.259 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: NO_MATCH (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP4",
+        "frequency_hz": 66.846668,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE9 62.0092 Hz",
+        "difference_percent": -7.237,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE11 0.551; next FE17 0.244 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: AMBIGUOUS_CLUSTER (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP5",
+        "frequency_hz": 74.214905,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE11 72.1900 Hz",
+        "difference_percent": -2.728,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE10 0.484; next FE15 0.137 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: NO_MATCH (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP6",
+        "frequency_hz": 112.26551,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE12 116.5804 Hz",
+        "difference_percent": 3.843,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE12 0.520; next FE17 0.203 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: NO_MATCH (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP7",
+        "frequency_hz": 145.935693,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE13 167.4903 Hz",
+        "difference_percent": 14.77,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE14 0.786; next FE18 0.310 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: AMBIGUOUS_CLUSTER (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP8",
+        "frequency_hz": 157.850827,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE13 167.4903 Hz",
+        "difference_percent": 6.107,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE16 0.427; next FE19 0.379 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: AMBIGUOUS_CLUSTER (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP9",
+        "frequency_hz": 169.184888,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE14 168.6080 Hz",
+        "difference_percent": -0.341,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE13 0.260; next FE20 0.185 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: NO_MATCH (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP10",
+        "frequency_hz": 180.136339,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE16 179.9016 Hz",
+        "difference_percent": -0.13,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE15 0.151; next FE16 0.131 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: NO_MATCH (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "EXP",
+        "record": "EXP11",
+        "frequency_hz": 191.601861,
+        "fitted_set": "Polymax_bravo — fitted modal records",
+        "nearest": "FE16 179.9016 Hz",
+        "difference_percent": -6.107,
+        "diagnostic": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+        "close_group": "—",
+        "research_mac": "FE18 0.542; next FE19 0.147 — RESEARCH_MAC_NOT_ADMISSIBLE",
+        "archived_research_status": "PRIORITY-1: AMBIGUOUS_CLUSTER (research; not a pair)",
+        "pair": "NONE — no admissible registration",
+        "history": "—"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE7",
+        "frequency_hz": 19.07217,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "—",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "—"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE8",
+        "frequency_hz": 59.874157,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "—",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: identity lost in M11_S4_E1_PLUS, M11_S4_E2_MINUS"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE9",
+        "frequency_hz": 62.009167,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "—",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: identity lost in M11_S4_E1_PLUS, M11_S4_E2_MINUS"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE10",
+        "frequency_hz": 71.849854,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "FE10/FE11",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: order exchanged: M11_S4_E1_PLUS → FE11; M11_S4_E2_MINUS → FE11"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE11",
+        "frequency_hz": 72.189987,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "FE10/FE11",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: order exchanged: M11_S4_E1_PLUS → FE10; M11_S4_E2_MINUS → FE10"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE12",
+        "frequency_hz": 116.580429,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "—",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "—"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE13",
+        "frequency_hz": 167.490265,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "FE13/FE14",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: order exchanged: M11_S4_E1_PLUS → FE14; M11_S4_E2_MINUS → FE14"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE14",
+        "frequency_hz": 168.607986,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "FE13/FE14",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: order exchanged: M11_S4_E1_PLUS → FE13; M11_S4_E2_MINUS → FE13"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE15",
+        "frequency_hz": 174.797699,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "FE15/FE16",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: tracked only as the confirmed cluster term FE15+FE16 (its members exchange when E1 ≠ E2)"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE16",
+        "frequency_hz": 179.901611,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "FE15/FE16",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: tracked only as the confirmed cluster term FE15+FE16 (its members exchange when E1 ≠ E2)"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE17",
+        "frequency_hz": 213.199478,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "FE17/FE18",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: order exchanged: M11_S4_E1_PLUS → FE18; M11_S4_E2_MINUS → FE18"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE18",
+        "frequency_hz": 213.952759,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "FE17/FE18",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: order exchanged: M11_S4_E1_PLUS → FE17; M11_S4_E2_MINUS → FE17"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE19",
+        "frequency_hz": 295.775513,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "—",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "—"
+      },
+      {
+        "kind": "FE elastic",
+        "record": "FE20",
+        "frequency_hz": 327.901031,
+        "fitted_set": "Abaqus M11 S4R_0875_BASELINE",
+        "nearest": "—",
+        "difference_percent": null,
+        "diagnostic": "FE frequency (no pair)",
+        "close_group": "—",
+        "research_mac": "—",
+        "archived_research_status": "—",
+        "pair": "NONE",
+        "history": "PRIORITY-2: identity lost in M11_S4_E1_PLUS, M11_S4_E2_MINUS"
+      }
+    ],
+    "experimental_records": 11,
+    "fe_elastic_modes": 14,
+    "fe_rigid_excluded": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "fitted_set": "Polymax_bravo — fitted modal records",
+    "experimental_close_groups": [],
+    "fe_close_groups": [
+      [
+        "FE10",
+        "FE11"
+      ],
+      [
+        "FE13",
+        "FE14"
+      ],
+      [
+        "FE15",
+        "FE16"
+      ],
+      [
+        "FE17",
+        "FE18"
+      ]
+    ],
+    "archived_clusters": [
+      {
+        "pair": "FE10 / FE11",
+        "status": "INDEPENDENT"
+      },
+      {
+        "pair": "FE13 / FE14",
+        "status": "INDEPENDENT"
+      },
+      {
+        "pair": "FE15 / FE16",
+        "status": "CONFIRMED cluster (one term, mean ln f)"
+      },
+      {
+        "pair": "FE17 / FE18",
+        "status": "INDEPENDENT"
+      }
+    ],
+    "registration": "NONE ACCEPTED — PHYSICAL_REGISTRATION_NOT_VERIFIED",
+    "mac": "NOT_COMPUTED",
+    "pairs": [],
+    "fit_holdout": "NOT_DECLARED",
+    "statements": [
+      "No mode pair: no physical registration is accepted, so no EXP↔FE MAC is computed and no pair is formed.",
+      "Frequency proximity never raises the status of a correspondence; the nearest FE frequency is diagnostic.",
+      "FIT / HOLDOUT: none declared — no confirmed set exists, and none is formed automatically.",
+      "Rigid-body FE modes are separated by the code's shape criterion: FE3, FE4, FE5, FE6.",
+      "FE modes in the data read: 18 (FE3–FE20); 14 elastic.",
+      "EXP1 = 18.6307 Hz and FE7 = 19.07217 Hz differ by +2.37 %: FREQUENCY_ONLY_DIAGNOSTIC — not a confirmed pair.",
+      "The PRIORITY-1 research MAC rests on the 261016 diagnostic reconstruction carried by the DERIVED point map: it is shown only as RESEARCH_MAC_NOT_ADMISSIBLE and enters no identification."
+    ]
+  },
+  "observability": {
+    "fe_only": [
+      {
+        "parameters": "E1 / E2 / G12",
+        "rank": 3,
+        "of": 3,
+        "condition": 1.83,
+        "terms": 10,
+        "basis": "PRIORITY-2 central ±5 % sensitivities of M11 (six real Abaqus solves; the tracked terms)",
+        "valid_for": "S4R_0875_BASELINE (free-free, h 0.875 mm) only",
+        "status": "FE_ONLY_MATHEMATICAL_OBSERVABILITY"
+      },
+      {
+        "parameters": "E (E1 = E2) / G12",
+        "rank": 2,
+        "of": 2,
+        "condition": 2.35,
+        "terms": 10,
+        "basis": "PRIORITY-2 central ±5 % sensitivities of M11 (six real Abaqus solves; the tracked terms)",
+        "valid_for": "S4R_0875_BASELINE (free-free, h 0.875 mm) only",
+        "status": "FE_ONLY_MATHEMATICAL_OBSERVABILITY"
+      }
+    ],
+    "fe_only_statement": "FE-only: the rank says which parameters the FE model distinguishes with the chosen modes. It does not say that the experiment determines them.",
+    "experimental": {
+      "status": "NOT_ASSESSED — NO_ADMISSIBLE_MODAL_OBSERVATIONS",
+      "reason": "no accepted physical registration and no admissible mode pair: no physical uncertainty of E or G12 is computed from an unconfirmed pair"
+    },
+    "hypotheses": [
+      {
+        "scenario": "S0",
+        "E1_MPa": 56000.0,
+        "E2_MPa": 56000.0,
+        "G12_MPa": 4763.4,
+        "assumed_pairs": "EXP1 ↔ FE7",
+        "status": "RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY",
+        "note": "an archived hypothesis (PRIORITY-3 / -4); never a material property, never a target, never chosen"
+      },
+      {
+        "scenario": "H1",
+        "E1_MPa": 43467.0,
+        "E2_MPa": 43467.0,
+        "G12_MPa": 4804.4,
+        "assumed_pairs": "EXP1 ↔ FE7; EXP8 ↔ FE15+FE16",
+        "status": "RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY",
+        "note": "an archived hypothesis (PRIORITY-3 / -4); never a material property, never a target, never chosen"
+      },
+      {
+        "scenario": "H2",
+        "E1_MPa": 41952.8,
+        "E2_MPa": 41952.8,
+        "G12_MPa": 4810.3,
+        "assumed_pairs": "EXP1 ↔ FE7; EXP7 ↔ FE14",
+        "status": "RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY",
+        "note": "an archived hypothesis (PRIORITY-3 / -4); never a material property, never a target, never chosen"
+      }
+    ]
+  },
+  "sensitivity_reuse": [
+    {
+      "existing_result": "PRIORITY-2 M11_S4_E1_MINUS (exit 0, completed True)",
+      "parameterisation": "E1 = 53200 MPa (one *Elastic field, ±5 % of the baseline)",
+      "fe_identity": "baseline INP 962f75f2fd5d… → INP 9206031e23f3…, ODB 38c6b0096a90…",
+      "branch_tracking": "14 of 14 branches tracked at FE-to-FE MAC ≥ 0.90",
+      "reuse_status": "REUSABLE — FE-only observability at the M11 free-free baseline",
+      "reason": "a central ±5 % derivative of this FE model; valid only for it (free-free, h 0.875 mm, 3 mm S4R): never carried to a model with the suspension, the force sensor or another thickness without new solves"
+    },
+    {
+      "existing_result": "PRIORITY-2 M11_S4_E1_PLUS (exit 0, completed True)",
+      "parameterisation": "E1 = 58800 MPa (one *Elastic field, ±5 % of the baseline)",
+      "fe_identity": "baseline INP 962f75f2fd5d… → INP b3a631909ac0…, ODB f70b02982cbc…",
+      "branch_tracking": "11 of 14 branches tracked at FE-to-FE MAC ≥ 0.90; lost: FE8, FE9, FE20; order exchanged: FE10→FE11, FE11→FE10, FE13→FE14, FE14→FE13, FE17→FE18, FE18→FE17",
+      "reuse_status": "REUSABLE — FE-only observability at the M11 free-free baseline",
+      "reason": "a central ±5 % derivative of this FE model; valid only for it (free-free, h 0.875 mm, 3 mm S4R): never carried to a model with the suspension, the force sensor or another thickness without new solves"
+    },
+    {
+      "existing_result": "PRIORITY-2 M11_S4_E2_MINUS (exit 0, completed True)",
+      "parameterisation": "E2 = 53200 MPa (one *Elastic field, ±5 % of the baseline)",
+      "fe_identity": "baseline INP 962f75f2fd5d… → INP 4200225bba4d…, ODB 5af4b61c7b90…",
+      "branch_tracking": "11 of 14 branches tracked at FE-to-FE MAC ≥ 0.90; lost: FE8, FE9, FE20; order exchanged: FE10→FE11, FE11→FE10, FE13→FE14, FE14→FE13, FE17→FE18, FE18→FE17",
+      "reuse_status": "REUSABLE — FE-only observability at the M11 free-free baseline",
+      "reason": "a central ±5 % derivative of this FE model; valid only for it (free-free, h 0.875 mm, 3 mm S4R): never carried to a model with the suspension, the force sensor or another thickness without new solves"
+    },
+    {
+      "existing_result": "PRIORITY-2 M11_S4_E2_PLUS (exit 0, completed True)",
+      "parameterisation": "E2 = 58800 MPa (one *Elastic field, ±5 % of the baseline)",
+      "fe_identity": "baseline INP 962f75f2fd5d… → INP 3cd0ed6aa60b…, ODB aa5c9b707ddc…",
+      "branch_tracking": "14 of 14 branches tracked at FE-to-FE MAC ≥ 0.90",
+      "reuse_status": "REUSABLE — FE-only observability at the M11 free-free baseline",
+      "reason": "a central ±5 % derivative of this FE model; valid only for it (free-free, h 0.875 mm, 3 mm S4R): never carried to a model with the suspension, the force sensor or another thickness without new solves"
+    },
+    {
+      "existing_result": "PRIORITY-2 M11_S4_G12_MINUS (exit 0, completed True)",
+      "parameterisation": "G12 = 4750 MPa (one *Elastic field, ±5 % of the baseline)",
+      "fe_identity": "baseline INP 962f75f2fd5d… → INP 909251e1990a…, ODB 8048f391b9f5…",
+      "branch_tracking": "14 of 14 branches tracked at FE-to-FE MAC ≥ 0.90",
+      "reuse_status": "REUSABLE — FE-only observability at the M11 free-free baseline",
+      "reason": "a central ±5 % derivative of this FE model; valid only for it (free-free, h 0.875 mm, 3 mm S4R): never carried to a model with the suspension, the force sensor or another thickness without new solves"
+    },
+    {
+      "existing_result": "PRIORITY-2 M11_S4_G12_PLUS (exit 0, completed True)",
+      "parameterisation": "G12 = 5250 MPa (one *Elastic field, ±5 % of the baseline)",
+      "fe_identity": "baseline INP 962f75f2fd5d… → INP 1ddbe7fa3849…, ODB ea3e59140035…",
+      "branch_tracking": "14 of 14 branches tracked at FE-to-FE MAC ≥ 0.90",
+      "reuse_status": "REUSABLE — FE-only observability at the M11 free-free baseline",
+      "reason": "a central ±5 % derivative of this FE model; valid only for it (free-free, h 0.875 mm, 3 mm S4R): never carried to a model with the suspension, the force sensor or another thickness without new solves"
+    },
+    {
+      "existing_result": "s_E (E1 = E2) = s_E1 + s_E2 (PRIORITY-2 table)",
+      "parameterisation": "E1 = E2 scaled together",
+      "fe_identity": "the same six solves (no joint E1 = E2 ±5 % solve exists)",
+      "branch_tracking": "the E1 and E2 jobs above",
+      "reuse_status": "CONDITIONAL — a superposition of separate perturbations, not an independently solved E1 = E2 perturbation",
+      "reason": "PRIORITY-4 real solves along E1 = E2 (H1, H2 at −22 / −25 %) agreed with the log-linear approximation to ≤ 0.32 %; that is not a ±5 % central check at the baseline, so a joint ±5 % pair (2 solves) is needed unless the owner accepts the superposition"
+    },
+    {
+      "existing_result": "PRIORITY-1 secant S4R_0875_G12_10000",
+      "parameterisation": "G12: G12 5 000 → 10 000",
+      "fe_identity": "INP 36dce25dc5fb…, manifest 280810115027…",
+      "branch_tracking": "FE-to-FE tracking of PRIORITY-1 (PLATE_FE_SENSITIVITY.csv)",
+      "reuse_status": "NOT_REUSABLE as a central derivative",
+      "reason": "a secant over ×2 / ×3: far outside the linear range of G12; it never replaces the S4 central ±5 % values"
+    },
+    {
+      "existing_result": "PRIORITY-1 secant S4R_0875_G12_15000",
+      "parameterisation": "G12: G12 5 000 → 15 000",
+      "fe_identity": "INP b5a504771a1c…, manifest f2b88494a626…",
+      "branch_tracking": "FE-to-FE tracking of PRIORITY-1 (PLATE_FE_SENSITIVITY.csv)",
+      "reuse_status": "NOT_REUSABLE as a central derivative",
+      "reason": "a secant over ×2 / ×3: far outside the linear range of G12; it never replaces the S4 central ±5 % values"
+    },
+    {
+      "existing_result": "PRIORITY-1 secant S4R_0875_E1_50400",
+      "parameterisation": "E1: E1 56 000 → 50 400",
+      "fe_identity": "INP fd220f14755f…, manifest 91c523bddb2d…",
+      "branch_tracking": "FE-to-FE tracking of PRIORITY-1 (PLATE_FE_SENSITIVITY.csv)",
+      "reuse_status": "NOT_REUSABLE as a central derivative",
+      "reason": "a secant over −10 %: not a central derivative at the baseline; it never replaces the S4 central ±5 % values"
+    },
+    {
+      "existing_result": "PRIORITY-1 secant S4R_0875_E2_50400",
+      "parameterisation": "E2: E2 56 000 → 50 400",
+      "fe_identity": "INP 5c08084b51c8…, manifest 688c0b1e78c5…",
+      "branch_tracking": "FE-to-FE tracking of PRIORITY-1 (PLATE_FE_SENSITIVITY.csv)",
+      "reuse_status": "NOT_REUSABLE as a central derivative",
+      "reason": "a secant over −10 %: not a central derivative at the baseline; it never replaces the S4 central ±5 % values"
+    },
+    {
+      "existing_result": "PRIORITY-4 real solve S0",
+      "parameterisation": "G12 = 4763.4 MPa",
+      "fe_identity": "INP 02234fe6b594…, ODB 2737f5fffe0f…",
+      "branch_tracking": "14 of 14 branches tracked at FE-to-FE MAC ≥ 0.90 (PRIORITY-4)",
+      "reuse_status": "VERIFICATION_RECORD_ONLY — not a sensitivity",
+      "reason": "a check of the approximation at a hypothetical point (RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY); not a derivative at the baseline"
+    },
+    {
+      "existing_result": "PRIORITY-4 real solve H1",
+      "parameterisation": "E1; E2; G12 = 43467; 43467; 4804.4 MPa",
+      "fe_identity": "INP 512dec840310…, ODB ee8a250fa62a…",
+      "branch_tracking": "14 of 14 branches tracked at FE-to-FE MAC ≥ 0.90 (PRIORITY-4)",
+      "reuse_status": "VERIFICATION_RECORD_ONLY — not a sensitivity",
+      "reason": "a check of the approximation at a hypothetical point (RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY); not a derivative at the baseline"
+    },
+    {
+      "existing_result": "PRIORITY-4 real solve H2",
+      "parameterisation": "E1; E2; G12 = 41952.8; 41952.8; 4810.3 MPa",
+      "fe_identity": "INP 553f5dc5623f…, ODB aa8a5de32339…",
+      "branch_tracking": "14 of 14 branches tracked at FE-to-FE MAC ≥ 0.90 (PRIORITY-4)",
+      "reuse_status": "VERIFICATION_RECORD_ONLY — not a sensitivity",
+      "reason": "a check of the approximation at a hypothetical point (RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY); not a derivative at the baseline"
+    },
+    {
+      "existing_result": "±2.5 % linearity repeat",
+      "parameterisation": "E (E1 = E2), G12",
+      "fe_identity": "—",
+      "branch_tracking": "—",
+      "reuse_status": "NOT_AVAILABLE — never run",
+      "reason": "SPEC §6 S4 asks for it; it is a future stage with its own authorisation"
+    }
+  ],
+  "fe_applicability_plan": {
+    "status": "PLAN ONLY — not a run order: no Abaqus, solver, extraction, LM or Auto-ID is authorised or started by this program",
+    "variants": [
+      {
+        "variant": "A. free-free reference",
+        "available_inputs": "the M11 model as extracted (package identity)",
+        "missing_inputs": "no support",
+        "existing_fe_assets": "the M11 package (manifest 354966dae212…, INP 962f75f2fd5d…, ODB 7daeb7e35adf…)",
+        "future_runs": "none (exists)",
+        "owner_authorisation": "not needed (no run)",
+        "scientific_purpose": "the existing M11 S4R_0875_BASELINE (no new job)"
+      },
+      {
+        "variant": "B. two-band suspension (261027)",
+        "available_inputs": "two rubber bands (owner, 2026-10-30); strings at two upper points along the nodal line of the first mode (laboratory note)",
+        "missing_inputs": "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)",
+        "existing_fe_assets": "none",
+        "future_runs": "PLATE_RC1_P1_B_TWO_BAND_SOFT, PLATE_RC1_P1_B_TWO_BAND_STIFF",
+        "owner_authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "scientific_purpose": "the primary experiment's suspension: does it move the elastic FE modes?"
+      },
+      {
+        "variant": "C. four-band historical suspension (261016)",
+        "available_inputs": "four rubber bands (owner, 2026-10-30); four corner straps in the 261016 PSV frame (M11 §13.3)",
+        "missing_inputs": "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)",
+        "existing_fe_assets": "none",
+        "future_runs": "PLATE_RC1_P1_C_FOUR_BAND_SOFT, PLATE_RC1_P1_C_FOUR_BAND_STIFF",
+        "owner_authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "scientific_purpose": "only the difference of the boundary conditions between the series; never a material identification from 33.4491 Hz, and no claim that the bands turn one mode into another before the shapes are identified — history only"
+      },
+      {
+        "variant": "D. force sensor / attachment",
+        "available_inputs": "a force reference channel (dataset 58 'Force * Velocity')",
+        "missing_inputs": "the sensor's point and mass are NOT recorded: needed from the owner or the laboratory before this job",
+        "existing_fe_assets": "none",
+        "future_runs": "PLATE_RC1_P1_D_SENSOR_MASS",
+        "owner_authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "scientific_purpose": "the mass (and rotary inertia, if recorded) of the force sensor at its point"
+      },
+      {
+        "variant": "E. thickness / model form",
+        "available_inputs": "20 archived edge readings (2026-10-21)",
+        "missing_inputs": "the interior thickness is not measured: the existing wedge model is a model-form alternative, never a fitted or invented thickness map",
+        "existing_fe_assets": "S4R_WEDGE: INP dcb639f14a00… and .dat d545876a72d7… (frequencies only; no extracted shapes)",
+        "future_runs": "PLATE_RC1_P1_E_WEDGE",
+        "owner_authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "scientific_purpose": "the effect of the measured edge-thickness pattern on the elastic modes (model form, not a field)"
+      }
+    ],
+    "stages": [
+      {
+        "stage": "1. FE applicability",
+        "purpose": "does the test set-up (suspension, sensor, thickness) move the elastic FE modes?",
+        "existing_results": "variant A (the M11 package)",
+        "new_fe_runs": "4 (B ×2, D, E) + 2 optional (C, history only)",
+        "prerequisites": "the suspension and sensor data (questions D), or a research range declared before the run",
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+      },
+      {
+        "stage": "2. E / G sensitivities",
+        "purpose": "central ±5 % derivatives of the adopted FE model",
+        "existing_results": "PRIORITY-2: E1, E2, G12 ±5 % at the M11 free-free baseline (6 solves; FE8 / FE9 / FE20 lost when E1 ≠ E2)",
+        "new_fe_runs": "M11 free-free kept: G12 0 (reuse) + E (E1 = E2) 2 (or 0 if the owner accepts the superposition); another adopted model (B / D / E): 4",
+        "prerequisites": "the adopted FE model; for a fit also a frozen registration and confirmed pairs",
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+      },
+      {
+        "stage": "3. Linearity of the sensitivities",
+        "purpose": "the ±2.5 % repeat (SPEC §6 S4)",
+        "existing_results": "none (PRIORITY-4 checked the approximation far from the baseline, not ±2.5 %)",
+        "new_fe_runs": "4",
+        "prerequisites": "stage 2",
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+      },
+      {
+        "stage": "4. Bounded fit (future)",
+        "purpose": "a declared campaign (question, τ_mf, Σ, bounds) and the bounded LM with branch tracking",
+        "existing_results": "S0 / H1 / H2 are hypotheses only",
+        "new_fe_runs": "≤ 12",
+        "prerequisites": "a frozen registration, confirmed pairs, FIT / HOLDOUT frozen before the fit, stages 2–3",
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+      },
+      {
+        "stage": "5. Check of the final FE model",
+        "purpose": "one real solve of the final candidate with FE-to-FE tracking of every branch (as PRIORITY-4 did for S0 / H1 / H2)",
+        "existing_results": "none",
+        "new_fe_runs": "1 per final candidate",
+        "prerequisites": "stage 4",
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+      }
+    ],
+    "jobs": [
+      {
+        "job": "PLATE_RC1_P1_B_TWO_BAND_SOFT",
+        "variant": "B. two-band suspension (261027)",
+        "source_inp": {
+          "member": "S4R_0875_BASELINE",
+          "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+          "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+        },
+        "changed": "two axial springs at the declared points, soft end",
+        "fixed": [
+          "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+          "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+          "h = 0.875 mm (except variant E)",
+          "the frequency step and the number of modes of the baseline"
+        ],
+        "values": {
+          "confirmed": [
+            "two rubber bands (owner, 2026-10-30)",
+            "strings at two upper points along the nodal line of the first mode (laboratory note)"
+          ],
+          "assumptions": [
+            "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)"
+          ],
+          "future_sensitivity": [
+            "band axial stiffness: a soft and a stiff end of the declared range"
+          ]
+        },
+        "expected_outputs": [
+          "PLATE_RC1_P1_B_TWO_BAND_SOFT.odb",
+          "PLATE_RC1_P1_B_TWO_BAND_SOFT.dat",
+          "PLATE_RC1_P1_B_TWO_BAND_SOFT.msg",
+          "PLATE_RC1_P1_B_TWO_BAND_SOFT.sta",
+          "extraction package of PLATE_RC1_P1_B_TWO_BAND_SOFT (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+        ],
+        "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+        "stop": [
+          "the job does not finish, or the solver reports an error or a negative eigenvalue",
+          "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+          "the rigid-body (suspension) modes do not separate from the elastic ones",
+          "an input value is not declared before the run (no value is tuned afterwards)"
+        ],
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "role": "applicability",
+        "run_order": false
+      },
+      {
+        "job": "PLATE_RC1_P1_B_TWO_BAND_STIFF",
+        "variant": "B. two-band suspension (261027)",
+        "source_inp": {
+          "member": "S4R_0875_BASELINE",
+          "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+          "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+        },
+        "changed": "two axial springs at the declared points, stiff end",
+        "fixed": [
+          "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+          "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+          "h = 0.875 mm (except variant E)",
+          "the frequency step and the number of modes of the baseline"
+        ],
+        "values": {
+          "confirmed": [
+            "two rubber bands (owner, 2026-10-30)",
+            "strings at two upper points along the nodal line of the first mode (laboratory note)"
+          ],
+          "assumptions": [
+            "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)"
+          ],
+          "future_sensitivity": [
+            "band axial stiffness: a soft and a stiff end of the declared range"
+          ]
+        },
+        "expected_outputs": [
+          "PLATE_RC1_P1_B_TWO_BAND_STIFF.odb",
+          "PLATE_RC1_P1_B_TWO_BAND_STIFF.dat",
+          "PLATE_RC1_P1_B_TWO_BAND_STIFF.msg",
+          "PLATE_RC1_P1_B_TWO_BAND_STIFF.sta",
+          "extraction package of PLATE_RC1_P1_B_TWO_BAND_STIFF (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+        ],
+        "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+        "stop": [
+          "the job does not finish, or the solver reports an error or a negative eigenvalue",
+          "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+          "the rigid-body (suspension) modes do not separate from the elastic ones",
+          "an input value is not declared before the run (no value is tuned afterwards)"
+        ],
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "role": "applicability",
+        "run_order": false
+      },
+      {
+        "job": "PLATE_RC1_P1_C_FOUR_BAND_SOFT",
+        "variant": "C. four-band historical suspension (261016)",
+        "source_inp": {
+          "member": "S4R_0875_BASELINE",
+          "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+          "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+        },
+        "changed": "four axial springs at the corner straps, soft end",
+        "fixed": [
+          "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+          "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+          "h = 0.875 mm (except variant E)",
+          "the frequency step and the number of modes of the baseline"
+        ],
+        "values": {
+          "confirmed": [
+            "four rubber bands (owner, 2026-10-30)",
+            "four corner straps in the 261016 PSV frame (M11 §13.3)"
+          ],
+          "assumptions": [
+            "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)"
+          ],
+          "future_sensitivity": [
+            "band axial stiffness: soft and stiff end"
+          ]
+        },
+        "expected_outputs": [
+          "PLATE_RC1_P1_C_FOUR_BAND_SOFT.odb",
+          "PLATE_RC1_P1_C_FOUR_BAND_SOFT.dat",
+          "PLATE_RC1_P1_C_FOUR_BAND_SOFT.msg",
+          "PLATE_RC1_P1_C_FOUR_BAND_SOFT.sta",
+          "extraction package of PLATE_RC1_P1_C_FOUR_BAND_SOFT (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+        ],
+        "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+        "stop": [
+          "the job does not finish, or the solver reports an error or a negative eigenvalue",
+          "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+          "the rigid-body (suspension) modes do not separate from the elastic ones",
+          "an input value is not declared before the run (no value is tuned afterwards)"
+        ],
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "role": "boundary-condition history",
+        "run_order": false
+      },
+      {
+        "job": "PLATE_RC1_P1_C_FOUR_BAND_STIFF",
+        "variant": "C. four-band historical suspension (261016)",
+        "source_inp": {
+          "member": "S4R_0875_BASELINE",
+          "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+          "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+        },
+        "changed": "four axial springs at the corner straps, stiff end",
+        "fixed": [
+          "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+          "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+          "h = 0.875 mm (except variant E)",
+          "the frequency step and the number of modes of the baseline"
+        ],
+        "values": {
+          "confirmed": [
+            "four rubber bands (owner, 2026-10-30)",
+            "four corner straps in the 261016 PSV frame (M11 §13.3)"
+          ],
+          "assumptions": [
+            "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)"
+          ],
+          "future_sensitivity": [
+            "band axial stiffness: soft and stiff end"
+          ]
+        },
+        "expected_outputs": [
+          "PLATE_RC1_P1_C_FOUR_BAND_STIFF.odb",
+          "PLATE_RC1_P1_C_FOUR_BAND_STIFF.dat",
+          "PLATE_RC1_P1_C_FOUR_BAND_STIFF.msg",
+          "PLATE_RC1_P1_C_FOUR_BAND_STIFF.sta",
+          "extraction package of PLATE_RC1_P1_C_FOUR_BAND_STIFF (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+        ],
+        "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+        "stop": [
+          "the job does not finish, or the solver reports an error or a negative eigenvalue",
+          "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+          "the rigid-body (suspension) modes do not separate from the elastic ones",
+          "an input value is not declared before the run (no value is tuned afterwards)"
+        ],
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "role": "boundary-condition history",
+        "run_order": false
+      },
+      {
+        "job": "PLATE_RC1_P1_D_SENSOR_MASS",
+        "variant": "D. force sensor / attachment",
+        "source_inp": {
+          "member": "S4R_0875_BASELINE",
+          "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+          "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+        },
+        "changed": "a point mass at the recorded sensor point",
+        "fixed": [
+          "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+          "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+          "h = 0.875 mm (except variant E)",
+          "the frequency step and the number of modes of the baseline"
+        ],
+        "values": {
+          "confirmed": [
+            "a force reference channel (dataset 58 'Force * Velocity')"
+          ],
+          "assumptions": [
+            "the sensor's point and mass are NOT recorded: needed from the owner or the laboratory before this job"
+          ],
+          "future_sensitivity": [
+            "attachment mass"
+          ]
+        },
+        "expected_outputs": [
+          "PLATE_RC1_P1_D_SENSOR_MASS.odb",
+          "PLATE_RC1_P1_D_SENSOR_MASS.dat",
+          "PLATE_RC1_P1_D_SENSOR_MASS.msg",
+          "PLATE_RC1_P1_D_SENSOR_MASS.sta",
+          "extraction package of PLATE_RC1_P1_D_SENSOR_MASS (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+        ],
+        "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+        "stop": [
+          "the job does not finish, or the solver reports an error or a negative eigenvalue",
+          "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+          "the rigid-body (suspension) modes do not separate from the elastic ones",
+          "an input value is not declared before the run (no value is tuned afterwards)"
+        ],
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "role": "applicability",
+        "run_order": false
+      },
+      {
+        "job": "PLATE_RC1_P1_E_WEDGE",
+        "variant": "E. thickness / model form",
+        "source_inp": {
+          "member": "S4R_WEDGE",
+          "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_WEDGE_FreeFree.inp",
+          "sha256": "dcb639f14a008eeb29179d36817993279451b615b9061753a9afec27b628bb4b"
+        },
+        "changed": "the existing S4R_WEDGE model (INP and .dat exist) re-solved with the baseline's output requests so that its shapes can be extracted and tracked",
+        "fixed": [
+          "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+          "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+          "h = 0.875 mm (except variant E)",
+          "the frequency step and the number of modes of the baseline"
+        ],
+        "values": {
+          "confirmed": [
+            "20 archived edge readings (2026-10-21)"
+          ],
+          "assumptions": [
+            "the interior thickness is not measured: the existing wedge model is a model-form alternative, never a fitted or invented thickness map"
+          ],
+          "future_sensitivity": [
+            "thickness model form"
+          ]
+        },
+        "expected_outputs": [
+          "PLATE_RC1_P1_E_WEDGE.odb",
+          "PLATE_RC1_P1_E_WEDGE.dat",
+          "PLATE_RC1_P1_E_WEDGE.msg",
+          "PLATE_RC1_P1_E_WEDGE.sta",
+          "extraction package of PLATE_RC1_P1_E_WEDGE (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+        ],
+        "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+        "stop": [
+          "the job does not finish, or the solver reports an error or a negative eigenvalue",
+          "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+          "the rigid-body (suspension) modes do not separate from the elastic ones",
+          "an input value is not declared before the run (no value is tuned afterwards)"
+        ],
+        "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+        "role": "applicability",
+        "run_order": false
+      }
+    ],
+    "never": [
+      "no INP is written with invented suspension or sensor characteristics",
+      "no value is fitted from 18.6307 or 33.4491 Hz",
+      "no plan here is a permission to run Abaqus"
+    ]
+  },
+  "blocking": [
+    "open registration fact: scanned_face",
+    "open registration fact: grid_plus_v_edge",
+    "open registration fact: scan_metric_geometry",
+    "open registration fact: scan_window_offsets_mm",
+    "open registration fact: fe_origin_corner",
+    "open registration fact: fe_normal_face",
+    "no accepted physical registration: no MAC, no mode pair, no FIT / HOLDOUT",
+    "FE applicability: suspension_points NOT_RECORDED",
+    "FE applicability: suspension_bands NOT_RECORDED",
+    "FE applicability: force_sensor NOT_RECORDED",
+    "FE applicability: thickness_map NOT_MEASURED_INSIDE",
+    "M8 GATE NOT_MET; D-077 NO_GLOBAL_PARAMETER_VALUE; production Auto-ID BLOCKED"
+  ]
+}

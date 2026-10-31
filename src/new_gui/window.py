@@ -58,6 +58,7 @@ from new_gui.diagnostic_panel import DiagnosticPanel
 from new_gui.known_sources_dialog import KnownSourcesDialog
 from new_gui.materials_panel import SUBTITLE as MATERIALS_SUBTITLE, MaterialsPanel
 from new_gui.generic_plate_panel import GenericPlatePanel, TITLE as GENERIC_TITLE
+from new_gui.physical_review_panel import PhysicalReviewPanel, TITLE as REVIEW_TITLE
 from new_gui.plate_study_panel import PlateStudyPanel
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
@@ -424,19 +425,29 @@ class MainWindow(QMainWindow):
     def _build_plate_page(self) -> QWidget:
         page, layout = self._page("Plate Study", "Research studies of single CFRP plates: A. the current study of "
                                                  "PLATE-300x300x1mm; B. the workbench of a new single plate of any "
-                                                 "size. No material value.")
+                                                 "size; C. the physical readiness review. No material value.")
         self.plate = PlateStudyPanel(ask_folder=self._ask_folder, family_root=self._plate_family_root)
         self.workbench = GenericPlatePanel()  # PRIORITY-8: B. New Single Plate — Research Workbench
+        # PRIORITY-9: C. Physical Readiness Review (the dossier of PLATE 261027 / M11, or of study B)
+        self.review = PhysicalReviewPanel(study_source=lambda: self.workbench.study)
         self.plate_tabs = QTabWidget()
         self.plate_tabs.setObjectName("plateTabs")
         self.plate_tabs.setDocumentMode(True)
         self.plate_tabs.addTab(self.plate, "A. Current PLATE Study")
-        self.plate_tabs.addTab(self.workbench, "B. New Single Plate")  # short: both tabs fit at 900 × 680
+        self.plate_tabs.addTab(self.workbench, "B. New Single Plate")  # short: the tabs fit at 900 × 680
+        self.plate_tabs.addTab(self.review, "C. Physical Readiness")
         self.plate_tabs.setTabToolTip(1, GENERIC_TITLE)
-        self.plate_tabs.currentChanged.connect(lambda index: self.workbench.activate() if index == 1 else None)
+        self.plate_tabs.setTabToolTip(2, REVIEW_TITLE)
+        self.plate_tabs.currentChanged.connect(self._plate_tab_shown)
         layout.addWidget(self.plate_tabs)
         layout.addStretch(1)
         return page
+
+    def _plate_tab_shown(self, index: int) -> None:
+        if index == 1:
+            self.workbench.activate()
+        elif index == 2:
+            self.review.activate()
 
     def _build_research_page(self) -> QWidget:
         page, layout = self._page("Research Results", "The archived results of the real modal matching, the FE "
@@ -692,6 +703,7 @@ class MainWindow(QMainWindow):
         self.comparison.set_inputs(*inputs, identities)  # a change removes the comparison and its drawings
         self.plate.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
         self.workbench.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
+        self.review.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
         self.research.set_workspace(identities["experimental"], identities["fe"],  # SHA-256 link only
                                     self._research_context(*inputs))
         self._registration_changed()

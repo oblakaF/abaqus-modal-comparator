@@ -1,0 +1,379 @@
+{
+  "schema": "amc/plate-physical-readiness/v1/fe-applicability-plan",
+  "identity": {
+    "profile": "M11-261027",
+    "specimen": "PLATE-300x300x1mm",
+    "series": "NEXP29/PLATE300-1MM/S261027-ROTATED",
+    "modal_set": "Polymax_bravo",
+    "fe_model": "Abaqus M11 S4R_0875_BASELINE",
+    "experimental_sha256": "76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+    "fe_manifest_sha256": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+    "inp_sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+    "kind": "PHYSICAL"
+  },
+  "status": "PLAN ONLY — not a run order: no Abaqus, solver, extraction, LM or Auto-ID is authorised or started by this program",
+  "variants": [
+    {
+      "variant": "A. free-free reference",
+      "available_inputs": "the M11 model as extracted (package identity)",
+      "missing_inputs": "no support",
+      "existing_fe_assets": "the M11 package (manifest 354966dae212…, INP 962f75f2fd5d…, ODB 7daeb7e35adf…)",
+      "future_runs": "none (exists)",
+      "owner_authorisation": "not needed (no run)",
+      "scientific_purpose": "the existing M11 S4R_0875_BASELINE (no new job)"
+    },
+    {
+      "variant": "B. two-band suspension (261027)",
+      "available_inputs": "two rubber bands (owner, 2026-10-30); strings at two upper points along the nodal line of the first mode (laboratory note)",
+      "missing_inputs": "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)",
+      "existing_fe_assets": "none",
+      "future_runs": "PLATE_RC1_P1_B_TWO_BAND_SOFT, PLATE_RC1_P1_B_TWO_BAND_STIFF",
+      "owner_authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "scientific_purpose": "the primary experiment's suspension: does it move the elastic FE modes?"
+    },
+    {
+      "variant": "C. four-band historical suspension (261016)",
+      "available_inputs": "four rubber bands (owner, 2026-10-30); four corner straps in the 261016 PSV frame (M11 §13.3)",
+      "missing_inputs": "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)",
+      "existing_fe_assets": "none",
+      "future_runs": "PLATE_RC1_P1_C_FOUR_BAND_SOFT, PLATE_RC1_P1_C_FOUR_BAND_STIFF",
+      "owner_authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "scientific_purpose": "only the difference of the boundary conditions between the series; never a material identification from 33.4491 Hz, and no claim that the bands turn one mode into another before the shapes are identified — history only"
+    },
+    {
+      "variant": "D. force sensor / attachment",
+      "available_inputs": "a force reference channel (dataset 58 'Force * Velocity')",
+      "missing_inputs": "the sensor's point and mass are NOT recorded: needed from the owner or the laboratory before this job",
+      "existing_fe_assets": "none",
+      "future_runs": "PLATE_RC1_P1_D_SENSOR_MASS",
+      "owner_authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "scientific_purpose": "the mass (and rotary inertia, if recorded) of the force sensor at its point"
+    },
+    {
+      "variant": "E. thickness / model form",
+      "available_inputs": "20 archived edge readings (2026-10-21)",
+      "missing_inputs": "the interior thickness is not measured: the existing wedge model is a model-form alternative, never a fitted or invented thickness map",
+      "existing_fe_assets": "S4R_WEDGE: INP dcb639f14a00… and .dat d545876a72d7… (frequencies only; no extracted shapes)",
+      "future_runs": "PLATE_RC1_P1_E_WEDGE",
+      "owner_authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "scientific_purpose": "the effect of the measured edge-thickness pattern on the elastic modes (model form, not a field)"
+    }
+  ],
+  "stages": [
+    {
+      "stage": "1. FE applicability",
+      "purpose": "does the test set-up (suspension, sensor, thickness) move the elastic FE modes?",
+      "existing_results": "variant A (the M11 package)",
+      "new_fe_runs": "4 (B ×2, D, E) + 2 optional (C, history only)",
+      "prerequisites": "the suspension and sensor data (questions D), or a research range declared before the run",
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+    },
+    {
+      "stage": "2. E / G sensitivities",
+      "purpose": "central ±5 % derivatives of the adopted FE model",
+      "existing_results": "PRIORITY-2: E1, E2, G12 ±5 % at the M11 free-free baseline (6 solves; FE8 / FE9 / FE20 lost when E1 ≠ E2)",
+      "new_fe_runs": "M11 free-free kept: G12 0 (reuse) + E (E1 = E2) 2 (or 0 if the owner accepts the superposition); another adopted model (B / D / E): 4",
+      "prerequisites": "the adopted FE model; for a fit also a frozen registration and confirmed pairs",
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+    },
+    {
+      "stage": "3. Linearity of the sensitivities",
+      "purpose": "the ±2.5 % repeat (SPEC §6 S4)",
+      "existing_results": "none (PRIORITY-4 checked the approximation far from the baseline, not ±2.5 %)",
+      "new_fe_runs": "4",
+      "prerequisites": "stage 2",
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+    },
+    {
+      "stage": "4. Bounded fit (future)",
+      "purpose": "a declared campaign (question, τ_mf, Σ, bounds) and the bounded LM with branch tracking",
+      "existing_results": "S0 / H1 / H2 are hypotheses only",
+      "new_fe_runs": "≤ 12",
+      "prerequisites": "a frozen registration, confirmed pairs, FIT / HOLDOUT frozen before the fit, stages 2–3",
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+    },
+    {
+      "stage": "5. Check of the final FE model",
+      "purpose": "one real solve of the final candidate with FE-to-FE tracking of every branch (as PRIORITY-4 did for S0 / H1 / H2)",
+      "existing_results": "none",
+      "new_fe_runs": "1 per final candidate",
+      "prerequisites": "stage 4",
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job"
+    }
+  ],
+  "jobs": [
+    {
+      "job": "PLATE_RC1_P1_B_TWO_BAND_SOFT",
+      "variant": "B. two-band suspension (261027)",
+      "source_inp": {
+        "member": "S4R_0875_BASELINE",
+        "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+        "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+      },
+      "changed": "two axial springs at the declared points, soft end",
+      "fixed": [
+        "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+        "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+        "h = 0.875 mm (except variant E)",
+        "the frequency step and the number of modes of the baseline"
+      ],
+      "values": {
+        "confirmed": [
+          "two rubber bands (owner, 2026-10-30)",
+          "strings at two upper points along the nodal line of the first mode (laboratory note)"
+        ],
+        "assumptions": [
+          "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)"
+        ],
+        "future_sensitivity": [
+          "band axial stiffness: a soft and a stiff end of the declared range"
+        ]
+      },
+      "expected_outputs": [
+        "PLATE_RC1_P1_B_TWO_BAND_SOFT.odb",
+        "PLATE_RC1_P1_B_TWO_BAND_SOFT.dat",
+        "PLATE_RC1_P1_B_TWO_BAND_SOFT.msg",
+        "PLATE_RC1_P1_B_TWO_BAND_SOFT.sta",
+        "extraction package of PLATE_RC1_P1_B_TWO_BAND_SOFT (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+      ],
+      "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+      "stop": [
+        "the job does not finish, or the solver reports an error or a negative eigenvalue",
+        "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+        "the rigid-body (suspension) modes do not separate from the elastic ones",
+        "an input value is not declared before the run (no value is tuned afterwards)"
+      ],
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "role": "applicability",
+      "run_order": false
+    },
+    {
+      "job": "PLATE_RC1_P1_B_TWO_BAND_STIFF",
+      "variant": "B. two-band suspension (261027)",
+      "source_inp": {
+        "member": "S4R_0875_BASELINE",
+        "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+        "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+      },
+      "changed": "two axial springs at the declared points, stiff end",
+      "fixed": [
+        "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+        "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+        "h = 0.875 mm (except variant E)",
+        "the frequency step and the number of modes of the baseline"
+      ],
+      "values": {
+        "confirmed": [
+          "two rubber bands (owner, 2026-10-30)",
+          "strings at two upper points along the nodal line of the first mode (laboratory note)"
+        ],
+        "assumptions": [
+          "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)"
+        ],
+        "future_sensitivity": [
+          "band axial stiffness: a soft and a stiff end of the declared range"
+        ]
+      },
+      "expected_outputs": [
+        "PLATE_RC1_P1_B_TWO_BAND_STIFF.odb",
+        "PLATE_RC1_P1_B_TWO_BAND_STIFF.dat",
+        "PLATE_RC1_P1_B_TWO_BAND_STIFF.msg",
+        "PLATE_RC1_P1_B_TWO_BAND_STIFF.sta",
+        "extraction package of PLATE_RC1_P1_B_TWO_BAND_STIFF (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+      ],
+      "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+      "stop": [
+        "the job does not finish, or the solver reports an error or a negative eigenvalue",
+        "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+        "the rigid-body (suspension) modes do not separate from the elastic ones",
+        "an input value is not declared before the run (no value is tuned afterwards)"
+      ],
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "role": "applicability",
+      "run_order": false
+    },
+    {
+      "job": "PLATE_RC1_P1_C_FOUR_BAND_SOFT",
+      "variant": "C. four-band historical suspension (261016)",
+      "source_inp": {
+        "member": "S4R_0875_BASELINE",
+        "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+        "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+      },
+      "changed": "four axial springs at the corner straps, soft end",
+      "fixed": [
+        "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+        "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+        "h = 0.875 mm (except variant E)",
+        "the frequency step and the number of modes of the baseline"
+      ],
+      "values": {
+        "confirmed": [
+          "four rubber bands (owner, 2026-10-30)",
+          "four corner straps in the 261016 PSV frame (M11 §13.3)"
+        ],
+        "assumptions": [
+          "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)"
+        ],
+        "future_sensitivity": [
+          "band axial stiffness: soft and stiff end"
+        ]
+      },
+      "expected_outputs": [
+        "PLATE_RC1_P1_C_FOUR_BAND_SOFT.odb",
+        "PLATE_RC1_P1_C_FOUR_BAND_SOFT.dat",
+        "PLATE_RC1_P1_C_FOUR_BAND_SOFT.msg",
+        "PLATE_RC1_P1_C_FOUR_BAND_SOFT.sta",
+        "extraction package of PLATE_RC1_P1_C_FOUR_BAND_SOFT (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+      ],
+      "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+      "stop": [
+        "the job does not finish, or the solver reports an error or a negative eigenvalue",
+        "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+        "the rigid-body (suspension) modes do not separate from the elastic ones",
+        "an input value is not declared before the run (no value is tuned afterwards)"
+      ],
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "role": "boundary-condition history",
+      "run_order": false
+    },
+    {
+      "job": "PLATE_RC1_P1_C_FOUR_BAND_STIFF",
+      "variant": "C. four-band historical suspension (261016)",
+      "source_inp": {
+        "member": "S4R_0875_BASELINE",
+        "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+        "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+      },
+      "changed": "four axial springs at the corner straps, stiff end",
+      "fixed": [
+        "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+        "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+        "h = 0.875 mm (except variant E)",
+        "the frequency step and the number of modes of the baseline"
+      ],
+      "values": {
+        "confirmed": [
+          "four rubber bands (owner, 2026-10-30)",
+          "four corner straps in the 261016 PSV frame (M11 §13.3)"
+        ],
+        "assumptions": [
+          "band stiffness, length and the exact attachment points are NOT recorded: they come from the owner or the laboratory, or from a research range declared before the run and labelled RESEARCH_RANGE (never from 18.6307 or 33.4491 Hz)"
+        ],
+        "future_sensitivity": [
+          "band axial stiffness: soft and stiff end"
+        ]
+      },
+      "expected_outputs": [
+        "PLATE_RC1_P1_C_FOUR_BAND_STIFF.odb",
+        "PLATE_RC1_P1_C_FOUR_BAND_STIFF.dat",
+        "PLATE_RC1_P1_C_FOUR_BAND_STIFF.msg",
+        "PLATE_RC1_P1_C_FOUR_BAND_STIFF.sta",
+        "extraction package of PLATE_RC1_P1_C_FOUR_BAND_STIFF (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+      ],
+      "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+      "stop": [
+        "the job does not finish, or the solver reports an error or a negative eigenvalue",
+        "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+        "the rigid-body (suspension) modes do not separate from the elastic ones",
+        "an input value is not declared before the run (no value is tuned afterwards)"
+      ],
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "role": "boundary-condition history",
+      "run_order": false
+    },
+    {
+      "job": "PLATE_RC1_P1_D_SENSOR_MASS",
+      "variant": "D. force sensor / attachment",
+      "source_inp": {
+        "member": "S4R_0875_BASELINE",
+        "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_0875_FreeFree.inp",
+        "sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+      },
+      "changed": "a point mass at the recorded sensor point",
+      "fixed": [
+        "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+        "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+        "h = 0.875 mm (except variant E)",
+        "the frequency step and the number of modes of the baseline"
+      ],
+      "values": {
+        "confirmed": [
+          "a force reference channel (dataset 58 'Force * Velocity')"
+        ],
+        "assumptions": [
+          "the sensor's point and mass are NOT recorded: needed from the owner or the laboratory before this job"
+        ],
+        "future_sensitivity": [
+          "attachment mass"
+        ]
+      },
+      "expected_outputs": [
+        "PLATE_RC1_P1_D_SENSOR_MASS.odb",
+        "PLATE_RC1_P1_D_SENSOR_MASS.dat",
+        "PLATE_RC1_P1_D_SENSOR_MASS.msg",
+        "PLATE_RC1_P1_D_SENSOR_MASS.sta",
+        "extraction package of PLATE_RC1_P1_D_SENSOR_MASS (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+      ],
+      "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+      "stop": [
+        "the job does not finish, or the solver reports an error or a negative eigenvalue",
+        "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+        "the rigid-body (suspension) modes do not separate from the elastic ones",
+        "an input value is not declared before the run (no value is tuned afterwards)"
+      ],
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "role": "applicability",
+      "run_order": false
+    },
+    {
+      "job": "PLATE_RC1_P1_E_WEDGE",
+      "variant": "E. thickness / model form",
+      "source_inp": {
+        "member": "S4R_WEDGE",
+        "file": "external_models/v3_20261021/Plate/temp_root/CFRP_S4R_WEDGE_FreeFree.inp",
+        "sha256": "dcb639f14a008eeb29179d36817993279451b615b9061753a9afec27b628bb4b"
+      },
+      "changed": "the existing S4R_WEDGE model (INP and .dat exist) re-solved with the baseline's output requests so that its shapes can be extracted and tracked",
+      "fixed": [
+        "plan 301 × 300 mm and the 3 mm S4R mesh of the baseline",
+        "the material constants of the baseline (E1 = E2, G12, ν12, ρ)",
+        "h = 0.875 mm (except variant E)",
+        "the frequency step and the number of modes of the baseline"
+      ],
+      "values": {
+        "confirmed": [
+          "20 archived edge readings (2026-10-21)"
+        ],
+        "assumptions": [
+          "the interior thickness is not measured: the existing wedge model is a model-form alternative, never a fitted or invented thickness map"
+        ],
+        "future_sensitivity": [
+          "thickness model form"
+        ]
+      },
+      "expected_outputs": [
+        "PLATE_RC1_P1_E_WEDGE.odb",
+        "PLATE_RC1_P1_E_WEDGE.dat",
+        "PLATE_RC1_P1_E_WEDGE.msg",
+        "PLATE_RC1_P1_E_WEDGE.sta",
+        "extraction package of PLATE_RC1_P1_E_WEDGE (manifest.json, geometry.csv, mode_NNNN.csv) by the pinned extractor — Abaqus Python on the new ODB is its own gate"
+      ],
+      "fe_mode_identity": "FE-to-FE: each elastic mode 7–20 of the baseline followed into the job with branch_tracker.track_branches on all FE nodes; close pairs by confirm_cluster; the suspension's rigid-body modes must separate from the elastic ones; no experimental MAC",
+      "stop": [
+        "the job does not finish, or the solver reports an error or a negative eigenvalue",
+        "a tracked elastic branch is lost or exchanged → that branch is reported, not re-paired by frequency",
+        "the rigid-body (suspension) modes do not separate from the elastic ones",
+        "an input value is not declared before the run (no value is tuned afterwards)"
+      ],
+      "authorisation": "NOT_GIVEN — a separate, explicit owner authorisation naming the job",
+      "role": "applicability",
+      "run_order": false
+    }
+  ],
+  "never": [
+    "no INP is written with invented suspension or sensor characteristics",
+    "no value is fitted from 18.6307 or 33.4491 Hz",
+    "no plan here is a permission to run Abaqus"
+  ]
+}
