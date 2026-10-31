@@ -384,6 +384,61 @@ def input_fingerprint(study: Study) -> dict:
             "modal_set": dict(study.modal_set) if study.modal_set else None}
 
 
+# PRIORITY-8-F2: the passport and evidence an offline candidate depends on
+FINGERPRINT_CLAIMS = ("material_orientation", "layup", "suspension", "measured_face", "instrument_axes", "measured_dofs",
+                      "fe_model_version", "excitation")
+
+
+def _digest(data) -> str:
+    return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")).hexdigest()
+
+
+def _q(q: Quantity) -> list:
+    return [q.value, q.unit, q.provenance, q.uncertainty]
+
+
+def passport_fingerprint(passport: Passport) -> str:
+    """SHA-256 of everything in the passport an offline candidate depends on: the identifiers, plan, mass, density,
+    thickness readings, engineering constants (FIXED and INITIAL) and the test conditions (material orientation,
+    suspension, measured face and DOF, instrument axes, FE model, excitation). Free-text sources are not part of it."""
+    return _digest({
+        "ids": [passport.design_id, passport.physical_specimen_id, passport.test_run_id],
+        "plan_mass": [_q(passport.length), _q(passport.width), _q(passport.mass), _q(passport.density)],
+        "thickness": [[r.position, *_q(r.thickness)] for r in passport.thickness],
+        "constants": [[c.name, c.role, *_q(c.quantity)] for c in passport.constants],
+        "claims": {name: [passport.claim(name).value, passport.claim(name).provenance] for name in FINGERPRINT_CLAIMS},
+    })
+
+
+def evidence_fingerprint(study: Study) -> str:
+    """SHA-256 of the registration evidence (key, value, provenance, derived_from of every fact)."""
+    return _digest(sorted([f.key, f.value, f.provenance, list(f.derived_from)] for f in study.evidence))
+
+
+def offline_inputs(study: Study) -> dict:
+    """Everything an offline candidate is computed from (its fingerprint)."""
+    return {"diagnostics": (study.diagnostics or {}).get("inputs"),
+            "sensitivities": (study.sensitivities or {}).get("file_sha256"),
+            "declaration": (study.declaration or {}).get("file_sha256"),
+            "passport": passport_fingerprint(study.passport), "evidence": evidence_fingerprint(study),
+            "kind": study.kind}
+
+
+OFFLINE_INPUT_NAMES = {"diagnostics": "the diagnostics", "sensitivities": "the sensitivity table",
+                       "declaration": "the declared observation set", "passport": "the passport (identifiers, plan, "
+                       "mass, thickness, constants or test conditions)", "evidence": "the registration evidence",
+                       "kind": "the study kind"}
+
+
+def retire_offline(study: Study, reason: str) -> Study:
+    """Keep the present offline candidate as a record (``superseded``) and remove it as a result."""
+    if not study.offline_result:
+        return study
+    entry = {"retired": _now(), "reason": reason, "inputs": study.offline_result.get("inputs"),
+             "diagnostics_summary": None, "offline_result": study.offline_result}
+    return replace(study, superseded=study.superseded + (entry,), offline_result=None)
+
+
 def retire_results(study: Study, reason: str) -> Study:
     """Keep the present results as a record of earlier inputs (``superseded``) before they are replaced."""
     if not study.diagnostics and not study.offline_result:
@@ -458,14 +513,12 @@ def results_state(study: Study, workspace: Optional[Mapping[str, Any]] = None,
             reasons.append("the sources are neither read in the Workspace nor verified on disk")
     offline = study.offline_result
     offline_state = None
-    if offline:
-        made_for = offline.get("inputs") or {}
-        same = (made_for.get("diagnostics") == recorded and made_for.get("sensitivities") ==
-                (study.sensitivities or {}).get("file_sha256") and made_for.get("declaration") ==
-                (study.declaration or {}).get("file_sha256"))
-        offline_state = state if same else STALE
-        if not same:
-            reasons.append("the offline result was computed for other diagnostics, sensitivities or declaration")
+    if offline:  # PRIORITY-8-F2: every input of the candidate, the passport and the evidence included
+        made_for, now = offline.get("inputs") or {}, offline_inputs(study)
+        differ = [name for key, name in OFFLINE_INPUT_NAMES.items() if made_for.get(key) != now[key]]
+        offline_state = state if not differ else STALE
+        if differ:
+            reasons.append("the offline candidate was computed for other inputs: " + ", ".join(differ) + " changed")
     return {"state": state, "offline": offline_state, "reasons": reasons,
             "current": state == CURRENT, "offline_current": offline_state == CURRENT}
 
@@ -987,5 +1040,6 @@ __all__ = ["BLOCKED", "CLAIMS", "Check", "Claim", "Constant", "NOT_AVAILABLE", "
            "modal_set_of", "new_study", "open_study", "readiness", "relocate_source", "save_study",
            "sensitivity_plan", "source_status", "study_from_dict", "study_to_dict", "set_diagnostics",
            "load_synthetic_inputs", "thickness_readiness", "results_state", "disk_status", "input_fingerprint",
-           "retire_results", "CURRENT", "STALE", "CHANGED", "MISSING", "NOT_CHECKED",
+           "retire_results", "retire_offline", "passport_fingerprint", "evidence_fingerprint", "offline_inputs",
+           "CURRENT", "STALE", "CHANGED", "MISSING", "NOT_CHECKED",
            "thickness_summary", "verify_source"]

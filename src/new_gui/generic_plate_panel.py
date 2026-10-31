@@ -572,8 +572,8 @@ class GenericPlatePanel(QWidget):
         except (ValueError, TypeError) as error:
             self._say(f"Evidence not evaluated: {error}")
             return False
-        self.study = replace(self.study, evidence=tuple(facts), offline_result=None).logged(
-            "evidence evaluated", f"{len(facts)} facts")
+        study = wb.retire_offline(self.study, "the registration evidence was changed")  # PRIORITY-8-F2: kept
+        self.study = replace(study, evidence=tuple(facts)).logged("evidence evaluated", f"{len(facts)} facts")
         self._say("Evidence evaluated (never a registration).")
         self._refresh()
         return True
@@ -919,9 +919,11 @@ class GenericPlatePanel(QWidget):
         self.tables.pop("offline", None)
         result = s.offline_result if fresh["offline_current"] else None
         if s.offline_result and result is None:
+            changed = [r for r in fresh["reasons"] if r.startswith("the offline candidate")]
             self.offline_body.addWidget(_label(
-                f"Offline candidate {fresh['offline']} — NOT CURRENT: it belongs to other inputs, sensitivities or "
-                f"declaration; it is {wb.NOT_CURRENT_NOTE}.", "error"))
+                f"Offline candidate {fresh['offline']} — NOT CURRENT: "
+                + ("; ".join(changed) or "it belongs to other inputs") + ". Its parameters and derived D11 / D12 / "
+                f"D66 are not shown; it is {wb.NOT_CURRENT_NOTE}.", "error"))
         if result:
             self.offline_body.addWidget(_label(" / ".join(result["labels"]), "warnings"))
             self.offline_body.addWidget(_label(

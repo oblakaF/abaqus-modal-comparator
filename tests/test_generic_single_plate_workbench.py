@@ -831,5 +831,141 @@ class F1PanelTests(_PanelWindow):
         self.assertIn("PHYSICAL_OFFLINE_FIT_BLOCKED", self.panel.gate_label.text())
 
 
+# ----------------------------------------------------------------------------- PRIORITY-8-F2 regressions
+
+def demo_converged() -> wb.Study:
+    from dataclasses import replace
+
+    study = demo_ready()
+    evidence = wb.evidence_result(study)
+    states = off.states(study, evidence)
+    return replace(study, offline_result=off.run_offline_study(study, evidence, states["sensitivities"],
+                                                               states["declaration"]))
+
+
+def with_passport(study: wb.Study, **changes) -> wb.Study:
+    from dataclasses import replace
+
+    return replace(study, passport=replace(study.passport, **changes))
+
+
+class F2OfflineFreshnessTests(unittest.TestCase):
+    """F2: the offline candidate belongs to the passport and evidence it was computed with."""
+
+    def setUp(self):
+        self.study = demo_converged()
+        self.assertEqual(self.study.offline_result["status"], "CONVERGED")
+        self.assertTrue(wb.results_state(self.study)["offline_current"])
+
+    def assert_stale(self, study, what):
+        state = wb.results_state(study)
+        self.assertEqual(state["offline"], wb.STALE)
+        self.assertFalse(state["offline_current"])
+        self.assertTrue(any(what in r for r in state["reasons"]), state["reasons"])
+        return state
+
+    def test_a_thickness_change_makes_the_candidate_stale_but_not_the_diagnostics(self):
+        thicker = tuple(wb.ThicknessReading(r.position, q("length", r.thickness.value + 0.1, "mm", "SYNTHETIC"),
+                                            r.method) for r in self.study.passport.thickness)
+        state = self.assert_stale(with_passport(self.study, thickness=thicker), "the passport")
+        self.assertEqual(state["state"], wb.CURRENT)  # the frequency diagnostics keep their sources: still current
+        self.assertTrue(state["current"])
+
+    def test_a_changed_fixed_nu12_never_leaves_d11_d12_current(self):
+        nu = wb.Constant("nu12", q("ratio", 0.3, "1", "SYNTHETIC"), "FIXED")
+        constants = tuple(nu if c.name == "nu12" else c for c in self.study.passport.constants)
+        changed = with_passport(self.study, constants=constants)
+        self.assert_stale(changed, "the passport")
+        with tempfile.TemporaryDirectory() as folder:
+            evidence = wb.evidence_result(changed)
+            written = wb.export_report(changed, folder, evidence, wb.readiness(changed, evidence))
+            data = json.loads(next(p for p in written if p.suffix == ".json").read_text(encoding="utf-8"))
+            md = next(p for p in written if p.suffix == ".md").read_text(encoding="utf-8")
+            names = [p.name for p in written]
+        self.assertIsNone(data["offline_result"])
+        self.assertEqual(data["not_current_results"]["offline_state"], wb.STALE)
+        self.assertNotIn("D11_Nmm", json.dumps({k: v for k, v in data.items() if k != "not_current_results"}))
+        self.assertNotIn("D11", md.split("## Earlier results")[0])
+        self.assertFalse(any(n.endswith("_offline_terms.csv") for n in names))
+
+    def test_a_changed_physical_specimen_id_makes_the_candidate_stale(self):
+        self.assert_stale(with_passport(self.study, physical_specimen_id="ANOTHER-PLATE"), "the passport")
+
+    def test_changed_evidence_or_conditions_make_the_candidate_stale(self):
+        from dataclasses import replace
+
+        evidence = tuple(gev.EvidenceFact(f.key, "unmarked" if f.key == "scanned_face" else f.value, f.provenance,
+                                          f.source) for f in self.study.evidence)
+        self.assert_stale(replace(self.study, evidence=evidence), "the registration evidence")
+        claims = dict(self.study.passport.claims, suspension=wb.Claim("hung on one wire", "SYNTHETIC", "x"))
+        self.assert_stale(with_passport(self.study, claims=claims), "the passport")
+        same = with_passport(self.study, claims=dict(self.study.passport.claims))
+        self.assertTrue(wb.results_state(same)["offline_current"])  # an equal passport stays current
+
+    def test_replacing_the_inputs_keeps_the_candidate_in_superseded(self):
+        for replace_input in (lambda s: off.with_sensitivities(s, DEMO / "DEMO_SENSITIVITIES.json"),
+                              lambda s: off.with_declaration(s, DEMO / "DEMO_DECLARATION.json")):
+            with self.subTest(replace_input=replace_input):
+                replaced = replace_input(self.study)
+                self.assertIsNone(replaced.offline_result)
+                self.assertEqual(len(replaced.superseded), len(self.study.superseded) + 1)
+                self.assertEqual(replaced.superseded[-1]["offline_result"]["status"], "CONVERGED")
+        retired = wb.retire_offline(self.study, "the registration evidence was changed")
+        self.assertEqual(retired.superseded[-1]["reason"], "the registration evidence was changed")
+        self.assertIsNone(retired.offline_result)
+
+    def test_reopening_and_export_keep_the_scientific_statuses(self):
+        with tempfile.TemporaryDirectory() as folder:
+            current = wb.open_study(wb.save_study(self.study, Path(folder) / "current.json"))
+            self.assertTrue(wb.results_state(current)["offline_current"])
+            stale = with_passport(self.study, physical_specimen_id="ANOTHER-PLATE")
+            reopened = wb.open_study(wb.save_study(stale, Path(folder) / "stale.json"))
+            self.assertEqual(wb.results_state(reopened)["offline"], wb.STALE)
+            evidence = wb.evidence_result(reopened)
+            written = wb.export_report(reopened, Path(folder) / "report", evidence, wb.readiness(reopened, evidence))
+            data = json.loads(next(p for p in written if p.suffix == ".json").read_text(encoding="utf-8"))
+        self.assertEqual(data["results_state"]["offline"], wb.STALE)
+        self.assertEqual(data["approved_material_values"]["status"], "NOT_AVAILABLE")
+        self.assertIn("DIAGNOSTIC_OPTIMIZER_CANDIDATE", json.dumps(data["not_current_results"]["offline_result"]))
+
+    def test_a_candidate_without_a_passport_fingerprint_is_stale(self):
+        from dataclasses import replace
+
+        legacy = replace(self.study, offline_result=dict(self.study.offline_result, inputs={
+            k: v for k, v in self.study.offline_result["inputs"].items() if k not in ("passport", "evidence")}))
+        self.assert_stale(legacy, "the passport")
+
+    def test_the_physical_offline_fit_stays_blocked(self):
+        from dataclasses import replace
+
+        physical = replace(demo_ready(), kind=wb.PHYSICAL)
+        reasons = off.gate(physical, wb.evidence_result(physical), None, None, {"consistent": True})
+        self.assertIn(wb.PHYSICAL_DECISION_NOT_VERIFIABLE, reasons)
+
+
+@unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
+class F2PanelTests(_PanelWindow):
+    def test_a_thickness_change_hides_the_old_candidate_and_its_d_values(self):
+        self.assertTrue(self.panel.open_study(str(DEMO / "DEMO_STUDY.json")))
+        self.assertTrue(self.panel.load_synthetic_inputs(str(DEMO / "DEMO_SYNTHETIC_INPUTS.json")))
+        self.assertTrue(self.panel.load_sensitivities(str(DEMO / "DEMO_SENSITIVITIES.json")))
+        self.assertTrue(self.panel.load_declaration(str(DEMO / "DEMO_DECLARATION.json")))
+        self.assertTrue(self.panel.run_offline())
+        shown = " ".join(w.text() for w in self.panel.findChildren(QLabel))
+        self.assertIn("D11_Nmm", shown)
+        first = self.panel.thickness_table.widgets[0][1]
+        first.setText("2.40")
+        self.assertTrue(self.panel.apply_measurements())
+        shown = " ".join(w.text() for w in self.panel.findChildren(QLabel))
+        self.assertIn("Offline candidate STALE — NOT CURRENT", shown)
+        self.assertNotIn("D11_Nmm", shown)
+        self.assertNotIn("offline", self.panel.tables)
+        self.assertIn("proximity", self.panel.tables)  # the diagnostics stay current
+        self.assertIn("7. Offline Research Study: stale", self.panel.step_line.text())
+        self.assertTrue(self.panel.evaluate_evidence())  # changed evidence: the candidate goes to superseded
+        self.assertIsNone(self.panel.study.offline_result)
+        self.assertEqual(self.panel.study.superseded[-1]["reason"], "the registration evidence was changed")
+
+
 if __name__ == "__main__":
     unittest.main()

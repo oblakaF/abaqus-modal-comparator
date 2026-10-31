@@ -409,3 +409,97 @@ Without a FIXED ν12, D11 and D12 are NOT_AVAILABLE.
 **Build.** The corrected portable build is `AbaqusModalComparator_RC3_F1` (`packaging/portable_rc3_f1`). It is made
 apart from RC3, whose EXE and ZIP are not replaced. The RC1, RC2 and RC3 packaging are unchanged (test). See
 `WINDOWS_PORTABLE_RC3.md`, RC3-F1.
+
+## 10. PRIORITY-8-F2 corrections
+
+Branch `fix/generic-single-plate-rc3-f2`, from `ad49498`.
+
+**The defect.** In RC3-F1 an offline candidate recorded only the diagnostics' inputs and the SHA-256 of the
+sensitivity table and declaration. So it stayed **CURRENT** after any of these changed:
+
+- the thickness;
+- a FIXED constant such as ν12;
+- `physical_specimen_id`;
+- a test condition;
+- the registration evidence.
+
+Its D11 / D12 / D66 were then shown and exported for a plate they were not computed for.
+
+### The offline fingerprint
+
+The candidate now records `wb.offline_inputs(study)`:
+
+- `diagnostics`: the diagnostics' inputs, as before;
+- `sensitivities` and `declaration`: the imported files' SHA-256, as before;
+- `passport`: `passport_fingerprint`, a SHA-256 of:
+  - the identifiers: `design_id`, `physical_specimen_id` and `test_run_id`;
+  - the length, width, mass and density;
+  - every thickness reading;
+  - every engineering constant (name, role FIXED / INITIAL, value, unit, provenance, uncertainty);
+  - the test conditions: material orientation, layup, suspension, measured face, instrument axes, measured DOF, FE
+    model version and excitation (value and provenance);
+- `evidence`: `evidence_fingerprint`, a SHA-256 of every registration evidence fact (key, value, provenance,
+  `derived_from`);
+- `kind`: the study kind.
+
+Free-text sources and notes are not part of it.
+
+### The state of the candidate
+
+**`results_state`** compares every recorded input with the present one:
+
+- **STALE:** any one differs. The reason names what changed, for example "the offline candidate was computed for other
+  inputs: the passport (identifiers, plan, mass, thickness, constants or test conditions) changed".
+- **CURRENT:** nothing differs, and the diagnostics are current.
+
+**A candidate from an earlier study file** (RC3-F1) records no passport and no evidence fingerprint. It is therefore
+STALE and has to be run again.
+
+**The frequency diagnostics are unchanged.** Their fingerprint is still the linked sources, the modal set and the
+synthetic inputs. A thickness or constant change leaves them **CURRENT**, as their EXP / FE sources are the same.
+
+### Replacing an input keeps the candidate as a record
+
+The present candidate is moved to `superseded`, with the reason and its inputs, before it is cleared, when:
+
+- the sensitivity table is imported again;
+- the declaration is imported again;
+- the registration evidence is evaluated again.
+
+Earlier, these three cleared it without a record.
+
+### What a STALE candidate shows
+
+- **GUI:** a banner names the changed inputs and says that its parameters and derived D11 / D12 / D66 are not shown.
+  The offline tables and D values are not shown, and step 7 is "stale".
+- **Export:**
+  - the JSON has `offline_result` null and the candidate under `not_current_results` with its state;
+  - the Markdown says NOT CURRENT;
+  - no `offline_terms` CSV is written.
+
+This is the F1 export rule, now reached for these inputs too.
+
+**Unchanged:**
+
+- the physical offline fit stays blocked (`PHYSICAL_OFFLINE_FIT_BLOCKED`);
+- `release_material_values` always refuses.
+
+### Tests
+
+`tests/test_generic_single_plate_workbench.py` has 47 tests, 9 of them new:
+
+- the thickness changes: the candidate is STALE and the diagnostics stay CURRENT;
+- the FIXED ν12 changes: the candidate is STALE, and the export has no D11 / D12 as a result and no offline terms CSV;
+- `physical_specimen_id` changes: STALE;
+- the evidence or a test condition changes: STALE, while an equal passport stays CURRENT;
+- the sensitivity table or declaration is imported again: the candidate is in `superseded`;
+- `retire_offline` keeps the candidate with its reason;
+- saving, reopening and exporting keep CURRENT and STALE;
+- an RC3-F1 candidate without a passport fingerprint is STALE;
+- the physical offline fit is still blocked;
+- a panel test runs the demonstration, changes one thickness reading and applies it:
+  - the STALE banner shows, the D values and offline table are hidden, the diagnostics stay;
+  - the evidence is then evaluated again and the candidate goes to `superseded`.
+
+The corrected portable build is `AbaqusModalComparator_RC3_F2` (`packaging/portable_rc3_f2`,
+`tests/test_windows_portable_rc3_f2.py`). It is made apart from RC1–RC3-F1. See `WINDOWS_PORTABLE_RC3.md`, RC3-F2.

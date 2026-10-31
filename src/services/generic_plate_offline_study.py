@@ -365,9 +365,7 @@ def run_offline_study(study: wb.Study, evidence: ev.EvidenceResult, sensitivitie
                "The pairs are the declared ones (" + declaration["registration_decision"].get("reference", "") +
                "); MAC is not a term of the objective."]
     labels = list(RESULT_LABELS) + ([wb.SYNTHETIC_LABEL] if study.synthetic else [])
-    made_for = {"diagnostics": (study.diagnostics or {}).get("inputs"),  # PRIORITY-8-F1: the inputs of this result
-                "sensitivities": (study.sensitivities or {}).get("file_sha256"),
-                "declaration": (study.declaration or {}).get("file_sha256")}
+    made_for = wb.offline_inputs(study)  # PRIORITY-8-F1/F2: the inputs of this result, the passport included
     return {"inputs": made_for, "status": lm.status.value, "labels": labels, "refusal": lm.refusal,
             "evaluations": lm.solves,
             "iterations": lm.iterations, "objective": lm.objective, "parameters": names, "candidate": candidate,
@@ -389,7 +387,7 @@ def with_sensitivities(study: wb.Study, path) -> wb.Study:
 
     imported = import_file(path)
     load_sensitivities(imported["data"], study)  # refused here when it is not this model's table
-    out = replace(study, sensitivities=imported, offline_result=None)
+    out = replace(wb.retire_offline(study, "the sensitivity table was replaced"), sensitivities=imported)
     return out.logged("sensitivity table imported", f"{Path(path).name} {imported['file_sha256'][:12]}…")
 
 
@@ -398,7 +396,7 @@ def with_declaration(study: wb.Study, path) -> wb.Study:
 
     imported = import_file(path)
     load_declaration(imported["data"], study, active_sensitivities(study))
-    out = replace(study, declaration=imported, offline_result=None)
+    out = replace(wb.retire_offline(study, "the declared observation set was replaced"), declaration=imported)
     return out.logged("observation set declared", f"{Path(path).name} {imported['file_sha256'][:12]}…")
 
 
