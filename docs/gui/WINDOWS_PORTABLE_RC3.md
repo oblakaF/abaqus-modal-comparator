@@ -165,8 +165,78 @@ The synthetic tests are no physical validation.
 - **Signing.** The EXE is not signed.
 - **Default folders.** The default folders are those of the development computer.
 - **The SP-10 package.** It is not included and is chosen by the user.
-- **The workbench creates no registration and no material value.** A new plate reaches the offline study only with
-  the owner's decision, a sensitivity table of its own FE model (Abaqus under its own gate) and a declared
-  observation set.
+- **The workbench creates no registration and no material value.** Since PRIORITY-8-F1 the physical offline fit is
+  blocked (`GENERIC_SINGLE_PLATE_WORKBENCH_RC3.md` §9). Only the synthetic demonstration reaches it.
 - **Not part of the build:** the old interface, the Abaqus-side scripts and an installer.
 - **Build warning.** PyInstaller warns that the hidden import `scipy.special._cdflib` is not found, as before.
+
+## RC3-F1 — the corrected build (PRIORITY-8-F1)
+
+**Built from code commit `c98fc36`** (branch `fix/generic-single-plate-rc3-f1`) with `packaging/portable_rc3_f1`. It is a
+separate folder and ZIP. The RC3 EXE and ZIP above are not replaced. The RC1, RC2 and RC3 desktop copies have the same
+SHA-256 before and after the build.
+
+| Item | Value |
+|---|---|
+| Commit | `c98fc3663e1db6896674bd7731e2de21583836b0` (clean tree) |
+| Folder | `C:\Users\VadimKrysko\Desktop\AbaqusModalComparator_RC3_F1\` — 720 files, 243 018 429 bytes |
+| EXE | `AbaqusModalComparator.exe`, 17 513 250 bytes, SHA-256 `9e990df9559cfb20fd0b49b218ed0cd8053c6da287eca550b9f926ba2e77238e` |
+| ZIP | `C:\Users\VadimKrysko\Desktop\AbaqusModalComparator_RC3_F1.zip`, 105 598 637 bytes, SHA-256 `afee5e44517fb33513cb4a67c2685b6fbf58e09d84439f780c04ccda8bbb5f79` |
+| RC1 / RC2 / RC3 (unchanged) | ZIP `e1c34b0d…` / `3c07d0b9…` / `a32f7a11…`; EXE `c3fc0576…` / `175e7b1a…` / `68fefa36…` |
+
+### F1 acceptance
+
+**The F1 route.** Two runs:
+
+1. `RUN_NEW_GUI.cmd` of `c98fc36`;
+2. the RC3-F1 EXE, unpacked from the desktop ZIP into
+   `…\PRIORITY8_F1_REVIEW\release c98fc36\Copied to another place\`, started directly.
+
+**Conditions:**
+
+- 150 % scaling, native dialogs, UI Automation;
+- isolated LOCALAPPDATA;
+- for the EXE: a clean environment and `AMC_OPEN_AUDIT`.
+
+The plate files were moved copies, one of them a copy made for the run.
+
+| Step | RUN_NEW_GUI.cmd | EXE |
+|---|---|---|
+| Plate FE package and UNV copy read, set chosen; a physical study linked; diagnostics **Results: CURRENT**, 11 rows | yes | yes |
+| Physical offline fit: button disabled, **PHYSICAL_OFFLINE_FIT_BLOCKED** with its reason | yes | yes |
+| Study saved | yes | yes |
+| The SP-13 UNV read instead: **Results: CHANGED — NOT CURRENT**, the tables are not shown; export: `diagnostics` null, `results_state` CHANGED, `not_current_results` CHANGED | yes | yes |
+| Workspace cleared, study reopened: the recorded files verified on disk by SHA-256 → **CURRENT** | yes | yes |
+| The UNV copy moved, study reopened → **MISSING — NOT CURRENT**, the tables are not shown | yes | yes |
+| **Choose a moved source file...** (fixed): the moved copy with the recorded SHA-256 accepted → **CURRENT** | yes | yes |
+| Synthetic demonstration: offline study **CONVERGED** 51 975.2 / 4 305.13 MPa, 5 FIT / 3 HOLDOUT, labels; export with offline terms | yes | yes |
+| No Abaqus process; closed, exit 0; originals unchanged | yes | yes |
+
+**Open-file record of the EXE (1338 files):**
+
+- none from the repository, an installed Python, a `.venv` or the user's cache;
+- reference files only from the portable `docs` (the demonstration);
+- one relative `struct.py`, as before.
+
+**Evidence:**
+
+- `…\PRIORITY8_F1_REVIEW\gui smoke cmd 3\`;
+- `…\release c98fc36\smoke run\`: `f1_smoke.json`, `open_audit.log`, `open_audit_summary.json` and screenshots
+  `01`–`05`.
+
+**Earlier attempts.** The earlier two cmd runs stopped at the relocation. That is how the clicked(bool) defect was
+found; it was corrected and tested before `c98fc36`.
+
+### F1 tests and CI
+
+**Tests:**
+
+- targeted: workbench (38), RC3-F1 packaging (3), RC3 (5), RC2 (6), RC1 (4), `test_new_gui1_workspace`,
+  `test_new_gui1_qt` and `test_plate_study_qt` — all pass;
+- full suite: 3220 tests, OK, 98 skipped (the same categories).
+
+**Interference.** One earlier full run had one failure in the legacy Tk test
+`test_g1_frequency_scaling…test_real_tk_scrolling_keeps_every_column_accessible`. It ran while a GUI smoke was open on
+the screen. Alone it passes, and the rerun with nothing else on the screen is OK.
+
+**CI:** `c98fc36`, run 41211309129, success.
