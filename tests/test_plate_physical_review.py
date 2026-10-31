@@ -402,6 +402,13 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(tabs.tabToolTip(2), "C. Physical Readiness Review")
         # the smoke found "7. Report _export": "&" is doubled, so it is shown and never a mnemonic
         self.assertEqual(self.panel.step_buttons.button(6).text(), "7. Report && export")
+        # the smoke found a page scroll bar at 900 × 680: the claim list never sizes itself to its longest item
+        from PySide6.QtWidgets import QComboBox
+
+        combo = self.panel.claim_choice
+        self.assertEqual(combo.sizeAdjustPolicy(), QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.assertLessEqual(combo.minimumContentsLength(), 14)
+        self.assertTrue(all(label.wordWrap() for label in self.panel.findChildren(QLabel)))
         self.assertFalse(self.panel.export_button.isEnabled())
         self.assertFalse(self.panel.build_from_workspace())  # nothing read in the Workspace
         self.assertIn("SOURCE_NOT_VERIFIED", " ".join(w.text() for w in self.panel.findChildren(QLabel)))

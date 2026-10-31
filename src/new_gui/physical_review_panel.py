@@ -112,7 +112,7 @@ class PhysicalReviewPanel(QWidget):
         self.freshness_line.setObjectName("prFreshness")
         head_layout.addWidget(self.freshness_line)
         buttons = QVBoxLayout()  # buttons in a column: no page width; clicked(bool) never reaches an optional argument
-        for text, slot, name in (("Build review from the Workspace (PLATE 261027 + M11)",
+        for text, slot, name in (("Build from the Workspace (PLATE 261027, M11)",
                                   lambda: self.build_from_workspace(), "prBuildWorkspace"),
                                  ("Build review from study B", lambda: self.build_from_study(), "prBuildStudy"),
                                  ("Open review...", lambda: self.open_review(), "prOpen"),
@@ -186,6 +186,10 @@ class PhysicalReviewPanel(QWidget):
                                "scientific interpretation: the owner's answer does.", "hint"))
         self.claim_choice = QComboBox()
         self.claim_choice.setObjectName("prClaim")
+        # a long claim never widens the page (the smoke found a page scroll bar at 900 × 680)
+        self.claim_choice.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.claim_choice.setMinimumContentsLength(14)
+        self.claim_choice.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         for claim in pr.CLAIM_TYPES:
             self.claim_choice.addItem(claim, claim)
         inner.addWidget(self.claim_choice, 0, Qt.AlignmentFlag.AlignLeft)
