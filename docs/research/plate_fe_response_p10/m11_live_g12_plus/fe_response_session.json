@@ -1,0 +1,2607 @@
+{
+  "schema": "amc/fe-response-session/v1",
+  "created": "2026-11-01T00:32:56+00:00",
+  "labels": [
+    "RESEARCH_ONLY",
+    "FE_ONLY",
+    "NOT_A_MATERIAL_PROPERTY",
+    "NO_EXPERIMENTAL_PAIRING"
+  ],
+  "family": {
+    "schema": "amc/fe-family/v1",
+    "model_id": "M11 S4R_0875_BASELINE",
+    "specimen_id": "PLATE-300x300x1mm",
+    "kind": "FE_MODEL",
+    "geometry": "",
+    "provenance": "folder D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central",
+    "baseline_parameters": {
+      "E1": 56000.0,
+      "E2": 56000.0,
+      "G12": 5000.0
+    },
+    "baseline": {
+      "id": "baseline",
+      "manifest": "D:\\git\\abaqus-modal-comparator-work\\research\\INTEGRATION_RC1_REVIEW\\moved inputs\\FE package copy\\manifest.json",
+      "parameter": null,
+      "value": null,
+      "unit": "MPa",
+      "inp": "D:\\git\\abaqus-modal-comparator-work\\research\\INTEGRATION_RC1_REVIEW\\moved inputs\\FE archive copy\\external_models\\v3_20261021\\Plate\\temp_root\\CFRP_S4R_0875_FreeFree.inp",
+      "dat": null,
+      "solver_log": null,
+      "run_record": null,
+      "provenance": "chosen by the user"
+    },
+    "variants": [
+      {
+        "id": "M11_S4_E1_MINUS",
+        "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_MINUS\\extraction\\manifest.json",
+        "parameter": "E1",
+        "value": 53200.0,
+        "unit": "MPa",
+        "inp": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_MINUS\\M11_S4_E1_MINUS.inp",
+        "dat": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_MINUS\\M11_S4_E1_MINUS.dat",
+        "solver_log": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_MINUS\\M11_S4_E1_MINUS.sta",
+        "run_record": {
+          "attempt": "1",
+          "job": "M11_S4_E1_MINUS",
+          "parameter": "E1",
+          "value": "53200.0",
+          "inp_sha256": "9206031e23f3d44acbb86f417ab62e412759eb7f44b0147101fb620825ec9f09",
+          "started": "2026-10-30T19:16:10+08:00",
+          "finished": "2026-10-30T19:16:27+08:00",
+          "exit_code": "0",
+          "sta_completed": "True",
+          "odb_sha256": "38c6b0096a9062c48891d3cdd3036fa12ccea8ffe6dd54a83eb47d534af2ef81",
+          "seconds": "16.5",
+          "note": "completed"
+        },
+        "provenance": "the folder D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central (INP-declared value)"
+      },
+      {
+        "id": "M11_S4_E1_PLUS",
+        "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_PLUS\\extraction\\manifest.json",
+        "parameter": "E1",
+        "value": 58800.0,
+        "unit": "MPa",
+        "inp": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_PLUS\\M11_S4_E1_PLUS.inp",
+        "dat": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_PLUS\\M11_S4_E1_PLUS.dat",
+        "solver_log": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_PLUS\\M11_S4_E1_PLUS.sta",
+        "run_record": {
+          "attempt": "2",
+          "job": "M11_S4_E1_PLUS",
+          "parameter": "E1",
+          "value": "58800.0",
+          "inp_sha256": "b3a631909ac0117e6d61806ba4fbfadfdd261cc023961969f8b7770c76b1ed89",
+          "started": "2026-10-30T19:16:27+08:00",
+          "finished": "2026-10-30T19:16:39+08:00",
+          "exit_code": "0",
+          "sta_completed": "True",
+          "odb_sha256": "f70b02982cbcc58cae3b51cc8f3dadd1a5df1beca915518a3caff07f668275f0",
+          "seconds": "12.2",
+          "note": "completed"
+        },
+        "provenance": "the folder D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central (INP-declared value)"
+      },
+      {
+        "id": "M11_S4_E2_MINUS",
+        "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_MINUS\\extraction\\manifest.json",
+        "parameter": "E2",
+        "value": 53200.0,
+        "unit": "MPa",
+        "inp": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_MINUS\\M11_S4_E2_MINUS.inp",
+        "dat": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_MINUS\\M11_S4_E2_MINUS.dat",
+        "solver_log": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_MINUS\\M11_S4_E2_MINUS.sta",
+        "run_record": {
+          "attempt": "3",
+          "job": "M11_S4_E2_MINUS",
+          "parameter": "E2",
+          "value": "53200.0",
+          "inp_sha256": "4200225bba4d17cf9d84f7eef3384ef29cbe6ca0a03374b51b2209a2e1804051",
+          "started": "2026-10-30T19:16:39+08:00",
+          "finished": "2026-10-30T19:16:51+08:00",
+          "exit_code": "0",
+          "sta_completed": "True",
+          "odb_sha256": "5af4b61c7b907bb6c6ceac9d134d3ddccc854eb9748bc1b70efbf06dcd4065c0",
+          "seconds": "12.4",
+          "note": "completed"
+        },
+        "provenance": "the folder D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central (INP-declared value)"
+      },
+      {
+        "id": "M11_S4_E2_PLUS",
+        "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_PLUS\\extraction\\manifest.json",
+        "parameter": "E2",
+        "value": 58800.0,
+        "unit": "MPa",
+        "inp": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_PLUS\\M11_S4_E2_PLUS.inp",
+        "dat": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_PLUS\\M11_S4_E2_PLUS.dat",
+        "solver_log": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_PLUS\\M11_S4_E2_PLUS.sta",
+        "run_record": {
+          "attempt": "4",
+          "job": "M11_S4_E2_PLUS",
+          "parameter": "E2",
+          "value": "58800.0",
+          "inp_sha256": "3cd0ed6aa60bc946cf92b026d46ca76afe71292c4e65ba8a32091eb930e717d4",
+          "started": "2026-10-30T19:16:51+08:00",
+          "finished": "2026-10-30T19:17:03+08:00",
+          "exit_code": "0",
+          "sta_completed": "True",
+          "odb_sha256": "aa5c9b707ddc526b00419e720a73a57de360687dfe84b09d33d66413a413c5b4",
+          "seconds": "12.1",
+          "note": "completed"
+        },
+        "provenance": "the folder D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central (INP-declared value)"
+      },
+      {
+        "id": "M11_S4_G12_MINUS",
+        "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_MINUS\\extraction\\manifest.json",
+        "parameter": "G12",
+        "value": 4750.0,
+        "unit": "MPa",
+        "inp": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_MINUS\\M11_S4_G12_MINUS.inp",
+        "dat": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_MINUS\\M11_S4_G12_MINUS.dat",
+        "solver_log": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_MINUS\\M11_S4_G12_MINUS.sta",
+        "run_record": {
+          "attempt": "5",
+          "job": "M11_S4_G12_MINUS",
+          "parameter": "G12",
+          "value": "4750.0",
+          "inp_sha256": "909251e1990ae03de3132f6941d9ab177e6e16d63a749c6c03e6ea8c47e0c279",
+          "started": "2026-10-30T19:17:03+08:00",
+          "finished": "2026-10-30T19:17:16+08:00",
+          "exit_code": "0",
+          "sta_completed": "True",
+          "odb_sha256": "8048f391b9f5c5ed2713538bef2acd9cda259b425532a5cbf93dd7e883b81190",
+          "seconds": "12.3",
+          "note": "completed"
+        },
+        "provenance": "the folder D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central (INP-declared value)"
+      },
+      {
+        "id": "M11_S4_G12_PLUS",
+        "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_PLUS\\extraction\\manifest.json",
+        "parameter": "G12",
+        "value": 5250.0,
+        "unit": "MPa",
+        "inp": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_PLUS\\M11_S4_G12_PLUS.inp",
+        "dat": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_PLUS\\M11_S4_G12_PLUS.dat",
+        "solver_log": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_PLUS\\M11_S4_G12_PLUS.sta",
+        "run_record": {
+          "attempt": "6",
+          "job": "M11_S4_G12_PLUS",
+          "parameter": "G12",
+          "value": "5250.0",
+          "inp_sha256": "1ddbe7fa38498f560bafbcb5bed5abdf18eb2114499ae68a956ca78ef6bb00d7",
+          "started": "2026-10-30T19:17:16+08:00",
+          "finished": "2026-10-30T19:17:28+08:00",
+          "exit_code": "0",
+          "sta_completed": "True",
+          "odb_sha256": "ea3e591400357ff5b5bd01f1215756730ae8caeef885e54824466ff33f32315a",
+          "seconds": "12.3",
+          "note": "completed"
+        },
+        "provenance": "the folder D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central (INP-declared value)"
+      }
+    ],
+    "problems": []
+  },
+  "identities": [
+    {
+      "id": "baseline",
+      "role": "baseline",
+      "parameter": null,
+      "value": null,
+      "unit": "MPa",
+      "manifest": "D:\\git\\abaqus-modal-comparator-work\\research\\INTEGRATION_RC1_REVIEW\\moved inputs\\FE package copy\\manifest.json",
+      "manifest_sha256": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+      "package_sha256": "a6687a33397976979254e1c2397219ed16c80a3af6437afeb624aef71e5e6c84",
+      "inp_sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+      "dat_sha256": null,
+      "solver_log_sha256": null,
+      "odb": null,
+      "odb_state": null,
+      "not_verified": [
+        "the ODB (not present or no recorded SHA-256): the package's origin from its solve is not verified"
+      ]
+    },
+    {
+      "id": "M11_S4_E1_MINUS",
+      "role": "variant",
+      "parameter": "E1",
+      "value": 53200.0,
+      "unit": "MPa",
+      "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_MINUS\\extraction\\manifest.json",
+      "manifest_sha256": "a2ae6efd1f6c707f056b7c915a714b77dd700ebad6bd935c9f01e8d49b1a4d00",
+      "package_sha256": "3554b4ab3bf9bc68c57a3e5d7a1cc49b23e6ecedfd5b8df14f89fcc84f867796",
+      "inp_sha256": "9206031e23f3d44acbb86f417ab62e412759eb7f44b0147101fb620825ec9f09",
+      "dat_sha256": "d227252738a75cbff6e41bd89e9d8f306a66699b2e25b21f8ca4301457afc6de",
+      "solver_log_sha256": "345a10b326e473d78688f4f9772a021f65f6dd0da530619df56e4bfac1ab4be7",
+      "odb": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_MINUS\\M11_S4_E1_MINUS.odb",
+      "odb_state": "VERIFIED_SHA256",
+      "not_verified": [],
+      "run": {
+        "exit_code": "0",
+        "sta_completed": "True",
+        "note": "completed"
+      }
+    },
+    {
+      "id": "M11_S4_E1_PLUS",
+      "role": "variant",
+      "parameter": "E1",
+      "value": 58800.0,
+      "unit": "MPa",
+      "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_PLUS\\extraction\\manifest.json",
+      "manifest_sha256": "3f7e09810481088f3bf7d77c4e2907c6d53b5252fd9e819f15a1f4450e48b3d9",
+      "package_sha256": "5fd33474c34c79b80630b931ca66d7fd13c80ecccc38435f1407f59297a63a54",
+      "inp_sha256": "b3a631909ac0117e6d61806ba4fbfadfdd261cc023961969f8b7770c76b1ed89",
+      "dat_sha256": "3d3ef49e54d744babecfb09705b0cf8f0e03d6d09554263c345b72bb1840fb09",
+      "solver_log_sha256": "f70e0d173c9a691051528693c75b830492a3dce61c7588b2ac26b2f3ba70145a",
+      "odb": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E1_PLUS\\M11_S4_E1_PLUS.odb",
+      "odb_state": "VERIFIED_SHA256",
+      "not_verified": [],
+      "run": {
+        "exit_code": "0",
+        "sta_completed": "True",
+        "note": "completed"
+      }
+    },
+    {
+      "id": "M11_S4_E2_MINUS",
+      "role": "variant",
+      "parameter": "E2",
+      "value": 53200.0,
+      "unit": "MPa",
+      "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_MINUS\\extraction\\manifest.json",
+      "manifest_sha256": "c658355d7bc57452eb1163a098537d067f6101114c1351b85829a5bcbf99fa58",
+      "package_sha256": "050880567f01be5938d28e702eac38bdb1cd77c2761a50f27d5a46429f835197",
+      "inp_sha256": "4200225bba4d17cf9d84f7eef3384ef29cbe6ca0a03374b51b2209a2e1804051",
+      "dat_sha256": "bb6795e9bd7798b380b0c31a2dfa9b10c81dc3a72f60f432752d4f50fde0651c",
+      "solver_log_sha256": "de0d6cdcee40d305c78851d5ad8eca1029ffeb9779463ed76bd1e2908724e7ba",
+      "odb": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_MINUS\\M11_S4_E2_MINUS.odb",
+      "odb_state": "VERIFIED_SHA256",
+      "not_verified": [],
+      "run": {
+        "exit_code": "0",
+        "sta_completed": "True",
+        "note": "completed"
+      }
+    },
+    {
+      "id": "M11_S4_E2_PLUS",
+      "role": "variant",
+      "parameter": "E2",
+      "value": 58800.0,
+      "unit": "MPa",
+      "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_PLUS\\extraction\\manifest.json",
+      "manifest_sha256": "988592df1c76d80f4e0ad4ed04ef8c4d9e2d8221f88a8ccb9522d7958c141c2a",
+      "package_sha256": "bfb8bc99e0b786b94c3493f23765bc600b6a205be8ea5d70eb6cfff437f56a20",
+      "inp_sha256": "3cd0ed6aa60bc946cf92b026d46ca76afe71292c4e65ba8a32091eb930e717d4",
+      "dat_sha256": "a46c76f52907d51582c62ee9378470acf23004d24f4394e6b89b414eb90aad4b",
+      "solver_log_sha256": "44a350ab4fbf40de918fd2447870ff7e503c5341964dd4ca39abf3370cb6ac9f",
+      "odb": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_E2_PLUS\\M11_S4_E2_PLUS.odb",
+      "odb_state": "VERIFIED_SHA256",
+      "not_verified": [],
+      "run": {
+        "exit_code": "0",
+        "sta_completed": "True",
+        "note": "completed"
+      }
+    },
+    {
+      "id": "M11_S4_G12_MINUS",
+      "role": "variant",
+      "parameter": "G12",
+      "value": 4750.0,
+      "unit": "MPa",
+      "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_MINUS\\extraction\\manifest.json",
+      "manifest_sha256": "36982be350338eafc1b575d3b12fa9c75b034d732711da08e69d6424ad151f89",
+      "package_sha256": "f637cc7df47395bcd1df49960727ce6d966c5640f4a7df3b2212a65d29ae7455",
+      "inp_sha256": "909251e1990ae03de3132f6941d9ab177e6e16d63a749c6c03e6ea8c47e0c279",
+      "dat_sha256": "dd3982760a763185570bd7de203119f0e37b9d3987c853110da1f8034612b3ae",
+      "solver_log_sha256": "2972513ba3fa9e8e0c5bec55e8c46760080ad58f28753e15edce2de154c46eb4",
+      "odb": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_MINUS\\M11_S4_G12_MINUS.odb",
+      "odb_state": "VERIFIED_SHA256",
+      "not_verified": [],
+      "run": {
+        "exit_code": "0",
+        "sta_completed": "True",
+        "note": "completed"
+      }
+    },
+    {
+      "id": "M11_S4_G12_PLUS",
+      "role": "variant",
+      "parameter": "G12",
+      "value": 5250.0,
+      "unit": "MPa",
+      "manifest": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_PLUS\\extraction\\manifest.json",
+      "manifest_sha256": "56116a4ef13d61c01bdc166e88eb0f8e3a0bc9e241b214383db103a925e6bbd9",
+      "package_sha256": "fc3299042334c77261318cb6d1bcb1e49773d5c1e79305bc464b1fdd4aa1bb8f",
+      "inp_sha256": "1ddbe7fa38498f560bafbcb5bed5abdf18eb2114499ae68a956ca78ef6bb00d7",
+      "dat_sha256": "c3194a5e806450feeb5a931433082f7636dab68895c530e977f3073091b85af7",
+      "solver_log_sha256": "7c205e44ea147056782e10fd8b7ea67d35b58d8c077b7c38f1305cd54cd17b8a",
+      "odb": "D:\\git\\abaqus-modal-comparator-work\\runs\\m11_carbon_plate\\s4_central\\M11_S4_G12_PLUS\\M11_S4_G12_PLUS.odb",
+      "odb_state": "VERIFIED_SHA256",
+      "not_verified": [],
+      "run": {
+        "exit_code": "0",
+        "sta_completed": "True",
+        "note": "completed"
+      }
+    }
+  ],
+  "fe_fingerprint": "5f55960442b5a6e4def30d0931c77ae6827fb285a020d35774b574883ea5e6f3",
+  "result": {
+    "kind": "LIVE_FE_PACKAGE_ANALYSIS",
+    "status": "LIVE_FE_PACKAGE_ANALYSIS",
+    "model_id": "M11 S4R_0875_BASELINE",
+    "specimen_id": "PLATE-300x300x1mm",
+    "family_kind": "FE_MODEL",
+    "baseline_geometry_sha256": "02fb9f9925aab3ce4aa0f947c096b03a232c4a1218a9a26fabaff62e5eb4c497",
+    "baseline_parameters": {
+      "E1": 56000.0,
+      "E2": 56000.0,
+      "G12": 5000.0
+    },
+    "completeness": {
+      "E1": {
+        "minus": "M11_S4_E1_MINUS",
+        "plus": "M11_S4_E1_PLUS",
+        "missing": []
+      },
+      "E2": {
+        "minus": "M11_S4_E2_MINUS",
+        "plus": "M11_S4_E2_PLUS",
+        "missing": []
+      },
+      "G12": {
+        "minus": "M11_S4_G12_MINUS",
+        "plus": "M11_S4_G12_PLUS",
+        "missing": []
+      }
+    },
+    "states_used": [
+      "M11_S4_E1_MINUS",
+      "M11_S4_E1_PLUS",
+      "M11_S4_E2_MINUS",
+      "M11_S4_E2_PLUS",
+      "M11_S4_G12_MINUS",
+      "M11_S4_G12_PLUS"
+    ],
+    "excluded": [],
+    "family_problems": [],
+    "rigid_excluded": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "branches": [
+      {
+        "branch": "FE7",
+        "baseline_mode": 7,
+        "hz": 19.07217025756836,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE7",
+            "hz": 19.064125061035156,
+            "mac": 0.9999996381117122,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE7",
+            "hz": 19.079591751098633,
+            "mac": 0.9999996969267808,
+            "permutation": false
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE7",
+            "hz": 19.063949584960938,
+            "mac": 0.999999632716253,
+            "permutation": false
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE7",
+            "hz": 19.079744338989258,
+            "mac": 0.9999996925594701,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE7",
+            "hz": 18.60553741455078,
+            "mac": 0.9999993846151133,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE7",
+            "hz": 19.526395797729492,
+            "mac": 0.9999994016458187,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE8",
+        "baseline_mode": 8,
+        "hz": 59.8741569519043,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE8",
+            "hz": 58.735618591308594,
+            "mac": 0.9261523524623242,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "BRANCH_LOSS",
+            "reason": "BRANCH_LOSS: FE8 (reference mode 8): best FE-to-FE MAC 0.890 < 0.9",
+            "candidate": null,
+            "hz": null,
+            "mac": null,
+            "permutation": false
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "BRANCH_LOSS",
+            "reason": "BRANCH_LOSS: FE8 (reference mode 8): best FE-to-FE MAC 0.880 < 0.9",
+            "candidate": null,
+            "hz": null,
+            "mac": null,
+            "permutation": false
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE8",
+            "hz": 60.2495002746582,
+            "mac": 0.9310266129707709,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE8",
+            "hz": 59.874114990234375,
+            "mac": 0.9999999979642649,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE8",
+            "hz": 59.87419891357422,
+            "mac": 0.9999999981877443,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE9",
+        "baseline_mode": 9,
+        "hz": 62.0091667175293,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE9",
+            "hz": 61.614341735839844,
+            "mac": 0.926238881495973,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "BRANCH_LOSS",
+            "reason": "BRANCH_LOSS: FE9 (reference mode 9): best FE-to-FE MAC 0.890 < 0.9",
+            "candidate": null,
+            "hz": null,
+            "mac": null,
+            "permutation": false
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "BRANCH_LOSS",
+            "reason": "BRANCH_LOSS: FE9 (reference mode 9): best FE-to-FE MAC 0.880 < 0.9",
+            "candidate": null,
+            "hz": null,
+            "mac": null,
+            "permutation": false
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE9",
+            "hz": 63.147159576416016,
+            "mac": 0.9311115242526085,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE9",
+            "hz": 62.00871658325195,
+            "mac": 0.9999998287218969,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE9",
+            "hz": 62.00959014892578,
+            "mac": 0.9999998495099367,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE10",
+        "baseline_mode": 10,
+        "hz": 71.849853515625,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE10",
+            "hz": 70.55188751220703,
+            "mac": 0.9999997683142914,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE11",
+            "hz": 73.12437438964844,
+            "mac": 0.9999998050111361,
+            "permutation": true
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE11",
+            "hz": 71.8279037475586,
+            "mac": 0.9999976326917256,
+            "permutation": true
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE10",
+            "hz": 71.87035369873047,
+            "mac": 0.9999979394317091,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE10",
+            "hz": 71.35995483398438,
+            "mac": 0.9999977794174052,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE10",
+            "hz": 72.33463287353516,
+            "mac": 0.9999979153614119,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE11",
+        "baseline_mode": 11,
+        "hz": 72.18998718261719,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE11",
+            "hz": 72.17565155029297,
+            "mac": 0.9999976204306942,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE10",
+            "hz": 72.2033920288086,
+            "mac": 0.999997990421892,
+            "permutation": true
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE10",
+            "hz": 70.87335968017578,
+            "mac": 0.9999991873335262,
+            "permutation": true
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE11",
+            "hz": 73.48255920410156,
+            "mac": 0.9999992066535033,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE11",
+            "hz": 71.70262145996094,
+            "mac": 0.999997758771851,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE11",
+            "hz": 72.67229461669922,
+            "mac": 0.999997897328813,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE12",
+        "baseline_mode": 12,
+        "hz": 116.58042907714844,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE12",
+            "hz": 115.75914764404297,
+            "mac": 0.9999979695942526,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE12",
+            "hz": 117.39381408691406,
+            "mac": 0.9999982814767955,
+            "permutation": false
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE12",
+            "hz": 115.70854187011719,
+            "mac": 0.9999974271993544,
+            "permutation": false
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE12",
+            "hz": 117.4431381225586,
+            "mac": 0.9999977820893532,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE12",
+            "hz": 115.34623718261719,
+            "mac": 0.9999960510225672,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE12",
+            "hz": 117.79624938964844,
+            "mac": 0.9999962122946899,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE13",
+        "baseline_mode": 13,
+        "hz": 167.49026489257812,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE13",
+            "hz": 163.26083374023438,
+            "mac": 0.9999992234485217,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE14",
+            "hz": 171.61526489257812,
+            "mac": 0.9999993859017403,
+            "permutation": true
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE14",
+            "hz": 167.4830322265625,
+            "mac": 0.9999988506285566,
+            "permutation": true
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE13",
+            "hz": 167.49749755859375,
+            "mac": 0.999998856703083,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE13",
+            "hz": 167.4891815185547,
+            "mac": 0.9999993773632757,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE13",
+            "hz": 167.49127197265625,
+            "mac": 0.9999994686322793,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE14",
+        "baseline_mode": 14,
+        "hz": 168.6079864501953,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE14",
+            "hz": 168.61563110351562,
+            "mac": 0.99999956205274,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE13",
+            "hz": 168.60107421875,
+            "mac": 0.9999996500031716,
+            "permutation": true
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE13",
+            "hz": 164.33567810058594,
+            "mac": 0.9999987098451086,
+            "permutation": true
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE14",
+            "hz": 172.7749481201172,
+            "mac": 0.9999986778820042,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE14",
+            "hz": 168.60690307617188,
+            "mac": 0.9999993704372956,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE14",
+            "hz": 168.60899353027344,
+            "mac": 0.9999994629953015,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE15",
+        "baseline_mode": 15,
+        "hz": 174.79769897460938,
+        "cluster": "FE15+FE16",
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              171.77825927734375,
+              178.91197204589844
+            ],
+            "mac": 0.9999982086076558,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              176.45176696777344,
+              182.16761779785156
+            ],
+            "mac": 0.9999983774951582,
+            "permutation": false
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              172.46588134765625,
+              178.14501953125
+            ],
+            "mac": 0.9999955614606626,
+            "permutation": false
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              175.7635498046875,
+              182.93209838867188
+            ],
+            "mac": 0.9999959277306417,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              174.3768768310547,
+              179.46656799316406
+            ],
+            "mac": 0.999991848432324,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              175.21705627441406,
+              180.33282470703125
+            ],
+            "mac": 0.9999926228592178,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE16",
+        "baseline_mode": 16,
+        "hz": 179.901611328125,
+        "cluster": "FE15+FE16",
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              171.77825927734375,
+              178.91197204589844
+            ],
+            "mac": 0.9999982086076558,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              176.45176696777344,
+              182.16761779785156
+            ],
+            "mac": 0.9999983774951582,
+            "permutation": false
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              172.46588134765625,
+              178.14501953125
+            ],
+            "mac": 0.9999955614606626,
+            "permutation": false
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              175.7635498046875,
+              182.93209838867188
+            ],
+            "mac": 0.9999959277306417,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              174.3768768310547,
+              179.46656799316406
+            ],
+            "mac": 0.999991848432324,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED_CLUSTER",
+            "reason": null,
+            "candidate": "FE15+FE16",
+            "hz": [
+              175.21705627441406,
+              180.33282470703125
+            ],
+            "mac": 0.9999926228592178,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE17",
+        "baseline_mode": 17,
+        "hz": 213.19947814941406,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE17",
+            "hz": 209.8789825439453,
+            "mac": 0.9999971563565505,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE18",
+            "hz": 216.4673309326172,
+            "mac": 0.9999975022848615,
+            "permutation": true
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE18",
+            "hz": 212.63241577148438,
+            "mac": 0.9999928091754382,
+            "permutation": true
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE17",
+            "hz": 213.7600860595703,
+            "mac": 0.999993791383382,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE17",
+            "hz": 211.72850036621094,
+            "mac": 0.9999915301615916,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE17",
+            "hz": 214.6539306640625,
+            "mac": 0.9999920758485398,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE18",
+        "baseline_mode": 18,
+        "hz": 213.9527587890625,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE18",
+            "hz": 213.472900390625,
+            "mac": 0.9999927724136053,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE17",
+            "hz": 214.42816162109375,
+            "mac": 0.9999940659983606,
+            "permutation": true
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE17",
+            "hz": 210.5196533203125,
+            "mac": 0.9999942160418643,
+            "permutation": true
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE18",
+            "hz": 217.32974243164062,
+            "mac": 0.9999945579507998,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE18",
+            "hz": 212.48768615722656,
+            "mac": 0.9999915021541756,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE18",
+            "hz": 215.40142822265625,
+            "mac": 0.9999920527047979,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE19",
+        "baseline_mode": 19,
+        "hz": 295.7755126953125,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE19",
+            "hz": 293.354248046875,
+            "mac": 0.9999947306489945,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE19",
+            "hz": 298.1730651855469,
+            "mac": 0.9999954393035068,
+            "permutation": false
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE19",
+            "hz": 293.15679931640625,
+            "mac": 0.9999916932340778,
+            "permutation": false
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE19",
+            "hz": 298.3662109375,
+            "mac": 0.9999926508549305,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE19",
+            "hz": 293.39825439453125,
+            "mac": 0.9999863463218829,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE19",
+            "hz": 298.1235046386719,
+            "mac": 0.9999873137062816,
+            "permutation": false
+          }
+        }
+      },
+      {
+        "branch": "FE20",
+        "baseline_mode": 20,
+        "hz": 327.9010314941406,
+        "cluster": null,
+        "variants": {
+          "M11_S4_E1_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE20",
+            "hz": 319.9827880859375,
+            "mac": 0.9153724038458247,
+            "permutation": false
+          },
+          "M11_S4_E1_PLUS": {
+            "status": "BRANCH_LOSS",
+            "reason": "BRANCH_LOSS: FE20 (reference mode 20): best FE-to-FE MAC 0.307 < 0.9",
+            "candidate": null,
+            "hz": null,
+            "mac": null,
+            "permutation": false
+          },
+          "M11_S4_E2_MINUS": {
+            "status": "BRANCH_LOSS",
+            "reason": "BRANCH_LOSS: FE20 (reference mode 20): best FE-to-FE MAC 0.297 < 0.9",
+            "candidate": null,
+            "hz": null,
+            "mac": null,
+            "permutation": false
+          },
+          "M11_S4_E2_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE20",
+            "hz": 328.27276611328125,
+            "mac": 0.9178286373729435,
+            "permutation": false
+          },
+          "M11_S4_G12_MINUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE20",
+            "hz": 327.8949279785156,
+            "mac": 0.9999932080458538,
+            "permutation": false
+          },
+          "M11_S4_G12_PLUS": {
+            "status": "TRACKED",
+            "reason": null,
+            "candidate": "FE20",
+            "hz": 327.90667724609375,
+            "mac": 0.9999942491143705,
+            "permutation": false
+          }
+        }
+      }
+    ],
+    "clusters": [
+      {
+        "rows": [
+          "FE10",
+          "FE11"
+        ],
+        "status": "INDEPENDENT",
+        "reasons": [
+          "individual branch identity stable in every direction: two observations"
+        ]
+      },
+      {
+        "rows": [
+          "FE13",
+          "FE14"
+        ],
+        "status": "INDEPENDENT",
+        "reasons": [
+          "individual branch identity stable in every direction: two observations"
+        ]
+      },
+      {
+        "rows": [
+          "FE15",
+          "FE16"
+        ],
+        "status": "CONFIRMED",
+        "reasons": [
+          "individual identity unstable in ['M11_S4_E1_PLUS', 'M11_S4_E2_MINUS']; subspace stable in all directions"
+        ]
+      },
+      {
+        "rows": [
+          "FE17",
+          "FE18"
+        ],
+        "status": "INDEPENDENT",
+        "reasons": [
+          "individual branch identity stable in every direction: two observations"
+        ]
+      }
+    ],
+    "central": [
+      {
+        "term": "FE7",
+        "f0_hz": 19.07217025756836,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 19.06412506103516,
+            "f_plus": 19.07959175109863,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.008102930018214997,
+            "mode": "TRACKED",
+            "s_minus": 0.008225599587067556,
+            "s_plus": 0.007973967010718286,
+            "one_sided_difference": -0.0002516325763492703
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 19.063949584960938,
+            "f_plus": 19.079744338989258,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.008274806252583852,
+            "mode": "TRACKED",
+            "s_minus": 0.00840504916325562,
+            "s_plus": 0.008137881360595808,
+            "one_sided_difference": -0.0002671678026598123
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 18.605537414550785,
+            "f_plus": 19.526395797729492,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.4826765053390997,
+            "mode": "TRACKED",
+            "s_minus": 0.4829280583867331,
+            "s_plus": 0.4824120466157895,
+            "one_sided_difference": -0.0005160117709435696
+          }
+        }
+      },
+      {
+        "term": "FE8",
+        "f0_hz": 59.87415695190428,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 58.73561859130861,
+            "f_plus": null,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "NOT_TRACKED — CENTRAL_SENSITIVITY_UNAVAILABLE",
+            "s": null,
+            "lost_in": [
+              "M11_S4_E1_PLUS"
+            ],
+            "reason": "BRANCH_LOSS: FE8 (reference mode 8): best FE-to-FE MAC 0.890 < 0.9"
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": null,
+            "f_plus": 60.24950027465819,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "NOT_TRACKED — CENTRAL_SENSITIVITY_UNAVAILABLE",
+            "s": null,
+            "lost_in": [
+              "M11_S4_E2_MINUS"
+            ],
+            "reason": "BRANCH_LOSS: FE8 (reference mode 8): best FE-to-FE MAC 0.880 < 0.9"
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 59.87411499023437,
+            "f_plus": 59.87419891357419,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 1.4004933228254778e-05,
+            "mode": "TRACKED",
+            "s_minus": 1.366321526275537e-05,
+            "s_plus": 1.4364182689703785e-05,
+            "one_sided_difference": 7.009674269484143e-07
+          }
+        }
+      },
+      {
+        "term": "FE9",
+        "f0_hz": 62.00916671752929,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 61.61434173583986,
+            "f_plus": null,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "NOT_TRACKED — CENTRAL_SENSITIVITY_UNAVAILABLE",
+            "s": null,
+            "lost_in": [
+              "M11_S4_E1_PLUS"
+            ],
+            "reason": "BRANCH_LOSS: FE9 (reference mode 9): best FE-to-FE MAC 0.890 < 0.9"
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": null,
+            "f_plus": 63.147159576415994,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "NOT_TRACKED — CENTRAL_SENSITIVITY_UNAVAILABLE",
+            "s": null,
+            "lost_in": [
+              "M11_S4_E2_MINUS"
+            ],
+            "reason": "BRANCH_LOSS: FE9 (reference mode 9): best FE-to-FE MAC 0.880 < 0.9"
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 62.00871658325193,
+            "f_plus": 62.00959014892577,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.00014075941520266848,
+            "mode": "TRACKED",
+            "s_minus": 0.00014152304791464334,
+            "s_plus": 0.00013995660508374223,
+            "one_sided_difference": -1.5664428309011174e-06
+          }
+        }
+      },
+      {
+        "term": "FE10",
+        "f0_hz": 71.84985351562499,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 70.55188751220705,
+            "f_plus": 73.12437438964844,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.35783453617075633,
+            "mode": "TRACKED",
+            "s_minus": 0.3554098405830853,
+            "s_plus": 0.36038362832274634,
+            "one_sided_difference": 0.004973787739661062
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 71.82790374755861,
+            "f_plus": 71.87035369873048,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.005903280190851939,
+            "mode": "TRACKED",
+            "s_minus": 0.005956755866679778,
+            "s_plus": 0.005847060999350857,
+            "one_sided_difference": -0.00010969486732892095
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 71.35995483398436,
+            "f_plus": 72.33463287353516,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.13554862672029847,
+            "mode": "TRACKED",
+            "s_minus": 0.13338426615636004,
+            "s_plus": 0.13782402762244303,
+            "one_sided_difference": 0.004439761466082992
+          }
+        }
+      },
+      {
+        "term": "FE11",
+        "f0_hz": 72.1899871826172,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 72.17565155029294,
+            "f_plus": 72.20339202880861,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.0038395248607589476,
+            "mode": "TRACKED",
+            "s_minus": 0.003871884744378684,
+            "s_plus": 0.0038055047859116915,
+            "one_sided_difference": -6.63799584669925e-05
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 70.87335968017577,
+            "f_plus": 73.48255920410155,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.36123322379643014,
+            "mode": "TRACKED",
+            "s_minus": 0.35885268985718527,
+            "s_plus": 0.363735888631113,
+            "one_sided_difference": 0.004883198773927733
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 71.70262145996094,
+            "f_plus": 72.67229461669923,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.13421709967219345,
+            "mode": "TRACKED",
+            "s_minus": 0.13206494607759744,
+            "s_plus": 0.13647966733873157,
+            "one_sided_difference": 0.004414721261134125
+          }
+        }
+      },
+      {
+        "term": "FE12",
+        "f0_hz": 116.5804290771484,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 115.75914764404301,
+            "f_plus": 117.39381408691405,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.14010802713991435,
+            "mode": "TRACKED",
+            "s_minus": 0.1378288150022352,
+            "s_plus": 0.1425041719600808,
+            "one_sided_difference": 0.0046753569578456
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 115.70854187011716,
+            "f_plus": 117.4431381225586,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.14867418227647794,
+            "mode": "TRACKED",
+            "s_minus": 0.1463535149931834,
+            "s_plus": 0.1511139090567408,
+            "one_sided_difference": 0.0047603940635574105
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 115.34623718261717,
+            "f_plus": 117.79624938964848,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.21000541946358053,
+            "mode": "TRACKED",
+            "s_minus": 0.20749398256649368,
+            "s_plus": 0.21264570310047692,
+            "one_sided_difference": 0.005151720533983245
+          }
+        }
+      },
+      {
+        "term": "FE13",
+        "f0_hz": 167.49026489257815,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 163.26083374023435,
+            "f_plus": 171.6152648925781,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.49864394408845436,
+            "mode": "TRACKED",
+            "s_minus": 0.4986246448406485,
+            "s_plus": 0.49866423346472555,
+            "one_sided_difference": 3.958862407704711e-05
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 167.48303222656247,
+            "f_plus": 167.4974975585938,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.0008629319178274599,
+            "mode": "TRACKED",
+            "s_minus": 0.0008418944094380722,
+            "s_plus": 0.0008850487343901203,
+            "one_sided_difference": 4.315432495204802e-05
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 167.4891815185547,
+            "f_plus": 167.4912719726562,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.00012470643417037297,
+            "mode": "TRACKED",
+            "s_minus": 0.0001261042315808806,
+            "s_plus": 0.00012323692417195718,
+            "one_sided_difference": -2.8673074089234152e-06
+          }
+        }
+      },
+      {
+        "term": "FE14",
+        "f0_hz": 168.60798645019534,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 168.61563110351562,
+            "f_plus": 168.60107421874997,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": -0.0008626349590678447,
+            "mode": "TRACKED",
+            "s_minus": -0.000883912376387184,
+            "s_plus": -0.0008402659252892825,
+            "one_sided_difference": 4.3646451097901595e-05
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 164.3356781005859,
+            "f_plus": 172.7749481201171,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.5003695594842263,
+            "mode": "TRACKED",
+            "s_minus": 0.5003628707651756,
+            "s_plus": 0.5003765913612693,
+            "one_sided_difference": 1.372059609372478e-05
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 168.60690307617193,
+            "f_plus": 168.60899353027344,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.00012387974081706549,
+            "mode": "TRACKED",
+            "s_minus": 0.00012526826956199102,
+            "s_plus": 0.0001224199750037816,
+            "one_sided_difference": -2.8482945582094317e-06
+          }
+        }
+      },
+      {
+        "term": "FE15+FE16",
+        "f0_hz": 177.3312936342055,
+        "cluster": true,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 175.3088335535926,
+            "f_plus": 179.28691543093964,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.2241950938189839,
+            "mode": "TRACKED_CLUSTER",
+            "s_minus": 0.2236260501411319,
+            "s_plus": 0.22479333170943397,
+            "one_sided_difference": 0.0011672815683020643
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 175.2824514923056,
+            "f_plus": 179.31200457864875,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.22709696320337036,
+            "mode": "TRACKED_CLUSTER",
+            "s_minus": 0.22656016433267206,
+            "s_plus": 0.22766130199932144,
+            "one_sided_difference": 0.0011011376666493766
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 176.90341891053447,
+            "f_plus": 177.75653769922485,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.048069087585484574,
+            "mode": "TRACKED_CLUSTER",
+            "s_minus": 0.04709720435544439,
+            "s_plus": 0.049090832305499474,
+            "one_sided_difference": 0.001993627950055081
+          }
+        }
+      },
+      {
+        "term": "FE17",
+        "f0_hz": 213.19947814941403,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 209.87898254394526,
+            "f_plus": 216.46733093261713,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.30882774345816666,
+            "mode": "TRACKED",
+            "s_minus": 0.3060274011237883,
+            "s_plus": 0.3117717545347513,
+            "one_sided_difference": 0.005744353410963021
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 212.63241577148446,
+            "f_plus": 213.76008605957026,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.05284954860201294,
+            "mode": "TRACKED",
+            "s_minus": 0.051923302569754526,
+            "s_plus": 0.053823314753791894,
+            "one_sided_difference": 0.0019000121840373682
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 211.72850036621097,
+            "f_plus": 214.65393066406259,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.1371086830071431,
+            "mode": "TRACKED",
+            "s_minus": 0.1349776688932129,
+            "s_plus": 0.13934902665325727,
+            "one_sided_difference": 0.004371357760044381
+          }
+        }
+      },
+      {
+        "term": "FE18",
+        "f0_hz": 213.95275878906241,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 213.47290039062491,
+            "f_plus": 214.4281616210937,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.044611538432426934,
+            "mode": "TRACKED",
+            "s_minus": 0.04377459079697163,
+            "s_plus": 0.045491424823120186,
+            "one_sided_difference": 0.001716834026148556
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 210.51965332031244,
+            "f_plus": 217.32974243164062,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.3181018853761371,
+            "mode": "TRACKED",
+            "s_minus": 0.31536721937936724,
+            "s_plus": 0.320976850656779,
+            "one_sided_difference": 0.005609631277411764
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 212.48768615722665,
+            "f_plus": 215.40142822265616,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.13607999030783724,
+            "mode": "TRACKED",
+            "s_minus": 0.1339589944866764,
+            "s_plus": 0.13830980168276466,
+            "one_sided_difference": 0.004350807196088269
+          }
+        }
+      },
+      {
+        "term": "FE19",
+        "f0_hz": 295.7755126953124,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 293.35424804687506,
+            "f_plus": 298.1730651855468,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "CENTRAL",
+            "s": 0.16279570471492497,
+            "mode": "TRACKED",
+            "s_minus": 0.1602518849790365,
+            "s_plus": 0.1654700325595428,
+            "one_sided_difference": 0.005218147580506288
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 293.1567993164062,
+            "f_plus": 298.3662109374999,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "CENTRAL",
+            "s": 0.17599322528621347,
+            "mode": "TRACKED",
+            "s_minus": 0.1733783434179283,
+            "s_plus": 0.1787422610343377,
+            "one_sided_difference": 0.005363917616409419
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 293.3982543945313,
+            "f_plus": 298.1235046386719,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.15963606631609797,
+            "mode": "TRACKED",
+            "s_minus": 0.15732753209416633,
+            "s_plus": 0.1620630375605085,
+            "one_sided_difference": 0.00473550546634216
+          }
+        }
+      },
+      {
+        "term": "FE20",
+        "f0_hz": 327.90103149414057,
+        "cluster": false,
+        "parameters": {
+          "E1": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E1_MINUS",
+            "plus_state": "M11_S4_E1_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": 319.98278808593756,
+            "f_plus": null,
+            "source": "M11_S4_E1_MINUS / M11_S4_E1_PLUS",
+            "status": "NOT_TRACKED — CENTRAL_SENSITIVITY_UNAVAILABLE",
+            "s": null,
+            "lost_in": [
+              "M11_S4_E1_PLUS"
+            ],
+            "reason": "BRANCH_LOSS: FE20 (reference mode 20): best FE-to-FE MAC 0.307 < 0.9"
+          },
+          "E2": {
+            "p0": 56000.0,
+            "minus_state": "M11_S4_E2_MINUS",
+            "plus_state": "M11_S4_E2_PLUS",
+            "p_minus": 53200.0,
+            "p_plus": 58800.0,
+            "f_minus": null,
+            "f_plus": 328.2727661132812,
+            "source": "M11_S4_E2_MINUS / M11_S4_E2_PLUS",
+            "status": "NOT_TRACKED — CENTRAL_SENSITIVITY_UNAVAILABLE",
+            "s": null,
+            "lost_in": [
+              "M11_S4_E2_MINUS"
+            ],
+            "reason": "BRANCH_LOSS: FE20 (reference mode 20): best FE-to-FE MAC 0.297 < 0.9"
+          },
+          "G12": {
+            "p0": 5000.0,
+            "minus_state": "M11_S4_G12_MINUS",
+            "plus_state": "M11_S4_G12_PLUS",
+            "p_minus": 4750.0,
+            "p_plus": 5250.0,
+            "f_minus": 327.89492797851574,
+            "f_plus": 327.90667724609375,
+            "source": "M11_S4_G12_MINUS / M11_S4_G12_PLUS",
+            "status": "CENTRAL",
+            "s": 0.00035801894638517247,
+            "mode": "TRACKED",
+            "s_minus": 0.0003628947845558801,
+            "s_plus": 0.00035289295824937383,
+            "one_sided_difference": -1.000182630650628e-05
+          }
+        }
+      }
+    ],
+    "rank": [
+      {
+        "parameters": [
+          "E1",
+          "E2",
+          "G12"
+        ],
+        "singular_values": [
+          0.9171230078996321,
+          0.667314938257141,
+          0.502277549603826
+        ],
+        "rank": 3,
+        "of": 3,
+        "condition": 1.8259287292912407,
+        "terms": [
+          "FE7",
+          "FE10",
+          "FE11",
+          "FE12",
+          "FE13",
+          "FE14",
+          "FE15+FE16",
+          "FE17",
+          "FE18",
+          "FE19"
+        ],
+        "status": "FE_ONLY"
+      },
+      {
+        "parameters": [
+          "E (E1 = E2)",
+          "G12"
+        ],
+        "singular_values": [
+          1.2371099720711225,
+          0.526508596477998
+        ],
+        "rank": 2,
+        "of": 2,
+        "condition": 2.3496481925396626,
+        "terms": [
+          "FE7",
+          "FE10",
+          "FE11",
+          "FE12",
+          "FE13",
+          "FE14",
+          "FE15+FE16",
+          "FE17",
+          "FE18",
+          "FE19"
+        ],
+        "status": "FE_ONLY — CONDITIONAL_SUPERPOSITION (s_E = s_E1 + s_E2; no joint E1 = E2 state solved)"
+      }
+    ],
+    "basis": "central difference in ln p over the actual parameter values of the two solved states"
+  },
+  "archive_comparison": {
+    "state": "AGREES",
+    "rows": [
+      {
+        "term": "FE7",
+        "parameter": "E1",
+        "live_s": 0.008102930018214997,
+        "archived_s": 0.0081,
+        "difference": 2.9300182149971654e-06,
+        "agree": true
+      },
+      {
+        "term": "FE7",
+        "parameter": "E2",
+        "live_s": 0.008274806252583852,
+        "archived_s": 0.00827,
+        "difference": 4.806252583852699e-06,
+        "agree": true
+      },
+      {
+        "term": "FE7",
+        "parameter": "G12",
+        "live_s": 0.4826765053390997,
+        "archived_s": 0.48268,
+        "difference": -3.494660900271729e-06,
+        "agree": true
+      },
+      {
+        "term": "FE8",
+        "parameter": "E1",
+        "live_s": null,
+        "archived_s": null,
+        "difference": null,
+        "agree": true
+      },
+      {
+        "term": "FE8",
+        "parameter": "E2",
+        "live_s": null,
+        "archived_s": null,
+        "difference": null,
+        "agree": true
+      },
+      {
+        "term": "FE8",
+        "parameter": "G12",
+        "live_s": 1.4004933228254778e-05,
+        "archived_s": 1e-05,
+        "difference": 4.004933228254778e-06,
+        "agree": true
+      },
+      {
+        "term": "FE9",
+        "parameter": "E1",
+        "live_s": null,
+        "archived_s": null,
+        "difference": null,
+        "agree": true
+      },
+      {
+        "term": "FE9",
+        "parameter": "E2",
+        "live_s": null,
+        "archived_s": null,
+        "difference": null,
+        "agree": true
+      },
+      {
+        "term": "FE9",
+        "parameter": "G12",
+        "live_s": 0.00014075941520266848,
+        "archived_s": 0.00014,
+        "difference": 7.594152026684951e-07,
+        "agree": true
+      },
+      {
+        "term": "FE10",
+        "parameter": "E1",
+        "live_s": 0.35783453617075633,
+        "archived_s": 0.35783,
+        "difference": 4.536170756352931e-06,
+        "agree": true
+      },
+      {
+        "term": "FE10",
+        "parameter": "E2",
+        "live_s": 0.005903280190851939,
+        "archived_s": 0.0059,
+        "difference": 3.2801908519388898e-06,
+        "agree": true
+      },
+      {
+        "term": "FE10",
+        "parameter": "G12",
+        "live_s": 0.13554862672029847,
+        "archived_s": 0.13555,
+        "difference": -1.3732797015386655e-06,
+        "agree": true
+      },
+      {
+        "term": "FE11",
+        "parameter": "E1",
+        "live_s": 0.0038395248607589476,
+        "archived_s": 0.00384,
+        "difference": -4.7513924105249683e-07,
+        "agree": true
+      },
+      {
+        "term": "FE11",
+        "parameter": "E2",
+        "live_s": 0.36123322379643014,
+        "archived_s": 0.36123,
+        "difference": 3.223796430140702e-06,
+        "agree": true
+      },
+      {
+        "term": "FE11",
+        "parameter": "G12",
+        "live_s": 0.13421709967219345,
+        "archived_s": 0.13422,
+        "difference": -2.9003278065597993e-06,
+        "agree": true
+      },
+      {
+        "term": "FE12",
+        "parameter": "E1",
+        "live_s": 0.14010802713991435,
+        "archived_s": 0.14011,
+        "difference": -1.9728600856583345e-06,
+        "agree": true
+      },
+      {
+        "term": "FE12",
+        "parameter": "E2",
+        "live_s": 0.14867418227647794,
+        "archived_s": 0.14867,
+        "difference": 4.182276477943114e-06,
+        "agree": true
+      },
+      {
+        "term": "FE12",
+        "parameter": "G12",
+        "live_s": 0.21000541946358053,
+        "archived_s": 0.21001,
+        "difference": -4.580536419468428e-06,
+        "agree": true
+      },
+      {
+        "term": "FE13",
+        "parameter": "E1",
+        "live_s": 0.49864394408845436,
+        "archived_s": 0.49864,
+        "difference": 3.944088454332917e-06,
+        "agree": true
+      },
+      {
+        "term": "FE13",
+        "parameter": "E2",
+        "live_s": 0.0008629319178274599,
+        "archived_s": 0.00086,
+        "difference": 2.9319178274599383e-06,
+        "agree": true
+      },
+      {
+        "term": "FE13",
+        "parameter": "G12",
+        "live_s": 0.00012470643417037297,
+        "archived_s": 0.00012,
+        "difference": 4.706434170372972e-06,
+        "agree": true
+      },
+      {
+        "term": "FE14",
+        "parameter": "E1",
+        "live_s": -0.0008626349590678447,
+        "archived_s": -0.00086,
+        "difference": -2.634959067844729e-06,
+        "agree": true
+      },
+      {
+        "term": "FE14",
+        "parameter": "E2",
+        "live_s": 0.5003695594842263,
+        "archived_s": 0.50037,
+        "difference": -4.405157736364629e-07,
+        "agree": true
+      },
+      {
+        "term": "FE14",
+        "parameter": "G12",
+        "live_s": 0.00012387974081706549,
+        "archived_s": 0.00012,
+        "difference": 3.879740817065483e-06,
+        "agree": true
+      },
+      {
+        "term": "FE15+FE16",
+        "parameter": "E1",
+        "live_s": 0.2241950938189839,
+        "archived_s": 0.2242,
+        "difference": -4.906181016117728e-06,
+        "agree": true
+      },
+      {
+        "term": "FE15+FE16",
+        "parameter": "E2",
+        "live_s": 0.22709696320337036,
+        "archived_s": 0.2271,
+        "difference": -3.0367966296351856e-06,
+        "agree": true
+      },
+      {
+        "term": "FE15+FE16",
+        "parameter": "G12",
+        "live_s": 0.048069087585484574,
+        "archived_s": 0.04807,
+        "difference": -9.12414515427673e-07,
+        "agree": true
+      },
+      {
+        "term": "FE17",
+        "parameter": "E1",
+        "live_s": 0.30882774345816666,
+        "archived_s": 0.30883,
+        "difference": -2.2565418333342357e-06,
+        "agree": true
+      },
+      {
+        "term": "FE17",
+        "parameter": "E2",
+        "live_s": 0.05284954860201294,
+        "archived_s": 0.05285,
+        "difference": -4.5139798705851053e-07,
+        "agree": true
+      },
+      {
+        "term": "FE17",
+        "parameter": "G12",
+        "live_s": 0.1371086830071431,
+        "archived_s": 0.13711,
+        "difference": -1.316992856909005e-06,
+        "agree": true
+      },
+      {
+        "term": "FE18",
+        "parameter": "E1",
+        "live_s": 0.044611538432426934,
+        "archived_s": 0.04461,
+        "difference": 1.5384324269368532e-06,
+        "agree": true
+      },
+      {
+        "term": "FE18",
+        "parameter": "E2",
+        "live_s": 0.3181018853761371,
+        "archived_s": 0.3181,
+        "difference": 1.8853761371007138e-06,
+        "agree": true
+      },
+      {
+        "term": "FE18",
+        "parameter": "G12",
+        "live_s": 0.13607999030783724,
+        "archived_s": 0.13608,
+        "difference": -9.692162766805623e-09,
+        "agree": true
+      },
+      {
+        "term": "FE19",
+        "parameter": "E1",
+        "live_s": 0.16279570471492497,
+        "archived_s": 0.1628,
+        "difference": -4.295285075034405e-06,
+        "agree": true
+      },
+      {
+        "term": "FE19",
+        "parameter": "E2",
+        "live_s": 0.17599322528621347,
+        "archived_s": 0.17599,
+        "difference": 3.225286213465184e-06,
+        "agree": true
+      },
+      {
+        "term": "FE19",
+        "parameter": "G12",
+        "live_s": 0.15963606631609797,
+        "archived_s": 0.15964,
+        "difference": -3.933683902029861e-06,
+        "agree": true
+      },
+      {
+        "term": "FE20",
+        "parameter": "E1",
+        "live_s": null,
+        "archived_s": null,
+        "difference": null,
+        "agree": true
+      },
+      {
+        "term": "FE20",
+        "parameter": "E2",
+        "live_s": null,
+        "archived_s": null,
+        "difference": null,
+        "agree": true
+      },
+      {
+        "term": "FE20",
+        "parameter": "G12",
+        "live_s": 0.00035801894638517247,
+        "archived_s": 0.00036,
+        "difference": -1.9810536148275504e-06,
+        "agree": true
+      }
+    ],
+    "max_abs_difference": 4.906181016117728e-06,
+    "tolerance": "the archive's 5 decimals (|Δs| ≤ 1.5e-5)",
+    "archive": "docs/research/plate_s4_central/CENTRAL_SENSITIVITIES.csv"
+  },
+  "what_if": {
+    "trial": {
+      "G12": 5250.0
+    },
+    "changes_ln": {
+      "G12": 0.04879016416943204
+    },
+    "rows": [
+      {
+        "term": "FE7",
+        "f0_hz": 19.07217025756836,
+        "predicted_hz": 19.52664774813779,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 19.526395797729492,
+        "error_percent": 0.001290306777090855,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.48293 / s+ 0.48241"
+      },
+      {
+        "term": "FE8",
+        "f0_hz": 59.87415695190428,
+        "predicted_hz": 59.874197864108794,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 59.87419891357419,
+        "error_percent": -1.7527840290298968e-06,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.00001 / s+ 0.00001"
+      },
+      {
+        "term": "FE9",
+        "f0_hz": 62.00916671752929,
+        "predicted_hz": 62.00959257779419,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 62.00959014892577,
+        "error_percent": 3.916923851932097e-06,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.00014 / s+ 0.00014"
+      },
+      {
+        "term": "FE10",
+        "f0_hz": 71.84985351562499,
+        "predicted_hz": 72.32660293205818,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 72.33463287353516,
+        "error_percent": -0.011101102138744157,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.13338 / s+ 0.13782"
+      },
+      {
+        "term": "FE11",
+        "f0_hz": 72.1899871826172,
+        "predicted_hz": 72.66427268872624,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 72.67229461669923,
+        "error_percent": -0.011038495502724288,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.13206 / s+ 0.13648"
+      },
+      {
+        "term": "FE12",
+        "f0_hz": 116.5804290771484,
+        "predicted_hz": 117.78107586921502,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 117.79624938964848,
+        "error_percent": -0.012881157517397046,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.20749 / s+ 0.21265"
+      },
+      {
+        "term": "FE13",
+        "f0_hz": 167.49026489257815,
+        "predicted_hz": 167.49128398138464,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 167.4912719726562,
+        "error_percent": 7.169763716063926e-06,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.00013 / s+ 0.00012"
+      },
+      {
+        "term": "FE14",
+        "f0_hz": 168.60798645019534,
+        "predicted_hz": 168.60900553897966,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 168.60899353027344,
+        "error_percent": 7.122221634681125e-06,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.00013 / s+ 0.00012"
+      },
+      {
+        "term": "FE15+FE16",
+        "f0_hz": 177.3312936342055,
+        "predicted_hz": 177.74767656246908,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 177.75653769922485,
+        "error_percent": -0.004984985008404941,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.04710 / s+ 0.04909"
+      },
+      {
+        "term": "FE17",
+        "f0_hz": 213.19947814941403,
+        "predicted_hz": 214.63046882619105,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 214.65393066406259,
+        "error_percent": -0.010930076052628745,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.13498 / s+ 0.13935"
+      },
+      {
+        "term": "FE18",
+        "f0_hz": 213.95275878906241,
+        "predicted_hz": 215.37799535926226,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 215.40142822265616,
+        "error_percent": -0.010878694532001632,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.13396 / s+ 0.13831"
+      },
+      {
+        "term": "FE19",
+        "f0_hz": 295.7755126953124,
+        "predicted_hz": 298.08820523120033,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 298.1235046386719,
+        "error_percent": -0.011840531498619189,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.15733 / s+ 0.16206"
+      },
+      {
+        "term": "FE20",
+        "f0_hz": 327.90103149414057,
+        "predicted_hz": 327.90675925484356,
+        "status": "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve",
+        "solved_hz": 327.90667724609375,
+        "error_percent": 2.500978342201421e-05,
+        "branch": "followed in the solved states used",
+        "linearity": "one-sided s− 0.00036 / s+ 0.00035"
+      }
+    ],
+    "labels": [
+      "FE_ONLY_LOCAL_PREDICTION — not an Abaqus solve"
+    ],
+    "solved_point": "M11_S4_G12_PLUS",
+    "limits": [
+      "no extrapolation beyond the solved states",
+      "linearity not confirmed without the ±2.5 % repeat (one-sided values shown)"
+    ]
+  },
+  "experiment": [
+    {
+      "record": "EXP1",
+      "hz": 18.6307,
+      "nearest_fe": "FE7",
+      "fe_hz": 19.07217025756836,
+      "difference_percent": 2.369584919344736,
+      "predicted_hz": 19.52664774813779,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP2",
+      "hz": 54.6193,
+      "nearest_fe": "FE8",
+      "fe_hz": 59.87415695190428,
+      "difference_percent": 9.620879344671728,
+      "predicted_hz": 59.874197864108794,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP3",
+      "hz": 63.495,
+      "nearest_fe": "FE9",
+      "fe_hz": 62.00916671752929,
+      "difference_percent": -2.340079191228772,
+      "predicted_hz": 62.00959257779419,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP4",
+      "hz": 66.8467,
+      "nearest_fe": "FE9",
+      "fe_hz": 62.00916671752929,
+      "difference_percent": -7.236757061262122,
+      "predicted_hz": 62.00959257779419,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP5",
+      "hz": 74.2149,
+      "nearest_fe": "FE11",
+      "fe_hz": 72.1899871826172,
+      "difference_percent": -2.7284451200268345,
+      "predicted_hz": 72.66427268872624,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP6",
+      "hz": 112.2655,
+      "nearest_fe": "FE12",
+      "fe_hz": 116.5804290771484,
+      "difference_percent": 3.843504083755378,
+      "predicted_hz": 117.78107586921502,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP7",
+      "hz": 145.9357,
+      "nearest_fe": "FE13",
+      "fe_hz": 167.49026489257815,
+      "difference_percent": 14.769905439572462,
+      "predicted_hz": 167.49128398138464,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP8",
+      "hz": 157.8508,
+      "nearest_fe": "FE13",
+      "fe_hz": 167.49026489257815,
+      "difference_percent": 6.106693721272349,
+      "predicted_hz": 167.49128398138464,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP9",
+      "hz": 169.1849,
+      "nearest_fe": "FE14",
+      "fe_hz": 168.60798645019534,
+      "difference_percent": -0.3409958866332996,
+      "predicted_hz": 168.60900553897966,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP10",
+      "hz": 180.1363,
+      "nearest_fe": "FE15+FE16",
+      "fe_hz": 177.3312936342055,
+      "difference_percent": -1.5571577554299165,
+      "predicted_hz": 177.74767656246908,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    },
+    {
+      "record": "EXP11",
+      "hz": 191.6019,
+      "nearest_fe": "FE15+FE16",
+      "fe_hz": 177.3312936342055,
+      "difference_percent": -7.448050549495855,
+      "predicted_hz": 177.74767656246908,
+      "status": "FREQUENCY_PROXIMITY_ONLY — NOT A MODE PAIR",
+      "pair": "NONE — no physical registration"
+    }
+  ],
+  "limits": [
+    "FE-only: sensitivities and predictions describe this FE model, not the physical plate and not a material.",
+    "A prediction is the local log-linear formula, not an Abaqus solve; it is never extrapolated beyond the solved states, and the ±5 % range is not a confirmed linear range without the ±2.5 % repeat.",
+    "E1 and E2 are FE model directions: without a traceable warp / fill orientation they are not independent constants of the physical CFRP.",
+    "E (E1 = E2) is a CONDITIONAL_SUPERPOSITION of the separate E1 and E2 states: no joint state was solved.",
+    "Experimental records are never paired with FE branches here: frequency proximity only, no MAC objective, no parameter chosen from a measured frequency."
+  ],
+  "scientific_status": "M8 GATE NOT_MET · D-077 NO_GLOBAL_PARAMETER_VALUE · production Auto-ID BLOCKED · no material value is released here"
+}

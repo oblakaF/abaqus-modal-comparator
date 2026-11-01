@@ -1,0 +1,388 @@
+"""PRIORITY-10: the FE Response Workbench (services.single_plate_fe_response) and tab D of the Plate Study page.
+
+A SYNTHETIC_TEST family of another plate (420 × 260 mm, research/plate_fe_response/make_synthetic_family.py) is written
+into a temporary folder; the real M11 S4 packages are read where they are on this computer (skipped elsewhere). Nothing
+here runs Abaqus, an LM or Auto-ID."""
+
+from __future__ import annotations
+
+import json
+import math
+import os
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "research" / "plate_fe_response"))
+
+import make_synthetic_family as syn  # noqa: E402
+from services import single_plate_fe_response as fr  # noqa: E402
+
+WORK = Path(r"D:\git\abaqus-modal-comparator-work")
+S4 = WORK / "runs" / "m11_carbon_plate" / "s4_central"
+COPIES = WORK / "research" / "INTEGRATION_RC1_REVIEW" / "moved inputs"
+M11_BASE = COPIES / "FE package copy" / "manifest.json"
+M11_INP = COPIES / "FE archive copy" / "external_models" / "v3_20261021" / "Plate" / "temp_root" / \
+    "CFRP_S4R_0875_FreeFree.inp"
+HAVE_M11 = M11_BASE.is_file() and M11_INP.is_file() and (S4 / "M11_S4_G12_PLUS" / "extraction" / "manifest.json").is_file()
+EXPONENTS = {mode: dict(zip(("E1", "E2", "G12"), a)) for mode, (_f, a) in syn.MODES.items()}
+
+
+def central(result, term, parameter):
+    return next(t for t in result["central"] if t["term"] == term)["parameters"][parameter]
+
+
+def branch(result, name):
+    return next(b for b in result["branches"] if b["branch"] == name)
+
+
+class _Synthetic(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.dir = Path(folder.name)
+
+    def family(self, name="family", **options):
+        return fr.family_from_declaration(syn.write_family(self.dir / name, **options))
+
+
+class SyntheticPlateTests(_Synthetic):
+    """Another plate (420 × 260 mm, SYNTHETIC_TEST): the method does not depend on M11."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._folder = tempfile.TemporaryDirectory()
+        cls.result = fr.analyse(fr.family_from_declaration(syn.write_family(Path(cls._folder.name) / "f")))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._folder.cleanup()
+
+    def test_2_independent_of_m11(self):
+        result = self.result
+        self.assertEqual((result["kind"], result["status"]), (fr.LIVE, fr.LIVE))
+        self.assertEqual(result["family_kind"], fr.SYNTHETIC_TEST)
+        self.assertEqual(result["rigid_excluded"], [1, 2, 3, 4, 5, 6])  # the code's rigid-body criterion
+        text = json.dumps(result)
+        for word in ("M11", "261027", "300x300", "Polymax"):
+            self.assertNotIn(word, text)
+        self.assertEqual(fr.compare_with_archive(result, "another")["state"], "NOT_APPLICABLE")
+
+    def test_9_central_differences_in_ln_p_recover_the_exponents(self):
+        for t in self.result["central"]:
+            if "+" in t["term"]:
+                continue
+            mode = int(t["term"][2:])
+            for p, item in t["parameters"].items():
+                if item.get("s") is not None:
+                    self.assertAlmostEqual(item["s"], EXPONENTS[mode][p], places=9, msg=(t["term"], p))
+        rank = self.result["rank"]
+        self.assertEqual((rank[0]["rank"], rank[0]["of"]), (3, 3))
+
+    def test_3_a_lost_branch_keeps_its_reason_and_has_no_central_value(self):
+        lost = branch(self.result, "FE14")["variants"]["E1_PLUS"]
+        self.assertEqual(lost["status"], "BRANCH_LOSS")
+        self.assertIn("best FE-to-FE MAC", lost["reason"])
+        item = central(self.result, "FE14", "E1")
+        self.assertIsNone(item["s"])
+        self.assertEqual(item["status"], fr.UNAVAILABLE)
+        self.assertEqual(item["lost_in"], ["E1_PLUS"])
+        self.assertAlmostEqual(central(self.result, "FE14", "E2")["s"], 0.2, places=9)  # other parameters unaffected
+
+    def test_4_an_order_exchange_is_followed_by_shape(self):
+        for state in ("E1_PLUS", "E2_MINUS"):
+            v10, v11 = branch(self.result, "FE10")["variants"][state], branch(self.result, "FE11")["variants"][state]
+            self.assertEqual((v10["candidate"], v11["candidate"]), ("FE11", "FE10"))
+            self.assertTrue(v10["permutation"] and v11["permutation"])
+        self.assertAlmostEqual(central(self.result, "FE10", "E1")["s"], 0.45, places=9)
+        self.assertIn({"rows": ["FE10", "FE11"], "status": "INDEPENDENT", "reasons": mock.ANY}, self.result["clusters"])
+
+    def test_5_a_confirmed_cluster_is_one_term(self):
+        terms = [t["term"] for t in self.result["central"]]
+        self.assertIn("FE12+FE13", terms)
+        self.assertNotIn("FE12", terms)
+        self.assertNotIn("FE13", terms)
+        self.assertEqual([c["status"] for c in self.result["clusters"] if c["rows"] == ["FE12", "FE13"]], ["CONFIRMED"])
+        self.assertAlmostEqual(central(self.result, "FE12+FE13", "E1")["s"], 0.25, places=9)
+        self.assertEqual(central(self.result, "FE12+FE13", "E1")["mode"], "TRACKED_CLUSTER")
+
+    def test_10_the_e1_e2_sum_is_conditional(self):
+        conditional = self.result["rank"][1]
+        self.assertEqual(conditional["parameters"], ["E (E1 = E2)", "G12"])
+        self.assertIn(fr.CONDITIONAL, conditional["status"])
+        prediction = fr.what_if(self.result, {fr.JOINT_E: 45000.0 * 1.02})
+        self.assertTrue(any(fr.CONDITIONAL in label for label in prediction["labels"]))
+        self.assertIsNone(prediction["solved_point"])  # no joint state was solved
+        row = next(r for r in prediction["rows"] if r["term"] == "FE8")
+        self.assertAlmostEqual(row["predicted_hz"], 60.0 * 1.02 ** 0.5, places=9)
+
+    def test_11_no_change_is_the_baseline(self):
+        prediction = fr.what_if(self.result, {"G12": 4000.0})
+        for row in prediction["rows"]:
+            if row["predicted_hz"] is not None:
+                self.assertAlmostEqual(row["predicted_hz"], row["f0_hz"], places=12)
+                self.assertEqual(row["status"], "BASELINE (no change)")
+
+    def test_12_a_prediction_is_compared_with_the_solved_fe_point(self):
+        prediction = fr.what_if(self.result, {"G12": 4200.0})
+        self.assertEqual(prediction["solved_point"], "G12_PLUS")
+        row = next(r for r in prediction["rows"] if r["term"] == "FE7")
+        self.assertAlmostEqual(row["solved_hz"], 25.0 * 1.05 ** 0.48, places=9)
+        self.assertAlmostEqual(row["error_percent"], 0.0, places=7)
+        self.assertIn(fr.PREDICTION, prediction["labels"][0])
+        halfway = fr.what_if(self.result, {"G12": 4100.0})
+        self.assertIsNone(halfway["solved_point"])
+        self.assertIsNone(next(r for r in halfway["rows"] if r["term"] == "FE7")["solved_hz"])
+        lost = next(r for r in fr.what_if(self.result, {"E1": 46000.0})["rows"] if r["term"] == "FE14")
+        self.assertIsNone(lost["predicted_hz"])
+        self.assertIn(fr.UNAVAILABLE, lost["status"])
+
+    def test_13_no_extrapolation(self):
+        for value in (4500.0, 3700.0):
+            with self.assertRaises(fr.WhatIfRefused) as caught:
+                fr.what_if(self.result, {"G12": value})
+            self.assertIn("never extrapolated", str(caught.exception))
+        with self.assertRaises(fr.WhatIfRefused):
+            fr.what_if(self.result, {"nu12": 0.3})
+
+    def test_14_no_transfer_to_another_fe_model(self):
+        with self.assertRaises(fr.WhatIfRefused) as caught:
+            fr.what_if(self.result, {"G12": 4200.0}, baseline_manifest_sha256="b" * 64,
+                       recorded_baseline_sha256="a" * 64)
+        self.assertIn("never carried to another model", str(caught.exception))
+
+    def test_17_experimental_records_stay_unpaired(self):
+        rows = fr.experiment_rows([{"number": 1, "hz": 24.0}, {"number": 2, "hz": 61.0}], self.result,
+                                  fr.what_if(self.result, {"G12": 3800.0}))
+        self.assertEqual({r["status"] for r in rows}, {fr.PROXIMITY_ONLY})
+        self.assertTrue(all(r["pair"].startswith("NONE") for r in rows))
+        self.assertEqual(rows[0]["nearest_fe"], "FE7")
+        self.assertIsNotNone(rows[0]["predicted_hz"])
+        self.assertNotIn("pairs", self.result)
+
+
+class SyntheticFamilyEdgeTests(_Synthetic):
+    def test_6_never_followed_by_frequency(self):
+        family_path = syn.write_family(self.dir / "f")
+        # a state with the baseline's frequencies but other shapes: every branch is lost, none re-paired by frequency
+        points = syn.nodes()
+        modes = syn.state_modes("BASELINE", points)
+        import numpy as np
+
+        xy = np.array([(x, y) for _n, x, y, _z in points])
+        x, y = xy[:, 0] / syn.PLAN_MM[0], xy[:, 1] / syn.PLAN_MM[1]
+        others = [np.sin((k + 4) * np.pi * x) * np.sin((k + 3) * np.pi * y) for k in range(len(modes) - 6)]
+        zero = np.zeros(len(points))
+        replaced = modes[:6] + [(n, f, np.column_stack([zero, zero, others[i]])) for i, (n, f, _u) in
+                                enumerate(modes[6:])]
+        syn.write_package(self.dir / "f" / "G12_PLUS" / "extraction", points, replaced, "G12_PLUS")
+        result = fr.analyse(fr.family_from_declaration(family_path))
+        for b in result["branches"]:
+            self.assertNotIn(b["variants"]["G12_PLUS"]["status"], fr.TRACKED_STATES, b["branch"])
+        self.assertTrue(all(t["parameters"]["G12"]["s"] is None for t in result["central"]))
+
+    def test_7_incompatible_geometry_is_excluded(self):
+        result = fr.analyse(self.family(other_geometry=["G12_PLUS"]))
+        self.assertIn(["G12_PLUS", mock.ANY], [list(x) for x in result["excluded"]])
+        self.assertIn("INCOMPATIBLE_FE_GEOMETRY", dict((a, b) for a, b in result["excluded"])["G12_PLUS"])
+        self.assertEqual(result["status"], fr.INCOMPLETE)
+        self.assertEqual(result["completeness"]["G12"]["missing"], ["+"])
+
+    def test_8_a_missing_state_is_named_never_substituted(self):
+        result = fr.analyse(self.family(without=["G12_MINUS"]))
+        self.assertEqual(result["status"], fr.INCOMPLETE)
+        self.assertEqual(result["completeness"]["G12"]["missing"], ["−"])
+        self.assertTrue(all(fr.INCOMPLETE in t["parameters"]["G12"]["status"] for t in result["central"]))
+        with self.assertRaises(fr.WhatIfRefused) as caught:
+            fr.what_if(result, {"G12": 4100.0})
+        self.assertIn(fr.INCOMPLETE, str(caught.exception))
+        self.assertIsNotNone(central(result, "FE7", "E1")["s"])  # the complete parameters keep their values
+
+    def test_9_unequal_steps_use_the_actual_values(self):
+        result = fr.analyse(self.family(ratios={"G12_PLUS": {"G12": 1.075}}))
+        item = central(result, "FE7", "G12")
+        self.assertEqual((item["p_minus"], item["p_plus"]), (3800.0, 4300.0))
+        self.assertAlmostEqual(item["s"], 0.48, places=9)  # a fixed ±5 % step would give another number
+
+    def test_the_folder_route_reads_the_parameters_from_the_inps(self):
+        self.family()
+        family = fr.family_from_folder(self.dir / "family", self.dir / "family" / "baseline" / "extraction" /
+                                       "manifest.json", "PLATE-Z FE", "PLATE-Z",
+                                       baseline_inp=self.dir / "family" / "baseline" / "baseline.inp")
+        self.assertEqual(sorted((v.parameter, v.value) for v in family.variants),
+                         [("E1", 42750.0), ("E1", 47250.0), ("E2", 28500.0), ("E2", 31500.0), ("G12", 3800.0),
+                          ("G12", 4200.0)])
+        self.assertEqual(family.problems, ())
+        with self.assertRaises(fr.FamilyRefused):  # no baseline values: never guessed
+            fr.family_from_folder(self.dir / "family", self.dir / "family" / "baseline" / "extraction" /
+                                  "manifest.json", "x", "y")
+
+    def test_15_16_save_reopen_and_invalidation(self):
+        family = self.family()
+        rows = fr.identities(family)
+        result = fr.analyse(family)
+        record = fr.session_record(family, rows, result, fr.what_if(result, {"E2": 31500.0}),
+                                   fr.experiment_rows([{"number": 1, "hz": 25.1}], result))
+        self.assertNotIn("mode_0007", json.dumps(record))  # no FE data inside the session
+        path = fr.save_session(record, self.dir / "session.json")
+        reopened = fr.open_session(path)
+        self.assertEqual(fr.session_state(reopened)["state"], "SOURCES_VERIFIED")
+        self.assertEqual(reopened["result"]["central"], json.loads(json.dumps(result))["central"])
+        self.assertEqual(reopened["what_if"]["trial"], {"E2": 31500.0})
+        written = fr.export_session(reopened, self.dir)
+        self.assertEqual(sorted(p.name for p in written), ["FE_RESPONSE_REPORT.md", "branch_tracking.csv",
+                                                           "central_sensitivities.csv", "fe_response_session.json",
+                                                           "what_if.csv"])
+        manifest = Path(family.variants[0].manifest)
+        manifest.write_text(manifest.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        state = fr.session_state(fr.open_session(path))
+        self.assertEqual(state["state"], "STALE")
+        self.assertIn("E1_MINUS: the manifest changed", state["reasons"])
+
+    def test_18_no_physical_lm_auto_id_or_solver(self):
+        with mock.patch("subprocess.Popen") as popen, mock.patch("subprocess.run") as run, \
+                mock.patch("services.identification_step.run_bounded_lm", side_effect=AssertionError("no LM")):
+            result = fr.analyse(self.family())
+            fr.what_if(result, {"G12": 4200.0})
+            popen.assert_not_called()
+            run.assert_not_called()
+        self.assertNotIn("material_values", result)
+
+
+class ArchiveTests(unittest.TestCase):
+    """The PRIORITY-2 table as an ARCHIVED_FE_RESULT (always available; never a new FE-to-FE MAC)."""
+
+    def test_1_the_archived_m11_values(self):
+        archive = fr.archived_result()
+        self.assertEqual(archive["kind"], fr.ARCHIVED)
+        terms = {t["term"]: t for t in archive["central"]}
+        self.assertAlmostEqual(terms["FE7"]["parameters"]["G12"]["s"], 0.48268, places=5)
+        self.assertAlmostEqual(terms["FE13"]["parameters"]["E1"]["s"], 0.49864, places=5)
+        self.assertAlmostEqual(terms["FE14"]["parameters"]["E2"]["s"], 0.50037, places=5)
+        self.assertIn("FE15+FE16", terms)
+        for term in ("FE8", "FE9", "FE20"):
+            for p in ("E1", "E2"):
+                self.assertIsNone(terms[term]["parameters"][p]["s"], (term, p))
+        ranks = {tuple(r["parameters"]): (r["rank"], round(r["condition"], 2)) for r in archive["rank"]}
+        self.assertEqual(ranks[("E1", "E2", "G12")], (3, 1.83))
+        self.assertEqual(ranks[("E (E1 = E2)", "G12")], (2, 2.35))
+        self.assertIn(fr.CONDITIONAL, archive["rank"][1]["status"])
+
+    def test_17_exp1_and_fe7_proximity_only(self):
+        rows = fr.experiment_rows([{"number": 1, "hz": 18.6307}], fr.archived_result())
+        self.assertEqual((rows[0]["record"], rows[0]["nearest_fe"], rows[0]["status"]), ("EXP1", "FE7",
+                                                                                         fr.PROXIMITY_ONLY))
+        self.assertAlmostEqual(rows[0]["difference_percent"], 2.37, places=2)
+
+
+@unittest.skipUnless(HAVE_M11, "the M11 S4 packages and the verified baseline copies are not on this computer")
+class RealM11Tests(unittest.TestCase):
+    """LIVE_FE_PACKAGE_ANALYSIS of the real M11 S4 packages: the PRIORITY-2 archive reproduced from the shapes."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.family = fr.family_from_folder(S4, M11_BASE, "M11 S4R_0875_BASELINE", "PLATE-300x300x1mm",
+                                           baseline_inp=M11_INP)
+        cls.rows = fr.identities(cls.family)
+        cls.result = fr.analyse(cls.family)
+
+    def test_1_live_values_reproduce_the_archive(self):
+        self.assertEqual(self.result["kind"], fr.LIVE)
+        self.assertEqual(self.rows[0]["manifest_sha256"], fr.M11_MANIFEST_SHA256)
+        self.assertAlmostEqual(central(self.result, "FE7", "G12")["s"], 0.48268, places=5)
+        self.assertAlmostEqual(central(self.result, "FE13", "E1")["s"], 0.49864, places=5)
+        self.assertAlmostEqual(central(self.result, "FE14", "E2")["s"], 0.50037, places=5)
+        comparison = fr.compare_with_archive(self.result, self.rows[0]["manifest_sha256"])
+        self.assertEqual(comparison["state"], "AGREES")
+        self.assertLess(comparison["max_abs_difference"], 1.5e-5)
+        self.assertTrue(all(r["odb_state"] == "VERIFIED_SHA256" for r in self.rows[1:]))
+
+    def test_3_4_5_lost_exchanged_and_clustered_branches(self):
+        for name in ("FE8", "FE9", "FE20"):
+            for state in ("M11_S4_E1_PLUS", "M11_S4_E2_MINUS"):
+                self.assertEqual(branch(self.result, name)["variants"][state]["status"], "BRANCH_LOSS", (name, state))
+            self.assertEqual(central(self.result, name, "E1")["status"], fr.UNAVAILABLE)
+        for a, b in (("FE10", "FE11"), ("FE13", "FE14"), ("FE17", "FE18")):
+            self.assertEqual(branch(self.result, a)["variants"]["M11_S4_E1_PLUS"]["candidate"], f"FE{int(b[2:])}")
+        self.assertIn("FE15+FE16", [t["term"] for t in self.result["central"]])
+        self.assertAlmostEqual(central(self.result, "FE7", "E1")["s"], 0.0081, places=4)  # FE7 stays available
+
+    def test_12_the_g12_plus_prediction_against_the_solved_point(self):
+        prediction = fr.what_if(self.result, {"G12": 5250.0})
+        fe7 = next(r for r in prediction["rows"] if r["term"] == "FE7")
+        self.assertAlmostEqual(fe7["solved_hz"], 19.5264, places=3)
+        self.assertLess(abs(fe7["error_percent"]), 0.01)
+
+
+try:
+    from PySide6.QtWidgets import QApplication  # noqa: F401
+    HAVE_QT = True
+except ImportError:  # pragma: no cover
+    HAVE_QT = False
+
+
+@unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
+class PanelTests(unittest.TestCase):
+    def setUp(self):
+        from new_gui import window as wm
+
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.dir = Path(directory.name)
+        patch = mock.patch.dict(os.environ, {"LOCALAPPDATA": directory.name})
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.app = QApplication.instance() or wm.create_application([])
+        self.window = wm.MainWindow(ask_path=lambda kind, start: "")
+        self.window.resize(1366, 768)
+        self.window.show()
+        self.addCleanup(self.window.close)
+        self.panel = self.window.fe_response
+
+    def test_19_tab_d_beside_a_b_c_and_the_synthetic_route(self):
+        tabs = self.window.plate_tabs
+        self.assertEqual([tabs.tabText(i) for i in range(4)], ["A. Current PLATE Study", "B. New Single Plate",
+                                                               "C. Physical Readiness", "D. FE Response"])
+        self.assertEqual(tabs.tabToolTip(3), "D. FE Response Workbench")
+        self.assertFalse(self.panel.run())  # nothing chosen
+        declaration = syn.write_family(self.dir / "family")
+        self.assertTrue(self.panel.load_declaration(str(declaration)))
+        self.assertTrue(self.panel.run())
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(self.panel.freshness()[0], "CURRENT")
+        self.assertIn("tracking", self.panel.tables)
+        self.assertTrue(self.panel.predict("G12", 4200.0))
+        self.assertIn("what_if", self.panel.tables)
+        self.assertFalse(self.panel.predict("G12", 9000.0))  # outside the solved range
+        self.assertIn("never extrapolated", self.panel.message.text())
+        # an experimental modal set changes only the experimental display, never the FE results
+        exp = mock.Mock(sets=[mock.Mock(records=[mock.Mock(number=1, frequency_hz=24.5)])])
+        self.panel.set_inputs(None, None, exp, {"sha256": "x"}, 0)
+        self.assertEqual(self.panel.freshness()[0], "CURRENT")
+        self.assertTrue(self.panel.save_session(str(self.dir / "s.json")))
+        self.assertTrue(self.panel.export(str(self.dir)))
+        # another family chosen: the results are STALE, no prediction from them
+        self.assertTrue(self.panel.load_declaration(str(syn.write_family(self.dir / "other",
+                                                                         without=["G12_MINUS"]))))
+        self.assertEqual(self.panel.freshness()[0], "STALE")
+        self.assertFalse(self.panel.predict("G12", 4200.0))
+        self.assertTrue(self.panel.open_session(str(self.dir / "s.json")))
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(self.panel.freshness()[0], "STORED")
+        self.assertTrue(self.panel.predict("E1", 46000.0))
+
+    def test_the_tracking_can_be_cancelled(self):
+        self.assertTrue(self.panel.load_declaration(str(syn.write_family(self.dir / "family"))))
+        self.assertTrue(self.panel.run())
+        self.panel.cancel()
+        self.assertTrue(self.panel.wait_idle())
+        self.assertIsNone(self.panel.result)
+        self.assertIn("Cancelled", self.panel.message.text())
+
+
+if __name__ == "__main__":
+    unittest.main()
