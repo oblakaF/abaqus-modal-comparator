@@ -531,6 +531,11 @@ class PanelTests(unittest.TestCase):
         self.assertTrue(self.panel.open_session(str(self.dir / "s.json")))
         self.assertTrue(self.panel.wait_idle())
         self.assertEqual(self.panel.freshness()[0], "STORED")
+        # the smoke found the family line naming the earlier choice: it names the session's baseline
+        self.assertTrue(self.panel.family_line.text().startswith("Reopened session: "))
+        self.assertIn(str(self.dir / "family" / "baseline"), self.panel.family_line.text())
+        self.assertEqual(self.panel.baseline_manifest, str(self.dir / "family" / "baseline" / "extraction" /
+                                                           "manifest.json"))
         self.assertTrue(self.panel.predict("E1", 46000.0))
         self.assertTrue(self.panel.wait_idle())
         self.assertIsNotNone(self.panel.prediction)

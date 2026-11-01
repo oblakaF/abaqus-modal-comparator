@@ -539,6 +539,8 @@ class FEResponsePanel(QWidget):
                 self.comparison, self.prediction = record.get("archive_comparison"), record.get("what_if")
                 self.analysed_family, self.reopened = record.get("family"), outcome
                 self.invalidated, self.source_check = None, None
+                baseline = (record.get("family") or {}).get("baseline") or {}  # the session's, not an earlier choice
+                self.baseline_manifest, self.baseline_inp = baseline.get("manifest"), baseline.get("inp")
                 self.model_edit.setText((record.get("family") or {}).get("model_id") or "")
                 self.specimen_edit.setText((record.get("family") or {}).get("specimen_id") or "")
                 self._fill_parameters()
@@ -601,11 +603,16 @@ class FEResponsePanel(QWidget):
         for body in self.bodies:
             self._clear(body)
         self.tables = {}
-        f = self.family
-        self.family_line.setText(
-            (f"FE family: {f.model_id} · specimen {f.specimen_id} · {f.kind} · baseline {f.baseline.manifest} · "
-             f"{len(f.variants)} states") if f else (f"Baseline: {self.baseline_manifest}" if self.baseline_manifest
-                                                     else "No FE family chosen."))
+        f, stored = self.family, self.analysed_family or {}
+        if f:
+            line = (f"FE family: {f.model_id} · specimen {f.specimen_id} · {f.kind} · baseline {f.baseline.manifest} · "
+                    f"{len(f.variants)} states")
+        elif self.reopened is not None:
+            line = (f"Reopened session: {stored.get('model_id')} · specimen {stored.get('specimen_id')} · baseline "
+                    f"{(stored.get('baseline') or {}).get('manifest')} · {len(stored.get('variants') or ())} states")
+        else:
+            line = f"Baseline: {self.baseline_manifest}" if self.baseline_manifest else "No FE family chosen."
+        self.family_line.setText(line)
         state, reason = self.freshness()
         result = self.result
         if self.running:
