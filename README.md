@@ -97,6 +97,76 @@ creates no material value.
 **File > Choose a known new experimental source...** offers the three fitted working sources of the 2026-10-29
 delivery. They are checked against `docs/experimental/new_exp_20261029/SOURCE_PROVENANCE.csv` and by SHA-256.
 
+**Working from other folders (WINDOWS-RC1-A, `docs/gui/WINDOWS_RC1_A.md`):**
+- In the known-sources dialog, **Choose folder...** points to the delivery folder wherever it lies, or to its
+  `SPname_files_ROTATED_261028` subfolder. A file is used only with its declared size and SHA-256; a missing or changed
+  file is refused with the reason.
+- On the Plate Study page, **Choose FE archive folder...** sets the folder that holds the plate's FE family. Each
+  member is verified there by its recorded SHA-256, and a member not found is shown as MISSING. A new folder discards
+  the earlier study result.
+- **FE input.** The new interface views an extracted FE package: choose its `manifest.json`, with the CSV files
+  beside it.
+  - An Abaqus `.odb` cannot be viewed in this version of the new interface, and choosing one starts no Abaqus.
+  - `RUN_PROGRAM.cmd` keeps its own ODB route.
+
+**Research Results** (PRIORITY-5A, `docs/gui/PRIORITY5_RESEARCH_RESULTS.md`) shows the archived research results of
+PRIORITY-1–4 for PLATE (261027), SP-13 (261028) and SP-10 (261029). It reads them only; nothing is computed or started.
+- **Mode matching:** every experimental mode, with the published statuses.
+- **Research MAC matrices:** shown from a local `matching_record.json` that you choose, checked by its structure and
+  SHA-256. They are never a confirmed MAC.
+- **PLATE FE sensitivities:** E1, E2, G12 with the rank of the sensitivity matrix.
+- **Inverse parameter study:** S0, H1, H2 with their real Abaqus checks.
+
+The tables are archived snapshots: they are tied to your Workspace files only when the SHA-256 match. Every value is
+RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY.
+
+**SP-10 FE results** (PRIORITY-7, `docs/gui/PRIORITY7_SP10_RC2.md`). For SP-10, Research Results shows two separate
+groups:
+- **A. Historical PRIORITY-1:** the archived table, unchanged. Its FE_SHAPES_UNAVAILABLE statuses describe the state
+  at that time.
+- **B. Updated SP-10 FE Results — PRIORITY-6:**
+  - the FE7–FE25 frequencies of `SP10_NEW_E1=E2_NSM_DENSITY`, whose shapes were extracted in PRIORITY-6;
+  - a frequency-only diagnostic of EXP1–EXP12, marked FREQUENCY_PROXIMITY_ONLY — NOT A CONFIRMED MODE PAIR.
+
+Both come from small archived records. The 3.1 GB extracted package is never read there: choose its `manifest.json`
+on the Workspace page to view the shapes. The page compares the SHA-256 of the files read in the Workspace with the
+PRIORITY-6 sources. A match is not a registration: SP-10 261029 stays PHYSICAL_REGISTRATION_NOT_VERIFIED.
+
+**Single-plate research workbench** (PRIORITY-8, `docs/gui/GENERIC_SINGLE_PLATE_WORKBENCH_RC3.md`). The Plate Study page
+has two tabs:
+- **A. Current PLATE Study:** the accepted study of PLATE-300x300x1mm, unchanged.
+- **B. New Single Plate — Research Workbench:** a research study of any single rectangular CFRP plate without a core,
+  in eight steps:
+  1. **Specimen & Test Setup:** its own identifiers.
+  2. **FE and Experimental Inputs:** the files read in the Workspace, linked by SHA-256.
+  3. **Measurements & Geometry:** with units and provenance.
+  4. **Physical Registration Evidence:** a complete set is never a registration.
+  5. **Modal Diagnostics:** frequency proximity only, never pairs.
+  6. **Parameter Observability:** NOT_READY_FOR_IDENTIFICATION with the reasons.
+  7. **Offline Research Study:** only with a sensitivity table of this FE model, a declared observation set and the
+     owner's registration decision. The result is a DIAGNOSTIC_OPTIMIZER_CANDIDATE, not a material property.
+  8. **Report & Save:** the study JSON, reopened with its sources checked; a Markdown / JSON / CSV report.
+
+To start:
+1. Read the plate's files on the Workspace page and choose the modal set on the Analysis page.
+2. Open Plate Study > B and click **New study**.
+3. Fill the steps in order.
+
+`docs/examples/generic_single_plate_demo/DEMO_STUDY.json` (**Open study...**) is a SYNTHETIC demonstration of another
+plate (420 × 260 mm) that goes through every step, the offline study included. It is never a physical experiment.
+
+**Portable Windows build RC3** (`docs/gui/WINDOWS_PORTABLE_RC3.md`): the folder `AbaqusModalComparator_RC3`, built by
+`packaging/portable_rc3/build_portable.py`. RC1 and RC2 are unchanged.
+
+**Portable Windows build RC2** (`docs/gui/WINDOWS_PORTABLE_RC2.md`): the folder `AbaqusModalComparator_RC2`, built by
+`packaging/portable_rc2/build_portable.py` from the program with the SP-10 integration. RC1 below is unchanged.
+
+**Portable Windows build** (WINDOWS PORTABLE RC1, `docs/gui/WINDOWS_PORTABLE_RC1.md`): the folder
+`AbaqusModalComparator_RC1` holds `AbaqusModalComparator.exe`, the new interface frozen with its libraries and
+reference files. It starts with no Python or VS Code installation and starts no Abaqus. Measurement, FE and solver
+files are not included; you choose them in the program. The build is made by
+`packaging/portable_rc1/build_portable.py`.
+
 ## Input procedure
 
 1. Select the Abaqus `*.odb` file.

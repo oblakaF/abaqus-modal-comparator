@@ -1,0 +1,578 @@
+{
+ "verified": "2026-10-31T16:49:36+08:00",
+ "result": "PASS",
+ "problems": [],
+ "labels": "RESEARCH_ONLY / HYPOTHETICAL_PAIRING / NOT_A_MATERIAL_PROPERTY",
+ "source": {
+  "job": "SP10_NEW_E1=E2_NSM_DENSITY",
+  "odb_v2_copy": "D:\\git\\abaqus-modal-comparator-work\\external_models\\v2_20261019\\SP-10\\temp_root\\SP10_NEW_E1=E2_NSM_DENSITY.odb",
+  "odb_sha256": "87a9036fb5dc314e14a1fcb0d9ef4e0175d80bc6dfb05ceeea926d1ae767302c",
+  "odb_bytes": 979511712,
+  "dat_sha256": "c2ff381cb61a4f113c87b09527372783f4d46df0354755ba1f1b1801f97dab01",
+  "inp_sha256": "851ed627afd2ebc7539304247aefac3248507b5be2fc19ac992be84cb6f7f16f",
+  "level_a_original": "C:\\temp\\SP10_NEW_E1=E2_NSM_DENSITY.odb",
+  "odb_name_in_manifest": "D:/git/abaqus-modal-comparator-work/research/PRIORITY6_SP10_FE_SHAPES_202610/input/SP10_NEW_E1=E2_NSM_DENSITY.odb",
+  "analysis_title": ""
+ },
+ "extraction": {
+  "extractor_sha256": "039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d",
+  "step": "SP_10_MODAL_FREE",
+  "requested": [
+   7,
+   25
+  ],
+  "modes": 19,
+  "frequency_range_hz": [
+   23.886,
+   457.61
+  ],
+  "modes_above_220_hz": [
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25
+  ]
+ },
+ "geometry": {
+  "nodes": 1667491,
+  "instances": {
+   "CFRP_BOT-1": 90306,
+   "CFRP_TOP-1": 90306,
+   "SP02_HONEYCOMB_CORE-1": 1486879
+  },
+  "inp_instances": [
+   "SP02_HONEYCOMB_CORE-1",
+   "CFRP_BOT-1",
+   "CFRP_TOP-1"
+  ]
+ },
+ "frequencies": [
+  {
+   "mode": 7,
+   "odb_hz": 23.886,
+   "odb_eigfreq_hz": 23.885852813720703,
+   "dat_step2_hz": 23.886,
+   "dat_step1_hz": 23.886,
+   "abs_diff_hz": 0.000147,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0007.csv"
+  },
+  {
+   "mode": 8,
+   "odb_hz": 76.529,
+   "odb_eigfreq_hz": 76.52921295166016,
+   "dat_step2_hz": 76.529,
+   "dat_step1_hz": 76.529,
+   "abs_diff_hz": 0.000213,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0008.csv"
+  },
+  {
+   "mode": 9,
+   "odb_hz": 79.572,
+   "odb_eigfreq_hz": 79.5722427368164,
+   "dat_step2_hz": 79.572,
+   "dat_step1_hz": 79.572,
+   "abs_diff_hz": 0.000243,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0009.csv"
+  },
+  {
+   "mode": 10,
+   "odb_hz": 90.785,
+   "odb_eigfreq_hz": 90.78456115722656,
+   "dat_step2_hz": 90.785,
+   "dat_step1_hz": 90.785,
+   "abs_diff_hz": 0.000439,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0010.csv"
+  },
+  {
+   "mode": 11,
+   "odb_hz": 91.986,
+   "odb_eigfreq_hz": 91.98574829101562,
+   "dat_step2_hz": 91.986,
+   "dat_step1_hz": 91.986,
+   "abs_diff_hz": 0.000252,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0011.csv"
+  },
+  {
+   "mode": 12,
+   "odb_hz": 146.12,
+   "odb_eigfreq_hz": 146.1160888671875,
+   "dat_step2_hz": 146.12,
+   "dat_step1_hz": 146.12,
+   "abs_diff_hz": 0.003911,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0012.csv"
+  },
+  {
+   "mode": 13,
+   "odb_hz": 210.88,
+   "odb_eigfreq_hz": 210.88394165039062,
+   "dat_step2_hz": 210.88,
+   "dat_step1_hz": 210.88,
+   "abs_diff_hz": 0.003942,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0013.csv"
+  },
+  {
+   "mode": 14,
+   "odb_hz": 214.23,
+   "odb_eigfreq_hz": 214.23443603515625,
+   "dat_step2_hz": 214.23,
+   "dat_step1_hz": 214.23,
+   "abs_diff_hz": 0.004436,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0014.csv"
+  },
+  {
+   "mode": 15,
+   "odb_hz": 220.04,
+   "odb_eigfreq_hz": 220.04440307617188,
+   "dat_step2_hz": 220.04,
+   "dat_step1_hz": 220.04,
+   "abs_diff_hz": 0.004403,
+   "equal_to_dat": true,
+   "above_220_hz": false,
+   "node_count": 1667491,
+   "file": "mode_0015.csv"
+  },
+  {
+   "mode": 16,
+   "odb_hz": 226.95,
+   "odb_eigfreq_hz": 226.94651794433594,
+   "dat_step2_hz": 226.95,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.003482,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0016.csv"
+  },
+  {
+   "mode": 17,
+   "odb_hz": 265.04,
+   "odb_eigfreq_hz": 265.0355224609375,
+   "dat_step2_hz": 265.04,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.004478,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0017.csv"
+  },
+  {
+   "mode": 18,
+   "odb_hz": 267.14,
+   "odb_eigfreq_hz": 267.1443786621094,
+   "dat_step2_hz": 267.14,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.004379,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0018.csv"
+  },
+  {
+   "mode": 19,
+   "odb_hz": 364.5,
+   "odb_eigfreq_hz": 364.5004577636719,
+   "dat_step2_hz": 364.5,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.000458,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0019.csv"
+  },
+  {
+   "mode": 20,
+   "odb_hz": 405.84,
+   "odb_eigfreq_hz": 405.8395690917969,
+   "dat_step2_hz": 405.84,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.000431,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0020.csv"
+  },
+  {
+   "mode": 21,
+   "odb_hz": 411.95,
+   "odb_eigfreq_hz": 411.94586181640625,
+   "dat_step2_hz": 411.95,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.004138,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0021.csv"
+  },
+  {
+   "mode": 22,
+   "odb_hz": 415.75,
+   "odb_eigfreq_hz": 415.7490539550781,
+   "dat_step2_hz": 415.75,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.000946,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0022.csv"
+  },
+  {
+   "mode": 23,
+   "odb_hz": 420.86,
+   "odb_eigfreq_hz": 420.8575439453125,
+   "dat_step2_hz": 420.86,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.002456,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0023.csv"
+  },
+  {
+   "mode": 24,
+   "odb_hz": 448.28,
+   "odb_eigfreq_hz": 448.2764587402344,
+   "dat_step2_hz": 448.28,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.003541,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0024.csv"
+  },
+  {
+   "mode": 25,
+   "odb_hz": 457.61,
+   "odb_eigfreq_hz": 457.6130065917969,
+   "dat_step2_hz": 457.61,
+   "dat_step1_hz": null,
+   "abs_diff_hz": 0.003007,
+   "equal_to_dat": true,
+   "above_220_hz": true,
+   "node_count": 1667491,
+   "file": "mode_0025.csv"
+  }
+ ],
+ "odb_history_vs_dat": [
+  {
+   "mode": 1,
+   "odb_eigfreq_hz": 0.0,
+   "odb_eigval": -0.0015300021041184664,
+   "dat_hz": 0.0,
+   "dat_eigval": -0.00153,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 2,
+   "odb_eigfreq_hz": 0.0,
+   "odb_eigval": -0.0012257175985723734,
+   "dat_hz": 0.0,
+   "dat_eigval": -0.00122572,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 3,
+   "odb_eigfreq_hz": 0.0,
+   "odb_eigval": -0.0007315441034734249,
+   "dat_hz": 0.0,
+   "dat_eigval": -0.000731544,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 4,
+   "odb_eigfreq_hz": 0.005896414164453745,
+   "odb_eigval": 0.0013725737808272243,
+   "dat_hz": 0.00589641,
+   "dat_eigval": 0.00137257,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 5,
+   "odb_eigfreq_hz": 0.009751343168318272,
+   "odb_eigval": 0.0037539510522037745,
+   "dat_hz": 0.00975134,
+   "dat_eigval": 0.00375395,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 6,
+   "odb_eigfreq_hz": 0.011559228412806988,
+   "odb_eigval": 0.005274938885122538,
+   "dat_hz": 0.0115592,
+   "dat_eigval": 0.00527494,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 7,
+   "odb_eigfreq_hz": 23.885852813720703,
+   "odb_eigval": 22523.779296875,
+   "dat_hz": 23.886,
+   "dat_eigval": 22524.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 8,
+   "odb_eigfreq_hz": 76.52921295166016,
+   "odb_eigval": 231214.078125,
+   "dat_hz": 76.529,
+   "dat_eigval": 231214.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 9,
+   "odb_eigfreq_hz": 79.5722427368164,
+   "odb_eigval": 249967.15625,
+   "dat_hz": 79.572,
+   "dat_eigval": 249967.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 10,
+   "odb_eigfreq_hz": 90.78456115722656,
+   "odb_eigval": 325374.6875,
+   "dat_hz": 90.785,
+   "dat_eigval": 325375.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 11,
+   "odb_eigfreq_hz": 91.98574829101562,
+   "odb_eigval": 334041.78125,
+   "dat_hz": 91.986,
+   "dat_eigval": 334042.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 12,
+   "odb_eigfreq_hz": 146.1160888671875,
+   "odb_eigval": 842860.6875,
+   "dat_hz": 146.12,
+   "dat_eigval": 842861.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 13,
+   "odb_eigfreq_hz": 210.88394165039062,
+   "odb_eigval": 1755685.625,
+   "dat_hz": 210.88,
+   "dat_eigval": 1755690.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 14,
+   "odb_eigfreq_hz": 214.23443603515625,
+   "odb_eigval": 1811917.0,
+   "dat_hz": 214.23,
+   "dat_eigval": 1811920.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 15,
+   "odb_eigfreq_hz": 220.04440307617188,
+   "odb_eigval": 1911526.75,
+   "dat_hz": 220.04,
+   "dat_eigval": 1911530.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 16,
+   "odb_eigfreq_hz": 226.94651794433594,
+   "odb_eigval": 2033324.75,
+   "dat_hz": 226.95,
+   "dat_eigval": 2033320.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 17,
+   "odb_eigfreq_hz": 265.0355224609375,
+   "odb_eigval": 2773115.25,
+   "dat_hz": 265.04,
+   "dat_eigval": 2773120.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 18,
+   "odb_eigfreq_hz": 267.1443786621094,
+   "odb_eigval": 2817421.5,
+   "dat_hz": 267.14,
+   "dat_eigval": 2817420.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 19,
+   "odb_eigfreq_hz": 364.5004577636719,
+   "odb_eigval": 5245126.0,
+   "dat_hz": 364.5,
+   "dat_eigval": 5245130.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 20,
+   "odb_eigfreq_hz": 405.8395690917969,
+   "odb_eigval": 6502322.0,
+   "dat_hz": 405.84,
+   "dat_eigval": 6502320.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 21,
+   "odb_eigfreq_hz": 411.94586181640625,
+   "odb_eigval": 6699464.0,
+   "dat_hz": 411.95,
+   "dat_eigval": 6699460.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 22,
+   "odb_eigfreq_hz": 415.7490539550781,
+   "odb_eigval": 6823737.0,
+   "dat_hz": 415.75,
+   "dat_eigval": 6823740.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 23,
+   "odb_eigfreq_hz": 420.8575439453125,
+   "odb_eigval": 6992460.0,
+   "dat_hz": 420.86,
+   "dat_eigval": 6992460.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 24,
+   "odb_eigfreq_hz": 448.2764587402344,
+   "odb_eigval": 7933259.0,
+   "dat_hz": 448.28,
+   "dat_eigval": 7933260.0,
+   "equal_to_dat": true
+  },
+  {
+   "mode": 25,
+   "odb_eigfreq_hz": 457.6130065917969,
+   "odb_eigval": 8267162.5,
+   "dat_hz": 457.61,
+   "dat_eigval": 8267160.0,
+   "equal_to_dat": true
+  }
+ ],
+ "identity": {
+  "manifest_sha256": "035b274c43fb8b7143bceb4dec99fdb2926a0f094cdafe1a0355faa45d8b1542",
+  "files": {
+   "geometry.csv": {
+    "bytes": 137438197,
+    "sha256": "915a6a03036937ed6b6316c94f428bcef94ad10d4a8c0886b90559a4c10265eb"
+   },
+   "manifest.json": {
+    "bytes": 32570,
+    "sha256": "035b274c43fb8b7143bceb4dec99fdb2926a0f094cdafe1a0355faa45d8b1542"
+   },
+   "mode_0007.csv": {
+    "bytes": 155966693,
+    "sha256": "6c6211e25dc0b650791d87b9fba97a6f8ed9767ff57c3393fccbd0035e64831e"
+   },
+   "mode_0008.csv": {
+    "bytes": 155898666,
+    "sha256": "052edeb1381fd3ca3171c5aff86c7d18271bc386e8d5796dde6309b40ee1e362"
+   },
+   "mode_0009.csv": {
+    "bytes": 155758480,
+    "sha256": "abd0d71eefbdeeb21daa479df95553497d9380af077dbefb341ec87b60f0ab05"
+   },
+   "mode_0010.csv": {
+    "bytes": 155836365,
+    "sha256": "b253901118b45c6b45ca056db4f5974e484877d705eaf8e3ef2ce60a0d2bb018"
+   },
+   "mode_0011.csv": {
+    "bytes": 155791114,
+    "sha256": "2bf1ee508c69779914d41f438c8365e41c467a3ffd5235ca8594a96aff9de1a3"
+   },
+   "mode_0012.csv": {
+    "bytes": 155756263,
+    "sha256": "e1435bf994cfc648cda01beb0d551d2b483a2be2ad63820be09cbf3289723c47"
+   },
+   "mode_0013.csv": {
+    "bytes": 157523469,
+    "sha256": "850bf27c00b74f05faf66c81bef1f7d9d426f771aa2fbcd0712d374e0d66f09a"
+   },
+   "mode_0014.csv": {
+    "bytes": 157506345,
+    "sha256": "b4c87b783cf7ca36dc66e69c0ea3ad46993ec34ee8c553cf7bc64e5e3e3e62b7"
+   },
+   "mode_0015.csv": {
+    "bytes": 155580193,
+    "sha256": "e483c7806fd7759ad9f18a2f6fa34a5e64798f15aca72c468ca0b63e4d47202c"
+   },
+   "mode_0016.csv": {
+    "bytes": 155675337,
+    "sha256": "29a162f99611b0d973b8411476e26624d6c2468e2d20eacf458a4c31c1a04d41"
+   },
+   "mode_0017.csv": {
+    "bytes": 155355966,
+    "sha256": "25e24ae2350f17f56135aa3d872c4b04502fcd1c722a7b1172c5b9dba9fc17ac"
+   },
+   "mode_0018.csv": {
+    "bytes": 155377149,
+    "sha256": "9a8a483449e72d9d30298bac7b23f6c316d961ced09be11e5c3f1396c7358e9e"
+   },
+   "mode_0019.csv": {
+    "bytes": 154934939,
+    "sha256": "e9536fff38a68afc0619d992e2baca0eab506de23efe3feafa673bc78c32bdf7"
+   },
+   "mode_0020.csv": {
+    "bytes": 155485495,
+    "sha256": "7522591c2a733a35e706f283726c6670784701cd5b878905b0352b40bdc5b865"
+   },
+   "mode_0021.csv": {
+    "bytes": 155414531,
+    "sha256": "13ccaf759a5d6c07e19e58990aab02a6ae4bc898ecc41a686f16a538e316ea5a"
+   },
+   "mode_0022.csv": {
+    "bytes": 155356273,
+    "sha256": "6f905ab5c0454eecb94a2e6688f718ec80c3358e0ed1e99877ace07d772db8a6"
+   },
+   "mode_0023.csv": {
+    "bytes": 155385940,
+    "sha256": "cf7753d44b41dbfc3504f4e78cf3f5347668b49483abe7fe469dc6454c273d50"
+   },
+   "mode_0024.csv": {
+    "bytes": 154991040,
+    "sha256": "ac1ceb05d92fe29e0f6a0e4a35e4cab8c78e5b88b413e9f5a317fe08bbcd8554"
+   },
+   "mode_0025.csv": {
+    "bytes": 155012352,
+    "sha256": "ee676af0641f41e4e3bdf4931b0ea3601fb910e8711161e9cbd0a117d3b06e22"
+   }
+  },
+  "total_bytes": 3096077377,
+  "location": "outside Git: D:\\git\\abaqus-modal-comparator-work\\research\\PRIORITY6_SP10_FE_SHAPES_202610\\output"
+ }
+}

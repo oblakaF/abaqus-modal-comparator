@@ -34,13 +34,15 @@ from services import specimen_catalog_view as catalog
 FE, EXPERIMENTAL = registry.FE, registry.EXPERIMENTAL
 KINDS = (FE, EXPERIMENTAL)
 KIND_TITLE = {FE: "FE results", EXPERIMENTAL: "Experimental data"}
-DIALOG_FILTERS = {
-    FE: "Abaqus results (*.odb manifest.json);;Abaqus ODB (*.odb);;Extracted manifest (manifest.json);;All files (*)",
+DIALOG_FILTERS = {  # WINDOWS-RC1-A: the readable FE input first; an .odb is offered only with its limitation
+    FE: ("Extracted FE package (manifest.json);;Abaqus ODB - not viewable in this interface (*.odb);;"
+         "All files (*)"),
     EXPERIMENTAL: ("Universal files (*.unv *.uff);;Simcenter Testlab project (*.lms);;"
                    "All files (*)"),
 }
 KIND_HELP = {
-    FE: "An Abaqus .odb, or a manifest.json extracted from one.",
+    FE: ("An extracted FE package: its manifest.json, with the CSV files beside it. An Abaqus .odb cannot be "
+         "viewed in this interface."),
     EXPERIMENTAL: "A Simcenter Testlab .unv / .uff, or an .lms project with its exported .unv / .uff beside it.",
 }
 
@@ -57,6 +59,11 @@ LABEL_HINT = ("Optional. Your own name for this data. It is not looked up in the
               "files to no archived specimen, registration or status.")
 ARCHIVE_NOTE = ("The research archive is a read-only list of the laboratory's specimen records. Viewing it changes "
                 "none of your workspace files, transfers no registration and assigns no modal status.")
+# WINDOWS-RC1-A: what an .odb means in the new interface (shown when one is chosen; nothing is started)
+ODB_TYPE_NOTE = "not viewable in this interface"
+ODB_NOTE = ("An Abaqus .odb cannot be viewed in this version of the new interface, and choosing it starts no Abaqus. "
+            "To view its modes, choose the manifest.json of a package already extracted from it (with its CSV "
+            "files). The existing interface RUN_PROGRAM.cmd keeps its own ODB route.")
 STATUS_PATH = Path(__file__).resolve().parents[2] / "docs" / "auto_id" / "STATUS.json"
 UNKNOWN = "UNKNOWN"
 
@@ -84,7 +91,9 @@ def file_type_text(kind: str, path: Path) -> str:
     """The type of a checked file, from its name only."""
     suffix, name = path.suffix.lower(), path.name.lower()
     if kind == FE:
-        return "Extracted FE manifest (manifest.json)" if name == "manifest.json" else "Abaqus output database (.odb)"
+        if name == "manifest.json":
+            return "Extracted FE manifest (manifest.json)"
+        return f"Abaqus output database (.odb) — {ODB_TYPE_NOTE}" if suffix == ".odb" else "FE file"
     if suffix == ".lms":
         from universal_reader import resolve_testlab_file  # the same resolver check_file used; existence only
 

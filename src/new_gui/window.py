@@ -49,7 +49,7 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QGuiApplication, QKeySequence, QPalette
 from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
-                               QStackedWidget, QVBoxLayout, QWidget)
+                               QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
 
 from new_gui import APP_NAME, STAGE
 from new_gui.archive_dialog import ArchiveDialog
@@ -57,17 +57,22 @@ from new_gui.comparison_panel import WIDE_CONTENT, ComparisonPanel
 from new_gui.diagnostic_panel import DiagnosticPanel
 from new_gui.known_sources_dialog import KnownSourcesDialog
 from new_gui.materials_panel import SUBTITLE as MATERIALS_SUBTITLE, MaterialsPanel
+from new_gui.generic_plate_panel import GenericPlatePanel, TITLE as GENERIC_TITLE
+from new_gui.physical_review_panel import PhysicalReviewPanel, TITLE as REVIEW_TITLE
+from new_gui.fe_response_panel import FEResponsePanel, TITLE as FE_RESPONSE_TITLE
 from new_gui.plate_study_panel import PlateStudyPanel
 from new_gui.preview_model import FAILED, INSPECT, IDLE, READ, READING, STATE_TEXT, InspectSlot, Outcome, run_read
 from new_gui.preview_panel import PreviewPanel
 from new_gui.registration_check_panel import RegistrationCheckPanel
+from new_gui.research_results_panel import ResearchResultsPanel
 from new_gui.shape_panel import ShapePanel
-from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, EMPTY_TEXT, EXPERIMENTAL, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, DIALOG_FILTERS, Workspace,
-                                     scientific_status)
+from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, DIALOG_FILTERS, EMPTY_TEXT, EXPERIMENTAL, FE,
+                                     KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, ODB_NOTE, Workspace, scientific_status)
 
-PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study")
+PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study", "Research Results")
 MATERIALS_PAGE = 3
 PLATE_PAGE = 4
+RESEARCH_PAGE = 5  # PRIORITY-5A: archived research results, read on the page's first show
 KNOWN_SOURCES = "Choose a known new experimental source..."
 DIALOG_TITLES = {FE: "Choose the FE results file", EXPERIMENTAL: "Choose the experimental data file"}
 OPEN_ARCHIVE = "Open research archive..."
@@ -205,6 +210,8 @@ class SourceCard(QFrame):
         layout.addLayout(grid)
         self.note = _label(CHOSEN_NOTE, "hint")
         layout.addWidget(self.note)
+        self.odb_note = _label(ODB_NOTE, "warnings")  # WINDOWS-RC1-A: an .odb is not viewable here; nothing starts
+        layout.addWidget(self.odb_note)
         self.error = _label("", "error")
         layout.addWidget(self.error)
         buttons = QHBoxLayout()
@@ -238,6 +245,7 @@ class SourceCard(QFrame):
         self.path.setCursorPosition(len(self.path.text()))  # a long path shows its end: folder and file name
         self.file_type.setText(choice.file_type if choice.chosen else "—")
         self.note.setVisible(choice.chosen and state == IDLE)
+        self.odb_note.setVisible(self.kind == FE and choice.chosen and choice.path.suffix.lower() == ".odb")
         self.error.setText(message)
         self.error.setVisible(bool(message))
         self.choose_button.setText("Replace file..." if choice.chosen else "Choose file...")
@@ -290,6 +298,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self._scroll(self._build_status_page()))
         self.stack.addWidget(self._scroll(self._build_materials_page()))
         self.stack.addWidget(self._scroll(self._build_plate_page()))
+        self.stack.addWidget(self._scroll(self._build_research_page()))
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()
@@ -415,11 +424,44 @@ class MainWindow(QMainWindow):
         return page
 
     def _build_plate_page(self) -> QWidget:
-        page, layout = self._page("Plate Study", "Research study of one free-free CFRP plate (PLATE-300x300x1mm): "
-                                                 "frequencies, independent shapes, registration status, FE "
-                                                 "sensitivities and readiness. No fit and no material value.")
+        page, layout = self._page("Plate Study", "Research studies of single CFRP plates: A. the current study of "
+                                                 "PLATE-300x300x1mm; B. the workbench of a new single plate of any "
+                                                 "size; C. the physical readiness review; D. the FE-only response "
+                                                 "of an FE model. No material value.")
         self.plate = PlateStudyPanel(ask_folder=self._ask_folder, family_root=self._plate_family_root)
-        layout.addWidget(self.plate)
+        self.workbench = GenericPlatePanel()  # PRIORITY-8: B. New Single Plate — Research Workbench
+        # PRIORITY-9: C. Physical Readiness Review (the dossier of PLATE 261027 / M11, or of study B)
+        self.review = PhysicalReviewPanel(study_source=lambda: self.workbench.study)
+        self.fe_response = FEResponsePanel()  # PRIORITY-10: D. FE Response Workbench (FE-only)
+        self.plate_tabs = QTabWidget()
+        self.plate_tabs.setObjectName("plateTabs")
+        self.plate_tabs.setDocumentMode(True)
+        self.plate_tabs.addTab(self.plate, "A. Current PLATE Study")
+        self.plate_tabs.addTab(self.workbench, "B. New Single Plate")  # short: the tabs fit at 900 × 680
+        self.plate_tabs.addTab(self.review, "C. Physical Readiness")
+        self.plate_tabs.addTab(self.fe_response, "D. FE Response")
+        self.plate_tabs.setTabToolTip(1, GENERIC_TITLE)
+        self.plate_tabs.setTabToolTip(2, REVIEW_TITLE)
+        self.plate_tabs.setTabToolTip(3, FE_RESPONSE_TITLE)
+        self.plate_tabs.currentChanged.connect(self._plate_tab_shown)
+        layout.addWidget(self.plate_tabs)
+        layout.addStretch(1)
+        return page
+
+    def _plate_tab_shown(self, index: int) -> None:
+        if index == 1:
+            self.workbench.activate()
+        elif index == 2:
+            self.review.activate()
+        elif index == 3:
+            self.fe_response.activate()
+
+    def _build_research_page(self) -> QWidget:
+        page, layout = self._page("Research Results", "The archived results of the real modal matching, the FE "
+                                                      "parameter sensitivities and the inverse parameter study "
+                                                      "(PRIORITY-1–4): viewing only, nothing is computed.")
+        self.research = ResearchResultsPanel()
+        layout.addWidget(self.research)
         layout.addStretch(1)
         return page
 
@@ -483,6 +525,8 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------------------------------- actions
 
     def show_page(self, index: int) -> None:
+        if index == RESEARCH_PAGE:
+            self.research.load()  # the archived snapshot is read on first show, not at start-up
         if index == MATERIALS_PAGE:
             self.materials.load()  # the project's material records are read on first show, not at start-up
         self.stack.setCurrentIndex(index)
@@ -553,7 +597,8 @@ class MainWindow(QMainWindow):
         """A read, a shape drawing, the frequency diagnostic or the registration check is still running."""
         return (self.reading() or any(panel.busy() for panel in self.shape_panels.values())
                 or self.diagnostic.busy() or self.registration.busy() or self.comparison.busy()
-                or self.plate.busy())
+                or self.plate.busy() or self.workbench.busy() or self.review.busy()
+                or self.fe_response.busy())
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
         """Process events until no read or drawing is running (tests and checks); returns whether all ended."""
@@ -573,6 +618,9 @@ class MainWindow(QMainWindow):
         self.registration.cancel()  # and the registration check
         self.comparison.cancel()  # and the verified comparison, its drawings included
         self.plate.cancel()  # and the plate study
+        self.workbench.cancel()  # and the single-plate workbench's drawings
+        self.review.cancel()  # and the physical readiness review's background check (PRIORITY-9-F1)
+        self.fe_response.cancel()  # and the FE response tracking (PRIORITY-10)
         super().closeEvent(event)
 
     def _analysis_changed(self) -> None:
@@ -621,8 +669,14 @@ class MainWindow(QMainWindow):
         """The known new working sources; a chosen, verified one only sets the experimental file's path."""
         self.known_dialog = KnownSourcesDialog(self, self._known_root)
         self.known_dialog.accepted.connect(self._known_source_chosen)
+        self.known_dialog.finished.connect(self._known_folder_kept)
         self.known_dialog.open()
         return self.known_dialog
+
+    def _known_folder_kept(self, _result=0) -> None:
+        """WINDOWS-RC1-A: the folder the user chose in the dialog is offered again for the rest of the session."""
+        if self.known_dialog is not None:
+            self._known_root = self.known_dialog.root
 
     def _known_source_chosen(self) -> None:
         if self.known_dialog is not None and self.known_dialog.chosen_path is not None:
@@ -658,8 +712,26 @@ class MainWindow(QMainWindow):
         identities = {"fe": self._read_identity(FE), "experimental": self._read_identity(EXPERIMENTAL)}
         self.comparison.set_inputs(*inputs, identities)  # a change removes the comparison and its drawings
         self.plate.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
+        self.workbench.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
+        self.review.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
+        self.fe_response.set_inputs(inputs[0], identities["fe"], inputs[1], identities["experimental"], inputs[2])
+        self.research.set_workspace(identities["experimental"], identities["fe"],  # SHA-256 link only
+                                    self._research_context(*inputs))
         self._registration_changed()
         self._analysis_changed()
+
+    @staticmethod
+    def _research_context(fe_preview, experimental_preview, set_index) -> dict:
+        """PRIORITY-7: what the Research Results page compares with the PRIORITY-6 sources besides the SHA-256 — the
+        modal set chosen for the frequency diagnostic and the FE modes read (no data is read again)."""
+        modal_set = None
+        sets = experimental_preview.sets if experimental_preview is not None else ()
+        if set_index is not None and 0 <= set_index < len(sets):
+            chosen = sets[set_index]
+            modal_set = {"names": (chosen.display_name, chosen.key), "records": len(chosen.records)}
+        return {"modal_set": modal_set,
+                "fe_modes": tuple((m.number, m.frequency_hz) for m in fe_preview.modes) if fe_preview else (),
+                "fe_step": fe_preview.step_name if fe_preview is not None else None}
 
     def _read_identity(self, kind: str):
         """The identity of the file read for the shown preview of ``kind`` (None when not read or not confirmed)."""

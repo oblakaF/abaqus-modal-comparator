@@ -44,8 +44,9 @@ PREVIEW_NOTE = ("The data as the analysis importer reads them. This is a preview
                 "other side, no modal set or mode is selected, paired or excluded, no MAC is computed, and the data "
                 "are not declared ready for an analysis.")
 NOT_INSPECTED = "Not read yet. Click Inspect file to read the file's modal data."
-ODB_NOT_READ = ("This is an Abaqus .odb. Its modes can be read only from an existing extracted package: choose that "
-                "package's manifest.json (with its CSV files) as the FE file. Abaqus is not started for a preview.")
+ODB_NOT_READ = ("This is an Abaqus .odb: the new interface cannot view it in this version, and Abaqus is not "
+                "started. Choose the manifest.json of a package already extracted from it (with its CSV files) as the "
+                "FE file. The existing interface RUN_PROGRAM.cmd keeps its own ODB route.")
 PROVISIONAL_NOTE = ("These records are response snapshots at FRF peaks, derived by the importer without a fitted "
                     "modal set. Each one is PROVISIONAL — NOT A VALIDATED FITTED MODE.")
 FE_HEADERS = ("Mode", "Frequency (Hz)", "Frequency source", "FE nodes")

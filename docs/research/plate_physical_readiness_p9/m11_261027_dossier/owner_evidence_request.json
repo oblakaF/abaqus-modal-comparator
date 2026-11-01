@@ -1,0 +1,146 @@
+{
+  "schema": "amc/plate-physical-readiness/v1/owner-evidence-request",
+  "identity": {
+    "profile": "M11-261027",
+    "specimen": "PLATE-300x300x1mm",
+    "series": "NEXP29/PLATE300-1MM/S261027-ROTATED",
+    "modal_set": "Polymax_bravo",
+    "fe_model": "Abaqus M11 S4R_0875_BASELINE",
+    "experimental_sha256": "76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+    "fe_manifest_sha256": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+    "inp_sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3",
+    "kind": "PHYSICAL"
+  },
+  "states": {
+    "sources": "SOURCES_VERIFIED",
+    "registration": "PHYSICAL_REGISTRATION_NOT_VERIFIED",
+    "mode_pairs": "MODE_PAIRS_NOT_CONFIRMED",
+    "identification": "NOT_READY_FOR_IDENTIFICATION",
+    "review_package": "READY_FOR_OWNER_REVIEW"
+  },
+  "questions": [
+    {
+      "group": "A. The face of the plate",
+      "id": "A1",
+      "question": "Which absolute physical face of the plate faced the Polytec in the 261016 series: the face with the marking or the face without it?",
+      "closes": [
+        "scanned_face",
+        "grid_plus_v_edge"
+      ],
+      "acceptable_evidence": "one answer (marked / unmarked) with its source; the owner's same-face statement then carries it to 261027. 'The same face as in 261016' is relative and does not answer it",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    },
+    {
+      "group": "A. The face of the plate",
+      "id": "A2",
+      "question": "Which source document or confirmation establishes that face (for example a photograph of the mounted plate from the Polytec side with the marking visible, a laboratory record, the owner's own observation)?",
+      "closes": [
+        "scanned_face",
+        "grid_plus_v_edge"
+      ],
+      "acceptable_evidence": "the document is chosen in Source Audit; it is recorded by SHA-256 and its reading is confirmed by the owner",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    },
+    {
+      "group": "B. The physical scan geometry",
+      "id": "B1",
+      "question": "Which of these existing materials is available: (a) the original 300by300_plate_only_1mm_ROTATED_261027.svd; (b) a PSV screenshot of 261016 with the points on the video frame; (c) the original scanner angles and the camera frame / scale; (d) other independently measured coordinates of the points?",
+      "closes": [
+        "scan_window_offsets_mm",
+        "scan_metric_geometry"
+      ],
+      "acceptable_evidence": "any one of (a)–(d); if none is available, both facts stay NOT_VERIFIED (the 277.7 × 277.0 mm UNV grid and the diagnostic 261016 reconstruction are never the physical window)",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    },
+    {
+      "group": "C. The FE orientation",
+      "id": "C1",
+      "question": "Is there a measured physical landmark that ties FE (0, 0) to a specific corner of the plate?",
+      "closes": [
+        "fe_origin_corner",
+        "fe_normal_face"
+      ],
+      "acceptable_evidence": "a measured landmark recorded with its source",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    },
+    {
+      "group": "C. The FE orientation",
+      "id": "C2",
+      "question": "If there is none: should a geometrically founded FE variant with a measured asymmetry (for example the measured edge thicknesses) be prepared? Naming a corner by agreement alone stays CONVENTION_ONLY and is never physical evidence.",
+      "closes": [
+        "fe_origin_corner",
+        "fe_normal_face"
+      ],
+      "acceptable_evidence": "an owner decision to prepare such a variant (its FE runs need their own authorisation)",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    },
+    {
+      "group": "D. The applicability of the model",
+      "id": "D1",
+      "question": "Please state the actual attachment points of the two suspensions. Recorded now: two upper points along the nodal line of the first mode; the exact points are not recorded.",
+      "closes": [
+        "suspension_points"
+      ],
+      "acceptable_evidence": "a measurement or record with its source; never derived from a measured or FE frequency",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    },
+    {
+      "group": "D. The applicability of the model",
+      "id": "D2",
+      "question": "Please state the length and known characteristics of the two rubber bands and strings. Recorded now: two rubber bands (owner, 2026-10-30); stiffness and lengths not recorded.",
+      "closes": [
+        "suspension_bands"
+      ],
+      "acceptable_evidence": "a measurement or record with its source; never derived from a measured or FE frequency",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    },
+    {
+      "group": "D. The applicability of the model",
+      "id": "D3",
+      "question": "Please state the place, mass and attachment of the force sensor. Recorded now: a force reference channel exists (dataset 58 'Force * Velocity'); the point, mass and attachment are not recorded.",
+      "closes": [
+        "force_sensor"
+      ],
+      "acceptable_evidence": "a measurement or record with its source; never derived from a measured or FE frequency",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    },
+    {
+      "group": "D. The applicability of the model",
+      "id": "D4",
+      "question": "Please state the real thickness of the plate, including a possible non-uniformity inside it. Recorded now: 20 perimeter readings 0.71–0.94 mm (2026-10-21); the interior is not measured; edge means differ by about 13 % (edge 2 against edge 4).",
+      "closes": [
+        "thickness_map"
+      ],
+      "acceptable_evidence": "a measurement or record with its source; never derived from a measured or FE frequency",
+      "answer": null,
+      "answer_provenance": null,
+      "evidence_document": null,
+      "evidence_document_sha256": null
+    }
+  ],
+  "instructions": "Answer each question with its source; leave a question empty when nothing exists. No value is derived from a frequency."
+}
