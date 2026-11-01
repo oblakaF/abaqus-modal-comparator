@@ -184,7 +184,7 @@ collapsed to zero width.
   Results, SP-10, the branch tracker, clusters, FE preview and package identity;
 - all pass.
 
-**Full suite** on `44fe1df`: **3299 tests, OK, 98 skipped** (the same categories), with isolated LOCALAPPDATA and
+**Full suite** on `44fe1df`: **3298 tests, OK, 98 skipped** (the same categories), with isolated LOCALAPPDATA and
 nothing else on the screen.
 
 **Windows GUI smoke** (`RUN_NEW_GUI.cmd` of `44fe1df`; Windows 150 %, native dialogs, UI Automation, isolated
