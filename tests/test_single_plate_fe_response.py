@@ -468,6 +468,7 @@ class RealM11Tests(unittest.TestCase):
 
 try:
     from PySide6.QtWidgets import QApplication  # noqa: F401
+    from new_gui import fe_response_panel as fpanel
     HAVE_QT = True
 except ImportError:  # pragma: no cover
     HAVE_QT = False
@@ -593,6 +594,133 @@ class PanelTests(unittest.TestCase):
         written = {p.name: p for p in self.panel.last_export}
         self.assertEqual(json.loads(written["fe_response_session.json"].read_text(encoding="utf-8"))
                          ["source_check"]["state"], "SOURCES_VERIFIED")
+
+    def folder_route(self, name):
+        """Another plate by the folder route (baseline + baseline INP + folder of states), its ids not retyped."""
+        root = syn.write_family(self.dir / name).parent
+        self.assertTrue(self.panel.choose_baseline(str(root / "baseline" / "extraction" / "manifest.json")))
+        self.assertTrue(self.panel.choose_baseline_inp(str(root / "baseline" / "baseline.inp")))
+        self.assertTrue(self.panel.choose_states_folder(str(root)))
+        return root
+
+    def ids(self):
+        return self.panel.model_edit.text(), self.panel.specimen_edit.text()
+
+    def test_f1_08_ids_of_a_declaration_are_not_carried_to_another_baseline(self):
+        self.tracked()
+        synthetic = self.ids()
+        self.assertEqual(synthetic, ("SYNTHETIC_TEST-PLATE-420x260-S4", "SYNTHETIC_TEST-PLATE-420x260"))
+        earlier = self.panel.family
+        self.assertTrue(self.panel.save_session(str(self.dir / "synthetic.json")))
+        self.folder_route("plate_z")
+        neutral = (fpanel.DEFAULT_MODEL_ID, fpanel.DEFAULT_SPECIMEN_ID)
+        self.assertEqual(self.ids(), neutral)
+        self.assertEqual((self.panel.family.model_id, self.panel.family.specimen_id), neutral)
+        self.assertEqual((earlier.model_id, earlier.specimen_id), synthetic)  # a family made is never changed
+        self.assertTrue(self.panel.run())
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual((self.panel.result["model_id"], self.panel.result["specimen_id"]), neutral)
+        self.assertTrue(self.panel.save_session(str(self.dir / "plate_z.json")))
+        record = fr.open_session(self.dir / "plate_z.json")
+        self.assertEqual((record["family"]["model_id"], record["family"]["specimen_id"]), neutral)
+        self.assertEqual(record["fe_fingerprint"], fr.fe_fingerprint(record["identities"], self.panel.family))
+        self.assertEqual(fr.session_state(record)["state"], "SOURCES_VERIFIED")
+        (self.dir / "report").mkdir()
+        self.assertTrue(self.panel.export(str(self.dir / "report")))
+        self.assertTrue(self.panel.wait_idle())
+        exported = json.loads(next(p for p in self.panel.last_export if p.name == "fe_response_session.json")
+                              .read_text(encoding="utf-8"))
+        self.assertEqual((exported["family"]["model_id"], exported["result"]["model_id"]),
+                         (fpanel.DEFAULT_MODEL_ID, fpanel.DEFAULT_MODEL_ID))
+        self.assertNotIn("SYNTHETIC", json.dumps(exported["family"]))
+        # the identity check is not weakened: another model id under the same sources is not the session's fingerprint
+        forged = dict(record, family=dict(record["family"], model_id=synthetic[0]))
+        self.assertEqual(fr.session_state(forged)["state"], "STALE")
+        # the original session reopens with its own ids
+        self.assertTrue(self.panel.open_session(str(self.dir / "synthetic.json")))
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(self.panel.freshness()[0], "STORED")
+        self.assertEqual(self.ids(), synthetic)
+
+    def test_f1_08_ids_of_a_session_are_not_carried_to_another_baseline(self):
+        self.tracked()
+        self.assertTrue(self.panel.save_session(str(self.dir / "synthetic.json")))
+        self.tracked("again")
+        self.assertTrue(self.panel.open_session(str(self.dir / "synthetic.json")))
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(self.ids(), ("SYNTHETIC_TEST-PLATE-420x260-S4", "SYNTHETIC_TEST-PLATE-420x260"))
+        # the states folder of the session's own baseline is the same FE model: its ids stay
+        root = self.dir / "family"
+        self.assertTrue(self.panel.choose_states_folder(str(root)))
+        self.assertEqual(self.panel.family.model_id, "SYNTHETIC_TEST-PLATE-420x260-S4")
+        self.assertTrue(self.panel.open_session(str(self.dir / "synthetic.json")))
+        self.assertTrue(self.panel.wait_idle())
+        # the smoke found the family line still naming the session after another baseline was chosen
+        other = syn.write_family(self.dir / "plate_y").parent / "baseline" / "extraction" / "manifest.json"
+        self.assertTrue(self.panel.choose_baseline(str(other)))
+        self.assertEqual(self.panel.family_line.text(), f"Baseline: {other}")
+        self.assertEqual(self.ids(), (fpanel.DEFAULT_MODEL_ID, fpanel.DEFAULT_SPECIMEN_ID))
+        self.folder_route("plate_z")
+        self.assertEqual(self.ids(), (fpanel.DEFAULT_MODEL_ID, fpanel.DEFAULT_SPECIMEN_ID))
+        self.assertEqual(self.panel.family.model_id, fpanel.DEFAULT_MODEL_ID)
+
+    def test_f1_08_ids_the_user_entered_stay_and_a_cancelled_choice_changes_nothing(self):
+        from PySide6.QtTest import QTest
+
+        self.tracked()
+        auto = self.ids()
+        self.panel.model_edit.clear()
+        QTest.keyClicks(self.panel.model_edit, auto[0])  # typed by the user, even if equal to the filled-in id
+        self.panel.specimen_edit.setText("PLATE-Z")  # entered (the text is not the filled-in id)
+        self.folder_route("plate_z")
+        self.assertEqual(self.ids(), (auto[0], "PLATE-Z"))
+        self.assertEqual((self.panel.family.model_id, self.panel.family.specimen_id), (auto[0], "PLATE-Z"))
+        self.assertTrue(self.panel.run())
+        self.assertTrue(self.panel.wait_idle())
+        # a cancelled dialog changes neither the ids nor the chosen set
+        self.tracked("again")
+        before = (self.ids(), self.panel.baseline_manifest, self.panel.baseline_inp, self.panel.family,
+                  self.panel.result, self.panel.freshness(), dict(self.panel._auto_ids))
+        self.panel._ask_file, self.panel._ask_folder = (lambda *_a: ""), (lambda *_a: "")
+        self.assertFalse(self.panel.choose_baseline())
+        self.assertFalse(self.panel.choose_baseline_inp())
+        self.assertFalse(self.panel.choose_states_folder())
+        self.assertFalse(self.panel.load_declaration())
+        self.assertFalse(self.panel.open_session())
+        self.assertEqual((self.ids(), self.panel.baseline_manifest, self.panel.baseline_inp, self.panel.family,
+                          self.panel.result, self.panel.freshness(), dict(self.panel._auto_ids)), before)
+        self.assertEqual(self.panel.freshness()[0], "CURRENT")
+
+    @unittest.skipUnless(HAVE_M11, "the M11 S4 packages and the verified baseline copies are not on this computer")
+    def test_f1_08_m11_after_a_synthetic_declaration(self):
+        self.tracked()
+        self.assertTrue(self.panel.choose_baseline(str(M11_BASE)))
+        self.assertTrue(self.panel.choose_baseline_inp(str(M11_INP)))
+        self.assertTrue(self.panel.choose_states_folder(str(S4)))
+        self.assertTrue(self.panel.run())
+        self.assertTrue(self.panel.wait_idle())
+        result = self.panel.result
+        self.assertEqual((result["model_id"], result["specimen_id"]),
+                         (fpanel.DEFAULT_MODEL_ID, fpanel.DEFAULT_SPECIMEN_ID))  # neutral, never guessed
+        fe7 = branch(result, "FE7")
+        modes = {int(m.number): float(m.frequency_hz) for m in fr._dataset(str(M11_BASE)).sorted_modes()}
+        self.assertEqual((fe7["baseline_mode"], fe7["hz"]), (7, modes[7]))  # the baseline FE package itself
+        self.assertAlmostEqual(fe7["hz"], 19.07217, places=5)
+        before = json.dumps(result, sort_keys=True, default=str)
+        rows = []
+        for value in (5250.0, 4750.0, 5000.0, 5250.0):
+            self.assertTrue(self.panel.predict("G12", value))
+            self.assertTrue(self.panel.wait_idle())
+            self.assertEqual(self.panel.source_check["state"], "SOURCES_VERIFIED")
+            rows.append(next(r for r in self.panel.prediction["rows"] if r["term"] == "FE7"))
+        self.assertEqual(json.dumps(self.panel.result, sort_keys=True, default=str), before)  # baseline untouched
+        self.assertEqual(rows[0], rows[3])  # nothing accumulates
+        self.assertEqual(rows[2]["predicted_hz"], fe7["hz"])
+        self.assertAlmostEqual(rows[0]["solved_hz"], 19.5264, places=3)
+        self.assertTrue(self.panel.choose_baseline(str(self.dir / "family" / "baseline" / "extraction" /
+                                                       "manifest.json")))
+        self.assertEqual(self.panel.freshness()[0], "STALE")
+        self.assertFalse(self.panel.predict("G12", 5250.0))
 
     def test_the_tracking_can_be_cancelled(self):
         self.assertTrue(self.panel.load_declaration(str(syn.write_family(self.dir / "family"))))

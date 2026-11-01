@@ -363,3 +363,56 @@ M11 files (manifests, `mode_0010.csv`, INPs) unchanged.
 
 **A defect found by the first smoke** (`F1 gui smoke cmd 1`, `c885438`). After a session was opened, the family line
 named the baseline chosen before it. Corrected in `2b6df4b`, with a test.
+
+### 9.6 F1-08: the ids of one FE set are not carried to another
+
+The technical acceptance of `20c910c` found one defect (scenario F1-08). The numbers were never carried between FE
+sets, but the FE model id and the specimen id were. A declaration or a reopened session wrote its ids into the two
+fields. A later baseline chosen by the folder route kept them. As a result, the M11 results were named
+`SYNTHETIC_TEST-PLATE-420x260-S4` in the result, the session, the export and the fingerprint. The defect dates from
+PRIORITY-10, not from F1.
+
+**The correction** (`fe_response_panel.py` only):
+
+- The panel remembers the ids it filled in itself from a declaration or a session (`_fill_ids`).
+- Choosing another baseline resets those ids to the neutral defaults `FE model` / `specimen` (`_drop_filled_ids`).
+  No M11 or other physical id is guessed.
+- An id the user typed or entered stays. A typed id is recognised by `textEdited`; an entered one by its text no
+  longer being the filled-in id.
+- A family already made keeps its ids; nothing is renamed afterwards.
+- A cancelled dialog changes nothing.
+- The states folder of the session's own baseline is the same FE model, so its ids stay.
+- The smoke found the family line still naming the reopened session after another baseline was chosen. Once a new
+  choice makes the results STALE, the line names the new baseline instead.
+
+The baseline, STALE, the source verification, the What-If and the scientific status are unchanged.
+
+**Tests** (4 new; 37 in this file):
+
+- a synthetic declaration, then another plate by the folder route:
+  - neutral ids in the fields, the family, the result, the session JSON and the export;
+  - the fingerprint is still checked: another model id makes the session STALE;
+  - the original session reopens with its own ids;
+- a synthetic session, then another baseline: neutral ids, and the family line names the new baseline;
+- ids the user entered stay through another baseline; five cancelled dialogs change nothing;
+- M11 after a synthetic declaration (where the M11 data are present):
+  - neutral ids;
+  - FE7 = 19.07217 Hz read from the baseline package;
+  - G12 5 250 / 4 750 / 5 000 / 5 250 leave the result unchanged and do not accumulate;
+  - another baseline makes the results STALE.
+
+Without the correction, three of the new tests fail and the fourth errors; so does the family-line check without its
+line.
+
+**Acceptance:**
+
+- 37 targeted tests pass on Python 3.11 and with pytest on 3.14.
+- `test_new_gui6_workbench`: 48 OK, 1 skipped.
+- The full suite, run alone on Python 3.11: 3 310 OK, 98 skipped.
+- Windows smoke through `RUN_NEW_GUI.cmd` at 150 %:
+  - synthetic → M11: neutral ids, FE7 19.07217, G12 5 250 → 19.52665 (solved 19.52640) and back;
+  - the export and the session carry `FE model` / `specimen`;
+  - the synthetic session, then another baseline: neutral ids, and the line names the new baseline;
+  - typed ids kept through another baseline and two cancelled dialogs;
+  - after a restart, the M11 session reopens STORED with its own ids;
+  - no page scroll bar; no Abaqus process; exit 0; the 149 watched M11 files unchanged.

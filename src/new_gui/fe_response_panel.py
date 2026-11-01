@@ -29,6 +29,7 @@ INTRO = ("FE-only: one FE model of a plate, its baseline and its solved perturba
          "the solved FE points. Not an Abaqus solve, not a material identification; experimental records are never "
          "paired here.")
 SECTIONS = ("1. Sources", "2. Tracking", "3. Sensitivities", "4. What-If", "5. Report")
+DEFAULT_MODEL_ID, DEFAULT_SPECIMEN_ID = "FE model", "specimen"  # neutral: no FE model or specimen is guessed
 
 
 def _label(text: str = "", name: str = "") -> QLabel:
@@ -97,6 +98,7 @@ class FEResponsePanel(QWidget):
         self.source_check: Optional[dict] = None  # the last check of the FE sources before a prediction or export
         self.last_export: tuple = ()
         self.records: list = []  # experimental records (number, hz) read in the Workspace: proximity only
+        self._auto_ids: dict = {}  # field -> the id filled in from a declaration or a session (not the user's)
         self.tables: dict = {}
         self.active = False
         layout = QVBoxLayout(self)
@@ -106,7 +108,10 @@ class FEResponsePanel(QWidget):
         head_layout.addWidget(_label(INTRO, "hint"))
         head_layout.addWidget(_label(fr.SCIENTIFIC_STATUS, "warnings"))
         grid = QGridLayout()
-        self.model_edit, self.specimen_edit = _edit("frModel", "FE model"), _edit("frSpecimen", "specimen")
+        self.model_edit = _edit("frModel", DEFAULT_MODEL_ID)
+        self.specimen_edit = _edit("frSpecimen", DEFAULT_SPECIMEN_ID)
+        self.model_edit.textEdited.connect(lambda _text: self._auto_ids.pop("model", None))  # typed: the user's id
+        self.specimen_edit.textEdited.connect(lambda _text: self._auto_ids.pop("specimen", None))
         # plain captions: a wrapping label (Ignored width) collapses in a column that does not stretch
         grid.addWidget(QLabel("FE model id"), 0, 0)
         grid.addWidget(self.model_edit, 0, 1)
@@ -298,6 +303,21 @@ class FEResponsePanel(QWidget):
 
     # ------------------------------------------------------------------------------------------ commands
 
+    def _fill_ids(self, model_id: str, specimen_id: str) -> None:
+        """The ids of a declaration or a session, written into the fields; they belong to that FE model only."""
+        self.model_edit.setText(model_id)
+        self.specimen_edit.setText(specimen_id)
+        self._auto_ids = {"model": model_id, "specimen": specimen_id}
+
+    def _drop_filled_ids(self) -> None:
+        """Another baseline: the ids filled in from the previous declaration or session are not carried to it (the
+        neutral defaults instead); an id the user entered stays. The ids of a family already made never change."""
+        for key, edit, default in (("model", self.model_edit, DEFAULT_MODEL_ID),
+                                   ("specimen", self.specimen_edit, DEFAULT_SPECIMEN_ID)):
+            if key in self._auto_ids and edit.text() == self._auto_ids[key]:
+                edit.setText(default)
+        self._auto_ids = {}
+
     def _invalidate(self, reason: str) -> None:
         """A new baseline, baseline INP or family: the shown results stop being current at once and running work is
         discarded. Nothing is predicted, saved or exported from them until the tracking runs again."""
@@ -318,6 +338,7 @@ class FEResponsePanel(QWidget):
             return False
         self._invalidate(f"the FE baseline was chosen again ({path}): the results belong to the previous choice")
         self.baseline_manifest, self.family = path, None  # the family belonged to the previous baseline
+        self._drop_filled_ids()  # and so did the ids filled in from its declaration or session (F1-08)
         self._say(f"Baseline: {path}. Choose the folder of its solved states (or load a declaration)."
                   + (" The previous FE results are STALE." if self.result is not None else ""))
         self._refresh()
@@ -347,8 +368,9 @@ class FEResponsePanel(QWidget):
         if not folder:
             return False
         try:
-            self.family = fr.family_from_folder(folder, self.baseline_manifest, self.model_edit.text().strip() or
-                                                "FE model", self.specimen_edit.text().strip() or "specimen",
+            self.family = fr.family_from_folder(folder, self.baseline_manifest,
+                                                self.model_edit.text().strip() or DEFAULT_MODEL_ID,
+                                                self.specimen_edit.text().strip() or DEFAULT_SPECIMEN_ID,
                                                 baseline_inp=self.baseline_inp)
         except fr.FamilyRefused as error:
             self._say(f"Not read: {error}")
@@ -374,8 +396,7 @@ class FEResponsePanel(QWidget):
         self._invalidate(f"another FE family was chosen (the declaration {path})")
         self.family = family
         self.baseline_manifest, self.baseline_inp = family.baseline.manifest, family.baseline.inp
-        self.model_edit.setText(self.family.model_id)
-        self.specimen_edit.setText(self.family.specimen_id)
+        self._fill_ids(self.family.model_id, self.family.specimen_id)
         self.reopened = None
         self._say(f"FE family {self.family.model_id}: {len(self.family.variants)} states ({self.family.kind}). Run the "
                   "FE-to-FE tracking.")
@@ -541,8 +562,8 @@ class FEResponsePanel(QWidget):
                 self.invalidated, self.source_check = None, None
                 baseline = (record.get("family") or {}).get("baseline") or {}  # the session's, not an earlier choice
                 self.baseline_manifest, self.baseline_inp = baseline.get("manifest"), baseline.get("inp")
-                self.model_edit.setText((record.get("family") or {}).get("model_id") or "")
-                self.specimen_edit.setText((record.get("family") or {}).get("specimen_id") or "")
+                self._fill_ids((record.get("family") or {}).get("model_id") or "",
+                               (record.get("family") or {}).get("specimen_id") or "")
                 self._fill_parameters()
                 self._say(f"Session opened: {path}. {outcome['note']}.")
             self._refresh()
@@ -607,7 +628,7 @@ class FEResponsePanel(QWidget):
         if f:
             line = (f"FE family: {f.model_id} · specimen {f.specimen_id} · {f.kind} · baseline {f.baseline.manifest} · "
                     f"{len(f.variants)} states")
-        elif self.reopened is not None:
+        elif self.reopened is not None and not self.invalidated:  # a new choice no longer names the session (F1-08)
             line = (f"Reopened session: {stored.get('model_id')} · specimen {stored.get('specimen_id')} · baseline "
                     f"{(stored.get('baseline') or {}).get('manifest')} · {len(stored.get('variants') or ())} states")
         else:
