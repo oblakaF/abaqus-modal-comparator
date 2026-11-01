@@ -318,3 +318,48 @@ route also refuses declared baseline values that contradict the baseline INP.
 - another baseline or baseline INP → STALE at once, with no prediction, save or export, and a running tracking
   discarded;
 - a changed shape file found by the check before a prediction; the export refused; the reopened session STALE.
+
+### 9.5 Results of the acceptance
+
+**Tests:**
+
+- targeted: 33 of `test_single_plate_fe_response`, under Python 3.13 and the CI's 3.11; the real M11 packages
+  included on this computer;
+- full suite on `2b6df4b`: **3306 tests, OK, 98 skipped** (the same categories; FAIL 0), isolated LOCALAPPDATA.
+
+**Windows GUI smoke.** `RUN_NEW_GUI.cmd` of `2b6df4b`: Windows 150 %, native dialogs, UI Automation, isolated
+LOCALAPPDATA. Evidence: `D:\git\abaqus-modal-comparator-work\research\PRIORITY10_P10_REVIEW\F1 gui smoke cmd 2\`.
+
+**M11 (real packages, read in place):**
+
+- tracked: 14 branches in 6 states; "PRIORITY-2 archive: AGREES (max |Δs| 4.91e-06)";
+- G12 = 5 250 predicted after the sources verified again (FE7 solved 19.52640 Hz);
+- export of 5 files, with `source_check` SOURCES_VERIFIED;
+- the saved session reopened **STORED**; the family line names the session's baseline.
+
+**Another baseline or baseline INP chosen:**
+
+- STALE at once and the tables hidden;
+- "No prediction: the FE results are STALE";
+- "Not exported: the FE results are STALE".
+
+**Synthetic family (420 × 260 mm):**
+
+- tracked and G12 = 4 200 predicted;
+- one shape file of E1_MINUS changed under its byte-identical manifest:
+  - the next prediction: "Not done: … E1_MINUS: the package files changed";
+  - the export refused;
+  - the saved session reopened STALE.
+
+**Declarations:**
+
+- the GPa declaration: values shown in MPa (42 750, 4 200), "Declared values against the INPs" listed, tracked and
+  predicted;
+- `psi` refused: "the unit 'psi' is not supported for a modulus";
+- G12_PLUS declared as 4 250: "Not read: G12_PLUS: G12 is declared 4250 MPa but its INP has 4200 MPa".
+
+**Window sizes and end:** no page scroll bar at 900 × 680 and 1366 × 768; no Abaqus process; exit 0; the 20 watched
+M11 files (manifests, `mode_0010.csv`, INPs) unchanged.
+
+**A defect found by the first smoke** (`F1 gui smoke cmd 1`, `c885438`). After a session was opened, the family line
+named the baseline chosen before it. Corrected in `2b6df4b`, with a test.
