@@ -45,7 +45,7 @@ another geometry into a folder the user names, never into the repository: extrac
   - Anything else is listed as not used.
   - Only the chosen folder is read.
 - **A family declaration** (`amc/fe-family/v1`): model and specimen ids, the baseline values and every state's manifest
-  (or a `.dat`), parameter, value and unit. Paths may be relative.
+  (or a `.dat`), parameter, value and unit. Paths may be relative. Units and the INP check: see §9 (PRIORITY-10-F1).
 
 **Identities:**
 
@@ -122,12 +122,13 @@ CURRENT.
 - the experiment display, the limits and the scientific status;
 - no FE data.
 
-**Open session...** hashes every manifest again in the background (never the whole package):
+**Open session...** verifies the FE sources again in the background (since PRIORITY-10-F1: manifests, packages, INPs,
+`.dat` files and every used state; see §9):
 
 - **STORED** when they verify;
 - **STALE** (results hidden, no prediction) when one changed or is missing.
 
-**Choosing another baseline, folder or declaration** makes the shown results STALE.
+**Choosing another baseline, baseline INP, folder or declaration** makes the shown results STALE at once (§9).
 
 **Export results...** writes the session JSON, `central_sensitivities.csv`, `branch_tracking.csv`, `what_if.csv` and
 `FE_RESPONSE_REPORT.md` into a new folder.
@@ -236,3 +237,84 @@ copies unchanged.
   - SP-13 refused.
 
 Both pass. Evidence: `…\PRIORITY10_P10_REVIEW\regression cmd\` and `…\regression tab C cmd\`.
+
+## 9. PRIORITY-10-F1 — the results bound to their actual FE sources
+
+Branch `fix/plate-fe-response-p10-f1`, from `0f7ad3d`. Goal: never use stale or wrongly parametrised FE
+sensitivities. No new portable build; RC4-F1 is unchanged.
+
+### 9.1 Reopening a session
+
+`session_state` → `verify_sources` checks, in the background:
+
+- every manifest (SHA-256);
+- every package by `fe_package_identity.identify` (the manifest and every geometry and mode-shape file the loader
+  reads): a changed shape file under a byte-identical manifest is found;
+- every INP and `.dat` (SHA-256; a session of PRIORITY-10 takes their paths from its recorded family);
+- every state the results used (`states_used` and the − / + state of every central difference): it must be a state of
+  the recorded family and among the recorded sources, with its manifest and package SHA-256 recorded;
+- the recorded identities against the session's FE fingerprint.
+
+Any difference → **STALE**: the results are hidden; no prediction, no save, no export.
+
+### 9.2 The live session
+
+- **Choosing another baseline, baseline INP, folder or declaration** invalidates the shown results at once, before
+  any new tracking. Running work is discarded, and the family built on the previous baseline or INP is dropped (the
+  folder must be chosen again).
+- **The tracking** verifies its sources again after reading them: a file that changed during the read refuses the
+  result.
+- **Predict and Export** check first what is immediate (current results, solved range). They then verify the FE
+  sources again in the background; the GUI stays responsive and Cancel stops it. Only then is the prediction shown or
+  the export written, and the export records that check (`source_check`). A changed source makes the results STALE
+  instead.
+
+### 9.3 Units and the INP in a declaration
+
+**Parameters.** Only elastic moduli (E1, E2, E3, G12, G13, G23) are parameters of a family. Any other parameter is
+refused.
+
+**Units.** Every value is converted to MPa:
+
+| Unit | Factor to MPa |
+|---|---|
+| MPa, N/mm2, N/mm^2, N/mm² | 1 |
+| GPa | 1000 |
+| kPa | 0.001 |
+| Pa, N/m2, N/m^2, N/m² | 10⁻⁶ |
+
+- No unit means MPa.
+- Any other unit is refused, never guessed: `psi`, `ksi`, `kg/cm2`, and `mPa` or `MPA` (the case matters).
+- A baseline value is a number in `baseline_unit` or `{"value", "unit"}`.
+- A converted state keeps what was declared (`declared`, for example "42.75 GPa").
+
+**The INP check.** Where a member names its INP, the declaration is checked against it, at a relative tolerance of
+10⁻⁶. `inp_modulus_unit` gives the model's stress unit (MPa by default).
+
+The declaration is refused when:
+
+- a declared baseline value differs from the baseline INP;
+- a state's declared value differs from its own INP;
+- a state's INP changes any other material constant (E1 … G23, ρ, h) against the baseline INP.
+
+Without a baseline INP, only the declared parameters are compared, and the family says so (`checks`). The folder
+route also refuses declared baseline values that contradict the baseline INP.
+
+### 9.4 Tests
+
+`tests/test_single_plate_fe_response.py`: 33 tests (25 + 8).
+
+**Service:**
+
+- a changed shape file under an unchanged manifest;
+- a changed INP of a state and of the baseline;
+- a used state missing from the sources or from the disk;
+- GPa / Pa against MPa (the same sensitivities), refused units and a non-modulus parameter;
+- declared values against the INP, an undeclared E3 change, and no baseline INP;
+- an unchanged M11 session, fresh and the three PRIORITY-10 archive sessions, reopening SOURCES_VERIFIED.
+
+**Panel:**
+
+- another baseline or baseline INP → STALE at once, with no prediction, save or export, and a running tracking
+  discarded;
+- a changed shape file found by the check before a prediction; the export refused; the reopened session STALE.

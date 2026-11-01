@@ -93,6 +93,9 @@ class FEResponsePanel(QWidget):
         self.comparison: Optional[dict] = None
         self.prediction: Optional[dict] = None
         self.reopened: Optional[dict] = None
+        self.invalidated: Optional[str] = None  # why the shown results stopped being current (a new choice)
+        self.source_check: Optional[dict] = None  # the last check of the FE sources before a prediction or export
+        self.last_export: tuple = ()
         self.records: list = []  # experimental records (number, hz) read in the Workspace: proximity only
         self.tables: dict = {}
         self.active = False
@@ -224,10 +227,14 @@ class FEResponsePanel(QWidget):
         self._refresh()
 
     def freshness(self) -> tuple:
-        """CURRENT, STALE (the chosen family is not the one analysed, or a reopened session's sources changed),
-        STORED (a reopened session whose FE sources verify) or NONE."""
+        """CURRENT, STALE (another baseline, INP or family was chosen, the chosen family is not the one analysed, or
+        the FE sources changed on disk), STORED (a reopened session whose FE sources verify) or NONE."""
         if self.result is None:
             return "NONE", ""
+        if self.invalidated:
+            return "STALE", self.invalidated
+        if self.source_check is not None and self.source_check.get("state") == "STALE":
+            return "STALE", "the FE sources changed on disk: " + "; ".join(self.source_check.get("reasons", ()))
         if self.reopened is not None:
             if self.reopened.get("state") == "STALE":
                 return "STALE", "; ".join(self.reopened.get("reasons", ()))
@@ -291,14 +298,28 @@ class FEResponsePanel(QWidget):
 
     # ------------------------------------------------------------------------------------------ commands
 
+    def _invalidate(self, reason: str) -> None:
+        """A new baseline, baseline INP or family: the shown results stop being current at once and running work is
+        discarded. Nothing is predicted, saved or exported from them until the tracking runs again."""
+        if self._cancel_event is not None:
+            self._cancel_event.set()
+        if self.running is not None:
+            self._token += 1
+            self.running, self._cancel_event = None, None
+        if self.result is not None:
+            self.invalidated = reason
+        self.prediction = None
+
     def choose_baseline(self, path: Optional[str] = None) -> bool:
         self.activate()
         path = path if path is not None else self._ask_file("Choose the FE baseline package (manifest.json)",
                                                             "FE package (manifest.json)")
         if not path:
             return False
-        self.baseline_manifest = path
-        self._say(f"Baseline: {path}. Choose the folder of its solved states (or load a declaration).")
+        self._invalidate(f"the FE baseline was chosen again ({path}): the results belong to the previous choice")
+        self.baseline_manifest, self.family = path, None  # the family belonged to the previous baseline
+        self._say(f"Baseline: {path}. Choose the folder of its solved states (or load a declaration)."
+                  + (" The previous FE results are STALE." if self.result is not None else ""))
         self._refresh()
         return True
 
@@ -308,8 +329,12 @@ class FEResponsePanel(QWidget):
                                                             "Abaqus input (*.inp)")
         if not path:
             return False
-        self.baseline_inp = path
-        self._say(f"Baseline INP: {path} (its constants give the baseline parameter values; never run).")
+        self._invalidate(f"the baseline INP was chosen again ({path}): the results belong to the previous choice")
+        self.baseline_inp, self.family = path, None  # the states' parameters were read against the previous INP
+        self._say(f"Baseline INP: {path} (its constants give the baseline parameter values; never run). Choose the "
+                  "folder of the solved states again." + (" The previous FE results are STALE." if self.result
+                                                          is not None else ""))
+        self._refresh()
         return True
 
     def choose_states_folder(self, folder: Optional[str] = None) -> bool:
@@ -328,6 +353,7 @@ class FEResponsePanel(QWidget):
         except fr.FamilyRefused as error:
             self._say(f"Not read: {error}")
             return False
+        self._invalidate(f"another FE family was chosen (the folder {folder})")
         self.reopened = None
         self._say(f"{len(self.family.variants)} FE states found in {folder}"
                   + (f"; not used: {'; '.join(f'{a}: {b}' for a, b in self.family.problems)}" if self.family.problems
@@ -341,11 +367,13 @@ class FEResponsePanel(QWidget):
         if not path:
             return False
         try:
-            self.family = fr.family_from_declaration(path)
+            family = fr.family_from_declaration(path)
         except fr.FamilyRefused as error:
             self._say(f"Not read: {error}")
             return False
-        self.baseline_manifest = self.family.baseline.manifest
+        self._invalidate(f"another FE family was chosen (the declaration {path})")
+        self.family = family
+        self.baseline_manifest, self.baseline_inp = family.baseline.manifest, family.baseline.inp
         self.model_edit.setText(self.family.model_id)
         self.specimen_edit.setText(self.family.specimen_id)
         self.reopened = None
@@ -366,6 +394,10 @@ class FEResponsePanel(QWidget):
             rows = fr.identities(family, cancel)
             progress = lambda text: None  # noqa: E731
             result = fr.analyse(family, cancel, progress)
+            # the identities were taken before the read: the files read must still be those files
+            check = fr.verify_sources(rows, fr.used_states(result), cancel=cancel)
+            if check["state"] == "STALE":
+                raise fr.FamilyRefused("the FE sources changed or cannot be verified: " + "; ".join(check["reasons"]))
             comparison = fr.compare_with_archive(result, rows[0]["manifest_sha256"])
             return rows, result, comparison
 
@@ -375,6 +407,7 @@ class FEResponsePanel(QWidget):
             else:
                 self.identity_rows, self.result, self.comparison = outcome
                 self.analysed_family, self.prediction, self.reopened = fr.family_to_dict(family), None, None
+                self.invalidated, self.source_check = None, None
                 self._fill_parameters()
                 self._say(f"{self.result['kind']}: {len(self.result['branches'])} elastic FE branches followed into "
                           f"{len(self.result['states_used'])} states — status {self.result['status']}.")
@@ -407,11 +440,39 @@ class FEResponsePanel(QWidget):
         except fr.WhatIfRefused as error:
             self.range_line.setText(str(error))
 
+    def _verified(self, label: str, then) -> None:
+        """Verify the FE sources of the shown results again in the background (manifests, packages, INPs, every used
+        state), then ``then(check)``; a changed source makes the results STALE instead."""
+        rows, used = list(self.identity_rows), fr.used_states(self.result)
+        family = self.analysed_family or {}
+        paths = {m.get("id"): m for m in [family.get("baseline") or {}] + list(family.get("variants") or ())
+                 if isinstance(m, dict)}
+
+        def finish(outcome):
+            if isinstance(outcome, Exception):
+                self._say(f"Not done: the FE sources cannot be verified now ({outcome}).")
+            else:
+                self.source_check = outcome
+                if outcome["state"] == "STALE":
+                    self.prediction = None
+                    self._say("Not done: the FE sources changed on disk, the FE results are STALE: "
+                              + "; ".join(outcome["reasons"]) + ". Run the tracking again.")
+                else:
+                    then(outcome)
+            self._refresh()
+
+        self._start(label, lambda cancel: fr.verify_sources(rows, used, paths, cancel), finish)
+
     def predict(self, parameter: Optional[str] = None, value: Optional[float] = None) -> bool:
+        """A refusal (results not current, out of range, ...) is immediate (False). An accepted prediction (True) is
+        shown only after the FE sources verify again in the background (``wait_idle``)."""
         self.activate()
         state, reason = self.freshness()
         if state not in ("CURRENT", "STORED"):
             self._say(f"No prediction: the FE results are {state} ({reason}).")
+            return False
+        if self.busy():
+            self._say("Busy.")
             return False
         parameter = parameter or self.parameter_choice.currentData()
         try:
@@ -420,27 +481,34 @@ class FEResponsePanel(QWidget):
             self._say("Give the trial value as a number of MPa.")
             return False
         try:
-            self.prediction = fr.what_if(self.result, {parameter: value})
+            prediction = fr.what_if(self.result, {parameter: value})
         except fr.WhatIfRefused as error:
             self.prediction = None
             self._say(f"No prediction: {error}")
             self._refresh()
             return False
-        self._say(f"FE-only prediction for {parameter} = {value:g} MPa — {fr.PREDICTION}.")
-        self._refresh()
-        self.show_step(3)
+
+        def then(_check):
+            self.prediction = prediction
+            self._say(f"FE-only prediction for {parameter} = {value:g} MPa — {fr.PREDICTION} (FE sources verified "
+                      "again).")
+            self.show_step(3)
+
+        self._verified("Verifying the FE sources before the prediction (cancellable)...", then)
         return True
 
     def session(self) -> dict:
-        family = self.family or fr.family_from_declaration(self.analysed_family)
+        family = self.family or fr.family_from_record(self.analysed_family)
         return fr.session_record(family, self.identity_rows, self.result, self.prediction,
                                  fr.experiment_rows(self.records, self.result, self.prediction) if self.records else None,
                                  self.comparison)
 
     def save_session(self, path: Optional[str] = None) -> bool:
         self.activate()
-        if self.result is None:
-            self._say("No FE results to save.")
+        state, reason = self.freshness()
+        if self.result is None or state not in ("CURRENT", "STORED"):
+            self._say("No FE results to save." if self.result is None else
+                      f"Not saved: the FE results are {state} ({reason}).")
             return False
         path = path if path is not None else self._ask_save()
         if not path:
@@ -470,32 +538,43 @@ class FEResponsePanel(QWidget):
                 self.result, self.identity_rows = record.get("result"), record.get("identities") or []
                 self.comparison, self.prediction = record.get("archive_comparison"), record.get("what_if")
                 self.analysed_family, self.reopened = record.get("family"), outcome
+                self.invalidated, self.source_check = None, None
                 self.model_edit.setText((record.get("family") or {}).get("model_id") or "")
                 self.specimen_edit.setText((record.get("family") or {}).get("specimen_id") or "")
                 self._fill_parameters()
                 self._say(f"Session opened: {path}. {outcome['note']}.")
             self._refresh()
 
-        self._start("Verifying the session's FE sources (manifests only)...", lambda cancel: fr.session_state(
-            record, cancel), finish)
+        self._start("Verifying the session's FE sources (manifests, packages, INPs, used states)...",
+                    lambda cancel: fr.session_state(record, cancel), finish)
         return True
 
     def export(self, folder: Optional[str] = None) -> bool:
+        """A refusal is immediate (False); an accepted export (True) is written only after the FE sources verify
+        again in the background (``wait_idle``)."""
         self.activate()
         state, reason = self.freshness()
         if self.result is None or state not in ("CURRENT", "STORED"):
             self._say(f"Not exported: the FE results are {state} ({reason}).")
             return False
+        if self.busy():
+            self._say("Busy.")
+            return False
         folder = folder if folder is not None else self._ask_folder("Choose the folder for the FE response report")
         if not folder:
             return False
-        try:
-            written = fr.export_session(self.session(), folder)
-        except (fr.FamilyRefused, OSError) as error:
-            self._say(f"Not exported: {error}")
-            return False
-        self.last_export = written
-        self._say("Written:\n" + "\n".join(str(p) for p in written))
+        record = self.session()
+
+        def then(check):
+            try:
+                written = fr.export_session({**record, "source_check": check}, folder)
+            except (fr.FamilyRefused, OSError) as error:
+                self._say(f"Not exported: {error}")
+                return
+            self.last_export = written
+            self._say("Written (FE sources verified again):\n" + "\n".join(str(p) for p in written))
+
+        self._verified("Verifying the FE sources before the export (cancellable)...", then)
         return True
 
     # ------------------------------------------------------------------------------------------ display
@@ -555,6 +634,12 @@ class FEResponsePanel(QWidget):
                     [(r["id"], r["parameter"] or "—", r["value"], r["manifest_sha256"], r["package_sha256"],
                       r["inp_sha256"], r.get("odb_state") or "—", "; ".join(r["not_verified"]) or "—")
                      for r in self.identity_rows], 7, (0, 1, 3, 4, 5, 6, 7))
+        checks = (self.analysed_family or {}).get("checks") or []
+        if checks:
+            body.addWidget(_label("Declared values against the INPs:\n" + "\n".join(f"• {c}" for c in checks), "hint"))
+        if self.source_check is not None:
+            body.addWidget(_label(f"FE sources verified again before the last prediction / export: "
+                                  f"{self.source_check['state']} ({self.source_check.get('basis', '')})", "hint"))
         excluded = (self.result or {}).get("excluded") or []
         problems = (self.result or {}).get("family_problems") or []
         if excluded or problems:

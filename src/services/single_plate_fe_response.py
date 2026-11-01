@@ -22,6 +22,11 @@ historical table, never a new FE-to-FE MAC), FREQUENCY_ONLY (no shapes: followin
 needed state is missing). Experimental records are shown beside the FE frequencies only as FREQUENCY_PROXIMITY_ONLY:
 no pair, no MAC objective, no choice of a parameter from a measured frequency.
 
+PRIORITY-10-F1: the results stay bound to their sources. ``verify_sources`` checks every manifest, every package
+(``fe_package_identity``: every shape and geometry file), every INP and .dat and the presence of every used state;
+any difference makes the results STALE. A declaration's moduli are converted to MPa from supported units only, and its
+values are checked against the INPs it names.
+
 Nothing here runs Abaqus, Abaqus Python, an extraction, an LM or Auto-ID, and no disk is searched: only the files and
 the folder the user names are read. M8 GATE NOT_MET, D-077 NO_GLOBAL_PARAMETER_VALUE and production Auto-ID BLOCKED are
 unchanged.
@@ -113,6 +118,7 @@ class FEMember:
     solver_log: Optional[str] = None
     run_record: Optional[Mapping[str, Any]] = None  # the solver run row (exit, completed, ODB SHA-256)
     provenance: str = ""
+    declared: str = ""  # the value as declared when its unit was not MPa (``value`` is always MPa)
 
 
 @dataclass(frozen=True)
@@ -126,9 +132,38 @@ class Family:
     geometry_note: str = ""
     provenance: str = ""
     problems: tuple = ()  # members that could not be declared, with the reason
+    checks: tuple = ()  # what was checked against the INPs, and what could not be
 
     def parameters(self) -> tuple:
         return tuple(dict.fromkeys(v.parameter for v in self.variants if v.parameter))
+
+
+MATERIAL_KEYS = ("E1", "E2", "E3", "nu12", "nu13", "nu23", "G12", "G13", "G23", "rho", "h")
+MODULI = ("E1", "E2", "E3", "G12", "G13", "G23")
+# the supported units of a modulus as factors to MPa; case-sensitive ("mPa" is not "MPa"), nothing else is guessed
+MODULUS_UNITS = {"MPa": 1.0, "N/mm2": 1.0, "N/mm^2": 1.0, "N/mm²": 1.0, "GPa": 1.0e3, "kPa": 1.0e-3, "Pa": 1.0e-6,
+                 "N/m2": 1.0e-6, "N/m^2": 1.0e-6, "N/m²": 1.0e-6}
+VALUE_TOLERANCE = 1e-6  # relative: a declared value against its INP constant (the INP prints a few decimals)
+
+
+def to_mpa(value, unit, what: str) -> float:
+    """``value`` in ``unit`` as MPa. An unsupported unit, or a value that is not a positive finite number, is
+    refused."""
+    factor = MODULUS_UNITS.get(str(unit).strip()) if unit is not None else None
+    if factor is None:
+        raise FamilyRefused(f"{what}: the unit {unit!r} is not supported for a modulus (supported: "
+                            f"{', '.join(MODULUS_UNITS)}); nothing is converted by guess")
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise FamilyRefused(f"{what}: {value!r} is not a number") from None
+    if not math.isfinite(number) or number <= 0.0:
+        raise FamilyRefused(f"{what}: {number:g} is not a positive modulus")
+    return number * factor
+
+
+def _differs(a: float, b: float) -> bool:
+    return abs(a - b) > VALUE_TOLERANCE * max(abs(a), abs(b))
 
 
 def _member_from(data: Mapping[str, Any], base: Path, role: str) -> FEMember:
@@ -138,29 +173,38 @@ def _member_from(data: Mapping[str, Any], base: Path, role: str) -> FEMember:
             return None
         p = Path(value)
         return str(p if p.is_absolute() else (base / p))
-    value = data.get("value")
-    return FEMember(str(data.get("id") or data.get("member_id") or role), role, path("manifest"),
-                    data.get("parameter"), None if value is None else float(value), str(data.get("unit") or "MPa"),
-                    path("inp"), path("dat"), path("solver_log"), data.get("run_record"),
-                    str(data.get("provenance") or ""))
+    member_id = str(data.get("id") or data.get("member_id") or role)
+    parameter, value, unit = data.get("parameter"), data.get("value"), data.get("unit") or "MPa"
+    declared = str(data.get("declared") or "")
+    if role == "variant" and parameter is not None and parameter not in MODULI:
+        raise FamilyRefused(f"{member_id}: {parameter} is not an elastic modulus ({', '.join(MODULI)}): not supported "
+                            "as a parameter of an FE family")
+    if value is not None:
+        mpa = to_mpa(value, unit, f"{member_id}: {parameter}")
+        if MODULUS_UNITS[str(unit).strip()] != 1.0:
+            declared = f"{float(value):g} {str(unit).strip()}"
+        value = mpa
+    return FEMember(member_id, role, path("manifest"), parameter, value, "MPa", path("inp"), path("dat"),
+                    path("solver_log"), data.get("run_record"), str(data.get("provenance") or ""), declared)
 
 
-def family_from_declaration(source) -> Family:
-    """A family declared in JSON (schema ``amc/fe-family/v1``): model and specimen ids, the baseline and its parameter
-    values, and the states, each with its manifest (or .dat for frequencies only), parameter, value and unit. Paths
-    may be relative to the declaration file."""
-    if isinstance(source, Mapping):
-        data, base = dict(source), Path(".")
-    else:
-        path = Path(source)
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise FamilyRefused(f"{path} cannot be read as an FE family ({error})") from error
-        base = path.parent
+def _baseline_values(data: Mapping[str, Any]) -> dict:
+    """The declared baseline values in MPa: a number (in ``baseline_unit``, MPa by default) or {"value", "unit"}."""
+    default = data.get("baseline_unit") or "MPa"
+    out = {}
+    for name, item in (data.get("baseline_parameters") or {}).items():
+        if name not in MODULI:
+            raise FamilyRefused(f"the baseline {name} is not an elastic modulus ({', '.join(MODULI)}): not supported "
+                                "as a parameter of an FE family")
+        value, unit = (item.get("value"), item.get("unit") or default) if isinstance(item, Mapping) else (item, default)
+        out[str(name)] = to_mpa(value, unit, f"the baseline {name}")
+    return out
+
+
+def _parse_family(data: Mapping[str, Any], base: Path) -> Family:
     if data.get("schema") != SCHEMA_FAMILY:
         raise FamilyRefused(f"not an FE family declaration ({SCHEMA_FAMILY})")
-    params = {str(k): float(v) for k, v in (data.get("baseline_parameters") or {}).items()}
+    params = _baseline_values(data)
     if not params:
         raise FamilyRefused("the baseline parameter values are not declared")
     baseline = _member_from(data.get("baseline") or {}, base, "baseline")
@@ -177,7 +221,92 @@ def family_from_declaration(source) -> Family:
                   str(data.get("provenance") or ""))
 
 
-MATERIAL_KEYS = ("E1", "E2", "E3", "nu12", "nu13", "nu23", "G12", "G13", "G23", "rho", "h")
+def _inp_values(path, what: str, unit: str) -> dict:
+    """The material constants of an INP, the moduli in MPa (``unit``: the model's stress unit)."""
+    if not Path(path).is_file():
+        raise FamilyRefused(f"{what}: the INP {path} is missing")
+    values = _read_inp(path)
+    if not any(k in values for k in MODULI):
+        raise FamilyRefused(f"{what}: {path} has no *Elastic, type=ENGINEERING CONSTANTS: the declared values cannot "
+                            "be checked")
+    return {k: (to_mpa(v, unit, f"{what}: {k} of its INP") if k in MODULI else v) for k, v in values.items()}
+
+
+def _check_inps(family: Family, inp_unit: str) -> tuple:
+    """Every declared value against the INP of its member: the baseline values, each state's changed parameter, and no
+    other material constant of a state differing from the baseline INP. A mismatch refuses the declaration; what
+    cannot be checked (no INP) is named."""
+    notes = []
+    base_inp = _inp_values(family.baseline.inp, "the baseline", inp_unit) if family.baseline.inp else None
+    if base_inp is not None:
+        for p, value in family.baseline_parameters.items():
+            if p not in base_inp:
+                raise FamilyRefused(f"the baseline: {p} is declared but its INP does not define it")
+            if _differs(value, base_inp[p]):
+                raise FamilyRefused(f"the baseline: {p} is declared {value:g} MPa but its INP has {base_inp[p]:g} MPa")
+        notes.append("baseline: the declared values equal its INP")
+    else:
+        notes.append("baseline: no INP — the declared baseline values are not checked against a model input")
+    for v in family.variants:
+        if not v.inp:
+            notes.append(f"{v.member_id}: no INP — the declared {v.parameter} is not checked and another material "
+                         "change cannot be excluded")
+            continue
+        values = _inp_values(v.inp, v.member_id, inp_unit)
+        if v.parameter not in values:
+            raise FamilyRefused(f"{v.member_id}: {v.parameter} is declared but its INP does not define it")
+        if _differs(v.value, values[v.parameter]):
+            raise FamilyRefused(f"{v.member_id}: {v.parameter} is declared {v.value:g} MPa but its INP has "
+                                f"{values[v.parameter]:g} MPa")
+        if base_inp is not None:
+            changed = [k for k in MATERIAL_KEYS if k != v.parameter and (k in base_inp or k in values) and (
+                k not in base_inp or k not in values or _differs(base_inp[k], values[k]))]
+            if changed:
+                raise FamilyRefused(f"{v.member_id}: its INP also changes {', '.join(changed)} against the baseline "
+                                    "INP, which the declaration does not state: not a one-parameter state")
+            notes.append(f"{v.member_id}: {v.parameter} equals its INP; no other material constant differs from the "
+                         "baseline INP")
+        else:
+            others = [p for p, value in family.baseline_parameters.items() if p != v.parameter and (
+                p not in values or _differs(value, values[p]))]
+            if others:
+                raise FamilyRefused(f"{v.member_id}: its INP also changes {', '.join(others)} against the declared "
+                                    "baseline values, which the declaration does not state")
+            notes.append(f"{v.member_id}: {v.parameter} equals its INP; without a baseline INP only the declared "
+                         "parameters are compared")
+    return tuple(notes)
+
+
+def family_from_declaration(source) -> Family:
+    """A family declared in JSON (schema ``amc/fe-family/v1``): model and specimen ids, the baseline and its parameter
+    values, and the states, each with its manifest (or .dat for frequencies only), parameter, value and unit. Paths
+    may be relative to the declaration file.
+
+    Only elastic moduli are parameters. Each value is converted to MPa from its unit (MPa when none is given; the
+    supported units are ``MODULUS_UNITS``); another unit is refused. Where a member names its INP, the declared values
+    are checked against it (``inp_modulus_unit``: the model's stress unit, MPa by default): a different value, or a
+    state whose INP changes another material constant, refuses the declaration."""
+    if isinstance(source, Mapping):
+        data, base = dict(source), Path(".")
+    else:
+        path = Path(source)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise FamilyRefused(f"{path} cannot be read as an FE family ({error})") from error
+        base = path.parent
+    if not isinstance(data, Mapping):
+        raise FamilyRefused(f"not an FE family declaration ({SCHEMA_FAMILY})")
+    family = _parse_family(data, base)
+    return replace(family, checks=_check_inps(family, data.get("inp_modulus_unit") or "MPa"))
+
+
+def family_from_record(data: Mapping[str, Any]) -> Family:
+    """The family a session recorded (``family_to_dict``: values in MPa, absolute paths). Nothing is read from disk:
+    the sources are verified by ``session_state`` / ``verify_sources``."""
+    family = _parse_family(data, Path("."))
+    return replace(family, problems=tuple(tuple(p) for p in data.get("problems") or ()),
+                   checks=tuple(data.get("checks") or ()))
 
 
 def _read_inp(path) -> dict:
@@ -200,8 +329,13 @@ def family_from_folder(folder, baseline_manifest, model_id: str, specimen_id: st
     if not folder.is_dir():
         raise FamilyRefused(f"{folder} is not a folder")
     base_values = dict(_read_inp(baseline_inp)) if baseline_inp else {}
-    if baseline_parameters:
-        base_values.update({k: float(v) for k, v in baseline_parameters.items()})
+    if baseline_inp and not base_values:
+        raise FamilyRefused(f"the baseline INP {baseline_inp} cannot be read or has no material constants")
+    for k, v in (baseline_parameters or {}).items():
+        if k in base_values and _differs(float(v), base_values[k]):
+            raise FamilyRefused(f"the baseline {k} is declared {float(v):g} MPa but the baseline INP has "
+                                f"{base_values[k]:g} MPa")
+        base_values[k] = float(v)
     if not all(p in base_values for p in parameters):
         raise FamilyRefused("the baseline values of " + ", ".join(p for p in parameters if p not in base_values)
                             + " are not known: choose the baseline INP or declare them")
@@ -237,19 +371,23 @@ def family_from_folder(folder, baseline_manifest, model_id: str, specimen_id: st
                                  f"the folder {folder} (INP-declared value)"))
     baseline = FEMember("baseline", "baseline", str(baseline_manifest), None, None, "MPa",
                         str(baseline_inp) if baseline_inp else None, provenance="chosen by the user")
+    checks = (("baseline: its values from its INP" if baseline_inp else "baseline: declared values (no INP)"),
+              "each state: its parameter and value read from its own INP (MPa: the model's N-mm units); every other "
+              "material constant equal to the baseline's")
     return Family(model_id, specimen_id, baseline, {p: float(base_values[p]) for p in parameters}, tuple(variants),
-                  kind, provenance=f"folder {folder}", problems=tuple(problems))
+                  kind, provenance=f"folder {folder}", problems=tuple(problems), checks=checks)
 
 
 def family_to_dict(family: Family) -> dict:
     def member(m: FEMember) -> dict:
         return {"id": m.member_id, "manifest": m.manifest, "parameter": m.parameter, "value": m.value, "unit": m.unit,
-                "inp": m.inp, "dat": m.dat, "solver_log": m.solver_log, "run_record": m.run_record,
-                "provenance": m.provenance}
+                "declared": m.declared or None, "inp": m.inp, "dat": m.dat, "solver_log": m.solver_log,
+                "run_record": m.run_record, "provenance": m.provenance}
     return {"schema": SCHEMA_FAMILY, "model_id": family.model_id, "specimen_id": family.specimen_id,
             "kind": family.kind, "geometry": family.geometry_note, "provenance": family.provenance,
             "baseline_parameters": dict(family.baseline_parameters), "baseline": member(family.baseline),
-            "variants": [member(v) for v in family.variants], "problems": [list(p) for p in family.problems]}
+            "variants": [member(v) for v in family.variants], "problems": [list(p) for p in family.problems],
+            "checks": list(family.checks)}
 
 
 # ----------------------------------------------------------------------------- identities
@@ -262,8 +400,9 @@ def identities(family: Family, cancel: Optional[threading.Event] = None) -> list
     out = []
     for m in (family.baseline,) + tuple(family.variants):
         row = {"id": m.member_id, "role": m.role, "parameter": m.parameter, "value": m.value, "unit": m.unit,
-               "manifest": m.manifest, "manifest_sha256": None, "package_sha256": None, "inp_sha256": None,
-               "dat_sha256": None, "solver_log_sha256": None, "odb": None, "odb_state": None, "not_verified": []}
+               "manifest": m.manifest, "manifest_sha256": None, "package_sha256": None, "inp": m.inp,
+               "inp_sha256": None, "dat": m.dat, "dat_sha256": None, "solver_log_sha256": None, "odb": None,
+               "odb_state": None, "not_verified": []}
         if m.manifest:
             row["manifest_sha256"] = sha256_file(m.manifest, cancel)
             try:
@@ -656,18 +795,96 @@ def open_session(path) -> dict:
     return record
 
 
-def session_state(record: Mapping[str, Any], cancel: Optional[threading.Event] = None) -> dict:
-    """The FE sources of a session now: every manifest (only the manifest, never the whole package) and INP hashed
-    again. Any change makes the FE results STALE; the experimental context never does."""
-    reasons = []
-    for row in record.get("identities", ()):
-        for key, path_key in (("manifest_sha256", "manifest"),):
-            path = row.get(path_key)
-            if path and row.get(key):
+def used_states(result: Optional[Mapping[str, Any]]) -> list:
+    """The FE states a result was computed from: the states read and the − / + states of every central difference."""
+    result = result or {}
+    used = set(result.get("states_used") or ())
+    for sides in (result.get("completeness") or {}).values():
+        used.update(s for s in ((sides or {}).get("minus"), (sides or {}).get("plus")) if s)
+    return sorted(used)
+
+
+def verify_sources(identity_rows: Sequence[Mapping[str, Any]], used: Sequence[str] = (),
+                   paths: Optional[Mapping[str, Mapping[str, Any]]] = None,
+                   cancel: Optional[threading.Event] = None) -> dict:
+    """The recorded FE sources against the files now: every manifest (SHA-256), every package (``fe_package_identity``:
+    the manifest and every file the loader reads, so a changed shape file under an unchanged manifest is found), every
+    INP and .dat, and the presence of every state in ``used``. Any difference, or a source of the baseline or of a
+    used state whose identity was not recorded, makes the results STALE. ``paths`` (id → {"inp", "dat"}) supplies the
+    paths a session of PRIORITY-10 did not record in its identity rows."""
+    from services import fe_package_identity as fpi
+
+    reasons, checked = [], 0
+    ids = {row.get("id") for row in identity_rows}
+    reasons += [f"{state}: used by the results but not among the recorded sources" for state in used
+                if state not in ids]
+    if not any(row.get("role") == "baseline" for row in identity_rows):
+        reasons.append("the baseline is not among the recorded sources")
+    for row in identity_rows:
+        name = row.get("id")
+        needed = row.get("role") == "baseline" or name in used
+        manifest = row.get("manifest")
+        if not manifest:
+            if needed and name in used:
+                reasons.append(f"{name}: no extracted package recorded")
+        else:
+            if row.get("manifest_sha256"):
+                now = sha256_file(manifest, cancel)
+                if now != row["manifest_sha256"]:
+                    reasons.append(f"{name}: the manifest {'is missing' if now is None else 'changed'}")
+                    continue
+            elif needed:
+                reasons.append(f"{name}: the manifest SHA-256 was not recorded: it cannot be verified")
+            if row.get("package_sha256"):
+                try:
+                    now = fpi.identify(manifest, cancel)["package_sha256"]
+                except fpi.PackageIdentityRefused as error:
+                    if error.kind == fpi.CANCELLED:
+                        raise FamilyRefused("cancelled") from error
+                    reasons.append(f"{name}: the package cannot be identified now ({error})")
+                    continue
+                if now != row["package_sha256"]:
+                    reasons.append(f"{name}: the package files changed (a shape or geometry file differs; package "
+                                   "SHA-256)")
+            elif needed:
+                reasons.append(f"{name}: the package SHA-256 was not recorded: its shape files cannot be verified")
+        for key, label in (("inp", "INP"), ("dat", ".dat")):
+            path = row.get(key) or ((paths or {}).get(name) or {}).get(key)
+            recorded = row.get(f"{key}_sha256")
+            if recorded and not path:
+                reasons.append(f"{name}: the {label} path was not recorded: it cannot be verified")
+            elif path:
                 now = sha256_file(path, cancel)
-                if now != row[key]:
-                    reasons.append(f"{row['id']}: the manifest {'is missing' if now is None else 'changed'}")
-    return {"state": "STALE" if reasons else "SOURCES_VERIFIED", "reasons": reasons,
+                if now != recorded:
+                    reasons.append(f"{name}: the {label} " + ("is missing" if now is None else "changed" if recorded
+                                                              else "was not readable when recorded"))
+        checked += 1
+    return {"state": "STALE" if reasons else "SOURCES_VERIFIED", "reasons": reasons, "members": checked,
+            "basis": "manifest, package (every file the loader reads), INP and .dat SHA-256; every used state present"}
+
+
+def session_state(record: Mapping[str, Any], cancel: Optional[threading.Event] = None) -> dict:
+    """The FE sources of a session now (``verify_sources``): every manifest, package, INP and .dat hashed again and
+    every state the results used present. The recorded identities must also be the ones the session's fingerprint
+    names. Any difference makes the FE results STALE; the experimental context never does."""
+    family = record.get("family") or {}
+    rows = list(record.get("identities") or ())
+    reasons = []
+    try:
+        fingerprint = fe_fingerprint(rows, family_from_record(family))
+    except (FamilyRefused, KeyError, TypeError, ValueError) as error:
+        fingerprint, reasons = None, [f"the session's FE family cannot be read ({error})"]
+    if fingerprint is not None and fingerprint != record.get("fe_fingerprint"):
+        reasons.append("the recorded sources are not the ones the session's FE fingerprint names")
+    members = [family.get("baseline") or {}] + list(family.get("variants") or ())
+    paths = {m.get("id"): m for m in members if isinstance(m, Mapping)}
+    declared = {m.get("id") for m in family.get("variants") or () if isinstance(m, Mapping)}
+    used = used_states(record.get("result"))
+    reasons += [f"{state}: used by the results but not a state of the session's family" for state in used
+                if state not in declared]
+    checked = verify_sources(rows, used, paths, cancel)
+    reasons += checked["reasons"]
+    return {"state": "STALE" if reasons else "SOURCES_VERIFIED", "reasons": reasons, "basis": checked["basis"],
             "note": "stored FE results; the FE sources verify by SHA-256 (run again to recompute)" if not reasons
             else "the FE sources changed: the stored FE results are not current"}
 

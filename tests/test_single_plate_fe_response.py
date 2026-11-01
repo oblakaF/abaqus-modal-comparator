@@ -10,6 +10,7 @@ import json
 import math
 import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import unittest
@@ -253,6 +254,141 @@ class SyntheticFamilyEdgeTests(_Synthetic):
         self.assertNotIn("material_values", result)
 
 
+def perturb_shape(manifest: Path, mode: int = 10) -> None:
+    """Change one value of one mode-shape file of a package; its manifest stays byte-identical."""
+    path = Path(manifest).parent / f"mode_{mode:04d}.csv"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    parts = lines[1].split(",")
+    parts[4] = repr(float(parts[4]) * 1.001 + 1e-6)
+    lines[1] = ",".join(parts)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def sha(path) -> str:
+    return fr.sha256_file(path)
+
+
+class SourceBindingTests(_Synthetic):
+    """PRIORITY-10-F1: the results stay bound to the FE sources they were computed from."""
+
+    def session(self, name="family"):
+        family = self.family(name)
+        result = fr.analyse(family)
+        path = fr.save_session(fr.session_record(family, fr.identities(family), result), self.dir / f"{name}.json")
+        self.assertEqual(fr.session_state(fr.open_session(path))["state"], "SOURCES_VERIFIED")
+        return family, path
+
+    def test_f1_1_a_changed_shape_file_under_an_unchanged_manifest(self):
+        family, path = self.session()
+        manifest = Path(next(v for v in family.variants if v.member_id == "E1_MINUS").manifest)
+        before = sha(manifest)
+        perturb_shape(manifest)
+        self.assertEqual(sha(manifest), before)  # the manifest alone would still verify
+        state = fr.session_state(fr.open_session(path))
+        self.assertEqual(state["state"], "STALE")
+        self.assertTrue(any(r.startswith("E1_MINUS: the package files changed") for r in state["reasons"]),
+                        state["reasons"])
+
+    def test_f1_2_a_changed_inp(self):
+        family, path = self.session()
+        for member in (next(v for v in family.variants if v.member_id == "G12_PLUS"), family.baseline):
+            inp = Path(member.inp)
+            inp.write_text(inp.read_text(encoding="ascii") + "** edited\n", encoding="ascii")
+            state = fr.session_state(fr.open_session(path))
+            self.assertEqual(state["state"], "STALE")
+            self.assertIn(f"{member.member_id}: the INP changed", state["reasons"])
+
+    def test_f1_3_every_used_state_must_be_present(self):
+        family, path = self.session()
+        record = fr.open_session(path)
+        dropped = dict(record, identities=[r for r in record["identities"] if r["id"] != "E2_PLUS"])
+        state = fr.session_state(dropped)
+        self.assertEqual(state["state"], "STALE")
+        self.assertIn("E2_PLUS: used by the results but not among the recorded sources", state["reasons"])
+        shutil.rmtree(self.dir / "family" / "G12_MINUS" / "extraction")
+        state = fr.session_state(record)
+        self.assertEqual(state["state"], "STALE")
+        self.assertIn("G12_MINUS: the manifest is missing", state["reasons"])
+
+    def rewrite(self, declaration: Path, name: str, change) -> Path:
+        data = json.loads(declaration.read_text(encoding="utf-8"))
+        change(data)
+        path = declaration.parent / name
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
+
+    def test_f1_4_moduli_in_gpa_are_mpa_and_other_units_are_refused(self):
+        declaration = syn.write_family(self.dir / "family")
+
+        def in_gpa(data):
+            data["baseline_unit"] = "GPa"
+            data["baseline_parameters"] = {k: v / 1000.0 for k, v in data["baseline_parameters"].items()}
+            data["baseline_parameters"]["G12"] = {"value": 4.0e9, "unit": "Pa"}
+            for v in data["variants"]:
+                v["value"], v["unit"] = v["value"] / 1000.0, "GPa"
+        mpa = fr.family_from_declaration(declaration)
+        gpa = fr.family_from_declaration(self.rewrite(declaration, "gpa.json", in_gpa))
+        for p, value in mpa.baseline_parameters.items():
+            self.assertAlmostEqual(gpa.baseline_parameters[p], value, delta=1e-9 * value)
+        for a, b in zip(mpa.variants, gpa.variants):
+            self.assertAlmostEqual(b.value, a.value, delta=1e-9 * a.value)
+            self.assertEqual((b.unit, b.declared), ("MPa", f"{a.value / 1000.0:g} GPa"))
+        r_mpa, r_gpa = fr.analyse(mpa), fr.analyse(gpa)
+        for t_mpa, t_gpa in zip(r_mpa["central"], r_gpa["central"]):
+            for p, item in t_mpa["parameters"].items():
+                if item["s"] is not None:
+                    self.assertAlmostEqual(t_gpa["parameters"][p]["s"], item["s"], places=9)
+        self.assertEqual(fr.what_if(r_gpa, {"G12": 4200.0})["solved_point"], "G12_PLUS")
+        for unit in ("psi", "ksi", "mPa", "MPA", "kg/cm2"):
+            with self.assertRaises(fr.FamilyRefused, msg=unit) as caught:
+                fr.family_from_declaration(self.rewrite(declaration, "u.json", lambda d: d["variants"][0].update(
+                    unit=unit)))
+            self.assertIn("is not supported for a modulus", str(caught.exception))
+        with self.assertRaises(fr.FamilyRefused):
+            fr.family_from_declaration(self.rewrite(declaration, "u.json", lambda d: d.update(baseline_unit="psi")))
+        with self.assertRaises(fr.FamilyRefused) as caught:
+            fr.family_from_declaration(self.rewrite(declaration, "u.json", lambda d: d["variants"][0].update(
+                parameter="nu12", value=0.31)))
+        self.assertIn("not an elastic modulus", str(caught.exception))
+        # the INP's own unit: an MPa model read as GPa no longer matches the declaration
+        with self.assertRaises(fr.FamilyRefused) as caught:
+            fr.family_from_declaration(self.rewrite(declaration, "u.json", lambda d: d.update(inp_modulus_unit="GPa")))
+        self.assertIn("but its INP has", str(caught.exception))
+
+    def test_f1_5_declared_values_must_be_the_inp_values(self):
+        declaration = syn.write_family(self.dir / "family")
+
+        def variant(data, state):
+            return next(v for v in data["variants"] if v["id"] == state)
+        with self.assertRaises(fr.FamilyRefused) as caught:
+            fr.family_from_declaration(self.rewrite(declaration, "x.json", lambda d: variant(d, "G12_PLUS").update(
+                value=4250.0)))
+        self.assertIn("G12_PLUS: G12 is declared 4250 MPa but its INP has 4200 MPa", str(caught.exception))
+        with self.assertRaises(fr.FamilyRefused) as caught:
+            fr.family_from_declaration(self.rewrite(declaration, "x.json", lambda d: d["baseline_parameters"].update(
+                G12=4100.0)))
+        self.assertIn("the baseline: G12 is declared 4100 MPa but its INP has 4000 MPa", str(caught.exception))
+        # an undeclared material change in a state's INP
+        inp = self.dir / "family" / "G12_PLUS" / "G12_PLUS.inp"
+        original = inp.read_text(encoding="ascii")
+        inp.write_text(original.replace(" 8500.,", " 8600.,"), encoding="ascii")
+        with self.assertRaises(fr.FamilyRefused) as caught:
+            fr.family_from_declaration(declaration)
+        self.assertIn("G12_PLUS: its INP also changes E3", str(caught.exception))
+        inp.write_text(original, encoding="ascii")
+        family = fr.family_from_declaration(declaration)
+        self.assertIn("G12_PLUS: G12 equals its INP; no other material constant differs from the baseline INP",
+                      family.checks)
+        # without a baseline INP: what cannot be checked is named
+        family = fr.family_from_declaration(self.rewrite(declaration, "x.json", lambda d: d["baseline"].pop("inp")))
+        self.assertTrue(any("baseline: no INP" in c for c in family.checks))
+        # the folder route: declared baseline values against the baseline INP
+        with self.assertRaises(fr.FamilyRefused):
+            fr.family_from_folder(self.dir / "family", self.dir / "family" / "baseline" / "extraction" /
+                                  "manifest.json", "x", "y", baseline_parameters={"G12": 4100.0},
+                                  baseline_inp=self.dir / "family" / "baseline" / "baseline.inp")
+
+
 class ArchiveTests(unittest.TestCase):
     """The PRIORITY-2 table as an ARCHIVED_FE_RESULT (always available; never a new FE-to-FE MAC)."""
 
@@ -317,6 +453,18 @@ class RealM11Tests(unittest.TestCase):
         self.assertAlmostEqual(fe7["solved_hz"], 19.5264, places=3)
         self.assertLess(abs(fe7["error_percent"]), 0.01)
 
+    def test_f1_6_an_unchanged_m11_session_reopens(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = fr.save_session(fr.session_record(self.family, self.rows, self.result), Path(folder) / "m11.json")
+            state = fr.session_state(fr.open_session(path))
+        self.assertEqual((state["state"], state["reasons"]), ("SOURCES_VERIFIED", []))
+        self.assertTrue(all(r["package_sha256"] and r["inp_sha256"] for r in self.rows))
+        # the PRIORITY-10 sessions of the archive (identity rows without INP paths) verify the same way
+        for name in ("m11_live_g12_plus", "m11_live_g12_minus", "m11_live_e_joint_plus2"):
+            archived = ROOT / "docs" / "research" / "plate_fe_response_p10" / name / "fe_response_session.json"
+            state = fr.session_state(fr.open_session(archived))
+            self.assertEqual((state["state"], state["reasons"]), ("SOURCES_VERIFIED", []), name)
+
 
 try:
     from PySide6.QtWidgets import QApplication  # noqa: F401
@@ -362,7 +510,9 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(self.panel.freshness()[0], "CURRENT")
         self.assertIn("tracking", self.panel.tables)
         self.assertTrue(self.panel.predict("G12", 4200.0))
+        self.assertTrue(self.panel.wait_idle())  # shown only after the FE sources verify again
         self.assertIn("what_if", self.panel.tables)
+        self.assertEqual(self.panel.source_check["state"], "SOURCES_VERIFIED")
         self.assertFalse(self.panel.predict("G12", 9000.0))  # outside the solved range
         self.assertIn("never extrapolated", self.panel.message.text())
         # an experimental modal set changes only the experimental display, never the FE results
@@ -371,6 +521,8 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(self.panel.freshness()[0], "CURRENT")
         self.assertTrue(self.panel.save_session(str(self.dir / "s.json")))
         self.assertTrue(self.panel.export(str(self.dir)))
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(len(self.panel.last_export), 5)
         # another family chosen: the results are STALE, no prediction from them
         self.assertTrue(self.panel.load_declaration(str(syn.write_family(self.dir / "other",
                                                                          without=["G12_MINUS"]))))
@@ -380,6 +532,62 @@ class PanelTests(unittest.TestCase):
         self.assertTrue(self.panel.wait_idle())
         self.assertEqual(self.panel.freshness()[0], "STORED")
         self.assertTrue(self.panel.predict("E1", 46000.0))
+        self.assertTrue(self.panel.wait_idle())
+        self.assertIsNotNone(self.panel.prediction)
+
+    def tracked(self, name="family"):
+        declaration = syn.write_family(self.dir / name)
+        self.assertTrue(self.panel.load_declaration(str(declaration)))
+        self.assertTrue(self.panel.run())
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(self.panel.freshness()[0], "CURRENT")
+        return declaration
+
+    def test_f1_another_baseline_or_baseline_inp_invalidates_at_once(self):
+        self.tracked()
+        other = syn.write_family(self.dir / "other").parent
+        self.assertTrue(self.panel.choose_baseline(str(other / "baseline" / "extraction" / "manifest.json")))
+        state, reason = self.panel.freshness()  # immediately, before any new tracking
+        self.assertEqual(state, "STALE")
+        self.assertIn("FE baseline was chosen again", reason)
+        self.assertIn("STALE", self.panel.state_line.text())
+        self.assertNotIn("tracking", self.panel.tables)  # the previous results are no longer shown
+        self.assertIsNone(self.panel.family)
+        self.assertFalse(self.panel.predict("G12", 4200.0))
+        self.assertFalse(self.panel.export(str(self.dir)))
+        self.assertFalse(self.panel.save_session(str(self.dir / "stale.json")))
+        self.tracked("again")
+        self.assertTrue(self.panel.choose_baseline_inp(str(other / "baseline" / "baseline.inp")))
+        self.assertEqual(self.panel.freshness()[0], "STALE")
+        self.assertFalse(self.panel.predict("G12", 4200.0))
+        # a choice during a running tracking discards that tracking
+        self.assertTrue(self.panel.load_declaration(str(self.dir / "again" / "fe_family.json")))
+        self.assertTrue(self.panel.run())
+        self.assertTrue(self.panel.choose_baseline(str(other / "baseline" / "extraction" / "manifest.json")))
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(self.panel.freshness()[0], "STALE")
+
+    def test_f1_a_changed_source_stops_the_prediction_and_the_export(self):
+        declaration = self.tracked()
+        self.assertTrue(self.panel.save_session(str(self.dir / "s.json")))
+        perturb_shape(declaration.parent / "E1_MINUS" / "extraction" / "manifest.json")
+        self.assertTrue(self.panel.predict("G12", 4200.0))  # accepted, then the sources are verified again
+        self.assertTrue(self.panel.wait_idle())
+        self.assertIsNone(self.panel.prediction)
+        self.assertEqual(self.panel.freshness()[0], "STALE")
+        self.assertIn("E1_MINUS: the package files changed", self.panel.message.text())
+        self.assertFalse(self.panel.export(str(self.dir)))
+        self.assertTrue(self.panel.open_session(str(self.dir / "s.json")))
+        self.assertTrue(self.panel.wait_idle())
+        self.assertEqual(self.panel.freshness()[0], "STALE")
+        self.assertFalse(self.panel.predict("G12", 4200.0))
+        # an export started while the results verify is written only after the check
+        self.tracked("fresh")
+        self.assertTrue(self.panel.export(str(self.dir)))
+        self.assertTrue(self.panel.wait_idle())
+        written = {p.name: p for p in self.panel.last_export}
+        self.assertEqual(json.loads(written["fe_response_session.json"].read_text(encoding="utf-8"))
+                         ["source_check"]["state"], "SOURCES_VERIFIED")
 
     def test_the_tracking_can_be_cancelled(self):
         self.assertTrue(self.panel.load_declaration(str(syn.write_family(self.dir / "family"))))
