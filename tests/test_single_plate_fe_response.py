@@ -348,6 +348,12 @@ class PanelTests(unittest.TestCase):
         self.assertEqual([tabs.tabText(i) for i in range(4)], ["A. Current PLATE Study", "B. New Single Plate",
                                                                "C. Physical Readiness", "D. FE Response"])
         self.assertEqual(tabs.tabToolTip(3), "D. FE Response Workbench")
+        # the smoke found the captions of the id fields collapsed to zero width: they never wrap
+        from PySide6.QtWidgets import QLabel
+
+        captions = [w for w in self.panel.findChildren(QLabel) if w.text() in ("FE model id", "Specimen id")]
+        self.assertEqual(len(captions), 2)
+        self.assertTrue(all(not w.wordWrap() and w.minimumSizeHint().width() > 0 for w in captions))
         self.assertFalse(self.panel.run())  # nothing chosen
         declaration = syn.write_family(self.dir / "family")
         self.assertTrue(self.panel.load_declaration(str(declaration)))

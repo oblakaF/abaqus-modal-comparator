@@ -104,9 +104,10 @@ class FEResponsePanel(QWidget):
         head_layout.addWidget(_label(fr.SCIENTIFIC_STATUS, "warnings"))
         grid = QGridLayout()
         self.model_edit, self.specimen_edit = _edit("frModel", "FE model"), _edit("frSpecimen", "specimen")
-        grid.addWidget(_label("FE model id"), 0, 0)
+        # plain captions: a wrapping label (Ignored width) collapses in a column that does not stretch
+        grid.addWidget(QLabel("FE model id"), 0, 0)
         grid.addWidget(self.model_edit, 0, 1)
-        grid.addWidget(_label("Specimen id"), 1, 0)
+        grid.addWidget(QLabel("Specimen id"), 1, 0)
         grid.addWidget(self.specimen_edit, 1, 1)
         grid.setColumnStretch(1, 1)
         head_layout.addLayout(grid)
