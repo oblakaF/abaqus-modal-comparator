@@ -16,10 +16,12 @@ import contextlib
 import hashlib
 import importlib.util
 import io
+import os
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -153,8 +155,12 @@ class PortableRc5PackagingTests(unittest.TestCase):
             self.assertEqual(self.build.check_zip(root, archive), {"zip_files": 4, "crc": "OK"})
             with zipfile.ZipFile(archive) as zf:
                 self.assertIn("AbaqusModalComparator_RC5/PACKAGE_SHA256.txt", zf.namelist())
-            with self.assertRaises(Exception):  # an existing ZIP is never replaced
+            with self.assertRaises(SystemExit):  # an existing ZIP is never replaced
                 self.build.make_zip(root, archive)
+            # nor where a rename replaces its target (POSIX, as on the CI runner): the guard is not the rename
+            with mock.patch.object(self.build.os, "rename", os.replace), self.assertRaises(SystemExit):
+                self.build.make_zip(root, archive)
+            self.assertFalse(archive.with_suffix(".zip.partial").exists())
             (root / "docs" / "research" / "table.csv").write_bytes(b"changed")
             (root / "docs" / "extra.md").write_bytes(b"extra")
             checked = self.build.verify_folder(root)

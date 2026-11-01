@@ -262,12 +262,14 @@ def verify_folder(folder: Path) -> dict:
 
 def make_zip(folder: Path, archive: Path) -> None:
     tmp = archive.with_suffix(".zip.partial")
-    if tmp.exists():
-        raise SystemExit(f"refused: {tmp} exists")
+    # refused before anything is written: os.rename replaces its target on POSIX, so it is not the guard
+    for existing in (archive, tmp):
+        if existing.exists():
+            raise SystemExit(f"refused: {existing} exists (an existing ZIP is never replaced)")
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for path in sorted(folder.rglob("*")):
             zf.write(path, Path(folder.name) / path.relative_to(folder))
-    os.rename(tmp, archive)  # never replaces an existing ZIP
+    os.rename(tmp, archive)
 
 
 def check_zip(folder: Path, archive: Path) -> dict:
