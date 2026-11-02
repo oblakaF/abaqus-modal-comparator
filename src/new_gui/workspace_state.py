@@ -34,15 +34,15 @@ from services import specimen_catalog_view as catalog
 FE, EXPERIMENTAL = registry.FE, registry.EXPERIMENTAL
 KINDS = (FE, EXPERIMENTAL)
 KIND_TITLE = {FE: "FE results", EXPERIMENTAL: "Experimental data"}
-DIALOG_FILTERS = {  # WINDOWS-RC1-A: the readable FE input first; an .odb is offered only with its limitation
-    FE: ("Extracted FE package (manifest.json);;Abaqus ODB - not viewable in this interface (*.odb);;"
-         "All files (*)"),
+DIALOG_FILTERS = {  # RC6: an .odb is extracted on the user's command (Extract modal results...); a package is read
+    FE: ("Abaqus ODB or extracted FE package (*.odb manifest.json);;Abaqus ODB (*.odb);;"
+         "Extracted FE package (manifest.json);;All files (*)"),
     EXPERIMENTAL: ("Universal files (*.unv *.uff);;Simcenter Testlab project (*.lms);;"
                    "All files (*)"),
 }
 KIND_HELP = {
-    FE: ("An extracted FE package: its manifest.json, with the CSV files beside it. An Abaqus .odb cannot be "
-         "viewed in this interface."),
+    FE: ("An Abaqus .odb (its modal results are extracted with Abaqus Python on your command, Extract modal "
+         "results...), or an already extracted FE package: its manifest.json, with the CSV files beside it."),
     EXPERIMENTAL: "A Simcenter Testlab .unv / .uff, or an .lms project with its exported .unv / .uff beside it.",
 }
 
@@ -59,11 +59,13 @@ LABEL_HINT = ("Optional. Your own name for this data. It is not looked up in the
               "files to no archived specimen, registration or status.")
 ARCHIVE_NOTE = ("The research archive is a read-only list of the laboratory's specimen records. Viewing it changes "
                 "none of your workspace files, transfers no registration and assigns no modal status.")
-# WINDOWS-RC1-A: what an .odb means in the new interface (shown when one is chosen; nothing is started)
-ODB_TYPE_NOTE = "not viewable in this interface"
-ODB_NOTE = ("An Abaqus .odb cannot be viewed in this version of the new interface, and choosing it starts no Abaqus. "
-            "To view its modes, choose the manifest.json of a package already extracted from it (with its CSV "
-            "files). The existing interface RUN_PROGRAM.cmd keeps its own ODB route.")
+# RC6: what an .odb means in the new interface (shown when one is chosen; nothing is started by the choice)
+ODB_TYPE_NOTE = "its modal results are extracted on your command"
+ODB_NOTE = ("An Abaqus .odb is not read directly. Click Extract modal results...: the program checks the file and "
+            "the Abaqus installation and, only after you confirm, runs the project's extractor through Abaqus Python "
+            "(the ODB is opened read-only) into a results folder you choose. The extracted package then becomes the "
+            "FE file here. Choosing the .odb itself starts nothing.")
+EXTRACT_ODB = "Extract modal results..."
 STATUS_PATH = Path(__file__).resolve().parents[2] / "docs" / "auto_id" / "STATUS.json"
 UNKNOWN = "UNKNOWN"
 
@@ -232,6 +234,7 @@ def scientific_status(status_path: Optional[Path] = None) -> tuple[StatusRow, ..
     )
 
 
-__all__ = ["ANALYSIS_NOT_RUN", "ArchiveListing", "CHOSEN_NOT_CHECKED", "EXPERIMENTAL", "FE", "FileChoice", "KINDS",
+__all__ = ["ANALYSIS_NOT_RUN", "ArchiveListing", "CHOSEN_NOT_CHECKED", "EXPERIMENTAL", "EXTRACT_ODB", "FE",
+           "FileChoice", "KINDS",
            "NOT_CHOSEN", "StatusRow", "Workspace", "check_choice", "file_type_text", "load_archive",
            "scientific_status"]

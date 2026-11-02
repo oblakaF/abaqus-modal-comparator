@@ -66,8 +66,9 @@ from new_gui.preview_panel import PreviewPanel
 from new_gui.registration_check_panel import RegistrationCheckPanel
 from new_gui.research_results_panel import ResearchResultsPanel
 from new_gui.shape_panel import ShapePanel
-from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, DIALOG_FILTERS, EMPTY_TEXT, EXPERIMENTAL, FE,
-                                     KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, ODB_NOTE, Workspace, scientific_status)
+from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, DIALOG_FILTERS, EMPTY_TEXT, EXPERIMENTAL,
+                                     EXTRACT_ODB, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, ODB_NOTE, Workspace,
+                                     scientific_status)
 
 PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study", "Research Results")
 MATERIALS_PAGE = 3
@@ -210,8 +211,15 @@ class SourceCard(QFrame):
         layout.addLayout(grid)
         self.note = _label(CHOSEN_NOTE, "hint")
         layout.addWidget(self.note)
-        self.odb_note = _label(ODB_NOTE, "warnings")  # WINDOWS-RC1-A: an .odb is not viewable here; nothing starts
+        self.odb_note = _label(ODB_NOTE, "warnings")  # RC6: an .odb is extracted on the user's command only
         layout.addWidget(self.odb_note)
+        self.extract_button = QPushButton(EXTRACT_ODB)  # RC6: opens the extraction dialog; nothing runs until confirmed
+        self.extract_button.setObjectName("extractOdb")
+        self.extract_button.setToolTip("Check the .odb and the Abaqus installation, then extract its frequencies, "
+                                       "geometry and mode shapes with Abaqus Python into a folder you choose. "
+                                       "Abaqus starts only after your explicit confirmation.")
+        self.extract_button.clicked.connect(lambda: window.open_odb_import())
+        layout.addWidget(self.extract_button, 0, Qt.AlignmentFlag.AlignLeft)
         self.error = _label("", "error")
         layout.addWidget(self.error)
         buttons = QHBoxLayout()
@@ -245,7 +253,9 @@ class SourceCard(QFrame):
         self.path.setCursorPosition(len(self.path.text()))  # a long path shows its end: folder and file name
         self.file_type.setText(choice.file_type if choice.chosen else "—")
         self.note.setVisible(choice.chosen and state == IDLE)
-        self.odb_note.setVisible(self.kind == FE and choice.chosen and choice.path.suffix.lower() == ".odb")
+        is_odb = self.kind == FE and choice.chosen and choice.path.suffix.lower() == ".odb"
+        self.odb_note.setVisible(is_odb)
+        self.extract_button.setVisible(is_odb)
         self.error.setText(message)
         self.error.setVisible(bool(message))
         self.choose_button.setText("Replace file..." if choice.chosen else "Choose file...")
@@ -266,7 +276,7 @@ class MainWindow(QMainWindow):
     def __init__(self, *, ask_path: Optional[Callable[[str, str], str]] = None,
                  archive_path: Optional[Path] = None, status_path: Optional[Path] = None,
                  ask_folder: Optional[Callable[[], str]] = None, known_root: Optional[Path] = None,
-                 plate_family_root: Optional[Path] = None):
+                 plate_family_root: Optional[Path] = None, odb_import_options: Optional[dict] = None):
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} — {STAGE}")
         self.workspace = Workspace()
@@ -276,6 +286,10 @@ class MainWindow(QMainWindow):
         self._ask_folder = ask_folder
         self._known_root = known_root
         self._plate_family_root = plate_family_root
+        # RC6: the extraction dialog's hooks (results_folder, ask_folder, ask_launcher, runner, confirm, discover);
+        # tests replace the launcher and the confirmation, the program uses the dialogs and the real bridge
+        self._odb_import_options = dict(odb_import_options or {})
+        self.odb_dialog = None  # the open OdbImportDialog, if any
         self.known_dialog: Optional[KnownSourcesDialog] = None
         self.archive_dialog: Optional[ArchiveDialog] = None
         self.status_rows = scientific_status(status_path)
@@ -595,7 +609,8 @@ class MainWindow(QMainWindow):
 
     def busy(self) -> bool:
         """A read, a shape drawing, the frequency diagnostic or the registration check is still running."""
-        return (self.reading() or any(panel.busy() for panel in self.shape_panels.values())
+        return (self.reading() or (self.odb_dialog is not None and self.odb_dialog.busy())
+                or any(panel.busy() for panel in self.shape_panels.values())
                 or self.diagnostic.busy() or self.registration.busy() or self.comparison.busy()
                 or self.plate.busy() or self.workbench.busy() or self.review.busy()
                 or self.fe_response.busy())
@@ -610,6 +625,9 @@ class MainWindow(QMainWindow):
         return not self.busy()
 
     def closeEvent(self, event) -> None:
+        if self.odb_dialog is not None:  # RC6: a running extraction is cancelled (its owned process stopped)
+            self.odb_dialog.cancel_extraction()
+            self.odb_dialog.slot.reset()
         for slot in self.slots.values():  # running reads are cancelled and their outcomes discarded
             slot.reset()
         for panel in self.shape_panels.values():  # and so are running drawings
@@ -682,6 +700,41 @@ class MainWindow(QMainWindow):
         if self.known_dialog is not None and self.known_dialog.chosen_path is not None:
             self.choose_file(EXPERIMENTAL, str(self.known_dialog.chosen_path))
             self.show_page(0)
+
+    def open_odb_import(self):
+        """RC6: the extraction dialog for the chosen .odb. Nothing runs until the user confirms there; a finished
+        extraction's manifest.json replaces the .odb as the FE file and is read with Inspect file."""
+        from new_gui.odb_import_dialog import OdbImportDialog
+
+        choice = self.workspace.choice(FE)
+        if not choice.chosen or choice.path.suffix.lower() != ".odb":
+            return None
+        if self.odb_dialog is not None and self.odb_dialog.isVisible():
+            self.odb_dialog.raise_()
+            self.odb_dialog.activateWindow()
+            return self.odb_dialog
+        options = dict(self._odb_import_options)
+        folder = options.pop("results_folder", None) or (self._odb_results_folder if self._odb_results_folder else None)
+        self.odb_dialog = OdbImportDialog(choice.path, self, results_folder=folder, **options)
+        self.odb_dialog.accepted.connect(self._odb_package_extracted)
+        self.odb_dialog.finished.connect(self._odb_folder_kept)
+        self.odb_dialog.open()
+        return self.odb_dialog
+
+    _odb_results_folder: Optional[str] = None  # the results folder the user chose last, offered again
+
+    def _odb_folder_kept(self, _result=0) -> None:
+        if self.odb_dialog is not None and self.odb_dialog.folder.text().strip():
+            self._odb_results_folder = self.odb_dialog.folder.text().strip()
+
+    def _odb_package_extracted(self) -> None:
+        """The extracted package becomes the FE file (the existing route) and is read at once."""
+        if self.odb_dialog is None or self.odb_dialog.manifest_path is None:
+            return
+        manifest = self.odb_dialog.manifest_path
+        if self.choose_file(FE, str(manifest)) == "":
+            self.show_page(0)
+            self.inspect_file(FE)
 
     def _about(self) -> None:
         QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n{STAGE}\n\nChoose your FE results and experimental data, read "

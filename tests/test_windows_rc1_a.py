@@ -208,17 +208,20 @@ class OdbTests(_PlateWindow):
         self.assertEqual(self.window.choose_file(ws.FE, str(odb)), "")
         card = self.window.cards[ws.FE]
         self.assertFalse(card.odb_note.isHidden())  # shown on the Workspace card
-        self.assertIn("cannot be viewed in this version of the new interface", card.odb_note.text())
-        self.assertIn("RUN_PROGRAM.cmd", card.odb_note.text())
-        self.assertIn("not viewable in this interface", card.file_type.text())
-        self.assertTrue(ws.DIALOG_FILTERS[ws.FE].startswith("Extracted FE package (manifest.json)"))
+        self.assertIn("not read directly", card.odb_note.text())  # RC6: extracted on the user's command only
+        self.assertIn("Extract modal results", card.odb_note.text())
+        self.assertIn("starts nothing", card.odb_note.text())
+        self.assertIn("extracted on your command", card.file_type.text())
+        self.assertFalse(card.extract_button.isHidden())
+        self.assertIn("manifest.json", ws.DIALOG_FILTERS[ws.FE])
+        self.assertIn("*.odb", ws.DIALOG_FILTERS[ws.FE])
         with mock.patch("subprocess.Popen") as popen, \
                 mock.patch("services.importer_runtime.ensure_application_importers") as importers:
             with self.assertRaises(pm.PreviewRefused) as refused:
                 _original_read_preview(ws.FE, odb)  # the real function (the fixture patches pm.read_preview)
             popen.assert_not_called()
             importers.assert_not_called()
-        self.assertIn("Abaqus is not started", str(refused.exception))
+        self.assertIn("Abaqus is not started by Inspect file", str(refused.exception))
         self.assertIn("manifest.json", str(refused.exception))
         self.read()  # an ordinary manifest.json and UNV are still read
         self.assertTrue(card.odb_note.isHidden())

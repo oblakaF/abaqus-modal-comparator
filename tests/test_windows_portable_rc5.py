@@ -94,7 +94,8 @@ class PortableRc5PackagingTests(unittest.TestCase):
     def test_rc1_to_rc4_f1_packaging_unchanged(self):
         packaging = ROOT / "packaging"
         earlier = sorted(p.relative_to(packaging).as_posix() for p in packaging.glob("portable_rc*/*")
-                         if p.is_file() and p.parent.name != "portable_rc5" and p.suffix in {".py", ".spec", ".txt"})
+                         if p.is_file() and p.parent.name not in ("portable_rc5", "portable_rc6")  # RC6 is later
+                         and p.suffix in {".py", ".spec", ".txt"})
         self.assertEqual(earlier, sorted(UNCHANGED))
         for relative, expected in UNCHANGED.items():
             data = (ROOT / "packaging" / relative).read_bytes().replace(b"\r\n", b"\n")
