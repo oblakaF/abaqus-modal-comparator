@@ -108,6 +108,7 @@ class DialogTests(_Case):
         self.assertEqual(dialog._runner.calls, [])
         bat = self.root / "abaqus.bat"
         bat.write_text("@echo off\n", encoding="utf-8")
+        os.chmod(bat, 0o755)  # on POSIX (CI) a launcher must be executable to count
         self.assertTrue(dialog.choose_launcher(str(bat)))  # Browse: a launcher the user points to
         self.assertTrue(dialog.extract_button.isEnabled())
 

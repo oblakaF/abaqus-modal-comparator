@@ -94,6 +94,7 @@ class DetectionTests(_Folder):
         self.assertIn("does not exist", chosen.abaqus.explanation)
         bat = self.root / "my_abaqus.bat"
         bat.write_text("@echo off\n", encoding="utf-8")
+        os.chmod(bat, 0o755)  # on POSIX (CI) a launcher must be executable to count
         chosen = self.plan(abaqus_command=str(bat))
         self.assertTrue(chosen.abaqus.available)
         self.assertEqual(Path(chosen.abaqus.command), bat.resolve())
@@ -144,11 +145,9 @@ class PlanTests(_Folder):
         self.assertEqual(dict(plan.summary())["Requested modes"][:4], "1-30")
 
     def test_too_little_free_space_is_refused_before_anything_starts(self):
-        with mock.patch.object(svc.shutil, "disk_usage", return_value=os.statvfs_result((0,) * 10)
-                               if hasattr(os, "statvfs_result") else mock.Mock(free=10 * 2**20)):
-            with mock.patch.object(svc.shutil, "disk_usage", return_value=mock.Mock(free=10 * 2**20)):
-                with self.assertRaises(svc.OdbImportRefused) as refused:
-                    self.plan()
+        with mock.patch.object(svc.shutil, "disk_usage", return_value=mock.Mock(free=10 * 2**20)):
+            with self.assertRaises(svc.OdbImportRefused) as refused:
+                self.plan()
         self.assertIn("Not enough free space", str(refused.exception))
 
 
