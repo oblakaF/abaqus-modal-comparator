@@ -51,6 +51,11 @@ MINIMUM_UNIQUE_POINT_COUNT = 3
 MINIMUM_MEASURED_DOF_COVERAGE_FRACTION = 0.05
 MINIMUM_POINT_COVERAGE_FRACTION = 0.02
 MINIMUM_SPATIAL_EXTENT_FRACTION = 0.02
+# SCIENTIFIC-CROSSCHECK-F1: a cell whose measured DOFs pass the coverage floor but on which one of the two shapes has
+# zero norm has no shape response to compare. Its MAC is undefined (modal_assurance_criterion returns None), so the
+# shape identity cannot be established and the cell is not an admissible pair candidate. Without this status the
+# frequency-only branch admitted such a cell by frequency alone. The MAC matrix keeps NaN there (diagnostic).
+UNDEFINED_MAC_COVERAGE_STATUS = "undefined MAC: zero modal norm on the measured DOFs"
 
 
 class GeometryOrientationAmbiguousError(RuntimeError):
@@ -741,7 +746,9 @@ def _mac_matrix_for_geometry(
     ``coverage_admissible_matrix``
     is a boolean gate: a cell below the Stage 2 #4 coverage floor must not
     participate in Hungarian assignment as a valid candidate, independent of
-    its MAC/frequency admissibility."""
+    its MAC/frequency admissibility. A cell above the floor whose MAC is
+    undefined (a zero-norm shape on its measured DOFs) gets the status
+    UNDEFINED_MAC_COVERAGE_STATUS and is not admissible either."""
     shape = (len(abaqus_rotated_modes), len(experimental_vectors))
     mac_matrix = np.full(shape, np.nan, dtype=float)
     coverage_admissible = np.zeros(shape, dtype=bool)
@@ -768,8 +775,6 @@ def _mac_matrix_for_geometry(
                 full_grid_point_count,
                 full_grid_extent,
             )
-            coverage_reports[row][column] = coverage
-            coverage_admissible[row, column] = coverage.status == "accepted"
             if np.any(dof_mask):
                 value = modal_assurance_criterion(
                     abaqus_rotated[dof_mask],
@@ -777,6 +782,11 @@ def _mac_matrix_for_geometry(
                 )
             else:
                 value = None
+            if value is None and coverage.status == "accepted":
+                # Enough measured DOFs, but a zero-norm shape on them: MAC undefined (SCIENTIFIC-CROSSCHECK-F1).
+                coverage = coverage._replace(status=UNDEFINED_MAC_COVERAGE_STATUS)
+            coverage_reports[row][column] = coverage
+            coverage_admissible[row, column] = coverage.status == "accepted"
             mac_matrix[row, column] = np.nan if value is None else value
     return mac_matrix, coverage_admissible, coverage_reports
 
@@ -925,6 +935,7 @@ def _build_candidate_diagnostics(
             )
             coverage = coverage_reports[row][column]
             coverage_gate_passed = coverage.status == "accepted"
+            undefined_mac = coverage.status == UNDEFINED_MAC_COVERAGE_STATUS
             admissible = coverage_gate_passed and (
                 (
                     frequency_gate_passed
@@ -937,11 +948,11 @@ def _build_candidate_diagnostics(
             if not frequency_gate_passed:
                 reasons.append("frequency")
             if mac_value is None:
-                if not frequency_only_passed:
+                if not frequency_only_passed or undefined_mac:
                     reasons.append("mac_unavailable")
             elif mac_gate_passed is False:
                 reasons.append("mac")
-            if not coverage_gate_passed:
+            if not coverage_gate_passed and not undefined_mac:  # an undefined MAC is named by "mac_unavailable"
                 reasons.append("coverage")
 
             candidate = ModeCandidateDiagnostic(
