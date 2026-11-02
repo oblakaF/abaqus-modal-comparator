@@ -155,6 +155,11 @@ To start:
 `docs/examples/generic_single_plate_demo/DEMO_STUDY.json` (**Open study...**) is a SYNTHETIC demonstration of another
 plate (420 × 260 mm) that goes through every step, the offline study included. It is never a physical experiment.
 
+**Portable Windows build RC6** (`docs/gui/WINDOWS_PORTABLE_RC6.md`): RC5 plus the direct import of an Abaqus `.odb`
+in the new interface (Extract modal results...: the packaged extractor runs through Abaqus Python only after the
+user's confirmation, read-only, into a results folder; the package then becomes the FE file). Built by
+`packaging/portable_rc6/build_portable.py`. RC1 to RC5 are unchanged.
+
 **Portable Windows build RC5** (`docs/gui/WINDOWS_PORTABLE_RC5.md`): the folder `AbaqusModalComparator_RC5`, a
 WORKING RESEARCH PREVIEW of the single-plate workbench (Plate Study A–D) built from `main` after PR #122 by
 `packaging/portable_rc5/build_portable.py`. It identifies no material value. RC1 to RC4-F1 are unchanged.
