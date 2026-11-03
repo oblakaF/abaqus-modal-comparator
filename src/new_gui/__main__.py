@@ -19,10 +19,10 @@ def main(argv=None) -> int:
               "or start RUN_NEW_GUI.cmd, which installs it into the local .venv.", file=sys.stderr)
         return 2
 
-    from new_gui.window import MainWindow, create_application
+    from new_gui.window import ANALYZE_PAGE, MainWindow, create_application
 
     app = QApplication.instance() or create_application(list(sys.argv if argv is None else argv))
-    window = MainWindow()
+    window = MainWindow(start_page=ANALYZE_PAGE)
     window.show()
     return app.exec()
 

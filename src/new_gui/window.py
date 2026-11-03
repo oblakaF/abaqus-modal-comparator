@@ -52,6 +52,7 @@ from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFileDial
                                QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
 
 from new_gui import APP_NAME, STAGE
+from new_gui.analyze_panel import AnalyzePanel, SUBTITLE as ANALYZE_SUBTITLE
 from new_gui.archive_dialog import ArchiveDialog
 from new_gui.comparison_panel import WIDE_CONTENT, ComparisonPanel
 from new_gui.diagnostic_panel import DiagnosticPanel
@@ -70,10 +71,13 @@ from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHECK_ODB_SOURCE, CHOSEN_
                                      EXPERIMENTAL, EXTRACT_ODB, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, ODB_NOTE,
                                      Workspace, has_odb_source, scientific_status)
 
-PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study", "Research Results")
+PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study", "Research Results", "Analyze")
 MATERIALS_PAGE = 3
 PLATE_PAGE = 4
 RESEARCH_PAGE = 5  # PRIORITY-5A: archived research results, read on the page's first show
+ANALYZE_PAGE = 6  # UNIVERSAL-UI-1: the primary workflow; the program starts here
+NAV_PRIMARY = (ANALYZE_PAGE, MATERIALS_PAGE)
+NAV_HISTORY = (0, 1, 2, PLATE_PAGE, RESEARCH_PAGE)  # the earlier pages and the research history, unchanged
 KNOWN_SOURCES = "Choose a known new experimental source..."
 DIALOG_TITLES = {FE: "Choose the FE results file", EXPERIMENTAL: "Choose the experimental data file"}
 OPEN_ARCHIVE = "Open research archive..."
@@ -288,7 +292,8 @@ class MainWindow(QMainWindow):
     def __init__(self, *, ask_path: Optional[Callable[[str, str], str]] = None,
                  archive_path: Optional[Path] = None, status_path: Optional[Path] = None,
                  ask_folder: Optional[Callable[[], str]] = None, known_root: Optional[Path] = None,
-                 plate_family_root: Optional[Path] = None, odb_import_options: Optional[dict] = None):
+                 plate_family_root: Optional[Path] = None, odb_import_options: Optional[dict] = None,
+                 analyze_options: Optional[dict] = None, start_page: int = 0):
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} — {STAGE}")
         self.workspace = Workspace()
@@ -301,6 +306,7 @@ class MainWindow(QMainWindow):
         # RC6: the extraction dialog's hooks (results_folder, ask_folder, ask_launcher, runner, confirm, discover);
         # tests replace the launcher and the confirmation, the program uses the dialogs and the real bridge
         self._odb_import_options = dict(odb_import_options or {})
+        self._analyze_options = dict(analyze_options or {})  # UNIVERSAL-UI-1: AnalyzePanel's hooks (tests)
         self.odb_dialog = None  # the open OdbImportDialog, if any
         self._source_token = 0  # RC6: the running ODB source check; a newer token discards its outcome
         self._source_cancel: Optional[threading.Event] = None
@@ -329,6 +335,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self._scroll(self._build_materials_page()))
         self.stack.addWidget(self._scroll(self._build_plate_page()))
         self.stack.addWidget(self._scroll(self._build_research_page()))
+        self.stack.addWidget(self._scroll(self._build_analyze_page()))
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()
@@ -340,7 +347,7 @@ class MainWindow(QMainWindow):
         self.comparison.changed.connect(self._analysis_changed)
         self.setMinimumSize(560, 420)
         self._fit_to_screen()
-        self.show_page(0)
+        self.show_page(start_page)
         self.refresh()
 
     # ---------------------------------------------------------------------------------------------- building
@@ -358,12 +365,16 @@ class MainWindow(QMainWindow):
         layout.addSpacing(16)
         self.nav = QButtonGroup(self)
         self.nav.setExclusive(True)
-        for index, name in enumerate(PAGES):
-            button = QPushButton(name)
-            button.setCheckable(True)
-            button.setObjectName(f"nav{name}")
-            self.nav.addButton(button, index)
-            layout.addWidget(button)
+        for group, caption in ((NAV_PRIMARY, ""), (NAV_HISTORY, "Earlier pages and research")):
+            if caption:
+                layout.addSpacing(16)
+                layout.addWidget(_label(caption, "stage"))
+            for index in group:
+                button = QPushButton(PAGES[index])
+                button.setCheckable(True)
+                button.setObjectName(f"nav{PAGES[index]}")
+                self.nav.addButton(button, index)
+                layout.addWidget(button)
         self.nav.idClicked.connect(self.show_page)
         layout.addStretch(1)
         self.archive_button = QPushButton(OPEN_ARCHIVE)
@@ -391,6 +402,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(_label(title, "pageTitle"))
         layout.addWidget(_label(subtitle, "subtitle"))
         return page, layout
+
+    def _build_analyze_page(self) -> QWidget:
+        page, layout = self._page("Analyze", ANALYZE_SUBTITLE)
+        self.analyze = AnalyzePanel(**self._analyze_options)
+        layout.addWidget(self.analyze)
+        layout.addStretch(1)
+        return page
 
     def _build_workspace_page(self) -> QWidget:
         page, layout = self._page("Workspace", "Your own FE results and experimental data. No laboratory archive "
@@ -522,7 +540,6 @@ class MainWindow(QMainWindow):
         menu = self.menuBar().addMenu("&File")
         for text, shortcut, slot in (("Choose FE file...", "Ctrl+1", lambda: self.choose_file(FE)),
                                      ("Choose experimental file...", "Ctrl+2", lambda: self.choose_file(EXPERIMENTAL)),
-                                     (KNOWN_SOURCES, "Ctrl+3", self.open_known_sources),
                                      ("Inspect FE file", "Ctrl+Shift+1", lambda: self.inspect_file(FE)),
                                      ("Inspect experimental file", "Ctrl+Shift+2",
                                       lambda: self.inspect_file(EXPERIMENTAL))):
@@ -539,6 +556,10 @@ class MainWindow(QMainWindow):
         close.setShortcut(QKeySequence.StandardKey.Quit)
         close.triggered.connect(self.close)
         menu.addAction(close)
+        known = QAction(KNOWN_SOURCES, self)
+        known.setShortcut(QKeySequence("Ctrl+3"))
+        known.triggered.connect(self.open_known_sources)
+        self.menuBar().addMenu("&Research").addAction(known)
         about = QAction("About", self)
         about.triggered.connect(self._about)
         self.menuBar().addMenu("&Help").addAction(about)
@@ -688,7 +709,7 @@ class MainWindow(QMainWindow):
         return (self.reading() or (self.odb_dialog is not None and self.odb_dialog.busy())
                 or any(panel.busy() for panel in self.shape_panels.values())
                 or self.diagnostic.busy() or self.registration.busy() or self.comparison.busy()
-                or self.plate.busy() or self.workbench.busy() or self.review.busy()
+                or self.analyze.busy() or self.plate.busy() or self.workbench.busy() or self.review.busy()
                 or self.fe_response.busy())
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
@@ -704,6 +725,7 @@ class MainWindow(QMainWindow):
         if self.odb_dialog is not None:  # RC6: a running extraction is cancelled (its owned process stopped)
             self.odb_dialog.cancel_extraction()
             self.odb_dialog.slot.reset()
+        self.analyze.shutdown()  # UNIVERSAL-UI-1: the running step, its owned Abaqus process and its drawings
         self._reset_source_check()
         for slot in self.slots.values():  # running reads are cancelled and their outcomes discarded
             slot.reset()
@@ -814,16 +836,10 @@ class MainWindow(QMainWindow):
             self.inspect_file(FE)
 
     def _about(self) -> None:
-        QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n{STAGE}\n\nChoose your FE results and experimental data, read "
-                                          "them with Inspect file and view single mode shapes. On the Analysis page, "
-                                          "Run frequency diagnostic compares the frequencies of one experimental "
-                                          "modal set with the FE frequencies, only when you click it. The nearest "
-                                          "FE frequencies are not established mode pairs. Check reference "
-                                          "registration only checks whether an accepted archived physical "
-                                          "registration applies to the read data. Only when it is verified, Run "
-                                          "verified modal comparison runs the scientific comparator with it (MAC "
-                                          "and mode pairs). The Materials page shows existing records only. No "
-                                          "Auto-ID is run.")
+        QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n{STAGE}\n\nChoose an Abaqus .odb and an experimental .unv or "
+                                          ".uff, then click Analyze. Mode pairs and MAC appear only with a verified "
+                                          "physical registration; otherwise the result is a frequency-only "
+                                          "diagnostic. No FE analysis is solved and no Auto-ID is run.")
 
     # ---------------------------------------------------------------------------------------------- display
 

@@ -345,7 +345,8 @@ class SeparationTests(unittest.TestCase):
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))
-        self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "archive_dialog.py",
+        self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "analyze_model.py", "analyze_panel.py",
+                                                   "archive_dialog.py",
                                                    "comparison_model.py", "comparison_panel.py",
                                                    "diagnostic_model.py", "diagnostic_panel.py",
                                                    "fe_response_panel.py", "generic_plate_panel.py",
