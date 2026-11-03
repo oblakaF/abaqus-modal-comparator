@@ -66,9 +66,9 @@ from new_gui.preview_panel import PreviewPanel
 from new_gui.registration_check_panel import RegistrationCheckPanel
 from new_gui.research_results_panel import ResearchResultsPanel
 from new_gui.shape_panel import ShapePanel
-from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHOSEN_NOTE, DIALOG_FILTERS, EMPTY_TEXT, EXPERIMENTAL,
-                                     EXTRACT_ODB, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, ODB_NOTE, Workspace,
-                                     scientific_status)
+from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHECK_ODB_SOURCE, CHOSEN_NOTE, DIALOG_FILTERS, EMPTY_TEXT,
+                                     EXPERIMENTAL, EXTRACT_ODB, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, ODB_NOTE,
+                                     Workspace, has_odb_source, scientific_status)
 
 PAGES = ("Workspace", "Analysis", "Status", "Materials", "Plate Study", "Research Results")
 MATERIALS_PAGE = 3
@@ -220,6 +220,14 @@ class SourceCard(QFrame):
                                        "Abaqus starts only after your explicit confirmation.")
         self.extract_button.clicked.connect(lambda: window.open_odb_import())
         layout.addWidget(self.extract_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.source_button = QPushButton(CHECK_ODB_SOURCE)  # RC6: the package's ODB hashed again, on command only
+        self.source_button.setObjectName("checkOdbSource")
+        self.source_button.setToolTip("Hash the ODB this package was extracted from and compare its content (SHA-256) "
+                                      "with the content recorded at the extraction. Abaqus is not started.")
+        self.source_button.clicked.connect(lambda: window.check_odb_source())
+        layout.addWidget(self.source_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.source_status = _label("", "hint")
+        layout.addWidget(self.source_status)
         self.error = _label("", "error")
         layout.addWidget(self.error)
         buttons = QHBoxLayout()
@@ -256,6 +264,9 @@ class SourceCard(QFrame):
         is_odb = self.kind == FE and choice.chosen and choice.path.suffix.lower() == ".odb"
         self.odb_note.setVisible(is_odb)
         self.extract_button.setVisible(is_odb)
+        extracted = self.kind == FE and has_odb_source(choice.path)
+        self.source_button.setVisible(extracted)
+        self.source_status.setVisible(extracted and bool(self.source_status.text()))
         self.error.setText(message)
         self.error.setVisible(bool(message))
         self.choose_button.setText("Replace file..." if choice.chosen else "Choose file...")
@@ -268,6 +279,7 @@ class _ReadBridge(QObject):
     """Carries a read's outcome from its worker thread to the window's thread (a queued signal)."""
 
     done = Signal(object)
+    source_checked = Signal(int, str, str)  # RC6: token, status, text of the ODB source check
 
 
 class MainWindow(QMainWindow):
@@ -290,6 +302,9 @@ class MainWindow(QMainWindow):
         # tests replace the launcher and the confirmation, the program uses the dialogs and the real bridge
         self._odb_import_options = dict(odb_import_options or {})
         self.odb_dialog = None  # the open OdbImportDialog, if any
+        self._source_token = 0  # RC6: the running ODB source check; a newer token discards its outcome
+        self._source_cancel: Optional[threading.Event] = None
+        self.source_check_status = ""
         self.known_dialog: Optional[KnownSourcesDialog] = None
         self.archive_dialog: Optional[ArchiveDialog] = None
         self.status_rows = scientific_status(status_path)
@@ -298,6 +313,7 @@ class MainWindow(QMainWindow):
         self._threads: list[threading.Thread] = []
         self._bridge = _ReadBridge(self)
         self._bridge.done.connect(self._read_done)
+        self._bridge.source_checked.connect(self._source_checked)
 
         central = QWidget()
         root = QHBoxLayout(central)
@@ -562,6 +578,8 @@ class MainWindow(QMainWindow):
         self.messages[kind] = message
         if self.workspace is not before and not message:  # a new or replaced file: the old preview is gone
             self.slots[kind].reset()
+            if kind == FE:
+                self._reset_source_check()
         self.refresh()
         if message:
             self.statusBar().showMessage("File not accepted.", 8000)
@@ -571,7 +589,65 @@ class MainWindow(QMainWindow):
         self.workspace = self.workspace.clear(kind)
         self.messages[kind] = ""
         self.slots[kind].reset()
+        if kind == FE:
+            self._reset_source_check()
         self.refresh()
+
+    def _reset_source_check(self) -> None:
+        """Another FE file: a running source check is cancelled and its outcome discarded; its text goes."""
+        if self._source_cancel is not None:
+            self._source_cancel.set()
+        self._source_cancel, self.source_check_status = None, ""
+        self._source_token += 1
+        self.cards[FE].source_status.setText("")
+        self.cards[FE].source_button.setEnabled(True)
+
+    def check_odb_source(self) -> bool:
+        """RC6: hash the source ODB of the chosen package again (background thread); never starts Abaqus."""
+        choice = self.workspace.choice(FE)
+        if not has_odb_source(choice.path) or self._source_cancel is not None:
+            return False
+        self._source_token += 1
+        self._source_cancel = threading.Event()
+        token, cancel, folder = self._source_token, self._source_cancel, choice.path.parent
+        card = self.cards[FE]
+        card.source_button.setEnabled(False)
+        card.source_status.setObjectName("hint")
+        card.source_status.setText("Identifying the ODB content...")
+        _restyle(card.source_status)
+        card.source_status.setVisible(True)
+
+        def work() -> None:
+            from services import odb_import_service as svc
+
+            try:
+                found = svc.verify_source(folder, cancel_event=cancel)
+                status, text = found.status, found.text
+            except svc.OdbImportCancelled:
+                status, text = "CANCELLED", ""
+            except (svc.OdbImportRefused, OSError) as error:
+                status, text = "NOT_CHECKED", f"The ODB could not be checked: {error}"
+            try:
+                self._bridge.source_checked.emit(token, status, text)
+            except RuntimeError:  # the window is already gone
+                pass
+
+        worker = threading.Thread(target=work, name="new-gui-odb-source", daemon=True)
+        self._threads = [thread for thread in self._threads if thread.is_alive()] + [worker]
+        worker.start()
+        return True
+
+    def _source_checked(self, token: int, status: str, text: str) -> None:
+        if token != self._source_token:
+            self.discarded += 1
+            return
+        self._source_cancel, self.source_check_status = None, status
+        card = self.cards[FE]
+        card.source_button.setEnabled(True)
+        card.source_status.setObjectName("hint" if status == "SOURCE_UNCHANGED" else "error")
+        card.source_status.setText(text)
+        _restyle(card.source_status)
+        card.source_status.setVisible(bool(text))
 
     def inspect_file(self, kind: str) -> bool:
         """Read the chosen file of ``kind`` in a background thread; returns False when nothing is started."""
@@ -628,6 +704,7 @@ class MainWindow(QMainWindow):
         if self.odb_dialog is not None:  # RC6: a running extraction is cancelled (its owned process stopped)
             self.odb_dialog.cancel_extraction()
             self.odb_dialog.slot.reset()
+        self._reset_source_check()
         for slot in self.slots.values():  # running reads are cancelled and their outcomes discarded
             slot.reset()
         for panel in self.shape_panels.values():  # and so are running drawings

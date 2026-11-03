@@ -151,6 +151,18 @@ class PlanTests(_Folder):
         self.assertIn("Not enough free space", str(refused.exception))
 
 
+class SpaceWarningTests(_Folder):
+    def test_a_path_with_a_space_is_named_before_anything_starts(self):
+        self.assertEqual(svc.path_space_warning(("D:/a/b.odb", "D:/results")), ())
+        self.assertIn("D:/a b/c.odb", svc.path_space_warning(("D:/a b/c.odb", "D:/results"))[0])
+        with mock.patch.object(svc, "_CMD_WRAPPER", True):  # the ODB of this fixture is "plate model.odb"
+            plan = self.plan()
+        self.assertTrue(any("contain a space" in text and "plate model.odb" in text for text in plan.warnings))
+        self.assertTrue(plan.ready)  # a warning, not a refusal: it was not tried with a real Abaqus
+        with mock.patch.object(svc, "_CMD_WRAPPER", False):
+            self.assertFalse(any("contain a space" in text for text in self.plan().warnings))
+
+
 class RunTests(_Folder):
     def test_nothing_runs_without_confirmation(self):
         run = fake_runner()

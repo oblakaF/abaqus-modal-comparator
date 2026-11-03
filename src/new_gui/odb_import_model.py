@@ -27,7 +27,8 @@ CONFIRM_TEXT = ("Abaqus Python will be started now with the extraction script, w
 NOTE = ("The program starts nothing by itself: the extraction runs only after you confirm it. The ODB is opened "
         "readOnly=True by the project's existing extractor (abaqus_scripts/extract_odb.py). The package is written "
         "into a new sub-folder of the results folder; existing results are never overwritten. A package already "
-        "extracted from the same ODB content (SHA-256) and the same range is reused without starting Abaqus.")
+        "extracted from the same ODB content (SHA-256) and the same range is reused without starting Abaqus. Reading "
+        "the package afterwards uses the program's usual read cache under %LOCALAPPDATA%, which is usually on C:.")
 RANGE_NOTE = ("The requested range is clipped to the modes the ODB holds; the range actually extracted is shown "
               "afterwards. The first elastic mode (for example FE7 of a free-free plate) is never skipped by the "
               "program: start the range at 1 to see every mode, rigid-body modes included.")

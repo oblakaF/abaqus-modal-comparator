@@ -66,6 +66,14 @@ ODB_NOTE = ("An Abaqus .odb is not read directly. Click Extract modal results...
             "(the ODB is opened read-only) into a results folder you choose. The extracted package then becomes the "
             "FE file here. Choosing the .odb itself starts nothing.")
 EXTRACT_ODB = "Extract modal results..."
+CHECK_ODB_SOURCE = "Check the source ODB"
+ODB_SOURCE_RECORD = "extraction_source.json"  # services.odb_import_service.SOURCE_RECORD (that module loads on demand)
+
+
+def has_odb_source(path: Optional[Path]) -> bool:
+    """The chosen FE file is the manifest of a package extracted by the ODB route: its source can be checked again."""
+    return (path is not None and path.name.lower() == "manifest.json"
+            and (path.parent / ODB_SOURCE_RECORD).is_file())
 STATUS_PATH = Path(__file__).resolve().parents[2] / "docs" / "auto_id" / "STATUS.json"
 UNKNOWN = "UNKNOWN"
 

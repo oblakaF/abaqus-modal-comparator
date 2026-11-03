@@ -269,6 +269,20 @@ class ExtractionPlan:
                                "needed"))
 
 
+_CMD_WRAPPER = os.name == "nt"  # abaqus_bridge._windows_command starts the launcher through cmd.exe
+
+
+def path_space_warning(paths: Sequence) -> tuple:
+    """Paths with a space that the launcher line carries. The bridge's cmd.exe wrapper quotes them twice, so a launcher
+    receives them split at the space (seen with a stand-in launcher; not tried with a real Abaqus)."""
+    spaced = [str(path) for path in paths if " " in str(path)]
+    if not spaced:
+        return ()
+    return ("These paths contain a space, and the extraction will probably fail on them: "
+            + "; ".join(spaced) + ". Use paths without spaces: move or copy the ODB or the program folder, or choose "
+            "another results folder.",)
+
+
 def plan_extraction(odb_path, results_folder, start_mode: int = DEFAULT_START_MODE, end_mode: int = DEFAULT_END_MODE,
                     abaqus_command: str = "", *, discover=None) -> ExtractionPlan:
     """What an extraction would do, with everything checked that can be checked without starting anything."""
@@ -289,8 +303,9 @@ def plan_extraction(odb_path, results_folder, start_mode: int = DEFAULT_START_MO
                                "mode is not below the first.")
     free, needed = free_space_check(folder, odb.size)
     extractor = extractor_script_path()
+    spaces = path_space_warning((odb.path, folder, extractor)) if _CMD_WRAPPER else ()
     return ExtractionPlan(odb, folder, start, end, detect_abaqus(abaqus_command, discover=discover), free, needed,
-                          extractor, extractor.is_file(), odb.warnings)
+                          extractor, extractor.is_file(), odb.warnings + spaces)
 
 
 @dataclass(frozen=True)

@@ -233,6 +233,53 @@ class WindowTests(_Case):
             self.assertIn(COMPONENT_LABEL[ws.FE][{"U1": "x", "U2": "y", "U3": "z"}[label]], components)
         self.assertEqual(len(self.runner.calls), 1)
 
+    def extracted_package(self):
+        w = self.window
+        w.choose_file(ws.FE, str(self.odb))
+        dialog = w.open_odb_import()
+        self.assertTrue(dialog.extract())
+        self.assertTrue(w.wait_for_reads(120))
+        dialog.use_button.click()
+        self.assertTrue(w.wait_for_reads(120))
+        return w.cards[ws.FE]
+
+    def test_the_source_odb_is_checked_again_by_content_on_command(self):
+        w = self.window
+        self.assertEqual(ws.ODB_SOURCE_RECORD, svc.SOURCE_RECORD)
+        card = self.extracted_package()
+        self.assertTrue(card.source_button.isVisible())
+        self.assertEqual(w.source_check_status, "")  # nothing is hashed until the command
+        self.assertTrue(w.check_odb_source())
+        self.assertTrue(w.wait_for_reads(60))
+        self.assertEqual(w.source_check_status, svc.SOURCE_UNCHANGED)
+        self.assertIn("unchanged", card.source_status.text())
+        stat = self.odb.stat()
+        self.odb.write_bytes(b"Synthetic odb; never opened " * 50)  # the same size
+        os.utime(self.odb, ns=(stat.st_atime_ns, stat.st_mtime_ns))  # the same modification time
+        self.assertTrue(w.check_odb_source())
+        self.assertTrue(w.wait_for_reads(60))
+        self.assertEqual(w.source_check_status, svc.SOURCE_CHANGED)
+        self.assertIn("Extract again", card.source_status.text())
+        self.odb.unlink()
+        self.assertTrue(w.check_odb_source())
+        self.assertTrue(w.wait_for_reads(60))
+        self.assertEqual(w.source_check_status, svc.SOURCE_MISSING)
+        self.assertEqual(len(self.runner.calls), 1)  # Abaqus is never started by the check
+
+    def test_another_fe_file_drops_the_source_check(self):
+        from test_local_fe_preview import described, write_package
+
+        w = self.window
+        card = self.extracted_package()
+        self.assertTrue(w.check_odb_source())
+        self.assertTrue(w.wait_for_reads(60))
+        self.assertTrue(card.source_status.text())
+        plain = write_package(self.root / "inputs" / "package", [(7, 101.25, described(101.25))])
+        self.assertEqual(w.choose_file(ws.FE, str(plain)), "")
+        self.assertFalse(card.source_button.isVisible())  # a package without a record of its ODB
+        self.assertEqual(card.source_status.text(), "")
+        self.assertFalse(w.check_odb_source())
+
     def test_inspect_of_an_odb_points_to_the_extraction(self):
         w = self.window
         w.choose_file(ws.FE, str(self.odb))
