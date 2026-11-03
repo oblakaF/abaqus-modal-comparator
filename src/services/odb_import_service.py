@@ -431,6 +431,23 @@ def _mark_incomplete(folder: Path, state: str) -> None:
         pass
 
 
+# ------------------------------------------------------------------------------------------------ the read cache
+
+
+def cache_folder() -> Optional[Path]:
+    """The folder the user chose for the read cache of large packages, or None."""
+    import fast_cache
+
+    return fast_cache.cache_folder()
+
+
+def set_cache_folder(folder) -> Optional[Path]:
+    """Set or clear (empty) that folder; ValueError when it cannot be one. Nothing is created here."""
+    import fast_cache
+
+    return fast_cache.set_cache_folder(folder)
+
+
 # ------------------------------------------------------------------------------------------------ re-detection
 
 
