@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QFormLayout, QGridLayout, Q
                                QMessageBox, QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSpinBox,
                                QVBoxLayout, QWidget)
 
-import fast_cache
 from new_gui import odb_import_model as om
 from services import odb_import_service as svc
 
@@ -114,7 +113,7 @@ class OdbImportDialog(QDialog):
         self.cache = QLineEdit()
         self.cache.setObjectName("cacheFolder")
         self.cache.setPlaceholderText("optional: none chosen")
-        chosen_cache = fast_cache.cache_folder()
+        chosen_cache = svc.cache_folder()
         self.cache.setText("" if chosen_cache is None else str(chosen_cache))
         self.cache.editingFinished.connect(self.apply_cache_folder)
         form.addWidget(self.cache, 3, 1)
@@ -245,7 +244,7 @@ class OdbImportDialog(QDialog):
     def apply_cache_folder(self) -> bool:
         """The folder in the field (empty: none) becomes the read cache's destination; it is created when first used."""
         try:
-            fast_cache.set_cache_folder(self.cache.text())
+            svc.set_cache_folder(self.cache.text())
         except ValueError as error:
             self.cache_error.setText(str(error))
             return False
