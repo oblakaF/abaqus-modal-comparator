@@ -16,6 +16,10 @@ unchanged. Its proposal is diagnostic: it never reaches ``analyse``, so the stat
 UNIVERSAL-REG-2: ``save_registration_draft`` and ``open_registration_draft`` keep that proposal as a JSON draft and check
 it again on the current files. A draft changes nothing in ``analyse`` either.
 
+UNIVERSAL-REG-3: ``confirm_registration`` writes a person's confirmation of a revalidated draft to its own file, and
+``analyse(..., confirmation=...)`` compares with it. With a confirmation, the archived registrations are not consulted;
+a confirmation that does not hold leaves REGISTRATION_REQUIRED and the frequency-only result.
+
 The extraction package is managed here: it lives in ``<odb folder>/<odb name>_modal_packages`` and is found again by the
 ODB's content (SHA-256) and the requested range, so the user never chooses a ``manifest.json``.
 """
@@ -33,6 +37,7 @@ from new_gui import diagnostic_model as dm
 from new_gui import preview_model as pm
 from new_gui import registration_check_model as rm
 from new_gui.workspace_state import EXPERIMENTAL, FE
+from services import confirmed_registration as cs
 from services import generic_registration as gr
 from services import odb_import_service as svc
 
@@ -45,11 +50,15 @@ FILTERS = {FE: "Abaqus ODB (*.odb);;All files (*)", EXPERIMENTAL: "Experimental 
 REGISTRATION_REQUIRED = "REGISTRATION_REQUIRED"
 REGISTRATION_TEXT = "No verified physical registration: no mode pairs and no MAC. Frequency comparison only."
 VERIFIED_TEXT = "A verified physical registration applies to these files. Pairs and MAC are the comparator's result."
-REFUSED, FAILED, PROVISIONAL = "refused", "failed", "provisional"
+CONFIRMED_COMPARISON = "USER_CONFIRMED_COMPARISON"
+CONFIRMED_TEXT = ("Mode pairs and MAC use the physical registration you confirmed. Your confirmation records your "
+                  "statement; it is not independent proof of physical correctness.")
+REFUSED, FAILED, PROVISIONAL, NOT_CONFIRMED = "refused", "failed", "provisional", "not_confirmed"
 REGISTRATION_NOTES = {  # what the program shows; the service's own wording stays in ``registration_reason``
     REFUSED: "Registration check: no accepted registration matches these two files.",
     FAILED: "Registration check FAILED: it could not be completed, so nothing about these files is verified.",
     PROVISIONAL: "Registration not checked: the chosen set holds FRF peak records, not validated fitted modes.",
+    NOT_CONFIRMED: "Confirmed registration not applied: it does not hold for the current data. See details.",
 }
 VERIFIED_LIMITS = ("Only the registered geometric mapping is reused: frequencies and mode shapes are these files' own. "
                    "No acceptance gate or threshold is changed.")
@@ -280,6 +289,39 @@ def open_registration_draft(inputs: Inputs, set_index: int, path, cancel_event) 
     return result
 
 
+def _protected(inputs: Inputs, *extra) -> tuple:
+    return _source_files(inputs) + tuple(item for item in extra if item)
+
+
+def confirm_registration(inputs: Inputs, set_index: int, draft_path, confirmed_by: str, evidence_location: str, statements,
+                         path, cancel_event) -> dict:
+    """A person's confirmation of a draft that is reproduced now, in its own file; the draft file is not touched."""
+    if rm.set_is_provisional(inputs.full_experimental, set_index):
+        raise cs.ConfirmationRefused(cs.NOT_BOUND, cm.PROVISIONAL_BLOCK)
+    result = open_registration_draft(inputs, set_index, draft_path, cancel_event)
+    if not result.proposal.proposed:
+        reasons = " ".join(problem.text for problem in result.proposal.problems)
+        raise cs.ConfirmationRefused(cs.NOT_BOUND, f"The draft does not hold for the current data: {reasons}")
+    experimental = inputs.full_experimental.sets[set_index].dataset
+    document = cs.confirmation_document(result.document, inputs.full_fe.dataset, experimental, confirmed_by=confirmed_by,
+                                        evidence_location=evidence_location, statements=statements)
+    gr.write_draft(document, path, _protected(inputs, draft_path))
+    return document
+
+
+def open_confirmation(inputs: Inputs, set_index: int, path, cancel_event) -> cs.ConfirmedRegistration:
+    """A saved confirmation checked against the current files. It is not applied here. Raises ``ConfirmationRefused``."""
+    if rm.set_is_provisional(inputs.full_experimental, set_index):
+        raise cs.ConfirmationRefused(cs.NOT_BOUND, cm.PROVISIONAL_BLOCK)
+    try:
+        document = gr.read_draft(path)
+        confirm_sources(inputs, cancel_event)
+    except (gr.DraftRefused, StepFailed) as error:
+        raise cs.ConfirmationRefused(cs.INVALID, str(error)) from error
+    return cs.revalidate(document, inputs.full_fe.dataset, inputs.full_experimental.sets[set_index].dataset,
+                         modal_set=_modal_set_identity(inputs, set_index), sources=_source_hashes(inputs))
+
+
 def _ranges(numbers) -> str:
     """1, 2, 13-20"""
     parts, numbers = [], sorted(numbers)
@@ -348,14 +390,29 @@ def _verified(inputs: Inputs, set_index: int, cancel_event) -> tuple:
     return compared.view, "", ""
 
 
-def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
+def _confirmed(inputs: Inputs, set_index: int, confirmation: dict, cancel_event) -> tuple:
+    """As ``_verified``, for a person's confirmation; no archived registration is consulted or fallen back on."""
+    compared = cm.run_compare_confirmed(inputs.full_fe, inputs.full_experimental, set_index, confirmation, 0, cancel_event,
+                                        inputs.identities, (inputs.fe, inputs.experimental),
+                                        _modal_set_identity(inputs, set_index), _source_hashes(inputs))
+    if compared.cancelled:
+        raise StepCancelled()
+    if compared.view is None:
+        return None, compared.refusal or compared.error, NOT_CONFIRMED if compared.refusal else FAILED
+    return compared.view, "", ""
+
+
+def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional[dict] = None) -> Analysis:
     confirm_sources(inputs, cancel_event)
     outcome = dm.run_diagnostic(inputs.fe, inputs.experimental, set_index, 0, cancel_event)
     if outcome.cancelled:
         raise StepCancelled()
     if outcome.error:
         raise StepFailed(outcome.error)
-    comparison, reason, registration = _verified(inputs, set_index, cancel_event)
+    if confirmation is None:
+        comparison, reason, registration = _verified(inputs, set_index, cancel_event)
+    else:
+        comparison, reason, registration = _confirmed(inputs, set_index, confirmation, cancel_event)
     view = outcome.view
     analyzed = inputs.experimental.sets[set_index]
     total = len(inputs.full_experimental.sets[set_index].records)
@@ -385,16 +442,22 @@ def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
     notes = tuple(inputs.fe.warnings) + tuple(view.range_warnings) + tuple(view.importer_warnings)
     if unavailable:
         notes += (f"Requested FE modes not available in the results: {_ranges(unavailable)}.",)
-    if comparison is not None:
+    if comparison is not None and confirmation is not None:
+        status = CONFIRMED_COMPARISON if comparison.status == cm.PAIRS_FOUND else comparison.status
+        statement = CONFIRMED_TEXT
+        notes += tuple(comparison.warnings)
+    elif comparison is not None:
         status, statement = comparison.status, VERIFIED_TEXT
         notes += tuple(w for w in comparison.warnings if not w.startswith(_REUSE_WARNING)) + (VERIFIED_LIMITS,)
     else:
         status, statement = REGISTRATION_REQUIRED, REGISTRATION_TEXT
+        if confirmation is not None and reason:
+            notes += (reason,)
     return Analysis(status, statement, set_index, view.set_title, fe_rows, experimental, nearest, first_elastic,
                     tuple(sorted(rigid)), tuple(facts), notes, comparison, reason, registration, unavailable, total)
 
 
 __all__ = ["Analysis", "Inputs", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse", "consent_text",
-           "confirm_sources", "extract", "open_registration_draft", "propose_registration", "registration_geometry",
+           "confirm_registration", "confirm_sources", "extract", "open_confirmation", "open_registration_draft", "propose_registration", "registration_geometry",
            "save_registration_draft", "file_problem", "find_package", "make_plan", "package_folder", "plan_warnings",
            "read_inputs", "scoped_experimental", "scoped_fe", "scoped_inputs"]

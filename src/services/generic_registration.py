@@ -694,6 +694,7 @@ class DraftResult:
 
     proposal: Proposal
     evidence: Optional[Evidence] = None
+    document: Optional[Mapping] = None  # the draft that was reproduced
 
 
 def revalidate_draft(document: dict, fe_dataset, experimental_dataset, *, modal_set: Mapping,
@@ -724,7 +725,7 @@ def revalidate_draft(document: dict, fe_dataset, experimental_dataset, *, modal_
         problem = Problem(DRAFT_NOT_REPRODUCED, "The stored result differs from the result computed now from the same "
                                                 f"evidence: {', '.join(differences)}.")
         return DraftResult(required([problem], evidence=evidence), evidence)
-    return DraftResult(again, evidence)
+    return DraftResult(again, evidence, document)
 
 
 __all__ = ["DIRECTIONS", "DOFS", "DraftRefused", "DraftResult", "Evidence", "HEURISTICS", "HEURISTICS_NOTE", "LIMIT",

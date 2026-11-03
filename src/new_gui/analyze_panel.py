@@ -6,6 +6,9 @@ show the result. Pairs and MAC appear only with a verified registration; otherwi
 The steps are ``new_gui.analyze_model``'s and run in worker threads. Replacing a file or Cancel stops the running step
 and discards its outcome.
 
+UNIVERSAL-REG-3: Compare with confirmed registration runs only on command, with a confirmation made or opened after this
+analysis; the sources and the confirmation are checked again first. A confirmation is never picked up by itself.
+
 UNIVERSAL-UI-2: compact progress, the result's scientific notes behind Show details, the tables on tabs. The status, the
 registration outcome and the number of warnings stay visible.
 """
@@ -24,8 +27,10 @@ from PySide6.QtWidgets import (QBoxLayout, QComboBox, QFileDialog, QFrame, QGrid
 from new_gui import analyze_model as am
 from new_gui import comparison_model as cm
 from new_gui.diagnostic_model import NEAREST_TITLE
+from new_gui.confirmation_dialog import ConfirmationDialog, FILTER as CONFIRMATION_FILTER
 from new_gui.diagnostic_panel import DiagnosticTable
 from new_gui.registration_dialog import RegistrationDialog
+from services import confirmed_registration as cs
 from new_gui.shape_panel import ShapePanel
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
@@ -43,6 +48,11 @@ SHOW_LOG, HIDE_LOG = "Show log", "Hide log"
 SET_UP_REGISTRATION = "Set up registration..."
 PROPOSED_TEXT = "Registration setup: the geometry checks passed. Diagnostic only: not applied, so no MAC and no mode pairs."
 REFUSED_TEXT = "Registration setup: the evidence does not establish a registration."
+OPEN_CONFIRMATION = "Open confirmation..."
+COMPARE_CONFIRMED = "Compare with confirmed registration"
+READY_TEXT = "Confirmed registration ready. It is checked again against the current files when you click Compare."
+UNUSABLE_TEXT = "Confirmation not usable: "
+PAIR_HINT = "Click a pair to show its two shapes side by side, each on its own coordinates."
 REVIEWED_TEXT = ("Registration setup: mapping reviewed by you. Not an accepted physical registration: not applied, so no "
                  "MAC and no mode pairs.")
 SHAPE_HINT = ("Click a row to show that EXP record and its nearest FE mode side by side, each on its own coordinates. "
@@ -50,7 +60,7 @@ SHAPE_HINT = ("Click a row to show that EXP record and its nearest FE mode side 
 TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "nearest": "Nearest frequency", "fe": "FE modes",
               "experimental": "Experimental modes"}
 BADGE_STATE = {cm.PAIRS_FOUND: "read"}  # any other status is not a verified pairing; a failed check is "blocked"
-_FIND, _EXTRACT, _READ, _ANALYSE = "find", "extract", "read", "analyse"
+_FIND, _EXTRACT, _READ, _ANALYSE, _CONFIRMATION = "find", "extract", "read", "analyse", "confirmation"
 
 
 def _label(text: str = "", name: str = "") -> QLabel:
@@ -140,6 +150,10 @@ class AnalyzePanel(QWidget):
         self.registration_dialog: Optional[RegistrationDialog] = None
         self.proposal = None
         self.proposal_label: Optional[QLabel] = None
+        self.confirmation: Optional[dict] = None  # made or opened after this analysis; used only on command
+        self.confirmation_view: Optional[ConfirmationDialog] = None
+        self.open_confirmation_button: Optional[QPushButton] = None
+        self.compare_button: Optional[QPushButton] = None
         self.result_tabs: Optional[QTabWidget] = None
         self.tables: dict = {}
         self._token = 0
@@ -318,6 +332,7 @@ class AnalyzePanel(QWidget):
             self.registration_dialog = RegistrationDialog(self.inputs, self.analysis.set_index, self)
             self.registration_dialog.checked.connect(self._proposal_checked)
             self.registration_dialog.reviewed.connect(self._proposal_reviewed)
+            self.registration_dialog.confirmed.connect(self._use_confirmation)
         self.registration_dialog.show()
         self.registration_dialog.raise_()
         return self.registration_dialog
@@ -332,18 +347,90 @@ class AnalyzePanel(QWidget):
         if self.proposal_label is not None and self.proposal is not None and self.proposal.proposed:
             self.proposal_label.setText(REVIEWED_TEXT if reviewed else PROPOSED_TEXT)
 
+    def _use_confirmation(self, document: dict) -> None:
+        self.confirmation = document
+        if self.proposal_label is not None:
+            self.proposal_label.setText(READY_TEXT)
+            self.proposal_label.setVisible(True)
+        if self.compare_button is not None:
+            self.compare_button.setVisible(True)
+
+    def open_confirmation(self, path: Optional[str] = None) -> bool:
+        """Check a saved confirmation against the current files and display it; it is used only on command."""
+        if self.analysis is None or self.state == RUNNING or self.analysis.comparison is not None:
+            return False
+        if path is None:
+            path, _filter = QFileDialog.getOpenFileName(self, OPEN_CONFIRMATION, "", CONFIRMATION_FILTER)
+        if not path:
+            return False
+        inputs, index = self.inputs, self.analysis.set_index
+        self._stop()
+        self._cancel = threading.Event()
+        cancel = self._cancel
+        self.state = RUNNING
+        self._set_message("Checking the confirmation against the current files...", "hint")
+        self._refresh()
+
+        def work(_say):
+            try:
+                return am.open_confirmation(inputs, index, path, cancel)
+            except cs.ConfirmationRefused as refusal:
+                return refusal
+
+        self._run(_CONFIRMATION, work)
+        return True
+
+    def _confirmation_opened(self, value) -> None:
+        self.state = DONE
+        self._cancel = None
+        self._set_message("", "hint")
+        self._refresh()
+        if isinstance(value, cs.ConfirmationRefused):
+            self.confirmation = None
+            if self.compare_button is not None:
+                self.compare_button.setVisible(False)
+            if self.proposal_label is not None:
+                self.proposal_label.setText(UNUSABLE_TEXT + str(value))
+                self.proposal_label.setVisible(True)
+            return
+        self.confirmation_view = ConfirmationDialog(self.inputs, self.analysis.set_index, value.document["draft"], None,
+                                                    self, existing=value.document)
+        self.confirmation_view.confirmed.connect(self._use_confirmation)
+        self.confirmation_view.show()
+
+    def compare_confirmed(self) -> bool:
+        """The comparison with the confirmation, which is checked again first. Returns False when nothing started."""
+        if self.confirmation is None or self.analysis is None or self.state == RUNNING:
+            return False
+        inputs, index, confirmation = self.inputs, self.analysis.set_index, self.confirmation
+        self._stop()
+        self._cancel = threading.Event()
+        cancel = self._cancel
+        self.state = RUNNING
+        self._set_message("Checking the confirmation and comparing the mode shapes...", "hint")
+        self._refresh()
+        self._run(_ANALYSE, lambda _say: am.analyse(inputs, index, cancel, confirmation))
+        return True
+
     def _close_registration(self) -> None:
+        view, self.confirmation_view = self.confirmation_view, None
+        if view is not None:
+            view.confirmed.disconnect(self._use_confirmation)
+            view.close()
+            view.deleteLater()
         dialog, self.registration_dialog = self.registration_dialog, None
         self.proposal = None
         if dialog is not None:
             dialog.checked.disconnect(self._proposal_checked)
             dialog.reviewed.disconnect(self._proposal_reviewed)
+            dialog.confirmed.disconnect(self._use_confirmation)
             dialog.close()
             dialog.deleteLater()
 
     def _reset(self) -> None:
         self._stop()
         self.state, self.plan, self.inputs, self.analysis = IDLE, None, None, None
+        self.confirmation = None
         self.log.clear()
         self.set_combo.clear()
         self._set_message("", "hint")
@@ -362,7 +449,7 @@ class AnalyzePanel(QWidget):
             self._stop()
             return
         self._stop()
-        self.state = IDLE
+        self.state = DONE if self.analysis is not None else IDLE  # the frequency result of a comparison stays
         self._set_message("Cancelled.", "hint")
         self._refresh()
 
@@ -380,7 +467,7 @@ class AnalyzePanel(QWidget):
                 return False
         self.file_error.setText("")
         self._stop()
-        self.analysis, self.inputs = None, None
+        self.analysis, self.inputs, self.confirmation = None, None, None
         self.log.clear()
         self._show_result()
         self.set_combo.clear()
@@ -435,11 +522,15 @@ class AnalyzePanel(QWidget):
             self.discarded += 1
             return
         if isinstance(value, am.StepCancelled):
-            self.state = IDLE
+            self.state = DONE if self.analysis is not None else IDLE
             self._set_message("Cancelled.", "hint")
             self._refresh()
         elif isinstance(value, am.StepFailed):
+            self.analysis = None  # for example a file changed: what was read no longer stands
+            self._show_result()
             self._block(str(value))
+        elif step == _CONFIRMATION:
+            self._confirmation_opened(value)
         elif step == _FIND:
             self._package_found(value)
         elif step == _EXTRACT:
@@ -496,6 +587,7 @@ class AnalyzePanel(QWidget):
         if self.inputs is None or self.state == RUNNING or not 0 <= index < len(self.inputs.experimental.sets):
             return False
         self.set_combo.setCurrentIndex(self.set_combo.findData(index))
+        self.confirmation = None
         self._stop()
         self._cancel = threading.Event()
         self._analyse(index)
@@ -512,12 +604,16 @@ class AnalyzePanel(QWidget):
 
     def _analysed(self, analysis: am.Analysis) -> None:
         self.analysis = analysis
+        self.confirmation = None  # every comparison asks for it again
         self.state = DONE
         self._cancel = None
         self._set_message("", "hint")
         self._show_result()
         self._refresh()
-        if analysis.nearest_rows:
+        pairs = analysis.comparison.pair_rows if analysis.comparison is not None else ()
+        if pairs:
+            self.show_pair(0)
+        elif analysis.nearest_rows:
             self.show_candidate(0)
 
     def _block(self, text: str) -> None:
@@ -533,14 +629,27 @@ class AnalyzePanel(QWidget):
         if self.analysis is None or not 0 <= row < len(self.analysis.nearest_rows):
             return False
         values = self.analysis.nearest_rows[row]
+        return self._draw_shapes(values[1], values[3])
+
+    def show_pair(self, row: int) -> bool:
+        """Draw one pair's EXP record and FE mode side by side (each on its own coordinates)."""
+        pairs = self.analysis.comparison.pair_rows if self.analysis and self.analysis.comparison is not None else ()
+        if not 0 <= row < len(pairs):
+            return False
+        cells = pairs[row].cells
+        return self._draw_shapes(cells[3], cells[0])
+
+    def _draw_shapes(self, experimental_number: str, fe_number: str) -> bool:
         experimental = self.shape_panels[EXPERIMENTAL]
         fe = self.shape_panels[FE]
         records = self.inputs.experimental.sets[self.analysis.set_index].records
-        record = next(i for i, item in enumerate(records) if str(item.number) == values[1])
+        record = next((i for i, item in enumerate(records) if str(item.number) == experimental_number), None)
+        if record is None:
+            return False
         experimental.set_combo.setCurrentIndex(experimental.set_combo.findData(self.analysis.set_index))
         experimental.item_combo.setCurrentIndex(experimental.item_combo.findData(record))
         experimental.show_shape()
-        mode = next((i for i, item in enumerate(self.inputs.fe.modes) if str(item.number) == values[3]), None)
+        mode = next((i for i, item in enumerate(self.inputs.fe.modes) if str(item.number) == fe_number), None)
         if mode is not None:
             fe.item_combo.setCurrentIndex(fe.item_combo.findData(mode))
             fe.show_shape()
@@ -563,6 +672,9 @@ class AnalyzePanel(QWidget):
         self.file_error.setVisible(bool(self.file_error.text()))
         self.set_row.setVisible(self.set_combo.count() > 1)
         self.set_combo.setEnabled(not running)
+        for button in (self.compare_button, self.open_confirmation_button, self.registration_button):
+            if button is not None:
+                button.setEnabled(not running)
         blocked = self.state == BLOCKED
         self.progress.setVisible(running)
         has_log = (running or blocked) and bool(self.log.toPlainText())
@@ -585,6 +697,7 @@ class AnalyzePanel(QWidget):
         self.shapes.setVisible(analysis is not None)
         self.status_label = self.registration_label = self.warning_label = None
         self.details = self.result_tabs = self.registration_button = self.proposal_label = None
+        self.open_confirmation_button = self.compare_button = None
         self.tables: dict = {}
         if analysis is None:
             return
@@ -634,6 +747,15 @@ class AnalyzePanel(QWidget):
             self.registration_button.setObjectName("analyzeSetUpRegistration")
             self.registration_button.clicked.connect(lambda: self.open_registration())
             inner.addWidget(self.registration_button, 0, Qt.AlignmentFlag.AlignLeft)
+            self.open_confirmation_button = QPushButton(OPEN_CONFIRMATION)
+            self.open_confirmation_button.setObjectName("analyzeOpenConfirmation")
+            self.open_confirmation_button.clicked.connect(lambda: self.open_confirmation())
+            inner.addWidget(self.open_confirmation_button, 0, Qt.AlignmentFlag.AlignLeft)
+            self.compare_button = QPushButton(COMPARE_CONFIRMED)
+            self.compare_button.setObjectName("analyzeCompareConfirmed")
+            self.compare_button.setVisible(False)
+            self.compare_button.clicked.connect(lambda: self.compare_confirmed())
+            inner.addWidget(self.compare_button, 0, Qt.AlignmentFlag.AlignLeft)
         self.result_layout.addWidget(card)
 
     def _add_table(self, key: str, title: str, headers, rows, stretch: int, hint: str = "") -> None:
@@ -653,7 +775,8 @@ class AnalyzePanel(QWidget):
     def _add_comparison(self, view) -> None:
         pairs = tuple(tuple(row.cells[i] for i in am.PAIR_COLUMNS) for row in view.pair_rows)
         if pairs:
-            self._add_table("pairs", "", am.PAIR_HEADERS, pairs, 7)
+            self._add_table("pairs", "", am.PAIR_HEADERS, pairs, 7, PAIR_HINT)
+            self.tables["pairs"].cellClicked.connect(lambda row, _column: self.show_pair(row))
         else:
             card, inner = _card()
             inner.addWidget(_label(cm.NO_PAIR_TEXT, "hint"))
@@ -671,7 +794,7 @@ class AnalyzePanel(QWidget):
                                         else QBoxLayout.Direction.LeftToRight)
 
     def busy(self) -> bool:
-        return (self.state == RUNNING or any(thread.is_alive() for thread in self._threads)
+        return ((self.confirmation_view is not None and self.confirmation_view.busy()) or self.state == RUNNING or any(thread.is_alive() for thread in self._threads)
                 or any(panel.busy() for panel in self.shape_panels.values())
                 or (self.registration_dialog is not None and self.registration_dialog.busy()))
 

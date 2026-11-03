@@ -5,6 +5,8 @@ the dialog shows the proposed mapping and every failure. Nothing is prefilled, a
 
 UNIVERSAL-REG-2: Save draft and Open draft keep and check again a proposal. Saving needs the user's explicit review of
 what is on the screen; an opened draft is shown unreviewed. A draft is never an accepted physical registration.
+
+UNIVERSAL-REG-3: Confirm registration... revalidates the saved draft now and only then opens the separate confirmation.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFram
                                QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
 from new_gui import analyze_model as am
+from new_gui.confirmation_dialog import ConfirmationDialog
 from new_gui.diagnostic_panel import DiagnosticTable
 from services import generic_registration as gr
 
@@ -27,6 +30,8 @@ CHECK = "Check evidence"
 CHECKING = "Checking the evidence..."
 SAVE_DRAFT = "Save draft..."
 OPEN_DRAFT = "Open draft..."
+CONFIRM = "Confirm registration..."
+NEED_DRAFT = "Review the mapping and save it as a draft first."
 OPENING = "Checking the draft against the current files..."
 SAVING = "Saving the draft..."
 REVIEW = "I have reviewed this mapping and its evidence."
@@ -85,6 +90,7 @@ class RegistrationDialog(QDialog):
 
     checked = Signal(object)
     reviewed = Signal(bool)
+    confirmed = Signal(object)
 
     def __init__(self, inputs: am.Inputs, set_index: int, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -94,6 +100,8 @@ class RegistrationDialog(QDialog):
         self.checked_evidence: Optional[gr.Evidence] = None
         self.table: Optional[DiagnosticTable] = None
         self._handler: Optional[Callable] = None
+        self.draft_path: Optional[str] = None  # the draft file that holds the shown proposal
+        self.confirmation_dialog: Optional[ConfirmationDialog] = None
         self._token = 0
         self._cancel: Optional[threading.Event] = None
         self._threads: list[threading.Thread] = []
@@ -127,6 +135,11 @@ class RegistrationDialog(QDialog):
         self.open_button.setObjectName("regOpenDraft")
         self.open_button.clicked.connect(lambda: self.open_draft())
         row.addWidget(self.open_button)
+        self.confirm_button = QPushButton(CONFIRM)
+        self.confirm_button.setObjectName("regConfirm")
+        self.confirm_button.setEnabled(False)
+        self.confirm_button.clicked.connect(lambda: self.confirm_registration())
+        row.addWidget(self.confirm_button)
         close = QPushButton("Close")
         close.clicked.connect(self.close)
         row.addWidget(close)
@@ -248,7 +261,7 @@ class RegistrationDialog(QDialog):
         worker = threading.Thread(target=target, name="new-gui-registration", daemon=True)
         self._threads = [thread for thread in self._threads if thread.is_alive()] + [worker]
         worker.start()
-        for button in (self.check_button, self.save_button, self.open_button):
+        for button in (self.check_button, self.save_button, self.open_button, self.confirm_button):
             button.setEnabled(False)
         self.busy_label.setText(text)
         self.busy_label.setVisible(True)
@@ -277,8 +290,9 @@ class RegistrationDialog(QDialog):
         return self.review_box is not None and self.review_box.isChecked()
 
     def _refresh_save(self) -> None:
-        self.save_button.setEnabled(self.proposal is not None and self.proposal.proposed and self.is_reviewed()
-                                    and self._cancel is None)
+        ready = self.proposal is not None and self.proposal.proposed and self.is_reviewed() and self._cancel is None
+        self.save_button.setEnabled(ready)
+        self.confirm_button.setEnabled(ready and self.draft_path is not None)
 
     def _review_changed(self, reviewed: bool) -> None:
         self._refresh_save()
@@ -305,6 +319,7 @@ class RegistrationDialog(QDialog):
             if isinstance(saved, Exception):
                 self._note(str(saved), "error")
             else:
+                self.draft_path = str(saved)
                 self._note(f"Saved {saved}. {NOT_ACCEPTED}")
 
         def work(cancel):
@@ -335,10 +350,44 @@ class RegistrationDialog(QDialog):
                     self._show(gr.required([problem]))
                     return
                 self.checked_evidence = result.evidence
+                self.draft_path = str(path)
                 self._note(REPRODUCED)
             else:
                 self.checked_evidence = None
+                self.draft_path = None
             self._show(result.proposal)
+
+        def failed(error: Exception):
+            problem = gr.Problem(gr.DRAFT_INVALID, f"The draft could not be checked ({type(error).__name__}: {error}).")
+            return gr.DraftResult(gr.required([problem]))
+
+        return self._run(OPENING, lambda cancel: am.open_registration_draft(inputs, set_index, path, cancel), done,
+                         failed)
+
+    def confirm_registration(self) -> bool:
+        """Revalidate the saved draft now; only a reproduced one, unchanged on the form, opens the confirmation."""
+        if self.proposal is None or not self.proposal.proposed or not self.is_reviewed() or self.draft_path is None:
+            self._note(NEED_DRAFT, "error")
+            return False
+        evidence, _bad = self.evidence()
+        if evidence != self.checked_evidence:
+            self._note(FORM_CHANGED, "error")
+            return False
+        inputs, set_index, path = self.inputs, self.set_index, self.draft_path
+        self._note("")
+
+        def done(result) -> None:
+            if result is None:
+                return
+            if not result.proposal.proposed or result.evidence != evidence:
+                self.draft_path = None
+                self.checked_evidence = None
+                self._show(result.proposal if not result.proposal.proposed else gr.required(
+                    [gr.Problem(gr.DRAFT_NOT_REPRODUCED, "The saved draft is not the evidence on this form.")]))
+                return
+            self.confirmation_dialog = ConfirmationDialog(inputs, set_index, result.document, path, self)
+            self.confirmation_dialog.confirmed.connect(self.confirmed)
+            self.confirmation_dialog.show()
 
         def failed(error: Exception):
             problem = gr.Problem(gr.DRAFT_INVALID, f"The draft could not be checked ({type(error).__name__}: {error}).")
@@ -400,7 +449,8 @@ class RegistrationDialog(QDialog):
         self.checked.emit(proposal)
 
     def busy(self) -> bool:
-        return self._cancel is not None or any(thread.is_alive() for thread in self._threads)
+        return (self._cancel is not None or any(thread.is_alive() for thread in self._threads)
+                or (self.confirmation_dialog is not None and self.confirmation_dialog.busy()))
 
     def stop(self) -> None:
         if self._cancel is not None:
@@ -413,6 +463,8 @@ class RegistrationDialog(QDialog):
 
     def closeEvent(self, event) -> None:
         self.stop()
+        if self.confirmation_dialog is not None:
+            self.confirmation_dialog.close()
         super().closeEvent(event)
 
 

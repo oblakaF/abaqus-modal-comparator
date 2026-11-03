@@ -338,7 +338,9 @@ class SeparationTests(unittest.TestCase):
                        # RC6: the ODB import adapter (the Abaqus bridge is behind it; nothing starts unconfirmed)
                        "services.odb_import_service",
                        # UNIVERSAL-REG-1: the diagnostic evidence check (no FrozenRegistration, no comparator)
-                       "services.generic_registration"}
+                       "services.generic_registration",
+                       # UNIVERSAL-REG-3: a person's confirmation; only its revalidation reaches the comparator
+                       "services.confirmed_registration"}
     # NEW-GUI.6: the scientific comparator and the program's own final drawing / report owners, each only in the one
     # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
     SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
@@ -350,6 +352,7 @@ class SeparationTests(unittest.TestCase):
         self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "analyze_model.py", "analyze_panel.py",
                                                    "archive_dialog.py",
                                                    "comparison_model.py", "comparison_panel.py",
+                                                   "confirmation_dialog.py",
                                                    "diagnostic_model.py", "diagnostic_panel.py",
                                                    "fe_response_panel.py", "generic_plate_panel.py",
                                                    "known_sources.py",

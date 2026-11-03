@@ -32,6 +32,11 @@ UNIVERSAL-UI-3: ``scope`` is an optional pair of subset previews of the verified
 verified on the full previews; the comparator and the display wording then see the subset only, so a mode outside it
 cannot take part in the assignment.
 
+UNIVERSAL-REG-3: ``run_compare_confirmed`` is the same comparator with a registration a person confirmed, for data with
+no archived registration. It takes the confirmation file's content, never a registration object, so that the sources
+and the whole confirmation are checked again immediately before every comparison. It never falls back to an archived
+registration.
+
 One heavy operation at a time: the comparison shares the lock of the frequency diagnostic and the registration check
 (NEW-GUI.4/5). ``ComparisonSlot`` keeps the current request; a replaced or cleared file, Inspect again, another modal
 set, a new registration check or a closed window cancels it and its outcome is discarded. A request cancelled while
@@ -158,6 +163,32 @@ def check_sources(fe_preview, sources: Optional[dict], experimental_now: Optiona
     return {"fe": fe_read, "experimental": experimental_read}
 
 
+def compare_confirmed(fe_preview, experimental_preview, set_index: int, confirmation: dict, cancel_event, sources: dict,
+                      scope: tuple, modal_set: dict, source_hashes: dict):
+    """Check the sources and the confirmation now, then run the comparator on ``scope``; (confirmed, result)."""
+    from new_gui import preview_model as pm
+    from services import confirmed_registration as cs
+
+    if rm.set_is_provisional(experimental_preview, set_index):
+        raise ComparisonRefused(PROVISIONAL_BLOCK)
+    now = pm.file_identity(experimental_preview.source_path, cancel_event)
+    if now is None:
+        raise ComparisonRefused("the experimental file cannot be identified now.")
+    check_sources(fe_preview, sources, now, cancel_event)
+    confirmed = cs.revalidate(confirmation, fe_preview.dataset, experimental_preview.sets[set_index].dataset,
+                              modal_set=modal_set, sources=source_hashes)
+    _check_scope(fe_preview, experimental_preview, set_index, scope)
+    if cancel_event.is_set():
+        raise ComparisonCancelled()
+    from modal_core import compare_modal_datasets  # the reviewed quality-control facade (runtime_contracts)
+
+    result = compare_modal_datasets(scope[0].dataset, scope[1].sets[set_index].dataset,
+                                    frozen_registration=confirmed.registration)
+    result.metadata["user_confirmed_registration"] = confirmed.provenance()
+    result.warnings.insert(0, confirmed.warning())
+    return confirmed, result
+
+
 def _check_scope(fe_preview, experimental_preview, set_index: int, scope: tuple) -> None:
     """A scope holds only modes of the verified data, each with its own number and frequency."""
     def identities(dataset) -> list:
@@ -242,6 +273,33 @@ def run_compare(fe_preview, experimental_preview, set_index: int, registration_h
     return ComparisonOutcome(token, bound=bound, result=result, view=view, mac_image=mac_image,
                              sources={"fe": (sources or {}).get("fe"),
                                       "experimental": (sources or {}).get("experimental")})
+
+
+def run_compare_confirmed(fe_preview, experimental_preview, set_index: int, confirmation: dict, token: int,
+                          cancel_event: threading.Event, sources: dict, scope: tuple, modal_set: dict,
+                          source_hashes: dict) -> ComparisonOutcome:
+    """``compare_confirmed`` and its display wording as an outcome; every failure becomes a message (worker thread)."""
+    from services.confirmed_registration import ConfirmationRefused
+
+    try:
+        with rm.SERVICE_LOCK:
+            if cancel_event.is_set():
+                return ComparisonOutcome(token, cancelled=True)
+            bound, result = compare_confirmed(fe_preview, experimental_preview, set_index, confirmation, cancel_event,
+                                              sources, scope, modal_set, source_hashes)
+        view = comparison_view(result, bound, scope[0], scope[1], set_index)
+    except (ConfirmationRefused, ComparisonRefused) as refusal:
+        if cancel_event.is_set():
+            return ComparisonOutcome(token, cancelled=True)
+        return ComparisonOutcome(token, refusal=str(refusal))
+    except Exception as error:  # noqa: BLE001  (cancellation, the comparator's errors or anything unexpected)
+        if cancel_event.is_set() or type(error).__name__ == "ComparisonCancelled":
+            return ComparisonOutcome(token, cancelled=True)
+        return ComparisonOutcome(token, error=f"The comparison could not be completed ({type(error).__name__}: {error}).")
+    if cancel_event.is_set():
+        return ComparisonOutcome(token, cancelled=True)
+    return ComparisonOutcome(token, bound=bound, result=result, view=view,
+                             sources={"fe": sources.get("fe"), "experimental": sources.get("experimental")})
 
 
 class ComparisonSlot:
@@ -526,4 +584,5 @@ def run_pair_images(result, index: int, token: int, cancel_event: threading.Even
 
 
 __all__ = ["ComparisonOutcome", "ComparisonRefused", "ComparisonSlot", "ComparisonView", "PairImages", "PairRow",
-           "compare", "comparison_view", "render_mac_image", "run_compare", "run_pair_images", "unavailable"]
+           "compare", "compare_confirmed", "comparison_view", "render_mac_image", "run_compare",
+           "run_compare_confirmed", "run_pair_images", "unavailable"]
