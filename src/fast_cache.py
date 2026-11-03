@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import pickle
+import shutil
 import tempfile
 import time
 from copy import deepcopy
@@ -26,7 +27,37 @@ _RUNTIME_METADATA_KEYS = {
     "binary_odb_cache_reused",
     "odb_dataset_load_seconds",
     "binary_odb_cache_write_failed",
+    "unv_cache_write_skipped",
+    "binary_odb_cache_write_skipped",
 }
+
+# Without a folder the user chose, only small entries go to the per-user cache. The size is the dataset's arrays in
+# memory, an upper estimate of the compressed file; the M11 package (10201 nodes, 20 modes) is well below this limit.
+IMPLICIT_CACHE_LIMIT_BYTES = 64 * 1024 * 1024
+CACHE_FREE_SPACE_RESERVE_BYTES = 200 * 1024 * 1024
+SKIPPED_LARGE = "large_without_chosen_folder"
+SKIPPED_LOW_SPACE = "low_disk_space"
+_CACHE_FOLDER: Optional[Path] = None
+
+
+def set_cache_folder(folder) -> Optional[Path]:
+    """The user's cache folder, or None for no explicit choice. The folder is created only when an entry is written."""
+    global _CACHE_FOLDER
+    text = "" if folder is None else str(folder).strip()
+    if not text:
+        _CACHE_FOLDER = None
+        return None
+    path = Path(text).expanduser()
+    if not path.is_absolute():
+        raise ValueError(f"The cache folder must be a full path: {text}")
+    if path.exists() and not path.is_dir():
+        raise ValueError(f"The cache folder is a file: {text}")
+    _CACHE_FOLDER = path.resolve()
+    return _CACHE_FOLDER
+
+
+def cache_folder() -> Optional[Path]:
+    return _CACHE_FOLDER
 
 
 def _schema_fingerprint() -> str:
@@ -81,9 +112,16 @@ def _atomic_pickle_dump(value: Any, destination: Path, compressed: bool) -> None
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     opener = gzip.open if compressed else open
-    with opener(temporary, "wb") as stream:
-        pickle.dump(value, stream, protocol=pickle.HIGHEST_PROTOCOL)
-    os.replace(temporary, destination)
+    try:
+        with opener(temporary, "wb") as stream:
+            pickle.dump(value, stream, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(temporary, destination)
+    except BaseException:  # a full disk must not keep the partial file of this write
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def _pickle_load(source: Path, compressed: bool) -> Any:
@@ -124,6 +162,43 @@ def _user_cache_path(file_name: str) -> Path:
     except ValueError as error:
         raise ValueError("Cache path escaped the current-user cache directory.") from error
     return candidate
+
+
+def _lookup_paths(file_name: str) -> list:
+    """Where an entry may be read from: the chosen folder first, then the per-user cache."""
+    paths = [] if _CACHE_FOLDER is None else [_CACHE_FOLDER / file_name]
+    return paths + [_user_cache_path(file_name)]
+
+
+def _estimated_cache_bytes(dataset: ModalDataset) -> int:
+    total = 0
+    for mode in dataset.modes:
+        for array in (mode.coordinates, mode.vectors, getattr(mode, "measured_dofs", None)):
+            total += int(getattr(array, "nbytes", 0))
+        total += 64 * len(mode.node_ids)  # node ids are Python strings, not counted by nbytes
+    return total
+
+
+def _has_room(folder: Path, needed_bytes: int) -> bool:
+    existing = Path(folder)
+    while not existing.exists() and existing.parent != existing:
+        existing = existing.parent
+    try:
+        return shutil.disk_usage(existing).free >= needed_bytes + CACHE_FREE_SPACE_RESERVE_BYTES
+    except OSError:
+        return False
+
+
+def _store_entry(file_name: str, payload: Dict[str, Any], canonical: ModalDataset) -> Optional[str]:
+    """Write an entry where policy allows. Returns why it was skipped, or None; OSError means the write failed."""
+    estimate = _estimated_cache_bytes(canonical)
+    if _CACHE_FOLDER is None and estimate > IMPLICIT_CACHE_LIMIT_BYTES:
+        return SKIPPED_LARGE
+    path = _user_cache_path(file_name) if _CACHE_FOLDER is None else _CACHE_FOLDER / file_name
+    if not _has_room(path.parent, estimate):
+        return SKIPPED_LOW_SPACE
+    _atomic_pickle_dump(payload, path, compressed=True)
+    return None
 
 
 def _clean_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -210,8 +285,10 @@ def _cached_universal_loader(
     if canonical is not None:
         return _returned_dataset(canonical, "memory", started, "unv_cache_reused")
 
-    cache_path = _user_cache_path(f"unv_{key}.pkl.gz")
-    if cache_path.exists():
+    file_name = f"unv_{key}.pkl.gz"
+    for cache_path in _lookup_paths(file_name):
+        if not cache_path.exists():
+            continue
         try:
             payload = _pickle_load(cache_path, compressed=True)
             if payload.get("version") == _CACHE_VERSION:
@@ -219,10 +296,7 @@ def _cached_universal_loader(
                 _MEMORY_UNV[key] = canonical
                 return _returned_dataset(canonical, "disk", started, "unv_cache_reused")
         except Exception:
-            try:
-                cache_path.unlink()
-            except OSError:
-                pass
+            pass  # an unreadable entry is left in place; a new write replaces it
 
     loaded = _ORIGINAL_UNIVERSAL_LOADER(
         source,
@@ -230,11 +304,7 @@ def _cached_universal_loader(
     )
     canonical = _clone_dataset(loaded)
     try:
-        _atomic_pickle_dump(
-            {"version": _CACHE_VERSION, "dataset": canonical},
-            cache_path,
-            compressed=True,
-        )
+        skipped = _store_entry(file_name, {"version": _CACHE_VERSION, "dataset": canonical}, canonical)
     except OSError:
         returned = _returned_dataset(canonical, False, started, "unv_cache_reused")
         returned.metadata["unv_cache_write_failed"] = True
@@ -242,7 +312,10 @@ def _cached_universal_loader(
         return returned
 
     _MEMORY_UNV[key] = canonical
-    return _returned_dataset(canonical, False, started, "unv_cache_reused")
+    returned = _returned_dataset(canonical, False, started, "unv_cache_reused")
+    if skipped:
+        returned.metadata["unv_cache_write_skipped"] = skipped
+    return returned
 
 
 def _manifest_signature(manifest_path: Path) -> Dict[str, Any]:
@@ -277,17 +350,16 @@ def _cached_extracted_odb_loader(manifest_path: Path, cancel_event=None):
     signature = _manifest_signature(manifest_path)
     signature_text = json.dumps(signature, sort_keys=True)
     key = hashlib.sha256(signature_text.encode("utf-8")).hexdigest()
-    cache_path = _user_cache_path(f"odb_{key}.pkl.gz")
+    file_name = f"odb_{key}.pkl.gz"
     started = time.perf_counter()
 
-    if cache_path.exists():
+    for cache_path in _lookup_paths(file_name):
+        if not cache_path.exists():
+            continue
         try:
             payload = _pickle_load(cache_path, compressed=True)
         except Exception:
-            try:
-                cache_path.unlink()
-            except OSError:
-                pass
+            pass  # an unreadable entry is left in place; a new write replaces it
         else:
             _raise_if_cancelled(cancel_event)
             if payload.get("signature") == signature:
@@ -304,17 +376,7 @@ def _cached_extracted_odb_loader(manifest_path: Path, cancel_event=None):
     )
     canonical = _clone_dataset(loaded)
     try:
-        _atomic_pickle_dump(
-            {"signature": signature, "dataset": canonical},
-            cache_path,
-            compressed=True,
-        )
-        for stale in _user_cache_root().glob("odb_*.pkl.gz"):
-            if stale != cache_path:
-                try:
-                    stale.unlink()
-                except OSError:
-                    pass
+        skipped = _store_entry(file_name, {"signature": signature, "dataset": canonical}, canonical)
     except OSError:
         returned = _returned_dataset(
             canonical,
@@ -327,6 +389,8 @@ def _cached_extracted_odb_loader(manifest_path: Path, cancel_event=None):
         return returned
 
     returned = _returned_dataset(canonical, False, started, "binary_odb_cache_reused")
+    if skipped:
+        returned.metadata["binary_odb_cache_write_skipped"] = skipped
     _raise_if_cancelled(cancel_event)
     return returned
 

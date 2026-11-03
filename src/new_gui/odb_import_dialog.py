@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QFormLayout, QGridLayout, Q
                                QMessageBox, QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSpinBox,
                                QVBoxLayout, QWidget)
 
+import fast_cache
 from new_gui import odb_import_model as om
 from services import odb_import_service as svc
 
@@ -51,6 +52,7 @@ class OdbImportDialog(QDialog):
 
     def __init__(self, odb_path, parent=None, *, results_folder: Optional[Path] = None,
                  ask_folder: Optional[Callable[[str], str]] = None, ask_launcher: Optional[Callable[[str], str]] = None,
+                 ask_cache_folder: Optional[Callable[[str], str]] = None,
                  runner=None, confirm: Optional[Callable[[], bool]] = None, discover=None):
         super().__init__(parent)
         self.setWindowTitle(om.TITLE)
@@ -58,6 +60,7 @@ class OdbImportDialog(QDialog):
         self.odb_path = Path(odb_path)
         self._ask_folder = ask_folder or self._dialog_folder
         self._ask_launcher = ask_launcher or self._dialog_launcher
+        self._ask_cache_folder = ask_cache_folder or self._dialog_cache_folder
         self._runner = runner
         self._confirm = confirm or self._dialog_confirm
         self._discover = discover
@@ -107,7 +110,19 @@ class OdbImportDialog(QDialog):
         self.folder_button.setObjectName("chooseResultsFolder")
         self.folder_button.clicked.connect(lambda: self.choose_folder())
         form.addWidget(self.folder_button, 2, 2)
-        form.addWidget(QLabel("Mode range"), 3, 0)
+        form.addWidget(QLabel("Cache folder"), 3, 0)
+        self.cache = QLineEdit()
+        self.cache.setObjectName("cacheFolder")
+        self.cache.setPlaceholderText("optional: none chosen")
+        chosen_cache = fast_cache.cache_folder()
+        self.cache.setText("" if chosen_cache is None else str(chosen_cache))
+        self.cache.editingFinished.connect(self.apply_cache_folder)
+        form.addWidget(self.cache, 3, 1)
+        self.cache_button = QPushButton("Choose cache...")
+        self.cache_button.setObjectName("chooseCacheFolder")
+        self.cache_button.clicked.connect(lambda: self.choose_cache_folder())
+        form.addWidget(self.cache_button, 3, 2)
+        form.addWidget(QLabel("Mode range"), 4, 0)
         modes = QHBoxLayout()
         self.start_mode = QSpinBox()
         self.start_mode.setObjectName("startMode")
@@ -122,11 +137,14 @@ class OdbImportDialog(QDialog):
         modes.addWidget(QLabel("to"))
         modes.addWidget(self.end_mode)
         modes.addStretch(1)
-        form.addLayout(modes, 3, 1, 1, 2)
+        form.addLayout(modes, 4, 1, 1, 2)
         for spin in (self.start_mode, self.end_mode):
             spin.valueChanged.connect(lambda _v: self.replan())
         form.setColumnStretch(1, 1)
         layout.addLayout(form)
+        layout.addWidget(_label(om.CACHE_NOTE, "hint"))
+        self.cache_error = _label("", "error")
+        layout.addWidget(self.cache_error)
         layout.addWidget(_label(om.RANGE_NOTE, "hint"))
         self.availability = _label("", "warnings")
         layout.addWidget(self.availability)
@@ -185,6 +203,9 @@ class OdbImportDialog(QDialog):
     def _dialog_folder(self, start: str) -> str:
         return QFileDialog.getExistingDirectory(self, "Choose the results folder for the extracted package", start)
 
+    def _dialog_cache_folder(self, start: str) -> str:
+        return QFileDialog.getExistingDirectory(self, "Choose the folder for the read cache", start)
+
     def _dialog_launcher(self, start: str) -> str:
         path, _f = QFileDialog.getOpenFileName(self, "Choose the Abaqus launcher", start,
                                                "Abaqus launcher (abaqus*.bat abq*.bat *.cmd *.exe);;All files (*)")
@@ -213,6 +234,27 @@ class OdbImportDialog(QDialog):
         self.launcher.setText(str(path))
         self.replan()
         return True
+
+    def choose_cache_folder(self, folder: Optional[str] = None) -> bool:
+        folder = folder if folder is not None else self._ask_cache_folder(self.cache.text() or str(self.odb_path.parent))
+        if not folder or not str(folder).strip():
+            return False
+        self.cache.setText(str(folder))
+        return self.apply_cache_folder()
+
+    def apply_cache_folder(self) -> bool:
+        """The folder in the field (empty: none) becomes the read cache's destination; it is created when first used."""
+        try:
+            fast_cache.set_cache_folder(self.cache.text())
+        except ValueError as error:
+            self.cache_error.setText(str(error))
+            return False
+        self.cache_error.setText("")
+        return True
+
+    def accept(self) -> None:
+        if self.apply_cache_folder():
+            super().accept()
 
     def replan(self) -> None:
         """Look again (nothing starts): the plan or the reason it cannot be made."""
@@ -260,8 +302,8 @@ class OdbImportDialog(QDialog):
         self.extract_button.setEnabled(self.plan is not None and self.plan.ready and not running)
         self.cancel_button.setEnabled(running)
         self.use_button.setEnabled(self.slot.manifest_path is not None)
-        for widget in (self.launcher, self.launcher_button, self.folder, self.folder_button, self.start_mode,
-                       self.end_mode):
+        for widget in (self.launcher, self.launcher_button, self.folder, self.folder_button, self.cache,
+                       self.cache_button, self.start_mode, self.end_mode):
             widget.setEnabled(not running)
         self.close_button.setEnabled(not running)
 
