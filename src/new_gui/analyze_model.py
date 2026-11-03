@@ -22,8 +22,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Optional
 
-import numpy as np
-
 from new_gui import comparison_model as cm
 from new_gui import diagnostic_model as dm
 from new_gui import preview_model as pm
@@ -134,7 +132,7 @@ def _read_only(mode):
     """A copy of one mode whose arrays and metadata cannot be written; the read mode is not touched."""
     frozen = copy.copy(mode)
     for name, value in vars(mode).items():
-        if isinstance(value, np.ndarray):
+        if hasattr(value, "flags") and hasattr(value, "view"):  # an array
             view = value.view()
             view.flags.writeable = False
             setattr(frozen, name, view)
