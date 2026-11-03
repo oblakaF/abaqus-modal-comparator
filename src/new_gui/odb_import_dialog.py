@@ -13,8 +13,10 @@ import threading
 from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QDialog, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPlainTextEdit, QPushButton, QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
+                               QMessageBox, QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSpinBox,
+                               QVBoxLayout, QWidget)
 
 from new_gui import odb_import_model as om
 from services import odb_import_service as svc
@@ -28,6 +30,13 @@ def _label(text: str = "", name: str = "") -> QLabel:
     label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
     label.setMinimumWidth(0)
     label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    return label
+
+
+def _value(text: str) -> QLabel:
+    """A value of the plan or the result; the tooltip holds it in full (a long path can be cut at the right edge)."""
+    label = _label(text)
+    label.setToolTip(text)
     return label
 
 
@@ -61,14 +70,24 @@ class OdbImportDialog(QDialog):
         self._bridge.progress.connect(self._progress)
         self._bridge.done.connect(self._done)
 
-        layout = QVBoxLayout(self)
+        # The content scrolls and the command row stays below it: the plan, the log and the result together are
+        # taller than a screen, and the commands must stay reachable (found by the RC6 EXE smoke).
+        outer = QVBoxLayout(self)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        area = QScrollArea()
+        area.setObjectName("odbImportScroll")
+        area.setWidgetResizable(True)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        area.setWidget(page)
+        outer.addWidget(area, 1)
         layout.addWidget(_label(om.TITLE, "cardTitle"))
         layout.addWidget(_label(om.NOTE, "hint"))
         form = QGridLayout()
         form.setHorizontalSpacing(10)
-        form.addWidget(_label("ODB"), 0, 0)
+        form.addWidget(QLabel("ODB file"), 0, 0)
         form.addWidget(_label(str(self.odb_path), "fileName"), 0, 1, 1, 2)
-        form.addWidget(_label("Abaqus launcher"), 1, 0)
+        form.addWidget(QLabel("Launcher"), 1, 0)
         self.launcher = QLineEdit()
         self.launcher.setObjectName("abaqusLauncher")
         self.launcher.setPlaceholderText("detected automatically; or Browse to abaqus.bat / abqXXXX.bat")
@@ -78,7 +97,7 @@ class OdbImportDialog(QDialog):
         self.launcher_button.setObjectName("browseLauncher")
         self.launcher_button.clicked.connect(lambda: self.choose_launcher())
         form.addWidget(self.launcher_button, 1, 2)
-        form.addWidget(_label("Results folder"), 2, 0)
+        form.addWidget(QLabel("Write results to"), 2, 0)
         self.folder = QLineEdit()
         self.folder.setObjectName("resultsFolder")
         self.folder.setPlaceholderText("where the extracted package is written (a new sub-folder each time)")
@@ -88,7 +107,7 @@ class OdbImportDialog(QDialog):
         self.folder_button.setObjectName("chooseResultsFolder")
         self.folder_button.clicked.connect(lambda: self.choose_folder())
         form.addWidget(self.folder_button, 2, 2)
-        form.addWidget(_label("Modes"), 3, 0)
+        form.addWidget(QLabel("Mode range"), 3, 0)
         modes = QHBoxLayout()
         self.start_mode = QSpinBox()
         self.start_mode.setObjectName("startMode")
@@ -98,9 +117,9 @@ class OdbImportDialog(QDialog):
         self.end_mode.setObjectName("endMode")
         self.end_mode.setRange(1, 100000)
         self.end_mode.setValue(svc.DEFAULT_END_MODE)
-        modes.addWidget(_label("from"))
+        modes.addWidget(QLabel("from"))
         modes.addWidget(self.start_mode)
-        modes.addWidget(_label("to"))
+        modes.addWidget(QLabel("to"))
         modes.addWidget(self.end_mode)
         modes.addStretch(1)
         form.addLayout(modes, 3, 1, 1, 2)
@@ -124,6 +143,7 @@ class OdbImportDialog(QDialog):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(400)
         self.log.setPlaceholderText("The extractor's progress lines appear here.")
+        self.log.setMinimumHeight(110)
         layout.addWidget(self.log, 1)
         self.result = QFormLayout()
         self.result_widget = QWidget()
@@ -145,11 +165,20 @@ class OdbImportDialog(QDialog):
             buttons.addWidget(button)
         buttons.addStretch(1)
         buttons.addWidget(self.close_button)
-        layout.addLayout(buttons)
+        outer.addLayout(buttons)
         if results_folder is not None:
             self.folder.setText(str(results_folder))
-        self.resize(760, 640)
+        self._fit_to_screen()
         self.replan()
+
+    def _fit_to_screen(self) -> None:
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        if screen is None:
+            self.resize(760, 640)
+            return
+        free = screen.availableGeometry()
+        self.setMaximumHeight(free.height())
+        self.resize(min(760, int(free.width() * 0.9)), min(640, int(free.height() * 0.85)))
 
     # -------------------------------------------------------------------------------- dialogs (replaced in tests)
 
@@ -215,7 +244,7 @@ class OdbImportDialog(QDialog):
                 self.availability.setObjectName("warnings")
             self.fixes.setText("" if plan.abaqus.available else "\n".join(f"• {fix}" for fix in plan.abaqus.fixes))
             for caption, value in plan.summary():
-                self.facts.addRow(caption, _label(value))
+                self.facts.addRow(caption, _value(value))
             blockers = list(plan.blockers) + list(plan.warnings)
             self.message.setText("\n".join(b for b in blockers if b not in (plan.abaqus.explanation,)))
         else:
@@ -286,7 +315,7 @@ class OdbImportDialog(QDialog):
         else:
             self.manifest_path = Path(outcome.result.manifest_path)
             for caption, value in om.result_lines(outcome.result):
-                self.result.addRow(caption, _label(value))
+                self.result.addRow(caption, _value(value))
             self.message.setText("")
         self._buttons()
 

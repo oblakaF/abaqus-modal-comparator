@@ -112,6 +112,26 @@ class DialogTests(_Case):
         self.assertTrue(dialog.choose_launcher(str(bat)))  # Browse: a launcher the user points to
         self.assertTrue(dialog.extract_button.isEnabled())
 
+    def test_the_commands_stay_on_screen_after_a_long_result(self):
+        """The RC6 EXE smoke found the commands below the screen's edge: the content now scrolls above them."""
+        from PySide6.QtWidgets import QScrollArea
+
+        dialog = self.dialog()
+        dialog.show()
+        self.addCleanup(dialog.close)
+        self.assertTrue(dialog.extract())
+        self.assertTrue(self.wait(dialog))
+        self.app.processEvents()
+        area = dialog.findChild(QScrollArea, "odbImportScroll")
+        self.assertTrue(area.isAncestorOf(dialog.log))
+        for button in (dialog.extract_button, dialog.cancel_button, dialog.use_button, dialog.close_button):
+            self.assertFalse(area.isAncestorOf(button))
+        free = dialog.screen().availableGeometry()
+        self.assertLessEqual(dialog.height(), free.height())
+        bottom = dialog.use_button.mapTo(dialog, dialog.use_button.rect().bottomLeft()).y()
+        self.assertLessEqual(bottom, dialog.height())
+        self.assertTrue(dialog.use_button.isEnabled())
+
     def test_a_refused_confirmation_starts_nothing(self):
         dialog = self.dialog(confirm=lambda: False)
         self.assertFalse(dialog.extract())
