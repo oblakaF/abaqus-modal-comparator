@@ -40,8 +40,10 @@ frozen registrations and research results are untouched; the extractor `abaqus_s
 6. Errors are messages, never a hang: no modal results in the range (the extractor's "No frequency-extraction
    frames" is explained), an Abaqus failure (the log tail), no space, a cancellation.
 
-A `manifest.json` can still be chosen directly. `services.odb_import_service.verify_source(package)` hashes the ODB
-again and reports a change **by content**, also when size and modification time are unchanged.
+A `manifest.json` can still be chosen directly. **Check the source ODB** on the FE card (shown for a package that has
+an `extraction_source.json`) hashes the ODB again (`services.odb_import_service.verify_source`) and reports a change
+**by content**, also when size and modification time are unchanged. The dialog's commands stay in a fixed row below
+its scrolling content, so they are reachable on any screen.
 
 ## Build
 
@@ -57,16 +59,16 @@ repository's, `readOnly=True`). The program starts without Abaqus; only the extr
 | Item | Value |
 |---|---|
 | Base | RC5 `3d4e38be35b0347b4c34c088b0ebbf320c581043` (`main` `0bea1de68dc346d20958e6f53a9e1d634a870f5d`) |
-| Build commit | `4a90ea2a6ba0aeae7b5620159a5ad38ea79eb5dc` (`feature/rc6-direct-odb-import`, clean tree) |
-| Build folder | `D:\git\abaqus-modal-comparator-work\build\portable_rc6\dist\AbaqusModalComparator_RC6\` — 751 files, 243 926 775 bytes |
-| EXE | `AbaqusModalComparator.exe`, 17 715 714 bytes, SHA-256 `a7a5c2304691dd19868dee2a1143899dc52b385e5b88edcb415261748ad2e82d` |
-| ZIP | `AbaqusModalComparator_RC6.zip`, 105 974 319 bytes, SHA-256 `f8590e7ca48c6ca5d3eaf77f43b152ed70f59bb4730bdc52cbf984b8db998e86` |
+| Build commit | `ae32bd22626561e5c6407317a479f71c0e1db7dc` (`feature/rc6-direct-odb-import`, clean tree) |
+| Build folder | `D:\git\abaqus-modal-comparator-work\build\portable_rc6_ae32bd2\dist\AbaqusModalComparator_RC6\` — 752 files, 243 942 387 bytes |
+| EXE | `AbaqusModalComparator.exe`, 17 719 854 bytes, SHA-256 `31cb3313c0e2b6930725986d58d9a8ae808d9049b8eeff7985d2a8eda8fd8b0b` |
+| ZIP | `AbaqusModalComparator_RC6.zip`, 105 984 571 bytes, SHA-256 `0879b6f3b598ffc8e52632ac2b3f12b7a94ab86e937bf95aedd4d2750bf4aa63` |
 | Extractor in the build | `abaqus_scripts\extract_odb.py`, SHA-256 `039aa067adeac83e457ccacc9036c767f98c41517fb1ffdd5293fdd01dc6534d`, resolved by the bridge at that path |
 | Python / PyInstaller / PySide6 | 3.14.6 / 6.22.3 / 6.12.0 (as RC5) |
 | Desktop | not copied (the owner keeps RC5.zip there); RC5 unchanged |
 
-Unpacked from the ZIP into a path with spaces (`…\WINDOWS_PORTABLE_RC6_REVIEW\release 4a90ea2\Copied to another
-place\`) and into a path without spaces (`…\release_4a90ea2_nospace\`): `--verify` 750 / 750 in both.
+Unpacked from the ZIP into a path without spaces (`…\WINDOWS_PORTABLE_RC6_REVIEW\release_ae32bd2\`): `--verify`
+751 / 751. The earlier build of `4a90ea2` was also unpacked into a path with spaces, which exposed the defect below.
 
 ## Acceptance of the EXE (no Abaqus started)
 
@@ -76,12 +78,20 @@ with the system Python: it writes the worker registration, copies the read-only 
 folder clipped to the requested range, prints the extractor's PROGRESS lines, and never opens the ODB). The harness
 aborts unless the dialog names that fake path as the launcher it will run. Clean environment (no Python, repository
 or SIMULIA on PATH; isolated LOCALAPPDATA; `AMC_OPEN_AUDIT`), Windows 10 at 150 %, UI Automation. Inputs: the
-read-only M11 copies (`…\INTEGRATION_RC1_REVIEW\moved inputs\`: the ODB copy `CFRP_S4R_0875_FreeFree.odb`, the UNV
-copy of 261027).
+read-only M11 copies (the ODB copy in `…\WINDOWS_PORTABLE_RC6_REVIEW\inputs_nospace\`, the UNV copy of 261027 in
+`…\INTEGRATION_RC1_REVIEW\moved inputs\`).
 
-Results: `…\WINDOWS_PORTABLE_RC6_REVIEW\release_4a90ea2_nospace\exe_smoke_run_5\rc6_exe_smoke.json` and screenshots.
-(Runs 1–4 stopped on defects of the smoke harness itself — the fake launcher's argument parsing, the cancel timing,
-the mode combo, the modal-set choice — and on the quoting defect below; none of the program.)
+Results: `…\WINDOWS_PORTABLE_RC6_REVIEW\release_ae32bd2\exe_smoke_run_4\rc6_exe_smoke.json` and screenshots.
+
+Runs of this build: `exe_smoke_run_2` and `_3` never reached the program's dialog (a wrong EXE name and a Python
+without PIL in the harness). `exe_smoke_run_1` passed every step except the cancellation: the run went on to the end,
+with no cancellation message. The dialog treats a set cancel event as cancelled even after a finished run, so that
+click never reached the button's handler. The cause was not proven; the same click worked at once in `_4` and in two
+runs of the `4a90ea2` build. `_4` also recorded the button, window and cursor positions around the click.
+
+Earlier builds: the runs of `4a90ea2` stopped on defects of the smoke harness and on the quoting defect below. They
+also found one program defect, fixed in `ae32bd2`: the dialog was taller than the screen, so **Use this package** could
+not be reached.
 
 | Step | Result |
 |---|---|
@@ -89,10 +99,12 @@ the mode combo, the modal-set choice — and on the quoting defect below; none o
 | The ODB chosen | the type, the note and Extract modal results... shown; nothing started |
 | The dialog as opened | "Choose a results folder" (no plan yet); the button disabled |
 | With a results folder | plan shown: ODB 5.6 MB, launcher found "Abaqus 2024 — detected ✓" (`abq2024.bat`), script in the portable folder, free space; the button enabled; **nothing ran** |
-| Cancel during a run | with the fake launcher (slow marker): confirmed, started, cancelled → CANCELLED, the folder marked INCOMPLETE, no package |
+| A path with a space | the plan warns before anything starts; the folder is not created |
+| Cancel during a run | with the fake launcher (slow marker): confirmed, started, cancelled after the first click (0.5 s) → CANCELLED, the folder marked INCOMPLETE, no manifest (see the runs above) |
 | The extraction | confirmed → progress → package `CFRP_S4R_0875_FreeFree_modes_1-30`, extracted 1–20 (the ODB's 1–20), `extraction_source.json` with SHA-256 `7daeb7e3…` = the ODB copy's content (and the frozen M11 record) |
 | Use this package | the FE file is the manifest; "Content read; preview only"; "18 modes loaded (3–20)" — the loader refuses modes 1 and 2 whose manifest frequency is the extractor's frameValue fallback of a zero-frequency frame (its existing rule, shown as messages); FE7 19.0722 Hz; the shape of mode 7 as U3 and as U1 (10201 FE nodes) |
 | UNV + frequency diagnostic | the set Polymax_bravo (11 records): FREQUENCY_ONLY_DIAGNOSTIC, EXP1 18.6307 Hz nearest FE7 19.0722 Hz (+2.37 %), as RC5 |
+| Check the source ODB | "The ODB content is unchanged (SHA-256 7daeb7e35adf…)." |
 | The same ODB again | the package reused, Abaqus not started |
 | Close | exit 0; no Abaqus process at any time; inputs unchanged (SHA-256 of the ODB copy the same) |
 
@@ -107,6 +119,14 @@ existing launcher detection (`ui_policy._referenced_launcher`, which follows bat
 - **A real ODB end to end**: not run. The owner has not authorised an Abaqus run; RC6 is **not verified on a real ODB
   with Abaqus**. The route up to and after the Abaqus call is verified; the call itself is the unchanged bridge.
 
+## Open: the read cache on C:
+
+Reading a package uses the program's existing read cache: `odb_*.pkl.gz` under `%LOCALAPPDATA%\AbaqusModalComparator\
+cache`, usually on C: (M11 3.4 MB, SP-02 about 0.79 GiB; the loader removes older `odb_*` entries). So the requirement
+not to create large caches on C: without the user's choice is **not met** for large packages. The dialog discloses
+the cache; `fast_cache` is shared with the legacy interface and outside the allowed files. A small override of its root
+is the owner's decision.
+
 ## Defect found (not fixed here: outside the allowed files)
 
 `abaqus_bridge._windows_command` wraps the launcher line in `cmd.exe /d /s /c <line>` as a list; `subprocess`
@@ -115,15 +135,16 @@ the launcher receives `\"D:\a` `b\x.odb\"` — the extractor then fails on the a
 launcher in a results folder "results folder" and a portable folder "Copied to another place"). It affects the ODB
 path, the results folder and the portable folder when any contains a space, and the existing RUN_PROGRAM.cmd route
 too. Minimal fix (owner's decision): pass the command to `Popen` as one string, `f'cmd.exe /d /s /c "{line}"'`, so no
-second quoting happens. Until then RC6 extracts correctly only when the three paths have no spaces; the dialog does
-not yet warn about it.
+second quoting happens. Until then RC6 is expected to extract correctly only when the three paths have no spaces; the
+dialog warns about such a path in its plan (`path_space_warning`) before anything starts. This was seen with the fake
+launcher and has not been tried with real Abaqus.
 
 ## Tests and CI
 
-- `tests/test_odb_import_service.py` (16): detection, plan, no confirmation / no Abaqus / no space / bad range refuse,
+- `tests/test_odb_import_service.py` (17): detection, plan, no confirmation / no Abaqus / no space / bad range refuse,
   a confirmed run with its record, reuse, a changed content extracted again, an incomplete package not reused,
   errors and cancellation, the content re-check.
-- `tests/test_new_gui_odb_import_qt.py` (10): the dialog (plan, no Abaqus + Browse, refused confirmation, run with
+- `tests/test_new_gui_odb_import_qt.py` (13): the dialog (plan, no Abaqus + Browse, refused confirmation, run with
   progress, failure, cancellation, the user's range) and the window (ODB → dialog → Use → read, U1/U2/U3 offered;
   Inspect of an ODB points to the extraction; a manifest still imported).
 - `tests/test_windows_portable_rc6.py` (6): the RC6 build, RC1–RC5 unchanged, the extractor packaged where the bridge
@@ -131,7 +152,8 @@ not yet warn about it.
 - Regressions: the new GUI tests (1–6), `test_windows_rc1_a`, `test_local_fe_preview`, `test_abaqus_cancellation`,
   `test_process_ownership`, `test_extraction_cache_reuse`, `test_frf_import`, `test_polymax_modal_sets`,
   `test_universal_hardening`: OK.
-- Full suite on `4a90ea2`: 3347 tests, 1 failure in `test_app_catalog2_home…test_use_is_exactly_the_browse_contract`
-  (the existing Tk home dashboard; timing). Measured alone with a fresh LOCALAPPDATA: 4 / 8 OK on the unchanged RC5
-  base `3d4e38b`, 7 / 8 OK on RC6 — flaky before RC6, unrelated to it.
+- `test_app_catalog2_home…test_use_is_exactly_the_browse_contract` (the existing Tk home dashboard) is flaky: it failed
+  once in the full suite on `4a90ea2`. Measured alone with a fresh LOCALAPPDATA: 4 / 8 OK on the unchanged RC5 base
+  `3d4e38b`, 7 / 8 OK on RC6. It fails before RC6 too.
+- Full suite on the final commit: see the report.
 - CI: see the report.
