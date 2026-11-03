@@ -301,9 +301,40 @@ def stop_owned_process_and_wait(
     return process.poll() is not None
 
 
-def _windows_command(executable: str, arguments: List[str]) -> List[str]:
-    command_line = subprocess.list2cmdline([executable] + arguments)
-    return ["cmd.exe", "/d", "/s", "/c", command_line]
+# cmd.exe still acts on these inside double quotes (% !), a batch launcher can expose them again when it re-quotes its
+# arguments (& | < > ^), or they end the quoting itself ("). No escape survives a chain of batch files, so a value that
+# holds one is refused rather than passed on.
+_CMD_UNSAFE_CHARACTERS = '"%!^&|<>'
+_CMD_BARE_TOKEN = re.compile(r"[A-Za-z0-9_.:\\/-]+")
+
+
+def _refuse_unsafe_for_cmd(value: str) -> None:
+    found = sorted({char for char in value if char in _CMD_UNSAFE_CHARACTERS or ord(char) < 32})
+    if found:
+        shown = " ".join(repr(char)[1:-1] for char in found)
+        raise AbaqusExtractionError(
+            f"This value cannot be passed safely to the Abaqus launcher through cmd.exe: {value!r}. "
+            f"It contains: {shown}. Rename the file or folder, or choose another location; nothing was started."
+        )
+
+
+def _cmd_argument(value: str) -> str:
+    _refuse_unsafe_for_cmd(value)
+    if _CMD_BARE_TOKEN.fullmatch(value):
+        return value  # a plain word stays bare, as before: a batch launcher may compare it (python, --odb)
+    # Inside the quotes cmd.exe takes a backslash literally, but the launcher's program reads \" as a quote.
+    trailing = len(value) - len(value.rstrip("\\"))
+    return '"' + value + "\\" * trailing + '"'
+
+
+def _windows_command(executable: str, arguments: List[str]) -> str:
+    """The whole command line for ``cmd.exe /d /s /c``, as ONE string that Popen passes unchanged.
+
+    Given as a list, subprocess would quote the line a second time, and the launcher would receive a path with a space
+    split in two. /s removes exactly the outer pair of quotes added here.
+    """
+    command_line = " ".join(_cmd_argument(item) for item in [executable] + arguments)
+    return f'cmd.exe /d /s /c "{command_line}"'
 
 
 def run_abaqus_extraction(
@@ -319,9 +350,12 @@ def run_abaqus_extraction(
 ) -> Path:
     odb_path = Path(odb_path).resolve()
     output_directory = Path(output_directory).resolve()
+    script_path = Path(__file__).resolve().parents[1] / "abaqus_scripts" / "extract_odb.py"
+    if os.name == "nt":  # before anything is created
+        for value in (abaqus_command.strip() or "abaqus", str(odb_path), str(output_directory), str(script_path)):
+            _refuse_unsafe_for_cmd(value)
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    script_path = Path(__file__).resolve().parents[1] / "abaqus_scripts" / "extract_odb.py"
     if not script_path.exists():
         raise FileNotFoundError(f"Abaqus extraction script was not found: {script_path}")
 
@@ -365,7 +399,7 @@ def run_abaqus_extraction(
     started = time.monotonic()
     try:
         with log_path.open("w", encoding="utf-8") as log:
-            log.write("COMMAND\n" + " ".join(command) + "\n\nOUTPUT\n")
+            log.write("COMMAND\n" + (command if isinstance(command, str) else " ".join(command)) + "\n\nOUTPUT\n")
             log.flush()
             popen_options = {
                 "cwd": str(script_path.parent),
