@@ -15,7 +15,15 @@ The rule x_fe = R (s x_exp) + t, with s from the units, a proper rotation R and 
 
 The result is a proposal for these exact data. Any missing, contradictory or ambiguous evidence gives
 REGISTRATION_REQUIRED with the reasons. A proposal is not a ``FrozenRegistration``: nothing here can reach a comparator.
-The mapping limits are those of the guided registration (the comparator's geometry limits).
+The mapping limits are those of the guided registration (the comparator's geometry limits). The landmark extent, the
+stated-axis angle and the FE-node tie rule (``HEURISTICS``) are provisional diagnostic heuristics, not approved
+scientific gates.
+
+UNIVERSAL-REG-2: a proposal can be kept as a versioned JSON draft. Reopening never trusts the file: the structure and
+its SHA-256, then the source hashes, the modal set and both geometries against the current data, and finally the whole
+result is computed again from the stored evidence alone and compared. The SHA-256 only finds accidental or careless
+changes, since anyone can recompute it; the recomputation is the check. A draft is never an accepted physical
+registration and always needs the user's review.
 """
 
 from __future__ import annotations
@@ -24,11 +32,16 @@ from dataclasses import asdict, dataclass, field
 import hashlib
 import itertools
 import json
+import math
+import os
+from pathlib import Path
 from typing import Mapping, Optional
+import uuid
 
 import numpy as np
 from scipy.spatial import cKDTree
 
+from domain.specimen_manifest import canonical_hash
 from reviewed_core import experimental_measurement_masks
 from scientific_state import modal_dataset_geometry_identity
 
@@ -41,9 +54,16 @@ UNITS = tuple(UNIT_IN_METRES)
 DIRECTIONS = ("+X", "-X", "+Y", "-Y", "+Z", "-Z")
 DOFS = ("x", "y", "z")
 GEOMETRY_TOLERANCE = 0.03  # of the scan diagonal, the comparator's geometry tolerance
+# Provisional diagnostic heuristics, not approved scientific gates:
 RANK_RATIO = 0.05  # a landmark set thinner than this share of its length has no usable extent in that direction
 STATED_AXIS_DEGREES = 5.0  # how far landmarks may turn a stated axis
 TIE_SHARE = 0.01  # of the tolerance: two FE nodes this close in distance cannot separate a point
+HEURISTIC_STATUS = "PROVISIONAL_DIAGNOSTIC_HEURISTIC"
+HEURISTICS = (("landmark_extent_ratio", RANK_RATIO, "share of the landmark set's length"),
+              ("stated_axis_angle", STATED_AXIS_DEGREES, "degrees"),
+              ("fe_node_tie", TIE_SHARE, "share of the geometry tolerance"))
+HEURISTICS_NOTE = ("Provisional diagnostic heuristics, not approved scientific gates: landmark extent 5 %, stated axis "
+                   "5 degrees, FE-node tie 1 % of the geometry tolerance.")
 CANDIDATE_NODES = 8
 MAX_SYMMETRY_POINTS = 300
 
@@ -60,6 +80,27 @@ GEOMETRY = "GEOMETRY_INVALID"
 LOCAL_AXES = "LOCAL_COORDINATE_SYSTEMS"
 STALE = "FILES_CHANGED"
 LIMIT = "Diagnostic only: this mapping is not applied. No MAC and no mode pair is computed from it."
+DRAFT_SCHEMA = "universal/registration-draft/v1"
+DRAFT_STATUS = "DIAGNOSTIC_DRAFT_NOT_ACCEPTED"
+DRAFT_INVALID = "DRAFT_INVALID"
+DRAFT_TAMPERED = "DRAFT_TAMPERED"
+DRAFT_CHANGED = "DRAFT_SOURCES_CHANGED"
+DRAFT_NOT_REPRODUCED = "DRAFT_NOT_REPRODUCED"
+MAX_DRAFT_BYTES = 64 * 1024 * 1024
+REPRODUCTION_SHARE = 1.0e-9  # floating-point noise only: labels and texts must be equal
+_EVIDENCE_KEYS = ("fe_unit", "experimental_unit", "axes", "measured_side", "measured_dofs", "landmarks", "source")
+_RESULT_KEYS = ("status", "axes_in_fe", "rotation", "translation", "scale", "warnings", "checks", "metrics", "mapping")
+_DRAFT_KEYS = ("schema", "status", "accepted_physical_registration", "review_required", "limit",
+               "provisional_heuristics", "evidence", "evidence_sha256", "result", "modal_set", "sources",
+               "fe_geometry_sha256", "experimental_geometry_sha256", "draft_sha256")
+
+
+class DraftRefused(ValueError):
+    """A draft cannot be saved or opened; ``code`` names the reason."""
+
+    def __init__(self, code: str, text: str) -> None:
+        super().__init__(text)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -108,6 +149,7 @@ class Proposal:
     evidence_hash: str = ""
     fe_geometry_sha256: str = ""
     limit: str = LIMIT
+    heuristics_note: str = HEURISTICS_NOTE
 
     @property
     def proposed(self) -> bool:
@@ -226,7 +268,8 @@ def _rotation(evidence: Evidence, a: np.ndarray, b: np.ndarray, stated: list, pr
     solid = planar and len(a) >= 4 and values[2] / values[0] >= RANK_RATIO
     if not planar:
         problems.append(Problem(AMBIGUOUS, "The landmarks lie on a line or are too few, so they leave a rotation free. "
-                                           "State all three axes, or give landmarks that span a plane."))
+                                           "State all three axes, or give landmarks that span a plane. "
+                                           "(Provisional diagnostic heuristic.)"))
         return None
     rotation, reflected = _rigid_fit(a, b)
     if solid:
@@ -240,7 +283,8 @@ def _rotation(evidence: Evidence, a: np.ndarray, b: np.ndarray, stated: list, pr
         normal = vt[2]
         if not any(abs(normal[index]) > 0.5 for index, _vector_ in stated):
             problems.append(Problem(AMBIGUOUS, "The landmarks lie in one plane, so they cannot show which way it faces. "
-                                               "State an experimental axis that points out of that plane."))
+                                               "State an experimental axis that points out of that plane. "
+                                               "(Provisional diagnostic heuristic.)"))
             return None
         checks.append(f"Orientation from the rigid fit of {len(a)} coplanar landmarks; the facing from a stated axis.")
     limit = np.cos(np.radians(STATED_AXIS_DEGREES))
@@ -249,7 +293,8 @@ def _rotation(evidence: Evidence, a: np.ndarray, b: np.ndarray, stated: list, pr
             names = "xyz"
             problems.append(Problem(LANDMARK, f"The landmarks turn experimental +{names[index]} more than "
                                               f"{STATED_AXIS_DEGREES:g} degrees from the stated "
-                                              f"{evidence.axes[index]}: the evidence contradicts itself."))
+                                              f"{evidence.axes[index]}: the evidence contradicts itself. "
+                                              "(Provisional diagnostic heuristic.)"))
             return None
     return rotation
 
@@ -450,7 +495,7 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
     if len(set(chosen.tolist())) != len(chosen):
         problems.append(Problem(SHARED, f"{len(chosen) - len(set(chosen.tolist()))} points share an FE node."))
     if ties:
-        warnings.append(f"{ties} points are equally near two FE nodes.")
+        warnings.append(f"{ties} points are equally near two FE nodes (provisional diagnostic heuristic).")
     others = _other_orientations(mapped, fe_points, tolerance, diagonal)
     if others:
         warnings.append(f"The geometry alone also fits {others} other orientations: only your evidence separates them.")
@@ -472,5 +517,216 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
     return Proposal(REGISTRATION_PROPOSED, (), **common)
 
 
-__all__ = ["DIRECTIONS", "DOFS", "Evidence", "LIMIT", "MappedPoint", "Problem", "Proposal", "REGISTRATION_PROPOSED",
-           "REGISTRATION_REQUIRED", "UNITS", "geometry_summary", "propose", "required"]
+# ----------------------------------------------------------------------------- UNIVERSAL-REG-2: the draft file
+
+def experimental_geometry_sha256(experimental_dataset) -> str:
+    found = _names(experimental_dataset, "experimental", [])
+    return "" if found is None else canonical_hash({"points": found[0], "coordinates": found[1].tolist()})
+
+
+def _heuristics_document() -> list:
+    return [{"name": name, "value": value, "unit": unit, "status": HEURISTIC_STATUS, "approved_scientific_gate": False}
+            for name, value, unit in HEURISTICS]
+
+
+def _result_document(proposal: Proposal) -> dict:
+    return {"status": proposal.status, "axes_in_fe": list(proposal.axes_in_fe),
+            "rotation": [list(row) for row in proposal.rotation], "translation": list(proposal.translation),
+            "scale": proposal.scale, "warnings": list(proposal.warnings), "checks": list(proposal.checks),
+            "metrics": dict(proposal.metrics),
+            "mapping": [[p.experimental_point, p.fe_node, p.distance, p.landmark] for p in proposal.mapping]}
+
+
+def draft_document(proposal: Proposal, evidence: Evidence, experimental_dataset, *, modal_set: Mapping,
+                   sources: Mapping) -> dict:
+    """The versioned draft of a proposal; it holds no time and no folder, so the same inputs give the same bytes."""
+    if not proposal.proposed:
+        raise DraftRefused(DRAFT_INVALID, "Only a proposal that passed every check can be saved as a draft.")
+    if proposal.evidence_hash != evidence.evidence_hash:
+        raise DraftRefused(DRAFT_INVALID, "The evidence changed after the check. Check the evidence again.")
+    body = {"schema": DRAFT_SCHEMA, "status": DRAFT_STATUS, "accepted_physical_registration": False,
+            "review_required": True, "limit": LIMIT, "provisional_heuristics": _heuristics_document(),
+            "evidence": asdict(evidence), "evidence_sha256": evidence.evidence_hash,
+            "result": _result_document(proposal), "modal_set": dict(modal_set), "sources": json.loads(json.dumps(sources)),
+            "fe_geometry_sha256": proposal.fe_geometry_sha256,
+            "experimental_geometry_sha256": experimental_geometry_sha256(experimental_dataset)}
+    body = json.loads(json.dumps(body))  # tuples as lists, as the file holds them
+    return dict(body, draft_sha256=canonical_hash(body))
+
+
+def draft_bytes(document: Mapping) -> bytes:
+    return (json.dumps(document, indent=1, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
+
+
+def write_draft(document: Mapping, path, protected=()) -> Path:
+    """Write the draft beside nothing it describes: a source file is never overwritten; the write is all or nothing."""
+    path = Path(path)
+    if path.suffix.lower() != ".json":
+        raise DraftRefused(DRAFT_INVALID, "A registration draft is a .json file.")
+    for item in protected:
+        if path.resolve() == Path(item).resolve() or (path.exists() and Path(item).exists()
+                                                      and os.path.samefile(path, item)):
+            raise DraftRefused(DRAFT_INVALID, f"{path.name} is a source file of this analysis; it is not overwritten.")
+    temporary = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_bytes(draft_bytes(document))
+        os.replace(temporary, path)
+    except OSError as error:
+        temporary.unlink(missing_ok=True)
+        raise DraftRefused(DRAFT_INVALID, f"The draft could not be written: {error}") from error
+    return path
+
+
+def _unique_keys(pairs: list) -> dict:
+    keys = [key for key, _value in pairs]
+    if len(set(keys)) != len(keys):
+        raise ValueError("a key is repeated")
+    return dict(pairs)
+
+
+def _no_constant(name: str):
+    raise ValueError(f"{name} is not a number")
+
+
+def read_draft(path) -> dict:
+    """The file's JSON, strictly: no repeated key and no NaN or infinity. Raises ``DraftRefused``."""
+    try:
+        if Path(path).stat().st_size > MAX_DRAFT_BYTES:
+            raise ValueError("the file is too large for a draft")
+        document = json.loads(Path(path).read_text(encoding="utf-8"), object_pairs_hook=_unique_keys,
+                              parse_constant=_no_constant)
+    except (OSError, ValueError) as error:
+        raise DraftRefused(DRAFT_INVALID, f"The draft cannot be read: {error}.") from error
+    if not isinstance(document, dict):
+        raise DraftRefused(DRAFT_INVALID, "The file is not a registration draft.")
+    return document
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _require_keys(value, keys: tuple, name: str) -> None:
+    if not isinstance(value, dict) or set(value) != set(keys):
+        missing = sorted(set(keys) - set(value)) if isinstance(value, dict) else list(keys)
+        extra = sorted(set(value) - set(keys)) if isinstance(value, dict) else []
+        raise DraftRefused(DRAFT_INVALID, f"The draft's {name} is incomplete or altered (missing {missing}, unexpected "
+                                          f"{extra}).")
+
+
+def _evidence_of(document: dict) -> Evidence:
+    value = document["evidence"]
+    _require_keys(value, _EVIDENCE_KEYS, "evidence")
+    landmarks = value["landmarks"]
+    valid = (all(isinstance(value[key], str) for key in ("fe_unit", "experimental_unit", "measured_side", "source"))
+             and isinstance(value["axes"], list) and len(value["axes"]) == 3
+             and all(isinstance(item, str) for item in value["axes"])
+             and isinstance(value["measured_dofs"], list) and all(isinstance(item, str) for item in value["measured_dofs"])
+             and isinstance(landmarks, list)
+             and all(isinstance(pair, list) and len(pair) == 2 and all(isinstance(item, str) for item in pair)
+                     for pair in landmarks))
+    if not valid:
+        raise DraftRefused(DRAFT_INVALID, "The draft's evidence has values of the wrong type.")
+    return Evidence(value["fe_unit"], value["experimental_unit"], tuple(value["axes"]), value["measured_side"],
+                    tuple(value["measured_dofs"]), tuple(tuple(pair) for pair in landmarks), value["source"])
+
+
+def _check_structure(document: dict) -> Evidence:
+    """The schema, every field, the content hash and the fixed statements; nothing here reads the current data."""
+    if document.get("schema") != DRAFT_SCHEMA:
+        raise DraftRefused(DRAFT_INVALID, f"Not a registration draft of the version {DRAFT_SCHEMA}.")
+    _require_keys(document, _DRAFT_KEYS, "content")
+    _require_keys(document["result"], _RESULT_KEYS, "result")
+    body = {key: value for key, value in document.items() if key != "draft_sha256"}
+    if canonical_hash(body) != document["draft_sha256"]:
+        raise DraftRefused(DRAFT_TAMPERED, "The draft's content does not match its SHA-256: it was altered.")
+    if (document["status"] != DRAFT_STATUS or document["accepted_physical_registration"] is not False
+            or document["review_required"] is not True or document["limit"] != LIMIT):
+        raise DraftRefused(DRAFT_TAMPERED, "The draft claims more than a draft may: it is never an accepted physical "
+                                           "registration, and it always needs review.")
+    if document["provisional_heuristics"] != _heuristics_document():
+        raise DraftRefused(DRAFT_NOT_REPRODUCED, "The draft was made under other provisional heuristics.")
+    evidence = _evidence_of(document)
+    if evidence.evidence_hash != document["evidence_sha256"]:
+        raise DraftRefused(DRAFT_TAMPERED, "The draft's evidence does not match its recorded SHA-256.")
+    return evidence
+
+
+def _close(first, second, scale: float = 1.0) -> bool:
+    first, second = np.asarray(first, dtype=float), np.asarray(second, dtype=float)
+    return first.shape == second.shape and bool(np.all(np.abs(first - second) <= REPRODUCTION_SHARE * max(scale, 1.0)))
+
+
+def _differences(stored: dict, again: dict) -> list:
+    """What the stored result and the result computed now do not share."""
+    differences = [name for name in ("status", "axes_in_fe", "warnings", "checks") if stored[name] != again[name]]
+    numbers = _is_number(stored["scale"]) and all(
+        isinstance(row, list) and all(_is_number(item) for item in row) for row in stored["rotation"]
+    ) and isinstance(stored["translation"], list) and all(_is_number(item) for item in stored["translation"])
+    if not numbers:
+        return differences + ["numbers"]
+    size = float(np.abs(np.asarray(again["translation"], dtype=float)).max(initial=1.0))
+    if not _close(stored["rotation"], again["rotation"]):
+        differences.append("rotation")
+    if not _close(stored["translation"], again["translation"], size):
+        differences.append("translation")
+    if not _close(stored["scale"], again["scale"]):
+        differences.append("scale")
+    mapping = stored["mapping"]
+    if (not isinstance(mapping, list) or len(mapping) != len(again["mapping"])
+            or not all(isinstance(row, list) and len(row) == 4 for row in mapping)):
+        return differences + ["mapping"]
+    if any(row[0] != other[0] or row[1] != other[1] or row[3] != other[3] for row, other in zip(mapping, again["mapping"])):
+        differences.append("mapping")
+    elif not all(_is_number(row[2]) for row in mapping) or not _close(
+            [row[2] for row in mapping], [row[2] for row in again["mapping"]], size):
+        differences.append("mapping distances")
+    if not isinstance(stored["metrics"], dict) or set(stored["metrics"]) != set(again["metrics"]) or not all(
+            _is_number(stored["metrics"][key]) and _close(stored["metrics"][key], again["metrics"][key], size)
+            for key in again["metrics"]):
+        differences.append("metrics")
+    return differences
+
+
+@dataclass(frozen=True)
+class DraftResult:
+    """The outcome of reopening a draft: a reproduced proposal with its evidence, or REGISTRATION_REQUIRED."""
+
+    proposal: Proposal
+    evidence: Optional[Evidence] = None
+
+
+def revalidate_draft(document: dict, fe_dataset, experimental_dataset, *, modal_set: Mapping,
+                     sources: Mapping) -> DraftResult:
+    """Check the draft against the current data and compute its result again from its evidence alone."""
+    try:
+        evidence = _check_structure(document)
+    except DraftRefused as refusal:
+        return DraftResult(required([Problem(refusal.code, str(refusal))]))
+    problems = []
+    if document["sources"] != json.loads(json.dumps(sources)):
+        problems.append(Problem(DRAFT_CHANGED, "The draft was made on other file contents (SHA-256)."))
+    if document["modal_set"] != json.loads(json.dumps(modal_set)):
+        problems.append(Problem(DRAFT_CHANGED, "The draft was made on another modal set."))
+    if document["experimental_geometry_sha256"] != experimental_geometry_sha256(experimental_dataset):
+        problems.append(Problem(DRAFT_CHANGED, "The draft was made on another experimental geometry."))
+    if document["fe_geometry_sha256"] != str(modal_dataset_geometry_identity(fe_dataset)["sha256"]):
+        problems.append(Problem(DRAFT_CHANGED, "The draft was made on another FE geometry."))
+    if problems:
+        return DraftResult(required(problems, evidence=evidence), evidence)
+    again = propose(fe_dataset, experimental_dataset, evidence)
+    if not again.proposed:
+        return DraftResult(Proposal(REGISTRATION_REQUIRED, tuple(again.problems) + (
+            Problem(DRAFT_NOT_REPRODUCED, "The draft's own evidence does not establish its mapping on these data."),),
+            warnings=again.warnings, checks=again.checks, evidence_hash=evidence.evidence_hash), evidence)
+    differences = _differences(document["result"], json.loads(json.dumps(_result_document(again))))
+    if differences:
+        problem = Problem(DRAFT_NOT_REPRODUCED, "The stored result differs from the result computed now from the same "
+                                                f"evidence: {', '.join(differences)}.")
+        return DraftResult(required([problem], evidence=evidence), evidence)
+    return DraftResult(again, evidence)
+
+
+__all__ = ["DIRECTIONS", "DOFS", "DraftRefused", "DraftResult", "Evidence", "HEURISTICS", "HEURISTICS_NOTE", "LIMIT",
+           "MappedPoint", "Problem", "Proposal", "REGISTRATION_PROPOSED", "REGISTRATION_REQUIRED", "UNITS", "draft_bytes",
+           "draft_document", "geometry_summary", "propose", "read_draft", "required", "revalidate_draft", "write_draft"]

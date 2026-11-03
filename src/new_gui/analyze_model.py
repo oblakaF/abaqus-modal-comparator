@@ -13,6 +13,9 @@ the counts and the shape choices then use read-only subsets, so a mode outside t
 UNIVERSAL-REG-1: ``propose_registration`` checks stated physical evidence on the read files, once they are confirmed
 unchanged. Its proposal is diagnostic: it never reaches ``analyse``, so the status, the pairs and the MAC do not change.
 
+UNIVERSAL-REG-2: ``save_registration_draft`` and ``open_registration_draft`` keep that proposal as a JSON draft and check
+it again on the current files. A draft changes nothing in ``analyse`` either.
+
 The extraction package is managed here: it lives in ``<odb folder>/<odb name>_modal_packages`` and is found again by the
 ODB's content (SHA-256) and the requested range, so the user never chooses a ``manifest.json``.
 """
@@ -226,6 +229,57 @@ def propose_registration(inputs: Inputs, set_index: int, evidence: gr.Evidence, 
     return proposal
 
 
+def _modal_set_identity(inputs: Inputs, set_index: int) -> dict:
+    chosen = inputs.full_experimental.sets[set_index]
+    return {"key": chosen.key, "display_name": chosen.display_name, "processing_name": chosen.processing_name,
+            "record_count": len(chosen.records)}
+
+
+def _source_hashes(inputs: Inputs) -> dict:
+    fe, experimental = inputs.identities["fe"], inputs.identities["experimental"]
+    package = fe["package"]
+    return {"fe": {"manifest_sha256": fe["sha256"], "package_sha256": package["package_sha256"],
+                   "files": [[item["role"], item["relative"], item["size"], item["sha256"]] for item in package["files"]]},
+            "experimental": {"sha256": experimental["sha256"], "size": experimental["size"]}}
+
+
+def _source_files(inputs: Inputs) -> tuple:
+    folder = Path(inputs.full_fe.manifest_path).parent
+    return ((inputs.full_fe.manifest_path, inputs.full_experimental.source_path, inputs.full_experimental.selected_path)
+            + tuple(folder / item["relative"] for item in inputs.identities["fe"]["package"]["files"]))
+
+
+def save_registration_draft(inputs: Inputs, set_index: int, evidence: gr.Evidence, proposal: gr.Proposal, path,
+                            cancel_event) -> Path:
+    """The checked proposal as a draft, once the files are confirmed unchanged and the result is computed again."""
+    confirm_sources(inputs, cancel_event)
+    fe, experimental = inputs.full_fe.dataset, inputs.full_experimental.sets[set_index].dataset
+    if gr.propose(fe, experimental, evidence) != proposal:
+        raise gr.DraftRefused(gr.DRAFT_INVALID, "The proposal is not the result of this evidence. Check it again.")
+    if cancel_event.is_set():
+        raise StepCancelled()
+    document = gr.draft_document(proposal, evidence, experimental, modal_set=_modal_set_identity(inputs, set_index),
+                                 sources=_source_hashes(inputs))
+    return gr.write_draft(document, path, _source_files(inputs))
+
+
+def open_registration_draft(inputs: Inputs, set_index: int, path, cancel_event) -> gr.DraftResult:
+    """A draft checked again on the read data, once the files are confirmed unchanged; a refusal is never a mapping."""
+    try:
+        document = gr.read_draft(path)
+    except gr.DraftRefused as refusal:
+        return gr.DraftResult(gr.required([gr.Problem(refusal.code, str(refusal))]))
+    try:
+        confirm_sources(inputs, cancel_event)
+    except StepFailed as error:
+        return gr.DraftResult(gr.required([gr.Problem(gr.DRAFT_CHANGED, str(error))]))
+    result = gr.revalidate_draft(document, inputs.full_fe.dataset, inputs.full_experimental.sets[set_index].dataset,
+                                 modal_set=_modal_set_identity(inputs, set_index), sources=_source_hashes(inputs))
+    if cancel_event.is_set():
+        raise StepCancelled()
+    return result
+
+
 def _ranges(numbers) -> str:
     """1, 2, 13-20"""
     parts, numbers = [], sorted(numbers)
@@ -341,5 +395,6 @@ def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
 
 
 __all__ = ["Analysis", "Inputs", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse", "consent_text",
-           "confirm_sources", "extract", "propose_registration", "registration_geometry", "file_problem", "find_package", "make_plan", "package_folder", "plan_warnings",
+           "confirm_sources", "extract", "open_registration_draft", "propose_registration", "registration_geometry",
+           "save_registration_draft", "file_problem", "find_package", "make_plan", "package_folder", "plan_warnings",
            "read_inputs", "scoped_experimental", "scoped_fe", "scoped_inputs"]

@@ -43,6 +43,8 @@ SHOW_LOG, HIDE_LOG = "Show log", "Hide log"
 SET_UP_REGISTRATION = "Set up registration..."
 PROPOSED_TEXT = "Registration setup: the geometry checks passed. Diagnostic only: not applied, so no MAC and no mode pairs."
 REFUSED_TEXT = "Registration setup: the evidence does not establish a registration."
+REVIEWED_TEXT = ("Registration setup: mapping reviewed by you. Not an accepted physical registration: not applied, so no "
+                 "MAC and no mode pairs.")
 SHAPE_HINT = ("Click a row to show that EXP record and its nearest FE mode side by side, each on its own coordinates. "
               "They are not a mode pair.")
 TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "nearest": "Nearest frequency", "fe": "FE modes",
@@ -315,6 +317,7 @@ class AnalyzePanel(QWidget):
         if self.registration_dialog is None:
             self.registration_dialog = RegistrationDialog(self.inputs, self.analysis.set_index, self)
             self.registration_dialog.checked.connect(self._proposal_checked)
+            self.registration_dialog.reviewed.connect(self._proposal_reviewed)
         self.registration_dialog.show()
         self.registration_dialog.raise_()
         return self.registration_dialog
@@ -325,11 +328,16 @@ class AnalyzePanel(QWidget):
             self.proposal_label.setText(PROPOSED_TEXT if proposal.proposed else REFUSED_TEXT)
             self.proposal_label.setVisible(True)
 
+    def _proposal_reviewed(self, reviewed: bool) -> None:
+        if self.proposal_label is not None and self.proposal is not None and self.proposal.proposed:
+            self.proposal_label.setText(REVIEWED_TEXT if reviewed else PROPOSED_TEXT)
+
     def _close_registration(self) -> None:
         dialog, self.registration_dialog = self.registration_dialog, None
         self.proposal = None
         if dialog is not None:
             dialog.checked.disconnect(self._proposal_checked)
+            dialog.reviewed.disconnect(self._proposal_reviewed)
             dialog.close()
             dialog.deleteLater()
 
