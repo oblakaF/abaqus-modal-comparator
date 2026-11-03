@@ -190,9 +190,9 @@ def read_source_record(package_folder: Path) -> Optional[dict]:
     return data
 
 
-def existing_packages(results_folder: Path, odb_sha256: str, start: int, end: int) -> list:
-    """The packages in ``results_folder`` extracted from the same ODB content with the same requested range, each
-    complete (manifest and every listed file present)."""
+def existing_packages(results_folder: Path, odb_sha256: str, start: int, end: int, covering: bool = False) -> list:
+    """The packages in ``results_folder`` extracted from the same ODB content with the same requested range (or, with
+    ``covering``, a requested range that includes it), each complete (manifest and every listed file present)."""
     found = []
     try:
         children = sorted(p for p in Path(results_folder).iterdir() if p.is_dir())
@@ -202,7 +202,9 @@ def existing_packages(results_folder: Path, odb_sha256: str, start: int, end: in
         record = read_source_record(child)
         if record is None or record["odb"].get("sha256") != odb_sha256:
             continue
-        if (int(record.get("start_mode", -1)), int(record.get("end_mode", -1))) != (int(start), int(end)):
+        requested = int(record.get("start_mode", -1)), int(record.get("end_mode", -1))
+        if requested != (int(start), int(end)) and not (covering and 0 <= requested[0] <= int(start)
+                                                        and requested[1] >= int(end)):
             continue
         manifest = child / "manifest.json"
         try:

@@ -48,6 +48,7 @@ def facts_of(draft: dict) -> tuple:
     return (("Physical evidence", (f"Units: FE {evidence['fe_unit']}, experimental {evidence['experimental_unit']}",
                                    f"Stated axes: {axes}", f"Resulting axes: {resulting}",
                                    f"Measured side (FE): {evidence['measured_side']}",
+                                   f"Measured FE part: {evidence['measured_instance'] or 'the only one'}",
                                    f"Measured DOFs: {', '.join(evidence['measured_dofs'])}")),
             ("Landmarks", tuple(landmarks)),
             ("Provenance", (f"Evidence source: {evidence['source']}",)),

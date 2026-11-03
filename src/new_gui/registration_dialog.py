@@ -172,6 +172,11 @@ class RegistrationDialog(QDialog):
         self.experimental_unit = _combo(gr.UNITS, "regExperimentalUnit", CHOOSE)
         self.axes = tuple(_combo(gr.DIRECTIONS, f"regAxis{name}", NOT_STATED) for name in "xyz")
         self.side = _combo(gr.DIRECTIONS, "regSide", CHOOSE)
+        instances = am.registration_instances(self.inputs)
+        self.instance = _combo(instances if len(instances) > 1 else (), "regInstance", CHOOSE)
+        self.instance.setVisible(len(instances) > 1)
+        self.instance_caption = QLabel("Measured FE part")
+        self.instance_caption.setVisible(len(instances) > 1)
         self.dofs = {name: QCheckBox(name) for name in gr.DOFS}
         self.landmarks = QPlainTextEdit()
         self.landmarks.setObjectName("regLandmarks")
@@ -195,9 +200,11 @@ class RegistrationDialog(QDialog):
             dofs.addWidget(box)
         dofs.addStretch(1)
         for row, (caption, item) in enumerate((("Units", units), ("Experimental axes in FE", axes),
-                                               ("Measured side (FE)", self.side), ("Measured DOFs", dofs),
-                                               ("Landmarks", self.landmarks), ("Evidence source", self.source))):
-            grid.addWidget(QLabel(caption), row, 0, Qt.AlignmentFlag.AlignTop)
+                                               ("Measured side (FE)", self.side), (self.instance_caption, self.instance),
+                                               ("Measured DOFs", dofs), ("Landmarks", self.landmarks),
+                                               ("Evidence source", self.source))):
+            grid.addWidget(caption if isinstance(caption, QLabel) else QLabel(caption), row, 0,
+                           Qt.AlignmentFlag.AlignTop)
             if isinstance(item, QWidget):
                 grid.addWidget(item, row, 1)
             else:
@@ -211,7 +218,8 @@ class RegistrationDialog(QDialog):
                            axes=tuple(combo.currentData() for combo in self.axes),
                            measured_side=self.side.currentData(),
                            measured_dofs=tuple(name for name, box in self.dofs.items() if box.isChecked()),
-                           landmarks=pairs, source=self.source.text().strip()), bad
+                           landmarks=pairs, source=self.source.text().strip(),
+                           measured_instance=self.instance.currentData()), bad
 
     def check(self) -> bool:
         """Check the stated evidence in a worker thread; a newer check or a closed dialog discards this one."""
@@ -398,7 +406,7 @@ class RegistrationDialog(QDialog):
 
     def _fill(self, evidence: gr.Evidence) -> None:
         for combo, value in ((self.fe_unit, evidence.fe_unit), (self.experimental_unit, evidence.experimental_unit),
-                             (self.side, evidence.measured_side)):
+                             (self.side, evidence.measured_side), (self.instance, evidence.measured_instance)):
             combo.setCurrentIndex(combo.findData(value))
         for combo, value in zip(self.axes, evidence.axes):
             combo.setCurrentIndex(combo.findData(value))

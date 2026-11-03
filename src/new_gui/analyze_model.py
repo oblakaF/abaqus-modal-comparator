@@ -116,7 +116,9 @@ def find_package(plan: svc.ExtractionPlan, cancel_event=None, progress=None) -> 
     """The manifest of a complete package of this ODB's content and range, or None. Hashes the ODB; starts nothing."""
     try:
         identity = svc.hash_file(plan.odb.path, cancel_event, progress)
-        found = svc.existing_packages(plan.results_folder, identity["sha256"], plan.start_mode, plan.end_mode)
+        found = (svc.existing_packages(plan.results_folder, identity["sha256"], plan.start_mode, plan.end_mode)
+                 or svc.existing_packages(plan.results_folder, identity["sha256"], plan.start_mode, plan.end_mode,
+                                          covering=True))  # a wider extraction holds these modes; the scope applies
     except svc.OdbImportCancelled as error:
         raise StepCancelled() from error
     except (svc.OdbImportRefused, OSError) as error:
@@ -224,6 +226,10 @@ def confirm_sources(inputs: Inputs, cancel_event) -> None:
 
 def registration_geometry(inputs: Inputs, set_index: int) -> tuple:
     return gr.geometry_summary(inputs.full_fe.dataset, inputs.full_experimental.sets[set_index].dataset)
+
+
+def registration_instances(inputs: Inputs) -> tuple:
+    return gr.fe_instances(inputs.full_fe.dataset)
 
 
 def propose_registration(inputs: Inputs, set_index: int, evidence: gr.Evidence, cancel_event) -> gr.Proposal:

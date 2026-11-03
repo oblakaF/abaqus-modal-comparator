@@ -71,7 +71,7 @@ class PlateDraftTests(_Service):
 
     def test_the_file_holds_what_the_task_names(self):
         document = self.document
-        self.assertEqual(document["schema"], "universal/registration-draft/v1")
+        self.assertEqual(document["schema"], "universal/registration-draft/v2")
         self.assertEqual(document["evidence"]["landmarks"], [["100", "PART-1:1"]])
         for key in ("fe_unit", "experimental_unit", "axes", "measured_side", "measured_dofs", "source"):
             self.assertIn(key, document["evidence"])
@@ -257,7 +257,7 @@ class IncompleteDraftTests(_Service):
 
     def test_another_version_is_refused(self):
         document = copy.deepcopy(self.document)
-        document["schema"] = "universal/registration-draft/v2"
+        document["schema"] = "universal/registration-draft/v1"
         self.assert_rejected(self.reopen(rehash(document)), gr.DRAFT_INVALID)
 
 

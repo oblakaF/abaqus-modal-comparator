@@ -572,7 +572,7 @@ class AnalyzePanel(QWidget):
             return
         self.set_combo.addItem(CHOOSE_SET, None)
         for index, item in enumerate(sets):
-            self.set_combo.addItem(f"{item.title} ({len(item.records)} records)", index)
+            self.set_combo.addItem(item.title, index)
         self.state = NEED_SET
         self._set_message(f"This file holds {len(sets)} modal sets. Choose one to continue.", "hint")
         self._refresh()

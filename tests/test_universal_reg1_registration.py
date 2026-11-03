@@ -331,7 +331,7 @@ class MappingTests(unittest.TestCase):
         points = plate(3, 2)
         labels = [f"{name}:{k}" for name in ("A", "B") for k in (1, 2, 3)]
         proposal = gr.propose(fe_dataset(points, labels), experimental_dataset(in_metres(points)),
-                              evidence(landmarks=(("100", "1"),)))
+                              evidence(landmarks=(("100", "1"),), measured_instance="A"))
         self.assertEqual(proposal.status, gr.REGISTRATION_REQUIRED)
         self.assertIn("2 instances", proposal.problems[0].text)
 
@@ -347,6 +347,95 @@ class MappingTests(unittest.TestCase):
         experimental.modes[1].coordinates = experimental.modes[1].coordinates + 1.0
         proposal = gr.propose(fe_dataset(points), experimental, evidence())
         self.assertEqual(proposal.problems[0].code, gr.GEOMETRY)
+
+
+class ThinStructureTests(unittest.TestCase):
+    """The defect found on a real sandwich: distance alone put 128 of 289 points on core nodes."""
+
+    @staticmethod
+    def sandwich():
+        """Skins at z = 0 and z = 3, and a finer core between them, all closer than the geometry tolerance."""
+        skin = plate(9, 7)
+        core = np.array([[x, y, z] for z in (0.5, 1.5, 2.5) for y in np.linspace(12.5, 287.5, 12)
+                         for x in np.linspace(12.5, 387.5, 16)])
+        points = np.vstack((skin + [0.0, 0.0, 3.0], core, skin))
+        labels = ([f"TOP:{k + 1}" for k in range(len(skin))] + [f"CORE:{k + 1}" for k in range(len(core))]
+                  + [f"BOT:{k + 1}" for k in range(len(skin))])
+        return points, labels, skin
+
+    def scan(self):
+        """A scan between the skin nodes, so that core nodes can be nearer than top-skin nodes."""
+        _points, _labels, skin = self.sandwich()
+        return (skin + [15.0, 15.0, 3.0])[:60]
+
+    def test_several_parts_need_the_measured_one_stated(self):
+        points, labels, _skin = self.sandwich()
+        proposal = gr.propose(fe_dataset(points, labels), experimental_dataset(in_metres(self.scan())),
+                              evidence(landmarks=(("100", "TOP:1"),)))
+        self.assertEqual(proposal.status, gr.REGISTRATION_REQUIRED)
+        self.assertEqual(proposal.problems[0].code, gr.MISSING)
+        self.assertIn("which FE part was measured", proposal.problems[0].text)
+        self.assertIn("CORE", proposal.problems[0].text)
+        self.assertEqual(proposal.mapping, ())
+
+    def test_every_point_stays_on_the_stated_part(self):
+        points, labels, _skin = self.sandwich()
+        scan = plate(9, 7)[:40] + [0.0, 0.0, 3.0]
+        proposal = gr.propose(fe_dataset(points, labels), experimental_dataset(in_metres(scan)),
+                              evidence(landmarks=(("100", "TOP:1"),), measured_instance="TOP"))
+        self.assertTrue(proposal.proposed, proposal.problems)
+        self.assertEqual({m.fe_node.split(":")[0] for m in proposal.mapping}, {"TOP"})
+
+    def test_an_unknown_part_is_not_accepted(self):
+        points, labels, _skin = self.sandwich()
+        proposal = gr.propose(fe_dataset(points, labels), experimental_dataset(in_metres(points[:20])),
+                              evidence(landmarks=(("100", "TOP:1"),), measured_instance="NOPE"))
+        self.assertEqual(proposal.status, gr.REGISTRATION_REQUIRED)
+
+    def test_a_landmark_on_another_part_is_refused(self):
+        points, labels, _skin = self.sandwich()
+        scan = plate(9, 7)[:40] + [0.0, 0.0, 3.0]
+        proposal = gr.propose(fe_dataset(points, labels), experimental_dataset(in_metres(scan)),
+                              evidence(landmarks=(("100", "BOT:1"),), measured_instance="TOP"))
+        self.assertEqual(proposal.status, gr.REGISTRATION_REQUIRED)
+        self.assertIn(gr.SIDE, [problem.code for problem in proposal.problems])
+
+    @staticmethod
+    def thin_solid():
+        """One instance with three node layers through 1 mm, the skin of a merged mesh or a thin solid plate."""
+        return np.array([[x, y, z] for z in (0.0, 0.5, 1.0) for y in np.linspace(0, 300, 7)
+                         for x in np.linspace(0, 400, 9)])
+
+    def test_one_thin_instance_uses_only_the_stated_side(self):
+        points = self.thin_solid()
+        top = points[points[:, 2] == 1.0]
+        first = row_of(points, top[0])
+        proposal = gr.propose(fe_dataset(points), experimental_dataset(in_metres(top)),
+                              evidence(landmarks=(("100", f"PART-1:{first + 1}"),)))
+        self.assertTrue(proposal.proposed, proposal.problems)
+        rows = [int(m.fe_node.split(":")[1]) - 1 for m in proposal.mapping]
+        self.assertTrue(np.all(points[rows, 2] == 1.0))
+        self.assertTrue(any("Thin structure" in text for text in proposal.checks))
+        self.assertFalse(any("no depth" in text for text in proposal.warnings))
+
+    def test_the_other_side_is_reached_only_by_stating_it(self):
+        points = self.thin_solid()
+        bottom = points[points[:, 2] == 0.0]
+        first = row_of(points, bottom[0])
+        proposal = gr.propose(fe_dataset(points), experimental_dataset(in_metres(bottom)),
+                              evidence(measured_side="-Z", landmarks=(("100", f"PART-1:{first + 1}"),)))
+        self.assertTrue(proposal.proposed, proposal.problems)
+        rows = [int(m.fe_node.split(":")[1]) - 1 for m in proposal.mapping]
+        self.assertTrue(np.all(points[rows, 2] == 0.0))
+
+    def test_a_landmark_on_the_far_side_of_a_thin_structure_is_refused(self):
+        points = self.thin_solid()
+        bottom = points[points[:, 2] == 0.0]
+        first = row_of(points, bottom[0])
+        proposal = gr.propose(fe_dataset(points), experimental_dataset(in_metres(bottom)),
+                              evidence(landmarks=(("100", f"PART-1:{first + 1}"),)))
+        self.assertEqual(proposal.status, gr.REGISTRATION_REQUIRED)
+        self.assertIn(gr.SIDE, [problem.code for problem in proposal.problems])
 
 
 class MeasuredSideTests(unittest.TestCase):

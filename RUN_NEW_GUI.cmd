@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 
-title Abaqus-Simcenter Modal Comparator - new interface preview
+title Abaqus-Simcenter Modal Comparator
 
 set "BASE_PYTHON="
 where py >nul 2>nul
@@ -37,7 +37,7 @@ if errorlevel 1 (
     if errorlevel 1 goto :error
 )
 
-echo Starting the new interface preview...
+echo Starting the program...
 set "PYTHONPATH=%~dp0src"
 ".venv\Scripts\python.exe" -m new_gui
 if errorlevel 1 goto :error
@@ -47,7 +47,7 @@ exit /b 0
 
 :error
 echo.
-echo The new interface could not start or finished with an error.
+echo The program could not start or finished with an error.
 echo Review the messages above, then press any key.
 pause >nul
 endlocal

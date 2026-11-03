@@ -9,6 +9,7 @@ shown with the checks replaced, to prove that pairs and MAC come only from them.
 from __future__ import annotations
 
 import ast
+from dataclasses import replace
 import hashlib
 import json
 import math
@@ -434,6 +435,47 @@ class FailureTests(_Case):
         self.assertTrue(panel.choose_launcher(str(launcher)))
         self.run_analysis(panel)
         self.assertEqual(panel.state, DONE, panel.message.text())
+
+    def extract_range(self, start, end, nodes=None):
+        """A package of this ODB in its usual folder, as an extraction of that requested range leaves it."""
+        nodes = nodes or plate_nodes()
+        plan = am.make_plan(self.odb, "", None, FOUND)
+        plan = replace(plan, start_mode=start, end_mode=end)
+        return am.extract(plan, threading.Event(), None, Runner(nodes))
+
+    def test_a_wider_extraction_is_reused_within_the_first_twenty(self):
+        manifest = self.extract_range(1, 30)
+        panel = self.panel(discover=NONE)
+        self.run_analysis(panel)
+        self.assertEqual(panel.state, DONE, panel.message.text())
+        self.assertEqual(self.consents, [])
+        self.assertEqual(self.runner.calls, [])
+        self.assertEqual(Path(panel.inputs.full_fe.manifest_path), manifest)
+        self.assertEqual(len(panel.inputs.full_fe.modes), 25)
+        self.assertEqual([row[0] for row in panel.analysis.fe_rows], [str(n) for n in range(1, 21)])
+
+    def test_the_exact_range_is_preferred_to_a_wider_one(self):
+        self.extract_range(1, 30)
+        exact = self.extract_range(1, 20)
+        panel = self.panel(discover=NONE)
+        self.run_analysis(panel)
+        self.assertEqual(Path(panel.inputs.full_fe.manifest_path), exact)
+
+    def test_a_narrower_or_later_extraction_is_not_reused(self):
+        for start, end in ((1, 10), (7, 30)):
+            with self.subTest(start=start, end=end):
+                self.extract_range(start, end)
+                panel = self.panel(discover=NONE)
+                self.run_analysis(panel)
+                self.assertEqual(panel.state, BLOCKED)
+                self.assertIn("No Abaqus launcher was found", panel.message.text())
+
+    def test_a_wider_extraction_of_another_odb_is_not_reused(self):
+        self.extract_range(1, 30)
+        self.odb.write_bytes(self.odb.read_bytes() + b"changed")
+        panel = self.panel(discover=NONE)
+        self.run_analysis(panel)
+        self.assertEqual(panel.state, BLOCKED)
 
     def test_a_package_already_extracted_works_without_abaqus(self):
         first = self.panel()

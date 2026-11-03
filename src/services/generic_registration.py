@@ -13,6 +13,11 @@ The rule x_fe = R (s x_exp) + t, with s from the units, a proper rotation R and 
   which way the plane faces (the landmarks alone cannot);
 - anything less is ambiguous, and a mirrored statement or a mirrored landmark set is refused.
 
+WORKING-DRAFT-R1: which FE nodes can receive a point. With several FE instances, the measured instance must be stated
+(a sandwich's skin and core lie closer together than the geometry tolerance, so distance alone mixes them). On a thin
+structure, whose depth along the measured side is within that tolerance, only the half of the depth towards the stated
+side can receive points; a landmark elsewhere is refused.
+
 The result is a proposal for these exact data. Any missing, contradictory or ambiguous evidence gives
 REGISTRATION_REQUIRED with the reasons. A proposal is not a ``FrozenRegistration``: nothing here can reach a comparator.
 The mapping limits are those of the guided registration (the comparator's geometry limits). The landmark extent, the
@@ -65,6 +70,7 @@ HEURISTICS = (("landmark_extent_ratio", RANK_RATIO, "share of the landmark set's
 HEURISTICS_NOTE = ("Provisional diagnostic heuristics, not approved scientific gates: landmark extent 5 %, stated axis "
                    "5 degrees, FE-node tie 1 % of the geometry tolerance.")
 CANDIDATE_NODES = 8
+NO_DEPTH_SHARE = 1.0e-6  # of the tolerance: below this a mesh is flat along the measured side (rounding only)
 MAX_SYMMETRY_POINTS = 300
 
 # what stops a proposal
@@ -80,7 +86,7 @@ GEOMETRY = "GEOMETRY_INVALID"
 LOCAL_AXES = "LOCAL_COORDINATE_SYSTEMS"
 STALE = "FILES_CHANGED"
 LIMIT = "Diagnostic only: this mapping is not applied. No MAC and no mode pair is computed from it."
-DRAFT_SCHEMA = "universal/registration-draft/v1"
+DRAFT_SCHEMA = "universal/registration-draft/v2"
 DRAFT_STATUS = "DIAGNOSTIC_DRAFT_NOT_ACCEPTED"
 DRAFT_INVALID = "DRAFT_INVALID"
 DRAFT_TAMPERED = "DRAFT_TAMPERED"
@@ -88,7 +94,8 @@ DRAFT_CHANGED = "DRAFT_SOURCES_CHANGED"
 DRAFT_NOT_REPRODUCED = "DRAFT_NOT_REPRODUCED"
 MAX_DRAFT_BYTES = 64 * 1024 * 1024
 REPRODUCTION_SHARE = 1.0e-9  # floating-point noise only: labels and texts must be equal
-_EVIDENCE_KEYS = ("fe_unit", "experimental_unit", "axes", "measured_side", "measured_dofs", "landmarks", "source")
+_EVIDENCE_KEYS = ("fe_unit", "experimental_unit", "axes", "measured_side", "measured_dofs", "landmarks", "source",
+                  "measured_instance")
 _RESULT_KEYS = ("status", "axes_in_fe", "rotation", "translation", "scale", "warnings", "checks", "metrics", "mapping")
 _DRAFT_KEYS = ("schema", "status", "accepted_physical_registration", "review_required", "limit",
                "provisional_heuristics", "evidence", "evidence_sha256", "result", "modal_set", "sources",
@@ -114,6 +121,7 @@ class Evidence:
     measured_dofs: tuple = ()  # experimental components ("x", "y", "z")
     landmarks: tuple = ()  # (experimental point, FE node) identified independently of any modal result
     source: str = ""  # how the statements were established
+    measured_instance: str = ""  # the FE instance that was measured; required when the FE data hold several
 
     @property
     def evidence_hash(self) -> str:
@@ -182,6 +190,16 @@ def _names(dataset, label: str, problems: list) -> Optional[tuple]:
             problems.append(Problem(GEOMETRY, f"The {label} records do not share one geometry."))
             return None
     return names, points
+
+
+def _instance_of(label: str) -> str:
+    return label.rpartition(":")[0]
+
+
+def fe_instances(fe_dataset) -> tuple:
+    """The FE instance names, for the statement of which one was measured."""
+    found = _names(fe_dataset, "FE", [])
+    return () if found is None else tuple(sorted({_instance_of(name) for name in found[0]}))
 
 
 def _extent(points: np.ndarray) -> float:
@@ -431,6 +449,11 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
     if isinstance(diagnostics, Mapping) and any(diagnostics.values()):
         problems.append(Problem(LOCAL_AXES, "The experimental file uses local coordinate systems, and the importer does "
                                             "not rotate into them, so the stated axes cannot be checked."))
+    if fe is not None and not missing:
+        instances = sorted({_instance_of(name) for name in fe[0]})
+        if len(instances) > 1 and evidence.measured_instance not in instances:
+            problems.append(Problem(MISSING, "Still needed: which FE part was measured. The FE data hold "
+                                             f"{', '.join(instances)}, and distance alone cannot separate them."))
     if missing or fe is None or experimental is None or problems:
         return required(problems, evidence=evidence)
 
@@ -475,10 +498,30 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
 
     mapped = scaled @ rotation.T + translation
     side = _vector(evidence.measured_side)
-    if float(np.ptp(fe_points @ side)) <= tolerance:
+    allowed = np.arange(len(fe_names))
+    if evidence.measured_instance:
+        allowed = np.asarray([row for row, name in enumerate(fe_names)
+                              if _instance_of(name) == evidence.measured_instance], dtype=int)
+        checks.append(f"Measured FE part: {evidence.measured_instance} ({len(allowed)} nodes).")
+    depth = fe_points[allowed] @ side
+    span = float(np.ptp(depth)) if len(allowed) else 0.0
+    if span <= NO_DEPTH_SHARE * max(tolerance, 1.0e-12):
         warnings.append(f"The FE nodes have no depth along {evidence.measured_side}: the measured side is stated, and "
                         "the mesh cannot confirm it.")
-    chosen, hidden, ties = _map_points(mapped, fe_points, side, tolerance, dict(zip(rows_e, rows_f)))
+    elif span <= tolerance:
+        allowed = allowed[depth > float(depth.max()) - span / 2.0]
+        checks.append(f"Thin structure ({span:.4g} {evidence.fe_unit} along {evidence.measured_side}): points only on "
+                      f"the stated side ({len(allowed)} nodes).")
+    inside = set(allowed.tolist())
+    outside = [fe_names[row] for row in rows_f if row not in inside]
+    if outside:
+        problems.append(Problem(SIDE, f"These landmark FE nodes are not on the stated measured face or part: "
+                                      f"{', '.join(outside)}."))
+        return required(problems, evidence=evidence, checks=tuple(checks))
+    position = {row: index for index, row in enumerate(allowed.tolist())}
+    fixed = {point: position[row] for point, row in zip(rows_e, rows_f)}
+    chosen, hidden, ties = _map_points(mapped, fe_points[allowed], side, tolerance, fixed)
+    chosen = allowed[chosen]
     distances = np.linalg.norm(fe_points[chosen] - mapped, axis=1)
     matched = float(np.mean(distances <= tolerance))
     rms = float(np.sqrt(np.mean(distances ** 2)))
@@ -496,7 +539,7 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
         problems.append(Problem(SHARED, f"{len(chosen) - len(set(chosen.tolist()))} points share an FE node."))
     if ties:
         warnings.append(f"{ties} points are equally near two FE nodes (provisional diagnostic heuristic).")
-    others = _other_orientations(mapped, fe_points, tolerance, diagonal)
+    others = _other_orientations(mapped, fe_points[allowed], tolerance, diagonal)
     if others:
         warnings.append(f"The geometry alone also fits {others} other orientations: only your evidence separates them.")
     checks.append(f"Mapping: {matched:.1%} within {tolerance:.4g} {evidence.fe_unit}, RMS {rms:.4g}, largest distance "
@@ -618,7 +661,8 @@ def _evidence_of(document: dict) -> Evidence:
     value = document["evidence"]
     _require_keys(value, _EVIDENCE_KEYS, "evidence")
     landmarks = value["landmarks"]
-    valid = (all(isinstance(value[key], str) for key in ("fe_unit", "experimental_unit", "measured_side", "source"))
+    valid = (all(isinstance(value[key], str) for key in ("fe_unit", "experimental_unit", "measured_side", "source",
+                                                         "measured_instance"))
              and isinstance(value["axes"], list) and len(value["axes"]) == 3
              and all(isinstance(item, str) for item in value["axes"])
              and isinstance(value["measured_dofs"], list) and all(isinstance(item, str) for item in value["measured_dofs"])
@@ -628,7 +672,8 @@ def _evidence_of(document: dict) -> Evidence:
     if not valid:
         raise DraftRefused(DRAFT_INVALID, "The draft's evidence has values of the wrong type.")
     return Evidence(value["fe_unit"], value["experimental_unit"], tuple(value["axes"]), value["measured_side"],
-                    tuple(value["measured_dofs"]), tuple(tuple(pair) for pair in landmarks), value["source"])
+                    tuple(value["measured_dofs"]), tuple(tuple(pair) for pair in landmarks), value["source"],
+                    value["measured_instance"])
 
 
 def _check_structure(document: dict) -> Evidence:
@@ -730,4 +775,4 @@ def revalidate_draft(document: dict, fe_dataset, experimental_dataset, *, modal_
 
 __all__ = ["DIRECTIONS", "DOFS", "DraftRefused", "DraftResult", "Evidence", "HEURISTICS", "HEURISTICS_NOTE", "LIMIT",
            "MappedPoint", "Problem", "Proposal", "REGISTRATION_PROPOSED", "REGISTRATION_REQUIRED", "UNITS", "draft_bytes",
-           "draft_document", "geometry_summary", "propose", "read_draft", "required", "revalidate_draft", "write_draft"]
+           "draft_document", "fe_instances", "geometry_summary", "propose", "read_draft", "required", "revalidate_draft", "write_draft"]
