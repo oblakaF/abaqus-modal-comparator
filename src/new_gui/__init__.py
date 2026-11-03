@@ -29,7 +29,10 @@ project's existing material records, classified and read-only. Export report... 
 the diagnostic report into a folder the user chooses. No Auto-ID, identification or FE computation is run.
 
 UNIVERSAL-UI-1: the program starts on the Analyze page (``analyze_panel``, ``analyze_model``), the primary workflow for
-any FE model: an ``.odb``, a ``.unv`` / ``.uff`` and one Analyze button. The earlier pages stay, listed separately.
+any FE model: an ``.odb``, a ``.unv`` / ``.uff`` and one Analyze button.
+
+UNIVERSAL-UI-2: the program opens ``production_window``, with the Analyze and Materials pages only. ``window.MainWindow``
+keeps the earlier pages and the research records unchanged; it opens only with ``python -m new_gui --research``.
 
 Start it with ``RUN_NEW_GUI.cmd`` or ``python -m new_gui`` (with ``src`` on the path). PySide6 is installed from
 ``requirements-new-gui.txt``, separately from ``requirements.txt``.

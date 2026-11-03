@@ -99,9 +99,10 @@ class _Bridge(QObject):
 class ShapePanel(QFrame):
     """One side's shape view; hidden until that side's file was inspected."""
 
-    def __init__(self, kind: str):
+    def __init__(self, kind: str, compact: bool = False):
         super().__init__()
         self.kind = kind
+        self.compact = compact  # the page states the note itself; the long texts wait behind Show details
         self.setObjectName("card")
         self.preview = None
         self.slot = sm.ShapeSlot()
@@ -113,8 +114,7 @@ class ShapePanel(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(8)
-        title = QLabel(f"{KIND_TITLE[kind]}: {'mode' if kind == FE else 'record'} shape")
-        title.setObjectName("cardTitle")
+        title = _label(f"{KIND_TITLE[kind]}: {'mode' if kind == FE else 'record'} shape", "cardTitle")
         layout.addWidget(title)
         self.hint = _label(sm.NOTHING_CHOSEN[kind], "hint")
         layout.addWidget(self.hint)
@@ -162,7 +162,21 @@ class ShapePanel(QFrame):
         layout.addWidget(self.caption)
         self.note = _label(sm.SHAPE_NOTE, "hint")
         layout.addWidget(self.note)
+        self.details_toggle: Optional[QPushButton] = None
+        if compact:
+            self.details_toggle = QPushButton("Show details")
+            self.details_toggle.setObjectName("detailsToggle")
+            self.details_toggle.setCheckable(True)
+            self.details_toggle.toggled.connect(self._details_toggled)
+            layout.insertWidget(layout.indexOf(self.facts), self.details_toggle, 0, Qt.AlignmentFlag.AlignLeft)
+            for combo in (self.set_combo, self.item_combo, self.component_combo):
+                if combo is not None:
+                    combo.setMinimumContentsLength(6)
         self.setVisible(False)
+        self._refresh()
+
+    def _details_toggled(self, shown: bool) -> None:
+        self.details_toggle.setText("Hide details" if shown else "Show details")
         self._refresh()
 
     # ------------------------------------------------------------------------------------------ choices
@@ -287,7 +301,10 @@ class ShapePanel(QFrame):
             provisional = sm.is_provisional(preview_set, index)
         self.hint.setVisible(index is None)
         self.facts.setText("\n".join(facts))
-        self.facts.setVisible(bool(facts))
+        details = not self.compact or self.details_toggle.isChecked()
+        if self.compact:
+            self.details_toggle.setVisible(bool(facts))
+        self.facts.setVisible(bool(facts) and details)
         self.record_warnings.setText("Importer warnings for this record:\n" + "\n".join(f"• {w}" for w in warnings)
                                      if warnings else "")
         self.record_warnings.setVisible(bool(warnings))
@@ -307,5 +324,5 @@ class ShapePanel(QFrame):
         else:
             self.image.clear_image()
             self.caption.setText("")
-        self.caption.setVisible(state == sm.SHOWN)
-        self.note.setVisible(has_preview)
+        self.caption.setVisible(state == sm.SHOWN and details)
+        self.note.setVisible(has_preview and not self.compact)

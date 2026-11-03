@@ -30,9 +30,17 @@ EXPERIMENTAL_SUFFIXES = (".unv", ".uff")
 SUFFIXES = {FE: FE_SUFFIXES, EXPERIMENTAL: EXPERIMENTAL_SUFFIXES}
 FILTERS = {FE: "Abaqus ODB (*.odb);;All files (*)", EXPERIMENTAL: "Experimental modal data (*.unv *.uff);;All files (*)"}
 REGISTRATION_REQUIRED = "REGISTRATION_REQUIRED"
-REGISTRATION_TEXT = ("No independently verified physical registration applies to these files, so there are no FE-EXP "
-                     "mode pairs and no MAC. The frequencies below are a frequency-only diagnostic.")
+REGISTRATION_TEXT = "No verified physical registration: no mode pairs and no MAC. Frequency comparison only."
 VERIFIED_TEXT = "A verified physical registration applies to these files. Pairs and MAC are the comparator's result."
+REFUSED, FAILED, PROVISIONAL = "refused", "failed", "provisional"
+REGISTRATION_NOTES = {  # what the program shows; the service's own wording stays in ``registration_reason``
+    REFUSED: "Registration check: no accepted registration matches these two files.",
+    FAILED: "Registration check FAILED: it could not be completed, so nothing about these files is verified.",
+    PROVISIONAL: "Registration not checked: the chosen set holds FRF peak records, not validated fitted modes.",
+}
+VERIFIED_LIMITS = ("Only the registered geometric mapping is reused: frequencies and mode shapes are these files' own. "
+                   "No acceptance gate or threshold is changed.")
+_REUSE_WARNING = "Physical registration reused"  # names the archived source; VERIFIED_LIMITS states its limits
 RIGID_NOTE = "Rigid-body FE modes are identified by their shape (rigid-body projection), not by their frequency."
 CONSENT_TITLE = "Start Abaqus Python?"
 _SPACE_WARNING = "These paths contain a space"  # abaqus_bridge passes such paths whole since RC6-F1
@@ -154,7 +162,17 @@ class Analysis:
     facts: tuple
     notes: tuple
     comparison: Any = None  # comparison_model.ComparisonView, only with a verified registration
-    registration_reason: str = ""  # why the status is REGISTRATION_REQUIRED (a tooltip, never a pair or a MAC)
+    registration_reason: str = ""  # the service's own reason for REGISTRATION_REQUIRED (never a pair or a MAC)
+    registration_outcome: str = ""  # REFUSED, FAILED or PROVISIONAL; empty with a verified registration
+
+    @property
+    def registration_note(self) -> str:
+        return REGISTRATION_NOTES.get(self.registration_outcome, "")
+
+    @property
+    def summary(self) -> str:
+        rigid = f"{len(self.rigid_modes)} rigid-body, first elastic {self.first_elastic or 'none'}"
+        return f"FE: {len(self.fe_rows)} modes ({rigid}). Experimental: {len(self.experimental_rows)} records."
 
 
 NEAREST_HEADERS = ("EXP record", "EXP mode", "EXP (Hz)", "Nearest FE mode", "FE (Hz)", "Error (%)", "Next FE mode",
@@ -166,21 +184,21 @@ PAIR_HEADERS = tuple(cm.PAIR_HEADERS[i] for i in PAIR_COLUMNS)
 
 
 def _verified(inputs: Inputs, set_index: int, cancel_event) -> tuple:
-    """(comparison view or None, why not): a pair or a MAC exists only through both checks of the existing services."""
+    """(comparison view or None, why not, outcome): a pair or a MAC exists only through both checks of the services."""
     if rm.set_is_provisional(inputs.experimental, set_index):
-        return None, cm.PROVISIONAL_BLOCK
+        return None, cm.PROVISIONAL_BLOCK, PROVISIONAL
     check = rm.run_check(inputs.fe, inputs.experimental, set_index, 0, cancel_event)
     if check.cancelled:
         raise StepCancelled()
     if check.view is None:
-        return None, check.refusal or check.error
+        return None, check.refusal or check.error, REFUSED if check.refusal else FAILED
     compared = cm.run_compare(inputs.fe, inputs.experimental, set_index, check.view.registration, 0, cancel_event,
                               inputs.identities)
     if compared.cancelled:
         raise StepCancelled()
     if compared.view is None:
-        return None, compared.refusal or compared.error
-    return compared.view, ""
+        return None, compared.refusal or compared.error, REFUSED if compared.refusal else FAILED
+    return compared.view, "", ""
 
 
 def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
@@ -190,7 +208,7 @@ def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
         raise StepCancelled()
     if outcome.error:
         raise StepFailed(outcome.error)
-    comparison, reason = _verified(inputs, set_index, cancel_event)
+    comparison, reason, registration = _verified(inputs, set_index, cancel_event)
     view = outcome.view
     full = inputs.experimental.sets[set_index]
     position = {}
@@ -213,11 +231,11 @@ def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
     notes = tuple(inputs.fe.warnings) + tuple(view.range_warnings) + tuple(view.importer_warnings)
     if comparison is not None:
         status, statement = comparison.status, VERIFIED_TEXT
-        notes += tuple(comparison.warnings)
+        notes += tuple(w for w in comparison.warnings if not w.startswith(_REUSE_WARNING)) + (VERIFIED_LIMITS,)
     else:
         status, statement = REGISTRATION_REQUIRED, REGISTRATION_TEXT
     return Analysis(status, statement, set_index, view.set_title, fe_rows, experimental, nearest, first_elastic,
-                    tuple(sorted(rigid)), tuple(facts), notes, comparison, reason)
+                    tuple(sorted(rigid)), tuple(facts), notes, comparison, reason, registration)
 
 
 __all__ = ["Analysis", "Inputs", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse", "consent_text",

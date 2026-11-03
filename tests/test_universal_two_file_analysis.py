@@ -42,6 +42,7 @@ from new_gui import analyze_model as am  # noqa: E402
 from new_gui import comparison_model as cm  # noqa: E402
 from new_gui import registration_check_model as rm  # noqa: E402
 from new_gui import shape_model as sm  # noqa: E402
+from new_gui import production_window  # noqa: E402
 from new_gui import window as window_module  # noqa: E402
 from new_gui.analyze_panel import AnalyzePanel, BLOCKED, DONE, IDLE, NEED_SET, RUNNING  # noqa: E402
 from new_gui.workspace_state import EXPERIMENTAL, FE  # noqa: E402
@@ -585,27 +586,26 @@ class IntegrityTests(_Case):
 
 
 class WindowTests(_Case):
-    def window(self, **kwargs):
-        window = window_module.MainWindow(analyze_options={"runner": Runner(plate_nodes()), "discover": FOUND,
-                                                           "consent": self.consent}, **kwargs)
+    def window(self, kind=production_window.ProductionWindow):
+        window = kind(analyze_options={"runner": Runner(plate_nodes()), "discover": FOUND, "consent": self.consent})
         self.addCleanup(window.deleteLater)
         self.addCleanup(window.close)
         return window
 
     def test_the_program_starts_on_analyze(self):
         source = (ROOT / "src" / "new_gui" / "__main__.py").read_text(encoding="utf-8")
-        self.assertIn("MainWindow(start_page=ANALYZE_PAGE)", source)
-        window = self.window(start_page=window_module.ANALYZE_PAGE)
+        self.assertIn("ProductionWindow()", source)
+        window = self.window()
         self.assertIs(window.stack.currentWidget().widget().findChild(AnalyzePanel), window.analyze)
 
-    def test_the_sidebar_puts_the_workflow_first_and_keeps_the_research_pages_separately(self):
-        window = self.window()
+    def test_the_earlier_window_puts_the_workflow_first_and_keeps_the_research_pages_separately(self):
+        window = self.window(window_module.MainWindow)
         names = [b.text() for b in window.sidebar.findChildren(QPushButton) if b.isCheckable()]
         self.assertEqual(names[:2], ["Analyze", "Materials"])
         self.assertEqual(set(names[2:]), {"Workspace", "Analysis", "Status", "Plate Study", "Research Results"})
 
     def test_the_known_sources_shortcut_left_the_file_menu(self):
-        window = self.window()
+        window = self.window(window_module.MainWindow)
         file_menu = [a.text() for a in window.menuBar().actions()[0].menu().actions()]
         self.assertNotIn(window_module.KNOWN_SOURCES, file_menu)
         research = next(a.menu() for a in window.menuBar().actions() if a.text() == "&Research")
@@ -630,7 +630,7 @@ class WindowTests(_Case):
 class PrimaryWorkflowTextTests(unittest.TestCase):
     """No specimen, no research shortcut and no plate-specific wording in the primary workflow."""
 
-    FILES = ("analyze_model.py", "analyze_panel.py")
+    FILES = ("analyze_model.py", "analyze_panel.py", "production_window.py", "materials_status_panel.py", "theme.py")
 
     def test_no_specimen_or_plate_wording(self):
         pattern = re.compile(r"SP-?\d|M11|PLATE|plate|Plate|specimen|Specimen|known_sources|research_results")

@@ -352,14 +352,16 @@ class SeparationTests(unittest.TestCase):
                                                    "fe_response_panel.py", "generic_plate_panel.py",
                                                    "known_sources.py",
                                                    "known_sources_dialog.py", "materials_model.py",
-                                                   "materials_panel.py", "odb_import_dialog.py",
+                                                   "materials_panel.py", "materials_status_panel.py",
+                                                   "odb_import_dialog.py",
                                                    "odb_import_model.py", "physical_review_panel.py",
                                                    "plate_study_model.py",
                                                    "plate_study_panel.py", "preview_model.py", "preview_panel.py",
+                                                   "production_window.py",
                                                    "registration_check_model.py", "registration_check_panel.py",
                                                    "report_export.py", "research_results_model.py",
                                                    "research_results_panel.py", "shape_model.py", "shape_panel.py",
-                                                   "window.py", "workspace_state.py"])
+                                                   "theme.py", "window.py", "workspace_state.py"])
         stdlib = set(sys.stdlib_module_names) | {"__future__"}
         for path in files:
             for name in _imports(path):

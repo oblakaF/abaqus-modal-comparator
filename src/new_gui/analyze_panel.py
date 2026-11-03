@@ -5,6 +5,9 @@ ask for a modal set only when the file holds several, run the frequency-only dia
 show the result. Pairs and MAC appear only with a verified registration; otherwise the status is REGISTRATION_REQUIRED.
 The steps are ``new_gui.analyze_model``'s and run in worker threads. Replacing a file or Cancel stops the running step
 and discards its outcome.
+
+UNIVERSAL-UI-2: compact progress, the result's scientific notes behind Show details, the tables on tabs. The status, the
+registration outcome and the number of warnings stay visible.
 """
 
 from __future__ import annotations
@@ -15,7 +18,8 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (QBoxLayout, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPlainTextEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget)
+                               QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTabWidget,
+                               QVBoxLayout, QWidget)
 
 from new_gui import analyze_model as am
 from new_gui import comparison_model as cm
@@ -26,13 +30,20 @@ from new_gui.workspace_state import EXPERIMENTAL, FE
 
 TITLE = "Analyze"
 SUBTITLE = "Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze."
-CAPTIONS = {FE: "FE results (.odb)", EXPERIMENTAL: "Experimental data (.unv, .uff)"}
+CAPTIONS = {FE: "FE results (.odb)", EXPERIMENTAL: "Experiment (.unv, .uff)"}
 ANALYZE = "Analyze"
 CANCEL = "Cancel"
 CHOOSE_SET = "Choose a modal set..."
 IDLE, RUNNING, NEED_SET, DONE, BLOCKED = "idle", "running", "need_set", "done", "blocked"
-SIDE_BY_SIDE_WIDTH = 720  # below this page width the two shapes are stacked
-SHAPE_HINT = "Click a row to show that EXP record and its nearest FE mode side by side. They are not a mode pair."
+SIDE_BY_SIDE_WIDTH = 600  # below this page width the two shapes are stacked
+TABLE_HEIGHT = 250  # a long table scrolls, so that the shapes stay near
+SHOW_DETAILS, HIDE_DETAILS = "Show details", "Hide details"
+SHOW_LOG, HIDE_LOG = "Show log", "Hide log"
+SHAPE_HINT = ("Click a row to show that EXP record and its nearest FE mode side by side, each on its own coordinates. "
+              "They are not a mode pair.")
+TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "nearest": "Nearest frequency", "fe": "FE modes",
+              "experimental": "Experimental modes"}
+BADGE_STATE = {cm.PAIRS_FOUND: "read"}  # any other status is not a verified pairing; a failed check is "blocked"
 _FIND, _EXTRACT, _READ, _ANALYSE = "find", "extract", "read", "analyse"
 
 
@@ -54,6 +65,36 @@ def _card() -> tuple[QFrame, QVBoxLayout]:
     layout.setContentsMargins(16, 14, 16, 14)
     layout.setSpacing(8)
     return frame, layout
+
+
+class _ResultTable(DiagnosticTable):
+    height_cap = TABLE_HEIGHT
+
+    def __init__(self, headers, rows, stretch: int):
+        super().__init__(headers, rows, stretch)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+
+class _Details(QWidget):
+    """A toggle and the text behind it, collapsed until the user asks."""
+
+    def __init__(self, lines):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        self.toggle = QPushButton(SHOW_DETAILS)
+        self.toggle.setObjectName("detailsToggle")
+        self.toggle.setCheckable(True)
+        self.toggle.toggled.connect(self._toggled)
+        layout.addWidget(self.toggle, 0, Qt.AlignmentFlag.AlignLeft)
+        self.body = _label("\n".join(lines), "hint")
+        self.body.setVisible(False)
+        layout.addWidget(self.body)
+
+    def _toggled(self, shown: bool) -> None:
+        self.toggle.setText(HIDE_DETAILS if shown else SHOW_DETAILS)
+        self.body.setVisible(shown)
 
 
 class _Bridge(QObject):
@@ -86,6 +127,10 @@ class AnalyzePanel(QWidget):
         self.analysis: Optional[am.Analysis] = None
         self.discarded = 0
         self.status_label: Optional[QLabel] = None
+        self.registration_label: Optional[QLabel] = None
+        self.warning_label: Optional[QLabel] = None
+        self.details: Optional[_Details] = None
+        self.result_tabs: Optional[QTabWidget] = None
         self.tables: dict = {}
         self._token = 0
         self._cancel: Optional[threading.Event] = None
@@ -107,7 +152,7 @@ class AnalyzePanel(QWidget):
         self.shapes_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, self.shapes)
         self.shapes_layout.setContentsMargins(0, 0, 0, 0)
         self.shapes_layout.setSpacing(12)
-        self.shape_panels = {kind: ShapePanel(kind) for kind in (EXPERIMENTAL, FE)}
+        self.shape_panels = {kind: ShapePanel(kind, compact=True) for kind in (EXPERIMENTAL, FE)}
         for panel in self.shape_panels.values():
             self.shapes_layout.addWidget(panel, 1, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.shapes)
@@ -120,19 +165,21 @@ class AnalyzePanel(QWidget):
         card, inner = _card()
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
-        grid.setColumnStretch(1, 1)
+        grid.setVerticalSpacing(4)
+        grid.setColumnStretch(0, 1)
         self.fields, self.choose_buttons = {}, {}
         for row, kind in enumerate((FE, EXPERIMENTAL)):
-            grid.addWidget(QLabel(CAPTIONS[kind]), row, 0)
+            grid.addWidget(QLabel(CAPTIONS[kind]), 2 * row, 0, 1, 2)  # above its field: any window width fits
             field = QLineEdit()
             field.setReadOnly(True)
             field.setObjectName(f"analyzeFile_{kind}")
             field.setPlaceholderText("not chosen")
-            grid.addWidget(field, row, 1)
+            field.setMinimumWidth(80)
+            grid.addWidget(field, 2 * row + 1, 0)
             button = QPushButton("Choose file...")
             button.setObjectName(f"analyzeChoose_{kind}")
             button.clicked.connect(lambda _checked=False, k=kind: self.choose_file(k))
-            grid.addWidget(button, row, 2)
+            grid.addWidget(button, 2 * row + 1, 1)
             self.fields[kind], self.choose_buttons[kind] = field, button
         inner.addLayout(grid)
         self.file_error = _label("", "error")
@@ -146,16 +193,16 @@ class AnalyzePanel(QWidget):
         self.cancel_button.setObjectName("analyzeCancel")
         self.cancel_button.clicked.connect(self.cancel)
         row.addWidget(self.cancel_button)
+        row.addStretch(1)
+        inner.addLayout(row)
         self.launcher_button = QPushButton("Choose Abaqus launcher...")
         self.launcher_button.setObjectName("analyzeLauncher")
         self.launcher_button.clicked.connect(lambda: self.choose_launcher())
-        row.addWidget(self.launcher_button)
+        inner.addWidget(self.launcher_button, 0, Qt.AlignmentFlag.AlignLeft)
         self.folder_button = QPushButton("Choose extraction folder...")
         self.folder_button.setObjectName("analyzeFolder")
         self.folder_button.clicked.connect(lambda: self.choose_folder())
-        row.addWidget(self.folder_button)
-        row.addStretch(1)
-        inner.addLayout(row)
+        inner.addWidget(self.folder_button, 0, Qt.AlignmentFlag.AlignLeft)
         self.set_row = QWidget()
         set_layout = QHBoxLayout(self.set_row)
         set_layout.setContentsMargins(0, 0, 0, 0)
@@ -168,8 +215,20 @@ class AnalyzePanel(QWidget):
         self.set_combo.activated.connect(self._set_activated)
         set_layout.addWidget(self.set_combo, 1)
         inner.addWidget(self.set_row)
+        self.progress = QProgressBar()
+        self.progress.setObjectName("analyzeProgress")
+        self.progress.setRange(0, 0)  # the steps report no fraction: it says only that the work goes on
+        self.progress.setTextVisible(False)
+        self.progress.setFixedHeight(6)
+        inner.addWidget(self.progress)
         self.message = _label("", "hint")
+        self.message.setVisible(False)
         inner.addWidget(self.message)
+        self.log_button = QPushButton(SHOW_LOG)
+        self.log_button.setObjectName("detailsToggle")
+        self.log_button.setCheckable(True)
+        self.log_button.toggled.connect(self._log_toggled)
+        inner.addWidget(self.log_button, 0, Qt.AlignmentFlag.AlignLeft)
         self.log = QPlainTextEdit()
         self.log.setObjectName("analyzeLog")
         self.log.setReadOnly(True)
@@ -236,6 +295,10 @@ class AnalyzePanel(QWidget):
         self.folder = Path(path)
         self._set_message(f"Extraction folder: {self.folder}. Click Analyze.", "hint")
         return True
+
+    def _log_toggled(self, shown: bool) -> None:
+        self.log_button.setText(HIDE_LOG if shown else SHOW_LOG)
+        self._refresh()
 
     def _reset(self) -> None:
         self._stop()
@@ -324,6 +387,7 @@ class AnalyzePanel(QWidget):
     def _progress(self, token: int, text: str) -> None:
         if token == self._token:
             self.log.appendPlainText(text)
+            self._refresh()
 
     def _step_done(self, token: int, step: str, value) -> None:
         if token != self._token:
@@ -459,7 +523,10 @@ class AnalyzePanel(QWidget):
         self.set_row.setVisible(self.set_combo.count() > 1)
         self.set_combo.setEnabled(not running)
         blocked = self.state == BLOCKED
-        self.log.setVisible(running or (blocked and bool(self.log.toPlainText())))
+        self.progress.setVisible(running)
+        has_log = (running or blocked) and bool(self.log.toPlainText())
+        self.log_button.setVisible(has_log)
+        self.log.setVisible(has_log and self.log_button.isChecked())
         self.launcher_button.setVisible(blocked and self.plan is not None and not self.plan.ready)
         self.folder_button.setVisible(blocked)
         self.changed.emit()
@@ -474,59 +541,83 @@ class AnalyzePanel(QWidget):
         for panel in self.shape_panels.values():
             panel.set_preview(None)
         self.shapes.setVisible(analysis is not None)
-        self.status_label = None
+        self.status_label = self.registration_label = self.warning_label = None
+        self.details = self.result_tabs = None
         self.tables: dict = {}
         if analysis is None:
             return
-        card, inner = _card()
-        self.status_label = _label(analysis.status, "cardTitle")
-        inner.addWidget(self.status_label)
-        statement = _label(analysis.statement, "hint")
-        if analysis.registration_reason:
-            statement.setToolTip(analysis.registration_reason)
-        inner.addWidget(statement)
-        inner.addWidget(_label("\n".join(analysis.facts), "hint"))
-        inner.addWidget(_label(am.RIGID_NOTE, "hint"))
-        if analysis.notes:
-            inner.addWidget(_label("\n".join(f"• {note}" for note in analysis.notes), "warnings"))
-        self.result_layout.addWidget(card)
+        self._add_summary(analysis)
+        self.result_tabs = QTabWidget()
+        self.result_tabs.setObjectName("analyzeResults")
+        self.result_tabs.setDocumentMode(True)
+        tabs_card, tabs_inner = _card()
+        tabs_inner.addWidget(self.result_tabs)
+        self.result_layout.addWidget(tabs_card)
         if analysis.comparison is not None:
             self._add_comparison(analysis.comparison)
         self._add_table("nearest", NEAREST_TITLE, am.NEAREST_HEADERS, analysis.nearest_rows, 9, SHAPE_HINT)
         self.tables["nearest"].cellClicked.connect(lambda row, _column: self.show_candidate(row))
-        self._add_table("fe", "FE frequencies", am.FE_HEADERS, analysis.fe_rows, 2)
-        self._add_table("experimental", "Experimental frequencies", am.EXPERIMENTAL_HEADERS, analysis.experimental_rows, 3)
+        self._add_table("fe", "", am.FE_HEADERS, analysis.fe_rows, 2)
+        self._add_table("experimental", "", am.EXPERIMENTAL_HEADERS, analysis.experimental_rows, 3)
         self.shape_panels[EXPERIMENTAL].set_preview(self.inputs.experimental)
         self.shape_panels[FE].set_preview(self.inputs.fe)
         for panel in self.shape_panels.values():
             panel.component_combo.setCurrentIndex(panel.component_combo.findData("magnitude"))  # any geometry
 
-    def _add_table(self, key: str, title: str, headers, rows, stretch: int, hint: str = "") -> None:
+    def _add_summary(self, analysis: am.Analysis) -> None:
+        """The status, the registration outcome and the warning count are always visible; the wording is behind Details."""
         card, inner = _card()
-        inner.addWidget(_label(title, "cardTitle"))
-        if hint:
-            inner.addWidget(_label(hint, "hint"))
-        table = DiagnosticTable(headers, rows, stretch)
+        failed = analysis.registration_outcome == am.FAILED
+        self.status_label = QLabel(analysis.status)
+        self.status_label.setObjectName("badge")
+        self.status_label.setProperty("state", "blocked" if failed else BADGE_STATE.get(analysis.status, "chosen"))
+        self.status_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        inner.addWidget(self.status_label, 0, Qt.AlignmentFlag.AlignLeft)
+        inner.addWidget(_label(analysis.statement))
+        if analysis.registration_note:
+            self.registration_label = _label(analysis.registration_note, "error" if failed else "warnings")
+            inner.addWidget(self.registration_label)
+        inner.addWidget(_label(analysis.summary, "hint"))
+        if analysis.notes:
+            count = len(analysis.notes)
+            self.warning_label = _label(f"{count} warning{'' if count == 1 else 's'}: see details.", "warnings")
+            inner.addWidget(self.warning_label)
+        self.details = _Details(analysis.facts + (am.RIGID_NOTE,) + tuple(f"• {note}" for note in analysis.notes))
+        inner.addWidget(self.details)
+        self.result_layout.addWidget(card)
+
+    def _add_table(self, key: str, title: str, headers, rows, stretch: int, hint: str = "") -> None:
+        page = QWidget()
+        inner = QVBoxLayout(page)
+        inner.setContentsMargins(0, 8, 0, 0)
+        inner.setSpacing(8)
+        for text, name in ((title, "sectionTitle"), (hint, "hint")):
+            if text:
+                inner.addWidget(_label(text, name))
+        table = _ResultTable(headers, rows, stretch)
         self.tables[key] = table
         inner.addWidget(table)
-        self.result_layout.addWidget(card)
+        inner.addStretch(1)
+        self.result_tabs.addTab(page, TAB_TITLES[key])
 
     def _add_comparison(self, view) -> None:
         pairs = tuple(tuple(row.cells[i] for i in am.PAIR_COLUMNS) for row in view.pair_rows)
         if pairs:
-            self._add_table("pairs", "FE-EXP mode pairs", am.PAIR_HEADERS, pairs, 7)
+            self._add_table("pairs", "", am.PAIR_HEADERS, pairs, 7)
         else:
             card, inner = _card()
             inner.addWidget(_label(cm.NO_PAIR_TEXT, "hint"))
-            self.result_layout.addWidget(card)
+            self.result_layout.insertWidget(self.result_layout.count() - 1, card)
         if view.mac_cells:
             headers = ("FE \\ EXP",) + tuple(str(mode) for mode in view.mac_experimental_modes)
             rows = tuple((str(mode),) + tuple(cells) for mode, cells in zip(view.mac_fe_modes, view.mac_cells))
-            self._add_table("mac", "MAC", headers, rows, 0)
+            self._add_table("mac", "", headers, rows, 0)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self.shapes_layout.setDirection(QBoxLayout.Direction.TopToBottom if event.size().width() < SIDE_BY_SIDE_WIDTH
+        need = sum(panel.minimumSizeHint().width() for panel in self.shape_panels.values()) + 12
+        self.shapes_layout.setDirection(QBoxLayout.Direction.TopToBottom
+                                        if event.size().width() < max(SIDE_BY_SIDE_WIDTH, need)
                                         else QBoxLayout.Direction.LeftToRight)
 
     def busy(self) -> bool:

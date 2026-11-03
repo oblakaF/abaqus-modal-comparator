@@ -46,7 +46,7 @@ import time
 from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QGuiApplication, QKeySequence, QPalette
+from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
                                QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
@@ -67,6 +67,7 @@ from new_gui.preview_panel import PreviewPanel
 from new_gui.registration_check_panel import RegistrationCheckPanel
 from new_gui.research_results_panel import ResearchResultsPanel
 from new_gui.shape_panel import ShapePanel
+from new_gui.theme import create_application, light_palette  # noqa: F401  (kept importable here)
 from new_gui.workspace_state import (ANALYSIS_NOT_RUN, CHECK_ODB_SOURCE, CHOSEN_NOTE, DIALOG_FILTERS, EMPTY_TEXT,
                                      EXPERIMENTAL, EXTRACT_ODB, FE, KIND_HELP, KIND_TITLE, KINDS, LABEL_HINT, ODB_NOTE,
                                      Workspace, has_odb_source, scientific_status)
@@ -82,79 +83,6 @@ KNOWN_SOURCES = "Choose a known new experimental source..."
 DIALOG_TITLES = {FE: "Choose the FE results file", EXPERIMENTAL: "Choose the experimental data file"}
 OPEN_ARCHIVE = "Open research archive..."
 NARROW_WIDTH = 760  # below this content width the two source cards are stacked
-STYLE = """
-QWidget { color: #1f2933; font-size: 10pt; }
-QMainWindow, #content, QScrollArea, QScrollArea > QWidget > QWidget { background: #f4f6f9; }
-QScrollArea { border: none; }
-#sidebar { background: #1f2a37; }
-#sidebar QLabel { color: #e4e7eb; }
-#appName { font-size: 11pt; font-weight: 600; }
-#stage { color: #9aa5b1; font-size: 9pt; }
-#sidebar QPushButton { color: #e4e7eb; background: transparent; border: none; border-radius: 6px;
-                       padding: 8px 12px; text-align: left; }
-#sidebar QPushButton:hover { background: #323f4b; }
-#sidebar QPushButton:checked { background: #3e4c59; font-weight: 600; }
-#sidebar QPushButton#archiveButton { border: 1px solid #52606d; text-align: center; }
-#pageTitle { font-size: 16pt; font-weight: 600; }
-#subtitle, #hint { color: #52606d; }
-#card, #emptyState { background: #ffffff; border: 1px solid #d9dee5; border-radius: 8px; }
-#emptyState { background: #eef4ff; border-color: #bcd0f7; }
-#cardTitle { font-size: 12pt; font-weight: 600; }
-#badge { border-radius: 10px; padding: 2px 10px; background: #e4e7eb; color: #3e4c59; }
-#badge[state="chosen"] { background: #fff4d6; color: #7a5200; }
-#badge[state="blocked"] { background: #fde8e8; color: #9b1c1c; }
-#badge[state="read"] { background: #e3f4e8; color: #1e6b37; }
-#sectionTitle { font-weight: 600; }
-#warnings { color: #7a4b00; }
-QTableWidget { background: #ffffff; border: 1px solid #d9dee5; gridline-color: #e4e7eb; }
-QHeaderView::section { background: #eef1f5; border: none; border-right: 1px solid #d9dee5; padding: 4px 6px; }
-#error { color: #b42318; }
-#fileName { font-weight: 600; }
-QLineEdit { background: #ffffff; border: 1px solid #c4cdd5; border-radius: 4px; padding: 4px 6px; }
-QLineEdit[readOnly="true"] { background: #f8f9fb; }
-QPushButton { background: #ffffff; border: 1px solid #c4cdd5; border-radius: 4px; padding: 5px 12px; }
-QPushButton:hover { border-color: #2563eb; }
-QPushButton:disabled { color: #9aa5b1; border-color: #e4e7eb; }
-QPushButton#primary { background: #2563eb; border-color: #2563eb; color: #ffffff; }
-QPushButton#primary:hover { background: #1d4ed8; }
-QPushButton#primary:disabled { background: #e4e7eb; border-color: #e4e7eb; color: #9aa5b1; }
-QStatusBar { background: #e9edf2; color: #3e4c59; }
-QMenuBar { background: #ffffff; border-bottom: 1px solid #d9dee5; }
-QMenuBar::item:selected, QMenu::item:selected { background: #2563eb; color: #ffffff; }
-QMenu { background: #ffffff; border: 1px solid #d9dee5; }
-QDialog { background: #f4f6f9; }
-"""
-
-
-PALETTE = {  # one light theme, whatever the Windows colour mode (a dark system palette would hide dark text)
-    QPalette.ColorRole.Window: "#f4f6f9", QPalette.ColorRole.WindowText: "#1f2933",
-    QPalette.ColorRole.Base: "#ffffff", QPalette.ColorRole.AlternateBase: "#f8f9fb",
-    QPalette.ColorRole.Text: "#1f2933", QPalette.ColorRole.Button: "#ffffff",
-    QPalette.ColorRole.ButtonText: "#1f2933", QPalette.ColorRole.Highlight: "#2563eb",
-    QPalette.ColorRole.HighlightedText: "#ffffff", QPalette.ColorRole.ToolTipBase: "#ffffff",
-    QPalette.ColorRole.ToolTipText: "#1f2933", QPalette.ColorRole.PlaceholderText: "#7b8794",
-    QPalette.ColorRole.Link: "#2563eb", QPalette.ColorRole.BrightText: "#ffffff",
-}
-
-
-def light_palette() -> QPalette:
-    palette = QPalette()
-    for role, colour in PALETTE.items():
-        palette.setColor(role, QColor(colour))
-    for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text, QPalette.ColorRole.ButtonText):
-        palette.setColor(QPalette.ColorGroup.Disabled, role, QColor("#9aa5b1"))
-    return palette
-
-
-def create_application(argv: list[str]) -> QApplication:
-    app = QApplication(argv)
-    app.setApplicationName(APP_NAME)
-    if hasattr(app.styleHints(), "setColorScheme"):  # Qt 6.8+
-        app.styleHints().setColorScheme(Qt.ColorScheme.Light)
-    app.setStyle("Fusion")  # the same look under any Windows theme; the colours are set by PALETTE and STYLE
-    app.setPalette(light_palette())
-    app.setStyleSheet(STYLE)
-    return app
 
 
 def _label(text: str = "", name: str = "", wrap: bool = True) -> QLabel:

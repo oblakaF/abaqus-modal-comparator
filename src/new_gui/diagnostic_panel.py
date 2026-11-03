@@ -57,6 +57,8 @@ class DiagnosticTable(QTableWidget):
     """A read-only table as tall as its rows. ``stretch`` takes the free width (never less than its header);
     ``capped`` text columns are at most TEXT_CAP wide. When the columns do not fit, the table scrolls horizontally."""
 
+    height_cap: Optional[int] = None  # a subclass may limit the height; its rows then scroll
+
     def __init__(self, headers, rows, stretch: int, capped=(), text_columns=()):
         super().__init__(len(rows), len(headers))
         self.setObjectName("diagnosticTable")
@@ -102,6 +104,8 @@ class DiagnosticTable(QTableWidget):
         overflow = header.length() > self.viewport().width()
         height = (header.sizeHint().height() + self.verticalHeader().length() + 2 * self.frameWidth() + 2
                   + (self.horizontalScrollBar().sizeHint().height() if overflow else 0))
+        if self.height_cap is not None:
+            height = min(height, self.height_cap)
         if self.height() != height:
             self.setFixedHeight(height)
 
