@@ -336,7 +336,9 @@ class SeparationTests(unittest.TestCase):
                        # PRIORITY-5A: the archived research results reader (no computation, no solver)
                        "services.research_results_reader",
                        # RC6: the ODB import adapter (the Abaqus bridge is behind it; nothing starts unconfirmed)
-                       "services.odb_import_service"}
+                       "services.odb_import_service",
+                       # UNIVERSAL-REG-1: the diagnostic evidence check (no FrozenRegistration, no comparator)
+                       "services.generic_registration"}
     # NEW-GUI.6: the scientific comparator and the program's own final drawing / report owners, each only in the one
     # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
     SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
@@ -357,8 +359,8 @@ class SeparationTests(unittest.TestCase):
                                                    "odb_import_model.py", "physical_review_panel.py",
                                                    "plate_study_model.py",
                                                    "plate_study_panel.py", "preview_model.py", "preview_panel.py",
-                                                   "production_window.py",
-                                                   "registration_check_model.py", "registration_check_panel.py",
+                                                   "production_window.py", "registration_check_model.py",
+                                                   "registration_check_panel.py", "registration_dialog.py",
                                                    "report_export.py", "research_results_model.py",
                                                    "research_results_panel.py", "shape_model.py", "shape_panel.py",
                                                    "theme.py", "window.py", "workspace_state.py"])

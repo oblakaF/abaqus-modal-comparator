@@ -25,6 +25,7 @@ from new_gui import analyze_model as am
 from new_gui import comparison_model as cm
 from new_gui.diagnostic_model import NEAREST_TITLE
 from new_gui.diagnostic_panel import DiagnosticTable
+from new_gui.registration_dialog import RegistrationDialog
 from new_gui.shape_panel import ShapePanel
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
@@ -39,6 +40,9 @@ SIDE_BY_SIDE_WIDTH = 600  # below this page width the two shapes are stacked
 TABLE_HEIGHT = 250  # a long table scrolls, so that the shapes stay near
 SHOW_DETAILS, HIDE_DETAILS = "Show details", "Hide details"
 SHOW_LOG, HIDE_LOG = "Show log", "Hide log"
+SET_UP_REGISTRATION = "Set up registration..."
+PROPOSED_TEXT = "Registration setup: the geometry checks passed. Diagnostic only: not applied, so no MAC and no mode pairs."
+REFUSED_TEXT = "Registration setup: the evidence does not establish a registration."
 SHAPE_HINT = ("Click a row to show that EXP record and its nearest FE mode side by side, each on its own coordinates. "
               "They are not a mode pair.")
 TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "nearest": "Nearest frequency", "fe": "FE modes",
@@ -130,6 +134,10 @@ class AnalyzePanel(QWidget):
         self.registration_label: Optional[QLabel] = None
         self.warning_label: Optional[QLabel] = None
         self.details: Optional[_Details] = None
+        self.registration_button: Optional[QPushButton] = None
+        self.registration_dialog: Optional[RegistrationDialog] = None
+        self.proposal = None
+        self.proposal_label: Optional[QLabel] = None
         self.result_tabs: Optional[QTabWidget] = None
         self.tables: dict = {}
         self._token = 0
@@ -299,6 +307,31 @@ class AnalyzePanel(QWidget):
     def _log_toggled(self, shown: bool) -> None:
         self.log_button.setText(HIDE_LOG if shown else SHOW_LOG)
         self._refresh()
+
+    def open_registration(self) -> Optional[RegistrationDialog]:
+        """The evidence dialog for the shown result; it changes nothing on the page but its own summary line."""
+        if self.analysis is None or self.inputs is None or self.analysis.comparison is not None:
+            return None
+        if self.registration_dialog is None:
+            self.registration_dialog = RegistrationDialog(self.inputs, self.analysis.set_index, self)
+            self.registration_dialog.checked.connect(self._proposal_checked)
+        self.registration_dialog.show()
+        self.registration_dialog.raise_()
+        return self.registration_dialog
+
+    def _proposal_checked(self, proposal) -> None:
+        self.proposal = proposal
+        if self.proposal_label is not None:
+            self.proposal_label.setText(PROPOSED_TEXT if proposal.proposed else REFUSED_TEXT)
+            self.proposal_label.setVisible(True)
+
+    def _close_registration(self) -> None:
+        dialog, self.registration_dialog = self.registration_dialog, None
+        self.proposal = None
+        if dialog is not None:
+            dialog.checked.disconnect(self._proposal_checked)
+            dialog.close()
+            dialog.deleteLater()
 
     def _reset(self) -> None:
         self._stop()
@@ -532,6 +565,7 @@ class AnalyzePanel(QWidget):
         self.changed.emit()
 
     def _show_result(self) -> None:
+        self._close_registration()  # a proposal belongs to the result it was stated on
         while self.result_layout.count():
             widget = self.result_layout.takeAt(0).widget()
             if widget is not None:
@@ -542,7 +576,7 @@ class AnalyzePanel(QWidget):
             panel.set_preview(None)
         self.shapes.setVisible(analysis is not None)
         self.status_label = self.registration_label = self.warning_label = None
-        self.details = self.result_tabs = None
+        self.details = self.result_tabs = self.registration_button = self.proposal_label = None
         self.tables: dict = {}
         if analysis is None:
             return
@@ -584,6 +618,14 @@ class AnalyzePanel(QWidget):
             inner.addWidget(self.warning_label)
         self.details = _Details(analysis.facts + (am.RIGID_NOTE,) + tuple(f"• {note}" for note in analysis.notes))
         inner.addWidget(self.details)
+        if analysis.comparison is None:
+            self.proposal_label = _label("", "warnings")
+            self.proposal_label.setVisible(False)
+            inner.addWidget(self.proposal_label)
+            self.registration_button = QPushButton(SET_UP_REGISTRATION)
+            self.registration_button.setObjectName("analyzeSetUpRegistration")
+            self.registration_button.clicked.connect(lambda: self.open_registration())
+            inner.addWidget(self.registration_button, 0, Qt.AlignmentFlag.AlignLeft)
         self.result_layout.addWidget(card)
 
     def _add_table(self, key: str, title: str, headers, rows, stretch: int, hint: str = "") -> None:
@@ -622,11 +664,13 @@ class AnalyzePanel(QWidget):
 
     def busy(self) -> bool:
         return (self.state == RUNNING or any(thread.is_alive() for thread in self._threads)
-                or any(panel.busy() for panel in self.shape_panels.values()))
+                or any(panel.busy() for panel in self.shape_panels.values())
+                or (self.registration_dialog is not None and self.registration_dialog.busy()))
 
     def shutdown(self) -> None:
         self._stop()
         self.state = IDLE
+        self._close_registration()
         for panel in self.shape_panels.values():
             panel.cancel()
 

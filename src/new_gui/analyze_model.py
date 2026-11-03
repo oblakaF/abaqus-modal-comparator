@@ -10,6 +10,9 @@ UNIVERSAL-UI-3: one mode scope for every result: FE modes 1-20 and the first 20 
 source identities and the registration are verified on the full read data; the diagnostic, the comparator, the tables,
 the counts and the shape choices then use read-only subsets, so a mode outside the scope influences nothing shown.
 
+UNIVERSAL-REG-1: ``propose_registration`` checks stated physical evidence on the read files, once they are confirmed
+unchanged. Its proposal is diagnostic: it never reaches ``analyse``, so the status, the pairs and the MAC do not change.
+
 The extraction package is managed here: it lives in ``<odb folder>/<odb name>_modal_packages`` and is found again by the
 ODB's content (SHA-256) and the requested range, so the user never chooses a ``manifest.json``.
 """
@@ -27,6 +30,7 @@ from new_gui import diagnostic_model as dm
 from new_gui import preview_model as pm
 from new_gui import registration_check_model as rm
 from new_gui.workspace_state import EXPERIMENTAL, FE
+from services import generic_registration as gr
 from services import odb_import_service as svc
 
 FIRST_MODE, LAST_MODE = 1, 20  # the first 20 modes; never fewer at the low end, so EXP1 and the first elastic FE stay
@@ -206,6 +210,22 @@ def confirm_sources(inputs: Inputs, cancel_event) -> None:
         raise StepFailed(STALE_TEXT) from error
 
 
+def registration_geometry(inputs: Inputs, set_index: int) -> tuple:
+    return gr.geometry_summary(inputs.full_fe.dataset, inputs.full_experimental.sets[set_index].dataset)
+
+
+def propose_registration(inputs: Inputs, set_index: int, evidence: gr.Evidence, cancel_event) -> gr.Proposal:
+    """The evidence checked on the read data, or REGISTRATION_REQUIRED when a file changed since it was read."""
+    try:
+        confirm_sources(inputs, cancel_event)
+    except StepFailed as error:
+        return gr.required([gr.Problem(gr.STALE, str(error))], evidence=evidence)
+    proposal = gr.propose(inputs.full_fe.dataset, inputs.full_experimental.sets[set_index].dataset, evidence)
+    if cancel_event.is_set():
+        raise StepCancelled()
+    return proposal
+
+
 def _ranges(numbers) -> str:
     """1, 2, 13-20"""
     parts, numbers = [], sorted(numbers)
@@ -321,5 +341,5 @@ def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
 
 
 __all__ = ["Analysis", "Inputs", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse", "consent_text",
-           "confirm_sources", "extract", "file_problem", "find_package", "make_plan", "package_folder", "plan_warnings",
+           "confirm_sources", "extract", "propose_registration", "registration_geometry", "file_problem", "find_package", "make_plan", "package_folder", "plan_warnings",
            "read_inputs", "scoped_experimental", "scoped_fe", "scoped_inputs"]

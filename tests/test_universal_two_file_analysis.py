@@ -630,7 +630,8 @@ class WindowTests(_Case):
 class PrimaryWorkflowTextTests(unittest.TestCase):
     """No specimen, no research shortcut and no plate-specific wording in the primary workflow."""
 
-    FILES = ("analyze_model.py", "analyze_panel.py", "production_window.py", "materials_status_panel.py", "theme.py")
+    FILES = ("analyze_model.py", "analyze_panel.py", "production_window.py", "materials_status_panel.py", "theme.py",
+             "registration_dialog.py")
 
     def test_no_specimen_or_plate_wording(self):
         pattern = re.compile(r"SP-?\d|M11|PLATE|plate|Plate|specimen|Specimen|known_sources|research_results")
