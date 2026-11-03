@@ -273,8 +273,8 @@ class FirstTwentyTests(_Case):
         self.assertEqual(len(rows), 20)
         self.assertEqual(rows[0][:3], ("EXP1", "1", "20.5000"))
         self.assertEqual(rows[-1][0], "EXP20")
-        self.assertIn("20 of 25 record(s)", panel.analysis.facts[1])
-        self.assertEqual(len(panel.inputs.experimental.sets[0].records), 25)  # the read data are not changed
+        self.assertIn("20 of 25 record(s) analyzed", panel.analysis.facts[1])
+        self.assertEqual(len(panel.inputs.full_experimental.sets[0].records), 25)  # the read data are not changed
 
     def test_a_short_odb_is_analysed_with_what_it_holds(self):
         nodes = plate_nodes()

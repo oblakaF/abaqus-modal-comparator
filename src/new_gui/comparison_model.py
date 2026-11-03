@@ -28,6 +28,10 @@ manifest is hashed again and the experimental file's fresh SHA-256 (from the ser
 changed since it was read is refused before the comparator runs. The outcome keeps these identities: an export states
 them, never a hash taken later.
 
+UNIVERSAL-UI-3: ``scope`` is an optional pair of subset previews of the verified data. Everything verified above is
+verified on the full previews; the comparator and the display wording then see the subset only, so a mode outside it
+cannot take part in the assignment.
+
 One heavy operation at a time: the comparison shares the lock of the frequency diagnostic and the registration check
 (NEW-GUI.4/5). ``ComparisonSlot`` keeps the current request; a replaced or cleared file, Inspect again, another modal
 set, a new registration check or a closed window cancels it and its outcome is discarded. A request cancelled while
@@ -154,9 +158,22 @@ def check_sources(fe_preview, sources: Optional[dict], experimental_now: Optiona
     return {"fe": fe_read, "experimental": experimental_read}
 
 
+def _check_scope(fe_preview, experimental_preview, set_index: int, scope: tuple) -> None:
+    """A scope holds only modes of the verified data, each with its own number and frequency."""
+    def identities(dataset) -> list:
+        return [(int(mode.number), float(mode.frequency_hz)) for mode in dataset.modes]
+
+    full = (identities(fe_preview.dataset), identities(experimental_preview.sets[set_index].dataset))
+    chosen = (identities(scope[0].dataset), identities(scope[1].sets[set_index].dataset))
+    if not all(chosen[side] and set(chosen[side]) <= set(full[side]) for side in (0, 1)):
+        raise ComparisonRefused("the selected modes are not modes of the verified data.")
+
+
 def compare(fe_preview, experimental_preview, set_index: int, registration_hash: Optional[str],
-            cancel_event: Optional[threading.Event] = None, sources: Optional[dict] = None):
-    """Verify the registration again and run the scientific comparator; returns (bound registration, result)."""
+            cancel_event: Optional[threading.Event] = None, sources: Optional[dict] = None,
+            scope: Optional[tuple] = None):
+    """Verify the registration again on the full data and run the scientific comparator on them or, with ``scope``
+    (FE preview, experimental preview), on that subset; returns (bound registration, result)."""
     if rm.set_is_provisional(experimental_preview, set_index):
         raise ComparisonRefused(PROVISIONAL_BLOCK)
     bound = rm.check(fe_preview, experimental_preview, set_index, cancel_event)  # fresh: raises its refusal
@@ -164,11 +181,14 @@ def compare(fe_preview, experimental_preview, set_index: int, registration_hash:
         raise ComparisonRefused(f"the verified registration is now {bound.registration.registration_hash[:12]}…, not "
                                 f"the {registration_hash[:12]}… the check showed; check the registration again.")
     check_sources(fe_preview, sources, bound.experimental, cancel_event)
+    if scope is not None:
+        _check_scope(fe_preview, experimental_preview, set_index, scope)
     if cancel_event is not None and cancel_event.is_set():
         raise ComparisonCancelled()
     from modal_core import compare_modal_datasets  # the reviewed quality-control facade (runtime_contracts)
 
-    result = compare_modal_datasets(fe_preview.dataset, experimental_preview.sets[set_index].dataset,
+    compared_fe, compared_experimental = scope or (fe_preview, experimental_preview)
+    result = compare_modal_datasets(compared_fe.dataset, compared_experimental.sets[set_index].dataset,
                                     frozen_registration=bound.registration)
     result.metadata["geometry_verified_registration"] = bound.provenance()  # as runtime_hardening attaches it
     result.warnings.insert(0, bound.warning())
@@ -192,7 +212,8 @@ class ComparisonOutcome:
 
 
 def run_compare(fe_preview, experimental_preview, set_index: int, registration_hash: Optional[str], token: int,
-                cancel_event: threading.Event, sources: Optional[dict] = None) -> ComparisonOutcome:
+                cancel_event: threading.Event, sources: Optional[dict] = None,
+                scope: Optional[tuple] = None) -> ComparisonOutcome:
     """``compare`` and its display wording as an outcome; every failure becomes a message (worker thread)."""
     from services.new_odb_comparison import AcceptedReferenceRefusal
 
@@ -201,10 +222,11 @@ def run_compare(fe_preview, experimental_preview, set_index: int, registration_h
             if cancel_event.is_set():  # cancelled while waiting: the comparator never runs
                 return ComparisonOutcome(token, cancelled=True)
             bound, result = compare(fe_preview, experimental_preview, set_index, registration_hash, cancel_event,
-                                    sources)
+                                    sources, scope)
         if cancel_event.is_set():
             return ComparisonOutcome(token, cancelled=True)
-        view = comparison_view(result, bound, fe_preview, experimental_preview, set_index)
+        shown_fe, shown_experimental = scope or (fe_preview, experimental_preview)
+        view = comparison_view(result, bound, shown_fe, shown_experimental, set_index)
         mac_image = render_mac_image(result, cancel_event)
     except (AcceptedReferenceRefusal, ComparisonRefused) as refusal:
         if cancel_event.is_set():

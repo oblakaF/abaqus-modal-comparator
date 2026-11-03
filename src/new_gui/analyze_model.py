@@ -6,15 +6,23 @@ itself: ``odb_import_service`` (extraction, only after the user's consent), ``pr
 ``registration_check_model`` (whether a verified physical registration applies) and ``comparison_model`` (pairs and MAC,
 only with such a registration). Without one, the status is REGISTRATION_REQUIRED: frequencies only, no pair and no MAC.
 
+UNIVERSAL-UI-3: one mode scope for every result: FE modes 1-20 and the first 20 records of each experimental set. The
+source identities and the registration are verified on the full read data; the diagnostic, the comparator, the tables,
+the counts and the shape choices then use read-only subsets, so a mode outside the scope influences nothing shown.
+
 The extraction package is managed here: it lives in ``<odb folder>/<odb name>_modal_packages`` and is found again by the
 ODB's content (SHA-256) and the requested range, so the user never chooses a ``manifest.json``.
 """
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, replace
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Callable, Optional
+
+import numpy as np
 
 from new_gui import comparison_model as cm
 from new_gui import diagnostic_model as dm
@@ -41,6 +49,7 @@ REGISTRATION_NOTES = {  # what the program shows; the service's own wording stay
 VERIFIED_LIMITS = ("Only the registered geometric mapping is reused: frequencies and mode shapes are these files' own. "
                    "No acceptance gate or threshold is changed.")
 _REUSE_WARNING = "Physical registration reused"  # names the archived source; VERIFIED_LIMITS states its limits
+STALE_TEXT = "A file changed after it was read, so nothing was analyzed. Click Analyze to read both files again."
 RIGID_NOTE = "Rigid-body FE modes are identified by their shape (rigid-body projection), not by their frequency."
 CONSENT_TITLE = "Start Abaqus Python?"
 _SPACE_WARNING = "These paths contain a space"  # abaqus_bridge passes such paths whole since RC6-F1
@@ -121,11 +130,59 @@ def _read(kind: str, path, cancel_event):
     return outcome.preview, outcome.identity
 
 
+def _read_only(mode):
+    """A copy of one mode whose arrays and metadata cannot be written; the read mode is not touched."""
+    frozen = copy.copy(mode)
+    for name, value in vars(mode).items():
+        if isinstance(value, np.ndarray):
+            view = value.view()
+            view.flags.writeable = False
+            setattr(frozen, name, view)
+    frozen.metadata = MappingProxyType(copy.deepcopy(dict(mode.metadata or {})))
+    return frozen
+
+
+def _read_only_dataset(dataset, modes):
+    frozen = copy.copy(dataset)
+    frozen.modes = tuple(_read_only(mode) for mode in modes)
+    frozen.metadata = copy.deepcopy(dict(dataset.metadata or {}))  # its own dict: a service caches residuals here
+    frozen.history = tuple(copy.deepcopy(list(dataset.history or ())))
+    return frozen
+
+
+def scoped_fe(fe):
+    """The FE preview limited to the requested mode numbers; a lower or higher mode never replaces a missing one."""
+    def inside(number) -> bool:
+        return FIRST_MODE <= int(number) <= LAST_MODE
+
+    return replace(fe, modes=tuple(mode for mode in fe.modes if inside(mode.number)),
+                   dataset=_read_only_dataset(fe.dataset, [m for m in fe.dataset.modes if inside(m.number)]))
+
+
+def scoped_experimental(experimental):
+    """Each modal set limited to its first 20 records in file order (EXP1 to EXP20)."""
+    sets = tuple(replace(item, records=tuple(item.records[:MODE_LIMIT]),
+                         dataset=_read_only_dataset(item.dataset, list(item.dataset.modes)[:MODE_LIMIT]))
+                 for item in experimental.sets)
+    return replace(experimental, sets=sets)
+
+
 @dataclass(frozen=True)
 class Inputs:
+    """``fe`` and ``experimental`` are the mode scope, used for every result; ``full_*`` are the data as read, used only
+    to verify the source identities and the registration."""
+
     fe: Any
     experimental: Any
     identities: dict
+    full_fe: Any
+    full_experimental: Any
+
+
+def scoped_inputs(fe, experimental, identities: dict) -> Inputs:
+    if not any(FIRST_MODE <= int(mode.number) <= LAST_MODE for mode in fe.modes):
+        raise StepFailed(f"The FE results hold none of the requested modes {FIRST_MODE}-{LAST_MODE}.")
+    return Inputs(scoped_fe(fe), scoped_experimental(experimental), identities, fe, experimental)
 
 
 def read_inputs(manifest, experimental_path, cancel_event) -> Inputs:
@@ -133,19 +190,33 @@ def read_inputs(manifest, experimental_path, cancel_event) -> Inputs:
     experimental, experimental_identity = _read(EXPERIMENTAL, experimental_path, cancel_event)
     if not experimental.sets:
         raise StepFailed(f"{Path(experimental_path).name} holds no modal data.")
-    return Inputs(fe, experimental, {"fe": fe_identity, "experimental": experimental_identity})
+    return scoped_inputs(fe, experimental, {"fe": fe_identity, "experimental": experimental_identity})
 
 
-def first_modes(experimental, set_index: int):
-    """The preview limited to the lowest 20 mode numbers of the chosen set, for the frequency tables. Nothing below
-    them is left out, so EXP1 always stays; the registration and the comparator use the whole set they were sealed on."""
-    chosen = experimental.sets[set_index]
-    if len(chosen.records) <= MODE_LIMIT:
-        return experimental
-    kept = set(sorted(record.number for record in chosen.records)[:MODE_LIMIT])
-    limited = replace(chosen, records=tuple(r for r in chosen.records if r.number in kept),
-                      dataset=replace(chosen.dataset, modes=[m for m in chosen.dataset.modes if int(m.number) in kept]))
-    return replace(experimental, sets=experimental.sets[:set_index] + (limited,) + experimental.sets[set_index + 1:])
+def confirm_sources(inputs: Inputs, cancel_event) -> None:
+    """Both files are still the files that were read (a modal set may be chosen long after the read)."""
+    now = pm.file_identity(inputs.full_experimental.source_path, cancel_event)
+    if cancel_event.is_set():
+        raise StepCancelled()
+    if now is None or inputs.identities.get("experimental") is None:
+        raise StepFailed(STALE_TEXT)
+    try:
+        cm.check_sources(inputs.full_fe, inputs.identities, now, cancel_event)
+    except cm.ComparisonCancelled as error:
+        raise StepCancelled() from error
+    except cm.ComparisonRefused as error:
+        raise StepFailed(STALE_TEXT) from error
+
+
+def _ranges(numbers) -> str:
+    """1, 2, 13-20"""
+    parts, numbers = [], sorted(numbers)
+    while numbers:
+        first = last = numbers.pop(0)
+        while numbers and numbers[0] == last + 1:
+            last = numbers.pop(0)
+        parts.append(str(first) if first == last else f"{first}-{last}")
+    return ", ".join(parts)
 
 
 @dataclass(frozen=True)
@@ -164,6 +235,8 @@ class Analysis:
     comparison: Any = None  # comparison_model.ComparisonView, only with a verified registration
     registration_reason: str = ""  # the service's own reason for REGISTRATION_REQUIRED (never a pair or a MAC)
     registration_outcome: str = ""  # REFUSED, FAILED or PROVISIONAL; empty with a verified registration
+    unavailable_fe: tuple = ()  # requested FE mode numbers the results do not hold
+    experimental_total: int = 0  # records of the chosen set as read
 
     @property
     def registration_note(self) -> str:
@@ -172,7 +245,9 @@ class Analysis:
     @property
     def summary(self) -> str:
         rigid = f"{len(self.rigid_modes)} rigid-body, first elastic {self.first_elastic or 'none'}"
-        return f"FE: {len(self.fe_rows)} modes ({rigid}). Experimental: {len(self.experimental_rows)} records."
+        missing = f" Unavailable: {_ranges(self.unavailable_fe)}." if self.unavailable_fe else ""
+        return (f"FE: {len(self.fe_rows)} of {MODE_LIMIT} requested modes ({rigid}).{missing} Experimental: "
+                f"{len(self.experimental_rows)} of {self.experimental_total} records analyzed.")
 
 
 NEAREST_HEADERS = ("EXP record", "EXP mode", "EXP (Hz)", "Nearest FE mode", "FE (Hz)", "Error (%)", "Next FE mode",
@@ -185,15 +260,15 @@ PAIR_HEADERS = tuple(cm.PAIR_HEADERS[i] for i in PAIR_COLUMNS)
 
 def _verified(inputs: Inputs, set_index: int, cancel_event) -> tuple:
     """(comparison view or None, why not, outcome): a pair or a MAC exists only through both checks of the services."""
-    if rm.set_is_provisional(inputs.experimental, set_index):
+    if rm.set_is_provisional(inputs.full_experimental, set_index):
         return None, cm.PROVISIONAL_BLOCK, PROVISIONAL
-    check = rm.run_check(inputs.fe, inputs.experimental, set_index, 0, cancel_event)
+    check = rm.run_check(inputs.full_fe, inputs.full_experimental, set_index, 0, cancel_event)
     if check.cancelled:
         raise StepCancelled()
     if check.view is None:
         return None, check.refusal or check.error, REFUSED if check.refusal else FAILED
-    compared = cm.run_compare(inputs.fe, inputs.experimental, set_index, check.view.registration, 0, cancel_event,
-                              inputs.identities)
+    compared = cm.run_compare(inputs.full_fe, inputs.full_experimental, set_index, check.view.registration, 0,
+                              cancel_event, inputs.identities, scope=(inputs.fe, inputs.experimental))
     if compared.cancelled:
         raise StepCancelled()
     if compared.view is None:
@@ -202,17 +277,18 @@ def _verified(inputs: Inputs, set_index: int, cancel_event) -> tuple:
 
 
 def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
-    limited = first_modes(inputs.experimental, set_index)
-    outcome = dm.run_diagnostic(inputs.fe, limited, set_index, 0, cancel_event)
+    confirm_sources(inputs, cancel_event)
+    outcome = dm.run_diagnostic(inputs.fe, inputs.experimental, set_index, 0, cancel_event)
     if outcome.cancelled:
         raise StepCancelled()
     if outcome.error:
         raise StepFailed(outcome.error)
     comparison, reason, registration = _verified(inputs, set_index, cancel_event)
     view = outcome.view
-    full = inputs.experimental.sets[set_index]
+    analyzed = inputs.experimental.sets[set_index]
+    total = len(inputs.full_experimental.sets[set_index].records)
     position = {}
-    for index, record in enumerate(full.records):
+    for index, record in enumerate(analyzed.records):
         position.setdefault(record.number, index + 1)
     nearest = tuple((f"EXP{position[int(row[1])]}",) + tuple(row[1:9]) + (row[11],) for row in view.nearest_rows)
     experimental = tuple((f"EXP{position[int(row[1])]}",) + tuple(row[1:]) for row in view.experimental_rows)
@@ -223,21 +299,29 @@ def analyse(inputs: Inputs, set_index: int, cancel_event) -> Analysis:
     fe_rows = tuple((str(n), f"{f:.4f}", kind) for n, f, kind in every)
     numbers = [row[0] for row in every]
     first_elastic = next((str(n) for n, _f, kind in every if kind == "elastic"), None)
+    unavailable = tuple(n for n in range(FIRST_MODE, LAST_MODE + 1) if n not in numbers)
+    outside = [int(m.number) for m in inputs.full_fe.modes if not FIRST_MODE <= int(m.number) <= LAST_MODE]
     facts = [f"FE: requested modes {FIRST_MODE}-{LAST_MODE}, loaded "
              + (f"{len(numbers)} ({min(numbers)}-{max(numbers)})" if numbers else "none")
              + f"; rigid-body by shape: {', '.join(str(n) for n in sorted(rigid)) or 'none'}; "
              + f"first elastic: {first_elastic or 'none'}",
-             f"EXP: {view.set_title}; {len(limited.sets[set_index].records)} of {len(full.records)} record(s) analysed"]
+             f"EXP: {view.set_title}; {len(analyzed.records)} of {total} record(s) analyzed"]
+    if outside:
+        facts.append(f"FE modes outside the requested range, not analyzed: {_ranges(outside)}.")
+    if total > len(analyzed.records):
+        facts.append(f"Experimental records after EXP{len(analyzed.records)}, not analyzed: {total - len(analyzed.records)}.")
     notes = tuple(inputs.fe.warnings) + tuple(view.range_warnings) + tuple(view.importer_warnings)
+    if unavailable:
+        notes += (f"Requested FE modes not available in the results: {_ranges(unavailable)}.",)
     if comparison is not None:
         status, statement = comparison.status, VERIFIED_TEXT
         notes += tuple(w for w in comparison.warnings if not w.startswith(_REUSE_WARNING)) + (VERIFIED_LIMITS,)
     else:
         status, statement = REGISTRATION_REQUIRED, REGISTRATION_TEXT
     return Analysis(status, statement, set_index, view.set_title, fe_rows, experimental, nearest, first_elastic,
-                    tuple(sorted(rigid)), tuple(facts), notes, comparison, reason, registration)
+                    tuple(sorted(rigid)), tuple(facts), notes, comparison, reason, registration, unavailable, total)
 
 
 __all__ = ["Analysis", "Inputs", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse", "consent_text",
-           "extract", "file_problem", "find_package", "first_modes", "make_plan", "package_folder", "plan_warnings",
-           "read_inputs"]
+           "confirm_sources", "extract", "file_problem", "find_package", "make_plan", "package_folder", "plan_warnings",
+           "read_inputs", "scoped_experimental", "scoped_fe", "scoped_inputs"]
