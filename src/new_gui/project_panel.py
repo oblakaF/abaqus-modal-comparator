@@ -10,10 +10,11 @@ from typing import Mapping, Optional
 
 from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QVBoxLayout
 
-from new_gui.shape_panel import ImageView, _combo, _label
+from new_gui.shape_panel import ImageActions, ImageView, _combo, _label
 from new_gui.workspace_state import FE, KIND_TITLE
 
-SAVED_NOTE = "Saved picture of the magnitude, on its own coordinates. Not drawn again and not checked against the files."
+SAVED_NOTE = ("Saved picture of the magnitude, on its own coordinates, as drawn when the file was saved. It is not drawn again. "
+              "A picture saved by an earlier version can show white gaps of its drawing; a fresh analysis draws it anew.")
 
 
 class SavedShapePanel(QFrame):
@@ -41,6 +42,8 @@ class SavedShapePanel(QFrame):
         layout.addWidget(self.status)
         self.image = ImageView()
         layout.addWidget(self.image)
+        self.image_actions = ImageActions(self.image, f"saved_{'fe' if kind == FE else 'experimental'}_shape")
+        layout.addWidget(self.image_actions)
         layout.addWidget(_label(SAVED_NOTE, "hint"))
         self.setVisible(False)
 

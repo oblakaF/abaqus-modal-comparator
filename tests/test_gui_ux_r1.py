@@ -16,18 +16,19 @@ import test_universal_two_file_analysis as base
 import test_working_draft_r2_project as r2
 
 from PySide6.QtCore import QPoint, QPointF, Qt
-from PySide6.QtGui import QWheelEvent
-from PySide6.QtWidgets import QApplication, QGridLayout, QPushButton, QScrollArea, QWidget
+from PySide6.QtGui import QImage, QWheelEvent
+from PySide6.QtWidgets import QApplication, QComboBox, QGridLayout, QPushButton, QScrollArea, QWidget
 
 from modal_core import ModalDataset, ModeShape
 from new_gui import analyze_model as am
+from new_gui import analyze_summary as asm
 from new_gui import mac_points_model as mp
 from new_gui import materials_workspace_model as mw
 from new_gui import production_window as pw
 from new_gui import review_model as rv
 from new_gui import review_panel as rp
 from new_gui import shape_model as sm
-from new_gui.shape_panel import ImageView
+from new_gui.shape_panel import ImageActions, ImageView
 from new_gui.workspace_state import EXPERIMENTAL, FE
 from services import analysis_project as ap
 from services import modal_data_viewer as viewer
@@ -37,7 +38,8 @@ WANTED_HEADERS = ("Row", "EXP mode", "EXP frequency (Hz)", "Selected FE mode", "
 
 
 def cells(table) -> list:
-    return [[table.item(r, c).text() for c in range(table.columnCount())] for r in range(table.rowCount())]
+    return [[table.item(r, c).text() if table.item(r, c) else "" for c in range(table.columnCount())]
+            for r in range(table.rowCount())]
 
 
 def wheel(widget, delta=-120) -> QWheelEvent:
@@ -112,11 +114,12 @@ class ReviewStateTests(unittest.TestCase):
         self.assertEqual(caught.exception.rows, (1,))
         self.assertFalse(state.row(0).manual)
         state.assign(0, "8", allow_duplicate=True)
-        self.assertIn("FE mode 8 is selected for rows 1, 2", state.duplicate_warning())
+        self.assertEqual(state.duplicate_warning(), "Not one-to-one: FE 8 (rows 1, 2).")
+        self.assertEqual(state.conflicts(), {"8": [1, 2]})
 
     def test_an_automatic_duplicate_is_also_stated(self):
         nearest = (NEAREST[0], ("EXP2", "2", "96.0000", "7", "95.0000", "-1.04", "8", "105.0000", "+9.38", "—"))
-        self.assertIn("FE mode 7 is selected for rows 1, 2", rv.ReviewState(_Stub(nearest, FE_ROWS)).duplicate_warning())
+        self.assertIn("FE 7 (rows 1, 2)", rv.ReviewState(_Stub(nearest, FE_ROWS)).duplicate_warning())
 
     def test_a_rigid_body_mode_cannot_be_selected(self):
         state = self.state()
@@ -129,6 +132,13 @@ class ReviewStateTests(unittest.TestCase):
         state.assign(0, "9", allow_duplicate=True)
         for image in (rv.frequency_plot(state, 0), rv.difference_plot(state, 0)):
             self.assertTrue(image.startswith(b"\x89PNG"))
+
+    def test_the_selected_row_changes_both_plots(self):
+        state = self.state()
+        self.assertEqual(rv.selected_point(state, 1)[0].row, 1)
+        self.assertIsNone(rv.selected_point(state, None))
+        self.assertNotEqual(rv.frequency_plot(state, 0), rv.frequency_plot(state, 1))
+        self.assertNotEqual(rv.difference_plot(state, 0), rv.difference_plot(state, 1))
 
 
 class FrfTests(unittest.TestCase):
@@ -145,8 +155,17 @@ class FrfTests(unittest.TestCase):
         frequency, indicator, coherence = rv.frf_series(dataset)
         self.assertEqual(frequency.tolist(), [1.0, 2.0, 3.0])
         self.assertEqual(indicator.tolist(), [0.5, 2.0, 0.1])
-        self.assertTrue(rv.frf_plot((frequency, indicator, coherence), (2.0,), 2.0).startswith(b"\x89PNG"))
+        records = (("EXP 1", 2.0), ("EXP 2", 3.0))
+        peaks = rv.frf_plot((frequency, indicator, coherence), records, 0, True)
+        self.assertTrue(peaks.startswith(b"\x89PNG"))
+        self.assertNotEqual(peaks, rv.frf_plot((frequency, indicator, coherence), records, 1, True))
+        self.assertNotEqual(peaks, rv.frf_plot((frequency, indicator, coherence), records, 0, False))
         self.assertTrue(rv.frf_plot((frequency, indicator, None)).startswith(b"\x89PNG"))
+
+    def test_what_is_missing_is_named(self):
+        self.assertEqual(rv.frf_missing(None, True), rv.FRF_NEEDS_SOURCE)
+        self.assertEqual(rv.frf_missing(ModalDataset("EXP", Path("x"), [], metadata={"dataset_types": [15, 55]}), False), rv.FRF_NOT_IN_FILE)
+        self.assertEqual(rv.frf_missing(ModalDataset("EXP", Path("x"), [], metadata={"dataset_types": [58]}), False), rv.FRF_NOT_USABLE)
 
 
 class DisplayGridTests(unittest.TestCase):
@@ -167,6 +186,27 @@ class DisplayGridTests(unittest.TestCase):
         cells = viewer.display_cells(x, y)
         self.assertLess(cells, 101)
         count, _, _ = np.histogram2d(x, y, bins=(cells, cells))
+        self.assertEqual(viewer.display_hole_fraction(count), 0.0)
+
+    def test_a_cell_just_under_the_pitch_leaves_no_stripes_at_the_same_places_in_any_mode(self):
+        # the real sandwich: 3 mm skin nodes, and 2.948 mm cells left whole empty rows in every picture
+        x, y = self.regular(171, 3.0)
+        count, _, _ = np.histogram2d(x, y, bins=(173, 173))
+        self.assertGreater(viewer.display_hole_fraction(count), 0.0)
+        cells = viewer.display_cells(x, y)
+        count, _, _ = np.histogram2d(x, y, bins=(cells, cells))
+        self.assertEqual(int((count == 0).sum()), 0)
+        for shift in (20.0, 40.0, 75.0):
+            image, _extent = viewer._binned(x, y, np.sin(x / shift) * np.cos(y / shift), cells)
+            self.assertTrue(np.isfinite(image).all())
+
+    def test_runs_of_two_and_three_empty_cells_count_as_gaps(self):
+        for gap in (1, 2, 3):
+            count = np.ones((12, 12))
+            count[4:4 + gap, 5] = 0
+            self.assertGreater(viewer.display_hole_fraction(count), 0.0, gap)
+        count = np.ones((20, 20))
+        count[5:15, 5:15] = 0  # a real hole
         self.assertEqual(viewer.display_hole_fraction(count), 0.0)
 
     def test_every_cell_value_is_a_mean_of_real_nodes_and_a_cut_out_stays_blank(self):
@@ -193,6 +233,39 @@ class DisplayGridTests(unittest.TestCase):
         self.assertIn("mean per display cell", figure.axes[0].get_xlabel())
         self.assertIn("empty cells blank", figure.axes[0].get_xlabel())
         self.assertNotIn("through the depth", figure.axes[0].get_xlabel())
+
+
+class OrientationTests(unittest.TestCase):
+    points = np.array([[10.0, 1.0, 5.0], [20.0, 1.0, 5.0], [10.0, 4.0, 5.0], [20.0, 4.0, 5.5]])
+
+    def test_source_axes_keep_the_coordinates_and_name_them(self):
+        kept = self.points.copy()
+        x, y, first, second = viewer.display_coordinates(self.points, viewer.DisplayView("source"))
+        self.assertEqual((first, second), ("X", "Y"))
+        self.assertEqual(x.tolist(), self.points[:, 0].tolist())
+        self.assertEqual(y.tolist(), self.points[:, 1].tolist())
+        np.testing.assert_array_equal(self.points, kept)
+
+    def test_each_source_plane_can_be_chosen(self):
+        for plane, names in (("xy", ("X", "Y")), ("xz", ("X", "Z")), ("yz", ("Y", "Z"))):
+            self.assertEqual(viewer.display_coordinates(self.points, viewer.DisplayView(plane))[2:], names)
+
+    def test_rotation_and_mirror_change_only_the_layout(self):
+        kept = self.points.copy()
+        x, y, first, second = viewer.display_coordinates(self.points, viewer.DisplayView("xy", 90))
+        self.assertEqual((first, second), ("\u2212Y", "X"))
+        self.assertEqual(x.tolist(), (-self.points[:, 1]).tolist())
+        self.assertEqual(y.tolist(), self.points[:, 0].tolist())
+        x, _y, first, _second = viewer.display_coordinates(self.points, viewer.DisplayView("xy", 0, True))
+        self.assertEqual(first, "\u2212X")
+        self.assertEqual(x.tolist(), (-self.points[:, 0]).tolist())
+        x, y, first, second = viewer.display_coordinates(self.points, viewer.DisplayView("xy", 180))
+        self.assertEqual((first, second), ("\u2212X", "\u2212Y"))
+        np.testing.assert_array_equal(self.points, kept)
+
+    def test_an_unknown_view_is_refused(self):
+        with self.assertRaises(ValueError):
+            viewer.display_coordinates(self.points, viewer.DisplayView("uv"))
 
 
 class ImageViewTests(unittest.TestCase):
@@ -305,7 +378,8 @@ class ReviewPageTests(_Flow):
     def test_the_table_has_the_required_columns_and_every_record(self):
         window, panel = self.analysed()
         table = window.review.table
-        self.assertEqual(tuple(table.horizontalHeaderItem(c).text() for c in range(table.columnCount())), WANTED_HEADERS)
+        self.assertEqual(tuple(table.horizontalHeaderItem(c).text() for c in range(table.columnCount())),
+                         WANTED_HEADERS + ("Actions",))
         self.assertEqual(table.rowCount(), len(panel.analysis.nearest_rows))
         self.assertEqual(table.item(0, 1).text(), panel.analysis.nearest_rows[0][1])  # EXP mode 1 is kept
         self.assertEqual(table.item(0, 6).text(), panel.analysis.nearest_rows[0][3])
@@ -358,7 +432,8 @@ class ReviewPageTests(_Flow):
         review._ask_duplicate = lambda _text: rp.KEEP
         self.assertTrue(review.select_mode(1, taken))
         self.wait(panel)
-        self.assertIn("not one-to-one", review.duplicate_label.text())
+        self.assertIn("Not one-to-one", review.duplicate_label.text())
+        self.assertLess(len(review.duplicate_label.text()), 80)
         review.reset_all()
         self.wait(panel)
         review._ask_duplicate = lambda _text: rp.SWAP
@@ -366,6 +441,77 @@ class ReviewPageTests(_Flow):
         self.wait(panel)
         self.assertEqual((review.state.selected(0), review.state.selected(1)), (before, taken))
         self.assertTrue(review.duplicate_label.isHidden())
+
+    def test_swap_is_in_the_last_column_of_each_applicable_row(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        last = review.table.columnCount() - 1
+        rows = review.table.rowCount()
+        self.assertEqual([review.table.cellWidget(r, last).text() for r in range(rows - 1)], ["Swap"] * (rows - 1))
+        self.assertIsNone(review.table.cellWidget(rows - 1, last))
+        before = (review.state.selected(0), review.state.selected(1))
+        review.table.cellWidget(0, last).click()
+        self.wait(panel)
+        self.assertEqual((review.state.selected(0), review.state.selected(1)), before[::-1])
+        self.assertEqual(review.current, 0)
+        self.assertEqual(review.combos[0].currentData(), before[1])
+        self.assertIn(rv.USER_HYPOTHESIS, review.hypothesis_label.text())
+        self.assertFalse(hasattr(review, "swap_button"))
+
+    def test_the_wheel_changes_no_tab_and_no_list_on_any_page(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        tabs = window.review.views
+        index = tabs.currentIndex()
+        self.assertFalse(wheel(tabs.tabBar()).isAccepted())
+        self.assertEqual(tabs.currentIndex(), index)
+        fe = panel.shape_panels[FE]
+        before = [fe.item_combo.currentIndex(), fe.component_combo.currentIndex(), fe.view_combo.currentIndex()]
+        for combo in (fe.item_combo, fe.component_combo, fe.view_combo):
+            wheel(combo)
+        self.assertEqual([fe.item_combo.currentIndex(), fe.component_combo.currentIndex(), fe.view_combo.currentIndex()], before)
+        plain = QComboBox(window)  # any list, also one not made by the program's own helpers
+        plain.addItems(["a", "b"])
+        wheel(plain)
+        self.assertEqual(plain.currentIndex(), 0)
+
+    def test_the_shape_view_can_be_chosen_and_redraws(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        fe = panel.shape_panels[FE]
+        first = fe.image.data
+        self.assertEqual(fe.display(), sm.DEFAULT_VIEW)
+        self.assertIn("Source coordinates", fe.projection.text())
+        fe.rotation_combo.setCurrentIndex(fe.rotation_combo.findData(90))
+        self.assertTrue(fe.show_shape())
+        self.wait(panel)
+        self.assertEqual(fe.display(), ("source", 90, False))
+        self.assertEqual(fe.slot.state, sm.SHOWN)
+        self.assertNotEqual(fe.image.data, first)
+        fe.view_combo.setCurrentIndex(fe.view_combo.findData("best_fit"))
+        self.assertIn("best-fit plane", fe.projection.text())
+        self.assertIn("MAC", fe.projection.text())
+        self.assertIs(panel.analysis, panel.analysis)
+        coordinates = np.asarray(panel.inputs.fe.dataset.modes[0].coordinates)
+        self.assertEqual(coordinates.shape[1], 3)
+        self.assertEqual(panel.status_label.text(), am.REGISTRATION_REQUIRED)
+
+    def test_all_tables_fill_the_pane_and_select_their_own_rows(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        window.resize(1180, 800)
+        review = window.review
+        review.views.setCurrentIndex(3)
+        review.splitter.setSizes([60, 200, 520])
+        self.app.processEvents()
+        table = panel.tables["fe"]
+        panel.result_tabs.setCurrentIndex(1)
+        self.app.processEvents()
+        self.assertGreater(table.height(), 250)
+        self.assertIs(review.views.widget(3), panel.tables_box)
+        table.selectRow(2)
+        self.assertEqual([i.row() for i in table.selectionModel().selectedRows()], [2])
 
     def test_a_manual_choice_changes_no_result_no_saved_file_and_no_pair(self):
         window, panel = self.analysed()
@@ -440,7 +586,8 @@ class ReviewPageTests(_Flow):
         window.review.views.setCurrentIndex(2)
         self.app.processEvents()
         self.assertIsNotNone(window.review.frf_image.source)
-        self.assertEqual(window.review.frf_note.text(), "")
+        self.assertEqual(window.review.frf_note.text(), rv.FITTED_NOTE)
+        self.assertTrue(window.review.frf_actions.copy_button.isEnabled())
 
     def test_frf_peak_records_get_a_short_label_one_explanation_and_full_details(self):
         window, panel = self.analysed()
@@ -455,6 +602,84 @@ class ReviewPageTests(_Flow):
         self.assertFalse(window.review.provisional_note.isHidden())
         self.assertTrue(window.review.state.provisional)
         self.assertEqual(panel.analysis.experimental_rows[0][3], sm.PROVISIONAL_TEXT)  # the data keep the full wording
+
+
+class ImageActionTests(_Flow):
+    def test_copy_and_save_use_the_original_picture_and_are_off_without_one(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        fe = panel.shape_panels[FE]
+        data = fe.image.data
+        self.assertTrue(data.startswith(b"\x89PNG"))
+        actions = fe.image_actions
+        self.assertTrue(actions.copy_button.isEnabled())
+        self.assertTrue(actions.copy())
+        original = QImage.fromData(data, "PNG")
+        copied = QApplication.clipboard().image()
+        self.assertEqual((copied.width(), copied.height()), (original.width(), original.height()))
+        target = self.root / "shape.png"
+        actions.ask_path = lambda: str(target)
+        self.assertTrue(actions.save())
+        self.assertEqual(target.read_bytes(), data)
+        fe.image.clear_image()
+        self.assertFalse(actions.copy_button.isEnabled())
+        self.assertFalse(actions.save_button.isEnabled())
+        self.assertFalse(actions.copy())
+        self.assertFalse(actions.save())
+
+    def test_every_plotted_result_has_the_actions(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        for actions in (review.frequency_actions, review.difference_actions, review.frf_actions,
+                        panel.shape_panels[EXPERIMENTAL].image_actions, window.mac_points.measured_actions):
+            self.assertIsInstance(actions, ImageActions)
+        self.assertFalse(review.frf_actions.copy_button.isEnabled())  # no picture yet
+        review.views.setCurrentIndex(1)
+        self.app.processEvents()
+        self.assertTrue(review.frequency_actions.save_button.isEnabled())
+
+    def test_a_saved_picture_can_be_exported_as_stored(self):
+        _window, panel = self.analysed()
+        self.wait(panel)
+        self.saved(panel)
+        _second, again = self.reopened()
+        saved = again.saved_shapes[FE]
+        entry = next(e for e in saved.entries if e["number"] == saved.shown_number)
+        target = self.root / "saved.png"
+        saved.image_actions.ask_path = lambda: str(target)
+        self.assertTrue(saved.image_actions.save())
+        self.assertEqual(target.read_bytes(), again.snapshot.images[entry["image"]])
+        self.assertTrue(saved.image_actions.copy())
+
+
+class SummaryTests(_Flow):
+    def test_analyze_says_what_is_loaded_and_available(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        rows = dict(cells(panel.summary_table))
+        self.assertEqual(rows["FE results"], self.odb.name)
+        self.assertEqual(rows["Experiment"], Path(self.exp_path).name)
+        self.assertIn("first elastic", rows["FE modes"])
+        self.assertIn(asm.FITTED, rows["Experimental records"])
+        self.assertEqual(rows["Frequency table and plots"], asm.AVAILABLE)
+        self.assertIn("no usable FRF curve", rows["FRF spectrum"])
+        self.assertEqual(rows["MAC and mode pairs"], mp.REASONS[am.REFUSED])
+        self.assertTrue(window.stack.widget(pw.ANALYZE_PAGE).widget().isAncestorOf(panel.summary_table))
+
+    def test_a_saved_result_says_what_needs_the_sources(self):
+        _window, panel = self.analysed()
+        self.wait(panel)
+        self.saved(panel)
+        _second, again = self.reopened()
+        rows = dict(cells(again.summary_table))
+        self.assertEqual(rows["FRF spectrum"], asm.NEEDS_SOURCE)
+        self.assertEqual(rows["Mode shapes"], "Saved magnitude pictures only")
+
+    def test_frf_peak_records_are_named_as_such(self):
+        self.assertEqual(asm._record_type(3, 3), asm.FRF_PEAKS)
+        self.assertEqual(asm._record_type(0, 3), asm.FITTED)
+        self.assertEqual(asm._record_type(1, 3), asm.MIXED)
 
 
 class SavedResultTests(_Flow):
@@ -536,6 +761,27 @@ class MacPointsTests(_Flow):
         self.assertIsNone(mac.point_table)
         self.assertTrue(window.stack.widget(pw.MAC_PAGE).widget().isAncestorOf(panel.registration_button))
 
+    def test_the_measured_points_are_shown_with_no_registration(self):
+        window, panel = self.analysed()
+        mac = window.mac_points
+        mode = panel.measured_mode()
+        self.assertIsNone(panel.analysis.comparison)
+        self.assertEqual(mac.measured_table.rowCount(), len(mode.node_ids))
+        self.assertEqual(mac.measured_table.item(0, 0).text(), str(mode.node_ids[0]))
+        self.assertIsNotNone(mac.measured_image.source)
+        self.assertTrue(mac.measured_actions.copy_button.isEnabled())
+        self.assertIn(f"{len(mode.node_ids)} points", mac.measured_status.text())
+        self.assertNotIn("MAC", " ".join(mp.MEASURED_HEADERS))
+        self.assertFalse(mac.badge.isHidden())
+
+    def test_a_saved_result_says_the_measured_points_need_the_sources(self):
+        _window, panel = self.analysed()
+        self.wait(panel)
+        self.saved(panel)
+        window, _again = self.reopened()
+        self.assertEqual(window.mac_points.measured_status.text(), mp.MEASURED_NEEDS_SOURCE)
+        self.assertIsNone(window.mac_points.measured_table)
+
     def test_the_provisional_reason_and_every_outcome_have_their_own_text(self):
         for outcome in (am.PROVISIONAL, am.REFUSED, am.FAILED, am.NOT_CONFIRMED):
             stub = mock.Mock(comparison=None, registration_outcome=outcome)
@@ -574,7 +820,8 @@ class MacPointsTests(_Flow):
         window, panel = self.compared()
         mac = window.mac_points
         self.assertEqual([panel.comparison_tabs.tabText(i) for i in range(panel.comparison_tabs.count())],
-                         ["Mode pairs", "MAC", "Points", "Mapping diagnostics", "Line profile"])
+                         ["Mode pairs", "MAC", "Registered points", "Mapping diagnostics", "Line profile"])
+        self.assertTrue(panel.mac_actions.copy_button.isEnabled())
         result = panel.analysis.comparison_result
         self.assertEqual(mac.point_table.rowCount(), len(result.experimental.modes[0].node_ids))
         self.assertEqual(mac.coverage_table.rowCount(), reg3.RECORDS)
@@ -642,6 +889,9 @@ class MaterialsTests(_Flow):
         self.assertEqual(window.analyze.paths, {FE: None, EXPERIMENTAL: None})
         self.assertIsNone(window.analyze.analysis)
         self.assertIn(mw.NO_PACKAGE, workspace.fact_notes[FE].text())
+        rows = dict(cells(workspace.fact_tables[FE]))
+        self.assertEqual(rows["FE package"], "Not found")
+        self.assertEqual(rows["INP beside the ODB"], "None found")
         self.assertEqual(workspace.fact_tables[EXPERIMENTAL].item(0, 1).text(), "exp data.unv")
         self.assertEqual(self.consents, [])
 
@@ -654,7 +904,11 @@ class MaterialsTests(_Flow):
         window, panel = self.analysed()
         self.wait(panel)
         manifest = Path(panel.inputs.full_fe.manifest_path)
-        self.assertEqual(dict(mw.read_fe_facts(self.odb, threading.Event()).rows)["Nodes"], str(len(self.nodes())))
+        self.odb.with_suffix(".inp").write_text("*Heading\n", encoding="utf-8")
+        found = dict(mw.read_fe_facts(self.odb, threading.Event()).rows)
+        self.assertEqual(found["Nodes"], str(len(self.nodes())))
+        self.assertIn("Found", found["FE package"])
+        self.assertEqual(found["INP beside the ODB"], f"{self.odb.stem}.inp exists but was not parsed")
         for mode_file in manifest.parent.glob("mode_*.csv"):
             mode_file.rename(mode_file.with_suffix(".hidden"))  # the geometry facts do not need them
         table = dict(mw.geometry_facts(manifest))

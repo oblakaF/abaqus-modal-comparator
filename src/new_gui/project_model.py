@@ -185,7 +185,7 @@ def _result_document(analysis: am.Analysis) -> dict:
 
 
 def _draw(kind: str, source, index: int, cancel_event) -> sm.ShapeOutcome:
-    outcome = sm.run_render(kind, source, index, SHAPE_COMPONENT, 0, cancel_event)
+    outcome = sm.run_render(kind, source, index, SHAPE_COMPONENT, 0, cancel_event, sm.DEFAULT_VIEW)
     if outcome.cancelled:
         raise am.StepCancelled()
     return outcome

@@ -55,8 +55,10 @@ MINIMUM_SPATIAL_POINTS = 3
 DISPLAY_GRID_THRESHOLD = 5000  # above this many nodes the field is averaged on a display grid
 DISPLAY_GRID_CELLS = 220  # the finest grid; a coarser one is used when its cells would be smaller than the node spacing
 DISPLAY_GRID_MINIMUM = 20
-DISPLAY_GRID_STEP = 0.8
-DISPLAY_GRID_HOLES = 0.005  # empty cells between occupied neighbours, as a fraction of the occupied cells
+DISPLAY_GRID_STEP = 0.95
+DISPLAY_GAP_CELLS = 3  # an empty run this short between occupied cells is mesh spacing; a longer one is a real hole
+PLANES = ("source", "xy", "xz", "yz", "best_fit")
+UNIT_TEXT = "unit not stated by the source"
 # APP-DATA.6: points span no plane when the second singular value of the centred points is at most this fraction of
 # the first (the rule of the APP-DATA.4/5 previews); their out-of-plane direction would be arbitrary.
 COLLINEAR_TOLERANCE = 1.0e-6
@@ -281,27 +283,83 @@ def _grid_shape(x: np.ndarray, y: np.ndarray, cells: float) -> tuple[int, int]:
 
 
 def display_hole_fraction(count: np.ndarray) -> float:
-    """Empty cells with occupied cells on both sides, per occupied cell: sampling holes, not a real cut-out's interior."""
+    """Empty cells in short runs between occupied cells, per occupied cell: gaps of the sampling, not a real cut-out."""
 
     filled = count > 0
-    across = ~filled[1:-1, :] & filled[:-2, :] & filled[2:, :]
-    along = ~filled[:, 1:-1] & filled[:, :-2] & filled[:, 2:]
-    return (int(across.sum()) + int(along.sum())) / max(1, int(filled.sum()))
+    holes = 0
+    for grid in (filled, filled.T):
+        size = grid.shape[0]
+        for gap in range(1, DISPLAY_GAP_CELLS + 1):
+            if size < gap + 2:
+                continue
+            run = grid[: size - gap - 1] & grid[gap + 1:]
+            for step in range(1, gap + 1):
+                run = run & ~grid[step: size - gap - 1 + step]
+            holes += gap * int(run.sum())
+    return holes / max(1, int(filled.sum()))
+
+
+_last_grid: tuple = ((), 0)  # the modes of one model share their geometry, so the search runs once per model and view
 
 
 def display_cells(x: np.ndarray, y: np.ndarray) -> int:
-    """The finest grid whose cells are not smaller than the node spacing, so that no value has to be invented for a hole.
+    """The finest grid with no gap of the sampling, so that no value has to be invented for a hole.
 
-    A fixed grid finer than the mesh leaves most cells without a node: a regular 3 mm mesh on 1.37 mm cells draws a dotted
-    field. Coarsening only averages more real nodes per cell; cells that stay empty are left blank."""
+    A grid finer than the mesh leaves cells without a node at the same places in every mode: a 3 mm mesh on 2.95 mm cells
+    draws white stripes. Coarsening only averages more real nodes per cell; a real hole, wider than DISPLAY_GAP_CELLS cells,
+    and the outside of the model stay blank."""
 
+    global _last_grid
+    key = (len(x), float(x[0]), float(x[-1]), float(y[0]), float(y[-1]), float(x.sum()), float(y.sum()))
+    if _last_grid[0] == key:
+        return _last_grid[1]
     cells = float(DISPLAY_GRID_CELLS)
     while cells > DISPLAY_GRID_MINIMUM:
         count, _, _ = np.histogram2d(x, y, bins=_grid_shape(x, y, cells))
-        if display_hole_fraction(count) <= DISPLAY_GRID_HOLES:
+        if display_hole_fraction(count) == 0.0:
             break
         cells *= DISPLAY_GRID_STEP
-    return max(DISPLAY_GRID_MINIMUM, int(round(cells)))
+    found = max(DISPLAY_GRID_MINIMUM, int(round(cells)))
+    _last_grid = (key, found)
+    return found
+
+
+@dataclass(frozen=True)
+class DisplayView:
+    """How a picture is laid out. Display only: no coordinate, mapping, MAC or pairing ever reads it."""
+
+    plane: str = "best_fit"
+    rotation: int = 0  # degrees, a multiple of 90
+    mirror: bool = False
+
+
+def _negated(label: str) -> str:
+    return label[1:] if label.startswith("\u2212") else f"\u2212{label}"
+
+
+def display_coordinates(coordinates: np.ndarray, view: DisplayView) -> tuple:
+    """(x, y, x label, y label) of the points in this view; the coordinates themselves are not changed."""
+
+    if view.plane not in PLANES:
+        raise ValueError(f"unknown view {view.plane!r}; choose one of {', '.join(PLANES)}.")
+    if view.plane == "best_fit":
+        center, plane, _ = _plane_basis(coordinates)
+        projected = (coordinates - center) @ plane.T
+        x, y = projected[:, 0], projected[:, 1]
+        first, second = "In-plane principal coordinate 1", "In-plane principal coordinate 2"
+    else:
+        if view.plane == "source":
+            spans = np.ptp(coordinates, axis=0)
+            axes = sorted(int(axis) for axis in np.argsort(spans)[-2:])
+        else:
+            axes = ["xyz".index(letter) for letter in view.plane]
+        x, y = coordinates[:, axes[0]], coordinates[:, axes[1]]
+        first, second = "XYZ"[axes[0]], "XYZ"[axes[1]]
+    for _ in range((view.rotation // 90) % 4):
+        x, y, first, second = -y, x, _negated(second), first
+    if view.mirror:
+        x, first = -x, _negated(first)
+    return x, y, first, second
 
 
 def _binned(x: np.ndarray, y: np.ndarray, values: np.ndarray, cells: int):
@@ -314,8 +372,9 @@ def _binned(x: np.ndarray, y: np.ndarray, values: np.ndarray, cells: int):
     return mean.T, (xe[0], xe[-1], ye[0], ye[-1])
 
 
-def render_mode(mode, role: str, component: str, output_path: Path, title: str, note: str = "") -> Path:
-    """One mode on its own points only (no mapping, no overlay)."""
+def render_mode(mode, role: str, component: str, output_path: Path, title: str, note: str = "",
+                display: Optional[DisplayView] = None) -> Path:
+    """One mode on its own points only (no mapping, no overlay). ``display`` changes the picture's layout and nothing else."""
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -325,9 +384,9 @@ def render_mode(mode, role: str, component: str, output_path: Path, title: str, 
     scale = float(np.nanmax(np.abs(values))) if len(values) else 0.0
     if scale > 0.0:
         values = values / scale
-    center, plane, normal = _plane_basis(coordinates)
-    projected = (coordinates - center) @ plane.T
-    x, y = projected[:, 0], projected[:, 1]
+    center, _plane, normal = _plane_basis(coordinates)
+    view = display or DisplayView()
+    x, y, x_label, y_label = display_coordinates(coordinates, view)
     signed = component != "magnitude"
     limits = (-1.0, 1.0) if signed else (0.0, 1.0)
     colour_map = "coolwarm" if signed else "viridis"
@@ -341,10 +400,10 @@ def render_mode(mode, role: str, component: str, output_path: Path, title: str, 
         method = (f"{len(values)} FE nodes, mean per display cell ({image.shape[1]} x {image.shape[0]}), empty cells blank")
         depth = float(np.ptp((coordinates - center) @ normal))
         if depth > 1.0e-6 * max(float(np.ptp(x)), float(np.ptp(y))):
-            method += "; nodes through the depth are averaged together"
+            method += "\nnodes through the depth are averaged together"
     else:
         artist = None
-        planar_points = len(np.unique(np.round(projected, 9), axis=0)) >= 3
+        planar_points = len(np.unique(np.round(np.column_stack([x, y]), 9), axis=0)) >= 3
         if planar_points and len(values) >= 3:
             try:
                 artist = axis.tricontourf(x, y, values, levels=21, cmap=colour_map, vmin=limits[0], vmax=limits[1])
@@ -353,11 +412,15 @@ def render_mode(mode, role: str, component: str, output_path: Path, title: str, 
         points = axis.scatter(x, y, c=values, cmap=colour_map, vmin=limits[0], vmax=limits[1], s=30,
                               edgecolors="black", linewidths=0.3, zorder=3)
         artist = artist or points
-        method = f"{len(values)} points"
+        method = f"{len(values)} points; colour between points is for display only"
     figure.colorbar(artist, ax=axis, label="Normalised " + ("amplitude" if signed else "magnitude"))
     axis.set_title(title + (f"\n{note}" if note else ""), fontsize=9)
-    axis.set_xlabel(f"In-plane principal coordinate 1\n{COMPONENT_TEXT[role][component]} · {method}", fontsize=8)
-    axis.set_ylabel("In-plane principal coordinate 2", fontsize=8)
+    source_axes = view.plane != "best_fit"
+    suffix = f" ({UNIT_TEXT})" if source_axes else ""
+    adjusted = ", display rotated" if view.rotation else ""
+    adjusted += ", display mirrored" if view.mirror else ""
+    axis.set_xlabel(f"{x_label}{suffix}{adjusted}\n{COMPONENT_TEXT[role][component]} · {method}", fontsize=8)
+    axis.set_ylabel(f"{y_label}{suffix}", fontsize=8)
     axis.set_aspect("equal", adjustable="box")
     axis.grid(True, alpha=0.25)
     figure.savefig(output_path, dpi=150)
@@ -371,7 +434,8 @@ def mode_by_number(dataset, number: int):
     raise KeyError(f"mode {number} is not in {getattr(dataset, 'source_path', 'the dataset')}")
 
 
-def render_viewer_mode(dataset, role: str, number: int, component: str, directory: Path) -> tuple[Path, ViewerMode]:
+def render_viewer_mode(dataset, role: str, number: int, component: str, directory: Path,
+                       display: Optional[DisplayView] = None) -> tuple[Path, ViewerMode]:
     mode = mode_by_number(dataset, number)
     entry = next(item for item in viewer_modes(dataset, role) if item.number == int(number))
     if not entry.spatial_available:
@@ -386,7 +450,7 @@ def render_viewer_mode(dataset, role: str, number: int, component: str, director
     else:
         title, note = f"Experimental mode {entry.number} — {entry.frequency_hz:.3f} Hz", entry.source_text
     stem = f"{'fe' if role == FE else 'exp'}_{entry.number:04d}_{component}"
-    return render_mode(mode, role, component, Path(directory) / f"{stem}.png", title, note), entry
+    return render_mode(mode, role, component, Path(directory) / f"{stem}.png", title, note, display), entry
 
 
 # ----------------------------------------------------------------------------- loaded data kept for viewing

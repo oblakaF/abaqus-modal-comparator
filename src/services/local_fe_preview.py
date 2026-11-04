@@ -145,7 +145,7 @@ def _check(cancel_event) -> None:
 
 
 def render_fe_mode_shape(preview: FePreview, index: int, component: str, directory,
-                         cancel_event=None) -> FeShapeView:
+                         cancel_event=None, display=None) -> FeShapeView:
     """Draw loaded mode ``index`` of ``preview`` on its own FE nodes with the main window's viewer (read-only)."""
     if component not in SHAPE_COMPONENTS:
         raise ValueError(f"unknown component {component!r}; choose one of {', '.join(SHAPE_COMPONENTS)}.")
@@ -165,7 +165,7 @@ def render_fe_mode_shape(preview: FePreview, index: int, component: str, directo
     # The loaded mode itself, alone in a dataset: the drawing cannot pick another mode of the package.
     single = ModalDataset(dataset.source_name, dataset.source_path, [mode], metadata=dict(dataset.metadata or {}))
     with _RENDER_LOCK:
-        path, _ = viewer.render_viewer_mode(single, viewer.FE, int(mode.number), component, Path(directory))
+        path, _ = viewer.render_viewer_mode(single, viewer.FE, int(mode.number), component, Path(directory), display)
     _check(cancel_event)
     lines = [f"FE mode {row.number} — {frequency_text(row)} Hz; frequency source: {source_text(row) or 'not recorded'}.",
              f"Shown: {COMPONENT_TEXT[component]} on {row.node_count} FE nodes at their own coordinates (extracted "

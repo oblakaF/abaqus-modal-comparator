@@ -15,13 +15,15 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayo
                                QWidget)
 
 from new_gui import review_model as rv
-from new_gui.shape_panel import ImageView, ScrollSafeCombo, _label
+from new_gui.shape_panel import ImageActions, ImageView, ScrollSafeCombo, _label
 
 EMPTY_TEXT = "No result yet. Choose the two files on the Analyze page and click Analyze, or open a saved result."
 SWAP, KEEP, CANCEL = "swap", "keep", "cancel"
-RESET_ROW, RESET_ALL, SWAP_NEXT = "Reset row", "Reset all to automatic", "Swap with next"
+RESET_ROW, RESET_ALL, SWAP_TEXT = "Reset Row", "Reset All", "Swap"
+ACTIONS = "Actions"
 TAB_SHAPES, TAB_PLOTS, TAB_FRF, TAB_TABLES = "Mode shapes", "Frequency plots", "FRF spectrum", "All tables"
 _MANUAL_TINT = QColor("#fff4d6")
+_CONFLICT_TINT = QColor("#fde8e8")
 _FE_COLUMN = 3
 
 
@@ -44,6 +46,7 @@ class ReviewPanel(QWidget):
         self.state: Optional[rv.ReviewState] = None
         self.current: Optional[int] = None
         self.combos: list = []
+        self.swap_buttons: list = []
         self._building = False
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 12, 16, 12)
@@ -87,41 +90,36 @@ class ReviewPanel(QWidget):
         inner.setSpacing(6)
         inner.addWidget(_label(rv.TITLE, "sectionTitle"))
         inner.addWidget(_label(rv.LIMIT_TEXT, "hint"))
-        self.table = QTableWidget(0, len(rv.HEADERS))
+        self.table = QTableWidget(0, len(rv.HEADERS) + 1)
         self.table.setObjectName("reviewFrequencyTable")
         self.table.setMinimumWidth(240)  # its columns stretch to any width; its rows must not widen the page
-        self.table.setHorizontalHeaderLabels(list(rv.HEADERS))
+        self.table.setHorizontalHeaderLabels(list(rv.HEADERS) + [ACTIONS])
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(30)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # all seven always fit: no sideways scrolling
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # all always fit: no sideways scrolling
+        header.setSectionResizeMode(len(rv.HEADERS), QHeaderView.ResizeMode.ResizeToContents)
         header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap)
         header.setMinimumHeight(42)
         self.table.itemSelectionChanged.connect(self._row_selected)
         inner.addWidget(self.table, 1)
         row = QHBoxLayout()
-        self.swap_button = QPushButton(SWAP_NEXT)
-        self.swap_button.setObjectName("reviewSwapNext")
-        self.swap_button.clicked.connect(lambda: self.swap_with_next())
         self.reset_row_button = QPushButton(RESET_ROW)
         self.reset_row_button.setObjectName("reviewResetRow")
         self.reset_row_button.clicked.connect(lambda: self.reset_row())
         self.reset_all_button = QPushButton(RESET_ALL)
         self.reset_all_button.setObjectName("reviewResetAll")
         self.reset_all_button.clicked.connect(lambda: self.reset_all())
-        for button in (self.swap_button, self.reset_row_button, self.reset_all_button):
-            button.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)  # they share any width: no sideways scroll
-            button.setMinimumWidth(70)
-            button.setToolTip(button.text())
+        self.duplicate_label = _label("", "warnings")
+        row.addWidget(self.duplicate_label, 1)
+        for button in (self.reset_row_button, self.reset_all_button):
             row.addWidget(button)
         inner.addLayout(row)
         self.hypothesis_label = _label("", "warnings")
         inner.addWidget(self.hypothesis_label)
-        self.duplicate_label = _label("", "error")
-        inner.addWidget(self.duplicate_label)
         self.session_label = _label(rv.SESSION_ONLY_TEXT, "hint")
         inner.addWidget(self.session_label)
         return pane
@@ -143,13 +141,18 @@ class ReviewPanel(QWidget):
         plots = QWidget()
         inner = QVBoxLayout(plots)
         inner.setContentsMargins(0, 8, 0, 0)
+        inner.addWidget(_label(rv.PLOTS_EXPLANATION, "hint"))
         self.frequency_image, self.difference_image = ImageView(), ImageView()
+        self.frequency_actions = ImageActions(self.frequency_image, "fe_vs_exp_frequency")
+        self.difference_actions = ImageActions(self.difference_image, "signed_frequency_error")
         pictures = QGridLayout()  # side by side: both fit the pane without scrolling
         pictures.setHorizontalSpacing(8)
         pictures.setColumnStretch(0, 1)
         pictures.setColumnStretch(1, 1)
         pictures.addWidget(self.frequency_image, 0, 0)
         pictures.addWidget(self.difference_image, 0, 1)
+        pictures.addWidget(self.frequency_actions, 1, 0)
+        pictures.addWidget(self.difference_actions, 1, 1)
         inner.addLayout(pictures)
         inner.addStretch(1)
         self.views.addTab(_scrolled(plots), TAB_PLOTS)
@@ -160,9 +163,11 @@ class ReviewPanel(QWidget):
         inner.addWidget(self.frf_note)
         self.frf_image = ImageView()
         inner.addWidget(self.frf_image)
+        self.frf_actions = ImageActions(self.frf_image, "frf_spectrum")
+        inner.addWidget(self.frf_actions)
         inner.addStretch(1)
         self.views.addTab(_scrolled(frf), TAB_FRF)
-        self.views.addTab(_scrolled(self.analyze.tables_box), TAB_TABLES)
+        self.views.addTab(self.analyze.tables_box, TAB_TABLES)  # the tables fill the pane and scroll by themselves
         self.views.currentChanged.connect(lambda _index: self._draw_plots())
         return self.views
 
@@ -184,6 +189,7 @@ class ReviewPanel(QWidget):
         self._building = True
         self.table.clearContents()
         self.combos = []
+        self.swap_buttons = []
         rows = self.state.rows() if self.state is not None else ()
         self.table.setRowCount(len(rows))
         for row in rows:
@@ -199,18 +205,30 @@ class ReviewPanel(QWidget):
             combo.activated.connect(lambda _index, r=row.row, c=combo: self.select_mode(r, c.currentData()))
             self.table.setCellWidget(row.row, _FE_COLUMN, combo)
             self.combos.append(combo)
+            if row.row + 1 < len(rows):
+                swap = QPushButton(SWAP_TEXT)
+                swap.setObjectName("reviewSwap")
+                swap.setToolTip("Swap the selected FE modes of this row and the next row. A hypothesis, not a validated identity.")
+                swap.clicked.connect(lambda _checked=False, r=row.row: self.swap_with_next(r))
+                self.table.setCellWidget(row.row, len(rv.HEADERS), swap)
+                self.swap_buttons.append(swap)
         self._building = False
         self._show_rows()
 
     def _show_rows(self) -> None:
         """The cells of the current selection; a manual row is tinted and its origin is in the tooltip and the line below."""
         self._building = True
+        conflict_rows = {r for rows in self.state.conflicts().values() for r in rows} if self.state is not None else set()
         for row in self.state.rows() if self.state is not None else ():
             for column, text in enumerate(row.cells()):
                 item = self.table.item(row.row, column)
                 item.setText(text)
                 item.setToolTip(f"{row.record}: {row.origin}")
                 item.setBackground(_MANUAL_TINT if row.manual else QColor("#ffffff"))
+            if row.row + 1 in conflict_rows:
+                conflict = self.table.item(row.row, _FE_COLUMN + 1)
+                conflict.setBackground(_CONFLICT_TINT)
+                conflict.setToolTip(f"FE mode {row.selected_mode} is also selected for another row: not one-to-one.")
             combo = self.combos[row.row]
             found = combo.findData(row.selected_mode)
             combo.setCurrentIndex(found)
@@ -229,7 +247,6 @@ class ReviewPanel(QWidget):
 
     def _buttons(self) -> None:
         state, current = self.state, self.current
-        self.swap_button.setEnabled(state is not None and current is not None and current + 1 < len(state))
         self.reset_row_button.setEnabled(state is not None and current in state.manual)
 
     def _selected_changed(self) -> None:
@@ -318,6 +335,9 @@ class ReviewPanel(QWidget):
         self._show_rows()
         if row is not None:
             self.current = row
+            self._building = True
+            self.table.selectRow(row)
+            self._building = False
             self.analyze.show_candidate(row)
         self._buttons()
         self._draw_plots()
@@ -354,20 +374,16 @@ class ReviewPanel(QWidget):
             self._draw_frf()
 
     def _draw_frf(self) -> None:
-        if self.analyze.snapshot is not None:
-            self.frf_image.clear_image()
-            self.frf_note.setText(rv.FRF_NEEDS_SOURCE)
-            return
-        series = rv.frf_series(self.analyze.chosen_dataset())
+        saved = self.analyze.snapshot is not None
+        dataset = None if saved else self.analyze.chosen_dataset()
+        series = None if saved else rv.frf_series(dataset)
         if series is None:
             self.frf_image.clear_image()
-            self.frf_note.setText(rv.FRF_NOT_IN_FILE)
+            self.frf_note.setText(rv.frf_missing(dataset, saved))
             return
-        rows = self.state.rows()
-        marks = [float(row.exp_text) for row in rows]
-        current = float(rows[self.current].exp_text) if self.current is not None else None
-        self.frf_note.setText("")
-        self.frf_image.set_image(rv.frf_plot(series, marks, current))
+        records = [(f"EXP {row.exp_mode}", float(row.exp_text)) for row in self.state.rows()]
+        self.frf_note.setText(rv.FRF_PEAK_NOTE if self.state.provisional else rv.FITTED_NOTE)
+        self.frf_image.set_image(rv.frf_plot(series, records, self.current, self.state.provisional))
 
 
 __all__ = ["CANCEL", "KEEP", "ReviewPanel", "SWAP"]

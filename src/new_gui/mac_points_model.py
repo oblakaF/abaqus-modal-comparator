@@ -39,6 +39,12 @@ NO_LINE = "No line of at least three mapped points runs along a coordinate axis,
 NOT_MEASURED = "This component is not measured on the chosen line: no profile is drawn and no value is created."
 PAIR_TEXT = ("Both shapes on the same registered measured points, from the comparator's pair data; the third view is its "
              "amplitude correlation. Click a pair to draw it.")
+MEASURED_TITLE = "Measured experimental points"
+MEASURED_NOTE = ("The measurement geometry as read, in the file's own coordinates. It needs no registration and says nothing about "
+                 "mode identity or MAC.")
+MEASURED_NEEDS_SOURCE = ("The measured points are not kept in a saved file. Check source files on the Analyze page, then Analyze, to "
+                         "inspect them.")
+MEASURED_HEADERS = ("EXP point", "X", "Y", "Z", "Measured DOFs")
 POINT_NOTE = "MAC applies to each mode pair over all mapped measured DOFs. There is no MAC per point."
 POINT_HEADERS = ("EXP point", "X", "Y", "Z", "FE node", "Residual (FE units)", "Measured DOFs")
 COVERAGE_COLUMNS = (0, 3, 8, 9, 10)  # of comparison_model.PAIR_HEADERS: FE, EXP, measured DOFs, coverage, mapped points
@@ -75,6 +81,51 @@ def unavailable_reason(analysis, saved: bool) -> str:
     if analysis.comparison is not None:
         return ""
     return REASONS.get(analysis.registration_outcome) or (SAVED_NO_REGISTRATION if saved else REASONS[am.REFUSED])
+
+
+def measured_rows(mode) -> tuple:
+    """Each measured point of a record as read: its coordinates and the DOFs the importer recorded."""
+    measured = getattr(mode, "measured_dofs", None)
+    mask = None if measured is None else np.asarray(measured, dtype=bool)
+    coordinates = np.asarray(mode.coordinates, dtype=float)
+    rows = []
+    for index, node in enumerate(np.asarray(mode.node_ids)):
+        dofs = "not recorded" if mask is None else " ".join(a for a, used in zip(AXES, mask[index]) if used) or "none"
+        rows.append((str(node), *(f"{value:.5g}" for value in coordinates[index]), dofs))
+    return tuple(rows)
+
+
+def measured_summary(mode) -> str:
+    measured = getattr(mode, "measured_dofs", None)
+    points = len(mode.node_ids)
+    if measured is None:
+        return f"{points} points. The importer recorded no measured-DOF list."
+    mask = np.asarray(measured, dtype=bool)
+    per_axis = ", ".join(f"{axis}: {int(mask[:, column].sum())}" for column, axis in enumerate(AXES))
+    return f"{points} points, {int(mask.sum())} measured DOFs ({per_axis})."
+
+
+def layout_plot(mode) -> bytes:
+    """The points in the two source axes of largest extent; no FE model and no value on them."""
+    from services.modal_data_viewer import DisplayView, UNIT_TEXT, display_coordinates
+
+    coordinates = np.asarray(mode.coordinates, dtype=float)
+    finite = np.all(np.isfinite(coordinates), axis=1)
+    x, y, x_label, y_label = display_coordinates(coordinates[finite], DisplayView("source"))
+    figure = Figure(figsize=(5.0, 3.8), constrained_layout=True)
+    FigureCanvasAgg(figure)
+    axis = figure.add_subplot(111)
+    axis.scatter(x, y, s=28, c="#2563eb", edgecolors="white", linewidths=0.6)
+    axis.set_aspect("equal", adjustable="datalim")
+    axis.set_title(f"{MEASURED_TITLE} ({int(finite.sum())})", fontsize=10, color="#3e4c59", loc="left")
+    axis.set_xlabel(f"{x_label} ({UNIT_TEXT})", fontsize=8, color="#52606d")
+    axis.set_ylabel(f"{y_label} ({UNIT_TEXT})", fontsize=8, color="#52606d")
+    axis.tick_params(labelsize=8, colors="#52606d")
+    axis.grid(True, color="#e4e7eb", linewidth=0.8)
+    out = io.BytesIO()
+    with sm._RENDER:
+        figure.savefig(out, format="png", dpi=130)
+    return out.getvalue()
 
 
 def coverage_rows(view) -> tuple:

@@ -80,9 +80,13 @@ def geometry_facts(manifest: Path, cancel_event=None) -> tuple:
     return tuple(rows)
 
 
-def beside_odb(odb: Path) -> tuple:
-    """Files with the ODB's name beside it, named only; they are not opened."""
-    return tuple(candidate.name for candidate in (odb.with_suffix(".inp"), odb.with_suffix(".cae")) if candidate.is_file())
+def source_rows(odb: Path, package_found: bool) -> tuple:
+    """Whether the extracted data and a model source exist. Files beside the ODB are named only; they are not opened."""
+    rows = [("FE package", "Found: extracted modes of this ODB's content" if package_found else "Not found")]
+    for suffix, caption in ((".inp", "INP"), (".cae", "CAE")):
+        candidate = odb.with_suffix(suffix)
+        rows.append((f"{caption} beside the ODB", f"{candidate.name} exists but was not parsed" if candidate.is_file() else "None found"))
+    return tuple(rows)
 
 
 def read_fe_facts(odb, cancel_event, say=None) -> Facts:
@@ -97,11 +101,9 @@ def read_fe_facts(odb, cancel_event, say=None) -> Facts:
         raise am.StepCancelled() from error
     except (svc.OdbImportRefused, OSError) as error:
         raise am.StepFailed(f"The ODB could not be read: {error}") from error
-    files = beside_odb(odb)
-    note = f"Beside the ODB, not read: {', '.join(files)}." if files else "No INP or CAE file with this name is beside the ODB."
     if not found:
-        return Facts((("Extracted modes", "None found"),), f"{NO_PACKAGE} {note}")
-    return Facts(geometry_facts(found[0] / "manifest.json", cancel_event), note)
+        return Facts(source_rows(odb, False), NO_PACKAGE)
+    return Facts(source_rows(odb, True) + geometry_facts(found[0] / "manifest.json", cancel_event))
 
 
 def experimental_facts(preview) -> Facts:
@@ -135,5 +137,5 @@ def saved_facts(document: dict) -> tuple:
     return fe, experimental
 
 
-__all__ = ["Facts", "MATERIAL_STATEMENT", "PROPERTY_HEADERS", "STATUS_TEXT", "WORKFLOW", "WORKFLOW_TITLE", "experimental_facts",
+__all__ = ["Facts", "source_rows", "MATERIAL_STATEMENT", "PROPERTY_HEADERS", "STATUS_TEXT", "WORKFLOW", "WORKFLOW_TITLE", "experimental_facts",
            "geometry_facts", "property_rows", "read_experimental_facts", "read_fe_facts", "saved_facts"]

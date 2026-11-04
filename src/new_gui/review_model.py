@@ -30,6 +30,18 @@ PROVISIONAL_EXPLANATION = ("This experimental set holds FRF peak records, not fi
                            "wording is in the details.")
 FRF_NEEDS_SOURCE = "FRF curves are not kept in a saved project file. Check source files and Analyze again to show them."
 FRF_NOT_IN_FILE = "This experimental file holds no FRF curves (dataset 58), so no spectrum is drawn: none is made up."
+FRF_NOT_USABLE = ("This file holds dataset 58 records, but the importer formed no usable FRF curve from them, so no spectrum is "
+                  "drawn: none is made up.")
+FRF_PEAK_NOTE = ("Triangles: FRF peak records, response snapshots at detected peaks, not fitted modal shapes. Orange: the record "
+                 "of the selected table row.")
+FITTED_NOTE = ("Dashed lines: fitted modes of the chosen set at their frequencies. They are not peaks of this curve. Orange: the "
+               "record of the selected table row.")
+PLOTS_EXPLANATION = ("Left: each dot is one table row. On the dashed equal frequency line FE and EXP agree; above it FE is higher. "
+                     "Right: FE − EXP in percent. The dark outline marks the selected table row.")
+LABEL_AUTOMATIC, LABEL_EQUAL = "Automatic nearest-frequency candidate", "Equal frequency line (FE = EXP)"
+LABEL_MANUAL = f"Manual candidate ({USER_HYPOTHESIS})"
+LABEL_SELECTED, LABEL_SELECTED_RECORD = "Selected table row", "Record of the selected row"
+LABEL_FRF_PEAK, LABEL_FITTED = "FRF peak record, not fitted", "Fitted mode frequency"
 SAVED_PLOTS_TEXT = ("Shown from the saved file: frequencies and the saved magnitude pictures. Other components and FRF curves "
                     "need the source files: Check source files on the Analyze page, then Analyze.")
 SESSION_ONLY_TEXT = "Manual choices are kept for this session only: they are not saved and change no saved or computed result."
@@ -139,15 +151,21 @@ class ReviewState:
         else:
             self.manual.pop(index, None)
 
-    def duplicate_warning(self) -> str:
-        groups = {}
+    def conflicts(self) -> dict:
+        """FE mode -> table rows (from 1) of every FE mode selected more than once."""
+        groups: dict = {}
         for index in range(len(self)):
             mode = self.selected(index)
             if mode in self.fe_hz:
                 groups.setdefault(mode, []).append(index + 1)
-        lines = [f"FE mode {mode} is selected for rows {', '.join(str(row) for row in rows)}."
-                 for mode, rows in groups.items() if len(rows) > 1]
-        return "Diagnostic: not one-to-one. " + " ".join(lines) if lines else ""
+        return {mode: rows for mode, rows in groups.items() if len(rows) > 1}
+
+    def duplicate_warning(self) -> str:
+        groups = self.conflicts()
+        if not groups:
+            return ""
+        return "Not one-to-one: " + "; ".join(f"FE {mode} (rows {', '.join(str(r) for r in rows)})"
+                                               for mode, rows in groups.items()) + "."
 
     def hypothesis_text(self) -> str:
         if not self.manual:
@@ -196,11 +214,16 @@ def _plotted(state: ReviewState) -> list:
     return points
 
 
+def selected_point(state: ReviewState, current: Optional[int]):
+    """The plotted point of the selected table row, or None."""
+    return next((p for p in _plotted(state) if p[0].row == current), None)
+
+
 def frequency_plot(state: ReviewState, current: Optional[int] = None) -> bytes:
     figure = _figure()
     axis = figure.add_subplot(111)
     points = _plotted(state)
-    for manual, colour, marker, label in ((False, _AUTOMATIC, "o", "Automatic nearest"), (True, _MANUAL, "D", USER_HYPOTHESIS)):
+    for manual, colour, marker, label in ((False, _AUTOMATIC, "o", LABEL_AUTOMATIC), (True, _MANUAL, "D", LABEL_MANUAL)):
         chosen = [p for p in points if p[0].manual == manual]
         if chosen:
             axis.scatter([p[1] for p in chosen], [p[2] for p in chosen], s=36, c=colour, marker=marker, label=label, zorder=3,
@@ -208,13 +231,16 @@ def frequency_plot(state: ReviewState, current: Optional[int] = None) -> bytes:
     if points:
         low = min(min(p[1], p[2]) for p in points)
         high = max(max(p[1], p[2]) for p in points)
-        axis.plot((low, high), (low, high), color=_MUTED, linewidth=1.0, linestyle="--", label="f_FE = f_EXP", zorder=1)
-    for p in points:
-        if p[0].row == current:
-            axis.scatter([p[1]], [p[2]], s=130, facecolors="none", edgecolors=_INK, linewidths=1.5, zorder=4)
-    _style(axis, "EXP frequency (Hz)", "Selected FE frequency (Hz)", "FE versus experimental frequency (candidates)")
+        axis.plot((low, high), (low, high), color=_MUTED, linewidth=1.0, linestyle="--", label=LABEL_EQUAL, zorder=1)
+    chosen = selected_point(state, current)
+    if chosen is not None:
+        axis.scatter([chosen[1]], [chosen[2]], s=170, facecolors="none", edgecolors=_INK, linewidths=2.0, zorder=4,
+                     label=LABEL_SELECTED)
+        axis.annotate(f"EXP {chosen[0].exp_mode} / FE {chosen[0].selected_mode}", (chosen[1], chosen[2]), xytext=(9, -13),
+                      textcoords="offset points", fontsize=8, color=_INK, weight="bold")
+    _style(axis, "EXP frequency (Hz)", "FE frequency (Hz)", "FE vs EXP frequency comparison")
     if points:
-        axis.legend(fontsize=8, frameon=False, loc="upper left")
+        axis.legend(fontsize=7, frameon=False, loc="upper left")
     return _png(figure)
 
 
@@ -222,18 +248,19 @@ def difference_plot(state: ReviewState, current: Optional[int] = None) -> bytes:
     figure = _figure()
     axis = figure.add_subplot(111)
     points = _plotted(state)
-    for manual, colour, label in ((False, _AUTOMATIC, "Automatic nearest"), (True, _MANUAL, USER_HYPOTHESIS)):
+    for manual, colour, label in ((False, _AUTOMATIC, LABEL_AUTOMATIC), (True, _MANUAL, LABEL_MANUAL)):
         chosen = [p for p in points if p[0].manual == manual]
         if chosen:
             axis.bar([p[0].row + 1 for p in chosen], [p[3] for p in chosen], width=0.6, color=colour, label=label, zorder=3)
     axis.axhline(0.0, color=_MUTED, linewidth=1.0, zorder=2)
-    for p in points:
-        if p[0].row == current:
-            axis.bar([p[0].row + 1], [p[3]], width=0.72, fill=False, edgecolor=_INK, linewidth=1.5, zorder=4)
-    axis.set_xticks([p[0].row + 1 for p in points])
-    _style(axis, "Row", "Δf (%)", "Signed frequency difference (candidates)")
+    chosen = selected_point(state, current)
+    if chosen is not None:
+        axis.bar([chosen[0].row + 1], [chosen[3]], width=0.78, fill=False, edgecolor=_INK, linewidth=2.0, zorder=4,
+                 label=LABEL_SELECTED)
+    axis.set_xticks([p[0].row + 1 for p in points], [p[0].exp_mode for p in points])
+    _style(axis, "EXP mode", "Frequency error, FE − EXP (%)", "Signed frequency error")
     if points:
-        axis.legend(fontsize=8, frameon=False)
+        axis.legend(fontsize=7, frameon=False)
     return _png(figure)
 
 
@@ -248,27 +275,50 @@ def frf_series(dataset) -> Optional[tuple]:
     return frequency, indicator, coherence if len(coherence) == len(frequency) else None
 
 
-def frf_plot(series: tuple, marks=(), current: Optional[float] = None) -> bytes:
-    """The combined FRF indicator with the set's record frequencies; coherence, when read, on its own axes below."""
+def frf_plot(series: tuple, records=(), current: Optional[int] = None, provisional: bool = False) -> bytes:
+    """The imported FRF indicator, with the set's records marked at their frequencies; coherence, when read, below.
+
+    ``records`` are (name, Hz). FRF peak records are triangles on the curve; fitted modes are dashed lines, never peaks."""
     frequency, indicator, coherence = series
-    figure = _figure((6.0, 4.4) if coherence is not None else (6.0, 3.2))
+    figure = _figure((9.0, 4.8) if coherence is not None else (9.0, 3.6))
     if coherence is not None:
         axis, lower = figure.subplots(2, 1, sharex=True, height_ratios=(3, 1))
     else:
         axis, lower = figure.add_subplot(111), None
-    axis.semilogy(frequency, np.maximum(indicator / max(float(np.max(indicator)), 1.0e-30), 1.0e-12), color=_AUTOMATIC,
-                  linewidth=1.2)
-    for value in marks:
-        axis.axvline(value, color=_MUTED, linewidth=0.8, linestyle=":")
-    if current is not None:
-        axis.axvline(current, color=_INK, linewidth=1.5)
-    _style(axis, "" if lower is not None else "Frequency (Hz)", "Normalized indicator",
-           "Experimental FRF indicator; dotted: records of this set; solid: selected row")
+    curve = np.maximum(indicator / max(float(np.max(indicator)), 1.0e-30), 1.0e-12)
+    axis.semilogy(frequency, curve, color=_AUTOMATIC, linewidth=1.2, label="Imported FRF indicator")
+    transform = axis.get_xaxis_transform()
+    kind = LABEL_FRF_PEAK if provisional else LABEL_FITTED
+    for index, (name, hz) in enumerate(records):
+        selected = index == current
+        colour, width = (_MANUAL, 1.8) if selected else (_MUTED, 0.8)
+        label = kind if index == 0 else None
+        if provisional:
+            y = curve[int(np.argmin(np.abs(frequency - hz)))]
+            axis.scatter([hz], [y], marker="v", s=70 if selected else 30, c=colour, zorder=4, label=label)
+        else:
+            axis.axvline(hz, color=colour, linewidth=width, linestyle="--", zorder=2, label=label)
+        axis.text(hz, 1.01, f"{name}  {hz:.1f} Hz", transform=transform, rotation=90, ha="center", va="bottom", fontsize=7,
+                  color=_INK if selected else _MUTED, weight="bold" if selected else "normal")
+    if current is not None and 0 <= current < len(records):
+        axis.axvline(records[current][1], color=_MANUAL, linewidth=1.8, zorder=3, label=LABEL_SELECTED_RECORD)
+    _style(axis, "" if lower is not None else "Frequency (Hz)", "Normalized indicator", "")
+    axis.legend(fontsize=7, frameon=False, loc="lower right")
     if lower is not None:
         lower.plot(frequency, coherence, color=_AUTOMATIC, linewidth=1.0)
         lower.set_ylim(0.0, 1.05)
         _style(lower, "Frequency (Hz)", "Mean coherence", "")
     return _png(figure)
+
+
+def frf_missing(dataset, saved: bool) -> str:
+    """Why no curve can be drawn, in the file's own terms."""
+    if saved:
+        return FRF_NEEDS_SOURCE
+    metadata = getattr(dataset, "metadata", None) or {}
+    if 58 in tuple(metadata.get("dataset_types") or ()):
+        return FRF_NOT_USABLE
+    return FRF_NOT_IN_FILE
 
 
 def mac_plot(view) -> bytes:

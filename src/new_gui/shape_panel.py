@@ -15,14 +15,17 @@ from __future__ import annotations
 import threading
 from typing import Optional
 
+from pathlib import Path
+
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-                               QVBoxLayout)
+from PySide6.QtGui import QGuiApplication, QImage, QPixmap
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
+                               QVBoxLayout, QWidget)
 
 from new_gui import shape_model as sm
 from new_gui.workspace_state import EXPERIMENTAL, FE, KIND_TITLE
 
+COPY_IMAGE, SAVE_PNG = "Copy Image", "Save PNG"
 MAX_IMAGE_HEIGHT = 560  # logical pixels; a tall image is scaled down, never cut
 SCROLLBAR_ALLOWANCE = 24  # shrinking by this little keeps the height: see ImageView._fit
 
@@ -61,8 +64,11 @@ def _combo(name: str) -> QComboBox:
 class ImageView(QLabel):
     """A PNG scaled to the available width with its proportions kept (never wider than the panel)."""
 
+    image_changed = Signal(bool)
+
     def __init__(self):
         super().__init__()
+        self.data = b""  # the original PNG, as drawn or saved: what Copy Image and Save PNG use
         self.setObjectName("shapeImage")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -78,15 +84,19 @@ class ImageView(QLabel):
             self.clear_image()
             return False
         self.source = pixmap
+        self.data = bytes(data)
         self._fitted_width = None
         self._fit()
+        self.image_changed.emit(True)
         return True
 
     def clear_image(self) -> None:
         self.source = None
+        self.data = b""
         self._fitted_width = None
         self.clear()
         self.setFixedHeight(0)
+        self.image_changed.emit(False)
 
     def _fit(self) -> None:
         if self.source is None or self.source.isNull():
@@ -115,6 +125,60 @@ class ImageView(QLabel):
         super().resizeEvent(event)
         if not self._fitting:
             self._fit()
+
+
+class ImageActions(QWidget):
+    """Copy Image and Save PNG of one picture: its original bytes, never a capture of the screen. Off without a picture."""
+
+    def __init__(self, view: ImageView, name: str = "picture"):
+        super().__init__()
+        self.view = view
+        self.name = name
+        self.ask_path = self._dialog_path
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+        self.copy_button = QPushButton(COPY_IMAGE)
+        self.copy_button.setObjectName("imageCopy")
+        self.copy_button.clicked.connect(lambda: self.copy())
+        self.save_button = QPushButton(SAVE_PNG)
+        self.save_button.setObjectName("imageSave")
+        self.save_button.clicked.connect(lambda: self.save())
+        row.addWidget(self.copy_button)
+        row.addWidget(self.save_button)
+        row.addStretch(1)
+        view.image_changed.connect(self._changed)
+        self._changed(bool(view.data))
+
+    def _changed(self, available: bool) -> None:
+        self.copy_button.setEnabled(available)
+        self.save_button.setEnabled(available)
+
+    def copy(self) -> bool:
+        image = QImage.fromData(self.view.data, "PNG") if self.view.data else QImage()
+        if image.isNull():
+            return False
+        QGuiApplication.clipboard().setImage(image)
+        return True
+
+    def _dialog_path(self) -> str:
+        path, _filter = QFileDialog.getSaveFileName(self, SAVE_PNG, f"{self.name}.png", "PNG image (*.png)")
+        return path
+
+    def save(self) -> bool:
+        if not self.view.data:
+            return False
+        path = self.ask_path()
+        if not path:
+            return False
+        target = Path(path)
+        target = target if target.suffix else target.with_name(target.name + ".png")
+        try:
+            target.write_bytes(self.view.data)
+        except OSError as error:
+            self.save_button.setToolTip(f"Not saved: {error}")
+            return False
+        return True
 
 
 class _Bridge(QObject):
@@ -185,13 +249,18 @@ class ShapePanel(QFrame):
         layout.addWidget(self.status)
         self.image = ImageView()
         layout.addWidget(self.image)
+        self.image_actions = ImageActions(self.image, f"{'fe' if kind == FE else 'experimental'}_shape")
+        layout.addWidget(self.image_actions)
         self.caption = _label("", "")
         layout.addWidget(self.caption)
         self.note = _label(sm.SHAPE_NOTE, "hint")
         layout.addWidget(self.note)
-        self.projection = _label(sm.PROJECTION_TEXT, "hint")
+        self.projection = _label(sm.view_text(sm.DEFAULT_VIEW[0]), "hint")
         self.projection.setVisible(compact)
         layout.addWidget(self.projection)
+        self.view_combo = self.rotation_combo = self.mirror_combo = None
+        if compact:
+            self._build_view_row(layout, grid)
         self.details_toggle: Optional[QPushButton] = None
         if compact:
             self.provisional.setText(sm.FRF_PEAK_SHORT)  # the page explains it once; the full wording is in the details
@@ -209,6 +278,31 @@ class ShapePanel(QFrame):
                     combo.setMinimumContentsLength(6)
         self.setVisible(False)
         self._refresh()
+
+    def _build_view_row(self, layout, grid) -> None:
+        self.view_combo = _combo("shapeView")
+        for plane, text in sm.VIEWS:
+            self.view_combo.addItem(text, plane)
+        self.rotation_combo = _combo("shapeRotation")
+        for degrees in sm.ROTATIONS:
+            self.rotation_combo.addItem(f"{degrees}°", degrees)
+        self.mirror_combo = _combo("shapeMirror")
+        self.mirror_combo.addItem("No", False)
+        self.mirror_combo.addItem("Left-right", True)
+        row = QHBoxLayout()
+        for caption, combo in (("View", self.view_combo), ("Rotate", self.rotation_combo), ("Mirror", self.mirror_combo)):
+            row.addWidget(QLabel(caption))
+            row.addWidget(combo, 1)
+            combo.setMinimumContentsLength(3)
+            combo.currentIndexChanged.connect(self._choice_changed)
+            combo.activated.connect(lambda _row=0: self.show_shape())
+        layout.insertLayout(layout.indexOf(self.hint) + 1, row)
+
+    def display(self):
+        """(plane, rotation, mirror) chosen for this picture; None where the panel offers no view choice."""
+        if self.view_combo is None:
+            return None
+        return (self.view_combo.currentData(), self.rotation_combo.currentData(), self.mirror_combo.currentData())
 
     def _details_toggled(self, shown: bool) -> None:
         self.details_toggle.setText("Hide details" if shown else "Show details")
@@ -284,16 +378,17 @@ class ShapePanel(QFrame):
         source = self.preview if self.kind == FE else self.chosen_set()
         index, component = self.chosen_index(), self.chosen_component()
         set_index = None if self.kind == FE else self.set_combo.currentData()
+        display = self.display()
         token, cancel_event = self.slot.start((set_index, index, component))
-        worker = threading.Thread(target=self._draw, args=(source, index, component, token, cancel_event),
+        worker = threading.Thread(target=self._draw, args=(source, index, component, token, cancel_event, display),
                                   name=f"new-gui-shape-{self.kind}", daemon=True)
         self._threads = [thread for thread in self._threads if thread.is_alive()] + [worker]
         worker.start()
         self._refresh()
         return True
 
-    def _draw(self, source, index, component, token, cancel_event) -> None:
-        outcome = sm.run_render(self.kind, source, index, component, token, cancel_event)  # no widget here
+    def _draw(self, source, index, component, token, cancel_event, display=None) -> None:
+        outcome = sm.run_render(self.kind, source, index, component, token, cancel_event, display)  # no widget here
         try:
             self._bridge.done.emit(outcome)
         except RuntimeError:  # the panel is already gone
@@ -364,3 +459,5 @@ class ShapePanel(QFrame):
             self.caption.setText("")
         self.caption.setVisible(state == sm.SHOWN and details)
         self.note.setVisible(has_preview and not self.compact)
+        if self.view_combo is not None:
+            self.projection.setText(sm.view_text(self.view_combo.currentData()))

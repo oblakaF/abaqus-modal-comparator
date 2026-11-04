@@ -15,9 +15,9 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLay
 from new_gui import comparison_model as cm
 from new_gui import mac_points_model as mp
 from new_gui.diagnostic_panel import DiagnosticTable
-from new_gui.shape_panel import ImageView, _combo, _label
+from new_gui.shape_panel import ImageActions, ImageView, _combo, _label
 
-TAB_POINTS, TAB_PROVENANCE, TAB_PROFILE = "Points", "Mapping diagnostics", "Line profile"
+TAB_POINTS, TAB_PROVENANCE, TAB_PROFILE = "Registered points", "Mapping diagnostics", "Line profile"
 
 
 class _BoundedTable(DiagnosticTable):
@@ -70,6 +70,26 @@ class MacPointsPanel(QWidget):
         inner.addWidget(self.evidence_box)
         self.evidence_table: Optional[DiagnosticTable] = None
         layout.addWidget(card)
+        card, inner = _card()
+        inner.addWidget(_label(mp.MEASURED_TITLE, "sectionTitle"))
+        inner.addWidget(_label(mp.MEASURED_NOTE, "hint"))
+        self.measured_status = _label("", "hint")
+        inner.addWidget(self.measured_status)
+        self.measured_box = QHBoxLayout()
+        self.measured_box.setSpacing(12)
+        picture = QVBoxLayout()
+        self.measured_image = ImageView()
+        picture.addWidget(self.measured_image)
+        self.measured_actions = ImageActions(self.measured_image, "measured_points")
+        picture.addWidget(self.measured_actions)
+        picture.addStretch(1)
+        self.measured_box.addLayout(picture, 1)
+        self.measured_table_box = QVBoxLayout()
+        self.measured_box.addLayout(self.measured_table_box, 1)
+        inner.addLayout(self.measured_box)
+        self.measured_table: Optional[DiagnosticTable] = None
+        self.measured_card = card
+        layout.addWidget(card)
         layout.addWidget(analyze.registration_box)
         layout.addWidget(analyze.comparison_box)
         self.pair_card, inner = _card()
@@ -79,8 +99,10 @@ class MacPointsPanel(QWidget):
         images = QGridLayout()
         images.setHorizontalSpacing(8)
         self.pair_images = tuple(ImageView() for _ in cm.PAIR_CAPTIONS)
-        for column, image in enumerate(self.pair_images):
+        self.pair_actions = tuple(ImageActions(image, f"pair_{name}") for image, (name, _caption) in zip(self.pair_images, cm.PAIR_CAPTIONS))
+        for column, (image, actions) in enumerate(zip(self.pair_images, self.pair_actions)):
             images.addWidget(image, 0, column)
+            images.addWidget(actions, 1, column)
             images.setColumnStretch(column, 1)
         inner.addLayout(images)
         layout.addWidget(self.pair_card)
@@ -102,6 +124,7 @@ class MacPointsPanel(QWidget):
         self.reason.setVisible(bool(reason))
         self.badge.setVisible(bool(reason))
         self._rebuild_evidence()
+        self._rebuild_measured()
         view = analysis.comparison if analysis is not None else None
         self.pair_card.setVisible(view is not None and bool(view.pair_rows))
         self.pair_status.setText(mp.NEEDS_SOURCE if panel.snapshot is not None else mp.PAIR_TEXT)
@@ -129,6 +152,27 @@ class MacPointsPanel(QWidget):
         self.evidence_table = DiagnosticTable(mp.EVIDENCE_HEADERS, rows, 2, text_columns=(0, 1))
         self.evidence_table.setObjectName("macEvidence")
         self.evidence_layout.addWidget(self.evidence_table)
+
+    def _rebuild_measured(self) -> None:
+        """The measurement geometry, whatever the state of the registration."""
+        if self.measured_table is not None:
+            self.measured_table.setParent(None)
+            self.measured_table.deleteLater()
+            self.measured_table = None
+        self.measured_image.clear_image()
+        analysis = self.analyze.analysis
+        self.measured_card.setVisible(analysis is not None)
+        if analysis is None:
+            return
+        mode = self.analyze.measured_mode()
+        if mode is None:
+            self.measured_status.setText(mp.MEASURED_NEEDS_SOURCE if self.analyze.snapshot is not None else mp.NO_DETAIL)
+            return
+        self.measured_status.setText(mp.measured_summary(mode))
+        self.measured_image.set_image(mp.layout_plot(mode))
+        self.measured_table = _BoundedTable(mp.MEASURED_HEADERS, mp.measured_rows(mode), 4)
+        self.measured_table.setObjectName("macMeasuredPoints")
+        self.measured_table_box.addWidget(self.measured_table)
 
     def _tab(self, title: str) -> QVBoxLayout:
         page = QWidget()
@@ -176,6 +220,8 @@ class MacPointsPanel(QWidget):
         inner.addWidget(self.profile_status)
         self.profile_image = ImageView()
         inner.addWidget(self.profile_image)
+        self.profile_actions = ImageActions(self.profile_image, "line_profile")
+        inner.addWidget(self.profile_actions)
         inner.addStretch(1)
         for index, pair in enumerate(pairs):
             self.pair_combo.addItem(f"FE {pair.abaqus_mode} / EXP {pair.experimental_mode}", index)

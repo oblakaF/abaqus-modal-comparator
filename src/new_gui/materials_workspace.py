@@ -160,7 +160,8 @@ class MaterialsWorkspace(QWidget):
                     self._stop(kind)
                     self._show(kind, mw.experimental_facts(panel.inputs.full_experimental))
                 elif kind == FE and panel.inputs is not None:
-                    self._read(kind, lambda cancel, _say: mw.Facts(mw.geometry_facts(panel.inputs.full_fe.manifest_path, cancel)))
+                    odb, manifest = panel.paths[kind], panel.inputs.full_fe.manifest_path
+                    self._read(kind, lambda cancel, _say: mw.Facts(mw.source_rows(odb, True) + mw.geometry_facts(manifest, cancel)))
                 else:
                     self._read(kind)
         return True

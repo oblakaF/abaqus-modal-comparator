@@ -241,10 +241,10 @@ class SaveAndReopenTests(_Project):
         _window, panel = self.analysed()
         real = sm.run_render
 
-        def refuse_first(kind, source, index, component, token, cancel):
+        def refuse_first(kind, source, index, component, token, cancel, display=None):
             if kind == FE and index == 0:
                 return sm.ShapeOutcome(kind, token, error="No spatial view of this mode")
-            return real(kind, source, index, component, token, cancel)
+            return real(kind, source, index, component, token, cancel, display)
 
         with mock.patch.object(sm, "run_render", side_effect=refuse_first):
             self.saved(panel)

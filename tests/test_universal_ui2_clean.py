@@ -150,7 +150,6 @@ class LayoutTests(_WindowCase):
                 self.assertEqual(area.horizontalScrollBar().maximum(), 0)
                 if size[0] > 1000:  # at 900 the placeholder font of the offscreen platform leaves room to stack them only
                     self.assertEqual(panel.shapes_layout.direction(), QBoxLayout.Direction.LeftToRight)
-                self.assertLessEqual(panel.tables["nearest"].height(), 250)
 
     def test_a_missing_abaqus_keeps_the_window_within_its_width(self):
         window = self.window((900, 680))

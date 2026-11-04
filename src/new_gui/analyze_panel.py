@@ -29,11 +29,12 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtGui import QResizeEvent
-from PySide6.QtWidgets import (QBoxLayout, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QAbstractItemView, QBoxLayout, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTabWidget,
                                QVBoxLayout, QWidget)
 
 from new_gui import analyze_model as am
+from new_gui import analyze_summary as asm
 from new_gui import comparison_model as cm
 from new_gui.diagnostic_model import NEAREST_TITLE
 from new_gui.confirmation_dialog import ConfirmationDialog, FILTER as CONFIRMATION_FILTER
@@ -44,7 +45,7 @@ from new_gui.project_panel import SavedShapePanel
 from new_gui.registration_dialog import RegistrationDialog
 from services import analysis_project as ap
 from services import confirmed_registration as cs
-from new_gui.shape_panel import ImageView, ScrollSafeCombo, ShapePanel
+from new_gui.shape_panel import ImageActions, ImageView, ScrollSafeCombo, ShapePanel
 from new_gui import shape_model as sm
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
@@ -119,11 +120,29 @@ def _card() -> tuple[QFrame, QVBoxLayout]:
 
 
 class _ResultTable(DiagnosticTable):
+    """``fill``: the table takes the height it is given, scrolls by itself and selects its own rows."""
+
     height_cap = TABLE_HEIGHT
 
-    def __init__(self, headers, rows, stretch: int):
+    def __init__(self, headers, rows, stretch: int, fill: bool = False):
+        self.fill = fill
         super().__init__(headers, rows, stretch)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        if fill:
+            self.setMinimumHeight(0)
+            self.setMaximumHeight(16777215)
+            self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+            self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def fit(self) -> None:
+        if not self.fill:
+            super().fit()
+            return
+        header = self.horizontalHeader()
+        others = sum(header.sectionSize(c) for c in range(self.columnCount()) if c != self.stretch)
+        header.resizeSection(self.stretch, max(self._header_width(self.stretch), self.viewport().width() - others))
 
 
 class _Details(QWidget):
@@ -182,6 +201,7 @@ class AnalyzePanel(QWidget):
                  consent: Optional[Callable[[str], bool]] = None, runner=None, discover=None,
                  external_results: bool = False):
         super().__init__()
+        self.external_results = external_results
         self._ask_path = ask_path or self._dialog_path
         self._ask_folder = ask_folder or self._dialog_folder
         self._ask_launcher = ask_launcher or self._dialog_launcher
@@ -237,7 +257,10 @@ class AnalyzePanel(QWidget):
         layout.setSpacing(12)
         layout.addWidget(self._build_inputs())
         self.project_box, self.project_layout = self._box()
+        self.summary_box, self.summary_layout = self._box()
+        layout.addWidget(self.summary_box)
         layout.addWidget(self.project_box)
+        self.summary_table: Optional[DiagnosticTable] = None
         self.result_box, self.result_layout = self._box()
         self.registration_box, self.registration_layout = self._box()
         self.comparison_box, self.comparison_layout = self._box()
@@ -349,9 +372,6 @@ class AnalyzePanel(QWidget):
         self.message = _label("", "hint")
         self.message.setVisible(False)
         inner.addWidget(self.message)
-        self.result_line = _label("", "hint")
-        self.result_line.setVisible(False)
-        inner.addWidget(self.result_line)
         self.log_button = QPushButton(SHOW_LOG)
         self.log_button.setObjectName("detailsToggle")
         self.log_button.setCheckable(True)
@@ -706,6 +726,7 @@ class AnalyzePanel(QWidget):
 
     def _files_read(self, inputs: am.Inputs) -> None:
         self.inputs = inputs
+        self._show_summary()
         sets = inputs.experimental.sets
         self.set_combo.clear()
         if len(sets) == 1:
@@ -881,11 +902,36 @@ class AnalyzePanel(QWidget):
             return ap.KIND_NONE
         return ap.KIND_CONFIRMED if self.registration_ref is not None else ap.KIND_ARCHIVED
 
+    def measured_mode(self):
+        """One record of the chosen set as read, for its points and measured DOFs; None without read data."""
+        if self.analysis is None or self.inputs is None:
+            return None
+        modes = self.inputs.full_experimental.sets[self.analysis.set_index].dataset.modes
+        return modes[0] if len(modes) else None
+
     def chosen_dataset(self):
         """The experimental dataset of the shown result, when it was read in this session."""
         if self.analysis is None or self.inputs is None:
             return None
         return self.inputs.experimental.sets[self.analysis.set_index].dataset
+
+    def _show_summary(self) -> None:
+        """What is loaded and what can be done with it; empty until the files were read or a saved result opened."""
+        while self.summary_layout.count():
+            widget = self.summary_layout.takeAt(0).widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+        self.summary_table = None
+        if self.inputs is None and self.analysis is None:
+            return
+        card, inner = _card()
+        inner.addWidget(_label("Loaded data", "sectionTitle"))
+        rows = asm.summary_rows(self.paths, self.inputs, self.analysis, self.snapshot, FE, EXPERIMENTAL)
+        self.summary_table = DiagnosticTable(asm.HEADERS, rows, 1, text_columns=(0,))
+        self.summary_table.setObjectName("analyzeSummary")
+        inner.addWidget(self.summary_table)
+        self.summary_layout.addWidget(card)
 
     def _fill_result(self) -> None:
         self._close_registration()  # a proposal belongs to the result it was stated on
@@ -898,8 +944,7 @@ class AnalyzePanel(QWidget):
                     widget.deleteLater()
         analysis = self.analysis
         self.review_state = rv.ReviewState(analysis, *self._full_frequencies()) if analysis is not None else None
-        self.result_line.setText(f"{analysis.summary} The results are on the Review page." if analysis is not None else "")
-        self.result_line.setVisible(analysis is not None)
+        self._show_summary()
         for panel in self.shape_panels.values():
             panel.set_preview(None)
         for panel in self.saved_shapes.values():
@@ -920,7 +965,7 @@ class AnalyzePanel(QWidget):
         self.result_tabs.setDocumentMode(True)
         tabs_card, tabs_inner = _card()
         tabs_inner.addWidget(self.result_tabs)
-        self.tables_layout.addWidget(tabs_card)
+        self.tables_layout.addWidget(tabs_card, 1)
         if analysis.comparison is not None:
             self._add_comparison(analysis.comparison)
         self._add_table("nearest", NEAREST_TITLE, am.NEAREST_HEADERS, analysis.nearest_rows, 9, SHAPE_HINT)
@@ -992,14 +1037,16 @@ class AnalyzePanel(QWidget):
                 inner.addWidget(_label(text, name))
         if above is not None:
             inner.addWidget(above)
+        fill = self.external_results and tabs is None
         table = _ResultTable(headers, tuple(tuple(str(cell).replace(sm.PROVISIONAL_TEXT, sm.FRF_PEAK_SHORT) for cell in row)
-                                            for row in rows), stretch)
+                                            for row in rows), stretch, fill)
         for row, values in enumerate(rows):
             for column, value in enumerate(values):  # a shortened cell keeps the whole wording in its tooltip
                 table.item(row, column).setToolTip(str(value))
         self.tables[key] = table
-        inner.addWidget(table)
-        inner.addStretch(1)
+        inner.addWidget(table, 1 if fill else 0)
+        if not fill:
+            inner.addStretch(1)
         (tabs or self.result_tabs).addTab(page, TAB_TITLES[key])
 
     def _add_comparison(self, view) -> None:
@@ -1021,8 +1068,14 @@ class AnalyzePanel(QWidget):
             picture = None
             values = getattr(view, "mac_values", ())  # empty when the numbers were not kept: the table still shows the text
             if isinstance(values, tuple) and values and len(values) == len(view.mac_fe_modes):
-                picture = ImageView()
-                picture.set_image(rv.mac_plot(view))
+                self.mac_image = ImageView()
+                self.mac_actions = ImageActions(self.mac_image, "mac_matrix")
+                picture = QWidget()
+                column = QVBoxLayout(picture)
+                column.setContentsMargins(0, 0, 0, 0)
+                column.addWidget(self.mac_image)
+                column.addWidget(self.mac_actions)
+                self.mac_image.set_image(rv.mac_plot(view))
             self._add_table("mac", "", headers, rows, 0, tabs=self.comparison_tabs, above=picture)
 
     # ---------------------------------------------------------------------------------------------- projects

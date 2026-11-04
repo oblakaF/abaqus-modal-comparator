@@ -273,7 +273,7 @@ def _measured_text(mode, mask: Optional[np.ndarray]) -> str:
 
 
 def render_record_shape(preview_set: PreviewSet, index: int, component: str, directory,
-                        cancel_event=None) -> ShapeView:
+                        cancel_event=None, display=None) -> ShapeView:
     """Draw record ``index`` of ``preview_set`` on its measured points with the main window's viewer (read-only)."""
     if component not in SHAPE_COMPONENTS:
         raise ValueError(f"unknown component {component!r}; choose one of {', '.join(SHAPE_COMPONENTS)}.")
@@ -314,7 +314,7 @@ def render_record_shape(preview_set: PreviewSet, index: int, component: str, dir
     _check(cancel_event)
     single = ModalDataset(dataset.source_name, dataset.source_path, [shown], metadata=dict(dataset.metadata or {}))
     with _RENDER_LOCK:
-        path, _ = viewer.render_viewer_mode(single, viewer.EXPERIMENTAL, shown.number, component, Path(directory))
+        path, _ = viewer.render_viewer_mode(single, viewer.EXPERIMENTAL, shown.number, component, Path(directory), display)
     _check(cancel_event)
     lines = (record.label,  # the row's own wording: PROVISIONAL, AMBIGUOUS (importer) or the fitted-mode source
              f"Record {index + 1} of {preview_set.title}: experimental record {record.number}, "

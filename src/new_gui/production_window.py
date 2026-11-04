@@ -11,10 +11,10 @@ from __future__ import annotations
 import time
 from typing import Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
-from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
-                               QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
+                               QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QTabBar, QVBoxLayout, QWidget)
 
 from new_gui import APP_NAME
 from new_gui.analyze_panel import (AnalyzePanel, CLOSE_PROJECT, OPEN_PROJECT, RUNNING, SAVE_PROJECT, SAVE_PROJECT_AS,
@@ -32,6 +32,18 @@ MATERIALS_PAGE_SUBTITLE = "Choose an ODB and a UNV/UFF for this page, or reuse t
 ABOUT = ("Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze. Mode pairs and MAC appear only "
          "with a verified physical registration; otherwise the result is a frequency comparison. No FE analysis is "
          "solved.")
+
+
+class _WheelGuard(QObject):
+    """Throughout the window and its dialogs, the wheel never changes a tab or a closed list: it goes on to the table or page
+    beneath. An open list scrolls itself."""
+
+    def eventFilter(self, watched, event) -> bool:
+        if event.type() == QEvent.Type.Wheel and (isinstance(watched, QTabBar) or (
+                isinstance(watched, QComboBox) and not watched.view().isVisible())):
+            event.ignore()  # Qt then offers the event to the parent widget
+            return True
+        return False
 
 
 def _page(title: str, subtitle: str, content: QWidget) -> QScrollArea:
@@ -59,6 +71,8 @@ class ProductionWindow(QMainWindow):
 
     def __init__(self, *, analyze_options: Optional[dict] = None):
         super().__init__()
+        self.wheel_guard = _WheelGuard(self)
+        QApplication.instance().installEventFilter(self.wheel_guard)
         self.setWindowTitle(APP_NAME)
         self.analyze = AnalyzePanel(**dict(analyze_options or {}), external_results=True)
         self.materials = MaterialsStatusPanel()
@@ -76,7 +90,7 @@ class ProductionWindow(QMainWindow):
         self.stack.addWidget(_page(PAGES[ANALYZE_PAGE], ANALYZE_SUBTITLE, self.analyze))
         review = QScrollArea()  # only a very short window scrolls the whole page; the panes scroll by themselves
         review.setWidgetResizable(True)
-        self.review.setMinimumHeight(600)
+        self.review.setMinimumHeight(480)
         review.setWidget(self.review)
         self.stack.addWidget(review)
         self.stack.addWidget(_page(PAGES[MAC_PAGE], MAC_SUBTITLE, self.mac_points))
@@ -203,6 +217,7 @@ class ProductionWindow(QMainWindow):
         self.analyze.shutdown()  # the running step, its owned Abaqus process and its drawings
         self.mac_points.shutdown()
         self.materials_workspace.shutdown()
+        QApplication.instance().removeEventFilter(self.wheel_guard)
         super().closeEvent(event)
 
 

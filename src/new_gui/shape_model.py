@@ -48,6 +48,13 @@ PROVISIONAL_TEXT = "PROVISIONAL — NOT A VALIDATED FITTED MODE"
 FRF_PEAK_SHORT = "FRF peak — not fitted"
 PROJECTION_TEXT = ("Independent display projection: the best-fit plane of this data set alone, not the source axes, and "
                    "not aligned with the other view. The source data state no length unit.")
+SOURCE_AXES_TEXT = ("Source coordinates of this data set, with no length unit stated by the source. The two views keep their "
+                    "own systems, so they are not aligned unless a registration says so.")
+ADJUSTED_TEXT = " Rotate and Mirror change this picture only: no coordinate, registration, MAC or pairing."
+VIEWS = (("source", "Source axes"), ("xy", "Source XY"), ("xz", "Source XZ"), ("yz", "Source YZ"),
+         ("best_fit", "Best-fit plane"))
+ROTATIONS = (0, 90, 180, 270)
+DEFAULT_VIEW = ("source", 0, False)  # (plane, rotation, mirror)
 
 _RENDER = threading.Lock()  # one drawing at a time across both sides (matplotlib figures)
 
@@ -133,30 +140,40 @@ def record_components(preview_set, index: int) -> frozenset:
 # ---------------------------------------------------------------------------------------------- drawing
 
 
-def render(kind: str, source, index: int, component: str, directory, cancel_event=None):
+def view_text(plane: str) -> str:
+    return (PROJECTION_TEXT if plane == "best_fit" else SOURCE_AXES_TEXT) + ADJUSTED_TEXT
+
+
+def render(kind: str, source, index: int, component: str, directory, cancel_event=None, display=None):
     """Call the service of ``kind``: ``source`` is the FE preview or the experimental PreviewSet."""
     if kind not in KINDS:
         raise ValueError(f"unknown source kind {kind!r}")
     if component not in COMPONENTS:
         raise ValueError(f"unknown component {component!r}")
     with _RENDER:
+        view = None
+        if display is not None:
+            from services.modal_data_viewer import DisplayView
+
+            view = DisplayView(*display)
         if kind == FE:
             from services import local_fe_preview as fp
 
-            return fp.render_fe_mode_shape(source, index, component, directory, cancel_event=cancel_event)
+            return fp.render_fe_mode_shape(source, index, component, directory, cancel_event=cancel_event, display=view)
         from services import local_experimental_preview as xp
 
-        return xp.render_record_shape(source, index, component, directory, cancel_event=cancel_event)
+        return xp.render_record_shape(source, index, component, directory, cancel_event=cancel_event, display=view)
 
 
 def run_render(kind: str, source, index: int, component: str, token: int,
-               cancel_event: threading.Event) -> ShapeOutcome:
+               cancel_event: threading.Event, display=None) -> ShapeOutcome:
     """Draw in a folder of this request only, read the PNG, remove the folder; every failure becomes an outcome."""
     folder = Path(tempfile.mkdtemp(prefix="new_gui_shape_"))
     try:
         if cancel_event.is_set():
             return ShapeOutcome(kind, token, cancelled=True)
-        view = render(kind, source, index, component, folder, cancel_event)
+        view = (render(kind, source, index, component, folder, cancel_event) if display is None
+                else render(kind, source, index, component, folder, cancel_event, display))
         image_path = Path(view.image_path)
         if folder.resolve() not in image_path.resolve().parents:
             return ShapeOutcome(kind, token, error="The service wrote the image outside the request's folder.")
