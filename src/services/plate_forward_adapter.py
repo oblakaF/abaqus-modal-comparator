@@ -577,6 +577,12 @@ class StageAMatrixForwardBackend:
             raise _refuse(RefusalCode.INADMISSIBLE_PARAMETERS, str(exc)) from exc
         return self._stage_a_parameters_in_package_units(converted)
 
+    def validity_domain_si(self) -> Mapping[str, Tuple[float, float]]:
+        """The stored parameter domain in N*m; it is read only, never widened."""
+
+        factor = _STAGE_A_D_PER_N_M[self.units]
+        return {name: (lower / factor, upper / factor) for name, (lower, upper) in self.validity_domain.items()}
+
     def _preflight_solve(self, mode_count: int) -> None:
         if isinstance(mode_count, bool) or not isinstance(mode_count, int) or mode_count <= 0:
             raise _refuse(RefusalCode.INVALID_INPUT, "mode_count must be a positive integer.")
@@ -659,6 +665,7 @@ class StageAMatrixForwardBackend:
         vectors = np.asarray(result.eigenvectors)
         residual = active_k @ vectors - (active_m @ vectors) * result.eigenvalues
         denominators = result.eigenvalues * np.linalg.norm(active_m @ vectors, axis=0)
+        orthonormality = vectors.T @ (active_m @ vectors) - np.eye(vectors.shape[1])
         health = result.rigid_spectrum_health
         return PlateForwardResult(
             execution_status=ExecutionStatus.COMPLETED,
@@ -685,6 +692,7 @@ class StageAMatrixForwardBackend:
                 "parameters_in_package_units": package_parameters.values.tolist(),
                 "package_units": self.units,
                 "max_eigen_residual": float(np.max(np.linalg.norm(residual, axis=0) / denominators)),
+                "max_orthonormality_error": float(np.max(np.abs(orthonormality))),
                 "rigid_spectrum_status": None if health is None else health.status,
                 "rigid_to_first_elastic_ratio": None if health is None else health.rigid_to_first_elastic_ratio,
                 "expected_rigid_body_modes": self.expected_rigid_body_modes,
@@ -704,6 +712,7 @@ class StageAMatrixForwardBackend:
         mode_count: int,
         *,
         finite_difference_relative_steps: Sequence[float] = (),
+        coordinate_system: StageASensitivityCoordinate = StageASensitivityCoordinate.AFFINE,
     ) -> SensitivityResult:
         """Reuse the existing Stage-A sensitivities, including the stored mass derivative.
 
@@ -720,7 +729,7 @@ class StageAMatrixForwardBackend:
                 self.basis,
                 package_parameters,
                 mode_count + 1,
-                coordinate_system=StageASensitivityCoordinate.AFFINE,
+                coordinate_system=coordinate_system,
                 expected_rigid_body_modes=self.expected_rigid_body_modes,
                 finite_difference_relative_steps=tuple(finite_difference_relative_steps),
                 observed_mode_ids=tuple(range(1, mode_count + 1)),
