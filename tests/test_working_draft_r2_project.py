@@ -919,6 +919,27 @@ class MenuTests(_Project):
         self.assertEqual({key: action.shortcut().toString() for key, action in window.project_actions.items()},
                          {"open": "Ctrl+O", "save": "Ctrl+S", "save_as": "Ctrl+Shift+S", "close": ""})
 
+    def test_the_word_project_stays_forbidden_outside_the_commands(self):
+        from test_universal_ui2_clean import FORBIDDEN
+
+        for allowed in ("Open Project...", "Save Project", "Save Project As...", "Close Project"):
+            self.assertIsNone(FORBIDDEN.search(allowed), allowed)
+        for shown in ("Project SP-13", "the project archive", "Project"):
+            self.assertIsNotNone(FORBIDDEN.search(shown), shown)
+
+    def test_a_narrow_window_stacks_the_buttons_instead_of_scrolling(self):
+        window = self.window()
+        direction = analyze_panel.QBoxLayout.Direction
+        window.resize(700, 500)  # at 560 the earlier page already scrolls sideways under the offscreen font
+        for _ in range(5):
+            self.app.processEvents()
+        self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0)
+        self.assertEqual(window.analyze.project_row.direction(), direction.TopToBottom)
+        window.resize(1500, 800)
+        for _ in range(5):
+            self.app.processEvents()
+        self.assertEqual(window.analyze.project_row.direction(), direction.LeftToRight)
+
     def test_close_project_empties_the_page_and_keeps_the_file(self):
         _window, panel = self.analysed()
         self.saved(panel)

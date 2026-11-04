@@ -27,7 +27,7 @@ from new_gui.workspace_state import EXPERIMENTAL, FE
 
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN = re.compile(r"SP-?\d|\bM\d+\b|PLATE|[Pp]late|[Ss]pecimen|NEW-GUI|\bRC\d|PRIORITY|Auto-ID|[Rr]esearch|[Aa]rchiv|"
-                       r"Workspace|[Ff]ixture|\b[Pp]roject\b|[Ss]tage\b|D-0\d\d|PolyMAX")
+                       r"Workspace|[Ff]ixture|(?<!Open )(?<!Save )(?<!Close )\b[Pp]roject\b|[Ss]tage\b|D-0\d\d|PolyMAX")  # the commands stay
 REUSED = ("Physical registration reused by FE geometry identity (X): SP-13 fixture-sp13, registration abc (frozen "
           "mapping). archived sensitivities apply only if 11. Scaling verifies this ODB.")
 SIZES = ((900, 680), (1366, 768))
@@ -89,7 +89,8 @@ class NavigationTests(_WindowCase):
         window = self.window()
         self.assertEqual([a.text() for a in window.menuBar().actions()], ["&File", "&Help"])
         self.assertEqual([a.text() for a in window.menuBar().actions()[0].menu().actions() if a.text()],
-                         ["Choose FE file...", "Choose experimental file...", "Exit"])
+                         ["Open Project...", "Save Project", "Save Project As...", "Close Project",
+                          "Choose FE file...", "Choose experimental file...", "Exit"])
 
     def test_the_window_is_clean_before_and_after_an_analysis(self):
         for size in SIZES:

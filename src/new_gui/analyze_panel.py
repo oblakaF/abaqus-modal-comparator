@@ -227,7 +227,8 @@ class AnalyzePanel(QWidget):
 
     def _build_inputs(self) -> QFrame:
         card, inner = _card()
-        project_row = QHBoxLayout()
+        self.project_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        project_row = self.project_row
         self.open_project_button = QPushButton(OPEN_PROJECT)
         self.open_project_button.setObjectName("projectOpen")
         self.open_project_button.clicked.connect(lambda: self.open_project())
@@ -1122,6 +1123,11 @@ class AnalyzePanel(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        buttons = (self.open_project_button, self.save_project_button, self.save_as_button)
+        margin = self.project_row.spacing() * 2 + 2 * 16 + 2  # between the buttons, and the card's own margins
+        self.project_row.setDirection(QBoxLayout.Direction.TopToBottom
+                                      if event.size().width() <= sum(b.sizeHint().width() for b in buttons) + margin
+                                      else QBoxLayout.Direction.LeftToRight)  # a narrow window never scrolls sideways
         need = sum(panel.minimumSizeHint().width() for panel in self.shape_panels.values()) + 12
         self.shapes_layout.setDirection(QBoxLayout.Direction.TopToBottom
                                         if event.size().width() < max(SIDE_BY_SIDE_WIDTH, need)

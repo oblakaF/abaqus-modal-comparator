@@ -72,4 +72,6 @@ moved and changed files were copies of the plate's experimental file; no origina
 - **Cancelling a fresh analysis started from a snapshot** leaves an empty page. Open the project again; its file is untouched.
 - **Scope.** Only the shown modal set is saved. Choosing another set needs a fresh analysis.
 - **Paths.** Opening looks at the paths the project names, including network paths.
+- **Narrow windows.** Below about 700 px the three project buttons stack. At 560 px the page still scrolls sideways under
+  the offscreen test font, as it did before this work.
 - **Save time.** Saving draws every picture again from the data in memory, which takes seconds to tens of seconds.
