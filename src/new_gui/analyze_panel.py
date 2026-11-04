@@ -542,14 +542,16 @@ class AnalyzePanel(QWidget):
         """The one command. Returns False when nothing was started (a missing file, or a step is running)."""
         if self.state == RUNNING or not all(self.paths.values()):
             return False
+        if self.snapshot is not None and not self._sources_confirmed():  # before any look at the saved paths
+            return False
         for kind, path in self.paths.items():
             problem = am.file_problem(kind, path)  # the file may have gone since it was chosen
             if problem:
                 self.file_error.setText(problem)
                 self._refresh()
                 return False
-        if self.snapshot is not None and not self._leave_snapshot():
-            return False
+        if self.snapshot is not None:
+            self._leave_snapshot()
         self.file_error.setText("")
         self._stop()
         self.analysis, self.inputs, self.confirmation = None, None, None
@@ -987,7 +989,7 @@ class AnalyzePanel(QWidget):
         self._refresh()
 
     def open_project(self, path: Optional[str] = None) -> bool:
-        """Show a saved project; nothing is read but the project, and no comparison or Abaqus starts."""
+        """Show a saved project. Only that file is read: no path named in it is looked at, and nothing starts."""
         if self.state == RUNNING:
             return False
         if path is None:
@@ -997,7 +999,7 @@ class AnalyzePanel(QWidget):
 
         def work(_cancel, _say):
             snapshot = pj.open_project(path)
-            return snapshot, pj.quick_look(snapshot.document)
+            return snapshot, pj.not_checked(snapshot.document)
 
         self._project_step(_OPEN, "Opening the project...", work)
         return True
@@ -1068,13 +1070,16 @@ class AnalyzePanel(QWidget):
         self._reset()
         return True
 
-    def _leave_snapshot(self) -> bool:
-        """Only with the saved content confirmed; the fresh result then owes nothing to the project."""
+    def _sources_confirmed(self) -> bool:
         check = self.source_check
         if check is None or not check.hashed or not check.can_analyze:
             self._set_message(NOT_CHECKED_TEXT, "error")
             self._refresh()
             return False
+        return True
+
+    def _leave_snapshot(self) -> None:
+        """Only with the saved content confirmed; the fresh result then owes nothing to the project."""
         document = self.snapshot.document
         self._wanted_set_key = document["modal_set"]["key"]
         self._fresh_text = FRESH_TEXT.format(saved=document["saved_at"])
@@ -1082,7 +1087,6 @@ class AnalyzePanel(QWidget):
         if document["registration"]["kind"] == ap.KIND_CONFIRMED and path:
             self._reopen_text = REOPEN_TEXT.format(path=path)
         self.snapshot, self.source_check, self.project_path = None, None, None
-        return True
 
     def _add_snapshot_card(self) -> None:
         card, inner = _card()

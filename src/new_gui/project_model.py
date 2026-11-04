@@ -318,7 +318,7 @@ def analysis_of(document: dict) -> am.Analysis:
 
 
 def open_project(path) -> Snapshot:
-    """The saved results of a project that passes every check. Reads only the project. Raises ``ProjectRefused``."""
+    """The saved results of a project that passes every check. Reads only this file. Raises ``ProjectRefused``."""
     document, images = ap.read_project(path)
     try:
         analysis = analysis_of(document)
@@ -328,17 +328,6 @@ def open_project(path) -> Snapshot:
 
 
 # ---------------------------------------------------------------------------------------------- the source files
-
-
-def _looks(path: str, size: int, role: str) -> SourceRow:
-    """Without reading the file: only absence or another size can be seen, so the content stays not checked."""
-    try:
-        found = Path(path).stat().st_size
-    except OSError:
-        return SourceRow(role, MISSING, path)
-    if found != size:
-        return SourceRow(role, CHANGED, path, f"size {found} bytes, saved {size}")
-    return SourceRow(role, NOT_CHECKED, path, "the file is there; its content is not checked yet")
 
 
 def _registration_row(document: dict) -> SourceRow:
@@ -366,14 +355,18 @@ def _confirmation_detail(registration: dict) -> str:
     return f"{state}; after Analyze, open it to compare again"
 
 
-def quick_look(document: dict) -> SourceCheck:
-    """What opening a project shows at once. Nothing is hashed, so a new analysis stays blocked."""
+def not_checked(document: dict) -> SourceCheck:
+    """What opening a project shows: the saved paths, as text only. No path in the project is looked at or contacted, so
+    a project from anywhere opens offline and at once, and a new analysis stays blocked."""
     sources = document["sources"]
-    package = sources["fe_package"]
-    rows = (_looks(sources["fe_odb"]["path"], sources["fe_odb"]["size"], ROLE_ODB),
-            _looks(package["manifest_path"], package["manifest_size"], ROLE_PACKAGE),
-            _looks(sources["experimental"]["path"], sources["experimental"]["size"], ROLE_EXPERIMENTAL),
-            _registration_row(document))
+    registration = document["registration"]
+    detail = "not looked at; use Check source files"
+    place = registration["confirmation_path"] or registration["registration_file"]
+    rows = (SourceRow(ROLE_ODB, NOT_CHECKED, sources["fe_odb"]["path"], detail),
+            SourceRow(ROLE_PACKAGE, NOT_CHECKED, sources["fe_package"]["manifest_path"], detail),
+            SourceRow(ROLE_EXPERIMENTAL, NOT_CHECKED, sources["experimental"]["path"], detail),
+            SourceRow(ROLE_REGISTRATION, "NONE", "", "the saved result has no registration")
+            if registration["kind"] == ap.KIND_NONE else SourceRow(ROLE_REGISTRATION, NOT_CHECKED, place, detail))
     return SourceCheck(rows, False, False, {FE: Path(sources["fe_odb"]["path"]),
                                             EXPERIMENTAL: Path(sources["experimental"]["path"])})
 
@@ -462,4 +455,4 @@ def check_sources(document: dict, odb_path, experimental_path, folder, cancel_ev
 
 __all__ = ["CHANGED", "MISSING", "MOVED", "NOT_CHECKED", "NOT_REVALIDATED", "RegistrationReference", "SourceCheck",
            "SourceRow", "Snapshot", "UNCHANGED", "UNREADABLE", "analysis_document", "analysis_of", "check_sources",
-           "open_project", "quick_look", "relocated_document", "save_analysis", "save_snapshot"]
+           "not_checked", "open_project", "relocated_document", "save_analysis", "save_snapshot"]

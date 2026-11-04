@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sys
 import threading
 import time
 from unittest import mock
@@ -445,7 +446,7 @@ class SourceChecksTests(_Project):
         self.assertIn("not found", again.file_error.text())
         self.assertEqual(again.status_label.property("state"), "chosen")
 
-    def test_an_old_record_without_the_odb_size_does_not_read_as_changed(self):
+    def test_an_old_record_without_the_odb_size_saves_the_file_size(self):
         _window, panel = self.analysed()
         manifest = Path(panel.inputs.full_fe.manifest_path)
         path = manifest.parent / svc.SOURCE_RECORD
@@ -453,8 +454,7 @@ class SourceChecksTests(_Project):
         del record["odb"]["size"]
         path.write_text(json.dumps(record), encoding="utf-8")
         self.saved(panel)
-        _second, again = self.reopened()
-        self.assertEqual(self.row(again, pj.ROLE_ODB).state, pj.NOT_CHECKED)
+        self.assertEqual(ap.read_project(self.project)[0]["sources"]["fe_odb"]["size"], self.odb.stat().st_size)
 
     def test_the_reminder_of_the_confirmation_goes_once_it_is_compared(self):
         _window, panel = self.analysed()
@@ -482,7 +482,7 @@ class SourceChecksTests(_Project):
             stream.write(b"\n")
         _second, again = self.reopened()
         self.assertEqual(displayed(again), before)
-        self.assertEqual(self.row(again, pj.ROLE_EXPERIMENTAL).state, pj.CHANGED)
+        self.assertEqual(self.row(again, pj.ROLE_EXPERIMENTAL).state, pj.NOT_CHECKED)
         check = self.check(again)
         self.assertFalse(check.can_analyze)
         self.assertEqual(self.row(again, pj.ROLE_EXPERIMENTAL).state, pj.CHANGED)
@@ -517,7 +517,8 @@ class SourceChecksTests(_Project):
         self.exp_path.unlink()
         _second, again = self.reopened()
         self.assertEqual(displayed(again), before)
-        self.assertEqual(self.row(again, pj.ROLE_ODB).state, pj.MISSING)
+        self.assertEqual(self.row(again, pj.ROLE_ODB).state, pj.NOT_CHECKED)
+        self.assertFalse(again.analyze_button.isEnabled())
         self.assertFalse(self.check(again).can_analyze)
         self.assertEqual(self.row(again, pj.ROLE_ODB).state, pj.MISSING)
         self.assertEqual(self.row(again, pj.ROLE_EXPERIMENTAL).state, pj.MISSING)
@@ -573,7 +574,7 @@ class SourceChecksTests(_Project):
         folder = self.root / "packages elsewhere"
         shutil.move(manifest.parent.parent, folder)
         _second, again = self.reopened()
-        self.assertEqual(self.row(again, pj.ROLE_PACKAGE).state, pj.MISSING)
+        self.assertEqual(self.row(again, pj.ROLE_PACKAGE).state, pj.NOT_CHECKED)
         check = self.check(again)
         self.assertTrue(check.can_analyze)
         self.assertEqual(self.row(again, pj.ROLE_PACKAGE).state, pj.MISSING)
@@ -607,6 +608,188 @@ class SourceChecksTests(_Project):
         _second, again = self.reopened()
         self.check(again)
         self.assertEqual((base.sha(self.odb), base.sha(self.exp_path)), before)
+
+
+NETWORK = "\\\\unreachable-host.invalid\\share\\"
+
+
+class _FileAccess:
+    """Every look at a file while active: Python's own audit events for opening and listing, and the stat calls."""
+
+    active = None
+
+    def __enter__(self):
+        _FileAccess.active = self.seen = []
+        real_stat, real_exists, real_isfile = os.stat, os.path.exists, os.path.isfile
+
+        def stat(path, *args, **kwargs):
+            self.seen.append(str(path))
+            return real_stat(path, *args, **kwargs)
+
+        def exists(path):
+            self.seen.append(str(path))
+            return real_exists(path)
+
+        def isfile(path):
+            self.seen.append(str(path))
+            return real_isfile(path)
+
+        self.patches = [mock.patch.object(os, "stat", stat), mock.patch.object(os.path, "exists", exists),
+                        mock.patch.object(os.path, "isfile", isfile)]
+        for patch in self.patches:
+            patch.start()
+        return self
+
+    def __exit__(self, *_details):
+        for patch in self.patches:
+            patch.stop()
+        _FileAccess.active = None
+
+
+def _audit(event, args):
+    seen = _FileAccess.active
+    if seen is not None and event in ("open", "os.listdir", "os.scandir") and args and isinstance(args[0], (str, os.PathLike)):
+        seen.append(os.fspath(args[0]))
+
+
+sys.addaudithook(_audit)
+
+
+class OfflineOpenTests(_Project):
+    """Open Project reads only the file chosen; the saved paths are text until Check source files."""
+
+    def network_project(self, panel) -> Path:
+        """A real project whose saved paths all name a host that does not exist."""
+        self.saved(panel)
+
+        def move(document):
+            sources = document["sources"]
+            sources["fe_odb"]["path"] = NETWORK + "model.odb"
+            sources["fe_package"]["manifest_path"] = NETWORK + "package\\manifest.json"
+            sources["experimental"]["path"] = sources["experimental"]["source_path"] = NETWORK + "data.unv"
+            if document["registration"]["kind"] != ap.KIND_NONE:
+                document["registration"]["confirmation_path"] = NETWORK + "confirmation.json"
+                document["registration"]["draft_path"] = NETWORK + "draft.json"
+
+        rewrite(self.project, change=move)
+        return self.project
+
+    def open_watched(self, path):
+        window = pw.ProductionWindow(analyze_options={"runner": self.fail_runner, "discover": base.FOUND,
+                                                      "consent": self.consent})
+        self.addCleanup(window.deleteLater)
+        self.addCleanup(window.close)
+        panel = window.analyze
+        window.show()
+        self.app.processEvents()
+        with _FileAccess() as watch:
+            self.assertTrue(panel.open_project(str(path)))
+            self.wait(panel)
+            for row in range(len(panel.analysis.nearest_rows)):
+                panel.show_candidate(row)
+            self.app.processEvents()
+        return panel, watch.seen
+
+    def test_no_saved_network_path_is_looked_at(self):
+        _window, panel = self.analysed()
+        before = displayed(panel)
+        path = self.network_project(panel)
+        again, seen = self.open_watched(path)
+        self.assertEqual(again.state, DONE, again.message.text())
+        self.assertEqual([item for item in seen if "unreachable-host" in item], [])
+        self.assertTrue(any(item.endswith(path.name) for item in seen))  # the watch does see the project being read
+        self.assertEqual(displayed(again), before)
+
+    def test_no_saved_network_confirmation_is_looked_at(self):
+        _window, panel = self.analysed()
+        self.confirmed(panel)
+        self.compare(panel)
+        before = displayed(panel)
+        path = self.network_project(panel)
+        again, seen = self.open_watched(path)
+        self.assertEqual([item for item in seen if "unreachable-host" in item], [])
+        self.assertEqual(displayed(again), before)
+        self.assertEqual(again.status_label.text(), am.CONFIRMED_COMPARISON)
+        self.assertEqual(self.row(again, pj.ROLE_REGISTRATION).state, pj.NOT_CHECKED)
+        self.assertIn("unreachable-host", self.row(again, pj.ROLE_REGISTRATION).path)
+
+    def test_no_local_source_is_looked_at_either(self):
+        _window, panel = self.analysed()
+        self.confirmed(panel)
+        self.compare(panel)
+        manifest = Path(panel.inputs.full_fe.manifest_path)
+        self.saved(panel)
+        again, seen = self.open_watched(self.project)
+        named = (str(self.odb), str(self.exp_path), str(manifest), str(self.confirmation_path), str(self.draft_path))
+        self.assertEqual([item for item in seen if any(place in item for place in named)], [])
+        self.assertIsNotNone(again.snapshot)
+
+    def test_the_services_that_read_sources_are_not_called(self):
+        _window, panel = self.analysed()
+        self.confirmed(panel)
+        self.compare(panel)
+        path = self.network_project(panel)
+        refuse = AssertionError("opening touches no source")
+        with mock.patch.object(pj.gr, "read_draft", side_effect=refuse), mock.patch.object(pj.pm, "file_identity", side_effect=refuse), \
+                mock.patch.object(pj.fpi, "identify", side_effect=refuse), mock.patch.object(svc, "existing_packages", side_effect=refuse), \
+                mock.patch.object(svc, "hash_file", side_effect=refuse), mock.patch.object(svc, "read_source_record", side_effect=refuse):
+            again, _seen = self.open_watched(path)
+        self.assertEqual(again.state, DONE, again.message.text())
+
+    def test_every_external_source_is_not_checked_until_asked(self):
+        _window, panel = self.analysed()
+        self.confirmed(panel)
+        self.compare(panel)
+        self.saved(panel)
+        _second, again = self.reopened()
+        self.assertEqual({row.role: row.state for row in again.source_check.rows},
+                         {pj.ROLE_ODB: pj.NOT_CHECKED, pj.ROLE_PACKAGE: pj.NOT_CHECKED,
+                          pj.ROLE_EXPERIMENTAL: pj.NOT_CHECKED, pj.ROLE_REGISTRATION: pj.NOT_CHECKED})
+        self.assertFalse(again.source_check.hashed)
+        self.check(again)
+        self.assertEqual(self.row(again, pj.ROLE_ODB).state, pj.UNCHANGED)
+        self.assertEqual(self.row(again, pj.ROLE_REGISTRATION).state, pj.NOT_REVALIDATED)
+
+    def test_analyze_does_not_look_at_a_path_before_the_check(self):
+        _window, panel = self.analysed()
+        path = self.network_project(panel)
+        again, _seen = self.open_watched(path)
+        with _FileAccess() as watch:
+            self.assertFalse(again.analyze())
+        self.assertEqual([item for item in watch.seen if "unreachable-host" in item], [])
+        self.assertIsNotNone(again.snapshot)
+        self.assertIn("blocked", again.message.text())
+
+    def test_saved_shapes_and_results_need_no_source(self):
+        _window, panel = self.analysed()
+        self.confirmed(panel)
+        self.compare(panel)
+        path = self.network_project(panel)
+        again, _seen = self.open_watched(path)
+        self.assertIsNotNone(again.saved_shapes[FE].image.source)
+        self.assertIsNotNone(again.saved_shapes[EXPERIMENTAL].image.source)
+        self.assertIn("pairs", again.tables)
+        self.assertIn("mac", again.tables)
+
+    def test_the_explicit_check_of_unavailable_paths_blocks_analyze(self):
+        _window, panel = self.analysed()
+        self.saved(panel)
+        gone = self.root / "not mounted"
+
+        def move(document):
+            sources = document["sources"]
+            sources["fe_odb"]["path"] = str(gone / "model.odb")
+            sources["fe_package"]["manifest_path"] = str(gone / "package" / "manifest.json")
+            sources["experimental"]["path"] = sources["experimental"]["source_path"] = str(gone / "data.unv")
+
+        rewrite(self.project, change=move)
+        _second, again = self.reopened()
+        self.assertEqual(self.row(again, pj.ROLE_ODB).state, pj.NOT_CHECKED)
+        self.assertFalse(self.check(again).can_analyze)
+        self.assertEqual(self.row(again, pj.ROLE_ODB).state, pj.MISSING)
+        self.assertEqual(self.row(again, pj.ROLE_EXPERIMENTAL).state, pj.MISSING)
+        self.assertEqual(self.row(again, pj.ROLE_PACKAGE).state, pj.MISSING)
+        self.assertFalse(again.analyze())
 
 
 class DamagedFileTests(_Project):

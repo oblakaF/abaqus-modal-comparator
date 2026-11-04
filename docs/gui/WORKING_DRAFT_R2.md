@@ -7,7 +7,8 @@ is in [PROJECT_FORMAT.md](PROJECT_FORMAT.md).
 
 - **Open Project, Save Project, Save Project As**: buttons at the top of the Analyze page and in the File menu, with Ctrl+O,
   Ctrl+S and Ctrl+Shift+S. Close Project is in the File menu and in the snapshot's own card.
-- **Opening a project** shows the saved tables, status and shape pictures. It reads only the project file.
+- **Opening a project** shows the saved tables, status and shape pictures. It reads only the project file, and every external
+  source reads `NOT_CHECKED` (WORKING-DRAFT-R2-F1).
 - **Check source files** hashes the ODB, the experimental file and the FE package now, on command only. Analyze stays
   blocked until the ODB and the experimental file have the saved content.
 - **Analyze** after that is an ordinary fresh analysis. A saved confirmation is not picked up: it must be opened and is
@@ -71,7 +72,8 @@ moved and changed files were copies of the plate's experimental file; no origina
 - **A closed window does not ask.** Closing with an unsaved result gives no prompt.
 - **Cancelling a fresh analysis started from a snapshot** leaves an empty page. Open the project again; its file is untouched.
 - **Scope.** Only the shown modal set is saved. Choosing another set needs a fresh analysis.
-- **Paths.** Opening looks at the paths the project names, including network paths.
+- **Paths.** Opening touches no saved path. Check source files, Save and Save As can reach the paths a project names,
+  including network paths.
 - **Narrow windows.** The three project buttons stack when their row does not fit. At 560 px the page still scrolls sideways
   under the offscreen test font, as it did before this work.
 - **Save time.** Saving draws every picture again from the data in memory, which takes seconds to tens of seconds.

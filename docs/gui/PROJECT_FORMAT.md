@@ -9,8 +9,8 @@ A saved record of one shown analysis: the frequencies, tables, status and pictur
 came from. The ODB, the UNV/UFF and the extracted FE package are not copied into it. The real projects tried were 3.2 MB
 (plate) and 4.3 MB (a sandwich with a 3.9 GB package); dense synthetic pictures reached about 14 MB.
 
-Its content is a **saved snapshot**, not a current result. Opening one reads only the project file: Abaqus, the FE reader
-and the comparator do not start, and no source file is hashed.
+Its content is a **saved snapshot**, not a current result. Opening one reads only the project file: no path named in it is
+looked at or contacted, and Abaqus, the FE reader and the comparator do not start.
 
 ## Container
 
@@ -73,13 +73,14 @@ A status in a project is never raised, and its badge is never the green one used
 
 | Step | What happens | What it does not do |
 |---|---|---|
-| Open Project | Shows the saved results. Reports only missing files and different sizes. | Hash sources; unlock Analyze. |
+| Open Project | Shows the saved results. Every external source reads `NOT_CHECKED`. | Look at any saved path; unlock Analyze. |
 | Check source files | Hashes the ODB, experimental file and FE package now, and reports `UNCHANGED`, `MOVED`, `CHANGED`, `MISSING` or `UNREADABLE`. | Change the results or the status. The registration stays `NOT_REVALIDATED`. |
 | Analyze, once the ODB and experimental file have the saved content | A fresh analysis through the ordinary services, on the saved modal set. Reuses the extracted package when found. | Reuse a saved status, pair or MAC. Start Abaqus without the usual consent. |
 | Open confirmation, Compare | A saved confirmation is revalidated in full against the fresh data. | Happen by itself. |
 
-Opening a project and checking its sources look at the paths the project names, reading them only to compare hashes. Open
-projects only from people you trust: a path on a network share is contacted.
+Opening a project never touches the paths it names. Check source files does, reading them only to compare hashes, so a path
+on a network share is contacted at that point. Check a project's sources only if you trust where it came from. Save and Save
+As also compare the target with the saved paths, so that no source is overwritten, and that comparison can reach them too.
 
 Missing or changed sources leave the snapshot readable and Analyze blocked. A moved file is accepted only when its content
 hash equals the saved one; Save then records the new path and keeps the old one in `relocated_from`.
