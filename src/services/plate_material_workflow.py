@@ -41,6 +41,7 @@ from domain.plate_inverse_problem import (
     PlateInverseResult,
     ResidualTableRow,
     StudyIntent,
+    SYNTHETIC_NO_PHYSICAL_SOURCE,
     UncertaintyReport,
     finite_positive,
 )
@@ -279,15 +280,18 @@ def _declaration_refusal(declaration: PlateInverseDeclaration) -> Optional[Tuple
     """Checks that need no solve. Each returns one specific reason."""
 
     invalid = InverseRefusalCode.DECLARATION_INVALID
-    if declaration.intent is StudyIntent.SPECIMEN_ENGINEERING_CALIBRATION:
+    if not isinstance(declaration.intent, StudyIntent):
         return (
-            InverseRefusalCode.CALIBRATION_NOT_SUPPORTED,
-            "This workflow has no specimen-calibration path, and a material refusal never falls back to one.",
+            InverseRefusalCode.UNSUPPORTED_STUDY_INTENT,
+            f"Study intent {declaration.intent!r} is not supported. This workflow has no specimen-calibration "
+            "path, and a material refusal never falls back to one.",
         )
-    if declaration.evidence_kind is not EvidenceKind.SYNTHETIC and not declaration.execution_authorization:
-        return InverseRefusalCode.NOT_AUTHORIZED, "A non-synthetic study needs an explicit execution authorization."
-    if declaration.intent is StudyIntent.SYNTHETIC_SOFTWARE_TEST and declaration.evidence_kind is not EvidenceKind.SYNTHETIC:
-        return InverseRefusalCode.DECLARATION_INVALID, "A synthetic software test must hold synthetic evidence."
+    if declaration.intent is not StudyIntent.SYNTHETIC_SOFTWARE_TEST or declaration.evidence_kind is not EvidenceKind.SYNTHETIC:
+        return (
+            InverseRefusalCode.NOT_AUTHORIZED,
+            f"MAT-2 authorizes SYNTHETIC inverse execution only; this is {declaration.intent.value} with "
+            f"{declaration.evidence_kind.value} evidence. Text in execution_authorization does not change that.",
+        )
     rows = declaration.rows
     identifiers = [row.row_id for row in rows]
     if not rows or len(set(identifiers)) != len(identifiers):
@@ -549,12 +553,33 @@ def _baseline_check(
     return macs
 
 
+def _refuse_repeated_rows(declaration: PlateInverseDeclaration, baseline: ForwardState) -> None:
+    """Frozen rows on a numerically repeated eigenvalue have no defined individual eigenvectors.
+
+    The eigensolver returns an arbitrary basis of the pair, and it differs between platforms. The review
+    below and the baseline check compare individual shapes, so their outcome would depend on that basis.
+    """
+
+    limit = declaration.policy.repeated_frequency_relative_spacing
+    ordered = sorted(declaration.rows, key=lambda row: baseline.frequencies_hz[row.model_mode - 1])
+    for left, right in zip(ordered, ordered[1:]):
+        low, high = (baseline.frequencies_hz[row.model_mode - 1] for row in (left, right))
+        if high / low - 1.0 <= limit:
+            raise _StudyRefusal(
+                InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER,
+                f"Rows ({left.row_id}, {right.row_id}): model frequencies coincide within {limit:g} at the start "
+                "point, so their shapes are an arbitrary basis of the pair and neither individual identity nor "
+                "the cluster review is defined there.",
+            )
+
+
 def _cluster_review(
     study: _Study, baseline: ForwardState, p0: np.ndarray, bounds: MixedParameterBounds
 ) -> Tuple[ClusterConfirmation, ...]:
     """Examine each frequency trigger under the governed perturbations; refuse whatever stays unresolved."""
 
     declaration = study.declaration
+    _refuse_repeated_rows(declaration, baseline)
     triggers = cluster_triggers(
         [
             TriggerRow(row.row_id, float(row.experimental_hz), baseline.frequencies_hz[row.model_mode - 1])
@@ -683,18 +708,28 @@ def _diagnostics(
 
 
 def _frozen_set(
-    declaration: PlateInverseDeclaration, model: Any, baseline: ForwardState, macs: Mapping[str, float]
+    declaration: PlateInverseDeclaration, baseline: ForwardState, macs: Mapping[str, float]
 ) -> FrozenObservationSet:
-    registration = declaration.observation_set.identity()
+    """The frozen rows of a SYNTHETIC study, which has no input deck, geometry file or measurement file.
+
+    Model, registration and declaration identities stay in the declaration, under their own names.
+    """
+
+    if declaration.evidence_kind is not EvidenceKind.SYNTHETIC:
+        raise _StudyRefusal(
+            InverseRefusalCode.NOT_AUTHORIZED, "Physical-source identities cannot be verified by this workflow."
+        )
+    observations = declaration.observation_set
+    items = observations.points if isinstance(observations, CoordinateObservationSet) else observations.items
     identity = BaselineIdentity(
         forward_model_id=declaration.backend_id.value,
-        job_name=declaration.study_id,
-        generated_inp_sha256=model.model_identity,
-        fe_geometry_sha256=model.model_identity,
-        registration_hash=str(registration["registration_id"]),
-        experimental_source_sha256=declaration.declaration_hash,
+        job_name=SYNTHETIC_NO_PHYSICAL_SOURCE,
+        generated_inp_sha256=SYNTHETIC_NO_PHYSICAL_SOURCE,
+        fe_geometry_sha256=SYNTHETIC_NO_PHYSICAL_SOURCE,
+        registration_hash=SYNTHETIC_NO_PHYSICAL_SOURCE,
+        experimental_source_sha256=SYNTHETIC_NO_PHYSICAL_SOURCE,
         modal_set=declaration.study_id,
-        measured_dofs=tuple(sorted({str(row.mode_source) for row in declaration.rows})),
+        measured_dofs=tuple(item.observation_id for item in items),
         evidence_source=declaration.evidence_kind.value,
         evidence_record_sha256=None,
     )
@@ -962,7 +997,7 @@ def _run_stages(declaration: PlateInverseDeclaration, model: Any, study: _Study)
     review = _cluster_review(study, baseline, p0, bounds)
     cluster_rows = [item.row_ids for item in review]
     macs = _baseline_check(declaration, baseline, cluster_rows)
-    frozen = _frozen_set(declaration, model, baseline, macs)
+    frozen = _frozen_set(declaration, baseline, macs)
     holdout_ids = [row.row_id for row in declaration.rows if row.role is ObservationRole.HOLDOUT]
     try:
         design = build_objective_design(frozen, holdout_ids, review, _row_sigmas(declaration), len(bounds.names))

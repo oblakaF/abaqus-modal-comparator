@@ -22,7 +22,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
+from domain.campaign_definition import SPECIMEN_ENGINEERING_CALIBRATION
 from domain.plate_inverse_problem import (
+    SYNTHETIC_NO_PHYSICAL_SOURCE,
     FittedParameter,
     FrozenPlateObservation,
     InverseNumericalPolicy,
@@ -62,6 +64,8 @@ from services.identification_step import (
 from services.matrix_model_service import AbaqusDof, StageAAffineBasis, StageAMatrixParameters
 from services.plate_forward_adapter import RitzForwardBackend, StageAMatrixForwardBackend, write_stage_a_package
 from services.plate_material_workflow import (
+    _StudyRefusal,
+    _frozen_set,
     ForwardState,
     RitzInverseModel,
     StageAInverseModel,
@@ -600,15 +604,54 @@ class RitzRefusals(AbaqusForbiddenMixin, unittest.TestCase):
                 self.assert_refused(result, InverseRefusalCode.INPUT_SOURCE_REFUSED)
                 self.assertEqual(result.solves, 0)
 
-    def test_calibration_intent_has_no_path(self):
-        result = run_plate_inverse_study(ritz_declaration(intent=StudyIntent.SPECIMEN_ENGINEERING_CALIBRATION))
-        self.assert_refused(result, InverseRefusalCode.CALIBRATION_NOT_SUPPORTED)
+    def test_calibration_request_fails_closed_with_no_path(self):
+        self.assertEqual({item.value for item in StudyIntent}, {"SYNTHETIC_SOFTWARE_TEST", "MATERIAL_IDENTIFICATION_RESEARCH"})
+        for intent in (SPECIMEN_ENGINEERING_CALIBRATION, "ANYTHING_ELSE", None):
+            with self.subTest(intent=intent):
+                result = run_plate_inverse_study(ritz_declaration(intent=intent), model=_NeverSolved())
+                self.assert_refused(result, InverseRefusalCode.UNSUPPORTED_STUDY_INTENT)
+                self.assertEqual(result.solves, 0)
 
-    def test_non_synthetic_study_needs_authorization(self):
-        result = run_plate_inverse_study(ritz_declaration(
-            evidence_kind=EvidenceKind.PHYSICAL, intent=StudyIntent.MATERIAL_IDENTIFICATION_RESEARCH
-        ))
+    def test_non_synthetic_study_is_refused_whatever_the_authorization_text_says(self):
+        for kind in (EvidenceKind.RESEARCH, EvidenceKind.PHYSICAL):
+            for intent in StudyIntent:
+                for text in (None, "", "Approved by the owner", "HUMAN GATE PASSED"):
+                    with self.subTest(kind=kind, intent=intent, text=text):
+                        declaration = ritz_declaration(evidence_kind=kind, intent=intent, execution_authorization=text)
+                        result = run_plate_inverse_study(declaration, model=_NeverSolved())
+                        self.assert_refused(result, InverseRefusalCode.NOT_AUTHORIZED)
+                        self.assertEqual(result.solves, 0)
+
+    def test_non_synthetic_study_is_refused_before_a_package_is_opened(self):
+        declaration = ritz_declaration(evidence_kind=EvidenceKind.PHYSICAL, execution_authorization="Approved")
+        result = run_plate_inverse_study(declaration, stage_a_package=Path("does-not-exist"))
         self.assert_refused(result, InverseRefusalCode.NOT_AUTHORIZED)
+
+    def test_research_intent_on_synthetic_data_is_not_authorized_either(self):
+        declaration = ritz_declaration(intent=StudyIntent.MATERIAL_IDENTIFICATION_RESEARCH, execution_authorization="Approved")
+        result = run_plate_inverse_study(declaration, model=_NeverSolved())
+        self.assert_refused(result, InverseRefusalCode.NOT_AUTHORIZED)
+
+    def _frozen(self, declaration):
+        return _frozen_set(declaration, _START_STATE, {row.row_id: 1.0 for row in declaration.rows})
+
+    def test_synthetic_provenance_claims_no_physical_source_file(self):
+        frozen = self._frozen(RITZ_BASE)
+        identity = frozen.identity
+        for name in ("job_name", "generated_inp_sha256", "fe_geometry_sha256", "registration_hash", "experimental_source_sha256"):
+            self.assertEqual(getattr(identity, name), SYNTHETIC_NO_PHYSICAL_SOURCE, name)
+        self.assertEqual(identity.evidence_source, "SYNTHETIC")
+        self.assertIsNone(identity.evidence_record_sha256)
+        self.assertEqual(identity.measured_dofs, tuple(point.observation_id for point in RITZ_SET.points))
+        self.assertNotIn(RITZ_BASE.model_identity, str(identity))
+        self.assertNotIn(RITZ_BASE.declaration_hash, str(identity))
+        self.assertNotIn(RITZ_SET.registration_id, str(identity))
+        self.assertEqual(frozen.observation_hash, self._frozen(RITZ_BASE).observation_hash)
+
+    def test_physical_identities_cannot_be_presented_as_verified(self):
+        with self.assertRaises(_StudyRefusal) as caught:
+            self._frozen(ritz_declaration(evidence_kind=EvidenceKind.PHYSICAL))
+        self.assertIs(caught.exception.code, InverseRefusalCode.NOT_AUTHORIZED)
 
     def test_model_identity_must_match(self):
         result = run_plate_inverse_study(ritz_declaration(model_identity="f" * 64))
@@ -633,6 +676,9 @@ class RitzRefusals(AbaqusForbiddenMixin, unittest.TestCase):
         )
         result = run_plate_inverse_study(ritz_declaration(rows=tuple(rows)))
         self.assert_refused(result, InverseRefusalCode.BASELINE_PAIRING_REFUSED)
+        self.assertIn("frozen as model mode", result.refusal_reason)
+        self.assertIn("not changed", result.refusal_reason)
+        self.assertEqual(result.iterations, ())  # refused before the fit: nothing was re-paired or fitted
 
     def test_start_outside_the_strict_frequency_gate(self):
         far = {"D11": 24.0, "D22": 14.0, "D66": 4.6, "u": 0.1}
@@ -740,16 +786,49 @@ class RitzRefusals(AbaqusForbiddenMixin, unittest.TestCase):
         self.assertIsNone(result.final_parameters)
 
 
-class Clusters(AbaqusForbiddenMixin, unittest.TestCase):
-    """A square plate with D11 close to D22 has a rotating near-degenerate pair."""
+class _AnyEigenbasis(RitzInverseModel):
+    """Returns exactly repeated pairs in a chosen basis, as a different eigensolver or platform may do.
+
+    The pair is first aligned with the reference shapes, then turned by ``angle``.
+    """
+
+    def __init__(self, declaration, reference, angle):
+        super().__init__(declaration)
+        self.reference, self.angle = reference, angle
+
+    def solve(self, parameters):
+        state = super().solve(parameters)
+        shapes, observed = state.shapes.copy(), state.observed.copy()
+        root = np.sqrt(self.weights)
+        frequencies = state.frequencies_hz
+        for i in range(len(frequencies) - 1):
+            if abs(frequencies[i] / frequencies[i + 1] - 1.0) > 1.0e-10:
+                continue
+            modes = [i, i + 1]
+            left, _, right = np.linalg.svd((shapes[modes] * root) @ (self.reference.shapes[modes] * root).T)
+            c, s = math.cos(self.angle), math.sin(self.angle)
+            turn = np.array([[c, s], [-s, c]]) @ (left @ right).T
+            shapes[modes] = turn @ shapes[modes]
+            observed[:, modes] = observed[:, modes] @ turn.T
+        return dataclasses.replace(state, shapes=shapes, observed=observed)
+
+
+class _NeverSolved:
+    """Stands where a backend would be, for refusals that must come before any solve."""
+
+    def __getattr__(self, name):
+        raise AssertionError(f"A refused declaration reached the model: {name}.")
+
+
+class SymmetricSquarePlate(AbaqusForbiddenMixin, unittest.TestCase):
+    """A square plate at D11 = D22, whose elastic spectrum holds exactly repeated pairs."""
 
     GEOMETRY = PlateGeometry.from_units(300.0, 300.0, "mm", mass=100.0, mass_unit="g", thickness=2.0)
     TRUTH = {"D11": 5.1, "D22": 5.0, "D66": 1.75, "u": 0.3}
     START = {"D11": 5.0, "D22": 5.0, "D66": 1.9, "u": 0.3}
     BOUNDS = {"D11": (3.0, 8.0), "D22": (3.0, 8.0), "D66": (1.0, 3.0), "u": (-0.5, 0.6)}
-    # Modes 6 and 7 are a second repeated pair. It passes the axis-by-axis review as individually stable but
-    # can rotate under a combined step, which the study then refuses as branch loss, so it is not observed here.
-    MODES = (1, 2, 3, 4, 5, 8, 9, 10)
+    ANGLES = tuple(math.radians(value) for value in (0.0, 10.0, 25.0, 45.0, 90.0))
+    SEPARATED = (1, 2, 3, 8, 9, 10)  # modes 4 to 7 are two repeated pairs
 
     def setUp(self):
         super().setUp()
@@ -757,55 +836,52 @@ class Clusters(AbaqusForbiddenMixin, unittest.TestCase):
             ObservationPoint(f"p{i}", x * 0.14, y * 0.13)
             for i, (x, y) in enumerate((a, b) for a in (-1.0, -0.6, -0.2, 0.3, 0.7, 1.0) for b in (-1.0, -0.4, 0.2, 0.6, 1.0))
         ))
+        self.truth = ritz_state(self.TRUTH, self.GEOMETRY, 8, 14, self.points)
 
-    PAIRS = ((4, 5),)
-
-    def rows(self, cluster):
-        truth = ritz_state(self.TRUTH, self.GEOMETRY, 8, 14, self.points)
-        start = ritz_state(self.START, self.GEOMETRY, 8, 14, self.points)
-        mapping = row_map(truth, start)
-        rows = []
-        for mode in self.MODES:
-            rows.append(FrozenPlateObservation(
-                f"row{mode}", mode, truth.frequencies_hz[mode - 1], mode if mode in (4, 5) else mapping[mode],
-                ObservationRole.HOLDOUT if mode == 3 else ObservationRole.FIT,
-                "pair" if mode in (4, 5) else f"F{mode}", CURVE_FITTED,
-                tuple(truth.observed[:, mode - 1]),
-                None, SIGMA, False,
-            ))
-        for pair in self.PAIRS:
-            self.assertLess(abs(start.frequencies_hz[pair[0] - 1] / start.frequencies_hz[pair[1] - 1] - 1.0), 1.0e-6)
-        return tuple(rows)
-
-    def declaration(self, cluster, declared):
+    def declaration(self, modes, declared=()):
+        rows = tuple(
+            FrozenPlateObservation(
+                f"row{mode}", mode, self.truth.frequencies_hz[mode - 1], mode,
+                ObservationRole.HOLDOUT if mode == 3 else ObservationRole.FIT, f"F{mode}", CURVE_FITTED,
+                tuple(self.truth.observed[:, mode - 1]), None, SIGMA, False,
+            )
+            for mode in modes
+        )
         return PlateInverseDeclaration(
-            "SYNTHETIC-CLUSTER", StudyIntent.SYNTHETIC_SOFTWARE_TEST, EvidenceKind.SYNTHETIC,
+            "SYNTHETIC-SQUARE", StudyIntent.SYNTHETIC_SOFTWARE_TEST, EvidenceKind.SYNTHETIC,
             ForwardBackendId.KIRCHHOFF_RITZ_4D, ritz_identity(self.GEOMETRY), "SYNTHETIC-NO-SPECIMEN", self.points,
-            self.rows(cluster), parameters(self.START, self.BOUNDS), confirmed_clusters=declared,
+            rows, parameters(self.START, self.BOUNDS), confirmed_clusters=declared,
             geometry=self.GEOMETRY, degree_x=8, degree_y=8, forward_mode_count=14, budget=BUDGET,
             provenance="SYNTHETIC",
         )
 
-    def declared_pairs(self):
-        return (("row4", "row5"),)
+    def test_frozen_rows_on_a_repeated_eigenvalue_are_refused_in_every_basis(self):
+        # Before this check the same declaration gave a candidate, a pairing refusal or a cluster refusal,
+        # depending only on the basis that the eigensolver happened to return.
+        for declared in ((), (("row1", "row2"),), (("row4", "row5"),)):
+            declaration = self.declaration((1, 2, 3, 4, 5, 8, 9, 10), declared)
+            for angle in self.ANGLES:
+                with self.subTest(declared=declared, angle=angle):
+                    result = run_plate_inverse_study(declaration, model=_AnyEigenbasis(declaration, self.truth, angle))
+                    self.assertIs(result.refusal_code, InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER, result.refusal_reason)
+                    self.assertIn("arbitrary basis", result.refusal_reason)
+                    self.assertIsNone(result.final_parameters)
+                    self.assertEqual(result.solves, 1)
 
-    def test_undeclared_cluster_is_refused(self):
-        result = run_plate_inverse_study(self.declaration(self.PAIRS[0], ()))
-        self.assertIs(result.refusal_code, InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER, result.refusal_reason)
-        self.assertIn("separate observations", result.refusal_reason)
-        self.assertIsNone(result.final_parameters)
-
-    def test_declared_pair_that_is_not_a_cluster_is_refused(self):
-        declared = self.declared_pairs() + (("row1", "row2"),)
-        result = run_plate_inverse_study(self.declaration(self.PAIRS[0], declared))
-        self.assertIs(result.refusal_code, InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER, result.refusal_reason)
-        self.assertIn("not confirmed", result.refusal_reason)
-
-    def test_symmetric_point_cannot_separate_d11_from_d22(self):
-        # On a square plate at D11 = D22 the two columns coincide. The declared cluster does not hide that.
-        result = run_plate_inverse_study(self.declaration(self.PAIRS[0], self.declared_pairs()))
-        self.assertIs(result.refusal_code, InverseRefusalCode.RANK_DEFICIENT, result.refusal_reason)
-        self.assertIsNone(result.final_parameters)
+    def test_four_parameters_are_rank_deficient_at_the_symmetric_point(self):
+        declaration = self.declaration(self.SEPARATED)
+        # Swapping x and y leaves each separated mode unchanged, so d/dlnD11 equals d/dlnD22 at fixed D12.
+        # With D12 = u*D22, the D22 column therefore equals the D11 column plus u times the u column.
+        reference = RitzInverseModel(declaration)
+        analytic = reference.analytic_sensitivities(self.START, max(self.SEPARATED))[[mode - 1 for mode in self.SEPARATED]]
+        gap = analytic[:, 1] - analytic[:, 0] - self.START["u"] * analytic[:, 3]
+        self.assertLess(float(np.abs(gap).max()), 1.0e-9)
+        for angle in self.ANGLES:  # the unobserved repeated pairs must not influence the outcome
+            with self.subTest(angle=angle):
+                result = run_plate_inverse_study(declaration, model=_AnyEigenbasis(declaration, self.truth, angle))
+                self.assertIs(result.refusal_code, InverseRefusalCode.RANK_DEFICIENT, result.refusal_reason)
+                self.assertIn("rank 3 < 4", result.refusal_reason)
+                self.assertIsNone(result.final_parameters)
 
 
 class ConfirmedCluster(StageCase):
@@ -839,7 +915,7 @@ class ConfirmedCluster(StageCase):
             sparse.identity(count, format="csr"), tuple(AbaqusDof(index + 1, 3) for index in range(count)),
         )
 
-    def test_confirmed_pair_is_one_observation_and_the_fit_recovers(self):
+    def study(self):
         directory = self.package(basis=self.pair_basis())
         count = self.ELASTIC + 2
         observations = DofObservationSet("SYNTHETIC-REGISTRATION", tuple(
@@ -877,6 +953,10 @@ class ConfirmedCluster(StageCase):
             directory, rows=tuple(rows), observation_set=observations, forward_mode_count=count,
             parameters=parameters(self.START, STAGE_BOUNDS), confirmed_clusters=(tuple(pair_rows),),
         )
+        return directory, declaration, rows, pair_rows
+
+    def test_confirmed_pair_is_one_observation_and_the_fit_recovers(self):
+        directory, declaration, rows, pair_rows = self.study()
         result = run_plate_inverse_study(declaration, stage_a_package=directory)
         self.assertIs(result.numerical_status, NumericalStatus.CONVERGED, result.refusal_reason)
         ids = [row.term_id for row in result.fit_residuals]
@@ -884,9 +964,24 @@ class ConfirmedCluster(StageCase):
         self.assertEqual(len(ids), len([r for r in rows if r.role is ObservationRole.FIT]) - 1)
         self.assertLessEqual(abs(result.final_parameters["r"] - self.TRUTH["r"]), 0.25 * result.uncertainty.statistical_sd["r"] + 1e-12)
 
+    def test_undeclared_cluster_is_refused(self):
+        directory, declaration, _, pair_rows = self.study()
         undeclared = dataclasses.replace(declaration, confirmed_clusters=())
-        refused = run_plate_inverse_study(undeclared, stage_a_package=directory)
-        self.assertIs(refused.refusal_code, InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER, refused.refusal_reason)
+        result = run_plate_inverse_study(undeclared, stage_a_package=directory)
+        self.assertIs(result.refusal_code, InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER, result.refusal_reason)
+        self.assertIn("separate observations", result.refusal_reason)
+        for row in pair_rows:
+            self.assertIn(row, result.refusal_reason)
+        self.assertIsNone(result.final_parameters)
+
+    def test_declared_pair_that_is_not_a_cluster_is_refused(self):
+        directory, declaration, rows, pair_rows = self.study()
+        separate = tuple(row.row_id for row in rows if row.family != "pair" and row.role is ObservationRole.FIT)[:2]
+        declared = dataclasses.replace(declaration, confirmed_clusters=(tuple(pair_rows), separate))
+        result = run_plate_inverse_study(declared, stage_a_package=directory)
+        self.assertIs(result.refusal_code, InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER, result.refusal_reason)
+        self.assertIn("not confirmed", result.refusal_reason)
+        self.assertIsNone(result.final_parameters)
 
 
 class PublishedBenchmark(AbaqusForbiddenMixin, unittest.TestCase):

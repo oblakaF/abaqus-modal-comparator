@@ -27,6 +27,9 @@ from .plate_material_problem import (
 
 
 PLATE_INVERSE_DECLARATION_SCHEMA = "abm/plate-inverse-declaration/v1"
+# Stands in the baseline-identity fields that name physical source files. A synthetic study has no such
+# files, so these fields hold no hash at all: no other identity is put in their place.
+SYNTHETIC_NO_PHYSICAL_SOURCE = "SYNTHETIC_NO_PHYSICAL_SOURCE"
 RESTRICTIONS_UNCHANGED = (
     "M8 GATE NOT_MET",
     "D-077 NO_GLOBAL_PARAMETER_VALUE",
@@ -36,9 +39,7 @@ RESTRICTIONS_UNCHANGED = (
 
 class StudyIntent(str, Enum):
     SYNTHETIC_SOFTWARE_TEST = "SYNTHETIC_SOFTWARE_TEST"
-    MATERIAL_IDENTIFICATION_RESEARCH = "MATERIAL_IDENTIFICATION_RESEARCH"
-    # Named so that it can be refused explicitly. This workflow has no calibration path.
-    SPECIMEN_ENGINEERING_CALIBRATION = "SPECIMEN_ENGINEERING_CALIBRATION"
+    MATERIAL_IDENTIFICATION_RESEARCH = "MATERIAL_IDENTIFICATION_RESEARCH"  # not authorized to run in MAT-2
 
 
 class ObservationRole(str, Enum):
@@ -72,7 +73,7 @@ class ReleaseStatus(str, Enum):
 
 class InverseRefusalCode(str, Enum):
     DECLARATION_INVALID = "DECLARATION_INVALID"
-    CALIBRATION_NOT_SUPPORTED = "CALIBRATION_NOT_SUPPORTED"
+    UNSUPPORTED_STUDY_INTENT = "UNSUPPORTED_STUDY_INTENT"
     MISSING_HOLDOUT = "MISSING_HOLDOUT"
     HOLDOUT_NOT_INDEPENDENT = "HOLDOUT_NOT_INDEPENDENT"
     INCOMPLETE_COVARIANCE = "INCOMPLETE_COVARIANCE"
@@ -174,6 +175,8 @@ class InverseNumericalPolicy:
     max_orthonormality_error: float = 1.0e-8
     max_analytic_sensitivity_difference: float = 1.0e-4
     max_objective_replay_difference: float = 1.0e-9
+    # At or below this spacing two frozen modes have no defined individual eigenvectors, only a subspace.
+    repeated_frequency_relative_spacing: float = 1.0e-9
 
     def identity(self) -> Mapping[str, Any]:
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
@@ -212,13 +215,16 @@ class PlateInverseDeclaration:
     degree_y: Optional[int] = None
     forward_mode_count: int = 12
     stage_a_model_id: Optional[str] = None
-    execution_authorization: Optional[str] = None
+    execution_authorization: Optional[str] = None  # recorded text only: it never enables an execution
     provenance: str = ""
     policy: InverseNumericalPolicy = InverseNumericalPolicy()
     budget: InverseResourceBudget = InverseResourceBudget()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "intent", StudyIntent(self.intent))
+        try:
+            object.__setattr__(self, "intent", StudyIntent(self.intent))
+        except ValueError:  # kept as text, so that the workflow can refuse it with a result and a code
+            object.__setattr__(self, "intent", str(self.intent))
         object.__setattr__(self, "evidence_kind", EvidenceKind(self.evidence_kind))
         object.__setattr__(self, "backend_id", ForwardBackendId(self.backend_id))
         object.__setattr__(self, "rows", tuple(self.rows))
