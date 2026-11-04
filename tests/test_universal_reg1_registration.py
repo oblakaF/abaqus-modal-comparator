@@ -541,7 +541,8 @@ class _Gui(base._Case):
 
 class GuiTests(_Gui):
     def test_the_action_is_compact_and_opens_an_empty_form(self):
-        _window, panel = self.analysed()
+        window, panel = self.analysed()
+        window.show_page(pw.MAC_PAGE)  # GUI-UX-R1: the registration commands are on this page
         self.assertEqual(panel.registration_button.text(), SET_UP_REGISTRATION)
         self.assertTrue(panel.registration_button.isVisible())
         panel.registration_button.click()
@@ -571,7 +572,7 @@ class GuiTests(_Gui):
         self.assertEqual(dialog.table.rowCount(), len(proposal.mapping))
         self.assertEqual(dialog.status_label.text(), gr.REGISTRATION_PROPOSED)
         self.assertEqual(panel.proposal_label.text(), PROPOSED_TEXT)
-        self.assertTrue(panel.proposal_label.isVisible())
+        self.assertFalse(panel.proposal_label.isHidden())
         # the result itself: still required, with no pair and no MAC
         self.assertEqual(panel.status_label.text(), am.REGISTRATION_REQUIRED)
         self.assertEqual(panel.analysis.status, am.REGISTRATION_REQUIRED)
@@ -645,9 +646,10 @@ class GuiTests(_Gui):
 
     def test_a_verified_result_offers_no_setup(self):
         verified = am.rm.RegistrationOutcome(0, view=mock.Mock(registration="hash-1"))
-        cells = ("7", "20.0", "EXP1", "1", "20.5", "-2.44", "0.981", "paired", "")
+        cells = ("7", "20.0", "EXP1", "1", "20.5", "-2.44", "0.981", "paired", "12", "100 %", "4")
         view = mock.Mock(status=cm.PAIRS_FOUND, pair_rows=(mock.Mock(cells=cells),), mac_cells=(("0.981",),),
-                         mac_fe_modes=(7,), mac_experimental_modes=(1,), warnings=())
+                         mac_fe_modes=(7,), mac_experimental_modes=(1,), warnings=(), mac_values=((0.981,),),
+                         assigned_cells=frozenset({(0, 0)}), provenance=(), gates=())
         with mock.patch.object(am.rm, "run_check", return_value=verified), \
                 mock.patch.object(cm, "run_compare", return_value=cm.ComparisonOutcome(0, view=view)):
             _window, panel = self.analysed()

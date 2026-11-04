@@ -35,6 +35,7 @@ except ImportError as error:  # pragma: no cover - depends on the environment
     raise unittest.SkipTest(f"PySide6 is not installed ({error}); install requirements-new-gui.txt to run the "
                             "new interface tests (CI sets NEW_GUI_REQUIRE_QT=1 and runs them)")
 
+from new_gui import shape_panel
 from new_gui import shape_model as sm  # noqa: E402
 from new_gui import window as window_module  # noqa: E402
 from new_gui import workspace_state as ws  # noqa: E402
@@ -332,7 +333,7 @@ class LayoutTests(_Window):
             ratio = shown.devicePixelRatio()
             self.assertLessEqual(shown.width() / ratio, panel.image.width() + 1)  # never wider than the panel
             self.assertAlmostEqual(shown.width() / shown.height(), source.width() / source.height(), delta=0.02)
-            self.assertLessEqual(panel.image.height(), panel.image.width() * source.height() / source.width() + 2)
+            self.assertLessEqual(panel.image.height(), (panel.image.width() + shape_panel.SCROLLBAR_ALLOWANCE) * source.height() / source.width() + 2)
 
     def test_a_long_mode_name_does_not_widen_the_panel(self):
         panel = self.inspect(ws.FE, self.manifest)

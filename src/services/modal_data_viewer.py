@@ -53,7 +53,10 @@ RIGID_RESIDUALS_KEY = "rigid_body_residual_fraction_by_mode"
 RIGID_BODY_METHOD = "six-vector rigid-body subspace projection of the mode shape"
 MINIMUM_SPATIAL_POINTS = 3
 DISPLAY_GRID_THRESHOLD = 5000  # above this many nodes the field is averaged on a display grid
-DISPLAY_GRID_CELLS = 220
+DISPLAY_GRID_CELLS = 220  # the finest grid; a coarser one is used when its cells would be smaller than the node spacing
+DISPLAY_GRID_MINIMUM = 20
+DISPLAY_GRID_STEP = 0.8
+DISPLAY_GRID_HOLES = 0.005  # empty cells between occupied neighbours, as a fraction of the occupied cells
 # APP-DATA.6: points span no plane when the second singular value of the centred points is at most this fraction of
 # the first (the rule of the APP-DATA.4/5 previews); their out-of-plane direction would be arbitrary.
 COLLINEAR_TOLERANCE = 1.0e-6
@@ -272,13 +275,39 @@ def component_values(mode, component: str) -> np.ndarray:
     return np.real(aligned[:, "xyz".index(component)])
 
 
+def _grid_shape(x: np.ndarray, y: np.ndarray, cells: float) -> tuple[int, int]:
+    span = max(float(np.ptp(x)), float(np.ptp(y)), 1.0e-30)
+    return (max(2, int(round(cells * float(np.ptp(x)) / span))), max(2, int(round(cells * float(np.ptp(y)) / span))))
+
+
+def display_hole_fraction(count: np.ndarray) -> float:
+    """Empty cells with occupied cells on both sides, per occupied cell: sampling holes, not a real cut-out's interior."""
+
+    filled = count > 0
+    across = ~filled[1:-1, :] & filled[:-2, :] & filled[2:, :]
+    along = ~filled[:, 1:-1] & filled[:, :-2] & filled[:, 2:]
+    return (int(across.sum()) + int(along.sum())) / max(1, int(filled.sum()))
+
+
+def display_cells(x: np.ndarray, y: np.ndarray) -> int:
+    """The finest grid whose cells are not smaller than the node spacing, so that no value has to be invented for a hole.
+
+    A fixed grid finer than the mesh leaves most cells without a node: a regular 3 mm mesh on 1.37 mm cells draws a dotted
+    field. Coarsening only averages more real nodes per cell; cells that stay empty are left blank."""
+
+    cells = float(DISPLAY_GRID_CELLS)
+    while cells > DISPLAY_GRID_MINIMUM:
+        count, _, _ = np.histogram2d(x, y, bins=_grid_shape(x, y, cells))
+        if display_hole_fraction(count) <= DISPLAY_GRID_HOLES:
+            break
+        cells *= DISPLAY_GRID_STEP
+    return max(DISPLAY_GRID_MINIMUM, int(round(cells)))
+
+
 def _binned(x: np.ndarray, y: np.ndarray, values: np.ndarray, cells: int):
     """Mean of the field per display cell (large FE models; every node contributes)."""
 
-    span = max(float(np.ptp(x)), float(np.ptp(y)), 1.0e-30)
-    nx = max(2, int(round(cells * float(np.ptp(x)) / span)))
-    ny = max(2, int(round(cells * float(np.ptp(y)) / span)))
-    total, xe, ye = np.histogram2d(x, y, bins=(nx, ny), weights=values)
+    total, xe, ye = np.histogram2d(x, y, bins=_grid_shape(x, y, cells), weights=values)
     count, _, _ = np.histogram2d(x, y, bins=(xe, ye))
     with np.errstate(invalid="ignore", divide="ignore"):
         mean = np.where(count > 0, total / count, np.nan)
@@ -296,7 +325,7 @@ def render_mode(mode, role: str, component: str, output_path: Path, title: str, 
     scale = float(np.nanmax(np.abs(values))) if len(values) else 0.0
     if scale > 0.0:
         values = values / scale
-    center, plane, _ = _plane_basis(coordinates)
+    center, plane, normal = _plane_basis(coordinates)
     projected = (coordinates - center) @ plane.T
     x, y = projected[:, 0], projected[:, 1]
     signed = component != "magnitude"
@@ -306,10 +335,13 @@ def render_mode(mode, role: str, component: str, output_path: Path, title: str, 
     figure = _new_figure((6.2, 4.8))
     axis = figure.add_subplot(111)
     if len(values) > DISPLAY_GRID_THRESHOLD:
-        image, extent = _binned(x, y, values, DISPLAY_GRID_CELLS)
+        image, extent = _binned(x, y, values, display_cells(x, y))
         artist = axis.imshow(image, origin="lower", extent=extent, cmap=colour_map, vmin=limits[0], vmax=limits[1],
                              interpolation="nearest", aspect="equal")
-        method = f"{len(values)} FE nodes, averaged per display cell"
+        method = (f"{len(values)} FE nodes, mean per display cell ({image.shape[1]} x {image.shape[0]}), empty cells blank")
+        depth = float(np.ptp((coordinates - center) @ normal))
+        if depth > 1.0e-6 * max(float(np.ptp(x)), float(np.ptp(y))):
+            method += "; nodes through the depth are averaged together"
     else:
         artist = None
         planar_points = len(np.unique(np.round(projected, 9), axis=0)) >= 3

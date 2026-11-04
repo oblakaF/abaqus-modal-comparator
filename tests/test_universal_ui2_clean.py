@@ -31,6 +31,7 @@ FORBIDDEN = re.compile(r"SP-?\d|\bM\d+\b|PLATE|[Pp]late|[Ss]pecimen|NEW-GUI|\bRC
 REUSED = ("Physical registration reused by FE geometry identity (X): SP-13 fixture-sp13, registration abc (frozen "
           "mapping). archived sensitivities apply only if 11. Scaling verifies this ODB.")
 SIZES = ((900, 680), (1366, 768))
+ALLOWED = re.compile(r"Physically validated archived evidence|Single-plate model calibration|Load the specimen FE model")  # GUI-UX-R1
 
 
 def shown_text(window) -> list:
@@ -74,15 +75,17 @@ class _WindowCase(base._Case):
         return window.analyze
 
     def assert_clean(self, window):
-        found = [(text, FORBIDDEN.search(text).group()) for text in shown_text(window) if FORBIDDEN.search(text)]
+        texts = [ALLOWED.sub("", text) for text in shown_text(window)]
+        found = [(text, FORBIDDEN.search(text).group()) for text in texts if FORBIDDEN.search(text)]
         self.assertEqual(found, [])
 
 
 class NavigationTests(_WindowCase):
-    def test_public_navigation_is_analyze_and_materials_only(self):
+    def test_public_navigation_is_the_four_workflow_pages_only(self):
         window = self.window()
-        self.assertEqual([b.text() for b in window.sidebar.findChildren(QPushButton)], ["Analyze", "Materials"])
-        self.assertEqual(window.stack.count(), 2)
+        self.assertEqual([b.text() for b in window.sidebar.findChildren(QPushButton)],
+                         ["Analyze", "Review", "MAC / Points", "Materials"])
+        self.assertEqual(window.stack.count(), 4)
         self.assertEqual(window.stack.currentIndex(), pw.ANALYZE_PAGE)
 
     def test_the_menus_hold_no_earlier_page_or_shortcut(self):
@@ -270,14 +273,15 @@ class ScientificStatementTests(_WindowCase):
 
     def test_a_verified_comparison_shows_pairs_and_mac_without_naming_the_source(self):
         verified = rm.RegistrationOutcome(0, view=SimpleNamespace(registration="hash-1"))
-        cells = ("7", "20.0", "EXP1", "1", "20.5", "-2.44", "0.981", "paired", "")
+        cells = ("7", "20.0", "EXP1", "1", "20.5", "-2.44", "0.981", "paired", "12", "100 %", "4")
         view = SimpleNamespace(status=cm.PAIRS_FOUND, pair_rows=(SimpleNamespace(cells=cells),),
                                mac_cells=(("0.981",),), mac_fe_modes=(7,), mac_experimental_modes=(1,),
+                               mac_values=((0.981,),), assigned_cells=frozenset({(0, 0)}), provenance=(), gates=(),
                                warnings=(REUSED, "Comparator warning."))
         window, panel = self.analysed_with(check=verified, compare=cm.ComparisonOutcome(0, view=view))
         self.assertEqual(panel.status_label.text(), cm.PAIRS_FOUND)
         self.assertEqual(panel.status_label.property("state"), "read")
-        tabs = panel.result_tabs
+        tabs = panel.comparison_tabs
         self.assertEqual([tabs.tabText(i) for i in range(2)], ["Mode pairs", "MAC"])
         self.assertIsNone(panel.registration_label)
         self.assertIn("Comparator warning.", panel.details.body.text())

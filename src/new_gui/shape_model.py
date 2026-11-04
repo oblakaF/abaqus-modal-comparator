@@ -45,6 +45,9 @@ SHAPE_NOTE = ("One shape on its own coordinates, as the service draws it. It is 
               "no overlay, orientation, node correspondence, MAC or mode pair. The normal is taken to the best-fit "
               "plane of this data set alone.")
 PROVISIONAL_TEXT = "PROVISIONAL — NOT A VALIDATED FITTED MODE"
+FRF_PEAK_SHORT = "FRF peak — not fitted"
+PROJECTION_TEXT = ("Independent display projection: the best-fit plane of this data set alone, not the source axes, and "
+                   "not aligned with the other view. The source data state no length unit.")
 
 _RENDER = threading.Lock()  # one drawing at a time across both sides (matplotlib figures)
 
@@ -114,6 +117,17 @@ def record_warnings(preview_set, index: int) -> tuple:
 
 def is_provisional(preview_set, index: int) -> bool:
     return bool(preview_set.records[index].provisional)
+
+
+def record_components(preview_set, index: int) -> frozenset:
+    """The components this record can show: X, Y and Z only where the importer recorded a measured DOF or data."""
+    from services import local_experimental_preview as xp
+    from services import modal_data_viewer as viewer
+
+    mode = preview_set.dataset.modes[index]
+    mask = xp._measured_mask(mode)
+    axes = viewer.measured_axes(mode) if mask is None else tuple(a for a, used in zip("xyz", mask.any(axis=0)) if used)
+    return frozenset(("magnitude", *axes) + (("normal",) if viewer.out_of_plane_available(mode) else ()))
 
 
 # ---------------------------------------------------------------------------------------------- drawing

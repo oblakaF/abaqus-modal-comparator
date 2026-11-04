@@ -15,7 +15,7 @@ import numpy as np
 
 import test_universal_two_file_analysis as base
 import test_universal_reg1_registration as reg1
-from test_universal_ui2_clean import FORBIDDEN, shown_text
+from test_universal_ui2_clean import ALLOWED, FORBIDDEN, shown_text
 
 from PySide6.QtWidgets import QCheckBox, QLabel, QPushButton
 
@@ -729,7 +729,8 @@ class DisplayTests(_Flow):
         self.sign(confirming)
         self.wait(panel)
         self.compare(panel)
-        found = [t for t in shown_text(window) if FORBIDDEN.search(t) and str(self.root) not in t]
+        found = [t for t in map(lambda text: ALLOWED.sub("", text), shown_text(window))
+                 if FORBIDDEN.search(t) and str(self.root) not in t]
         self.assertEqual(found, [])
 
     def test_a_cancelled_comparison_keeps_the_frequency_result(self):

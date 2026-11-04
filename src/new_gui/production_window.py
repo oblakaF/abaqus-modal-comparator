@@ -1,4 +1,6 @@
-"""UNIVERSAL-UI-2: the program's window: the Analyze and Materials pages, for any FE model and any experimental data.
+"""UNIVERSAL-UI-2: the program's window, for any FE model and any experimental data.
+
+GUI-UX-R1: four pages: Analyze, Review, MAC / Points and Materials, each with its own scrolling.
 
 It imports none of the earlier pages, so nothing of them can appear here. ``new_gui.window.MainWindow`` keeps them and
 opens only with an explicit command-line option (``new_gui.__main__``).
@@ -17,11 +19,16 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame, QHBoxLayout, 
 from new_gui import APP_NAME
 from new_gui.analyze_panel import (AnalyzePanel, CLOSE_PROJECT, OPEN_PROJECT, RUNNING, SAVE_PROJECT, SAVE_PROJECT_AS,
                                    SNAPSHOT_BADGE, SUBTITLE as ANALYZE_SUBTITLE)
+from new_gui.mac_points_panel import MacPointsPanel
 from new_gui.materials_status_panel import MaterialsStatusPanel, SUBTITLE as MATERIALS_SUBTITLE
+from new_gui.materials_workspace import MaterialsWorkspace
+from new_gui.review_panel import ReviewPanel
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
-PAGES = ("Analyze", "Materials")
-ANALYZE_PAGE, MATERIALS_PAGE = 0, 1
+PAGES = ("Analyze", "Review", "MAC / Points", "Materials")
+ANALYZE_PAGE, REVIEW_PAGE, MAC_PAGE, MATERIALS_PAGE = 0, 1, 2, 3
+MAC_SUBTITLE = "Mode pairs and MAC, what they rest on, and why they may be missing. Nothing here is computed from a manual choice."
+MATERIALS_PAGE_SUBTITLE = "Choose an ODB and a UNV/UFF for this page, or reuse the two from Analyze. Read-only: no value is issued."
 ABOUT = ("Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze. Mode pairs and MAC appear only "
          "with a verified physical registration; otherwise the result is a frequency comparison. No FE analysis is "
          "solved.")
@@ -53,8 +60,11 @@ class ProductionWindow(QMainWindow):
     def __init__(self, *, analyze_options: Optional[dict] = None):
         super().__init__()
         self.setWindowTitle(APP_NAME)
-        self.analyze = AnalyzePanel(**dict(analyze_options or {}))
+        self.analyze = AnalyzePanel(**dict(analyze_options or {}), external_results=True)
         self.materials = MaterialsStatusPanel()
+        self.review = ReviewPanel(self.analyze)
+        self.mac_points = MacPointsPanel(self.analyze)
+        self.materials_workspace = MaterialsWorkspace(self.analyze, self.materials)
         central = QWidget()
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
@@ -64,11 +74,20 @@ class ProductionWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.stack.setObjectName("content")
         self.stack.addWidget(_page(PAGES[ANALYZE_PAGE], ANALYZE_SUBTITLE, self.analyze))
-        self.stack.addWidget(_page(PAGES[MATERIALS_PAGE], MATERIALS_SUBTITLE, self.materials))
+        review = QScrollArea()  # only a very short window scrolls the whole page; the panes scroll by themselves
+        review.setWidgetResizable(True)
+        self.review.setMinimumHeight(600)
+        review.setWidget(self.review)
+        self.stack.addWidget(review)
+        self.stack.addWidget(_page(PAGES[MAC_PAGE], MAC_SUBTITLE, self.mac_points))
+        self.stack.addWidget(_page(PAGES[MATERIALS_PAGE], MATERIALS_PAGE_SUBTITLE, self.materials_workspace))
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()
         self.analyze.changed.connect(self._project_changed)
+        self.analyze.analysis_ready.connect(self._result_ready)
+        self.analyze.analysis_blocked.connect(lambda: self.show_page(ANALYZE_PAGE))
+        self.analyze.message_changed.connect(self.statusBar().showMessage)
         self._project_changed()
         self.setMinimumSize(560, 420)
         self._fit_to_screen()
@@ -91,7 +110,7 @@ class ProductionWindow(QMainWindow):
         for index, text in enumerate(PAGES):
             button = QPushButton(text)
             button.setCheckable(True)
-            button.setObjectName(f"nav{text}")
+            button.setObjectName("nav" + "".join(c for c in text if c.isalnum()))
             self.nav.addButton(button, index)
             layout.addWidget(button)
         self.nav.idClicked.connect(self.show_page)
@@ -103,9 +122,9 @@ class ProductionWindow(QMainWindow):
         self.project_actions = {}
         for key, text, shortcut, slot in (
                 ("open", OPEN_PROJECT, "Ctrl+O", lambda: self._project(self.analyze.open_project)),
-                ("save", SAVE_PROJECT, "Ctrl+S", lambda: self._project(self.analyze.save_project)),
+                ("save", SAVE_PROJECT, "Ctrl+S", lambda: self.analyze.save_project()),  # the status bar shows the outcome
                 ("save_as", SAVE_PROJECT_AS, "Ctrl+Shift+S",  # Windows has no standard key for Save As
-                 lambda: self._project(self.analyze.save_project_as)),
+                 lambda: self.analyze.save_project_as()),
                 ("close", CLOSE_PROJECT, None, lambda: self._project(self.analyze.close_project))):
             action = QAction(text, self)
             if shortcut is not None:
@@ -142,6 +161,12 @@ class ProductionWindow(QMainWindow):
         self.show_page(ANALYZE_PAGE)
         command()
 
+    def _result_ready(self) -> None:
+        """From Analyze to the result; a comparison started on MAC / Points, or work on Materials, stays where it is."""
+        if self.stack.currentIndex() == ANALYZE_PAGE:
+            self.show_page(REVIEW_PAGE)
+        self.mac_points.refresh_evidence()
+
     def _project_changed(self) -> None:
         panel = self.analyze
         for key in ("save", "save_as"):
@@ -157,11 +182,13 @@ class ProductionWindow(QMainWindow):
         self.analyze.choose_file(kind)
 
     def show_page(self, index: int) -> None:
+        if index == MAC_PAGE:
+            self.mac_points.refresh_evidence()  # the manual-choice count follows the Review page
         self.stack.setCurrentIndex(index)
         self.nav.button(index).setChecked(True)
 
     def busy(self) -> bool:
-        return self.analyze.busy()
+        return self.analyze.busy() or self.mac_points.busy() or self.materials_workspace.busy()
 
     def wait_for_reads(self, timeout: float = 120.0) -> bool:
         """Process events until nothing runs (tests and checks); returns whether all ended."""
@@ -174,7 +201,9 @@ class ProductionWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self.analyze.shutdown()  # the running step, its owned Abaqus process and its drawings
+        self.mac_points.shutdown()
+        self.materials_workspace.shutdown()
         super().closeEvent(event)
 
 
-__all__ = ["ANALYZE_PAGE", "MATERIALS_PAGE", "PAGES", "ProductionWindow"]
+__all__ = ["ANALYZE_PAGE", "MAC_PAGE", "MATERIALS_PAGE", "PAGES", "ProductionWindow", "REVIEW_PAGE"]

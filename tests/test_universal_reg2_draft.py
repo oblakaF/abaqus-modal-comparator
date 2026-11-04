@@ -511,9 +511,10 @@ class GuiTests(reg1._Gui):
 
     def test_a_verified_result_still_offers_no_setup(self):
         verified = am.rm.RegistrationOutcome(0, view=mock.Mock(registration="hash-1"))
-        cells = ("7", "20.0", "EXP1", "1", "20.5", "-2.44", "0.981", "paired", "")
+        cells = ("7", "20.0", "EXP1", "1", "20.5", "-2.44", "0.981", "paired", "12", "100 %", "4")
         view = mock.Mock(status=cm.PAIRS_FOUND, pair_rows=(mock.Mock(cells=cells),), mac_cells=(("0.981",),),
-                         mac_fe_modes=(7,), mac_experimental_modes=(1,), warnings=())
+                         mac_fe_modes=(7,), mac_experimental_modes=(1,), warnings=(), mac_values=((0.981,),),
+                         assigned_cells=frozenset({(0, 0)}), provenance=(), gates=())
         with mock.patch.object(am.rm, "run_check", return_value=verified), \
                 mock.patch.object(cm, "run_compare", return_value=cm.ComparisonOutcome(0, view=view)):
             _window, panel = self.analysed()

@@ -15,6 +15,9 @@ registration outcome and the number of warnings stay visible.
 WORKING-DRAFT-R2: Save Project and Open Project. An opened project is a saved snapshot: its tables and pictures come only
 from the file, no result can be recalculated from it, and the badge is never the verified one. Analyze stays blocked until
 Check source files finds the ODB and the experimental file with their saved content; it then gives a fresh result.
+
+GUI-UX-R1: with ``external_results`` the page keeps only the inputs and the saved result's source check. The result's widgets
+stay this panel's, and the program's window places them on the Review and MAC / Points pages.
 """
 
 from __future__ import annotations
@@ -36,11 +39,13 @@ from new_gui.diagnostic_model import NEAREST_TITLE
 from new_gui.confirmation_dialog import ConfirmationDialog, FILTER as CONFIRMATION_FILTER
 from new_gui.diagnostic_panel import DiagnosticTable
 from new_gui import project_model as pj
+from new_gui import review_model as rv
 from new_gui.project_panel import SavedShapePanel
 from new_gui.registration_dialog import RegistrationDialog
 from services import analysis_project as ap
 from services import confirmed_registration as cs
-from new_gui.shape_panel import ShapePanel
+from new_gui.shape_panel import ImageView, ScrollSafeCombo, ShapePanel
+from new_gui import shape_model as sm
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
 TITLE = "Analyze"
@@ -85,6 +90,10 @@ SAME_CONTENT_TEXT = ("The ODB and the experimental file have the saved content. 
 BLOCKED_TEXT = ("A new analysis stays blocked: the ODB and the experimental file must have the saved content. The saved "
                 "results stay readable. Use Choose file... if a file moved.")
 FRESH_TEXT = "Fresh analysis of the current files, not the saved snapshot of {saved}."
+SCOPE_TEXT = (f"FE modes {am.FIRST_MODE}-{am.LAST_MODE} are requested. Experimental: the first {am.MODE_LIMIT} records of the "
+              "chosen modal set, the first record included. The first elastic FE mode is found by shape.")
+CANDIDATE_SHOWN = "Shown: EXP {exp} ({exp_hz} Hz) and FE {fe} ({fe_hz} Hz), {origin}. Frequency-based candidate, not a validated pair."
+PAIR_SHOWN = "Shown: EXP {exp} and FE {fe}, the comparator's pair. Each view stays on its own coordinates."
 REOPEN_TEXT = (" The saved project used the confirmation {path}. It is not applied by itself: use Open confirmation to "
                "compare again.")
 
@@ -139,6 +148,18 @@ class _Details(QWidget):
         self.body.setVisible(shown)
 
 
+class _ShapesRow(QWidget):
+    """The two shape views; side by side when they fit, wherever the row is placed."""
+
+    def __init__(self, panel):
+        super().__init__()
+        self.panel = panel
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.panel.fit_shapes(event.size().width())
+
+
 class _Bridge(QObject):
     done = Signal(int, str, object)  # token, step, the step's value or its exception
     progress = Signal(int, str)
@@ -149,10 +170,17 @@ class AnalyzePanel(QWidget):
     ``discover`` are replaced in tests; the program uses the dialogs and the real bridge."""
 
     changed = Signal()
+    result_shown = Signal()  # a new result, or none, is in the widgets
+    analysis_ready = Signal()  # a finished analysis or an opened saved result
+    analysis_blocked = Signal()
+    shapes_shown = Signal(str)
+    pair_chosen = Signal(int)
+    message_changed = Signal(str)
 
     def __init__(self, *, ask_path: Optional[Callable[[str, str], str]] = None,
                  ask_folder: Optional[Callable[[str], str]] = None, ask_launcher: Optional[Callable[[str], str]] = None,
-                 consent: Optional[Callable[[str], bool]] = None, runner=None, discover=None):
+                 consent: Optional[Callable[[str], bool]] = None, runner=None, discover=None,
+                 external_results: bool = False):
         super().__init__()
         self._ask_path = ask_path or self._dialog_path
         self._ask_folder = ask_folder or self._dialog_folder
@@ -181,6 +209,8 @@ class AnalyzePanel(QWidget):
         self.open_confirmation_button: Optional[QPushButton] = None
         self.compare_button: Optional[QPushButton] = None
         self.result_tabs: Optional[QTabWidget] = None
+        self.comparison_tabs: Optional[QTabWidget] = None
+        self.review_state: Optional[rv.ReviewState] = None
         self.tables: dict = {}
         self.snapshot: Optional[pj.Snapshot] = None  # an opened project: the page shows only what it holds
         self.source_check: Optional[pj.SourceCheck] = None
@@ -206,12 +236,13 @@ class AnalyzePanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
         layout.addWidget(self._build_inputs())
-        self.result_box = QWidget()
-        self.result_layout = QVBoxLayout(self.result_box)
-        self.result_layout.setContentsMargins(0, 0, 0, 0)
-        self.result_layout.setSpacing(12)
-        layout.addWidget(self.result_box)
-        self.shapes = QWidget()
+        self.project_box, self.project_layout = self._box()
+        layout.addWidget(self.project_box)
+        self.result_box, self.result_layout = self._box()
+        self.registration_box, self.registration_layout = self._box()
+        self.comparison_box, self.comparison_layout = self._box()
+        self.tables_box, self.tables_layout = self._box()
+        self.shapes = _ShapesRow(self)
         self.shapes_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, self.shapes)
         self.shapes_layout.setContentsMargins(0, 0, 0, 0)
         self.shapes_layout.setSpacing(12)
@@ -221,11 +252,23 @@ class AnalyzePanel(QWidget):
         self.saved_shapes = {kind: SavedShapePanel(kind) for kind in (EXPERIMENTAL, FE)}
         for panel in self.saved_shapes.values():
             self.shapes_layout.addWidget(panel, 1, Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(self.shapes)
+        for box in (self.result_box, self.registration_box, self.comparison_box, self.tables_box, self.shapes):
+            if external_results:
+                box.setParent(self)  # until the window places it on its page
+            else:
+                layout.addWidget(box)
         self.shapes.setVisible(False)
         self._refresh()
 
     # ---------------------------------------------------------------------------------------------- building
+
+    @staticmethod
+    def _box() -> tuple:
+        box = QWidget()
+        layout = QVBoxLayout(box)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        return box, layout
 
     def _build_inputs(self) -> QFrame:
         card, inner = _card()
@@ -263,6 +306,7 @@ class AnalyzePanel(QWidget):
             grid.addWidget(button, 2 * row + 1, 1)
             self.fields[kind], self.choose_buttons[kind] = field, button
         inner.addLayout(grid)
+        inner.addWidget(_label(SCOPE_TEXT, "hint"))
         self.file_error = _label("", "error")
         inner.addWidget(self.file_error)
         row = QHBoxLayout()
@@ -288,7 +332,7 @@ class AnalyzePanel(QWidget):
         set_layout = QHBoxLayout(self.set_row)
         set_layout.setContentsMargins(0, 0, 0, 0)
         set_layout.addWidget(QLabel("Modal set"))
-        self.set_combo = QComboBox()
+        self.set_combo = ScrollSafeCombo()
         self.set_combo.setObjectName("analyzeSet")
         self.set_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.set_combo.setMinimumContentsLength(20)
@@ -305,6 +349,9 @@ class AnalyzePanel(QWidget):
         self.message = _label("", "hint")
         self.message.setVisible(False)
         inner.addWidget(self.message)
+        self.result_line = _label("", "hint")
+        self.result_line.setVisible(False)
+        inner.addWidget(self.result_line)
         self.log_button = QPushButton(SHOW_LOG)
         self.log_button.setObjectName("detailsToggle")
         self.log_button.setCheckable(True)
@@ -717,12 +764,14 @@ class AnalyzePanel(QWidget):
             self.show_pair(0)
         elif analysis.nearest_rows:
             self.show_candidate(0)
+        self.analysis_ready.emit()
 
     def _block(self, text: str) -> None:
         self.state = BLOCKED
         self._cancel = None
         self._set_message(text, "error")
         self._refresh()
+        self.analysis_blocked.emit()
 
     # ---------------------------------------------------------------------------------------------- the shapes
 
@@ -731,7 +780,13 @@ class AnalyzePanel(QWidget):
         if self.analysis is None or not 0 <= row < len(self.analysis.nearest_rows):
             return False
         values = self.analysis.nearest_rows[row]
-        return self._draw_shapes(values[1], values[3])
+        if self.review_state is None:
+            return self._draw_shapes(values[1], values[3])
+        shown = self.review_state.row(row)
+        drawn = self._draw_shapes(shown.exp_mode, shown.selected_mode)
+        self.shapes_shown.emit(CANDIDATE_SHOWN.format(exp=shown.exp_mode, exp_hz=shown.exp_text, fe=shown.selected_mode,
+                                                      fe_hz=shown.selected_text, origin=shown.origin))
+        return drawn
 
     def show_pair(self, row: int) -> bool:
         """Draw one pair's EXP record and FE mode side by side (each on its own coordinates)."""
@@ -739,7 +794,13 @@ class AnalyzePanel(QWidget):
         if not 0 <= row < len(pairs):
             return False
         cells = pairs[row].cells
-        return self._draw_shapes(cells[3], cells[0])
+        drawn = self._draw_shapes(cells[3], cells[0])
+        self.shapes_shown.emit(PAIR_SHOWN.format(exp=cells[3], fe=cells[0]))
+        return drawn
+
+    def _pair_clicked(self, row: int) -> None:
+        self.show_pair(row)
+        self.pair_chosen.emit(row)
 
     def _draw_shapes(self, experimental_number: str, fe_number: str) -> bool:
         if self.snapshot is not None:  # the saved pictures; nothing is drawn or read
@@ -768,6 +829,7 @@ class AnalyzePanel(QWidget):
         self.message.style().polish(self.message)
         self.message.setText(text)
         self.message.setVisible(bool(text))
+        self.message_changed.emit(text)
 
     def _refresh(self) -> None:
         running = self.state == RUNNING
@@ -798,13 +860,46 @@ class AnalyzePanel(QWidget):
         self.changed.emit()
 
     def _show_result(self) -> None:
+        self._fill_result()
+        self.result_shown.emit()
+
+    def _full_frequencies(self) -> tuple:
+        """Full-precision frequencies for a manual choice's difference: the saved ones, or the ones read."""
+        if self.snapshot is not None:
+            modes = self.snapshot.document["modes"]
+            return ({str(mode["number"]): mode["frequency_hz"] for mode in modes["fe"]},
+                    {mode["record"]: mode["frequency_hz"] for mode in modes["experimental"]})
+        records = self.inputs.experimental.sets[self.analysis.set_index].records
+        return ({str(mode.number): mode.frequency_hz for mode in self.inputs.fe.modes},
+                {f"EXP{position}": record.frequency_hz for position, record in enumerate(records, 1)})
+
+    def registration_kind(self) -> str:
+        """The registration behind the result shown: nothing else can make a comparison exist."""
+        if self.snapshot is not None:
+            return self.snapshot.document["registration"]["kind"]
+        if self.analysis is None or self.analysis.comparison is None:
+            return ap.KIND_NONE
+        return ap.KIND_CONFIRMED if self.registration_ref is not None else ap.KIND_ARCHIVED
+
+    def chosen_dataset(self):
+        """The experimental dataset of the shown result, when it was read in this session."""
+        if self.analysis is None or self.inputs is None:
+            return None
+        return self.inputs.experimental.sets[self.analysis.set_index].dataset
+
+    def _fill_result(self) -> None:
         self._close_registration()  # a proposal belongs to the result it was stated on
-        while self.result_layout.count():
-            widget = self.result_layout.takeAt(0).widget()
-            if widget is not None:
-                widget.setParent(None)
-                widget.deleteLater()
+        for layout in (self.project_layout, self.result_layout, self.registration_layout, self.comparison_layout,
+                       self.tables_layout):
+            while layout.count():
+                widget = layout.takeAt(0).widget()
+                if widget is not None:
+                    widget.setParent(None)
+                    widget.deleteLater()
         analysis = self.analysis
+        self.review_state = rv.ReviewState(analysis, *self._full_frequencies()) if analysis is not None else None
+        self.result_line.setText(f"{analysis.summary} The results are on the Review page." if analysis is not None else "")
+        self.result_line.setVisible(analysis is not None)
         for panel in self.shape_panels.values():
             panel.set_preview(None)
         for panel in self.saved_shapes.values():
@@ -812,7 +907,7 @@ class AnalyzePanel(QWidget):
         self.shapes.setVisible(analysis is not None)
         self.snapshot_label = self.source_label = self.check_button = None
         self.status_label = self.registration_label = self.warning_label = None
-        self.details = self.result_tabs = self.registration_button = self.proposal_label = None
+        self.details = self.result_tabs = self.comparison_tabs = self.registration_button = self.proposal_label = None
         self.open_confirmation_button = self.compare_button = None
         self.tables: dict = {}
         if analysis is None:
@@ -825,7 +920,7 @@ class AnalyzePanel(QWidget):
         self.result_tabs.setDocumentMode(True)
         tabs_card, tabs_inner = _card()
         tabs_inner.addWidget(self.result_tabs)
-        self.result_layout.addWidget(tabs_card)
+        self.tables_layout.addWidget(tabs_card)
         if analysis.comparison is not None:
             self._add_comparison(analysis.comparison)
         self._add_table("nearest", NEAREST_TITLE, am.NEAREST_HEADERS, analysis.nearest_rows, 9, SHAPE_HINT)
@@ -866,7 +961,9 @@ class AnalyzePanel(QWidget):
             inner.addWidget(self.warning_label)
         self.details = _Details(analysis.facts + (am.RIGID_NOTE,) + tuple(f"• {note}" for note in analysis.notes))
         inner.addWidget(self.details)
+        self.result_layout.addWidget(card)
         if analysis.comparison is None and not saved:
+            card, inner = _card()
             self.proposal_label = _label("", "warnings")
             self.proposal_label.setVisible(False)
             inner.addWidget(self.proposal_label)
@@ -883,9 +980,9 @@ class AnalyzePanel(QWidget):
             self.compare_button.setVisible(False)
             self.compare_button.clicked.connect(lambda: self.compare_confirmed())
             inner.addWidget(self.compare_button, 0, Qt.AlignmentFlag.AlignLeft)
-        self.result_layout.addWidget(card)
+            self.registration_layout.addWidget(card)
 
-    def _add_table(self, key: str, title: str, headers, rows, stretch: int, hint: str = "") -> None:
+    def _add_table(self, key: str, title: str, headers, rows, stretch: int, hint: str = "", tabs=None, above=None) -> None:
         page = QWidget()
         inner = QVBoxLayout(page)
         inner.setContentsMargins(0, 8, 0, 0)
@@ -893,25 +990,40 @@ class AnalyzePanel(QWidget):
         for text, name in ((title, "sectionTitle"), (hint, "hint")):
             if text:
                 inner.addWidget(_label(text, name))
-        table = _ResultTable(headers, rows, stretch)
+        if above is not None:
+            inner.addWidget(above)
+        table = _ResultTable(headers, tuple(tuple(str(cell).replace(sm.PROVISIONAL_TEXT, sm.FRF_PEAK_SHORT) for cell in row)
+                                            for row in rows), stretch)
+        for row, values in enumerate(rows):
+            for column, value in enumerate(values):  # a shortened cell keeps the whole wording in its tooltip
+                table.item(row, column).setToolTip(str(value))
         self.tables[key] = table
         inner.addWidget(table)
         inner.addStretch(1)
-        self.result_tabs.addTab(page, TAB_TITLES[key])
+        (tabs or self.result_tabs).addTab(page, TAB_TITLES[key])
 
     def _add_comparison(self, view) -> None:
+        self.comparison_tabs = QTabWidget()
+        self.comparison_tabs.setObjectName("macResults")
+        self.comparison_tabs.setDocumentMode(True)
+        card, inner = _card()
         pairs = tuple(tuple(row.cells[i] for i in am.PAIR_COLUMNS) for row in view.pair_rows)
         if pairs:
-            self._add_table("pairs", "", am.PAIR_HEADERS, pairs, 7, PAIR_HINT)
-            self.tables["pairs"].cellClicked.connect(lambda row, _column: self.show_pair(row))
+            self._add_table("pairs", "", am.PAIR_HEADERS, pairs, 7, PAIR_HINT, tabs=self.comparison_tabs)
+            self.tables["pairs"].cellClicked.connect(lambda row, _column: self._pair_clicked(row))
         else:
-            card, inner = _card()
             inner.addWidget(_label(cm.NO_PAIR_TEXT, "hint"))
-            self.result_layout.insertWidget(self.result_layout.count() - 1, card)
+        inner.addWidget(self.comparison_tabs)
+        self.comparison_layout.addWidget(card)
         if view.mac_cells:
             headers = ("FE \\ EXP",) + tuple(str(mode) for mode in view.mac_experimental_modes)
             rows = tuple((str(mode),) + tuple(cells) for mode, cells in zip(view.mac_fe_modes, view.mac_cells))
-            self._add_table("mac", "", headers, rows, 0)
+            picture = None
+            values = getattr(view, "mac_values", ())  # empty when the numbers were not kept: the table still shows the text
+            if isinstance(values, tuple) and values and len(values) == len(view.mac_fe_modes):
+                picture = ImageView()
+                picture.set_image(rv.mac_plot(view))
+            self._add_table("mac", "", headers, rows, 0, tabs=self.comparison_tabs, above=picture)
 
     # ---------------------------------------------------------------------------------------------- projects
 
@@ -1032,6 +1144,7 @@ class AnalyzePanel(QWidget):
             self.show_pair(0)
         elif self.analysis.nearest_rows:
             self.show_candidate(0)
+        self.analysis_ready.emit()
 
     def check_sources(self) -> bool:
         """Hash the source files now and show what was found; opening a project does not do this by itself."""
@@ -1110,7 +1223,7 @@ class AnalyzePanel(QWidget):
         row.addWidget(close)
         row.addStretch(1)
         inner.addLayout(row)
-        self.result_layout.addWidget(card)
+        self.project_layout.addWidget(card)
         self._show_snapshot_facts()
 
     def _show_snapshot_facts(self) -> None:
@@ -1133,9 +1246,10 @@ class AnalyzePanel(QWidget):
         room = sum(b.sizeHint().width() for b in buttons) + PROJECT_ROW_MARGIN
         self.project_row.setDirection(QBoxLayout.Direction.TopToBottom if event.size().width() <= room
                                       else QBoxLayout.Direction.LeftToRight)  # a narrow window never scrolls sideways
+
+    def fit_shapes(self, width: int) -> None:
         need = sum(panel.minimumSizeHint().width() for panel in self.shape_panels.values()) + 12
-        self.shapes_layout.setDirection(QBoxLayout.Direction.TopToBottom
-                                        if event.size().width() < max(SIDE_BY_SIDE_WIDTH, need)
+        self.shapes_layout.setDirection(QBoxLayout.Direction.TopToBottom if width < max(SIDE_BY_SIDE_WIDTH, need)
                                         else QBoxLayout.Direction.LeftToRight)
 
     def busy(self) -> bool:

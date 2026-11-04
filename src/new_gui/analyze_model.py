@@ -27,7 +27,7 @@ ODB's content (SHA-256) and the requested range, so the user never chooses a ``m
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Optional
@@ -357,6 +357,7 @@ class Analysis:
     registration_outcome: str = ""  # REFUSED, FAILED or PROVISIONAL; empty with a verified registration
     unavailable_fe: tuple = ()  # requested FE mode numbers the results do not hold
     experimental_total: int = 0  # records of the chosen set as read
+    comparison_result: Any = field(default=None, compare=False, repr=False)  # the comparator's own result; never saved
 
     @property
     def registration_note(self) -> str:
@@ -379,7 +380,7 @@ PAIR_HEADERS = tuple(cm.PAIR_HEADERS[i] for i in PAIR_COLUMNS)
 
 
 def _verified(inputs: Inputs, set_index: int, cancel_event) -> tuple:
-    """(comparison view or None, why not, outcome): a pair or a MAC exists only through both checks of the services."""
+    """(comparison outcome or None, why not, outcome): a pair or a MAC exists only through both checks of the services."""
     if rm.set_is_provisional(inputs.full_experimental, set_index):
         return None, cm.PROVISIONAL_BLOCK, PROVISIONAL
     check = rm.run_check(inputs.full_fe, inputs.full_experimental, set_index, 0, cancel_event)
@@ -393,7 +394,7 @@ def _verified(inputs: Inputs, set_index: int, cancel_event) -> tuple:
         raise StepCancelled()
     if compared.view is None:
         return None, compared.refusal or compared.error, REFUSED if compared.refusal else FAILED
-    return compared.view, "", ""
+    return compared, "", ""
 
 
 def _confirmed(inputs: Inputs, set_index: int, confirmation: dict, cancel_event) -> tuple:
@@ -405,7 +406,7 @@ def _confirmed(inputs: Inputs, set_index: int, confirmation: dict, cancel_event)
         raise StepCancelled()
     if compared.view is None:
         return None, compared.refusal or compared.error, NOT_CONFIRMED if compared.refusal else FAILED
-    return compared.view, "", ""
+    return compared, "", ""
 
 
 def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional[dict] = None) -> Analysis:
@@ -416,9 +417,10 @@ def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional
     if outcome.error:
         raise StepFailed(outcome.error)
     if confirmation is None:
-        comparison, reason, registration = _verified(inputs, set_index, cancel_event)
+        compared, reason, registration = _verified(inputs, set_index, cancel_event)
     else:
-        comparison, reason, registration = _confirmed(inputs, set_index, confirmation, cancel_event)
+        compared, reason, registration = _confirmed(inputs, set_index, confirmation, cancel_event)
+    comparison = compared.view if compared is not None else None
     view = outcome.view
     analyzed = inputs.experimental.sets[set_index]
     total = len(inputs.full_experimental.sets[set_index].records)
@@ -460,7 +462,8 @@ def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional
         if confirmation is not None and reason:
             notes += (reason,)
     return Analysis(status, statement, set_index, view.set_title, fe_rows, experimental, nearest, first_elastic,
-                    tuple(sorted(rigid)), tuple(facts), notes, comparison, reason, registration, unavailable, total)
+                    tuple(sorted(rigid)), tuple(facts), notes, comparison, reason, registration, unavailable, total,
+                    compared.result if compared is not None else None)
 
 
 __all__ = ["Analysis", "Inputs", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse", "consent_text",

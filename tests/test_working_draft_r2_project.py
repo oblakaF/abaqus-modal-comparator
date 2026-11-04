@@ -263,7 +263,7 @@ class SnapshotIsHistoricalTests(_Project):
         self.assertIn(analyze_panel.SNAPSHOT_BADGE, window.windowTitle())
         badges = [label.text() for label in again.findChildren(analyze_panel.QLabel) if label.objectName() == "badge"]
         self.assertIn(analyze_panel.SNAPSHOT_BADGE, badges)
-        self.assertIn("Nothing was recalculated", again.result_box.findChildren(analyze_panel.QLabel)[1].text())
+        self.assertIn("Nothing was recalculated", again.project_box.findChildren(analyze_panel.QLabel)[1].text())
         self.assertIn(self.project.name, again.snapshot_label.text())
 
     def test_a_snapshot_offers_no_registration_and_no_comparison(self):

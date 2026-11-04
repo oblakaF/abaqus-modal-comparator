@@ -24,6 +24,7 @@ from new_gui import shape_model as sm
 from new_gui.workspace_state import EXPERIMENTAL, FE, KIND_TITLE
 
 MAX_IMAGE_HEIGHT = 560  # logical pixels; a tall image is scaled down, never cut
+SCROLLBAR_ALLOWANCE = 24  # shrinking by this little keeps the height: see ImageView._fit
 
 
 def _label(text: str = "", name: str = "") -> QLabel:
@@ -37,8 +38,19 @@ def _label(text: str = "", name: str = "") -> QLabel:
     return label
 
 
+class ScrollSafeCombo(QComboBox):
+    """The wheel never changes a closed choice: it goes on to the page or table beneath (an open list scrolls itself)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def wheelEvent(self, event) -> None:
+        event.ignore()
+
+
 def _combo(name: str) -> QComboBox:
-    combo = QComboBox()
+    combo = ScrollSafeCombo()
     combo.setObjectName(name)
     combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
     combo.setMinimumContentsLength(14)  # a long mode name never widens the window
@@ -56,6 +68,8 @@ class ImageView(QLabel):
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setMinimumSize(1, 1)
         self.source: Optional[QPixmap] = None
+        self._fitting = False
+        self._fitted_width: Optional[int] = None
         self.setFixedHeight(0)
 
     def set_image(self, data: bytes) -> bool:
@@ -64,11 +78,13 @@ class ImageView(QLabel):
             self.clear_image()
             return False
         self.source = pixmap
+        self._fitted_width = None
         self._fit()
         return True
 
     def clear_image(self) -> None:
         self.source = None
+        self._fitted_width = None
         self.clear()
         self.setFixedHeight(0)
 
@@ -76,18 +92,29 @@ class ImageView(QLabel):
         if self.source is None or self.source.isNull():
             return
         width = max(1, self.width())
-        height = max(1, min(MAX_IMAGE_HEIGHT, round(width * self.source.height() / self.source.width())))
+        # In a scroll area the height decides the scroll bar, and the scroll bar decides the width. If the height followed
+        # every width, the bar would appear and vanish without end, inside one resize, until the stack overflows.
+        if self._fitted_width is None or width > self._fitted_width or self._fitted_width - width > SCROLLBAR_ALLOWANCE:
+            self._fitted_width = width
+            height = max(1, min(MAX_IMAGE_HEIGHT, round(width * self.source.height() / self.source.width())))
+        else:
+            height = max(1, self.height())
         ratio = self.devicePixelRatioF()
         scaled = self.source.scaled(round(width * ratio), round(height * ratio), Qt.AspectRatioMode.KeepAspectRatio,
                                     Qt.TransformationMode.SmoothTransformation)
         scaled.setDevicePixelRatio(ratio)
         self.setPixmap(scaled)
         if self.height() != height:
-            self.setFixedHeight(height)
+            self._fitting = True  # setFixedHeight resizes at once; the height follows the width, so no second fit is needed
+            try:
+                self.setFixedHeight(height)
+            finally:
+                self._fitting = False
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self._fit()
+        if not self._fitting:
+            self._fit()
 
 
 class _Bridge(QObject):
@@ -162,8 +189,16 @@ class ShapePanel(QFrame):
         layout.addWidget(self.caption)
         self.note = _label(sm.SHAPE_NOTE, "hint")
         layout.addWidget(self.note)
+        self.projection = _label(sm.PROJECTION_TEXT, "hint")
+        self.projection.setVisible(compact)
+        layout.addWidget(self.projection)
         self.details_toggle: Optional[QPushButton] = None
         if compact:
+            self.provisional.setText(sm.FRF_PEAK_SHORT)  # the page explains it once; the full wording is in the details
+            self.provisional.setToolTip(sm.PROVISIONAL_TEXT)
+            for combo in (self.set_combo, self.item_combo, self.component_combo):
+                if combo is not None:
+                    combo.activated.connect(lambda _row=0: self.show_shape())
             self.details_toggle = QPushButton("Show details")
             self.details_toggle.setObjectName("detailsToggle")
             self.details_toggle.setCheckable(True)
@@ -299,6 +334,9 @@ class ShapePanel(QFrame):
             facts = sm.record_facts(preview_set, index)
             warnings = sm.record_warnings(preview_set, index)
             provisional = sm.is_provisional(preview_set, index)
+            allowed = sm.record_components(preview_set, index)
+            for row, component in enumerate(sm.COMPONENTS):
+                self.component_combo.model().item(row).setEnabled(component in allowed)
         self.hint.setVisible(index is None)
         self.facts.setText("\n".join(facts))
         details = not self.compact or self.details_toggle.isChecked()
