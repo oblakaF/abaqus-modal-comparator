@@ -929,16 +929,19 @@ class MenuTests(_Project):
 
     def test_a_narrow_window_stacks_the_buttons_instead_of_scrolling(self):
         window = self.window()
+        """Whatever the platform's font: the row stacks when it would not fit, and returns when it does."""
         direction = analyze_panel.QBoxLayout.Direction
-        window.resize(700, 500)  # at 560 the earlier page already scrolls sideways under the offscreen font
+        panel = window.analyze
+        room = sum(b.sizeHint().width() for b in (panel.open_project_button, panel.save_project_button,
+                                                  panel.save_as_button)) + analyze_panel.PROJECT_ROW_MARGIN
+        for extra, expected in ((-20, direction.TopToBottom), (400, direction.LeftToRight)):
+            panel.resizeEvent(analyze_panel.QResizeEvent(analyze_panel.QSize(room + extra, 400), panel.size()))
+            self.assertEqual(panel.project_row.direction(), expected)
+        window.resize(pw.ProductionWindow.minimumWidth(window) + 2000, 800)
         for _ in range(5):
             self.app.processEvents()
+        self.assertEqual(panel.project_row.direction(), direction.LeftToRight)
         self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0)
-        self.assertEqual(window.analyze.project_row.direction(), direction.TopToBottom)
-        window.resize(1500, 800)
-        for _ in range(5):
-            self.app.processEvents()
-        self.assertEqual(window.analyze.project_row.direction(), direction.LeftToRight)
 
     def test_close_project_empties_the_page_and_keeps_the_file(self):
         _window, panel = self.analysed()

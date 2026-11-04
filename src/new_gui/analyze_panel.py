@@ -24,7 +24,8 @@ from pathlib import Path
 import threading
 from typing import Callable, Optional
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, QSize, Qt, Signal
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (QBoxLayout, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTabWidget,
                                QVBoxLayout, QWidget)
@@ -70,6 +71,7 @@ TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "nearest": "Nearest frequency
 BADGE_STATE = {cm.PAIRS_FOUND: "read"}  # any other status is not a verified pairing; a failed check is "blocked"
 _FIND, _EXTRACT, _READ, _ANALYSE, _CONFIRMATION = "find", "extract", "read", "analyse", "confirmation"
 _SAVE, _OPEN, _CHECK = "save", "open", "check"
+PROJECT_ROW_MARGIN = 80  # the card's margins, the spacing and a reserve: the row's width follows the platform's font
 OPEN_PROJECT, SAVE_PROJECT, SAVE_PROJECT_AS = "Open Project...", "Save Project", "Save Project As..."
 CHECK_SOURCES, CLOSE_PROJECT = "Check source files", "Close Project"
 PROJECT_FILTER = f"Modal Comparator project (*{ap.SUFFIX})"
@@ -1124,9 +1126,8 @@ class AnalyzePanel(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         buttons = (self.open_project_button, self.save_project_button, self.save_as_button)
-        margin = self.project_row.spacing() * 2 + 2 * 16 + 2  # between the buttons, and the card's own margins
-        self.project_row.setDirection(QBoxLayout.Direction.TopToBottom
-                                      if event.size().width() <= sum(b.sizeHint().width() for b in buttons) + margin
+        room = sum(b.sizeHint().width() for b in buttons) + PROJECT_ROW_MARGIN
+        self.project_row.setDirection(QBoxLayout.Direction.TopToBottom if event.size().width() <= room
                                       else QBoxLayout.Direction.LeftToRight)  # a narrow window never scrolls sideways
         need = sum(panel.minimumSizeHint().width() for panel in self.shape_panels.values()) + 12
         self.shapes_layout.setDirection(QBoxLayout.Direction.TopToBottom
