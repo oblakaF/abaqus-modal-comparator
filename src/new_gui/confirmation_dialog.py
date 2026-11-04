@@ -75,6 +75,7 @@ class ConfirmationDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(TITLE)
         self.inputs, self.set_index, self.draft_path, self.existing = inputs, set_index, draft_path, existing
+        self.saved_path, self._target = "", ""  # the file this dialog wrote, kept with a project as a reference
         self.document: Optional[dict] = existing
         self._token = 0
         self._cancel: Optional[threading.Event] = None
@@ -173,6 +174,7 @@ class ConfirmationDialog(QDialog):
         if not path:
             return False
         inputs, set_index, draft_path = self.inputs, self.set_index, self.draft_path
+        self._target = str(path)
         name, location, statements = self.name.text(), self.location.text(), tuple(self.boxes)
         self._token += 1
         self._cancel = threading.Event()
@@ -204,6 +206,7 @@ class ConfirmationDialog(QDialog):
             self._say(str(value), "error")
             return
         self.document = value
+        self.saved_path = self._target
         self._say("Saved. The confirmation records your statement; it is not proof of physical correctness.")
         self.confirmed.emit(value)
 

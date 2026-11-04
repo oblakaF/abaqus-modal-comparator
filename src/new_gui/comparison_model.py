@@ -413,6 +413,7 @@ class ComparisonView:
     target_counts: str
     limits: tuple = LIMITS
     auto_id_note: str = AUTO_ID_NOTE
+    mac_values: tuple = ()  # WORKING-DRAFT-R2: the same MAC matrix as numbers, None where not finite (kept in a project)
 
 
 def comparison_view(result, bound, fe_preview, experimental_preview, set_index: int) -> ComparisonView:
@@ -516,7 +517,8 @@ def comparison_view(result, bound, fe_preview, experimental_preview, set_index: 
         unmatched_experimental_rows=tuple((str(item["mode"]), _hz(item["frequency_hz"]))
                                           for item in metadata_fe.get("unmatched_experimental_candidates") or ()),
         unpaired_experimental=unpaired, rigid_rows=rigid_rows, close_groups=close_groups,
-        warnings=tuple(str(w) for w in result.warnings), provenance=tuple(facts), gates=gates, target_counts=target)
+        warnings=tuple(str(w) for w in result.warnings), provenance=tuple(facts), gates=gates, target_counts=target,
+        mac_values=tuple(tuple(float(value) if np.isfinite(value) else None for value in row) for row in matrix))
 
 
 def _float(value) -> str:

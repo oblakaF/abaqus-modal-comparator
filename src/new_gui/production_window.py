@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame, QHBoxLayout, 
                                QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget)
 
 from new_gui import APP_NAME
-from new_gui.analyze_panel import AnalyzePanel, SUBTITLE as ANALYZE_SUBTITLE
+from new_gui.analyze_panel import (AnalyzePanel, CLOSE_PROJECT, OPEN_PROJECT, RUNNING, SAVE_PROJECT, SAVE_PROJECT_AS,
+                                   SNAPSHOT_BADGE, SUBTITLE as ANALYZE_SUBTITLE)
 from new_gui.materials_status_panel import MaterialsStatusPanel, SUBTITLE as MATERIALS_SUBTITLE
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
@@ -67,6 +68,8 @@ class ProductionWindow(QMainWindow):
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()
+        self.analyze.changed.connect(self._project_changed)
+        self._project_changed()
         self.setMinimumSize(560, 420)
         self._fit_to_screen()
         self.show_page(ANALYZE_PAGE)
@@ -97,6 +100,20 @@ class ProductionWindow(QMainWindow):
 
     def _build_menu(self) -> None:
         menu = self.menuBar().addMenu("&File")
+        self.project_actions = {}
+        for key, text, shortcut, slot in (
+                ("open", OPEN_PROJECT, "Ctrl+O", lambda: self._project(self.analyze.open_project)),
+                ("save", SAVE_PROJECT, "Ctrl+S", lambda: self._project(self.analyze.save_project)),
+                ("save_as", SAVE_PROJECT_AS, "Ctrl+Shift+S",  # Windows has no standard key for Save As
+                 lambda: self._project(self.analyze.save_project_as)),
+                ("close", CLOSE_PROJECT, None, lambda: self._project(self.analyze.close_project))):
+            action = QAction(text, self)
+            if shortcut is not None:
+                action.setShortcut(QKeySequence(shortcut))
+            action.triggered.connect(slot)
+            menu.addAction(action)
+            self.project_actions[key] = action
+        menu.addSeparator()
         for text, shortcut, slot in (("Choose FE file...", "Ctrl+1", lambda: self._choose(FE)),
                                      ("Choose experimental file...", "Ctrl+2", lambda: self._choose(EXPERIMENTAL))):
             action = QAction(text, self)
@@ -120,6 +137,20 @@ class ProductionWindow(QMainWindow):
         free = screen.availableGeometry()
         self.resize(max(self.minimumWidth(), min(1180, int(free.width() * 0.9))),
                     max(self.minimumHeight(), min(800, int(free.height() * 0.9))))
+
+    def _project(self, command) -> None:
+        self.show_page(ANALYZE_PAGE)
+        command()
+
+    def _project_changed(self) -> None:
+        panel = self.analyze
+        for key in ("save", "save_as"):
+            self.project_actions[key].setEnabled(panel.can_save())
+        self.project_actions["open"].setEnabled(panel.state != RUNNING)
+        self.project_actions["close"].setEnabled(panel.state != RUNNING)
+        name = f"{panel.project_path.name} - " if panel.project_path else ""
+        saved = f"{SNAPSHOT_BADGE} - " if panel.snapshot is not None else ""
+        self.setWindowTitle(f"{saved}{name}{APP_NAME}")
 
     def _choose(self, kind: str) -> None:
         self.show_page(ANALYZE_PAGE)

@@ -11,10 +11,15 @@ analysis; the sources and the confirmation are checked again first. A confirmati
 
 UNIVERSAL-UI-2: compact progress, the result's scientific notes behind Show details, the tables on tabs. The status, the
 registration outcome and the number of warnings stay visible.
+
+WORKING-DRAFT-R2: Save Project and Open Project. An opened project is a saved snapshot: its tables and pictures come only
+from the file, no result can be recalculated from it, and the badge is never the verified one. Analyze stays blocked until
+Check source files finds the ODB and the experimental file with their saved content; it then gives a fresh result.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import threading
 from typing import Callable, Optional
@@ -29,7 +34,10 @@ from new_gui import comparison_model as cm
 from new_gui.diagnostic_model import NEAREST_TITLE
 from new_gui.confirmation_dialog import ConfirmationDialog, FILTER as CONFIRMATION_FILTER
 from new_gui.diagnostic_panel import DiagnosticTable
+from new_gui import project_model as pj
+from new_gui.project_panel import SavedShapePanel
 from new_gui.registration_dialog import RegistrationDialog
+from services import analysis_project as ap
 from services import confirmed_registration as cs
 from new_gui.shape_panel import ShapePanel
 from new_gui.workspace_state import EXPERIMENTAL, FE
@@ -61,6 +69,22 @@ TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "nearest": "Nearest frequency
               "experimental": "Experimental modes"}
 BADGE_STATE = {cm.PAIRS_FOUND: "read"}  # any other status is not a verified pairing; a failed check is "blocked"
 _FIND, _EXTRACT, _READ, _ANALYSE, _CONFIRMATION = "find", "extract", "read", "analyse", "confirmation"
+_SAVE, _OPEN, _CHECK = "save", "open", "check"
+OPEN_PROJECT, SAVE_PROJECT, SAVE_PROJECT_AS = "Open Project...", "Save Project", "Save Project As..."
+CHECK_SOURCES, CLOSE_PROJECT = "Check source files", "Close Project"
+PROJECT_FILTER = f"Modal Comparator project (*{ap.SUFFIX})"
+SNAPSHOT_BADGE = "SAVED SNAPSHOT"
+SNAPSHOT_TEXT = ("Saved results, shown from the project file. Nothing was recalculated, and the status below is the one "
+                 "found when the project was saved: it is not checked against the current files.")
+AS_SAVED = "When saved: "
+NOT_CHECKED_TEXT = "A new analysis is blocked until Check source files finds the saved content."
+SAME_CONTENT_TEXT = ("The ODB and the experimental file have the saved content. Click Analyze for a fresh result; the "
+                     "registration is checked again as in any analysis.")
+BLOCKED_TEXT = ("A new analysis stays blocked: the ODB and the experimental file must have the saved content. The saved "
+                "results stay readable. Use Choose file... if a file moved.")
+FRESH_TEXT = "Fresh analysis of the current files, not the saved snapshot of {saved}."
+REOPEN_TEXT = (" The saved project used the confirmation {path}. It is not applied by itself: use Open confirmation to "
+               "compare again.")
 
 
 def _label(text: str = "", name: str = "") -> QLabel:
@@ -156,6 +180,19 @@ class AnalyzePanel(QWidget):
         self.compare_button: Optional[QPushButton] = None
         self.result_tabs: Optional[QTabWidget] = None
         self.tables: dict = {}
+        self.snapshot: Optional[pj.Snapshot] = None  # an opened project: the page shows only what it holds
+        self.source_check: Optional[pj.SourceCheck] = None
+        self.project_path: Optional[Path] = None
+        self.registration_ref: Optional[pj.RegistrationReference] = None  # of the comparison shown
+        self.confirmation_ref: Optional[pj.RegistrationReference] = None  # of the confirmation ready to use
+        self._compared_with: Optional[pj.RegistrationReference] = None
+        self._opened_confirmation = ""
+        self._wanted_set_key: Optional[str] = None  # the saved choice of modal set, for a fresh analysis of a project
+        self._fresh_text, self._reopen_text = "", ""
+        self._state_before_project = IDLE
+        self.snapshot_label: Optional[QLabel] = None
+        self.source_label: Optional[QLabel] = None
+        self.check_button: Optional[QPushButton] = None
         self._token = 0
         self._cancel: Optional[threading.Event] = None
         self._threads: list[threading.Thread] = []
@@ -179,6 +216,9 @@ class AnalyzePanel(QWidget):
         self.shape_panels = {kind: ShapePanel(kind, compact=True) for kind in (EXPERIMENTAL, FE)}
         for panel in self.shape_panels.values():
             self.shapes_layout.addWidget(panel, 1, Qt.AlignmentFlag.AlignTop)
+        self.saved_shapes = {kind: SavedShapePanel(kind) for kind in (EXPERIMENTAL, FE)}
+        for panel in self.saved_shapes.values():
+            self.shapes_layout.addWidget(panel, 1, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.shapes)
         self.shapes.setVisible(False)
         self._refresh()
@@ -187,6 +227,20 @@ class AnalyzePanel(QWidget):
 
     def _build_inputs(self) -> QFrame:
         card, inner = _card()
+        project_row = QHBoxLayout()
+        self.open_project_button = QPushButton(OPEN_PROJECT)
+        self.open_project_button.setObjectName("projectOpen")
+        self.open_project_button.clicked.connect(lambda: self.open_project())
+        self.save_project_button = QPushButton(SAVE_PROJECT)
+        self.save_project_button.setObjectName("projectSave")
+        self.save_project_button.clicked.connect(lambda: self.save_project())
+        self.save_as_button = QPushButton(SAVE_PROJECT_AS)
+        self.save_as_button.setObjectName("projectSaveAs")
+        self.save_as_button.clicked.connect(lambda: self.save_project_as())
+        for button in (self.open_project_button, self.save_project_button, self.save_as_button):
+            project_row.addWidget(button)
+        project_row.addStretch(1)
+        inner.addLayout(project_row)
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(4)
@@ -295,13 +349,22 @@ class AnalyzePanel(QWidget):
         if problem:
             self._refresh()
             return problem
-        self.paths[kind] = Path(path).resolve()
-        self.fields[kind].setText(str(self.paths[kind]))
-        self.fields[kind].setToolTip(str(self.paths[kind]))
+        self._set_path(kind, Path(path).resolve())
+        if self.snapshot is not None:  # a moved source: accepted only if a check finds the saved content there
+            self.source_check = None
+            self._stop()
+            self.state = DONE
+            self.check_sources()
+            return ""
         if kind == FE:
             self.folder = None  # the extraction folder belongs to the ODB chosen
         self._reset()
         return ""
+
+    def _set_path(self, kind: str, path: Optional[Path]) -> None:
+        self.paths[kind] = path
+        self.fields[kind].setText(str(path) if path else "")
+        self.fields[kind].setToolTip(str(path) if path else "")
 
     def choose_launcher(self, path: Optional[str] = None) -> bool:
         path = path if path is not None else self._ask_launcher(self.launcher)
@@ -317,6 +380,9 @@ class AnalyzePanel(QWidget):
         if not path or not str(path).strip():
             return False
         self.folder = Path(path)
+        if self.snapshot is not None:
+            self.check_sources()
+            return True
         self._set_message(f"Extraction folder: {self.folder}. Click Analyze.", "hint")
         return True
 
@@ -349,6 +415,14 @@ class AnalyzePanel(QWidget):
 
     def _use_confirmation(self, document: dict) -> None:
         self.confirmation = document
+        view = self.confirmation_view
+        made = getattr(self.registration_dialog, "confirmation_dialog", None)
+        if view is not None and document is view.existing:
+            self.confirmation_ref = pj.RegistrationReference(document, self._opened_confirmation)
+        elif made is not None:
+            self.confirmation_ref = pj.RegistrationReference(document, made.saved_path, str(made.draft_path or ""))
+        else:
+            self.confirmation_ref = pj.RegistrationReference(document)
         if self.proposal_label is not None:
             self.proposal_label.setText(READY_TEXT)
             self.proposal_label.setVisible(True)
@@ -357,12 +431,13 @@ class AnalyzePanel(QWidget):
 
     def open_confirmation(self, path: Optional[str] = None) -> bool:
         """Check a saved confirmation against the current files and display it; it is used only on command."""
-        if self.analysis is None or self.state == RUNNING or self.analysis.comparison is not None:
+        if self.analysis is None or self.state == RUNNING or self.analysis.comparison is not None or self.inputs is None:
             return False
         if path is None:
             path, _filter = QFileDialog.getOpenFileName(self, OPEN_CONFIRMATION, "", CONFIRMATION_FILTER)
         if not path:
             return False
+        self._opened_confirmation = str(path)
         inputs, index = self.inputs, self.analysis.set_index
         self._stop()
         self._cancel = threading.Event()
@@ -400,9 +475,11 @@ class AnalyzePanel(QWidget):
 
     def compare_confirmed(self) -> bool:
         """The comparison with the confirmation, which is checked again first. Returns False when nothing started."""
-        if self.confirmation is None or self.analysis is None or self.state == RUNNING:
+        if self.confirmation is None or self.analysis is None or self.state == RUNNING or self.inputs is None:
             return False
         inputs, index, confirmation = self.inputs, self.analysis.set_index, self.confirmation
+        self._compared_with = self.confirmation_ref
+        self._reopen_text = ""
         self._stop()
         self._cancel = threading.Event()
         cancel = self._cancel
@@ -431,6 +508,9 @@ class AnalyzePanel(QWidget):
         self._stop()
         self.state, self.plan, self.inputs, self.analysis = IDLE, None, None, None
         self.confirmation = None
+        self.snapshot, self.source_check, self.project_path = None, None, None
+        self.registration_ref, self.confirmation_ref, self._compared_with = None, None, None
+        self._wanted_set_key, self._fresh_text, self._reopen_text = None, "", ""
         self.log.clear()
         self.set_combo.clear()
         self._set_message("", "hint")
@@ -465,9 +545,12 @@ class AnalyzePanel(QWidget):
                 self.file_error.setText(problem)
                 self._refresh()
                 return False
+        if self.snapshot is not None and not self._leave_snapshot():
+            return False
         self.file_error.setText("")
         self._stop()
         self.analysis, self.inputs, self.confirmation = None, None, None
+        self.registration_ref, self.confirmation_ref, self._compared_with = None, None, None
         self.log.clear()
         self._show_result()
         self.set_combo.clear()
@@ -529,6 +612,12 @@ class AnalyzePanel(QWidget):
             self.analysis = None  # for example a file changed: what was read no longer stands
             self._show_result()
             self._block(str(value))
+        elif step == _OPEN:
+            self._project_opened(value)
+        elif step == _SAVE:
+            self._project_saved(value)
+        elif step == _CHECK:
+            self._sources_checked(value)
         elif step == _CONFIRMATION:
             self._confirmation_opened(value)
         elif step == _FIND:
@@ -574,6 +663,11 @@ class AnalyzePanel(QWidget):
         for index, item in enumerate(sets):
             self.set_combo.addItem(item.title, index)
         self.state = NEED_SET
+        wanted, self._wanted_set_key = self._wanted_set_key, None
+        chosen = next((index for index, item in enumerate(sets) if str(item.key) == wanted), None)
+        if chosen is not None:  # the set the saved project names, by its identity; never a choice made from results
+            self.choose_set(chosen)
+            return
         self._set_message(f"This file holds {len(sets)} modal sets. Choose one to continue.", "hint")
         self._refresh()
 
@@ -595,6 +689,7 @@ class AnalyzePanel(QWidget):
 
     def _analyse(self, index: int) -> None:
         self.analysis = None
+        self._compared_with = None
         self._show_result()
         self.state = RUNNING
         self._set_message("Comparing frequencies and checking the registration...", "hint")
@@ -605,6 +700,8 @@ class AnalyzePanel(QWidget):
     def _analysed(self, analysis: am.Analysis) -> None:
         self.analysis = analysis
         self.confirmation = None  # every comparison asks for it again
+        self.registration_ref = self._compared_with if analysis.comparison is not None else None
+        self._compared_with = None
         self.state = DONE
         self._cancel = None
         self._set_message("", "hint")
@@ -640,6 +737,9 @@ class AnalyzePanel(QWidget):
         return self._draw_shapes(cells[3], cells[0])
 
     def _draw_shapes(self, experimental_number: str, fe_number: str) -> bool:
+        if self.snapshot is not None:  # the saved pictures; nothing is drawn or read
+            shown = self.saved_shapes[EXPERIMENTAL].show_number(experimental_number)
+            return self.saved_shapes[FE].show_number(fe_number) or shown
         experimental = self.shape_panels[EXPERIMENTAL]
         fe = self.shape_panels[FE]
         records = self.inputs.experimental.sets[self.analysis.set_index].records
@@ -667,7 +767,14 @@ class AnalyzePanel(QWidget):
     def _refresh(self) -> None:
         running = self.state == RUNNING
         ready = all(self.paths.values())
-        self.analyze_button.setEnabled(ready and not running)
+        check = self.source_check
+        allowed = self.snapshot is None or (check is not None and check.hashed and check.can_analyze)
+        self.analyze_button.setEnabled(ready and not running and allowed)
+        self.open_project_button.setEnabled(not running)
+        self.save_project_button.setEnabled(self.can_save())
+        self.save_as_button.setEnabled(self.can_save())
+        if self.check_button is not None:
+            self.check_button.setEnabled(not running)
         self.cancel_button.setVisible(running)
         self.file_error.setVisible(bool(self.file_error.text()))
         self.set_row.setVisible(self.set_combo.count() > 1)
@@ -681,7 +788,8 @@ class AnalyzePanel(QWidget):
         self.log_button.setVisible(has_log)
         self.log.setVisible(has_log and self.log_button.isChecked())
         self.launcher_button.setVisible(blocked and self.plan is not None and not self.plan.ready)
-        self.folder_button.setVisible(blocked)
+        package_lost = self.snapshot is not None and check is not None and check.hashed and check.manifest is None
+        self.folder_button.setVisible(blocked or package_lost)
         self.changed.emit()
 
     def _show_result(self) -> None:
@@ -694,13 +802,18 @@ class AnalyzePanel(QWidget):
         analysis = self.analysis
         for panel in self.shape_panels.values():
             panel.set_preview(None)
+        for panel in self.saved_shapes.values():
+            panel.set_entries((), {})
         self.shapes.setVisible(analysis is not None)
+        self.snapshot_label = self.source_label = self.check_button = None
         self.status_label = self.registration_label = self.warning_label = None
         self.details = self.result_tabs = self.registration_button = self.proposal_label = None
         self.open_confirmation_button = self.compare_button = None
         self.tables: dict = {}
         if analysis is None:
             return
+        if self.snapshot is not None:
+            self._add_snapshot_card()
         self._add_summary(analysis)
         self.result_tabs = QTabWidget()
         self.result_tabs.setObjectName("analyzeResults")
@@ -714,6 +827,11 @@ class AnalyzePanel(QWidget):
         self.tables["nearest"].cellClicked.connect(lambda row, _column: self.show_candidate(row))
         self._add_table("fe", "", am.FE_HEADERS, analysis.fe_rows, 2)
         self._add_table("experimental", "", am.EXPERIMENTAL_HEADERS, analysis.experimental_rows, 3)
+        if self.snapshot is not None:
+            shapes = self.snapshot.document["shapes"]
+            self.saved_shapes[EXPERIMENTAL].set_entries(shapes["experimental"], self.snapshot.images)
+            self.saved_shapes[FE].set_entries(shapes["fe"], self.snapshot.images)
+            return
         self.shape_panels[EXPERIMENTAL].set_preview(self.inputs.experimental)
         self.shape_panels[FE].set_preview(self.inputs.fe)
         for panel in self.shape_panels.values():
@@ -723,12 +841,16 @@ class AnalyzePanel(QWidget):
         """The status, the registration outcome and the warning count are always visible; the wording is behind Details."""
         card, inner = _card()
         failed = analysis.registration_outcome == am.FAILED
+        saved = self.snapshot is not None
         self.status_label = QLabel(analysis.status)
         self.status_label.setObjectName("badge")
-        self.status_label.setProperty("state", "blocked" if failed else BADGE_STATE.get(analysis.status, "chosen"))
+        self.status_label.setProperty("state", "blocked" if failed else "chosen" if saved
+                                      else BADGE_STATE.get(analysis.status, "chosen"))  # a saved status is never green
         self.status_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         inner.addWidget(self.status_label, 0, Qt.AlignmentFlag.AlignLeft)
-        inner.addWidget(_label(analysis.statement))
+        inner.addWidget(_label((AS_SAVED if saved else "") + analysis.statement))
+        if self._fresh_text:
+            inner.addWidget(_label(self._fresh_text + self._reopen_text, "hint"))
         if analysis.registration_note:
             self.registration_label = _label(analysis.registration_note, "error" if failed else "warnings")
             inner.addWidget(self.registration_label)
@@ -739,7 +861,7 @@ class AnalyzePanel(QWidget):
             inner.addWidget(self.warning_label)
         self.details = _Details(analysis.facts + (am.RIGID_NOTE,) + tuple(f"• {note}" for note in analysis.notes))
         inner.addWidget(self.details)
-        if analysis.comparison is None:
+        if analysis.comparison is None and not saved:
             self.proposal_label = _label("", "warnings")
             self.proposal_label.setVisible(False)
             inner.addWidget(self.proposal_label)
@@ -785,6 +907,218 @@ class AnalyzePanel(QWidget):
             headers = ("FE \\ EXP",) + tuple(str(mode) for mode in view.mac_experimental_modes)
             rows = tuple((str(mode),) + tuple(cells) for mode, cells in zip(view.mac_fe_modes, view.mac_cells))
             self._add_table("mac", "", headers, rows, 0)
+
+    # ---------------------------------------------------------------------------------------------- projects
+
+    def can_save(self) -> bool:
+        return (self.state == DONE and self.analysis is not None
+                and (self.snapshot is not None or self.inputs is not None))
+
+    def _project_step(self, step: str, text: str, work: Callable) -> None:
+        """A project step in a worker; a refusal comes back as a value, so the shown result is never lost to it."""
+        self._state_before_project = self.state
+        self._stop()
+        self._cancel = threading.Event()
+        cancel = self._cancel
+        self.state = RUNNING
+        self._set_message(text, "hint")
+        self._refresh()
+
+        def guarded(say):
+            try:
+                return work(cancel, say)
+            except am.StepCancelled:
+                raise
+            except ap.ProjectRefused as refusal:
+                return refusal
+            except Exception as error:  # noqa: BLE001  (a message, never a crash of the window)
+                return ap.ProjectRefused(ap.WRITE_FAILED, f"The project step could not be completed "
+                                                          f"({type(error).__name__}: {error}).")
+
+        self._run(step, guarded)
+
+    def save_project(self, path: Optional[str] = None) -> bool:
+        if not self.can_save():
+            return False
+        target = path or self.project_path
+        return self._start_save(target) if target else self.save_project_as()
+
+    def save_project_as(self, path: Optional[str] = None) -> bool:
+        if not self.can_save():
+            return False
+        if path is None:
+            odb = self.paths[FE]
+            start = str(self.project_path or (odb.with_suffix(ap.SUFFIX) if odb else f"analysis{ap.SUFFIX}"))
+            path, _filter = QFileDialog.getSaveFileName(self, SAVE_PROJECT_AS, start, PROJECT_FILTER)
+        if not path:
+            return False
+        path = Path(path)
+        return self._start_save(path if path.suffix else path.with_name(path.name + ap.SUFFIX))
+
+    def _start_save(self, target) -> bool:
+        analysis, inputs, odb, reference = self.analysis, self.inputs, self.paths[FE], self.registration_ref
+        snapshot, check = self.snapshot, self.source_check
+
+        def work(cancel, say):
+            if snapshot is not None:
+                return pj.save_snapshot(snapshot, check, target, cancel)
+            return pj.save_analysis(analysis, inputs, odb, reference, target, cancel, say)
+
+        self._project_step(_SAVE, "Saving the project: drawing the shapes, then writing the file...", work)
+        return True
+
+    def _project_saved(self, value) -> None:
+        self.state = DONE
+        self._cancel = None
+        if isinstance(value, ap.ProjectRefused):
+            self._set_message(f"Project not saved: {value}", "error")
+            self._refresh()
+            return
+        self.project_path = Path(value)
+        if self.snapshot is not None:
+            self.snapshot = replace(self.snapshot, path=self.project_path,
+                                    document=pj.relocated_document(self.snapshot.document, self.source_check))
+            self._show_snapshot_facts()
+        size = self.project_path.stat().st_size / 2 ** 20
+        self._set_message(f"Project saved: {self.project_path} ({size:.1f} MB). The source files are not in it.", "hint")
+        self._refresh()
+
+    def open_project(self, path: Optional[str] = None) -> bool:
+        """Show a saved project; nothing is read but the project, and no comparison or Abaqus starts."""
+        if self.state == RUNNING:
+            return False
+        if path is None:
+            path, _filter = QFileDialog.getOpenFileName(self, OPEN_PROJECT, str(self.project_path or ""), PROJECT_FILTER)
+        if not path:
+            return False
+
+        def work(_cancel, _say):
+            snapshot = pj.open_project(path)
+            return snapshot, pj.quick_look(snapshot.document)
+
+        self._project_step(_OPEN, "Opening the project...", work)
+        return True
+
+    def _project_opened(self, value) -> None:
+        self._cancel = None
+        if isinstance(value, ap.ProjectRefused):
+            self.state = self._state_before_project  # what was shown stays
+            self._set_message(f"Project not opened: {value}", "error")
+            self._refresh()
+            return
+        snapshot, check = value
+        self.snapshot, self.source_check, self.project_path = snapshot, check, snapshot.path
+        self.inputs, self.plan, self.confirmation, self.folder = None, None, None, None
+        self.registration_ref, self.confirmation_ref, self._compared_with = None, None, None
+        self._wanted_set_key, self._fresh_text, self._reopen_text = None, "", ""
+        self.analysis = snapshot.analysis
+        self.state = DONE
+        self.log.clear()
+        self.set_combo.clear()
+        self.file_error.setText("")
+        sources = snapshot.document["sources"]
+        self._set_path(FE, Path(sources["fe_odb"]["path"]))
+        self._set_path(EXPERIMENTAL, Path(sources["experimental"]["path"]))
+        self._set_message("", "hint")
+        self._show_result()
+        self._refresh()
+        pairs = self.analysis.comparison.pair_rows if self.analysis.comparison is not None else ()
+        if pairs:
+            self.show_pair(0)
+        elif self.analysis.nearest_rows:
+            self.show_candidate(0)
+
+    def check_sources(self) -> bool:
+        """Hash the source files now and show what was found; opening a project does not do this by itself."""
+        if self.snapshot is None or self.state == RUNNING:
+            return False
+        document, odb, experimental, folder = self.snapshot.document, self.paths[FE], self.paths[EXPERIMENTAL], self.folder
+
+        def work(cancel, say):
+            return pj.check_sources(document, odb, experimental, folder, cancel, say)
+
+        self._project_step(_CHECK, "Checking the source files (hashing them can take a while)...", work)
+        return True
+
+    def _sources_checked(self, value) -> None:
+        self.state = DONE
+        self._cancel = None
+        if isinstance(value, ap.ProjectRefused):
+            self._set_message(f"Sources not checked: {value}", "error")
+            self._refresh()
+            return
+        self.source_check = value
+        if value.extraction_folder is not None:
+            self.folder = value.extraction_folder
+        self._show_snapshot_facts()
+        self._set_message(SAME_CONTENT_TEXT if value.can_analyze else BLOCKED_TEXT, "hint" if value.can_analyze else "error")
+        self._refresh()
+
+    def close_project(self) -> bool:
+        """Leave what is shown: an empty page, with the saved file untouched."""
+        if self.state == RUNNING:
+            return False
+        self._set_path(FE, None)
+        self._set_path(EXPERIMENTAL, None)
+        self.folder = None
+        self.file_error.setText("")
+        self._reset()
+        return True
+
+    def _leave_snapshot(self) -> bool:
+        """Only with the saved content confirmed; the fresh result then owes nothing to the project."""
+        check = self.source_check
+        if check is None or not check.hashed or not check.can_analyze:
+            self._set_message(NOT_CHECKED_TEXT, "error")
+            self._refresh()
+            return False
+        document = self.snapshot.document
+        self._wanted_set_key = document["modal_set"]["key"]
+        self._fresh_text = FRESH_TEXT.format(saved=document["saved_at"])
+        path = document["registration"]["confirmation_path"]
+        if document["registration"]["kind"] == ap.KIND_CONFIRMED and path:
+            self._reopen_text = REOPEN_TEXT.format(path=path)
+        self.snapshot, self.source_check, self.project_path = None, None, None
+        return True
+
+    def _add_snapshot_card(self) -> None:
+        card, inner = _card()
+        badge = QLabel(SNAPSHOT_BADGE)
+        badge.setObjectName("badge")
+        badge.setProperty("state", "chosen")
+        inner.addWidget(badge, 0, Qt.AlignmentFlag.AlignLeft)
+        inner.addWidget(_label(SNAPSHOT_TEXT))
+        self.snapshot_label = _label("", "hint")
+        inner.addWidget(self.snapshot_label)
+        self.source_label = _label("", "hint")
+        inner.addWidget(self.source_label)
+        row = QHBoxLayout()
+        self.check_button = QPushButton(CHECK_SOURCES)
+        self.check_button.setObjectName("projectCheckSources")
+        self.check_button.clicked.connect(lambda: self.check_sources())
+        row.addWidget(self.check_button)
+        close = QPushButton(CLOSE_PROJECT)
+        close.setObjectName("projectClose")
+        close.clicked.connect(lambda: self.close_project())
+        row.addWidget(close)
+        row.addStretch(1)
+        inner.addLayout(row)
+        self.result_layout.addWidget(card)
+        self._show_snapshot_facts()
+
+    def _show_snapshot_facts(self) -> None:
+        if self.snapshot is None or self.snapshot_label is None:
+            return
+        document = self.snapshot.document
+        registration = document["registration"]
+        lines = [f"Project: {self.snapshot.path}", f"Saved: {document['saved_at']}",
+                 f"Modal set: {document['modal_set']['title']}", f"Registration when saved: {registration['kind']}"]
+        if registration["kind"] == ap.KIND_CONFIRMED:
+            lines.append(f"Confirmed by {registration['confirmed_by']} on {registration['confirmed_at']}; this records "
+                         "a statement, not proof of physical correctness.")
+        self.snapshot_label.setText("\n".join(lines))
+        rows = self.source_check.rows if self.source_check is not None else ()
+        self.source_label.setText("\n".join(row.text for row in rows))
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
