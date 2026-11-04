@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPushButton,
                                QScrollArea, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
@@ -137,7 +137,8 @@ class ReviewPanel(QWidget):
         inner.addWidget(self.selection_label)
         inner.addWidget(self.analyze.shapes)
         inner.addStretch(1)
-        self.views.addTab(_scrolled(shapes), TAB_SHAPES)
+        self.shapes_area = _scrolled(shapes)
+        self.views.addTab(self.shapes_area, TAB_SHAPES)
         plots = QWidget()
         inner = QVBoxLayout(plots)
         inner.setContentsMargins(0, 8, 0, 0)
@@ -253,7 +254,11 @@ class ReviewPanel(QWidget):
         self._draw_plots()
 
     def _ready(self) -> None:
-        """Mark the row of what the panel has just drawn (the first pair, or else row 1), without drawing it again."""
+        """A new result opens on Mode shapes, at the top. The row of what the panel has just drawn (the first pair, or else
+        row 1) is marked without drawing it again."""
+        self.views.setCurrentWidget(self.shapes_area)
+        self._shapes_to_top()
+        QTimer.singleShot(0, self._shapes_to_top)  # after the window has shown the page and moved the keyboard focus
         if self.state is None or not len(self.state):
             return
         view = self.analyze.analysis.comparison
@@ -353,6 +358,11 @@ class ReviewPanel(QWidget):
         return {swap: SWAP, keep: KEEP}.get(box.clickedButton(), CANCEL)
 
     # ---------------------------------------------------------------------------------------------- display
+
+    def _shapes_to_top(self) -> None:
+        """Only for a new result: Analyze going disabled moves the focus into this pane, and Qt scrolls to the focused widget."""
+        self.table.setFocus()
+        self.shapes_area.verticalScrollBar().setValue(0)
 
     def _shapes_shown(self, text: str) -> None:
         self.selection_label.setText(text)

@@ -263,6 +263,7 @@ class ShapePanel(QFrame):
             self._build_view_row(layout, grid)
         self.details_toggle: Optional[QPushButton] = None
         if compact:
+            self.show_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # disabled during each redraw: a focused one would scroll the pane
             self.provisional.setText(sm.FRF_PEAK_SHORT)  # the page explains it once; the full wording is in the details
             self.provisional.setToolTip(sm.PROVISIONAL_TEXT)
             for combo in (self.set_combo, self.item_combo, self.component_combo):

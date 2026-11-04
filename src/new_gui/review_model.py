@@ -48,6 +48,7 @@ SESSION_ONLY_TEXT = "Manual choices are kept for this session only: they are not
 _DASH = "—"
 _INK, _MUTED, _GRID = "#3e4c59", "#52606d", "#e4e7eb"
 _AUTOMATIC, _MANUAL = "#2563eb", "#b45309"
+LABEL_SPACING_POINTS = 11.0  # the width of one vertical FRF label, its bold form included
 
 
 class DuplicateSelection(ValueError):
@@ -275,10 +276,35 @@ def frf_series(dataset) -> Optional[tuple]:
     return frequency, indicator, coherence if len(coherence) == len(frequency) else None
 
 
-def frf_plot(series: tuple, records=(), current: Optional[int] = None, provisional: bool = False) -> bytes:
+def spread_labels(positions, gap: float, low: float, high: float) -> list:
+    """Label places in the order of ``positions``, at least ``gap`` apart and as near their positions as that allows.
+
+    Only where a label is written: a marker stays at its own frequency, and a leader joins the two."""
+    count = len(positions)
+    if not count:
+        return []
+    order = sorted(range(count), key=lambda i: positions[i])
+    gap = min(gap, (high - low) / max(1, count - 1))
+    # with s = place - rank * gap, keeping the gaps is keeping s in order: the closest such s is a pooled running mean
+    pools: list = []
+    for rank, index in enumerate(order):
+        pools.append([positions[index] - rank * gap, 1])
+        while len(pools) > 1 and pools[-2][0] > pools[-1][0]:
+            value, size = pools.pop()
+            pools[-1] = [(pools[-1][0] * pools[-1][1] + value * size) / (pools[-1][1] + size), pools[-1][1] + size]
+    shifted = [value for value, size in pools for _ in range(size)]
+    shifted = [min(max(value, low), high - (count - 1) * gap) for value in shifted]
+    places = [0.0] * count
+    for rank, index in enumerate(order):
+        places[index] = shifted[rank] + rank * gap
+    return places
+
+
+def frf_figure(series: tuple, records=(), current: Optional[int] = None, provisional: bool = False) -> Figure:
     """The imported FRF indicator, with the set's records marked at their frequencies; coherence, when read, below.
 
-    ``records`` are (name, Hz). FRF peak records are triangles on the curve; fitted modes are dashed lines, never peaks."""
+    ``records`` are (name, Hz). FRF peak records are triangles on the curve; fitted modes are dashed lines, never peaks.
+    Labels of close records are spread apart; the marks stay at the records' frequencies."""
     frequency, indicator, coherence = series
     figure = _figure((9.0, 4.8) if coherence is not None else (9.0, 3.6))
     if coherence is not None:
@@ -287,7 +313,6 @@ def frf_plot(series: tuple, records=(), current: Optional[int] = None, provision
         axis, lower = figure.add_subplot(111), None
     curve = np.maximum(indicator / max(float(np.max(indicator)), 1.0e-30), 1.0e-12)
     axis.semilogy(frequency, curve, color=_AUTOMATIC, linewidth=1.2, label="Imported FRF indicator")
-    transform = axis.get_xaxis_transform()
     kind = LABEL_FRF_PEAK if provisional else LABEL_FITTED
     for index, (name, hz) in enumerate(records):
         selected = index == current
@@ -298,17 +323,31 @@ def frf_plot(series: tuple, records=(), current: Optional[int] = None, provision
             axis.scatter([hz], [y], marker="v", s=70 if selected else 30, c=colour, zorder=4, label=label)
         else:
             axis.axvline(hz, color=colour, linewidth=width, linestyle="--", zorder=2, label=label)
-        axis.text(hz, 1.01, f"{name}  {hz:.1f} Hz", transform=transform, rotation=90, ha="center", va="bottom", fontsize=7,
-                  color=_INK if selected else _MUTED, weight="bold" if selected else "normal")
     if current is not None and 0 <= current < len(records):
         axis.axvline(records[current][1], color=_MANUAL, linewidth=1.8, zorder=3, label=LABEL_SELECTED_RECORD)
     _style(axis, "" if lower is not None else "Frequency (Hz)", "Normalized indicator", "")
     axis.legend(fontsize=7, frameon=False, loc="lower right")
+    low, high = axis.get_xlim()
+    axis.set_xlim(low, high)  # the labels are placed for this range
+    room = axis.get_position().width * figure.get_figwidth() * 72.0
+    places = spread_labels([hz for _name, hz in records], LABEL_SPACING_POINTS / room * (high - low), low, high)
+    transform = axis.get_xaxis_transform()
+    for index, ((name, hz), place) in enumerate(zip(records, places)):
+        selected = index == current
+        axis.annotate(f"{name}  {hz:.1f} Hz", xy=(hz, 1.0), xycoords=transform, xytext=(place, 1.07), textcoords=transform,
+                      rotation=90, ha="center", va="bottom", fontsize=7, color=_INK if selected else _MUTED,
+                      weight="bold" if selected else "normal", annotation_clip=False,
+                      arrowprops={"arrowstyle": "-", "color": _MANUAL if selected else _MUTED, "linewidth": 0.6,
+                                  "shrinkA": 0, "shrinkB": 0})
     if lower is not None:
         lower.plot(frequency, coherence, color=_AUTOMATIC, linewidth=1.0)
         lower.set_ylim(0.0, 1.05)
         _style(lower, "Frequency (Hz)", "Mean coherence", "")
-    return _png(figure)
+    return figure
+
+
+def frf_plot(series: tuple, records=(), current: Optional[int] = None, provisional: bool = False) -> bytes:
+    return _png(frf_figure(series, records, current, provisional))
 
 
 def frf_missing(dataset, saved: bool) -> str:

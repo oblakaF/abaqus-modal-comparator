@@ -162,6 +162,51 @@ class FrfTests(unittest.TestCase):
         self.assertNotEqual(peaks, rv.frf_plot((frequency, indicator, coherence), records, 0, False))
         self.assertTrue(rv.frf_plot((frequency, indicator, None)).startswith(b"\x89PNG"))
 
+    def test_spread_labels_keep_their_order_and_gap_and_stay_near(self):
+        positions = [10.0, 10.5, 11.0, 50.0, 100.0]
+        places = rv.spread_labels(positions, 4.0, 0.0, 120.0)
+        self.assertEqual(places, sorted(places))
+        self.assertTrue(all(b - a >= 4.0 - 1e-9 for a, b in zip(places, places[1:])))
+        self.assertEqual(places[3:], [50.0, 100.0])  # a label with room stays at its record
+        self.assertAlmostEqual(places[1], 10.5)
+        self.assertEqual(rv.spread_labels([], 4.0, 0.0, 1.0), [])
+
+    def test_spread_labels_stay_inside_the_axis_in_input_order(self):
+        places = rv.spread_labels([9.9, 0.1, 10.0, 0.0], 3.0, 0.0, 10.0)
+        self.assertTrue(all(0.0 <= place <= 10.0 for place in places))
+        self.assertLess(places[3], places[1])
+        self.assertLess(places[0], places[2])
+        ordered = sorted(places)
+        self.assertTrue(all(b - a >= 3.0 - 1e-9 for a, b in zip(ordered, ordered[1:])))
+
+    def test_close_frf_labels_do_not_overlap_and_the_data_stay_as_read(self):
+        # the frequencies of the real file where the labels ran together
+        hz = (8.75, 15.3125, 33.4375, 55.3125, 68.125, 71.875, 116.9, 144.7, 149.1, 158.8, 169.4, 180.9, 200.6, 213.4, 275.9,
+              282.5, 294.7, 318.4, 326.2, 333.8)
+        frequency = np.linspace(0.0, 400.0, 1601)
+        indicator = 1.0 + np.sin(frequency / 7.0) ** 2
+        coherence = np.full_like(frequency, 0.9)
+        records = tuple((f"EXP {i + 1}", value) for i, value in enumerate(hz))
+        kept = indicator.copy()
+        figure = rv.frf_figure((frequency, indicator, coherence), records, 5, True)
+        figure.canvas.draw()
+        renderer = figure.canvas.get_renderer()
+        axis = figure.axes[0]
+        labels = axis.texts
+        self.assertEqual([t.get_text() for t in labels], [f"{name}  {value:.1f} Hz" for name, value in records])
+        boxes = sorted((t.get_window_extent(renderer) for t in labels), key=lambda box: box.x0)
+        for left, right in zip(boxes, boxes[1:]):
+            self.assertLessEqual(left.x1, right.x0 + 0.5)
+        self.assertEqual(labels[5].get_weight(), "bold")
+        for label, value in zip(labels, hz):
+            self.assertEqual(label.xy[0], value)  # each leader ends at the record's own frequency
+        self.assertEqual([round(float(c.get_offsets()[0][0]), 6) for c in axis.collections], [round(v, 6) for v in hz])
+        curve = axis.lines[0]
+        np.testing.assert_array_equal(curve.get_xdata(), frequency)
+        np.testing.assert_array_almost_equal(curve.get_ydata(), indicator / indicator.max())
+        np.testing.assert_array_equal(figure.axes[1].lines[0].get_ydata(), coherence)
+        np.testing.assert_array_equal(indicator, kept)
+
     def test_what_is_missing_is_named(self):
         self.assertEqual(rv.frf_missing(None, True), rv.FRF_NEEDS_SOURCE)
         self.assertEqual(rv.frf_missing(ModalDataset("EXP", Path("x"), [], metadata={"dataset_types": [15, 55]}), False), rv.FRF_NOT_IN_FILE)
@@ -476,6 +521,36 @@ class ReviewPageTests(_Flow):
         wheel(plain)
         self.assertEqual(plain.currentIndex(), 0)
 
+    def test_a_new_result_opens_mode_shapes_at_the_top_and_a_redraw_keeps_the_scroll(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        window.resize(1180, 620)
+        review = window.review
+        self.app.processEvents()
+        bar = review.shapes_area.verticalScrollBar()
+        self.assertGreater(bar.maximum(), 0)
+        bar.setValue(bar.maximum())
+        review.views.setCurrentIndex(1)
+        self.run_analysis(panel)  # a new result
+        self.wait(panel)
+        self.app.processEvents()
+        self.assertIs(review.views.currentWidget(), review.shapes_area)
+        self.assertEqual(bar.value(), 0)
+        self.assertTrue(review.shapes_area.widget().isAncestorOf(panel.shape_panels[FE].view_combo))
+        bar.setValue(min(120, bar.maximum()))
+        kept = bar.value()
+        self.assertGreater(kept, 0)
+        review.show_row(1)  # ordinary redraws
+        self.wait(panel)
+        panel.shape_panels[FE].show_shape()
+        self.wait(panel)
+        self.app.processEvents()
+        self.assertEqual(bar.value(), kept)
+
+    def test_a_focused_show_button_is_not_possible_so_a_redraw_cannot_move_the_pane(self):
+        window, panel = self.analysed()
+        self.assertEqual(panel.shape_panels[FE].show_button.focusPolicy(), Qt.FocusPolicy.NoFocus)
+
     def test_the_shape_view_can_be_chosen_and_redraws(self):
         window, panel = self.analysed()
         self.wait(panel)
@@ -730,6 +805,15 @@ class SavedResultTests(_Flow):
         self.assertEqual(window.review.state.row(current).exp_mode, pair[3])
         self.assertEqual([i.row() for i in window.review.table.selectionModel().selectedRows()], [current])
         self.assertIn(f"EXP {pair[3]} and FE {pair[0]}", window.review.selection_label.text())
+
+    def test_an_opened_result_also_starts_at_the_top_of_mode_shapes(self):
+        _window, panel = self.analysed()
+        self.wait(panel)
+        self.saved(panel)
+        window, _again = self.reopened()
+        self.app.processEvents()
+        self.assertIs(window.review.views.currentWidget(), window.review.shapes_area)
+        self.assertEqual(window.review.shapes_area.verticalScrollBar().value(), 0)
 
     def test_old_project_files_still_open_and_the_format_is_unchanged(self):
         self.assertEqual(ap.SCHEMA, "universal/analysis-project/v1")

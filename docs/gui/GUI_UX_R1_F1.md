@@ -61,10 +61,23 @@ New project saves draw on source axes. The project format is unchanged.
 - Pictures inside old projects are not redrawn.
 - The wheel filter covers the program's window and its dialogs, not the research window.
 
-## Known defects found in the final visible run, not corrected
+## GUI-UX-R1-F2: the two defects of the F1 visible run
 
-Correcting them needs code changes, and the task's testing budget and single visible run were already used.
+- **Mode shapes open scrolled down: corrected.** The cause was focus. Analyze going disabled moved the keyboard focus into the pane,
+  and Qt scrolled to the focused widget. A new analysis or opened project now selects Mode shapes at the top and gives the table
+  the focus. The Show shape button takes no focus, because it is disabled during each redraw. Ordinary redraws keep the scroll.
+- **FRF labels overlapping: corrected.** Close labels are spread apart at no less than one label's width, with a thin leader to the
+  record's own frequency. Only the label moves: peak marks, frequencies, FRF values and coherence are unchanged. The selected
+  record's label stays bold.
 
-- **Mode shapes open scrolled down.** After an analysis the pane starts about 182 pixels down, so View, Rotate and Mirror are above
-  the visible part until the user scrolls up.
-- **FRF labels overlap** where two peaks are very close, such as EXP 5 and EXP 6, or EXP 8 and EXP 9.
+### What was checked
+
+Automated, one completed run on the final code: 18 tests, OK, 90 s. They cover both corrections and the regression interrupted in F1
+(`SaveAndReopenTests`).
+
+The visible run confirmed both corrections on real data: the top of Mode shapes on a fresh result and on an opened project, and
+separated FRF labels with EXP 5 selected.
+
+**Not verified in that run, because of errors in the driving script:** a real click on Swap, operating View, Rotate and Mirror, the
+wheel over an in-table mode selector, and scroll kept after a redraw. Offscreen tests cover Swap and the scroll, and the wheel filter
+through a sent event; these are not visible checks. Rotate was exercised offscreen in the F1 tests, not re-run in F2.
