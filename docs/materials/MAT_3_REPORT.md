@@ -218,4 +218,22 @@ Outside the repository, in `D:\git\abaqus-modal-comparator-work\research\MAT_3\`
 
 ## Final SHA and CI
 
-Recorded after the push of the implementation commit.
+**Implementation commit:** `52e296ca196539c30c9db3bd87792a27f5bcad91`, parent `7f2cd3733b5e68fa5536d20a21336f6764ba2124`. A later commit
+that changes only this section is the branch head. Its SHA and CI state are given in the hand-over, since a file cannot name the
+commit that contains it.
+
+**CI of the implementation commit:** [run 41979866942](https://github.com/oblakaF/abaqus-modal-comparator/actions/runs/41979866942),
+**completed, failure**, on Linux with Python 3.11.
+
+| Step | Result |
+|---|---|
+| Run unit tests | failure, exit code 1 |
+| Qt tests offscreen | failure, exit code 134 |
+| M11 research synthetic tests | success, 29 tests, 2 skipped on that platform |
+
+The same two steps failed at the base commit `7f2cd37` and before MAT code existed. **CI is not green, and this does not show that
+MAT-3 added no failure.** The job log returns HTTP 403 without authentication and no token was read, so the individual failures
+were not seen. `test_mat3_materials_study` has not been confirmed on Linux.
+
+**Older GUI defects:** the failing tests at this commit could not be listed for the same reason. The one seen locally is the
+`test_new_gui1_workspace` file-list test above. None was repaired.
