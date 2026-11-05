@@ -245,12 +245,17 @@ def mode_55_4(number, frequency, ambiguous=False):
 class ShapeViewServiceTests(_Folder):
     """APP-DATA.4: one record of one set drawn on its own measured points by services.modal_data_viewer."""
 
-    def drawn(self, preview_set, index, component):
+    def drawn(self, preview_set, index, component, display=None):
         """The view, and the one-mode dataset handed to the main window's viewer (render_viewer_mode)."""
         with mock.patch.object(viewer, "render_viewer_mode", wraps=viewer.render_viewer_mode) as render:
-            view = preview_service.render_record_shape(preview_set, index, component, self.folder / "views")
-        (dataset, role, number, drawn_component, _directory), _ = render.call_args
+            view = preview_service.render_record_shape(preview_set, index, component, self.folder / "views",
+                                                       display=display)
+        render.assert_called_once()
+        (dataset, role, number, drawn_component, directory, drawn_display), options = render.call_args
+        self.assertEqual(options, {})
         self.assertEqual((role, drawn_component), (viewer.EXPERIMENTAL, component))
+        self.assertEqual(directory, self.folder / "views")
+        self.assertIs(drawn_display, display)  # the chosen layout reaches the viewer as it is, or none at all
         mode, = dataset.modes
         self.assertEqual(number, mode.number)
         self.assertTrue(view.image_path.is_file())
@@ -282,6 +287,17 @@ class ShapeViewServiceTests(_Folder):
             self.assertIn(f"Record {record_index + 1} of {chosen.title}", view.lines[1])
             self.assertIn(chosen.display_name, view.lines[0])  # the set's own name, never another set's
         self.assertEqual(fingerprint(unv), before)
+
+    def test_a_rotated_or_mirrored_view_changes_the_picture_and_no_data(self):
+        preview = preview_service.preview_experimental_file(S.write_experiment(self.folder / "view.unv", S.E0, S.G0))
+        chosen = preview.sets[0]
+        plain, plain_mode = self.drawn(chosen, 1, "normal")
+        plain_picture = plain.image_path.read_bytes()
+        turned, turned_mode = self.drawn(chosen, 1, "normal", viewer.DisplayView(rotation=90, mirror=True))
+        self.assertNotEqual(turned.image_path.read_bytes(), plain_picture)
+        self.assert_same_record(turned_mode, plain_mode)
+        self.assertEqual((turned.index, turned.record, turned.component, turned.points_shown, turned.lines),
+                         (plain.index, plain.record, plain.component, plain.points_shown, plain.lines))
 
     def test_components_that_are_not_measured_are_refused_and_never_created(self):
         preview = preview_service.preview_experimental_file(S.write_experiment(self.folder / "z.unv", S.E0, S.G0))

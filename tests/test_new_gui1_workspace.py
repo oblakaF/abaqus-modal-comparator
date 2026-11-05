@@ -345,19 +345,44 @@ class SeparationTests(unittest.TestCase):
     # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
     SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
                                                   "numpy"},
-                          "report_export.py": {"reporting"}}
+                          "report_export.py": {"reporting"},
+                          # GUI-UX-R1: drawing of already loaded values; display scaling of a saved pair, no comparison
+                          "review_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure",
+                                              "matplotlib.patches", "numpy"},
+                          "mac_points_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure", "numpy",
+                                                  "modal_scaling"},
+                          # MAT-3: the one adapter over the shared inverse workflow, for synthetic studies only
+                          "materials_study_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure", "numpy",
+                                                       "scipy", "domain.plate_inverse_problem",
+                                                       "domain.plate_material_problem",
+                                                       "services.matrix_model_service",
+                                                       "services.plate_forward_adapter",
+                                                       "services.plate_material_workflow",
+                                                       "services.plate_ritz_forward"},
+                          "materials_study_panel.py": {"domain.plate_material_problem"}}
+    # "from services import x" passes the "services" entry above whatever x is, so the modules added since the list was
+    # last reviewed have the exact services they may take from that package. Every module not listed takes none new.
+    REVIEWED_SERVICES = {"mac_points_model.py": {"analysis_project"},
+                         "materials_study_model.py": {"materials_project"},
+                         "materials_study_panel.py": {"analysis_project", "materials_project"},
+                         "materials_workspace_model.py": {"odb_import_service"},
+                         "analyze_summary.py": set(), "mac_points_panel.py": set(), "materials_workspace.py": set(),
+                         "review_model.py": set(), "review_panel.py": set()}
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))
         self.assertEqual([p.name for p in files], ["__init__.py", "__main__.py", "analyze_model.py", "analyze_panel.py",
-                                                   "archive_dialog.py",
+                                                   "analyze_summary.py", "archive_dialog.py",
                                                    "comparison_model.py", "comparison_panel.py",
                                                    "confirmation_dialog.py",
                                                    "diagnostic_model.py", "diagnostic_panel.py",
                                                    "fe_response_panel.py", "generic_plate_panel.py",
                                                    "known_sources.py",
-                                                   "known_sources_dialog.py", "materials_model.py",
+                                                   "known_sources_dialog.py", "mac_points_model.py",
+                                                   "mac_points_panel.py", "materials_model.py",
                                                    "materials_panel.py", "materials_status_panel.py",
+                                                   "materials_study_model.py", "materials_study_panel.py",
+                                                   "materials_workspace.py", "materials_workspace_model.py",
                                                    "odb_import_dialog.py",
                                                    "odb_import_model.py", "physical_review_panel.py",
                                                    "plate_study_model.py",
@@ -366,7 +391,8 @@ class SeparationTests(unittest.TestCase):
                                                    "registration_check_model.py",
                                                    "registration_check_panel.py", "registration_dialog.py",
                                                    "report_export.py", "research_results_model.py",
-                                                   "research_results_panel.py", "shape_model.py", "shape_panel.py",
+                                                   "research_results_panel.py", "review_model.py", "review_panel.py",
+                                                   "shape_model.py", "shape_panel.py",
                                                    "theme.py", "window.py", "workspace_state.py"])
         stdlib = set(sys.stdlib_module_names) | {"__future__"}
         for path in files:
@@ -376,6 +402,25 @@ class SeparationTests(unittest.TestCase):
                     if top in stdlib or top in ("PySide6", "new_gui"):
                         continue
                     self.assertIn(name, self.PROJECT_MODULES | self.SCIENTIFIC_MODULES.get(path.name, set()))
+        for name, allowed in self.REVIEWED_SERVICES.items():
+            with self.subTest(services_of=name):
+                tree = ast.parse((NEW_GUI / name).read_text(encoding="utf-8"))
+                taken = {alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+                         and node.module == "services" for alias in node.names}
+                self.assertEqual(taken, allowed)
+
+    def test_the_inverse_workflow_is_reached_only_through_the_materials_page_run_command(self):
+        """MAT-3: one adapter calls the workflow, and only the page's run slot calls that adapter."""
+        callers: dict[str, set[str]] = {}
+        for path in sorted(NEW_GUI.glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+            names |= {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+            for target in ("run_plate_inverse_study", "execute_study"):
+                if target in names:
+                    callers.setdefault(target, set()).add(path.name)
+        self.assertEqual(callers, {"run_plate_inverse_study": {"materials_study_model.py"},
+                                   "execute_study": {"materials_study_panel.py"}})
 
     def test_no_tkinter_program_no_install_layer_and_no_solver(self):
         forbidden = ("main", "home_dashboard", "tkinter", "subprocess", "abaqus_bridge", "modal_core",

@@ -294,12 +294,14 @@ class NothingComputedTests(_Window):
         # tests/test_new_gui5_qt.py check when they become available and what a click gives.
         # NEW-GUI.6 (authorised): the workbench adds Run verified modal comparison and Export report..., and the two
         # unpaired independent shape views their Show shape; all are disabled at start (tests/test_new_gui6_qt.py).
+        # GUI-UX-R1-F1 (owner request): each shape view's picture has Copy Image and Save PNG, disabled without a picture.
         w = self.window
         analysis, status = w.stack.widget(1).widget(), w.stack.widget(2).widget()
         buttons = analysis.findChildren(QPushButton)
         self.assertEqual([button.text() for button in buttons],
                          ["Run frequency diagnostic", "Check reference registration", "Run verified modal comparison",
-                          "Export report...", "Show shape", "Show shape"])
+                          "Export report...", "Show shape", "Copy Image", "Save PNG", "Show shape", "Copy Image",
+                          "Save PNG"])
         self.assertFalse(any(button.isEnabled() for button in buttons))
         self.assertEqual(status.findChildren(QPushButton), [])
         texts = " ".join(_texts(analysis))

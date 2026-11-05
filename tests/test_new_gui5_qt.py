@@ -142,9 +142,13 @@ class AvailabilityTests(_Window):
         analysis = self.window.stack.widget(1).widget()
         # NEW-GUI.6 (authorised): the workbench's commands and its unpaired shape views follow; the analysis commands
         # still share one set choice (the shape views' own choices only choose what is drawn, unpaired).
-        self.assertEqual([b.text() for b in analysis.findChildren(QPushButton)],
+        # GUI-UX-R1-F1 (owner request): each picture's Copy Image and Save PNG, disabled because nothing has been drawn.
+        buttons = analysis.findChildren(QPushButton)
+        self.assertEqual([b.text() for b in buttons],
                          ["Run frequency diagnostic", "Check reference registration", "Run verified modal comparison",
-                          "Export report...", "Show shape", "Show shape"])  # no second set choice
+                          "Export report...", "Show shape", "Copy Image", "Save PNG", "Show shape", "Copy Image",
+                          "Save PNG"])  # no second set choice
+        self.assertFalse(any(b.isEnabled() for b in buttons if b.text() in ("Copy Image", "Save PNG")))
         shape_views = self.window.comparison.shapes.values()
         self.assertEqual(len([combo for combo in analysis.findChildren(type(self.window.diagnostic.set_combo))
                               if not any(view.isAncestorOf(combo) for view in shape_views)]), 1)

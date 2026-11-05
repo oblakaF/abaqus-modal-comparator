@@ -241,14 +241,18 @@ class ServiceTests(_Folder):
 class FeShapeServiceTests(_Folder):
     """APP-DATA.5: one loaded FE mode drawn on its own nodes by services.modal_data_viewer (role FE)."""
 
-    def drawn(self, preview, index, component):
+    def drawn(self, preview, index, component, display=None):
         """The view, and the one-mode dataset handed to the main window's viewer (render_viewer_mode, role FE)."""
         from services import modal_data_viewer as viewer
 
         with mock.patch.object(viewer, "render_viewer_mode", wraps=viewer.render_viewer_mode) as render:
-            view = fe_preview.render_fe_mode_shape(preview, index, component, self.folder / "views")
-        (dataset, role, number, drawn_component, _directory), _ = render.call_args
+            view = fe_preview.render_fe_mode_shape(preview, index, component, self.folder / "views", display=display)
+        render.assert_called_once()
+        (dataset, role, number, drawn_component, directory, drawn_display), options = render.call_args
+        self.assertEqual(options, {})
         self.assertEqual((role, drawn_component), (viewer.FE, component))
+        self.assertEqual(directory, self.folder / "views")
+        self.assertIs(drawn_display, display)  # the chosen layout reaches the viewer as it is, or none at all
         mode, = dataset.modes
         self.assertEqual(number, mode.number)
         self.assertEqual(view.image_path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
@@ -281,6 +285,19 @@ class FeShapeServiceTests(_Folder):
                           " Hz; frequency source: ", view.lines[0])
             self.assertIn("rigid-body and elastic modes are not classified or excluded", view.lines[2])
         self.assertEqual(fingerprint(manifest.parent), before)
+
+    def test_a_rotated_or_mirrored_view_changes_the_picture_and_no_data(self):
+        from services import modal_data_viewer as viewer
+
+        preview = fe_preview.preview_fe_package(write_shape_package(self.folder / "view", PLATE_NODES,
+                                                                    plate_modes(PLATE_NODES)))
+        plain, plain_mode = self.drawn(preview, 7, "normal")
+        plain_picture = plain.image_path.read_bytes()
+        turned, turned_mode = self.drawn(preview, 7, "normal", viewer.DisplayView(rotation=90, mirror=True))
+        self.assertNotEqual(turned.image_path.read_bytes(), plain_picture)
+        self.assert_loaded_mode(turned_mode, plain_mode)
+        self.assertEqual((turned.index, turned.mode, turned.component, turned.points_shown, turned.lines),
+                         (plain.index, plain.mode, plain.component, plain.points_shown, plain.lines))
 
     def test_each_component_of_the_selected_mode(self):
         preview = fe_preview.preview_fe_package(write_shape_package(self.folder / "c", PLATE_NODES,

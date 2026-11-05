@@ -553,9 +553,12 @@ class PanelTests(_PanelWindow):
         self.assertIn("positive", self.panel.message.text())
 
     def test_the_layout_choices_that_keep_the_page_narrow(self):
-        """Font-independent: the step buttons stand in two columns over one page at a time, and no row of buttons
-        is laid out side by side (the page width itself is checked by the Windows GUI smoke at 900 × 680)."""
+        """The step buttons stand in two columns over one page at a time, and no row of commands is laid out side by
+        side. GUI-UX-R1-F1 (owner request): a picture's own Copy Image and Save PNG are the one row of two. They must
+        not set the page's width (the page width itself is checked by the Windows GUI smoke at 900 × 680)."""
         from PySide6.QtWidgets import QHBoxLayout, QPushButton, QStackedWidget
+
+        from new_gui.shape_panel import COPY_IMAGE, ImageActions, SAVE_PNG
 
         self.assertIsInstance(self.panel.tabs, QStackedWidget)
         self.assertEqual(self.panel.tabs.count(), 8)
@@ -567,7 +570,27 @@ class PanelTests(_PanelWindow):
         for layout in self.panel.findChildren(QHBoxLayout):
             buttons = [layout.itemAt(i).widget() for i in range(layout.count())
                        if isinstance(layout.itemAt(i).widget(), QPushButton)]
-            self.assertLessEqual(len(buttons), 1, [b.text() for b in buttons])
+            if isinstance(layout.parentWidget(), ImageActions):
+                self.assertEqual([b.text() for b in buttons], [COPY_IMAGE, SAVE_PNG])
+            else:
+                self.assertLessEqual(len(buttons), 1, [b.text() for b in buttons])
+        rows = self.panel.findChildren(ImageActions)
+        self.assertEqual(rows, [shape.image_actions for shape in self.panel.shapes.values()])  # one per shape view
+        self.window.show_page(self.wm.PLATE_PAGE)
+        self.window.plate_tabs.setCurrentIndex(1)
+        self.panel.tabs.setCurrentIndex(next(index for index in range(self.panel.tabs.count())
+                                             if self.panel.tabs.widget(index).isAncestorOf(rows[0])))
+        for shape in self.panel.shapes.values():
+            shape.setVisible(True)  # hidden until a file is read, and a hidden widget adds nothing to the page's width
+        self.app.processEvents()  # the layouts take the change in on the way
+        width = self.panel.tabs.minimumSizeHint().width()
+        for row in rows:
+            row.setVisible(False)
+        self.app.processEvents()
+        self.assertEqual(self.panel.tabs.minimumSizeHint().width(), width)  # the two commands do not set the page's width
+        for row in rows:
+            row.setVisible(True)
+            self.assertLessEqual(row.minimumSizeHint().width(), width)
 
     def test_the_link_follows_the_workspace(self):
         from new_gui.shape_panel import ShapePanel
