@@ -23,12 +23,14 @@ from new_gui.mac_points_panel import MacPointsPanel
 from new_gui.materials_status_panel import MaterialsStatusPanel, SUBTITLE as MATERIALS_SUBTITLE
 from new_gui.materials_workspace import MaterialsWorkspace
 from new_gui.review_panel import ReviewPanel
+from services import analysis_project as ap
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
 PAGES = ("Analyze", "Review", "MAC / Points", "Materials")
 ANALYZE_PAGE, REVIEW_PAGE, MAC_PAGE, MATERIALS_PAGE = 0, 1, 2, 3
 MAC_SUBTITLE = "Mode pairs and MAC, what they rest on, and why they may be missing. Nothing here is computed from a manual choice."
-MATERIALS_PAGE_SUBTITLE = "Choose an ODB and a UNV/UFF for this page, or reuse the two from Analyze. Read-only: no value is issued."
+MATERIALS_PAGE_SUBTITLE = ("Run a SYNTHETIC software test of the two model methods, and inspect an ODB and a UNV/UFF read-only. "
+                           "No material value is issued.")
 ABOUT = ("Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze. Mode pairs and MAC appear only "
          "with a verified physical registration; otherwise the result is a frequency comparison. No FE analysis is "
          "solved.")
@@ -79,6 +81,7 @@ class ProductionWindow(QMainWindow):
         self.review = ReviewPanel(self.analyze)
         self.mac_points = MacPointsPanel(self.analyze)
         self.materials_workspace = MaterialsWorkspace(self.analyze, self.materials)
+        self.analyze.route_project = self._route_project
         central = QWidget()
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
@@ -174,6 +177,14 @@ class ProductionWindow(QMainWindow):
     def _project(self, command) -> None:
         self.show_page(ANALYZE_PAGE)
         command()
+
+    def _route_project(self, path) -> bool:
+        """A v2 file holds Materials results: that page opens it. Only the file's own manifest is read to know this."""
+        if ap.project_schema(path) != ap.SCHEMA_V2:
+            return False
+        self.show_page(MATERIALS_PAGE)
+        self.materials_workspace.study.open_results(str(path))
+        return True
 
     def _result_ready(self) -> None:
         """From Analyze to the result; a comparison started on MAC / Points, or work on Materials, stays where it is."""

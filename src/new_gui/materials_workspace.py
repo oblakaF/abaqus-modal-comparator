@@ -2,6 +2,9 @@
 
 The files chosen here belong to this page: they change nothing on Analyze, Review or MAC / Points. Reading runs in worker
 threads and starts no process. No material value exists here.
+
+MAT-3: the page also holds the diagnostic study section (``materials_study_panel``), which runs SYNTHETIC software tests
+and takes no value from the files chosen here.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from PySide6.QtWidgets import QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLi
 
 from new_gui import analyze_model as am
 from new_gui import materials_workspace_model as mw
+from new_gui.materials_study_panel import MaterialsStudyPanel
 from new_gui.diagnostic_panel import DiagnosticTable
 from new_gui.shape_panel import _label
 from new_gui.workspace_state import EXPERIMENTAL, FE
@@ -24,6 +28,8 @@ FACT_TITLES = {FE: "FE model geometry", EXPERIMENTAL: "Experimental data"}
 USE_ANALYZE = "Use the two files from Analyze"
 READING = "Reading..."
 NO_FILES_TEXT = "Analyze holds no files yet."
+NO_REGISTRATION = "Absent: no physical registration is confirmed on this page"
+USED_BY_ANALYZE = "Used by the comparison on Analyze; it is not a declaration for a fit"
 
 
 def _card():
@@ -42,6 +48,8 @@ class _Bridge(QObject):
 class MaterialsWorkspace(QWidget):
     """``status`` is the fixed state panel; ``ask_path(kind, start)`` is replaced in tests."""
 
+    experimental_kind = EXPERIMENTAL
+
     def __init__(self, analyze, status: QWidget, ask_path: Optional[Callable[[str, str], str]] = None):
         super().__init__()
         self.analyze = analyze
@@ -57,6 +65,8 @@ class MaterialsWorkspace(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
+        self.study = MaterialsStudyPanel(self)
+        layout.addWidget(self.study)
         layout.addWidget(self._build_inputs())
         self.fact_boxes: dict = {}
         self.fact_tables: dict = {}
@@ -118,6 +128,10 @@ class MaterialsWorkspace(QWidget):
         self.message.setVisible(False)
         inner.addWidget(self.message)
         return card
+
+    def registration_text(self) -> str:
+        analysis = self.analyze.analysis
+        return USED_BY_ANALYZE if analysis is not None and analysis.comparison is not None else NO_REGISTRATION
 
     def _dialog_path(self, kind: str, start: str) -> str:
         path, _filter = QFileDialog.getOpenFileName(self, CAPTIONS[kind], start, am.FILTERS[kind])
@@ -224,6 +238,7 @@ class MaterialsWorkspace(QWidget):
             self.facts[kind] = None
             self.fact_notes[kind].setText("Not read.")
             self._say(str(value))
+            self.study.refresh_real()
         else:
             self._show(kind, value)
 
@@ -242,11 +257,13 @@ class MaterialsWorkspace(QWidget):
         self.fact_boxes[kind].addWidget(table)
         self.fact_notes[kind].setText(facts.note)
         self.fact_notes[kind].setVisible(bool(facts.note))
+        self.study.refresh_real()
 
     def busy(self) -> bool:
-        return any(thread.is_alive() for thread in self._threads)
+        return self.study.busy() or any(thread.is_alive() for thread in self._threads)
 
     def shutdown(self) -> None:
+        self.study.shutdown()
         for kind in (FE, EXPERIMENTAL):
             self._stop(kind)
 

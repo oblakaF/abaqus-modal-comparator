@@ -41,7 +41,10 @@ def shown_text(window) -> list:
         texts.append(action.text())
         if action.menu() is not None:
             texts += [item.text() for item in action.menu().actions()]
+    study = window.materials_workspace.study  # MAT-3: its owner-specified section names the methods and their scope
     for widget in window.findChildren(QWidget):
+        if widget is study or study.isAncestorOf(widget):
+            continue
         texts.append(widget.toolTip())
         if isinstance(widget, (QLabel, QAbstractButton)):
             texts.append(widget.text())

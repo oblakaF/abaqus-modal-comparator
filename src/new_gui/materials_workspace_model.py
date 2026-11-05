@@ -1,8 +1,8 @@
 """GUI-UX-R1: the facts the Materials page can state about two chosen files, with no Qt.
 
-Read-only. The FE facts come from an already extracted package (its manifest and geometry file; the mode files are not read
+Read-only: the study section beside it (MAT-3) never uses these files. The FE facts come from an already extracted package (its manifest and geometry file; the mode files are not read
 and Abaqus is never started). The extraction stores no material, section, layup, density, thickness or length unit, so none
-of them is shown or guessed. The page computes no material value, runs no iteration and starts no solver.
+of them is shown or guessed. Nothing here computes a material value, runs an iteration or starts a solver.
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ WORKFLOW = ("1. Load the specimen FE model and experimental modal dataset.",
             "6. Evaluate frequency residuals, holdout results, uncertainty and model-form sensitivity.",
             "7. Report either a supported result or a scientific refusal.")
 WORKFLOW_TITLE = "Single-plate model calibration: future workflow, not available now"
-STATUS_TEXT = ("Current scientific status: this page runs no optimizer, FE iteration or solver, and it issues no number. "
-               "Frequency agreement does not establish a material value. A model-specific calibration is not an identified "
+STATUS_TEXT = ("Current scientific status: on real files this page runs no optimizer, FE iteration or solver, and it issues "
+               "no number. The diagnostic study above runs SYNTHETIC software tests only. Frequency agreement does not establish a material value. A model-specific calibration is not an identified "
                "material property.")
 
 
@@ -48,6 +48,8 @@ def property_rows() -> tuple:
 class Facts:
     rows: tuple  # (caption, value)
     note: str = ""
+    shapes: str = ""  # experimental: whether the records hold shapes; "" when not known from this source
+    data_kind: str = ""  # experimental: fitted modes, FRF peaks or UNKNOWN; "" when not known from this source
 
 
 def _fmt(value: float) -> str:
@@ -115,7 +117,19 @@ def experimental_facts(preview) -> Facts:
         peak = any(record.provisional for record in item.records)
         rows.append((item.title, f"{points} points, {dofs} measured DOFs" + ("; FRF peak — not fitted" if peak else "")))
     rows.append(("Units", "Not stated by the data read"))
-    return Facts(tuple(rows))
+    records = [record for item in preview.sets for record in item.records]
+    shaped = sum(1 for record in records if record.point_count > 0)
+    shapes = f"Present: {shaped} of {len(records)} records" if shaped else "Absent"
+    return Facts(tuple(rows), shapes=shapes, data_kind=_data_kind(records))
+
+
+def _data_kind(records) -> str:
+    """As the importer classified the records. A file's name or title is not evidence of what it holds."""
+    if records and all(record.provisional for record in records):
+        return "FRF peaks: not fitted modes"
+    if records and all(not record.provisional and str(record.classification).startswith("FITTED") for record in records):
+        return "Fitted modes"
+    return "UNKNOWN"
 
 
 def read_experimental_facts(path, cancel_event) -> Facts:

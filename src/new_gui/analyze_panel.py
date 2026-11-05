@@ -235,6 +235,7 @@ class AnalyzePanel(QWidget):
         self.snapshot: Optional[pj.Snapshot] = None  # an opened project: the page shows only what it holds
         self.source_check: Optional[pj.SourceCheck] = None
         self.project_path: Optional[Path] = None
+        self.route_project = None  # set by the window: gives a project of another page's format to that page
         self.registration_ref: Optional[pj.RegistrationReference] = None  # of the comparison shown
         self.confirmation_ref: Optional[pj.RegistrationReference] = None  # of the confirmation ready to use
         self._compared_with: Optional[pj.RegistrationReference] = None
@@ -1161,6 +1162,8 @@ class AnalyzePanel(QWidget):
             path, _filter = QFileDialog.getOpenFileName(self, OPEN_PROJECT, str(self.project_path or ""), PROJECT_FILTER)
         if not path:
             return False
+        if self.route_project is not None and self.route_project(path):
+            return True  # a Materials project (MAT-3): that page shows it; nothing on this page changes
 
         def work(_cancel, _say):
             snapshot = pj.open_project(path)

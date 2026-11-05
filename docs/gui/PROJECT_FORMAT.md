@@ -67,6 +67,38 @@ The file is written to a temporary name beside the target, flushed, read back wi
 into place. A failed or cancelled save leaves an existing project untouched and no temporary file. A project cannot
 overwrite a source file of its own analysis.
 
+## Version 2: Materials results
+
+Schema `universal/analysis-project/v2`, added by MAT-3. It is a separate version with its own check
+(`src/services/materials_project.py`), written and read by the Materials page. The v1 format, its check and its readers are
+unchanged, and each version refuses the other by name with `PROJECT_OTHER_VERSION`. File > Open Project reads only a file's
+manifest to know its version and gives a v2 file to the Materials page.
+
+The container, limits, hashes, strict JSON and atomic writing are those above. A v2 file holds `manifest.json` and
+`project.json` only: no picture and no source file. `project.json` holds `schema`, `saved_at`, `written_at`, `program` and:
+
+| `materials` field | Holds |
+|---|---|
+| `study_kind` | always `SYNTHETIC_SOFTWARE_TEST` |
+| `backend_id` | `KIRCHHOFF_RITZ_4D` or `STAGE_A_MATRIX_3D` |
+| `input` | the form as entered, as text, with its units |
+| `known_values` | the known synthetic values |
+| `declaration`, `declaration_hash` | the frozen declaration in its identity form, and its hash |
+| `result`, `result_hash` | every field of the workflow's result, statuses and refusal included, and its hash |
+| `units`, `provenance` | units, and where the study's data and model came from |
+| `references` | paths the page held, as text with the state `NOT_OPENED` |
+| `statement` | what the result does not establish |
+
+Floats keep every bit. A non-finite value is stored as `{"non_finite": "inf"}`, because strict JSON has none.
+
+**A file cannot state more than the workflow can.** Reading refuses, as `PROJECT_INVALID`: any field that is missing, unknown or
+of the wrong type; a study that is not SYNTHETIC; a release status other than `NOT_A_RELEASE_VALUE`; altered restrictions; a
+refusal holding a result; `DIAGNOSTIC_OPTIMIZER_CANDIDATE` without convergence, full rank, a passed pattern test and valid
+leave-one-family-out cases; and a declaration or result that does not match its hash. These checks are not a signature either:
+measured values rewritten by hand with a SYNTHETIC label and consistent hashes are not detected.
+
+**Opening** reads only the chosen file, starts no calculation and opens no path named in it. Run calculates anew from the form.
+
 ## Status and revalidation
 
 A status in a project is never raised, and its badge is never the green one used for a verified result.

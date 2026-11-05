@@ -10,6 +10,10 @@ Nothing is ever unpickled, executed or extracted to disk: the members are read i
 names above are accepted, and JSON refuses repeated keys, NaN and infinity. No ODB, UNV, UFF or extracted FE package is
 stored; only their paths and hashes are.
 
+MAT-3: ``SCHEMA_V2`` is a separate, explicit version for the results of the Materials page. Its content has its own strict
+check (``services.materials_project``). ``read_project`` and ``write_project`` keep reading and writing v1 by default with
+the v1 check unchanged, and each version refuses the other by name.
+
 The checks detect damage and careless editing. They are not a signature: someone who rewrites the file and its hashes is
 not detected. A project therefore never proves anything. Its results stay a saved snapshot until the source files are
 checked and the analysis is run again, and its status is never raised to a stronger one.
@@ -34,6 +38,7 @@ import zipfile
 
 SUFFIX = ".mcproj"
 SCHEMA = "universal/analysis-project/v1"
+SCHEMA_V2 = "universal/analysis-project/v2"  # the Materials page's results: services.materials_project
 MANIFEST = "manifest.json"
 PROJECT = "project.json"
 _IMAGE_NAME = re.compile(r"images/(fe|exp)_[0-9]{1,4}\.png")
@@ -331,8 +336,8 @@ def _read_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo, limit: int) ->
     return data
 
 
-def read_project(path) -> tuple:
-    """(document, {member name: PNG bytes}) of a project that passes every check. Raises ``ProjectRefused``."""
+def read_project(path, schema: str = SCHEMA, validate=validate_document) -> tuple:
+    """(document, {member name: PNG bytes}) of a project of ``schema`` that passes every check. Raises ``ProjectRefused``."""
     path = Path(path)
     try:
         size = path.stat().st_size
@@ -346,7 +351,7 @@ def read_project(path) -> tuple:
         raise ProjectRefused(NOT_A_PROJECT, f"The project cannot be read: {error}.") from error
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            return _read_archive(archive, path.name)
+            return _read_archive(archive, path.name, schema, validate)
     except zipfile.BadZipFile as error:
         raise ProjectRefused(NOT_A_PROJECT, f"{path.name} is damaged or is not a project file: {error}.") from error
     except (EOFError, OSError, NotImplementedError, RuntimeError, ValueError) as error:
@@ -355,7 +360,21 @@ def read_project(path) -> tuple:
         raise ProjectRefused(DAMAGED, f"{path.name} is damaged: {error}.") from error
 
 
-def _read_archive(archive: zipfile.ZipFile, shown: str) -> tuple:
+def project_schema(path) -> Optional[str]:
+    """The schema a project's manifest states, read under the same limits, or None. Nothing else in the file is read."""
+    try:
+        path = Path(path)
+        if path.stat().st_size > MAX_PROJECT_BYTES:
+            return None
+        with zipfile.ZipFile(path) as archive:
+            manifest = _strict_json(_read_member(archive, archive.getinfo(MANIFEST), MAX_MANIFEST_BYTES))
+    except (OSError, EOFError, KeyError, RuntimeError, ValueError, NotImplementedError, zipfile.BadZipFile):
+        return None
+    schema = manifest.get("schema") if isinstance(manifest, dict) else None
+    return schema if isinstance(schema, str) else None
+
+
+def _read_archive(archive: zipfile.ZipFile, shown: str, schema: str = SCHEMA, validate=validate_document) -> tuple:
     infos = archive.infolist()
     names = [info.filename for info in infos]
     if len(set(names)) != len(names):
@@ -384,9 +403,9 @@ def _read_archive(archive: zipfile.ZipFile, shown: str) -> tuple:
         raise ProjectRefused(DAMAGED, f"The manifest of {shown} cannot be read: {error}.") from error
     if not isinstance(manifest, dict) or set(manifest) != {"schema", "members", "members_sha256"}:
         raise ProjectRefused(DAMAGED, f"The manifest of {shown} is not valid.")
-    if manifest["schema"] != SCHEMA:
-        raise ProjectRefused(OTHER_VERSION, f"This project has the format {manifest['schema']!r}; this program reads "
-                                            f"{SCHEMA!r}.")
+    if manifest["schema"] != schema:
+        raise ProjectRefused(OTHER_VERSION, f"This project has the format {manifest['schema']!r}; this command reads "
+                                            f"{schema!r}.")
     members = manifest["members"]
     if not isinstance(members, dict) or _members_hash(members) != manifest["members_sha256"]:
         raise ProjectRefused(DAMAGED, f"The manifest of {shown} does not match its own hash.")
@@ -405,7 +424,7 @@ def _read_archive(archive: zipfile.ZipFile, shown: str) -> tuple:
     images = {name: content for name, content in contents.items() if name != PROJECT}
     for name, content in images.items():
         _check_png(name, content)
-    validate_document(document, images)
+    validate(document, images)
     return document, images
 
 
@@ -422,14 +441,14 @@ def _same_file(target: Path, other) -> bool:
         return False
 
 
-def project_bytes(document: Mapping, images: Mapping[str, bytes]) -> bytes:
+def project_bytes(document: Mapping, images: Mapping[str, bytes], schema: str = SCHEMA) -> bytes:
     """The ZIP file of a valid document: JSON compressed, pictures stored as they are (PNG is compressed already)."""
     content = _json_bytes(document)
     if len(content) > MAX_PROJECT_JSON_BYTES:
         raise ProjectRefused(TOO_LARGE, "The results are larger than a project can hold.")
     members = {PROJECT: {"size": len(content), "sha256": _sha256(content)}}
     members.update({name: {"size": len(data), "sha256": _sha256(data)} for name, data in sorted(images.items())})
-    manifest = _json_bytes({"schema": SCHEMA, "members": members, "members_sha256": _members_hash(members)})
+    manifest = _json_bytes({"schema": schema, "members": members, "members_sha256": _members_hash(members)})
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr(zipfile.ZipInfo(MANIFEST), manifest, zipfile.ZIP_DEFLATED)
@@ -439,7 +458,8 @@ def project_bytes(document: Mapping, images: Mapping[str, bytes]) -> bytes:
     return buffer.getvalue()
 
 
-def write_project(document: Mapping, images: Mapping[str, bytes], path, protected=(), cancel_event=None) -> Path:
+def write_project(document: Mapping, images: Mapping[str, bytes], path, protected=(), cancel_event=None,
+                  schema: str = SCHEMA, validate=validate_document) -> Path:
     """Write the project all or nothing; a source file is never overwritten. Raises ``ProjectRefused``."""
     path = Path(path)
     if path.suffix.lower() != SUFFIX:
@@ -452,8 +472,8 @@ def write_project(document: Mapping, images: Mapping[str, bytes], path, protecte
         raise ProjectRefused(TOO_LARGE, "The saved pictures are outside what a project can hold.")
     for name, data in images.items():
         _check_png(name, data)
-    validate_document(document, images)
-    data = project_bytes(document, images)
+    validate(document, images)
+    data = project_bytes(document, images, schema)
     if len(data) > MAX_PROJECT_BYTES:
         raise ProjectRefused(TOO_LARGE, "The results are larger than a project can hold.")
     temporary = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
@@ -462,7 +482,7 @@ def write_project(document: Mapping, images: Mapping[str, bytes], path, protecte
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
-        read_project(temporary)  # what was written is read back with the same checks before it takes the name
+        read_project(temporary, schema, validate)  # what was written is read back with the same checks before it takes the name
         if cancel_event is not None and cancel_event.is_set():
             raise ProjectRefused(WRITE_FAILED, "The save was cancelled.")
         os.replace(temporary, path)
@@ -478,5 +498,5 @@ def write_project(document: Mapping, images: Mapping[str, bytes], path, protecte
 
 __all__ = ["DAMAGED", "INVALID", "KIND_ARCHIVED", "KIND_CONFIRMED", "KIND_NONE", "MAX_IMAGE_BYTES", "MAX_IMAGES",
            "MAX_PROJECT_BYTES", "NOT_A_PROJECT", "NO_PAIR", "OTHER_VERSION", "ProjectRefused", "REGISTRATION_REQUIRED",
-           "SCHEMA", "STATUSES", "SUFFIX", "TOO_LARGE", "USER_CONFIRMED", "VERIFIED", "WRITE_FAILED", "project_bytes",
+           "SCHEMA", "SCHEMA_V2", "STATUSES", "project_schema", "SUFFIX", "TOO_LARGE", "USER_CONFIRMED", "VERIFIED", "WRITE_FAILED", "project_bytes",
            "read_project", "validate_document", "write_project"]
