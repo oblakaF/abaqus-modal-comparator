@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 import test_universal_two_file_analysis as base
 import test_working_draft_r2_project as r2
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QEventLoop, QTimer
 
 from domain.plate_inverse_problem import MaterialReleaseRefusal, PlateInverseResult
 from domain.plate_material_problem import EvidenceKind, identity_hash
@@ -643,12 +643,7 @@ class RunControl(_Page):
 
     def test_the_interface_keeps_running_and_results_reach_widgets_on_its_thread(self):
         _window, panel = self.page()
-        beats = []
-        timer = QTimer()
-        timer.setInterval(5)
-        timer.timeout.connect(lambda: beats.append(time.monotonic()))
-        timer.start()
-        seen = []
+        beats, seen = [], []
         original = panel._show_section
 
         def show(*args):
@@ -656,12 +651,36 @@ class RunControl(_Page):
             original(*args)
 
         with mock.patch.object(panel, "_show_section", show):
-            panel.run_button.click()
+            gate, _patcher = self.holding(panel)  # the worker stays unfinished until the test lets it go
+            loop = QEventLoop()
+            ticking, limit = QTimer(), QTimer()
+            self.addCleanup(ticking.stop)
+            self.addCleanup(limit.stop)
+
+            def beat():
+                beats.append(time.monotonic())
+                if len(beats) > 5:
+                    loop.quit()
+
+            ticking.setInterval(5)
+            ticking.timeout.connect(beat)
+            limit.setSingleShot(True)
+            limit.timeout.connect(loop.quit)
+            limit.start(10000)  # bounded, and shorter than the gate's own limit
+            ticking.start()
+            loop.exec()
+            ticking.stop()
+            limit.stop()
+            self.assertGreater(len(beats), 5)  # all of these came while the work was certainly not finished
+            self.assertLess(max(right - left for left, right in zip(beats, beats[1:])), 2.0)
+            self.assertFalse(gate.go.is_set())
+            self.assertTrue(panel._thread.is_alive())
+            self.assertEqual(panel._active, sp.RUNNING)
+            self.assertEqual(seen, [])
+            self.assertIsNone(panel.record)
+            gate.go.set()
             self.wait(panel)
-        timer.stop()
         self.assertEqual(seen, [True])
-        self.assertGreater(len(beats), 5)
-        self.assertLess(max(right - left for left, right in zip(beats, beats[1:])), 2.0)
         self.assertGreater(panel.solves_done, 10)
 
 

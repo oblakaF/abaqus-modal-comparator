@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import replace
+from datetime import datetime, timezone
 import hashlib
 import io
 import json
@@ -64,6 +65,18 @@ def demo_study() -> wb.Study:
     study = wb.open_study(DEMO / "DEMO_STUDY.json")
     study = wb.set_diagnostics(study, wb.load_synthetic_inputs(DEMO / "DEMO_SYNTHETIC_INPUTS.json", study))
     return off.with_sensitivities(study, DEMO / "DEMO_SENSITIVITIES.json")
+
+
+class _Clock(datetime):
+    """The dossier's clock: fixed, or moved on one second per reading, so a test does not depend on the wall clock."""
+
+    step = 0
+    readings = 0
+
+    @classmethod
+    def now(cls, tz=None):
+        _Clock.readings += cls.step
+        return datetime(2026, 11, 5, 8, 0, _Clock.readings, tzinfo=tz or timezone.utc)
 
 
 def drop_created(record):
@@ -286,13 +299,14 @@ class DossierTests(unittest.TestCase):
         self.dir = Path(folder.name)
 
     def test_the_seven_documents_are_reproducible(self):
-        first, second = pr.build_review(m11_inputs()), pr.build_review(m11_inputs())
-        self.assertEqual(drop_created(first), drop_created(second))
+        # At one time every field is equal, the time and the integrity hash that seals it included.
+        with mock.patch.object(pr, "datetime", _Clock), mock.patch.object(_Clock, "step", 0):
+            first, second = pr.build_review(m11_inputs()), pr.build_review(m11_inputs())
+        self.assertEqual(first, second)
         one, two = pr.documents(first), pr.documents(second)
         for name in pr.REQUIRED_DOCUMENTS:
             self.assertIn(name, one)
-            if name != "physical_readiness.json":
-                self.assertEqual(one[name], two[name], name)
+            self.assertEqual(one[name], two[name], name)
         for name in ("evidence_matrix.csv", "modal_observations.csv", "sensitivity_reuse.csv"):
             rows = list(csv.DictReader(io.StringIO(one[name])))
             self.assertTrue(rows, name)
@@ -302,6 +316,18 @@ class DossierTests(unittest.TestCase):
         plan = json.loads(one["fe_applicability_plan.json"])
         self.assertEqual(plan["status"], pr.PLAN_ONLY)
         self.assertIn("NOT_ASSESSED — NO_ADMISSIBLE_MODAL_OBSERVATIONS", one["PHYSICAL_READINESS_REPORT.md"])
+
+    def test_across_a_second_only_the_time_and_the_hash_that_seals_it_differ(self):
+        with mock.patch.object(pr, "datetime", _Clock), mock.patch.object(_Clock, "step", 1):
+            first, second = pr.build_review(m11_inputs()), pr.build_review(m11_inputs())
+        self.assertEqual([key for key in first if first[key] != second[key]], ["created", "integrity"])
+        self.assertEqual(set(first), set(second))
+        self.assertNotEqual(first["created"], second["created"])
+        self.assertNotEqual(first["integrity"]["content_sha256"], second["integrity"]["content_sha256"])
+        self.assertEqual(pr.integrity_state(first), pr.INTACT)
+        self.assertEqual(pr.integrity_state(second), pr.INTACT)
+        one, two = pr.documents(first), pr.documents(second)
+        self.assertEqual([name for name in pr.REQUIRED_DOCUMENTS if one[name] != two[name]], ["physical_readiness.json"])
 
     def test_the_export_is_atomic_outside_the_program_and_writes_no_fe_file(self):
         record = pr.build_review(m11_inputs())

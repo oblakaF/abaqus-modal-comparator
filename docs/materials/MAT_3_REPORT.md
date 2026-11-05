@@ -216,6 +216,48 @@ the classes run above; Analyze gained only the routing hook.
 Outside the repository, in `D:\git\abaqus-modal-comparator-work\research\MAT_3\`: `final_targeted.log`, `final_code.sha256`,
 `inventory.json`, `baseline_gui_subset.log`, `workspace_inventory.log`.
 
+## F1 correction
+
+Base `777db68ee0135ea873181cadb23f2d48276c7206`. Only tests and this report changed. No working code, tolerance, gate or evidence.
+
+**`RunControl.test_the_interface_keeps_running_and_results_reach_widgets_on_its_thread`. Cause: the test's design.** It counted timer
+beats during a real run, so the count depended on how long the run took. Reproduced with its logic at the base: 22 beats in a
+119-solve run on this machine, and 2 beats when the run is replaced by an immediate return, against the required more than 5. That
+the review's CI failure happened this way was not read from a log by me. Fix: the worker is held by `_Gate` before its first solve,
+and the beats are counted during that hold, with a 10 s limit. The test also checks that the worker is alive, the page is running
+and no result has arrived during the hold. The threshold, the gap limit and the main-thread check are unchanged.
+
+**`DossierTests.test_the_seven_documents_are_reproducible`. Cause: the test depended on the wall clock.** The differing paths are
+`$.created` and `$.integrity.content_sha256`. `build_review` stamps `created` in whole seconds, and `content_digest` seals everything
+except `integrity`, so the hash changes with the time. The test removed `created` and kept the hash, so it failed whenever the two
+builds fell on either side of a second. Reproduced on the real clock with no mock, placing the builds across a boundary: 4 of 6
+attempts at `0bea1de` (`origin/main`, before MAT-3) and 6 of 6 at `777db68`, each time with exactly these two keys. A build takes
+about 2.5 ms here, so an unplaced run rarely hits it. `plate_physical_review.py` and its test are unchanged between `0bea1de` and
+`777db68`, so MAT-3 did not cause it.
+
+**No working-code defect.** Sealing `created` is correct: it detects an edit of the saved time, and revalidation already compares
+content without `created` and `integrity`. **Nothing was removed from the comparison.** With a fixed clock the test now compares whole
+records and all seven documents, including `physical_readiness.json`, which it used to skip. A new test crosses a second and requires
+that exactly `created` and `integrity` differ, that both records stay intact, and that only `physical_readiness.json` changes.
+
+**F1 tests**, Python 3.11.17, offscreen Qt, one process at a time, one BLAS thread, each run once with no repeat after a result:
+
+| Check | Runs | Result | Time |
+|---|---|---|---|
+| The corrected responsiveness test | 5 | 5 PASS | 4.3 to 5.3 s per process |
+| The dossier test and the new clock test | 10 | 10 PASS | 0.6 s per process |
+| `test_plate_physical_review.DossierTests` | 1 | 6 tests PASS | 1 s |
+| `test_mat3_materials_study` | 1 | 55 tests PASS | 47 s |
+
+Every run is in `f1_targeted.log`. About 117 s of the separate 300 s limit, including the reproductions (`f1_repro.log`,
+`f1_boundary.log`).
+
+**F1 NOT_RUN:** full suite; the other classes of `test_plate_physical_review`; Linux locally.
+
+**Limit:** the causes above were reproduced here. I could not read the CI log (HTTP 403 without authentication), so the link to the
+exact CI failures rests on your review's naming of the tests and on these reproductions. The F1 commit is the branch head; its SHA
+and CI state are in the hand-over.
+
 ## Final SHA and CI
 
 **Implementation commit:** `52e296ca196539c30c9db3bd87792a27f5bcad91`, parent `7f2cd3733b5e68fa5536d20a21336f6764ba2124`. A later commit
