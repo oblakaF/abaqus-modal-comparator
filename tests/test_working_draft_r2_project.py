@@ -6,13 +6,16 @@ accepted registration can match synthetic files; that case proves only that a sa
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import io
 import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 from unittest import mock
@@ -617,6 +620,7 @@ class _FileAccess:
     """Every look at a file while active: Python's own audit events for opening and listing, and the stat calls."""
 
     active = None
+    events = 0  # audit events received, watched or not: only an installed hook raises this
 
     def __enter__(self):
         _FileAccess.active = self.seen = []
@@ -647,16 +651,155 @@ class _FileAccess:
 
 
 def _audit(event, args):
+    _FileAccess.events += 1
     seen = _FileAccess.active
     if seen is not None and event in ("open", "os.listdir", "os.scandir") and args and isinstance(args[0], (str, os.PathLike)):
         seen.append(os.fspath(args[0]))
 
 
-sys.addaudithook(_audit)
+# An audit hook can never be removed from its process, and discovery imports every test module before it runs one, so
+# a hook installed on import would stay for the whole suite and through interpreter finalization. It lives only in the
+# one child process that OfflineOpenTests run in (run_offline_child).
+_AUDIT_ACTIVE = False
+_OFFLINE_CHILD_CODE = ("import sys; import test_working_draft_r2_project as t; "
+                       "sys.exit(t.run_offline_child(sys.argv[1]))")
+_OFFLINE_CHILD_LIMIT = 600.0  # seconds: the child is killed after this, and each of its tests is then reported failed
+_OFFLINE_CHILD_REPORT = None
+
+
+class _OfflineChildResult(unittest.TestResult):
+    """Each test's audit events; the outcomes are in the base class's own lists."""
+
+    def __init__(self):
+        super().__init__()
+        self.events = {}
+
+    def startTest(self, test):
+        super().startTest(test)
+        self.events[test._testMethodName] = -_FileAccess.events
+
+    def stopTest(self, test):
+        self.events[test._testMethodName] += _FileAccess.events
+        super().stopTest(test)
+
+
+def run_offline_child(result_path: str) -> int:
+    """The child process: install the hook, prove it sees what it must, run every OfflineOpenTests test, record it all."""
+    global _AUDIT_ACTIVE
+    sys.addaudithook(_audit)
+    _AUDIT_ACTIVE = True
+    here = Path(__file__)
+    with _FileAccess() as watch:  # none of these goes through the watch's stat patches: only the hook can see them
+        here.open("rb").close()
+        os.listdir(here.parent)
+        with os.scandir(here.parent):
+            pass
+    sees = {"open": str(here) in watch.seen, "os.listdir": str(here.parent) in watch.seen,
+            "os.scandir": watch.seen.count(str(here.parent)) >= 2}
+    result = _OfflineChildResult()
+    unittest.defaultTestLoader.loadTestsFromTestCase(OfflineOpenTests).run(result)
+    tests = {name: {"outcome": "passed", "detail": "", "events": events} for name, events in result.events.items()}
+    other = []
+    for kind, found in (("skipped", result.skipped), ("failed", result.failures), ("failed", result.errors)):
+        for test, detail in found:
+            name = getattr(test, "_testMethodName", None)
+            if name in tests:
+                tests[name].update(outcome=kind, detail=tests[name]["detail"] + detail)
+            else:  # a class-level problem belongs to no one test
+                other.append(f"{test}: {detail}")
+    Path(result_path).write_text(json.dumps({"pid": os.getpid(), "hook_active": _AUDIT_ACTIVE, "hook_sees": sees,
+                                             "tests": tests, "other": other}), encoding="utf-8")
+    return 0 if result.wasSuccessful() and not other else 1
+
+
+def start_offline_child(code: str = _OFFLINE_CHILD_CODE, limit: float = _OFFLINE_CHILD_LIMIT) -> dict:
+    """Run one child to its end or its limit. Its exit code, output and result file all come back, whatever happened."""
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / "offline_result.json"
+        environment = dict(os.environ, PYTHONIOENCODING="utf-8")
+        environment.setdefault("QT_QPA_PLATFORM", "offscreen")
+        report = {"returncode": None, "timed_out": False, "result": None}
+        try:
+            done = subprocess.run([sys.executable, "-X", "faulthandler", "-c", code, str(path)], cwd=str(ROOT / "tests"),
+                                  env=environment, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                  timeout=limit, check=False)
+        except subprocess.TimeoutExpired as expired:  # subprocess.run has already killed it and waited for it
+            report.update(timed_out=True, stdout=_text(expired.stdout), stderr=_text(expired.stderr))
+        else:
+            report.update(returncode=done.returncode, stdout=done.stdout, stderr=done.stderr)
+        if path.is_file():
+            report["result"] = json.loads(path.read_text(encoding="utf-8"))
+    return report
+
+
+def _text(output) -> str:
+    return output.decode("utf-8", "replace") if isinstance(output, bytes) else (output or "")
+
+
+def offline_verdict(report: dict, name: str) -> tuple:
+    """(passed, skipped or failed; the reason) of one test. Anything but a clean child under a working hook is a failure."""
+    tail = (f"exit code {report['returncode']}, timed out: {report['timed_out']}\n"
+            f"--- child stderr\n{report.get('stderr', '')[-4000:]}\n--- child stdout\n{report.get('stdout', '')[-1000:]}")
+    result = report["result"]
+    if report["timed_out"] or result is None:
+        return "failed", "The child process gave no result.\n" + tail
+    outcome = result["tests"].get(name)
+    everything_passed = (not result["other"] and all(test["outcome"] in ("passed", "skipped")
+                                                     for test in result["tests"].values()))
+    if report["returncode"] != (0 if everything_passed else 1):
+        return "failed", "The child process did not end as its results require.\n" + tail
+    if not result["hook_active"] or not all(result["hook_sees"].values()):
+        return "failed", f"The audit hook was not working: {result['hook_sees']}\n" + tail
+    if outcome is None:
+        return "failed", "This test did not run in the child process.\n" + "\n".join(result["other"]) + "\n" + tail
+    if outcome["outcome"] == "skipped":
+        return "skipped", outcome["detail"]
+    if outcome["outcome"] == "failed":
+        return "failed", outcome["detail"] + "\n" + tail
+    if outcome["events"] <= 0:
+        return "failed", "The hook received no event during this test.\n" + tail
+    return "passed", ""
+
+
+def _offline_report() -> dict:
+    global _OFFLINE_CHILD_REPORT
+    if _OFFLINE_CHILD_REPORT is None:
+        _OFFLINE_CHILD_REPORT = start_offline_child()
+        said = [line for line in _OFFLINE_CHILD_REPORT.get("stderr", "").splitlines()
+                if line.strip() and not line.startswith("This plugin does not support")]
+        if said:  # whatever the child said beyond the offscreen platform's notices stays visible in the log
+            sys.stderr.write("[OfflineOpenTests child process]\n" + "\n".join(said) + "\n")
+    return _OFFLINE_CHILD_REPORT
 
 
 class OfflineOpenTests(_Project):
-    """Open Project reads only the file chosen; the saved paths are text until Check source files."""
+    """Open Project reads only the file chosen; the saved paths are text until Check source files.
+
+    These tests need the audit hook, so all of them run in one child process that has it. Here each reports its own
+    outcome there under its own name; see run_offline_child and OfflineOpenIsolationTests.
+    """
+
+    def run(self, result=None):
+        if _AUDIT_ACTIVE:
+            return super().run(result)
+        result = self.defaultTestResult() if result is None else result
+        result.startTest(self)
+        try:
+            kind, reason = offline_verdict(_offline_report(), self._testMethodName)
+            if kind == "skipped":
+                result.addSkip(self, reason)
+            elif kind == "passed":
+                result.addSuccess(self)
+            else:
+                try:
+                    self.fail(reason)
+                except self.failureException:
+                    result.addFailure(self, sys.exc_info())
+        except Exception:  # noqa: BLE001 - a failure of the reporting itself is this test's error, never a pass
+            result.addError(self, sys.exc_info())
+        finally:
+            result.stopTest(self)
+        return result
 
     def network_project(self, panel) -> Path:
         """A real project whose saved paths all name a host that does not exist."""
@@ -790,6 +933,85 @@ class OfflineOpenTests(_Project):
         self.assertEqual(self.row(again, pj.ROLE_EXPERIMENTAL).state, pj.MISSING)
         self.assertEqual(self.row(again, pj.ROLE_PACKAGE).state, pj.MISSING)
         self.assertFalse(again.analyze())
+
+
+class OfflineOpenIsolationTests(unittest.TestCase):
+    """MAT-4.F2: the hook stays out of this process, and the tests above really ran under it, in another process."""
+
+    def test_importing_this_module_installs_no_hook_in_this_process(self):
+        self.assertFalse(_AUDIT_ACTIVE)
+        here = Path(__file__)
+        before = _FileAccess.events
+        with _FileAccess() as watch:
+            here.open("rb").close()
+            os.listdir(here.parent)
+        self.assertEqual(watch.seen, [])
+        self.assertEqual(_FileAccess.events, before)
+        tree = ast.parse(here.read_text(encoding="utf-8"))
+        callers = [node.name for node in tree.body if isinstance(node, ast.FunctionDef)
+                   and any(isinstance(call, ast.Attribute) and call.attr == "addaudithook" for call in ast.walk(node))]
+        at_import = [node for node in tree.body if not isinstance(node, (ast.FunctionDef, ast.ClassDef))
+                     and any(isinstance(call, ast.Attribute) and call.attr == "addaudithook" for call in ast.walk(node))]
+        self.assertEqual(callers, ["run_offline_child"])
+        self.assertEqual(at_import, [])
+
+    def test_every_test_ran_under_the_hook_in_another_process(self):
+        report = _offline_report()
+        result = report["result"]
+        self.assertIsNotNone(result, report)
+        self.assertNotEqual(result["pid"], os.getpid())
+        self.assertTrue(result["hook_active"])
+        self.assertEqual(result["hook_sees"], {"open": True, "os.listdir": True, "os.scandir": True})
+        names = unittest.defaultTestLoader.getTestCaseNames(OfflineOpenTests)
+        self.assertEqual(len(names), 8)
+        self.assertEqual(sorted(result["tests"]), sorted(names))
+        for name in names:
+            self.assertGreater(result["tests"][name]["events"], 0, name)
+
+    def test_an_abort_reaches_the_parent_with_its_code_and_stderr(self):
+        report = start_offline_child("import sys; sys.stderr.write('said before the abort'); sys.stderr.flush(); "
+                                     "import os; os.abort()", 60.0)
+        self.assertNotIn(report["returncode"], (0, 1))
+        kind, reason = offline_verdict(report, "any_test")
+        self.assertEqual(kind, "failed")
+        self.assertIn(f"exit code {report['returncode']}", reason)
+        self.assertIn("said before the abort", reason)
+
+    def test_a_clean_exit_without_results_is_not_a_pass(self):
+        report = start_offline_child("raise SystemExit(0)", 60.0)
+        self.assertEqual(report["returncode"], 0)
+        self.assertEqual(offline_verdict(report, "any_test")[0], "failed")
+
+    def test_a_child_over_its_limit_is_stopped_and_reported(self):
+        started = time.monotonic()
+        report = start_offline_child("import sys, time; print('still here', flush=True); time.sleep(60)", 3.0)
+        self.assertLess(time.monotonic() - started, 30.0)
+        self.assertTrue(report["timed_out"])
+        kind, reason = offline_verdict(report, "any_test")
+        self.assertEqual(kind, "failed")
+        self.assertIn("timed out: True", reason)
+
+    def verdict_of(self, returncode, outcome="passed", other=(), events=5, sees=True):
+        result = {"pid": 1, "hook_active": True, "hook_sees": {"open": sees}, "other": list(other),
+                  "tests": {"named": {"outcome": outcome, "detail": "the child's traceback", "events": events}}}
+        return offline_verdict({"returncode": returncode, "timed_out": False, "result": result, "stdout": "",
+                                "stderr": "the child's stderr"}, "named")
+
+    def test_each_way_a_child_can_be_wrong_is_a_failure(self):
+        self.assertEqual(self.verdict_of(0), ("passed", ""))
+        kind, reason = self.verdict_of(1, outcome="failed")
+        self.assertEqual(kind, "failed")
+        self.assertIn("the child's traceback", reason)
+        self.assertIn("the child's stderr", reason)
+        for wrong in (self.verdict_of(1),  # exit 1 although all passed
+                      self.verdict_of(-6),  # every test passed, then the process crashed while ending
+                      self.verdict_of(134),
+                      self.verdict_of(0, outcome="failed"),  # exit 0 although a test failed
+                      self.verdict_of(0, other=("class problem",)),
+                      self.verdict_of(0, events=0),  # no hook event during the test
+                      self.verdict_of(0, sees=False)):  # the hook does not see what it must
+            self.assertEqual(wrong[0], "failed", wrong)
+        self.assertEqual(self.verdict_of(0, outcome="skipped")[0], "skipped")
 
 
 class DamagedFileTests(_Project):

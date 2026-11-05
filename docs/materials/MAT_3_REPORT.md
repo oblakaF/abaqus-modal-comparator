@@ -269,9 +269,12 @@ commit that contains it.
 
 | Step | Result |
 |---|---|
-| Run unit tests | failure, exit code 1 |
-| Qt tests offscreen | failure, exit code 134 |
+| Run unit tests | failure, exit code 134 |
+| Qt tests offscreen | failure, exit code 1 |
 | M11 research synthetic tests | success, 29 tests, 2 skipped on that platform |
+
+**Corrected in MAT-4.F2:** this table first gave the two exit codes the wrong way round. The job's annotations place code 1 at line 63
+and code 134 at line 5176 of the logs, and the Qt step's log is short while the full suite's is about 5000 lines.
 
 The same two steps failed at the base commit `7f2cd37` and before MAT code existed. **CI is not green, and this does not show that
 MAT-3 added no failure.** The job log returns HTTP 403 without authentication and no token was read, so the individual failures

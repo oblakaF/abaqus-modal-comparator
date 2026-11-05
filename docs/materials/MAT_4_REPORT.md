@@ -94,8 +94,8 @@ The older checks are unchanged, including the ban on `subprocess`, `abaqus_bridg
 
 **Known from the evidence I have:**
 - The task records `bool_dealloc` after the full CI suite at `5f398e8`.
-- At the earlier commit `52e296c`, the Qt step, which runs only `test_new_gui1_qt`, ended with exit code 134. That hints at a small case
-  on Linux, but I have not seen its log, so it is not proof.
+- **Corrected in MAT-4.F2:** I first wrote that the Qt step at `52e296c` ended with exit code 134, as a hint of a small case on Linux. That
+  was wrong. Exit code 134 belongs to the full suite. The Qt step ended with code 1, from its failing test, and gives no such hint.
 - The message generally means that `True` or `False` lost too many references, which [CPython's check](https://bugs.python.org/msg400728)
   attributes to refcount bugs in C extensions. This describes the message, not this crash. One web search found no matching PySide6
   report, and no dependency was changed.
