@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import types
 import unittest
 
 for _name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
@@ -52,6 +53,7 @@ from domain.plate_material_problem import (
     RefusalCode,
 )
 from plate_forward_support import SYNTHETIC, TEST_LIMITS, AbaqusForbiddenMixin
+from services import plate_material_workflow
 from services.identification_step import (
     CoordinateKind,
     InadmissibleTrial,
@@ -868,6 +870,25 @@ class SymmetricSquarePlate(AbaqusForbiddenMixin, unittest.TestCase):
                     self.assertIsNone(result.final_parameters)
                     self.assertEqual(result.solves, 1)
 
+    def test_one_frozen_member_of_a_repeated_pair_is_refused_in_every_basis(self):
+        # The partner is not an observation, yet the individual eigenvector of the frozen member is still arbitrary.
+        for member in (4, 5):
+            modes = tuple(sorted((1, 2, 3, member, 8, 9, 10)))
+            for declared in ((), (("row1", "row2"),)):
+                declaration = self.declaration(modes, declared)
+                outcomes = set()
+                for angle in self.ANGLES:
+                    with self.subTest(member=member, declared=declared, angle=angle):
+                        result = run_plate_inverse_study(declaration, model=_AnyEigenbasis(declaration, self.truth, angle))
+                        self.assertIs(result.refusal_code, InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER, result.refusal_reason)
+                        self.assertIn("arbitrary basis", result.refusal_reason)
+                        self.assertIn("not frozen", result.refusal_reason)
+                        self.assertIsNone(result.final_parameters)
+                        self.assertEqual(result.iterations, ())
+                        self.assertEqual(result.solves, 1)  # no review, MAC check or fit was reached
+                        outcomes.add((result.refusal_code, result.refusal_reason))
+                self.assertEqual(len(outcomes), 1, outcomes)
+
     def test_four_parameters_are_rank_deficient_at_the_symmetric_point(self):
         declaration = self.declaration(self.SEPARATED)
         # Swapping x and y leaves each separated mode unchanged, so d/dlnD11 equals d/dlnD22 at fixed D12.
@@ -882,6 +903,44 @@ class SymmetricSquarePlate(AbaqusForbiddenMixin, unittest.TestCase):
                 self.assertIs(result.refusal_code, InverseRefusalCode.RANK_DEFICIENT, result.refusal_reason)
                 self.assertIn("rank 3 < 4", result.refusal_reason)
                 self.assertIsNone(result.final_parameters)
+
+
+class RepeatedNeighbourGuard(unittest.TestCase):
+    """The guard reads only the solved spectrum: the stand-ins below hold no shape from which to compute a MAC."""
+
+    LIMIT = InverseNumericalPolicy().repeated_frequency_relative_spacing
+
+    @staticmethod
+    def check(modes, spectrum):
+        rows = tuple(types.SimpleNamespace(row_id=f"row{mode}", model_mode=mode) for mode in modes)
+        declaration = types.SimpleNamespace(rows=rows, policy=InverseNumericalPolicy())
+        plate_material_workflow._refuse_repeated_rows(declaration, types.SimpleNamespace(frequencies_hz=tuple(spectrum)))
+
+    def assert_refused(self, modes, spectrum):
+        with self.assertRaises(plate_material_workflow._StudyRefusal) as caught:
+            self.check(modes, spectrum)
+        self.assertIs(caught.exception.code, InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER)
+
+    def test_the_lower_and_the_upper_unfrozen_neighbour_are_both_checked(self):
+        self.assert_refused([2], [10.0, 20.0, 20.0, 30.0])  # upper
+        self.assert_refused([3], [10.0, 20.0, 20.0, 30.0])  # lower
+
+    def test_the_two_ends_of_the_solved_spectrum_have_one_neighbour(self):
+        self.assert_refused([1], [10.0, 10.0, 30.0])
+        self.assert_refused([3], [10.0, 30.0, 30.0])
+        self.check([1], [10.0, 20.0, 30.0])
+        self.check([3], [10.0, 20.0, 30.0])
+
+    def test_the_existing_tolerance_is_the_limit(self):
+        self.assert_refused([1], [100.0, 100.0 * (1.0 + 0.5 * self.LIMIT), 200.0])
+        self.check([1], [100.0, 100.0 * (1.0 + 2.0 * self.LIMIT), 200.0])
+
+    def test_a_repeated_pair_away_from_the_frozen_modes_is_ignored(self):
+        self.check([1, 2], [10.0, 20.0, 30.0, 30.0, 40.0])
+        self.check([1, 5], [10.0, 20.0, 30.0, 30.0, 40.0])
+
+    def test_two_frozen_members_are_still_refused(self):
+        self.assert_refused([2, 3], [10.0, 20.0, 20.0, 30.0])
 
 
 class ConfirmedCluster(StageCase):

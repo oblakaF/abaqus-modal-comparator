@@ -554,23 +554,35 @@ def _baseline_check(
 
 
 def _refuse_repeated_rows(declaration: PlateInverseDeclaration, baseline: ForwardState) -> None:
-    """Frozen rows on a numerically repeated eigenvalue have no defined individual eigenvectors.
+    """A frozen mode on a numerically repeated eigenvalue has no defined individual eigenvector.
 
-    The eigensolver returns an arbitrary basis of the pair, and it differs between platforms. The review
-    below and the baseline check compare individual shapes, so their outcome would depend on that basis.
+    The eigensolver returns an arbitrary basis of the eigenspace, and it differs between platforms. The
+    review below and the baseline check compare individual shapes, so their outcome would depend on that
+    basis. The partner may be a mode that no row selects, so each frozen mode is compared with its two
+    neighbours in the whole solved ascending spectrum. Only frequencies are read here. The declaration
+    check guarantees a solved mode above the highest frozen mode, so no upper neighbour goes unchecked.
     """
 
     limit = declaration.policy.repeated_frequency_relative_spacing
-    ordered = sorted(declaration.rows, key=lambda row: baseline.frequencies_hz[row.model_mode - 1])
-    for left, right in zip(ordered, ordered[1:]):
-        low, high = (baseline.frequencies_hz[row.model_mode - 1] for row in (left, right))
-        if high / low - 1.0 <= limit:
-            raise _StudyRefusal(
-                InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER,
-                f"Rows ({left.row_id}, {right.row_id}): model frequencies coincide within {limit:g} at the start "
-                "point, so their shapes are an arbitrary basis of the pair and neither individual identity nor "
-                "the cluster review is defined there.",
-            )
+    spectrum = baseline.frequencies_hz
+    frozen = {row.model_mode: row.row_id for row in declaration.rows}
+    for mode in sorted(frozen):
+        for neighbour in (mode - 1, mode + 1):
+            if not 1 <= neighbour <= len(spectrum):
+                continue
+            low, high = sorted((spectrum[mode - 1], spectrum[neighbour - 1]))
+            if high / low - 1.0 <= limit:
+                partner = (
+                    f"row {frozen[neighbour]} (model mode {neighbour})"
+                    if neighbour in frozen
+                    else f"model mode {neighbour}, which is not frozen"
+                )
+                raise _StudyRefusal(
+                    InverseRefusalCode.UNRESOLVED_MODAL_CLUSTER,
+                    f"Row {frozen[mode]} (model mode {mode}) and {partner}: model frequencies coincide within "
+                    f"{limit:g} at the start point, so these shapes are an arbitrary basis of the eigenspace and "
+                    "neither individual identity nor the cluster review is defined there.",
+                )
 
 
 def _cluster_review(

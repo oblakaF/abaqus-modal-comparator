@@ -1,6 +1,6 @@
 # MAT-2 report: shared offline inverse workflow
 
-Status: **REVIEW_READY**, including the F1 correction below. Not self-accepted. MAT-3 has not started.
+Status: **REVIEW_READY**, including the F1 and F2 corrections below. Not self-accepted. MAT-3 has not started.
 
 For the reviewer of MAT-2. Base: accepted MAT-1 `14f36d608420bb5324e1b49be7f644340c8c45d9`; branch
 `feature/materials-offline-v1`; `origin/main` at start `0bea1de68dc346d20958e6f53a9e1d634a870f5d`.
@@ -16,7 +16,7 @@ edited.
 |---|---|---|
 | `src/domain/plate_inverse_problem.py` | New | Frozen declaration, result contract, separate statuses, refusal codes |
 | `src/services/plate_material_workflow.py` | New | The one workflow over both backends |
-| `tests/test_plate_material_workflow.py` | New | 72 focused tests after F1 |
+| `tests/test_plate_material_workflow.py` | New | 78 focused tests after F2 |
 | `src/services/identification_step.py` | Opt-in additions | Mixed coordinates in the existing loop. Default path unchanged |
 | `src/services/plate_forward_adapter.py` | Three small additions | Orthonormality diagnostic for Stage A, the existing (D, D66, r) sensitivity coordinate, the stored domain in N*m |
 | `docs/materials/MAT_2_REPORT.md` | New | This report |
@@ -36,8 +36,8 @@ No GUI, project-schema or unrelated change.
    covariance.
 2. **Model identity:** declared identity must equal the opened model; Stage-A specimen, model and evidence kind must match
    the package; bounds must lie inside the stored domain.
-3. **Start point:** forward solve with numerical health checks, refusal of frozen rows on a numerically repeated
-   eigenvalue, then frequency triggers and the governed +/-5 % cluster review, then the strict baseline check. That check
+3. **Start point:** forward solve with numerical health checks, refusal of any frozen mode on a numerically repeated
+   eigenvalue, whether or not its partner is frozen, then frequency triggers and the governed +/-5 % cluster review, then the strict baseline check. That check
    verifies the frozen mapping and never changes it.
 4. **Identifiability before fitting:** rank and the 8 % limit on the complete tracked sensitivity matrix.
 5. **Fit:** bounded LM on whitened ln-frequency residuals. MAC is not an input. Every point is tracked from the last accepted
@@ -125,7 +125,7 @@ HOLDOUT data and experimental shapes do not change the fit.
 
 **Negative, each returning a specific code and no candidate:** rank-deficient (too few terms, collinear columns, symmetric
 square plate, unobservable r); weak parameter above 8 %; missing and non-independent HOLDOUT; unresolved and falsely declared
-clusters; frozen rows on a repeated eigenvalue; wrong Stage-A model, specimen, identity and evidence kind; missing package;
+clusters; frozen modes on a repeated eigenvalue, including one frozen member of a pair; wrong Stage-A model, specimen, identity and evidence kind; missing package;
 bounds and start outside range;
 inadmissible point; loss of branch identity; failed residual and orthogonality, at the start and during a fit; incomplete
 covariance; FRF peaks and unknown sources; unsupported intent; any non-synthetic study; attempted release; iteration,
@@ -137,9 +137,9 @@ solve, time and cancel stops.
   UNKNOWN.
 - **`SYNTHETIC` is a declared label for the Ritz backend.** The workflow cannot detect measured frequencies declared as
   synthetic. A Stage-A package's stored evidence kind is checked against the declaration.
-- **Repeated frozen pairs are refused, not resolved.** The governed cluster review compares individual shapes, so it has no
-  basis-independent answer at an exact repeat. A study on a perfectly symmetric model cannot use such a pair until a
-  basis-independent review is decided. The refusal limit of 1e-9 in relative spacing is numerical, not scientific.
+- **Frozen modes on a repeated eigenvalue are refused, not resolved.** The governed cluster review compares individual shapes, so it has no
+  basis-independent answer at an exact repeat. A study on a perfectly symmetric model cannot use such a mode, even alone,
+  until a basis-independent review is decided. The refusal limit of 1e-9 in relative spacing is numerical, not scientific.
 - **Benchmark coverage:** one isotropic published case. No independent reference with D11 != D22 and D12 != 0: NOT_RUN.
 - **Stage-A fixtures are small diagonal or 2-by-2 block matrices,** so they test the adapter and not an FE model.
 - **`setup_provisional`, Sigma diagonal:** covariance is diagonal by declaration, and correlated terms are named as missing.
@@ -282,7 +282,44 @@ Using a real sandwich specimen later would need:
 No core, adhesive or skin property may be inferred from fitting one or more frequencies without an appropriate, independently
 justified physical model.
 
+## F2 correction
+
+Base `ba834ba9482cdc58f8688ebfe9f3f6c96d922f78`. **Defect:** `_refuse_repeated_rows()` compared only declared rows, so selecting
+one member of a repeated pair passed the guard although that member's eigenvector is basis-dependent.
+
+**Fix:** each frozen mode is now compared with its lower and upper neighbours in the whole solved ascending baseline spectrum,
+frozen or not, using the existing `repeated_frequency_relative_spacing` of 1e-9. A match gives `UNRESOLVED_MODAL_CLUSTER`. The
+guard reads frequencies only, so no MAC-based orientation, re-pairing or eigenvector selection happens. It also covers the old
+case of two frozen members. Every upper neighbour exists, because the declaration check already requires a solved mode above the
+highest frozen mode. No threshold or scientific gate changed.
+
+One member frozen, modes (1, 2, 3, member, 8, 9, 10), same outcome for member 4 and member 5:
+
+| Basis angle | At `ba834ba` | At F2 |
+|---|---|---|
+| 0, 10 degrees | **`DIAGNOSTIC_OPTIMIZER_CANDIDATE`**, 92 solves | `UNRESOLVED_MODAL_CLUSTER`, 1 solve |
+| 25 degrees | `BRANCH_IDENTITY_LOST`, 3 solves | `UNRESOLVED_MODAL_CLUSTER`, 1 solve |
+| 45, 90 degrees | `BASELINE_PAIRING_REFUSED`, 1 solve | `UNRESOLVED_MODAL_CLUSTER`, 1 solve |
+
+**Tests:** `test_one_frozen_member_of_a_repeated_pair_is_refused_in_every_basis` requires the same code and the same reason at
+all five angles. `RepeatedNeighbourGuard` checks the lower and upper neighbour, both spectrum ends, the tolerance on both sides,
+a repeated pair away from the frozen modes, and two frozen members. Before the fix the regression and three of the five guard
+tests failed.
+
+**Limit of the guard:** it runs at the start point only, as before. A mode that becomes repeated during a fit is not caught by
+this check.
+
+**Behaviour preserved:** Ritz, Ritz with offsets and Stage A are identical in every bit between `ba834ba` and F2, in fitted
+parameters, objective, statistical sd, robustness ranges, HOLDOUT residuals, leave-one-family-out estimates, statuses and solve
+counts. The Stage-A confirmed-pair fit and the published benchmark were not in that comparison. Their tests pass with unchanged
+tolerances.
+
+**Final targeted regression,** Python 3.11.17, numpy 2.4.6, scipy 1.17.1, Windows, sequential, one BLAS thread:
+`test_plate_material_workflow` 78, `test_identification_step` 13, `test_spec_v1_2_normative` 6, `test_spec_v1_2_policy_draft` 16,
+`test_v12_i1_campaign_question` 19. All 132 PASS, 0 skipped, 23 s. About 33 s of the 60 s budget across all runs. The other
+MAT-2 modules, full suite, GUI, real-data fitting and Abaqus: NOT_RUN, as instructed.
+
 ## Artifacts
 
 Outside the repository, in `D:\git\abaqus-modal-comparator-work\research\MAT_2\`: `final_targeted.log` and
-`final_code.sha256` for `570c911`; `f1_final_targeted.log` and `f1_final_code.sha256` for F1.
+`final_code.sha256` for `570c911`; `f1_final_targeted.log` and `f1_final_code.sha256` for F1; `f2_final_targeted.log` and `f2_final_code.sha256` for F2.
