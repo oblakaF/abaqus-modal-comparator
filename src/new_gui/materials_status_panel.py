@@ -11,14 +11,14 @@ from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from new_gui.diagnostic_panel import DiagnosticTable
 
-SUBTITLE = "Material properties of your model."
-NOT_AVAILABLE = "NOT AVAILABLE"
-STATE_TEXT = "No material property has been identified. This program compares FE and experimental modal data; it does " \
-             "not estimate material properties."
+SUBTITLE = "Свойства материала вашей модели."
+NOT_AVAILABLE = "НЕДОСТУПНО"
+STATE_TEXT = "Свойства материала не идентифицированы. Программа сравнивает модальные данные FE и эксперимента и не оценивает " \
+             "свойства материала."
 PARAMETERS = ("E1", "E2", "G12")
-NOT_IDENTIFIED = "Not identified"
-HEADERS = ("Parameter", "Value")
-LIMIT_TEXT = "Frequencies, MAC and mode pairs do not establish a material value."
+NOT_IDENTIFIED = "Не идентифицировано"
+HEADERS = ("Параметр", "Значение")
+LIMIT_TEXT = "Частоты, MAC и пары мод не устанавливают значение материала."
 
 
 def _text(text: str, name: str = "") -> QLabel:

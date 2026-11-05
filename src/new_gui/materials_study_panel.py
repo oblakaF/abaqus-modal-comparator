@@ -1,8 +1,11 @@
-"""MAT-3: the study section of the Materials page (PySide6): input, method, parameters, observations, run and results.
+"""MAT-3, MAT-4.UX1: the study part of the Materials page (PySide6): four tabs, Calculation, Results, Plots and Diagnostics.
 
 A run happens in one owned worker thread that touches no widget; its outcome returns through a queued signal and is shown
 only when it belongs to the current run. Cancel stops the workflow between two forward solves. Only one background job runs
 at a time. Opening a saved result reads that one file, starts no calculation and opens none of the paths named in it.
+
+The plots are drawn on this thread from the result's numbers, at the size they are shown and at the screen's own scale, so
+nothing is ever enlarged from a smaller picture. Drawing computes no result.
 """
 
 from __future__ import annotations
@@ -12,10 +15,10 @@ import threading
 import time
 from typing import Callable, Optional
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QProgressBar,
-                               QPushButton, QSizePolicy, QVBoxLayout, QWidget)
+                               QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QToolButton, QVBoxLayout, QWidget)
 
 from domain.plate_material_problem import PlateForwardRefusal
 from new_gui import APP_NAME
@@ -25,26 +28,34 @@ from new_gui.shape_panel import _label
 from services import analysis_project as ap
 from services import materials_project as mp
 
-PROJECT_FILTER = "Materials results (*.mcproj)"
-PLOT_WIDTH = 480
-NOT_RUN = "NOT RUN"
+PROJECT_FILTER = "Результаты Materials (*.mcproj)"
+PLOT_FILTER = "Изображение PNG (*.png)"
+TAB_RUN, TAB_RESULTS, TAB_PLOTS, TAB_DIAGNOSTICS = 0, 1, 2, 3
+TAB_TITLES = ("Расчёт", "Результаты", "Графики", "Диагностика")
+NOT_RUN = "Расчёт не выполнялся"
 RUNNING, PREPARING = "RUNNING", "PREPARING"
-CANCELLED_TEXT = "Cancelled at a safe point between solves. No result of this run is shown as current."
-SNAPSHOT_TEXT = ("SAVED SNAPSHOT from {name}. Shown from that file only: nothing was calculated and no saved path was opened. "
-                 "Run calculates anew from the form.")
-FRESH_TEXT = "Calculated in this session."
-INPUTS_CHANGED = "The form differs from the input of the result shown. Run to calculate from the form."
-TITLES = {"A": "A. Input", "B": "B. Method", "C": "C. Fitting parameters", "D": "D. Observations", "E": "E. Run",
-          "F": "F. Results"}
+CANCELLED_TEXT = "Отменено в безопасной точке между решениями. Результат этого запуска не показан."
+SNAPSHOT_TEXT = "СОХРАНЁННЫЙ РЕЗУЛЬТАТ из файла {name}. Ничего не рассчитывалось, и пути из файла не открывались."
+FRESH_TEXT = "Рассчитано в этом сеансе."
+INPUTS_CHANGED = "Настройки изменились: показанный результат относится к прежним настройкам. Запустите расчёт заново."
+NO_RESULT_TEXT = "Результата пока нет. Запустите расчёт на вкладке «Расчёт» или откройте сохранённый результат."
+NO_PLOT_TEXT = "График появится после расчёта или открытия сохранённого результата."
+NO_POINTS_TEXT = "Для этого результата данных для графика нет."
+NO_DIAGNOSTICS_TEXT = "Диагностика появится после расчёта или открытия сохранённого результата."
 PARAMETER_KEYS = ("truth", "start", "lower", "upper")
-PARAMETER_CAPTIONS = ("Known SYNTHETIC value", "Start", "Lower bound", "Upper bound")
+PARAMETER_CAPTIONS = ("Известное синтетическое", "Начальное", "Нижняя граница", "Верхняя граница")
+TABLE_HEIGHT = 340  # a longer table scrolls inside itself
+PLOT_RATIOS = {"error": (0.62, 520, 760), "objective": (0.44, 320, 560)}  # height for a width: share, least, most
+PLOT_FILES = {"error": "oshibka_chastoty.png", "objective": "shodimost.png"}
+RESULT_TABLES = ("status", "parameters", "frequencies", "iterations", "identifiability", "holdout", "families", "convergence",
+                 "uncertainty", "conditional", "summary_parameters", "summary_frequencies")
 
 
 def _card():
     frame = QFrame()
     frame.setObjectName("card")
     layout = QVBoxLayout(frame)
-    layout.setContentsMargins(16, 14, 16, 14)
+    layout.setContentsMargins(16, 12, 16, 12)
     layout.setSpacing(8)
     return frame, layout
 
@@ -77,13 +88,146 @@ def _combo(items, name: str) -> QComboBox:
     return combo
 
 
+def scrolled(content: QWidget, always_bar: bool = False) -> QScrollArea:
+    """A tab's own scrolling. ``always_bar`` keeps the width steady for content whose height follows its width."""
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setFrameShape(QFrame.Shape.NoFrame)
+    if always_bar:
+        area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+    area.setWidget(content)
+    return area
+
+
+class Section(QWidget):
+    """A titled part that opens and closes with its own button (Space or a click). Closed, its content stays alive."""
+
+    def __init__(self, title: str, help_text: str = "", name: str = "", expanded: bool = False):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        self.toggle = QToolButton()
+        self.toggle.setObjectName("sectionToggle")
+        self.toggle.setText(title)
+        self.toggle.setCheckable(True)
+        self.toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)  # a long title never widens the page
+        self.toggle.setMinimumWidth(1)
+        self.toggle.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        if name:
+            self.toggle.setAccessibleName(name)
+        if help_text:
+            self.toggle.setToolTip(help_text)
+        layout.addWidget(self.toggle)
+        self.body = QWidget()
+        self.inner = QVBoxLayout(self.body)
+        self.inner.setContentsMargins(18, 0, 0, 6)
+        self.inner.setSpacing(8)
+        layout.addWidget(self.body)
+        if help_text:
+            self.inner.addWidget(_label(help_text, "hint"))
+        self.toggle.toggled.connect(self._toggled)
+        self.toggle.setChecked(expanded)
+        self._toggled(expanded)
+
+    def _toggled(self, opened: bool) -> None:
+        self.toggle.setArrowType(Qt.ArrowType.DownArrow if opened else Qt.ArrowType.RightArrow)
+        self.body.setVisible(opened)
+
+
+class _Table(DiagnosticTable):
+    """As tall as its rows up to a limit, and then it scrolls inside itself. It can take the keyboard focus to scroll."""
+
+    height_cap = TABLE_HEIGHT
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+
+class PlotView(QLabel):
+    """One plot, drawn from the result's numbers at the size shown and at the screen's scale. Never scaled from a smaller one."""
+
+    def __init__(self, kind: str, draw: Callable, name: str):
+        super().__init__()
+        self.kind = kind
+        self.draw = draw
+        self.section = None
+        self.data = b""  # the PNG now shown
+        self.setObjectName(name)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)  # a picture never widens the page
+        self.setMinimumSize(1, 1)
+        self._drawn = None
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(120)
+        self._timer.timeout.connect(self.render_now)
+        share, least, most = PLOT_RATIOS[kind]
+        self._height = lambda width: max(least, min(most, round(width * share)))
+
+    def set_section(self, section) -> None:
+        self.section = section
+        self._drawn = None
+        self.data = b""
+        self.clear()
+        if self.isVisible():
+            self.render_now()
+
+    def scale(self) -> float:
+        return self.devicePixelRatioF()
+
+    def render_now(self) -> bool:
+        """Draw for the present width and scale, unless this exact picture is already shown."""
+        self._timer.stop()
+        if self.section is None or not self.isVisible():
+            return False
+        width, ratio = max(1, self.width()), self.scale()
+        height = self._height(width)
+        if self.height() != height:
+            self.setFixedHeight(height)
+        if self._drawn == (width, height, ratio):
+            return False
+        data = self.draw(self.section, width, height, ratio)
+        if data is None:
+            return False
+        pixmap = QPixmap()
+        pixmap.loadFromData(data, "PNG")
+        pixmap.setDevicePixelRatio(ratio)
+        self.setPixmap(pixmap)
+        self.data = data
+        self._drawn = (width, height, ratio)
+        return True
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._timer.start()  # once the resizing stops
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._timer.start(0)
+
+    def event(self, event) -> bool:
+        if event.type() == QEvent.Type.DevicePixelRatioChange:  # moved to a screen with another scale
+            self._timer.start(0)
+        return super().event(event)
+
+
 class _Bridge(QObject):
     done = Signal(int, str, object)
     solved = Signal(int, int)
 
 
-class MaterialsStudyPanel(QWidget):
-    """``workspace`` gives the files chosen on the page; they are read only for the real-data facts shown here."""
+class MaterialsStudyPanel(QStackedWidget):
+    """``workspace`` gives the files chosen on the page; they are read only for the real-data facts shown here.
+
+    The pages are this widget's four tabs; the page's tab bar belongs to ``MaterialsWorkspace``. ``real_card`` is shown on
+    the fifth tab. ``tab_wanted`` asks for a tab when a result arrives.
+    """
+
+    tab_wanted = Signal(int)
 
     def __init__(self, workspace):
         super().__init__()
@@ -93,6 +237,7 @@ class MaterialsStudyPanel(QWidget):
         self.snapshot_path: Optional[Path] = None
         self.project_path: Optional[Path] = None
         self.solves_done = 0
+        self.summary_cells: list = []
         self._token = 0
         self._active: Optional[str] = None
         self._cancel: Optional[threading.Event] = None
@@ -102,16 +247,11 @@ class MaterialsStudyPanel(QWidget):
         self._bridge = _Bridge(self)
         self._bridge.done.connect(self._job_done)
         self._bridge.solved.connect(self._solved)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-        layout.addWidget(self._build_header())
-        layout.addWidget(self._build_input())
-        layout.addWidget(self._build_method())
-        layout.addWidget(self._build_parameters())
-        layout.addWidget(self._build_observations())
-        layout.addWidget(self._build_run())
-        layout.addWidget(self._build_results())
+        self.addWidget(scrolled(self._build_run_page()))
+        self.addWidget(scrolled(self._build_results_page()))
+        self.addWidget(scrolled(self._build_plots_page(), always_bar=True))
+        self.addWidget(scrolled(self._build_diagnostics_page()))
+        self.real_card = self._build_real_card()
         self.method_combo.currentIndexChanged.connect(self._method_changed)
         self.source_combo.currentIndexChanged.connect(self._refresh)
         self.package_source.currentIndexChanged.connect(self._refresh)
@@ -120,82 +260,95 @@ class MaterialsStudyPanel(QWidget):
             (field.textChanged if isinstance(field, QLineEdit) else field.currentIndexChanged).connect(self._refresh)
         self._method_changed()
 
-    # ---------------------------------------------------------------------------------------------- building
+    # ---------------------------------------------------------------------------------------------- the Calculation tab
 
-    def _build_header(self) -> QFrame:
+    def _build_run_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 10, 8, 10)
+        layout.setSpacing(10)
+        layout.addWidget(self._build_choice())
+        layout.addWidget(self._build_geometry())
+        layout.addWidget(self._build_run())
+        self.advanced = Section("Расширенные настройки", name="materialsAdvanced")
+        self.advanced.toggle.setObjectName("sectionToggle")
+        self._build_advanced(self.advanced.inner)
         card, inner = _card()
-        inner.addWidget(_label("Diagnostic model study", "sectionTitle"))
-        inner.addWidget(_label("Fits a bending model through the shared inverse workflow. It runs SYNTHETIC software tests with "
-                               "known values. A result is a diagnostic candidate at most, never a material property, a ply "
-                               "constant or a calibration, and it is kept apart from the material status further down.", "hint"))
+        inner.addWidget(self.advanced)
+        layout.addWidget(card)
+        layout.addStretch(1)
+        return page
+
+    def _build_choice(self) -> QFrame:
+        card, inner = _card()
         grid = QGridLayout()
-        grid.addWidget(_caption("Study data"), 0, 0)
-        self.source_combo = _combo((("Built-in SYNTHETIC example", sm.SYNTHETIC_SOURCE),
-                                    ("Real experimental file: view only", sm.REAL_SOURCE)), "materialsSource")
-        grid.addWidget(self.source_combo, 0, 1)
+        grid.setHorizontalSpacing(10)
+        self.method_combo = _combo(tuple((sm.METHOD_NAMES[key], key) for key in (sm.RITZ, sm.STAGE_A)), "materialsMethod")
+        for index, key in enumerate((sm.RITZ, sm.STAGE_A)):
+            self.method_combo.setItemData(index, key, Qt.ItemDataRole.ToolTipRole)
+        self.source_combo = _combo((("Встроенный синтетический пример", sm.SYNTHETIC_SOURCE),
+                                    ("Реальный файл: только просмотр", sm.REAL_SOURCE)), "materialsSource")
+        grid.addWidget(_caption("Метод"), 0, 0)
+        grid.addWidget(self.method_combo, 0, 1)
+        grid.addWidget(_caption("Данные"), 1, 0)
+        grid.addWidget(self.source_combo, 1, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 5)
         inner.addLayout(grid)
+        self.method_text = _label("", "hint")
+        inner.addWidget(self.method_text)
         return card
 
-    def _build_input(self) -> QFrame:
-        card, inner = _card()
-        inner.addWidget(_label(TITLES["A"], "sectionTitle"))
+    def _build_geometry(self) -> QFrame:
+        self.geometry_card, inner = _card()
+        inner.addWidget(_label("Плита", "sectionTitle"))
         form = sm.default_form()["geometry"]
         self.geometry_grid = QGridLayout()
         self.a_field, self.b_field = _field(form["a"], "materialsA"), _field(form["b"], "materialsB")
-        self.length_unit = _combo((("mm", "mm"), ("m", "m")), "materialsLengthUnit")
-        self.mass_basis = _combo((("Mass", "mass"), ("Surface mass (kg/m2)", "surface")), "materialsMassBasis")
+        self.length_unit = _combo((("мм", "mm"), ("м", "m")), "materialsLengthUnit")
         self.mass_field = _field(form["mass"], "materialsMass")
-        self.mass_unit = _combo((("g", "g"), ("kg", "kg")), "materialsMassUnit")
-        self.thickness_field = _field(form["thickness"], "materialsThickness")
-        rows = (("Length a", self.a_field), ("Width b", self.b_field), ("Length unit", self.length_unit),
-                ("Mass given as", self.mass_basis), ("Value", self.mass_field), ("Mass unit", self.mass_unit),
-                ("Thickness (optional)", self.thickness_field))
-        for index, (text, widget) in enumerate(rows):
-            self.geometry_grid.addWidget(_caption(text), index // 2, 2 * (index % 2))
-            self.geometry_grid.addWidget(widget, index // 2, 2 * (index % 2) + 1)
-        _pairs(self.geometry_grid)
+        self.mass_unit = _combo((("г", "g"), ("кг", "kg")), "materialsMassUnit")
+        self.mass_caption = _caption("Масса")
+        rows = ((("Длина a", self.a_field), ("Ширина b", self.b_field), ("Единица", self.length_unit)),
+                ((self.mass_caption, self.mass_field), ("Единица", self.mass_unit)))
+        for row, pairs in enumerate(rows):
+            for index, (text, widget) in enumerate(pairs):
+                self.geometry_grid.addWidget(text if isinstance(text, QLabel) else _caption(text), row, 2 * index)
+                self.geometry_grid.addWidget(widget, row, 2 * index + 1)
+        for column, share in enumerate((2, 3, 2, 3, 2, 3)):
+            self.geometry_grid.setColumnStretch(column, share)
         inner.addLayout(self.geometry_grid)
         self.geometry_note = _label("", "hint")
         inner.addWidget(self.geometry_note)
-        self.source_note = _label("Source of these values: declared for this SYNTHETIC test, not measured. Their uncertainty is "
-                                  "NOT_AVAILABLE and is not taken as zero.", "hint")
-        inner.addWidget(self.source_note)
-        return card
+        return self.geometry_card
 
-    def _build_method(self) -> QFrame:
+    def _build_run(self) -> QFrame:
         card, inner = _card()
-        inner.addWidget(_label(TITLES["B"], "sectionTitle"))
-        self.method_combo = _combo(tuple((sm.METHOD_NAMES[key], key) for key in (sm.RITZ, sm.STAGE_A)), "materialsMethod")
-        inner.addWidget(self.method_combo)
-        self.method_text = _label("", "hint")
-        inner.addWidget(self.method_text)
-        self.scope_text = _label("", "warnings")
-        inner.addWidget(self.scope_text)
-        self.availability = _label("")
-        self.availability.setObjectName("materialsAvailability")
-        inner.addWidget(self.availability)
-        self.package_row = QWidget()
-        row = QHBoxLayout(self.package_row)
-        row.setContentsMargins(0, 0, 0, 0)
-        self.package_source = _combo((("Built-in SYNTHETIC test package", sm.BUILT_IN), ("Package chosen here", sm.SELECTED)),
-                                     "materialsPackageSource")
-        row.addWidget(self.package_source)
-        self.package_field = QLineEdit()
-        self.package_field.setReadOnly(True)
-        self.package_field.setPlaceholderText("no package chosen")
-        self.package_field.setMinimumWidth(80)
-        row.addWidget(self.package_field, 1)
-        self.package_button = QPushButton("Choose folder...")
-        self.package_button.setObjectName("materialsChoosePackage")
-        self.package_button.clicked.connect(lambda: self.choose_package())
-        row.addWidget(self.package_button)
-        inner.addWidget(self.package_row)
-        self.package_note = _label("", "hint")
-        inner.addWidget(self.package_note)
-        self.package_box = QVBoxLayout()
-        inner.addLayout(self.package_box)
+        row = QHBoxLayout()
+        self.run_button = QPushButton("Запустить расчёт")
+        self.run_button.setObjectName("primary")
+        self.run_button.setMinimumHeight(36)
+        self.run_button.clicked.connect(lambda: self.run())
+        self.cancel_button = QPushButton("Отмена")
+        self.cancel_button.setObjectName("materialsCancel")
+        self.cancel_button.setMinimumHeight(36)
+        self.cancel_button.clicked.connect(lambda: self.cancel())
+        row.addWidget(self.run_button)
+        row.addWidget(self.cancel_button)
+        self.progress = QProgressBar()
+        self.progress.setTextVisible(False)
+        self.progress.setFixedHeight(10)
+        self.progress.setVisible(False)
+        row.addWidget(self.progress, 1)
+        inner.addLayout(row)
+        self.run_state = _label(NOT_RUN)
+        self.run_state.setObjectName("materialsRunState")
+        inner.addWidget(self.run_state)
+        self.blocked = _label(sm.RUN_BLOCKED + ". Сведения о файлах — на вкладке «FE / Эксперимент».", "error")
+        inner.addWidget(self.blocked)
+        self.message = _label("", "error")
+        self.message.setVisible(False)
+        inner.addWidget(self.message)
         return card
 
     def _parameter_grid(self, backend: str) -> tuple:
@@ -214,127 +367,280 @@ class MaterialsStudyPanel(QWidget):
                 grid.addWidget(fields[name][key], row, column)
         return widget, fields
 
-    def _build_parameters(self) -> QFrame:
-        card, inner = _card()
-        inner.addWidget(_label(TITLES["C"], "sectionTitle"))
+    def _build_advanced(self, inner: QVBoxLayout) -> None:
+        self.scope_text = _label("", "warnings")
+        inner.addWidget(self.scope_text)
+
+        self.plate_extra = QWidget()
+        extra = QVBoxLayout(self.plate_extra)
+        extra.setContentsMargins(0, 0, 0, 0)
+        extra.setSpacing(8)
+        inner.addWidget(self.plate_extra)
+        extra.addWidget(_label("Плита: дополнительно", "sectionTitle"))
+        form = sm.default_form()["geometry"]
+        grid = QGridLayout()
+        self.mass_basis = _combo((("Масса", "mass"), ("Поверхностная масса (кг/м²)", "surface")), "materialsMassBasis")
+        self.thickness_field = _field(form["thickness"], "materialsThickness")
+        grid.addWidget(_caption("Масса задана как"), 0, 0)
+        grid.addWidget(self.mass_basis, 0, 1)
+        grid.addWidget(_caption("Толщина (необязательно)"), 0, 2)
+        grid.addWidget(self.thickness_field, 0, 3)
+        _pairs(grid)
+        extra.addLayout(grid)
+        self.source_note = _label("Источник этих значений: заданы для синтетической проверки, не измерены. Их неопределённость "
+                                  "NOT_AVAILABLE и не считается нулём.", "hint")
+        extra.addWidget(self.source_note)
+
+        self.package_title = _label("Пакет матриц", "sectionTitle")
+        inner.addWidget(self.package_title)
+        self.availability = _label("")
+        self.availability.setObjectName("materialsAvailability")
+        inner.addWidget(self.availability)
+        self.package_row = QWidget()
+        row = QHBoxLayout(self.package_row)
+        row.setContentsMargins(0, 0, 0, 0)
+        self.package_source = _combo((("Встроенный синтетический пакет", sm.BUILT_IN), ("Пакет, выбранный здесь", sm.SELECTED)),
+                                     "materialsPackageSource")
+        row.addWidget(self.package_source, 2)
+        self.package_field = QLineEdit()
+        self.package_field.setReadOnly(True)
+        self.package_field.setPlaceholderText("пакет не выбран")
+        self.package_field.setMinimumWidth(80)
+        row.addWidget(self.package_field, 3)
+        self.package_button = QPushButton("Выбрать папку...")
+        self.package_button.setObjectName("materialsChoosePackage")
+        self.package_button.clicked.connect(lambda: self.choose_package())
+        row.addWidget(self.package_button)
+        inner.addWidget(self.package_row)
+        self.package_note = _label("", "hint")
+        inner.addWidget(self.package_note)
+        self.package_box = QVBoxLayout()
+        inner.addLayout(self.package_box)
+
+        inner.addWidget(_label("Параметры подбора", "sectionTitle"))
         self.parameter_grids, self.parameter_fields = {}, {}
         for backend in (sm.RITZ, sm.STAGE_A):
             self.parameter_grids[backend], self.parameter_fields[backend] = self._parameter_grid(backend)
             inner.addWidget(self.parameter_grids[backend])
         self.parameter_note = _label("", "hint")
         inner.addWidget(self.parameter_note)
+
+        inner.addWidget(_label("Модель и наблюдения", "sectionTitle"))
         numerics = sm.default_form()["numerics"]
         grid = QGridLayout()
         self.numeric_fields = {key: _field(numerics[key], f"materialsNumeric_{key}") for key in numerics}
-        rows = (("Basis degree", "degree"), ("Solved modes", "mode_count"), ("Observed modes", "observed_modes"),
-                ("HOLDOUT modes (last)", "holdout_modes"), ("Sigma per row (ln f)", "sigma"))
-        for index, (text, key) in enumerate(rows):
-            grid.addWidget(_caption(text), index // 2, 2 * (index % 2))
+        rows = (("Степень базиса", "degree", ""), ("Рассчитываемые моды", "mode_count", ""), ("Наблюдаемые моды", "observed_modes", ""),
+                ("Моды HOLDOUT (последние)", "holdout_modes", sm.TERM_HELP["HOLDOUT"]), ("Сигма на строку (ln f)", "sigma", sm.TERM_HELP["sigma"]))
+        for index, (text, key, tip) in enumerate(rows):
+            caption = _caption(text)
+            caption.setToolTip(tip)
+            self.numeric_fields[key].setToolTip(tip)
+            grid.addWidget(caption, index // 2, 2 * (index % 2))
             grid.addWidget(self.numeric_fields[key], index // 2, 2 * (index % 2) + 1)
         _pairs(grid)
         inner.addLayout(grid)
-        return card
-
-    def _build_observations(self) -> QFrame:
-        card, inner = _card()
-        inner.addWidget(_label(TITLES["D"], "sectionTitle"))
         row = QHBoxLayout()
-        self.prepare_button = QPushButton("Prepare observations")
+        self.prepare_button = QPushButton("Подготовить наблюдения")
         self.prepare_button.setObjectName("materialsPrepare")
         self.prepare_button.clicked.connect(lambda: self.prepare())
         row.addWidget(self.prepare_button)
         row.addStretch(1)
         inner.addLayout(row)
-        self.observation_note = _label("Observations are made from the known values when you prepare or run the study.", "hint")
-        inner.addWidget(self.observation_note)
-        self.observation_box = QVBoxLayout()
-        inner.addLayout(self.observation_box)
-        self.real_note = _label(sm.REAL_NOTE, "warnings")
-        inner.addWidget(self.real_note)
-        self.real_box = QVBoxLayout()
-        inner.addLayout(self.real_box)
-        return card
+        self.prepare_note = _label("Показывает зафиксированные строки FIT и HOLDOUT на вкладке «Диагностика», без подбора.", "hint")
+        inner.addWidget(self.prepare_note)
 
-    def _build_run(self) -> QFrame:
-        card, inner = _card()
-        inner.addWidget(_label(TITLES["E"], "sectionTitle"))
+        inner.addWidget(_label("Ограничения расчёта", "sectionTitle"))
         budget = sm.default_form()["budget"]
         grid = QGridLayout()
         self.solves_field = _field(budget["max_solves"], "materialsMaxSolves")
         self.seconds_field = _field(budget["max_seconds"], "materialsMaxSeconds")
         self.note_field = QLineEdit()
         self.note_field.setObjectName("materialsAuthorizationNote")
-        self.note_field.setPlaceholderText("recorded with the study; it enables nothing")
+        self.note_field.setPlaceholderText("записывается вместе с расчётом; ничего не разрешает")
         self.note_field.setMinimumWidth(80)
-        grid.addWidget(_caption("Solve limit"), 0, 0)
+        grid.addWidget(_caption("Лимит решений"), 0, 0)
         grid.addWidget(self.solves_field, 0, 1)
-        grid.addWidget(_caption("Time limit (s)"), 0, 2)
+        grid.addWidget(_caption("Лимит времени, с"), 0, 2)
         grid.addWidget(self.seconds_field, 0, 3)
-        grid.addWidget(_caption("Authorization note"), 1, 0)
+        grid.addWidget(_caption("Примечание о разрешении"), 1, 0)
         grid.addWidget(self.note_field, 1, 1, 1, 3)
         _pairs(grid)
         inner.addLayout(grid)
         self.preflight_box = QVBoxLayout()
         inner.addLayout(self.preflight_box)
-        row = QHBoxLayout()
-        self.run_button = QPushButton("Run")
-        self.run_button.setObjectName("primary")
-        self.run_button.clicked.connect(lambda: self.run())
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.setObjectName("materialsCancel")
-        self.cancel_button.clicked.connect(lambda: self.cancel())
-        row.addWidget(self.run_button)
-        row.addWidget(self.cancel_button)
-        row.addStretch(1)
-        inner.addLayout(row)
-        self.progress = QProgressBar()
-        self.progress.setVisible(False)
-        inner.addWidget(self.progress)
-        self.run_state = _label(NOT_RUN)
-        self.run_state.setObjectName("materialsRunState")
-        inner.addWidget(self.run_state)
-        self.blocked = _label(sm.RUN_BLOCKED, "error")
-        inner.addWidget(self.blocked)
-        self.message = _label("", "error")
-        self.message.setVisible(False)
-        inner.addWidget(self.message)
+
+    def _build_real_card(self) -> QFrame:
+        card, inner = _card()
+        inner.addWidget(_label("Реальные файлы и готовность", "sectionTitle"))
+        self.real_note = _label(sm.REAL_NOTE, "warnings")
+        inner.addWidget(self.real_note)
+        self.real_state = _label(sm.RUN_BLOCKED, "error")
+        inner.addWidget(self.real_state)
+        self.real_hint = _label("Сводка появляется, если на вкладке «Расчёт» выбрать данные «Реальный файл: только просмотр». "
+                                "Подбор при этом не запускается.", "hint")
+        inner.addWidget(self.real_hint)
+        self.real_box = QVBoxLayout()
+        inner.addLayout(self.real_box)
         return card
 
-    def _build_results(self) -> QFrame:
+    # ---------------------------------------------------------------------------------------------- the Results tab
+
+    def _build_results_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 10, 8, 10)
+        layout.setSpacing(10)
         card, inner = _card()
-        inner.addWidget(_label(TITLES["F"], "sectionTitle"))
+        self.badge = _label(NOT_RUN, "badge")  # the long status codes wrap at their own row and never widen the page
+        inner.addWidget(self.badge)
         row = QHBoxLayout()
-        self.save_button = QPushButton("Save results...")
+        self.save_button = QPushButton("Сохранить результат")
         self.save_button.setObjectName("materialsSave")
         self.save_button.clicked.connect(lambda: self.save_results())
-        self.open_button = QPushButton("Open results...")
+        self.open_button = QPushButton("Открыть результат")
         self.open_button.setObjectName("materialsOpen")
         self.open_button.clicked.connect(lambda: self.open_results())
         row.addWidget(self.save_button)
         row.addWidget(self.open_button)
         row.addStretch(1)
+        self.summary_grid = QGridLayout()
+        self.summary_grid.setHorizontalSpacing(12)
+        self.summary_grid.setVerticalSpacing(4)
+        self.summary_grid.setColumnStretch(0, 1)
+        self.summary_grid.setColumnStretch(1, 5)
+        inner.addLayout(self.summary_grid)
         inner.addLayout(row)
-        self.badge = _label(NOT_RUN, "badge")
-        inner.addWidget(self.badge)
+        self.results_empty = _label(NO_RESULT_TEXT, "hint")
+        inner.addWidget(self.results_empty)
+        self.statement = _label("", "warnings")
+        inner.addWidget(self.statement)
         self.origin_note = _label("", "hint")
         inner.addWidget(self.origin_note)
         self.changed_note = _label(INPUTS_CHANGED, "warnings")
         self.changed_note.setVisible(False)
         inner.addWidget(self.changed_note)
-        self.statement = _label("", "warnings")
-        inner.addWidget(self.statement)
-        self.results_box = QVBoxLayout()
-        self.results_box.setSpacing(8)
-        inner.addLayout(self.results_box)
-        self.objective_view, self.error_view = QLabel(), QLabel()
-        for view, name in ((self.objective_view, "materialsObjectivePlot"), (self.error_view, "materialsErrorPlot")):
-            view.setObjectName(name)
-            view.setVisible(False)
-            view.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)  # a picture never widens the page
-            inner.addWidget(view)
+        self.results_message = _label("", "error")
+        self.results_message.setVisible(False)
+        inner.addWidget(self.results_message)
+        layout.addWidget(card)
+        self.parameter_card, inner = _card()
+        inner.addWidget(_label("Параметры модели", "sectionTitle"))
+        self.summary_parameter_box = QVBoxLayout()
+        inner.addLayout(self.summary_parameter_box)
+        layout.addWidget(self.parameter_card)
+        self.frequency_card, inner = _card()
+        title = _label("Частоты и HOLDOUT", "sectionTitle")
+        title.setToolTip(sm.TERM_HELP["HOLDOUT"])
+        inner.addWidget(title)
+        self.holdout_line = _label("")
+        self.holdout_line.setToolTip(sm.TERM_HELP["HOLDOUT"])
+        inner.addWidget(self.holdout_line)
+        self.summary_frequency_box = QVBoxLayout()
+        inner.addLayout(self.summary_frequency_box)
+        layout.addWidget(self.frequency_card)
+        layout.addStretch(1)
+        self.parameter_card.setVisible(False)
+        self.frequency_card.setVisible(False)
+        return page
+
+    # ---------------------------------------------------------------------------------------------- the Plots tab
+
+    def _plot_card(self, title: str, kind: str, view: PlotView) -> tuple:
+        card, inner = _card()
+        row = QHBoxLayout()
+        row.addWidget(_label(title, "sectionTitle"), 1)
+        button = QPushButton("Сохранить график (PNG)...")
+        button.setObjectName(f"materialsSavePlot_{kind}")
+        button.clicked.connect(lambda _checked=False, k=kind: self.save_plot(k))
+        row.addWidget(button)
+        inner.addLayout(row)
+        inner.addWidget(view)
+        return card, button
+
+    def _build_plots_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 10, 8, 10)
+        layout.setSpacing(10)
+        self.plots_empty = _label(NO_PLOT_TEXT, "hint")
+        layout.addWidget(self.plots_empty)
+        self.error_view = PlotView("error", sm.error_plot, "materialsErrorPlot")
+        self.objective_view = PlotView("objective", sm.objective_plot, "materialsObjectivePlot")
+        self.plot_views = {"error": self.error_view, "objective": self.objective_view}
+        self.error_card, error_button = self._plot_card("Ошибка частоты до и после подбора", "error", self.error_view)
+        self.objective_card, objective_button = self._plot_card("Сходимость целевой функции", "objective", self.objective_view)
+        self.plot_buttons = {"error": error_button, "objective": objective_button}
+        layout.addWidget(self.error_card)
+        layout.addWidget(self.objective_card)
+        self.plot_message = _label("", "error")
+        self.plot_message.setVisible(False)
+        layout.addWidget(self.plot_message)
+        layout.addStretch(1)
+        self.error_card.setVisible(False)
+        self.objective_card.setVisible(False)
+        return page
+
+    # ---------------------------------------------------------------------------------------------- the Diagnostics tab
+
+    def _build_diagnostics_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 10, 8, 10)
+        layout.setSpacing(10)
+        self.diagnostics_empty = _label(NO_DIAGNOSTICS_TEXT, "hint")
+        layout.addWidget(self.diagnostics_empty)
+        card, inner = _card()
+        inner.setSpacing(4)
+        self.sections: dict = {}
+        self._boxes: dict = {}
+
+        def group(key, title, help_text, expanded=False):
+            section = Section(title, help_text, f"materialsDiagnostics_{key}", expanded)
+            self.sections[key] = section
+            inner.addWidget(section)
+            return section
+
+        def box(section, key, caption=""):
+            if caption:
+                section.inner.addWidget(_label(caption, "sectionTitle"))
+            holder = QVBoxLayout()
+            section.inner.addLayout(holder)
+            self._boxes[key] = holder
+
+        section = group("status", "Статусы и причины", "Точные коды результата и подробные причины отказа.", True)
+        box(section, "status")
+        section.inner.addWidget(_label("Причины и заявление расчётной схемы (исходный текст, он входит в записанный результат)", "sectionTitle"))
         self.reasons = _label("", "hint")
-        inner.addWidget(self.reasons)
-        return card
+        section.inner.addWidget(self.reasons)
+        self.original_statement = _label("", "hint")
+        section.inner.addWidget(self.original_statement)
+        section = group("parameters", "Параметры и неопределённость", sm.TERM_HELP["uncertainty"])
+        box(section, "parameters", "Все параметры")
+        box(section, "uncertainty", "Составляющие неопределённости")
+        section = group("conditional", "Условные эффективные изгибные значения",
+                        "Пересчёт жёсткостей при заданной толщине. " + sm.CONDITIONAL_NOTE + ".")
+        box(section, "conditional")
+        section = group("modes", "Идентичность мод и MAC", sm.TERM_HELP["MAC"])
+        box(section, "frequencies")
+        section = group("fit", "FIT и HOLDOUT", sm.TERM_HELP["HOLDOUT"])
+        self.observation_note = _label("", "hint")
+        section.inner.addWidget(self.observation_note)
+        box(section, "observations", "Зафиксированные строки")
+        box(section, "holdout", "Невязки HOLDOUT")
+        section = group("convergence", "Итерации и сходимость",
+                        "Шаги подбора и численные проверки: невязки, ортонормированность, чувствительности, смены порядка мод.")
+        box(section, "iterations", "История итераций")
+        box(section, "convergence", "Сходимость и численные проверки")
+        section = group("rank", "Ранг и наблюдаемость", sm.TERM_HELP["rank"])
+        box(section, "identifiability")
+        section = group("families", "Исключение одного семейства",
+                        "Подбор повторяется без одного семейства мод FIT: показывает, зависит ли результат от него.")
+        box(section, "families")
+        layout.addWidget(card)
+        layout.addStretch(1)
+        self.diagnostics_card = card
+        card.setVisible(False)
+        return page
 
     def _all_inputs(self) -> tuple:
         parameters = tuple(field for fields in self.parameter_fields.values() for entry in fields.values() for field in entry.values())
@@ -389,10 +695,16 @@ class MaterialsStudyPanel(QWidget):
         backend = self.backend
         for key, grid in self.parameter_grids.items():
             grid.setVisible(key == backend)
+        self.method_combo.setToolTip(backend)
         self.method_text.setText(sm.METHOD_TEXT[backend])
         self.scope_text.setText(sm.APPLICABILITY[backend])
-        self.package_row.setVisible(backend == sm.STAGE_A)
         ritz = backend == sm.RITZ
+        self.geometry_card.setVisible(ritz)  # the matrix package holds its own model: geometry and mass are not its inputs
+        self.plate_extra.setVisible(ritz)
+        self.package_title.setVisible(not ritz)
+        self.availability.setVisible(not ritz)
+        self.package_row.setVisible(not ritz)
+        self.package_note.setVisible(not ritz)
         for widget in (self.a_field, self.b_field, self.length_unit, self.mass_basis, self.mass_field, self.mass_unit,
                        self.thickness_field):
             widget.setEnabled(ritz)
@@ -401,19 +713,17 @@ class MaterialsStudyPanel(QWidget):
             field.setText(numerics[key])
             field.setEnabled(ritz or key == "sigma")  # the Stage-A example's modes are those of its fixture
         self.parameter_note.setText(
-            "Stiffness in N*m. D12 = u*D22 and u is dimensionless. Physical limits: D11, D22, D66 > 0 and D12^2 < D11*D22."
-            if ritz else "Stiffness in N*m. D22 = D11 = D and D12 = r*D. The bounds must lie inside the package's stored domain.")
+            "Жёсткости в Н·м. D12 = u*D22, u безразмерно. Физические ограничения: D11, D22, D66 > 0 и D12² < D11*D22."
+            if ritz else "Жёсткости в Н·м. D22 = D11 = D и D12 = r*D. Границы должны лежать внутри диапазона, записанного в пакете.")
         self._clear_observations()
         self._refresh()
 
     def _availability_text(self) -> str:
-        if self.backend == sm.RITZ:
-            return "Available: this method needs no ODB, Abaqus or matrix file."
         if self.package_source.currentData() == sm.BUILT_IN:
-            return "Available for the SYNTHETIC example: the built-in test package is generated for the run and not kept."
+            return "Доступно для синтетического примера: встроенный пакет создаётся на время расчёта и не сохраняется."
         if not self.package_field.text():
-            return "Not available: no package is chosen. Run gives the workflow's refusal; nothing is substituted."
-        return "Package chosen: the workflow judges it against this study when you run, and refuses one that does not match."
+            return "Недоступно: пакет не выбран. При запуске будет отказ расчётной схемы; ничего не подставляется."
+        return "Пакет выбран: при запуске расчётная схема сверит его с этим исследованием и откажет, если он не подходит."
 
     def _refresh(self) -> None:
         running = self._active is not None
@@ -421,14 +731,16 @@ class MaterialsStudyPanel(QWidget):
         rows, problems = sm.preflight(form)
         self._table("preflight", self.preflight_box, sm.PREFLIGHT_HEADERS, rows, 0)
         self.availability.setText(self._availability_text())
-        self.geometry_note.setText(sm.geometry_text(form) if self.backend == sm.RITZ else "Not used by this method.")
-        self.mass_unit.setEnabled(self.backend == sm.RITZ and self.mass_basis.currentData() == "mass")
+        self.geometry_note.setText(sm.geometry_text(form) if self.backend == sm.RITZ else "")
+        surface = self.mass_basis.currentData() == "surface"
+        self.mass_caption.setText("Поверхностная масса, кг/м²" if surface else "Масса")
+        self.mass_unit.setEnabled(self.backend == sm.RITZ and not surface)
         self.package_source.setEnabled(not running)
         self.package_button.setEnabled(not running and self.package_source.currentData() == sm.SELECTED)
         self.package_field.setEnabled(self.package_source.currentData() == sm.SELECTED)
         real = self.real_source
         self.blocked.setVisible(real)
-        self.real_note.setVisible(real)
+        self.real_hint.setVisible(not real)
         self.prepare_button.setEnabled(not running and not real)
         self.run_button.setEnabled(not running and not real and not problems)
         self.cancel_button.setEnabled(self._active == RUNNING)
@@ -447,6 +759,9 @@ class MaterialsStudyPanel(QWidget):
         self.message.setText(text)
         self.message.setVisible(bool(text))
         self._message_is_form = bool(text) and from_form
+        shown = "" if from_form else text  # an outcome of Save or Open is also said where those commands are
+        self.results_message.setText(shown)
+        self.results_message.setVisible(bool(shown))
 
     def _table(self, key: str, box, headers, rows, stretch: int, text_columns=()) -> None:
         old = self._tables.pop(key, None)
@@ -455,7 +770,7 @@ class MaterialsStudyPanel(QWidget):
             old.deleteLater()
         if not rows:
             return
-        table = DiagnosticTable(headers, rows, stretch, text_columns=text_columns or tuple(range(len(headers))))
+        table = _Table(headers, rows, stretch, text_columns=text_columns or tuple(range(len(headers))))
         table.setObjectName(f"materials_{key}")
         self._tables[key] = table
         box.addWidget(table)
@@ -471,11 +786,11 @@ class MaterialsStudyPanel(QWidget):
             return
         facts = self.workspace.facts.get(self.workspace.experimental_kind)
         rows = sm.real_data_rows(facts, self.workspace.registration_text(), self.note_field.text())
-        self._table("real", self.real_box, ("Fact", "Value"), rows, 1, (0,))
+        self._table("real", self.real_box, ("Сведение", "Значение"), rows, 1, (0,))
 
     def _clear_observations(self) -> None:
-        self._table("observations", self.observation_box, (), (), 0)
-        self.observation_note.setText("Observations are made from the known values when you prepare or run the study.")
+        self._table("observations", self._boxes["observations"], (), (), 0)
+        self.observation_note.setText("Наблюдения строятся из известных значений при подготовке или запуске.")
 
     # ---------------------------------------------------------------------------------------------- background jobs
 
@@ -547,18 +862,21 @@ class MaterialsStudyPanel(QWidget):
             return False
         form = self.form()
         self._say("")
-        self.run_state.setText("Preparing the observations...")
+        self.run_state.setText("Подготовка наблюдений...")
         return self._start(PREPARING, lambda: sm.prepare_rows(form))
 
     def _prepared(self, value, _cancelled: bool) -> None:
-        self.run_state.setText(NOT_RUN if self.record is None else self.run_state.text())
+        self.run_state.setText(NOT_RUN if self.record is None else FRESH_TEXT)
         if isinstance(value, Exception):
             self._clear_observations()
-            self._say(f"The observations could not be prepared: {value}", False)
+            self._say(f"Наблюдения не подготовлены: {value}", False)
             return
         rows, note = value
-        self._table("observations", self.observation_box, sm.OBSERVATION_HEADERS, rows, 6)
+        self._table("observations", self._boxes["observations"], sm.OBSERVATION_HEADERS, rows, 6)
         self.observation_note.setText(note)
+        self.prepare_note.setText("Наблюдения подготовлены: см. вкладку «Диагностика», раздел «FIT и HOLDOUT».")
+        self.diagnostics_card.setVisible(True)
+        self.diagnostics_empty.setVisible(False)
 
     def run(self) -> bool:
         """Start one study. Refuses a second one, a real source and a form over the limits; each says why."""
@@ -593,7 +911,7 @@ class MaterialsStudyPanel(QWidget):
         self.progress.setRange(0, limit)
         self.progress.setValue(0)
         self.progress.setVisible(True)
-        self.run_state.setText(f"Running: 0 of at most {limit} solves")
+        self.run_state.setText(f"Выполняется: 0 решений, не более {limit}")
         return self._start(RUNNING, lambda: sm.execute_study(form, cancel, on_solve), cancel)
 
     def _solved(self, token: int, count: int) -> None:
@@ -601,32 +919,35 @@ class MaterialsStudyPanel(QWidget):
             return
         self.solves_done = count
         self.progress.setValue(min(count, self.progress.maximum()))
-        self.run_state.setText(f"Running: {count} of at most {self.progress.maximum()} solves, "
-                               f"{time.monotonic() - self._started:.1f} s")
+        self.run_state.setText(f"Выполняется: решений {count}, не более {self.progress.maximum()}, "
+                               f"{time.monotonic() - self._started:.1f} с")
 
     def cancel(self) -> bool:
         if self._active != RUNNING or self._cancel is None:
             return False
         self._cancel.set()
-        self.run_state.setText("Cancelling at the next safe point...")
+        self.run_state.setText("Отмена в следующей безопасной точке...")
         return True
 
     def _run_done(self, value, cancelled: bool) -> None:
         if isinstance(value, Exception):
-            self.run_state.setText("Not run.")
-            self._say(f"The study did not start: {value}", False)
+            self.run_state.setText("Расчёт не запущен.")
+            self._say(f"Расчёт не запущен: {value}", False)
             return
         if cancelled or sm.is_cancelled(value):
             self.run_state.setText(CANCELLED_TEXT)
             self.badge.setText("CANCELLED")
             self.badge.setProperty("state", "")
             self._repolish()
+            self._show_summary(sm.cancelled_summary(self.backend))
+            self.results_empty.setVisible(False)
             return
         self.snapshot_path = None
         self.project_path = None
         self._show_section(mp.materials_document(value, APP_NAME), FRESH_TEXT)
-        self._table("observations", self.observation_box, sm.OBSERVATION_HEADERS, sm.observation_rows(value["declaration"]), 6)
+        self._table("observations", self._boxes["observations"], sm.OBSERVATION_HEADERS, sm.observation_rows(value["declaration"]), 6)
         self.observation_note.setText(sm.registration_text(value["declaration"]))
+        self.tab_wanted.emit(TAB_RESULTS)
 
     # ---------------------------------------------------------------------------------------------- showing a result
 
@@ -634,19 +955,36 @@ class MaterialsStudyPanel(QWidget):
         self.badge.style().unpolish(self.badge)
         self.badge.style().polish(self.badge)
 
+    def _show_summary(self, rows) -> None:
+        while self.summary_grid.count():
+            widget = self.summary_grid.takeAt(0).widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+        self.summary_cells = [list(row) for row in rows]
+        for index, (caption, text) in enumerate(rows):
+            self.summary_grid.addWidget(_label(caption, "summaryCaption"), index, 0)
+            self.summary_grid.addWidget(_label(text, "summaryValue"), index, 1)
+
     def _clear_results(self) -> None:
         self.record = None
-        for key in ("status", "parameters", "frequencies", "iterations", "identifiability", "holdout", "families", "convergence",
-                    "uncertainty", "conditional"):
-            self._table(key, self.results_box, (), (), 0)
-        for view in (self.objective_view, self.error_view):
-            view.clear()
-            view.setVisible(False)
-        for label in (self.origin_note, self.statement, self.reasons):
+        for key in RESULT_TABLES:
+            self._table(key, None, (), (), 0)
+        self._show_summary(())
+        for label in (self.origin_note, self.statement, self.reasons, self.holdout_line, self.original_statement):
             label.setText("")
         self.badge.setText(NOT_RUN)
         self.badge.setProperty("state", "")
         self._repolish()
+        for view in self.plot_views.values():
+            view.set_section(None)
+        for widget in (self.parameter_card, self.frequency_card, self.error_card, self.objective_card, self.diagnostics_card):
+            widget.setVisible(False)
+        self.results_empty.setVisible(True)
+        self.plots_empty.setText(NO_PLOT_TEXT)
+        self.plots_empty.setVisible(True)
+        self.diagnostics_empty.setVisible(True)
+        self.plot_message.setVisible(False)
 
     def _show_section(self, document: dict, origin: str) -> None:
         self._clear_results()
@@ -657,36 +995,63 @@ class MaterialsStudyPanel(QWidget):
         self.badge.setText(f"{scientific} | {result['release_status']}")
         self.badge.setProperty("state", "blocked" if result["refusal_code"] else "chosen")  # never the green of a verified result
         self._repolish()
+        self.results_empty.setVisible(False)
+        self.diagnostics_empty.setVisible(False)
+        self.diagnostics_card.setVisible(True)
+        self._show_summary(sm.result_summary(section))
         self.origin_note.setText(origin)
-        self.statement.setText(section["statement"])
+        self.statement.setText(sm.STATEMENT_RU)
+        self.original_statement.setText(section["statement"])
         self.reasons.setText(sm.reason_text(section))
-        self.run_state.setText(f"{result['execution_status']}: {result['numerical_status']}, {result['solves']} solves")
-        box = self.results_box
-        self._table("status", box, ("Status", "Value"), sm.status_rows(section), 1)
-        self._table("parameters", box, sm.PARAMETER_HEADERS, sm.parameter_rows(section), 6)
-        self._table("frequencies", box, sm.FREQUENCY_HEADERS, sm.frequency_rows(section), 8)
-        self._table("iterations", box, sm.ITERATION_HEADERS, sm.iteration_rows(section), 5)
-        self._table("identifiability", box, ("Rank and observability", "Value"), sm.identifiability_rows(section), 1)
-        self._table("holdout", box, sm.HOLDOUT_HEADERS, sm.holdout_rows(section), 0)
-        self._table("families", box, sm.FAMILY_HEADERS, sm.family_rows(section), 2)
-        self._table("convergence", box, ("Convergence and numerical checks", "Value"), sm.convergence_rows(section), 1)
-        self._table("uncertainty", box, ("Uncertainty components", "Value"), sm.uncertainty_rows(section), 1)
-        self._table("conditional", box, ("Conditional effective flexural values", "Value"), sm.conditional_rows(section), 1)
-        self._show_plot(self.objective_view, sm.objective_plot(section))
-        self._show_plot(self.error_view, sm.error_plot(section))
+        self.run_state.setText(f"{result['execution_status']}: {result['numerical_status']}, решений: {result['solves']}")
+        boxes = self._boxes
+        self._table("summary_parameters", self.summary_parameter_box, sm.SUMMARY_PARAMETER_HEADERS, sm.summary_parameter_rows(section), 0)
+        self.parameter_card.setVisible(True)
+        frequencies = sm.summary_frequency_rows(section)
+        self._table("summary_frequencies", self.summary_frequency_box, sm.SUMMARY_FREQUENCY_HEADERS, frequencies, 1)
+        self.holdout_line.setText(sm.holdout_summary(section))
+        self.frequency_card.setVisible(bool(frequencies))
+        self._table("status", boxes["status"], ("Статус", "Значение"), sm.status_rows(section), 1)
+        self._table("parameters", boxes["parameters"], sm.PARAMETER_HEADERS, sm.parameter_rows(section), 6)
+        self._table("frequencies", boxes["frequencies"], sm.FREQUENCY_HEADERS, sm.frequency_rows(section), 8)
+        self._table("iterations", boxes["iterations"], sm.ITERATION_HEADERS, sm.iteration_rows(section), 5)
+        self._table("identifiability", boxes["identifiability"], ("Ранг и наблюдаемость", "Значение"), sm.identifiability_rows(section), 1)
+        self._table("holdout", boxes["holdout"], sm.HOLDOUT_HEADERS, sm.holdout_rows(section), 0)
+        self._table("families", boxes["families"], sm.FAMILY_HEADERS, sm.family_rows(section), 2)
+        self._table("convergence", boxes["convergence"], ("Сходимость и численные проверки", "Значение"), sm.convergence_rows(section), 1)
+        self._table("uncertainty", boxes["uncertainty"], ("Составляющие неопределённости", "Значение"), sm.uncertainty_rows(section), 1)
+        self._table("conditional", boxes["conditional"], ("Условные эффективные изгибные значения", "Значение"), sm.conditional_rows(section), 1)
+        self.sections["conditional"].setVisible(bool(sm.conditional_rows(section)))
+        self.error_card.setVisible(bool(sm.error_rows(section)))
+        self.objective_card.setVisible(bool(sm.objective_points(section)))
+        self.error_view.set_section(section)
+        self.objective_view.set_section(section)
+        drawn = self.error_card.isVisibleTo(self.error_card.parentWidget()) or self.objective_card.isVisibleTo(self.objective_card.parentWidget())
+        self.plots_empty.setText(NO_POINTS_TEXT)
+        self.plots_empty.setVisible(not drawn)
 
-    @staticmethod
-    def _show_plot(view: QLabel, data: Optional[bytes]) -> None:
-        if data is None:
-            view.clear()
-            view.setVisible(False)
-            return
-        pixmap = QPixmap()
-        pixmap.loadFromData(data, "PNG")
-        scaled = pixmap.scaledToWidth(PLOT_WIDTH)
-        view.setPixmap(scaled)
-        view.setFixedHeight(scaled.height())
-        view.setVisible(True)
+    # ---------------------------------------------------------------------------------------------- saving a plot
+
+    def save_plot(self, kind: str, path: Optional[str] = None) -> bool:
+        """Save a plot drawn anew from the numbers at a fixed high resolution, whatever the size of the window."""
+        section = self.plot_views[kind].section
+        if section is None:
+            return False
+        if path is None:
+            path, _filter = QFileDialog.getSaveFileName(self, "Сохранить график", PLOT_FILES[kind], PLOT_FILTER)
+        if not path:
+            return False
+        target = Path(path)
+        target = target if target.suffix else target.with_name(target.name + ".png")
+        data = (sm.error_plot if kind == "error" else sm.objective_plot)(section, *sm.EXPORT_SIZE)
+        try:
+            target.write_bytes(data)
+        except OSError as error:
+            self.plot_message.setText(f"График не сохранён: {error}")
+            self.plot_message.setVisible(True)
+            return False
+        self.plot_message.setVisible(False)
+        return True
 
     # ---------------------------------------------------------------------------------------------- the package
 
@@ -695,22 +1060,22 @@ class MaterialsStudyPanel(QWidget):
         if self._active is not None:
             return False
         if path is None:
-            path = QFileDialog.getExistingDirectory(self, "Choose a matrix package folder", self.package_field.text())
+            path = QFileDialog.getExistingDirectory(self, "Выберите папку пакета матриц", self.package_field.text())
         if not path:
             return False
         self.package_source.setCurrentIndex(self.package_source.findData(sm.SELECTED))
         self.package_field.setText(str(path))
         self.package_field.setToolTip(str(path))
-        self.package_note.setText("Reading the package's manifest...")
+        self.package_note.setText("Чтение манифеста пакета...")
         self._table("package", self.package_box, (), (), 0)
         return self._start("package", lambda: sm.package_facts(path))
 
     def _package_read(self, value, _cancelled: bool) -> None:
         if isinstance(value, Exception):
-            self.package_note.setText(f"This package cannot be used: {value}")
+            self.package_note.setText(f"Этот пакет нельзя использовать: {value}")
             return
-        self.package_note.setText("Read from the package's manifest. Its matrices were not loaded.")
-        self._table("package", self.package_box, ("Fact", "Value"), value, 1, (0,))
+        self.package_note.setText("Прочитано из манифеста пакета. Матрицы не загружались.")
+        self._table("package", self.package_box, ("Сведение", "Значение"), value, 1, (0,))
 
     # ---------------------------------------------------------------------------------------------- save and open
 
@@ -719,7 +1084,7 @@ class MaterialsStudyPanel(QWidget):
             return False
         if path is None:
             start = str(self.project_path or self.snapshot_path or f"materials{ap.SUFFIX}")
-            path, _filter = QFileDialog.getSaveFileName(self, "Save results", start, PROJECT_FILTER)
+            path, _filter = QFileDialog.getSaveFileName(self, "Сохранить результат", start, PROJECT_FILTER)
         if not path:
             return False
         section = self.record["materials"]
@@ -730,17 +1095,17 @@ class MaterialsStudyPanel(QWidget):
 
     def _saved(self, value, _cancelled: bool) -> None:
         if isinstance(value, Exception):
-            self._say(f"Not saved: {value}", False)
+            self._say(f"Не сохранено: {value}", False)
             return
         self.project_path = Path(value)
-        self.origin_note.setText(f"Saved: {self.project_path}. No source file is in it.")
+        self.origin_note.setText(f"Сохранено: {self.project_path}. Исходных файлов в нём нет.")
 
     def open_results(self, path: Optional[str] = None) -> bool:
         """Show a saved result: only that file is read, no calculation starts and no path named in it is opened."""
         if self._active is not None:
             return False
         if path is None:
-            path, _filter = QFileDialog.getOpenFileName(self, "Open results", str(self.project_path or ""), PROJECT_FILTER)
+            path, _filter = QFileDialog.getOpenFileName(self, "Открыть результат", str(self.project_path or ""), PROJECT_FILTER)
         if not path:
             return False
         self._say("")
@@ -748,7 +1113,7 @@ class MaterialsStudyPanel(QWidget):
 
     def _opened(self, value, _cancelled: bool) -> None:
         if isinstance(value, Exception):
-            self._say(f"Not opened: {value}", False)
+            self._say(f"Не открыто: {value}", False)
             return
         path, document = value
         self.source_combo.setCurrentIndex(self.source_combo.findData(sm.SYNTHETIC_SOURCE))
@@ -756,8 +1121,9 @@ class MaterialsStudyPanel(QWidget):
         self.snapshot_path = self.project_path = path
         self._show_section(document, SNAPSHOT_TEXT.format(name=path.name))
         section = document["materials"]
-        self._table("observations", self.observation_box, sm.OBSERVATION_HEADERS, sm.observation_rows(section["declaration"]), 6)
+        self._table("observations", self._boxes["observations"], sm.OBSERVATION_HEADERS, sm.observation_rows(section["declaration"]), 6)
         self.observation_note.setText(sm.registration_text(section["declaration"]))
+        self.tab_wanted.emit(TAB_RESULTS)
 
 
-__all__ = ["MaterialsStudyPanel"]
+__all__ = ["MaterialsStudyPanel", "PlotView", "Section", "TAB_DIAGNOSTICS", "TAB_PLOTS", "TAB_RESULTS", "TAB_RUN", "TAB_TITLES", "scrolled"]

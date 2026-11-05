@@ -29,8 +29,7 @@ from new_gui.workspace_state import EXPERIMENTAL, FE
 PAGES = ("Analyze", "Review", "MAC / Points", "Materials")
 ANALYZE_PAGE, REVIEW_PAGE, MAC_PAGE, MATERIALS_PAGE = 0, 1, 2, 3
 MAC_SUBTITLE = "Mode pairs and MAC, what they rest on, and why they may be missing. Nothing here is computed from a manual choice."
-MATERIALS_PAGE_SUBTITLE = ("Run a SYNTHETIC software test of the two model methods, and inspect an ODB and a UNV/UFF read-only. "
-                           "No material value is issued.")
+MATERIALS_PAGE_SUBTITLE = "Синтетическая проверка двух методов и просмотр файлов ODB и UNV/UFF. Значения материала здесь не выдаются."
 ABOUT = ("Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze. Mode pairs and MAC appear only "
          "with a verified physical registration; otherwise the result is a frequency comparison. No FE analysis is "
          "solved.")
@@ -48,7 +47,8 @@ class _WheelGuard(QObject):
         return False
 
 
-def _page(title: str, subtitle: str, content: QWidget) -> QScrollArea:
+def _page(title: str, subtitle: str, content: QWidget, fill: bool = False) -> QScrollArea:
+    """``fill``: the content takes the page's height and scrolls inside itself; only a very short window scrolls the page."""
     page = QWidget()
     layout = QVBoxLayout(page)
     layout.setContentsMargins(24, 20, 24, 20)
@@ -60,8 +60,9 @@ def _page(title: str, subtitle: str, content: QWidget) -> QScrollArea:
     note.setObjectName("subtitle")
     note.setWordWrap(True)
     layout.addWidget(note)
-    layout.addWidget(content)
-    layout.addStretch(1)
+    layout.addWidget(content, 1 if fill else 0)
+    if not fill:
+        layout.addStretch(1)
     area = QScrollArea()
     area.setWidgetResizable(True)
     area.setWidget(page)
@@ -97,7 +98,7 @@ class ProductionWindow(QMainWindow):
         review.setWidget(self.review)
         self.stack.addWidget(review)
         self.stack.addWidget(_page(PAGES[MAC_PAGE], MAC_SUBTITLE, self.mac_points))
-        self.stack.addWidget(_page(PAGES[MATERIALS_PAGE], MATERIALS_PAGE_SUBTITLE, self.materials_workspace))
+        self.stack.addWidget(_page(PAGES[MATERIALS_PAGE], MATERIALS_PAGE_SUBTITLE, self.materials_workspace, fill=True))
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()

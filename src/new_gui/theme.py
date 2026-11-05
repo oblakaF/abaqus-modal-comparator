@@ -53,6 +53,14 @@ QMenu { background: #ffffff; border: 1px solid #d9dee5; }
 QProgressBar { background: #e4e7eb; border: none; border-radius: 3px; }
 QProgressBar::chunk { background: #2563eb; border-radius: 3px; }
 QTabWidget::pane { border: none; }
+#materialsTabs::tab { background: #e9edf2; border: 1px solid #d9dee5; border-bottom: none; border-top-left-radius: 6px;
+                      border-top-right-radius: 6px; padding: 8px 18px; margin-right: 2px; color: #3e4c59; }
+#materialsTabs::tab:selected { background: #ffffff; color: #1d4ed8; font-weight: 600; }
+#materialsTabs::tab:hover:!selected { background: #f4f6f9; }
+QToolButton#sectionToggle { background: transparent; border: none; font-weight: 600; padding: 4px 2px; }
+QToolButton#sectionToggle:hover { color: #1d4ed8; }
+#summaryCaption { color: #52606d; }
+#summaryValue { font-weight: 600; }
 QDialog { background: #f4f6f9; }
 """
 

@@ -18,26 +18,26 @@ from new_gui import preview_model as pm
 from new_gui.workspace_state import EXPERIMENTAL
 from services import odb_import_service as svc
 
-NOT_STORED = "Not in the extracted data"
-NO_PACKAGE = ("No extracted modes were found for this ODB, so its geometry is not shown. Run Analyze for this ODB first. "
-              "This page never starts Abaqus.")
-MATERIAL_STATEMENT = ("The extracted FE data hold no material names, sections, layups, E1, E2, G12, density, thickness or "
-                      "units, and this program does not guess them. To show them, a separate INP or CAE source would be "
-                      "required, or an extended ODB extraction with Abaqus Python, separately authorized.")
-PROPERTY_HEADERS = ("Property", "FE input", "Independent measurement", "Identified / calibrated")
-INPUT_PROPERTIES = ("Material names", "Sections and layups", "E1, E2, G12", "Density", "Thickness", "Length unit")
-NOT_PROVIDED, NOT_ISSUED = "None provided", "Not issued"
-WORKFLOW = ("1. Load the specimen FE model and experimental modal dataset.",
-            "2. Inspect actual input properties and geometry.",
-            "3. Select a scientifically approved calibration parameter set.",
-            "4. Establish physical registration and modal identity.",
-            "5. Run explicitly authorized FE iterations.",
-            "6. Evaluate frequency residuals, holdout results, uncertainty and model-form sensitivity.",
-            "7. Report either a supported result or a scientific refusal.")
-WORKFLOW_TITLE = "Single-plate model calibration: future workflow, not available now"
-STATUS_TEXT = ("Current scientific status: on real files this page runs no optimizer, FE iteration or solver, and it issues "
-               "no number. The diagnostic study above runs SYNTHETIC software tests only. Frequency agreement does not establish a material value. A model-specific calibration is not an identified "
-               "material property.")
+NOT_STORED = "Нет в извлечённых данных"
+NO_PACKAGE = ("Для этого ODB не найдены извлечённые моды, поэтому геометрия не показана. Сначала выполните Analyze для этого ODB. "
+              "Эта страница никогда не запускает Abaqus.")
+MATERIAL_STATEMENT = ("В извлечённых данных FE нет названий материалов, сечений, укладок, E1, E2, G12, плотности, толщины и "
+                      "единиц, и программа их не угадывает. Чтобы их показать, нужен отдельный источник INP или CAE либо расширенное "
+                      "извлечение из ODB через Abaqus Python с отдельным разрешением.")
+PROPERTY_HEADERS = ("Свойство", "Вход FE", "Независимое измерение", "Идентифицировано / откалибровано")
+INPUT_PROPERTIES = ("Названия материалов", "Сечения и укладки", "E1, E2, G12", "Плотность", "Толщина", "Единица длины")
+NOT_PROVIDED, NOT_ISSUED = "Не предоставлено", "Не выдано"
+WORKFLOW = ("1. Загрузить FE-модель образца и экспериментальный модальный набор.",
+            "2. Проверить фактические входные свойства и геометрию.",
+            "3. Выбрать научно утверждённый набор параметров калибровки.",
+            "4. Установить физическую регистрацию и идентичность мод.",
+            "5. Выполнить явно разрешённые итерации FE.",
+            "6. Оценить невязки частот, результаты HOLDOUT, неопределённость и чувствительность к форме модели.",
+            "7. Сообщить обоснованный результат либо научный отказ.")
+WORKFLOW_TITLE = "Калибровка модели одной плиты: будущий рабочий процесс, сейчас недоступен"
+STATUS_TEXT = ("Текущий научный статус: на реальных файлах эта страница не запускает оптимизатор, итерации FE или решатель и не выдаёт "
+               "чисел. Вкладка «Расчёт» выполняет только синтетические проверки программы. Совпадение частот не устанавливает значение материала. Калибровка для конкретной модели не является идентифицированным "
+               "свойством материала.")
 
 
 def property_rows() -> tuple:
@@ -71,23 +71,23 @@ def geometry_facts(manifest: Path, cancel_event=None) -> tuple:
             for axis, key in enumerate("xyz"):
                 value = float(row[key])
                 low[axis], high[axis] = min(low[axis], value), max(high[axis], value)
-    rows = [("Extracted modes", f"{document.get('start_mode', '?')} to {document.get('end_mode', '?')}"),
-            ("Step", str(document.get("step_name") or "not recorded")),
-            ("Analysis title", str(document.get("analysis_title") or "not recorded")),
-            ("Nodes", str(count)), ("Instances", ", ".join(sorted(i for i in instances if i)) or "not recorded")]
+    rows = [("Извлечённые моды", f"{document.get('start_mode', '?')} – {document.get('end_mode', '?')}"),
+            ("Шаг", str(document.get("step_name") or "не записан")),
+            ("Название анализа", str(document.get("analysis_title") or "не записано")),
+            ("Узлы", str(count)), ("Экземпляры", ", ".join(sorted(i for i in instances if i)) or "не записаны")]
     if count:
-        rows += [(f"{key} extent", f"{_fmt(low[axis])} to {_fmt(high[axis])} (size {_fmt(high[axis] - low[axis])})")
+        rows += [(f"Диапазон {key}", f"{_fmt(low[axis])} – {_fmt(high[axis])} (размер {_fmt(high[axis] - low[axis])})")
                  for axis, key in enumerate("XYZ")]
-    rows.append(("Units", "Not stated by the extracted data"))
+    rows.append(("Единицы", "В извлечённых данных не указаны"))
     return tuple(rows)
 
 
 def source_rows(odb: Path, package_found: bool) -> tuple:
     """Whether the extracted data and a model source exist. Files beside the ODB are named only; they are not opened."""
-    rows = [("FE package", "Found: extracted modes of this ODB's content" if package_found else "Not found")]
+    rows = [("Пакет FE", "Найден: извлечённые моды содержимого этого ODB" if package_found else "Не найден")]
     for suffix, caption in ((".inp", "INP"), (".cae", "CAE")):
         candidate = odb.with_suffix(suffix)
-        rows.append((f"{caption} beside the ODB", f"{candidate.name} exists but was not parsed" if candidate.is_file() else "None found"))
+        rows.append((f"{caption} рядом с ODB", f"{candidate.name} есть, но не разбирался" if candidate.is_file() else "Не найден"))
     return tuple(rows)
 
 
@@ -109,26 +109,26 @@ def read_fe_facts(odb, cancel_event, say=None) -> Facts:
 
 
 def experimental_facts(preview) -> Facts:
-    rows = [("File", Path(preview.selected_path).name), ("Dataset types", ", ".join(str(x) for x in preview.dataset_types) or "none"),
-            ("Geometry nodes", str(preview.geometry_node_count)), ("Modal sets", str(len(preview.sets)))]
+    rows = [("Файл", Path(preview.selected_path).name), ("Типы наборов данных", ", ".join(str(x) for x in preview.dataset_types) or "нет"),
+            ("Узлы геометрии", str(preview.geometry_node_count)), ("Модальные наборы", str(len(preview.sets)))]
     for item in preview.sets:
         points = max((record.point_count for record in item.records), default=0)
         dofs = max((record.measured_dof_count for record in item.records), default=0)
         peak = any(record.provisional for record in item.records)
-        rows.append((item.title, f"{points} points, {dofs} measured DOFs" + ("; FRF peak — not fitted" if peak else "")))
-    rows.append(("Units", "Not stated by the data read"))
+        rows.append((item.title, f"точек: {points}, измеренных степеней свободы: {dofs}" + ("; пик FRF — не подобранная мода" if peak else "")))
+    rows.append(("Единицы", "В прочитанных данных не указаны"))
     records = [record for item in preview.sets for record in item.records]
     shaped = sum(1 for record in records if record.point_count > 0)
-    shapes = f"Present: {shaped} of {len(records)} records" if shaped else "Absent"
+    shapes = f"Есть: {shaped} из {len(records)} записей" if shaped else "Нет"
     return Facts(tuple(rows), shapes=shapes, data_kind=_data_kind(records))
 
 
 def _data_kind(records) -> str:
     """As the importer classified the records. A file's name or title is not evidence of what it holds."""
     if records and all(record.provisional for record in records):
-        return "FRF peaks: not fitted modes"
+        return "Пики FRF: не подобранные моды"
     if records and all(not record.provisional and str(record.classification).startswith("FITTED") for record in records):
-        return "Fitted modes"
+        return "Подобранные моды"
     return "UNKNOWN"
 
 
@@ -144,10 +144,10 @@ def read_experimental_facts(path, cancel_event) -> Facts:
 def saved_facts(document: dict) -> tuple:
     """From a saved result's own file: no path named in it is looked at."""
     fe_modes, modes = document["modes"]["fe"], document["modes"]["experimental"]
-    fe = Facts((("Extracted modes when saved", f"{len(fe_modes)}"), ("Units", "Not stated by the extracted data")),
-               "From the saved file. The source files were not looked at.")
-    experimental = Facts((("Modal set when saved", document["modal_set"]["title"]), ("Records when saved", str(len(modes)))),
-                         "From the saved file. The source files were not looked at.")
+    fe = Facts((("Извлечённые моды при сохранении", f"{len(fe_modes)}"), ("Единицы", "В извлечённых данных не указаны")),
+               "Из сохранённого файла. Исходные файлы не открывались.")
+    experimental = Facts((("Модальный набор при сохранении", document["modal_set"]["title"]), ("Записи при сохранении", str(len(modes)))),
+                         "Из сохранённого файла. Исходные файлы не открывались.")
     return fe, experimental
 
 

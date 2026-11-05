@@ -352,7 +352,8 @@ class SeparationTests(unittest.TestCase):
                           "mac_points_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure", "numpy",
                                                   "modal_scaling"},
                           # MAT-3: the one adapter over the shared inverse workflow, for synthetic studies only
-                          "materials_study_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure", "numpy",
+                          "materials_study_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure",
+                                                       "matplotlib.patches", "matplotlib.ticker", "numpy",  # MAT-4.UX1: drawing only
                                                        "scipy", "domain.plate_inverse_problem",
                                                        "domain.plate_material_problem",
                                                        "services.matrix_model_service",

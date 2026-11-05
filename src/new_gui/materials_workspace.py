@@ -3,8 +3,11 @@
 The files chosen here belong to this page: they change nothing on Analyze, Review or MAC / Points. Reading runs in worker
 threads and starts no process. No material value exists here.
 
-MAT-3: the page also holds the diagnostic study section (``materials_study_panel``), which runs SYNTHETIC software tests
-and takes no value from the files chosen here.
+MAT-3: the page also holds the diagnostic study (``materials_study_panel``), which runs SYNTHETIC software tests and takes
+no value from the files chosen here.
+
+MAT-4.UX1: the page has five tabs. The first four are the study's own pages, and the fifth holds these files and facts.
+Changing tabs reads no file and starts no calculation.
 """
 
 from __future__ import annotations
@@ -14,22 +17,24 @@ import threading
 from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLineEdit, QPushButton, QStackedWidget, QTabBar, QVBoxLayout, QWidget
 
 from new_gui import analyze_model as am
 from new_gui import materials_workspace_model as mw
-from new_gui.materials_study_panel import MaterialsStudyPanel
+from new_gui.materials_study_panel import MaterialsStudyPanel, Section, TAB_TITLES, scrolled
 from new_gui.diagnostic_panel import DiagnosticTable
 from new_gui.shape_panel import _label
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
-CAPTIONS = {FE: "Select FE results: ODB", EXPERIMENTAL: "Select experiment: UNV/UFF"}
-FACT_TITLES = {FE: "FE model geometry", EXPERIMENTAL: "Experimental data"}
-USE_ANALYZE = "Use the two files from Analyze"
-READING = "Reading..."
-NO_FILES_TEXT = "Analyze holds no files yet."
-NO_REGISTRATION = "Absent: no physical registration is confirmed on this page"
-USED_BY_ANALYZE = "Used by the comparison on Analyze; it is not a declaration for a fit"
+CAPTIONS = {FE: "Результаты FE: ODB", EXPERIMENTAL: "Эксперимент: UNV/UFF"}
+FACT_TITLES = {FE: "Геометрия FE-модели", EXPERIMENTAL: "Экспериментальные данные"}
+USE_ANALYZE = "Взять два файла из Analyze"
+READING = "Чтение..."
+NO_FILES_TEXT = "В Analyze пока нет файлов."
+NO_REGISTRATION = "Нет: физическая регистрация на этой странице не подтверждена"
+USED_BY_ANALYZE = "Используется сравнением в Analyze; это не объявление для подбора"
+TAB_FILES = 4
+ALL_TAB_TITLES = TAB_TITLES + ("FE / Эксперимент",)
 
 
 def _card():
@@ -64,24 +69,48 @@ class MaterialsWorkspace(QWidget):
         self._bridge.done.connect(self._read_done)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(0)
         self.study = MaterialsStudyPanel(self)
-        layout.addWidget(self.study)
+        self.tabs = QTabBar()
+        self.tabs.setObjectName("materialsTabs")
+        self.tabs.setExpanding(False)
+        self.tabs.setDrawBase(False)
+        self.tabs.setUsesScrollButtons(True)
+        for title in ALL_TAB_TITLES:
+            self.tabs.addTab(title)
+        layout.addWidget(self.tabs)
+        self.pages = QStackedWidget()
+        self.pages.setMinimumHeight(420)  # only a very short window scrolls the whole page
+        self.pages.addWidget(self.study)
+        files = QWidget()
+        outer = layout
+        layout = QVBoxLayout(files)
+        layout.setContentsMargins(0, 10, 8, 10)
+        layout.setSpacing(10)
+        self.pages.addWidget(scrolled(files))
+        outer.addWidget(self.pages, 1)
+        self.tabs.currentChanged.connect(self._tab_changed)
+        self.study.tab_wanted.connect(self.select_tab)
         layout.addWidget(self._build_inputs())
+        layout.addWidget(self.study.real_card)
         self.fact_boxes: dict = {}
         self.fact_tables: dict = {}
         self.fact_notes: dict = {}
+        facts = QHBoxLayout()
+        facts.setSpacing(10)
         for kind in (FE, EXPERIMENTAL):
             card, inner = _card()
             inner.addWidget(_label(FACT_TITLES[kind], "sectionTitle"))
-            self.fact_notes[kind] = _label("Not read yet.", "hint")
+            self.fact_notes[kind] = _label("Пока не прочитано.", "hint")
             inner.addWidget(self.fact_notes[kind])
             box = QVBoxLayout()
             inner.addLayout(box)
+            inner.addStretch(1)
             self.fact_boxes[kind] = box
-            layout.addWidget(card)
+            facts.addWidget(card, 1)
+        layout.addLayout(facts)
         card, inner = _card()
-        inner.addWidget(_label("Material input properties", "sectionTitle"))
+        inner.addWidget(_label("Входные свойства материала", "sectionTitle"))
         self.material_statement = _label(mw.MATERIAL_STATEMENT, "warnings")
         inner.addWidget(self.material_statement)
         self.property_table = DiagnosticTable(mw.PROPERTY_HEADERS, mw.property_rows(), 0, text_columns=(1, 2, 3))
@@ -90,12 +119,26 @@ class MaterialsWorkspace(QWidget):
         layout.addWidget(card)
         layout.addWidget(status)
         card, inner = _card()
-        inner.addWidget(_label(mw.WORKFLOW_TITLE, "sectionTitle"))
         self.status_text = _label(mw.STATUS_TEXT, "")
         inner.addWidget(self.status_text)
-        inner.addWidget(_label("\n".join(mw.WORKFLOW), "hint"))
+        self.workflow = Section(mw.WORKFLOW_TITLE, name="materialsWorkflow")
+        self.workflow.inner.addWidget(_label("\n".join(mw.WORKFLOW), "hint"))
+        inner.addWidget(self.workflow)
         layout.addWidget(card)
         layout.addStretch(1)
+        self.select_tab(0)
+
+    def select_tab(self, index: int) -> None:
+        self.tabs.setCurrentIndex(index)
+        self._tab_changed(index)
+
+    def _tab_changed(self, index: int) -> None:
+        """Only shows a page. A real file is read only when it is chosen, and a calculation starts only from its button."""
+        if index == TAB_FILES:
+            self.pages.setCurrentIndex(1)
+        else:
+            self.pages.setCurrentIndex(0)
+            self.study.setCurrentIndex(index)
 
     def _build_inputs(self) -> QFrame:
         card, inner = _card()
@@ -108,10 +151,10 @@ class MaterialsWorkspace(QWidget):
             grid.addWidget(_label(CAPTIONS[kind]), 2 * row, 0, 1, 2)
             field = QLineEdit()
             field.setReadOnly(True)
-            field.setPlaceholderText("not chosen")
+            field.setPlaceholderText("не выбран")
             field.setMinimumWidth(80)
             grid.addWidget(field, 2 * row + 1, 0)
-            button = QPushButton("Choose file...")
+            button = QPushButton("Выбрать файл...")
             button.setObjectName(f"materialsChoose_{kind}")
             button.clicked.connect(lambda _checked=False, k=kind: self.choose_file(k))
             grid.addWidget(button, 2 * row + 1, 1)
@@ -217,7 +260,7 @@ class MaterialsWorkspace(QWidget):
             except (am.StepFailed, am.StepCancelled) as error:
                 value = error
             except Exception as error:  # noqa: BLE001  (a message, never a crash of the window)
-                value = am.StepFailed(f"The file could not be read ({type(error).__name__}: {error}).")
+                value = am.StepFailed(f"Файл не прочитан ({type(error).__name__}: {error}).")
             try:
                 bridge.done.emit(kind, token, value)
             except RuntimeError:
@@ -233,10 +276,10 @@ class MaterialsWorkspace(QWidget):
         self.reading[kind] = False
         self._cancels[kind] = None
         if isinstance(value, am.StepCancelled):
-            self.fact_notes[kind].setText("Cancelled.")
+            self.fact_notes[kind].setText("Отменено.")
         elif isinstance(value, am.StepFailed):
             self.facts[kind] = None
-            self.fact_notes[kind].setText("Not read.")
+            self.fact_notes[kind].setText("Не прочитано.")
             self._say(str(value))
             self.study.refresh_real()
         else:
@@ -251,7 +294,7 @@ class MaterialsWorkspace(QWidget):
     def _show(self, kind: str, facts: mw.Facts) -> None:
         self.facts[kind] = facts
         self._clear_table(kind)
-        table = DiagnosticTable(("Fact", "Value"), facts.rows, 1, text_columns=(0,))
+        table = DiagnosticTable(("Сведение", "Значение"), facts.rows, 1, text_columns=(0,))
         table.setObjectName(f"materialsFacts_{kind}")
         self.fact_tables[kind] = table
         self.fact_boxes[kind].addWidget(table)
