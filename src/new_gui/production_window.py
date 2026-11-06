@@ -29,7 +29,7 @@ from new_gui.workspace_state import EXPERIMENTAL, FE
 PAGES = ("Analyze", "Review", "MAC / Points", "Materials")
 ANALYZE_PAGE, REVIEW_PAGE, MAC_PAGE, MATERIALS_PAGE = 0, 1, 2, 3
 MAC_SUBTITLE = "Mode pairs and MAC, what they rest on, and why they may be missing. Nothing here is computed from a manual choice."
-MATERIALS_PAGE_SUBTITLE = "Синтетическая проверка двух методов и просмотр файлов ODB и UNV/UFF. Значения материала здесь не выдаются."
+MATERIALS_PAGE_SUBTITLE = "Synthetic test of the two model methods, and a read-only view of ODB and UNV/UFF files. No material value is issued."
 ABOUT = ("Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze. Mode pairs and MAC appear only "
          "with a verified physical registration; otherwise the result is a frequency comparison. No FE analysis is "
          "solved.")

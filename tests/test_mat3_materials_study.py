@@ -123,7 +123,7 @@ class TwoMethods(_Files):
         rows = {row[0]: row for row in sm.parameter_rows(section)}
         for name, value in direct.final_parameters.items():
             self.assertEqual(rows[name][2], f"{value:.6g}")
-        self.assertEqual(rows["D12 (производная)"][2], f"{direct.final_stiffness['D12']:.6g}")
+        self.assertEqual(rows["D12 (derived)"][2], f"{direct.final_stiffness['D12']:.6g}")
         self.assertEqual(rows["D11"][3], "12")
         table = sm.frequency_rows(section)
         self.assertEqual(len(table), len(direct.frequencies))
@@ -136,10 +136,10 @@ class TwoMethods(_Files):
             self.assertEqual(row[7], f"{100.0 * (found.final_model_hz / found.experimental_hz - 1.0):+.4f} %")
         self.assertEqual({row[2] for row in table}, {"FIT", "HOLDOUT"})
         self.assertEqual(len(sm.iteration_rows(section)), len(direct.iterations))
-        self.assertEqual(dict(sm.identifiability_rows(section))["Ранг"], "4 из 4")
+        self.assertEqual(dict(sm.identifiability_rows(section))["Rank"], "4 of 4")
         self.assertEqual(len(sm.holdout_rows(section)), 2)
         self.assertEqual(len(sm.family_rows(section)), 8)
-        self.assertEqual(dict(sm.convergence_rows(section))["Прямые решения"], str(direct.solves))
+        self.assertEqual(dict(sm.convergence_rows(section))["Forward solves"], str(direct.solves))
         self.assertTrue(any("Sigma_meas NOT_AVAILABLE" in row[1] for row in sm.uncertainty_rows(section)))
         self.assertTrue(sm.objective_plot(section).startswith(b"\x89PNG"))
         self.assertTrue(sm.error_plot(section).startswith(b"\x89PNG"))
@@ -156,8 +156,8 @@ class TwoMethods(_Files):
         geometry = sm.geometry_of(surface)
         self.assertEqual(geometry.surface_mass_kg_m2, 2.0)
         self.assertIsNone(geometry.thickness_m)
-        self.assertIn("E и G отсутствуют", sm.geometry_text(surface))
-        self.assertIn("не доказывает", sm.geometry_text(sm.default_form(sm.RITZ)))
+        self.assertIn("E and G stay missing", sm.geometry_text(surface))
+        self.assertIn("does not prove", sm.geometry_text(sm.default_form(sm.RITZ)))
 
     def test_a_form_that_is_not_numbers_is_refused_by_field(self):
         form = sm.default_form(sm.RITZ)
@@ -165,7 +165,7 @@ class TwoMethods(_Files):
         form["parameters"]["D11"]["start"] = "?"
         form["numerics"]["holdout_modes"] = "99"
         _rows, problems = sm.preflight(form)
-        for word in ("a:", "D11 начальное", "HOLDOUT"):
+        for word in ("a:", "D11 start", "HOLDOUT"):
             self.assertTrue(any(word in text for text in problems), word)
 
     def test_the_resource_limits_are_checked_before_a_start(self):
@@ -232,16 +232,16 @@ class WrongPackages(_Files):
         result = sm.execute_study(stage_form(path), threading.Event())["result"]
         self.assertEqual(result["refusal_code"], "EVIDENCE_KIND_MISMATCH")
         self.assertIsNone(result["final_parameters"])
-        self.assertIn("BLOCKED", dict(sm.package_facts(path))["Готовность"])
+        self.assertIn("BLOCKED", dict(sm.package_facts(path))["Readiness"])
 
     def test_a_good_package_shows_its_identity_and_ranges_without_loading_matrices(self):
         path = sm.write_synthetic_package(self.root / "good")
         with mock.patch("numpy.load", side_effect=AssertionError("no matrix is loaded to show the facts")):
             facts = dict(sm.package_facts(path))
-        self.assertEqual(facts["Модель"], sm.STAGE_MODEL)
-        self.assertEqual(facts["Вид данных"], "SYNTHETIC")
-        self.assertEqual(facts["Ограничение"], "D22=D11")
-        self.assertEqual(facts["Диапазон D66"], "0.02 до 0.08")
+        self.assertEqual(facts["Model"], sm.STAGE_MODEL)
+        self.assertEqual(facts["Evidence kind"], "SYNTHETIC")
+        self.assertEqual(facts["Constraint"], "D22=D11")
+        self.assertEqual(facts["Domain D66"], "0.02 to 0.08")
         self.assertEqual(sm.execute_study(stage_form(path), threading.Event())["result"]["scientific_status"], CANDIDATE)
 
 
@@ -283,7 +283,7 @@ class ReleaseStaysRefused(_Files):
     def test_the_interpretation_limits_are_on_every_parameter_row(self):
         for row in sm.parameter_rows(study(sm.RITZ)):
             self.assertTrue(row[6])
-        self.assertIn("не свойства слоя", dict(sm.conditional_rows(study(sm.RITZ)))["Смысл"])
+        self.assertIn("not ply properties", dict(sm.conditional_rows(study(sm.RITZ)))["Meaning"])
 
 
 class ProjectFormat(_Files):
@@ -310,7 +310,7 @@ class ProjectFormat(_Files):
         self.assertEqual(section["result"]["refusal_code"], "PACKAGE_REFUSED")
         self.assertEqual(section["units"]["D"], "N*m")
         self.assertIn("source", section["provenance"])
-        self.assertEqual(sm.status_rows(section)[7], ("Отказ", "PACKAGE_REFUSED"))
+        self.assertEqual(sm.status_rows(section)[7], ("Refusal", "PACKAGE_REFUSED"))
 
     def test_non_finite_numbers_keep_their_value_in_strict_json(self):
         self.assertEqual(mp.to_json(float("inf")), {"non_finite": "inf"})
@@ -456,9 +456,9 @@ class Page(_Page):
         self.assertFalse(panel.cancel_button.isEnabled())
         self.assertFalse(panel.save_button.isEnabled())
         self.assertEqual(panel.badge.text(), sp.NOT_RUN)
-        self.assertIn("ODB, Abaqus и файлы матриц не нужны", panel.method_text.text())
-        self.assertIn("подвес", panel.scope_text.text())
-        self.assertEqual(window.materials.table.item(0, 1).text(), "Не идентифицировано")  # the material status stays apart
+        self.assertIn("No ODB, Abaqus or matrix file is needed", panel.method_text.text())
+        self.assertIn("suspension", panel.scope_text.text())
+        self.assertEqual(window.materials.table.item(0, 1).text(), "Not identified")  # the material status stays apart
 
     def test_ritz_from_the_button_to_the_tables(self):
         window, panel = self.page()
@@ -472,22 +472,22 @@ class Page(_Page):
         self.assertEqual(panel.table_cells("parameters"), [list(row) for row in sm.parameter_rows(section)])
         self.assertEqual(panel.table_cells("frequencies"), [list(row) for row in sm.frequency_rows(section)])
         statuses = dict(panel.table_cells("status"))
-        self.assertEqual(statuses["Научный статус"], CANDIDATE)
-        self.assertEqual(statuses["Статус выпуска"], NOT_A_RELEASE)
-        self.assertEqual(statuses["Численный статус"], "CONVERGED")
-        self.assertEqual(statuses["Исследование"], "SYNTHETIC_SOFTWARE_TEST")
+        self.assertEqual(statuses["Scientific status"], CANDIDATE)
+        self.assertEqual(statuses["Release status"], NOT_A_RELEASE)
+        self.assertEqual(statuses["Numerical status"], "CONVERGED")
+        self.assertEqual(statuses["Study"], "SYNTHETIC_SOFTWARE_TEST")
         self.assertEqual(len(panel.table_cells("observations")), 10)
         self.assertTrue(panel.save_button.isEnabled())
         self.assertFalse(panel.objective_view.isHidden())
         self.assertFalse(panel.error_view.isHidden())
-        self.assertEqual(window.materials.table.item(0, 1).text(), "Не идентифицировано")
+        self.assertEqual(window.materials.table.item(0, 1).text(), "Not identified")
         self.app.processEvents()
         self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0)
 
     def test_stage_a_from_the_method_choice(self):
         _window, panel = self.page()
         panel.method_combo.setCurrentIndex(panel.method_combo.findData(sm.STAGE_A))
-        self.assertIn("Доступно", panel.availability.text())
+        self.assertIn("Available", panel.availability.text())
         self.assertFalse(panel.package_row.isHidden())
         self.assertFalse(panel.a_field.isEnabled())
         self.assertEqual(set(panel.form()["parameters"]), {"D", "D66", "r"})
@@ -501,14 +501,14 @@ class Page(_Page):
         _window, panel = self.page()
         panel.method_combo.setCurrentIndex(panel.method_combo.findData(sm.STAGE_A))
         panel.package_source.setCurrentIndex(panel.package_source.findData(sm.SELECTED))
-        self.assertIn("Недоступно", panel.availability.text())
+        self.assertIn("Not available", panel.availability.text())
         self.run_it(panel)
         self.assertIn("PACKAGE_REFUSED", panel.reasons.text())
         self.assertEqual(panel.badge.property("state"), "blocked")
         self.assertEqual(panel.table_cells("parameters")[0][2], sm.DASH)
         self.assertTrue(panel.choose_package(str(self.root / "no such package")))
         self.wait(panel)
-        self.assertIn("нельзя использовать", panel.package_note.text())
+        self.assertIn("cannot be used", panel.package_note.text())
         self.run_it(panel)
         self.assertIn("PACKAGE_REFUSED", panel.reasons.text())
         self.assertEqual(panel.record["materials"]["result"]["backend_id"], sm.STAGE_A)
@@ -519,7 +519,7 @@ class Page(_Page):
         path = sm.write_synthetic_package(self.root / "chosen")
         self.assertTrue(panel.choose_package(str(path)))
         self.wait(panel)
-        self.assertEqual(dict(panel.table_cells("package"))["Модель"], sm.STAGE_MODEL)
+        self.assertEqual(dict(panel.table_cells("package"))["Model"], sm.STAGE_MODEL)
         self.run_it(panel)
         self.assertEqual(panel.record["materials"]["result"]["scientific_status"], CANDIDATE)
         self.assertEqual(panel.record["materials"]["references"][0]["path"], str(path))
@@ -703,22 +703,22 @@ class RealSource(_Page):
                     self.assertFalse(panel.busy())
                     self.assertIn("BLOCKED", panel.message.text())
                     self.assertIn("NOT_AUTHORIZED", panel.message.text())
-                    self.assertEqual(dict(panel.table_cells("real"))["Обратный расчёт по реальным данным"], "BLOCKED")
+                    self.assertEqual(dict(panel.table_cells("real"))["Real-data inverse execution"], "BLOCKED")
         self.assertIsNone(panel.record)
 
     def test_the_file_facts_are_shown_and_used_for_nothing(self):
         window, panel = self.page()
         self.real(panel)
-        self.assertEqual(dict(panel.table_cells("real"))["Данные прочитаны"], "Файл не прочитан")
+        self.assertEqual(dict(panel.table_cells("real"))["Data read"], "No file read")
         workspace = window.materials_workspace
         self.assertTrue(workspace.choose_file(EXPERIMENTAL, str(self.unv(base.plate_nodes()))))
         self.assertTrue(window.wait_for_reads())
         rows = dict(panel.table_cells("real"))
-        self.assertEqual(rows["Данные прочитаны"], "Да")
-        self.assertIn("Есть", rows["Формы мод"])
-        self.assertIn("Нет", rows["Регистрация"])
-        self.assertEqual(rows["Источник"], "Реальный эксперимент, выбранный пользователем")
-        self.assertIn(rows["Тип данных"], ("Подобранные моды", "Пики FRF: не подобранные моды", "UNKNOWN"))
+        self.assertEqual(rows["Data read"], "Yes")
+        self.assertIn("Present", rows["Mode shapes"])
+        self.assertIn("Absent", rows["Registration"])
+        self.assertEqual(rows["Source"], "Real experiment, chosen by the user")
+        self.assertIn(rows["Data type"], ("Fitted modes", "FRF peaks: not fitted modes", "UNKNOWN"))
         self.assertFalse(panel.run())
 
     def test_a_real_file_on_the_page_does_not_enter_a_synthetic_test(self):
@@ -768,7 +768,7 @@ class SaveAndOpen(_Page):
                 self.assertEqual(panel.message.text(), "")
                 self.assertEqual(self.shown(panel), before)
                 self.assertEqual(panel.form(), form)
-                self.assertIn("СОХРАНЁННЫЙ РЕЗУЛЬТАТ", panel.origin_note.text())
+                self.assertIn("SAVED RESULT", panel.origin_note.text())
                 self.assertEqual(panel.badge.property("state"), "chosen")
                 self.assertTrue(panel.changed_note.isHidden())
                 path.unlink()
@@ -805,7 +805,7 @@ class SaveAndOpen(_Page):
         damaged.write_bytes(b"not a project")
         self.assertTrue(first.open_results(str(damaged)))
         self.wait(first)
-        self.assertIn("Не открыто", first.message.text())
+        self.assertIn("Not opened", first.message.text())
         self.assertEqual(self.shown(first), before)
 
     def test_a_changed_form_is_flagged_and_the_next_run_is_fresh(self):
@@ -826,7 +826,7 @@ class SaveAndOpen(_Page):
         self.wait(window.materials_workspace.study)
         self.assertEqual(window.stack.currentIndex(), pw.MATERIALS_PAGE)
         self.assertIsNone(analyze.snapshot)
-        self.assertIn("СОХРАНЁННЫЙ РЕЗУЛЬТАТ", window.materials_workspace.study.origin_note.text())
+        self.assertIn("SAVED RESULT", window.materials_workspace.study.origin_note.text())
 
     def test_an_old_project_still_opens_on_analyze_unchanged(self):
         window, panel = self.analysed()
@@ -842,7 +842,7 @@ class SaveAndOpen(_Page):
         self.assertIsNone(study_panel.record)  # an old project holds no Materials result
         self.assertTrue(study_panel.open_results(str(self.project)))
         self.wait(study_panel)
-        self.assertIn("Не открыто", study_panel.message.text())
+        self.assertIn("Not opened", study_panel.message.text())
 
 
 if __name__ == "__main__":

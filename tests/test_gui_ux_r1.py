@@ -958,11 +958,11 @@ class MaterialsTests(_Flow):
         self.assertEqual([row[0] for row in rows], list(mw.INPUT_PROPERTIES))
         for row in rows:
             self.assertEqual(row[1:], [mw.NOT_STORED, mw.NOT_PROVIDED, mw.NOT_ISSUED])
-        self.assertIn("INP или CAE", workspace.material_statement.text())
+        self.assertIn("INP or CAE", workspace.material_statement.text())
         text = " ".join(mw.WORKFLOW)
-        self.assertIn("явно разрешённые", text)
-        self.assertIn("научный отказ", text)
-        self.assertEqual(window.materials.table.item(0, 1).text(), "Не идентифицировано")
+        self.assertIn("explicitly authorized", text)
+        self.assertIn("scientific refusal", text)
+        self.assertEqual(window.materials.table.item(0, 1).text(), "Not identified")
 
     def test_its_files_are_its_own_and_start_nothing(self):
         window = self.window()
@@ -974,8 +974,8 @@ class MaterialsTests(_Flow):
         self.assertIsNone(window.analyze.analysis)
         self.assertIn(mw.NO_PACKAGE, workspace.fact_notes[FE].text())
         rows = dict(cells(workspace.fact_tables[FE]))
-        self.assertEqual(rows["Пакет FE"], "Не найден")
-        self.assertEqual(rows["INP рядом с ODB"], "Не найден")
+        self.assertEqual(rows["FE package"], "Not found")
+        self.assertEqual(rows["INP beside the ODB"], "None found")
         self.assertEqual(workspace.fact_tables[EXPERIMENTAL].item(0, 1).text(), "exp data.unv")
         self.assertEqual(self.consents, [])
 
@@ -990,15 +990,15 @@ class MaterialsTests(_Flow):
         manifest = Path(panel.inputs.full_fe.manifest_path)
         self.odb.with_suffix(".inp").write_text("*Heading\n", encoding="utf-8")
         found = dict(mw.read_fe_facts(self.odb, threading.Event()).rows)
-        self.assertEqual(found["Узлы"], str(len(self.nodes())))
-        self.assertIn("Найден", found["Пакет FE"])
-        self.assertEqual(found["INP рядом с ODB"], f"{self.odb.stem}.inp есть, но не разбирался")
+        self.assertEqual(found["Nodes"], str(len(self.nodes())))
+        self.assertIn("Found", found["FE package"])
+        self.assertEqual(found["INP beside the ODB"], f"{self.odb.stem}.inp exists but was not parsed")
         for mode_file in manifest.parent.glob("mode_*.csv"):
             mode_file.rename(mode_file.with_suffix(".hidden"))  # the geometry facts do not need them
         table = dict(mw.geometry_facts(manifest))
-        self.assertEqual(table["Узлы"], str(len(self.nodes())))
-        self.assertIn("Диапазон X", table)
-        self.assertEqual(table["Единицы"], "В извлечённых данных не указаны")
+        self.assertEqual(table["Nodes"], str(len(self.nodes())))
+        self.assertIn("X extent", table)
+        self.assertEqual(table["Units"], "Not stated by the extracted data")
         self.assertNotIn("E1", table)
 
     def test_reusing_the_files_of_analyze(self):
@@ -1020,7 +1020,7 @@ class MaterialsTests(_Flow):
                 mock.patch("services.odb_import_service.hash_file", side_effect=AssertionError("no hash")):
             self.assertTrue(window.materials_workspace.use_analyze_files())
         self.assertFalse(window.materials_workspace.busy())
-        self.assertIn("не открывались", window.materials_workspace.fact_notes[FE].text())
+        self.assertIn("not looked at", window.materials_workspace.fact_notes[FE].text())
 
     def test_nothing_to_reuse_is_said(self):
         workspace = self.window().materials_workspace

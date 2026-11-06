@@ -11,6 +11,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import threading
@@ -20,7 +21,9 @@ from unittest import mock
 import test_mat3_materials_study as mat3
 
 from PIL import Image
-from PySide6.QtWidgets import QPushButton, QScrollArea, QTableWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (QAbstractButton, QComboBox, QLabel, QLineEdit, QPushButton, QScrollArea, QStyle,
+                               QStyleOptionComboBox, QTabBar, QTableWidget, QWidget)
 
 from new_gui import materials_study_model as sm
 from new_gui import materials_study_panel as sp
@@ -65,7 +68,7 @@ class Structure(_Tabs):
     def test_five_tabs_and_each_shows_its_own_page(self):
         window, workspace, panel = self.tabs()
         self.assertEqual([workspace.tabs.tabText(i) for i in range(workspace.tabs.count())],
-                         ["Расчёт", "Результаты", "Графики", "Диагностика", "FE / Эксперимент"])
+                         ["Calculation", "Results", "Plots", "Diagnostics", "FE / Experiment"])
         self.assertEqual(workspace.tabs.currentIndex(), 0)
         marks = {0: panel.run_button, 1: panel.save_button, 2: panel.plots_empty, 3: panel.diagnostics_empty, 4: workspace.reuse_button}
         for index, mark in marks.items():
@@ -100,9 +103,9 @@ class Structure(_Tabs):
                        window.materials.table, workspace.status_text, panel.real_state):
             self.assertTrue(widget.isVisible())
         self.assertIn("BLOCKED", panel.real_state.text())
-        self.assertEqual(workspace.property_table.horizontalHeaderItem(1).text(), "Вход FE")
-        self.assertEqual(workspace.property_table.horizontalHeaderItem(2).text(), "Независимое измерение")
-        self.assertEqual(workspace.property_table.horizontalHeaderItem(3).text(), "Идентифицировано / откалибровано")
+        self.assertEqual(workspace.property_table.horizontalHeaderItem(1).text(), "FE input")
+        self.assertEqual(workspace.property_table.horizontalHeaderItem(2).text(), "Independent measurement")
+        self.assertEqual(workspace.property_table.horizontalHeaderItem(3).text(), "Identified / calibrated")
         self.assertTrue(workspace.workflow.toggle.isEnabled())
 
     def test_a_chosen_real_file_stays_on_the_fifth_tab_and_enables_no_fit(self):
@@ -116,7 +119,7 @@ class Structure(_Tabs):
         self.assertFalse(panel.prepare_button.isEnabled())
         self.assertFalse(panel.run())
         self.assertIn("NOT_AUTHORIZED", panel.message.text())
-        self.assertEqual(dict(panel.table_cells("real"))["Обратный расчёт по реальным данным"], "BLOCKED")
+        self.assertEqual(dict(panel.table_cells("real"))["Real-data inverse execution"], "BLOCKED")
 
 
 class RunTab(_Tabs):
@@ -141,11 +144,11 @@ class RunTab(_Tabs):
 
     def test_the_method_names_are_plain_and_the_codes_stay_the_data(self):
         _window, _workspace, panel = self.tabs()
-        self.assertEqual([panel.method_combo.itemText(i) for i in range(2)], ["Метод Ритца", "Матричная модель Stage A"])
+        self.assertEqual([panel.method_combo.itemText(i) for i in range(2)], ["Ritz plate model", "Stage A matrix model"])
         self.assertEqual([panel.method_combo.itemData(i) for i in range(2)], ["KIRCHHOFF_RITZ_4D", "STAGE_A_MATRIX_3D"])
-        self.assertEqual(panel.run_button.text(), "Запустить расчёт")
-        self.assertEqual(panel.cancel_button.text(), "Отмена")
-        self.assertEqual(panel.source_combo.currentText(), "Встроенный синтетический пример")
+        self.assertEqual(panel.run_button.text(), "Run calculation")
+        self.assertEqual(panel.cancel_button.text(), "Cancel")
+        self.assertEqual(panel.source_combo.currentText(), "Built-in synthetic example")
 
     def test_each_method_shows_only_its_own_inputs(self):
         _window, _workspace, panel = self.tabs()
@@ -180,7 +183,7 @@ class RunTab(_Tabs):
         self.assertTrue(panel.solves_field.isVisible())
         panel.solves_field.setText("12")
         panel.parameter_fields[sm.RITZ]["D11"]["start"].setText("12.5")
-        panel.note_field.setText("примечание")
+        panel.note_field.setText("a note")
         panel.advanced.toggle.setChecked(False)
         for index in (1, 2, 3, 4, 0):
             workspace.select_tab(index)
@@ -189,21 +192,21 @@ class RunTab(_Tabs):
         self.assertEqual(panel.parameter_fields[sm.RITZ]["D11"]["start"].text(), "12.5")
         panel.advanced.toggle.setChecked(True)
         self.app.processEvents()
-        self.assertEqual(panel.note_field.text(), "примечание")
+        self.assertEqual(panel.note_field.text(), "a note")
         with mock.patch.object(sm, "run_plate_inverse_study", wraps=workflow.run_plate_inverse_study) as called:
             section = self.run_to_end(panel)
         called.assert_called_once()
         self.assertEqual(section["result"]["execution_status"], "BUDGET_EXHAUSTED")  # the limit from the hidden section really applied
         self.assertEqual(section["input"]["parameters"]["D11"]["start"], "12.5")
-        self.assertEqual(section["input"]["authorization_note"], "примечание")
+        self.assertEqual(section["input"]["authorization_note"], "a note")
 
     def test_a_mistake_in_a_hidden_field_is_said_on_the_run_screen(self):
         _window, _workspace, panel = self.tabs()
-        panel.solves_field.setText("много")
+        panel.solves_field.setText("many")
         self.app.processEvents()
         self.assertFalse(panel.run_button.isEnabled())
         self.assertTrue(panel.message.isVisible())
-        self.assertIn("Лимит решений", panel.message.text())
+        self.assertIn("Solve limit", panel.message.text())
 
 
 class ResultsTab(_Tabs):
@@ -225,7 +228,7 @@ class ResultsTab(_Tabs):
                 known = {row[0].split(",")[0]: row[3] for row in rows}
                 for name in expected:
                     self.assertEqual(known[name], f"{float(section['known_values'][name]):.6g}", name)
-                self.assertTrue(any("Н·м" in row[0] for row in rows))
+                self.assertTrue(any("N·m" in row[0] for row in rows))
                 self.assertEqual(section["result"]["numerical_status"], "CONVERGED")
                 if backend == sm.STAGE_A:
                     self.assertEqual(section["result"]["solves"], 86)  # the owner's run
@@ -234,14 +237,14 @@ class ResultsTab(_Tabs):
         _window, _workspace, panel = self.tabs()
         section = self.run_to_end(panel)
         summary = dict(panel.summary_cells)
-        self.assertEqual(list(summary), ["Расчёт", "Метод", "Сходимость", "Научные проверки", "Смысл чисел"])
-        self.assertIn("Завершён (COMPLETED)", summary["Расчёт"])
-        self.assertEqual(summary["Метод"], "Метод Ритца (KIRCHHOFF_RITZ_4D)")
-        self.assertEqual(summary["Сходимость"], "Достигнута (CONVERGED)")
-        self.assertIn("DIAGNOSTIC_OPTIMIZER_CANDIDATE", summary["Научные проверки"])
-        self.assertIn("SYNTHETIC_SOFTWARE_TEST", summary["Смысл чисел"])
-        self.assertIn("NOT_A_RELEASE_VALUE", summary["Смысл чисел"])
-        self.assertIn("не являются принятыми свойствами материала", panel.statement.text())
+        self.assertEqual(list(summary), ["Run", "Method", "Convergence", "Scientific checks", "Meaning of the numbers"])
+        self.assertIn("Completed (COMPLETED)", summary["Run"])
+        self.assertEqual(summary["Method"], "Ritz plate model (KIRCHHOFF_RITZ_4D)")
+        self.assertEqual(summary["Convergence"], "Reached (CONVERGED)")
+        self.assertIn("DIAGNOSTIC_OPTIMIZER_CANDIDATE", summary["Scientific checks"])
+        self.assertIn("SYNTHETIC_SOFTWARE_TEST", summary["Meaning of the numbers"])
+        self.assertIn("NOT_A_RELEASE_VALUE", summary["Meaning of the numbers"])
+        self.assertIn("not accepted material properties", panel.statement.text())
         self.assertEqual(panel.badge.text(), "DIAGNOSTIC_OPTIMIZER_CANDIDATE | NOT_A_RELEASE_VALUE")
         self.assertEqual(section["result"]["release_status"], "NOT_A_RELEASE_VALUE")
         area = self.visible_area(self.window_workspace(panel))
@@ -258,8 +261,8 @@ class ResultsTab(_Tabs):
         self.run_to_end(panel)
         self.assertEqual(workspace.tabs.currentIndex(), sp.TAB_RESULTS)
         summary = dict(panel.summary_cells)
-        self.assertIn("PACKAGE_REFUSED", summary["Научные проверки"])
-        self.assertNotIn("Достигнута", summary["Сходимость"])
+        self.assertIn("PACKAGE_REFUSED", summary["Scientific checks"])
+        self.assertNotIn("Reached", summary["Convergence"])
         self.assertEqual(panel.table_cells("summary_parameters")[0][2], sm.DASH)
         self.assertEqual(panel.badge.property("state"), "blocked")
 
@@ -272,7 +275,7 @@ class ResultsTab(_Tabs):
         self.assertEqual(rows, [[row[1], row[2], row[3], row[4], row[5], row[6], row[7]] for row in sm.frequency_rows(section)])
         errors = [row for row in sm.error_rows(section) if row[1] == "HOLDOUT"]
         for mode, _role, _before, after in errors:
-            self.assertIn(f"мода {mode}:", panel.holdout_line.text())
+            self.assertIn(f"mode {mode}:", panel.holdout_line.text())
             self.assertIn(f"{after:+.4f} %", panel.holdout_line.text())
 
     def test_a_tiny_error_keeps_its_size_and_sign(self):
@@ -307,17 +310,17 @@ class ResultsTab(_Tabs):
         self.assertEqual(workspace.tabs.currentIndex(), sp.TAB_RUN)
         self.assertEqual(panel.run_state.text(), sp.CANCELLED_TEXT)
         self.assertIsNone(panel.record)
-        self.assertEqual(dict(panel.summary_cells)["Смысл чисел"], "Чисел нет")
-        self.assertIn("CANCELLED", dict(panel.summary_cells)["Расчёт"])
+        self.assertEqual(dict(panel.summary_cells)["Meaning of the numbers"], "No numbers")
+        self.assertIn("CANCELLED", dict(panel.summary_cells)["Run"])
         self.assertNotIn("summary_parameters", panel._tables)
         self.assertTrue(panel.run_button.isEnabled())
 
     def test_a_form_that_does_not_build_stays_on_the_run_tab(self):
         _window, workspace, panel = self.tabs()
-        with mock.patch.object(sm, "execute_study", side_effect=sm.FormProblem(("причина",))):
+        with mock.patch.object(sm, "execute_study", side_effect=sm.FormProblem(("a reason",))):
             self.run_it(panel)
         self.assertEqual(workspace.tabs.currentIndex(), sp.TAB_RUN)
-        self.assertIn("причина", panel.message.text())
+        self.assertIn("a reason", panel.message.text())
         self.assertTrue(panel.message.isVisible())
 
 
@@ -413,7 +416,7 @@ print(json.dumps({"ratio": view.devicePixelRatioF(), "logical": [view.width(), v
             self.assertEqual(png_size(saved.read_bytes()), (3200, 1800))
             self.assertGreater(3200, png_size(view.data)[0])
         self.assertFalse(panel.save_plot("error", str(self.root / "no such folder" / "x.png")))
-        self.assertIn("не сохранён", panel.plot_message.text())
+        self.assertIn("not saved", panel.plot_message.text())
 
     def test_the_errors_are_signed_model_against_observation_and_holdout_is_marked(self):
         section = mat3.study(sm.RITZ)
@@ -497,9 +500,9 @@ class Diagnostics(_Tabs):
 
     def test_the_terms_are_explained(self):
         _window, _workspace, panel = self.tabs()
-        for key, word in (("modes", "MAC"), ("fit", "HOLDOUT"), ("rank", "Ранг"), ("parameters", "Неопределённость")):
+        for key, word in (("modes", "MAC"), ("fit", "HOLDOUT"), ("rank", "Rank"), ("parameters", "Uncertainty")):
             self.assertIn(word, panel.sections[key].toggle.toolTip())
-        self.assertIn("Сигма", panel.numeric_fields["sigma"].toolTip())
+        self.assertIn("Sigma", panel.numeric_fields["sigma"].toolTip())
         self.assertIn("HOLDOUT", panel.numeric_fields["holdout_modes"].toolTip())
 
     def test_prepare_shows_the_rows_on_diagnostics_without_a_fit(self):
@@ -540,8 +543,8 @@ class Layout(_Tabs):
 
     def test_a_long_table_stays_inside_its_own_scroll_area(self):
         _window, _workspace, panel = self.tabs((900, 700))
-        rows = tuple((f"строка {index}", "очень длинный текст " * 30) for index in range(200))
-        panel._table("status", panel._boxes["status"], ("Статус", "Значение"), rows, 1)
+        rows = tuple((f"row {index}", "a very long text " * 30) for index in range(200))
+        panel._table("status", panel._boxes["status"], ("Status", "Value"), rows, 1)
         self.app.processEvents()
         table = panel._tables["status"]
         self.assertEqual(table.height(), sp.TABLE_HEIGHT)
@@ -608,7 +611,7 @@ class SaveAndOpen(_Tabs):
         self.assertFalse(panel.changed_note.isVisible())
         panel.solves_field.setText("500")
         self.assertTrue(panel.changed_note.isVisible())
-        self.assertIn("прежним настройкам", panel.changed_note.text())
+        self.assertIn("previous settings", panel.changed_note.text())
         panel.solves_field.setText("900")
         self.assertFalse(panel.changed_note.isVisible())
 
@@ -621,7 +624,7 @@ class SaveAndOpen(_Tabs):
         self.wait(panel)
         self.app.processEvents()
         self.assertTrue(panel.results_message.isVisible())
-        self.assertIn("Не открыто", panel.results_message.text())
+        self.assertIn("Not opened", panel.results_message.text())
         self.assertTrue(panel.results_empty.isVisible())
 
     def test_the_format_and_the_saved_codes_are_unchanged(self):
@@ -638,6 +641,192 @@ class SaveAndOpen(_Tabs):
         self.assertEqual(section["statement"], sm.STATEMENT)  # the saved English statement and provenance are not retranslated
         self.assertIn("SYNTHETIC", section["declaration"]["provenance"])
         self.assertEqual(section["result_hash"], panel.record["materials"]["result_hash"])
+
+
+CYRILLIC = re.compile("[Ѐ-ӿ]")
+
+
+def shown_texts(window) -> list:
+    """Every text a user can see or hover in the window: labels, buttons, fields, lists, tabs, tables, tooltips and menus."""
+    found = [window.windowTitle()]
+    for widget in window.findChildren(QWidget):
+        found += [widget.toolTip(), widget.accessibleName(), widget.windowTitle()]
+        if isinstance(widget, (QLabel, QAbstractButton)):
+            found.append(widget.text())
+        if isinstance(widget, QLineEdit):
+            found += [widget.text(), widget.placeholderText()]
+        if isinstance(widget, QComboBox):
+            for index in range(widget.count()):
+                found += [widget.itemText(index), str(widget.itemData(index, Qt.ItemDataRole.ToolTipRole) or "")]
+        if isinstance(widget, QTabBar):
+            found += [widget.tabText(index) for index in range(widget.count())]
+        if isinstance(widget, QTableWidget):
+            found += [widget.horizontalHeaderItem(column).text() for column in range(widget.columnCount())
+                      if widget.horizontalHeaderItem(column) is not None]
+            found += [widget.item(row, column).text() for row in range(widget.rowCount()) for column in range(widget.columnCount())
+                      if widget.item(row, column) is not None]
+    actions = list(window.menuBar().actions())
+    while actions:
+        action = actions.pop()
+        found += [action.text(), action.toolTip()]
+        if action.menu() is not None:
+            actions += list(action.menu().actions())
+    return [text for text in found if text]
+
+
+def edit_width(combo) -> int:
+    option = QStyleOptionComboBox()
+    combo.initStyleOption(option)
+    return combo.style().subControlRect(QStyle.ComplexControl.CC_ComboBox, option, QStyle.SubControl.SC_ComboBoxEditField, combo).width()
+
+
+class EnglishOnly(_Tabs):
+    """MAT-4.UX1.F1: the interface is English only, wherever a text can appear."""
+
+    def open_everything(self, workspace, panel) -> None:
+        for group in panel.sections.values():
+            group.toggle.setChecked(True)
+        panel.advanced.toggle.setChecked(True)
+        workspace.workflow.toggle.setChecked(True)
+        for index in range(5):
+            workspace.select_tab(index)
+            self.app.processEvents()
+
+    def test_no_russian_text_in_the_window_for_either_method_and_every_state(self):
+        for backend in (sm.RITZ, sm.STAGE_A):
+            with self.subTest(backend=backend):
+                window, workspace, panel = self.tabs((900, 700))
+                if backend == sm.STAGE_A:
+                    self.choose_stage_a(panel)
+                self.run_to_end(panel)
+                self.open_everything(workspace, panel)
+                texts = shown_texts(window)
+                panel.solves_field.setText("many")  # a form problem
+                panel.package_source.setCurrentIndex(panel.package_source.findData(sm.SELECTED))  # no package chosen
+                self.app.processEvents()
+                texts += shown_texts(window)
+                panel.source_combo.setCurrentIndex(panel.source_combo.findData(sm.REAL_SOURCE))  # the refusal of real data
+                self.app.processEvents()
+                panel.run()
+                texts += shown_texts(window)
+                self.assertGreater(len(texts), 300)
+                self.assertEqual([text for text in texts if CYRILLIC.search(text)], [])
+                window.close()
+
+    def test_no_russian_string_in_the_new_gui_sources(self):
+        """Covers what no single screen shows: dialog titles, messages of failures and every other literal."""
+        root = Path(__file__).resolve().parents[1] / "src" / "new_gui"
+        found = []
+        for path in sorted(root.glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            found += [(path.name, node.lineno) for node in ast.walk(tree)
+                      if isinstance(node, ast.Constant) and isinstance(node.value, str) and CYRILLIC.search(node.value)]
+        self.assertEqual(found, [])
+
+    def test_the_saved_plot_files_have_english_names(self):
+        self.assertEqual(sp.PLOT_FILES, {"error": "frequency_error.png", "objective": "objective_convergence.png"})
+
+
+class NarrowWindow(_Tabs):
+    """MAT-4.UX1.F1: the three defects of the Windows smoke test at 900 x 700 (D1, D2, D3), and the usual size."""
+
+    SIZES = ((900, 700), (1366, 768))
+
+    def test_d1_every_plot_text_lies_inside_the_picture(self):
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        from matplotlib.text import Text
+
+        for backend in (sm.RITZ, sm.STAGE_A):
+            section = mat3.study(backend)
+            # the smallest heights the page gives (PLOT_RATIOS) near a 900-pixel window, at 100 % and 150 %, and the saved size
+            for build, size in ((sm.objective_figure, (560, 320, 1.0)), (sm.objective_figure, (690, 320, 1.5)),
+                                (sm.error_figure, (560, 520, 1.0)), (sm.error_figure, (690, 520, 1.5)),
+                                (sm.objective_figure, sm.EXPORT_SIZE), (sm.error_figure, sm.EXPORT_SIZE)):
+                with self.subTest(backend=backend, plot=build.__name__, size=size):
+                    figure = build(section, *size)
+                    renderer = FigureCanvasAgg(figure).get_renderer()
+                    figure.draw(renderer)
+                    width, height = figure.get_size_inches()
+                    drawn = figure.get_tightbbox(renderer)  # everything drawn: titles, axis labels, ticks, legend, annotations
+                    self.assertGreaterEqual(drawn.x0, -0.01)
+                    self.assertGreaterEqual(drawn.y0, -0.01)
+                    self.assertLessEqual(drawn.x1, width + 0.01)
+                    self.assertLessEqual(drawn.y1, height + 0.01)
+                    frame = figure.bbox
+                    for axis in figure.axes:  # each axis label lies inside the picture, both ends
+                        for label in (axis.yaxis.label, axis.xaxis.label, axis.title):
+                            if label.get_text():
+                                box = label.get_window_extent(renderer)
+                                self.assertTrue(frame.x0 - 0.5 <= box.x0 and box.x1 <= frame.x1 + 0.5, label.get_text())
+                                self.assertTrue(frame.y0 - 0.5 <= box.y0 and box.y1 <= frame.y1 + 0.5, label.get_text())
+                    texts = [text.get_text() for text in figure.findobj(Text) if text.get_text().strip()]
+                    self.assertTrue(set(texts) & {"Objective", "Error, %"})
+                    self.assertEqual([text for text in texts if CYRILLIC.search(text)], [])
+
+    def test_d1_the_objective_label_is_shorter_than_its_axis_on_screen(self):
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+        for backend in (sm.RITZ, sm.STAGE_A):
+            with self.subTest(backend=backend):
+                _workspace, panel, _section = Plots.shown_plots(self, (900, 700), backend)
+                view = panel.objective_view
+                figure = sm.objective_figure(view.section, view.width(), view.height(), view.scale())
+                renderer = FigureCanvasAgg(figure).get_renderer()
+                figure.draw(renderer)
+                axis = figure.axes[0]
+                self.assertLess(axis.yaxis.label.get_window_extent(renderer).height, axis.get_window_extent(renderer).height)
+                panel.window().close()
+
+    def test_d2_the_frequency_table_shows_every_role_and_column_without_scrolling(self):
+        for size in self.SIZES:
+            for backend in (sm.RITZ, sm.STAGE_A):
+                with self.subTest(size=size, backend=backend):
+                    window, workspace, panel = self.tabs(size)
+                    if backend == sm.STAGE_A:
+                        self.choose_stage_a(panel)
+                    section = self.run_to_end(panel)
+                    workspace.select_tab(sp.TAB_RESULTS)
+                    self.app.processEvents()
+                    table = panel._tables["summary_frequencies"]
+                    header = table.horizontalHeader()
+                    for column in range(table.columnCount()):  # no cell and no header is cut: "HOLDOUT" stays whole
+                        self.assertGreaterEqual(header.sectionSize(column), table.sizeHintForColumn(column), column)
+                        self.assertGreaterEqual(header.sectionSize(column), header.sectionSizeHint(column), column)
+                    natural = sum(table.natural)
+                    # The offscreen test font is about 1.6 times as wide as Segoe UI, so at 900 the columns fit on Windows (measured
+                    # there: 482 of 634 pixels) but not always here. Whenever they fit, the whole table is in view and the free
+                    # width is shared, not given to one column.
+                    if natural <= table.viewport().width():
+                        self.assertEqual(table.horizontalScrollBar().maximum(), 0)  # "Error after" is in view
+                        self.assertEqual(header.length(), table.viewport().width())
+                        spare = [header.sectionSize(column) - table.natural[column] for column in range(table.columnCount())]
+                        self.assertLessEqual(max(spare) - min(spare), 1)
+                    elif size == (1366, 768):
+                        self.fail(f"the frequency table does not fit at 1366: {natural} > {table.viewport().width()}")
+                    self.assertIn("HOLDOUT", [row[1] for row in panel.table_cells("summary_frequencies")])
+                    self.assertEqual(panel.table_cells("summary_frequencies"),
+                                     [list(row) for row in sm.summary_frequency_rows(section)])
+                    self.assertEqual(self.visible_area(workspace).horizontalScrollBar().maximum(), 0)
+                    window.close()
+
+    def test_d3_no_choice_list_cuts_its_entries(self):
+        for size in self.SIZES:
+            for backend in (sm.RITZ, sm.STAGE_A):
+                with self.subTest(size=size, backend=backend):
+                    window, workspace, panel = self.tabs(size)
+                    if backend == sm.STAGE_A:
+                        self.choose_stage_a(panel)
+                    panel.advanced.toggle.setChecked(True)
+                    workspace.select_tab(sp.TAB_RUN)
+                    self.app.processEvents()
+                    combos = [combo for combo in panel.findChildren(QComboBox) if combo.isVisible()]
+                    self.assertEqual(panel.package_source in combos, backend == sm.STAGE_A)
+                    for combo in combos:
+                        for index in range(combo.count()):
+                            text = combo.itemText(index)
+                            self.assertGreaterEqual(edit_width(combo), combo.fontMetrics().horizontalAdvance(text), text)
+                    self.assertEqual(self.visible_area(workspace).horizontalScrollBar().maximum(), 0)
+                    window.close()
 
 
 class Boundaries(unittest.TestCase):

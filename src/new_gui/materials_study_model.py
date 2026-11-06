@@ -65,41 +65,40 @@ STAGE_PROVENANCE = "SYNTHETIC: observations computed from a diagonal matrix fixt
 STATEMENT = ("SYNTHETIC software test. Recovering known values tests the software and says nothing about a real material. "
              "A diagnostic candidate is not a material property, a ply constant or a calibration.")
 DASH = "—"
-DERIVED = " (производная)"
+DERIVED = " (derived)"
 
-METHOD_NAMES = {RITZ: "Метод Ритца", STAGE_A: "Матричная модель Stage A"}
-STATEMENT_RU = ("Это числа синтетической проверки программы: они не являются принятыми свойствами материала, "
-                "константами слоя или калибровкой.")
+METHOD_NAMES = {RITZ: "Ritz plate model", STAGE_A: "Stage A matrix model"}
+RESULT_STATEMENT = ("These numbers come from a synthetic software test. They are not accepted material properties, ply "
+                    "constants or a calibration.")
 METHOD_TEXT = {
-    RITZ: ("Модель тонкой плиты рассчитывается прямо в программе. Подбираются четыре жёсткости: D11, D22, D66 и u (D12 = u*D22). "
-           "ODB, Abaqus и файлы матриц не нужны."),
-    STAGE_A: ("Используется готовый пакет матриц. Подбираются три параметра: D, D66 и r (D22 = D11 = D, D12 = r*D). Без "
-              "совместимого пакета метод отказывает: Abaqus не запускается, и другой метод не подставляется."),
+    RITZ: ("Thin-plate model computed in this program. Fits four stiffnesses: D11, D22, D66 and u (D12 = u*D22). "
+           "No ODB, Abaqus or matrix file is needed."),
+    STAGE_A: ("Uses a prepared matrix package. Fits three parameters: D, D66 and r (D22 = D11 = D, D12 = r*D). Without a "
+              "compatible package it refuses: Abaqus is not started, and the other method is not used instead."),
 }
 APPLICABILITY = {
-    RITZ: ("Область применения: одна плоская прямоугольная свободная однородно-эквивалентная ортотропная плита с известными осями "
-           "материала: постоянные D, нет связи изгиба и растяжения, нет D16 и D26, равномерная масса. Сдвиг, инерция поворота, "
-           "подвес, преднапряжение и неоднородность в модель не входят и здесь не проверяются. Малая толщина сама по себе не "
-           "доказывает применимость модели."),
-    STAGE_A: ("Область применения: только модель и диапазон параметров, записанные в пакете. Встроенный пакет — малый диагональный "
-              "тестовый набор, а не модель какой-либо плиты. Геометрия и масса в этом методе не используются."),
+    RITZ: ("Scope: one flat, rectangular, free-free, homogeneous-equivalent orthotropic plate with known material axes: constant "
+           "D, no bending-extension coupling, no D16 or D26, uniform mass. Shear, rotary inertia, suspension, prestress and "
+           "non-uniformity are not in the model and are not checked here. Thinness alone does not prove the model applies."),
+    STAGE_A: ("Scope: only the model and the parameter range stored in the package. The built-in package is a small diagonal "
+              "test fixture, not a model of any plate. This method does not use geometry or mass."),
 }
-ROLE_LIMIT = {"log": "Жёсткость модели; не константа слоя",
-              "linear": "Со знаком; правило точности не утверждено",
-              "derived": "Производная величина; неопределённость не распространена"}
-RUN_BLOCKED = "Обратный расчёт по реальным данным: BLOCKED"
-REAL_NOTE = ("Реальные файлы здесь только просматриваются. Никакой текст, настройка или сохранённый файл не включают подбор по "
-             "измерениям, и эти значения никогда не используются в синтетической проверке.")
+ROLE_LIMIT = {"log": "Model stiffness; not a ply constant",
+              "linear": "Signed; no precision rule approved",
+              "derived": "Derived; uncertainty not propagated"}
+RUN_BLOCKED = "Real-data inverse execution: BLOCKED"
+REAL_NOTE = ("Real files are only inspected here. No text, setting or saved file enables a fit on measured data, and these "
+             "values are never used in the synthetic test.")
 TERM_HELP = {
-    "MAC": "MAC — мера сходства двух форм колебаний (0–1). Здесь проверяет только, та ли это мода; значения материала по MAC не подбираются.",
-    "HOLDOUT": "HOLDOUT — моды, которые не участвуют в подборе. Они показывают, предсказывает ли модель то, на чём не настраивалась. FIT — моды, по которым идёт подбор.",
-    "rank": "Ранг показывает, сколько параметров можно независимо определить по этим модам. Число обусловленности показывает, насколько плохо они различимы.",
-    "sigma": "Сигма — заданная погрешность ln(f) в одной строке наблюдений. Она задаёт вес строки в подборе.",
-    "uncertainty": "Неопределённость — оценка разброса результата. Показаны только доступные составляющие; отсутствующие перечислены и не считаются нулём.",
+    "MAC": "MAC measures how similar two mode shapes are (0 to 1). Here it only checks that a mode is the same mode; no material value is fitted to MAC.",
+    "HOLDOUT": "HOLDOUT modes are left out of the fit. They show whether the model predicts what it was not tuned to. FIT modes are the ones the fit uses.",
+    "rank": "Rank: how many parameters these modes can determine independently. Condition number: how poorly the parameters are told apart.",
+    "sigma": "Sigma: the stated error of ln(f) in one observation row. It sets the weight of that row in the fit.",
+    "uncertainty": "Uncertainty: an estimate of the spread of the result. Only the available components are shown; missing ones are listed and never taken as zero.",
 }
-EXECUTION_TEXT = {"COMPLETED": "Завершён", "CANCELLED": "Отменён", "BUDGET_EXHAUSTED": "Остановлен: исчерпан лимит",
-                  "REFUSED": "Отказ", "FAILED": "Ошибка"}
-UNIT_TEXT = {"N*m": "Н·м", "1": "безразмерный", "Hz": "Гц"}
+EXECUTION_TEXT = {"COMPLETED": "Completed", "CANCELLED": "Cancelled", "BUDGET_EXHAUSTED": "Stopped: limit reached",
+                  "REFUSED": "Refused", "FAILED": "Failed"}
+UNIT_TEXT = {"N*m": "N·m", "1": "dimensionless", "Hz": "Hz"}
 EXPORT_SIZE = (1600, 900, 2.0)  # logical width and height, and scale: a saved plot is 3200 x 1800 pixels, whatever the screen
 BASE_DPI = 100
 _INK, _MUTED, _GRID = "#3e4c59", "#52606d", "#e4e7eb"
@@ -153,10 +152,10 @@ def _float(text: str, name: str, problems: list) -> float:
     try:
         value = float(str(text).strip().replace(",", "."))
     except ValueError:
-        problems.append(f"{name}: введите число")
+        problems.append(f"{name}: enter a number")
         return math.nan
     if not math.isfinite(value):
-        problems.append(f"{name}: введите конечное число")
+        problems.append(f"{name}: enter a finite number")
     return value
 
 
@@ -164,10 +163,10 @@ def _whole(text: str, name: str, problems: list, low: int, high: int) -> int:
     try:
         value = int(str(text).strip())
     except ValueError:
-        problems.append(f"{name}: введите целое число")
+        problems.append(f"{name}: enter a whole number")
         return low
     if not low <= value <= high:
-        problems.append(f"{name}: от {low} до {high}")
+        problems.append(f"{name}: {low} to {high}")
     return value
 
 
@@ -175,8 +174,8 @@ def geometry_of(form: Mapping) -> PlateGeometry:
     """Geometry in stated units, SI inside. Raises ``FormProblem``."""
     entered, problems = form["geometry"], []
     a, b = _float(entered["a"], "a", problems), _float(entered["b"], "b", problems)
-    mass = _float(entered["mass"], "масса", problems)
-    thickness = _float(entered["thickness"], "толщина", problems) if str(entered["thickness"]).strip() else None
+    mass = _float(entered["mass"], "mass", problems)
+    thickness = _float(entered["thickness"], "thickness", problems) if str(entered["thickness"]).strip() else None
     if problems:
         raise FormProblem(problems)
     names = ("a", "b", "mass") + (() if thickness is None else ("thickness",))
@@ -196,12 +195,12 @@ def geometry_text(form: Mapping) -> str:
     try:
         geometry = geometry_of(form)
     except FormProblem as problem:
-        return f"Нельзя использовать: {problem}"
-    text = (f"a = {geometry.a_m:.6g} м, b = {geometry.b_m:.6g} м, поверхностная масса = {geometry.surface_mass_kg_m2:.6g} кг/м²")
+        return f"Not usable: {problem}"
+    text = (f"a = {geometry.a_m:.6g} m, b = {geometry.b_m:.6g} m, surface mass = {geometry.surface_mass_kg_m2:.6g} kg/m²")
     if geometry.thickness_m is None:
-        return text + ". Толщина не задана: показываются D, а E и G отсутствуют."
-    return (text + f", толщина = {geometry.thickness_m:.6g} м. Отношение min(a, b)/h = "
-            f"{min(geometry.a_m, geometry.b_m) / geometry.thickness_m:.4g}; это не доказывает поведение тонкой плиты.")
+        return text + ". No thickness: D is reported, and E and G stay missing."
+    return (text + f", thickness = {geometry.thickness_m:.6g} m. Ratio min(a, b)/h = "
+            f"{min(geometry.a_m, geometry.b_m) / geometry.thickness_m:.4g}; this does not prove thin-plate behaviour.")
 
 
 @dataclass(frozen=True)
@@ -224,31 +223,31 @@ def parse_form(form: Mapping) -> Parsed:
     backend = form["backend"]
     names = RITZ_PARAMETERS if backend == RITZ else STAGE_A_PARAMETERS
     if tuple(form["parameters"]) != tuple(names):
-        raise FormProblem((f"этот метод подбирает ровно {', '.join(names)}",))
+        raise FormProblem((f"this method fits exactly {', '.join(names)}",))
     truth, parameters = {}, []
     for name in names:
         entry = form["parameters"][name]
-        truth[name] = _float(entry["truth"], f"{name} известное", problems)
-        start = _float(entry["start"], f"{name} начальное", problems)
-        lower = _float(entry["lower"], f"{name} нижняя граница", problems)
-        upper = _float(entry["upper"], f"{name} верхняя граница", problems)
+        truth[name] = _float(entry["truth"], f"{name} known value", problems)
+        start = _float(entry["start"], f"{name} start", problems)
+        lower = _float(entry["lower"], f"{name} lower bound", problems)
+        upper = _float(entry["upper"], f"{name} upper bound", problems)
         parameters.append(FittedParameter(name, start, lower, upper))
     numerics, budget = form["numerics"], form["budget"]
-    degree = _whole(numerics["degree"], "Степень базиса", problems, 2, 31) if backend == RITZ else 0
-    mode_count = _whole(numerics["mode_count"], "Рассчитываемые моды", problems, 2, 64)
-    observed = _whole(numerics["observed_modes"], "Наблюдаемые моды", problems, 2, 64)
-    holdout = _whole(numerics["holdout_modes"], "Моды HOLDOUT", problems, 1, 64)
-    sigma = _float(numerics["sigma"], "Сигма", problems)
+    degree = _whole(numerics["degree"], "Basis degree", problems, 2, 31) if backend == RITZ else 0
+    mode_count = _whole(numerics["mode_count"], "Solved modes", problems, 2, 64)
+    observed = _whole(numerics["observed_modes"], "Observed modes", problems, 2, 64)
+    holdout = _whole(numerics["holdout_modes"], "HOLDOUT modes", problems, 1, 64)
+    sigma = _float(numerics["sigma"], "Sigma", problems)
     if math.isfinite(sigma) and sigma <= 0.0:
-        problems.append("Сигма: должна быть положительной")
+        problems.append("Sigma: must be positive")
     if holdout >= observed:
-        problems.append("Моды HOLDOUT: должно быть меньше, чем наблюдаемых мод")
+        problems.append("HOLDOUT modes: must be fewer than the observed modes")
     if observed >= mode_count:
-        problems.append("Рассчитываемые моды: должно быть больше, чем наблюдаемых мод")
-    solves = _whole(budget["max_solves"], "Лимит решений", problems, 1, MAX_SOLVES_CAP)
-    seconds = _float(budget["max_seconds"], "Лимит времени", problems)
+        problems.append("Solved modes: must exceed the observed modes")
+    solves = _whole(budget["max_solves"], "Solve limit", problems, 1, MAX_SOLVES_CAP)
+    seconds = _float(budget["max_seconds"], "Time limit", problems)
     if math.isfinite(seconds) and not 0.0 < seconds <= MAX_SECONDS_CAP:
-        problems.append(f"Лимит времени: больше 0 и не более {MAX_SECONDS_CAP} с")
+        problems.append(f"Time limit: above 0 and at most {MAX_SECONDS_CAP} s")
     if problems:
         raise FormProblem(problems)
     return Parsed(backend, truth, tuple(parameters), degree, mode_count, observed, holdout, sigma, solves, seconds)
@@ -274,22 +273,22 @@ def preflight(form: Mapping) -> tuple:
     if parsed.backend == RITZ:
         dofs = (parsed.degree + 1) ** 2
         memory = 8 * dofs * dofs * 8  # the five geometry matrices and three working matrices, dense
-        rows.append(("Размер модели", f"{dofs} коэффициентов", f"не более {limits.max_dofs}", _state(dofs <= limits.max_dofs)))
-        rows.append(("Оценка рабочей памяти", f"{memory / 2 ** 20:.1f} МиБ", f"не более {limits.max_allocation_bytes / 2 ** 20:.0f} МиБ",
+        rows.append(("Model size", f"{dofs} coefficients", f"at most {limits.max_dofs}", _state(dofs <= limits.max_dofs)))
+        rows.append(("Estimated working memory", f"{memory / 2 ** 20:.1f} MiB", f"at most {limits.max_allocation_bytes / 2 ** 20:.0f} MiB",
                      _state(memory <= limits.max_allocation_bytes)))
         if dofs > limits.max_dofs:
-            problems.append(f"Степень базиса: {dofs} коэффициентов превышают лимит {limits.max_dofs}")
+            problems.append(f"Basis degree: {dofs} coefficients exceed the limit of {limits.max_dofs}")
         if memory > limits.max_allocation_bytes:
-            problems.append("Степень базиса: оценка памяти превышает лимит")
+            problems.append("Basis degree: the estimated memory exceeds the limit")
     else:
-        rows.append(("Пакет", "размер проверяется при открытии", f"не более {limits.max_package_file_bytes / 2 ** 20:.0f} МиБ", "ПРОВЕРЯЕТСЯ ПРИ ОТКРЫТИИ"))
-    rows.append(("Лимит решений", str(parsed.max_solves), f"не более {MAX_SOLVES_CAP}", "OK"))
-    rows.append(("Лимит времени", f"{parsed.max_seconds:g} с", f"не более {MAX_SECONDS_CAP} с", "OK"))
+        rows.append(("Package", "size checked when it is opened", f"at most {limits.max_package_file_bytes / 2 ** 20:.0f} MiB", "CHECKED WHEN OPENED"))
+    rows.append(("Solve limit", str(parsed.max_solves), f"at most {MAX_SOLVES_CAP}", "OK"))
+    rows.append(("Time limit", f"{parsed.max_seconds:g} s", f"at most {MAX_SECONDS_CAP} s", "OK"))
     return tuple(rows), tuple(problems)
 
 
 def _state(good: bool) -> str:
-    return "OK" if good else "ВЫШЕ ЛИМИТА"
+    return "OK" if good else "OVER THE LIMIT"
 
 
 # ---------------------------------------------------------------------------------------------- building a synthetic study
@@ -375,7 +374,7 @@ def _stage_request(form: Mapping, parsed: Parsed, scratch: Path) -> StudyRequest
     start_point = {item.name: item.start for item in parsed.parameters}
     truth_values, start_values = _stage_lambda(parsed.truth), _stage_lambda(start_point)
     if (truth_values <= 0.0).any() or (start_values <= 0.0).any():
-        raise FormProblem(("При этих значениях собственное значение тестового набора неположительно",))
+        raise FormProblem(("These values make a fixture eigenvalue non-positive",))
     start_order, truth_order = list(np.argsort(start_values)), list(np.argsort(truth_values))
     rows = []
     for rank, dof in enumerate(truth_order, start=1):
@@ -413,7 +412,7 @@ def build_request(form: Mapping, scratch: Path) -> StudyRequest:
     try:
         return _ritz_request(form, parsed) if parsed.backend == RITZ else _stage_request(form, parsed, scratch)
     except PlateForwardRefusal as refusal:
-        raise FormProblem((f"Известные или начальные значения не решаются: {refusal.reason}",)) from refusal
+        raise FormProblem((f"The known or start values cannot be solved: {refusal.reason}",)) from refusal
 
 
 def prepare_rows(form: Mapping) -> tuple:
@@ -457,11 +456,11 @@ def real_data_gate(authorization_text: str = "") -> tuple:
 def real_data_rows(facts, registration: str, authorization_text: str = "") -> tuple:
     code, reason = real_data_gate(authorization_text)
     if facts is None:
-        rows = [("Данные прочитаны", "Файл не прочитан"), ("Формы мод", "Неизвестно"), ("Тип данных", "UNKNOWN")]
+        rows = [("Data read", "No file read"), ("Mode shapes", "Unknown"), ("Data type", "UNKNOWN")]
     else:
-        rows = [("Данные прочитаны", "Да"), ("Формы мод", facts.shapes or "Неизвестно"), ("Тип данных", facts.data_kind or "UNKNOWN")]
-    return tuple(rows + [("Регистрация", registration), ("Источник", "Реальный эксперимент, выбранный пользователем"),
-                         ("Обратный расчёт по реальным данным", "BLOCKED"), ("Ответ расчётной схемы", f"{code}: {reason}")])
+        rows = [("Data read", "Yes"), ("Mode shapes", facts.shapes or "Unknown"), ("Data type", facts.data_kind or "UNKNOWN")]
+    return tuple(rows + [("Registration", registration), ("Source", "Real experiment, chosen by the user"),
+                         ("Real-data inverse execution", "BLOCKED"), ("Workflow answer", f"{code}: {reason}")])
 
 
 def package_facts(path) -> tuple:
@@ -470,14 +469,14 @@ def package_facts(path) -> tuple:
     manifest = found.manifest
     domain = manifest["validity_domain"]
     synthetic = manifest["evidence_kind"] == EvidenceKind.SYNTHETIC.value
-    rows = [("Модель", str(manifest["model_id"])), ("Заявленный источник", str(manifest["specimen_id"])),
-            ("Вид данных", str(manifest["evidence_kind"])), ("Единицы", str(manifest["units"])),
-            ("Параметры", ", ".join(str(item) for item in manifest["parameter_names"])), ("Ограничение", str(manifest["constraint"])),
-            ("Поведение массы", str(manifest["mass_slope"])), ("Ожидаемые моды жёсткого тела", str(manifest["expected_rigid_body_modes"]))]
-    rows += [(f"Диапазон {name}", f"{domain[name][0]:g} до {domain[name][1]:g}") for name in sorted(domain)]
-    rows += [("Степени свободы матрицы", str(found.dof_count)), ("SHA-256 файла матриц", found.matrix_sha256),
-             ("Готовность", "Читается. Исследование ещё должно совпасть с идентичностью этого пакета."
-              if synthetic else "Читается, только просмотр: обратный расчёт по реальным данным BLOCKED.")]
+    rows = [("Model", str(manifest["model_id"])), ("Declared source", str(manifest["specimen_id"])),
+            ("Evidence kind", str(manifest["evidence_kind"])), ("Units", str(manifest["units"])),
+            ("Parameters", ", ".join(str(item) for item in manifest["parameter_names"])), ("Constraint", str(manifest["constraint"])),
+            ("Mass behaviour", str(manifest["mass_slope"])), ("Rigid modes expected", str(manifest["expected_rigid_body_modes"]))]
+    rows += [(f"Domain {name}", f"{domain[name][0]:g} to {domain[name][1]:g}") for name in sorted(domain)]
+    rows += [("Matrix DOFs", str(found.dof_count)), ("Matrix file SHA-256", found.matrix_sha256),
+             ("Readiness", "Readable. A study still has to match this package's identity."
+              if synthetic else "Readable, view only: real-data inverse execution is BLOCKED.")]
     return tuple(rows)
 
 
@@ -489,7 +488,7 @@ def _text(value: Any) -> str:
     if value is None:
         return DASH
     if isinstance(value, bool):
-        return "да" if value else "нет"
+        return "yes" if value else "no"
     return f"{value:.6g}" if isinstance(value, (int, float)) else str(value)
 
 
@@ -506,12 +505,12 @@ def _signed_percent(value: float) -> str:
 
 def status_rows(section: Mapping) -> tuple:
     result, declaration = section["result"], section["declaration"]
-    rows = [("Исследование", declaration["intent"]), ("Вид данных", result["evidence_kind"]), ("Метод", result["backend_id"]),
-            ("Статус выполнения", result["execution_status"]), ("Численный статус", result["numerical_status"]),
-            ("Научный статус", result["scientific_status"]), ("Статус выпуска", result["release_status"])]
+    rows = [("Study", declaration["intent"]), ("Evidence", result["evidence_kind"]), ("Method", result["backend_id"]),
+            ("Execution status", result["execution_status"]), ("Numerical status", result["numerical_status"]),
+            ("Scientific status", result["scientific_status"]), ("Release status", result["release_status"])]
     if result["refusal_code"]:
-        rows.append(("Отказ", result["refusal_code"]))
-    return tuple(rows) + tuple(("Без изменений", item) for item in result["restrictions_unchanged"])
+        rows.append(("Refusal", result["refusal_code"]))
+    return tuple(rows) + tuple(("Unchanged", item) for item in result["restrictions_unchanged"])
 
 
 def method_title(backend: str) -> str:
@@ -524,28 +523,28 @@ def result_summary(section: Mapping) -> tuple:
     execution, numerical = result["execution_status"], result["numerical_status"]
     scientific, release = result["scientific_status"], result["release_status"]
     if numerical in ("CONVERGED", "CONVERGED_AT_BOUND"):
-        converged = "На границе диапазона" if numerical == "CONVERGED_AT_BOUND" else "Достигнута"
+        converged = "Reached at a range bound" if numerical == "CONVERGED_AT_BOUND" else "Reached"
     else:
-        converged = "Не достигнута"
+        converged = "Not reached"
     if result["refusal_code"]:
-        checks = f"Отказ: {result['refusal_code']} ({scientific})"
+        checks = f"Refused: {result['refusal_code']} ({scientific})"
     elif scientific == "DIAGNOSTIC_OPTIMIZER_CANDIDATE":
-        checks = f"Пройдены: только диагностический кандидат ({scientific})"
+        checks = f"Passed: diagnostic candidate only ({scientific})"
     else:
-        checks = f"Не пройдены ({scientific})"
+        checks = f"Not passed ({scientific})"
     if result["evidence_kind"] == "SYNTHETIC":
-        meaning = f"Синтетическая проверка программы, не значение материала ({section['declaration']['intent']}, {release})"
+        meaning = f"Synthetic software test, not a material value ({section['declaration']['intent']}, {release})"
     else:
-        meaning = f"Значение реального материала недоступно ({release})"
-    return (("Расчёт", f"{EXECUTION_TEXT.get(execution, execution)} ({execution}), решений: {result['solves']}"),
-            ("Метод", method_title(result["backend_id"])), ("Сходимость", f"{converged} ({numerical})"),
-            ("Научные проверки", checks), ("Смысл чисел", meaning))
+        meaning = f"No real material value is available ({release})"
+    return (("Run", f"{EXECUTION_TEXT.get(execution, execution)} ({execution}), {result['solves']} solves"),
+            ("Method", method_title(result["backend_id"])), ("Convergence", f"{converged} ({numerical})"),
+            ("Scientific checks", checks), ("Meaning of the numbers", meaning))
 
 
 def cancelled_summary(backend: str) -> tuple:
-    return (("Расчёт", "Отменён в безопасной точке (CANCELLED). Результат этого запуска не показан."),
-            ("Метод", method_title(backend)), ("Сходимость", "Не оценивалась"), ("Научные проверки", "Не выполнялись"),
-            ("Смысл чисел", "Чисел нет"))
+    return (("Run", "Cancelled at a safe point (CANCELLED). No result of this run is shown."),
+            ("Method", method_title(backend)), ("Convergence", "Not evaluated"), ("Scientific checks", "Not run"),
+            ("Meaning of the numbers", "No numbers"))
 
 
 def _unit(units: Mapping, name: str) -> str:
@@ -560,7 +559,7 @@ def summary_parameter_rows(section: Mapping) -> tuple:
     for row in parameter_rows(section):
         derived = row[0].endswith(DERIVED)
         name = row[0][:-len(DERIVED)] if derived else row[0]
-        rows.append((_unit(units, name) + (" (производная)" if derived else ""), row[1], row[2], row[3]))
+        rows.append((_unit(units, name) + (DERIVED if derived else ""), row[1], row[2], row[3]))
     return tuple(rows)
 
 
@@ -585,32 +584,32 @@ def summary_frequency_rows(section: Mapping) -> tuple:
 def holdout_summary(section: Mapping) -> str:
     rows = [row for row in error_rows(section) if row[1] == "HOLDOUT" and row[3] is not None]
     if not rows:
-        return "HOLDOUT: нет данных после подбора."
+        return "HOLDOUT: no values after the fit."
     worst = max(abs(row[3]) for row in rows)
-    named = ", ".join(f"мода {row[0]}: {_signed_percent(row[3])}" for row in rows)
-    return f"HOLDOUT (моды вне подбора): {named}. Наибольшая ошибка по модулю: {_signed_percent(worst).lstrip('+')}."
+    named = ", ".join(f"mode {row[0]}: {_signed_percent(row[3])}" for row in rows)
+    return f"HOLDOUT (modes left out of the fit): {named}. Largest absolute error: {_signed_percent(worst).lstrip('+')}."
 
 
 def reason_text(section: Mapping) -> str:
     result = section["result"]
     lines = [f"{result['refusal_code']}: {result['refusal_reason']}"] if result["refusal_code"] else []
     if result["forward_refusal_code"]:
-        lines.append(f"Прямая модель: {result['forward_refusal_code']}")
+        lines.append(f"Forward model: {result['forward_refusal_code']}")
     return "\n".join(lines + list(result["scientific_reasons"]))
 
 
 def observation_rows(declaration: Mapping) -> tuple:
     return tuple((row["row_id"], str(row["experimental_mode"]), _text(row["experimental_hz"]), str(row["model_mode"]), row["role"],
-                  row["family"], row["mode_source"] or DASH, str(len(row["shape"])), "Годно: SYNTHETIC, зафиксировано")
+                  row["family"], row["mode_source"] or DASH, str(len(row["shape"])), "Usable: SYNTHETIC, frozen")
                  for row in declaration["rows"])
 
 
 def registration_text(declaration: Mapping) -> str:
     seen = declaration["observation_set"]
     count = len(seen.get("points", seen.get("items", ())))
-    what = "зарегистрированных координат" if seen["kind"] == "COORDINATE" else "степеней свободы матрицы"
-    return (f"Регистрация {seen['registration_id']}: {count} {what}, задано этой синтетической проверкой. "
-            f"FIT и HOLDOUT зафиксированы до запуска. MAC проверяет только идентичность моды и не подбирается.")
+    what = "registered coordinates" if seen["kind"] == "COORDINATE" else "matrix DOFs"
+    return (f"Registration {seen['registration_id']}: {count} {what}, stated by this synthetic test. "
+            f"FIT and HOLDOUT are frozen before the run. MAC checks mode identity only and is not fitted.")
 
 
 def parameter_rows(section: Mapping) -> tuple:
@@ -622,13 +621,13 @@ def parameter_rows(section: Mapping) -> tuple:
     rows = []
     for name in (item["name"] for item in declaration["parameters"]):
         linear = name in ("u", "r")
-        spread = f"{mp.number(sd[name]):.3g} ({'абс.' if linear else 'ln'})" if sd.get(name) is not None else DASH
+        spread = f"{mp.number(sd[name]):.3g} ({'absolute' if linear else 'ln'})" if sd.get(name) is not None else DASH
         rows.append((name, _text(start.get(name)), _text(found.get(name)), _text(known.get(name)), units.get(name, DASH), spread,
                      ROLE_LIMIT["linear" if linear else "log"]))
     before, after = result["initial_stiffness"] or {}, result["final_stiffness"] or {}
     if "D12" in known:
         rows.append(("D12" + DERIVED, _text(before.get("D12")), _text(after.get("D12")), _text(known["D12"]), units.get("D12", DASH),
-                     "не распространена", ROLE_LIMIT["derived"]))
+                     "not propagated", ROLE_LIMIT["derived"]))
     return tuple(rows)
 
 
@@ -642,8 +641,8 @@ def frequency_rows(section: Mapping) -> tuple:
         found, check = frequencies.get(row["row_id"]), identity.get(row["row_id"])
         before = None if found is None else mp.number(found["initial_model_hz"])
         after = None if found is None else mp.number(found["final_model_hz"])
-        shape = "Не достигнуто" if check is None else (
-            f"Мода {check['initial_model_mode']} → {check['final_model_mode']}; MAC {_text(check['final_experimental_mac'])}")
+        shape = "Not reached" if check is None else (
+            f"Mode {check['initial_model_mode']} → {check['final_model_mode']}; MAC {_text(check['final_experimental_mac'])}")
         rows.append((row["row_id"], str(row["experimental_mode"]), row["role"], _text(measured), _text(before), _text(after),
                      _percent(None if before is None else before / measured - 1.0),
                      _percent(None if after is None else after / measured - 1.0), shape))
@@ -658,11 +657,11 @@ def iteration_rows(section: Mapping) -> tuple:
 def identifiability_rows(section: Mapping) -> tuple:
     block = section["result"]["identifiability"]
     if block is None:
-        return (("Ранг и наблюдаемость", "Не достигнуто"),)
-    rows = [("Статус", block["status"]), ("Ранг", f"{block['rank']} из {len(block['parameter_ids'])}"),
-            ("Параметры", ", ".join(block["parameter_ids"])), ("Число обусловленности", _text(block["condition_number"])),
-            ("Сингулярные числа", ", ".join(_text(value) for value in block["singular_values"]))]
-    rows += [(f"Проекция q {name}", _text(value)) for name, value in block["projection_q"].items()]
+        return (("Rank and observability", "Not reached"),)
+    rows = [("Status", block["status"]), ("Rank", f"{block['rank']} of {len(block['parameter_ids'])}"),
+            ("Parameters", ", ".join(block["parameter_ids"])), ("Condition number", _text(block["condition_number"])),
+            ("Singular values", ", ".join(_text(value) for value in block["singular_values"]))]
+    rows += [(f"Projection q {name}", _text(value)) for name, value in block["projection_q"].items()]
     return tuple(rows)
 
 
@@ -681,45 +680,46 @@ def family_rows(section: Mapping) -> tuple:
 
 def convergence_rows(section: Mapping) -> tuple:
     result = section["result"]
-    return (("Целевая функция в начале", _text(result["initial_objective"])), ("Целевая функция в конце", _text(result["final_objective"])),
-            ("Итерации", str(len(result["iterations"]))), ("Прямые решения", str(result["solves"])),
-            ("Наибольшая собственная невязка", _text(result["max_eigen_residual_seen"])),
-            ("Наибольшая ошибка ортонормированности", _text(result["max_orthonormality_error_seen"])),
-            ("Аналитические и отслеживаемые чувствительности", _text(result["max_analytic_sensitivity_difference"])),
-            ("Смены порядка мод", "; ".join(f"{left} и {right}" for left, right in result["order_changes"]) or "нет"),
-            ("Заявление о пакете", result["package_validation_status"]))
+    return (("Objective at the start", _text(result["initial_objective"])), ("Objective at the end", _text(result["final_objective"])),
+            ("Iterations", str(len(result["iterations"]))), ("Forward solves", str(result["solves"])),
+            ("Largest eigen residual seen", _text(result["max_eigen_residual_seen"])),
+            ("Largest orthonormality error seen", _text(result["max_orthonormality_error_seen"])),
+            ("Analytic against tracked sensitivities", _text(result["max_analytic_sensitivity_difference"])),
+            ("Mode order changes", "; ".join(f"{left} and {right}" for left, right in result["order_changes"]) or "none"),
+            ("Package statement", result["package_validation_status"]))
 
 
 def uncertainty_rows(section: Mapping) -> tuple:
     block = section["result"]["uncertainty"]
     if block is None:
-        return (("Неопределённость", "Не достигнуто"),)
-    rows = [("Проверка картины невязок", block["pattern_status"]), ("Поправка Бирге", block["birge_status"])]
-    rows += [("Доступно", item) for item in block["available_components"]]
-    rows += [(f"Диапазон {name}", f"{_text(low)} до {_text(high)}") for name, (low, high) in block["robustness_range"].items()]
+        return (("Uncertainty", "Not reached"),)
+    rows = [("Residual pattern test", block["pattern_status"]), ("Birge adjustment", block["birge_status"])]
+    rows += [("Available", item) for item in block["available_components"]]
+    rows += [(f"Range {name}", f"{_text(low)} to {_text(high)}") for name, (low, high) in block["robustness_range"].items()]
     if block["robustness_range"]:
-        rows.append(("Смысл диапазонов", block["robustness_note"]))
-    return tuple(rows + [("Отсутствует", item) for item in block["missing_components"]])
+        rows.append(("Meaning of the ranges", block["robustness_note"]))
+    return tuple(rows + [("Missing", item) for item in block["missing_components"]])
 
 
 def conditional_rows(section: Mapping) -> tuple:
     values = section["result"]["conditional_effective_constants"]
     if not values:
         return ()
-    return (("Смысл", CONDITIONAL_NOTE),) + tuple((name, _text(value)) for name, value in values.items())
+    return (("Meaning", CONDITIONAL_NOTE),) + tuple((name, _text(value)) for name, value in values.items())
 
 
-CONDITIONAL_NOTE = "Для этой модели при этой толщине; не свойства слоя и не принятые константы"
-PARAMETER_HEADERS = ("Параметр", "Начальное", "Найденное (диагностика)", "Известное синтетическое", "Единица", "Статист. СКО", "Предел толкования")
-FREQUENCY_HEADERS = ("Строка", "Мода", "Роль", "Синтетическое наблюдение, Гц", "До подбора, Гц", "После подбора, Гц", "Ошибка до",
-                     "Ошибка после", "Отслеживаемая мода, MAC (только идентичность)")
-OBSERVATION_HEADERS = ("Строка", "Мода", "Частота, Гц", "Зафиксированная мода модели", "Роль", "Семейство", "Источник", "Значений формы", "Статус")
-ITERATION_HEADERS = ("Итерация", "Демпфирование", "Цель до", "Пробная цель", "Принято", "Примечание")
-HOLDOUT_HEADERS = ("Член", "Семейство", "Сигма (ln)", "ln отношения до", "ln отношения после", "Взвешенное после")
-FAMILY_HEADERS = ("Исключено", "Статус", "Оценка", "Причины")
-PREFLIGHT_HEADERS = ("Ресурс", "Этот запуск", "Лимит", "Состояние")
-SUMMARY_PARAMETER_HEADERS = ("Параметр", "Начальное", "Рассчитанное", "Известное синтетическое")
-SUMMARY_FREQUENCY_HEADERS = ("Мода", "Роль", "Наблюдение, Гц", "До подбора, Гц", "После подбора, Гц", "Ошибка до", "Ошибка после")
+CONDITIONAL_NOTE = "Of this model at this thickness; not ply properties, not accepted constants"
+PARAMETER_HEADERS = ("Parameter", "Start", "Found (diagnostic)", "Known synthetic value", "Unit", "Statistical SD", "Interpretation limit")
+FREQUENCY_HEADERS = ("Row", "Mode", "Role", "Synthetic observation, Hz", "Before fit, Hz", "After fit, Hz", "Error before",
+                     "Error after", "Tracked mode, MAC (identity only)")
+OBSERVATION_HEADERS = ("Row", "Mode", "Frequency, Hz", "Frozen model mode", "Role", "Family", "Source", "Shape values", "Status")
+ITERATION_HEADERS = ("Iteration", "Damping", "Objective before", "Trial objective", "Accepted", "Note")
+HOLDOUT_HEADERS = ("Term", "Family", "Sigma (ln)", "ln ratio before", "ln ratio after", "Whitened after")
+FAMILY_HEADERS = ("Left out", "Status", "Estimate", "Reasons")
+PREFLIGHT_HEADERS = ("Resource", "This run", "Limit", "State")
+SUMMARY_PARAMETER_HEADERS = ("Parameter", "Start", "Calculated", "Known synthetic")
+# Two-line headers keep the seven columns inside a 900-pixel window; no column is narrower than its text (D2).
+SUMMARY_FREQUENCY_HEADERS = ("Mode", "Role", "Observed\n(Hz)", "Before fit\n(Hz)", "After fit\n(Hz)", "Error\nbefore", "Error\nafter")
 
 
 # ---------------------------------------------------------------------------------------------- the two plots
@@ -749,6 +749,10 @@ def _style(axis, title: str, xlabel: str, ylabel: str) -> None:
         axis.spines[side].set_visible(False)
 
 
+OBJECTIVE_TITLE = "Objective convergence (log scale)"
+ERROR_TITLE = "Frequency error before and after the fit"
+
+
 def objective_points(section: Mapping) -> tuple:
     """The objective at each accepted step and at the end; empty when it cannot be drawn on a log scale."""
     result = section["result"]
@@ -759,6 +763,11 @@ def objective_points(section: Mapping) -> tuple:
 
 
 def objective_plot(section: Mapping, width: int = 1000, height: int = 480, scale: float = 1.0) -> Optional[bytes]:
+    figure = objective_figure(section, width, height, scale)
+    return None if figure is None else _png(figure)
+
+
+def objective_figure(section: Mapping, width: int = 1000, height: int = 480, scale: float = 1.0) -> Optional[Figure]:
     points = objective_points(section)
     if not points:
         return None
@@ -768,12 +777,12 @@ def objective_plot(section: Mapping, width: int = 1000, height: int = 480, scale
     axis.semilogy(steps, points, color=_FIRST, linewidth=2.0, marker="o", markersize=8)
     axis.xaxis.get_major_locator().set_params(integer=True)
     axis.margins(x=0.08, y=0.18)
-    _style(axis, "Сходимость целевой функции", "Принятый шаг", "Целевая функция (логарифмическая шкала)")
+    _style(axis, OBJECTIVE_TITLE, "Accepted step", "Objective")
     axis.grid(True, axis="x", color=_GRID, linewidth=0.8)
     for step, value, place in ((0, points[0], (10, 6)), (len(points) - 1, points[-1], (-10, -16))):  # off the falling line
         axis.annotate(f"{value:.4g}", (step, value), xytext=place, textcoords="offset points", fontsize=10, color=_INK,
                       ha="left" if step == 0 else "right")
-    return _png(figure)
+    return figure
 
 
 def _error_axis(axis, rows, column: int, title: str, labels: bool) -> None:
@@ -796,7 +805,7 @@ def _error_axis(axis, rows, column: int, title: str, labels: bool) -> None:
     formatter.set_powerlimits((-2, 3))
     axis.yaxis.set_major_formatter(formatter)
     axis.yaxis.get_offset_text().set_fontsize(10)
-    _style(axis, title, "", "Ошибка, %")
+    _style(axis, title, "", "Error, %")
     if labels:
         for place, value in zip(places, values):
             if np.isfinite(value):
@@ -807,6 +816,11 @@ def _error_axis(axis, rows, column: int, title: str, labels: bool) -> None:
 
 
 def error_plot(section: Mapping, width: int = 1000, height: int = 620, scale: float = 1.0) -> Optional[bytes]:
+    figure = error_figure(section, width, height, scale)
+    return None if figure is None else _png(figure)
+
+
+def error_figure(section: Mapping, width: int = 1000, height: int = 620, scale: float = 1.0) -> Optional[Figure]:
     """Signed frequency error before and after the fit, each on its own scale: a residual after the fit is far smaller than
     before it, and on one shared scale it could not be seen at all. Each panel states its own scale on its axis."""
     from matplotlib.patches import Patch
@@ -817,13 +831,13 @@ def error_plot(section: Mapping, width: int = 1000, height: int = 620, scale: fl
     figure = _figure(width, height, scale)
     first, second = figure.subplots(2, 1, sharex=False)
     labels = width / len(rows) >= 68  # a label stays on when the bars leave room for it
-    _error_axis(first, rows, 2, "До подбора", labels)
-    _error_axis(second, rows, 3, "После подбора (своя шкала)", labels)
-    second.set_xlabel("Номер моды", fontsize=11, color=_MUTED)
-    figure.legend(handles=[Patch(color=_FIRST, label="FIT: участвует в подборе"),
-                           Patch(facecolor=_SECOND, hatch="//", edgecolor="#ffffff", label="HOLDOUT: вне подбора")],
+    _error_axis(first, rows, 2, "Before the fit", labels)
+    _error_axis(second, rows, 3, "After the fit (own scale)", labels)
+    second.set_xlabel("Mode number", fontsize=11, color=_MUTED)
+    figure.legend(handles=[Patch(color=_FIRST, label="FIT: used in the fit"),
+                           Patch(facecolor=_SECOND, hatch="//", edgecolor="#ffffff", label="HOLDOUT: left out of the fit")],
                   loc="outside upper right", ncols=2, fontsize=10, frameon=False)
-    return _png(figure)
+    return figure
 
 
 __all__ = ["BUILT_IN", "RITZ", "SELECTED", "STAGE_A", "FormProblem", "build_request", "default_form", "execute_study",

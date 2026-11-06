@@ -26,15 +26,15 @@ from new_gui.diagnostic_panel import DiagnosticTable
 from new_gui.shape_panel import _label
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
-CAPTIONS = {FE: "Результаты FE: ODB", EXPERIMENTAL: "Эксперимент: UNV/UFF"}
-FACT_TITLES = {FE: "Геометрия FE-модели", EXPERIMENTAL: "Экспериментальные данные"}
-USE_ANALYZE = "Взять два файла из Analyze"
-READING = "Чтение..."
-NO_FILES_TEXT = "В Analyze пока нет файлов."
-NO_REGISTRATION = "Нет: физическая регистрация на этой странице не подтверждена"
-USED_BY_ANALYZE = "Используется сравнением в Analyze; это не объявление для подбора"
+CAPTIONS = {FE: "FE results: ODB", EXPERIMENTAL: "Experiment: UNV/UFF"}
+FACT_TITLES = {FE: "FE model geometry", EXPERIMENTAL: "Experimental data"}
+USE_ANALYZE = "Use the two files from Analyze"
+READING = "Reading..."
+NO_FILES_TEXT = "Analyze holds no files yet."
+NO_REGISTRATION = "Absent: no physical registration is confirmed on this page"
+USED_BY_ANALYZE = "Used by the comparison on Analyze; it is not a declaration for a fit"
 TAB_FILES = 4
-ALL_TAB_TITLES = TAB_TITLES + ("FE / Эксперимент",)
+ALL_TAB_TITLES = TAB_TITLES + ("FE / Experiment",)
 
 
 def _card():
@@ -101,7 +101,7 @@ class MaterialsWorkspace(QWidget):
         for kind in (FE, EXPERIMENTAL):
             card, inner = _card()
             inner.addWidget(_label(FACT_TITLES[kind], "sectionTitle"))
-            self.fact_notes[kind] = _label("Пока не прочитано.", "hint")
+            self.fact_notes[kind] = _label("Not read yet.", "hint")
             inner.addWidget(self.fact_notes[kind])
             box = QVBoxLayout()
             inner.addLayout(box)
@@ -110,7 +110,7 @@ class MaterialsWorkspace(QWidget):
             facts.addWidget(card, 1)
         layout.addLayout(facts)
         card, inner = _card()
-        inner.addWidget(_label("Входные свойства материала", "sectionTitle"))
+        inner.addWidget(_label("Material input properties", "sectionTitle"))
         self.material_statement = _label(mw.MATERIAL_STATEMENT, "warnings")
         inner.addWidget(self.material_statement)
         self.property_table = DiagnosticTable(mw.PROPERTY_HEADERS, mw.property_rows(), 0, text_columns=(1, 2, 3))
@@ -151,10 +151,10 @@ class MaterialsWorkspace(QWidget):
             grid.addWidget(_label(CAPTIONS[kind]), 2 * row, 0, 1, 2)
             field = QLineEdit()
             field.setReadOnly(True)
-            field.setPlaceholderText("не выбран")
+            field.setPlaceholderText("not chosen")
             field.setMinimumWidth(80)
             grid.addWidget(field, 2 * row + 1, 0)
-            button = QPushButton("Выбрать файл...")
+            button = QPushButton("Choose file...")
             button.setObjectName(f"materialsChoose_{kind}")
             button.clicked.connect(lambda _checked=False, k=kind: self.choose_file(k))
             grid.addWidget(button, 2 * row + 1, 1)
@@ -260,7 +260,7 @@ class MaterialsWorkspace(QWidget):
             except (am.StepFailed, am.StepCancelled) as error:
                 value = error
             except Exception as error:  # noqa: BLE001  (a message, never a crash of the window)
-                value = am.StepFailed(f"Файл не прочитан ({type(error).__name__}: {error}).")
+                value = am.StepFailed(f"The file could not be read ({type(error).__name__}: {error}).")
             try:
                 bridge.done.emit(kind, token, value)
             except RuntimeError:
@@ -276,10 +276,10 @@ class MaterialsWorkspace(QWidget):
         self.reading[kind] = False
         self._cancels[kind] = None
         if isinstance(value, am.StepCancelled):
-            self.fact_notes[kind].setText("Отменено.")
+            self.fact_notes[kind].setText("Cancelled.")
         elif isinstance(value, am.StepFailed):
             self.facts[kind] = None
-            self.fact_notes[kind].setText("Не прочитано.")
+            self.fact_notes[kind].setText("Not read.")
             self._say(str(value))
             self.study.refresh_real()
         else:
@@ -294,7 +294,7 @@ class MaterialsWorkspace(QWidget):
     def _show(self, kind: str, facts: mw.Facts) -> None:
         self.facts[kind] = facts
         self._clear_table(kind)
-        table = DiagnosticTable(("Сведение", "Значение"), facts.rows, 1, text_columns=(0,))
+        table = DiagnosticTable(("Fact", "Value"), facts.rows, 1, text_columns=(0,))
         table.setObjectName(f"materialsFacts_{kind}")
         self.fact_tables[kind] = table
         self.fact_boxes[kind].addWidget(table)
