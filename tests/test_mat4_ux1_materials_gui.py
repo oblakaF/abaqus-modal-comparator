@@ -829,6 +829,95 @@ class NarrowWindow(_Tabs):
                     window.close()
 
 
+class RealSourceView(_Tabs):
+    """REAL-PLATE.R1.F1: a real source shows no synthetic specimen input; the synthetic example comes back unchanged."""
+
+    def real(self, panel, on=True):
+        panel.source_combo.setCurrentIndex(panel.source_combo.findData(sm.REAL_SOURCE if on else sm.SYNTHETIC_SOURCE))
+        self.app.processEvents()
+
+    def shown_texts(self, panel) -> list:
+        page = panel.widget(sp.TAB_RUN).widget()
+        found = []
+        for widget in page.findChildren(QWidget):
+            if not widget.isVisible():
+                continue
+            if isinstance(widget, (QLabel, QAbstractButton)):
+                found.append(widget.text())
+            if isinstance(widget, QLineEdit):
+                found.append(widget.text())
+            if isinstance(widget, QComboBox):
+                found.append(widget.currentText())
+        return [text for text in found if text]
+
+    def test_the_real_view_shows_no_synthetic_input_and_one_message(self):
+        for backend in (sm.RITZ, sm.STAGE_A):
+            with self.subTest(backend=backend):
+                window, workspace, panel = self.tabs((900, 700))
+                if backend == sm.STAGE_A:
+                    self.choose_stage_a(panel)
+                panel.advanced.toggle.setChecked(True)
+                self.real(panel)
+                for widget in (panel.geometry_card, panel.advanced_card, panel.method_combo, panel.method_text, panel.run_button,
+                               panel.cancel_button, panel.a_field, panel.mass_field, panel.thickness_field, panel.solves_field,
+                               panel.package_source):
+                    self.assertFalse(widget.isVisible(), widget.objectName())
+                self.assertTrue(panel.source_combo.isVisible() and panel.source_combo.isEnabled())
+                self.assertTrue(panel.blocked.isVisible())
+                self.assertEqual(panel.blocked.text(), sp.REAL_VIEW_TEXT)
+                self.assertIn("FE / Experiment", panel.blocked.text())
+                self.assertIn("Real-data inverse execution: BLOCKED", panel.blocked.text())
+                shown = " | ".join(self.shown_texts(panel))
+                defaults = sm.default_form(backend)
+                for text in (sm.METHOD_TEXT[backend], sm.METHOD_NAMES[backend], sm.geometry_text(defaults), "Length a", "Mass",
+                             "Run calculation", "Advanced settings"):
+                    self.assertNotIn(text, shown)
+                self.assertFalse(panel.run())
+                self.assertIn("NOT_AUTHORIZED", panel.message.text())
+                self.assertIsNone(panel.record)
+                self.assertEqual(self.visible_area(workspace).horizontalScrollBar().maximum(), 0)
+                window.close()
+
+    def test_choosing_synthetic_again_restores_the_entered_inputs_of_both_methods(self):
+        window, workspace, panel = self.tabs()
+        panel.a_field.setText("310")
+        panel.mass_field.setText("118.37")
+        panel.solves_field.setText("700")
+        panel.parameter_fields[sm.RITZ]["D11"]["start"].setText("12.5")
+        before = panel.form()
+        self.real(panel)
+        self.real(panel, False)
+        self.assertEqual(panel.form(), before)
+        for widget in (panel.geometry_card, panel.advanced_card, panel.method_combo, panel.method_text, panel.run_button):
+            self.assertTrue(widget.isVisible(), widget.objectName())
+        self.assertFalse(panel.blocked.isVisible())
+        self.choose_stage_a(panel)
+        stage = panel.form()
+        self.real(panel)
+        self.real(panel, False)
+        self.assertEqual(panel.form(), stage)
+        self.assertFalse(panel.geometry_card.isVisible())  # Stage A's own view: the package holds its geometry
+        self.assertTrue(panel.run_button.isVisible() and panel.run_button.isEnabled())
+        window.close()
+
+    def test_both_methods_still_run_after_a_visit_to_the_real_view(self):
+        window, workspace, panel = self.tabs()
+        self.real(panel)
+        self.real(panel, False)
+        ritz = self.run_to_end(panel)
+        self.assertEqual(ritz["result"]["numerical_status"], "CONVERGED")
+        workspace.select_tab(sp.TAB_RUN)
+        self.choose_stage_a(panel)
+        self.real(panel)
+        self.real(panel, False)
+        section = self.run_to_end(panel)
+        result = section["result"]
+        self.assertEqual((result["solves"], result["numerical_status"]), (86, "CONVERGED"))
+        rows = {row[0].split(",")[0]: row for row in sm.summary_parameter_rows(section)}
+        self.assertEqual((rows["D"][2], rows["D66"][2], rows["r"][2]), ("0.36", "0.05", "0.09"))
+        window.close()
+
+
 class Boundaries(unittest.TestCase):
     def test_no_mathematical_logic_entered_the_widgets(self):
         root = Path(__file__).resolve().parents[1] / "src" / "new_gui"

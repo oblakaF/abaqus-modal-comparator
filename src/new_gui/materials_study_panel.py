@@ -46,6 +46,9 @@ PARAMETER_KEYS = ("truth", "start", "lower", "upper")
 PARAMETER_CAPTIONS = ("Known synthetic", "Start", "Lower bound", "Upper bound")
 SYNTHETIC_CHOICE, REAL_CHOICE = "Built-in synthetic example", "Real file: view only"
 BUILT_IN_PACKAGE, CHOSEN_PACKAGE = "Built-in synthetic package", "Package folder chosen here"
+REAL_VIEW_TEXT = ("Real files are inspected on the FE / Experiment tab. The synthetic test inputs are hidden: the actual "
+                  "specimen geometry and physical material properties are not taken from them or inferred here. "
+                  + sm.RUN_BLOCKED + ".")
 TABLE_HEIGHT = 340  # a longer table scrolls inside itself
 PLOT_RATIOS = {"error": (0.62, 520, 760), "objective": (0.44, 320, 560)}  # height for a width: share, least, most
 PLOT_FILES = {"error": "frequency_error.png", "objective": "objective_convergence.png"}
@@ -301,9 +304,9 @@ class MaterialsStudyPanel(QStackedWidget):
         self.advanced = Section("Advanced settings", name="materialsAdvanced")
         self.advanced.toggle.setObjectName("sectionToggle")
         self._build_advanced(self.advanced.inner)
-        card, inner = _card()
+        self.advanced_card, inner = _card()
         inner.addWidget(self.advanced)
-        layout.addWidget(card)
+        layout.addWidget(self.advanced_card)
         layout.addStretch(1)
         return page
 
@@ -315,7 +318,8 @@ class MaterialsStudyPanel(QStackedWidget):
         for index, key in enumerate((sm.RITZ, sm.STAGE_A)):
             self.method_combo.setItemData(index, key, Qt.ItemDataRole.ToolTipRole)
         self.source_combo = _combo(((SYNTHETIC_CHOICE, sm.SYNTHETIC_SOURCE), (REAL_CHOICE, sm.REAL_SOURCE)), "materialsSource")
-        grid.addWidget(_caption("Method"), 0, 0)
+        self.method_caption = _caption("Method")
+        grid.addWidget(self.method_caption, 0, 0)
         grid.addWidget(self.method_combo, 0, 1)
         grid.addWidget(_caption("Data"), 1, 0)
         grid.addWidget(self.source_combo, 1, 1)
@@ -371,7 +375,7 @@ class MaterialsStudyPanel(QStackedWidget):
         self.run_state = _label(NOT_RUN)
         self.run_state.setObjectName("materialsRunState")
         inner.addWidget(self.run_state)
-        self.blocked = _label(sm.RUN_BLOCKED + ". File details are on the FE / Experiment tab.", "error")
+        self.blocked = _label(REAL_VIEW_TEXT, "error")  # the one message of the real-file view
         inner.addWidget(self.blocked)
         self.message = _label("", "error")
         self.message.setVisible(False)
@@ -777,6 +781,7 @@ class MaterialsStudyPanel(QStackedWidget):
         real = self.real_source
         self.blocked.setVisible(real)
         self.real_hint.setVisible(not real)
+        self._show_source_view(real)
         self.prepare_button.setEnabled(not running and not real)
         self.run_button.setEnabled(not running and not real and not problems)
         self.cancel_button.setEnabled(self._active == RUNNING)
@@ -788,6 +793,14 @@ class MaterialsStudyPanel(QStackedWidget):
             self._say("; ".join(problems))
         elif self.message.text() and self._message_is_form:
             self._say("")
+
+    def _show_source_view(self, real: bool) -> None:
+        """REAL-PLATE.R1.F1: with a real source only the source choice and the message stay; every synthetic input, model
+        description and fitting control is hidden, never cleared, so choosing the synthetic example shows them unchanged."""
+        for widget in (self.method_caption, self.method_combo, self.method_text, self.advanced_card, self.run_button,
+                       self.cancel_button, self.run_state):
+            widget.setVisible(not real)
+        self.geometry_card.setVisible(not real and self.backend == sm.RITZ)
 
     _message_is_form = False
 
