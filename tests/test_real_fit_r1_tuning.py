@@ -87,10 +87,20 @@ class ReadingAndConversion(unittest.TestCase):
         with self.assertRaises(rft.TuningRefused):
             rft.read_inp(folder / "layup.inp")
 
-    def test_the_dat_frequencies_and_the_elastic_ones(self):
+    def test_the_dat_frequencies_are_listed_and_never_classified_by_frequency(self):
         rows = rft.read_dat_frequencies(_files() / "plate.dat")
         self.assertEqual(rows, ((1, 0.0), (7, 19.072), (8, 59.874)))
-        self.assertEqual(rft.elastic_fe_frequencies(rows), ((7, 19.072), (8, 59.874)))
+        self.assertFalse(hasattr(rft, "elastic_fe_frequencies"))  # R1.F1: no frequency cutoff for rigid-body modes
+
+    def test_without_fe_mode_shapes_the_classification_is_unavailable(self):
+        from new_gui import research_tuning_model as rm
+
+        self.assertTrue(rm._classify(None, threading.Event())[1].startswith("unavailable"))
+        fake = _files() / "plate.odb"
+        fake.write_bytes(b"not an odb")
+        elastic, text = rm._classify(str(fake), threading.Event())
+        self.assertEqual(elastic, ())
+        self.assertTrue(text.startswith("unavailable"), text)
 
     def test_the_isotropic_limit_of_the_bending_stiffness(self):
         E, nu, t = 70000.0, 0.3, 2.0
@@ -127,18 +137,24 @@ class Tuning(unittest.TestCase):
     def test_known_values_are_recovered_and_supported(self):
         result = rft.run_tuning(self.inputs, self.request(self.synthetic(42000, 42000, 6500)))
         self.assertEqual(result.status, rft.SUPPORTED, result.reasons)
+        self.assertAlmostEqual(result.estimates["E (E1 = E2)"] / 42000, 1.0, places=5)
         self.assertAlmostEqual(result.candidate["E1"] / 42000, 1.0, places=5)
         self.assertAlmostEqual(result.candidate["G12"] / 6500, 1.0, places=5)
         self.assertLess(result.rms_holdout_after, 1e-6)
         self.assertEqual(result.label, rft.RESULT_LABEL)
         self.assertEqual(result.practical_rank, 2)
-        self.assertEqual(result.warnings, [])
+        self.assertEqual([w for w in result.warnings if not w.startswith("FE classification unavailable")], [])
 
     def test_an_exchange_of_e1_and_e2_is_reported_not_chosen(self):
         result = rft.run_tuning(self.inputs, self.request(self.synthetic(60000, 44000, 4800), parameterization=rft.FREE))
         self.assertEqual(result.status, rft.MIRROR, result.reasons)
         self.assertIsNone(result.candidate)
         self.assertEqual(len(result.minima), 2)
+        self.assertAlmostEqual(result.estimates["E_stiff"] / 60000, 1.0, delta=0.02)  # estimates without an axis
+        self.assertAlmostEqual(result.estimates["E_soft"] / 44000, 1.0, delta=0.02)
+        self.assertEqual(len(result.axis_assignments), 2)  # both assignments, none chosen
+        firsts = sorted(round(a["E1 (FE X)"], -2) for a in result.axis_assignments)
+        self.assertLess(firsts[0], firsts[1])
         values = sorted((round(m["values"]["E1"]), round(m["values"]["E2"])) for m in result.minima)
         self.assertAlmostEqual(values[0][0] / 44000, 1.0, delta=0.02)
         self.assertAlmostEqual(values[0][1] / 60000, 1.0, delta=0.02)
@@ -163,10 +179,41 @@ class Tuning(unittest.TestCase):
         self.assertTrue(any("model-form" in w for w in result.warnings), result.warnings)
 
     def test_a_bound_is_reported(self):
-        result = rft.run_tuning(self.inputs, self.request(self.synthetic(56000 * 6, 56000 * 6, 5000)))
+        records = self.synthetic(60000, 44000, 4800)  # an E1 = E2 fit of a split spectrum, in a very narrow range
+        result = rft.run_tuning(self.inputs, self.request(records, search_factor=1.0001))
         self.assertEqual(result.status, rft.AT_BOUND)
         self.assertIsNone(result.candidate)
-        self.assertIn("E", result.active_bounds)
+        self.assertIsNone(result.estimates)
+        self.assertTrue(result.active_bounds)
+
+    def test_the_start_and_bounds_come_from_the_data_not_from_the_inp(self):
+        records = self.synthetic(42000, 42000, 6500)
+        first = rft.run_tuning(self.inputs, self.request(records))
+        from dataclasses import replace
+
+        other = replace(self.inputs, E1=3 * self.inputs.E1, E2=3 * self.inputs.E2, G12=0.3 * self.inputs.G12)
+        second = rft.run_tuning(other, self.request(records))
+        self.assertEqual(first.initialization["start"], second.initialization["start"])
+        self.assertEqual(first.initialization["bounds"], second.initialization["bounds"])
+        self.assertAlmostEqual(first.fitted["E1"], second.fitted["E1"], places=3)
+        self.assertEqual(first.initialization["inp_values_used"], "no (shown for comparison only)")
+
+    def test_the_lowest_record_is_checked_not_removed(self):
+        records = self.synthetic(42000, 42000, 6500)
+        result = rft.run_tuning(self.inputs, self.request(records))
+        self.assertTrue(result.first_mode_check["done"])
+        self.assertEqual(result.first_mode_check["left_out_record"], 1)
+        self.assertLess(result.first_mode_check["largest_change"], 1e-4)  # exact data: nothing leans on it
+        self.assertIn(1, [r["record"] for r in result.rows if r["role"] == rft.FIT])  # it stays in the fit
+
+    def test_quantities_and_the_accuracy_statement_are_explicit(self):
+        result = rft.run_tuning(self.inputs, self.request(self.synthetic(42000, 42000, 6500)))
+        categories = {q["category"] for q in result.quantities}
+        self.assertTrue({"MEASURED", "FITTED", "ASSUMED (INP), FIXED", "FIXED, NOT IDENTIFIED", "UNAVAILABLE"} <= categories)
+        self.assertIn("nu12", next(q["quantity"] for q in result.quantities if q["category"] == "FIXED, NOT IDENTIFIED"))
+        self.assertIn("not a demonstrated or certified", result.accuracy_statement)
+        factors = {row["assumption"]: row["moduli_factor"] for row in result.assumption_sensitivity}
+        self.assertAlmostEqual(factors["thickness +5%, surface mass held (measured mass)"], 1.05 ** -3)
 
     def test_cancel_returns_no_result(self):
         cancel = threading.Event()
@@ -224,7 +271,8 @@ class Page(unittest.TestCase):
 
         folder = _files()
         inputs = rft.read_inp(folder / "plate.inp")
-        sources = rm.Sources(inputs, str(folder / "plate.dat"), ((7, 19.072), (8, 59.874)), "exp.unv", "0" * 64, "Set", tuple(records))
+        sources = rm.Sources(inputs, str(folder / "plate.dat"), ((7, 19.072), (8, 59.874)), ((7, 19.072), (8, 59.874)),
+                             "shape-based (test)", "exp.unv", "0" * 64, "Set", tuple(records))
         window, panel = self.window()
         with mock.patch.object(rm, "read_sources", return_value=sources):
             panel.choose_file("inp", str(folder / "plate.inp"))
@@ -246,6 +294,9 @@ class Page(unittest.TestCase):
         cells = {row[0]: row for row in panel.table_cells("candidate")}
         self.assertAlmostEqual(float(cells["E1"][2]) / 45000, 1.0, places=3)  # whole MPa
         self.assertIn(rft.RESULT_LABEL, panel.status.text())
+        self.assertEqual([row[0] for row in panel.table_cells("estimates")], ["E (E1 = E2)", "G12"])
+        self.assertIn("FIXED, NOT IDENTIFIED", [row[1] for row in panel.table_cells("quantities")])
+        self.assertIn("not a demonstrated", panel.accuracy.text())
         self.assertTrue(panel.plot_data.startswith(b"\x89PNG"))
         self.assertEqual(len(panel.table_cells("frequencies")), 10)
         target = Path(tempfile.mkdtemp()) / "proposal.json"
@@ -266,13 +317,20 @@ class Page(unittest.TestCase):
         self.assertTrue(panel.cancel())
         self.wait(panel)
         self.assertIn(panel.result.status if panel.result else rft.CANCELLED, (rft.CANCELLED, rft.MIRROR))
+        panel.run()
+        self.wait(panel)
+        self.assertEqual(panel.result.status, rft.MIRROR)
+        self.assertEqual([row[0] for row in panel.table_cells("estimates")], ["E_stiff", "E_soft", "G12"])
+        self.assertEqual(len(panel.table_cells("axes")), 2)
+        self.assertNotIn("candidate", panel._tables)  # no oriented block
+        self.assertIn("unresolved", panel.candidate_none.text())
         self.assertTrue(panel.run_button.isEnabled())
 
     def test_a_bad_setting_is_said_and_nothing_starts(self):
         window, panel, _inputs = self.loaded([(k + 1, 20.0 * (k + 1)) for k in range(8)])
-        panel.lower.setText("2")
+        panel.search.setText("1")
         self.assertFalse(panel.run())
-        self.assertIn("bounds", panel.message.text())
+        self.assertIn("search range", panel.message.text())
         self.assertFalse(panel.busy())
 
 

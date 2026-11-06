@@ -18,16 +18,19 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 import numpy as np
 
+from new_gui import analyze_model as am
 from new_gui import preview_model as pm
-from new_gui.workspace_state import EXPERIMENTAL
+from new_gui.workspace_state import EXPERIMENTAL, FE
+from services import modal_data_viewer as viewer
 from services import research_frequency_tuning as rft
 
 LABEL = rft.RESULT_LABEL
 SURROGATE_NOTE = ("Ritz values are frequencies of the Kirchhoff plate surrogate, not Abaqus FE results. A candidate is a "
                   "proposal for a new Abaqus solve; only that solve can confirm it.")
 STATUS_TEXT = {
-    rft.SUPPORTED: "Candidate issued: the fit is numerically supported.",
-    rft.MIRROR: "No candidate: E1 and E2 fit equally well exchanged; which plate axis is stiff is not identifiable.",
+    rft.SUPPORTED: "Estimates and an oriented candidate issued: the fit is numerically supported.",
+    rft.MIRROR: ("Numerical estimates issued (E_stiff, E_soft, G12). No oriented candidate: E1 and E2 fit equally well "
+                 "exchanged, so which plate axis is stiff is not identifiable."),
     rft.NOT_IDENTIFIABLE: "No candidate: the selected frequencies cannot separate the parameters.",
     rft.AT_BOUND: "No candidate: a parameter ended at its bound.",
     rft.NOT_CONVERGED: "No candidate: the fit did not converge.",
@@ -46,26 +49,56 @@ class ReadFailed(ValueError):
 class Sources:
     inputs: rft.AbaqusPlateInputs
     dat_path: Optional[str]
-    fe_elastic: tuple  # (mode, Hz) from the model's own .dat, or ()
+    dat_rows: tuple  # (mode, Hz) of the .dat beside the INP, unclassified
+    fe_elastic: tuple  # (mode, Hz) of the elastic FE modes classified by shape, or () when no classification exists
+    fe_classification: str
     unv_path: str
     unv_sha256: str
     set_title: str
     records: tuple  # (record number, Hz) of the curve-fitted records
 
 
-def read_sources(inp_path, unv_path, cancel: threading.Event) -> Sources:
-    """The INP (and its .dat, when present beside it) and the fitted modes of the experimental file. Read only."""
+def _classify(odb, cancel) -> tuple:
+    """(elastic (mode, Hz), text), by the comparator's shape-based rigid-body criterion on an already extracted package of
+    this ODB's content. Abaqus is never started: without such a package the classification is unavailable."""
+    if not odb:
+        return (), "unavailable: no ODB chosen, so no FE mode shapes"
+    try:
+        plan = am.make_plan(odb, discover=lambda: ())
+        manifest = am.find_package(plan, cancel)
+    except (am.StepFailed, am.StepCancelled) as error:
+        return (), f"unavailable: {error}"
+    if manifest is None:
+        return (), "unavailable: no extracted modes of this ODB's content (Abaqus is not started here)"
+    outcome = pm.run_read(FE, manifest, 0, cancel)
+    if outcome.error or outcome.cancelled:
+        return (), f"unavailable: {outcome.error or 'cancelled'}"
+    dataset = outcome.preview.dataset
+    residuals = viewer.classify_rigid_body_fe_modes(dataset)
+    threshold = viewer.rigid_body_threshold()
+    modes = [(int(m.number), float(m.frequency_hz)) for m in dataset.sorted_modes()]
+    rigid = [n for n, _f in modes if residuals.get(n, 1.0) <= threshold]
+    elastic = tuple((n, f) for n, f in modes if residuals.get(n, 1.0) > threshold)
+    return elastic, (f"shape-based (rigid-body shape projection residual <= {threshold:g}, the comparator's criterion): "
+                     f"rigid {', '.join(map(str, rigid)) or 'none'}; elastic from mode {elastic[0][0] if elastic else '-'}; "
+                     f"package {Path(manifest).parent.name}")
+
+
+def read_sources(inp_path, unv_path, cancel: threading.Event, odb_path=None) -> Sources:
+    """The INP (and its .dat, when present beside it), an optional ODB for the shape-based FE classification, and the
+    fitted modes of the experimental file. Read only."""
     try:
         inputs = rft.read_inp(inp_path)
     except (OSError, rft.TuningRefused) as error:
         raise ReadFailed(f"The INP could not be used: {error}") from error
     dat = Path(inp_path).with_suffix(".dat")
-    fe = ()
+    rows = ()
     if dat.is_file():
         try:
-            fe = rft.elastic_fe_frequencies(rft.read_dat_frequencies(dat))
+            rows = rft.read_dat_frequencies(dat)
         except rft.TuningRefused:
-            fe = ()
+            rows = ()
+    elastic, classification = _classify(odb_path, cancel)
     outcome = pm.run_read(EXPERIMENTAL, unv_path, 0, cancel)
     if outcome.cancelled:
         raise ReadFailed("Cancelled.")
@@ -77,7 +110,8 @@ def read_sources(inp_path, unv_path, cancel: threading.Event) -> Sources:
     chosen = fitted[0]
     records = tuple((int(r.number), float(r.frequency_hz)) for r in chosen.records)
     identity = outcome.identity or {}
-    return Sources(inputs, str(dat) if fe else None, fe, str(unv_path), str(identity.get("sha256", "")), chosen.title, records)
+    return Sources(inputs, str(dat) if rows else None, rows, elastic, classification, str(unv_path),
+                   str(identity.get("sha256", "")), chosen.title, records)
 
 
 def default_holdout(records) -> tuple:
@@ -111,8 +145,12 @@ def input_rows(sources: Sources) -> tuple:
             ("Density", f"{i.density_t_mm3:g} t/mm³"), ("Shell thickness", f"{i.thickness_mm:g} mm"),
             ("Plan (from the nodes)", f"{i.a_mm:g} × {i.b_mm:g} mm"), ("Model mass", f"{i.mass_g:.2f} g"),
             ("Material orientation", "*Orientation present" if i.has_orientation else "none: global axes")]
-    rows.append(("Stored FE elastic modes (.dat)", f"{len(sources.fe_elastic)}, first {sources.fe_elastic[0][1]:g} Hz"
-                 if sources.fe_elastic else "no .dat beside the INP"))
+    rows.append(("Stored FE frequencies (.dat)", f"{len(sources.dat_rows)} modes, unclassified" if sources.dat_rows
+                 else "no .dat beside the INP"))
+    rows.append(("FE classification", sources.fe_classification))
+    if sources.fe_elastic:
+        rows.append(("Elastic FE modes (by shape)", f"{len(sources.fe_elastic)}, first mode {sources.fe_elastic[0][0]} at "
+                                                     f"{sources.fe_elastic[0][1]:g} Hz"))
     return tuple(rows)
 
 
@@ -141,6 +179,52 @@ def candidate_rows(result: rft.TuningResult) -> tuple:
 CANDIDATE_HEADERS = ("Input", "INP value (MPa)", "Candidate (MPa)", "Change")
 
 
+def estimate_rows(result: rft.TuningResult) -> tuple:
+    if not result.estimates:
+        return ()
+    sd = {}
+    if result.log_sd and "E1" in result.parameter_names:  # E_stiff / E_soft take the SD of the axis that carries them
+        stiff, soft = ("E1", "E2") if result.fitted["E1"] >= result.fitted["E2"] else ("E2", "E1")
+        sd = {"E_stiff": result.log_sd[stiff], "E_soft": result.log_sd[soft], "G12": result.log_sd["G12"]}
+    elif result.log_sd:
+        sd = {"E (E1 = E2)": result.log_sd["E"], "G12": result.log_sd["G12"]}
+    return tuple((name, f"{value:.0f}", "—" if name not in sd else f"±{np.exp(sd[name]) - 1:.1%}")
+                 for name, value in result.estimates.items())
+
+
+ESTIMATE_HEADERS = ("Research estimate", "Value (MPa)", "Statistical SD (model-conditional; not a certified accuracy)")
+
+
+def axis_rows(result: rft.TuningResult) -> tuple:
+    return tuple((a["assignment"], f"{a['E1 (FE X)']:.0f}", f"{a['E2 (FE Y)']:.0f}", f"{a['G12']:.0f}", f"{a['cost']:.6g}")
+                 for a in result.axis_assignments)
+
+
+AXIS_HEADERS = ("Possible axis assignment (none chosen)", "E1 along FE X (MPa)", "E2 along FE Y (MPa)", "G12 (MPa)", "Cost")
+
+
+def quantity_rows(result: rft.TuningResult) -> tuple:
+    return tuple((q["quantity"], q["category"], q["source"]) for q in result.quantities)
+
+
+QUANTITY_HEADERS = ("Quantity", "Category", "Source")
+
+
+def first_mode_rows(result: rft.TuningResult) -> tuple:
+    check = result.first_mode_check
+    if not check or not check.get("done"):
+        return (("Lowest record left out", (check or {}).get("reason", "not run")),)
+    rows = [("Left out for this check only", f"record {check['left_out_record']} at {check['left_out_hz']:.4f} Hz")]
+    rows += [(f"{('E1 = E2' if name == 'E' else name)} without it", f"{value:.0f} MPa ({check['change'][name]:+.1%})")
+             for name, value in check["values"].items()]
+    rows.append(("Condition number without it", f"{check['condition_number']:.4g}"))
+    return tuple(rows)
+
+
+def assumption_rows(result: rft.TuningResult) -> tuple:
+    return tuple((row["assumption"], f"× {row['moduli_factor']:.3f}") for row in result.assumption_sensitivity)
+
+
 def minima_rows(result: rft.TuningResult) -> tuple:
     return tuple((str(index + 1), ", ".join(f"{k} {v:.0f}" for k, v in m["values"].items()), f"{m['cost']:.6g}")
                  for index, m in enumerate(result.minima))
@@ -148,7 +232,11 @@ def minima_rows(result: rft.TuningResult) -> tuple:
 
 def diagnostic_rows(result: rft.TuningResult) -> tuple:
     rows = [("Status", result.status), ("Label", result.label), ("Parameters fitted", ", ".join(result.parameter_names)),
-            ("Correspondence", "Rank order of the kept frequencies (exploratory spectrum fit), with any declared ranks"),
+            ("Correspondence", "Rank order of the kept frequencies (exploratory spectrum fit), with any declared ranks; it "
+             "assumes no measured mode is missing or extra below the highest one"),
+            ("Initialization", f"{result.initialization.get('method', '—')}; INP values not used"),
+            ("Data-scaled start", ", ".join(f"{k} {v:.0f}" for k, v in result.initialization.get("start", {}).items())),
+            ("Search bounds", "; ".join(f"{k} {lo:.0f} to {hi:.0f}" for k, (lo, hi) in result.initialization.get("bounds", {}).items())),
             ("Forward solves", str(result.evaluations)),
             ("Singular values (d ln f / d ln p)", ", ".join(f"{v:.4g}" for v in result.singular_values)),
             ("Practical rank", f"{result.practical_rank} of {len(result.parameter_names)}"),
@@ -163,7 +251,7 @@ def diagnostic_rows(result: rft.TuningResult) -> tuple:
     if result.correlation:
         rows.append(("Parameter correlation", "; ".join(", ".join(f"{v:+.3f}" for v in row) for row in result.correlation)))
     for index, start in enumerate(result.starts):
-        rows.append((f"Start {index + 1} (factors {start['start_factor']})",
+        rows.append((f"Start {index + 1} from " + ", ".join(f"{k} {v:.0f}" for k, v in start["start"].items()),
                      ", ".join(f"{k} {v:.0f}" for k, v in start["values"].items()) + f"; cost {start['cost']:.6g}"))
     return tuple(rows)
 
@@ -177,7 +265,7 @@ def surrogate_rows(result: rft.TuningResult) -> tuple:
                  for r in result.surrogate)
 
 
-SURROGATE_HEADERS = ("Elastic rank", "Abaqus mode (.dat)", "Abaqus (Hz)", "Ritz at INP values (Hz)", "Ritz / Abaqus − 1")
+SURROGATE_HEADERS = ("Elastic rank (by shape)", "Abaqus mode", "Abaqus (Hz)", "Ritz at INP values (Hz)", "Ritz / Abaqus − 1")
 
 
 def error_plot(result: rft.TuningResult, width: int = 900, height: int = 420, scale: float = 1.0) -> Optional[bytes]:

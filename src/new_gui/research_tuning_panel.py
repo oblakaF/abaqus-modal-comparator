@@ -48,7 +48,7 @@ class ResearchTuningPanel(QWidget):
         self.setObjectName("researchTuning")
         self._ask_path = ask_path or self._dialog_path
         self._ask_save = ask_save or self._dialog_save
-        self.paths = {"inp": "", "unv": ""}
+        self.paths = {"inp": "", "unv": "", "odb": ""}
         self.sources: Optional[rm.Sources] = None
         self.result: Optional[rft.TuningResult] = None
         self.request: Optional[rft.TuningRequest] = None
@@ -82,7 +82,8 @@ class ResearchTuningPanel(QWidget):
         grid = QGridLayout()
         grid.setColumnStretch(1, 1)
         self.fields, self.buttons = {}, {}
-        for row, (key, caption) in enumerate((("inp", "Abaqus model input (.inp)"), ("unv", "PolyMAX modal set (.unv / .uff)"))):
+        for row, (key, caption) in enumerate((("inp", "Abaqus model input (.inp)"), ("unv", "PolyMAX modal set (.unv / .uff)"),
+                                              ("odb", "Abaqus results (.odb), optional: shape-based FE classification"))):
             grid.addWidget(_label(caption), 2 * row, 0, 1, 2)
             field = QLineEdit()
             field.setReadOnly(True)
@@ -95,7 +96,9 @@ class ResearchTuningPanel(QWidget):
             grid.addWidget(button, 2 * row + 1, 2)
             self.fields[key], self.buttons[key] = field, button
         inner.addLayout(grid)
-        self.read_note = _label("The .dat beside the INP is read too, for the Abaqus frequencies at the INP values.", "hint")
+        self.read_note = _label("The .dat beside the INP is listed unclassified. Rigid-body and elastic FE modes are told apart "
+                                "only by shape, from modes already extracted from the chosen ODB; Abaqus is never started.",
+                                "hint")
         inner.addWidget(self.read_note)
         self.inputs_box = QVBoxLayout()
         inner.addLayout(self.inputs_box)
@@ -119,16 +122,19 @@ class ResearchTuningPanel(QWidget):
         self.declared = QLineEdit()
         self.declared.setObjectName("tuningDeclared")
         self.declared.setPlaceholderText("optional, e.g. 3:4, 4:3 (record:rank)")
-        self.lower = QLineEdit("0.2")
-        self.upper = QLineEdit("5")
+        self.search = QLineEdit("10")
+        self.search.setObjectName("tuningSearch")
+        self.search.setToolTip("Bounds: the data-scaled start divided and multiplied by this factor. The INP values do not "
+                               "set the start or the bounds.")
         self.degree = QLineEdit("14")
         for row, (caption, widget) in enumerate((("Fitted inputs", self.parameterization), ("Declared ranks", self.declared),
-                                                 ("Lower bound (× INP)", self.lower), ("Upper bound (× INP)", self.upper),
+                                                 ("Search range (× data-scaled start)", self.search),
                                                  ("Ritz basis degree", self.degree))):
             grid.addWidget(_label(caption), row // 2, 2 * (row % 2))
             grid.addWidget(widget, row // 2, 2 * (row % 2) + 1)
         inner.addLayout(grid)
-        inner.addWidget(_label("Held fixed at the INP values: thickness, density, nu12, E3, nu13, nu23, G13, G23.", "hint"))
+        inner.addWidget(_label("Held fixed at the INP values (assumed, not identified): thickness, density, nu12, E3, nu13, "
+                               "nu23, G13, G23. The start comes from the measured frequencies alone.", "hint"))
         row = QHBoxLayout()
         self.run_button = QPushButton("Run tuning")
         self.run_button.setObjectName("primary")
@@ -161,6 +167,15 @@ class ResearchTuningPanel(QWidget):
         self.reasons = _label("", "warnings")
         inner.addWidget(self.reasons)
         inner.addWidget(_label(rm.SURROGATE_NOTE, "hint"))
+        self.accuracy = _label("", "warnings")
+        inner.addWidget(self.accuracy)
+        self.estimate_box, self.axis_box = QVBoxLayout(), QVBoxLayout()
+        inner.addWidget(_label("Numerical research estimates", "sectionTitle"))
+        inner.addLayout(self.estimate_box)
+        inner.addLayout(self.axis_box)
+        inner.addWidget(_label("Oriented Abaqus input candidate (only when the axes are resolved)", "sectionTitle"))
+        self.candidate_none = _label("", "hint")
+        inner.addWidget(self.candidate_none)
         self.candidate_box = QVBoxLayout()
         inner.addLayout(self.candidate_box)
         self.plot = QLabel()
@@ -170,7 +185,11 @@ class ResearchTuningPanel(QWidget):
         self.plot.setMinimumSize(1, 1)
         inner.addWidget(self.plot)
         self.result_boxes = {}
-        for key, title in (("frequencies", "Frequencies: FIT and HOLDOUT"), ("minima", "Minima reached from the starts"),
+        for key, title in (("quantities", "What is measured, assumed, fitted and fixed"),
+                           ("frequencies", "Frequencies: FIT and HOLDOUT"),
+                           ("first_mode", "Dependence on the lowest experimental record (it stays in the fit)"),
+                           ("assumptions", "What the fixed inputs carry: factor on the estimated moduli"),
+                           ("minima", "Minima reached from the starts"),
                            ("diagnostics", "Convergence, rank and coupling"),
                            ("sensitivity", "Sensitivity d ln f / d ln p (FIT rows, at the fitted point)"),
                            ("surrogate", "Surrogate check: Ritz against the stored Abaqus frequencies at the INP values")):
@@ -247,7 +266,7 @@ class ResearchTuningPanel(QWidget):
     # ---------------------------------------------------------------------------------------------- files
 
     def _dialog_path(self, kind: str, start: str) -> str:
-        pattern = "Abaqus input (*.inp)" if kind == "inp" else "Experimental modal data (*.unv *.uff)"
+        pattern = {"inp": "Abaqus input (*.inp)", "odb": "Abaqus ODB (*.odb)"}.get(kind, "Experimental modal data (*.unv *.uff)")
         path, _f = QFileDialog.getOpenFileName(self, "Choose file", start, pattern)
         return path
 
@@ -266,10 +285,10 @@ class ResearchTuningPanel(QWidget):
         self.fields[kind].setToolTip(str(path))
         self.sources = None
         self._clear_result()
-        if all(self.paths.values()):
-            inp, unv = self.paths["inp"], self.paths["unv"]
+        if self.paths["inp"] and self.paths["unv"]:
+            inp, unv, odb = self.paths["inp"], self.paths["unv"], self.paths["odb"] or None
             self.state.setText("Reading the files...")
-            self._start("read", lambda cancel, _s: rm.read_sources(inp, unv, cancel))
+            self._start("read", lambda cancel, _s: rm.read_sources(inp, unv, cancel, odb))
         self._refresh()
         return True
 
@@ -354,7 +373,7 @@ class ResearchTuningPanel(QWidget):
             self.sources.records, holdout=[r for r, role in roles.items() if role == rft.HOLDOUT],
             excluded=[r for r, role in roles.items() if role == rft.EXCLUDED], declared=declared)
         return rft.TuningRequest(observations, self.parameterization.currentData(),
-                                 rft.DECLARED if declared else rft.RANK_ORDER, float(self.lower.text()), float(self.upper.text()),
+                                 rft.DECLARED if declared else rft.RANK_ORDER, float(self.search.text()),
                                  degree=int(self.degree.text()))
 
     def run(self) -> bool:
@@ -362,8 +381,8 @@ class ResearchTuningPanel(QWidget):
             return False
         try:
             request = self.build_request()
-            if not 0 < request.lower_factor < 1 < request.upper_factor:
-                raise ValueError("The bounds must satisfy 0 < lower < 1 < upper (factors of the INP values).")
+            if not request.search_factor > 1.0:
+                raise ValueError("The search range factor must exceed 1.")
             if not 4 <= request.degree <= 24:
                 raise ValueError("The Ritz basis degree must be between 4 and 24.")
         except (ValueError, KeyError) as error:
@@ -374,7 +393,8 @@ class ResearchTuningPanel(QWidget):
         self.request = request
         sources = self.sources
         self.state.setText("Fitting...")
-        return self._start("fit", lambda cancel, solved: rft.run_tuning(sources.inputs, request, sources.fe_elastic, cancel, solved))
+        return self._start("fit", lambda cancel, solved: rft.run_tuning(sources.inputs, request, sources.fe_elastic, cancel,
+                                                                         solved, sources.fe_classification))
 
     def _say(self, text: str) -> None:
         self.message.setText(text)
@@ -384,7 +404,8 @@ class ResearchTuningPanel(QWidget):
         self.result = None
         self.plot_data = b""
         self.plot.clear()
-        for key in ("candidate", "frequencies", "minima", "diagnostics", "sensitivity", "surrogate"):
+        for key in ("estimates", "axes", "candidate", "quantities", "frequencies", "first_mode", "assumptions", "minima",
+                    "diagnostics", "sensitivity", "surrogate"):
             self._table(key, None, (), (), 0)
         self.results_card.setVisible(False)
         self.export_note.setText("")
@@ -397,13 +418,28 @@ class ResearchTuningPanel(QWidget):
         self.status.style().unpolish(self.status)
         self.status.style().polish(self.status)
         self.reasons.setText("\n".join([rm.STATUS_TEXT.get(result.status, result.status)] + list(result.reasons) + list(result.warnings)))
+        self.accuracy.setText(result.accuracy_statement)
+        self._table("estimates", self.estimate_box, rm.ESTIMATE_HEADERS, rm.estimate_rows(result), 0)
+        self._table("axes", self.axis_box, rm.AXIS_HEADERS, rm.axis_rows(result), 0)
         self._table("candidate", self.candidate_box, rm.CANDIDATE_HEADERS, rm.candidate_rows(result), 0)
+        self.candidate_none.setText("" if result.candidate else "None: " + ("the E1 / E2 axis assignment is unresolved, so no "
+                                    "oriented *Elastic block is given." if result.status == rft.MIRROR else
+                                    "the fit is not numerically supported."))
+        self.candidate_none.setVisible(not result.candidate)
+        self._table("quantities", self.result_boxes["quantities"], rm.QUANTITY_HEADERS, rm.quantity_rows(result), 2)
+        self._table("first_mode", self.result_boxes["first_mode"], ("Check", "Value"), rm.first_mode_rows(result), 1)
+        self._table("assumptions", self.result_boxes["assumptions"], ("Fixed input changed", "Moduli factor"),
+                    rm.assumption_rows(result), 0)
         self._table("frequencies", self.result_boxes["frequencies"], rm.FREQUENCY_HEADERS, rm.frequency_rows(result), 1)
         self._table("minima", self.result_boxes["minima"], ("Minimum", "Fitted values (MPa)", "Cost"), rm.minima_rows(result), 1)
         self._table("diagnostics", self.result_boxes["diagnostics"], ("Item", "Value"), rm.diagnostic_rows(result), 1)
         self._table("sensitivity", self.result_boxes["sensitivity"], ("EXP record",) + tuple(result.parameter_names),
                     rm.sensitivity_rows(result), 0)
-        self._table("surrogate", self.result_boxes["surrogate"], rm.SURROGATE_HEADERS, rm.surrogate_rows(result), 0)
+        if result.surrogate:
+            self._table("surrogate", self.result_boxes["surrogate"], rm.SURROGATE_HEADERS, rm.surrogate_rows(result), 0)
+        else:
+            self._table("surrogate", self.result_boxes["surrogate"], ("Surrogate check",), (("Not made: FE classification "
+                        "unavailable. Choose an ODB whose modes are already extracted.",),), 0)
         self.state.setText(f"{result.status}: {result.evaluations} surrogate solves.")
         width = max(400, self.plot.width() or 900)
         ratio = self.devicePixelRatioF()
@@ -435,7 +471,7 @@ class ResearchTuningPanel(QWidget):
         running = self._active is not None
         for button in self.buttons.values():
             button.setEnabled(not running)
-        for widget in (self.parameterization, self.declared, self.lower, self.upper, self.degree):
+        for widget in (self.parameterization, self.declared, self.search, self.degree):
             widget.setEnabled(not running)
         self.run_button.setEnabled(not running and self.sources is not None)
         self.cancel_button.setEnabled(self._active == "fit")

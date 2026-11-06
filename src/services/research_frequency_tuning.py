@@ -14,8 +14,11 @@ What it does, in order:
    ``Q12 = nu12 E2/(1 - nu12 nu21)``, ``Q66 = G12``, ``nu21 = nu12 E2/E1`` and ``Dij = Qij t^3/12``. Transverse shear
    (G13, G23) and E3 are not in this plate theory: they stay as the INP has them.
 3. Solves the free plate with the existing Kirchhoff-Ritz forward model (``plate_ritz_forward.solve_ritz``).
-4. Compares that surrogate spectrum, by rank, with the elastic frequencies stored in the model's own ``.dat``.
-5. Fits the selected experimental frequencies by bounded least squares on signed residuals ln(f_model / f_exp), under ONE
+4. Compares that surrogate spectrum, by rank, with the elastic FE frequencies, when the caller has them classified
+   by shape (the comparator's rigid-body criterion, P-2); without that classification no FE rank comparison is made.
+5. Starts from the data alone (REAL-FIT.R1.F1): a common modulus scaled to the measured frequencies and one
+   linearized split, with bounds around that start; the INP values are shown for comparison only. Then fits
+   the selected experimental frequencies by bounded least squares on signed residuals ln(f_model / f_exp), under ONE
    declared correspondence hypothesis: the k-th fitted experimental frequency against a stated elastic rank of the
    surrogate (by default the same rank). This is a frequency hypothesis, never a mode pair.
 6. Keeps HOLDOUT records out of the fit and reports their prediction, and reports the sensitivities d ln f / d ln p, the
@@ -53,8 +56,6 @@ MIRROR = "E1_E2_AXIS_ASSIGNMENT_NOT_IDENTIFIABLE"  # two minima with E1 and E2 e
 MIRROR_TOLERANCE = 0.05  # relative difference for "exchanged" (numerical policy)
 MISFIT_RMS = 0.02  # FIT residual RMS (ln f) above which the parameterization does not reproduce the spectrum (diagnostic)
 FIT, HOLDOUT, EXCLUDED = "FIT", "HOLDOUT", "EXCLUDED"
-DEFAULT_STARTS = {TIED: ((1.0, 1.0), (0.5, 2.0), (2.0, 0.5)),
-                  FREE: ((1.0, 1.0, 1.0), (0.6, 1.6, 1.0), (1.6, 0.6, 1.0), (0.8, 0.8, 2.0))}  # asymmetric: a mirror minimum shows
 PRACTICAL_RANK_RATIO = 1.0e-3  # a singular value below this share of the largest does not count (numerical policy)
 CONDITION_LIMIT = 1.0e3  # above it the parameters are reported as poorly distinguished (numerical policy)
 START_AGREEMENT = 1.0e-3  # relative spread of the fitted parameters over the starts (numerical policy)
@@ -200,11 +201,6 @@ def read_dat_frequencies(path) -> tuple:
     return tuple(rows)
 
 
-def elastic_fe_frequencies(rows, rigid_limit_hz: float = 1.0) -> tuple:
-    """The elastic modes of a free model: the rigid-body ones are those near 0 Hz (the .dat's own values)."""
-    return tuple((mode, hz) for mode, hz in rows if hz > rigid_limit_hz)
-
-
 # ---------------------------------------------------------------------------------------------- constitutive conversion
 
 
@@ -264,9 +260,7 @@ class TuningRequest:
     observations: tuple
     parameterization: str = TIED
     correspondence: str = RANK_ORDER
-    lower_factor: float = 0.2  # bounds as factors of the INP values
-    upper_factor: float = 5.0
-    starts: tuple = ()  # start points as factors of the INP values, one per parameter; empty: DEFAULT_STARTS
+    search_factor: float = 10.0  # bounds: the data-scaled start divided and multiplied by this factor
     degree: int = 14
 
     def fit_rows(self) -> tuple:
@@ -286,6 +280,94 @@ def observations_by_rank(records: Sequence[tuple], holdout: Sequence[int] = (), 
     return tuple(sorted(rows, key=lambda o: o.record))
 
 
+REFERENCE_MPA = 1000.0  # the arbitrary common modulus the data-scaled start begins from; not an INP value
+
+
+class _Cancelled(Exception):
+    pass
+
+
+class _Problem:
+    """One surrogate, one parameterization, one set of FIT rows: the spectrum, the residuals and their Jacobian."""
+
+    def __init__(self, inputs, names, rows, degree, cancel, progress):
+        top = max(o.surrogate_rank for o in rows)
+        self.surrogate = Surrogate(inputs, degree, max(top + 4, 12))
+        self.inputs, self.names, self.rows, self.cancel, self.progress = inputs, names, rows, cancel, progress
+        self.count = 0
+
+    def spectrum(self, x: np.ndarray) -> np.ndarray:
+        if self.cancel is not None and self.cancel.is_set():
+            raise _Cancelled()
+        self.count += 1
+        if self.progress is not None:
+            self.progress(self.count)
+        moduli = _moduli(self.names, np.exp(x), self.inputs)
+        return self.surrogate.frequencies(moduli["E1"], moduli["E2"], moduli["G12"])
+
+    def residual(self, x, rows=None):
+        return _residuals(self.spectrum(x), rows or self.rows)
+
+    def jacobian(self, x, rows=None, step=1.0e-5):
+        columns = []
+        for j in range(x.size):
+            up, down = x.copy(), x.copy()
+            up[j] += step
+            down[j] -= step
+            columns.append((self.residual(up, rows) - self.residual(down, rows)) / (2 * step))
+        return np.column_stack(columns)
+
+    def data_scaled_start(self) -> tuple:
+        """A start from the data alone: every modulus at REFERENCE_MPA, then (1) the common factor that the geometric mean
+        of the FIT frequencies asks for (f ~ sqrt(modulus) at fixed geometry and surface mass), and (2) one linearized
+        least-squares step that splits it between the parameters. Returns (x0, common factor, note)."""
+        reference = np.full(len(self.names), math.log(REFERENCE_MPA))
+        mismatch = -self.residual(reference)  # ln(f_exp / f_ref)
+        common = 2.0 * float(np.mean(mismatch))
+        scaled = reference + common
+        sensitivity = self.jacobian(scaled)
+        step, *_ = np.linalg.lstsq(sensitivity, -self.residual(scaled), rcond=None)
+        step = np.clip(step, -math.log(5.0), math.log(5.0))
+        return scaled + step, math.exp(common), ("reference modulus 1000 MPa, common factor from the mean log frequency "
+                                                 "ratio, one linearized split step")
+
+
+def _swap(names, x: np.ndarray) -> np.ndarray:
+    swapped = x.copy()
+    if "E1" in names:
+        i, j = names.index("E1"), names.index("E2")
+        swapped[i], swapped[j] = x[j], x[i]
+    return swapped
+
+
+def _solve(problem: _Problem, x0: np.ndarray, factor: float) -> dict:
+    lower, upper = x0 - math.log(factor), x0 + math.log(factor)
+    starts_x = [x0, x0 + np.array([math.log(0.6) if n != "G12" else math.log(1.6) for n in problem.names]),
+                x0 + np.array([math.log(1.6) if n != "G12" else math.log(0.6) for n in problem.names])]
+    if "E1" in problem.names:  # asymmetric starts and the exchanged start, so that a mirror minimum shows itself
+        starts_x += [x0 + np.array([math.log(1.3), math.log(0.77), 0.0]), x0 + np.array([math.log(0.77), math.log(1.3), 0.0]),
+                     _swap(problem.names, x0)]
+    starts = []
+    for start in starts_x:
+        x_start = np.clip(start, lower + 1e-9, upper - 1e-9)
+        solution = least_squares(problem.residual, x_start, jac=problem.jacobian, bounds=(lower, upper), method="trf",
+                                 x_scale=1.0, ftol=1e-14, xtol=1e-12, gtol=1e-12, max_nfev=200)
+        starts.append({"start": dict(zip(problem.names, np.exp(x_start).tolist())),
+                       "values": dict(zip(problem.names, np.exp(solution.x).tolist())), "cost": float(solution.cost),
+                       "status": int(solution.status), "message": solution.message, "success": bool(solution.success),
+                       "x": solution.x})
+    best = min(starts, key=lambda s: s["cost"])
+    minima = []
+    for item in sorted(starts, key=lambda s: s["cost"]):
+        if not any(float(np.max(np.abs(np.exp(item["x"] - m["x"]) - 1.0))) <= START_AGREEMENT for m in minima):
+            minima.append(item)
+    return {"x": best["x"], "starts": starts, "minima": minima, "lower": lower, "upper": upper}
+
+
+def _percent(sd_log: float) -> float:
+    return math.exp(sd_log) - 1.0
+
+
 @dataclass
 class TuningResult:
     status: str
@@ -295,11 +377,13 @@ class TuningResult:
     request: dict
     inputs: dict
     parameter_names: tuple
-    baseline: dict
-    fitted: Optional[dict]  # the optimizer's point (all starts' best), always reported for diagnosis
-    candidate: Optional[dict]  # only when numerically supported
-    rows: list  # per observation: record, role, rank, exp, Ritz baseline, Ritz fitted, residual before/after (ln)
-    sensitivity: list  # d ln f / d ln p, FIT rows, at the fitted point
+    baseline: dict  # the INP's values, for comparison only; they set neither the start nor the bounds
+    fitted: Optional[dict]  # the best minimum, always reported for diagnosis
+    candidate: Optional[dict]  # an oriented candidate: only when numerically supported AND the axes are resolved
+    estimates: Optional[dict]  # numerical research estimates; for an unresolved E1/E2 axis: E_stiff, E_soft, G12
+    axis_assignments: list  # both assignments when the axis is unresolved; never one chosen
+    rows: list
+    sensitivity: list
     singular_values: list
     condition_number: Optional[float]
     practical_rank: int
@@ -312,7 +396,13 @@ class TuningResult:
     rms_holdout_before: Optional[float]
     rms_holdout_after: Optional[float]
     surrogate: list
-    minima: list = field(default_factory=list)  # the distinct minima the starts reached, best first
+    initialization: dict = field(default_factory=dict)
+    first_mode_check: dict = field(default_factory=dict)
+    assumption_sensitivity: list = field(default_factory=list)
+    quantities: list = field(default_factory=list)
+    accuracy_statement: str = ""
+    fe_classification: str = ""
+    minima: list = field(default_factory=list)
     assumptions: tuple = ASSUMPTIONS
     evaluations: int = 0
 
@@ -324,65 +414,73 @@ def _residuals(frequencies: np.ndarray, rows: Sequence[Observation]) -> np.ndarr
     return np.array([math.log(frequencies[o.surrogate_rank - 1] / o.hz) for o in rows])
 
 
+ACCURACY_STATEMENT = ("Frequency errors are not parameter errors. The statistical SD is conditional on the model, the rank "
+                      "hypothesis and the fixed inputs; it leaves out the thickness and density assumptions, the support "
+                      "stiffness and any missed mode. A 10 % engineering accuracy of the parameters is a target, not a "
+                      "demonstrated or certified property of these estimates.")
+
+
+def _estimates(names, values: Mapping[str, float]) -> dict:
+    if "E" in names:
+        return {"E (E1 = E2)": values["E"], "G12": values["G12"]}
+    return {"E_stiff": max(values["E1"], values["E2"]), "E_soft": min(values["E1"], values["E2"]), "G12": values["G12"]}
+
+
+def quantity_table(inputs: AbaqusPlateInputs, names, fe_classification: str) -> list:
+    fitted = ", ".join("E1 = E2" if n == "E" else n for n in names)
+    return [
+        {"quantity": "Natural frequencies", "category": "MEASURED", "source": "PolyMAX curve-fitted records (the experimental file)"},
+        {"quantity": fitted, "category": "FITTED", "source": "this tuning (Kirchhoff-Ritz surrogate)"},
+        {"quantity": f"Thickness {inputs.thickness_mm:g} mm", "category": "ASSUMED (INP), FIXED", "source": "*Shell Section of the INP"},
+        {"quantity": f"Density {inputs.density_t_mm3:g} t/mm³", "category": "ASSUMED (INP), FIXED", "source": "*Density of the INP"},
+        {"quantity": f"Surface mass {inputs.density_t_mm3 * inputs.thickness_mm * 1e9:.4g} kg/m²", "category": "DERIVED",
+         "source": "density × thickness (INP)"},
+        {"quantity": f"Plan {inputs.a_mm:g} × {inputs.b_mm:g} mm", "category": "MODEL GEOMETRY (INP)", "source": "*Node extents"},
+        {"quantity": f"nu12 = {inputs.nu12:g}", "category": "FIXED, NOT IDENTIFIED", "source": "*Elastic of the INP"},
+        {"quantity": "E3, nu13, nu23, G13, G23", "category": "NOT IN THE SURROGATE, KEPT", "source": "*Elastic of the INP"},
+        {"quantity": "FE rigid-body / elastic classification", "category": "SHAPE-BASED" if fe_classification.startswith("shape")
+         else "UNAVAILABLE", "source": fe_classification},
+    ]
+
+
 def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(), cancel: Optional[threading.Event] = None,
-               progress: Optional[Callable[[int], None]] = None) -> TuningResult:
+               progress: Optional[Callable[[int], None]] = None, fe_classification: str = "") -> TuningResult:
+    """``fe_elastic``: (mode, Hz) of the elastic FE modes as classified by shape (P-2), or () when no classification exists."""
     names = PARAMETERIZATIONS[request.parameterization]
     fit_rows = request.fit_rows()
     holdout_rows = tuple(o for o in request.observations if o.role == HOLDOUT)
     if len(fit_rows) <= len(names):
         raise TuningRefused(f"{len(fit_rows)} FIT frequencies cannot determine {len(names)} parameters; keep more than "
                             f"{len(names)} in the fit.")
-    top = max(o.surrogate_rank for o in request.observations if o.role != EXCLUDED)
-    surrogate = Surrogate(inputs, request.degree, max(top + 4, 12))
-    base_values = {"E": inputs.E1, "E1": inputs.E1, "E2": inputs.E2, "G12": inputs.G12}
     if request.parameterization == TIED and inputs.E1 != inputs.E2:
         raise TuningRefused("E1 = E2 tying needs equal E1 and E2 in the INP; choose the three-parameter form.")
+    if not request.search_factor > 1.0:
+        raise TuningRefused("The search range factor must exceed 1.")
+    kept = tuple(o for o in request.observations if o.role != EXCLUDED)
+    problem = _Problem(inputs, names, fit_rows, request.degree, cancel, progress)
+    all_rows = _Problem(inputs, names, kept, request.degree, cancel, None)
+    base_values = {"E": inputs.E1, "E1": inputs.E1, "E2": inputs.E2, "G12": inputs.G12}
     base = np.array([math.log(base_values[n]) for n in names])
-    lower = base + math.log(request.lower_factor)
-    upper = base + math.log(request.upper_factor)
-    count = [0]
-
-    def spectrum(x: np.ndarray) -> np.ndarray:
-        if cancel is not None and cancel.is_set():
-            raise _Cancelled()
-        count[0] += 1
-        if progress is not None:
-            progress(count[0])
-        moduli = _moduli(names, np.exp(x), inputs)
-        return surrogate.frequencies(moduli["E1"], moduli["E2"], moduli["G12"])
-
-    def residual(x):
-        return _residuals(spectrum(x), fit_rows)
-
-    def jacobian(x, rows=fit_rows, step=1.0e-5):
-        columns = []
-        for j in range(x.size):
-            up, down = x.copy(), x.copy()
-            up[j] += step
-            down[j] -= step
-            columns.append((_residuals(spectrum(up), rows) - _residuals(spectrum(down), rows)) / (2 * step))
-        return np.column_stack(columns)
-
     try:
-        baseline_spectrum = spectrum(base)
-        starts = []
-        for factor in (request.starts or DEFAULT_STARTS[request.parameterization]):
-            x0 = np.clip(base + np.log(np.asarray(factor, dtype=float)), lower + 1e-9, upper - 1e-9)
-            solution = least_squares(residual, x0, jac=jacobian, bounds=(lower, upper), method="trf", x_scale=1.0,
-                                     ftol=1e-14, xtol=1e-12, gtol=1e-12, max_nfev=200)
-            starts.append({"start_factor": list(factor), "values": dict(zip(names, np.exp(solution.x).tolist())),
-                           "cost": float(solution.cost), "status": int(solution.status), "message": solution.message,
-                           "success": bool(solution.success), "x": solution.x})
-        best = min(starts, key=lambda s: s["cost"])
-        x = best["x"]
-        fitted_spectrum = spectrum(x)
-        J = jacobian(x)
+        x0, common, note = problem.data_scaled_start()
+        fit = _solve(problem, x0, request.search_factor)
+        x = fit["x"]
+        baseline_spectrum = all_rows.spectrum(base)
+        fitted_spectrum = all_rows.spectrum(x)
+        J = problem.jacobian(x)
+        if "E1" in names and len(fit["minima"]) == 1:  # look for the exchanged minimum explicitly; never assume it absent
+            mirror = _solve(problem, _swap(names, x), request.search_factor)
+            for item in mirror["minima"]:
+                if not any(float(np.max(np.abs(np.exp(item["x"] - m["x"]) - 1.0))) <= START_AGREEMENT for m in fit["minima"]):
+                    fit["minima"].append(item)
+            fit["starts"] += mirror["starts"]
+        first_mode = _first_mode_check(inputs, request, names, x, cancel)
     except _Cancelled:
         return _cancelled(inputs, request, names)
     singular = np.linalg.svd(J, compute_uv=False)
     rank = int(np.sum(singular > PRACTICAL_RANK_RATIO * singular[0])) if singular.size else 0
     condition = float(singular[0] / singular[-1]) if singular.size and singular[-1] > 0 else math.inf
-    r_after = _residuals(fitted_spectrum, fit_rows)
+    r_after = _residuals(fitted_spectrum[:], fit_rows)
     dof = len(fit_rows) - len(names)
     correlation = log_sd = None
     if rank == len(names):
@@ -390,36 +488,47 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
         sd = np.sqrt(np.diag(covariance))
         correlation = (covariance / np.outer(sd, sd)).round(6).tolist()
         log_sd = dict(zip(names, sd.tolist()))
-    active = [n for n, v, lo, hi in zip(names, x, lower, upper) if v - lo < 1e-6 or hi - v < 1e-6]
-    spread = max(float(np.max(np.abs(np.exp(s["x"] - x) - 1.0))) for s in starts)
+    active = [n for n, v, lo, hi in zip(names, x, fit["lower"], fit["upper"]) if v - lo < 1e-6 or hi - v < 1e-6]
+    minima = sorted(fit["minima"], key=lambda m: m["cost"])
+    mirror = (len(minima) >= 2 and "E1" in names and all(
+        abs(minima[0]["values"][a] / minima[1]["values"][b] - 1.0) <= MIRROR_TOLERANCE
+        for a, b in (("E1", "E2"), ("E2", "E1"), ("G12", "G12"))))
+    others = [m for m in minima[1:] if not mirror or m is not minima[1]]
     reasons = []
-    if not all(s["success"] for s in starts):
-        reasons.append("A start did not converge: " + "; ".join(s["message"] for s in starts if not s["success"]))
+    if not all(s["success"] for s in fit["starts"]):
+        reasons.append("A start did not converge: " + "; ".join(s["message"] for s in fit["starts"] if not s["success"]))
     if rank < len(names):
         reasons.append(f"Practical rank {rank} of {len(names)}: the FIT frequencies cannot separate the parameters.")
     if condition > CONDITION_LIMIT:
         reasons.append(f"Condition number {condition:.3g} exceeds {CONDITION_LIMIT:g}: the parameters are poorly distinguished.")
     if active:
-        reasons.append("At a bound: " + ", ".join(active) + ". The minimum lies outside the allowed range.")
-    if spread > START_AGREEMENT:
-        reasons.append(f"The starts end {spread:.2%} apart: the minimum is not unique within the bounds.")
-    minima = []
-    for item in sorted(starts, key=lambda s: s["cost"]):
-        if not any(float(np.max(np.abs(np.exp(item["x"] - m["x"]) - 1.0))) <= START_AGREEMENT for m in minima):
-            minima.append(item)
-    mirror = (len(minima) == 2 and "E1" in names and all(
-        abs(minima[0]["values"][a] / minima[1]["values"][b] - 1.0) <= MIRROR_TOLERANCE
-        for a, b in (("E1", "E2"), ("E2", "E1"), ("G12", "G12"))))
+        reasons.append("At a bound: " + ", ".join(active) + ". The minimum lies outside the search range.")
+    if others:
+        reasons.append(f"{len(others)} further minimum/minima besides the best: the minimum is not unique within the range.")
     if mirror:
-        reasons = [r for r in reasons if not r.startswith("The starts end")]
         reasons.append("Two minima with E1 and E2 exchanged fit almost equally (costs " + ", ".join(
-            f"{m['cost']:.6g}" for m in minima) + "): the frequencies support a stiff and a soft in-plane direction but not "
-            "which plate axis (FE X or Y) is which. That needs the physical orientation of the test plate.")
-    status = (MIRROR if mirror else NOT_CONVERGED if reasons and reasons[0].startswith("A start") else NOT_IDENTIFIABLE if rank < len(names)
-              or condition > CONDITION_LIMIT else AT_BOUND if active else STARTS_DISAGREE if spread > START_AGREEMENT else SUPPORTED)
+            f"{m['cost']:.6g}" for m in minima[:2]) + "): the frequencies support a stiff and a soft in-plane direction but "
+            "not which plate axis (FE X or Y) is which. That needs the physical orientation of the test plate.")
+    if reasons and reasons[0].startswith("A start"):
+        status = NOT_CONVERGED
+    elif rank < len(names) or condition > CONDITION_LIMIT:
+        status = NOT_IDENTIFIABLE
+    elif active:
+        status = AT_BOUND
+    elif others:
+        status = STARTS_DISAGREE
+    else:
+        status = MIRROR if mirror else SUPPORTED
     fitted = {k: float(v) for k, v in _moduli(names, np.exp(x), inputs).items()}
+    values = dict(zip(names, np.exp(x).tolist()))
+    estimates = _estimates(names, values) if status in (SUPPORTED, MIRROR) else None
+    axes = []
+    if mirror:
+        for label, m in zip(("assignment A", "assignment B"), minima[:2]):
+            axes.append({"assignment": label, "E1 (FE X)": m["values"]["E1"], "E2 (FE Y)": m["values"]["E2"],
+                         "G12": m["values"]["G12"], "cost": m["cost"]})
     rows = []
-    for o in request.observations:  # (built before the warnings above use them)
+    for o in request.observations:
         if o.role == EXCLUDED:
             rows.append({"record": o.record, "role": o.role, "rank": None, "exp_hz": o.hz, "ritz_before_hz": None,
                          "ritz_after_hz": None, "ln_before": None, "ln_after": None})
@@ -429,8 +538,8 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
                      "ritz_after_hz": after, "ln_before": math.log(before / o.hz), "ln_after": math.log(after / o.hz)})
 
     def rms(role, key):
-        values = [r[key] for r in rows if r["role"] == role]
-        return float(np.sqrt(np.mean(np.square(values)))) if values else None
+        found = [r[key] for r in rows if r["role"] == role]
+        return float(np.sqrt(np.mean(np.square(found)))) if found else None
 
     warnings = []
     fit_rms = float(np.sqrt(np.mean(np.square(r_after))))
@@ -439,33 +548,91 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
                         "reproduce the measured spectrum, and its values absorb model-form error.")
     if any(abs(r["ln_after"]) > 0.05 for r in rows if r["role"] == HOLDOUT):
         warnings.append("A HOLDOUT frequency is predicted more than 5 % off after the fit.")
+    if first_mode.get("largest_change", 0.0) > 0.05:
+        warnings.append(f"Leaving out the lowest experimental record changes a parameter by {first_mode['largest_change']:.1%}: "
+                        "the estimate depends on that record.")
+    if not fe_elastic:
+        warnings.append("FE classification unavailable: no extracted FE mode shapes, so the surrogate is not compared with "
+                        "the Abaqus spectrum by rank.")
+    statistical = {n: _percent(v) for n, v in (log_sd or {}).items()}
     return TuningResult(
         status=status, reasons=reasons, label=RESULT_LABEL, warnings=warnings,
         request={"parameterization": request.parameterization, "correspondence": request.correspondence,
-                 "bounds_factor": [request.lower_factor, request.upper_factor], "starts": [list(f) for f in (request.starts or DEFAULT_STARTS[request.parameterization])],
-                 "ritz_degree": request.degree, "observations": [asdict(o) for o in request.observations]},
+                 "search_factor": request.search_factor, "ritz_degree": request.degree,
+                 "observations": [asdict(o) for o in request.observations]},
         inputs=asdict(inputs), parameter_names=names,
         baseline={"E1": inputs.E1, "E2": inputs.E2, "G12": inputs.G12, "nu12": inputs.nu12},
-        fitted={**fitted, "nu12": inputs.nu12}, candidate=({**fitted, "nu12": inputs.nu12} if status == SUPPORTED else None),
+        fitted={**fitted, "nu12": inputs.nu12},
+        candidate=({**fitted, "nu12": inputs.nu12} if status == SUPPORTED else None),
+        estimates=estimates, axis_assignments=axes,
         rows=rows, sensitivity=[dict(zip(names, row)) | {"record": o.record} for o, row in zip(fit_rows, J.tolist())],
         singular_values=singular.tolist(), condition_number=condition, practical_rank=rank, correlation=correlation,
         log_sd=log_sd, active_bounds=active,
-        starts=[{k: v for k, v in s.items() if k != "x"} for s in starts],
+        starts=[{k: v for k, v in s.items() if k != "x"} for s in fit["starts"]],
         rms_fit_before=rms(FIT, "ln_before"), rms_fit_after=rms(FIT, "ln_after"),
         rms_holdout_before=rms(HOLDOUT, "ln_before"), rms_holdout_after=rms(HOLDOUT, "ln_after"),
         surrogate=[{"rank": r[0], "fe_mode": r[1], "fe_hz": r[2], "ritz_hz": r[3], "ritz_over_fe_minus_1": r[4]}
-                   for r in surrogate_discrepancy(surrogate, fe_elastic)] if fe_elastic else [],
-        minima=[{"values": dict(m["values"]), "cost": m["cost"]} for m in minima], evaluations=count[0])
+                   for r in surrogate_discrepancy(Surrogate(inputs, request.degree, max(len(fe_elastic) + 2, 12)),
+                                                  fe_elastic)] if fe_elastic else [],
+        initialization={"method": note, "reference_mpa": REFERENCE_MPA, "common_factor": common,
+                        "start": dict(zip(names, np.exp(x0).tolist())),
+                        "bounds": {n: [float(np.exp(lo)), float(np.exp(hi))] for n, lo, hi in zip(names, fit["lower"], fit["upper"])},
+                        "inp_values_used": "no (shown for comparison only)"},
+        first_mode_check=first_mode,
+        assumption_sensitivity=assumption_sensitivity(),
+        quantities=quantity_table(inputs, names, fe_classification or "unavailable"),
+        accuracy_statement=ACCURACY_STATEMENT + (" Statistical SD: " + ", ".join(f"{n} ±{v:.1%}" for n, v in statistical.items())
+                                                 if statistical else ""),
+        fe_classification=fe_classification or "unavailable",
+        minima=[{"values": dict(m["values"]), "cost": m["cost"]} for m in minima], evaluations=problem.count + all_rows.count)
 
 
-class _Cancelled(Exception):
-    pass
+def _first_mode_check(inputs, request, names, x, cancel) -> dict:
+    """The same fit with the lowest kept experimental record left out (not removed from the result): how much the estimates
+    lean on it. Ranks are renumbered by the same hypothesis."""
+    kept = sorted((o for o in request.observations if o.role != EXCLUDED), key=lambda o: o.hz)
+    if not kept or kept[0].role != FIT:
+        return {"done": False, "reason": "the lowest kept record is not a FIT record"}
+    lowest = kept[0]
+    records = [(o.record, o.hz) for o in request.observations]
+    holdout = [o.record for o in request.observations if o.role == HOLDOUT]
+    excluded = [o.record for o in request.observations if o.role == EXCLUDED] + [lowest.record]
+    observations = observations_by_rank(records, holdout, excluded)
+    # the left-out record keeps its surrogate rank: the hypothesis is not renumbered around it
+    observations = tuple(Observation(o.record, o.hz, o.role, o.surrogate_rank + (1 if o.role != EXCLUDED else 0))
+                         for o in observations)
+    fit_rows = tuple(o for o in observations if o.role == FIT)
+    if len(fit_rows) <= len(names):
+        return {"done": False, "reason": "too few FIT records without it"}
+    problem = _Problem(inputs, names, fit_rows, request.degree, cancel, None)
+    fit = _solve(problem, x, request.search_factor)
+    candidates = [m for m in fit["minima"]]
+    nearest = min(candidates, key=lambda m: float(np.max(np.abs(m["x"] - x))))
+    singular = np.linalg.svd(problem.jacobian(nearest["x"]), compute_uv=False)
+    changes = {n: float(math.exp(a - b) - 1.0) for n, a, b in zip(names, nearest["x"], x)}
+    return {"done": True, "left_out_record": lowest.record, "left_out_hz": lowest.hz,
+            "values": dict(zip(names, np.exp(nearest["x"]).tolist())), "change": changes,
+            "largest_change": max(abs(v) for v in changes.values()),
+            "condition_number": float(singular[0] / singular[-1]) if singular[-1] > 0 else math.inf}
+
+
+def assumption_sensitivity() -> list:
+    """How the estimates move with the fixed inputs, from the plate scaling f ~ sqrt(D / (rho h)), D ~ E t^3 (exact for the
+    surrogate). Not a fit; a statement of what the fixed inputs carry."""
+    rows = []
+    for change in (-0.05, 0.05):
+        rows.append({"assumption": f"thickness {change:+.0%}, surface mass held (measured mass)",
+                     "moduli_factor": (1.0 + change) ** -3})
+        rows.append({"assumption": f"thickness {change:+.0%}, density held (surface mass changes)",
+                     "moduli_factor": (1.0 + change) ** -2})
+        rows.append({"assumption": f"density {change:+.0%}", "moduli_factor": 1.0 + change})
+    return rows
 
 
 def _cancelled(inputs, request, names) -> TuningResult:
     return TuningResult(CANCELLED, ["Cancelled before the fit finished."], RESULT_LABEL, [], {}, asdict(inputs), names,
-                        {"E1": inputs.E1, "E2": inputs.E2, "G12": inputs.G12, "nu12": inputs.nu12}, None, None, [], [], [],
-                        None, 0, None, None, [], [], 0.0, None, None, None, [])
+                        {"E1": inputs.E1, "E2": inputs.E2, "G12": inputs.G12, "nu12": inputs.nu12}, None, None, None, [], [],
+                        [], [], None, 0, None, None, [], [], 0.0, None, None, None, [])
 
 
 def abaqus_elastic_line(inputs: AbaqusPlateInputs, candidate: Mapping[str, float]) -> str:
@@ -479,12 +646,14 @@ def abaqus_elastic_line(inputs: AbaqusPlateInputs, candidate: Mapping[str, float
 
 
 def export_document(result: TuningResult, inputs: AbaqusPlateInputs, sources: Mapping[str, str]) -> dict:
-    """Everything needed to reproduce and review the proposal; the Abaqus lines only when a candidate exists."""
+    """Everything needed to reproduce and review the proposal. An Abaqus *Elastic block only for an oriented candidate:
+    never when the E1/E2 axis is unresolved."""
     document = result.to_dict()
     document["sources"] = dict(sources)
     document["abaqus_elastic_candidate"] = abaqus_elastic_line(inputs, result.candidate) if result.candidate else None
-    document["statement"] = ("Surrogate (Kirchhoff-Ritz) result. The candidate is a proposal for a new Abaqus solve, not an FE "
-                             "result, not a material property and not a calibration. " + RESULT_LABEL)
+    document["statement"] = ("Surrogate (Kirchhoff-Ritz) research estimates. Not an FE result, not a material property and "
+                             "not a calibration; an oriented Abaqus block is given only when the axes are resolved. "
+                             + RESULT_LABEL)
     return document
 
 
@@ -494,8 +663,8 @@ def write_export(document: dict, path) -> Path:
     return path
 
 
-__all__ = ["ASSUMPTIONS", "AbaqusPlateInputs", "DECLARED", "FIT", "FREE", "HOLDOUT", "EXCLUDED", "Observation",
-           "PARAMETERIZATIONS", "RANK_ORDER", "RESULT_LABEL", "SUPPORTED", "Surrogate", "TIED", "TuningRefused",
-           "TuningRequest", "TuningResult", "abaqus_elastic_line", "bending_stiffness", "elastic_fe_frequencies",
-           "export_document", "observations_by_rank", "read_dat_frequencies", "read_inp", "run_tuning",
-           "surrogate_discrepancy", "write_export"]
+__all__ = ["ACCURACY_STATEMENT", "ASSUMPTIONS", "AbaqusPlateInputs", "DECLARED", "FIT", "FREE", "HOLDOUT", "EXCLUDED",
+           "MIRROR", "Observation", "PARAMETERIZATIONS", "RANK_ORDER", "RESULT_LABEL", "SUPPORTED", "Surrogate", "TIED",
+           "TuningRefused", "TuningRequest", "TuningResult", "abaqus_elastic_line", "assumption_sensitivity",
+           "bending_stiffness", "export_document", "observations_by_rank", "quantity_table", "read_dat_frequencies",
+           "read_inp", "run_tuning", "surrogate_discrepancy", "write_export"]

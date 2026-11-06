@@ -149,3 +149,65 @@ Focused tests only; one process at a time, one BLAS thread. The full suite was n
 - both fits ran, in 1.7 s and 2.4 s; both exports were written;
 - no sideways scroll at 900; no Russian text;
 - the source hashes were unchanged; no process started and nothing was written on `I:\`.
+
+## REAL-FIT.R1.F1: numerical estimates without false physical certainty
+
+**What changed.**
+- **FE classification by shape only.** The 1 Hz rigid-body cutoff is removed. Rigid-body and elastic FE modes are now told apart only
+  by shape, with the comparator's own criterion (`modal_data_viewer.classify_rigid_body_fe_modes`, rigid-body projection residual
+  ≤ 0.02). It reads modes already extracted from an optional ODB, which is found by content; Abaqus is never started. Without such
+  modes the classification is reported as UNAVAILABLE, and the surrogate is not compared with Abaqus by rank. The `.dat` frequencies
+  are listed unclassified.
+- **Start and bounds from the data.** Every modulus starts at an arbitrary 1000 MPa. Then:
+  1. a common factor is taken from the mean log ratio of the measured to the surrogate frequencies (f ~ √modulus at fixed geometry
+     and surface mass);
+  2. one linearized least-squares step splits that factor between the parameters;
+  3. the bounds are that start ÷ and × a search factor (default 10).
+
+  The INP constants are shown for comparison only. A test shows that tripling them changes neither the start nor the result.
+- **Estimates without an axis.** For E1, E2, G12, numerical **E_stiff, E_soft and G12** are reported even when the axis assignment is
+  unresolved, and both assignments are listed side by side; none is chosen. The oriented Abaqus `*Elastic` block is still given only
+  for a resolved candidate.
+- **Quantity categories.** Each quantity is labelled MEASURED (the PolyMAX frequencies), FITTED, ASSUMED (INP) and FIXED (thickness,
+  density), DERIVED (surface mass), MODEL GEOMETRY (the plan) or FIXED, NOT IDENTIFIED (nu12). E3, nu13, nu23, G13 and G23 are not in
+  the surrogate and are kept from the INP.
+- **The lowest experimental record stays in the fit.** A second fit without it is reported, as a check only.
+- **What the fixed inputs carry.**
+  - The thickness and density factors on the moduli come from the exact plate scaling.
+  - Thickness ±5 % changes the moduli by a factor 0.864–1.166 when the surface mass is held, or 0.907–1.108 when the density is held.
+  - Density ±5 % changes them by ±5 %.
+- **The accuracy statement.** Frequency errors are not parameter errors. The statistical SD is model-conditional. A 10 % engineering
+  accuracy is a target, not a demonstrated or certified property.
+
+**Real run, with the shape-based classification** (rigid FE modes 3–6, elastic from mode 7; FE modes 1 and 2 not loaded):
+
+| Fitted inputs | Status | Research estimates (MPa) and statistical SD | Without EXP 1 (check only) |
+|---|---|---|---|
+| E1 = E2, G12 | NUMERICALLY_SUPPORTED, with misfit warnings | E 50 006 ±4.7 %; G12 4 903 ±10.4 % | E −1.1 %; **G12 +9.4 %** (5 365) |
+| E1, E2, G12 | E1_E2_AXIS_ASSIGNMENT_NOT_IDENTIFIABLE | **E_stiff 59 643 ±2.1 %; E_soft 43 593 ±1.9 %; G12 4 824 ±3.1 %** | E −0.5 %; G12 +4.0 % (5 019) |
+
+- **Both axis assignments:**
+  - A: E1(FE X) 59 643 / E2(FE Y) 43 593, cost 0.000845;
+  - B: 44 171 / 58 724, cost 0.000858.
+- **Start:** data-scaled E1 33 619 / E2 58 643 / G12 8 376 MPa; common factor 23.7 from 1000 MPa. The result is unchanged from R1, so
+  it did not depend on the INP start.
+- **Errors:** FIT 6.8 % → 1.4 %, HOLDOUT 7.6 % → 2.4 % RMS.
+
+**Reading of the estimates.**
+- E_stiff and E_soft are well separated by the data: condition number 1.7, correlation |r| ≤ 0.21.
+- G12 leans on EXP 1: it moves 4–9 % without it.
+- None of the SD values contains the thickness, density, support, rank-hypothesis or surrogate errors.
+- A ±5 % thickness uncertainty alone moves the moduli by up to 16 %.
+- **No 10 % parameter accuracy is claimed.**
+
+![](real_fit_r1/f1_free_estimates.png)
+
+**Tests and verification.**
+- `test_real_fit_r1_tuning`: 21 tests, 4 of them new. They cover no frequency cutoff, the unavailable FE classification, the start
+  being independent of the INP, the lowest-record check, the quantity categories and the accuracy statement, E_stiff / E_soft with both
+  assignments, and the bound.
+- With `test_new_gui1_workspace` (allowed services updated), `test_universal_ui2_clean` and `test_process_shutdown`: 70 tests OK.
+- One Windows GUI pass on the real files, with the ODB copy for the classification:
+  - both fits ran, in 2.6 s and 5.2 s;
+  - no sideways scroll at 900 and no Russian text;
+  - the sources were unchanged; no process started and nothing was written on `I:\`.
