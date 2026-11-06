@@ -164,12 +164,22 @@ class FrequencyOnlyTests(_Case):
         experimental = ModalDataset("EXP", self.unv, modes(((1, 9.7), (2, 61.0), (3, 900.0))))
         diagnostic = new.frequency_only_diagnostic(fe, experimental, "x")
         statuses = [row[8] for row in new.frequency_only_table_rows(diagnostic)]
-        self.assertEqual(statuses[0], "FREQUENCY ONLY — not a pair; below the lowest extracted FE mode (60.00 Hz)")
+        self.assertEqual(statuses[0], "FREQUENCY ONLY — not a pair; below the lowest elastic FE mode (60.00 Hz)")
         self.assertEqual(statuses[1], "FREQUENCY ONLY — not a pair")
         self.assertTrue(statuses[2].endswith("above the highest extracted FE mode (140.00 Hz); extend the Abaqus "
                                              "mode range"))
-        self.assertIn("below the lowest extracted FE mode", "\n".join(diagnostic.text_lines()))
+        self.assertIn("below the lowest elastic FE mode", "\n".join(diagnostic.text_lines()))
         self.assertEqual(diagnostic.to_dict()["mac"], "NOT_COMPUTED")
+
+    def test_below_the_first_elastic_mode_names_the_elastic_range_not_the_extracted_one(self):
+        # REAL-PLATE.R1: the M11 S4R package holds rigid-body modes 3-6 near 0 Hz and its first elastic mode 7 at
+        # 19.072 Hz; PolyMAX record 1 of the 261027 ROTATED plate is 18.6307 Hz. Rigid modes are separate records (P-2), so
+        # the bound is the elastic one, and saying "lowest extracted FE mode" would deny the rigid modes listed beside it.
+        diagnostic = new.FrequencyOnlyDiagnostic("FREQUENCY_ONLY", "", ((7, 19.072), (8, 59.874)), ((1, 18.6307),), (),
+                                                 rigid_fe_modes=((3, 0.000218, 0.0), (6, 0.00209, 0.0)))
+        self.assertEqual(diagnostic.range_note(18.6307), "below the lowest elastic FE mode (19.07 Hz)")
+        self.assertEqual(diagnostic.range_note(19.5), "")
+        self.assertTrue(diagnostic.range_note(400.0).startswith("above the highest extracted FE mode (59.87 Hz)"))
 
     def test_no_fe_frequency(self):
         empty = ModalDataset("FE", self.new_odb, [])

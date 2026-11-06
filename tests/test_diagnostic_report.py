@@ -111,6 +111,11 @@ class FittedDiagnosticTests(_Case):
         self.loaded_data = self.loaded(self.unv)
         self.report, self.pdf, self.xlsx = self.written(self.loaded_data)
 
+    def test_the_range_note_names_the_elastic_fe_range(self):
+        # REAL-PLATE.R1: the range is that of the elastic modes (P-2); rigid-body modes below it are listed apart
+        self.assertEqual(dr._range_note(18.6307, (19.072, 327.9)), "below the lowest elastic FE mode (19.07 Hz)")
+        self.assertEqual(dr._range_note(50.0, (19.072, 327.9)), "")
+
     def test_frequencies_and_classifications_come_from_the_loaded_data(self):
         fe_hz = [m.frequency_hz for m in self.fe.sorted_modes()]
         exp_hz = [m.frequency_hz for m in self.loaded_data.experimental.sorted_modes()]

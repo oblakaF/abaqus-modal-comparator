@@ -121,8 +121,8 @@ def _range_note(frequency: float, fe_range) -> str:
     if fe_range is None:
         return "no FE frequency extracted"
     low, high = fe_range
-    if frequency < low:
-        return f"below the lowest extracted FE mode ({low:.2f} Hz)"
+    if frequency < low:  # the range is that of the elastic modes (P-2); rigid-body modes are listed apart
+        return f"below the lowest elastic FE mode ({low:.2f} Hz)"
     if frequency > high:
         return f"above the highest extracted FE mode ({high:.2f} Hz); extend the Abaqus mode range"
     return ""

@@ -203,12 +203,14 @@ class FrequencyOnlyDiagnostic:
         return "PROVISIONAL" in self.experimental_source
 
     def range_note(self, experimental_hz: float) -> str:
-        """Why a nearest-frequency difference says nothing: the frequency lies outside the extracted FE modes."""
+        """Why a nearest-frequency difference says nothing: the frequency lies outside the extracted elastic FE modes.
+        ``fe_modes`` holds the elastic modes only (P-2), so the lower bound names them: rigid-body modes extracted below
+        it are listed separately and must not be read as absent (REAL-PLATE.R1)."""
         if not self.fe_modes:
             return ""
         low, high = min(f for _, f in self.fe_modes), max(f for _, f in self.fe_modes)
         if experimental_hz < low:
-            return f"below the lowest extracted FE mode ({low:.2f} Hz)"
+            return f"below the lowest elastic FE mode ({low:.2f} Hz)"
         if experimental_hz > high:
             return f"above the highest extracted FE mode ({high:.2f} Hz); extend the Abaqus mode range"
         return ""
