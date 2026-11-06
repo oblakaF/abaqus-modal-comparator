@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QGridLayout, QHBo
 from new_gui import research_tuning_model as rm
 from new_gui.diagnostic_panel import DiagnosticTable
 from new_gui.shape_panel import _label
+from services import research_frequency_stability as rfs
 from services import research_frequency_tuning as rft
 
 INTRO = ("Refines the ASSUMED CFRP inputs of an Abaqus plate model against measured PolyMAX frequencies, with a "
@@ -52,6 +53,7 @@ class ResearchTuningPanel(QWidget):
         self.sources: Optional[rm.Sources] = None
         self.result: Optional[rft.TuningResult] = None
         self.request: Optional[rft.TuningRequest] = None
+        self.stability: Optional[dict] = None  # REAL-FIT.R2: the stability check of the shown result, when it was run
         self.plot_data = b""
         self._token = 0
         self._active: Optional[str] = None
@@ -197,6 +199,34 @@ class ResearchTuningPanel(QWidget):
             box = QVBoxLayout()
             inner.addLayout(box)
             self.result_boxes[key] = box
+        inner.addWidget(_label("4. Stability: leave one FIT record out", "sectionTitle"))
+        inner.addWidget(_label(rm.STABILITY_NOTE, "hint"))
+        row = QHBoxLayout()
+        self.stability_button = QPushButton("Check stability")
+        self.stability_button.setObjectName("tuningStability")
+        self.stability_button.setMinimumHeight(32)
+        self.stability_button.clicked.connect(lambda: self.run_stability())
+        row.addWidget(self.stability_button)
+        row.addStretch(1)
+        inner.addLayout(row)
+        self.stability_statement = _label("", "warnings")
+        self.stability_statement.setVisible(False)
+        inner.addWidget(self.stability_statement)
+        self.stability_boxes = {}
+        for key, title in (("stability_assessment", "The 10 % objective: three separate questions"),
+                           ("stability_loo", "Refits without one FIT record (changes against the full-data estimates)"),
+                           ("stability_control", "Which records control each estimate"),
+                           ("stability_influence", "Local influence d ln p / d ln f_exp (from the full fit's sensitivity matrix)"),
+                           ("stability_fixed", "Exact dependence on the assumed thickness and density")):
+            caption = _label(title, "sectionTitle")
+            caption.setVisible(False)
+            inner.addWidget(caption)
+            box = QVBoxLayout()
+            inner.addLayout(box)
+            self.stability_boxes[key] = (caption, box)
+        self.influence_note = _label("", "hint")
+        self.influence_note.setVisible(False)
+        self.stability_boxes["stability_influence"][1].addWidget(self.influence_note)
         row = QHBoxLayout()
         self.export_button = QPushButton("Export proposal (JSON)...")
         self.export_button.setObjectName("tuningExport")
@@ -328,6 +358,8 @@ class ResearchTuningPanel(QWidget):
     def _solved(self, token: int, count: int) -> None:
         if token == self._token and self._active == "fit":
             self.state.setText(f"Fitting: {count} surrogate solves...")
+        elif token == self._token and self._active == "stability":
+            self.state.setText(f"Stability check: {count} surrogate solves...")
 
     def _done(self, token: int, kind: str, value) -> None:
         if token != self._token:
@@ -344,6 +376,11 @@ class ResearchTuningPanel(QWidget):
             self.state.setText(f"Read: {len(value.records)} curve-fitted records of {value.set_title}.")
         elif kind == "fit":
             self._show_result(value)
+        elif kind == "stability":
+            if value.get("status") == rft.CANCELLED:
+                self.state.setText("Stability check cancelled. No stability result.")
+            else:
+                self._show_stability(value)
         self._refresh()
 
     def busy(self) -> bool:
@@ -358,7 +395,7 @@ class ResearchTuningPanel(QWidget):
             self._thread.join(timeout)
 
     def cancel(self) -> bool:
-        if self._active != "fit" or self._cancel is None:
+        if self._active not in ("fit", "stability") or self._cancel is None:
             return False
         self._cancel.set()
         self.state.setText("Cancelling after the current surrogate solve...")
@@ -397,6 +434,44 @@ class ResearchTuningPanel(QWidget):
         return self._start("fit", lambda cancel, solved: rft.run_tuning(sources.inputs, request, sources.fe_elastic, cancel,
                                                                          solved, sources.fe_classification))
 
+    def run_stability(self) -> bool:
+        """REAL-FIT.R2: leave each FIT record out of the shown result's own request, in the background."""
+        result, request, sources = self.result, self.request, self.sources
+        if self._active is not None or result is None or request is None or sources is None or result.status == rft.CANCELLED:
+            return False
+        self._say("")
+        self._clear_stability()
+        self.state.setText("Stability check...")
+        return self._start("stability", lambda cancel, solved: rfs.run_stability(sources.inputs, request, result, cancel,
+                                                                                 solved))
+
+    def _clear_stability(self) -> None:
+        self.stability = None
+        self.stability_statement.setText("")
+        self.stability_statement.setVisible(False)
+        self.influence_note.setVisible(False)
+        for key, (caption, _box) in self.stability_boxes.items():
+            self._table(key, None, (), (), 0)
+            caption.setVisible(False)
+
+    def _show_stability(self, stability: dict) -> None:
+        self.stability = stability
+        self.stability_statement.setText(stability["assessment"]["statement"] + " " + rft.RESULT_LABEL)
+        self.stability_statement.setVisible(True)
+        tables = {"stability_assessment": (("Question", "Verdict", "Basis"), rm.assessment_rows(stability), 2),
+                  "stability_loo": (rm.stability_headers(stability), rm.stability_rows(stability), 0),
+                  "stability_control": (rm.CONTROL_HEADERS, rm.control_rows(stability), 6),
+                  "stability_influence": (rm.influence_headers(stability), rm.influence_rows(stability), 0),
+                  "stability_fixed": (("Item", "Value"), rm.fixed_input_rows(stability), 1)}
+        for key, (headers, rows, stretch) in tables.items():
+            caption, box = self.stability_boxes[key]
+            caption.setVisible(True)
+            self._table(key, box, headers, rows, stretch)
+        influence = stability["influence"]
+        self.influence_note.setText(f"{influence['rank_note']}. {influence['share_note']}.")
+        self.influence_note.setVisible(True)
+        self.state.setText(f"Stability check done: {stability['solves']} surrogate solves.")
+
     def _say(self, text: str) -> None:
         self.message.setText(text)
         self.message.setVisible(bool(text))
@@ -408,6 +483,7 @@ class ResearchTuningPanel(QWidget):
         for key in ("estimates", "axes", "candidate", "quantities", "frequencies", "first_mode", "assumptions", "minima",
                     "diagnostics", "sensitivity", "surrogate"):
             self._table(key, None, (), (), 0)
+        self._clear_stability()
         self.results_card.setVisible(False)
         self.export_note.setText("")
 
@@ -461,7 +537,7 @@ class ResearchTuningPanel(QWidget):
                    "dat": self.sources.dat_path or "", "unv": self.sources.unv_path, "unv_sha256": self.sources.unv_sha256,
                    "modal_set": self.sources.set_title}
         try:
-            rft.write_export(rft.export_document(self.result, self.sources.inputs, sources), path)
+            rft.write_export(rft.export_document(self.result, self.sources.inputs, sources, self.stability), path)
         except OSError as error:
             self._say(f"Not exported: {error}")
             return False
@@ -475,7 +551,8 @@ class ResearchTuningPanel(QWidget):
         for widget in (self.parameterization, self.declared, self.search, self.degree):
             widget.setEnabled(not running)
         self.run_button.setEnabled(not running and self.sources is not None)
-        self.cancel_button.setEnabled(self._active == "fit")
+        self.cancel_button.setEnabled(self._active in ("fit", "stability"))
+        self.stability_button.setEnabled(not running and self.result is not None and self.result.status != rft.CANCELLED)
         self.progress.setVisible(running)
         self.export_button.setEnabled(not running and self.result is not None and self.result.status != rft.CANCELLED)
 

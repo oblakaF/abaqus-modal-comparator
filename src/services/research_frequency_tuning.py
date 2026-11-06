@@ -375,8 +375,10 @@ def _swap(names, x: np.ndarray) -> np.ndarray:
     return swapped
 
 
-def _solve(problem: _Problem, x0: np.ndarray, factor: float) -> dict:
-    lower, upper = x0 - math.log(factor), x0 + math.log(factor)
+def _solve(problem: _Problem, x0: np.ndarray, factor: float, bounds: Optional[tuple] = None) -> dict:
+    """``bounds`` (lower, upper) in ln p replaces the range x0 ÷/× factor (REAL-FIT.R2: a refit keeps the full fit's range)."""
+    lower, upper = (x0 - math.log(factor), x0 + math.log(factor)) if bounds is None else (np.asarray(bounds[0]),
+                                                                                          np.asarray(bounds[1]))
     starts_x = [x0, x0 + np.array([math.log(0.6) if n != "G12" else math.log(1.6) for n in problem.names]),
                 x0 + np.array([math.log(1.6) if n != "G12" else math.log(0.6) for n in problem.names])]
     if "E1" in problem.names:  # asymmetric starts and the exchanged start, so that a mirror minimum shows itself
@@ -678,11 +680,13 @@ def abaqus_elastic_line(inputs: AbaqusPlateInputs, candidate: Mapping[str, float
             f"{inputs.G13:.6g}, {inputs.G23:.6g}")
 
 
-def export_document(result: TuningResult, inputs: AbaqusPlateInputs, sources: Mapping[str, str]) -> dict:
+def export_document(result: TuningResult, inputs: AbaqusPlateInputs, sources: Mapping[str, str],
+                    stability: Optional[Mapping] = None) -> dict:
     """Everything needed to reproduce and review the proposal. An Abaqus *Elastic block only for an oriented candidate:
-    never when the E1/E2 axis is unresolved."""
+    never when the E1/E2 axis is unresolved. ``stability``: the REAL-FIT.R2 check of this same result, when it was run."""
     document = result.to_dict()
     document["sources"] = dict(sources)
+    document["stability"] = dict(stability) if stability else None
     document["abaqus_elastic_candidate"] = abaqus_elastic_line(inputs, result.candidate) if result.candidate else None
     document["statement"] = ("Surrogate (Kirchhoff-Ritz) research estimates. Not an FE result, not a material property and "
                              "not a calibration; an oriented Abaqus block is given only when the axes are resolved. "

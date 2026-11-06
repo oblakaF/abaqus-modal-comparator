@@ -273,6 +273,100 @@ def surrogate_rows(result: rft.TuningResult) -> tuple:
 SURROGATE_HEADERS = ("Elastic rank (by shape)", "Abaqus mode", "Abaqus (Hz)", "Ritz at INP values (Hz)", "Ritz / Abaqus − 1")
 
 
+STABILITY_NOTE = ("Each FIT record is left out once; every other record keeps its role and its declared rank (nothing is "
+                  "renumbered or rematched). Estimates are compared without an axis: E (E1 = E2) and G12, or E_stiff, "
+                  "E_soft and G12. Research only: stability is not accuracy.")
+
+
+def _signed(value) -> str:
+    return "—" if value is None else f"{value:+.2%}"
+
+
+def stability_headers(stability: dict) -> tuple:
+    names = tuple(stability["baseline"]["estimates"])
+    return (("Left out", "Rank", "EXP (Hz)") + tuple(f"{n} change" for n in names)
+            + ("FIT RMS (ln f)", "Left-out error", "Holdout RMS", "Rank / cond.", "Converged", "Bounds", "Minima"))
+
+
+def stability_rows(stability: dict) -> tuple:
+    names = tuple(stability["baseline"]["estimates"])
+    rows = []
+    for item in stability["leave_one_out"]:
+        if not item.get("done"):
+            rows.append((str(item["record"]), str(item["rank"]), f"{item['hz']:.4f}") + ("—",) * len(names)
+                        + (item.get("reason", "not done"), "—", "—", "—", "—", "—", "—"))
+            continue
+        notes = []
+        if item["mirror"]:
+            notes.append("mirror pair" + (", lowest cost exchanged (" + ", ".join(
+                f"{n} {item['lowest_cost_change'][n]:+.2%}" for n in names) + ")" if item["lowest_cost_in_other_assignment"] else ""))
+        for m in item["competing_minima"]:
+            notes.append(f"further minimum, cost × {m['cost_ratio_to_lowest']:.2f}")
+        rows.append((str(item["record"]), str(item["rank"]), f"{item['hz']:.4f}")
+                    + tuple(_signed(item["change"][n]) for n in names)
+                    + (f"{item['fit_rms_ln']:.4f}", _signed(item["left_out_residual_ln"]),
+                       "—" if item["holdout_rms_ln"] is None else f"{item['holdout_rms_ln']:.4f}",
+                       f"{item['practical_rank']} / {item['condition_number']:.3g}", "yes" if item["converged"] else "NO",
+                       ", ".join(item["active_bounds"]) or "none", "; ".join(notes) or "one"))
+    return tuple(rows)
+
+
+CONTROL_HEADERS = ("Estimate", "Full-data value (MPa)", "Largest leave-out change", "Record", "Share of squared changes",
+                   "Controlled by one record", "Strongest local influence (records)")
+
+
+def control_rows(stability: dict) -> tuple:
+    rows = []
+    for item in stability["control"]:
+        shares = stability["influence"]["squared_coefficient_shares"][item["parameter"]]
+        local = ", ".join(f"{r} ({shares[r]:.0%})" for r in item["local_order"][:3])
+        rows.append((item["parameter"], f"{stability['baseline']['estimates'][item['parameter']]:.0f}",
+                     _signed(item["largest_change"]), str(item["record"]), f"{item['share_of_squared_changes']:.0%}",
+                     "YES" if item["disproportionate"] else "no", local + (" — not determined" if item["locally_undetermined"] else "")))
+    return tuple(rows)
+
+
+def influence_headers(stability: dict) -> tuple:
+    return ("EXP record", "Leverage") + tuple(f"d ln {n} / d ln f" for n in stability["baseline"]["estimates"])
+
+
+def influence_rows(stability: dict) -> tuple:
+    names = tuple(stability["baseline"]["estimates"])
+    return tuple((str(c["record"]), f"{c['leverage']:.3f}") + tuple(f"{c[n]:+.3f}" for n in names)
+                 for c in stability["influence"]["coefficients"])
+
+
+def fixed_input_rows(stability: dict) -> tuple:
+    fixed = stability["fixed_inputs"]
+    rows = [("Relation", fixed["relation"])]
+    rows += [(key, f"{value:+g}") for key, value in fixed["exponents"].items()]
+    rows += [(f"{key}: factor for a 10 % change of the moduli", f"{lo:.4f} to {hi:.4f}")
+             for key, (lo, hi) in fixed["input_factor_for_a_10_percent_modulus_change"].items()]
+    rows.append(("Meaning of that factor", fixed["factor_note"]))
+    rows += [(key, f"{value:.4g} (independent of thickness and density)") for key, value in fixed["ratios"].items()]
+    rows += [(f"Surrogate check: {c['case']}", f"moduli × {c['moduli_factor']:.4f}; largest frequency difference "
+                                                f"{c['largest_relative_frequency_difference']:.1e}") for c in fixed["verification"]]
+    return tuple(rows)
+
+
+def assessment_rows(stability: dict) -> tuple:
+    a = stability["assessment"]
+    numerical = a["numerical_stability"]
+    rows = [("Numerical stability", numerical["verdict"], numerical["meaning"])]
+    rows += [(f"  {p['parameter']}", p["numerical_stability"],
+              f"largest change {p['largest_change_including_the_lowest_cost_minimum']:.2%} (target {a['target']:.0%})")
+             for p in numerical["parameters"]]
+    rows += [("  Caveat", "", c) for c in numerical["caveats"]]
+    fit = a["frequency_fit"]
+    rows.append(("Frequency fit", "WARNING: misfit" if fit["misfit_warning"] else "reported",
+                 f"FIT RMS {fit['fit_rms_ln']:.4f}, HOLDOUT RMS " + ("—" if fit["holdout_rms_ln"] is None else
+                                                                     f"{fit['holdout_rms_ln']:.4f}") + f" (ln f). {fit['meaning']}"))
+    accuracy = a["parameter_accuracy"]
+    rows.append(("Parameter accuracy (10 % target)", accuracy["verdict"], accuracy["reasons"][0]))
+    rows += [("", "", reason) for reason in accuracy["reasons"][1:]]
+    return tuple(rows)
+
+
 def error_plot(result: rft.TuningResult, width: int = 900, height: int = 420, scale: float = 1.0) -> Optional[bytes]:
     rows = [r for r in result.rows if r["role"] != rft.EXCLUDED and r["ln_after"] is not None]
     if not rows:

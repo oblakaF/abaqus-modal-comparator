@@ -342,7 +342,9 @@ class SeparationTests(unittest.TestCase):
                        # UNIVERSAL-REG-3: a person's confirmation; only its revalidation reaches the comparator
                        "services.confirmed_registration",
                        # REAL-FIT.R1: the research-only frequency tuning service (Ritz surrogate; no Abaqus, no workflow)
-                       "services.research_frequency_tuning"}
+                       "services.research_frequency_tuning",
+                       # REAL-FIT.R2: the stability check of a tuning result (same surrogate; no Abaqus, no workflow)
+                       "services.research_frequency_stability"}
     # NEW-GUI.6: the scientific comparator and the program's own final drawing / report owners, each only in the one
     # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
     SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
@@ -374,7 +376,7 @@ class SeparationTests(unittest.TestCase):
                          "analyze_summary.py": set(), "mac_points_panel.py": set(), "materials_workspace.py": set(),
                          "review_model.py": set(), "review_panel.py": set(),
                          "research_tuning_model.py": {"modal_data_viewer", "research_frequency_tuning"},
-                         "research_tuning_panel.py": {"research_frequency_tuning"}}
+                         "research_tuning_panel.py": {"research_frequency_stability", "research_frequency_tuning"}}
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))
