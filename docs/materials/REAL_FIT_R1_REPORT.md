@@ -211,3 +211,34 @@ Focused tests only; one process at a time, one BLAS thread. The full suite was n
   - both fits ran, in 2.6 s and 5.2 s;
   - no sideways scroll at 900 and no Russian text;
   - the sources were unchanged; no process started and nothing was written on `I:\`.
+
+## REAL-FIT.R1.F2: frequency correspondence kept and validated
+
+- **The check without the lowest record.** `_first_mode_check` now leaves out only the lowest kept record. Every other observation
+  keeps its declared surrogate rank and its role (FIT / HOLDOUT). The earlier code renumbered the ranks and shifted them by one, which
+  was right only for the default rank hypothesis. With a declared mapping it would have rematched the records.
+- **Validation before any fit.** `validate_correspondence` runs before any optimization: every FIT or HOLDOUT record needs a whole,
+  positive, unique rank of at most 60. A declared mapping that names an unknown or EXCLUDED record is refused.
+- **The Declared ranks field** gives clear English messages for bad syntax, a repeated record or a rank below 1.
+- **The page** checks the correspondence before it starts or clears anything. Roles, declared ranks and settings stay as entered.
+
+**Real-data recheck (default rank hypothesis), F1 output against F2 output for the same script:** every number is **identical**.
+- E1 = E2: E 50 005.787, G12 4 903.372.
+- E1, E2, G12: E_stiff 59 643.14, E_soft 43 592.566, G12 4 824.07.
+- FIT and HOLDOUT RMS before and after, condition numbers, and each record's residual.
+- First-mode check: −1.13 % / +9.42 % and −0.47 % / −0.50 % / +4.04 %, with ranks 2–9 kept.
+
+Under the default hypothesis the earlier renumbering happened to give the same ranks.
+
+**Tests.**
+- `test_real_fit_r1_tuning`: 27 tests, 6 of them new:
+  - a declared mapping with a skipped surrogate rank, recovered exactly and kept by the first-mode check;
+  - the default check's ranks;
+  - a partial mapping that duplicates a rank, refused before any optimizer call;
+  - unknown and EXCLUDED records and out-of-range ranks;
+  - the parser messages;
+  - the page keeping its inputs.
+- With `test_new_gui1_workspace`: 55 tests OK.
+
+**Windows GUI.** An invalid "3:4" mapping was refused with "rank 4 is assigned to records 3, 4", and the inputs and roles were kept.
+Both fits then gave the same estimates as above. No sideways scroll at 900, no Russian text, sources unchanged, no process started.

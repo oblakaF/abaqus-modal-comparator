@@ -240,6 +240,76 @@ class Tuning(unittest.TestCase):
         self.assertNotIn("services.identification_step", imported)
 
 
+class Correspondence(unittest.TestCase):
+    """REAL-FIT.R1.F2: a declared correspondence is validated before any fit and kept intact by every check."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.inputs = rft.read_inp(_files() / "plate.inp")
+        cls.spectrum = rft.Surrogate(cls.inputs, 10, 16).frequencies(42000, 42000, 6500)
+
+    def skipped_third(self):
+        """Measured records 1..9 with surrogate rank 3 not measured: record k >= 3 holds rank k + 1."""
+        records = [(1, float(self.spectrum[0])), (2, float(self.spectrum[1]))]
+        records += [(k, float(self.spectrum[k])) for k in range(3, 10)]
+        return records, {k: k + 1 for k in range(3, 10)}
+
+    def test_a_custom_mapping_is_fitted_and_kept_by_the_first_mode_check(self):
+        records, declared = self.skipped_third()
+        observations = rft.observations_by_rank(records, holdout=(9,), declared=declared)
+        self.assertEqual({o.record: o.surrogate_rank for o in observations}, {1: 1, 2: 2, **declared})
+        result = rft.run_tuning(self.inputs, rft.TuningRequest(observations, rft.TIED, rft.DECLARED, degree=10))
+        self.assertEqual(result.status, rft.SUPPORTED, result.reasons)
+        self.assertAlmostEqual(result.fitted["E1"] / 42000, 1.0, places=5)
+        check = result.first_mode_check
+        self.assertTrue(check["done"])
+        self.assertEqual((check["left_out_record"], check["left_out_rank"]), (1, 1))
+        self.assertEqual(check["ranks_kept"], {2: 2, **{k: k + 1 for k in range(3, 9)}})  # never renumbered or rematched
+        self.assertNotIn(9, check["ranks_kept"])  # HOLDOUT stays out of the fit
+        self.assertLess(check["largest_change"], 1e-4)  # exact data under the declared mapping: nothing moves
+        self.assertEqual([r["role"] for r in result.rows if r["record"] == 1], [rft.FIT])  # it stays in the main fit
+
+    def test_the_default_hypothesis_check_leaves_only_the_lowest_record_out(self):
+        records = [(k + 1, float(self.spectrum[k])) for k in range(9)]
+        result = rft.run_tuning(self.inputs, rft.TuningRequest(rft.observations_by_rank(records, holdout=(8, 9)), degree=10))
+        check = result.first_mode_check
+        self.assertEqual(check["ranks_kept"], {k: k for k in range(2, 8)})
+
+    def test_a_partial_mapping_that_duplicates_a_rank_is_refused_before_the_fit(self):
+        records = [(k + 1, float(self.spectrum[k])) for k in range(9)]
+        observations = rft.observations_by_rank(records, holdout=(9,), declared={3: 4})  # record 4 keeps rank 4 by default
+        with mock.patch.object(rft, "least_squares", side_effect=AssertionError("no fit on an invalid correspondence")):
+            with self.assertRaises(rft.TuningRefused) as caught:
+                rft.run_tuning(self.inputs, rft.TuningRequest(observations, degree=10))
+        self.assertIn("rank 4 is assigned to records 3, 4", str(caught.exception))
+
+    def test_invalid_ranks_and_unknown_records_are_refused(self):
+        records = [(k + 1, float(self.spectrum[k])) for k in range(9)]
+        with self.assertRaises(rft.TuningRefused):
+            rft.observations_by_rank(records, declared={12: 3})
+        with self.assertRaises(rft.TuningRefused):
+            rft.observations_by_rank(records, excluded=(5,), declared={5: 6})
+        for rank in (0, -2, rft.MAX_SURROGATE_RANK + 1):
+            with self.subTest(rank=rank), self.assertRaises(rft.TuningRefused) as caught:
+                rft.validate_correspondence(rft.observations_by_rank(records, declared={2: rank}) if rank > 0 else
+                                            tuple(rft.Observation(o.record, o.hz, o.role, rank if o.record == 2 else o.surrogate_rank)
+                                                  for o in rft.observations_by_rank(records)))
+            self.assertIn("record 2", str(caught.exception))
+        excluded_rank = tuple(rft.Observation(o.record, o.hz, o.role, o.surrogate_rank) for o in
+                              rft.observations_by_rank(records, excluded=(9,)))
+        rft.validate_correspondence(excluded_rank)  # an EXCLUDED record carries no rank and is not checked
+
+    def test_the_declared_text_is_parsed_with_clear_messages(self):
+        from new_gui import research_tuning_model as rm
+
+        self.assertEqual(rm.parse_declared(" 3:4, 4 : 3 "), {3: 4, 4: 3})
+        for text, part in (("3-4", "not record:rank"), ("3:4, 3:5", "more than once"), ("3:0", "a rank starts at 1"),
+                           ("a:b", "not record:rank")):
+            with self.subTest(text=text), self.assertRaises(ValueError) as caught:
+                rm.parse_declared(text)
+            self.assertIn(part, str(caught.exception))
+
+
 class Page(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -325,6 +395,20 @@ class Page(unittest.TestCase):
         self.assertNotIn("candidate", panel._tables)  # no oriented block
         self.assertIn("unresolved", panel.candidate_none.text())
         self.assertTrue(panel.run_button.isEnabled())
+
+    def test_an_invalid_correspondence_is_said_and_every_input_is_kept(self):
+        window, panel, _inputs = self.loaded([(k + 1, 20.0 * (k + 1)) for k in range(8)])
+        panel.set_role(2, rft.EXCLUDED)
+        panel.declared.setText("3:4")  # record 2 is EXCLUDED, so record 5 holds rank 4 by default: a duplicate
+        panel.search.setText("7")
+        roles = panel.roles()
+        self.assertFalse(panel.run())
+        self.assertIn("rank 4 is assigned to records 3, 5", panel.message.text())
+        self.assertFalse(panel.busy())
+        self.assertEqual((panel.declared.text(), panel.search.text(), panel.roles()), ("3:4", "7", roles))
+        panel.declared.setText("2:3")  # an EXCLUDED record has no rank
+        self.assertFalse(panel.run())
+        self.assertIn("EXCLUDED", panel.message.text())
 
     def test_a_bad_setting_is_said_and_nothing_starts(self):
         window, panel, _inputs = self.loaded([(k + 1, 20.0 * (k + 1)) for k in range(8)])

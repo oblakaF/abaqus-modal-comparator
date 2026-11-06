@@ -385,6 +385,7 @@ class ResearchTuningPanel(QWidget):
                 raise ValueError("The search range factor must exceed 1.")
             if not 4 <= request.degree <= 24:
                 raise ValueError("The Ritz basis degree must be between 4 and 24.")
+            rft.validate_correspondence(request.observations)  # R1.F2: before anything starts or is cleared
         except (ValueError, KeyError) as error:
             self._say(f"Not started: {error}")
             return False

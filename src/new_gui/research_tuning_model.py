@@ -126,10 +126,15 @@ def parse_declared(text: str) -> dict:
     for part in (p.strip() for p in str(text).split(",")):
         if not part:
             continue
-        record, rank = part.split(":")
-        mapping[int(record)] = int(rank)
-        if mapping[int(record)] < 1:
-            raise ValueError("A rank starts at 1.")
+        pieces = [piece.strip() for piece in part.split(":")]
+        if len(pieces) != 2 or not all(piece.lstrip("-").isdigit() for piece in pieces):
+            raise ValueError(f"Declared ranks: '{part}' is not record:rank with two whole numbers.")
+        record, rank = int(pieces[0]), int(pieces[1])
+        if record in mapping:
+            raise ValueError(f"Declared ranks: record {record} is given more than once.")
+        if rank < 1:
+            raise ValueError(f"Declared ranks: record {record} has rank {rank}; a rank starts at 1.")
+        mapping[record] = rank
     return mapping
 
 

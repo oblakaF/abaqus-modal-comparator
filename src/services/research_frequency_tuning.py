@@ -270,7 +270,17 @@ class TuningRequest:
 def observations_by_rank(records: Sequence[tuple], holdout: Sequence[int] = (), excluded: Sequence[int] = (),
                          declared: Optional[Mapping[int, int]] = None) -> tuple:
     """Experimental (record, Hz) as observations. Rank hypothesis: the k-th lowest kept record against surrogate rank k;
-    a declared mapping {record: rank} replaces it for the records it names."""
+    a declared mapping {record: rank} replaces it for the records it names. A mapping that names a record which is not
+    there, or not kept, is refused; whether the ranks are valid is checked by ``validate_correspondence``."""
+    known = {record for record, _hz in records}
+    unknown = sorted(set(declared or {}) - known)
+    if unknown:
+        raise TuningRefused("The declared ranks name record(s) " + ", ".join(map(str, unknown)) + " that the experimental "
+                            "set does not hold.")
+    declared_excluded = sorted(set(declared or {}) & set(excluded))
+    if declared_excluded:
+        raise TuningRefused("The declared ranks name EXCLUDED record(s) " + ", ".join(map(str, declared_excluded)) + "; "
+                            "an excluded record has no rank.")
     kept = sorted((r for r in records if r[0] not in set(excluded)), key=lambda item: item[1])
     rows = []
     for rank, (record, hz) in enumerate(kept, start=1):
@@ -278,6 +288,31 @@ def observations_by_rank(records: Sequence[tuple], holdout: Sequence[int] = (), 
         rows.append(Observation(record, float(hz), HOLDOUT if record in set(holdout) else FIT, int(target)))
     rows += [Observation(record, float(hz), EXCLUDED, 0) for record, hz in records if record in set(excluded)]
     return tuple(sorted(rows, key=lambda o: o.record))
+
+
+MAX_SURROGATE_RANK = 60  # the highest elastic rank a correspondence may name (the surrogate solves up to it plus a margin)
+
+
+def validate_correspondence(observations: Sequence[Observation], max_rank: int = MAX_SURROGATE_RANK) -> None:
+    """Every included (FIT or HOLDOUT) observation needs a whole, positive, in-range and unique surrogate rank. Raises
+    ``TuningRefused`` with every problem found; nothing is optimized on an invalid correspondence."""
+    included = [o for o in observations if o.role in (FIT, HOLDOUT)]
+    problems = []
+    for o in included:
+        if isinstance(o.surrogate_rank, bool) or not isinstance(o.surrogate_rank, int):
+            problems.append(f"record {o.record}: the rank {o.surrogate_rank!r} is not a whole number")
+        elif o.surrogate_rank < 1:
+            problems.append(f"record {o.record}: the rank {o.surrogate_rank} is not positive")
+        elif o.surrogate_rank > max_rank:
+            problems.append(f"record {o.record}: the rank {o.surrogate_rank} is above the highest allowed rank {max_rank}")
+    seen = {}
+    for o in included:
+        seen.setdefault(o.surrogate_rank, []).append(o.record)
+    for rank, records in sorted((k, v) for k, v in seen.items() if len(v) > 1 and isinstance(k, int)):
+        problems.append(f"rank {rank} is assigned to records {', '.join(map(str, records))}: each surrogate rank may "
+                        "match only one experimental record")
+    if problems:
+        raise TuningRefused("The frequency correspondence is invalid: " + "; ".join(problems) + ".")
 
 
 REFERENCE_MPA = 1000.0  # the arbitrary common modulus the data-scaled start begins from; not an INP value
@@ -447,6 +482,7 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
                progress: Optional[Callable[[int], None]] = None, fe_classification: str = "") -> TuningResult:
     """``fe_elastic``: (mode, Hz) of the elastic FE modes as classified by shape (P-2), or () when no classification exists."""
     names = PARAMETERIZATIONS[request.parameterization]
+    validate_correspondence(request.observations)
     fit_rows = request.fit_rows()
     holdout_rows = tuple(o for o in request.observations if o.role == HOLDOUT)
     if len(fit_rows) <= len(names):
@@ -589,18 +625,14 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
 
 def _first_mode_check(inputs, request, names, x, cancel) -> dict:
     """The same fit with the lowest kept experimental record left out (not removed from the result): how much the estimates
-    lean on it. Ranks are renumbered by the same hypothesis."""
+    lean on it. Only that record leaves: every other observation keeps its declared surrogate rank and its role, so the
+    correspondence is neither renumbered nor rematched (REAL-FIT.R1.F2)."""
     kept = sorted((o for o in request.observations if o.role != EXCLUDED), key=lambda o: o.hz)
     if not kept or kept[0].role != FIT:
         return {"done": False, "reason": "the lowest kept record is not a FIT record"}
     lowest = kept[0]
-    records = [(o.record, o.hz) for o in request.observations]
-    holdout = [o.record for o in request.observations if o.role == HOLDOUT]
-    excluded = [o.record for o in request.observations if o.role == EXCLUDED] + [lowest.record]
-    observations = observations_by_rank(records, holdout, excluded)
-    # the left-out record keeps its surrogate rank: the hypothesis is not renumbered around it
-    observations = tuple(Observation(o.record, o.hz, o.role, o.surrogate_rank + (1 if o.role != EXCLUDED else 0))
-                         for o in observations)
+    observations = tuple(o if o.record != lowest.record else Observation(o.record, o.hz, EXCLUDED, 0)
+                         for o in request.observations)
     fit_rows = tuple(o for o in observations if o.role == FIT)
     if len(fit_rows) <= len(names):
         return {"done": False, "reason": "too few FIT records without it"}
@@ -610,7 +642,8 @@ def _first_mode_check(inputs, request, names, x, cancel) -> dict:
     nearest = min(candidates, key=lambda m: float(np.max(np.abs(m["x"] - x))))
     singular = np.linalg.svd(problem.jacobian(nearest["x"]), compute_uv=False)
     changes = {n: float(math.exp(a - b) - 1.0) for n, a, b in zip(names, nearest["x"], x)}
-    return {"done": True, "left_out_record": lowest.record, "left_out_hz": lowest.hz,
+    return {"done": True, "left_out_record": lowest.record, "left_out_hz": lowest.hz, "left_out_rank": lowest.surrogate_rank,
+            "ranks_kept": {o.record: o.surrogate_rank for o in fit_rows},
             "values": dict(zip(names, np.exp(nearest["x"]).tolist())), "change": changes,
             "largest_change": max(abs(v) for v in changes.values()),
             "condition_number": float(singular[0] / singular[-1]) if singular[-1] > 0 else math.inf}
@@ -663,7 +696,7 @@ def write_export(document: dict, path) -> Path:
     return path
 
 
-__all__ = ["ACCURACY_STATEMENT", "ASSUMPTIONS", "AbaqusPlateInputs", "DECLARED", "FIT", "FREE", "HOLDOUT", "EXCLUDED",
+__all__ = ["MAX_SURROGATE_RANK", "validate_correspondence", "ACCURACY_STATEMENT", "ASSUMPTIONS", "AbaqusPlateInputs", "DECLARED", "FIT", "FREE", "HOLDOUT", "EXCLUDED",
            "MIRROR", "Observation", "PARAMETERIZATIONS", "RANK_ORDER", "RESULT_LABEL", "SUPPORTED", "Surrogate", "TIED",
            "TuningRefused", "TuningRequest", "TuningResult", "abaqus_elastic_line", "assumption_sensitivity",
            "bending_stiffness", "export_document", "observations_by_rank", "quantity_table", "read_dat_frequencies",
