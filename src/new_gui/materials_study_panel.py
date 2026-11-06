@@ -776,6 +776,7 @@ class MaterialsStudyPanel(QStackedWidget):
         self.mass_caption.setText("Surface mass, kg/m²" if surface else "Mass")
         self.mass_unit.setEnabled(self.backend == sm.RITZ and not surface)
         self.package_source.setEnabled(not running)
+        self.source_combo.setEnabled(not running)  # R1.F1: the source never changes under a running job
         self.package_button.setEnabled(not running and self.package_source.currentData() == sm.SELECTED)
         self.package_field.setEnabled(self.package_source.currentData() == sm.SELECTED)
         real = self.real_source
@@ -789,7 +790,7 @@ class MaterialsStudyPanel(QStackedWidget):
         self.open_button.setEnabled(not running)
         self.changed_note.setVisible(self.record is not None and form != self.record["materials"]["input"])
         self.refresh_real()
-        if problems and not running:
+        if problems and not running and not real:  # a real source shows its one message, not the hidden form's errors
             self._say("; ".join(problems))
         elif self.message.text() and self._message_is_form:
             self._say("")
@@ -797,9 +798,11 @@ class MaterialsStudyPanel(QStackedWidget):
     def _show_source_view(self, real: bool) -> None:
         """REAL-PLATE.R1.F1: with a real source only the source choice and the message stay; every synthetic input, model
         description and fitting control is hidden, never cleared, so choosing the synthetic example shows them unchanged."""
-        for widget in (self.method_caption, self.method_combo, self.method_text, self.advanced_card, self.run_button,
-                       self.cancel_button, self.run_state):
+        for widget in (self.method_caption, self.method_combo, self.method_text, self.advanced_card, self.run_button):
             widget.setVisible(not real)
+        running = self._active == RUNNING  # a running calculation always keeps its Cancel and its progress line
+        for widget in (self.cancel_button, self.run_state):
+            widget.setVisible(not real or running)
         self.geometry_card.setVisible(not real and self.backend == sm.RITZ)
 
     _message_is_form = False

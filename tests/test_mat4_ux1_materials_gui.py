@@ -918,6 +918,85 @@ class RealSourceView(_Tabs):
         window.close()
 
 
+class SourceSwitchGuards(_Tabs):
+    """REAL-PLATE.R1.F1 (final): the source cannot change under a running job, and a real source hides stale form errors."""
+
+    def test_a_running_calculation_keeps_its_cancel_whatever_the_source(self):
+        window, workspace, panel = self.tabs((900, 700))
+        gate = mat3._Gate()
+
+        def held_or_real(declaration, **options):  # the real-data gate's own call (no cancel) goes to the workflow
+            return gate(declaration, **options) if "cancel" in options else gate.real(declaration, **options)
+
+        patcher = mock.patch.object(sm, "run_plate_inverse_study", held_or_real)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(gate.go.set)
+        self.assertTrue(panel.source_combo.isEnabled())
+        panel.run_button.click()
+        self.assertTrue(gate.reached.wait(20.0))
+        self.app.processEvents()
+        self.assertEqual(panel._active, sp.RUNNING)
+        self.assertFalse(panel.source_combo.isEnabled())  # the user cannot switch it now
+        panel.source_combo.setCurrentIndex(panel.source_combo.findData(sm.REAL_SOURCE))  # nor can a programmatic change hide Cancel
+        self.app.processEvents()
+        self.assertTrue(panel.cancel_button.isVisible() and panel.cancel_button.isEnabled())
+        self.assertTrue(panel.run_state.isVisible())
+        self.assertTrue(panel.cancel())
+        gate.go.set()
+        self.wait(panel)
+        self.app.processEvents()
+        self.assertIsNone(panel.record)
+        self.assertEqual(panel.badge.text(), "CANCELLED")
+        self.assertTrue(panel.source_combo.isEnabled())  # free again once the job has ended
+        self.assertFalse(panel.cancel_button.isVisible())  # the real view, now that nothing runs
+        panel.source_combo.setCurrentIndex(panel.source_combo.findData(sm.SYNTHETIC_SOURCE))
+        self.app.processEvents()
+        self.assertTrue(panel.run_button.isVisible() and panel.run_button.isEnabled())
+        window.close()
+
+    def test_the_source_is_locked_during_every_background_job(self):
+        window, workspace, panel = self.tabs()
+        for kind in (sp.PREPARING, "package", "open", "save"):
+            with self.subTest(job=kind):
+                panel._active = kind
+                panel._refresh()
+                self.assertFalse(panel.source_combo.isEnabled())
+                panel._active = None
+                panel._refresh()
+                self.assertTrue(panel.source_combo.isEnabled())
+        window.close()
+
+    def test_a_real_source_hides_stale_form_errors_and_synthetic_restores_them(self):
+        window, workspace, panel = self.tabs((900, 700))
+        panel.solves_field.setText("many")
+        self.app.processEvents()
+        self.assertTrue(panel.message.isVisible())
+        self.assertIn("Solve limit", panel.message.text())
+        panel.source_combo.setCurrentIndex(panel.source_combo.findData(sm.REAL_SOURCE))
+        self.app.processEvents()
+        self.assertFalse(panel.message.isVisible())
+        self.assertNotIn("Solve limit", panel.message.text())
+        self.assertTrue(panel.blocked.isVisible())
+        self.assertEqual(panel.blocked.text(), sp.REAL_VIEW_TEXT)
+        panel.note_field.setText("changed while hidden")  # a hidden field changing does not bring the error back
+        self.app.processEvents()
+        self.assertFalse(panel.message.isVisible())
+        self.assertFalse(panel.run())
+        self.assertIn("NOT_AUTHORIZED", panel.message.text())  # the workflow's refusal of a direct call is still said
+        panel.source_combo.setCurrentIndex(panel.source_combo.findData(sm.SYNTHETIC_SOURCE))
+        self.app.processEvents()
+        self.assertEqual(panel.solves_field.text(), "many")  # nothing was cleared
+        self.assertTrue(panel.message.isVisible())
+        self.assertIn("Solve limit", panel.message.text())
+        self.assertFalse(panel.run_button.isEnabled())
+        panel.solves_field.setText("900")
+        self.app.processEvents()
+        self.assertFalse(panel.message.isVisible())
+        self.assertTrue(panel.run_button.isEnabled())
+        window.close()
+
+
 class Boundaries(unittest.TestCase):
     def test_no_mathematical_logic_entered_the_widgets(self):
         root = Path(__file__).resolve().parents[1] / "src" / "new_gui"
