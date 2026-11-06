@@ -340,7 +340,9 @@ class SeparationTests(unittest.TestCase):
                        # UNIVERSAL-REG-1: the diagnostic evidence check (no FrozenRegistration, no comparator)
                        "services.generic_registration",
                        # UNIVERSAL-REG-3: a person's confirmation; only its revalidation reaches the comparator
-                       "services.confirmed_registration"}
+                       "services.confirmed_registration",
+                       # REAL-FIT.R1: the research-only frequency tuning service (Ritz surrogate; no Abaqus, no workflow)
+                       "services.research_frequency_tuning"}
     # NEW-GUI.6: the scientific comparator and the program's own final drawing / report owners, each only in the one
     # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
     SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
@@ -360,7 +362,9 @@ class SeparationTests(unittest.TestCase):
                                                        "services.plate_forward_adapter",
                                                        "services.plate_material_workflow",
                                                        "services.plate_ritz_forward"},
-                          "materials_study_panel.py": {"domain.plate_material_problem"}}
+                          "materials_study_panel.py": {"domain.plate_material_problem"},
+                          # REAL-FIT.R1: the research tuning page draws its own result
+                          "research_tuning_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure", "numpy"}}
     # "from services import x" passes the "services" entry above whatever x is, so the modules added since the list was
     # last reviewed have the exact services they may take from that package. Every module not listed takes none new.
     REVIEWED_SERVICES = {"mac_points_model.py": {"analysis_project"},
@@ -368,7 +372,9 @@ class SeparationTests(unittest.TestCase):
                          "materials_study_panel.py": {"analysis_project", "materials_project"},
                          "materials_workspace_model.py": {"odb_import_service"},
                          "analyze_summary.py": set(), "mac_points_panel.py": set(), "materials_workspace.py": set(),
-                         "review_model.py": set(), "review_panel.py": set()}
+                         "review_model.py": set(), "review_panel.py": set(),
+                         "research_tuning_model.py": {"research_frequency_tuning"},
+                         "research_tuning_panel.py": {"research_frequency_tuning"}}
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))
@@ -392,7 +398,8 @@ class SeparationTests(unittest.TestCase):
                                                    "registration_check_model.py",
                                                    "registration_check_panel.py", "registration_dialog.py",
                                                    "report_export.py", "research_results_model.py",
-                                                   "research_results_panel.py", "review_model.py", "review_panel.py",
+                                                   "research_results_panel.py", "research_tuning_model.py",
+                                                   "research_tuning_panel.py", "review_model.py", "review_panel.py",
                                                    "shape_model.py", "shape_panel.py",
                                                    "theme.py", "window.py", "workspace_state.py"])
         stdlib = set(sys.stdlib_module_names) | {"__future__"}

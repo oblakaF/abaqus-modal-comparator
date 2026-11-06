@@ -31,7 +31,8 @@ FORBIDDEN = re.compile(r"SP-?\d|\bM\d+\b|PLATE|[Pp]late|[Ss]pecimen|NEW-GUI|\bRC
 REUSED = ("Physical registration reused by FE geometry identity (X): SP-13 fixture-sp13, registration abc (frozen "
           "mapping). archived sensitivities apply only if 11. Scaling verifies this ODB.")
 SIZES = ((900, 680), (1366, 768))
-ALLOWED = re.compile(r"Physically validated archived evidence|Single-plate model calibration|Load the specimen FE model")  # GUI-UX-R1
+ALLOWED = re.compile(r"Physically validated archived evidence|Single-plate model calibration|Load the specimen FE model"  # GUI-UX-R1
+                     r"|Research Tuning|" + re.escape(pw.TUNING_SUBTITLE))  # REAL-FIT.R1: the owner-specified research page
 
 
 def shown_text(window) -> list:
@@ -42,8 +43,9 @@ def shown_text(window) -> list:
         if action.menu() is not None:
             texts += [item.text() for item in action.menu().actions()]
     study = window.materials_workspace.study  # MAT-3: its owner-specified section names the methods and their scope
+    tuning = window.research_tuning  # REAL-FIT.R1: the owner-specified research page states what it is
     for widget in window.findChildren(QWidget):
-        if widget is study or study.isAncestorOf(widget):
+        if widget is study or study.isAncestorOf(widget) or widget is tuning or tuning.isAncestorOf(widget):
             continue
         texts.append(widget.toolTip())
         if isinstance(widget, (QLabel, QAbstractButton)):
@@ -87,8 +89,8 @@ class NavigationTests(_WindowCase):
     def test_public_navigation_is_the_four_workflow_pages_only(self):
         window = self.window()
         self.assertEqual([b.text() for b in window.sidebar.findChildren(QPushButton)],
-                         ["Analyze", "Review", "MAC / Points", "Materials"])
-        self.assertEqual(window.stack.count(), 4)
+                         ["Analyze", "Review", "MAC / Points", "Materials", "Research Tuning"])  # REAL-FIT.R1
+        self.assertEqual(window.stack.count(), 5)
         self.assertEqual(window.stack.currentIndex(), pw.ANALYZE_PAGE)
 
     def test_the_menus_hold_no_earlier_page_or_shortcut(self):

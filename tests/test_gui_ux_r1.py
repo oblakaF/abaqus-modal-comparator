@@ -368,7 +368,7 @@ class NavigationTests(_Flow):
     def test_four_pages_and_review_after_an_analysis(self):
         window = self.window()
         self.assertEqual([b.text() for b in window.sidebar.findChildren(QPushButton)],
-                         ["Analyze", "Review", "MAC / Points", "Materials"])
+                         ["Analyze", "Review", "MAC / Points", "Materials", "Research Tuning"])
         self.assertEqual(window.stack.currentIndex(), pw.ANALYZE_PAGE)
         _window, panel = self.analysed()
         self.assertEqual(_window.stack.currentIndex(), pw.REVIEW_PAGE)

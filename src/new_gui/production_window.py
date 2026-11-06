@@ -22,12 +22,15 @@ from new_gui.analyze_panel import (AnalyzePanel, CLOSE_PROJECT, OPEN_PROJECT, RU
 from new_gui.mac_points_panel import MacPointsPanel
 from new_gui.materials_status_panel import MaterialsStatusPanel, SUBTITLE as MATERIALS_SUBTITLE
 from new_gui.materials_workspace import MaterialsWorkspace
+from new_gui.research_tuning_panel import ResearchTuningPanel
 from new_gui.review_panel import ReviewPanel
 from services import analysis_project as ap
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
-PAGES = ("Analyze", "Review", "MAC / Points", "Materials")
-ANALYZE_PAGE, REVIEW_PAGE, MAC_PAGE, MATERIALS_PAGE = 0, 1, 2, 3
+PAGES = ("Analyze", "Review", "MAC / Points", "Materials", "Research Tuning")
+ANALYZE_PAGE, REVIEW_PAGE, MAC_PAGE, MATERIALS_PAGE, TUNING_PAGE = 0, 1, 2, 3, 4
+TUNING_SUBTITLE = ("Research only: tune the assumed CFRP inputs of an Abaqus plate model against measured frequencies with a "
+                   "plate surrogate. No Abaqus run; the result is not a material property.")
 MAC_SUBTITLE = "Mode pairs and MAC, what they rest on, and why they may be missing. Nothing here is computed from a manual choice."
 MATERIALS_PAGE_SUBTITLE = "Synthetic test of the two model methods, and a read-only view of ODB and UNV/UFF files. No material value is issued."
 ABOUT = ("Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze. Mode pairs and MAC appear only "
@@ -82,6 +85,7 @@ class ProductionWindow(QMainWindow):
         self.review = ReviewPanel(self.analyze)
         self.mac_points = MacPointsPanel(self.analyze)
         self.materials_workspace = MaterialsWorkspace(self.analyze, self.materials)
+        self.research_tuning = ResearchTuningPanel()
         self.analyze.route_project = self._route_project
         central = QWidget()
         root = QHBoxLayout(central)
@@ -99,6 +103,7 @@ class ProductionWindow(QMainWindow):
         self.stack.addWidget(review)
         self.stack.addWidget(_page(PAGES[MAC_PAGE], MAC_SUBTITLE, self.mac_points))
         self.stack.addWidget(_page(PAGES[MATERIALS_PAGE], MATERIALS_PAGE_SUBTITLE, self.materials_workspace, fill=True))
+        self.stack.addWidget(_page(PAGES[TUNING_PAGE], TUNING_SUBTITLE, self.research_tuning))
         root.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._build_menu()
@@ -229,8 +234,9 @@ class ProductionWindow(QMainWindow):
         self.analyze.shutdown()  # the running step, its owned Abaqus process and its drawings
         self.mac_points.shutdown()
         self.materials_workspace.shutdown()
+        self.research_tuning.shutdown()
         QApplication.instance().removeEventFilter(self.wheel_guard)
         super().closeEvent(event)
 
 
-__all__ = ["ANALYZE_PAGE", "MAC_PAGE", "MATERIALS_PAGE", "PAGES", "ProductionWindow", "REVIEW_PAGE"]
+__all__ = ["ANALYZE_PAGE", "MAC_PAGE", "MATERIALS_PAGE", "PAGES", "ProductionWindow", "REVIEW_PAGE", "TUNING_PAGE"]
