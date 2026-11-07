@@ -128,7 +128,7 @@ These are outside Git, in `D:\git\abaqus-modal-comparator-work\runs\real_fit_r4_
   - writes only new files (exclusive create), never into the source folder, and fails if any check fails;
   - starts no process and has no Abaqus or matrix-service import.
 - **Untouched:** no existing tuning, stability, Auto-ID, evidence or GUI code changed, and there are no `install_*` layers.
-- **`tests/test_research_fe_trial_preflight.py` (new, 9 tests):**
+- **`tests/test_research_fe_trial_preflight.py` (new, 10 tests since F1):**
   - both minima are transferred exactly;
   - non-target constants are kept;
   - the structure is unchanged and the diff is one line;
@@ -137,13 +137,14 @@ These are outside Git, in `D:\git\abaqus-modal-comparator-work\runs\real_fit_r4_
   - unsupported material definitions are refused (7 cases);
   - structural tampering fails the checks (6 cases plus the wrong minimum);
   - the axes are not established for a rotated instance or an explicit orientation;
-  - an audit hook confirms that no process starts.
+  - no process starts during a preparation: a scoped guard (see the F1 correction below) refuses every process-launch
+    entry point, and a second test shows that the guard catches a launch and restores everything.
 
 ## Tests
 
 | Command | Result |
 |---|---|
-| `python -m unittest tests.test_research_fe_trial_preflight` | 9 tests, OK |
+| `python -m unittest tests.test_research_fe_trial_preflight` | 10 tests, OK (after F1) |
 | `python -m unittest tests.test_new_gui1_workspace` (import boundary) | 28 tests, OK |
 | `python -m unittest tests.test_real_fit_r1_tuning` (tuning reader and solver, reused) | 27 tests, OK |
 | Full suite | NOT_RUN (not authorised) |
@@ -166,5 +167,34 @@ These are outside Git, in `D:\git\abaqus-modal-comparator-work\runs\real_fit_r4_
    - ν12 = 0.05, the thickness and the density remain assumptions. The moduli scale as ρ·t⁻² with them (REAL-FIT.R2).
 5. **The A/B axis ambiguity stays open** whatever the FE result. Choosing between A and B by FE frequency fit would be the
    correspondence/orientation optimisation this task excludes; the physical orientation of the test plate is needed.
+
+## Correction REAL-FIT.R4.F1: test isolation
+
+The first version of `test_preparation_cannot_launch_a_process` installed a permanent `sys.addaudithook` in the shared unittest
+process. Audit hooks cannot be removed, so it stayed active for every later test and during interpreter finalisation.
+
+It is replaced by `launch_guard()`, an `ExitStack` of `unittest.mock.patch.object` patches that exist only inside one `with` block.
+Each patch raises on any call, and the following entry points are patched where they exist on the platform:
+
+- `subprocess.Popen` (behind `run`, `call` and `check_output`);
+- `asyncio.create_subprocess_exec` and `create_subprocess_shell`;
+- `os.system`, `popen`, `startfile`, `posix_spawn*`, `fork` and `forkpty`;
+- every `os.spawn*` and `os.exec*`;
+- the low-level `_winapi.CreateProcess` (Windows) or `_posixsubprocess.fork_exec` (POSIX).
+
+The new test `test_the_guard_catches_a_launch_and_leaves_nothing_behind` shows three things:
+- `subprocess.run` and `os.system` are refused before any process is created;
+- every original attribute is identical after the block;
+- `subprocess.Popen` is the original.
+
+The service, the generated decks and the manifest are unchanged.
+
+**Limitation:** patching replaces names that are looked up at call time. A reference bound before the block, for example
+`from subprocess import Popen` imported earlier, or a direct native call through `ctypes`, would bypass the guard. Three things
+cover that gap:
+- the source check, which finds no `subprocess`, `os.system`, `Popen`, `startfile`, `spawn` or Abaqus/matrix-service reference in the
+  service;
+- the patched low-level `_winapi.CreateProcess`, through which every `subprocess` launch on Windows passes;
+- the real-data run, which was audited for process events (none).
 
 Abaqus was not launched. Static preflight is not FE agreement, and nothing here demonstrates the 10 % engineering-accuracy objective.

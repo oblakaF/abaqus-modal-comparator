@@ -1,12 +1,25 @@
 """REAL-FIT.R4: static preparation of the two Abaqus S4R trial decks from the Ritz research minima."""
 
+import asyncio
+import contextlib
 import copy
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+
+try:  # the Windows process-creation primitive under subprocess and multiprocessing
+    import _winapi
+except ImportError:  # pragma: no cover - not Windows
+    _winapi = None
+try:
+    import _posixsubprocess
+except ImportError:  # Windows
+    _posixsubprocess = None
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -16,6 +29,15 @@ from services import research_frequency_tuning as rft  # noqa: E402
 A = {"E1": 59643.140320162354, "E2": 43592.56647783119, "G12": 4824.07010224442}
 B = {"E1": 44170.77433673189, "E2": 58724.14887983508, "G12": 4817.417308245888}
 COSTS = (0.0008452616410310549, 0.0008576605619306323)
+ORIGINAL_POPEN = subprocess.Popen
+# Process-launch entry points patched only for the duration of one preparation (absent names are skipped).
+LAUNCH_ENTRY_POINTS = (
+    [(subprocess, "Popen"), (asyncio, "create_subprocess_exec"), (asyncio, "create_subprocess_shell")]
+    + [(os, n) for n in ("system", "popen", "startfile", "posix_spawn", "posix_spawnp", "fork", "forkpty",
+                         "spawnl", "spawnle", "spawnlp", "spawnlpe", "spawnv", "spawnve", "spawnvp", "spawnvpe",
+                         "execl", "execle", "execlp", "execlpe", "execv", "execve", "execvp", "execvpe")]
+    + ([(_winapi, "CreateProcess")] if _winapi else [])
+    + ([(_posixsubprocess, "fork_exec")] if _posixsubprocess else []))
 ELASTIC = "*Elastic, type=ENGINEERING CONSTANTS\n56000.,56000., 8500.,  0.05,   0.3,   0.3, 5000., 3000.\n 3000.,\n"
 
 
@@ -193,25 +215,43 @@ class Refusals(unittest.TestCase):
         self.assertEqual((flipped["normals_minus_z"], flipped["status"]), (4, "ESTABLISHED_FROM_DECK_AND_ABAQUS_CONVENTION"))
 
 
+@contextlib.contextmanager
+def launch_guard():
+    """Refuse every process-launch entry point for the duration of the block only; all are restored on exit."""
+    calls = []
+    with contextlib.ExitStack() as stack:
+        for module, name in LAUNCH_ENTRY_POINTS:
+            if hasattr(module, name):
+                def refuse(*_args, _name=f"{module.__name__}.{name}", **_kwargs):
+                    calls.append(_name)
+                    raise AssertionError(f"{_name} called during preflight")
+                stack.enter_context(mock.patch.object(module, name, refuse))
+        yield calls
+
+
 class NoAbaqus(unittest.TestCase):
     def test_preparation_cannot_launch_a_process(self):
         source = Path(pf.__file__).read_text(encoding="utf-8")
         for word in ("subprocess", "os.system", "Popen", "startfile", "spawn", "run_abaqus", "matrix_model_service"):
             self.assertNotIn(word, source)
-        events = []
-
-        def hook(event, _args):
-            if event in ("subprocess.Popen", "os.system", "os.startfile", "os.exec") or event.startswith("os.spawn"):
-                events.append(event)
-
-        sys.addaudithook(hook)
         files = Files()
         self.addCleanup(files.close)
-        manifest = pf.prepare(files.export, files.inp, files.out)
-        self.assertEqual(events, [])
+        with launch_guard() as calls:
+            manifest = pf.prepare(files.export, files.inp, files.out)
+        self.assertEqual(calls, [])
         self.assertEqual(manifest["abaqus"], "NOT_RUN")
         self.assertIn("NOT_RUN_IN_ABAQUS", manifest["label"])
 
+    def test_the_guard_catches_a_launch_and_leaves_nothing_behind(self):
+        originals = {(m.__name__, n): getattr(m, n) for m, n in LAUNCH_ENTRY_POINTS if hasattr(m, n)}
+        with launch_guard() as calls:
+            with self.assertRaises(AssertionError):
+                subprocess.run([sys.executable, "-c", "pass"])  # refused before any process is created
+            with self.assertRaises(AssertionError):
+                os.system("exit 0")
+        self.assertEqual(calls, ["subprocess.Popen", "os.system"])
+        self.assertEqual(originals, {(m.__name__, n): getattr(m, n) for m, n in LAUNCH_ENTRY_POINTS if hasattr(m, n)})
+        self.assertIs(subprocess.Popen, ORIGINAL_POPEN)
 
 if __name__ == "__main__":
     unittest.main()
