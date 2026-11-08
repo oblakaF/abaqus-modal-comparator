@@ -166,7 +166,9 @@ class LayoutTests(_WindowCase):
         self.assertEqual(panel.state, base.BLOCKED)
         self.assertFalse(panel.launcher_button.isHidden())
         self.assertFalse(panel.folder_button.isHidden())
+        self.assertTrue(panel.advanced_toggle.isChecked())  # ABM-UX2: the needed choice opens by itself
         self.app.processEvents()
+        self.assertTrue(panel.launcher_button.isVisible() and panel.folder_button.isVisible())
         self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0)
 
     def test_two_inputs_and_one_primary_button(self):
@@ -175,9 +177,35 @@ class LayoutTests(_WindowCase):
         self.assertEqual(set(panel.fields), {FE, EXPERIMENTAL})
         primary = [b for b in panel.findChildren(QPushButton) if b.objectName() == "primary" and b.isVisibleTo(panel)]
         self.assertEqual(primary, [panel.analyze_button])
-        for hidden in (panel.cancel_button, panel.launcher_button, panel.folder_button, panel.progress, panel.log,
-                       panel.log_button):
+        for hidden in (panel.cancel_button, panel.advanced, panel.progress, panel.log, panel.log_button):
             self.assertTrue(hidden.isHidden())
+        self.assertFalse(panel.launcher_button.isVisible() or panel.folder_button.isVisible())  # in the closed Advanced
+
+    def test_the_main_view_is_choose_choose_analyze_with_one_collapsed_advanced(self):
+        """ABM-UX2: no project toolbar on the page (the File menu has it); technical choices only in Advanced."""
+        window = self.window((900, 680))
+        panel = window.analyze
+        self.app.processEvents()
+        names = [b.text() for b in panel.findChildren(QPushButton) if b.isVisibleTo(panel)]
+        self.assertEqual(names, ["Choose file...", "Choose file...", "Analyze", "Advanced"])
+        tops = [w.mapTo(panel, w.rect().topLeft()).y() for w in (panel.fields[FE], panel.fields[EXPERIMENTAL],
+                                                                  panel.analyze_button, panel.advanced_toggle)]
+        self.assertEqual(tops, sorted(tops))
+        texts = [l.text() for l in panel.findChildren(QLabel) if l.isVisibleTo(panel) and l.text()]
+        self.assertFalse(any("FE modes 1-20" in t for t in texts))  # the scope note sits in Advanced
+        panel.advanced_toggle.setChecked(True)
+        self.app.processEvents()
+        self.assertEqual(panel.advanced_toggle.text(), "Hide advanced")
+        self.assertTrue(panel.launcher_button.isVisible() and panel.folder_button.isVisible())
+        shown = " ".join(l.text() for l in panel.advanced.findChildren(QLabel))
+        self.assertIn("FE modes 1-20", shown)
+        self.assertIn("Abaqus launcher: found automatically", shown)
+        self.assertIn("Extraction folder: beside the ODB", shown)
+        self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0)
+        panel.advanced_toggle.setChecked(False)
+        self.assertTrue(panel.advanced.isHidden())
+        menu = [action.text() for action in window.menuBar().actions()[0].menu().actions()]
+        self.assertLessEqual({"Open Project...", "Save Project", "Save Project As..."}, set(menu))
 
     def test_the_tables_are_tabs_and_a_row_still_shows_its_shapes(self):
         panel = self.analysed(self.window())

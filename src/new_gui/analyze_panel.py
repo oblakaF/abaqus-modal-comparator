@@ -60,6 +60,7 @@ SIDE_BY_SIDE_WIDTH = 600  # below this page width the two shapes are stacked
 TABLE_HEIGHT = 250  # a long table scrolls, so that the shapes stay near
 SHOW_DETAILS, HIDE_DETAILS = "Show details", "Hide details"
 SHOW_LOG, HIDE_LOG = "Show log", "Hide log"
+SHOW_ADVANCED, HIDE_ADVANCED = "Advanced", "Hide advanced"
 SET_UP_REGISTRATION = "Set up registration..."
 PROPOSED_TEXT = "Registration setup: the geometry checks passed. Diagnostic only: not applied, so no MAC and no mode pairs."
 REFUSED_TEXT = "Registration setup: the evidence does not establish a registration."
@@ -77,7 +78,7 @@ TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "nearest": "Nearest frequency
 BADGE_STATE = {cm.PAIRS_FOUND: "read"}  # any other status is not a verified pairing; a failed check is "blocked"
 _FIND, _EXTRACT, _READ, _ANALYSE, _CONFIRMATION = "find", "extract", "read", "analyse", "confirmation"
 _SAVE, _OPEN, _CHECK = "save", "open", "check"
-PROJECT_ROW_MARGIN = 80  # the card's margins, the spacing and a reserve: the row's width follows the platform's font
+ADVANCED_ROW_MARGIN = 80  # the card's margins, the spacing and a reserve: the row's width follows the platform's font
 OPEN_PROJECT, SAVE_PROJECT, SAVE_PROJECT_AS = "Open Project...", "Save Project", "Save Project As..."
 CHECK_SOURCES, CLOSE_PROJECT = "Check source files", "Close Project"
 PROJECT_FILTER = f"Modal Comparator project (*{ap.SUFFIX})"
@@ -295,22 +296,8 @@ class AnalyzePanel(QWidget):
         return box, layout
 
     def _build_inputs(self) -> QFrame:
+        """Choose FE, choose EXP, Analyze. Projects are in the File menu; the technical choices in a collapsed Advanced."""
         card, inner = _card()
-        self.project_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)
-        project_row = self.project_row
-        self.open_project_button = QPushButton(OPEN_PROJECT)
-        self.open_project_button.setObjectName("projectOpen")
-        self.open_project_button.clicked.connect(lambda: self.open_project())
-        self.save_project_button = QPushButton(SAVE_PROJECT)
-        self.save_project_button.setObjectName("projectSave")
-        self.save_project_button.clicked.connect(lambda: self.save_project())
-        self.save_as_button = QPushButton(SAVE_PROJECT_AS)
-        self.save_as_button.setObjectName("projectSaveAs")
-        self.save_as_button.clicked.connect(lambda: self.save_project_as())
-        for button in (self.open_project_button, self.save_project_button, self.save_as_button):
-            project_row.addWidget(button)
-        project_row.addStretch(1)
-        inner.addLayout(project_row)
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(4)
@@ -330,28 +317,6 @@ class AnalyzePanel(QWidget):
             grid.addWidget(button, 2 * row + 1, 1)
             self.fields[kind], self.choose_buttons[kind] = field, button
         inner.addLayout(grid)
-        inner.addWidget(_label(SCOPE_TEXT, "hint"))
-        self.file_error = _label("", "error")
-        inner.addWidget(self.file_error)
-        row = QHBoxLayout()
-        self.analyze_button = QPushButton(ANALYZE)
-        self.analyze_button.setObjectName("primary")
-        self.analyze_button.clicked.connect(self.analyze)
-        row.addWidget(self.analyze_button)
-        self.cancel_button = QPushButton(CANCEL)
-        self.cancel_button.setObjectName("analyzeCancel")
-        self.cancel_button.clicked.connect(self.cancel)
-        row.addWidget(self.cancel_button)
-        row.addStretch(1)
-        inner.addLayout(row)
-        self.launcher_button = QPushButton("Choose Abaqus launcher...")
-        self.launcher_button.setObjectName("analyzeLauncher")
-        self.launcher_button.clicked.connect(lambda: self.choose_launcher())
-        inner.addWidget(self.launcher_button, 0, Qt.AlignmentFlag.AlignLeft)
-        self.folder_button = QPushButton("Choose extraction folder...")
-        self.folder_button.setObjectName("analyzeFolder")
-        self.folder_button.clicked.connect(lambda: self.choose_folder())
-        inner.addWidget(self.folder_button, 0, Qt.AlignmentFlag.AlignLeft)
         self.set_row = QWidget()
         set_layout = QHBoxLayout(self.set_row)
         set_layout.setContentsMargins(0, 0, 0, 0)
@@ -364,6 +329,22 @@ class AnalyzePanel(QWidget):
         self.set_combo.activated.connect(self._set_activated)
         set_layout.addWidget(self.set_combo, 1)
         inner.addWidget(self.set_row)
+        self.file_error = _label("", "error")
+        inner.addWidget(self.file_error)
+        row = QHBoxLayout()
+        self.analyze_button = QPushButton(ANALYZE)
+        self.analyze_button.setObjectName("primary")
+        self.analyze_button.setMinimumHeight(36)
+        self.analyze_button.setMinimumWidth(140)
+        self.analyze_button.clicked.connect(self.analyze)
+        row.addWidget(self.analyze_button)
+        self.cancel_button = QPushButton(CANCEL)
+        self.cancel_button.setObjectName("analyzeCancel")
+        self.cancel_button.setMinimumHeight(36)
+        self.cancel_button.clicked.connect(self.cancel)
+        row.addWidget(self.cancel_button)
+        row.addStretch(1)
+        inner.addLayout(row)
         self.progress = QProgressBar()
         self.progress.setObjectName("analyzeProgress")
         self.progress.setRange(0, 0)  # the steps report no fraction: it says only that the work goes on
@@ -384,7 +365,42 @@ class AnalyzePanel(QWidget):
         self.log.setMaximumBlockCount(200)
         self.log.setFixedHeight(90)
         inner.addWidget(self.log)
+        self.advanced_toggle = QPushButton(SHOW_ADVANCED)
+        self.advanced_toggle.setObjectName("detailsToggle")
+        self.advanced_toggle.setCheckable(True)
+        self.advanced_toggle.toggled.connect(self._advanced_toggled)
+        inner.addWidget(self.advanced_toggle, 0, Qt.AlignmentFlag.AlignLeft)
+        self.advanced = QWidget()
+        self.advanced.setObjectName("analyzeAdvanced")
+        advanced = QVBoxLayout(self.advanced)
+        advanced.setContentsMargins(0, 0, 0, 0)
+        advanced.setSpacing(6)
+        advanced.addWidget(_label(SCOPE_TEXT, "hint"))
+        self.advanced_state = _label("", "hint")
+        advanced.addWidget(self.advanced_state)
+        self.advanced_buttons = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self.launcher_button = QPushButton("Choose Abaqus launcher...")
+        self.launcher_button.setObjectName("analyzeLauncher")
+        self.launcher_button.clicked.connect(lambda: self.choose_launcher())
+        self.advanced_buttons.addWidget(self.launcher_button)
+        self.folder_button = QPushButton("Choose extraction folder...")
+        self.folder_button.setObjectName("analyzeFolder")
+        self.folder_button.clicked.connect(lambda: self.choose_folder())
+        self.advanced_buttons.addWidget(self.folder_button)
+        self.advanced_buttons.addStretch(1)
+        advanced.addLayout(self.advanced_buttons)
+        self.advanced.setVisible(False)
+        inner.addWidget(self.advanced)
         return card
+
+    def _advanced_toggled(self, shown: bool) -> None:
+        self.advanced_toggle.setText(HIDE_ADVANCED if shown else SHOW_ADVANCED)
+        self.advanced.setVisible(shown)
+
+    def _advanced_text(self) -> str:
+        launcher = self.launcher or "found automatically when Abaqus is needed"
+        folder = str(self.folder) if self.folder else "beside the ODB"
+        return f"Abaqus launcher: {launcher}. Extraction folder: {folder}."
 
     # ---------------------------------------------------------------------------------------------- dialogs
 
@@ -859,9 +875,6 @@ class AnalyzePanel(QWidget):
         check = self.source_check
         allowed = self.snapshot is None or (check is not None and check.hashed and check.can_analyze)
         self.analyze_button.setEnabled(ready and not running and allowed)
-        self.open_project_button.setEnabled(not running)
-        self.save_project_button.setEnabled(self.can_save())
-        self.save_as_button.setEnabled(self.can_save())
         if self.check_button is not None:
             self.check_button.setEnabled(not running)
         self.cancel_button.setVisible(running)
@@ -876,9 +889,12 @@ class AnalyzePanel(QWidget):
         has_log = (running or blocked) and bool(self.log.toPlainText())
         self.log_button.setVisible(has_log)
         self.log.setVisible(has_log and self.log_button.isChecked())
-        self.launcher_button.setVisible(blocked and self.plan is not None and not self.plan.ready)
+        self.launcher_button.setEnabled(not running)
+        self.folder_button.setEnabled(not running)
+        self.advanced_state.setText(self._advanced_text())
         package_lost = self.snapshot is not None and check is not None and check.hashed and check.manifest is None
-        self.folder_button.setVisible(blocked or package_lost)
+        if (blocked or package_lost) and not self.advanced_toggle.isChecked():
+            self.advanced_toggle.setChecked(True)  # the launcher or folder choice is what the message asks for
         self.changed.emit()
 
     def _show_result(self) -> None:
@@ -1298,10 +1314,9 @@ class AnalyzePanel(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        buttons = (self.open_project_button, self.save_project_button, self.save_as_button)
-        room = sum(b.sizeHint().width() for b in buttons) + PROJECT_ROW_MARGIN
-        self.project_row.setDirection(QBoxLayout.Direction.TopToBottom if event.size().width() <= room
-                                      else QBoxLayout.Direction.LeftToRight)  # a narrow window never scrolls sideways
+        room = sum(b.sizeHint().width() for b in (self.launcher_button, self.folder_button)) + ADVANCED_ROW_MARGIN
+        self.advanced_buttons.setDirection(QBoxLayout.Direction.TopToBottom if event.size().width() <= room
+                                           else QBoxLayout.Direction.LeftToRight)  # a narrow window never scrolls sideways
 
     def fit_shapes(self, width: int) -> None:
         need = sum(panel.minimumSizeHint().width() for panel in self.shape_panels.values()) + 12

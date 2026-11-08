@@ -378,8 +378,8 @@ class NavigationTests(_Flow):
     def test_the_analyze_page_holds_only_the_inputs(self):
         window, panel = self.analysed()
         page = window.stack.widget(pw.ANALYZE_PAGE).widget()
-        for widget in (panel.fields[FE], panel.fields[EXPERIMENTAL], panel.analyze_button, panel.open_project_button,
-                       panel.save_project_button, panel.save_as_button):
+        for widget in (panel.fields[FE], panel.fields[EXPERIMENTAL], panel.analyze_button, panel.advanced_toggle,
+                       panel.advanced):
             self.assertTrue(page.isAncestorOf(widget))
         for widget in (panel.result_box, panel.shapes, panel.tables_box, panel.comparison_box):
             self.assertFalse(page.isAncestorOf(widget))

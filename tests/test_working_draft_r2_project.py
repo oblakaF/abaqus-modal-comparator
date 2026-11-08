@@ -1224,7 +1224,6 @@ class AtomicSaveTests(_Project):
         panel = window.analyze
         self.assertFalse(panel.can_save())
         self.assertFalse(panel.save_project())
-        self.assertFalse(panel.save_project_button.isEnabled())
         self.assertFalse(window.project_actions["save"].isEnabled())
         panel.choose_file(FE, str(self.odb))
         self.exp_path = self.unv(self.nodes(), reg3.freqs())
@@ -1315,10 +1314,10 @@ class ResponsivenessAndSizeTests(_Project):
 
 
 class MenuTests(_Project):
-    def test_the_three_actions_are_visible(self):
+    def test_the_project_commands_are_in_the_file_menu(self):
         window = self.window()
         names = {button.text() for button in window.analyze.findChildren(QPushButton)}
-        self.assertLessEqual({"Open Project...", "Save Project", "Save Project As..."}, names)
+        self.assertFalse({"Open Project...", "Save Project", "Save Project As..."} & names)  # ABM-UX2: no page toolbar
         menu = [action.text() for action in window.menuBar().actions()[0].menu().actions()]
         self.assertLessEqual({"Open Project...", "Save Project", "Save Project As...", "Close Project"}, set(menu))
         self.assertEqual({key: action.shortcut().toString() for key, action in window.project_actions.items()},
@@ -1337,15 +1336,15 @@ class MenuTests(_Project):
         """Whatever the platform's font: the row stacks when it would not fit, and returns when it does."""
         direction = analyze_panel.QBoxLayout.Direction
         panel = window.analyze
-        room = sum(b.sizeHint().width() for b in (panel.open_project_button, panel.save_project_button,
-                                                  panel.save_as_button)) + analyze_panel.PROJECT_ROW_MARGIN
+        panel.advanced_toggle.setChecked(True)  # ABM-UX2: the Advanced buttons are the page's only button row
+        room = sum(b.sizeHint().width() for b in (panel.launcher_button, panel.folder_button)) + analyze_panel.ADVANCED_ROW_MARGIN
         for extra, expected in ((-20, direction.TopToBottom), (400, direction.LeftToRight)):
             panel.resizeEvent(analyze_panel.QResizeEvent(analyze_panel.QSize(room + extra, 400), panel.size()))
-            self.assertEqual(panel.project_row.direction(), expected)
+            self.assertEqual(panel.advanced_buttons.direction(), expected)
         window.resize(pw.ProductionWindow.minimumWidth(window) + 2000, 800)
         for _ in range(5):
             self.app.processEvents()
-        self.assertEqual(panel.project_row.direction(), direction.LeftToRight)
+        self.assertEqual(panel.advanced_buttons.direction(), direction.LeftToRight)
         self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0)
 
     def test_close_project_empties_the_page_and_keeps_the_file(self):
