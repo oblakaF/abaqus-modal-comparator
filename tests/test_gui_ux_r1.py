@@ -844,6 +844,114 @@ class SummaryTests(_Flow):
         self.assertEqual(asm._record_type(1, 3), asm.MIXED)
 
 
+class SaveFromReviewTests(_Flow):
+    """ABM-UX4: Save result on the Review page is the File menu's Save Project, with its dialog and its messages."""
+
+    @staticmethod
+    def _content(path):
+        with zipfile.ZipFile(path) as archive:
+            names = sorted(archive.namelist())
+            document = json.loads(archive.read(ap.PROJECT))
+            pictures = {n: archive.read(n) for n in names if not n.endswith(".json")}  # a manifest hashes the timestamps
+        for key in ("saved_at", "written_at"):
+            document.pop(key, None)
+        return names, document, pictures
+
+    def test_disabled_without_a_result_and_while_running(self):
+        window = self.window()
+        review = window.review
+        self.assertEqual(review.save_button.text(), rp.SAVE_RESULT)
+        self.assertFalse(review.save_button.isEnabled())
+        _window, panel = self.analysed()
+        self.wait(panel)
+        review = _window.review
+        self.assertTrue(review.save_button.isEnabled())
+        self.assertTrue(review.save_button.isVisible())
+        self.assertLess(review.save_button.mapTo(review, review.save_button.rect().topLeft()).y(),
+                        review.splitter.mapTo(review, review.splitter.rect().topLeft()).y())  # beside the status
+        self.assertTrue(panel.analyze())  # another operation starts: saving waits for it
+        self.assertTrue(panel.busy())
+        self.assertFalse(review.save_button.isEnabled())
+        self.assertFalse(_window.project_actions["save"].isEnabled())
+        self.wait(panel)
+        self.assertTrue(review.save_button.isEnabled())
+
+    def test_first_save_asks_where_and_a_repeated_save_writes_the_same_file(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        asked = []
+        with mock.patch.object(analyze_panel_module().QFileDialog, "getSaveFileName",
+                               side_effect=lambda *a, **k: (asked.append(1), (str(self.project), ""))[1]):
+            review.save_button.click()
+            self.wait(panel)
+            self.assertEqual(len(asked), 1)
+            self.assertTrue(self.project.is_file())
+            self.assertIn("Project saved", review.save_feedback.text())
+            self.assertFalse(review.save_feedback.isHidden())
+            self.assertEqual(window.statusBar().currentMessage(), review.save_feedback.text())
+            self.assertEqual(window.stack.currentIndex(), pw.REVIEW_PAGE)
+            first = self._content(self.project)
+            review.save_button.click()  # the project has a path now: no dialog
+            self.wait(panel)
+            self.assertEqual(len(asked), 1)
+        self.assertEqual(self._content(self.project), first)
+        menu = self.root / "from the menu.mcproj"
+        with mock.patch.object(analyze_panel_module().QFileDialog, "getSaveFileName", return_value=(str(menu), "")):
+            window.project_actions["save_as"].trigger()
+            self.wait(panel)
+        names, document, pictures = self._content(menu)
+        self.assertEqual((names, pictures), (first[0], first[2]))  # the same format, files and saved shapes
+        self.assertEqual(json.dumps(document, sort_keys=True).replace(menu.name, "X"),
+                         json.dumps(first[1], sort_keys=True).replace(self.project.name, "X"))
+
+    def test_a_cancelled_dialog_saves_nothing_and_says_nothing(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        with mock.patch.object(analyze_panel_module().QFileDialog, "getSaveFileName", return_value=("", "")):
+            window.review.save_button.click()
+        self.wait(panel)
+        self.assertFalse(self.project.exists())
+        self.assertTrue(window.review.save_feedback.isHidden())
+        self.assertTrue(window.review.save_button.isEnabled())
+
+    def test_a_failed_save_is_shown_as_an_error_and_the_result_stays(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        analysis = panel.analysis
+        with mock.patch.object(analyze_panel_module().pj, "save_analysis", side_effect=OSError("disk full")):
+            self.assertTrue(panel.save_project(str(self.project)))
+            self.wait(panel)
+        review = window.review
+        self.assertIn("Project not saved", review.save_feedback.text())
+        self.assertEqual(review.save_feedback.objectName(), "error")
+        self.assertFalse(self.project.exists())
+        self.assertIs(panel.analysis, analysis)
+        self.assertTrue(review.save_button.isEnabled())
+        self.assertEqual(window.stack.currentIndex(), pw.REVIEW_PAGE)
+
+    def test_a_saved_result_reopens_with_the_same_frequencies_shapes_and_status(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        before = r2.displayed(panel)
+        status = panel.status_label.text()
+        with mock.patch.object(analyze_panel_module().QFileDialog, "getSaveFileName", return_value=(str(self.project), "")):
+            window.review.save_button.click()
+            self.wait(panel)
+        again_window, again = self.reopened()
+        self.assertEqual(r2.displayed(again), before)
+        self.assertEqual(again.status_label.text(), status)
+        self.assertEqual(again_window.review.status_sentence.text(), window.review.status_sentence.text())
+        self.assertTrue(again.saved_shapes[FE].entries and again.saved_shapes[EXPERIMENTAL].entries)
+        self.assertTrue(again_window.review.save_button.isEnabled())  # a reopened result can be saved again
+        self.assertTrue(again_window.review.save_feedback.isHidden())
+
+
+def analyze_panel_module():
+    from new_gui import analyze_panel
+    return analyze_panel
+
+
 class SavedResultTests(_Flow):
     def test_opening_shows_review_with_no_computation_and_says_what_needs_the_sources(self):
         _window, panel = self.analysed()

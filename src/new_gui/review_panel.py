@@ -28,6 +28,8 @@ _CONFLICT_TINT = QColor("#fde8e8")
 _FE_COLUMN = 3
 COMPACT_COLUMNS = (1, 2, 3, 4, 5)  # ABM-UX3: EXP mode and frequency, selected FE mode and frequency, Δf
 SHOW_COLUMNS, FEWER_COLUMNS = "Show all columns", "Show fewer columns"
+SAVE_RESULT = "Save result"
+_SAVE_MESSAGES = ("Saving the project", "Project saved", "Project not saved")  # the panel's own save messages
 PICTURE_IN_VIEW = 120  # pixels of a shape picture that count as "on screen" after a row click
 
 
@@ -62,7 +64,17 @@ class ReviewPanel(QWidget):
         top.setContentsMargins(0, 0, 0, 0)
         top.setSpacing(4)
         self.status_sentence = _label("", "warnings")
-        top.addWidget(self.status_sentence)
+        status_row = QHBoxLayout()  # ABM-UX4: the result is saved where it is read
+        status_row.setSpacing(12)
+        status_row.addWidget(self.status_sentence, 1)
+        self.save_button = QPushButton(SAVE_RESULT)
+        self.save_button.setObjectName("primary")
+        self.save_button.clicked.connect(lambda: self.analyze.save_project())
+        status_row.addWidget(self.save_button, 0, Qt.AlignmentFlag.AlignTop)
+        top.addLayout(status_row)
+        self.save_feedback = _label("", "hint")
+        self.save_feedback.setVisible(False)
+        top.addWidget(self.save_feedback)
         self.saved_note = _label(rv.SAVED_PLOTS_TEXT, "warnings")
         top.addWidget(self.saved_note)
         self.provisional_note = _label(rv.PROVISIONAL_EXPLANATION, "warnings")
@@ -89,7 +101,10 @@ class ReviewPanel(QWidget):
         analyze.result_shown.connect(self.rebuild)
         analyze.shapes_shown.connect(self._shapes_shown)
         analyze.analysis_ready.connect(self._ready)
+        analyze.changed.connect(self._save_state)
+        analyze.message_changed.connect(self._save_message)
         self.rebuild()
+        self._save_state()
 
     def heightForWidth(self, width: int) -> int:
         """ABM-UX3: the page fills the window and its panes scroll by themselves, so a chosen row's shapes are on screen.
@@ -218,6 +233,7 @@ class ReviewPanel(QWidget):
         self.empty.setVisible(not has_result)
         self.splitter.setVisible(has_result)
         self.top.setVisible(has_result)
+        self.save_feedback.setVisible(False)  # a new or opened result: an earlier save outcome is not about it
         analysis = self.analyze.analysis if has_result else None
         self.status_sentence.setText(rv.status_sentence(analysis, analysis.statement == am.CONFIRMED_TEXT)
                                      if analysis is not None else "")
@@ -318,6 +334,21 @@ class ReviewPanel(QWidget):
         self._draw_plots()
 
     # ---------------------------------------------------------------------------------------------- commands
+
+    def _save_state(self) -> None:
+        """Enabled exactly when the File menu's Save is: a shown result and nothing running."""
+        self.save_button.setEnabled(self.analyze.can_save())
+
+    def _save_message(self, text: str) -> None:
+        """The panel's own save outcome, shown beside the button (the status bar shows it too); other messages are not."""
+        if not text.startswith(_SAVE_MESSAGES):
+            return
+        failed = text.startswith("Project not saved")
+        self.save_feedback.setObjectName("error" if failed else "hint")
+        self.save_feedback.style().unpolish(self.save_feedback)
+        self.save_feedback.style().polish(self.save_feedback)
+        self.save_feedback.setText(text)
+        self.save_feedback.setVisible(True)
 
     def _columns_toggled(self, shown: bool) -> None:
         """Compact by default; the other columns (row, automatic nearest FE mode, Swap) are one click away."""
