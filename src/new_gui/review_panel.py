@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayo
                                QScrollArea, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
                                QWidget)
 
+from new_gui import analyze_model as am
 from new_gui import review_model as rv
 from new_gui.shape_panel import ImageActions, ImageView, ScrollSafeCombo, _label
 
@@ -25,6 +26,9 @@ TAB_SHAPES, TAB_PLOTS, TAB_FRF, TAB_TABLES = "Mode shapes", "Frequency plots", "
 _MANUAL_TINT = QColor("#fff4d6")
 _CONFLICT_TINT = QColor("#fde8e8")
 _FE_COLUMN = 3
+COMPACT_COLUMNS = (1, 2, 3, 4, 5)  # ABM-UX3: EXP mode and frequency, selected FE mode and frequency, Δf
+SHOW_COLUMNS, FEWER_COLUMNS = "Show all columns", "Show fewer columns"
+PICTURE_IN_VIEW = 120  # pixels of a shape picture that count as "on screen" after a row click
 
 
 def _scrolled(content: QWidget) -> QScrollArea:
@@ -53,6 +57,17 @@ class ReviewPanel(QWidget):
         layout.setSpacing(8)
         self.empty = _label(EMPTY_TEXT, "hint")
         layout.addWidget(self.empty)
+        self.top = QWidget()  # ABM-UX3: the status in one sentence, always visible; its full wording one click away
+        top = QVBoxLayout(self.top)
+        top.setContentsMargins(0, 0, 0, 0)
+        top.setSpacing(4)
+        self.status_sentence = _label("", "warnings")
+        top.addWidget(self.status_sentence)
+        self.saved_note = _label(rv.SAVED_PLOTS_TEXT, "warnings")
+        top.addWidget(self.saved_note)
+        self.provisional_note = _label(rv.PROVISIONAL_EXPLANATION, "warnings")
+        top.addWidget(self.provisional_note)
+        layout.addWidget(self.top)
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         self.splitter.setObjectName("reviewPanes")
         self.splitter.setChildrenCollapsible(False)
@@ -61,24 +76,32 @@ class ReviewPanel(QWidget):
         head = QVBoxLayout(self.header)
         head.setContentsMargins(0, 0, 0, 0)
         head.setSpacing(6)
-        self.saved_note = _label(rv.SAVED_PLOTS_TEXT, "warnings")
-        head.addWidget(self.saved_note)
-        self.provisional_note = _label(rv.PROVISIONAL_EXPLANATION, "warnings")
-        head.addWidget(self.provisional_note)
         head.addWidget(analyze.result_box)
         head.addStretch(1)
         self.header_area = _scrolled(self.header)
-        self.header_area.setMinimumHeight(70)
+        self.header_area.setMinimumHeight(70)  # the status card stays visible: registration outcome and warning count
         self.splitter.addWidget(self.header_area)
         self.splitter.addWidget(self._build_table_pane())
         self.splitter.addWidget(self._build_views())
         for index, stretch in enumerate((0, 1, 1)):
             self.splitter.setStretchFactor(index, stretch)
-        self.splitter.setSizes([84, 330, 320])  # the table shows several rows; the status is one drag away
+        self.splitter.setSizes([70, 330, 330])  # several table rows and the chosen row's shapes, both without page scrolling
         analyze.result_shown.connect(self.rebuild)
         analyze.shapes_shown.connect(self._shapes_shown)
         analyze.analysis_ready.connect(self._ready)
         self.rebuild()
+
+    def heightForWidth(self, width: int) -> int:
+        """ABM-UX3: the page fills the window and its panes scroll by themselves, so a chosen row's shapes are on screen.
+
+        The wrapped notes take their real height at this width; the panes take their minimum (the page scrolls only below
+        it). Without this the page would grow to the panes' preferred heights and push the shapes below the window."""
+        margins = self.layout().contentsMargins()
+        inner = width - margins.left() - margins.right()
+        heights = [max(widget.heightForWidth(inner), widget.minimumSizeHint().height()) if widget is not self.splitter
+                   else widget.minimumSizeHint().height() for widget in (self.empty, self.top, self.splitter)
+                   if not widget.isHidden()]
+        return margins.top() + margins.bottom() + sum(heights) + self.layout().spacing() * max(0, len(heights) - 1)
 
     # ---------------------------------------------------------------------------------------------- building
 
@@ -88,7 +111,8 @@ class ReviewPanel(QWidget):
         inner = QVBoxLayout(pane)
         inner.setContentsMargins(0, 0, 0, 0)
         inner.setSpacing(6)
-        inner.addWidget(_label(rv.TITLE, "sectionTitle"))
+        self.table_title = _label(rv.UNVERIFIED_TITLE, "sectionTitle")
+        inner.addWidget(self.table_title)
         inner.addWidget(_label(rv.LIMIT_TEXT, "hint"))
         self.table = QTableWidget(0, len(rv.HEADERS) + 1)
         self.table.setObjectName("reviewFrequencyTable")
@@ -113,11 +137,18 @@ class ReviewPanel(QWidget):
         self.reset_all_button = QPushButton(RESET_ALL)
         self.reset_all_button.setObjectName("reviewResetAll")
         self.reset_all_button.clicked.connect(lambda: self.reset_all())
+        self.columns_toggle = QPushButton(SHOW_COLUMNS)
+        self.columns_toggle.setObjectName("detailsToggle")
+        self.columns_toggle.setCheckable(True)
+        self.columns_toggle.setToolTip("Also show the row number, the automatic nearest FE mode and the Swap buttons.")
+        self.columns_toggle.toggled.connect(self._columns_toggled)
+        row.addWidget(self.columns_toggle)
         self.duplicate_label = _label("", "warnings")
         row.addWidget(self.duplicate_label, 1)
         for button in (self.reset_row_button, self.reset_all_button):
             row.addWidget(button)
         inner.addLayout(row)
+        self._columns_toggled(False)
         self.hypothesis_label = _label("", "warnings")
         inner.addWidget(self.hypothesis_label)
         self.session_label = _label(rv.SESSION_ONLY_TEXT, "hint")
@@ -138,6 +169,11 @@ class ReviewPanel(QWidget):
         inner.addWidget(self.analyze.shapes)
         inner.addStretch(1)
         self.shapes_area = _scrolled(shapes)
+        self.shapes_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # two shapes side by side:
+        self._kept_scroll: Optional[int] = None  # in a narrow window their right edge is reached, never cut off
+        bar = self.shapes_area.verticalScrollBar()
+        bar.rangeChanged.connect(self._restore_scroll)
+        bar.actionTriggered.connect(lambda _action: setattr(self, "_kept_scroll", None))  # the person scrolled
         self.views.addTab(self.shapes_area, TAB_SHAPES)
         plots = QWidget()
         inner = QVBoxLayout(plots)
@@ -181,6 +217,14 @@ class ReviewPanel(QWidget):
         self.current = None
         self.empty.setVisible(not has_result)
         self.splitter.setVisible(has_result)
+        self.top.setVisible(has_result)
+        analysis = self.analyze.analysis if has_result else None
+        self.status_sentence.setText(rv.status_sentence(analysis, analysis.statement == am.CONFIRMED_TEXT)
+                                     if analysis is not None else "")
+        self.status_sentence.setObjectName("hint" if analysis is not None and analysis.comparison is not None else "warnings")
+        self.status_sentence.style().unpolish(self.status_sentence)
+        self.status_sentence.style().polish(self.status_sentence)
+        self.table_title.setText(rv.table_title(analysis))
         self.saved_note.setVisible(has_result and self.analyze.snapshot is not None)
         self.provisional_note.setVisible(has_result and self.state.provisional)
         self._fill_table()
@@ -275,18 +319,29 @@ class ReviewPanel(QWidget):
 
     # ---------------------------------------------------------------------------------------------- commands
 
+    def _columns_toggled(self, shown: bool) -> None:
+        """Compact by default; the other columns (row, automatic nearest FE mode, Swap) are one click away."""
+        self.columns_toggle.setText(FEWER_COLUMNS if shown else SHOW_COLUMNS)
+        for column in range(self.table.columnCount()):
+            self.table.setColumnHidden(column, not shown and column not in COMPACT_COLUMNS)
+
     def _row_selected(self) -> None:
         if self._building:
             return
         rows = self.table.selectionModel().selectedRows()
         if rows:
+            if self.views.currentWidget() is self.analyze.tables_box:
+                self.views.setCurrentWidget(self.shapes_area)  # a chosen row shows its shapes; the plots mark it themselves
             self.show_row(rows[0].row())
+            if self.views.currentWidget() is self.shapes_area:
+                self._pictures_into_view()
 
     def show_row(self, row: int) -> bool:
         if self.state is None or not 0 <= row < len(self.state):
             return False
         self.current = row
         self._buttons()
+        self._keep_scroll()
         self.analyze.show_candidate(row)
         self._draw_plots()
         return True
@@ -343,6 +398,7 @@ class ReviewPanel(QWidget):
             self._building = True
             self.table.selectRow(row)
             self._building = False
+            self._keep_scroll()
             self.analyze.show_candidate(row)
         self._buttons()
         self._draw_plots()
@@ -359,8 +415,38 @@ class ReviewPanel(QWidget):
 
     # ---------------------------------------------------------------------------------------------- display
 
+    def _keep_scroll(self) -> None:
+        """A row's redraw briefly shortens the shapes while their pictures are replaced; the pane keeps its place."""
+        self._kept_scroll = self.shapes_area.verticalScrollBar().value()
+
+    def _pictures_into_view(self) -> None:
+        """After a row click: when no shape picture is on screen, the pane scrolls to the pictures (above them are the view
+        choices). A pane already showing a picture stays where the person left it."""
+        self.shapes_area.widget().layout().activate()
+        panels = self.analyze.saved_shapes if self.analyze.snapshot is not None else self.analyze.shape_panels
+        images = [panel.image for panel in panels.values() if not panel.isHidden()]
+        if not images:
+            return
+        viewport = self.shapes_area.viewport()
+        bar = self.shapes_area.verticalScrollBar()
+        tops = [image.mapTo(self.shapes_area.widget(), image.rect().topLeft()).y() for image in images]
+        shown = [min(top + image.height(), bar.value() + viewport.height()) - max(top, bar.value())
+                 for top, image in zip(tops, images)]
+        if max(shown) >= min(PICTURE_IN_VIEW, min(image.height() for image in images)):
+            return
+        target = max(0, min(tops) - 8)
+        self._kept_scroll = target  # also over the brief shortening while the pictures are replaced
+        bar.setValue(target)
+
+    def _restore_scroll(self, _low: int, high: int) -> None:
+        kept = self._kept_scroll
+        if kept is not None and high >= kept:
+            self._kept_scroll = None
+            self.shapes_area.verticalScrollBar().setValue(kept)
+
     def _shapes_to_top(self) -> None:
         """Only for a new result: Analyze going disabled moves the focus into this pane, and Qt scrolls to the focused widget."""
+        self._kept_scroll = None
         self.table.setFocus()
         self.shapes_area.verticalScrollBar().setValue(0)
 
@@ -396,4 +482,4 @@ class ReviewPanel(QWidget):
         self.frf_image.set_image(rv.frf_plot(series, records, self.current, self.state.provisional))
 
 
-__all__ = ["CANCEL", "KEEP", "ReviewPanel", "SWAP"]
+__all__ = ["CANCEL", "COMPACT_COLUMNS", "KEEP", "ReviewPanel", "SWAP"]

@@ -430,6 +430,93 @@ class ReviewPageTests(_Flow):
         self.assertEqual(table.item(0, 6).text(), panel.analysis.nearest_rows[0][3])
         self.assertEqual(window.review.combos[0].currentData(), panel.analysis.nearest_rows[0][3])
 
+    def test_ux3_compact_columns_by_default_and_all_columns_on_request(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        table = review.table
+        shown = [table.horizontalHeaderItem(c).text() for c in range(table.columnCount()) if not table.isColumnHidden(c)]
+        self.assertEqual(shown, ["EXP mode", "EXP frequency (Hz)", "Selected FE mode", "Selected FE frequency (Hz)", "Δf (%)"])
+        self.assertEqual(review.columns_toggle.text(), rp.SHOW_COLUMNS)
+        self.assertTrue(review.combos[0].isVisibleTo(table))  # the manual FE choice stays in the compact view
+        review.columns_toggle.setChecked(True)
+        self.assertFalse(any(table.isColumnHidden(c) for c in range(table.columnCount())))
+        self.assertEqual(review.columns_toggle.text(), rp.FEWER_COLUMNS)
+        self.assertEqual(table.cellWidget(0, table.columnCount() - 1).text(), "Swap")
+        review.columns_toggle.setChecked(False)
+        self.assertTrue(table.isColumnHidden(0) and table.isColumnHidden(6) and table.isColumnHidden(7))
+        for size in ((900, 680), (1366, 768)):
+            window.resize(*size)
+            self.app.processEvents()
+            self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
+            self.assertEqual(table.horizontalScrollBar().maximum(), 0, size)
+
+    def test_ux3_one_sentence_status_and_unverified_candidates_without_a_registration(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        self.assertIsNone(panel.analysis.comparison)
+        self.assertEqual(review.status_sentence.text(), rv.STATUS_UNREGISTERED)
+        self.assertEqual(review.status_sentence.text().count(". "), 0)  # one sentence
+        self.assertFalse(review.status_sentence.isHidden())
+        self.assertIn("unverified", review.status_sentence.text())
+        self.assertIn("no MAC", review.status_sentence.text())
+        self.assertEqual(review.table_title.text(), rv.UNVERIFIED_TITLE)
+        top = review.status_sentence.mapTo(review, review.status_sentence.rect().topLeft()).y()
+        self.assertLess(top, review.splitter.mapTo(review, review.splitter.rect().topLeft()).y())  # above the status card
+        self.assertTrue(review.header_area.widget().isAncestorOf(panel.status_label))
+        self.assertEqual(panel.status_label.text(), am.REGISTRATION_REQUIRED)
+
+    def test_ux3_a_confirmed_comparison_says_so_and_keeps_the_table_frequency_based(self):
+        window, panel = self.analysed()
+        self.confirmed(panel)
+        window.show_page(pw.REVIEW_PAGE)
+        self.compare(panel)
+        self.wait(panel)
+        review = window.review
+        self.assertEqual(review.status_sentence.text(), rv.STATUS_CONFIRMED)
+        self.assertEqual(review.table_title.text(), rv.PAIRED_TITLE)
+        self.assertNotIn("unverified", review.status_sentence.text())
+
+    def test_ux3_a_row_chosen_from_all_tables_opens_its_shapes(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        review.views.setCurrentWidget(panel.tables_box)
+        review.select_row(3)
+        self.wait(panel)
+        self.assertIs(review.views.currentWidget(), review.shapes_area)
+        row = panel.analysis.nearest_rows[3]
+        fe = panel.shape_panels[FE]
+        self.assertEqual(fe.preview.modes[fe.chosen_index()].number, int(row[3]))
+        self.assertEqual(panel.shape_panels[EXPERIMENTAL].chosen_index(), 3)
+        review.views.setCurrentIndex(1)  # the plots mark the chosen row themselves: the tab stays
+        review.select_row(1)
+        self.wait(panel)
+        self.assertEqual(review.views.currentIndex(), 1)
+        self.assertEqual(review.current, 1)
+
+    def test_ux3_a_row_click_brings_the_shape_pictures_on_screen_without_page_scrolling(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        window.resize(900, 700)
+        self.app.processEvents()
+        self.assertEqual(window.stack.currentWidget().verticalScrollBar().maximum(), 0)  # the page fills the window
+        review.select_row(4)
+        self.wait(panel)
+        self.app.processEvents()
+        bar, viewport = review.shapes_area.verticalScrollBar(), review.shapes_area.viewport()
+        for kind in (FE, EXPERIMENTAL):
+            image = panel.shape_panels[kind].image
+            top = image.mapTo(review.shapes_area.widget(), image.rect().topLeft()).y()
+            self.assertLess(top, bar.value() + viewport.height() - 60, kind)  # a good part of each picture is in view
+            self.assertGreater(top + image.height(), bar.value(), kind)
+        kept = bar.value()
+        review.show_row(5)  # a programmatic redraw keeps the place
+        self.wait(panel)
+        self.assertEqual(bar.value(), kept)
+
     def test_selecting_a_row_shows_its_shapes(self):
         window, panel = self.analysed()
         self.wait(panel)
@@ -769,6 +856,11 @@ class SavedResultTests(_Flow):
         self.assertEqual(cells(review.table)[0][1], again.analysis.nearest_rows[0][1])
         self.assertFalse(review.saved_note.isHidden())
         self.assertIsNotNone(again.saved_shapes[FE].image.source)
+        self.assertEqual(review.status_sentence.text(), rv.STATUS_UNREGISTERED)  # ABM-UX3: the same sentence when reopened
+        self.assertEqual(review.table_title.text(), rv.UNVERIFIED_TITLE)
+        self.assertTrue(review.table.isColumnHidden(0))
+        review.select_row(2)
+        self.assertEqual(again.saved_shapes[FE].shown_number, again.analysis.nearest_rows[2][3])
         review.views.setCurrentIndex(1)
         self.assertIsNotNone(review.frequency_image.source)
         review.views.setCurrentIndex(2)

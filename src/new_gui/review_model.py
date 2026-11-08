@@ -45,6 +45,18 @@ LABEL_FRF_PEAK, LABEL_FITTED = "FRF peak record, not fitted", "Fitted mode frequ
 SAVED_PLOTS_TEXT = ("Shown from the saved file: frequencies and the saved magnitude pictures. Other components and FRF curves "
                     "need the source files: Check source files on the Analyze page, then Analyze.")
 SESSION_ONLY_TEXT = "Manual choices are kept for this session only: they are not saved and change no saved or computed result."
+UNVERIFIED_TITLE = "Unverified frequency-based candidates"
+PAIRED_TITLE = "Frequency-based candidates (the MAC pairs are on the MAC / Points page)"
+STATUS_UNREGISTERED = ("No physical registration: the FE modes below are matched by frequency only and are unverified; "
+                       "no mode pairs and no MAC.")
+STATUS_FRF_PEAKS = ("FRF peak records, not fitted modes: the FE modes below are matched by frequency only and are "
+                    "unverified; no mode pairs and no MAC.")
+STATUS_FAILED = ("The registration check failed: the FE modes below are matched by frequency only and are unverified; "
+                 "no mode pairs and no MAC.")
+STATUS_CONFIRMED = ("Mode pairs and MAC use the registration you confirmed (see MAC / Points); this table is matched by "
+                    "frequency only.")
+STATUS_VERIFIED = ("Mode pairs and MAC use a verified physical registration (see MAC / Points); this table is matched by "
+                   "frequency only.")
 _DASH = "—"
 _INK, _MUTED, _GRID = "#3e4c59", "#52606d", "#e4e7eb"
 _AUTOMATIC, _MANUAL = "#2563eb", "#b45309"
@@ -174,6 +186,21 @@ class ReviewState:
         items = "; ".join(f"row {row.row + 1}: EXP {row.exp_mode} with FE {row.selected_mode}"
                           for row in self.rows() if row.manual)
         return f"{USER_HYPOTHESIS} (not a validated identity): {items}."
+
+
+def status_sentence(analysis, confirmed: bool) -> str:
+    """The result's status in one sentence. Without a comparison every row is an unverified frequency candidate."""
+    if analysis is None:
+        return ""
+    if analysis.comparison is not None:
+        return STATUS_CONFIRMED if confirmed else STATUS_VERIFIED
+    if any(sm.PROVISIONAL_TEXT in str(row[-1]) for row in analysis.experimental_rows):
+        return STATUS_FRF_PEAKS
+    return STATUS_FAILED if analysis.registration_outcome == "failed" else STATUS_UNREGISTERED
+
+
+def table_title(analysis) -> str:
+    return PAIRED_TITLE if analysis is not None and analysis.comparison is not None else UNVERIFIED_TITLE
 
 
 # ---------------------------------------------------------------------------------------------- plots
