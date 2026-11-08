@@ -310,7 +310,7 @@ class Correspondence(unittest.TestCase):
             self.assertIn(part, str(caught.exception))
 
 
-class Page(unittest.TestCase):
+class _PageHarness(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from PySide6.QtWidgets import QApplication
@@ -350,6 +350,8 @@ class Page(unittest.TestCase):
             self.wait(panel)
         return window, panel, inputs
 
+
+class Page(_PageHarness):
     def test_the_page_runs_shows_and_exports_a_candidate(self):
         surrogate = rft.Surrogate(rft.read_inp(_files() / "plate.inp"), 14, 16)
         spectrum = surrogate.frequencies(45000, 45000, 6000)
@@ -416,6 +418,125 @@ class Page(unittest.TestCase):
         self.assertFalse(panel.run())
         self.assertIn("search range", panel.message.text())
         self.assertFalse(panel.busy())
+
+
+class SavedResult(_PageHarness):
+    """ABM: an exported Research Tuning result is reopened as saved: only that file is read, nothing is recomputed."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        surrogate = rft.Surrogate(rft.read_inp(_files() / "plate.inp"), 14, 16)
+        cls.spectrum = surrogate.frequencies(60000, 44000, 4800)
+
+    def shown(self, panel):
+        def cells(table):
+            return [[table.item(r, c).text() if table.item(r, c) else "" for c in range(table.columnCount())]
+                    for r in range(table.rowCount())]
+
+        return {"tables": {key: cells(table) for key, table in sorted(panel._tables.items())
+                           if key not in ("inputs", "records")},  # the live input tables are not part of a result
+                "status": panel.status.text(), "reasons": panel.reasons.text(), "accuracy": panel.accuracy.text(),
+                "candidate_none": panel.candidate_none.text(), "stability": panel.stability_statement.text()}
+
+    def exported(self, stability=True):
+        """A FREE (mirror, both A/B) result, optionally with its stability check, exported; returns (path, shown, folder)."""
+        window, panel, _inputs = self.loaded([(k + 1, float(self.spectrum[k])) for k in range(10)])
+        panel.parameterization.setCurrentIndex(panel.parameterization.findData(rft.FREE))
+        self.assertTrue(panel.run())
+        self.wait(panel)
+        self.assertEqual(panel.result.status, rft.MIRROR)
+        if stability:
+            self.assertTrue(panel.run_stability())
+            self.wait(panel, 300)
+            self.assertIsNotNone(panel.stability)
+        folder = Path(tempfile.mkdtemp())
+        target = folder / "proposal.json"
+        self.assertTrue(panel.export(str(target)))
+        return target, self.shown(panel), panel.plot_data
+
+    def fresh(self):
+        return self.window()[1]
+
+    def test_a_saved_result_is_restored_identically_without_recalculation_or_source_access(self):
+        from new_gui import research_tuning_model as rm
+        from new_gui import research_tuning_panel as rtp
+
+        target, before, _plot = self.exported(stability=True)
+        document = json.loads(target.read_text(encoding="utf-8"))
+        named = [document["sources"]["inp"], document["sources"]["unv"]]
+        for name in named:  # the source files are gone: the saved result must not need them
+            if Path(name).exists():
+                Path(name).unlink()
+        panel = self.fresh()
+        opened = []
+        real_open = open
+
+        def recording_open(file, *args, **kwargs):
+            opened.append(str(file))
+            return real_open(file, *args, **kwargs)
+
+        refuse = mock.Mock(side_effect=AssertionError("recomputed"))
+        with mock.patch.object(rm, "read_sources", refuse), mock.patch.object(rft, "run_tuning", refuse), \
+                mock.patch.object(rtp.rfs, "run_stability", refuse), mock.patch("builtins.open", recording_open), \
+                mock.patch.object(rm, "_classify", refuse):
+            self.assertTrue(panel.open_result(str(target)))
+        self.app.processEvents()
+        refuse.assert_not_called()
+        self.assertFalse(panel.busy())
+        self.assertEqual([Path(p).resolve() for p in opened if not p.endswith((".ttf", ".otf", ".json"))
+                          and "matplotlib" not in p.lower()], [])
+        self.assertTrue(all(Path(p).resolve() == target.resolve() for p in opened if p.endswith(".json")))
+        self.assertEqual(self.shown(panel), before)  # every table, the status, the warnings and the stability, as saved
+        self.assertEqual(len(panel.table_cells("axes")), 2)  # both A/B alternatives
+        self.assertEqual(panel.parameterization.currentData(), rft.FREE)  # the setting shown matches the saved result
+        self.assertTrue(panel.plot_data.startswith(b"\x89PNG"))
+        self.assertTrue(panel.saved_note.isVisible())
+        self.assertIn("SAVED RESULT", panel.saved_note.text())
+        self.assertIn("not re-read or revalidated", panel.saved_note.text())
+        self.assertFalse(panel.stability_button.isEnabled())
+        self.assertFalse(panel.export_button.isEnabled())
+        self.assertFalse(panel.run_button.isEnabled())  # no live inputs: nothing can be calculated
+        self.assertFalse(panel.run_stability())
+        self.assertFalse(panel.export(str(target.with_name("again.json"))))
+
+    def test_invalid_files_are_refused_and_the_shown_result_is_kept(self):
+        target, _before, _plot = self.exported(stability=False)
+        panel = self.fresh()
+        self.assertTrue(panel.open_result(str(target)))
+        shown = self.shown(panel)
+        document = json.loads(target.read_text(encoding="utf-8"))
+        folder = target.parent
+        bad = {"corrupt.json": "{ not json", "array.json": "[1, 2]",
+               "schema.json": json.dumps(dict(document, schema="other/1")),
+               "label.json": json.dumps(dict(document, label="A MATERIAL PROPERTY")),
+               "missing.json": json.dumps({k: v for k, v in document.items() if k != "rows"}),
+               "damaged.json": json.dumps(dict(document, rows=[{"record": 1}])),
+               "cancelled.json": json.dumps(dict(document, status=rft.CANCELLED))}
+        for name, text in bad.items():
+            (folder / name).write_text(text, encoding="utf-8")
+            self.assertFalse(panel.open_result(str(folder / name)), name)
+            self.assertIn("Not opened", panel.message.text(), name)
+            self.assertEqual(self.shown(panel), shown, name)
+            self.assertEqual(panel.saved_path, str(target), name)
+        self.assertFalse(panel.open_result(str(folder / "absent.json")))
+        self.assertIn("cannot be read", panel.message.text())
+        with self.assertRaises(rft.TuningRefused) as caught:
+            rft.read_export(target, max_bytes=100)
+        self.assertIn("at most", str(caught.exception))
+
+    def test_choosing_live_inputs_ends_the_saved_view(self):
+        target, _before, _plot = self.exported(stability=False)
+        window, panel, _inputs = self.loaded([(k + 1, float(self.spectrum[k])) for k in range(10)])
+        self.assertTrue(panel.open_result(str(target)))
+        self.assertTrue(panel.run_button.isEnabled())  # the live inputs loaded before stay usable
+        self.assertFalse(panel.export_button.isEnabled())
+        panel.parameterization.setCurrentIndex(panel.parameterization.findData(rft.FREE))
+        self.assertTrue(panel.run())
+        self.wait(panel)
+        self.assertIsNone(panel.saved_path)
+        self.assertFalse(panel.saved_note.isVisible())
+        self.assertTrue(panel.export_button.isEnabled() and panel.stability_button.isEnabled())
 
 
 if __name__ == "__main__":

@@ -55,6 +55,7 @@ class ResearchTuningPanel(QWidget):
         self.request: Optional[rft.TuningRequest] = None
         self.stability: Optional[dict] = None  # REAL-FIT.R2: the stability check of the shown result, when it was run
         self.plot_data = b""
+        self.saved_path: Optional[str] = None  # set while a saved (exported) result is shown
         self._token = 0
         self._active: Optional[str] = None
         self._cancel: Optional[threading.Event] = None
@@ -104,6 +105,13 @@ class ResearchTuningPanel(QWidget):
         inner.addWidget(self.read_note)
         self.inputs_box = QVBoxLayout()
         inner.addLayout(self.inputs_box)
+        row = QHBoxLayout()
+        self.open_button = QPushButton("Open result...")
+        self.open_button.setObjectName("tuningOpenResult")
+        self.open_button.clicked.connect(lambda: self.open_result())
+        row.addWidget(self.open_button)
+        row.addStretch(1)
+        inner.addLayout(row)
         return card
 
     def _build_setup(self) -> QFrame:
@@ -166,6 +174,9 @@ class ResearchTuningPanel(QWidget):
         inner.addWidget(_label("3. Result", "sectionTitle"))
         self.status = _label("", "badge")
         inner.addWidget(self.status)
+        self.saved_note = _label("", "warnings")
+        self.saved_note.setVisible(False)
+        inner.addWidget(self.saved_note)
         self.reasons = _label("", "warnings")
         inner.addWidget(self.reasons)
         inner.addWidget(_label(rm.SURROGATE_NOTE, "hint"))
@@ -296,7 +307,8 @@ class ResearchTuningPanel(QWidget):
     # ---------------------------------------------------------------------------------------------- files
 
     def _dialog_path(self, kind: str, start: str) -> str:
-        pattern = {"inp": "Abaqus input (*.inp)", "odb": "Abaqus ODB (*.odb)"}.get(kind, "Experimental modal data (*.unv *.uff)")
+        pattern = {"inp": "Abaqus input (*.inp)", "odb": "Abaqus ODB (*.odb)", "result": rm.EXPORT_FILTER}.get(
+            kind, "Experimental modal data (*.unv *.uff)")
         path, _f = QFileDialog.getOpenFileName(self, "Choose file", start, pattern)
         return path
 
@@ -319,6 +331,35 @@ class ResearchTuningPanel(QWidget):
             inp, unv, odb = self.paths["inp"], self.paths["unv"], self.paths["odb"] or None
             self.state.setText("Reading the files...")
             self._start("read", lambda cancel, _s: rm.read_sources(inp, unv, cancel, odb))
+        self._refresh()
+        return True
+
+    def open_result(self, path: Optional[str] = None) -> bool:
+        """Show an exported result as it was saved. Only that file is read; nothing named in it is opened and nothing is
+        recalculated. An invalid file is said and the page keeps what it showed."""
+        if self._active is not None:
+            return False
+        path = path if path is not None else self._ask_path("result", str(Path(self.saved_path).parent) if self.saved_path else "")
+        if not path:
+            return False
+        try:
+            result, stability = rm.open_saved(path)
+        except rft.TuningRefused as error:
+            self._say(f"Not opened: {error}")
+            return False
+        self._say("")
+        self._clear_result()
+        self.request = None  # the saved run's request is not live: the stability check stays off
+        index = self.parameterization.findData(result.request.get("parameterization"))
+        if index >= 0:  # the setting shown matches the saved result
+            self.parameterization.setCurrentIndex(index)
+        self._show_result(result)
+        if stability:
+            self._show_stability(stability)
+        self.saved_path = str(path)
+        self.saved_note.setText(rm.SAVED_NOTE.format(name=Path(path).name))
+        self.saved_note.setVisible(True)
+        self.state.setText(f"Saved result opened: {Path(path).name}. No calculation was run.")
         self._refresh()
         return True
 
@@ -437,7 +478,7 @@ class ResearchTuningPanel(QWidget):
     def run_stability(self) -> bool:
         """REAL-FIT.R2: leave each FIT record out of the shown result's own request, in the background."""
         result, request, sources = self.result, self.request, self.sources
-        if self._active is not None or result is None or request is None or sources is None or result.status == rft.CANCELLED:
+        if self._active is not None or self.saved_path is not None or result is None or request is None or sources is None or result.status == rft.CANCELLED:
             return False
         self._say("")
         self._clear_stability()
@@ -486,6 +527,9 @@ class ResearchTuningPanel(QWidget):
         self._clear_stability()
         self.results_card.setVisible(False)
         self.export_note.setText("")
+        self.saved_path = None
+        self.saved_note.setText("")
+        self.saved_note.setVisible(False)
 
     def _show_result(self, result: rft.TuningResult) -> None:
         self.result = result
@@ -528,7 +572,7 @@ class ResearchTuningPanel(QWidget):
             self.plot.setFixedHeight(380)
 
     def export(self, path: Optional[str] = None) -> bool:
-        if self.result is None or self.sources is None or self.result.status == rft.CANCELLED:
+        if self.result is None or self.sources is None or self.saved_path is not None or self.result.status == rft.CANCELLED:
             return False
         path = path if path is not None else self._ask_save("research_tuning_proposal.json")
         if not path:
@@ -552,9 +596,11 @@ class ResearchTuningPanel(QWidget):
             widget.setEnabled(not running)
         self.run_button.setEnabled(not running and self.sources is not None)
         self.cancel_button.setEnabled(self._active in ("fit", "stability"))
-        self.stability_button.setEnabled(not running and self.result is not None and self.result.status != rft.CANCELLED)
+        live = self.result is not None and self.result.status != rft.CANCELLED and self.saved_path is None
+        self.stability_button.setEnabled(not running and live)
         self.progress.setVisible(running)
-        self.export_button.setEnabled(not running and self.result is not None and self.result.status != rft.CANCELLED)
+        self.export_button.setEnabled(not running and live)
+        self.open_button.setEnabled(not running)
 
 
 __all__ = ["ResearchTuningPanel"]

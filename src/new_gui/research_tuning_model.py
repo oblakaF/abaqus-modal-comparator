@@ -397,6 +397,34 @@ def error_plot(result: rft.TuningResult, width: int = 900, height: int = 420, sc
     return out.getvalue()
 
 
-__all__ = ["LABEL", "ReadFailed", "Sources", "candidate_rows", "default_holdout", "diagnostic_rows", "error_plot",
+SAVED_NOTE = ("SAVED RESULT, shown as exported from {name}. Its source files were not re-read or revalidated and nothing was "
+              "recalculated. The stability check and export need live inputs: choose the files and run the tuning.")
+
+
+def open_saved(path) -> tuple:
+    """(result, stability) of an exported proposal, validated and test-rendered; nothing named in the file is opened and
+    nothing is recomputed. Any defect is a rft.TuningRefused, so the page keeps what it shows."""
+    document = rft.read_export(path)
+    result = rft.result_from_export(document)
+    stability = rft.restore_record_keys(document.get("stability"))
+    if stability is not None and not isinstance(stability, dict):
+        raise rft.TuningRefused("The export is damaged: unexpected content in stability.")
+    try:
+        for rows in (estimate_rows, axis_rows, candidate_rows, quantity_rows, first_mode_rows, assumption_rows, frequency_rows,
+                     minima_rows, diagnostic_rows, sensitivity_rows):
+            rows(result)
+        if result.surrogate:
+            surrogate_rows(result)
+        if stability:
+            for rows in (stability_rows, control_rows, influence_rows, fixed_input_rows, assessment_rows):
+                rows(stability)
+            stability_headers(stability), influence_headers(stability)
+            stability["assessment"]["statement"], stability["influence"]["rank_note"], stability["solves"]
+    except (KeyError, IndexError, TypeError, ValueError, AttributeError) as error:
+        raise rft.TuningRefused(f"The export is damaged and cannot be shown ({type(error).__name__}: {error}).") from None
+    return result, stability
+
+
+__all__ = ["LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
            "frequency_rows", "input_rows", "minima_rows", "parse_declared", "read_sources", "sensitivity_rows",
            "surrogate_rows"]

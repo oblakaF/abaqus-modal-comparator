@@ -30,7 +30,7 @@ starts agree). The candidate values are surrogate (Ritz) results: they are propo
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 import hashlib
 import json
 import math
@@ -700,8 +700,67 @@ def write_export(document: dict, path) -> Path:
     return path
 
 
+EXPORT_MAX_BYTES = 20 * 2 ** 20  # an export is a few hundred kB; anything far larger is not one
+
+
+def read_export(path, max_bytes: int = EXPORT_MAX_BYTES) -> dict:
+    """An exported proposal as JSON, size-limited. Only this file is read: no path named in it is looked at."""
+    path = Path(path)
+    try:
+        size = path.stat().st_size
+    except OSError as error:
+        raise TuningRefused(f"The file cannot be read ({error}).") from None
+    if size > max_bytes:
+        raise TuningRefused(f"The file is {size / 2 ** 20:.1f} MB; a Research Tuning export is at most "
+                            f"{max_bytes / 2 ** 20:.0f} MB.")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        raise TuningRefused(f"Not a Research Tuning export: the file is not valid JSON ({type(error).__name__}).") from None
+    if not isinstance(document, dict):
+        raise TuningRefused("Not a Research Tuning export: the file holds no JSON object.")
+    return document
+
+
+def restore_record_keys(value):
+    """JSON writes integer dictionary keys (record numbers) as text; give them back as integers, recursively."""
+    if isinstance(value, dict):
+        return {(int(k) if isinstance(k, str) and k.isdigit() else k): restore_record_keys(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [restore_record_keys(v) for v in value]
+    return value
+
+
+def result_from_export(document: Mapping) -> TuningResult:
+    """The saved result of an export, exactly as it was written; nothing is recomputed. Refused unless it is this schema,
+    carries the research label, holds every result field with the expected kind and is not a cancelled run."""
+    if document.get("schema") != SCHEMA:
+        raise TuningRefused(f"Not a Research Tuning export: schema {document.get('schema')!r}, expected {SCHEMA!r}.")
+    if document.get("label") != RESULT_LABEL:
+        raise TuningRefused("The file does not carry the Research Tuning label; it is not opened.")
+    names = [item.name for item in fields(TuningResult)]
+    missing = [name for name in names if name not in document]
+    if missing:
+        raise TuningRefused(f"The export is incomplete: {', '.join(missing)} missing.")
+    values = {name: restore_record_keys(document[name]) for name in names}
+    kinds = {"status": str, "label": str, "reasons": list, "warnings": list, "request": dict, "inputs": dict,
+             "parameter_names": list, "baseline": dict, "axis_assignments": list, "rows": list, "sensitivity": list,
+             "singular_values": list, "practical_rank": int, "active_bounds": list, "starts": list, "surrogate": list,
+             "minima": list, "assumptions": list, "evaluations": int}
+    wrong = [name for name, kind in kinds.items() if not isinstance(values[name], kind)]
+    if wrong:
+        raise TuningRefused(f"The export is damaged: unexpected content in {', '.join(wrong)}.")
+    if tuple(values["parameter_names"]) not in PARAMETERIZATIONS.values():
+        raise TuningRefused("The export names unknown fitted inputs.")
+    if values["status"] == CANCELLED:
+        raise TuningRefused("The export holds a cancelled run; there is no result to show.")
+    values["parameter_names"] = tuple(values["parameter_names"])
+    values["assumptions"] = tuple(values["assumptions"])
+    return TuningResult(**values)
+
+
 __all__ = ["MAX_SURROGATE_RANK", "validate_correspondence", "ACCURACY_STATEMENT", "ASSUMPTIONS", "AbaqusPlateInputs", "DECLARED", "FIT", "FREE", "HOLDOUT", "EXCLUDED",
            "MIRROR", "Observation", "PARAMETERIZATIONS", "RANK_ORDER", "RESULT_LABEL", "SUPPORTED", "Surrogate", "TIED",
            "TuningRefused", "TuningRequest", "TuningResult", "abaqus_elastic_line", "assumption_sensitivity",
            "bending_stiffness", "export_document", "observations_by_rank", "quantity_table", "read_dat_frequencies",
-           "read_inp", "run_tuning", "surrogate_discrepancy", "write_export"]
+           "read_export", "read_inp", "restore_record_keys", "result_from_export", "run_tuning", "surrogate_discrepancy", "write_export"]
