@@ -2,7 +2,22 @@
 setlocal
 cd /d "%~dp0"
 
-title Abaqus-Simcenter Modal Comparator
+rem Main launcher. Default: the PySide6 program, through RUN_NEW_GUI.cmd (its own environment and dependency setup).
+rem "RUN_PROGRAM.cmd legacy" starts the legacy interface (src\main.py) with the setup below.
+
+if /i "%~1"=="legacy" goto :legacy
+if not "%~1"=="" (
+    echo Unknown option "%~1". Use RUN_PROGRAM.cmd for the program, or RUN_PROGRAM.cmd legacy for the legacy interface.
+    endlocal
+    exit /b 2
+)
+
+call "%~dp0RUN_NEW_GUI.cmd"
+set "RESULT=%errorlevel%"
+endlocal & exit /b %RESULT%
+
+:legacy
+title Abaqus-Simcenter Modal Comparator (legacy interface)
 
 set "BASE_PYTHON="
 where py >nul 2>nul
@@ -30,7 +45,7 @@ if not exist ".venv\Scripts\python.exe" (
 ".venv\Scripts\python.exe" src\ensure_dependencies.py
 if errorlevel 1 goto :error
 
-echo Starting Abaqus-Simcenter Modal Comparator...
+echo Starting Abaqus-Simcenter Modal Comparator (legacy interface)...
 ".venv\Scripts\python.exe" src\main.py
 if errorlevel 1 goto :error
 

@@ -38,17 +38,24 @@ Double-click:
 RUN_PROGRAM.cmd
 ```
 
-The launcher creates a local `.venv` environment and installs the required packages. The first launch can take several minutes.
+This opens the program (the PySide6 window). The launcher creates a local `.venv` environment and installs the required
+packages; the first launch can take several minutes.
 
-### New interface preview (NEW-GUI)
+The legacy interface is still available from a command prompt in this folder:
 
-A separate PySide6 (Qt) window is being built next to the existing program. Start it with:
+```text
+RUN_PROGRAM.cmd legacy
+```
+
+### The program window (NEW-GUI)
+
+`RUN_PROGRAM.cmd` starts it through `RUN_NEW_GUI.cmd`, which can also be run directly:
 
 ```text
 RUN_NEW_GUI.cmd
 ```
 
-The launcher uses the same `.venv` and also installs PySide6 from `requirements-new-gui.txt`, which the existing program
+The launcher uses the same `.venv` and also installs PySide6 from `requirements-new-gui.txt`, which the legacy interface
 does not need. Without the launcher, run `python -m pip install -r requirements-new-gui.txt`, then
 `python -m new_gui` with `src` on `PYTHONPATH`.
 
@@ -107,7 +114,7 @@ delivery. They are checked against `docs/experimental/new_exp_20261029/SOURCE_PR
 - **FE input.** The new interface views an extracted FE package: choose its `manifest.json`, with the CSV files
   beside it.
   - An Abaqus `.odb` cannot be viewed in this version of the new interface, and choosing one starts no Abaqus.
-  - `RUN_PROGRAM.cmd` keeps its own ODB route.
+  - The legacy interface (`RUN_PROGRAM.cmd legacy`) keeps its own ODB route.
 
 **Research Results** (PRIORITY-5A, `docs/gui/PRIORITY5_RESEARCH_RESULTS.md`) shows the archived research results of
 PRIORITY-1–4 for PLATE (261027), SP-13 (261028) and SP-10 (261029). It reads them only; nothing is computed or started.
