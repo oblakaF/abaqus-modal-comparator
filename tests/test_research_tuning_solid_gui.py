@@ -345,6 +345,52 @@ class SolidPage(unittest.TestCase):
         self.assertIn("FAILED: RIGID_BODY_CLASSIFICATION_FAILED: synthetic — not retried",
                       diagnostics["Point 2 (E1 90000, E2 15000, G12 11000)"])
 
+    def test_edited_what_if_inputs_never_leave_the_previous_results_visible(self):
+        # ABM-SOLID-6-F1: the displayed result always belongs to the entered points
+        panel = self.checked()
+        panel.set_whatif(self.POINTS[:1])
+        self.assertTrue(panel.run_whatif())
+        self.wait(panel)
+        self.assertEqual(panel.whatif_outcome.status, sfr.SOLVED)
+        old = panel.table_cells("whatif_frequencies")
+        panel.whatif_fields[0][0].setText("60000.0")  # the same value written differently: the result stays
+        self.assertIsNotNone(panel.whatif_outcome)
+        self.assertEqual(panel.table_cells("whatif_frequencies"), old)
+        self.assertTrue(panel.whatif_status.isVisible())
+
+        def gone():
+            self.assertIsNone(panel.whatif_outcome)
+            self.assertFalse(panel.whatif_status.isVisible())
+            self.assertFalse(panel.whatif_note.isVisible())
+            for key in ("whatif_frequencies", "whatif_diagnostics"):
+                self.assertNotIn(key, panel._tables)
+                self.assertFalse(panel.solid_boxes[key + "_caption"].isVisible())
+            self.assertIn("previous What-If results were cleared", panel.solid_state.text())
+
+        panel.whatif_fields[0][2].setText("")  # an incomplete edit
+        gone()
+        self.assertEqual(panel.whatif_fields[0][2].text(), "")
+        self.assertIn("Row 1: Enter all of E1, E2 and G12", panel.whatif_check.text())  # the validation message stays
+        panel.whatif_fields[0][2].setText("7000")  # back to the calculated input: nothing stale returns
+        self.assertIsNone(panel.whatif_outcome)
+        self.assertNotIn("whatif_frequencies", panel._tables)
+        new = (60000.0, 25000.0, 8000.0)
+        panel.set_whatif([new])  # a valid, different point
+        gone()
+        self.assertEqual(panel.whatif_fields[0][2].text(), "8000")
+        self.assertIn("1 point ready", panel.whatif_check.text())
+        self.assertTrue(panel.run_whatif())
+        self.wait(panel)
+        self.assertEqual(len(self.asked), 2)
+        self.assertIn("Point 1: E1 60000, E2 25000, G12 8000 MPa", self.asked[1])
+        self.assertEqual(panel.whatif_outcome.status, sfr.SOLVED)
+        self.assertEqual(len(panel.whatif_outcome.points), 1)
+        cells = panel.table_cells("whatif_frequencies")
+        expected = ss.SolidForwardModel(sm.load_solid_inp(self.inp)).solve(14, e1=new[0], e2=new[1], g12=new[2]).frequencies_hz
+        self.assertEqual([row[1] for row in cells], [f"{f:.4f}" for f in expected])
+        self.assertNotEqual(cells, old)
+        self.assertIn("G12 8000", " ".join(self.cells(panel, "whatif_diagnostics")))
+
     def test_the_single_inp_value_solve_is_unchanged_next_to_what_if(self):
         panel = self.checked()
         panel.set_whatif(self.POINTS[:1])

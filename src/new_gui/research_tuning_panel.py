@@ -258,6 +258,7 @@ class ResearchTuningPanel(QWidget):
             self.solid_boxes[key + "_caption"] = caption
         self.whatif_points: tuple = ()
         self.whatif_problems: dict = {}
+        self._whatif_result_points: tuple = ()  # the points of the displayed What-If result (ABM-SOLID-6-F1)
 
     def _build_setup(self) -> QFrame:
         card, inner = _card()
@@ -676,6 +677,11 @@ class ResearchTuningPanel(QWidget):
             return
         points, problems = rm.parse_whatif(rm.solid_material_constants(self.solid), self._whatif_texts())
         self.whatif_points, self.whatif_problems = points, problems
+        if self.whatif_outcome is not None and (problems or tuple(points) != self._whatif_result_points):
+            # the displayed result belongs to other inputs: never show it next to the edited ones
+            self._clear_whatif_result()
+            self.solid_state.setText("The What-If inputs changed: the previous What-If results were cleared. "
+                                     "Calculate again to see results for these inputs.")
         if problems:
             self.whatif_check.setText("Not ready: " + " ".join(
                 (f"Row {row}: " if row else "") + " ".join(messages) for row, messages in sorted(problems.items())))
@@ -704,6 +710,7 @@ class ResearchTuningPanel(QWidget):
             self.solid_state.setText("What-If not started: the calculation was not confirmed.")
             return False
         self._clear_whatif_result()
+        self._whatif_result_points = tuple(points)
         request = sfr.ForwardRequest(summary.inp_path, summary.sha256, points=points)
         limits = self.solid_limits
         bridge = self._bridge
@@ -720,6 +727,7 @@ class ResearchTuningPanel(QWidget):
 
     def _clear_whatif_result(self) -> None:
         self.whatif_outcome = None
+        self._whatif_result_points = ()
         self.whatif_status.setVisible(False)
         self.whatif_note.setVisible(False)
         for key in ("whatif_frequencies", "whatif_diagnostics"):
