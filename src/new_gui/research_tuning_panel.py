@@ -13,14 +13,17 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QProgressBar,
-                               QPushButton, QSizePolicy, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+                               QProgressBar, QPushButton, QSizePolicy, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from new_gui import research_tuning_model as rm
 from new_gui.diagnostic_panel import DiagnosticTable
 from new_gui.shape_panel import _label
 from services import research_frequency_stability as rfs
 from services import research_frequency_tuning as rft
+from services import solid_forward_runner as sfr
+
+QUIET_JOBS = (None, "check", "solid_check")  # jobs that never hold the file choice
 
 INTRO = ("The current exploratory workflow for real data: it refines the ASSUMED CFRP inputs (E1, E2, G12) of a supported "
          "shell FE model so that its Kirchhoff-Ritz plate surrogate matches fitted PolyMAX frequencies. Research only: no "
@@ -52,16 +55,22 @@ def _card():
 class _Bridge(QObject):
     done = Signal(int, str, object)
     solved = Signal(int, int)
+    solid_event = Signal(int, object)
 
 
 class ResearchTuningPanel(QWidget):
-    """``ask_path(kind, start)`` and ``ask_save(start)`` are replaced in tests."""
+    """``ask_path(kind, start)``, ``ask_save(start)`` and ``ask_confirm(title, text)`` are replaced in tests."""
 
-    def __init__(self, ask_path: Optional[Callable[[str, str], str]] = None, ask_save: Optional[Callable[[str], str]] = None):
+    def __init__(self, ask_path: Optional[Callable[[str, str], str]] = None, ask_save: Optional[Callable[[str], str]] = None,
+                 ask_confirm: Optional[Callable[[str, str], bool]] = None):
         super().__init__()
         self.setObjectName("researchTuning")
         self._ask_path = ask_path or self._dialog_path
         self._ask_save = ask_save or self._dialog_save
+        self._ask_confirm = ask_confirm or self._dialog_confirm
+        self.solid: Optional[rm.SolidSummary] = None  # ABM-SOLID-5: the checked solid model
+        self.solid_outcome: Optional[sfr.RunnerOutcome] = None
+        self.solid_limits = sfr.RunnerLimits()
         self.paths = {"inp": "", "unv": "", "odb": ""}
         self.sources: Optional[rm.Sources] = None
         self.result: Optional[rft.TuningResult] = None
@@ -77,6 +86,7 @@ class ResearchTuningPanel(QWidget):
         self._bridge = _Bridge(self)
         self._bridge.done.connect(self._done)
         self._bridge.solved.connect(self._solved)
+        self._bridge.solid_event.connect(self._solid_event)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
@@ -85,6 +95,7 @@ class ResearchTuningPanel(QWidget):
         layout.addWidget(self.banner)
         layout.addWidget(_label(INTRO, "hint"))
         layout.addWidget(self._build_files())
+        layout.addWidget(self._build_solid())
         layout.addWidget(self._build_setup())
         layout.addWidget(self._build_results())
         layout.addStretch(1)
@@ -137,6 +148,61 @@ class ResearchTuningPanel(QWidget):
         row.addStretch(1)
         inner.addLayout(row)
         return card
+
+    def _build_solid(self) -> QFrame:
+        """ABM-SOLID-5: the separate solid mode, shown only for an INP the solid importer reads."""
+        self.solid_card, inner = _card()
+        self.solid_card.setObjectName("card")
+        inner.addWidget(_label(rm.SOLID_TITLE, "sectionTitle"))
+        self.solid_badge = _label(sfr.RESULT_LABEL, "badge")
+        self.solid_badge.setProperty("state", "blocked")
+        inner.addWidget(self.solid_badge)
+        inner.addWidget(_label(rm.SOLID_INTRO, "hint"))
+        inner.addWidget(_label(rm.SOLID_LIMITS, "hint"))
+        self.solid_boxes = {}
+        for key, title in (("solid_identity", "Model identity"), ("solid_material", "Material (from the INP, unchanged)"),
+                           ("solid_reference", "Abaqus reference beside the INP (FE, not experiment)")):
+            inner.addWidget(_label(title, "sectionTitle"))
+            box = QVBoxLayout()
+            inner.addLayout(box)
+            self.solid_boxes[key] = box
+        self.solid_resources = _label("", "hint")
+        inner.addWidget(self.solid_resources)
+        row = QHBoxLayout()
+        self.solid_run_button = QPushButton("Calculate frequencies (one FE solve)...")
+        self.solid_run_button.setObjectName("primary")
+        self.solid_run_button.setMinimumHeight(36)
+        self.solid_run_button.clicked.connect(lambda: self.run_solid())
+        self.solid_cancel_button = QPushButton("Stop calculation")
+        self.solid_cancel_button.setMinimumHeight(36)
+        self.solid_cancel_button.clicked.connect(lambda: self.cancel_solid())
+        row.addWidget(self.solid_run_button)
+        row.addWidget(self.solid_cancel_button)
+        self.solid_progress = QProgressBar()
+        self.solid_progress.setRange(0, 0)
+        self.solid_progress.setTextVisible(False)
+        self.solid_progress.setFixedHeight(10)
+        self.solid_progress.setVisible(False)
+        row.addWidget(self.solid_progress, 1)
+        inner.addLayout(row)
+        self.solid_state = _label("")
+        inner.addWidget(self.solid_state)
+        self.solid_status = _label("", "badge")
+        self.solid_status.setVisible(False)
+        inner.addWidget(self.solid_status)
+        self.solid_fe_note = _label(rm.SOLID_FE_FE_NOTE, "hint")
+        self.solid_fe_note.setVisible(False)
+        inner.addWidget(self.solid_fe_note)
+        for key, title in (("solid_frequencies", "Elastic frequencies"), ("solid_diagnostics", "Supervision and numerical diagnostics")):
+            caption = _label(title, "sectionTitle")
+            caption.setVisible(False)
+            inner.addWidget(caption)
+            box = QVBoxLayout()
+            inner.addLayout(box)
+            self.solid_boxes[key] = box
+            self.solid_boxes[key + "_caption"] = caption
+        self.solid_card.setVisible(False)
+        return self.solid_card
 
     def _build_setup(self) -> QFrame:
         card, inner = _card()
@@ -346,8 +412,13 @@ class ResearchTuningPanel(QWidget):
         path, _f = QFileDialog.getSaveFileName(self, "Export proposal", start, rm.EXPORT_FILTER)
         return path
 
+    def _dialog_confirm(self, title: str, text: str) -> bool:
+        answer = QMessageBox.question(self, title, text, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                      QMessageBox.StandardButton.No)
+        return answer == QMessageBox.StandardButton.Yes
+
     def choose_file(self, kind: str, path: Optional[str] = None) -> bool:
-        if self._active not in (None, "check"):
+        if self._active not in QUIET_JOBS:
             return False
         path = path if path is not None else self._ask_path(kind, str(Path(self.paths[kind]).parent) if self.paths[kind] else "")
         if not path:
@@ -360,7 +431,11 @@ class ResearchTuningPanel(QWidget):
         inp, unv, odb = self.paths["inp"], self.paths["unv"], self.paths["odb"] or None
         if kind == "inp":
             self._clear_compatibility()
+            self._clear_solid()
             self._say("")
+        if self._active == "solid_check" and kind == "inp":  # the solid check of the old INP is dropped
+            self._token += 1
+            self._active, self._cancel = None, None
         if self._active == "check" and (kind == "inp" or unv):  # the new job checks the model again
             self._token += 1
             self._active, self._cancel = None, None
@@ -376,7 +451,7 @@ class ResearchTuningPanel(QWidget):
     def open_result(self, path: Optional[str] = None) -> bool:
         """Show an exported result as it was saved. Only that file is read; nothing named in it is opened and nothing is
         recalculated. An invalid file is said and the page keeps what it showed."""
-        if self._active not in (None, "check"):
+        if self._active not in QUIET_JOBS:
             return False
         path = path if path is not None else self._ask_path("result", str(Path(self.saved_path).parent) if self.saved_path else "")
         if not path:
@@ -387,7 +462,7 @@ class ResearchTuningPanel(QWidget):
             self._say(f"Not opened: {error}")
             return False
         self._say("")
-        if self._active == "check":  # a saved result replaces the pending model check
+        if self._active in ("check", "solid_check"):  # a saved result replaces the pending model check
             self._token += 1
             self._active, self._cancel = None, None
         self._clear_result()
@@ -448,6 +523,10 @@ class ResearchTuningPanel(QWidget):
         if token != self._token:
             return
         self._active, self._cancel = None, None
+        if kind in ("solid_check", "solid_run"):
+            self._solid_done(kind, value)
+            self._refresh()
+            return
         if isinstance(value, Exception):
             report = getattr(value, "compatibility", None)
             if report is not None:
@@ -456,6 +535,9 @@ class ResearchTuningPanel(QWidget):
             else:
                 self._say(str(value))
             self.state.setText("Not completed.")
+            if report is not None and self.paths["inp"]:  # ABM-SOLID-5: perhaps a supported solid model
+                inp = self.paths["inp"]
+                self._start("solid_check", lambda _cancel, _s: rm.check_solid(inp))
         elif kind == "check":
             self._show_compatibility(value)
             self.state.setText("Model checked. Choose the PolyMAX modal set.")
@@ -493,6 +575,116 @@ class ResearchTuningPanel(QWidget):
         self._cancel.set()
         self.state.setText("Cancelling after the current surrogate solve...")
         return True
+
+    # ---------------------------------------------------------------------------------------------- ABM-SOLID-5
+
+    def run_solid(self) -> bool:
+        """ONE supervised offline FE solve of the checked solid INP at its own values, after explicit confirmation."""
+        summary = self.solid
+        if summary is None or self._active not in (None,) or summary.preflight.get("decision") != "ALLOW":
+            return False
+        if not self._ask_confirm("Run one offline FE calculation", rm.solid_confirmation_text(summary)):
+            self.solid_state.setText("Not started: the calculation was not confirmed.")
+            return False
+        self._clear_solid_result()
+        request = sfr.ForwardRequest(summary.inp_path, summary.sha256)
+        limits = self.solid_limits
+        bridge = self._bridge
+        token = self._token + 1  # the token _start gives this job; bound before the worker can report
+
+        def emit(event) -> None:
+            try:
+                bridge.solid_event.emit(token, dict(event))
+            except RuntimeError:
+                pass
+
+        self.solid_state.setText("Starting the supervised worker...")
+        return self._start("solid_run", lambda cancel, _s: sfr.run(request, limits, cancel=cancel, progress=emit))
+
+    def cancel_solid(self) -> bool:
+        if self._active != "solid_run" or self._cancel is None:
+            return False
+        self._cancel.set()
+        self.solid_state.setText("Stopping: the worker and all its processes are being terminated...")
+        return True
+
+    def _solid_event(self, token: int, event: dict) -> None:
+        if token != self._token or self._active != "solid_run":
+            return
+        stage = event.get("stage", "")
+        detail = f" ({event['done']} / {event['total']})" if event.get("total") else ""
+        memory = ""
+        if event.get("peak_job_memory_bytes") is not None:
+            memory = (f" | peak memory so far {event['peak_job_memory_bytes'] / 1024 ** 3:.2f} GiB, available "
+                      f"{event.get('available_memory_bytes', 0) / 1024 ** 3:.2f} GiB")
+        self.solid_state.setText(f"Running: {stage}{detail}{memory}")
+
+    def _solid_done(self, kind: str, value) -> None:
+        if kind == "solid_check":
+            if isinstance(value, Exception):
+                self.solid = None
+                self.solid_card.setVisible(True)
+                self.solid_state.setText(str(value))
+                self.solid_run_button.setVisible(False)
+                self.solid_cancel_button.setVisible(False)
+                return
+            self._show_solid(value)
+            self._say("The Kirchhoff-Ritz tuning cannot use this INP. Its frequencies can be calculated in the solid "
+                      "offline FE section below.")
+            return
+        if isinstance(value, Exception):
+            self.solid_state.setText(f"Not completed: {value}")
+            return
+        self._show_solid_outcome(value)
+
+    def _clear_solid_result(self) -> None:
+        self.solid_outcome = None
+        self.solid_status.setVisible(False)
+        self.solid_fe_note.setVisible(False)
+        for key in ("solid_frequencies", "solid_diagnostics"):
+            self._table(key, None, (), (), 0)
+            self.solid_boxes[key + "_caption"].setVisible(False)
+
+    def _clear_solid(self) -> None:
+        self.solid = None
+        self._clear_solid_result()
+        for key in ("solid_identity", "solid_material", "solid_reference"):
+            self._table(key, None, (), (), 0)
+        self.solid_resources.setText("")
+        self.solid_state.setText("")
+        self.solid_card.setVisible(False)
+
+    def _show_solid(self, summary: rm.SolidSummary) -> None:
+        self.solid = summary
+        self.solid_card.setVisible(True)
+        self.solid_run_button.setVisible(True)
+        self.solid_cancel_button.setVisible(True)
+        self._table("solid_identity", self.solid_boxes["solid_identity"], ("Item", "Value"), rm.solid_identity_rows(summary), 1)
+        self._table("solid_material", self.solid_boxes["solid_material"], ("Input", "Value"), rm.solid_material_rows(summary), 1)
+        self._table("solid_reference", self.solid_boxes["solid_reference"], ("Item", "Value"),
+                    rm.solid_reference_rows(summary), 1)
+        self.solid_resources.setText(rm.solid_resource_text(summary))
+        allowed = summary.preflight.get("decision") == "ALLOW"
+        self.solid_state.setText("Ready. Nothing is calculated until you start and confirm it." if allowed
+                                 else "The calculation is not allowed on this computer now; see the resources line.")
+
+    def _show_solid_outcome(self, outcome: sfr.RunnerOutcome) -> None:
+        self.solid_outcome = outcome
+        solved = outcome.status == sfr.SOLVED
+        self.solid_status.setText(f"{outcome.status} | {sfr.RESULT_LABEL}" if solved else f"{outcome.status}: no frequencies")
+        self.solid_status.setProperty("state", "chosen" if solved else "blocked")
+        self.solid_status.style().unpolish(self.solid_status)
+        self.solid_status.style().polish(self.solid_status)
+        self.solid_status.setVisible(True)
+        if solved:
+            self.solid_boxes["solid_frequencies_caption"].setVisible(True)
+            self._table("solid_frequencies", self.solid_boxes["solid_frequencies"], rm.SOLID_FREQUENCY_HEADERS,
+                        rm.solid_frequency_rows(outcome.result, self.solid), 0)
+            self.solid_fe_note.setVisible(True)
+        self.solid_boxes["solid_diagnostics_caption"].setVisible(True)
+        self._table("solid_diagnostics", self.solid_boxes["solid_diagnostics"], ("Item", "Value"),
+                    rm.solid_diagnostic_rows(outcome), 1)
+        self.solid_state.setText(f"{outcome.status}: {outcome.message}")
 
     # ---------------------------------------------------------------------------------------------- run
 
@@ -663,7 +855,11 @@ class ResearchTuningPanel(QWidget):
         return True
 
     def _refresh(self) -> None:
-        running = self._active not in (None, "check")  # a model check never holds the file choice
+        running = self._active not in QUIET_JOBS  # a model check never holds the file choice
+        solid_ok = self.solid is not None and self.solid.preflight.get("decision") == "ALLOW"
+        self.solid_run_button.setEnabled(self._active is None and solid_ok)
+        self.solid_cancel_button.setEnabled(self._active == "solid_run")
+        self.solid_progress.setVisible(self._active == "solid_run")
         for button in self.buttons.values():
             button.setEnabled(not running)
         for widget in (self.parameterization, self.declared, self.search, self.degree):
@@ -672,7 +868,7 @@ class ResearchTuningPanel(QWidget):
         self.cancel_button.setEnabled(self._active in ("fit", "stability"))
         live = self.result is not None and self.result.status != rft.CANCELLED and self.saved_path is None
         self.stability_button.setEnabled(not running and live)
-        self.progress.setVisible(running)
+        self.progress.setVisible(running and self._active != "solid_run")
         self.export_button.setEnabled(not running and live)
         self.open_button.setEnabled(not running)
 

@@ -467,6 +467,236 @@ def open_saved(path) -> tuple:
     return result, stability
 
 
+# ================================================================================================ ABM-SOLID-5: solid mode
+
+SOLID_TITLE = "Solid offline FE — research"
+SOLID_INTRO = ("This INP is a solid C3D8I model, which the Kirchhoff-Ritz tuning above does not read. Here its modal "
+               "frequencies can be calculated offline, ONCE per confirmed request, at the INP's own material values, with "
+               "the program's reference C3D8I element in a supervised background process. No Abaqus, no fitting, no "
+               "parameter change.")
+SOLID_LIMITS = ("Limits: the reference element follows published incompatible-mode theory (9 Wilson-Taylor modes); its "
+                "equivalence to Abaqus C3D8I is NOT VERIFIED. One part, one instance, one material, one orientation, no "
+                "boundary conditions (free-free). The result is a numerical forward result, not material properties and "
+                "not a comparison with the experiment.")
+SOLID_FE_FE_NOTE = ("FE-to-FE only: offline FE against the Abaqus .dat beside the INP, paired by index after the six lowest "
+                    "(rigid-body) modes. This says nothing about the experiment; experimental mode shapes are compared on "
+                    "the Analyze and MAC / Points pages.")
+SOLID_FREQUENCY_HEADERS = ("Elastic mode", "Offline FE (Hz)", "Abaqus .dat (Hz)", "Difference (Hz)", "Difference (%)")
+
+
+@dataclass(frozen=True)
+class SolidReference:
+    dat_path: str
+    verified: bool
+    checks: tuple            # (check, value, PASS/FAIL)
+    elastic_hz: tuple        # .dat rows above the six lowest, as written
+    rigid_marked: tuple      # modes Abaqus itself marked with '*'
+    note: str
+
+
+@dataclass(frozen=True)
+class SolidSummary:
+    inp_path: str
+    sha256: str
+    element_count: int
+    node_count: int
+    dof_count: int
+    instance: Optional[str]
+    material_name: str
+    material: dict
+    density: float
+    axes: tuple
+    orientation: Optional[str]
+    requested_eigenvalues: Optional[int]
+    volume_mm3: float
+    formulation: str
+    abaqus_equivalence: str
+    preflight: dict
+    reference: Optional[SolidReference]
+
+
+def _printed_resolution(text: str) -> float:
+    """Half a unit in the last printed digit of an Abaqus number such as 1.1836072E-04."""
+    mantissa, _, exponent = text.upper().partition("E")
+    decimals = len(mantissa.split(".")[1]) if "." in mantissa else 0
+    return 0.5 * 10.0 ** (int(exponent or 0) - decimals)
+
+
+def read_solid_reference(dat_path, element_count: int, node_count: int, mass_t: float) -> SolidReference:
+    """The .dat eigenvalue table, shown only when its problem size and total mass match this INP's mesh and density.
+    The .dat does not echo the material constants, so those cannot be verified from it."""
+    import re
+
+    text = Path(dat_path).read_text(encoding="latin-1", errors="replace")
+    checks = []
+
+    def number(pattern):
+        found = re.search(pattern, text)
+        return found.group(1) if found else None
+
+    elements = number(r"NUMBER OF ELEMENTS IS\s+(\d+)")
+    nodes = number(r"NUMBER OF NODES DEFINED BY THE USER\s+(\d+)")
+    mass = number(r"TOTAL MASS OF MODEL\s+(\S+)")
+    checks.append(("Elements in the .dat", elements or "not found", "PASS" if elements and int(elements) == element_count else "FAIL"))
+    checks.append(("User nodes in the .dat", nodes or "not found", "PASS" if nodes and int(nodes) == node_count else "FAIL"))
+    if mass:
+        tolerance = _printed_resolution(mass) + 1e-12 * abs(mass_t)
+        same = abs(float(mass) - mass_t) <= tolerance
+        checks.append(("Total mass in the .dat", f"{mass} t (INP density × volume {mass_t:.7E} t, printed precision)",
+                       "PASS" if same else "FAIL"))
+    else:
+        checks.append(("Total mass in the .dat", "not found", "FAIL"))
+    start = text.find("E I G E N V A L U E    O U T P U T")
+    rows = []
+    if start >= 0:
+        for line in text[start:].splitlines()[1:]:
+            found = re.match(r"\s+(\d+)(\*?)\s+(\S+)\s+(\S+)\s+(\S+)", line)
+            if found:
+                rows.append((int(found.group(1)), found.group(2) == "*", float(found.group(5))))
+            elif rows and not line.strip():
+                break
+    checks.append(("Eigenvalue rows in the .dat", str(len(rows)), "PASS" if len(rows) > 6 else "FAIL"))
+    verified = all(c[2] == "PASS" for c in checks)
+    note = ("Mesh size and total mass match this INP; the .dat does not echo the material constants, so they are taken "
+            "as the INP's." if verified else "Not used: the .dat does not match this INP's mesh or mass.")
+    return SolidReference(str(dat_path), verified, tuple(checks), tuple(r[2] for r in rows[6:]),
+                          tuple(r[0] for r in rows if r[1]), note)
+
+
+def check_solid(inp_path) -> SolidSummary:
+    """Read-only: import with the solid importer, its preflight and memory decision, and a matching .dat if any."""
+    from services import solid_c3d8i_forward as sf
+    from services import solid_c3d8i_model as sm
+    from services import solid_forward_runner as sfr
+
+    try:
+        model = sm.load_solid_inp(inp_path)
+    except (OSError, sf.SolidElementError) as error:
+        raise ReadFailed(f"Solid offline FE is not available for this INP: {error}") from error
+    x = model.coordinates[model.connectivity]
+    geometries, inverse = np.unique((x - x[:, :1, :]).reshape(len(x), 24), axis=0, return_inverse=True)
+    volumes = np.array([sf.element_volume(g.reshape(8, 3)) for g in geometries])
+    volume = float(np.sum(volumes[np.asarray(inverse).reshape(-1)]))
+    try:
+        info = sfr.preflight(sfr.ForwardRequest(str(inp_path), model.source_sha256))
+    except sfr.RunnerRefused as error:
+        raise ReadFailed(f"Solid offline FE is not available: {error}") from error
+    dat = Path(inp_path).with_suffix(".dat")
+    reference = (read_solid_reference(dat, len(model.element_labels), len(model.node_labels), model.density * volume)
+                 if dat.is_file() else None)
+    m = model.material
+    return SolidSummary(str(inp_path), model.source_sha256, len(model.element_labels), len(model.node_labels),
+                        model.dof_count, model.instance_name, model.material_name,
+                        {k: getattr(m, k) for k in ("e1", "e2", "e3", "nu12", "nu13", "nu23", "g12", "g13", "g23")},
+                        model.density, tuple(map(tuple, model.material_axes.tolist())), model.orientation_name,
+                        model.requested_eigenvalues, volume, model.formulation, model.abaqus_equivalence, info, reference)
+
+
+def _gib(value) -> str:
+    return "—" if value is None else f"{value / 1024 ** 3:.2f} GiB"
+
+
+def solid_identity_rows(s: SolidSummary) -> tuple:
+    return (("INP", s.inp_path), ("SHA-256", s.sha256), ("Instance", s.instance or "none (flat input)"),
+            ("Elements", f"{s.element_count} C3D8I"), ("Nodes", str(s.node_count)), ("Degrees of freedom", str(s.dof_count)),
+            ("Volume", f"{s.volume_mm3:.6g} mm³"), ("Mass (INP density × volume)", f"{s.density * s.volume_mm3 * 1e6:.3f} g"),
+            ("Element formulation", s.formulation), ("Abaqus element equivalence", s.abaqus_equivalence))
+
+
+def solid_material_rows(s: SolidSummary) -> tuple:
+    m = s.material
+    axes = "global axes" if np.allclose(s.axes, np.eye(3)) else "; ".join(
+        f"{n} = ({', '.join(f'{v:.4g}' for v in row)})" for n, row in zip(("1", "2", "3"), s.axes))
+    return ((f"E1 (original, used)", f"{m['e1']:g} MPa"), ("E2 (original, used)", f"{m['e2']:g} MPa"),
+            ("G12 (original, used)", f"{m['g12']:g} MPa"), ("E3 (fixed)", f"{m['e3']:g} MPa"), ("nu12 (fixed)", f"{m['nu12']:g}"),
+            ("nu13 (fixed)", f"{m['nu13']:g}"), ("nu23 (fixed)", f"{m['nu23']:g}"), ("G13 (fixed)", f"{m['g13']:g} MPa"),
+            ("G23 (fixed)", f"{m['g23']:g} MPa"), ("Density (fixed)", f"{s.density:g} t/mm³"),
+            ("Material axes", f"{s.orientation or 'no orientation'}: {axes}"))
+
+
+def solid_resource_text(s: SolidSummary) -> str:
+    p = s.preflight
+    text = (f"Estimated peak {_gib(p['peak_bytes_estimate'])} (factor estimate {_gib(p['factor_bytes_estimate'])}); "
+            f"available now {_gib(p['available_memory_bytes'])}; supervised limit {_gib(p['job_memory_limit_bytes'])} for "
+            f"all worker processes; {_gib(p['reserve_free_memory_bytes'])} kept free for the system.")
+    if p["decision"] != "ALLOW":
+        text += " NOT ALLOWED: " + " ".join(p["decision_reasons"])
+    return text
+
+
+def solid_reference_rows(s: SolidSummary) -> tuple:
+    if s.reference is None:
+        return (("Abaqus .dat beside the INP", "none: no FE-to-FE comparison"),)
+    r = s.reference
+    rows = [("Abaqus .dat", r.dat_path)] + [(name, f"{value}  [{state}]") for name, value, state in r.checks]
+    rows.append(("Modes Abaqus marked rigid (*)", ", ".join(map(str, r.rigid_marked)) or "none marked"))
+    rows.append(("Use", r.note))
+    return tuple(rows)
+
+
+def solid_confirmation_text(s: SolidSummary) -> str:
+    m = s.material
+    return (f"Run ONE offline FE calculation of this model?\n\n{s.inp_path}\nSHA-256 {s.sha256}\n"
+            f"{s.element_count} C3D8I elements, {s.dof_count} degrees of freedom.\n\n"
+            f"Material exactly as in the INP, unchanged: E1 {m['e1']:g}, E2 {m['e2']:g}, G12 {m['g12']:g} MPa; "
+            f"E3 {m['e3']:g}, G13 {m['g13']:g}, G23 {m['g23']:g} MPa; nu12 {m['nu12']:g}, nu13 {m['nu13']:g}, "
+            f"nu23 {m['nu23']:g}; density {s.density:g} t/mm³.\n\n"
+            f"Scope: 6 rigid-body + 14 elastic + 4 guard modes, once. No fitting, no repetition, no Abaqus. "
+            f"{solid_resource_text(s)}")
+
+
+def solid_frequency_rows(result: dict, s: Optional[SolidSummary]) -> tuple:
+    ref = s.reference.elastic_hz if s is not None and s.reference is not None and s.reference.verified else ()
+    rows = []
+    for index, hz in enumerate(result["frequencies_hz"]):
+        if index < len(ref):
+            diff = hz - ref[index]
+            rows.append((str(index + 1), f"{hz:.4f}", f"{ref[index]:g}", f"{diff:+.4f}", f"{100 * diff / ref[index]:+.3f}"))
+        else:
+            rows.append((str(index + 1), f"{hz:.4f}", "—", "—", "—"))
+    return tuple(rows)
+
+
+def solid_diagnostic_rows(outcome) -> tuple:
+    rows = [("Status", outcome.status), ("Message", outcome.message),
+            ("Worker process", f"PID {outcome.worker_pid}, verified inside the supervision job" if outcome.worker_in_job
+             else f"PID {outcome.worker_pid}: NOT verified"),
+            ("Launcher process", f"PID {outcome.launcher_pid}"),
+            ("Peak memory, all worker processes (measured by Windows)", _gib(outcome.peak_job_memory_bytes) + (
+                " — LIMIT REACHED: this figure includes the allocation Windows refused" if outcome.memory_limit_reached
+                else "")),
+            ("Peak memory of the solver process (its own report)", _gib(outcome.peak_worker_commit_bytes)),
+            ("Available memory before / lowest during the run", f"{_gib(outcome.available_memory_before_bytes)} / "
+                                                                f"{_gib(outcome.min_available_memory_bytes)}"),
+            ("Worker processes still running after the run", "—" if outcome.active_processes_after is None
+             else str(outcome.active_processes_after)),
+            ("Runtime", f"{outcome.runtime_seconds:.1f} s")]
+    r = outcome.result
+    if r and "frequencies_hz" in r:
+        rigid = r["rigid"]
+        seconds = r["seconds"]
+        rows += [("Stages", ", ".join(f"{k} {v:.1f} s" for k, v in seconds.items())),
+                 ("Factorisation", f"{r['factor_nonzeros']:,} nonzeros"),
+                 ("Shift", f"{r['shift']:.6g} ({r['shift_source']}); {r['operator_applications']} operator applications"),
+                 ("Largest backward error", f"{r['max_backward_error']:.2e}"),
+                 ("Mass orthogonality error", f"{r['mass_orthogonality_error']:.2e}"),
+                 ("Rigid-body modes", f"{'passed' if rigid['passed'] else 'FAILED'}: C2E0 {rigid['c2e0']}, "
+                                      f"f_rigid,max / f_elastic,1 = {rigid['ratio']:.3g}, smallest span cosine "
+                                      f"{rigid['min_span_cosine']:.12f}, largest rigid content of an elastic mode "
+                                      f"{rigid['max_rigid_content_of_elastic']:.2e}"),
+                 ("First elastic mode", f"{r['frequencies_hz'][0]:.4f} Hz (kept: the six lowest are the verified rigid-body modes)"),
+                 ("Guard modes above the window", ", ".join(f"{v:.3f}" for v in r["guard_frequencies_hz"]) + " Hz"),
+                 ("Closest neighbouring pair", f"{100 * min(r['relative_spacing']):.2f} % relative spacing"),
+                 ("Material used", ", ".join(f"{k} {v:g}" for k, v in r["material"].items()) + f", density {r['density']:g}"),
+                 ("Element", f"{r['formulation']}; Abaqus equivalence {r['abaqus_equivalence']}")]
+    elif r:
+        rows.append(("Failure diagnostics", "; ".join(f"{k}: {v}" for k, v in r.items() if k != "all_eigenvalues")))
+    return tuple(rows)
+
+
 __all__ = ["ANALYZE_NOTE", "check_model", "compatibility_notes", "compatibility_rows", "LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
            "frequency_rows", "input_rows", "minima_rows", "parse_declared", "read_sources", "sensitivity_rows",
-           "surrogate_rows"]
+           "surrogate_rows", "SOLID_FE_FE_NOTE", "SOLID_FREQUENCY_HEADERS", "SOLID_INTRO", "SOLID_LIMITS", "SOLID_TITLE",
+           "SolidReference", "SolidSummary", "check_solid", "read_solid_reference", "solid_confirmation_text",
+           "solid_diagnostic_rows", "solid_frequency_rows", "solid_identity_rows", "solid_material_rows",
+           "solid_reference_rows", "solid_resource_text"]
