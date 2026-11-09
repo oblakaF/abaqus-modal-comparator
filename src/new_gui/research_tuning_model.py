@@ -41,8 +41,46 @@ EXPORT_FILTER = "Research tuning proposal (*.json)"
 DPI = 100
 
 
+ANALYZE_NOTE = ("Still available: the Analyze page shows the FE and EXP shapes and runs registration and comparison from "
+                "this model's ODB and the EXP file; none of that needs this INP.")
+
+
 class ReadFailed(ValueError):
-    pass
+    def __init__(self, message: str, compatibility: Optional[rft.InpCompatibility] = None):
+        super().__init__(message)
+        self.compatibility = compatibility
+
+
+def check_model(inp_path) -> rft.InpCompatibility:
+    """ABM-REAL-INPUT-1: what the INP is and whether Research Tuning reads it, from its text alone. A model it does not read
+    is a ReadFailed carrying the report; nothing is converted."""
+    try:
+        report = rft.inspect_inp(inp_path)
+    except (OSError, ValueError) as error:
+        raise ReadFailed(f"The INP could not be used: {error}") from error
+    if not report.supported:
+        raise ReadFailed(f"The INP could not be used: {report.reason}", report)
+    return report
+
+
+def compatibility_rows(report: rft.InpCompatibility) -> tuple:
+    return tuple((what, value) for what, value in report.facts)
+
+
+def compatibility_notes(report: rft.InpCompatibility) -> str:
+    """What the owner can still do with a model this page does not read. Files beside the INP are only looked up by name;
+    an extracted package is used by Analyze only when it matches the ODB."""
+    if report.supported:
+        return ""
+    inp = Path(report.inp_path)
+    lines = [ANALYZE_NOTE]
+    odb = inp.with_suffix(".odb")
+    if odb.is_file():
+        folder = am.package_folder(odb)
+        lines.append(f"{odb.name} is beside the INP" + (f", with extracted modes in {folder.name}; Analyze uses them "
+                                                        "without Abaqus when they match that ODB" if folder.is_dir() else "")
+                     + ". This does not enable Research Tuning.")
+    return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -56,6 +94,7 @@ class Sources:
     unv_sha256: str
     set_title: str
     records: tuple  # (record number, Hz) of the curve-fitted records
+    compatibility: Optional[rft.InpCompatibility] = None  # ABM-REAL-INPUT-1: what the INP is
 
 
 def _classify(odb, cancel) -> tuple:
@@ -87,8 +126,11 @@ def _classify(odb, cancel) -> tuple:
 def read_sources(inp_path, unv_path, cancel: threading.Event, odb_path=None) -> Sources:
     """The INP (and its .dat, when present beside it), an optional ODB for the shape-based FE classification, and the
     fitted modes of the experimental file. Read only."""
+    report = check_model(inp_path)
     try:
         inputs = rft.read_inp(inp_path)
+    except rft.InpNotSupported as error:
+        raise ReadFailed(f"The INP could not be used: {error}", error.report) from error
     except (OSError, rft.TuningRefused) as error:
         raise ReadFailed(f"The INP could not be used: {error}") from error
     dat = Path(inp_path).with_suffix(".dat")
@@ -111,7 +153,7 @@ def read_sources(inp_path, unv_path, cancel: threading.Event, odb_path=None) -> 
     records = tuple((int(r.number), float(r.frequency_hz)) for r in chosen.records)
     identity = outcome.identity or {}
     return Sources(inputs, str(dat) if rows else None, rows, elastic, classification, str(unv_path),
-                   str(identity.get("sha256", "")), chosen.title, records)
+                   str(identity.get("sha256", "")), chosen.title, records, report)
 
 
 def default_holdout(records) -> tuple:
@@ -425,6 +467,6 @@ def open_saved(path) -> tuple:
     return result, stability
 
 
-__all__ = ["LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
+__all__ = ["ANALYZE_NOTE", "check_model", "compatibility_notes", "compatibility_rows", "LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
            "frequency_rows", "input_rows", "minima_rows", "parse_declared", "read_sources", "sensitivity_rows",
            "surrogate_rows"]

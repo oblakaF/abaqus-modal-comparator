@@ -122,11 +122,198 @@ def _sha(path: Path) -> str:
     return digest.hexdigest()
 
 
-def read_inp(path) -> AbaqusPlateInputs:
-    """The material, density, shell thickness and plan of a single-part, single-material shell plate INP. Read only."""
-    path = Path(path)
-    text = path.read_text(encoding="latin-1")
-    lines = text.splitlines()
+# ---------------------------------------------------------------------------------------------- model compatibility
+# ABM-REAL-INPUT-1: what the INP is, read from its text, and whether this tool can use it. Nothing is converted or assumed:
+# a solid model is not turned into a shell, no thickness is taken from the mesh, and *Include files are named, never read.
+
+COMPATIBLE, SOLID_MODEL, MIXED_ELEMENTS, NO_SHELL_ELEMENTS, IN_INCLUDE, MISSING_DEFINITION, UNSUPPORTED_MATERIAL, \
+    COMPOSITE_LAYUP, MORE_THAN_ONE = ("COMPATIBLE_SHELL_MODEL", "SOLID_MODEL", "MIXED_ELEMENT_FAMILIES", "NO_SHELL_ELEMENTS",
+                                      "DEFINITIONS_IN_INCLUDED_FILE", "MISSING_DEFINITION", "UNSUPPORTED_MATERIAL_MODEL",
+                                      "COMPOSITE_LAYUP", "MORE_THAN_ONE_DEFINITION")
+_MATERIAL_OPTIONS = ("*elastic", "*density", "*damping", "*expansion", "*plastic", "*hyperelastic", "*hyperfoam",
+                     "*viscoelastic", "*conductivity", "*specific heat", "*depvar", "*user material", "*user defined field")
+_NOT_MODAL = ("*plastic", "*hyperelastic", "*hyperfoam", "*viscoelastic", "*user material")
+SOLID_BACKEND_NOTE = ("Research Tuning of a solid model needs a different forward model, a solid FE solve of every candidate; "
+                      "this program has none that runs offline, and an Abaqus solve needs the owner's authorisation.")
+
+
+@dataclass(frozen=True)
+class InpCompatibility:
+    inp_path: str
+    verdict: str
+    reason: str  # one or two sentences, user-readable
+    facts: tuple  # (what, as read from the INP)
+    includes: tuple  # (file named by *Include, found beside the INP)
+
+    @property
+    def supported(self) -> bool:
+        return self.verdict == COMPATIBLE
+
+
+class InpNotSupported(TuningRefused):
+    """The INP is not a model this tool reads; ``report`` says what it is and why."""
+
+    def __init__(self, report: InpCompatibility):
+        super().__init__(report.reason)
+        self.report = report
+
+
+def element_family(element_type: str) -> str:
+    kind = element_type.strip().upper()
+    if kind.startswith("SC"):
+        return "continuum shell"
+    if re.match(r"S\d|STRI", kind):
+        return "shell"
+    if kind.startswith("C3D"):
+        return "solid"
+    return "other"
+
+
+def _option(text: str, name: str) -> str:
+    found = re.search(name + r"\s*=\s*(\"[^\"]*\"|[^,]+)", text, re.I)
+    return found.group(1).strip().strip('"') if found else ""
+
+
+def _count(lines: Sequence[str], start: int) -> int:
+    count, previous = 0, ""
+    for line in lines[start + 1:]:
+        if line.startswith("*"):
+            break
+        if line.strip() and not previous.rstrip().endswith(","):
+            count += 1
+        previous = line if line.strip() else previous
+    return count
+
+
+def _inspect(path: Path, lines: Sequence[str], keyword: Sequence[tuple], data_after: Callable) -> InpCompatibility:
+    def low(k):
+        return k.lower()
+
+    elements = {}
+    for i, k in keyword:
+        if low(k).startswith("*element") and not low(k).startswith("*element output"):
+            kind = _option(k, "type").upper() or "?"
+            elements[kind] = elements.get(kind, 0) + _count(lines, i)
+    families = {element_family(kind) for kind in elements}
+    sections = [k for _i, k in keyword if re.match(r"\*\w[\w ]*section\b", low(k)) and "controls" not in low(k)]
+    shell_sections = [k for k in sections if low(k).startswith("*shell section")]
+    solid_sections = [k for k in sections if low(k).startswith("*solid section")]
+    includes = []
+    for _i, k in keyword:
+        if low(k).startswith("*include"):
+            name = _option(k, "input")
+            includes.append((name, bool(name) and (path.parent / name).is_file()))
+    materials, current = [], None
+    for i, k in keyword:
+        if low(k).startswith("*material"):
+            current = {"name": _option(k, "name"), "options": []}
+            materials.append(current)
+        elif current is not None and low(k).startswith(_MATERIAL_OPTIONS):
+            current["options"].append((k, _numbers(data_after(i))))
+        else:
+            current = None
+    nodes = []
+    for i, k in keyword:
+        if low(k) == "*node" or low(k).startswith("*node,"):
+            for line in data_after(i):
+                parts = [p for p in line.split(",") if p.strip()]
+                if len(parts) >= 3:
+                    nodes.append(tuple(float(p) for p in parts[1:4]) + (0.0,) * (4 - len(parts)))
+    facts = [("Elements", "; ".join(f"{kind}: {n} ({element_family(kind)})" for kind, n in elements.items())
+              or "no *Element in this file")]
+    facts.append(("Sections", "; ".join(
+        k.split(",")[0] + "".join(f", {o} {_option(k, o)}" for o in ("material", "orientation") if _option(k, o))
+        for k in sections) or "no section in this file"))
+    if shell_sections:
+        first = _numbers(data_after(next(i for i, k in keyword if k == shell_sections[0]))[:1])
+        facts.append(("Shell thickness", f"{first[0]:g}" if first else "not given on the *Shell Section line"))
+    for material in materials:
+        parts = []
+        for option, values in material["options"]:
+            head = option.split(",")[0]
+            kind = _option(option, "type").upper()
+            parts.append(f"{head}{' ' + kind if kind else ''} ({len(values)} values)" if head.lower() != "*density"
+                         else f"*Density {values[0]:g}" if values else "*Density (no value)")
+        facts.append((f"Material {material['name']}", "; ".join(parts) or "no material data"))
+    if not materials:
+        facts.append(("Materials", "no *Material in this file"))
+    orientations = [_option(k, "name") for _i, k in keyword if low(k).startswith("*orientation")]
+    facts.append(("Orientations", ", ".join(orientations) or "none"))
+    if nodes:
+        extent = [max(n[a] for n in nodes) - min(n[a] for n in nodes) for a in range(3)]
+        facts.append(("Node extent x × y × z", " × ".join(f"{e:g}" for e in extent) + f" ({len(nodes)} nodes)"))
+    else:
+        facts.append(("Nodes", "no *Node data in this file"))
+    facts.append(("*Include", "; ".join(f"{n or '(no input= file)'} ({'found' if ok else 'not found'} beside the INP, not read)"
+                                         for n, ok in includes) or "none"))
+
+    def report(verdict, reason):
+        return InpCompatibility(str(path), verdict, reason, tuple(facts), tuple(includes))
+
+    def missing(what):
+        if includes:
+            names = ", ".join(f"{n or '(unnamed)'} ({'found' if ok else 'not found'})" for n, ok in includes)
+            verb = "are" if " and " in what else "is"
+            return report(IN_INCLUDE, f"{what} {verb} not in this file; it may be in the included file(s) {names}. Research "
+                                      "Tuning reads one self-contained INP and does not follow *Include.")
+        return report(MISSING_DEFINITION, f"The INP has no {what}.")
+
+    kinds = ", ".join(elements)
+    if "solid" in families and "shell" not in families or (not elements and solid_sections and not shell_sections):
+        return report(SOLID_MODEL, f"Solid model ({kinds or 'no *Element'}, {'*Solid Section' if solid_sections else 'no shell section'}"
+                                   "): the Kirchhoff-Ritz surrogate of Research Tuning stands for a shell model and takes its "
+                                   "thickness from a *Shell Section. A solid model is not converted to a shell and no thickness "
+                                   "is taken from the mesh. " + SOLID_BACKEND_NOTE)
+    if "continuum shell" in families and "shell" not in families:
+        return report(SOLID_MODEL, f"Continuum-shell model ({kinds}): its thickness comes from the mesh, not from a "
+                                   "*Shell Section, and it is not converted here. " + SOLID_BACKEND_NOTE)
+    if "shell" in families and families - {"shell"}:
+        return report(MIXED_ELEMENTS, f"The INP mixes element families ({kinds}); Research Tuning reads a model of shell "
+                                      "elements only.")
+    if elements and "shell" not in families:
+        return report(NO_SHELL_ELEMENTS, f"The INP has no shell elements ({kinds}); Research Tuning reads a shell model only.")
+    if not materials:
+        return missing("*Material")
+    if len(materials) != 1:
+        return report(MORE_THAN_ONE, f"The INP holds {len(materials)} materials; this tool reads exactly one homogeneous "
+                                     "material.")
+    options = {opt.split(",")[0].strip().lower(): (opt, values) for opt, values in materials[0]["options"]}
+    absent = [name for name, key in (("*Elastic", "*elastic"), ("*Density", "*density")) if key not in options]
+    if not shell_sections and not sections:
+        absent.append("*Shell Section")
+    if absent:
+        return missing(" and ".join(absent) if len(absent) < 3 else "*Elastic, *Density and *Shell Section")
+    if not shell_sections:
+        return report(NO_SHELL_ELEMENTS, "The INP has no *Shell Section (" + ", ".join(k.split(",")[0] for k in sections)
+                      + "); Research Tuning reads a shell model only.")
+    other = [o.split(",")[0] for o, _v in materials[0]["options"] if o.lower().startswith(_NOT_MODAL)]
+    if other:
+        return report(UNSUPPORTED_MATERIAL, f"The material has {', '.join(other)}; this tool reads a linear elastic "
+                                            "orthotropic material only.")
+    elastic, values = options["*elastic"]
+    kind = (_option(elastic, "type") or "ISOTROPIC").upper()
+    wanted = {"ENGINEERING CONSTANTS": 9, "LAMINA": 6}.get(kind)
+    if wanted is None or len(values) < wanted:
+        return report(UNSUPPORTED_MATERIAL, f"*Elastic type {kind} with {len(values)} values is not an orthotropic "
+                                            "definition this tool reads.")
+    if len(values) != wanted or _option(elastic, "dependencies"):
+        return report(UNSUPPORTED_MATERIAL, f"*Elastic type {kind} holds {len(values)} values; this tool reads one "
+                                            f"temperature-independent set of {wanted}.")
+    if not options["*density"][1]:
+        return missing("*Density value")
+    if any("composite" in low(k) for k in shell_sections):
+        return report(COMPOSITE_LAYUP, "The shell section is a composite layup; this tool converts one homogeneous layer only.")
+    if len(shell_sections) > 1:
+        return report(MORE_THAN_ONE, "The INP holds more than one shell section.")
+    if not nodes:
+        return missing("*Node block")
+    note = " The included file(s) were not read." if includes else ""
+    return report(COMPATIBLE, f"Shell model ({kinds or 'elements not in this file'}, one *Shell Section, one orthotropic "
+                              f"material): Research Tuning can read it.{note}")
+
+
+def _keywords(path: Path):
+    lines = path.read_text(encoding="latin-1").splitlines()
     keyword = [(i, line.strip()) for i, line in enumerate(lines) if line.startswith("*") and not line.startswith("**")]
 
     def data_after(index: int) -> list:
@@ -136,6 +323,25 @@ def read_inp(path) -> AbaqusPlateInputs:
                 break
             out.append(line)
         return out
+
+    return lines, keyword, data_after
+
+
+def inspect_inp(path) -> InpCompatibility:
+    """What the INP holds and whether this tool can read it. Read only; *Include files are named, not opened."""
+    path = Path(path)
+    lines, keyword, data_after = _keywords(path)
+    return _inspect(path, lines, keyword, data_after)
+
+
+def read_inp(path) -> AbaqusPlateInputs:
+    """The material, density, shell thickness and plan of a single-part, single-material shell plate INP. Read only.
+    Anything else is refused with ``InpNotSupported``, whose report says what the INP is."""
+    path = Path(path)
+    lines, keyword, data_after = _keywords(path)
+    report = _inspect(path, lines, keyword, data_after)
+    if not report.supported:
+        raise InpNotSupported(report)
 
     materials = [(i, k) for i, k in keyword if k.lower().startswith("*material")]
     if len(materials) != 1:
@@ -763,4 +969,7 @@ __all__ = ["MAX_SURROGATE_RANK", "validate_correspondence", "ACCURACY_STATEMENT"
            "MIRROR", "Observation", "PARAMETERIZATIONS", "RANK_ORDER", "RESULT_LABEL", "SUPPORTED", "Surrogate", "TIED",
            "TuningRefused", "TuningRequest", "TuningResult", "abaqus_elastic_line", "assumption_sensitivity",
            "bending_stiffness", "export_document", "observations_by_rank", "quantity_table", "read_dat_frequencies",
-           "read_export", "read_inp", "restore_record_keys", "result_from_export", "run_tuning", "surrogate_discrepancy", "write_export"]
+           "read_export", "read_inp", "restore_record_keys", "result_from_export", "run_tuning", "surrogate_discrepancy", "write_export",
+           "COMPATIBLE", "SOLID_MODEL", "MIXED_ELEMENTS", "NO_SHELL_ELEMENTS", "IN_INCLUDE", "MISSING_DEFINITION",
+           "UNSUPPORTED_MATERIAL", "COMPOSITE_LAYUP", "MORE_THAN_ONE", "SOLID_BACKEND_NOTE", "InpCompatibility",
+           "InpNotSupported", "element_family", "inspect_inp"]

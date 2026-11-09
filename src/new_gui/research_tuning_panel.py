@@ -103,6 +103,15 @@ class ResearchTuningPanel(QWidget):
                                 "only by shape, from modes already extracted from the chosen ODB; Abaqus is never started.",
                                 "hint")
         inner.addWidget(self.read_note)
+        self.compat_title = _label("Model check", "sectionTitle")
+        self.compat_verdict = _label("", "hint")
+        self.compat_box = QVBoxLayout()
+        self.compat_notes = _label("", "hint")
+        inner.addWidget(self.compat_title)
+        inner.addWidget(self.compat_verdict)
+        inner.addLayout(self.compat_box)
+        inner.addWidget(self.compat_notes)
+        self._clear_compatibility()
         self.inputs_box = QVBoxLayout()
         inner.addLayout(self.inputs_box)
         row = QHBoxLayout()
@@ -317,7 +326,7 @@ class ResearchTuningPanel(QWidget):
         return path
 
     def choose_file(self, kind: str, path: Optional[str] = None) -> bool:
-        if self._active is not None:
+        if self._active not in (None, "check"):
             return False
         path = path if path is not None else self._ask_path(kind, str(Path(self.paths[kind]).parent) if self.paths[kind] else "")
         if not path:
@@ -327,17 +336,26 @@ class ResearchTuningPanel(QWidget):
         self.fields[kind].setToolTip(str(path))
         self.sources = None
         self._clear_result()
-        if self.paths["inp"] and self.paths["unv"]:
-            inp, unv, odb = self.paths["inp"], self.paths["unv"], self.paths["odb"] or None
+        inp, unv, odb = self.paths["inp"], self.paths["unv"], self.paths["odb"] or None
+        if kind == "inp":
+            self._clear_compatibility()
+            self._say("")
+        if self._active == "check" and (kind == "inp" or unv):  # the new job checks the model again
+            self._token += 1
+            self._active, self._cancel = None, None
+        if inp and unv:
             self.state.setText("Reading the files...")
             self._start("read", lambda cancel, _s: rm.read_sources(inp, unv, cancel, odb))
+        elif kind == "inp":
+            self.state.setText("Checking the model...")
+            self._start("check", lambda _cancel, _s: rm.check_model(inp))
         self._refresh()
         return True
 
     def open_result(self, path: Optional[str] = None) -> bool:
         """Show an exported result as it was saved. Only that file is read; nothing named in it is opened and nothing is
         recalculated. An invalid file is said and the page keeps what it showed."""
-        if self._active is not None:
+        if self._active not in (None, "check"):
             return False
         path = path if path is not None else self._ask_path("result", str(Path(self.saved_path).parent) if self.saved_path else "")
         if not path:
@@ -348,6 +366,9 @@ class ResearchTuningPanel(QWidget):
             self._say(f"Not opened: {error}")
             return False
         self._say("")
+        if self._active == "check":  # a saved result replaces the pending model check
+            self._token += 1
+            self._active, self._cancel = None, None
         self._clear_result()
         self.request = None  # the saved run's request is not live: the stability check stays off
         index = self.parameterization.findData(result.request.get("parameterization"))
@@ -407,11 +428,21 @@ class ResearchTuningPanel(QWidget):
             return
         self._active, self._cancel = None, None
         if isinstance(value, Exception):
-            self._say(str(value))
+            report = getattr(value, "compatibility", None)
+            if report is not None:
+                self._show_compatibility(report)
+                self._say("Research Tuning cannot use this INP; the model check above says why.")
+            else:
+                self._say(str(value))
             self.state.setText("Not completed.")
+        elif kind == "check":
+            self._show_compatibility(value)
+            self.state.setText("Model checked. Choose the PolyMAX modal set.")
         elif kind == "read":
             self.sources = value
             self._say("")
+            if value.compatibility is not None:
+                self._show_compatibility(value.compatibility)
             self._table("inputs", self.inputs_box, ("Initial assumed Abaqus value", "Value"), rm.input_rows(value), 1)
             self._show_records()
             self.state.setText(f"Read: {len(value.records)} curve-fitted records of {value.set_title}.")
@@ -513,6 +544,27 @@ class ResearchTuningPanel(QWidget):
         self.influence_note.setVisible(True)
         self.state.setText(f"Stability check done: {stability['solves']} surrogate solves.")
 
+    def _clear_compatibility(self) -> None:
+        self.compat_verdict.setText("")
+        self.compat_notes.setText("")
+        for widget in (self.compat_title, self.compat_verdict, self.compat_notes):
+            widget.setVisible(False)
+        self._table("compatibility", None, (), (), 0)
+
+    def _show_compatibility(self, report) -> None:
+        """ABM-REAL-INPUT-1: what the INP is; for a model this page does not read, what was read and what stays available."""
+        self.compat_title.setVisible(True)
+        self.compat_verdict.setText(report.reason)
+        self.compat_verdict.setObjectName("hint" if report.supported else "warnings")
+        self.compat_verdict.style().unpolish(self.compat_verdict)
+        self.compat_verdict.style().polish(self.compat_verdict)
+        self.compat_verdict.setVisible(True)
+        self._table("compatibility", self.compat_box, ("Read from the INP", "Value"),
+                    () if report.supported else rm.compatibility_rows(report), 1)
+        notes = rm.compatibility_notes(report)
+        self.compat_notes.setText(notes)
+        self.compat_notes.setVisible(bool(notes))
+
     def _say(self, text: str) -> None:
         self.message.setText(text)
         self.message.setVisible(bool(text))
@@ -589,7 +641,7 @@ class ResearchTuningPanel(QWidget):
         return True
 
     def _refresh(self) -> None:
-        running = self._active is not None
+        running = self._active not in (None, "check")  # a model check never holds the file choice
         for button in self.buttons.values():
             button.setEnabled(not running)
         for widget in (self.parameterization, self.declared, self.search, self.degree):
