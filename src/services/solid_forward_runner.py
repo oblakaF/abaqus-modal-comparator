@@ -12,6 +12,12 @@ Supervision (fixes the ABM-SOLID-4 monitoring failure, where only the venv launc
 
 The child verifies the INP SHA-256 the owner confirmed, imports the model with ``solid_c3d8i_model`` and solves
 ONCE with ``solid_c3d8i_solver`` at the INP material.  No Abaqus, no parameter change, no file written.
+
+ABM-SOLID-6, manual What-If: a request may instead carry up to three owner-entered (E1, E2, G12) points.  Each point
+is validated (finite, positive, positive definite with the INP's other constants) in the parent AND in the worker;
+the worker imports the model once, builds ONE forward model (one unique-geometry cache, one mass matrix) and solves
+the points in the given order, reporting each point as it finishes.  A failed point is reported, never retried;
+a stop (cancel, limit) keeps the points already completed.  No search, no fitting, no automatic choice.
 """
 
 from __future__ import annotations
@@ -34,6 +40,13 @@ GiB = 1024 ** 3
 SOLVED, REFUSED, CANCELLED, FAILED, KILLED = "SOLVED", "REFUSED", "CANCELLED", "FAILED", "KILLED"
 RESULT_LABEL = ("RESEARCH NUMERICAL FORWARD RESULT: offline C3D8I reference element (Abaqus equivalence NOT_VERIFIED) "
                 "at the INP's own material values; not identified material properties, not a physical validation.")
+PARTIAL = "PARTIAL"            # What-If: some points solved, some failed or not run
+POINT_SOLVED, POINT_FAILED, POINT_NOT_RUN = "SOLVED", "FAILED", "NOT_RUN"
+MAX_WHATIF_POINTS = 3
+WHATIF_LABEL = ("RESEARCH WHAT-IF FORWARD RESULT: offline C3D8I reference element (Abaqus equivalence NOT_VERIFIED) at "
+                "manually entered E1, E2, G12; every other constant, density, geometry and orientation as in the INP. "
+                "Not identified material properties: a closer frequency match does not prove a material property.")
+WHATIF_PARAMETERS = ("e1", "e2", "g12")
 
 
 @dataclass(frozen=True)
@@ -51,6 +64,7 @@ class ForwardRequest:
     inp_sha256: str
     elastic_modes: int = 14
     guard_modes: int = 4
+    points: tuple = ()          # ABM-SOLID-6: ((E1, E2, G12), ...) in MPa; empty = the single INP-value solve
 
 
 @dataclass
@@ -73,10 +87,59 @@ class RunnerOutcome:
     runtime_seconds: float = 0.0
     stages: list = field(default_factory=list)
     label: str = RESULT_LABEL
+    points: list = field(default_factory=list)   # What-If: one record per point, in the requested order
 
 
 class RunnerRefused(RuntimeError):
     pass
+
+
+# ------------------------------------------------------------------------------------------------ What-If points
+
+
+def point_problems(material, values) -> list:
+    """Why one (E1, E2, G12) entry is not admissible with ``material``'s other constants; empty when it is."""
+    from services import solid_c3d8i_forward as sf
+    from services import solid_c3d8i_model as sm
+    import math
+
+    if values is None or len(values) != 3:
+        return ["Enter E1, E2 and G12."]
+    problems, numbers = [], []
+    for name, value in zip(("E1", "E2", "G12"), values):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            problems.append(f"{name} is not a number.")
+            continue
+        if isinstance(value, bool) or not math.isfinite(number):
+            problems.append(f"{name} must be a finite number.")
+        elif number <= 0.0:
+            problems.append(f"{name} must be positive.")
+        numbers.append(number)
+    if problems:
+        return problems
+    try:
+        sm.vary_in_plane(material, e1=numbers[0], e2=numbers[1], g12=numbers[2])
+    except sf.InadmissibleMaterialError as error:
+        return [f"Not physically admissible with the INP's other constants: {error}"]
+    return []
+
+
+def validate_points(material, points) -> tuple:
+    """The points as floats, in order; RunnerRefused when any is inadmissible, repeated, or there are too many."""
+    points = tuple(points)
+    if not 1 <= len(points) <= MAX_WHATIF_POINTS:
+        raise RunnerRefused(f"Give 1 to {MAX_WHATIF_POINTS} What-If points; {len(points)} were given.")
+    messages = []
+    for index, values in enumerate(points, 1):
+        messages += [f"Point {index}: {p}" for p in point_problems(material, values)]
+    if messages:
+        raise RunnerRefused(" ".join(messages))
+    clean = tuple(tuple(float(v) for v in values) for values in points)
+    if len(set(clean)) != len(clean):
+        raise RunnerRefused("Two What-If points are identical; each point is solved once, so enter distinct points.")
+    return clean
 
 
 # ------------------------------------------------------------------------------------------------ Win32
@@ -262,6 +325,7 @@ def preflight(request: ForwardRequest, limits: RunnerLimits = RunnerLimits()) ->
     if sha256_of(request.inp_path) != request.inp_sha256:
         raise RunnerRefused("The INP changed since it was checked; check and confirm it again.")
     model = sm.load_solid_inp(request.inp_path)
+    points = validate_points(model.material, request.points) if request.points else ()
     pre = ss.SolidForwardModel(model, ss.ResourceLimits(max_memory_bytes=limits.max_job_memory_bytes)).preflight(
         request.elastic_modes, request.guard_modes)
     available = available_memory_bytes()
@@ -272,7 +336,8 @@ def preflight(request: ForwardRequest, limits: RunnerLimits = RunnerLimits()) ->
     info = {k: (list(v) if isinstance(v, tuple) else v) for k, v in pre.__dict__.items()}
     info.update(available_memory_bytes=available, job_memory_limit_bytes=limits.max_job_memory_bytes,
                 reserve_free_memory_bytes=limits.reserve_free_memory_bytes, decision_reasons=reasons,
-                decision="REFUSE" if reasons else "ALLOW")
+                decision="REFUSE" if reasons else "ALLOW", points=[list(p) for p in points],
+                solve_count=len(points) or 1)
     return info
 
 
@@ -284,7 +349,20 @@ def _child_argv() -> list:
 def run(request: ForwardRequest, limits: RunnerLimits = RunnerLimits(), *,
         progress: Optional[Callable[[dict], None]] = None, cancel: Optional[threading.Event] = None,
         child_argv: Optional[list] = None, skip_preflight: bool = False) -> RunnerOutcome:
-    """Run ONE supervised solve.  ``child_argv`` and ``skip_preflight`` exist only for supervision tests."""
+    """Run ONE supervised worker: the single INP-value solve, or the request's What-If points in order.
+    ``child_argv`` and ``skip_preflight`` exist only for supervision tests."""
+    outcome = _run_supervised(request, limits, progress=progress, cancel=cancel, child_argv=child_argv,
+                              skip_preflight=skip_preflight)
+    if request.points and not outcome.points:  # stopped before the worker reported anything: every point NOT_RUN
+        _complete_point_list(outcome, request)
+        outcome.message += " No What-If point was solved."
+    if request.points:
+        outcome.label = WHATIF_LABEL
+    return outcome
+
+
+def _run_supervised(request: ForwardRequest, limits: RunnerLimits, *, progress, cancel, child_argv,
+                    skip_preflight) -> RunnerOutcome:
     started = time.perf_counter()
     outcome = RunnerOutcome(status=FAILED, message="")
     cancel = cancel or threading.Event()
@@ -333,7 +411,7 @@ def run(request: ForwardRequest, limits: RunnerLimits = RunnerLimits(), *,
         spawned = time.perf_counter()
         spec = {"inp_path": request.inp_path, "inp_sha256": request.inp_sha256, "elastic_modes": request.elastic_modes,
                 "guard_modes": request.guard_modes, "max_memory_bytes": limits.max_job_memory_bytes,
-                "max_seconds": limits.max_seconds}
+                "max_seconds": limits.max_seconds, "points": [list(p) for p in request.points]}
         process.stdin.write((json.dumps(spec) + "\n").encode("utf-8"))
         process.stdin.close()
 
@@ -350,6 +428,7 @@ def run(request: ForwardRequest, limits: RunnerLimits = RunnerLimits(), *,
         last_event = time.perf_counter()
         outcome.min_available_memory_bytes = outcome.available_memory_before_bytes
         final = None
+        settled = False
         while True:
             try:
                 event = events.get(timeout=0.25)
@@ -388,6 +467,10 @@ def run(request: ForwardRequest, limits: RunnerLimits = RunnerLimits(), *,
                     event["peak_job_memory_bytes"] = job.peak_memory()
                     event["available_memory_bytes"] = available
                     note(event)
+                elif kind == "point":  # What-If: one finished point (solved or failed), from the verified worker
+                    outcome.points.append(event["point"])
+                    note({"event": "progress", "stage": f"point {event['point'].get('index')} "
+                                                        f"{event['point'].get('status')}"})
                 elif kind in ("result", "error"):
                     final = event
                 elif kind == "eof":
@@ -405,7 +488,12 @@ def run(request: ForwardRequest, limits: RunnerLimits = RunnerLimits(), *,
         outcome.peak_job_memory_bytes = job.peak_memory()
         outcome.memory_limit_reached = outcome.peak_job_memory_bytes > limits.max_job_memory_bytes
         if outcome.status == FAILED and final is not None:  # the loop ended at EOF
-            if final.get("event") == "result" and outcome.worker_in_job:
+            if final.get("event") == "result" and outcome.worker_in_job and request.points:
+                outcome.result = final["result"]
+                outcome.peak_worker_commit_bytes = final.get("peak_worker_commit_bytes")
+                _settle_points(outcome, request)
+                settled = True
+            elif final.get("event") == "result" and outcome.worker_in_job:
                 outcome.status, outcome.result = SOLVED, final["result"]
                 outcome.peak_worker_commit_bytes = final.get("peak_worker_commit_bytes")
                 outcome.message = "One offline FE solve completed."
@@ -418,6 +506,12 @@ def run(request: ForwardRequest, limits: RunnerLimits = RunnerLimits(), *,
         elif outcome.status == FAILED and not outcome.message:
             outcome.message = (f"The worker ended without a result (exit code {process.returncode}); "
                                f"the job memory limit is {limits.max_job_memory_bytes / GiB:.2f} GiB.")
+        if request.points and not settled:
+            _complete_point_list(outcome, request)
+            done = sum(p.get("status") == POINT_SOLVED for p in outcome.points)
+            outcome.message += (f" {done} of {len(request.points)} What-If points had been solved before this; they "
+                                "are shown, each other point is listed as FAILED or NOT_RUN." if done else
+                                " No What-If point was solved.")
     except RunnerRefused as error:
         outcome.status, outcome.message = REFUSED, str(error)
     finally:
@@ -446,12 +540,93 @@ def run(request: ForwardRequest, limits: RunnerLimits = RunnerLimits(), *,
     return outcome
 
 
+def _complete_point_list(outcome: RunnerOutcome, request: ForwardRequest) -> None:
+    """Every requested point appears once, in order; a point the worker never reported is NOT_RUN."""
+    reported = {int(p.get("index", 0)): p for p in outcome.points}
+    outcome.points = [reported.get(i) or {"index": i, "parameters": dict(zip(WHATIF_PARAMETERS, map(float, values))),
+                                          "status": POINT_NOT_RUN, "result": None, "error": None}
+                      for i, values in enumerate(request.points, 1)]
+
+
+def _settle_points(outcome: RunnerOutcome, request: ForwardRequest) -> None:
+    _complete_point_list(outcome, request)
+    solved = [p for p in outcome.points if p["status"] == POINT_SOLVED]
+    others = [p for p in outcome.points if p["status"] != POINT_SOLVED]
+    total = len(outcome.points)
+    if not others:
+        outcome.status, outcome.message = SOLVED, f"All {total} What-If points solved, each once, in the given order."
+        return
+    reasons = "; ".join(f"point {p['index']} {p['status']}" + (f" ({p['error'].get('kind')}: {p['error'].get('message')})"
+                                                                 if p.get("error") else "") for p in others)
+    outcome.status = PARTIAL if solved else FAILED
+    outcome.message = f"{len(solved)} of {total} What-If points solved; {reasons}. Nothing was retried."
+
+
 # ------------------------------------------------------------------------------------------------ child side
 
 
 def _emit(event: dict) -> None:
     sys.stdout.write(json.dumps(event, default=float) + "\n")
     sys.stdout.flush()
+
+
+def _result_payload(result, model) -> dict:
+    import numpy as np
+
+    r = result.rigid
+    m = result.material
+    return {
+        "frequencies_hz": result.frequencies_hz.tolist(), "guard_frequencies_hz": result.guard_frequencies_hz.tolist(),
+        "relative_spacing": result.relative_spacing.tolist(),
+        "max_backward_error": float(np.max(result.backward_errors)),
+        "mass_orthogonality_error": result.mass_orthogonality_error, "shift": result.shift,
+        "shift_source": result.shift_source, "operator_applications": result.operator_applications,
+        "factor_nonzeros": result.factor_nonzeros, "seconds": result.seconds,
+        "material": {k: getattr(m, k) for k in ("e1", "e2", "e3", "nu12", "nu13", "nu23", "g12", "g13", "g23")},
+        "density": result.density, "dof_count": model.dof_count, "element_count": len(model.element_labels),
+        "rigid": {"passed": r.passed, "c2e0": r.c2e0_status, "ratio": r.rigid_to_first_elastic_ratio,
+                  "eigenvalues": r.eigenvalues.tolist(), "min_span_cosine": float(np.min(r.span_cosines)),
+                  "max_rigid_content_of_elastic": r.max_rigid_content_of_elastic_modes},
+        "formulation": result.formulation, "abaqus_equivalence": result.abaqus_equivalence}
+
+
+def solve_points(forward, points, elastic_modes: int, guard_modes: int, emit: Callable[[dict], None],
+                 progress=None) -> dict:
+    """Solve validated What-If points in order with ONE forward model: its unique-geometry cache and its mass matrix are
+    built once and reused; only K(E1, E2, G12) is assembled per point.  Each point is emitted as {"event": "point"} when
+    it finishes.  A numerical failure of one point is reported and the next point is solved; nothing is retried.
+    A resource failure (memory, solver resource limit) stops the remaining points, which the parent lists as NOT_RUN."""
+    from services import solid_c3d8i_solver as ss
+
+    mass = forward.mass_matrix(progress=progress)
+    reused = []
+    for index, (e1, e2, g12) in enumerate(points, 1):
+        parameters = {"e1": e1, "e2": e2, "g12": g12}
+        emit({"event": "progress", "stage": f"point {index} of {len(points)}"})
+        record = {"index": index, "parameters": parameters, "status": POINT_SOLVED, "result": None, "error": None}
+        try:
+            result = forward.solve(elastic_modes, e1=e1, e2=e2, g12=g12, guard_modes=guard_modes, progress=progress)
+            record["result"] = _result_payload(result, forward.model)
+            del result
+        except ss.RigidBodyClassificationError as exc:
+            record["status"] = POINT_FAILED
+            record["error"] = {"kind": "RIGID_BODY_CLASSIFICATION_FAILED", "message": str(exc)}
+        except ss.ResourceLimitExceeded as exc:
+            record["status"] = POINT_FAILED
+            record["error"] = {"kind": "RESOURCE_LIMIT", "message": str(exc)}
+            record["mass_matrix_reused"] = forward.mass_matrix() is mass
+            reused.append(record["mass_matrix_reused"])
+            emit({"event": "point", "point": record})
+            break
+        except (ss.SolidSolverError, ValueError) as exc:
+            record["status"] = POINT_FAILED
+            record["error"] = {"kind": type(exc).__name__, "message": str(exc)}
+        record["mass_matrix_reused"] = forward.mass_matrix() is mass
+        reused.append(record["mass_matrix_reused"])
+        emit({"event": "point", "point": record})
+    # identity checks, not assumptions: the same model object and the same mass matrix object served every point
+    return {"one_forward_model": True, "mass_matrix_reused_for_every_point": bool(reused) and all(reused),
+            "points_attempted": len(reused)}
 
 
 def _child_main() -> int:
@@ -472,6 +647,12 @@ def _child_main() -> int:
         def progress(stage, done, total):
             _emit({"event": "progress", "stage": stage, "done": done, "total": total})
 
+        if spec.get("points"):
+            points = validate_points(model.material, spec["points"])  # again in the worker, before any assembly
+            reuse = solve_points(forward, points, int(spec["elastic_modes"]), int(spec["guard_modes"]), _emit, progress)
+            _emit({"event": "result", "peak_worker_commit_bytes": own_peak_commit_bytes(), "result": {
+                "reuse": reuse, "dof_count": model.dof_count, "element_count": len(model.element_labels)}})
+            return 0
         try:
             result = forward.solve(int(spec["elastic_modes"]), guard_modes=int(spec["guard_modes"]), progress=progress)
         except ss.RigidBodyClassificationError as exc:
@@ -482,21 +663,8 @@ def _child_main() -> int:
                                    "rigid_content": d.rigid_content.tolist(),
                                    "all_eigenvalues": exc.all_eigenvalues.tolist()}})
             return 3
-        r = result.rigid
-        m = result.material
-        _emit({"event": "result", "peak_worker_commit_bytes": own_peak_commit_bytes(), "result": {
-            "frequencies_hz": result.frequencies_hz.tolist(), "guard_frequencies_hz": result.guard_frequencies_hz.tolist(),
-            "relative_spacing": result.relative_spacing.tolist(),
-            "max_backward_error": float(np.max(result.backward_errors)),
-            "mass_orthogonality_error": result.mass_orthogonality_error, "shift": result.shift,
-            "shift_source": result.shift_source, "operator_applications": result.operator_applications,
-            "factor_nonzeros": result.factor_nonzeros, "seconds": result.seconds,
-            "material": {k: getattr(m, k) for k in ("e1", "e2", "e3", "nu12", "nu13", "nu23", "g12", "g13", "g23")},
-            "density": result.density, "dof_count": model.dof_count, "element_count": len(model.element_labels),
-            "rigid": {"passed": r.passed, "c2e0": r.c2e0_status, "ratio": r.rigid_to_first_elastic_ratio,
-                      "eigenvalues": r.eigenvalues.tolist(), "min_span_cosine": float(np.min(r.span_cosines)),
-                      "max_rigid_content_of_elastic": r.max_rigid_content_of_elastic_modes},
-            "formulation": result.formulation, "abaqus_equivalence": result.abaqus_equivalence}})
+        _emit({"event": "result", "peak_worker_commit_bytes": own_peak_commit_bytes(),
+               "result": _result_payload(result, model)})
         return 0
     except MemoryError:
         _emit({"event": "error", "kind": "MEMORY_LIMIT", "message": "The job memory limit stopped an allocation.",
@@ -512,5 +680,7 @@ if __name__ == "__main__" and "--child" in sys.argv:
     sys.exit(_child_main())
 
 
-__all__ = ["CANCELLED", "FAILED", "ForwardRequest", "KILLED", "REFUSED", "RESULT_LABEL", "RunnerLimits", "RunnerOutcome",
-           "RunnerRefused", "SOLVED", "available_memory_bytes", "preflight", "process_alive", "run", "sha256_of"]
+__all__ = ["CANCELLED", "FAILED", "ForwardRequest", "KILLED", "MAX_WHATIF_POINTS", "PARTIAL", "POINT_FAILED",
+           "POINT_NOT_RUN", "POINT_SOLVED", "REFUSED", "RESULT_LABEL", "RunnerLimits", "RunnerOutcome", "RunnerRefused",
+           "SOLVED", "WHATIF_LABEL", "WHATIF_PARAMETERS", "available_memory_bytes", "point_problems", "preflight",
+           "process_alive", "run", "sha256_of", "solve_points", "validate_points"]

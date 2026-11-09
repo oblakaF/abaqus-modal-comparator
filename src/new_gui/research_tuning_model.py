@@ -668,8 +668,8 @@ def solid_frequency_rows(result: dict, s: Optional[SolidSummary]) -> tuple:
     return tuple(rows)
 
 
-def solid_diagnostic_rows(outcome) -> tuple:
-    rows = [("Status", outcome.status), ("Message", outcome.message),
+def _supervision_rows(outcome) -> list:
+    return [("Status", outcome.status), ("Message", outcome.message),
             ("Worker process", f"PID {outcome.worker_pid}, verified inside the supervision job" if outcome.worker_in_job
              else f"PID {outcome.worker_pid}: NOT verified"),
             ("Launcher process", f"PID {outcome.launcher_pid}"),
@@ -682,6 +682,10 @@ def solid_diagnostic_rows(outcome) -> tuple:
             ("Worker processes still running after the run", "—" if outcome.active_processes_after is None
              else str(outcome.active_processes_after)),
             ("Runtime", f"{outcome.runtime_seconds:.1f} s")]
+
+
+def solid_diagnostic_rows(outcome) -> tuple:
+    rows = _supervision_rows(outcome)
     r = outcome.result
     if r and "frequencies_hz" in r:
         rigid = r["rigid"]
@@ -705,10 +709,156 @@ def solid_diagnostic_rows(outcome) -> tuple:
     return tuple(rows)
 
 
+# ================================================================================================ ABM-SOLID-6: What-If
+
+WHATIF_TITLE = "Manual What-If: E1, E2, G12 (research)"
+WHATIF_INTRO = ("Optional: enter up to three combinations of E1, E2 and G12 (MPa) to calculate their frequencies with this "
+                "model. Every other engineering constant, the density, geometry, orientation and the free-free condition "
+                "stay as in the INP. Each point is solved once, in the order entered, in one supervised worker. No search, "
+                "no fitting, no automatic E1/E2 orientation, no pairing with measured modes.")
+WHATIF_NOTE = ("Frequencies are listed in ascending order for each point and compared by that order, not by mode shape: "
+               "if two modes change places between points, the comparison of that row compares different modes. A "
+               "smaller difference from measured frequencies does not prove a material property.")
+WHATIF_FIELDS = ("E1", "E2", "G12")
+
+
+def solid_material_constants(s: SolidSummary):
+    """The INP's engineering constants rebuilt from the checked summary (validated again; nothing is re-read)."""
+    from services import solid_c3d8i_forward as sf
+
+    return sf.OrthotropicEngineeringConstants(**s.material)
+
+
+def parse_whatif(material, texts) -> tuple:
+    """(points, problems): ``texts`` holds one (E1, E2, G12) text triple per row. A blank row is skipped; any other row
+    must be complete and admissible. ``problems`` maps the row number (1-based) to its messages."""
+    from services import solid_forward_runner as sfr
+
+    points, problems = [], {}
+    for row, triple in enumerate(texts, 1):
+        cells = [str(t).strip() for t in triple]
+        if not any(cells):
+            continue
+        if not all(cells):
+            problems[row] = ["Enter all of E1, E2 and G12, or leave the row empty."]
+            continue
+        found = sfr.point_problems(material, cells)
+        if found:
+            problems[row] = found
+        else:
+            points.append(tuple(float(c) for c in cells))
+    if not problems and len(set(points)) != len(points):
+        problems[0] = ["Two rows are identical; each point is solved once, so enter distinct points."]
+    return tuple(points), problems
+
+
+def _change(value: float, original: float) -> str:
+    return "unchanged" if value == original else f"{100 * (value - original) / original:+.2f} %"
+
+
+def whatif_parameter_rows(s: SolidSummary, points) -> tuple:
+    rows = []
+    for name, key in zip(WHATIF_FIELDS, ("e1", "e2", "g12")):
+        original = s.material[key]
+        rows.append((f"{name} (MPa)", f"{original:g}",
+                     *(f"{p[WHATIF_FIELDS.index(name)]:g} ({_change(p[WHATIF_FIELDS.index(name)], original)})"
+                       for p in points)))
+    m = s.material
+    fixed = (f"E3 {m['e3']:g}, G13 {m['g13']:g}, G23 {m['g23']:g} MPa; nu12 {m['nu12']:g}, nu13 {m['nu13']:g}, "
+             f"nu23 {m['nu23']:g}; density {s.density:g} t/mm³")
+    rows.append(("Other constants, density", fixed, *("same as the INP" for _ in points)))
+    rows.append(("Geometry, orientation, boundary", f"{s.element_count} C3D8I, {s.orientation or 'no orientation'}, "
+                                                    "free-free", *("same as the INP" for _ in points)))
+    return tuple(rows)
+
+
+def whatif_parameter_headers(points) -> tuple:
+    return ("Parameter", "Original INP", *(f"Point {i}" for i in range(1, len(points) + 1)))
+
+
+def whatif_confirmation_text(s: SolidSummary, points) -> str:
+    lines = [f"Point {i}: E1 {p[0]:g}, E2 {p[1]:g}, G12 {p[2]:g} MPa" for i, p in enumerate(points, 1)]
+    m = s.material
+    return (f"Run {len(points)} offline FE calculation{'s' if len(points) != 1 else ''} (one per What-If point, in this "
+            f"order) of this model?\n\n{s.inp_path}\nSHA-256 {s.sha256}\n{s.element_count} C3D8I elements, "
+            f"{s.dof_count} degrees of freedom.\n\nOriginal INP: E1 {m['e1']:g}, E2 {m['e2']:g}, G12 {m['g12']:g} MPa.\n"
+            + "\n".join(lines) +
+            f"\n\nUnchanged: E3 {m['e3']:g}, G13 {m['g13']:g}, G23 {m['g23']:g} MPa; nu12 {m['nu12']:g}, nu13 "
+            f"{m['nu13']:g}, nu23 {m['nu23']:g}; density {s.density:g} t/mm³; geometry, orientation, free-free.\n\n"
+            f"Total FE solves: {len(points)}, sequential, in one supervised worker. No search, no fitting, no repetition "
+            f"of failed points, no Abaqus. {solid_resource_text(s)}")
+
+
+def whatif_frequency_headers(outcome) -> tuple:
+    points = outcome.points
+    base = next((p["index"] for p in points if p["status"] == "SOLVED"), None)
+    headers = ["Elastic mode"]
+    for p in points:
+        headers.append(f"Point {p['index']} (Hz)")
+        if base is not None and p["index"] != base:
+            headers.append(f"Point {p['index']} vs Point {base} (%)")
+    return tuple(headers)
+
+
+def whatif_frequency_rows(outcome) -> tuple:
+    points = outcome.points
+    solved = [p for p in points if p["status"] == "SOLVED"]
+    if not solved:
+        return ()
+    base = solved[0]
+    count = max(len(p["result"]["frequencies_hz"]) for p in solved)
+    rows = []
+    for mode in range(count):
+        row = [str(mode + 1)]
+        reference = base["result"]["frequencies_hz"][mode] if mode < len(base["result"]["frequencies_hz"]) else None
+        for p in points:
+            values = p["result"]["frequencies_hz"] if p["status"] == "SOLVED" else ()
+            hz = values[mode] if mode < len(values) else None
+            row.append(f"{hz:.4f}" if hz is not None else p["status"])
+            if p is not base:
+                row.append(f"{100 * (hz - reference) / reference:+.3f}" if hz is not None and reference else "—")
+        rows.append(tuple(row))
+    return tuple(rows)
+
+
+def whatif_diagnostic_rows(outcome) -> tuple:
+    rows = _supervision_rows(outcome)
+    reuse = (outcome.result or {}).get("reuse")
+    if reuse:
+        rows.append(("Model reuse", f"one import, one forward model (unique-geometry cache); mass matrix reused for every "
+                                    f"point: {'yes' if reuse['mass_matrix_reused_for_every_point'] else 'NO'}; "
+                                    f"{reuse['points_attempted']} point(s) attempted"))
+    for p in outcome.points:
+        q = p["parameters"]
+        head = f"Point {p['index']} (E1 {q['e1']:g}, E2 {q['e2']:g}, G12 {q['g12']:g})"
+        if p["status"] != "SOLVED":
+            error = p.get("error") or {}
+            rows.append((head, f"{p['status']}" + (f": {error.get('kind')}: {error.get('message')}" if error else
+                                                    ": not run") + " — not retried"))
+            continue
+        r = p["result"]
+        rigid = r["rigid"]
+        rows.append((head, f"SOLVED in {r['seconds'].get('total', 0.0):.1f} s; largest backward error "
+                           f"{r['max_backward_error']:.2e}; mass orthogonality {r['mass_orthogonality_error']:.2e}; "
+                           f"rigid-body modes {'passed' if rigid['passed'] else 'FAILED'} (C2E0 {rigid['c2e0']}); shift "
+                           f"{r['shift']:.6g}; factor {r['factor_nonzeros']:,} nonzeros; closest pair "
+                           f"{100 * min(r['relative_spacing']):.2f} %; guard modes up to {max(r['guard_frequencies_hz']):.3f} Hz; "
+                           f"mass matrix reused: {'yes' if p.get('mass_matrix_reused') else 'NO'}"))
+        used = r["material"]
+        rows.append((f"Point {p['index']} material used", ", ".join(f"{k} {v:g}" for k, v in used.items())
+                     + f", density {r['density']:g}"))
+    if outcome.points and outcome.points[0].get("result"):
+        r = outcome.points[0]["result"]
+        rows.append(("Element", f"{r['formulation']}; Abaqus equivalence {r['abaqus_equivalence']}"))
+    return tuple(rows)
+
+
 __all__ = ["ANALYZE_NOTE", "check_model", "compatibility_notes", "compatibility_rows", "LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
            "frequency_rows", "input_rows", "minima_rows", "parse_declared", "read_sources", "sensitivity_rows",
            "surrogate_rows", "SOLID_FE_FE_NOTE", "SOLID_FREQUENCY_HEADERS", "SOLID_INTRO", "SOLID_LIMITS",
            "SOLID_REFERENCE_PROVENANCE", "SOLID_TITLE",
            "SolidReference", "SolidSummary", "check_solid", "read_solid_reference", "solid_confirmation_text",
            "solid_diagnostic_rows", "solid_frequency_rows", "solid_identity_rows", "solid_material_rows",
-           "solid_reference_rows", "solid_resource_text"]
+           "solid_reference_rows", "solid_resource_text", "WHATIF_FIELDS", "WHATIF_INTRO", "WHATIF_NOTE", "WHATIF_TITLE",
+           "parse_whatif", "solid_material_constants", "whatif_confirmation_text", "whatif_diagnostic_rows", "whatif_frequency_headers",
+           "whatif_frequency_rows", "whatif_parameter_headers", "whatif_parameter_rows"]

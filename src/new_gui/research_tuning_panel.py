@@ -70,6 +70,7 @@ class ResearchTuningPanel(QWidget):
         self._ask_confirm = ask_confirm or self._dialog_confirm
         self.solid: Optional[rm.SolidSummary] = None  # ABM-SOLID-5: the checked solid model
         self.solid_outcome: Optional[sfr.RunnerOutcome] = None
+        self.whatif_outcome: Optional[sfr.RunnerOutcome] = None  # ABM-SOLID-6
         self.solid_limits = sfr.RunnerLimits()
         self.paths = {"inp": "", "unv": "", "odb": ""}
         self.sources: Optional[rm.Sources] = None
@@ -201,8 +202,62 @@ class ResearchTuningPanel(QWidget):
             inner.addLayout(box)
             self.solid_boxes[key] = box
             self.solid_boxes[key + "_caption"] = caption
+        self._build_whatif(inner)
         self.solid_card.setVisible(False)
         return self.solid_card
+
+    def _build_whatif(self, inner) -> None:
+        """ABM-SOLID-6: up to three owner-entered E1/E2/G12 points, solved once each after one confirmation."""
+        inner.addWidget(_label(rm.WHATIF_TITLE, "sectionTitle"))
+        self.whatif_badge = _label(sfr.WHATIF_LABEL, "badge")
+        self.whatif_badge.setProperty("state", "blocked")
+        inner.addWidget(self.whatif_badge)
+        inner.addWidget(_label(rm.WHATIF_INTRO, "hint"))
+        grid = QGridLayout()
+        for column, name in enumerate(rm.WHATIF_FIELDS, 1):
+            grid.addWidget(_label(f"{name} (MPa)"), 0, column)
+            grid.setColumnStretch(column, 1)
+        self.whatif_fields = []
+        for row in range(sfr.MAX_WHATIF_POINTS):
+            grid.addWidget(_label(f"Point {row + 1}"), row + 1, 0)
+            cells = []
+            for column, name in enumerate(rm.WHATIF_FIELDS, 1):
+                field = QLineEdit()
+                field.setObjectName(f"whatif_{row + 1}_{name}")
+                field.setMinimumWidth(60)
+                field.textChanged.connect(lambda _t: self._whatif_changed())
+                grid.addWidget(field, row + 1, column)
+                cells.append(field)
+            self.whatif_fields.append(cells)
+        inner.addLayout(grid)
+        self.whatif_check = _label("", "hint")
+        inner.addWidget(self.whatif_check)
+        self.whatif_parameters_box = QVBoxLayout()
+        inner.addLayout(self.whatif_parameters_box)
+        row = QHBoxLayout()
+        self.whatif_button = QPushButton("Calculate What-If points...")
+        self.whatif_button.setMinimumHeight(36)
+        self.whatif_button.clicked.connect(lambda: self.run_whatif())
+        row.addWidget(self.whatif_button)
+        row.addStretch(1)
+        inner.addLayout(row)
+        self.whatif_status = _label("", "badge")
+        self.whatif_status.setVisible(False)
+        inner.addWidget(self.whatif_status)
+        self.whatif_note = _label(rm.WHATIF_NOTE, "hint")
+        self.whatif_note.setVisible(False)
+        inner.addWidget(self.whatif_note)
+        for key, title in (("whatif_frequencies", "What-If frequencies by ascending order"),
+                           ("whatif_diagnostics", "What-If supervision and numerical diagnostics, per point")):
+            caption = _label(title, "sectionTitle")
+            caption.setVisible(False)
+            inner.addWidget(caption)
+            box = QVBoxLayout()
+            inner.addLayout(box)
+            self.solid_boxes[key] = box
+            self.solid_boxes[key + "_caption"] = caption
+        self.whatif_points: tuple = ()
+        self.whatif_problems: dict = {}
 
     def _build_setup(self) -> QFrame:
         card, inner = _card()
@@ -523,7 +578,7 @@ class ResearchTuningPanel(QWidget):
         if token != self._token:
             return
         self._active, self._cancel = None, None
-        if kind in ("solid_check", "solid_run"):
+        if kind in ("solid_check", "solid_run", "solid_whatif"):
             self._solid_done(kind, value)
             self._refresh()
             return
@@ -601,15 +656,104 @@ class ResearchTuningPanel(QWidget):
         self.solid_state.setText("Starting the supervised worker...")
         return self._start("solid_run", lambda cancel, _s: sfr.run(request, limits, cancel=cancel, progress=emit))
 
+    def set_whatif(self, rows) -> None:
+        """Fill the What-If fields: ``rows`` holds up to three (E1, E2, G12) entries; missing rows are left empty."""
+        rows = list(rows)
+        for index, cells in enumerate(self.whatif_fields):
+            values = rows[index] if index < len(rows) else ("", "", "")
+            for field, value in zip(cells, values):
+                field.setText("" if value in (None, "") else (value if isinstance(value, str) else f"{value:g}"))
+
+    def _whatif_texts(self) -> list:
+        return [[field.text() for field in cells] for cells in self.whatif_fields]
+
+    def _whatif_changed(self) -> None:
+        if self.solid is None:
+            self.whatif_points, self.whatif_problems = (), {}
+            self.whatif_check.setText("")
+            self._table("whatif_parameters", self.whatif_parameters_box, (), (), 0)
+            self._refresh()
+            return
+        points, problems = rm.parse_whatif(rm.solid_material_constants(self.solid), self._whatif_texts())
+        self.whatif_points, self.whatif_problems = points, problems
+        if problems:
+            self.whatif_check.setText("Not ready: " + " ".join(
+                (f"Row {row}: " if row else "") + " ".join(messages) for row, messages in sorted(problems.items())))
+        elif points:
+            self.whatif_check.setText(f"{len(points)} point{'s' if len(points) != 1 else ''} ready: "
+                                      f"{len(points)} FE solve{'s' if len(points) != 1 else ''} after confirmation.")
+        else:
+            self.whatif_check.setText("No What-If point entered.")
+        shown = points if not problems else ()
+        self._table("whatif_parameters", self.whatif_parameters_box, rm.whatif_parameter_headers(shown),
+                    rm.whatif_parameter_rows(self.solid, shown) if shown else (), 1)
+        self._refresh()
+
+    def run_whatif(self) -> bool:
+        """The confirmed What-If points, each solved once, in order, in ONE supervised worker."""
+        summary = self.solid
+        if summary is None or self._active is not None or summary.preflight.get("decision") != "ALLOW":
+            return False
+        self._whatif_changed()
+        points = self.whatif_points
+        if self.whatif_problems or not points:
+            self.solid_state.setText("What-If not started: " + (self.whatif_check.text() or "no point entered."))
+            return False
+        if not self._ask_confirm(f"Run {len(points)} What-If FE calculation{'s' if len(points) != 1 else ''}",
+                                 rm.whatif_confirmation_text(summary, points)):
+            self.solid_state.setText("What-If not started: the calculation was not confirmed.")
+            return False
+        self._clear_whatif_result()
+        request = sfr.ForwardRequest(summary.inp_path, summary.sha256, points=points)
+        limits = self.solid_limits
+        bridge = self._bridge
+        token = self._token + 1  # the token _start gives this job; bound before the worker can report
+
+        def emit(event) -> None:
+            try:
+                bridge.solid_event.emit(token, dict(event))
+            except RuntimeError:
+                pass
+
+        self.solid_state.setText("Starting the supervised worker for the What-If points...")
+        return self._start("solid_whatif", lambda cancel, _s: sfr.run(request, limits, cancel=cancel, progress=emit))
+
+    def _clear_whatif_result(self) -> None:
+        self.whatif_outcome = None
+        self.whatif_status.setVisible(False)
+        self.whatif_note.setVisible(False)
+        for key in ("whatif_frequencies", "whatif_diagnostics"):
+            self._table(key, None, (), (), 0)
+            self.solid_boxes[key + "_caption"].setVisible(False)
+
+    def _show_whatif_outcome(self, outcome: sfr.RunnerOutcome) -> None:
+        self.whatif_outcome = outcome
+        solved = sum(p.get("status") == sfr.POINT_SOLVED for p in outcome.points)
+        self.whatif_status.setText(f"{outcome.status}: {solved} of {len(outcome.points)} points solved | "
+                                   f"{sfr.WHATIF_LABEL}")
+        self.whatif_status.setProperty("state", "chosen" if outcome.status == sfr.SOLVED else "blocked")
+        self.whatif_status.style().unpolish(self.whatif_status)
+        self.whatif_status.style().polish(self.whatif_status)
+        self.whatif_status.setVisible(True)
+        if solved:
+            self.solid_boxes["whatif_frequencies_caption"].setVisible(True)
+            self._table("whatif_frequencies", self.solid_boxes["whatif_frequencies"], rm.whatif_frequency_headers(outcome),
+                        rm.whatif_frequency_rows(outcome), 0)
+            self.whatif_note.setVisible(True)
+        self.solid_boxes["whatif_diagnostics_caption"].setVisible(True)
+        self._table("whatif_diagnostics", self.solid_boxes["whatif_diagnostics"], ("Item", "Value"),
+                    rm.whatif_diagnostic_rows(outcome), 1)
+        self.solid_state.setText(f"What-If {outcome.status}: {outcome.message}")
+
     def cancel_solid(self) -> bool:
-        if self._active != "solid_run" or self._cancel is None:
+        if self._active not in ("solid_run", "solid_whatif") or self._cancel is None:
             return False
         self._cancel.set()
         self.solid_state.setText("Stopping: the worker and all its processes are being terminated...")
         return True
 
     def _solid_event(self, token: int, event: dict) -> None:
-        if token != self._token or self._active != "solid_run":
+        if token != self._token or self._active not in ("solid_run", "solid_whatif"):
             return
         stage = event.get("stage", "")
         detail = f" ({event['done']} / {event['total']})" if event.get("total") else ""
@@ -635,6 +779,9 @@ class ResearchTuningPanel(QWidget):
         if isinstance(value, Exception):
             self.solid_state.setText(f"Not completed: {value}")
             return
+        if kind == "solid_whatif":
+            self._show_whatif_outcome(value)
+            return
         self._show_solid_outcome(value)
 
     def _clear_solid_result(self) -> None:
@@ -648,6 +795,9 @@ class ResearchTuningPanel(QWidget):
     def _clear_solid(self) -> None:
         self.solid = None
         self._clear_solid_result()
+        self._clear_whatif_result()
+        self.set_whatif(())  # the points belonged to the previous INP's material
+        self._whatif_changed()
         for key in ("solid_identity", "solid_material", "solid_reference"):
             self._table(key, None, (), (), 0)
         self.solid_resources.setText("")
@@ -667,6 +817,10 @@ class ResearchTuningPanel(QWidget):
         allowed = summary.preflight.get("decision") == "ALLOW"
         self.solid_state.setText("Ready. Nothing is calculated until you start and confirm it." if allowed
                                  else "The calculation is not allowed on this computer now; see the resources line.")
+        for cells in self.whatif_fields:  # the original values as hints only; nothing is pre-filled
+            for field, key in zip(cells, ("e1", "e2", "g12")):
+                field.setPlaceholderText(f"INP {summary.material[key]:g}")
+        self._whatif_changed()
 
     def _show_solid_outcome(self, outcome: sfr.RunnerOutcome) -> None:
         self.solid_outcome = outcome
@@ -857,9 +1011,15 @@ class ResearchTuningPanel(QWidget):
     def _refresh(self) -> None:
         running = self._active not in QUIET_JOBS  # a model check never holds the file choice
         solid_ok = self.solid is not None and self.solid.preflight.get("decision") == "ALLOW"
+        solid_running = self._active in ("solid_run", "solid_whatif")
         self.solid_run_button.setEnabled(self._active is None and solid_ok)
-        self.solid_cancel_button.setEnabled(self._active == "solid_run")
-        self.solid_progress.setVisible(self._active == "solid_run")
+        self.solid_cancel_button.setEnabled(solid_running)
+        self.solid_progress.setVisible(solid_running)
+        self.whatif_button.setEnabled(self._active is None and solid_ok and bool(self.whatif_points)
+                                      and not self.whatif_problems)
+        for cells in self.whatif_fields:
+            for field in cells:
+                field.setEnabled(not solid_running)
         for button in self.buttons.values():
             button.setEnabled(not running)
         for widget in (self.parameterization, self.declared, self.search, self.degree):
@@ -868,7 +1028,7 @@ class ResearchTuningPanel(QWidget):
         self.cancel_button.setEnabled(self._active in ("fit", "stability"))
         live = self.result is not None and self.result.status != rft.CANCELLED and self.saved_path is None
         self.stability_button.setEnabled(not running and live)
-        self.progress.setVisible(running and self._active != "solid_run")
+        self.progress.setVisible(running and not solid_running)
         self.export_button.setEnabled(not running and live)
         self.open_button.setEnabled(not running)
 

@@ -221,6 +221,145 @@ class SolidPage(unittest.TestCase):
         rows = rm.solid_frequency_rows({"frequencies_hz": list(self.direct)}, summary)
         self.assertLess(float(rows[0][4]), -20.0)  # the large material difference is visible, labelled PROVISIONAL
 
+    # ------------------------------------------------------------------------------------------ ABM-SOLID-6 What-If
+
+    POINTS = ((60000.0, 25000.0, 7000.0), (90000.0, 15000.0, 11000.0))
+
+    def checked(self, confirm=True):
+        panel = self.panel(confirm)
+        panel.choose_file("inp", str(self.inp))
+        self.wait(panel)
+        return panel
+
+    def test_what_if_points_show_the_original_values_and_one_confirmation_lists_every_solve(self):
+        panel = self.checked()
+        self.assertFalse(panel.whatif_button.isEnabled())  # nothing entered, nothing pre-filled
+        self.assertEqual(panel.whatif_fields[0][0].text(), "")
+        self.assertEqual(panel.whatif_fields[0][0].placeholderText(), "INP 70000")
+        panel.set_whatif(self.POINTS)
+        self.assertTrue(panel.whatif_button.isEnabled())
+        self.assertIn("2 points ready: 2 FE solves", panel.whatif_check.text())
+        table = panel._tables["whatif_parameters"]
+        self.assertEqual([table.horizontalHeaderItem(i).text() for i in range(table.columnCount())],
+                         ["Parameter", "Original INP", "Point 1", "Point 2"])
+        rows = {r[0]: r[1:] for r in panel.table_cells("whatif_parameters")}
+        self.assertEqual(rows["E1 (MPa)"], ["70000", "60000 (-14.29 %)", "90000 (+28.57 %)"])
+        self.assertEqual(rows["G12 (MPa)"][0], "9000")
+        self.assertTrue(rows["Other constants, density"][0].startswith("E3 15000"))
+        self.assertEqual(rows["Other constants, density"][1:], ["same as the INP", "same as the INP"])
+        self.assertTrue(panel.run_whatif())
+        self.wait(panel)
+        self.assertEqual(len(self.asked), 1)
+        text = self.asked[0]
+        for part in ("Run 2 offline FE calculations", sfr.sha256_of(self.inp), "Original INP: E1 70000, E2 20000, G12 9000",
+                     "Point 1: E1 60000, E2 25000, G12 7000 MPa", "Point 2: E1 90000, E2 15000, G12 11000 MPa",
+                     "Total FE solves: 2", "No search, no fitting"):
+            self.assertIn(part, text)
+        outcome = panel.whatif_outcome
+        self.assertEqual(outcome.status, sfr.SOLVED, outcome.message)
+        self.assertIsNone(panel.solid_outcome)  # the single INP-value result is a separate calculation
+        self.assertIn(sfr.WHATIF_LABEL, panel.whatif_status.text())
+        self.assertIn("2 of 2 points solved", panel.whatif_status.text())
+        freq = panel._tables["whatif_frequencies"]
+        self.assertEqual([freq.horizontalHeaderItem(i).text() for i in range(freq.columnCount())],
+                         ["Elastic mode", "Point 1 (Hz)", "Point 2 (Hz)", "Point 2 vs Point 1 (%)"])
+        cells = panel.table_cells("whatif_frequencies")
+        self.assertEqual(len(cells), 14)
+        model = sm.load_solid_inp(self.inp)
+        for column, (e1, e2, g12) in zip((1, 2), self.POINTS):
+            expected = ss.SolidForwardModel(model).solve(14, e1=e1, e2=e2, g12=g12).frequencies_hz
+            self.assertEqual([row[column] for row in cells], [f"{f:.4f}" for f in expected])
+        first, second = float(cells[0][1]), float(cells[0][2])
+        self.assertAlmostEqual(float(cells[0][3]), 100 * (second - first) / first, places=2)
+        self.assertTrue(panel.whatif_note.isVisible())
+        diagnostics = self.cells(panel, "whatif_diagnostics")
+        self.assertIn("mass matrix reused for every point: yes", diagnostics["Model reuse"])
+        self.assertTrue(diagnostics["Point 1 (E1 60000, E2 25000, G12 7000)"].startswith("SOLVED"))
+        self.assertIn("e1 90000", diagnostics["Point 2 material used"])
+        self.assertIn("e3 15000", diagnostics["Point 2 material used"])
+        self.assertEqual(diagnostics["Worker processes still running after the run"], "0")
+        self.assertIn("verified inside the supervision job", diagnostics["Worker process"])
+
+    def test_a_declined_what_if_confirmation_runs_nothing(self):
+        panel = self.checked(confirm=False)
+        panel.set_whatif(self.POINTS[:1])
+        with mock.patch.object(sfr, "run", side_effect=AssertionError("solve started")):
+            self.assertFalse(panel.run_whatif())
+        self.assertEqual(len(self.asked), 1)
+        self.assertIn("Total FE solves: 1", self.asked[0])
+        self.assertIn("not confirmed", panel.solid_state.text())
+        self.assertIsNone(panel.whatif_outcome)
+
+    def test_invalid_what_if_entries_are_explained_and_never_run(self):
+        panel = self.checked()
+        for rows, part in (([("60000", "", "7000")], "Row 1: Enter all of E1, E2 and G12"),
+                           ([("60000", "-1", "7000")], "Row 1: E2 must be positive"),
+                           ([("abc", "1", "1")], "Row 1: E1 is not a number"),
+                           ([("1", "1", "nan")], "Row 1: G12 must be a finite"),
+                           ([self.POINTS[0], self.POINTS[0]], "Two rows are identical"),
+                           ([("", "", ""), ("1", "2", "0")], "Row 2: G12 must be positive")):
+            with self.subTest(rows=rows):
+                panel.set_whatif(rows)
+                self.assertIn(part, panel.whatif_check.text())
+                self.assertFalse(panel.whatif_button.isEnabled())
+                self.assertNotIn("whatif_parameters", panel._tables)
+                with mock.patch.object(sfr, "run", side_effect=AssertionError("solve started")):
+                    self.assertFalse(panel.run_whatif())
+        self.assertEqual(self.asked, [])  # no confirmation was even asked for
+
+    def test_cancelling_what_if_terminates_the_worker_and_reports_each_point(self):
+        panel = self.checked()
+        panel.set_whatif(self.POINTS)
+        self.assertTrue(panel.run_whatif())
+        self.assertTrue(panel.cancel_solid())
+        self.wait(panel)
+        outcome = panel.whatif_outcome
+        self.assertEqual(outcome.status, sfr.CANCELLED)
+        self.assertIn(outcome.active_processes_after, (0, None))
+        self.assertIn("0 of 2 points solved", panel.whatif_status.text())
+        diagnostics = self.cells(panel, "whatif_diagnostics")
+        self.assertIn("NOT_RUN", diagnostics["Point 2 (E1 90000, E2 15000, G12 11000)"])
+
+    def test_partial_what_if_results_are_shown_with_the_failed_point(self):
+        panel = self.checked()
+        panel.set_whatif(self.POINTS)
+        direct = [float(f) for f in self.direct]
+        outcome = sfr.RunnerOutcome(status=sfr.PARTIAL, message="1 of 2 What-If points solved; point 2 FAILED.",
+                                    result={"reuse": {"one_forward_model": True, "mass_matrix_reused_for_every_point": True,
+                                                      "points_attempted": 2}}, worker_pid=1, worker_in_job=True,
+                                    active_processes_after=0)
+        fake = {"frequencies_hz": direct, "guard_frequencies_hz": [1.0], "relative_spacing": [0.1],
+                "max_backward_error": 1e-14, "mass_orthogonality_error": 1e-14, "shift": -1.0, "shift_source": "ritz_bound",
+                "operator_applications": 10, "factor_nonzeros": 100, "seconds": {"total": 0.1},
+                "material": {"e1": 60000.0}, "density": 2.7e-9, "rigid": {"passed": True, "c2e0": "PASS"},
+                "formulation": "C3D8I", "abaqus_equivalence": "NOT_VERIFIED"}
+        outcome.points = [{"index": 1, "parameters": dict(zip(("e1", "e2", "g12"), self.POINTS[0])), "status": "SOLVED",
+                           "result": fake, "error": None, "mass_matrix_reused": True},
+                          {"index": 2, "parameters": dict(zip(("e1", "e2", "g12"), self.POINTS[1])), "status": "FAILED",
+                           "result": None, "error": {"kind": "RIGID_BODY_CLASSIFICATION_FAILED", "message": "synthetic"}}]
+        panel._show_whatif_outcome(outcome)
+        cells = panel.table_cells("whatif_frequencies")
+        self.assertEqual(cells[0][1:], [f"{direct[0]:.4f}", "FAILED", "—"])
+        self.assertIn("PARTIAL: 1 of 2 points solved", panel.whatif_status.text())
+        diagnostics = self.cells(panel, "whatif_diagnostics")
+        self.assertIn("FAILED: RIGID_BODY_CLASSIFICATION_FAILED: synthetic — not retried",
+                      diagnostics["Point 2 (E1 90000, E2 15000, G12 11000)"])
+
+    def test_the_single_inp_value_solve_is_unchanged_next_to_what_if(self):
+        panel = self.checked()
+        panel.set_whatif(self.POINTS[:1])
+        self.assertTrue(panel.run_solid())  # the original one-solve button still runs the INP values only
+        self.wait(panel)
+        self.assertEqual(panel.solid_outcome.status, sfr.SOLVED)
+        self.assertEqual(panel.solid_outcome.result["material"]["e1"], 70000.0)
+        self.assertEqual(panel.solid_outcome.points, [])
+        self.assertIsNone(panel.whatif_outcome)
+        self.assertIn("ONE offline FE calculation", self.asked[0])
+        panel.choose_file("inp", str(self.inp))  # a new INP check clears the points of the previous model
+        self.wait(panel)
+        self.assertEqual(panel.whatif_fields[0][0].text(), "")
+        self.assertIsNone(panel.solid_outcome)
+
     def test_the_shell_workflow_is_unchanged(self):
         panel = self.panel()
         shell = Path(tempfile.mkdtemp()) / "shell.inp"

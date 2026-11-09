@@ -14,6 +14,7 @@ import textwrap
 import threading
 import time
 import unittest
+from unittest import mock
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +53,26 @@ FAKE = textwrap.dedent('''
             emit({"event": "result", "result": {"size": len(block)}})
         except MemoryError:
             emit({"event": "error", "kind": "MEMORY_LIMIT", "message": "allocation refused"})
+    elif mode == "points":  # What-If: point 1 solved, point 2 failed, then the final result (point 3 never reported)
+        emit({"event": "hello", "pid": os.getpid()})
+        p = {"e1": 1.0, "e2": 1.0, "g12": 1.0}
+        emit({"event": "point", "point": {"index": 1, "parameters": p, "status": "SOLVED", "error": None,
+              "mass_matrix_reused": True, "result": {"frequencies_hz": [1.0, 2.0]}}})
+        emit({"event": "point", "point": {"index": 2, "parameters": p, "status": "FAILED", "result": None,
+              "error": {"kind": "RIGID_BODY_CLASSIFICATION_FAILED", "message": "synthetic"}}})
+        emit({"event": "result", "result": {"reuse": {"one_forward_model": True,
+              "mass_matrix_reused_for_every_point": True, "points_attempted": 2}}})
+    elif mode == "point_then_wait":
+        emit({"event": "hello", "pid": os.getpid()})
+        emit({"event": "point", "point": {"index": 1, "parameters": {"e1": 1.0, "e2": 1.0, "g12": 1.0},
+              "status": "SOLVED", "error": None, "result": {"frequencies_hz": [1.0]}}})
+        while True:
+            emit({"event": "progress", "stage": "point 2 of 3"}); time.sleep(0.2)
+    elif mode == "point_then_memory":
+        emit({"event": "hello", "pid": os.getpid()})
+        emit({"event": "point", "point": {"index": 1, "parameters": {"e1": 1.0, "e2": 1.0, "g12": 1.0},
+              "status": "SOLVED", "error": None, "result": {"frequencies_hz": [1.0]}}})
+        emit({"event": "error", "kind": "MEMORY_LIMIT", "message": "The job memory limit stopped an allocation."})
     elif mode == "grandchild":
         emit({"event": "hello", "pid": os.getpid()})
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
@@ -76,8 +97,8 @@ class RunnerCase(unittest.TestCase):
         path = self.model_path(nx=6, ny=3, nz=1, lx=60.0, ly=30.0, lz=5.0, **kwargs)
         return sfr.ForwardRequest(str(path), sfr.sha256_of(path))
 
-    def fake_run(self, *args, limits=None, progress=None, cancel=None):
-        return sfr.run(sfr.ForwardRequest("unused.inp", "0" * 64), limits or sfr.RunnerLimits(),
+    def fake_run(self, *args, limits=None, progress=None, cancel=None, points=()):
+        return sfr.run(sfr.ForwardRequest("unused.inp", "0" * 64, points=points), limits or sfr.RunnerLimits(),
                        child_argv=[sys.executable, str(self.fake), *map(str, args)], skip_preflight=True,
                        progress=progress, cancel=cancel)
 
@@ -224,6 +245,189 @@ class CancellationTests(RunnerCase):
         outcome = sfr.run(self.request(), cancel=cancel)
         self.assertEqual(outcome.status, sfr.CANCELLED)
         self.assertIsNone(outcome.launcher_pid)
+
+
+THREE = ((70000.0, 20000.0, 9000.0), (60000.0, 25000.0, 7000.0), (90000.0, 15000.0, 11000.0))
+
+
+class WhatIfTests(RunnerCase):
+    """ABM-SOLID-6: manual E1/E2/G12 points, synthetic models only."""
+
+    def independent(self, path, point):
+        """A fresh import and a fresh forward model for one point: nothing is shared with the What-If run."""
+        e1, e2, g12 = point
+        return ss.SolidForwardModel(sm.load_solid_inp(path)).solve(14, e1=e1, e2=e2, g12=g12).frequencies_hz
+
+    def test_two_and_three_point_runs_match_independent_single_point_solves_in_the_given_order(self):
+        base = self.request()
+        for points in (THREE[1:], THREE):
+            request = sfr.ForwardRequest(base.inp_path, base.inp_sha256, points=points)
+            outcome = sfr.run(request)
+            self.assertEqual(outcome.status, sfr.SOLVED, outcome.message)
+            self.assertEqual(outcome.label, sfr.WHATIF_LABEL)
+            self.assertTrue(outcome.worker_in_job)
+            self.assertEqual(outcome.preflight["solve_count"], len(points))
+            self.assertEqual([p["index"] for p in outcome.points], list(range(1, len(points) + 1)))
+            for record, point in zip(outcome.points, points):
+                self.assertEqual(record["status"], sfr.POINT_SOLVED)
+                self.assertEqual(tuple(record["parameters"].values()), point)  # E1, E2, G12 in the entered order
+                used = record["result"]["material"]
+                self.assertEqual((used["e1"], used["e2"], used["g12"]), point)
+                self.assertEqual((used["e3"], used["nu12"], used["g13"], used["g23"]), (15000.0, 0.0, 7000.0, 6000.0))
+                self.assertEqual(record["result"]["density"], 2.7e-9)
+                self.assertTrue(record["result"]["rigid"]["passed"])
+                np.testing.assert_allclose(record["result"]["frequencies_hz"], self.independent(base.inp_path, point),
+                                           rtol=1e-10)
+            self.assertTrue(outcome.result["reuse"]["mass_matrix_reused_for_every_point"])
+            self.assertEqual(outcome.result["reuse"]["points_attempted"], len(points))
+            self.assertIn(f"All {len(points)} What-If points solved", outcome.message)
+            self.assertNothingLeft(outcome)
+        # different points give different spectra: the parameters really reached the stiffness
+        self.assertFalse(np.allclose(outcome.points[0]["result"]["frequencies_hz"],
+                                     outcome.points[1]["result"]["frequencies_hz"]))
+
+    def test_the_mesh_geometry_cache_and_mass_matrix_are_built_once_for_all_points(self):
+        path = self.request().inp_path
+        model = sm.load_solid_inp(path)
+        forward = ss.SolidForwardModel(model)
+        geometries = forward.preflight(14).distinct_element_geometries
+        events = []
+        with mock.patch.object(ss, "consistent_mass", wraps=ss.consistent_mass) as mass_kernel, \
+                mock.patch.object(ss, "c3d8i_reference_stiffness", wraps=ss.c3d8i_reference_stiffness) as stiffness, \
+                mock.patch.object(sm, "load_solid_inp", side_effect=AssertionError("re-imported")), \
+                mock.patch.object(ss.SolidForwardModel, "__init__", side_effect=AssertionError("second model")):
+            reuse = sfr.solve_points(forward, THREE, 14, 4, events.append)
+        self.assertEqual(mass_kernel.call_count, geometries)          # element mass once per distinct geometry
+        self.assertEqual(stiffness.call_count, 3 * geometries)        # stiffness once per geometry and point
+        self.assertTrue(reuse["mass_matrix_reused_for_every_point"])
+        points = [e["point"] for e in events if e["event"] == "point"]
+        self.assertEqual([p["index"] for p in points], [1, 2, 3])
+        self.assertTrue(all(p["mass_matrix_reused"] for p in points))
+
+    def test_invalid_points_are_rejected_before_anything_runs(self):
+        from services import solid_c3d8i_forward as sf
+
+        material = sm.load_solid_inp(self.request().inp_path).material
+        for bad, part in (((0.0, 1.0, 1.0), "E1 must be positive"), ((1.0, -2.0, 1.0), "E2 must be positive"),
+                          ((1.0, 1.0, float("nan")), "G12 must be a finite"), ((float("inf"), 1.0, 1.0), "E1 must be a finite"),
+                          (("abc", 1.0, 1.0), "E1 is not a number"), ((1.0, 1.0), "Enter E1, E2 and G12")):
+            with self.subTest(bad=bad):
+                with self.assertRaises(sfr.RunnerRefused) as caught:
+                    sfr.validate_points(material, (bad,))
+                self.assertIn(part, str(caught.exception))
+        poisson = sf.OrthotropicEngineeringConstants(70000.0, 20000.0, 15000.0, 0.3, 0.3, 0.3, 9000.0, 7000.0, 6000.0)
+        with self.assertRaises(sfr.RunnerRefused) as caught:  # nu12^2 E2 / E1 > 1: not positive definite
+            sfr.validate_points(poisson, ((10000.0, 200000.0, 9000.0),))
+        self.assertIn("Not physically admissible", str(caught.exception))
+        self.assertEqual(sfr.validate_points(poisson, ((70000, 20000, 9000),)), ((70000.0, 20000.0, 9000.0),))
+        for points, part in ((THREE + THREE[:1], "1 to 3"), ((), "1 to 3"), ((THREE[0], THREE[0]), "identical")):
+            with self.assertRaises(sfr.RunnerRefused) as caught:
+                sfr.validate_points(material, points)
+            self.assertIn(part, str(caught.exception))
+        base = self.request()
+        outcome = sfr.run(sfr.ForwardRequest(base.inp_path, base.inp_sha256, points=((70000.0, 0.0, 9000.0),)))
+        self.assertEqual(outcome.status, sfr.REFUSED)
+        self.assertIn("Point 1: E2 must be positive", outcome.message)
+        self.assertIsNone(outcome.launcher_pid)  # refused in the parent: no worker was started
+        worker = sfr.run(sfr.ForwardRequest(base.inp_path, base.inp_sha256, points=((70000.0, 0.0, 9000.0),)),
+                         skip_preflight=True)  # the worker validates again
+        self.assertEqual(worker.status, sfr.FAILED)
+        self.assertIn("E2 must be positive", worker.message)
+        self.assertEqual([p["status"] for p in worker.points], [sfr.POINT_NOT_RUN])
+        self.assertNothingLeft(worker)
+
+    def test_a_failed_point_is_reported_not_retried_and_the_others_kept(self):
+        model = sm.load_solid_inp(self.request().inp_path)
+        forward = ss.SolidForwardModel(model)
+        real = forward.solve
+        calls = []
+
+        def flaky(*args, **kwargs):
+            calls.append(kwargs["e1"])
+            if len(calls) == 2:
+                raise ss.SolidSolverError("synthetic ARPACK failure")
+            return real(*args, **kwargs)
+
+        events = []
+        with mock.patch.object(forward, "solve", side_effect=flaky):
+            sfr.solve_points(forward, THREE, 14, 4, events.append)
+        self.assertEqual(calls, [70000.0, 60000.0, 90000.0])  # each point once, in order: no retry
+        points = [e["point"] for e in events if e["event"] == "point"]
+        self.assertEqual([p["status"] for p in points], ["SOLVED", "FAILED", "SOLVED"])
+        self.assertIn("synthetic ARPACK failure", points[1]["error"]["message"])
+        calls.clear()
+        events.clear()
+
+        def exhausted(*args, **kwargs):
+            calls.append(kwargs["e1"])
+            if len(calls) == 2:
+                raise ss.ResourceLimitExceeded("synthetic limit")
+            return real(*args, **kwargs)
+
+        with mock.patch.object(forward, "solve", side_effect=exhausted):
+            reuse = sfr.solve_points(forward, THREE, 14, 4, events.append)
+        self.assertEqual(calls, [70000.0, 60000.0])  # a resource limit stops the remaining points
+        self.assertEqual(reuse["points_attempted"], 2)
+
+    def test_partial_completion_is_reported_honestly(self):
+        outcome = self.fake_run("points", points=THREE)
+        self.assertEqual(outcome.status, sfr.PARTIAL)
+        self.assertEqual([p["status"] for p in outcome.points], ["SOLVED", "FAILED", "NOT_RUN"])
+        self.assertIn("1 of 3 What-If points solved", outcome.message)
+        self.assertIn("point 2 FAILED (RIGID_BODY_CLASSIFICATION_FAILED", outcome.message)
+        self.assertIn("point 3 NOT_RUN", outcome.message)
+        self.assertIn("Nothing was retried", outcome.message)
+        self.assertEqual(outcome.points[2]["parameters"], dict(zip(sfr.WHATIF_PARAMETERS, THREE[2])))
+        self.assertNothingLeft(outcome)
+
+    def test_cancel_and_memory_stop_keep_the_completed_points(self):
+        cancel = threading.Event()
+
+        def progress(event):
+            if event.get("stage") == "point 1 SOLVED":
+                cancel.set()
+
+        outcome = self.fake_run("point_then_wait", points=THREE, progress=progress, cancel=cancel)
+        self.assertEqual(outcome.status, sfr.CANCELLED)
+        self.assertEqual([p["status"] for p in outcome.points], ["SOLVED", "NOT_RUN", "NOT_RUN"])
+        self.assertIn("1 of 3 What-If points had been solved", outcome.message)
+        self.assertNothingLeft(outcome)
+        memory = self.fake_run("point_then_memory", points=THREE)
+        self.assertEqual(memory.status, sfr.FAILED)
+        self.assertIn("MEMORY_LIMIT", memory.message)
+        self.assertEqual([p["status"] for p in memory.points], ["SOLVED", "NOT_RUN", "NOT_RUN"])
+        self.assertNothingLeft(memory)
+        refused = sfr.run(sfr.ForwardRequest(self.request().inp_path, self.request().inp_sha256, points=THREE),
+                          sfr.RunnerLimits(max_job_memory_bytes=10_000))
+        self.assertEqual(refused.status, sfr.REFUSED)  # the memory decision covers What-If runs as well
+        self.assertIsNone(refused.launcher_pid)
+        self.assertEqual([p["status"] for p in refused.points], [sfr.POINT_NOT_RUN] * 3)
+        self.assertIn("No What-If point was solved", refused.message)
+        early = threading.Event()
+        early.set()  # cancelled before the worker starts: still one NOT_RUN record per requested point
+        before = sfr.run(sfr.ForwardRequest(self.request().inp_path, self.request().inp_sha256, points=THREE),
+                         cancel=early)
+        self.assertEqual(before.status, sfr.CANCELLED)
+        self.assertEqual([p["index"] for p in before.points], [1, 2, 3])
+        self.assertEqual([p["status"] for p in before.points], [sfr.POINT_NOT_RUN] * 3)
+        self.assertEqual(before.label, sfr.WHATIF_LABEL)
+
+    def test_a_real_what_if_run_can_be_cancelled(self):
+        cancel = threading.Event()
+        base = self.request()
+
+        def progress(event):
+            if event.get("stage") == "point 2 of 3":
+                cancel.set()
+
+        outcome = sfr.run(sfr.ForwardRequest(base.inp_path, base.inp_sha256, points=THREE), progress=progress,
+                          cancel=cancel)
+        self.assertIn(outcome.status, (sfr.CANCELLED, sfr.SOLVED))  # the tiny model may finish first
+        self.assertEqual(len(outcome.points), 3)
+        if outcome.status == sfr.CANCELLED:
+            self.assertEqual(outcome.points[0]["status"], sfr.POINT_SOLVED)
+            self.assertEqual(outcome.points[2]["status"], sfr.POINT_NOT_RUN)
+        self.assertNothingLeft(outcome)
 
 
 if __name__ == "__main__":
