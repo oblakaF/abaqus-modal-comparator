@@ -478,20 +478,25 @@ SOLID_LIMITS = ("Limits: the reference element follows published incompatible-mo
                 "equivalence to Abaqus C3D8I is NOT VERIFIED. One part, one instance, one material, one orientation, no "
                 "boundary conditions (free-free). The result is a numerical forward result, not material properties and "
                 "not a comparison with the experiment.")
-SOLID_FE_FE_NOTE = ("FE-to-FE only: offline FE against the Abaqus .dat beside the INP, paired by index after the six lowest "
-                    "(rigid-body) modes. This says nothing about the experiment; experimental mode shapes are compared on "
-                    "the Analyze and MAC / Points pages.")
-SOLID_FREQUENCY_HEADERS = ("Elastic mode", "Offline FE (Hz)", "Abaqus .dat (Hz)", "Difference (Hz)", "Difference (%)")
+SOLID_FE_FE_NOTE = ("FE-to-FE only, PROVISIONAL: offline FE against the Abaqus .dat beside the INP, paired by index after "
+                    "the six lowest (rigid-body) modes. The .dat's provenance is UNVERIFIED: equal element and node counts "
+                    "and total mass are consistency checks only and do not prove that the .dat was computed with this "
+                    "INP's material constants or FE model. This says nothing about the experiment; experimental mode "
+                    "shapes are compared on the Analyze and MAC / Points pages.")
+SOLID_FREQUENCY_HEADERS = ("Elastic mode", "Offline FE (Hz)", "Abaqus .dat (Hz, PROVISIONAL)",
+                           "Difference (Hz, PROVISIONAL)", "Difference (%, PROVISIONAL)")
+SOLID_REFERENCE_PROVENANCE = "UNVERIFIED"  # nothing in the .dat ties it to this INP's material constants
 
 
 @dataclass(frozen=True)
 class SolidReference:
     dat_path: str
-    verified: bool
+    consistent: bool         # mesh counts, mass and eigen table pass: a consistency diagnostic, never proof of identity
     checks: tuple            # (check, value, PASS/FAIL)
     elastic_hz: tuple        # .dat rows above the six lowest, as written
     rigid_marked: tuple      # modes Abaqus itself marked with '*'
     note: str
+    provenance: str = SOLID_REFERENCE_PROVENANCE
 
 
 @dataclass(frozen=True)
@@ -523,8 +528,9 @@ def _printed_resolution(text: str) -> float:
 
 
 def read_solid_reference(dat_path, element_count: int, node_count: int, mass_t: float) -> SolidReference:
-    """The .dat eigenvalue table, shown only when its problem size and total mass match this INP's mesh and density.
-    The .dat does not echo the material constants, so those cannot be verified from it."""
+    """The .dat eigenvalue table, shown (as PROVISIONAL) only when its problem size and total mass match this INP's mesh
+    and density. These are consistency diagnostics, not proof of model identity: the .dat does not echo the material
+    constants, so its provenance stays UNVERIFIED."""
     import re
 
     text = Path(dat_path).read_text(encoding="latin-1", errors="replace")
@@ -556,10 +562,11 @@ def read_solid_reference(dat_path, element_count: int, node_count: int, mass_t: 
             elif rows and not line.strip():
                 break
     checks.append(("Eigenvalue rows in the .dat", str(len(rows)), "PASS" if len(rows) > 6 else "FAIL"))
-    verified = all(c[2] == "PASS" for c in checks)
-    note = ("Mesh size and total mass match this INP; the .dat does not echo the material constants, so they are taken "
-            "as the INP's." if verified else "Not used: the .dat does not match this INP's mesh or mass.")
-    return SolidReference(str(dat_path), verified, tuple(checks), tuple(r[2] for r in rows[6:]),
+    consistent = all(c[2] == "PASS" for c in checks)
+    note = ("PROVISIONAL: mesh size and total mass are consistent with this INP, but that does not prove the same "
+            "material or FE model; the .dat does not echo the material constants. Differences are shown as PROVISIONAL."
+            if consistent else "Not used: the .dat is not consistent with this INP's mesh or mass.")
+    return SolidReference(str(dat_path), consistent, tuple(checks), tuple(r[2] for r in rows[6:]),
                           tuple(r[0] for r in rows if r[1]), note)
 
 
@@ -628,8 +635,11 @@ def solid_reference_rows(s: SolidSummary) -> tuple:
     if s.reference is None:
         return (("Abaqus .dat beside the INP", "none: no FE-to-FE comparison"),)
     r = s.reference
-    rows = [("Abaqus .dat", r.dat_path)] + [(name, f"{value}  [{state}]") for name, value, state in r.checks]
+    rows = [("Abaqus .dat", r.dat_path)] + [(f"{name} (consistency)", f"{value}  [{state}]")
+                                            for name, value, state in r.checks]
     rows.append(("Modes Abaqus marked rigid (*)", ", ".join(map(str, r.rigid_marked)) or "none marked"))
+    rows.append(("Provenance (same material and FE model)",
+                 f"{r.provenance}: the .dat does not echo the material constants; consistency checks are not proof"))
     rows.append(("Use", r.note))
     return tuple(rows)
 
@@ -646,7 +656,8 @@ def solid_confirmation_text(s: SolidSummary) -> str:
 
 
 def solid_frequency_rows(result: dict, s: Optional[SolidSummary]) -> tuple:
-    ref = s.reference.elastic_hz if s is not None and s.reference is not None and s.reference.verified else ()
+    # differences against a consistent .dat are PROVISIONAL (headers and note say so); an inconsistent .dat is not used
+    ref = s.reference.elastic_hz if s is not None and s.reference is not None and s.reference.consistent else ()
     rows = []
     for index, hz in enumerate(result["frequencies_hz"]):
         if index < len(ref):
@@ -696,7 +707,8 @@ def solid_diagnostic_rows(outcome) -> tuple:
 
 __all__ = ["ANALYZE_NOTE", "check_model", "compatibility_notes", "compatibility_rows", "LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
            "frequency_rows", "input_rows", "minima_rows", "parse_declared", "read_sources", "sensitivity_rows",
-           "surrogate_rows", "SOLID_FE_FE_NOTE", "SOLID_FREQUENCY_HEADERS", "SOLID_INTRO", "SOLID_LIMITS", "SOLID_TITLE",
+           "surrogate_rows", "SOLID_FE_FE_NOTE", "SOLID_FREQUENCY_HEADERS", "SOLID_INTRO", "SOLID_LIMITS",
+           "SOLID_REFERENCE_PROVENANCE", "SOLID_TITLE",
            "SolidReference", "SolidSummary", "check_solid", "read_solid_reference", "solid_confirmation_text",
            "solid_diagnostic_rows", "solid_frequency_rows", "solid_identity_rows", "solid_material_rows",
            "solid_reference_rows", "solid_resource_text"]

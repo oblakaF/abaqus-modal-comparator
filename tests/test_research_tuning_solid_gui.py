@@ -103,7 +103,8 @@ class SolidPage(unittest.TestCase):
         self.assertEqual(material["G12 (original, used)"], "9000 MPa")
         self.assertEqual(material["E3 (fixed)"], "15000 MPa")
         reference = self.cells(panel, "solid_reference")
-        self.assertIn("[PASS]", reference["Total mass in the .dat"])
+        self.assertIn("[PASS]", reference["Total mass in the .dat (consistency)"])
+        self.assertTrue(reference["Provenance (same material and FE model)"].startswith("UNVERIFIED"))
         self.assertTrue(panel.solid_run_button.isEnabled())
         self.assertFalse(panel.run_button.isEnabled())  # the shell tuning stays unavailable for this INP
         self.assertIn("solid offline FE section", panel.message.text())
@@ -138,6 +139,10 @@ class SolidPage(unittest.TestCase):
         self.assertEqual(rows[0][2], f"{self.reference[0]:g}")
         self.assertAlmostEqual(float(rows[0][4]), -0.1, places=2)  # (offline - .dat) / .dat
         self.assertTrue(panel.solid_fe_note.isVisible())
+        self.assertIn("PROVISIONAL", panel.solid_fe_note.text())
+        table = panel._tables["solid_frequencies"]
+        headers = [table.horizontalHeaderItem(i).text() for i in range(table.columnCount())]
+        self.assertTrue(all("PROVISIONAL" in h for h in headers[2:]), headers)
         diagnostics = self.cells(panel, "solid_diagnostics")
         self.assertIn("verified inside the supervision job", diagnostics["Worker process"])
         self.assertEqual(diagnostics["Worker processes still running after the run"], "0")
@@ -177,10 +182,44 @@ class SolidPage(unittest.TestCase):
         inp.write_text(box_inp(**DIMENSIONS), encoding="latin-1")
         write_dat(inp.with_suffix(".dat"), 19, 56, 2.7e-9 * 60 * 30 * 5, self.reference)
         summary = rm.check_solid(inp)
-        self.assertFalse(summary.reference.verified)
+        self.assertFalse(summary.reference.consistent)
         self.assertIn("Not used", dict(rm.solid_reference_rows(summary))["Use"])
         rows = rm.solid_frequency_rows({"frequencies_hz": list(self.direct)}, summary)
         self.assertEqual(rows[0][2:], ("—", "—", "—"))
+
+    def test_equal_mesh_and_mass_with_other_material_is_never_verified_and_differences_are_provisional(self):
+        """ABM-SOLID-5-F1: a .dat from a model with the same mesh and mass but different material constants passes
+        every consistency check, so those checks can never be shown as proof of identity."""
+        from new_gui import research_tuning_model as rm
+        from test_solid_c3d8i_model import ENGINEERING
+
+        folder = Path(tempfile.mkdtemp())
+        stiffer = folder / "STIFFER.inp"  # E1 and G12 changed, same mesh, same density, same mass
+        constants = list(ENGINEERING)
+        constants[0], constants[6] = 2 * constants[0], 2 * constants[6]
+        stiffer.write_text(box_inp(**DIMENSIONS, constants=tuple(constants)), encoding="latin-1")
+        other_material_hz = ss.SolidForwardModel(sm.load_solid_inp(stiffer)).solve(14).frequencies_hz
+        inp = folder / "ORIGINAL.inp"
+        inp.write_text(box_inp(**DIMENSIONS), encoding="latin-1")
+        write_dat(inp.with_suffix(".dat"), 18, 56, 2.7e-9 * 60 * 30 * 5, [float(f"{f:.5g}") for f in other_material_hz])
+        summary = rm.check_solid(inp)
+        reference = summary.reference
+        self.assertTrue(all(state == "PASS" for _, _, state in reference.checks))  # consistency passes ...
+        self.assertTrue(reference.consistent)
+        self.assertEqual(reference.provenance, "UNVERIFIED")  # ... but identity is never claimed
+        self.assertFalse(hasattr(reference, "verified"))
+        reference_rows = dict(rm.solid_reference_rows(summary))
+        self.assertTrue(reference_rows["Provenance (same material and FE model)"].startswith("UNVERIFIED"))
+        self.assertIn("PROVISIONAL", reference_rows["Use"])
+        self.assertIn("Elements in the .dat (consistency)", reference_rows)
+        for row_name, value in reference_rows.items():
+            self.assertNotIn("VERIFIED", value.replace("UNVERIFIED", ""), row_name)
+        for header in rm.SOLID_FREQUENCY_HEADERS[2:]:
+            self.assertIn("PROVISIONAL", header)
+        self.assertIn("PROVISIONAL", rm.SOLID_FE_FE_NOTE)
+        self.assertIn("UNVERIFIED", rm.SOLID_FE_FE_NOTE)
+        rows = rm.solid_frequency_rows({"frequencies_hz": list(self.direct)}, summary)
+        self.assertLess(float(rows[0][4]), -20.0)  # the large material difference is visible, labelled PROVISIONAL
 
     def test_the_shell_workflow_is_unchanged(self):
         panel = self.panel()
