@@ -22,8 +22,21 @@ from new_gui.shape_panel import _label
 from services import research_frequency_stability as rfs
 from services import research_frequency_tuning as rft
 
-INTRO = ("Refines the ASSUMED CFRP inputs of an Abaqus plate model against measured PolyMAX frequencies, with a "
-         "Kirchhoff-Ritz plate surrogate. Research only: no Abaqus run, no material property, no mode pairs.")
+INTRO = ("The current exploratory workflow for real data: it refines the ASSUMED CFRP inputs (E1, E2, G12) of a supported "
+         "shell FE model so that its Kirchhoff-Ritz plate surrogate matches fitted PolyMAX frequencies. Research only: no "
+         "Abaqus run, no material property, no mode pairs.")
+FILE_ROLES = ("INP: the FE model; its material, density, shell thickness and size are read, and the model check says why "
+              "another kind of model cannot be used. UNV / UFF: the measured, curve-fitted PolyMAX frequencies (FRF peak "
+              "records are never used). ODB, optional: its already extracted mode shapes tell rigid-body from elastic FE "
+              "modes. The Kirchhoff-Ritz surrogate is a thin homogeneous plate: it does not automatically apply to a solid "
+              "or sandwich FE model.")
+FORMS_TEXT = ("E1=E2, G12: one in-plane modulus for both directions and the shear modulus (two unknowns). E1, E2, G12: "
+              "separate moduli (three unknowns); then E1 and E2 exchanged may fit the frequencies equally well.")
+KINDS_TEXT = ("Measured: the PolyMAX frequencies. Fixed: the INP's thickness, density, nu12 and other constants, assumed "
+              "as written. Fitted: the exploratory E and G values, research estimates only.")
+MIRROR_TEXT = ("Why two alternatives: exchanging E1 and E2 gives the same frequencies here, so frequency agreement alone "
+               "cannot tell which plate axis is stiff. Neither is chosen; deciding needs independent evidence of the fibre "
+               "axes, such as a registered shape comparison or the layup record.")
 ROLES = (rft.FIT, rft.HOLDOUT, rft.EXCLUDED)
 
 
@@ -99,6 +112,8 @@ class ResearchTuningPanel(QWidget):
             grid.addWidget(button, 2 * row + 1, 2)
             self.fields[key], self.buttons[key] = field, button
         inner.addLayout(grid)
+        self.roles_note = _label(FILE_ROLES, "hint")
+        inner.addWidget(self.roles_note)
         self.read_note = _label("The .dat beside the INP is listed unclassified. Rigid-body and elastic FE modes are told apart "
                                 "only by shape, from modes already extracted from the chosen ODB; Abaqus is never started.",
                                 "hint")
@@ -138,6 +153,7 @@ class ResearchTuningPanel(QWidget):
         self.parameterization.setObjectName("tuningParameterization")
         for text in (rft.TIED, rft.FREE):
             self.parameterization.addItem(text, text)
+        self.parameterization.setToolTip(FORMS_TEXT)
         self.declared = QLineEdit()
         self.declared.setObjectName("tuningDeclared")
         self.declared.setPlaceholderText("optional, e.g. 3:4, 4:3 (record:rank)")
@@ -152,6 +168,7 @@ class ResearchTuningPanel(QWidget):
             grid.addWidget(_label(caption), row // 2, 2 * (row % 2))
             grid.addWidget(widget, row // 2, 2 * (row % 2) + 1)
         inner.addLayout(grid)
+        inner.addWidget(_label(FORMS_TEXT, "hint"))
         inner.addWidget(_label("Held fixed at the INP values (assumed, not identified): thickness, density, nu12, E3, nu13, "
                                "nu23, G13, G23. The start comes from the measured frequencies alone.", "hint"))
         row = QHBoxLayout()
@@ -188,7 +205,11 @@ class ResearchTuningPanel(QWidget):
         inner.addWidget(self.saved_note)
         self.reasons = _label("", "warnings")
         inner.addWidget(self.reasons)
+        self.mirror_note = _label(MIRROR_TEXT, "hint")
+        self.mirror_note.setVisible(False)
+        inner.addWidget(self.mirror_note)
         inner.addWidget(_label(rm.SURROGATE_NOTE, "hint"))
+        inner.addWidget(_label(KINDS_TEXT, "hint"))
         self.accuracy = _label("", "warnings")
         inner.addWidget(self.accuracy)
         self.estimate_box, self.axis_box = QVBoxLayout(), QVBoxLayout()
@@ -592,6 +613,7 @@ class ResearchTuningPanel(QWidget):
         self.status.style().polish(self.status)
         self.reasons.setText("\n".join([rm.STATUS_TEXT.get(result.status, result.status)] + list(result.reasons) + list(result.warnings)))
         self.accuracy.setText(result.accuracy_statement)
+        self.mirror_note.setVisible(result.status == rft.MIRROR)
         self._table("estimates", self.estimate_box, rm.ESTIMATE_HEADERS, rm.estimate_rows(result), 0)
         self._table("axes", self.axis_box, rm.AXIS_HEADERS, rm.axis_rows(result), 0)
         self._table("candidate", self.candidate_box, rm.CANDIDATE_HEADERS, rm.candidate_rows(result), 0)

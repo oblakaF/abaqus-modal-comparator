@@ -55,6 +55,11 @@ MAPPING_FACTS = ("FE geometry identity", "Orientation source", "Geometry candida
 PROFILE_NOTE = ("In the registered common coordinate system. One complex scale is fitted to the experiment over all mapped "
                 "DOFs of the pair; the profile does not change the MAC or the pair.")
 AXES = "XYZ"
+READINESS_TITLE = "Can MAC be computed for this result?"
+MAC_PLAIN = ("MAC compares the shapes of two modes over the same measured points and directions: 1 means the same shape, near "
+             "0 unrelated shapes. It needs fitted EXP modes and the FE points matched to the measured ones by a registration.")
+READY_QUESTIONS = ("Fitted EXP modes", "FE-to-EXP registration", "Measured directions and points", "MAC")
+SET_UP = "Use Set up registration... below."
 
 
 def evidence_levels(analysis, review_state, kind: str) -> tuple:
@@ -73,6 +78,58 @@ def evidence_levels(analysis, review_state, kind: str) -> tuple:
             ("MAC-based modal identity diagnostics", mac, "The comparator's result, only with a registration."),
             ("User-confirmed registration", confirmed, "Records a person's statement. It is not independent proof."),
             ("Physically validated archived evidence", reference, "Reused only for the same geometry. A manual choice never changes it."))
+
+
+def _provisional(analysis) -> bool:
+    return analysis.registration_outcome == am.PROVISIONAL or any(sm.PROVISIONAL_TEXT in str(row[-1])
+                                                                   for row in analysis.experimental_rows)
+
+
+def _directions(mode) -> str:
+    measured = getattr(mode, "measured_dofs", None)
+    points = len(mode.node_ids)
+    if measured is None:
+        return f"{points} points; the file states no measured-direction list"
+    mask = np.asarray(measured, dtype=bool)
+    axes = [axis for column, axis in enumerate(AXES) if mask[:, column].any()]
+    return f"{', '.join(axes) or 'none'} at {points} points"
+
+
+def readiness_rows(analysis, saved: bool, measured_mode, kind: str) -> tuple:
+    """ABM-UX5: the four prerequisites of MAC, each answered from the result shown; nothing is inferred or set up here."""
+    if analysis is None:
+        return ((READY_QUESTIONS[3], NO_RESULT),)
+    view = analysis.comparison
+    provisional = _provisional(analysis)
+    if provisional:
+        fitted = "No: the chosen set holds FRF peak records (response snapshots), not fitted modes."
+    else:
+        fitted = f"Yes: {analysis.experimental_total or len(analysis.experimental_rows)} fitted records of {analysis.set_title}."
+    if view is not None:
+        registration = ("Yes: the registration you confirmed. Your confirmation is your statement, not independent proof."
+                        if kind == ap.KIND_CONFIRMED else "Yes: an accepted registration matched by the FE geometry.")
+    elif provisional:
+        registration = "Not checked: FRF peak records are not compared."
+    else:
+        registration = {am.REFUSED: "No: none is confirmed for these files, and no accepted registration matches their geometry.",
+                        am.FAILED: "No: the registration check could not be completed.",
+                        am.NOT_CONFIRMED: "No: the registration you confirmed does not hold for the current data."}.get(
+            analysis.registration_outcome, "No: the saved result holds none." if saved else
+            "No: none is confirmed for these files, and no accepted registration matches their geometry.")
+    if measured_mode is None:
+        measured = ("Not in the saved file: check the source files and Analyze again." if saved
+                    else "Not available for this result.")
+    else:
+        measured = f"Measured directions: {_directions(measured_mode)}."
+    measured += (" FE nodes are matched to the points by the registration." if view is not None
+                 else " Which FE node belongs to which point is unknown until a registration exists.")
+    if view is not None:
+        mac = f"Yes: computed for {len(view.pair_rows)} pair{'' if len(view.pair_rows) == 1 else 's'} (see below)."
+    elif provisional:
+        mac = "No: MAC needs fitted mode shapes; choose a fitted modal set if the file holds one."
+    else:
+        mac = "No: a registration is missing. " + SET_UP
+    return tuple(zip(READY_QUESTIONS, (fitted, registration, measured, mac)))
 
 
 def unavailable_reason(analysis, saved: bool) -> str:
@@ -228,4 +285,4 @@ def profile_plot(pair, line: ProfileLine, component: int) -> Optional[bytes]:
     return out.getvalue()
 
 
-__all__ = ["evidence_levels", "point_rows", "profile_lines", "profile_plot", "unavailable_reason"]
+__all__ = ["MAC_PLAIN", "READINESS_TITLE", "READY_QUESTIONS", "readiness_rows", "evidence_levels", "point_rows", "profile_lines", "profile_plot", "unavailable_reason"]

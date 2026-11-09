@@ -55,6 +55,10 @@ VIEWS = (("source", "Source axes"), ("xy", "Source XY"), ("xz", "Source XZ"), ("
          ("best_fit", "Best-fit plane"))
 ROTATIONS = (0, 90, 180, 270)
 DEFAULT_VIEW = ("source", 0, False)  # (plane, rotation, mirror)
+NOT_MEASURED = "not measured"
+FE_COMPONENT_NOTE = ("U1, U2, U3: FE displacement along the FE model's own axes; Magnitude has no sign. A view that looks "
+                     "uniformly near zero is small next to this mode's largest motion as drawn; it does not prove the nodal "
+                     "values are zero.")
 
 _RENDER = threading.Lock()  # one drawing at a time across both sides (matplotlib figures)
 
@@ -135,6 +139,25 @@ def record_components(preview_set, index: int) -> frozenset:
     mask = xp._measured_mask(mode)
     axes = viewer.measured_axes(mode) if mask is None else tuple(a for a, used in zip("xyz", mask.any(axis=0)) if used)
     return frozenset(("magnitude", *axes) + (("normal",) if viewer.out_of_plane_available(mode) else ()))
+
+
+def component_text(kind: str, component: str, allowed=None) -> str:
+    """The component's name; an experimental X, Y or Z that the record does not hold says so (it cannot be chosen)."""
+    text = COMPONENT_LABEL[kind][component]
+    if kind == EXPERIMENTAL and allowed is not None and component in ("x", "y", "z") and component not in allowed:
+        return f"{text} ({NOT_MEASURED})"
+    return text
+
+
+def measured_note(allowed) -> str:
+    """Which directions this record measured, and that Magnitude hides the sign; nothing is filled in for the others."""
+    axes = [axis.upper() for axis in "xyz" if axis in allowed]
+    if not axes:
+        return "No measured direction is recorded for this record: only what the file holds can be drawn."
+    missing = [axis.upper() for axis in "xyz" if axis not in allowed]
+    absent = f" {' and '.join(missing)} {'was' if len(missing) == 1 else 'were'} not measured and cannot be chosen." if missing else ""
+    signed = "Z keeps it" if axes == ["Z"] else "the measured components keep it"
+    return f"Measured: {', '.join(axes)}{' only' if missing else ''}.{absent} Magnitude hides the sign; {signed}."
 
 
 # ---------------------------------------------------------------------------------------------- drawing
@@ -228,5 +251,5 @@ class ShapeSlot:
         return True
 
 
-__all__ = ["COMPONENTS", "COMPONENT_LABEL", "ShapeOutcome", "ShapeSlot", "fe_mode_facts", "fe_mode_options",
+__all__ = ["FE_COMPONENT_NOTE", "component_text", "measured_note", "COMPONENTS", "COMPONENT_LABEL", "ShapeOutcome", "ShapeSlot", "fe_mode_facts", "fe_mode_options",
            "record_facts", "record_options", "record_warnings", "render", "run_render", "set_options"]

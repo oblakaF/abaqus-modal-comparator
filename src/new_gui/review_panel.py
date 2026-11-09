@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPushButton,
+from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QColor, QCursor
+from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMenu, QMessageBox,
+                               QPushButton,
                                QScrollArea, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
                                QWidget)
 
@@ -31,6 +32,26 @@ SHOW_COLUMNS, FEWER_COLUMNS = "Show all columns", "Show fewer columns"
 SAVE_RESULT = "Save result"
 _SAVE_MESSAGES = ("Saving the project", "Project saved", "Project not saved")  # the panel's own save messages
 PICTURE_IN_VIEW = 120  # pixels of a shape picture that count as "on screen" after a row click
+VISUAL_ORDER = (0, 1, 2, 4, 5, 3, 6, 7)  # ABM-UX5: EXP mode, EXP Hz, FE Hz, Δf, then the FE mode choice; logical columns stay
+SIDE_BY_SIDE_WIDTH = 760  # the two frequency plots stand side by side from this pane width, else one above the other
+CELL_PADDING = 22
+
+
+def _title_width(title: str, metrics, lines: int = 3) -> int:
+    """The least width at which a column title wraps into at most ``lines`` lines (the header is three lines high)."""
+    words = title.split()
+    width = max(metrics.horizontalAdvance(word) for word in words)
+    while True:
+        count, line = 1, ""
+        for word in words:
+            trial = f"{line} {word}".strip()
+            if metrics.horizontalAdvance(trial) <= width:
+                line = trial
+            else:
+                count, line = count + 1, word
+        if count <= lines:
+            return width
+        width += 4
 
 
 def _scrolled(content: QWidget) -> QScrollArea:
@@ -45,10 +66,18 @@ def _scrolled(content: QWidget) -> QScrollArea:
 class ReviewPanel(QWidget):
     """``ask_duplicate(text)`` answers SWAP, KEEP or CANCEL; tests replace it, the program asks with a dialog."""
 
-    def __init__(self, analyze, ask_duplicate: Optional[Callable[[str], str]] = None):
+    def __init__(self, analyze, ask_duplicate: Optional[Callable[[str], str]] = None,
+                 ask_row: Optional[Callable[[tuple], Optional[int]]] = None):
         super().__init__()
         self.analyze = analyze
         self._ask_duplicate = ask_duplicate or self._dialog_duplicate
+        self._ask_row = ask_row or self._menu_row  # ABM-UX5: overlapping dots are chosen by the person, never by the program
+        self.charts: dict = {}  # kind -> review_model.Chart of what is shown, with where its rows are drawn
+        self._drawn_width: dict = {}
+        self._redraw = QTimer(self)
+        self._redraw.setSingleShot(True)
+        self._redraw.setInterval(120)
+        self._redraw.timeout.connect(self._draw_plots)
         self.state: Optional[rv.ReviewState] = None
         self.current: Optional[int] = None
         self.combos: list = []
@@ -139,10 +168,14 @@ class ReviewPanel(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # all always fit: no sideways scrolling
-        header.setSectionResizeMode(len(rv.HEADERS), QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)  # ABM-UX5: widths follow the contents (_size_columns)
+        header.setSectionResizeMode(_FE_COLUMN, QHeaderView.ResizeMode.Stretch)  # the FE choice takes the rest: no sideways
+        header.setSectionResizeMode(len(rv.HEADERS), QHeaderView.ResizeMode.ResizeToContents)  # scrolling
+        header.setStretchLastSection(False)
+        for visual, logical in enumerate(VISUAL_ORDER):
+            header.moveSection(header.visualIndex(logical), visual)
         header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap)
-        header.setMinimumHeight(42)
+        header.setMinimumHeight(58)
         self.table.itemSelectionChanged.connect(self._row_selected)
         inner.addWidget(self.table, 1)
         row = QHBoxLayout()
@@ -164,6 +197,8 @@ class ReviewPanel(QWidget):
             row.addWidget(button)
         inner.addLayout(row)
         self._columns_toggled(False)
+        self.colour_legend = _label("", "hint")  # ABM-UX5: what a tinted cell means, shown only when one is tinted
+        inner.addWidget(self.colour_legend)
         self.hypothesis_label = _label("", "warnings")
         inner.addWidget(self.hypothesis_label)
         self.session_label = _label(rv.SESSION_ONLY_TEXT, "hint")
@@ -194,34 +229,75 @@ class ReviewPanel(QWidget):
         inner = QVBoxLayout(plots)
         inner.setContentsMargins(0, 8, 0, 0)
         inner.addWidget(_label(rv.PLOTS_EXPLANATION, "hint"))
+        self.plot_note = _label("", "hint")
+        self.plot_note.setVisible(False)
+        inner.addWidget(self.plot_note)
         self.frequency_image, self.difference_image = ImageView(), ImageView()
         self.frequency_actions = ImageActions(self.frequency_image, "fe_vs_exp_frequency")
         self.difference_actions = ImageActions(self.difference_image, "signed_frequency_error")
-        pictures = QGridLayout()  # side by side: both fit the pane without scrolling
-        pictures.setHorizontalSpacing(8)
-        pictures.setColumnStretch(0, 1)
-        pictures.setColumnStretch(1, 1)
-        pictures.addWidget(self.frequency_image, 0, 0)
-        pictures.addWidget(self.difference_image, 0, 1)
-        pictures.addWidget(self.frequency_actions, 1, 0)
-        pictures.addWidget(self.difference_actions, 1, 1)
-        inner.addLayout(pictures)
+        self.pictures = QGridLayout()  # side by side in a wide pane, one above the other in a narrow one
+        self.pictures.setHorizontalSpacing(8)
+        self.pictures.setVerticalSpacing(6)
+        self._side_by_side: Optional[bool] = None
+        inner.addLayout(self.pictures)
         inner.addStretch(1)
-        self.views.addTab(_scrolled(plots), TAB_PLOTS)
+        self.plots_area = _scrolled(plots)
+        self.plots_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)  # a drawn chart never narrows its pane
+        self._arrange_plots(True)
+        self.views.addTab(self.plots_area, TAB_PLOTS)
+        for kind, image in (("frequency", self.frequency_image), ("difference", self.difference_image)):
+            image.clicked.connect(lambda x, y, k=kind: self._chart_clicked(k, x, y))
+            image.setCursor(Qt.CursorShape.PointingHandCursor)
+            image.installEventFilter(self)
         frf = QWidget()
         inner = QVBoxLayout(frf)
         inner.setContentsMargins(0, 8, 0, 0)
         self.frf_note = _label("", "hint")
         inner.addWidget(self.frf_note)
         self.frf_image = ImageView()
+        self.frf_image.clicked.connect(lambda x, y: self._chart_clicked("frf", x, y))
+        self.frf_image.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.frf_image.installEventFilter(self)
         inner.addWidget(self.frf_image)
         self.frf_actions = ImageActions(self.frf_image, "frf_spectrum")
         inner.addWidget(self.frf_actions)
         inner.addStretch(1)
-        self.views.addTab(_scrolled(frf), TAB_FRF)
+        frf_area = _scrolled(frf)
+        frf_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.views.addTab(frf_area, TAB_FRF)
         self.views.addTab(self.analyze.tables_box, TAB_TABLES)  # the tables fill the pane and scroll by themselves
         self.views.currentChanged.connect(lambda _index: self._draw_plots())
+        self.plots_area.viewport().installEventFilter(self)
         return self.views
+
+    def _arrange_plots(self, side_by_side: bool) -> None:
+        if side_by_side == self._side_by_side:
+            return
+        self._side_by_side = side_by_side
+        for widget in (self.frequency_image, self.difference_image, self.frequency_actions, self.difference_actions):
+            self.pictures.removeWidget(widget)
+        if side_by_side:
+            places = ((self.frequency_image, 0, 0), (self.difference_image, 0, 1), (self.frequency_actions, 1, 0),
+                      (self.difference_actions, 1, 1))
+        else:
+            places = ((self.frequency_image, 0, 0), (self.frequency_actions, 1, 0), (self.difference_image, 2, 0),
+                      (self.difference_actions, 3, 0))
+        for widget, row, column in places:
+            self.pictures.addWidget(widget, row, column, Qt.AlignmentFlag.AlignTop)
+        self.pictures.setColumnStretch(0, 1)
+        self.pictures.setColumnStretch(1, 1 if side_by_side else 0)
+
+    def eventFilter(self, watched, event) -> bool:
+        """A changed width redraws the shown charts at their new size (the height a picture takes is not a change)."""
+        if event.type() == QEvent.Type.Resize:
+            if watched is self.plots_area.viewport():
+                self._arrange_plots(watched.width() >= SIDE_BY_SIDE_WIDTH)
+            elif watched in (self.frequency_image, self.difference_image, self.frf_image):
+                kind = {self.frequency_image: "frequency", self.difference_image: "difference", self.frf_image: "frf"}[watched]
+                drawn = self._drawn_width.get(kind)
+                if drawn is not None and abs(drawn - watched.width()) > 6:
+                    self._redraw.start()
+        return super().eventFilter(watched, event)
 
     # ---------------------------------------------------------------------------------------------- content
 
@@ -273,8 +349,21 @@ class ReviewPanel(QWidget):
                 swap.clicked.connect(lambda _checked=False, r=row.row: self.swap_with_next(r))
                 self.table.setCellWidget(row.row, len(rv.HEADERS), swap)
                 self.swap_buttons.append(swap)
+        self._size_columns(rows)
         self._building = False
         self._show_rows()
+
+    def _size_columns(self, rows) -> None:
+        """Each fixed column as wide as its widest cell or the longest word of its title: the short EXP mode column stays
+        narrow, and the FE mode choice takes the remaining width."""
+        metrics = self.table.fontMetrics()
+        header_metrics = self.table.horizontalHeader().fontMetrics()
+        for column in range(len(rv.HEADERS)):
+            if column == _FE_COLUMN:
+                continue
+            texts = [row.cells()[column] for row in rows]
+            width = max([metrics.horizontalAdvance(text) for text in texts] + [_title_width(rv.HEADERS[column], header_metrics)])
+            self.table.setColumnWidth(column, width + CELL_PADDING)
 
     def _show_rows(self) -> None:
         """The cells of the current selection; a manual row is tinted and its origin is in the tooltip and the line below."""
@@ -302,6 +391,9 @@ class ReviewPanel(QWidget):
         warning = state.duplicate_warning() if state is not None else ""
         self.duplicate_label.setText(warning)
         self.duplicate_label.setVisible(bool(warning))
+        legend = ([rv.CONFLICT_TEXT] if conflict_rows else []) + ([rv.MANUAL_TINT_TEXT] if state is not None and state.manual else [])
+        self.colour_legend.setText(" ".join(legend))
+        self.colour_legend.setVisible(bool(legend))
         self.session_label.setVisible(bool(text))
         self.reset_all_button.setEnabled(bool(state and state.manual))
         self._buttons()
@@ -434,6 +526,32 @@ class ReviewPanel(QWidget):
         self._buttons()
         self._draw_plots()
 
+    def _chart_clicked(self, kind: str, x: float, y: float) -> Optional[int]:
+        """A click on a chart selects the table row drawn there, as a click on that row does (its shapes follow). Several
+        rows drawn on the same spot are offered to the person; none is chosen for them."""
+        chart = self.charts.get(kind)
+        if chart is None or self.state is None:
+            return None
+        rows = rv.rows_at(chart, x, y)
+        if not rows:
+            return None
+        row = rows[0] if len(rows) == 1 else self._ask_row(rows)
+        if row is None or not 0 <= row < len(self.state):
+            return None
+        self.select_row(row)
+        return row
+
+    def row_text(self, row: int) -> str:
+        cells = self.state.row(row)
+        return (f"Row {row + 1}: EXP {cells.exp_mode} ({cells.exp_text} Hz) with FE {cells.selected_mode} "
+                f"({cells.selected_text} Hz)")
+
+    def _menu_row(self, rows: tuple) -> Optional[int]:
+        menu = QMenu(self)
+        actions = {menu.addAction(self.row_text(row)): row for row in rows}
+        chosen = menu.exec(QCursor.pos())
+        return actions.get(chosen)
+
     def _dialog_duplicate(self, text: str) -> str:
         box = QMessageBox(self)
         box.setWindowTitle("FE mode already selected")
@@ -490,15 +608,38 @@ class ReviewPanel(QWidget):
         if state is None:
             for image in (self.frequency_image, self.difference_image, self.frf_image):
                 image.clear_image()
+            self.charts.clear()
+            self.plot_note.setVisible(False)
             self.frf_note.setText("")
             self.selection_label.setText("")
             return
         tab = self.views.tabText(self.views.currentIndex())
         if tab == TAB_PLOTS:
-            self.frequency_image.set_image(rv.frequency_plot(state, self.current))
-            self.difference_image.set_image(rv.difference_plot(state, self.current))
+            self._arrange_plots(self.plots_area.viewport().width() >= SIDE_BY_SIDE_WIDTH)
+            width = self._chart_width(self.frequency_image)
+            ratio = self.frequency_image.devicePixelRatioF()
+            frequency = rv.frequency_chart(state, self.current, width, min(540, round(width * 0.72)), ratio)
+            points = rv._plotted(state)
+            values = [abs(p[3]) for p in points]
+            detail = bool(values) and max(values) > rv.DETAIL_LIMIT and min(values) <= rv.DETAIL_LIMIT
+            difference = rv.difference_chart(state, self.current, width,
+                                             min(560, round(width * (0.95 if detail else 0.72))), ratio)
+            for kind, image, chart in (("frequency", self.frequency_image, frequency),
+                                       ("difference", self.difference_image, difference)):
+                self.charts[kind] = chart
+                self._drawn_width[kind] = image.width()
+                image.set_image(chart.png)
+            self.plot_note.setText(frequency.note)
+            self.plot_note.setVisible(bool(frequency.note))
         elif tab == TAB_FRF:
             self._draw_frf()
+
+    def _chart_width(self, image) -> int:
+        """The logical width the picture will take: its own, or before it is laid out, its share of the pane."""
+        if image.width() > 50:
+            return image.width()
+        pane = self.views.width() - 24
+        return max(280, pane // 2 if pane >= SIDE_BY_SIDE_WIDTH else pane)
 
     def _draw_frf(self) -> None:
         saved = self.analyze.snapshot is not None
@@ -506,11 +647,18 @@ class ReviewPanel(QWidget):
         series = None if saved else rv.frf_series(dataset)
         if series is None:
             self.frf_image.clear_image()
+            self.charts.pop("frf", None)
             self.frf_note.setText(rv.frf_missing(dataset, saved))
             return
         records = [(f"EXP {row.exp_mode}", float(row.exp_text)) for row in self.state.rows()]
         self.frf_note.setText(rv.FRF_PEAK_NOTE if self.state.provisional else rv.FITTED_NOTE)
-        self.frf_image.set_image(rv.frf_plot(series, records, self.current, self.state.provisional))
+        width = self._chart_width(self.frf_image)
+        height = min(560, round(width * (0.52 if series[2] is not None else 0.4)))
+        chart = rv.frf_chart(series, records, self.current, self.state.provisional, width, height,
+                             self.frf_image.devicePixelRatioF())
+        self.charts["frf"] = chart
+        self._drawn_width["frf"] = self.frf_image.width()
+        self.frf_image.set_image(chart.png)
 
 
-__all__ = ["CANCEL", "COMPACT_COLUMNS", "KEEP", "ReviewPanel", "SWAP"]
+__all__ = ["CANCEL", "COMPACT_COLUMNS", "KEEP", "ReviewPanel", "SWAP", "VISUAL_ORDER"]

@@ -192,14 +192,15 @@ class FrfTests(unittest.TestCase):
         figure.canvas.draw()
         renderer = figure.canvas.get_renderer()
         axis = figure.axes[0]
-        labels = axis.texts
-        self.assertEqual([t.get_text() for t in labels], [f"{name}  {value:.1f} Hz" for name, value in records])
-        boxes = sorted((t.get_window_extent(renderer) for t in labels), key=lambda box: box.x0)
+        labels = axis.texts  # ABM-UX5: each other record carries its number only; the selected one its name and frequency
+        others = [i for i in range(len(records)) if i != 5]
+        self.assertEqual([t.get_text() for t in labels], [str(i + 1) for i in others] + [f"EXP 6: {hz[5]:.2f} Hz"])
+        boxes = sorted((t.get_window_extent(renderer) for t in labels[:-1]), key=lambda box: box.x0)
         for left, right in zip(boxes, boxes[1:]):
             self.assertLessEqual(left.x1, right.x0 + 0.5)
-        self.assertEqual(labels[5].get_weight(), "bold")
-        for label, value in zip(labels, hz):
-            self.assertEqual(label.xy[0], value)  # each leader ends at the record's own frequency
+        self.assertEqual(labels[-1].get_weight(), "bold")
+        for label, index in zip(labels, others + [5]):
+            self.assertEqual(label.xy[0], hz[index])  # each leader ends at the record's own frequency
         self.assertEqual([round(float(c.get_offsets()[0][0]), 6) for c in axis.collections], [round(v, 6) for v in hz])
         curve = axis.lines[0]
         np.testing.assert_array_equal(curve.get_xdata(), frequency)

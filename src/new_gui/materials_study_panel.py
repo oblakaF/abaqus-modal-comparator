@@ -312,6 +312,9 @@ class MaterialsStudyPanel(QStackedWidget):
 
     def _build_choice(self) -> QFrame:
         card, inner = _card()
+        self.source_banner = _label("", "warnings")  # ABM-UX5: which data the page uses, unmistakably
+        self.source_banner.setObjectName("materialsSourceBanner")
+        inner.addWidget(self.source_banner)
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
         self.method_combo = _combo(tuple((sm.METHOD_NAMES[key], key) for key in (sm.RITZ, sm.STAGE_A)), "materialsMethod")
@@ -328,11 +331,14 @@ class MaterialsStudyPanel(QStackedWidget):
         inner.addLayout(grid)
         self.method_text = _label("", "hint")
         inner.addWidget(self.method_text)
+        self.real_next = _label(sm.REAL_NEXT, "hint")
+        inner.addWidget(self.real_next)
         return card
 
     def _build_geometry(self) -> QFrame:
         self.geometry_card, inner = _card()
-        inner.addWidget(_label("Plate", "sectionTitle"))
+        self.geometry_title = _label(sm.GEOMETRY_WHY, "sectionTitle")  # ABM-UX5: why a size and mass are entered
+        inner.addWidget(self.geometry_title)
         form = sm.default_form()["geometry"]
         self.geometry_grid = QGridLayout()
         self.a_field, self.b_field = _field(form["a"], "materialsA"), _field(form["b"], "materialsB")
@@ -464,6 +470,8 @@ class MaterialsStudyPanel(QStackedWidget):
             inner.addWidget(self.parameter_grids[backend])
         self.parameter_note = _label("", "hint")
         inner.addWidget(self.parameter_note)
+        self.parameter_help = _label("", "hint")
+        inner.addWidget(self.parameter_help)
 
         inner.addWidget(_label("Model and observations", "sectionTitle"))
         numerics = sm.default_form()["numerics"]
@@ -554,6 +562,8 @@ class MaterialsStudyPanel(QStackedWidget):
         inner.addWidget(self.results_empty)
         self.statement = _label("", "warnings")
         inner.addWidget(self.statement)
+        self.codes_note = _label("", "hint")  # ABM-UX5: the status codes in ordinary words
+        inner.addWidget(self.codes_note)
         self.origin_note = _label("", "hint")
         inner.addWidget(self.origin_note)
         self.changed_note = _label(INPUTS_CHANGED, "warnings")
@@ -565,6 +575,8 @@ class MaterialsStudyPanel(QStackedWidget):
         layout.addWidget(card)
         self.parameter_card, inner = _card()
         inner.addWidget(_label("Model parameters", "sectionTitle"))
+        self.result_parameter_help = _label("", "hint")
+        inner.addWidget(self.result_parameter_help)
         self.summary_parameter_box = QVBoxLayout()
         inner.addLayout(self.summary_parameter_box)
         layout.addWidget(self.parameter_card)
@@ -737,6 +749,7 @@ class MaterialsStudyPanel(QStackedWidget):
             grid.setVisible(key == backend)
         self.method_combo.setToolTip(backend)
         self.method_text.setText(sm.METHOD_TEXT[backend])
+        self.parameter_help.setText(sm.PARAMETER_HELP[backend])
         self.scope_text.setText(sm.APPLICABILITY[backend])
         ritz = backend == sm.RITZ
         self.geometry_card.setVisible(ritz)  # the matrix package holds its own model: geometry and mass are not its inputs
@@ -780,6 +793,8 @@ class MaterialsStudyPanel(QStackedWidget):
         self.package_button.setEnabled(not running and self.package_source.currentData() == sm.SELECTED)
         self.package_field.setEnabled(self.package_source.currentData() == sm.SELECTED)
         real = self.real_source
+        self.source_banner.setText(sm.REAL_BANNER if real else sm.EXAMPLE_BANNER[self.backend])
+        self.real_next.setVisible(real)
         self.blocked.setVisible(real)
         self.real_hint.setVisible(not real)
         self._show_source_view(real)
@@ -1023,7 +1038,8 @@ class MaterialsStudyPanel(QStackedWidget):
         for key in RESULT_TABLES:
             self._table(key, None, (), (), 0)
         self._show_summary(())
-        for label in (self.origin_note, self.statement, self.reasons, self.holdout_line, self.original_statement):
+        for label in (self.origin_note, self.statement, self.reasons, self.holdout_line, self.original_statement,
+                      self.codes_note, self.result_parameter_help):
             label.setText("")
         self.badge.setText(NOT_RUN)
         self.badge.setProperty("state", "")
@@ -1053,6 +1069,8 @@ class MaterialsStudyPanel(QStackedWidget):
         self._show_summary(sm.result_summary(section))
         self.origin_note.setText(origin)
         self.statement.setText(sm.RESULT_STATEMENT)
+        self.codes_note.setText(sm.status_meaning(section))
+        self.result_parameter_help.setText(sm.PARAMETER_HELP.get(result["backend_id"], ""))
         self.original_statement.setText(section["statement"])
         self.reasons.setText(sm.reason_text(section))
         self.run_state.setText(f"{result['execution_status']}: {result['numerical_status']}, {result['solves']} solves")

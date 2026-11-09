@@ -65,6 +65,7 @@ class ImageView(QLabel):
     """A PNG scaled to the available width with its proportions kept (never wider than the panel)."""
 
     image_changed = Signal(bool)
+    clicked = Signal(float, float)  # a left click on the picture, in the original PNG's pixels
 
     def __init__(self):
         super().__init__()
@@ -125,6 +126,26 @@ class ImageView(QLabel):
         super().resizeEvent(event)
         if not self._fitting:
             self._fit()
+
+    def image_point(self, x: float, y: float) -> Optional[tuple]:
+        """Where (x, y) of this widget falls on the original PNG, in its pixels; None outside the picture."""
+        pixmap = self.pixmap()
+        if self.source is None or pixmap is None or pixmap.isNull():
+            return None
+        ratio = pixmap.devicePixelRatio() or 1.0
+        width, height = pixmap.width() / ratio, pixmap.height() / ratio
+        left, top = (self.width() - width) / 2.0, (self.height() - height) / 2.0
+        fx, fy = (x - left) / width, (y - top) / height
+        if not (0.0 <= fx <= 1.0 and 0.0 <= fy <= 1.0):
+            return None
+        return fx * self.source.width(), fy * self.source.height()
+
+    def mousePressEvent(self, event) -> None:
+        super().mousePressEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton:
+            point = self.image_point(event.position().x(), event.position().y())
+            if point is not None:
+                self.clicked.emit(*point)
 
 
 class ImageActions(QWidget):
@@ -232,6 +253,9 @@ class ShapePanel(QFrame):
         grid.addWidget(QLabel("Component"), row, 0)
         grid.addWidget(self.component_combo, row, 1)
         layout.addLayout(grid)
+        self.component_note = _label("", "hint")  # ABM-UX5: which components are measured, and what Magnitude hides
+        self.component_note.setVisible(False)
+        layout.addWidget(self.component_note)
         self.facts = _label("", "hint")
         layout.addWidget(self.facts)
         self.record_warnings = _label("", "warnings")
@@ -432,7 +456,18 @@ class ShapePanel(QFrame):
             provisional = sm.is_provisional(preview_set, index)
             allowed = sm.record_components(preview_set, index)
             for row, component in enumerate(sm.COMPONENTS):
-                self.component_combo.model().item(row).setEnabled(component in allowed)
+                item = self.component_combo.model().item(row)
+                item.setEnabled(component in allowed)  # a component that was not measured cannot be chosen: no false data
+                item.setText(sm.component_text(self.kind, component, allowed))
+        if self.kind == FE:
+            self.component_note.setText(sm.FE_COMPONENT_NOTE if has_preview else "")
+        elif index is None:
+            for row, component in enumerate(sm.COMPONENTS):
+                self.component_combo.model().item(row).setText(sm.component_text(self.kind, component))
+            self.component_note.setText("")
+        else:
+            self.component_note.setText(sm.measured_note(allowed))
+        self.component_note.setVisible(bool(self.component_note.text()))
         self.hint.setVisible(index is None)
         self.facts.setText("\n".join(facts))
         details = not self.compact or self.details_toggle.isChecked()

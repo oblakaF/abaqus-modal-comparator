@@ -36,8 +36,12 @@ FRF_PEAK_NOTE = ("Triangles: FRF peak records, response snapshots at detected pe
                  "of the selected table row.")
 FITTED_NOTE = ("Dashed lines: fitted modes of the chosen set at their frequencies. They are not peaks of this curve. Orange: the "
                "record of the selected table row.")
-PLOTS_EXPLANATION = ("Left: each dot is one table row. On the dashed equal frequency line FE and EXP agree; above it FE is higher. "
-                     "Right: FE − EXP in percent. The dark outline marks the selected table row.")
+PLOTS_EXPLANATION = ("Each dot or bar is one table row: a frequency-based candidate, not a validated mode pair. Click a dot or "
+                     "a bar to select its row and show its shapes. On the dashed line FE = EXP; above it FE is higher.")
+CONFLICT_TEXT = ("Pink FE frequency: that FE mode is selected for more than one EXP record (not one-to-one). It is not a "
+                 "frequency-error limit.")
+MANUAL_TINT_TEXT = "Pale yellow row: your manual FE choice."
+DETAIL_LIMIT = 10.0  # percent: the detailed view of the signed error; larger values stay drawn in full above it
 LABEL_AUTOMATIC, LABEL_EQUAL = "Automatic nearest-frequency candidate", "Equal frequency line (FE = EXP)"
 LABEL_MANUAL = f"Manual candidate ({USER_HYPOTHESIS})"
 LABEL_SELECTED, LABEL_SELECTED_RECORD = "Selected table row", "Record of the selected row"
@@ -58,7 +62,7 @@ STATUS_CONFIRMED = ("Mode pairs and MAC use the registration you confirmed (see 
 STATUS_VERIFIED = ("Mode pairs and MAC use a verified physical registration (see MAC / Points); this table is matched by "
                    "frequency only.")
 _DASH = "—"
-_INK, _MUTED, _GRID = "#3e4c59", "#52606d", "#e4e7eb"
+_INK, _MUTED, _GRID = "#1f2933", "#52606d", "#e4e7eb"
 _AUTOMATIC, _MANUAL = "#2563eb", "#b45309"
 LABEL_SPACING_POINTS = 11.0  # the width of one vertical FRF label, its bold form included
 
@@ -206,17 +210,17 @@ def table_title(analysis) -> str:
 # ---------------------------------------------------------------------------------------------- plots
 
 
-def _figure(size=(6.0, 3.6)) -> Figure:
-    figure = Figure(figsize=size, constrained_layout=True)
+def _figure(size=(6.0, 3.6), dpi: float = 100.0) -> Figure:
+    figure = Figure(figsize=size, dpi=dpi, constrained_layout=True)
     FigureCanvasAgg(figure)
     return figure
 
 
 def _style(axis, xlabel: str, ylabel: str, title: str) -> None:
     axis.set_title(title, fontsize=10, color=_INK, loc="left")
-    axis.set_xlabel(xlabel, fontsize=9, color=_MUTED)
-    axis.set_ylabel(ylabel, fontsize=9, color=_MUTED)
-    axis.tick_params(labelsize=8, colors=_MUTED)
+    axis.set_xlabel(xlabel, fontsize=9, color=_MUTED, labelpad=4)
+    axis.set_ylabel(ylabel, fontsize=9, color=_MUTED, labelpad=4)
+    axis.tick_params(labelsize=8.5, colors=_MUTED, pad=3)
     axis.grid(True, color=_GRID, linewidth=0.8)
     axis.set_axisbelow(True)
     for side in ("top", "right"):
@@ -225,11 +229,36 @@ def _style(axis, xlabel: str, ylabel: str, title: str) -> None:
         axis.spines[side].set_color(_GRID)
 
 
-def _png(figure: Figure) -> bytes:
+def _png(figure: Figure, dpi: Optional[float] = 130) -> bytes:
     out = io.BytesIO()
     with sm._RENDER:
-        figure.savefig(out, format="png", dpi=130)
+        figure.savefig(out, format="png", dpi=dpi or figure.dpi)
     return out.getvalue()
+
+
+def _canvas(width: Optional[int], height: Optional[int], ratio: float, default=(6.0, 3.6)) -> Figure:
+    """A figure of exactly ``width`` x ``height`` logical pixels at the screen's pixel ratio, so the PNG is shown without
+    stretching. Without a size: the default size at 130 dpi, as before."""
+    if width and height:
+        return _figure((width / 100.0, height / 100.0), 100.0 * max(1.0, float(ratio)))
+    return _figure(default, 130.0)
+
+
+@dataclass(frozen=True)
+class Chart:
+    """A chart PNG and where its rows are drawn, in PNG pixels (origin top left): dots (row, x, y), or bar spans
+    (row, x0, x1, y0, y1). ``pixel_ratio`` is PNG pixels per logical pixel."""
+
+    png: bytes
+    points: tuple = ()
+    spans: tuple = ()
+    pixel_ratio: float = 1.0
+    note: str = ""
+
+
+def _to_png_pixels(figure: Figure, axis, x: float, y: float) -> tuple:
+    px, py = axis.transData.transform((x, y))
+    return float(px), float(figure.bbox.height - py)
 
 
 def _plotted(state: ReviewState) -> list:
@@ -242,54 +271,133 @@ def _plotted(state: ReviewState) -> list:
     return points
 
 
+def _not_drawn(state: ReviewState, points) -> str:
+    missing = len(state) - len(points)
+    if not missing:
+        return ""
+    return (f"{missing} EXP record{'' if missing == 1 else 's'} without a selected FE frequency "
+            f"{'is' if missing == 1 else 'are'} not drawn.")
+
+
 def selected_point(state: ReviewState, current: Optional[int]):
     """The plotted point of the selected table row, or None."""
     return next((p for p in _plotted(state) if p[0].row == current), None)
 
 
-def frequency_plot(state: ReviewState, current: Optional[int] = None) -> bytes:
-    figure = _figure()
+def frequency_chart(state: ReviewState, current: Optional[int] = None, width: Optional[int] = None,
+                    height: Optional[int] = None, ratio: float = 1.0) -> Chart:
+    """FE against EXP frequency of every row with both, as stored; the dot of the selected row is ringed."""
+    figure = _canvas(width, height, ratio)
     axis = figure.add_subplot(111)
     points = _plotted(state)
     for manual, colour, marker, label in ((False, _AUTOMATIC, "o", LABEL_AUTOMATIC), (True, _MANUAL, "D", LABEL_MANUAL)):
         chosen = [p for p in points if p[0].manual == manual]
         if chosen:
-            axis.scatter([p[1] for p in chosen], [p[2] for p in chosen], s=36, c=colour, marker=marker, label=label, zorder=3,
+            axis.scatter([p[1] for p in chosen], [p[2] for p in chosen], s=46, c=colour, marker=marker, label=label, zorder=3,
                          edgecolors="white", linewidths=1.0)
     if points:
         low = min(min(p[1], p[2]) for p in points)
         high = max(max(p[1], p[2]) for p in points)
         axis.plot((low, high), (low, high), color=_MUTED, linewidth=1.0, linestyle="--", label=LABEL_EQUAL, zorder=1)
+        pad = 0.04 * ((high - low) or 1.0)
+        axis.set_xlim(low - pad, high + pad)
+        axis.set_ylim(low - pad, high + pad)
     chosen = selected_point(state, current)
     if chosen is not None:
-        axis.scatter([chosen[1]], [chosen[2]], s=170, facecolors="none", edgecolors=_INK, linewidths=2.0, zorder=4,
+        axis.scatter([chosen[1]], [chosen[2]], s=190, facecolors="none", edgecolors=_INK, linewidths=2.0, zorder=4,
                      label=LABEL_SELECTED)
-        axis.annotate(f"EXP {chosen[0].exp_mode} / FE {chosen[0].selected_mode}", (chosen[1], chosen[2]), xytext=(9, -13),
-                      textcoords="offset points", fontsize=8, color=_INK, weight="bold")
-    _style(axis, "EXP frequency (Hz)", "FE frequency (Hz)", "FE vs EXP frequency comparison")
+        low_x, high_x = axis.get_xlim()
+        right = chosen[1] > (low_x + high_x) / 2
+        axis.annotate(f"EXP {chosen[0].exp_mode} / FE {chosen[0].selected_mode}", (chosen[1], chosen[2]),
+                      xytext=(-10 if right else 10, -14), textcoords="offset points", fontsize=8.5, color=_INK,
+                      weight="bold", ha="right" if right else "left")
+    _style(axis, "EXP frequency (Hz)", "Selected FE frequency (Hz)", "FE vs EXP frequency: candidates, not validated pairs")
     if points:
-        axis.legend(fontsize=7, frameon=False, loc="upper left")
-    return _png(figure)
+        axis.legend(fontsize=7.5, frameon=True, framealpha=0.92, edgecolor=_GRID, loc="upper left")
+    figure.canvas.draw()
+    hits = tuple((p[0].row, *_to_png_pixels(figure, axis, p[1], p[2])) for p in points)
+    return Chart(_png(figure, figure.dpi if width else None), points=hits if width else (),
+                 pixel_ratio=figure.dpi / 100.0, note=_not_drawn(state, points))
 
 
-def difference_plot(state: ReviewState, current: Optional[int] = None) -> bytes:
-    figure = _figure()
-    axis = figure.add_subplot(111)
-    points = _plotted(state)
+def frequency_plot(state: ReviewState, current: Optional[int] = None) -> bytes:
+    return frequency_chart(state, current).png
+
+
+def _bars(axis, points, current, limit: Optional[float] = None) -> None:
     for manual, colour, label in ((False, _AUTOMATIC, LABEL_AUTOMATIC), (True, _MANUAL, LABEL_MANUAL)):
         chosen = [p for p in points if p[0].manual == manual]
         if chosen:
-            axis.bar([p[0].row + 1 for p in chosen], [p[3] for p in chosen], width=0.6, color=colour, label=label, zorder=3)
+            axis.bar([p[0].row + 1 for p in chosen], [p[3] for p in chosen], width=0.62, color=colour, label=label, zorder=3)
     axis.axhline(0.0, color=_MUTED, linewidth=1.0, zorder=2)
-    chosen = selected_point(state, current)
+    chosen = next((p for p in points if p[0].row == current), None)
     if chosen is not None:
-        axis.bar([chosen[0].row + 1], [chosen[3]], width=0.78, fill=False, edgecolor=_INK, linewidth=2.0, zorder=4,
+        axis.bar([chosen[0].row + 1], [chosen[3]], width=0.8, fill=False, edgecolor=_INK, linewidth=2.0, zorder=4,
                  label=LABEL_SELECTED)
+    if limit is not None:
+        edge = limit * 1.2
+        axis.set_ylim(-edge, edge)
+        for p in points:
+            if abs(p[3]) > limit:  # cut at the view's edge, whole in the full-range view; its true value is written here
+                sign = 1.0 if p[3] > 0 else -1.0
+                axis.plot([p[0].row + 1], [sign * edge * 0.94], marker="^" if sign > 0 else "v", color=_INK, markersize=6,
+                          zorder=5)
+                axis.annotate(f"{p[3]:+.1f}", (p[0].row + 1, sign * edge * 0.94), xytext=(0, -13 if sign > 0 else 6),
+                              textcoords="offset points", ha="center", fontsize=7.5, color=_INK, zorder=6)
     axis.set_xticks([p[0].row + 1 for p in points], [p[0].exp_mode for p in points])
-    _style(axis, "EXP mode", "Frequency error, FE − EXP (%)", "Signed frequency error")
+    if len(points) > 14:
+        axis.tick_params(axis="x", labelsize=7.5)
+
+
+def difference_chart(state: ReviewState, current: Optional[int] = None, width: Optional[int] = None,
+                     height: Optional[int] = None, ratio: float = 1.0) -> Chart:
+    """The signed error 100 (f_FE - f_EXP) / f_EXP of every row, as stored. When some rows exceed DETAIL_LIMIT and others do
+    not, a second view shows ±DETAIL_LIMIT %: the larger bars are cut at its edge, marked and labelled with their value, and
+    stay whole in the full-range view above. No value is changed or left out."""
+    points = _plotted(state)
+    values = [abs(p[3]) for p in points]
+    detail = bool(values) and max(values) > DETAIL_LIMIT and min(values) <= DETAIL_LIMIT
+    figure = _canvas(width, height, ratio, (6.0, 5.2) if detail else (6.0, 3.6))
+    if detail:
+        full, close = figure.subplots(2, 1, sharex=True, height_ratios=(2, 3))
+    else:
+        full, close = figure.add_subplot(111), None
+    _bars(full, points, current)
+    _style(full, "" if close is not None else "EXP mode", "FE − EXP (%)",
+           "Signed frequency error, full range" if close is not None else "Signed frequency error")
     if points:
-        axis.legend(fontsize=7, frameon=False)
-    return _png(figure)
+        full.legend(fontsize=7.5, frameon=True, framealpha=0.92, edgecolor=_GRID)
+    if close is not None:
+        _bars(close, points, current, DETAIL_LIMIT)
+        _style(close, "EXP mode", "FE − EXP (%)", f"Detail ±{DETAIL_LIMIT:g} %: larger bars are cut, value written")
+    figure.canvas.draw()
+    spans = []
+    for axis in (full, close):
+        if axis is None:
+            continue
+        y0, y1 = axis.get_ylim()
+        for p in points:
+            x0, top = _to_png_pixels(figure, axis, p[0].row + 1 - 0.45, y1)
+            x1, bottom = _to_png_pixels(figure, axis, p[0].row + 1 + 0.45, y0)
+            spans.append((p[0].row, x0, x1, top, bottom))
+    return Chart(_png(figure, figure.dpi if width else None), spans=tuple(spans) if width else (),
+                 pixel_ratio=figure.dpi / 100.0, note=_not_drawn(state, points))
+
+
+def difference_plot(state: ReviewState, current: Optional[int] = None) -> bytes:
+    return difference_chart(state, current).png
+
+
+def rows_at(chart: Chart, x: float, y: float, reach: float = 9.0) -> tuple:
+    """The rows under a click at (x, y) PNG pixels, nearest first: every dot within ``reach`` logical pixels (overlapping
+    dots all count, so none is chosen for the person), then the bar span holding the click."""
+    reach *= chart.pixel_ratio
+    found = sorted((((px - x) ** 2 + (py - y) ** 2) ** 0.5, row) for row, px, py in chart.points)
+    rows = [row for distance, row in found if distance <= reach]
+    for row, x0, x1, top, bottom in chart.spans:
+        if x0 <= x <= x1 and top <= y <= bottom and row not in rows:
+            rows.append(row)
+    return tuple(rows)
 
 
 def frf_series(dataset) -> Optional[tuple]:
@@ -327,50 +435,80 @@ def spread_labels(positions, gap: float, low: float, high: float) -> list:
     return places
 
 
-def frf_figure(series: tuple, records=(), current: Optional[int] = None, provisional: bool = False) -> Figure:
-    """The imported FRF indicator, with the set's records marked at their frequencies; coherence, when read, below.
+def _record_number(name: str) -> str:
+    return name.split()[-1] if name.split() else name
 
-    ``records`` are (name, Hz). FRF peak records are triangles on the curve; fitted modes are dashed lines, never peaks.
-    Labels of close records are spread apart; the marks stay at the records' frequencies."""
+
+def frf_figure(series: tuple, records=(), current: Optional[int] = None, provisional: bool = False,
+               width: Optional[int] = None, height: Optional[int] = None, ratio: float = 1.0) -> Figure:
+    """The imported FRF indicator, as read, with the set's records marked at their frequencies; coherence, when read, below.
+
+    ``records`` are (name, Hz). FRF peak records are triangles on the curve; fitted modes are dashed lines, never peaks. Each
+    record carries only its number above the curve (spread apart when close; a leader joins it to its frequency); the
+    selected record carries its full name and frequency. Every record stays listed in the Review table."""
     frequency, indicator, coherence = series
-    figure = _figure((9.0, 4.8) if coherence is not None else (9.0, 3.6))
+    default = (9.0, 4.8) if coherence is not None else (9.0, 3.6)
+    figure = _canvas(width, height, ratio, default)
     if coherence is not None:
         axis, lower = figure.subplots(2, 1, sharex=True, height_ratios=(3, 1))
     else:
         axis, lower = figure.add_subplot(111), None
     curve = np.maximum(indicator / max(float(np.max(indicator)), 1.0e-30), 1.0e-12)
-    axis.semilogy(frequency, curve, color=_AUTOMATIC, linewidth=1.2, label="Imported FRF indicator")
+    axis.semilogy(frequency, curve, color=_AUTOMATIC, linewidth=1.1, label="Imported FRF indicator")
     kind = LABEL_FRF_PEAK if provisional else LABEL_FITTED
     for index, (name, hz) in enumerate(records):
         selected = index == current
-        colour, width = (_MANUAL, 1.8) if selected else (_MUTED, 0.8)
+        colour, width_line = (_MANUAL, 1.8) if selected else (_MUTED, 0.7)
         label = kind if index == 0 else None
         if provisional:
             y = curve[int(np.argmin(np.abs(frequency - hz)))]
-            axis.scatter([hz], [y], marker="v", s=70 if selected else 30, c=colour, zorder=4, label=label)
+            axis.scatter([hz], [y], marker="v", s=70 if selected else 26, c=colour, zorder=4, label=label)
         else:
-            axis.axvline(hz, color=colour, linewidth=width, linestyle="--", zorder=2, label=label)
+            axis.axvline(hz, color=colour, linewidth=width_line, linestyle="--", zorder=2, label=label, alpha=1.0 if selected else 0.7)
     if current is not None and 0 <= current < len(records):
         axis.axvline(records[current][1], color=_MANUAL, linewidth=1.8, zorder=3, label=LABEL_SELECTED_RECORD)
     _style(axis, "" if lower is not None else "Frequency (Hz)", "Normalized indicator", "")
-    axis.legend(fontsize=7, frameon=False, loc="lower right")
+    axis.legend(fontsize=7.5, frameon=True, framealpha=0.92, edgecolor=_GRID, loc="lower right")
     low, high = axis.get_xlim()
     axis.set_xlim(low, high)  # the labels are placed for this range
     room = axis.get_position().width * figure.get_figwidth() * 72.0
     places = spread_labels([hz for _name, hz in records], LABEL_SPACING_POINTS / room * (high - low), low, high)
     transform = axis.get_xaxis_transform()
     for index, ((name, hz), place) in enumerate(zip(records, places)):
-        selected = index == current
-        axis.annotate(f"{name}  {hz:.1f} Hz", xy=(hz, 1.0), xycoords=transform, xytext=(place, 1.07), textcoords=transform,
-                      rotation=90, ha="center", va="bottom", fontsize=7, color=_INK if selected else _MUTED,
-                      weight="bold" if selected else "normal", annotation_clip=False,
-                      arrowprops={"arrowstyle": "-", "color": _MANUAL if selected else _MUTED, "linewidth": 0.6,
-                                  "shrinkA": 0, "shrinkB": 0})
+        if index == current:
+            continue
+        axis.annotate(_record_number(name), xy=(hz, 1.0), xycoords=transform, xytext=(place, 1.025), textcoords=transform,
+                      ha="center", va="bottom", fontsize=7, color=_MUTED, annotation_clip=False,
+                      arrowprops={"arrowstyle": "-", "color": _GRID, "linewidth": 0.6, "shrinkA": 0, "shrinkB": 0})
+    if current is not None and 0 <= current < len(records):
+        name, hz = records[current]
+        middle = min(max(hz, low + 0.12 * (high - low)), high - 0.12 * (high - low))
+        axis.annotate(f"{name}: {hz:.2f} Hz", xy=(hz, 1.0), xycoords=transform, xytext=(middle, 1.11), textcoords=transform,
+                      ha="center", va="bottom", fontsize=8.5, color=_INK, weight="bold", annotation_clip=False,
+                      bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": _MANUAL, "linewidth": 1.0},
+                      arrowprops={"arrowstyle": "-", "color": _MANUAL, "linewidth": 0.9, "shrinkA": 0, "shrinkB": 0})
     if lower is not None:
         lower.plot(frequency, coherence, color=_AUTOMATIC, linewidth=1.0)
         lower.set_ylim(0.0, 1.05)
         _style(lower, "Frequency (Hz)", "Mean coherence", "")
     return figure
+
+
+def frf_chart(series: tuple, records=(), current: Optional[int] = None, provisional: bool = False,
+              width: Optional[int] = None, height: Optional[int] = None, ratio: float = 1.0) -> Chart:
+    """``frf_figure`` as a PNG with, per record, a narrow clickable column at its frequency over the indicator axis."""
+    figure = frf_figure(series, records, current, provisional, width, height, ratio)
+    figure.canvas.draw()
+    axis = figure.axes[0]
+    spans = []
+    if width:
+        y0, y1 = axis.get_ylim()
+        reach = 5.0 * figure.dpi / 100.0
+        for index, (_name, hz) in enumerate(records):
+            x, top = _to_png_pixels(figure, axis, hz, y1)
+            _x, bottom = _to_png_pixels(figure, axis, hz, y0)
+            spans.append((index, x - reach, x + reach, top, bottom))
+    return Chart(_png(figure, figure.dpi if width else None), spans=tuple(spans), pixel_ratio=figure.dpi / 100.0)
 
 
 def frf_plot(series: tuple, records=(), current: Optional[int] = None, provisional: bool = False) -> bytes:
@@ -407,4 +545,5 @@ def mac_plot(view) -> bytes:
 
 __all__ = ["DuplicateSelection", "FRF_NEEDS_SOURCE", "FRF_NOT_IN_FILE", "HEADERS", "LIMIT_TEXT", "PROVISIONAL_EXPLANATION",
            "ReviewRow", "ReviewState", "SAVED_PLOTS_TEXT", "SESSION_ONLY_TEXT", "TITLE", "USER_HYPOTHESIS", "difference_plot",
-           "frequency_plot", "frf_plot", "frf_series", "mac_plot"]
+           "frequency_plot", "frf_plot", "frf_series", "mac_plot", "Chart", "frequency_chart", "difference_chart",
+           "frf_chart", "rows_at", "CONFLICT_TEXT", "MANUAL_TINT_TEXT", "DETAIL_LIMIT"]

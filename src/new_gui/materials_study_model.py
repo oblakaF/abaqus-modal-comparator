@@ -87,6 +87,30 @@ ROLE_LIMIT = {"log": "Model stiffness; not a ply constant",
               "linear": "Signed; no precision rule approved",
               "derived": "Derived; uncertainty not propagated"}
 RUN_BLOCKED = "Real-data inverse execution: BLOCKED"
+# ABM-UX5: what the page is doing, in plain words; every status code stays exact in the results and details
+EXAMPLE_BANNER = {
+    RITZ: "BUILT-IN SYNTHETIC EXAMPLE: it tests the Ritz method on known stiffnesses; it does not identify your material.",
+    STAGE_A: ("BUILT-IN SYNTHETIC EXAMPLE: it tests the Stage A method on a compatible matrix package, not on a plate size "
+              "and mass; it does not identify your material."),
+}
+REAL_BANNER = "Using: REAL FILES, view only. Identifying a real material is blocked on this page."
+REAL_NEXT = ("What you can do with real data: the Research Tuning page explores a supported shell INP against fitted PolyMAX "
+             "frequencies (research only, no material property). Analyze and MAC / Points compare FE and EXP shapes.")
+GEOMETRY_WHY = "Plate of the synthetic example: it makes the example's frequencies; not your specimen"
+PARAMETER_HELP = {
+    RITZ: ("D11, D22: bending stiffness along a and along b. D66: twisting stiffness. D12 = u·D22 is derived (u has no "
+           "unit). All in N·m. Known synthetic: the value that made the example's frequencies. Start: where the optimizer "
+           "begins. Calculated: what the fit found. You do not need to calculate any of them to run the example."),
+    STAGE_A: ("D = D11 = D22: bending stiffness. D66: twisting stiffness. D12 = r·D is derived (r has no unit). All in N·m. "
+              "Known synthetic: the value that made the example's frequencies. Start: where the optimizer begins. "
+              "Calculated: what the fit found. You do not need to calculate any of them to run the example."),
+}
+CONVERGENCE_MEANING = ("Converged means the optimizer settled on these numbers; it does not make them a verified material "
+                       "property.")
+CODE_MEANING = {
+    "DIAGNOSTIC_OPTIMIZER_CANDIDATE": "DIAGNOSTIC_OPTIMIZER_CANDIDATE: numbers the optimizer found and checked, kept for diagnosis only.",
+    "NOT_A_RELEASE_VALUE": "NOT_A_RELEASE_VALUE: must not be used as a material property.",
+}
 REAL_NOTE = ("Real files are only inspected here. No text, setting or saved file enables a fit on measured data, and these "
              "values are never used in the synthetic test.")
 TERM_HELP = {
@@ -539,6 +563,14 @@ def result_summary(section: Mapping) -> tuple:
     return (("Run", f"{EXECUTION_TEXT.get(execution, execution)} ({execution}), {result['solves']} solves"),
             ("Method", method_title(result["backend_id"])), ("Convergence", f"{converged} ({numerical})"),
             ("Scientific checks", checks), ("Meaning of the numbers", meaning))
+
+
+def status_meaning(section: Mapping) -> str:
+    """The result's codes in ordinary words; the codes themselves stay as recorded."""
+    result = section["result"]
+    parts = [CONVERGENCE_MEANING] + [CODE_MEANING[code] for code in (result["scientific_status"], result["release_status"])
+                                     if code in CODE_MEANING]
+    return " ".join(parts)
 
 
 def cancelled_summary(backend: str) -> tuple:

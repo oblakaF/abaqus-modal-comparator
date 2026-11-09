@@ -6,6 +6,7 @@ point correspondence, the coverage, the pictures of a chosen pair and the line p
 
 from __future__ import annotations
 
+import html
 import threading
 from typing import Optional
 
@@ -57,7 +58,17 @@ class MacPointsPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
+        card, inner = _card()  # ABM-UX5: what MAC needs and what this result has, first and in plain words
+        inner.addWidget(_label(mp.READINESS_TITLE, "sectionTitle"))
+        self.readiness = QVBoxLayout()
+        self.readiness.setSpacing(4)
+        inner.addLayout(self.readiness)
+        self.readiness_labels: list = []
+        self.readiness_rows: tuple = ()
+        inner.addWidget(_label(mp.MAC_PLAIN, "hint"))
+        layout.addWidget(card)
         card, inner = _card()
+        inner.addWidget(_label("Details", "sectionTitle"))
         self.badge = QLabel(mp.UNAVAILABLE_BADGE)
         self.badge.setObjectName("badge")
         self.badge.setProperty("state", "blocked")
@@ -119,6 +130,7 @@ class MacPointsPanel(QWidget):
         self.result = analysis.comparison_result if analysis is not None else None
         for image in self.pair_images:
             image.clear_image()
+        self._rebuild_readiness()
         reason = mp.unavailable_reason(analysis, panel.snapshot is not None)
         self.reason.setText(reason)
         self.reason.setVisible(bool(reason))
@@ -133,6 +145,25 @@ class MacPointsPanel(QWidget):
             self._add_points_tab(view)
             self._add_provenance_tab(view)
             self._add_profile_tab()
+
+    def readiness_answers(self) -> dict:
+        return dict(self.readiness_rows)
+
+    def _rebuild_readiness(self) -> None:
+        for label in self.readiness_labels:
+            label.setParent(None)
+            label.deleteLater()
+        self.readiness_labels = []
+        analysis = self.analyze.analysis
+        mode = self.analyze.measured_mode() if analysis is not None else None
+        self.readiness_rows = mp.readiness_rows(analysis, self.analyze.snapshot is not None, mode,
+                                                self.analyze.registration_kind())
+        for question, answer in self.readiness_rows:
+            label = _label("", "hint" if answer.startswith("Yes") else "warnings")
+            label.setTextFormat(Qt.TextFormat.RichText)
+            label.setText(f"<b>{html.escape(question)}:</b> {html.escape(answer)}")
+            self.readiness.addWidget(label)
+            self.readiness_labels.append(label)
 
     def refresh_evidence(self) -> None:
         """The manual-choice count follows the Review page; nothing else on this page depends on it."""
