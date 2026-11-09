@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 ROOT = Path(__file__).resolve().parents[1]
@@ -181,6 +182,63 @@ class ParameterTests(SolverCase):
                 fm.solve(3, **kwargs)
         with self.assertRaises(ValueError):
             fm.solve(3, material=fm.model.material, e1=1.0)
+
+
+class RigidGuardTests(SolverCase):
+    """ABM-SOLID-3-F1: an elastic spectrum is returned only after the rigid-body checks pass."""
+
+    def test_passing_checks_keep_the_first_elastic_mode(self):
+        fm = ss.SolidForwardModel(self.bar())
+        result = fm.solve(6)
+        self.assertTrue(result.rigid.passed)
+        self.assertEqual(result.rigid.failure_reasons, ())
+        self.assertTrue(np.all(result.rigid.rigid_content[:6] > 1 - 1e-10))
+        self.assertTrue(np.all(result.rigid.rigid_content[6:] < 1e-10))
+        w = linalg.eigh(fm.stiffness_matrix().toarray(), fm.mass_matrix().toarray(), eigvals_only=True)
+        self.assertAlmostEqual(result.frequencies_hz[0] / (math.sqrt(w[6]) / (2 * math.pi)), 1.0, places=10)
+
+    def test_disconnected_bodies_are_refused_with_diagnostics(self):
+        text = box_inp(nx=3, ny=1, nz=1, lx=30.0, ly=5.0, lz=5.0)
+        head, rest = text.split("*Element, type=C3D8I\n", 1)
+        lines = rest.split("\n")
+        rest = "\n".join([lines[0]] + lines[2:])  # drop element 2: two separate bricks remain
+        text = (head + "*Element, type=C3D8I\n" + rest).replace(
+            "*Elset, elset=Set-1, generate\n 1, 3, 1", "*Elset, elset=Set-1\n 1, 3")
+        path = Path(self._dir.name) / "two_bodies.inp"
+        path.write_text(text, encoding="latin-1")
+        model = sm.load_solid_inp(path)
+        self.assertEqual(len(model.element_labels), 2)
+        with self.assertRaises(ss.RigidBodyClassificationError) as caught:
+            ss.SolidForwardModel(model).solve(6)
+        error = caught.exception
+        self.assertFalse(error.diagnostics.passed)
+        self.assertTrue(error.diagnostics.failure_reasons)
+        scale = abs(error.all_eigenvalues).max()
+        self.assertGreaterEqual(int(np.sum(np.abs(error.all_eigenvalues) < 1e-8 * scale)), 12)
+
+    def test_forced_c2e0_failure_returns_no_elastic_result(self):
+        from dataclasses import replace
+        from services import matrix_model_service as mms
+
+        real = mms._classify_expected_rigid_spectrum
+        with mock.patch.object(mms, "_classify_expected_rigid_spectrum",
+                               lambda values, count: replace(real(values, count), status="FAIL")):
+            with self.assertRaisesRegex(ss.RigidBodyClassificationError, "C2E0 FAIL") as caught:
+                ss.SolidForwardModel(self.bar()).solve(6)
+        self.assertEqual(caught.exception.diagnostics.c2e0_status, "FAIL")
+        self.assertTrue(np.all(caught.exception.diagnostics.rigid_content[:6] > 0.5))  # shape check alone passed
+
+    def test_forced_rigid_subspace_failure_returns_no_elastic_result(self):
+        def wrong_fields(coordinates):
+            return np.random.default_rng(3).standard_normal((3 * len(coordinates), 6))
+
+        with mock.patch.object(ss, "rigid_body_fields", wrong_fields):
+            with self.assertRaisesRegex(ss.RigidBodyClassificationError, "not mainly rigid") as caught:
+                ss.SolidForwardModel(self.bar()).solve(6)
+        diagnostics = caught.exception.diagnostics
+        self.assertEqual(diagnostics.c2e0_status, "PASS")  # spectrum check alone passed
+        self.assertFalse(diagnostics.passed)
+        self.assertEqual(len(caught.exception.all_eigenvalues), 6 + 6 + 4)
 
 
 class ControlTests(SolverCase):

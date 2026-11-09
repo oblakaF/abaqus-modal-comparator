@@ -12,10 +12,11 @@
   first elastic eigenvalue from above, so sigma stays on the order of the
   wanted spectrum.
 * Rigid-body modes: a free-free model has exactly six.  The six lowest
-  computed modes are reported as rigid only after the project C2E0 rigid
-  spectrum criterion (``matrix_model_service``) and a geometric check of their
-  span against the six analytic rigid-body fields are both reported; no
-  frequency cut-off is used.
+  computed modes are treated as rigid only when the project C2E0 rigid
+  spectrum criterion (``matrix_model_service``) does not FAIL and a shape
+  check against the six analytic rigid-body fields passes; otherwise
+  ``RigidBodyClassificationError`` is raised and no elastic spectrum is
+  returned.  No frequency cut-off is used.
 * Close modes: guard modes above the requested window are computed and the
   relative spacing of every neighbouring pair is reported.  Shapes inside a
   near-degenerate cluster are only defined up to a rotation within the
@@ -105,6 +106,22 @@ class RigidBodyDiagnostics:
     rigid_to_first_elastic_ratio: float
     span_cosines: np.ndarray          # principal-angle cosines: lowest six modes vs analytic rigid fields
     max_rigid_content_of_elastic_modes: float
+    # Per computed mode (ascending): fraction of its M-norm in the analytic rigid subspace, in [0, 1].
+    rigid_content: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    passed: bool = True
+    failure_reasons: tuple[str, ...] = ()
+
+
+class RigidBodyClassificationError(SolidSolverError):
+    """The six lowest modes could not be confirmed as the rigid-body modes; no elastic result is returned.
+
+    ``diagnostics`` and ``all_eigenvalues`` (every computed eigenvalue, ascending) are kept for investigation.
+    """
+
+    def __init__(self, message: str, diagnostics: RigidBodyDiagnostics, all_eigenvalues: np.ndarray):
+        super().__init__(message)
+        self.diagnostics = diagnostics
+        self.all_eigenvalues = all_eigenvalues
 
 
 @dataclass(frozen=True)
@@ -370,6 +387,10 @@ class SolidForwardModel:
         ortho = float(np.abs(vectors.T @ mv - np.eye(k)).max())
 
         rigid = self._rigid_diagnostics(values, vectors, mass)
+        if not rigid.passed:
+            raise RigidBodyClassificationError(
+                "Rigid-body classification failed; no elastic spectrum is returned: "
+                + " ".join(rigid.failure_reasons), rigid, values.copy())
         elastic = values[RIGID_BODY_MODES_FREE_FREE:]
         freqs = np.sqrt(np.clip(elastic, 0.0, None)) / (2.0 * math.pi)
         spacing = np.diff(freqs) / (0.5 * (freqs[1:] + freqs[:-1]))
@@ -386,18 +407,49 @@ class SolidForwardModel:
     def _rigid_diagnostics(self, values, vectors, mass) -> RigidBodyDiagnostics:
         from .matrix_model_service import _classify_expected_rigid_spectrum
 
-        health = _classify_expected_rigid_spectrum(values, RIGID_BODY_MODES_FREE_FREE)
+        from .matrix_model_service import MatrixModelError
+
+        reasons = []
+        try:
+            health = _classify_expected_rigid_spectrum(values, RIGID_BODY_MODES_FREE_FREE)
+            c2e0_status, ratio = health.status, float(health.rigid_to_first_elastic_ratio)
+            if health.status == "FAIL":
+                reasons.append(
+                    f"C2E0 FAIL: expected {RIGID_BODY_MODES_FREE_FREE} near-zero modes, detected "
+                    f"{health.detected_rigid_mode_count}; f_rigid,max/f_elastic,1="
+                    f"{health.rigid_to_first_elastic_ratio:.6g}; significant negative rigid eigenvalues="
+                    f"{health.significant_negative_rigid_eigenvalues}.")
+        except MatrixModelError as exc:  # the project check itself refuses the spectrum
+            c2e0_status, ratio = "FAIL", float("nan")
+            reasons.append(f"C2E0 FAIL: {exc}")
         r = rigid_body_fields(self.model.coordinates)
         g = r.T @ (mass @ r)
         w, q = np.linalg.eigh(0.5 * (g + g.T))
         r_m = r @ (q / np.sqrt(w))                       # M-orthonormal rigid basis
         projection = r_m.T @ (mass @ vectors)            # (6, k)
         cosines = np.linalg.svd(projection[:, :RIGID_BODY_MODES_FREE_FREE], compute_uv=False)
-        content = np.sum(projection[:, RIGID_BODY_MODES_FREE_FREE:] ** 2, axis=0)
+        rigid_content = np.sum(projection ** 2, axis=0)  # in [0, 1] for M-normalised modes
+        content = rigid_content[RIGID_BODY_MODES_FREE_FREE:]
+        # Classification: the project C2E0 spectrum check (FAIL is refused, as in matrix_model_service),
+        # and a shape check against the analytic rigid subspace at the majority boundary: each of the six
+        # lowest modes must lie mostly (> 1/2 of its M-norm) in the rigid subspace and every higher mode
+        # mostly outside it.  No frequency cut-off is involved.
+        lowest = rigid_content[:RIGID_BODY_MODES_FREE_FREE]
+        if not np.all(lowest > 0.5):
+            reasons.append(
+                "Analytic rigid subspace: lowest modes "
+                f"{[int(i) + 1 for i in np.flatnonzero(~(lowest > 0.5))]} are not mainly rigid "
+                f"(rigid content {np.round(lowest, 6).tolist()}).")
+        if content.size and not np.all(content < 0.5):
+            reasons.append(
+                "Analytic rigid subspace: modes "
+                f"{[int(i) + 1 + RIGID_BODY_MODES_FREE_FREE for i in np.flatnonzero(~(content < 0.5))]} "
+                "above the six lowest are mainly rigid.")
         return RigidBodyDiagnostics(
             count=RIGID_BODY_MODES_FREE_FREE, eigenvalues=values[:RIGID_BODY_MODES_FREE_FREE].copy(),
-            c2e0_status=health.status, rigid_to_first_elastic_ratio=float(health.rigid_to_first_elastic_ratio),
-            span_cosines=cosines, max_rigid_content_of_elastic_modes=float(content.max()) if content.size else 0.0)
+            c2e0_status=c2e0_status, rigid_to_first_elastic_ratio=ratio,
+            span_cosines=cosines, max_rigid_content_of_elastic_modes=float(content.max()) if content.size else 0.0,
+            rigid_content=rigid_content, passed=not reasons, failure_reasons=tuple(reasons))
 
 
 # --------------------------------------------------------------------------- FE-FE comparison helpers
@@ -431,7 +483,8 @@ def shape_mac_matrix(result: SolidModalResult, reference_node_ids: Sequence[str]
 
 
 __all__ = [
-    "Preflight", "ResourceLimitExceeded", "ResourceLimits", "RigidBodyDiagnostics", "SolidForwardModel",
+    "Preflight", "ResourceLimitExceeded", "ResourceLimits", "RigidBodyClassificationError",
+    "RigidBodyDiagnostics", "SolidForwardModel",
     "SolidModalResult", "SolidSolverError", "SolverCancelled", "rigid_body_fields", "ritz_shift",
     "shape_mac_matrix", "signed_frequency_residuals",
 ]
