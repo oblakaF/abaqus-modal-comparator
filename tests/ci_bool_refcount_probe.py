@@ -123,6 +123,11 @@ def main() -> int:
     case("QLabel.setText", lambda: [label.setText(str(i)) for i in range(N)])
     case("thread.is_alive polled", lambda: in_thread(lambda: time.sleep(0.2)))
     case("emit(int, int), main thread, connected", emit_case("two", (1, 2), False))
+    if os.environ.get("PROBE_QUICK") == "1":  # the version matrix: one clear answer per combination
+        change = results[-1][1]
+        print(f"::notice title=bool probe matrix::Python {sys.version.split()[0]}, PySide6 {PySide6.__version__} on "
+              f"{sys.platform}: {N} x Signal.emit() changed the reference counts of (True, False) by {change}", flush=True)
+        return 0
     case("emit(int, int), main thread, not connected", emit_case("two", (1, 2), False, connected=False))
     case("emit(int, int), main thread, result kept", emit_case("two", (1, 2), False, keep_result=True))
     case("emit(int, int), main thread, queued", emit_case("two", (1, 2), False, connection=Qt.ConnectionType.QueuedConnection))
