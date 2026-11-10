@@ -1105,7 +1105,8 @@ class MacPointsTests(_Flow):
         window, panel = self.compared()
         mac = window.mac_points
         self.assertEqual([panel.comparison_tabs.tabText(i) for i in range(panel.comparison_tabs.count())],
-                         ["Mode pairs", "MAC", "Registered points", "Mapping diagnostics", "Line profile"])
+                         ["Mode pairs", "MAC", "Candidates", "Unmatched modes", "Close modes",  # ABM-AUD-4
+                          "Registered points", "Mapping diagnostics", "Line profile"])
         self.assertTrue(panel.mac_actions.copy_button.isEnabled())
         result = panel.analysis.comparison_result
         self.assertEqual(mac.point_table.rowCount(), len(result.experimental.modes[0].node_ids))

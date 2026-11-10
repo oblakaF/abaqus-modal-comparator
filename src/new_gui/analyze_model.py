@@ -388,7 +388,8 @@ NEAREST_HEADERS = ("EXP record", "EXP mode", "EXP (Hz)", "Nearest FE mode", "FE 
                    "Next FE (Hz)", "Next error (%)", "Note")
 FE_HEADERS = ("FE mode", "Frequency (Hz)", "Type (by shape)")
 EXPERIMENTAL_HEADERS = ("EXP record", "EXP mode", "Frequency (Hz)", "Classification")
-PAIR_COLUMNS = (0, 1, 2, 3, 4, 5, 6, 7)  # of comparison_model.PAIR_HEADERS: modes, frequencies, error, MAC, status
+# of comparison_model.PAIR_HEADERS: modes, frequencies, error, MAC, status; ABM-AUD-4: coverage, points, close modes
+PAIR_COLUMNS = (0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 12)
 PAIR_HEADERS = tuple(cm.PAIR_HEADERS[i] for i in PAIR_COLUMNS)
 
 

@@ -73,7 +73,8 @@ REVIEWED_TEXT = ("Registration setup: mapping reviewed by you. Not an accepted p
                  "MAC and no mode pairs.")
 SHAPE_HINT = ("Click a row to show that EXP record and its nearest FE mode side by side, each on its own coordinates. "
               "They are not a mode pair.")
-TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "nearest": "Nearest frequency", "fe": "FE modes",
+TAB_TITLES = {"pairs": "Mode pairs", "mac": "MAC", "candidates": "Candidates", "unmatched_fe": "Unmatched modes",
+              "close": "Close modes", "nearest": "Nearest frequency", "fe": "FE modes",
               "experimental": "Experimental modes"}
 BADGE_STATE = {cm.PAIRS_FOUND: "read"}  # any other status is not a verified pairing; a failed check is "blocked"
 _FIND, _EXTRACT, _READ, _ANALYSE, _CONFIRMATION = "find", "extract", "read", "analyse", "confirmation"
@@ -1071,7 +1072,8 @@ class AnalyzePanel(QWidget):
         self.comparison_tabs.setObjectName("macResults")
         self.comparison_tabs.setDocumentMode(True)
         card, inner = _card()
-        pairs = tuple(tuple(row.cells[i] for i in am.PAIR_COLUMNS) for row in view.pair_rows)
+        pairs = tuple(tuple(row.cells[i] if i < len(row.cells) else cm.DASH for i in am.PAIR_COLUMNS)
+                      for row in view.pair_rows)  # a row that holds fewer cells shows a dash, never another cell
         if pairs:
             self._add_table("pairs", "", am.PAIR_HEADERS, pairs, 7, PAIR_HINT, tabs=self.comparison_tabs)
             self.tables["pairs"].cellClicked.connect(lambda row, _column: self._pair_clicked(row))
@@ -1094,6 +1096,70 @@ class AnalyzePanel(QWidget):
                 column.addWidget(self.mac_actions)
                 self.mac_image.set_image(rv.mac_plot(view))
             self._add_table("mac", "", headers, rows, 0, tabs=self.comparison_tabs, above=picture)
+        self._add_diagnostics(view)
+
+    def _add_diagnostics(self, view) -> None:
+        """ABM-AUD-4: why a candidate was not admitted, which modes have no pair, and what happens inside close groups.
+        Everything is the comparator's result as the view words it; a saved result shows what was saved."""
+        tabs = self.comparison_tabs
+
+        def rows_of(name: str) -> tuple:  # a view that does not hold a table shows none of it
+            value = getattr(view, name, ())
+            return value if isinstance(value, tuple) else ()
+
+        if rows_of("candidate_rows"):
+            self._add_table("candidates", "", cm.CANDIDATE_HEADERS, rows_of("candidate_rows"), 9, cm.CANDIDATE_NOTE,
+                            tabs=tabs)
+        page = QWidget()
+        inner = QVBoxLayout(page)
+        inner.setContentsMargins(0, 8, 0, 0)
+        inner.setSpacing(8)
+        inner.addWidget(_label(cm.UNMATCHED_NOTE, "hint"))
+        self.unmatched_labels = {}  # side -> one block of words per mode: the sentences are too long for table cells
+        for side, name, title, rows in (
+                ("fe", "FE", "FE modes without a pair", rows_of("unmatched_fe_rows")),
+                ("experimental", "EXP", "Experimental modes without a pair (inside the FE comparison band)",
+                 rows_of("unmatched_experimental_rows"))):
+            inner.addWidget(_label(title, "sectionTitle"))
+            self.unmatched_labels[side] = []
+            if not rows:
+                inner.addWidget(_label("None.", "hint"))
+            for row in rows:
+                lines = [f"{name} mode {row[0]} ({row[1]} Hz)" + (f": {row[4]}" if len(row) > 4 else "")]
+                lines += [f"{caption}: {cell}" for caption, cell in zip(cm.UNMATCHED_HEADERS[2:4], row[2:4])]
+                block = _label("\n".join(lines))  # a result saved earlier holds the mode and its frequency only
+                block.setObjectName("unmatchedMode")
+                self.unmatched_labels[side].append(block)
+                inner.addWidget(block)
+        inner.addWidget(_label("FE rigid-body modes, separated by shape and not compared", "sectionTitle"))
+        rigid = rows_of("rigid_rows")
+        if rigid:
+            self.tables["rigid"] = _ResultTable(cm.RIGID_HEADERS, rigid, 2)
+            inner.addWidget(self.tables["rigid"])
+        else:
+            inner.addWidget(_label("None.", "hint"))
+        inner.addStretch(1)
+        tabs.addTab(page, TAB_TITLES["unmatched_fe"])
+        page = QWidget()
+        inner = QVBoxLayout(page)
+        inner.setContentsMargins(0, 8, 0, 0)
+        inner.setSpacing(8)
+        named = rows_of("close_groups")
+        groups = cm.close_group_rows(view) if named else ()
+        self.close_labels = []  # one block of words per group: the sentences are too long for table cells
+        if groups:
+            inner.addWidget(_label(cm.CLOSE_NOTE, "hint"))
+            for cells in groups:
+                inner.addWidget(_label(cells[0], "sectionTitle"))
+                block = _label("\n".join(f"{caption}: {cell}" for caption, cell in zip(cm.CLOSE_HEADERS[1:], cells[1:])))
+                block.setObjectName("closeGroup")
+                self.close_labels.append(block)
+                inner.addWidget(block)
+        else:
+            inner.addWidget(_label(cm.CLOSE_NOT_SAVED + " " + "; ".join(named) + "." if named else cm.NO_CLOSE_GROUP,
+                                   "hint"))
+        inner.addStretch(1)
+        tabs.addTab(page, TAB_TITLES["close"])
 
     # ---------------------------------------------------------------------------------------------- projects
 

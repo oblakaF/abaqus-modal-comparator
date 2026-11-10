@@ -37,6 +37,15 @@ no archived registration. It takes the confirmation file's content, never a regi
 and the whole confirmation are checked again immediately before every comparison. It never falls back to an archived
 registration.
 
+ABM-AUD-4: the view also says why a mode has no pair (the comparator's own candidate diagnostics, worded), and what
+happens inside each group of close modes: the comparator's FE and experimental close groups joined by its assigned
+pairs, the individual MAC of each pair, the MAC of every FE / experimental combination inside the group, whether the
+assignment follows the frequency order, and the group's subspace MAC from ``services.modal_cluster_service`` (the
+existing basis-invariant measure, on the pairs' registered measured DOFs). A group value never changes a pair, its MAC or
+its status, and it is NOT_AVAILABLE, with the reason, whenever the group does not hold two assigned pairs of full rank.
+No threshold is added and no pair is formed here. These words are kept in the existing ``close_groups`` and unmatched
+rows of the view, so a saved project holds them without a new field.
+
 One heavy operation at a time: the comparison shares the lock of the frequency diagnostic and the registration check
 (NEW-GUI.4/5). ``ComparisonSlot`` keeps the current request; a replaced or cleared file, Inspect again, another modal
 set, a new registration check or a closed window cancels it and its outcome is discarded. A request cancelled while
@@ -104,7 +113,28 @@ PAIR_HEADERS = ("FE mode", "FE (Hz)", "Exp record", "Exp mode", "Exp (Hz)", "Err
                 "Measured DOFs", "DOF coverage", "Points", "Order", "Close modes", "Auto-ID use")
 CANDIDATE_HEADERS = ("Exp record", "Exp mode", "Exp (Hz)", "Best-MAC FE mode", "FE (Hz)", "MAC", "Error (%)",
                      "Coverage", "Admissible", "Rejected by", "Assigned")
-UNMATCHED_HEADERS = ("Mode", "Frequency (Hz)")
+UNMATCHED_HEADERS = ("Mode", "Frequency (Hz)", "Nearest in frequency", "Highest MAC", "Why it has no pair")
+CLOSE_HEADERS = ("Close group", "Assigned pairs (individual MAC)", "MAC inside the group", "Order in the group",
+                 "Subspace MAC (group)")
+CLOSE_SEPARATOR = " | "  # between the cells of one group's line in ``ComparisonView.close_groups``
+CLOSE_PREFIX = "Group: "
+NOT_AVAILABLE = "NOT_AVAILABLE"
+CLOSE_NOTE = ("Modes this close in frequency can mix or change order between the FE model and the test. The subspace MAC "
+              "compares the two spans of a group, whatever the order or the mixing inside it. It does not identify an "
+              "individual mode: every pair keeps its own MAC and comparator status, and no pair is changed here.")
+NO_CLOSE_GROUP = "The comparator found no group of close modes in these data."
+CLOSE_NOT_SAVED = "This saved result names its close groups only; their diagnostics were not saved with it."
+REASON_WORDS = {"frequency": "frequency difference above the comparator's limit",
+                "mac": "MAC below the comparator's limit",
+                "mac_unavailable": "MAC not available on the measured DOFs",
+                "coverage": "insufficient measured-DOF, point or spatial coverage"}
+CANDIDATE_NOTE = ("For each experimental record: the FE mode with the highest MAC, and the comparator's decision on it. A "
+                  "candidate is not a pair. Rejected by: frequency = " + REASON_WORDS["frequency"] + "; mac = "
+                  + REASON_WORDS["mac"] + "; mac_unavailable = " + REASON_WORDS["mac_unavailable"] + "; coverage = "
+                  + REASON_WORDS["coverage"] + ". Admissible but not assigned: the one-to-one assignment gave one of "
+                  "the two modes to another pair. The limits are listed under Mapping diagnostics.")
+UNMATCHED_NOTE = ("Modes the comparator left without a pair, with its diagnostics of their nearest-frequency and "
+                  "highest-MAC counterparts. A counterpart named here is not a pair and not a mode identity.")
 RIGID_HEADERS = ("FE mode", "Frequency (Hz)", "Rigid-body residual")
 DASH = dm.DASH
 
@@ -365,6 +395,156 @@ def _record_positions(experimental_preview, set_index: int) -> dict:
             for position, record in enumerate(experimental_preview.sets[set_index].records)}
 
 
+def _counterpart(candidate, side: str) -> str:
+    """One candidate of an unmatched mode in words: who, how far in frequency, which MAC, and the comparator's verdict."""
+    if candidate is None:
+        return DASH
+    other = (f"EXP {candidate.experimental_mode} ({_hz(candidate.experimental_frequency_hz)} Hz)" if side == "fe"
+             else f"FE {candidate.abaqus_mode} ({_hz(candidate.abaqus_frequency_hz)} Hz)")
+    verdict = ("admissible" if candidate.admissible else "rejected: "
+               + "; ".join(REASON_WORDS.get(code, str(code)) for code in candidate.rejection_reasons))
+    return f"{other}: error {_percent(candidate.frequency_error_percent)} %, MAC {_mac(candidate.mac)}; {verdict}"
+
+
+def _unmatched_rows(items, side: str, result, numbers: tuple) -> tuple:
+    """The comparator's unmatched modes of one side with its own candidate diagnostics for them. A counterpart named
+    here is information, never a pair."""
+    summaries = dict(result.diagnostic_summaries or {})
+    key = "abaqus" if side == "fe" else "experimental"
+    nearest = dict(zip(numbers, summaries.get(f"nearest_frequency_by_{key}") or []))
+    best = dict(zip(numbers, summaries.get(f"best_mac_by_{key}") or []))
+    rows = []
+    for item in items or ():
+        number = int(item["mode"])
+        own = [c for c in result.candidate_diagnostics or ()
+               if int(c.abaqus_mode if side == "fe" else c.experimental_mode) == number]
+        admissible = [c for c in own if c.admissible]
+        if admissible:
+            names = ", ".join(f"EXP {c.experimental_mode}" if side == "fe" else f"FE {c.abaqus_mode}" for c in admissible)
+            why = (f"Admissible with {names}, but not chosen by the comparator's one-to-one assignment: each mode is "
+                   "paired at most once.")
+        elif own:
+            why = "No admissible counterpart: every candidate fails a limit of the comparator."
+        else:
+            why = "The comparator recorded no candidate for this mode."
+        rows.append((str(number), _hz(item["frequency_hz"]), _counterpart(nearest.get(number), side),
+                     _counterpart(best.get(number), side), why))
+    return tuple(rows)
+
+
+def _subspace_text(pairs) -> str:
+    """The group's subspace MAC from the existing cluster service, or NOT_AVAILABLE with the reason."""
+    if len(pairs) < 2:
+        return (f"{NOT_AVAILABLE}: the group holds {len(pairs)} assigned pair{'' if len(pairs) == 1 else 's'}; a "
+                "subspace needs at least two FE and two experimental modes paired by the comparator")
+    from services import modal_cluster_service as clusters  # the validated basis-invariant measure; nothing is re-derived
+
+    try:
+        value, shared, fe_rank, experimental_rank = clusters._paired_subspace_mac(pairs)
+    except ValueError as error:
+        return f"{NOT_AVAILABLE}: {error}"
+    if fe_rank != len(pairs) or experimental_rank != len(pairs):
+        return (f"{NOT_AVAILABLE}: the group is rank deficient on the measured DOFs (FE rank {fe_rank}, experimental "
+                f"rank {experimental_rank} of {len(pairs)} modes)")
+    return f"{value:.3f} on {shared} shared measured DOFs ({len(pairs)} FE and {len(pairs)} experimental modes)"
+
+
+def close_group_lines(result) -> tuple:
+    """One line per group of close modes: the comparator's FE and experimental close groups joined by its assigned
+    pairs. Cells are separated by ``CLOSE_SEPARATOR`` in the order of ``CLOSE_HEADERS``. Nothing is paired here."""
+    import numpy as np
+
+    metadata = dict(getattr(result.abaqus, "metadata", None) or {})
+    fe_groups = [[int(item["mode"]) for item in group] for group in metadata.get("close_abaqus_mode_groups") or ()]
+    exp_groups = [[int(item["mode"]) for item in group] for group in metadata.get("close_experimental_mode_groups") or ()]
+    if not fe_groups and not exp_groups:
+        return ()
+    frequency = {}
+    for key, groups in (("fe", metadata.get("close_abaqus_mode_groups")), ("exp", metadata.get("close_experimental_mode_groups"))):
+        for group in groups or ():
+            for item in group:
+                frequency[(key, int(item["mode"]))] = float(item["frequency_hz"])
+    parent: dict = {}
+
+    def find(node):
+        parent.setdefault(node, node)
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
+
+    def join(a, b):
+        parent[find(a)] = find(b)
+
+    for key, groups in (("fe", fe_groups), ("exp", exp_groups)):
+        for group in groups:
+            for number in group[1:]:
+                join((key, group[0]), (key, number))
+            find((key, group[0]))
+    grouped = set(parent)
+    for pair in result.pairs:
+        fe, exp = ("fe", int(pair.abaqus_mode)), ("exp", int(pair.experimental_mode))
+        if fe in grouped or exp in grouped:  # the partner of a close mode belongs to the picture of that group
+            frequency.setdefault(fe, float(pair.abaqus_frequency_hz))
+            frequency.setdefault(exp, float(pair.experimental_frequency_hz))
+            join(fe, exp)
+    components: dict = {}
+    for node in list(parent):
+        components.setdefault(find(node), []).append(node)
+    matrix = np.asarray(result.mac_matrix, dtype=float)
+    fe_numbers = [int(n) for n in result.abaqus_mode_numbers]
+    exp_numbers = [int(n) for n in result.experimental_mode_numbers]
+    lines = []
+    for nodes in sorted(components.values(), key=lambda members: min(frequency[node] for node in members)):
+        fe_modes = sorted((n for key, n in nodes if key == "fe"), key=lambda n: frequency[("fe", n)])
+        exp_modes = sorted((n for key, n in nodes if key == "exp"), key=lambda n: frequency[("exp", n)])
+        pairs = sorted((pair for pair in result.pairs
+                        if int(pair.abaqus_mode) in fe_modes and int(pair.experimental_mode) in exp_modes),
+                       key=lambda pair: float(pair.abaqus_frequency_hz))
+
+        def side(name, modes, key):
+            if not modes:
+                return f"no {name} mode"
+            return (f"{name} {' / '.join(map(str, modes))} ("
+                    + ", ".join(_hz(frequency[(key, n)]) for n in modes) + " Hz)")
+
+        group = CLOSE_PREFIX + side("FE", fe_modes, "fe") + "; " + side("EXP", exp_modes, "exp")
+        assigned = "; ".join(f"FE {pair.abaqus_mode} with EXP {pair.experimental_mode}: MAC {_mac(pair.mac)}"
+                             for pair in pairs) or "none assigned"
+        paired_fe = {int(pair.abaqus_mode) for pair in pairs}
+        paired_exp = {int(pair.experimental_mode) for pair in pairs}
+        alone = ([f"FE {n}" for n in fe_modes if n not in paired_fe]
+                 + [f"EXP {n}" for n in exp_modes if n not in paired_exp])
+        if alone:
+            assigned += "; without a pair: " + ", ".join(alone)
+        inside = []
+        for fe in fe_modes:
+            if fe not in fe_numbers:
+                continue
+            cells = [f"EXP {exp} {_mac(float(matrix[fe_numbers.index(fe), exp_numbers.index(exp)]))}"
+                     for exp in exp_modes if exp in exp_numbers]
+            if cells:
+                inside.append(f"FE {fe}: " + ", ".join(cells))
+        if len(pairs) < 2:
+            order = DASH
+        else:
+            experimental_order = [float(pair.experimental_frequency_hz) for pair in pairs]  # pairs are in FE order
+            if experimental_order == sorted(experimental_order):
+                order = "as the frequency order on both sides"
+            else:
+                order = ("permuted against the frequency order: "
+                         + ", ".join(f"FE {pair.abaqus_mode} with EXP {pair.experimental_mode}" for pair in pairs)
+                         + " (the comparator's assignment by shape; no mode is renamed)")
+        lines.append(CLOSE_SEPARATOR.join((group, assigned, "; ".join(inside) or DASH, order, _subspace_text(pairs))))
+    return tuple(lines)
+
+
+def close_group_rows(view) -> tuple:
+    """The cells of each group line of a view (``CLOSE_HEADERS``); a result saved before ABM-AUD-4 holds none."""
+    return tuple(tuple(line[len(CLOSE_PREFIX):].split(CLOSE_SEPARATOR)) for line in view.close_groups
+                 if line.startswith(CLOSE_PREFIX) and line.count(CLOSE_SEPARATOR) == len(CLOSE_HEADERS) - 1)
+
+
 def _group_members(groups) -> dict:
     """Mode number -> the text of its close-mode group (the comparator's own groups)."""
     members = {}
@@ -478,7 +658,7 @@ def comparison_view(result, bound, fe_preview, experimental_preview, set_index: 
                        for n in quality.get("excluded_abaqus_modes") or ())
     close_groups = tuple(
         [f"FE modes {text}" for text in sorted(set(close_fe.values()))]
-        + [f"Experimental modes {text}" for text in sorted(set(close_exp.values()))])
+        + [f"Experimental modes {text}" for text in sorted(set(close_exp.values()))]) + close_group_lines(result)
 
     provenance = bound.provenance()
     meta = dict(result.metadata or {})
@@ -512,10 +692,9 @@ def comparison_view(result, bound, fe_preview, experimental_preview, set_index: 
         registration=str(provenance["registration_hash"]), registration_file=str(provenance["registration_file"]),
         pair_rows=tuple(rows), mac_fe_modes=fe_numbers, mac_experimental_modes=exp_numbers, mac_cells=mac_cells,
         assigned_cells=assigned, candidate_rows=tuple(candidates),
-        unmatched_fe_rows=tuple((str(item["mode"]), _hz(item["frequency_hz"]))
-                                for item in metadata_fe.get("unmatched_abaqus_modes") or ()),
-        unmatched_experimental_rows=tuple((str(item["mode"]), _hz(item["frequency_hz"]))
-                                          for item in metadata_fe.get("unmatched_experimental_candidates") or ()),
+        unmatched_fe_rows=_unmatched_rows(metadata_fe.get("unmatched_abaqus_modes"), "fe", result, fe_numbers),
+        unmatched_experimental_rows=_unmatched_rows(metadata_fe.get("unmatched_experimental_candidates"), "exp", result,
+                                                    exp_numbers),
         unpaired_experimental=unpaired, rigid_rows=rigid_rows, close_groups=close_groups,
         warnings=tuple(str(w) for w in result.warnings), provenance=tuple(facts), gates=gates, target_counts=target,
         mac_values=tuple(tuple(float(value) if np.isfinite(value) else None for value in row) for row in matrix))
@@ -586,5 +765,5 @@ def run_pair_images(result, index: int, token: int, cancel_event: threading.Even
 
 
 __all__ = ["ComparisonOutcome", "ComparisonRefused", "ComparisonSlot", "ComparisonView", "PairImages", "PairRow",
-           "compare", "compare_confirmed", "comparison_view", "render_mac_image", "run_compare",
+           "close_group_lines", "close_group_rows", "compare", "compare_confirmed", "comparison_view", "render_mac_image", "run_compare",
            "run_compare_confirmed", "run_pair_images", "unavailable"]
