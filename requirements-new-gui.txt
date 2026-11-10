@@ -1,3 +1,8 @@
 # The new interface (NEW-GUI.1, src/new_gui) only; the existing program does not need it.
 # Install after requirements.txt:  python -m pip install -r requirements-new-gui.txt
-PySide6-Essentials>=6.8,<7
+# ABM-AUD-2: the Linux build of 6.12.0 gives back one reference to True too many in every Signal.emit() when it runs on
+# Python 3.11 or older (500 emits: the reference count of True falls by 500), which ends a long run with "Fatal Python
+# error: bool_dealloc". 6.8 to 6.11 do not, Windows does not, and from Python 3.12 on True cannot be deallocated. Measured
+# by tests/ci_bool_refcount_probe.py; that probe also guards the CI against the defect coming back.
+PySide6-Essentials>=6.8,<7; sys_platform != "linux" or python_version >= "3.12"
+PySide6-Essentials>=6.8,<7,!=6.12.0; sys_platform == "linux" and python_version < "3.12"

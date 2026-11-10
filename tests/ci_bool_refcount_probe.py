@@ -123,10 +123,15 @@ def main() -> int:
     case("QLabel.setText", lambda: [label.setText(str(i)) for i in range(N)])
     case("thread.is_alive polled", lambda: in_thread(lambda: time.sleep(0.2)))
     case("emit(int, int), main thread, connected", emit_case("two", (1, 2), False))
-    if os.environ.get("PROBE_QUICK") == "1":  # the version matrix: one clear answer per combination
+    if os.environ.get("PROBE_QUICK") == "1":  # the guard of the CI: one clear answer, and a failure when references are lost
         change = results[-1][1]
         print(f"::notice title=bool probe matrix::Python {sys.version.split()[0]}, PySide6 {PySide6.__version__} on "
-              f"{sys.platform}: {N} x Signal.emit() changed the reference counts of (True, False) by {change}", flush=True)
+              f"{sys.platform}: {N} x Signal.emit() changed the reference counts of (True, False) by {change}"
+              + ("" if sys.version_info < (3, 12) else " (from Python 3.12 on these counts cannot change)"), flush=True)
+        if change != (0, 0):
+            print("::error title=bool probe matrix::Signal.emit() does not keep the reference counts of True / False: a "
+                  "long run on this Python would end with 'Fatal Python error: bool_dealloc'", flush=True)
+            return 1
         return 0
     case("emit(int, int), main thread, not connected", emit_case("two", (1, 2), False, connected=False))
     case("emit(int, int), main thread, result kept", emit_case("two", (1, 2), False, keep_result=True))

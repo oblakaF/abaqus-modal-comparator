@@ -7,6 +7,7 @@ name: Python tests
 #   linux / Qt stage .......... the NEW-GUI.1 Qt tests offscreen, none skipped.
 #   linux / M11 R6.5 .......... the research synthetic tests (no real data).
 #   windows-supervisor ........ the Win32 Job Object supervision natively: no skip is accepted there.
+# The Linux job runs on Python 3.11 (as before) and on Python 3.14 (the interpreter the Windows program is used with).
 # Every group is summarised by tests/ci_summary.py from its own log: a log without the closing lines (a native crash, a
 # kill, a timeout) is DID_NOT_FINISH, a failure. Logs are uploaded even when a group fails.
 
@@ -39,6 +40,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
           python -m pip install -r requirements-new-gui.txt
           python -m pip freeze | tee installed-packages.txt
+      - name: Guard - Signal.emit() keeps the reference counts of True and False
+        # ABM-AUD-2: PySide6 6.12.0 for Linux on Python 3.11 lost one reference to True per emit; the full suite then
+        # ended with "Fatal Python error: bool_dealloc". requirements-new-gui.txt excludes that build; this names the
+        # defect in seconds if another build brings it back.
+        shell: bash
+        timeout-minutes: 5
+        env:
+          PROBE_QUICK: "1"
+        run: python -X faulthandler tests/ci_bool_refcount_probe.py
       - name: Run unit tests (full suite, one process)
         shell: bash
         timeout-minutes: 60
@@ -134,37 +144,3 @@ jobs:
             windows-runner-results.txt
             windows-gui-results.txt
             installed-packages.txt
-
-  refcount-diagnosis:
-    # ABM-AUD-2 investigation of "Fatal Python error: bool_dealloc": which Python / PySide6 combinations lose a reference
-    # to True in every Signal.emit(). It reports; it decides nothing.
-    name: linux (bool probe, Python ${{ matrix.python }}, PySide6 ${{ matrix.pyside }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        python: ["3.11"]
-        pyside: ["6.8.*", "6.9.*", "6.10.*", "6.11.*", "6.12.*"]
-        include:
-          - python: "3.12"
-            pyside: "6.12.*"
-          - python: "3.14"
-            pyside: "6.12.*"
-    env:
-      QT_QPA_PLATFORM: offscreen
-      PROBE_QUICK: "1"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
-          python -m pip install -r requirements.txt
-          python -m pip install "PySide6-Essentials==${{ matrix.pyside }}"
-      - name: Probe
-        timeout-minutes: 10
-        run: python -X faulthandler tests/ci_bool_refcount_probe.py
