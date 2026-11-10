@@ -372,7 +372,8 @@ def assess(baseline, names, done, refits, control, dependence) -> dict:
                                 "meaning": ("how much one FIT record moves the estimate; a stable refit says the "
                                             "estimate does not hang on one frequency, not that it is accurate")},
         "frequency_fit": {"fit_rms_ln": baseline.rms_fit_after, "holdout_rms_ln": baseline.rms_holdout_after,
-                          "misfit_warning": misfit,
+                          "misfit_warning": misfit, "verdict": rft.fit_verdict(baseline.rms_fit_after),
+                          "threshold_ln": rft.MISFIT_RMS,
                           "meaning": "how well the surrogate reproduces the measured frequencies; not a parameter error"},
         "parameter_accuracy": {"verdict": NOT_DEMONSTRATED, "reasons": reasons},
         "statement": ("10 % TARGET: NOT DEMONSTRATED. "
@@ -384,6 +385,9 @@ def assess(baseline, names, done, refits, control, dependence) -> dict:
                           f"{p['parameter']} {p['largest_change_including_the_lowest_cost_minimum']:.1%}"
                           + (f" (record {p['record']})" if p["record"] is not None else "") for p in per) + ". "
                       + "".join(c + " " for c in caveats)
+                      + (f"HIGH MISFIT: the full-data FIT residual RMS is {baseline.rms_fit_after:.2%} (ln f), above the "
+                         f"{rft.MISFIT_RMS:.0%} diagnostic threshold; a refit that is stable says nothing about a model "
+                         "that does not reproduce the spectrum. " if misfit else "")
                       + "A small frequency residual or a stable refit is not a parameter accuracy; the accuracy also "
                         "depends on the assumed thickness, density, model form and correspondence, which these data do "
                         "not test."),

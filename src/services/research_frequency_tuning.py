@@ -26,6 +26,17 @@ What it does, in order:
 
 A candidate is issued only when the fit is numerically supported (converged, full practical rank, no active bound, the
 starts agree). The candidate values are surrogate (Ritz) results: they are proposals for a new Abaqus solve, not FE results.
+
+ABM-AUD-1 keeps three statements apart, because none of them implies the next:
+
+* the OPTIMIZER status (``status``): converged, at a bound, rank deficient, competing minima, exchanged axes;
+* the SPECTRAL FIT QUALITY (``fit_quality``): the FIT residual RMS against the diagnostic ``MISFIT_RMS``, the HOLDOUT
+  residuals separately. A converged fit with a large RMS is ``HIGH_MISFIT``: its numbers are kept for diagnosis, and its
+  candidate is ``DIAGNOSTIC_ONLY`` (no ready Abaqus block is written for it);
+* PHYSICAL VALIDITY (``validity``): never established here. No mode identity, no material property, no Abaqus check.
+
+The default correspondence takes every record's rank from the frequency order of the FULL measured set, so changing a
+record to HOLDOUT or EXCLUDED never renumbers another record; only a declared rank moves a record, and only that record.
 """
 
 from __future__ import annotations
@@ -55,7 +66,23 @@ SUPPORTED, NOT_IDENTIFIABLE, AT_BOUND, NOT_CONVERGED, STARTS_DISAGREE, CANCELLED
 MIRROR = "E1_E2_AXIS_ASSIGNMENT_NOT_IDENTIFIABLE"  # two minima with E1 and E2 exchanged: which plate axis is stiff is open
 MIRROR_TOLERANCE = 0.05  # relative difference for "exchanged" (numerical policy)
 MISFIT_RMS = 0.02  # FIT residual RMS (ln f) above which the parameterization does not reproduce the spectrum (diagnostic)
+HOLDOUT_WARNING = 0.05  # a HOLDOUT frequency predicted further off than this (ln f) is warned about (diagnostic)
 FIT, HOLDOUT, EXCLUDED = "FIT", "HOLDOUT", "EXCLUDED"
+# ABM-AUD-1: spectral fit quality, a statement separate from the optimizer status (it uses MISFIT_RMS, unchanged)
+FIT_WITHIN, HIGH_MISFIT, FIT_NOT_ASSESSED = "FIT_WITHIN_DIAGNOSTIC_THRESHOLD", "HIGH_MISFIT", "FIT_NOT_ASSESSED"
+HOLDOUT_WITHIN, HOLDOUT_DISAGREES, NO_HOLDOUT = "HOLDOUT_WITHIN_WARNING_LEVEL", "HOLDOUT_DISAGREES", "NO_HOLDOUT"
+# ABM-AUD-1: how a candidate may be presented. A research presentation rule; no governed Auto-ID criterion is involved.
+PROPOSAL, DIAGNOSTIC_ONLY, NO_CANDIDATE = "PROPOSAL_FOR_AN_ABAQUS_CHECK", "DIAGNOSTIC_ONLY_HIGH_MISFIT", "NO_CANDIDATE"
+NOT_ESTABLISHED = "NOT_ESTABLISHED"
+VALIDITY = {
+    "physical_validation": NOT_ESTABLISHED,
+    "mode_identity": NOT_ESTABLISHED + ": frequencies are matched by a rank hypothesis, no shape is compared",
+    "material_property": "NOT_A_MATERIAL_PROPERTY",
+    "abaqus": "NOT_VALIDATED_IN_ABAQUS",
+    "statement": ("Research only. A converged optimizer and a small frequency residual are not a physical validation: "
+                  "they establish no mode identity, no material-property accuracy and no eligibility for production "
+                  "identification."),
+}
 PRACTICAL_RANK_RATIO = 1.0e-3  # a singular value below this share of the largest does not count (numerical policy)
 CONDITION_LIMIT = 1.0e3  # above it the parameters are reported as poorly distinguished (numerical policy)
 START_AGREEMENT = 1.0e-3  # relative spread of the fitted parameters over the starts (numerical policy)
@@ -473,27 +500,114 @@ class TuningRequest:
         return tuple(o for o in self.observations if o.role == FIT)
 
 
+def default_ranks(records: Sequence[tuple]) -> dict:
+    """{record: rank} of the default hypothesis: the place of every record in the frequency order of the FULL measured set
+    (equal frequencies: by record number). It does not depend on any role, so no role change can renumber a record."""
+    ordered = sorted(records, key=lambda item: (float(item[1]), item[0]))
+    return {record: rank for rank, (record, _hz) in enumerate(ordered, start=1)}
+
+
 def observations_by_rank(records: Sequence[tuple], holdout: Sequence[int] = (), excluded: Sequence[int] = (),
                          declared: Optional[Mapping[int, int]] = None) -> tuple:
-    """Experimental (record, Hz) as observations. Rank hypothesis: the k-th lowest kept record against surrogate rank k;
-    a declared mapping {record: rank} replaces it for the records it names. A mapping that names a record which is not
-    there, or not kept, is refused; whether the ranks are valid is checked by ``validate_correspondence``."""
-    known = {record for record, _hz in records}
+    """Experimental (record, Hz) as observations.
+
+    Default rank hypothesis: the k-th lowest record of the FULL measured set against surrogate rank k (``default_ranks``).
+    A HOLDOUT record keeps that rank. An EXCLUDED record has no active rank (0), and its place is NOT taken by another
+    record: every remaining record keeps the rank it had (ABM-AUD-1; the ranks used to be renumbered over the kept
+    records). A declared mapping {record: rank} replaces the default for the records it names, and only for them.
+
+    Refused: a record number given twice, a role or a declared rank naming a record that is not there, a record that is
+    both HOLDOUT and EXCLUDED, a declared rank for an EXCLUDED record. Whether the resulting ranks are valid (whole,
+    positive, in range, unique) is checked by ``validate_correspondence``."""
+    numbers = [record for record, _hz in records]
+    repeated = sorted({record for record in numbers if numbers.count(record) > 1})
+    if repeated:
+        raise TuningRefused("The experimental set holds record(s) " + ", ".join(map(str, repeated)) + " more than once; "
+                            "a record number must be unique.")
+    known = set(numbers)
+    holdout, excluded = set(holdout), set(excluded)
+    for name, chosen in (("HOLDOUT", holdout), ("EXCLUDED", excluded)):
+        absent = sorted(chosen - known)
+        if absent:
+            raise TuningRefused(f"The {name} role names record(s) " + ", ".join(map(str, absent)) + " that the "
+                                "experimental set does not hold.")
+    both = sorted(holdout & excluded)
+    if both:
+        raise TuningRefused("Record(s) " + ", ".join(map(str, both)) + " are given as both HOLDOUT and EXCLUDED.")
     unknown = sorted(set(declared or {}) - known)
     if unknown:
         raise TuningRefused("The declared ranks name record(s) " + ", ".join(map(str, unknown)) + " that the experimental "
                             "set does not hold.")
-    declared_excluded = sorted(set(declared or {}) & set(excluded))
+    declared_excluded = sorted(set(declared or {}) & excluded)
     if declared_excluded:
         raise TuningRefused("The declared ranks name EXCLUDED record(s) " + ", ".join(map(str, declared_excluded)) + "; "
                             "an excluded record has no rank.")
-    kept = sorted((r for r in records if r[0] not in set(excluded)), key=lambda item: item[1])
+    default = default_ranks(records)
     rows = []
-    for rank, (record, hz) in enumerate(kept, start=1):
-        target = (declared or {}).get(record, rank)
-        rows.append(Observation(record, float(hz), HOLDOUT if record in set(holdout) else FIT, int(target)))
-    rows += [Observation(record, float(hz), EXCLUDED, 0) for record, hz in records if record in set(excluded)]
+    for record, hz in records:
+        if record in excluded:
+            rows.append(Observation(record, float(hz), EXCLUDED, 0))
+            continue
+        target = (declared or {}).get(record, default[record])
+        if isinstance(target, float) and target.is_integer():
+            target = int(target)
+        rows.append(Observation(record, float(hz), HOLDOUT if record in holdout else FIT, target))
     return tuple(sorted(rows, key=lambda o: o.record))
+
+
+def correspondence_summary(observations: Sequence[Observation], method: str = RANK_ORDER, legacy: bool = False) -> dict:
+    """What correspondence a set of observations states, in words and in data: the default ranks of the full set, the
+    records whose rank was declared otherwise, the EXCLUDED records and the surrogate ranks left without a measured record.
+    ``legacy``: observations saved by a version that renumbered the kept records; they are described as saved."""
+    default = default_ranks([(o.record, o.hz) for o in observations])
+    active = [o for o in observations if o.role in (FIT, HOLDOUT)]
+    excluded = sorted(o.record for o in observations if o.role == EXCLUDED)
+    declared = {} if legacy else {o.record: o.surrogate_rank for o in active if o.surrogate_rank != default[o.record]}
+    ranks = {o.record: o.surrogate_rank for o in active}
+    whole = [rank for rank in ranks.values() if isinstance(rank, int) and not isinstance(rank, bool) and rank >= 1]
+    used = set(whole)
+    unmatched = [rank for rank in range(1, max(whole) + 1) if rank not in used] if whole else []
+    lowest = min(observations, key=lambda o: (o.hz, o.record)) if observations else None
+    notes, lowest_note = [], ""
+    if legacy:
+        notes.append("Saved by an earlier program version, shown as saved: that version gave the default ranks to the "
+                     "kept records only, so the records above an EXCLUDED one were renumbered. The current version "
+                     "keeps every record's rank.")
+    else:
+        notes.append("Default hypothesis: every record takes its rank in the frequency order of the full measured set "
+                     f"({len(observations)} records). A HOLDOUT or EXCLUDED record keeps its place in that order, so no "
+                     "role change renumbers another record.")
+    if declared:
+        notes.append("Declared by the user: " + ", ".join(
+            f"record {record} -> rank {rank} (default {default[record]})" for record, rank in sorted(declared.items())) + ".")
+    if excluded:
+        notes.append("EXCLUDED by the user: record(s) " + ", ".join(map(str, excluded)) + ". They have no active rank and "
+                     "no other record takes their place.")
+    if lowest is not None and lowest.role == EXCLUDED and not legacy:
+        above = sorted(active, key=lambda o: (o.hz, o.record))
+        lowest_note = f"The lowest measured record {lowest.record} ({lowest.hz:.4f} Hz) is EXCLUDED by the user."
+        if above and above[0].record in declared:
+            lowest_note += (f" Record {above[0].record} is compared with surrogate rank {above[0].surrogate_rank} because "
+                            f"the user declared it (its default rank is {default[above[0].record]}); that is the user's "
+                            "hypothesis, not an established mode identity.")
+        elif above:
+            lowest_note += (f" Record {above[0].record} stays at surrogate rank {above[0].surrogate_rank}: it is not "
+                            "treated as the first mode.")
+        notes.append(lowest_note)
+    if unmatched:
+        notes.append("Surrogate rank(s) " + ", ".join(map(str, unmatched)) + " below the highest used rank have no "
+                     "measured record in this fit.")
+    return {
+        "method": method, "legacy_renumbered_ranks": bool(legacy and excluded),
+        "identity": "FREQUENCY_RANK_HYPOTHESIS — NOT_A_MODE_IDENTITY",
+        "identity_note": ("Frequencies are matched by rank only. No shape is compared, and the frequencies alone cannot "
+                          "show whether a measured mode is missing or extra; a mode identity is not established."),
+        "default_ranks": default, "ranks": ranks, "declared": declared, "excluded_records": excluded,
+        "holdout_records": sorted(o.record for o in observations if o.role == HOLDOUT),
+        "lowest_measured_record": None if lowest is None else lowest.record,
+        "lowest_measured_role": None if lowest is None else lowest.role,
+        "lowest_excluded_note": lowest_note, "unmatched_ranks": unmatched, "notes": notes,
+    }
 
 
 MAX_SURROGATE_RANK = 60  # the highest elastic rank a correspondence may name (the surrogate solves up to it plus a margin)
@@ -648,6 +762,11 @@ class TuningResult:
     minima: list = field(default_factory=list)
     assumptions: tuple = ASSUMPTIONS
     evaluations: int = 0
+    # ABM-AUD-1 (added to schema /1; an export without them is completed from its own saved numbers when it is opened)
+    fit_quality: dict = field(default_factory=dict)  # spectral fit quality: separate from ``status``
+    correspondence: dict = field(default_factory=dict)  # the rank hypothesis that was fitted, in data and in words
+    validity: dict = field(default_factory=dict)  # physical validity: never established by this tool
+    candidate_presentation: str = NO_CANDIDATE  # PROPOSAL, DIAGNOSTIC_ONLY or NO_CANDIDATE
 
     def to_dict(self) -> dict:
         return {"schema": SCHEMA, **asdict(self)}
@@ -684,6 +803,58 @@ def quantity_table(inputs: AbaqusPlateInputs, names, fe_classification: str) -> 
         {"quantity": "FE rigid-body / elastic classification", "category": "SHAPE-BASED" if fe_classification.startswith("shape")
          else "UNAVAILABLE", "source": fe_classification},
     ]
+
+
+def fit_verdict(fit_rms: Optional[float]) -> str:
+    if fit_rms is None or not math.isfinite(fit_rms):
+        return FIT_NOT_ASSESSED
+    return HIGH_MISFIT if fit_rms > MISFIT_RMS else FIT_WITHIN
+
+
+def assess_fit_quality(rows: Sequence[Mapping], derived_when_opened: bool = False) -> dict:
+    """The spectral fit quality of a finished fit, from its signed per-record residuals alone (``rows`` of the result).
+    It says how well the surrogate reproduces the measured frequencies under the declared correspondence. It is NOT the
+    optimizer status and NOT a parameter accuracy. FIT and HOLDOUT are reported separately; nothing is re-fitted."""
+    def part(role):
+        found = [(r["record"], r["ln_after"]) for r in rows if r.get("role") == role and r.get("ln_after") is not None]
+        if not found:
+            return None, 0, None
+        rms = float(np.sqrt(np.mean(np.square([value for _record, value in found]))))
+        record, value = max(found, key=lambda item: abs(item[1]))
+        return rms, len(found), {"record": record, "ln": float(value)}
+
+    fit_rms, fit_count, fit_largest = part(FIT)
+    holdout_rms, holdout_count, holdout_largest = part(HOLDOUT)
+    verdict = fit_verdict(fit_rms)
+    off = sorted(r["record"] for r in rows if r.get("role") == HOLDOUT and r.get("ln_after") is not None
+                 and abs(r["ln_after"]) > HOLDOUT_WARNING)
+    holdout = NO_HOLDOUT if not holdout_count else (HOLDOUT_DISAGREES if off else HOLDOUT_WITHIN)
+    if verdict == HIGH_MISFIT:
+        statement = (f"HIGH MISFIT: FIT residual RMS {fit_rms:.2%} (ln f) is above the {MISFIT_RMS:.0%} diagnostic "
+                     "threshold. The assumed model and frequency correspondence do not adequately reproduce the measured "
+                     "spectrum. The fitted values are kept for diagnosis only; they are not a usable proposal.")
+    elif verdict == FIT_WITHIN:
+        statement = (f"FIT residual RMS {fit_rms:.2%} (ln f) is within the {MISFIT_RMS:.0%} diagnostic threshold. This "
+                     "is agreement of frequencies under the declared correspondence, not a parameter accuracy and not a "
+                     "physical validation.")
+    else:
+        statement = "The spectral fit quality is not assessed: there is no fitted residual."
+    if holdout == HOLDOUT_DISAGREES:
+        statement += (" HOLDOUT record(s) " + ", ".join(map(str, off)) + f" are predicted more than "
+                      f"{HOLDOUT_WARNING:.0%} off: the fit does not predict the frequencies it did not use.")
+    return {"verdict": verdict, "fit_rms_ln": fit_rms, "threshold_ln": MISFIT_RMS, "fit_count": fit_count,
+            "largest_fit_residual": fit_largest, "holdout_verdict": holdout, "holdout_rms_ln": holdout_rms,
+            "holdout_count": holdout_count, "holdout_warning_ln": HOLDOUT_WARNING, "holdout_records_off": off,
+            "largest_holdout_residual": holdout_largest, "statement": statement,
+            "derived_when_opened": bool(derived_when_opened)}
+
+
+def candidate_presentation_of(candidate, quality: Mapping) -> str:
+    """How an oriented candidate may be shown (a research presentation rule): a candidate of a fit that is not within the
+    diagnostic threshold is DIAGNOSTIC_ONLY. Whether a candidate exists at all is still decided by the optimizer status."""
+    if not candidate:
+        return NO_CANDIDATE
+    return PROPOSAL if quality.get("verdict") == FIT_WITHIN else DIAGNOSTIC_ONLY
 
 
 def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(), cancel: Optional[threading.Event] = None,
@@ -786,12 +957,17 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
         return float(np.sqrt(np.mean(np.square(found)))) if found else None
 
     warnings = []
+    quality = assess_fit_quality(rows)
+    correspondence = correspondence_summary(request.observations, request.correspondence)
     fit_rms = float(np.sqrt(np.mean(np.square(r_after))))
     if fit_rms > MISFIT_RMS:
-        warnings.append(f"FIT residual RMS {fit_rms:.2%} in ln f exceeds {MISFIT_RMS:.0%}: this parameterization does not "
-                        "reproduce the measured spectrum, and its values absorb model-form error.")
-    if any(abs(r["ln_after"]) > 0.05 for r in rows if r["role"] == HOLDOUT):
+        warnings.append(f"HIGH MISFIT: FIT residual RMS {fit_rms:.2%} in ln f exceeds {MISFIT_RMS:.0%}: the assumed model, "
+                        "this parameterization and the frequency correspondence do not reproduce the measured spectrum; "
+                        "the fitted values absorb model-form or correspondence error and are diagnostic only.")
+    if any(abs(r["ln_after"]) > HOLDOUT_WARNING for r in rows if r["role"] == HOLDOUT):
         warnings.append("A HOLDOUT frequency is predicted more than 5 % off after the fit.")
+    if correspondence["lowest_excluded_note"]:
+        warnings.append(correspondence["lowest_excluded_note"])
     if first_mode.get("largest_change", 0.0) > 0.05:
         warnings.append(f"Leaving out the lowest experimental record changes a parameter by {first_mode['largest_change']:.1%}: "
                         "the estimate depends on that record.")
@@ -799,6 +975,7 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
         warnings.append("FE classification unavailable: no extracted FE mode shapes, so the surrogate is not compared with "
                         "the Abaqus spectrum by rank.")
     statistical = {n: _percent(v) for n, v in (log_sd or {}).items()}
+    candidate = {**fitted, "nu12": inputs.nu12} if status == SUPPORTED else None
     return TuningResult(
         status=status, reasons=reasons, label=RESULT_LABEL, warnings=warnings,
         request={"parameterization": request.parameterization, "correspondence": request.correspondence,
@@ -807,7 +984,8 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
         inputs=asdict(inputs), parameter_names=names,
         baseline={"E1": inputs.E1, "E2": inputs.E2, "G12": inputs.G12, "nu12": inputs.nu12},
         fitted={**fitted, "nu12": inputs.nu12},
-        candidate=({**fitted, "nu12": inputs.nu12} if status == SUPPORTED else None),
+        candidate=candidate, fit_quality=quality, correspondence=correspondence, validity=dict(VALIDITY),
+        candidate_presentation=candidate_presentation_of(candidate, quality),
         estimates=estimates, axis_assignments=axes,
         rows=rows, sensitivity=[dict(zip(names, row)) | {"record": o.record} for o, row in zip(fit_rows, J.tolist())],
         singular_values=singular.tolist(), condition_number=condition, practical_rank=rank, correlation=correlation,
@@ -835,22 +1013,25 @@ def _first_mode_check(inputs, request, names, x, cancel) -> dict:
     """The same fit with the lowest kept experimental record left out (not removed from the result): how much the estimates
     lean on it. Only that record leaves: every other observation keeps its declared surrogate rank and its role, so the
     correspondence is neither renumbered nor rematched (REAL-FIT.R1.F2)."""
-    kept = sorted((o for o in request.observations if o.role != EXCLUDED), key=lambda o: o.hz)
+    kept = sorted((o for o in request.observations if o.role != EXCLUDED), key=lambda o: (o.hz, o.record))
+    measured = min(request.observations, key=lambda o: (o.hz, o.record))
+    origin = {"lowest_measured_record": measured.record, "lowest_measured_role": measured.role}
     if not kept or kept[0].role != FIT:
-        return {"done": False, "reason": "the lowest kept record is not a FIT record"}
+        return {"done": False, "reason": "the lowest kept record is not a FIT record", **origin}
     lowest = kept[0]
     observations = tuple(o if o.record != lowest.record else Observation(o.record, o.hz, EXCLUDED, 0)
                          for o in request.observations)
     fit_rows = tuple(o for o in observations if o.role == FIT)
     if len(fit_rows) <= len(names):
-        return {"done": False, "reason": "too few FIT records without it"}
+        return {"done": False, "reason": "too few FIT records without it", **origin}
     problem = _Problem(inputs, names, fit_rows, request.degree, cancel, None)
     fit = _solve(problem, x, request.search_factor)
     candidates = [m for m in fit["minima"]]
     nearest = min(candidates, key=lambda m: float(np.max(np.abs(m["x"] - x))))
     singular = np.linalg.svd(problem.jacobian(nearest["x"]), compute_uv=False)
     changes = {n: float(math.exp(a - b) - 1.0) for n, a, b in zip(names, nearest["x"], x)}
-    return {"done": True, "left_out_record": lowest.record, "left_out_hz": lowest.hz, "left_out_rank": lowest.surrogate_rank,
+    return {"done": True, **origin,
+            "left_out_record": lowest.record, "left_out_hz": lowest.hz, "left_out_rank": lowest.surrogate_rank,
             "ranks_kept": {o.record: o.surrogate_rank for o in fit_rows},
             "values": dict(zip(names, np.exp(nearest["x"]).tolist())), "change": changes,
             "largest_change": max(abs(v) for v in changes.values()),
@@ -873,7 +1054,8 @@ def assumption_sensitivity() -> list:
 def _cancelled(inputs, request, names) -> TuningResult:
     return TuningResult(CANCELLED, ["Cancelled before the fit finished."], RESULT_LABEL, [], {}, asdict(inputs), names,
                         {"E1": inputs.E1, "E2": inputs.E2, "G12": inputs.G12, "nu12": inputs.nu12}, None, None, None, [], [],
-                        [], [], None, 0, None, None, [], [], 0.0, None, None, None, [])
+                        [], [], None, 0, None, None, [], [], 0.0, None, None, None, [],
+                        fit_quality=assess_fit_quality(()), validity=dict(VALIDITY))
 
 
 def abaqus_elastic_line(inputs: AbaqusPlateInputs, candidate: Mapping[str, float]) -> str:
@@ -888,15 +1070,26 @@ def abaqus_elastic_line(inputs: AbaqusPlateInputs, candidate: Mapping[str, float
 
 def export_document(result: TuningResult, inputs: AbaqusPlateInputs, sources: Mapping[str, str],
                     stability: Optional[Mapping] = None) -> dict:
-    """Everything needed to reproduce and review the proposal. An Abaqus *Elastic block only for an oriented candidate:
-    never when the E1/E2 axis is unresolved. ``stability``: the REAL-FIT.R2 check of this same result, when it was run."""
+    """Everything needed to reproduce and review the result. A ready Abaqus *Elastic block is written only for an oriented
+    candidate that may be presented as a proposal: never when the E1/E2 axis is unresolved, and never for a HIGH_MISFIT
+    fit, whose candidate numbers stay in the document as DIAGNOSTIC_ONLY (``candidate``, ``fitted``) with the reason the
+    block is withheld. ``stability``: the REAL-FIT.R2 check of this same result, when it was run."""
     document = result.to_dict()
+    quality = result.fit_quality or assess_fit_quality(result.rows)
+    presentation = candidate_presentation_of(result.candidate, quality)
+    document["fit_quality"], document["candidate_presentation"] = dict(quality), presentation
+    document["validity"] = dict(result.validity or VALIDITY)
     document["sources"] = dict(sources)
     document["stability"] = dict(stability) if stability else None
-    document["abaqus_elastic_candidate"] = abaqus_elastic_line(inputs, result.candidate) if result.candidate else None
+    document["abaqus_elastic_candidate"] = abaqus_elastic_line(inputs, result.candidate) if presentation == PROPOSAL else None
+    document["abaqus_elastic_candidate_withheld"] = (
+        None if presentation == PROPOSAL else
+        f"No oriented candidate: the optimizer status is {result.status}." if presentation == NO_CANDIDATE else
+        "Withheld: " + quality["statement"] + " The numbers under 'candidate' are DIAGNOSTIC_ONLY.")
     document["statement"] = ("Surrogate (Kirchhoff-Ritz) research estimates. Not an FE result, not a material property and "
-                             "not a calibration; an oriented Abaqus block is given only when the axes are resolved. "
-                             + RESULT_LABEL)
+                             "not a calibration; an oriented Abaqus block is given only when the axes are resolved and "
+                             f"the fit is not a HIGH_MISFIT. Optimizer status: {result.status}. Spectral fit quality: "
+                             f"{quality['verdict']}. Physical validity: {NOT_ESTABLISHED}. " + RESULT_LABEL)
     return document
 
 
@@ -937,6 +1130,9 @@ def restore_record_keys(value):
     return value
 
 
+ADDED_FIELDS = {"fit_quality": dict, "correspondence": dict, "validity": dict, "candidate_presentation": str}  # ABM-AUD-1
+
+
 def result_from_export(document: Mapping) -> TuningResult:
     """The saved result of an export, exactly as it was written; nothing is recomputed. Refused unless it is this schema,
     carries the research label, holds every result field with the expected kind and is not a cancelled run."""
@@ -945,10 +1141,13 @@ def result_from_export(document: Mapping) -> TuningResult:
     if document.get("label") != RESULT_LABEL:
         raise TuningRefused("The file does not carry the Research Tuning label; it is not opened.")
     names = [item.name for item in fields(TuningResult)]
-    missing = [name for name in names if name not in document]
+    missing = [name for name in names if name not in document and name not in ADDED_FIELDS]
     if missing:
         raise TuningRefused(f"The export is incomplete: {', '.join(missing)} missing.")
-    values = {name: restore_record_keys(document[name]) for name in names}
+    values = {name: restore_record_keys(document[name]) for name in names if name in document}
+    wrong = [name for name, kind in ADDED_FIELDS.items() if name in values and not isinstance(values[name], kind)]
+    if wrong:
+        raise TuningRefused(f"The export is damaged: unexpected content in {', '.join(wrong)}.")
     kinds = {"status": str, "label": str, "reasons": list, "warnings": list, "request": dict, "inputs": dict,
              "parameter_names": list, "baseline": dict, "axis_assignments": list, "rows": list, "sensitivity": list,
              "singular_values": list, "practical_rank": int, "active_bounds": list, "starts": list, "surrogate": list,
@@ -962,10 +1161,31 @@ def result_from_export(document: Mapping) -> TuningResult:
         raise TuningRefused("The export holds a cancelled run; there is no result to show.")
     values["parameter_names"] = tuple(values["parameter_names"])
     values["assumptions"] = tuple(values["assumptions"])
+    try:  # the fit quality always follows the saved residuals; an export of before ABM-AUD-1 is completed from them
+        recomputed = assess_fit_quality(values["rows"], derived_when_opened="fit_quality" not in values)
+        if "fit_quality" not in values:
+            values["fit_quality"] = recomputed
+        elif values["fit_quality"].get("verdict") != recomputed["verdict"]:
+            raise TuningRefused("The export is damaged: its fit quality does not follow from its own residuals.")
+        if "correspondence" not in values:
+            saved = [Observation(o["record"], o["hz"], o["role"], o["surrogate_rank"])
+                     for o in values["request"].get("observations", [])]
+            values["correspondence"] = correspondence_summary(saved, values["request"].get("correspondence", RANK_ORDER),
+                                                              legacy=True)
+        values.setdefault("validity", dict(VALIDITY))
+        # never read from the file: a file cannot present the candidate of a HIGH_MISFIT fit as a proposal
+        values["candidate_presentation"] = candidate_presentation_of(values.get("candidate"), recomputed)
+    except (KeyError, TypeError, ValueError, AttributeError) as error:
+        if isinstance(error, TuningRefused):
+            raise
+        raise TuningRefused(f"The export is damaged and cannot be shown ({type(error).__name__}: {error}).") from None
     return TuningResult(**values)
 
 
-__all__ = ["MAX_SURROGATE_RANK", "validate_correspondence", "ACCURACY_STATEMENT", "ASSUMPTIONS", "AbaqusPlateInputs", "DECLARED", "FIT", "FREE", "HOLDOUT", "EXCLUDED",
+__all__ = ["FIT_WITHIN", "HIGH_MISFIT", "FIT_NOT_ASSESSED", "HOLDOUT_WITHIN", "HOLDOUT_DISAGREES", "NO_HOLDOUT", "PROPOSAL",
+           "DIAGNOSTIC_ONLY", "NO_CANDIDATE", "NOT_ESTABLISHED", "VALIDITY", "MISFIT_RMS", "HOLDOUT_WARNING",
+           "assess_fit_quality", "candidate_presentation_of", "correspondence_summary", "default_ranks", "fit_verdict",
+           "MAX_SURROGATE_RANK", "validate_correspondence", "ACCURACY_STATEMENT", "ASSUMPTIONS", "AbaqusPlateInputs", "DECLARED", "FIT", "FREE", "HOLDOUT", "EXCLUDED",
            "MIRROR", "Observation", "PARAMETERIZATIONS", "RANK_ORDER", "RESULT_LABEL", "SUPPORTED", "Surrogate", "TIED",
            "TuningRefused", "TuningRequest", "TuningResult", "abaqus_elastic_line", "assumption_sensitivity",
            "bending_stiffness", "export_document", "observations_by_rank", "quantity_table", "read_dat_frequencies",

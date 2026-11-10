@@ -89,6 +89,63 @@ class Stability(unittest.TestCase):
             self.assertTrue(all(rank == ranks[record] for record, _role, rank in rows), rows)
             self.assertNotIn((9, rft.FIT, 10), rows)  # the HOLDOUT never enters a fit
 
+    def test_excluded_and_holdout_records_keep_their_place_in_every_refit(self):
+        """ABM-AUD-1: with the first and an intermediate record EXCLUDED, every leave-one-out refit removes only its own
+        FIT record. No rank is renumbered, the HOLDOUT stays a HOLDOUT, the EXCLUDED records never enter a problem and the
+        baseline result is not touched."""
+        records = self.synthetic(42000, 42000, 6500, count=12)
+        request = rft.TuningRequest(rft.observations_by_rank(records, holdout=(11, 12), excluded=(1, 6)), degree=10)
+        result = rft.run_tuning(self.inputs, request)
+        self.assertEqual({o.record: o.surrogate_rank for o in request.observations},
+                         {**{k: k for k in range(1, 13)}, 1: 0, 6: 0})
+        self.assertAlmostEqual(result.fitted["G12"] / 6500, 1.0, places=5)
+        before = json.dumps(result.to_dict(), default=str, sort_keys=True)
+        seen = []
+        original = rft._Problem
+
+        def recording(inputs, names, rows, degree, cancel, progress):
+            seen.append(tuple((o.record, o.role, o.surrogate_rank) for o in rows))
+            return original(inputs, names, rows, degree, cancel, progress)
+
+        with mock.patch.object(rft, "_Problem", side_effect=recording):
+            stability = rfs.run_stability(self.inputs, request, result)
+        self.assertEqual(json.dumps(result.to_dict(), default=str, sort_keys=True), before)  # the baseline is immutable
+        fit_records = [2, 3, 4, 5, 7, 8, 9, 10]
+        self.assertEqual([item["record"] for item in stability["leave_one_out"]], fit_records)
+        for item in stability["leave_one_out"]:
+            self.assertEqual(item["rank"], item["record"])
+            self.assertEqual(item["ranks_kept"], {k: k for k in fit_records if k != item["record"]})
+            self.assertLess(max(abs(v) for v in item["change"].values()), 1e-4)
+            self.assertIsNotNone(item["holdout_rms_ln"])  # the HOLDOUT records are still predicted, not fitted
+        self.assertEqual(stability["baseline"]["ranks"], {k: k for k in range(2, 13) if k != 6})
+        self.assertTrue(seen)
+        for rows in seen:
+            self.assertTrue(all(rank == record for record, _role, rank in rows), rows)  # no reconstruction anywhere
+            self.assertFalse({1, 6} & {record for record, _role, _rank in rows}, rows)  # EXCLUDED stays out
+            self.assertFalse([r for r in rows if r[0] in (11, 12) and r[1] == rft.FIT], rows)  # HOLDOUT is never fitted
+        self.assertIn("no rank is renumbered", stability["correspondence"])
+
+    def test_a_stable_refit_of_a_high_misfit_is_not_called_adequate(self):
+        """ABM-AUD-1: stability and spectral adequacy are separate. A wrong (declared) correspondence converges, and the
+        stability statement says HIGH MISFIT whatever the leave-one-out changes are."""
+        records = self.synthetic(42000, 42000, 6500)
+        request = rft.TuningRequest(rft.observations_by_rank(records, holdout=(9,), excluded=(1,),
+                                                             declared={k: k - 1 for k in range(2, 10)}),
+                                    rft.TIED, rft.DECLARED, degree=10)
+        result = rft.run_tuning(self.inputs, request)
+        self.assertEqual((result.status, result.fit_quality["verdict"]), (rft.SUPPORTED, rft.HIGH_MISFIT))
+        stability = rfs.run_stability(self.inputs, request, result)
+        fit = stability["assessment"]["frequency_fit"]
+        self.assertEqual((fit["verdict"], fit["misfit_warning"], fit["threshold_ln"]), (rft.HIGH_MISFIT, True, rft.MISFIT_RMS))
+        self.assertIn("HIGH MISFIT", stability["assessment"]["statement"])
+        self.assertIn("says nothing about a model that does not reproduce the spectrum", stability["assessment"]["statement"])
+        self.assertEqual(stability["assessment"]["parameter_accuracy"]["verdict"], rfs.NOT_DEMONSTRATED)
+        for item in stability["leave_one_out"]:  # the declared (wrong) correspondence is held, not repaired
+            self.assertEqual(item["ranks_kept"], {k: k - 1 for k in range(2, 9) if k != item["record"]})
+        good = rfs.run_stability(self.inputs, *self.fitted(records))["assessment"]
+        self.assertEqual(good["frequency_fit"]["verdict"], rft.FIT_WITHIN)
+        self.assertNotIn("HIGH MISFIT", good["statement"])
+
     def test_one_shifted_record_is_found_to_control_an_estimate(self):
         request, result = self.fitted(self.synthetic(42000, 42000, 6500, shift=(1, 1.03)))
         stability = rfs.run_stability(self.inputs, request, result)

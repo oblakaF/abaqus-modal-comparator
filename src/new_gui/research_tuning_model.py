@@ -27,16 +27,27 @@ from services import research_frequency_tuning as rft
 LABEL = rft.RESULT_LABEL
 SURROGATE_NOTE = ("Ritz values are frequencies of the Kirchhoff plate surrogate, not Abaqus FE results. A candidate is a "
                   "proposal for a new Abaqus solve; only that solve can confirm it.")
+# ABM-AUD-1: what the optimizer status says, and only that. The spectral fit quality and the physical validity are separate.
 STATUS_TEXT = {
-    rft.SUPPORTED: "Estimates and an oriented candidate issued: the fit is numerically supported.",
-    rft.MIRROR: ("Numerical estimates issued (E_stiff, E_soft, G12). No oriented candidate: E1 and E2 fit equally well "
-                 "exchanged, so which plate axis is stiff is not identifiable."),
-    rft.NOT_IDENTIFIABLE: "No candidate: the selected frequencies cannot separate the parameters.",
-    rft.AT_BOUND: "No candidate: a parameter ended at its bound.",
-    rft.NOT_CONVERGED: "No candidate: the fit did not converge.",
-    rft.STARTS_DISAGREE: "No candidate: different starts end at different minima.",
+    rft.SUPPORTED: ("Optimizer: converged, full practical rank, no bound, the starts agree. A numerical statement only: it "
+                    "does not say that the model reproduces the spectrum (see the spectral fit quality)."),
+    rft.MIRROR: ("Optimizer: converged to two minima with E1 and E2 exchanged. Numerical estimates E_stiff, E_soft, G12; no "
+                 "oriented candidate, because which plate axis is stiff is not identifiable."),
+    rft.NOT_IDENTIFIABLE: "Optimizer: no candidate, the selected frequencies cannot separate the parameters.",
+    rft.AT_BOUND: "Optimizer: no candidate, a parameter ended at its bound.",
+    rft.NOT_CONVERGED: "Optimizer: no candidate, the fit did not converge.",
+    rft.STARTS_DISAGREE: "Optimizer: no candidate, different starts end at different minima.",
     rft.CANCELLED: "Cancelled. No result.",
 }
+OPTIMIZER_SHORT = {
+    rft.SUPPORTED: "converged (full rank, no bound, starts agree)", rft.MIRROR: "converged, E1 / E2 axis not identifiable",
+    rft.NOT_IDENTIFIABLE: "parameters not separable", rft.AT_BOUND: "parameter at a bound",
+    rft.NOT_CONVERGED: "not converged", rft.STARTS_DISAGREE: "competing minima", rft.CANCELLED: "cancelled",
+}
+CORRESPONDENCE_HINT = ("Surrogate rank: the rank each record is compared with. By default it is the record's place in the "
+                       "frequency order of the whole measured set, so HOLDOUT or EXCLUDED never renumbers another record. "
+                       "To state a different correspondence, declare it (record:rank); nothing is re-matched automatically.")
+STALE_TEXT = "The settings changed: the previous result was cleared. Run the tuning again to see a result for these settings."
 EXPORT_FILTER = "Research tuning proposal (*.json)"
 DPI = 100
 
@@ -180,6 +191,108 @@ def parse_declared(text: str) -> dict:
     return mapping
 
 
+def correspondence_preview(records, roles, declared_text: str) -> tuple:
+    """({record: rank text}, problem) of the correspondence the page would fit now, by the service's own rules. ``problem``
+    is "" when it is valid, otherwise the service's refusal; with a problem the ranks are the default ones, for reading."""
+    roles = dict(roles)
+    holdout = [r for r, role in roles.items() if role == rft.HOLDOUT]
+    excluded = [r for r, role in roles.items() if role == rft.EXCLUDED]
+    problem = ""
+    try:
+        observations = rft.observations_by_rank(records, holdout=holdout, excluded=excluded,
+                                                declared=parse_declared(declared_text))
+        try:
+            rft.validate_correspondence(observations)
+        except rft.TuningRefused as error:
+            problem = str(error)
+    except (ValueError, KeyError) as error:  # TuningRefused is a ValueError
+        problem = str(error)
+        observations = rft.observations_by_rank(records, holdout=holdout, excluded=excluded)
+    default = rft.default_ranks(records)
+    texts = {}
+    for o in observations:
+        if o.role == rft.EXCLUDED:
+            texts[o.record] = "— (excluded; no other record takes rank " + str(default[o.record]) + ")"
+        elif o.surrogate_rank != default[o.record]:
+            texts[o.record] = f"{o.surrogate_rank} (declared; default {default[o.record]})"
+        else:
+            texts[o.record] = str(o.surrogate_rank)
+    return texts, problem
+
+
+def quality_of(result: rft.TuningResult) -> dict:
+    return result.fit_quality or rft.assess_fit_quality(result.rows)
+
+
+def _rms(value) -> str:
+    return "—" if value is None else f"{value:.2%}"
+
+
+def headline(result: rft.TuningResult) -> dict:
+    """ABM-AUD-1: the three separate statements of a result, short enough to read at once, and the badge states.
+    ``state``: "blocked" (the warning colour) unless there is an oriented candidate that may be shown as a proposal."""
+    quality = quality_of(result)
+    verdict = quality.get("verdict", rft.FIT_NOT_ASSESSED)
+    high, off = verdict == rft.HIGH_MISFIT, quality.get("holdout_verdict") == rft.HOLDOUT_DISAGREES
+    fit = {rft.HIGH_MISFIT: (f"SPECTRAL FIT: HIGH MISFIT — FIT RMS {_rms(quality.get('fit_rms_ln'))} is above the "
+                             f"{rft.MISFIT_RMS:.0%} diagnostic threshold. The model and correspondence do not reproduce "
+                             "the measured spectrum."),
+           rft.FIT_WITHIN: (f"SPECTRAL FIT: FIT RMS {_rms(quality.get('fit_rms_ln'))}, within the {rft.MISFIT_RMS:.0%} "
+                            "diagnostic threshold."),
+           rft.FIT_NOT_ASSESSED: "SPECTRAL FIT: not assessed."}[verdict]
+    if quality.get("holdout_count"):
+        fit += (f" HOLDOUT RMS {_rms(quality.get('holdout_rms_ln'))}"
+                + (" — HOLDOUT DISAGREES (record " + ", ".join(map(str, quality.get("holdout_records_off", [])))
+                   + " more than 5 % off)." if off else "."))
+    else:
+        fit += " No HOLDOUT record."
+    proposal = result.candidate_presentation == rft.PROPOSAL
+    return {
+        "optimizer": f"OPTIMIZER: {result.status} — {OPTIMIZER_SHORT.get(result.status, result.status)}.",
+        "fit": fit, "fit_state": "blocked" if high or off or verdict == rft.FIT_NOT_ASSESSED else "chosen",
+        "validity": ("PHYSICAL VALIDITY: NOT ESTABLISHED — research only. No mode identity, no material property, no "
+                     "Abaqus check; convergence and a small residual are not a validation."),
+        "state": "chosen" if proposal and not off else "blocked",
+        "high_misfit": high, "holdout_disagrees": off, "proposal": proposal,
+    }
+
+
+def fit_quality_rows(result: rft.TuningResult) -> tuple:
+    q = quality_of(result)
+
+    def largest(item):
+        return "—" if not item else f"record {item['record']}: {_pct(item['ln'])}"
+
+    rows = [("Spectral fit quality", q.get("verdict", rft.FIT_NOT_ASSESSED)),
+            ("FIT residual RMS (ln f)", f"{_rms(q.get('fit_rms_ln'))} over {q.get('fit_count', 0)} FIT record(s)"),
+            ("Diagnostic threshold (unchanged)", f"{rft.MISFIT_RMS:.0%}"),
+            ("Largest FIT residual", largest(q.get("largest_fit_residual"))),
+            ("HOLDOUT (not fitted)", q.get("holdout_verdict", rft.NO_HOLDOUT)),
+            ("HOLDOUT residual RMS (ln f)", f"{_rms(q.get('holdout_rms_ln'))} over {q.get('holdout_count', 0)} HOLDOUT record(s)"),
+            ("Largest HOLDOUT residual", largest(q.get("largest_holdout_residual"))),
+            ("Meaning", q.get("statement", ""))]
+    if q.get("derived_when_opened"):
+        rows.append(("Origin", "Derived from the saved residuals when the file was opened (saved before this assessment "
+                               "existed); nothing was re-fitted."))
+    return tuple(rows)
+
+
+def correspondence_rows(result: rft.TuningResult) -> tuple:
+    c = result.correspondence or {}
+    if not c:
+        return ()
+    rows = [("Kind", c.get("identity", "")), ("Method", {rft.RANK_ORDER: "default rank order of the full measured set",
+                                                         rft.DECLARED: "default rank order with ranks declared by the user"}
+                                              .get(c.get("method"), str(c.get("method")))),
+            ("Record -> surrogate rank", ", ".join(f"{record} -> {rank}" for record, rank in sorted(c.get("ranks", {}).items()))
+             or "none"),
+            ("EXCLUDED records (no rank)", ", ".join(map(str, c.get("excluded_records", []))) or "none"),
+            ("Surrogate ranks without a measured record", ", ".join(map(str, c.get("unmatched_ranks", []))) or "none")]
+    rows += [("Note", note) for note in c.get("notes", [])]
+    rows.append(("Not established", c.get("identity_note", "")))
+    return tuple(rows)
+
+
 def input_rows(sources: Sources) -> tuple:
     i = sources.inputs
 
@@ -224,6 +337,26 @@ def candidate_rows(result: rft.TuningResult) -> tuple:
 
 
 CANDIDATE_HEADERS = ("Input", "INP value (MPa)", "Candidate (MPa)", "Change")
+DIAGNOSTIC_CANDIDATE_HEADERS = ("Input", "INP value (MPa)", "DIAGNOSTIC ONLY, HIGH MISFIT (MPa)", "Change")
+CANDIDATE_TITLE = "Oriented Abaqus input candidate (only when the axes are resolved)"
+DIAGNOSTIC_CANDIDATE_NOTE = ("DIAGNOSTIC ONLY — NOT A PROPOSAL. The optimizer converged, but the spectral fit is a HIGH "
+                             "MISFIT, so these numbers absorb model-form or correspondence error. They are shown for "
+                             "investigation; no Abaqus *Elastic block is exported for them.")
+DIAGNOSTIC_ESTIMATE_NOTE = ("DIAGNOSTIC ONLY: the spectral fit is a HIGH MISFIT. These numbers are the optimizer's raw "
+                            "result, kept for investigation; they are not usable estimates.")
+
+
+def candidate_headers(result: rft.TuningResult) -> tuple:
+    return CANDIDATE_HEADERS if result.candidate_presentation != rft.DIAGNOSTIC_ONLY else DIAGNOSTIC_CANDIDATE_HEADERS
+
+
+def candidate_note(result: rft.TuningResult) -> str:
+    """What stands above (or instead of) the candidate table."""
+    if result.candidate:
+        return DIAGNOSTIC_CANDIDATE_NOTE if result.candidate_presentation == rft.DIAGNOSTIC_ONLY else (
+            "A proposal for a new Abaqus solve only; not validated in Abaqus and not a material property.")
+    return "None: " + ("the E1 / E2 axis assignment is unresolved, so no oriented *Elastic block is given."
+                       if result.status == rft.MIRROR else "the optimizer status gives no candidate.")
 
 
 def estimate_rows(result: rft.TuningResult) -> tuple:
@@ -240,6 +373,12 @@ def estimate_rows(result: rft.TuningResult) -> tuple:
 
 
 ESTIMATE_HEADERS = ("Research estimate", "Value (MPa)", "Statistical SD (model-conditional; not a certified accuracy)")
+DIAGNOSTIC_ESTIMATE_HEADERS = ("Optimizer result (diagnostic only)", "Value (MPa), HIGH MISFIT",
+                               "Statistical SD (model-conditional; not a certified accuracy)")
+
+
+def estimate_headers(result: rft.TuningResult) -> tuple:
+    return DIAGNOSTIC_ESTIMATE_HEADERS if quality_of(result).get("verdict") == rft.HIGH_MISFIT else ESTIMATE_HEADERS
 
 
 def axis_rows(result: rft.TuningResult) -> tuple:
@@ -259,9 +398,16 @@ QUANTITY_HEADERS = ("Quantity", "Category", "Source")
 
 def first_mode_rows(result: rft.TuningResult) -> tuple:
     check = result.first_mode_check
+    origin = ()
+    if check and check.get("lowest_measured_role") == rft.EXCLUDED:
+        origin = (("Lowest measured record", f"record {check['lowest_measured_record']} is EXCLUDED by the user; this check "
+                                             "concerns the lowest record that is kept, at its own unchanged rank"),)
     if not check or not check.get("done"):
-        return (("Lowest record left out", (check or {}).get("reason", "not run")),)
-    rows = [("Left out for this check only", f"record {check['left_out_record']} at {check['left_out_hz']:.4f} Hz")]
+        return origin + (("Lowest record left out", (check or {}).get("reason", "not run")),)
+    rows = list(origin) + [("Left out for this check only", f"record {check['left_out_record']} at "
+                                                            f"{check['left_out_hz']:.4f} Hz (surrogate rank "
+                                                            f"{check.get('left_out_rank', '—')}); every other record keeps "
+                                                            "its rank")]
     rows += [(f"{('E1 = E2' if name == 'E' else name)} without it", f"{value:.0f} MPa ({check['change'][name]:+.1%})")
              for name, value in check["values"].items()]
     rows.append(("Condition number without it", f"{check['condition_number']:.4g}"))
@@ -278,9 +424,15 @@ def minima_rows(result: rft.TuningResult) -> tuple:
 
 
 def diagnostic_rows(result: rft.TuningResult) -> tuple:
-    rows = [("Status", result.status), ("Label", result.label), ("Parameters fitted", ", ".join(result.parameter_names)),
-            ("Correspondence", "Rank order of the kept frequencies (exploratory spectrum fit), with any declared ranks; it "
-             "assumes no measured mode is missing or extra below the highest one"),
+    quality = quality_of(result)
+    rows = [("Optimizer status", result.status), ("Spectral fit quality", quality.get("verdict", rft.FIT_NOT_ASSESSED)),
+            ("Physical validity", rft.NOT_ESTABLISHED), ("Candidate presentation", result.candidate_presentation),
+            ("Label", result.label), ("Parameters fitted", ", ".join(result.parameter_names)),
+            ("Correspondence", "Rank order of the full measured set (a frequency hypothesis), with any declared ranks; an "
+             "EXCLUDED record leaves its rank unmatched. It is not a mode identity: a missing or extra measured mode "
+             "cannot be ruled out from the frequencies"
+             if not (result.correspondence or {}).get("legacy_renumbered_ranks") else
+             "As saved by an earlier version: rank order of the kept frequencies, renumbered after EXCLUDED records"),
             ("Initialization", f"{result.initialization.get('method', '—')}; INP values not used"),
             ("Data-scaled start", ", ".join(f"{k} {v:.0f}" for k, v in result.initialization.get("start", {}).items())),
             ("Search bounds", "; ".join(f"{k} {lo:.0f} to {hi:.0f}" for k, (lo, hi) in result.initialization.get("bounds", {}).items())),
@@ -453,7 +605,8 @@ def open_saved(path) -> tuple:
         raise rft.TuningRefused("The export is damaged: unexpected content in stability.")
     try:
         for rows in (estimate_rows, axis_rows, candidate_rows, quantity_rows, first_mode_rows, assumption_rows, frequency_rows,
-                     minima_rows, diagnostic_rows, sensitivity_rows):
+                     minima_rows, diagnostic_rows, sensitivity_rows, fit_quality_rows, correspondence_rows, headline,
+                     candidate_note, candidate_headers, estimate_headers):
             rows(result)
         if result.surrogate:
             surrogate_rows(result)
@@ -853,7 +1006,9 @@ def whatif_diagnostic_rows(outcome) -> tuple:
     return tuple(rows)
 
 
-__all__ = ["ANALYZE_NOTE", "check_model", "compatibility_notes", "compatibility_rows", "LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
+__all__ = ["CORRESPONDENCE_HINT", "STALE_TEXT", "candidate_headers", "candidate_note", "correspondence_preview",
+           "correspondence_rows", "estimate_headers", "fit_quality_rows", "headline", "quality_of",
+           "ANALYZE_NOTE", "check_model", "compatibility_notes", "compatibility_rows", "LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
            "frequency_rows", "input_rows", "minima_rows", "parse_declared", "read_sources", "sensitivity_rows",
            "surrogate_rows", "SOLID_FE_FE_NOTE", "SOLID_FREQUENCY_HEADERS", "SOLID_INTRO", "SOLID_LIMITS",
            "SOLID_REFERENCE_PROVENANCE", "SOLID_TITLE",

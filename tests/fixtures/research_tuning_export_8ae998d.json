@@ -1,0 +1,462 @@
+{
+ "schema": "research-frequency-tuning/1",
+ "status": "NUMERICALLY_SUPPORTED",
+ "reasons": [],
+ "label": "EXPLORATORY_FE_INPUT_CANDIDATE — NOT_A_MATERIAL_PROPERTY — NOT_VALIDATED_IN_ABAQUS",
+ "warnings": [
+  "FIT residual RMS 20.36% in ln f exceeds 2%: this parameterization does not reproduce the measured spectrum, and its values absorb model-form error.",
+  "A HOLDOUT frequency is predicted more than 5 % off after the fit.",
+  "Leaving out the lowest experimental record changes a parameter by 51.2%: the estimate depends on that record.",
+  "FE classification unavailable: no extracted FE mode shapes, so the surrogate is not compared with the Abaqus spectrum by rank."
+ ],
+ "request": {
+  "parameterization": "E1=E2, G12",
+  "correspondence": "RANK_ORDER_SPECTRUM",
+  "search_factor": 10.0,
+  "ritz_degree": 10,
+  "observations": [
+   {
+    "record": 1,
+    "hz": 21.539224,
+    "role": "EXCLUDED",
+    "surrogate_rank": 0
+   },
+   {
+    "record": 2,
+    "hz": 51.851124,
+    "role": "FIT",
+    "surrogate_rank": 1
+   },
+   {
+    "record": 3,
+    "hz": 53.703197,
+    "role": "FIT",
+    "surrogate_rank": 2
+   },
+   {
+    "record": 4,
+    "hz": 68.067868,
+    "role": "FIT",
+    "surrogate_rank": 3
+   },
+   {
+    "record": 5,
+    "hz": 68.335157,
+    "role": "FIT",
+    "surrogate_rank": 4
+   },
+   {
+    "record": 6,
+    "hz": 115.274472,
+    "role": "FIT",
+    "surrogate_rank": 5
+   },
+   {
+    "record": 7,
+    "hz": 145.035129,
+    "role": "FIT",
+    "surrogate_rank": 6
+   },
+   {
+    "record": 8,
+    "hz": 146.003352,
+    "role": "HOLDOUT",
+    "surrogate_rank": 7
+   },
+   {
+    "record": 9,
+    "hz": 156.647433,
+    "role": "HOLDOUT",
+    "surrogate_rank": 8
+   }
+  ]
+ },
+ "inputs": {
+  "inp_path": "synthetic_plate.inp",
+  "inp_sha256": "7800bbd499243d233721fadf056a684bc07ea8c051e0ab642774cdbb31754de1",
+  "material": "CFRP_T300_TEST",
+  "elastic_type": "ENGINEERING CONSTANTS",
+  "E1": 56000.0,
+  "E2": 56000.0,
+  "E3": 8500.0,
+  "nu12": 0.05,
+  "nu13": 0.3,
+  "nu23": 0.3,
+  "G12": 5000.0,
+  "G13": 3000.0,
+  "G23": 3000.0,
+  "density_t_mm3": 1.498e-09,
+  "thickness_mm": 0.875,
+  "a_mm": 301.0,
+  "b_mm": 300.0,
+  "has_orientation": false
+ },
+ "parameter_names": [
+  "E",
+  "G12"
+ ],
+ "baseline": {
+  "E1": 56000.0,
+  "E2": 56000.0,
+  "G12": 5000.0,
+  "nu12": 0.05
+ },
+ "fitted": {
+  "E1": 47659.443033228614,
+  "E2": 47659.443033228614,
+  "G12": 27584.359101752376,
+  "nu12": 0.05
+ },
+ "candidate": {
+  "E1": 47659.443033228614,
+  "E2": 47659.443033228614,
+  "G12": 27584.359101752376,
+  "nu12": 0.05
+ },
+ "estimates": {
+  "E (E1 = E2)": 47659.443033228614,
+  "G12": 27584.359101752376
+ },
+ "axis_assignments": [],
+ "rows": [
+  {
+   "record": 1,
+   "role": "EXCLUDED",
+   "rank": null,
+   "exp_hz": 21.539224,
+   "ritz_before_hz": null,
+   "ritz_after_hz": null,
+   "ln_before": null,
+   "ln_after": null
+  },
+  {
+   "record": 2,
+   "role": "FIT",
+   "rank": 1,
+   "exp_hz": 51.851124,
+   "ritz_before_hz": 19.09532073671416,
+   "ritz_after_hz": 42.55792177815725,
+   "ln_before": -0.9989332949260123,
+   "ln_after": -0.19751059891693654
+  },
+  {
+   "record": 3,
+   "role": "FIT",
+   "rank": 2,
+   "exp_hz": 53.703197,
+   "ritz_before_hz": 59.87196728507822,
+   "ritz_after_hz": 55.23591159785041,
+   "ln_before": 0.1087358694837838,
+   "ln_after": 0.028140779984009143
+  },
+  {
+   "record": 4,
+   "role": "FIT",
+   "rank": 3,
+   "exp_hz": 68.067868,
+   "ritz_before_hz": 62.00670040501957,
+   "ritz_after_hz": 57.213258371390275,
+   "ln_before": -0.09326281601553739,
+   "ln_after": -0.17371960503378867
+  },
+  {
+   "record": 5,
+   "role": "FIT",
+   "rank": 4,
+   "exp_hz": 68.335157,
+   "ritz_before_hz": 71.88473955578635,
+   "ritz_after_hz": 101.97709556604639,
+   "ln_before": 0.05063961888134004,
+   "ln_after": 0.4003238568752913
+  },
+  {
+   "record": 6,
+   "role": "FIT",
+   "rank": 5,
+   "exp_hz": 115.274472,
+   "ritz_before_hz": 72.2247926370831,
+   "ritz_after_hz": 102.1819374846889,
+   "ln_before": -0.4675326224511919,
+   "ln_after": -0.1205610725215768
+  },
+  {
+   "record": 7,
+   "role": "FIT",
+   "rank": 6,
+   "exp_hz": 145.035129,
+   "ritz_before_hz": 116.69982643149714,
+   "ritz_after_hz": 154.51676806919883,
+   "ln_before": -0.21737093005738092,
+   "ln_after": 0.06332663959723686
+  },
+  {
+   "record": 8,
+   "role": "HOLDOUT",
+   "rank": 7,
+   "exp_hz": 146.003352,
+   "ritz_before_hz": 167.46164598845252,
+   "ritz_after_hz": 155.54814627645405,
+   "ln_before": 0.13712476552307531,
+   "ln_after": 0.06332572570390194
+  },
+  {
+   "record": 9,
+   "role": "HOLDOUT",
+   "rank": 8,
+   "exp_hz": 156.647433,
+   "ritz_before_hz": 168.57963399832096,
+   "ritz_after_hz": 187.44367509357906,
+   "ln_before": 0.07341061306670238,
+   "ln_after": 0.17948077036631568
+  }
+ ],
+ "sensitivity": [
+  {
+   "E": 0.04036731739015531,
+   "G12": 0.45963268259230355,
+   "record": 2
+  },
+  {
+   "E": 0.49997426665952105,
+   "G12": 2.5733298651686717e-05,
+   "record": 3
+  },
+  {
+   "E": 0.49994751915027885,
+   "G12": 5.2480832180012975e-05,
+   "record": 4
+  },
+  {
+   "E": 0.17599450075067577,
+   "G12": 0.3240054992276198,
+   "record": 5
+  },
+  {
+   "E": 0.17715639021378957,
+   "G12": 0.32284360972148485,
+   "record": 6
+  },
+  {
+   "E": 0.4999058248078558,
+   "G12": 9.417507954023739e-05,
+   "record": 7
+  }
+ ],
+ "singular_values": [
+  0.9243834927873911,
+  0.6162795854372501
+ ],
+ "condition_number": 1.4999417709602392,
+ "practical_rank": 2,
+ "correlation": [
+  [
+   1.0,
+   -0.22712
+  ],
+  [
+   -0.22712,
+   1.0
+  ]
+ ],
+ "log_sd": {
+  "E": 0.28387017245000595,
+  "G12": 0.39492567948144064
+ },
+ "active_bounds": [],
+ "starts": [
+  {
+   "start": {
+    "E": 48732.65457325781,
+    "G12": 27156.036697586387
+   },
+   "values": {
+    "E": 47659.443033228614,
+    "G12": 27584.359101752376
+   },
+   "cost": 0.12439263361473543,
+   "status": 3,
+   "message": "`xtol` termination condition is satisfied.",
+   "success": true
+  },
+  {
+   "start": {
+    "E": 29239.592743954694,
+    "G12": 43449.65871613819
+   },
+   "values": {
+    "E": 47659.44340948308,
+    "G12": 27584.358729582822
+   },
+   "cost": 0.12439263361473571,
+   "status": 2,
+   "message": "`ftol` termination condition is satisfied.",
+   "success": true
+  },
+  {
+   "start": {
+    "E": 77972.24731721244,
+    "G12": 16293.622018551836
+   },
+   "values": {
+    "E": 47659.44270372926,
+    "G12": 27584.359522374372
+   },
+   "cost": 0.12439263361473586,
+   "status": 2,
+   "message": "`ftol` termination condition is satisfied.",
+   "success": true
+  }
+ ],
+ "rms_fit_before": 0.46310373480928096,
+ "rms_fit_after": 0.20362762878576132,
+ "rms_holdout_before": 0.10998254277517745,
+ "rms_holdout_after": 0.13457989163915235,
+ "surrogate": [],
+ "initialization": {
+  "method": "reference modulus 1000 MPa, common factor from the mean log frequency ratio, one linearized split step",
+  "reference_mpa": 1000.0,
+  "common_factor": 38.6518333949217,
+  "start": {
+   "E": 48732.65457325781,
+   "G12": 27156.036697586387
+  },
+  "bounds": {
+   "E": [
+    4873.265457325776,
+    487326.54573257867
+   ],
+   "G12": [
+    2715.6036697586383,
+    271560.36697586416
+   ]
+  },
+  "inp_values_used": "no (shown for comparison only)"
+ },
+ "first_mode_check": {
+  "done": true,
+  "left_out_record": 2,
+  "left_out_hz": 51.851124,
+  "left_out_rank": 1,
+  "ranks_kept": {
+   "3": 2,
+   "4": 3,
+   "5": 4,
+   "6": 5,
+   "7": 6
+  },
+  "values": {
+   "E": 55887.99320559377,
+   "G12": 13458.29314631729
+  },
+  "change": {
+   "E": 0.17265309136382756,
+   "G12": -0.5121041929351074
+  },
+  "largest_change": 0.5121041929351074,
+  "condition_number": 2.2881555011251273
+ },
+ "assumption_sensitivity": [
+  {
+   "assumption": "thickness -5%, surface mass held (measured mass)",
+   "moduli_factor": 1.1663507799970843
+  },
+  {
+   "assumption": "thickness -5%, density held (surface mass changes)",
+   "moduli_factor": 1.10803324099723
+  },
+  {
+   "assumption": "density -5%",
+   "moduli_factor": 0.95
+  },
+  {
+   "assumption": "thickness +5%, surface mass held (measured mass)",
+   "moduli_factor": 0.863837598531476
+  },
+  {
+   "assumption": "thickness +5%, density held (surface mass changes)",
+   "moduli_factor": 0.9070294784580498
+  },
+  {
+   "assumption": "density +5%",
+   "moduli_factor": 1.05
+  }
+ ],
+ "quantities": [
+  {
+   "quantity": "Natural frequencies",
+   "category": "MEASURED",
+   "source": "PolyMAX curve-fitted records (the experimental file)"
+  },
+  {
+   "quantity": "E1 = E2, G12",
+   "category": "FITTED",
+   "source": "this tuning (Kirchhoff-Ritz surrogate)"
+  },
+  {
+   "quantity": "Thickness 0.875 mm",
+   "category": "ASSUMED (INP), FIXED",
+   "source": "*Shell Section of the INP"
+  },
+  {
+   "quantity": "Density 1.498e-09 t/mm³",
+   "category": "ASSUMED (INP), FIXED",
+   "source": "*Density of the INP"
+  },
+  {
+   "quantity": "Surface mass 1.311 kg/m²",
+   "category": "DERIVED",
+   "source": "density × thickness (INP)"
+  },
+  {
+   "quantity": "Plan 301 × 300 mm",
+   "category": "MODEL GEOMETRY (INP)",
+   "source": "*Node extents"
+  },
+  {
+   "quantity": "nu12 = 0.05",
+   "category": "FIXED, NOT IDENTIFIED",
+   "source": "*Elastic of the INP"
+  },
+  {
+   "quantity": "E3, nu13, nu23, G13, G23",
+   "category": "NOT IN THE SURROGATE, KEPT",
+   "source": "*Elastic of the INP"
+  },
+  {
+   "quantity": "FE rigid-body / elastic classification",
+   "category": "UNAVAILABLE",
+   "source": "unavailable"
+  }
+ ],
+ "accuracy_statement": "Frequency errors are not parameter errors. The statistical SD is conditional on the model, the rank hypothesis and the fixed inputs; it leaves out the thickness and density assumptions, the support stiffness and any missed mode. A 10 % engineering accuracy of the parameters is a target, not a demonstrated or certified property of these estimates. Statistical SD: E ±32.8%, G12 ±48.4%",
+ "fe_classification": "unavailable",
+ "minima": [
+  {
+   "values": {
+    "E": 47659.443033228614,
+    "G12": 27584.359101752376
+   },
+   "cost": 0.12439263361473543
+  }
+ ],
+ "assumptions": [
+  "The Kirchhoff-Ritz plate is a surrogate of the S4R shell model: no transverse shear, no rotary inertia.",
+  "One homogeneous orthotropic layer on the global axes, as the INP defines it (no *Orientation, no layup).",
+  "Thickness, density and nu12 are held at the INP values; E3, nu13, nu23, G13 and G23 are not part of the fit.",
+  "The plate is free-free, as in the model. The test hung the plate on two strings at about 45 degrees with a shaker behind it; that suspension angle is not a fibre direction, and support stiffness is not in the model.",
+  "That the 27 October test plate is the M11 model's specimen is an ASSUMPTION; it is not verified.",
+  "Experimental frequencies are matched to the surrogate by a declared rank hypothesis, not by mode identity."
+ ],
+ "evaluations": 159,
+ "sources": {
+  "inp": "synthetic_plate.inp",
+  "inp_sha256": "7800bbd499243d233721fadf056a684bc07ea8c051e0ab642774cdbb31754de1",
+  "dat": "",
+  "unv": "synthetic.unv",
+  "unv_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "modal_set": "synthetic"
+ },
+ "stability": null,
+ "abaqus_elastic_candidate": "*Elastic, type=ENGINEERING CONSTANTS\n47659.4, 47659.4, 8500, 0.05, 0.3, 0.3, 27584.4, 3000\n3000,",
+ "statement": "Surrogate (Kirchhoff-Ritz) research estimates. Not an FE result, not a material property and not a calibration; an oriented Abaqus block is given only when the axes are resolved. EXPLORATORY_FE_INPUT_CANDIDATE — NOT_A_MATERIAL_PROPERTY — NOT_VALIDATED_IN_ABAQUS"
+}

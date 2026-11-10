@@ -13,8 +13,8 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                               QProgressBar, QPushButton, QSizePolicy, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+                               QMessageBox, QProgressBar, QPushButton, QSizePolicy, QVBoxLayout, QWidget)
 
 from new_gui import research_tuning_model as rm
 from new_gui.diagnostic_panel import DiagnosticTable
@@ -41,6 +41,57 @@ MIRROR_TEXT = ("Why two alternatives: exchanging E1 and E2 gives the same freque
                "cannot tell which plate axis is stiff. Neither is chosen; deciding needs independent evidence of the fibre "
                "axes, such as a registered shape comparison or the layup record.")
 ROLES = (rft.FIT, rft.HOLDOUT, rft.EXCLUDED)
+RECORD_HEADERS = ("EXP record", "Frequency (Hz)", "Role", "Surrogate rank (hypothesis)")
+
+
+ROLE_STYLE = ("QPushButton { padding: 3px 12px; border: 1px solid #cbd2d9; border-radius: 0px; background: #ffffff; "
+              "color: #52606d; min-height: 22px; }"
+              "QPushButton:checked { background: #1f2933; border-color: #1f2933; color: #ffffff; font-weight: 600; }"
+              "QPushButton:disabled { color: #9aa5b1; }"
+              "QPushButton:checked:disabled { background: #7b8794; border-color: #7b8794; color: #ffffff; }")
+
+
+class _RoleChooser(QWidget):
+    """The role of one record: FIT | HOLDOUT | EXCLUDED as three exclusive buttons (ABM-AUD-1). All three states are in
+    view, a change takes one deliberate press (a role change clears the shown result; a drop-down under a scrolled page
+    also changes with the mouse wheel), and every button is a named control that assistive technology can read and press.
+    It answers ``currentData``, ``currentIndex``, ``setCurrentIndex`` and ``currentIndexChanged`` like the drop-down it
+    replaces."""
+
+    currentIndexChanged = Signal(int)
+
+    def __init__(self, record: int):
+        super().__init__()
+        self.setObjectName(f"tuningRole_{record}")
+        self.setStyleSheet(ROLE_STYLE)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        self._group = QButtonGroup(self)
+        self._group.setExclusive(True)
+        self.buttons = []
+        for index, role in enumerate(ROLES):
+            button = QPushButton(role)
+            button.setCheckable(True)
+            button.setObjectName(f"tuningRole_{record}_{role}")
+            button.setAccessibleName(f"Record {record}: {role}")
+            button.setToolTip({rft.FIT: "Fitted.", rft.HOLDOUT: "Predicted only, not fitted.",
+                               rft.EXCLUDED: "Not used; its rank stays unmatched."}[role])
+            self._group.addButton(button, index)
+            row.addWidget(button)
+            self.buttons.append(button)
+        row.addStretch(1)
+        self.buttons[0].setChecked(True)
+        self._group.idToggled.connect(lambda index, on: self.currentIndexChanged.emit(index) if on else None)
+
+    def currentIndex(self) -> int:
+        return self._group.checkedId()
+
+    def currentData(self) -> str:
+        return ROLES[self._group.checkedId()]
+
+    def setCurrentIndex(self, index: int) -> None:
+        self.buttons[index].setChecked(True)
 
 
 def _card():
@@ -268,6 +319,11 @@ class ResearchTuningPanel(QWidget):
                                "hint"))
         self.records_box = QVBoxLayout()
         inner.addLayout(self.records_box)
+        self.correspondence_hint = _label(rm.CORRESPONDENCE_HINT, "hint")
+        inner.addWidget(self.correspondence_hint)
+        self.correspondence_note = _label("", "error")  # ABM-AUD-1: why the correspondence shown above cannot be fitted
+        self.correspondence_note.setVisible(False)
+        inner.addWidget(self.correspondence_note)
         grid = QGridLayout()
         for column, share in enumerate((1, 2, 1, 2)):
             grid.setColumnStretch(column, share)
@@ -284,6 +340,9 @@ class ResearchTuningPanel(QWidget):
         self.search.setToolTip("Bounds: the data-scaled start divided and multiplied by this factor. The INP values do not "
                                "set the start or the bounds.")
         self.degree = QLineEdit("14")
+        self.parameterization.currentIndexChanged.connect(lambda _i: self._settings_changed())
+        for field in (self.declared, self.search, self.degree):
+            field.textChanged.connect(lambda _t: self._settings_changed())
         for row, (caption, widget) in enumerate((("Fitted inputs", self.parameterization), ("Declared ranks", self.declared),
                                                  ("Search range (× data-scaled start)", self.search),
                                                  ("Ritz basis degree", self.degree))):
@@ -320,11 +379,17 @@ class ResearchTuningPanel(QWidget):
     def _build_results(self) -> QFrame:
         self.results_card, inner = _card()
         inner.addWidget(_label("3. Result", "sectionTitle"))
-        self.status = _label("", "badge")
-        inner.addWidget(self.status)
         self.saved_note = _label("", "warnings")
         self.saved_note.setVisible(False)
         inner.addWidget(self.saved_note)
+        # ABM-AUD-1: three separate statements, each on its own line: the optimizer, the spectral fit, physical validity
+        self.status = _label("", "badge")
+        inner.addWidget(self.status)
+        self.quality = _label("", "badge")
+        inner.addWidget(self.quality)
+        self.validity = _label("", "badge")
+        self.validity.setProperty("state", "blocked")
+        inner.addWidget(self.validity)
         self.reasons = _label("", "warnings")
         inner.addWidget(self.reasons)
         self.mirror_note = _label(MIRROR_TEXT, "hint")
@@ -336,9 +401,12 @@ class ResearchTuningPanel(QWidget):
         inner.addWidget(self.accuracy)
         self.estimate_box, self.axis_box = QVBoxLayout(), QVBoxLayout()
         inner.addWidget(_label("Numerical research estimates", "sectionTitle"))
+        self.estimate_note = _label(rm.DIAGNOSTIC_ESTIMATE_NOTE, "warnings")
+        self.estimate_note.setVisible(False)
+        inner.addWidget(self.estimate_note)
         inner.addLayout(self.estimate_box)
         inner.addLayout(self.axis_box)
-        inner.addWidget(_label("Oriented Abaqus input candidate (only when the axes are resolved)", "sectionTitle"))
+        inner.addWidget(_label(rm.CANDIDATE_TITLE, "sectionTitle"))
         self.candidate_none = _label("", "hint")
         inner.addWidget(self.candidate_none)
         self.candidate_box = QVBoxLayout()
@@ -350,7 +418,9 @@ class ResearchTuningPanel(QWidget):
         self.plot.setMinimumSize(1, 1)
         inner.addWidget(self.plot)
         self.result_boxes = {}
-        for key, title in (("quantities", "What is measured, assumed, fitted and fixed"),
+        for key, title in (("fit_quality", "Spectral fit quality (separate from the optimizer status)"),
+                           ("correspondence", "Frequency correspondence that was fitted (a hypothesis, not mode identity)"),
+                           ("quantities", "What is measured, assumed, fitted and fixed"),
                            ("frequencies", "Frequencies: FIT and HOLDOUT"),
                            ("first_mode", "Dependence on the lowest experimental record (it stays in the fit)"),
                            ("assumptions", "What the fixed inputs carry: factor on the estimated moduli"),
@@ -424,31 +494,69 @@ class ResearchTuningPanel(QWidget):
     def _show_records(self) -> None:
         records = self.sources.records
         holdout = set(rm.default_holdout(records))
-        table = QTableWidget(len(records), 3)
+        # ABM-AUD-1: a grid of named controls, not a table with cell widgets: Qt does not expose a table's cell widgets to
+        # the accessibility interface, so the role of a record could not be read or set by assistive technology.
+        table = QFrame()
         table.setObjectName("tuning_records")
-        table.setHorizontalHeaderLabels(["EXP record", "Frequency (Hz)", "Role"])
-        table.verticalHeader().setVisible(False)
-        self.role_combos = {}
-        for row, (record, hz) in enumerate(records):
-            for column, text in enumerate((str(record), f"{hz:.4f}")):
-                item = QTableWidgetItem(text)
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                table.setItem(row, column, item)
-            combo = QComboBox()
-            for role in ROLES:
-                combo.addItem(role, role)
+        grid = QGridLayout(table)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(4)
+        for column, (text, share, width) in enumerate(zip(RECORD_HEADERS, (0, 0, 0, 1), (100, 130, 280, 220))):
+            grid.addWidget(_label(text, "sectionTitle"), 0, column)
+            grid.setColumnStretch(column, share)
+            grid.setColumnMinimumWidth(column, width)  # the labels wrap and never ask for a width of their own
+        self.role_combos, self.rank_items = {}, {}
+        for row, (record, hz) in enumerate(records, start=1):
+            grid.addWidget(_label(str(record)), row, 0)
+            grid.addWidget(_label(f"{hz:.4f}"), row, 1)
+            combo = _RoleChooser(record)
             combo.setCurrentIndex(ROLES.index(rft.HOLDOUT if record in holdout else rft.FIT))
-            table.setCellWidget(row, 2, combo)
+            combo.currentIndexChanged.connect(lambda _i: self._settings_changed())  # after the default is set
+            grid.addWidget(combo, row, 2)
             self.role_combos[record] = combo
-        table.resizeColumnsToContents()
-        table.horizontalHeader().setStretchLastSection(True)
-        table.setFixedHeight(min(40 + 30 * len(records), 380))
+            rank = _label("")
+            rank.setObjectName(f"tuningRank_{record}")
+            grid.addWidget(rank, row, 3)
+            self.rank_items[record] = rank
         old = self._tables.pop("records", None)
         if old is not None:
             old.setParent(None)
             old.deleteLater()
         self._tables["records"] = table
         self.records_box.addWidget(table)
+        self._show_correspondence()
+
+    def _show_correspondence(self) -> None:
+        """ABM-AUD-1: the rank every record would be compared with now, and why that correspondence cannot be fitted,
+        when it cannot. Read from the service's own rules; nothing is decided here."""
+        if self.sources is None or not getattr(self, "rank_items", None):
+            self.correspondence_note.setVisible(False)
+            return
+        texts, problem = rm.correspondence_preview(self.sources.records, self.roles(), self.declared.text())
+        for record, item in self.rank_items.items():
+            item.setText(texts.get(record, ""))
+        self.correspondence_note.setText(f"This correspondence cannot be fitted: {problem}" if problem else "")
+        self.correspondence_note.setVisible(bool(problem))
+
+    def rank_texts(self) -> dict:
+        return {record: item.text() for record, item in getattr(self, "rank_items", {}).items()}
+
+    def _settings_changed(self) -> None:
+        """A role, a declared rank or a setting was edited. The correspondence shown follows at once, and a live result
+        of other settings is cleared: old numbers are never shown as the result of the settings on the page."""
+        self._show_correspondence()
+        if self._active is not None or self.result is None or self.saved_path is not None or self.request is None:
+            return
+        try:
+            same = self.build_request() == self.request
+        except (ValueError, KeyError):
+            same = False
+        if not same:
+            self._clear_result()
+            self.request = None
+            self.state.setText(rm.STALE_TEXT)
+            self._refresh()
 
     def roles(self) -> dict:
         return {record: combo.currentData() for record, combo in getattr(self, "role_combos", {}).items()}
@@ -948,9 +1056,11 @@ class ResearchTuningPanel(QWidget):
         self.result = None
         self.plot_data = b""
         self.plot.clear()
-        for key in ("estimates", "axes", "candidate", "quantities", "frequencies", "first_mode", "assumptions", "minima",
-                    "diagnostics", "sensitivity", "surrogate"):
+        for key in ("estimates", "axes", "candidate", "fit_quality", "correspondence", "quantities", "frequencies",
+                    "first_mode", "assumptions", "minima", "diagnostics", "sensitivity", "surrogate"):
             self._table(key, None, (), (), 0)
+        for label in (self.status, self.quality, self.validity, self.reasons, self.accuracy):
+            label.setText("")
         self._clear_stability()
         self.results_card.setVisible(False)
         self.export_note.setText("")
@@ -961,20 +1071,28 @@ class ResearchTuningPanel(QWidget):
     def _show_result(self, result: rft.TuningResult) -> None:
         self.result = result
         self.results_card.setVisible(True)
-        self.status.setText(f"{result.status} | {rft.RESULT_LABEL}")
-        self.status.setProperty("state", "chosen" if result.candidate else "blocked")
-        self.status.style().unpolish(self.status)
-        self.status.style().polish(self.status)
+        head = rm.headline(result)  # ABM-AUD-1: optimizer, spectral fit and physical validity are three statements
+        self.status.setText(f"{head['optimizer']} | {rft.RESULT_LABEL}")
+        self.quality.setText(head["fit"])
+        self.validity.setText(head["validity"])
+        for label, state in ((self.status, head["state"]), (self.quality, head["fit_state"]), (self.validity, "blocked")):
+            label.setProperty("state", state)  # never the success colour for a HIGH MISFIT or a HOLDOUT disagreement
+            label.style().unpolish(label)
+            label.style().polish(label)
         self.reasons.setText("\n".join([rm.STATUS_TEXT.get(result.status, result.status)] + list(result.reasons) + list(result.warnings)))
         self.accuracy.setText(result.accuracy_statement)
         self.mirror_note.setVisible(result.status == rft.MIRROR)
-        self._table("estimates", self.estimate_box, rm.ESTIMATE_HEADERS, rm.estimate_rows(result), 0)
+        self.estimate_note.setVisible(head["high_misfit"] and bool(result.estimates))
+        self._table("estimates", self.estimate_box, rm.estimate_headers(result), rm.estimate_rows(result), 0)
         self._table("axes", self.axis_box, rm.AXIS_HEADERS, rm.axis_rows(result), 0)
-        self._table("candidate", self.candidate_box, rm.CANDIDATE_HEADERS, rm.candidate_rows(result), 0)
-        self.candidate_none.setText("" if result.candidate else "None: " + ("the E1 / E2 axis assignment is unresolved, so no "
-                                    "oriented *Elastic block is given." if result.status == rft.MIRROR else
-                                    "the fit is not numerically supported."))
-        self.candidate_none.setVisible(not result.candidate)
+        self._table("candidate", self.candidate_box, rm.candidate_headers(result), rm.candidate_rows(result), 0)
+        self.candidate_none.setText(rm.candidate_note(result))
+        self.candidate_none.setObjectName("warnings" if result.candidate_presentation == rft.DIAGNOSTIC_ONLY else "hint")
+        self.candidate_none.style().unpolish(self.candidate_none)
+        self.candidate_none.style().polish(self.candidate_none)
+        self.candidate_none.setVisible(True)
+        self._table("fit_quality", self.result_boxes["fit_quality"], ("Item", "Value"), rm.fit_quality_rows(result), 1)
+        self._table("correspondence", self.result_boxes["correspondence"], ("Item", "Value"), rm.correspondence_rows(result), 1)
         self._table("quantities", self.result_boxes["quantities"], rm.QUANTITY_HEADERS, rm.quantity_rows(result), 2)
         self._table("first_mode", self.result_boxes["first_mode"], ("Check", "Value"), rm.first_mode_rows(result), 1)
         self._table("assumptions", self.result_boxes["assumptions"], ("Fixed input changed", "Moduli factor"),
@@ -989,7 +1107,8 @@ class ResearchTuningPanel(QWidget):
         else:
             self._table("surrogate", self.result_boxes["surrogate"], ("Surrogate check",), (("Not made: FE classification "
                         "unavailable. Choose an ODB whose modes are already extracted.",),), 0)
-        self.state.setText(f"{result.status}: {result.evaluations} surrogate solves.")
+        self.state.setText(f"Optimizer {result.status}; spectral fit {rm.quality_of(result).get('verdict')}: "
+                           f"{result.evaluations} surrogate solves.")
         width = max(400, self.plot.width() or 900)
         ratio = self.devicePixelRatioF()
         self.plot_data = rm.error_plot(result, width, 380, ratio) or b""
@@ -1030,7 +1149,8 @@ class ResearchTuningPanel(QWidget):
                 field.setEnabled(not solid_running)
         for button in self.buttons.values():
             button.setEnabled(not running)
-        for widget in (self.parameterization, self.declared, self.search, self.degree):
+        for widget in (self.parameterization, self.declared, self.search, self.degree,
+                       *getattr(self, "role_combos", {}).values()):  # ABM-AUD-1: no role changes under a running fit
             widget.setEnabled(not running)
         self.run_button.setEnabled(not running and self.sources is not None)
         self.cancel_button.setEnabled(self._active in ("fit", "stability"))
