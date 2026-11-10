@@ -168,8 +168,8 @@ def main(argv=None) -> int:
         print(f"::error title={args.group}: failed test::{name}")
     if len(facts["failed_tests"]) > MAX_NAMED:
         print(f"::error title={args.group}: failed tests::and {len(facts['failed_tests']) - MAX_NAMED} more; see the log")
-    if facts["crash_report"]:  # the interpreter's own words; "%0A" is a line break inside an annotation
-        print(f"::error title={args.group}: crash report::" + "%0A".join(facts["crash_report"]))
+    if facts["crash_report"]:  # the interpreter's own words, on one line: an annotation is read by its first line
+        print(f"::error title={args.group}: crash report::" + " || ".join(facts["crash_report"]))
     counts = ""
     if args.refcounts:
         trace = Path(args.refcounts)

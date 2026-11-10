@@ -132,12 +132,11 @@ jobs:
             installed-packages.txt
 
   refcount-diagnosis:
-    # ABM-AUD-2 investigation of "Fatal Python error: bool_dealloc" (CPython 3.11, Linux): the same suite with the garbage
-    # collector run before every test, so that a fall of the True / False reference counts is charged to the test that
-    # caused it. It reports; it is not what makes a run green or red beyond its own honest result.
-    name: linux (bool reference-count diagnosis)
+    # ABM-AUD-2 investigation of "Fatal Python error: bool_dealloc" (CPython 3.11, Linux): small operations repeated many
+    # times, with the change of the True / False reference counts reported for each. It reports; it decides nothing.
+    name: linux (bool reference-count probe)
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     env:
       QT_QPA_PLATFORM: offscreen
       NEW_GUI_REQUIRE_QT: "1"
@@ -152,21 +151,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-new-gui.txt
-      - name: Full suite with a collected reference-count trace
-        shell: bash
-        timeout-minutes: 100
-        run: |
-          set +e
-          python -X faulthandler tests/ci_run_suite.py --trace refcount-trace-collected.jsonl --collect 2>&1 | tee diagnosis-results.txt
-          code=${PIPESTATUS[0]}
-          set -e
-          python tests/ci_summary.py diagnosis-results.txt --group "Linux refcount diagnosis" --exit-code "$code" \
-            --min-tests 4000 --refcounts refcount-trace-collected.jsonl
-      - name: Upload the trace
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: refcount-diagnosis
-          path: |
-            diagnosis-results.txt
-            refcount-trace-collected.jsonl
+      - name: Probe
+        timeout-minutes: 20
+        run: python -X faulthandler tests/ci_bool_refcount_probe.py

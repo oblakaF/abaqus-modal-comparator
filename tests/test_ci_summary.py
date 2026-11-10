@@ -127,8 +127,8 @@ class Summary(unittest.TestCase):
         code, out, page = self.run_main(CRASHED, "--refcounts", str(trace))
         self.assertEqual(code, 1)
         self.assertIn("::error title=G: crash report::", out)
-        self.assertIn("bool_dealloc: deallocating True or False: bug likely caused by a refcount error in a C extension%0A"
-                      "Python runtime state: initialized%0ACurrent thread", out)
+        self.assertIn("bool_dealloc: deallocating True or False: bug likely caused by a refcount error in a C extension || "
+                      "Python runtime state: initialized || Current thread", out)
         self.assertIn("::notice title=G: True/False reference counts::Python 3.11.9 on linux", out)
         for part in ("lowest 390/5", "n.D.test_c (-10, -900)", "m.C.test_b (-610, +0)", "By module: n -910; m -610"):
             self.assertIn(part, out)
