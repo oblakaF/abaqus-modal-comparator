@@ -7,6 +7,11 @@ UNIVERSAL-REG-2: Save draft and Open draft keep and check again a proposal. Savi
 what is on the screen; an opened draft is shown unreviewed. A draft is never an accepted physical registration.
 
 UNIVERSAL-REG-3: Confirm registration... revalidates the saved draft now and only then opens the separate confirmation.
+
+ABM-AUD-3: the form says what is needed and where each statement comes from (the FE model, the experiment, the physical
+evidence). A scan turned in its plane by any angle is stated by its out-of-plane axis and three landmarks; a landmark is
+an FE node or an FE position. The result shows the rotation, the translation, the unit factor, the landmark consistency
+and the extent of the measurement grid against the FE outer dimensions. The dialog never exceeds the screen.
 """
 
 from __future__ import annotations
@@ -15,6 +20,7 @@ import threading
 from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
@@ -40,7 +46,21 @@ NOT_ACCEPTED = "A draft is not an accepted physical registration."
 REPRODUCED = "This draft was reproduced on the current files. Review it. " + NOT_ACCEPTED
 NEED_REVIEW = "Review the mapping and confirm it first."
 FORM_CHANGED = "The form changed after the check. Check the evidence again."
-LANDMARK_HINT = "One per line: experimental point, FE node"
+LANDMARK_HINT = "One per line: experimental point, FE node   or   experimental point, X, Y, Z (FE position, FE units)"
+INTRO = "State what you know from the part and the test, not from any modal result."
+NEEDED = ("Needed: the coordinate units of both files, the measured side, the measured DOFs, landmarks and where the "
+          "evidence comes from. Nothing is prefilled, and nothing is taken from frequencies or MAC.")
+TURNED = ("A flat scan turned in its plane by any angle (for example 45 degrees): state only the experimental axis that "
+          "points out of the plane, leave the two in-plane axes not stated, and give at least three landmarks that are "
+          "not on one line. The landmarks give the rotation.")
+LANDMARK_NOTE = ("A landmark is an experimental point and the place where it physically lies on the FE model: an FE node "
+                 "label, or its FE position X, Y, Z in FE units. Measure the place on the part; the outermost scan "
+                 "points are usually not on the FE edges.")
+SECTIONS = ("FE model", "Experiment", "Physical evidence (from the part and the test set-up)")
+SIDE_NOTE = "The FE direction the measured face looks towards."
+DOF_NOTE = "The experimental components that were measured."
+DETAILS_TITLE = "Transform and coverage"
+ACROSS = object()  # a form row that takes both columns
 MAPPING_HEADERS = ("Experimental point", "FE node", "Distance", "Landmark")
 BADGE_STATE = {gr.REGISTRATION_PROPOSED: "read", gr.REGISTRATION_REQUIRED: "chosen"}
 
@@ -54,6 +74,14 @@ def _text(text: str = "", name: str = "") -> QLabel:
     label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
     label.setMinimumWidth(0)
     return label
+
+
+class _MappingTable(DiagnosticTable):
+    height_cap = 260  # hundreds of points scroll inside the table, so the transform above it stays in reach
+
+    def __init__(self, headers, rows, stretch, **kwargs):
+        super().__init__(headers, rows, stretch, **kwargs)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
 
 def _combo(items, name: str, first: str) -> QComboBox:
@@ -76,9 +104,24 @@ def parse_landmarks(text: str) -> tuple:
             parts = line.split()
         if len(parts) == 2 and all(parts):
             pairs.append((parts[0], parts[1]))
-        else:
-            bad.append(line.strip())
+            continue
+        if len(parts) == 4 and parts[0]:  # a point and its FE position, written x, y, z or (x, y, z)
+            try:
+                pairs.append((parts[0], gr.position_text(*(float(part.strip("() ")) for part in parts[1:]))))
+                continue
+            except ValueError:
+                pass
+        bad.append(line.strip())
     return tuple(pairs), tuple(bad)
+
+
+def fit_to_screen(dialog: QDialog, width: int, height: int) -> None:
+    """The wanted size, never more than the screen offers (a 150 % scale on a small screen leaves little)."""
+    screen = dialog.screen() or QGuiApplication.primaryScreen()
+    if screen is not None:
+        available = screen.availableGeometry()
+        width, height = min(width, available.width() - 40), min(height, available.height() - 60)
+    dialog.resize(max(width, 320), max(height, 240))
 
 
 class _Bridge(QObject):
@@ -112,39 +155,44 @@ class RegistrationDialog(QDialog):
         outer.setContentsMargins(0, 0, 0, 0)
         area = QScrollArea()
         area.setWidgetResizable(True)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # the page wraps; a table scrolls itself
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(8)
         area.setWidget(page)
         outer.addWidget(area)
-        layout.addWidget(_text("State what you know from the part and the test, not from any modal result.", "hint"))
+        layout.addWidget(_text(INTRO, "hint"))
+        self.needed_label = _text(NEEDED, "hint")
+        layout.addWidget(self.needed_label)
         layout.addWidget(_text("\n".join(am.registration_geometry(inputs, set_index)), "hint"))
         layout.addLayout(self._build_form())
-        row = QHBoxLayout()
+        row, second = QHBoxLayout(), QHBoxLayout()  # two short rows: five commands in one do not fit a small window
         self.check_button = QPushButton(CHECK)
         self.check_button.setObjectName("primary")
         self.check_button.clicked.connect(self.check)
         row.addWidget(self.check_button)
-        self.save_button = QPushButton(SAVE_DRAFT)
-        self.save_button.setObjectName("regSaveDraft")
-        self.save_button.setEnabled(False)
-        self.save_button.clicked.connect(lambda: self.save_draft())
-        row.addWidget(self.save_button)
         self.open_button = QPushButton(OPEN_DRAFT)
         self.open_button.setObjectName("regOpenDraft")
         self.open_button.clicked.connect(lambda: self.open_draft())
         row.addWidget(self.open_button)
-        self.confirm_button = QPushButton(CONFIRM)
-        self.confirm_button.setObjectName("regConfirm")
-        self.confirm_button.setEnabled(False)
-        self.confirm_button.clicked.connect(lambda: self.confirm_registration())
-        row.addWidget(self.confirm_button)
         close = QPushButton("Close")
         close.clicked.connect(self.close)
         row.addWidget(close)
         row.addStretch(1)
+        self.save_button = QPushButton(SAVE_DRAFT)
+        self.save_button.setObjectName("regSaveDraft")
+        self.save_button.setEnabled(False)
+        self.save_button.clicked.connect(lambda: self.save_draft())
+        second.addWidget(self.save_button)
+        self.confirm_button = QPushButton(CONFIRM)
+        self.confirm_button.setObjectName("regConfirm")
+        self.confirm_button.setEnabled(False)
+        self.confirm_button.clicked.connect(lambda: self.confirm_registration())
+        second.addWidget(self.confirm_button)
+        second.addStretch(1)
         layout.addLayout(row)
+        layout.addLayout(second)
         self.busy_label = _text(CHECKING, "hint")
         self.busy_label.setVisible(False)
         layout.addWidget(self.busy_label)
@@ -161,8 +209,9 @@ class RegistrationDialog(QDialog):
         layout.addStretch(1)
         self.status_label: Optional[QLabel] = None
         self.problem_label: Optional[QLabel] = None
+        self.details_label: Optional[QLabel] = None
         self.review_box: Optional[QCheckBox] = None
-        self.resize(640, 640)
+        fit_to_screen(self, 700, 700)
 
     def _build_form(self) -> QGridLayout:
         grid = QGridLayout()
@@ -185,13 +234,11 @@ class RegistrationDialog(QDialog):
         self.source = QLineEdit()
         self.source.setObjectName("regSource")
         self.source.setPlaceholderText("For example: marker photograph, measurement drawing")
-        units = QHBoxLayout()
-        for caption, combo in (("FE", self.fe_unit), ("Experimental", self.experimental_unit)):
-            units.addWidget(QLabel(caption))
-            units.addWidget(combo)
-        units.addStretch(1)
+        self.turned_label = _text(TURNED, "hint")
+        self.landmark_label = _text(LANDMARK_NOTE, "hint")
         axes = QHBoxLayout()
         for name, combo in zip("xyz", self.axes):
+            combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
             axes.addWidget(QLabel(f"+{name}"))
             axes.addWidget(combo)
         axes.addStretch(1)
@@ -199,14 +246,33 @@ class RegistrationDialog(QDialog):
         for box in self.dofs.values():
             dofs.addWidget(box)
         dofs.addStretch(1)
-        for row, (caption, item) in enumerate((("Units", units), ("Experimental axes in FE", axes),
-                                               ("Measured side (FE)", self.side), (self.instance_caption, self.instance),
-                                               ("Measured DOFs", dofs), ("Landmarks", self.landmarks),
-                                               ("Evidence source", self.source))):
-            grid.addWidget(caption if isinstance(caption, QLabel) else QLabel(caption), row, 0,
-                           Qt.AlignmentFlag.AlignTop)
+        fe_title, experiment_title, evidence_title = (_text(title, "sectionTitle") for title in SECTIONS)
+        rows = ((fe_title, None), ("Coordinate unit", self.fe_unit),
+                ("Measured side", self.side), (None, _text(SIDE_NOTE, "hint")),
+                (self.instance_caption, self.instance),
+                (experiment_title, None), ("Coordinate unit", self.experimental_unit),
+                ("Measured DOFs", dofs), (None, _text(DOF_NOTE, "hint")),
+                (evidence_title, None), (QLabel("Experimental axes in FE"), None), (ACROSS, axes),
+                (ACROSS, self.turned_label),
+                ("Landmarks", self.landmarks), (None, self.landmark_label), ("Evidence source", self.source))
+        for row, (caption, item) in enumerate(rows):
+            if item is None:  # a section title across the form
+                grid.addWidget(caption, row, 0, 1, 2)
+                continue
+            if caption is ACROSS:  # three choices side by side need the whole width
+                if isinstance(item, QWidget):
+                    grid.addWidget(item, row, 0, 1, 2)
+                else:
+                    grid.addLayout(item, row, 0, 1, 2)
+                continue
+            if caption is not None:  # short, on one line: the explanation is the hint under the field
+                label = caption if isinstance(caption, QLabel) else QLabel(caption)
+                grid.addWidget(label, row, 0, Qt.AlignmentFlag.AlignTop)
             if isinstance(item, QWidget):
-                grid.addWidget(item, row, 1)
+                if isinstance(item, QComboBox):
+                    grid.addWidget(item, row, 1, Qt.AlignmentFlag.AlignLeft)
+                else:
+                    grid.addWidget(item, row, 1)
             else:
                 grid.addLayout(item, row, 1)
         return grid
@@ -431,6 +497,7 @@ class RegistrationDialog(QDialog):
         self.result_layout.addWidget(_text(proposal.limit))
         self.result_layout.addWidget(_text(proposal.heuristics_note, "hint"))
         self.problem_label = None
+        self.details_label = None
         if proposal.problems:
             self.problem_label = _text("\n".join(f"• {problem.text}" for problem in proposal.problems), "error")
             self.result_layout.addWidget(self.problem_label)
@@ -441,10 +508,15 @@ class RegistrationDialog(QDialog):
         if proposal.axes_in_fe:
             axes = ", ".join(f"+{name} → {text}" for name, text in zip("xyz", proposal.axes_in_fe))
             self.result_layout.addWidget(_text(f"Experimental axes in FE: {axes}."))
+        if proposal.details:
+            self.result_layout.addWidget(_text(DETAILS_TITLE, "sectionTitle"))
+            self.details_label = _text("\n".join(proposal.details))
+            self.details_label.setObjectName("regDetails")
+            self.result_layout.addWidget(self.details_label)
         if proposal.mapping:
             rows = tuple((p.experimental_point, p.fe_node, f"{p.distance:.4g}", "yes" if p.landmark else "")
                          for p in proposal.mapping)
-            self.table = DiagnosticTable(MAPPING_HEADERS, rows, 1, text_columns=(0, 1, 3))
+            self.table = _MappingTable(MAPPING_HEADERS, rows, 1, text_columns=(0, 1, 3))
             self.table.setObjectName("regMapping")
             self.result_layout.addWidget(self.table)
         if proposal.proposed:
@@ -476,4 +548,4 @@ class RegistrationDialog(QDialog):
         super().closeEvent(event)
 
 
-__all__ = ["RegistrationDialog", "TITLE", "parse_landmarks"]
+__all__ = ["RegistrationDialog", "TITLE", "fit_to_screen", "parse_landmarks"]

@@ -3,6 +3,9 @@
 Everything the confirmation covers is displayed: the evidence, the axes, the measured side, the DOFs, the point mapping,
 the provenance and the exact sources. Each physical statement is confirmed on its own and the person is named. An
 existing confirmation is displayed the same way, already checked against the current files, and is used only on command.
+
+ABM-AUD-3: the transform (rotation angle, translation, unit factor) and the extent of the measurement grid against the
+FE outer dimensions are displayed too, computed again from the draft's own numbers and the current data.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from PySide6.QtWidgets import (QCheckBox, QDialog, QFileDialog, QFrame, QHBoxLay
 from new_gui import analyze_model as am
 from new_gui.diagnostic_panel import DiagnosticTable
 from services import confirmed_registration as cs
+from services import generic_registration as gr
 
 TITLE = "Confirm physical registration"
 CONFIRM_AND_SAVE = "Confirm and save..."
@@ -38,12 +42,19 @@ def _text(text: str = "", name: str = "") -> QLabel:
     return label
 
 
-def facts_of(draft: dict) -> tuple:
+def facts_of(draft: dict, coverage: tuple = ()) -> tuple:
     """(section title, lines) of everything a confirmation covers, in reading order."""
     evidence, result, sources = draft["evidence"], draft["result"], draft["sources"]
     axes = ", ".join(f"+{name} → {text or 'not stated'}" for name, text in zip("xyz", evidence["axes"]))
     resulting = ", ".join(f"+{name} → {text}" for name, text in zip("xyz", result["axes_in_fe"]))
-    landmarks = [f"Experimental point {point} = FE node {node}" for point, node in evidence["landmarks"]]
+    landmarks = [f"Experimental point {point} = FE position {node} {evidence['fe_unit']}"
+                 if gr.landmark_position(node) is not None else f"Experimental point {point} = FE node {node}"
+                 for point, node in evidence["landmarks"]]
+    try:
+        transform = gr.transform_lines(result["rotation"], result["translation"], result["scale"], evidence["fe_unit"],
+                                       evidence["experimental_unit"], result["mapping"], result["metrics"])
+    except (KeyError, TypeError, ValueError):
+        transform = ()  # a display of what the draft holds; its check is the revalidation
     modal = draft["modal_set"]
     return (("Physical evidence", (f"Units: FE {evidence['fe_unit']}, experimental {evidence['experimental_unit']}",
                                    f"Stated axes: {axes}", f"Resulting axes: {resulting}",
@@ -51,6 +62,7 @@ def facts_of(draft: dict) -> tuple:
                                    f"Measured FE part: {evidence['measured_instance'] or 'the only one'}",
                                    f"Measured DOFs: {', '.join(evidence['measured_dofs'])}")),
             ("Landmarks", tuple(landmarks)),
+            ("Transform and coverage", tuple(transform) + tuple(coverage)),
             ("Provenance", (f"Evidence source: {evidence['source']}",)),
             ("Exact data", (f"Modal set: {modal['display_name']} ({modal['key']}), {modal['record_count']} records",
                             f"Experimental file SHA-256: {sources['experimental']['sha256']}",
@@ -59,6 +71,14 @@ def facts_of(draft: dict) -> tuple:
                             f"Experimental geometry SHA-256: {draft['experimental_geometry_sha256']}")),
             ("Warnings", tuple(result["warnings"]) or ("None.",)),
             ("Checks", tuple(result["checks"])))
+
+
+class _MappingTable(DiagnosticTable):
+    height_cap = 260  # hundreds of points scroll inside the table; the statements below it stay in reach
+
+    def __init__(self, headers, rows, stretch, **kwargs):
+        super().__init__(headers, rows, stretch, **kwargs)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
 
 class _Bridge(QObject):
@@ -87,6 +107,7 @@ class ConfirmationDialog(QDialog):
         outer.setContentsMargins(0, 0, 0, 0)
         area = QScrollArea()
         area.setWidgetResizable(True)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # the page wraps; the table scrolls itself
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(16, 14, 16, 14)
@@ -95,13 +116,13 @@ class ConfirmationDialog(QDialog):
         outer.addWidget(area)
         layout.addWidget(_text(INTRO))
         layout.addWidget(_text("\n".join(cs.LIMITS), "warnings"))
-        for title, lines in facts_of(draft):
+        for title, lines in facts_of(draft, am.registration_coverage(inputs, set_index, draft)):
             heading = _text(title, "sectionTitle")
             layout.addWidget(heading)
             layout.addWidget(_text("\n".join(lines), "hint"))
         layout.addWidget(_text("Point mapping", "sectionTitle"))
         rows = tuple((row[0], row[1], f"{row[2]:.4g}", "yes" if row[3] else "") for row in draft["result"]["mapping"])
-        self.table = DiagnosticTable(MAPPING_HEADERS, rows, 1, text_columns=(0, 1, 3))
+        self.table = _MappingTable(MAPPING_HEADERS, rows, 1, text_columns=(0, 1, 3))
         self.table.setObjectName("confirmMapping")
         layout.addWidget(self.table)
         layout.addWidget(_text(draft["limit"]))
@@ -124,7 +145,10 @@ class ConfirmationDialog(QDialog):
         row.addWidget(close)
         row.addStretch(1)
         layout.addLayout(row)
-        self.resize(720, 680)
+        screen = self.screen()
+        available = screen.availableGeometry() if screen is not None else None
+        self.resize(min(720, available.width() - 40) if available else 720,
+                    min(680, available.height() - 60) if available else 680)
 
     def _build_form(self, layout: QVBoxLayout) -> None:
         separator = QFrame()

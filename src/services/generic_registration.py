@@ -13,6 +13,12 @@ The rule x_fe = R (s x_exp) + t, with s from the units, a proper rotation R and 
   which way the plane faces (the landmarks alone cannot);
 - anything less is ambiguous, and a mirrored statement or a mirrored landmark set is refused.
 
+ABM-AUD-3: a scan turned in its plane by any angle needs no stated in-plane axis: the landmarks give the rotation, and
+the stated out-of-plane axis gives the facing. A landmark names where an experimental point physically lies on the FE
+model: an FE node, or an FE position "(x, y, z)" in FE units (a measured place need not be a mesh node). ``details``
+of a proposal states the rotation, the translation, the unit factor, the landmark consistency and the extent of the
+measurement grid against the FE outer dimensions; it is computed, never stored, and nothing is ever stretched.
+
 WORKING-DRAFT-R1: which FE nodes can receive a point. With several FE instances, the measured instance must be stated
 (a sandwich's skin and core lie closer together than the geometry tolerance, so distance alone mixes them). On a thin
 structure, whose depth along the measured side is within that tolerance, only the half of the depth towards the stated
@@ -33,13 +39,14 @@ registration and always needs the user's review.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, astuple, dataclass, field
 import hashlib
 import itertools
 import json
 import math
 import os
 from pathlib import Path
+import re
 from typing import Mapping, Optional
 import uuid
 
@@ -119,7 +126,7 @@ class Evidence:
     axes: tuple = ("", "", "")  # the FE direction of experimental +x, +y, +z ("" when not stated)
     measured_side: str = ""  # the FE direction the measured face looks towards
     measured_dofs: tuple = ()  # experimental components ("x", "y", "z")
-    landmarks: tuple = ()  # (experimental point, FE node) identified independently of any modal result
+    landmarks: tuple = ()  # (experimental point, FE node or "(x, y, z)" FE position), independent of any modal result
     source: str = ""  # how the statements were established
     measured_instance: str = ""  # the FE instance that was measured; required when the FE data hold several
 
@@ -158,6 +165,7 @@ class Proposal:
     fe_geometry_sha256: str = ""
     limit: str = LIMIT
     heuristics_note: str = HEURISTICS_NOTE
+    details: tuple = ()  # the transform and the coverage in words (``registration_details``); never stored in a draft
 
     @property
     def proposed(self) -> bool:
@@ -232,25 +240,57 @@ def _resolve_fe_label(label: str, names: list, lookup: dict) -> tuple:
     return None, f"FE node {label} is not in the FE results."
 
 
-def _landmarks(evidence: Evidence, experimental_names: list, fe_names: list, problems: list) -> tuple:
-    """(experimental rows, FE rows) of the stated landmarks."""
+_POSITION = re.compile(r"^\(([^,()]+),([^,()]+),([^,()]+)\)$")
+
+
+def position_text(x, y, z) -> str:
+    """How a landmark's FE position is written in the evidence: "(x, y, z)" in FE units."""
+    return "(" + ", ".join(repr(float(value) + 0.0) for value in (x, y, z)) + ")"
+
+
+def landmark_position(text) -> Optional[tuple]:
+    """The FE position of a landmark written "(x, y, z)", or None when the text names an FE node."""
+    found = _POSITION.match(str(text).strip())
+    if found is None:
+        return None
+    try:
+        values = tuple(float(value) for value in found.groups())
+    except ValueError:
+        return None
+    return values if all(math.isfinite(value) for value in values) else None
+
+
+def _landmarks(evidence: Evidence, experimental_names: list, fe_names: list, fe_points: np.ndarray,
+               problems: list) -> tuple:
+    """(experimental rows, FE rows, FE positions) of the stated landmarks; the FE row is None for a stated position."""
     experimental_lookup = {name: row for row, name in enumerate(experimental_names)}
     fe_lookup = {name: row for row, name in enumerate(fe_names)}
-    rows_e, rows_f = [], []
+    rows_e, rows_f, targets = [], [], []
     for point, node in evidence.landmarks:
         point, node = str(point).strip(), str(node).strip()
         if point not in experimental_lookup:
             problems.append(Problem(LANDMARK, f"Experimental point {point} is not in the experimental data."))
             continue
-        row, reason = _resolve_fe_label(node, fe_names, fe_lookup)
-        if reason:
-            problems.append(Problem(LANDMARK, reason))
+        position = landmark_position(node)
+        if position is not None:
+            row, target = None, np.asarray(position, dtype=float)
+        elif node.startswith("("):
+            problems.append(Problem(LANDMARK, f"{node} is not an FE position: write it as (x, y, z) in FE units."))
             continue
+        else:
+            row, reason = _resolve_fe_label(node, fe_names, fe_lookup)
+            if reason:
+                problems.append(Problem(LANDMARK, reason))
+                continue
+            target = fe_points[row]
         rows_e.append(experimental_lookup[point])
         rows_f.append(row)
-    if len(set(rows_e)) != len(rows_e) or len(set(rows_f)) != len(rows_f):
+        targets.append(target)
+    nodes = [row for row in rows_f if row is not None]
+    places = [tuple(target.tolist()) for row, target in zip(rows_f, targets) if row is None]
+    if len(set(rows_e)) != len(rows_e) or len(set(nodes)) != len(nodes) or len(set(places)) != len(places):
         problems.append(Problem(LANDMARK, "A landmark repeats an experimental point or an FE node."))
-    return rows_e, rows_f
+    return rows_e, rows_f, np.asarray(targets, dtype=float).reshape(len(targets), 3)
 
 
 def _stated_axes(evidence: Evidence, problems: list) -> list:
@@ -286,8 +326,8 @@ def _rotation(evidence: Evidence, a: np.ndarray, b: np.ndarray, stated: list, pr
     solid = planar and len(a) >= 4 and values[2] / values[0] >= RANK_RATIO
     if not planar:
         problems.append(Problem(AMBIGUOUS, "The landmarks lie on a line or are too few, so they leave a rotation free. "
-                                           "State all three axes, or give landmarks that span a plane. "
-                                           "(Provisional diagnostic heuristic.)"))
+                                           "State all three axes, or give at least three landmarks that are not on one "
+                                           "line. (Provisional diagnostic heuristic.)"))
         return None
     rotation, reflected = _rigid_fit(a, b)
     if solid:
@@ -301,17 +341,29 @@ def _rotation(evidence: Evidence, a: np.ndarray, b: np.ndarray, stated: list, pr
         normal = vt[2]
         if not any(abs(normal[index]) > 0.5 for index, _vector_ in stated):
             problems.append(Problem(AMBIGUOUS, "The landmarks lie in one plane, so they cannot show which way it faces. "
-                                               "State an experimental axis that points out of that plane. "
+                                               "State an experimental axis that points out of that plane (for a flat "
+                                               "scan, the axis along the measured direction). "
                                                "(Provisional diagnostic heuristic.)"))
             return None
+        limit = np.cos(np.radians(STATED_AXIS_DEGREES))
+        for index, vector in stated:
+            if abs(normal[index]) > 0.5 and float(rotation[:, index] @ vector) <= -limit:
+                problems.append(Problem(MIRRORED, f"With experimental +{'xyz'[index]} stated as {evidence.axes[index]}, "
+                                                  "the landmarks fit the FE model only as a mirror image, or as a scan "
+                                                  "seen from the opposite face. A mirrored orientation is not accepted: "
+                                                  "check the landmark pairs and the stated axis."))
+                return None
         checks.append(f"Orientation from the rigid fit of {len(a)} coplanar landmarks; the facing from a stated axis.")
     limit = np.cos(np.radians(STATED_AXIS_DEGREES))
     for index, vector in stated:
-        if float(rotation[:, index] @ vector) < limit:
+        cosine = float(rotation[:, index] @ vector)
+        if cosine < limit:
             names = "xyz"
-            problems.append(Problem(LANDMARK, f"The landmarks turn experimental +{names[index]} more than "
-                                              f"{STATED_AXIS_DEGREES:g} degrees from the stated "
-                                              f"{evidence.axes[index]}: the evidence contradicts itself. "
+            angle = float(np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0))))
+            problems.append(Problem(LANDMARK, f"The landmarks turn experimental +{names[index]} {angle:.1f} degrees from "
+                                              f"the stated {evidence.axes[index]} (at most {STATED_AXIS_DEGREES:g}): the "
+                                              "evidence contradicts itself. If the scan is turned in its plane, leave "
+                                              "its in-plane axes not stated: the landmarks give the rotation. "
                                               "(Provisional diagnostic heuristic.)"))
             return None
     return rotation
@@ -430,6 +482,124 @@ def _missing(evidence: Evidence) -> list:
     return missing
 
 
+def _span_hint(a: np.ndarray, b: np.ndarray) -> str:
+    """What the sizes of the two landmark sets say when they do not fit: wrong units, or a scan taken for the part."""
+    spread_a, spread_b = float(np.linalg.norm(a - a.mean(axis=0))), float(np.linalg.norm(b - b.mean(axis=0)))
+    if spread_a <= 0.0 or spread_b <= 0.0:
+        return ""
+    ratio = spread_b / spread_a
+    if not 0.8 <= ratio <= 1.25:
+        named = ""
+        for large, small in itertools.permutations(UNITS, 2):
+            factor = UNIT_IN_METRES[large] / UNIT_IN_METRES[small]
+            if factor > 1.0 and (0.8 <= ratio / factor <= 1.25 or 0.8 <= ratio * factor <= 1.25):
+                named = f" A factor of {factor:g} is {large} against {small}."
+                break
+        return f" The landmark distances differ by a factor of {ratio:.3g}: check the units.{named}"
+    if abs(ratio - 1.0) > GEOMETRY_TOLERANCE:
+        return (f" The FE landmark places span {ratio:.3f} times the experimental ones. The scan is moved rigidly at "
+                "its own size and never stretched: if the outermost scan points were paired with the FE corners or "
+                "edges, pair each point with the place where it physically lies instead.")
+    return ""
+
+
+def _axis_text(vector: np.ndarray) -> str:
+    row = int(np.argmax(np.abs(vector)))
+    if abs(abs(vector[row]) - 1.0) < 1.0e-6:
+        return ("+" if vector[row] > 0 else "-") + "XYZ"[row]
+    return "(" + ", ".join(f"{value + 0.0:+.3f}" for value in vector) + ")"
+
+
+def rotation_text(rotation) -> str:
+    """A proper rotation as an angle about an FE axis (right-hand rule), for reading against the test set-up."""
+    matrix = np.asarray(rotation, dtype=float)
+    angle = float(np.degrees(np.arccos(np.clip((np.trace(matrix) - 1.0) / 2.0, -1.0, 1.0))))
+    if angle < 1.0e-6:
+        return "none: the experimental axes are parallel to the FE axes"
+    if angle > 180.0 - 1.0e-6:
+        values, vectors = np.linalg.eigh((matrix + matrix.T) / 2.0)
+        axis = vectors[:, int(np.argmax(values))]
+    else:
+        axis = np.array([matrix[2, 1] - matrix[1, 2], matrix[0, 2] - matrix[2, 0], matrix[1, 0] - matrix[0, 1]])
+    axis = axis / float(np.linalg.norm(axis))
+    if axis[int(np.argmax(np.abs(axis)))] < 0.0:
+        axis, angle = -axis, -angle
+    return f"{angle:.3f} degrees about FE {_axis_text(axis)} (right-hand rule)"
+
+
+def _numbers(values) -> str:
+    return "(" + ", ".join(f"{float(value) + 0.0:.6g}" for value in values) + ")"
+
+
+def transform_lines(rotation, translation, scale, fe_unit: str, experimental_unit: str, mapping, metrics) -> tuple:
+    """The transform and the point mapping in words, from a result's own numbers (``mapping`` rows: point, FE node,
+    distance, landmark)."""
+    matrix = np.asarray(rotation, dtype=float)
+    distances = np.asarray([row[2] for row in mapping], dtype=float)
+    tolerance = float(metrics["tolerance"])
+    axes = ", ".join(f"+{name} along FE {_axis_text(matrix[:, index])}" for index, name in enumerate("xyz"))
+    return (f"Rule: x_FE = R ({scale:g} x_EXP) + t. A rigid motion: nothing is stretched, nothing is mirrored "
+            f"(determinant {float(np.linalg.det(matrix)):+.6f}).",
+            f"Rotation R: {rotation_text(matrix)}.",
+            f"Experimental axes in FE: {axes}.",
+            f"Translation t: {_numbers(translation)} {fe_unit} (the experimental origin in FE coordinates).",
+            f"Unit conversion: experimental {experimental_unit} to FE {fe_unit}, factor {scale:g}.",
+            f"Mapped points: {int(np.sum(distances <= tolerance))} of {len(distances)} within {tolerance:.4g} {fe_unit} "
+            f"of their FE node; RMS {float(metrics['rms']):.4g} {fe_unit}, largest distance "
+            f"{float(distances.max(initial=0.0)):.4g} {fe_unit}; {sum(bool(row[3]) for row in mapping)} are landmarks.")
+
+
+def _box_text(low: np.ndarray, high: np.ndarray, unit: str) -> str:
+    return ", ".join(f"{axis} {a + 0.0:.6g} to {b + 0.0:.6g} ({b - a:.6g})"
+                     for axis, a, b in zip("XYZ", low, high)) + f" {unit}"
+
+
+def coverage_lines(fe_dataset, experimental_dataset, evidence: Evidence, rotation, translation, scale) -> tuple:
+    """The measurement grid against the FE outer dimensions, and how well the landmarks agree. The grid is placed at its
+    own size: its extent is never taken for the specimen's, and nothing here is a gate."""
+    fe, experimental = _names(fe_dataset, "FE", []), _names(experimental_dataset, "experimental", [])
+    if fe is None or experimental is None:
+        return ()
+    fe_names, fe_points = fe
+    matrix, shift = np.asarray(rotation, dtype=float), np.asarray(translation, dtype=float)
+    scaled = experimental[1] * float(scale)
+    mapped = scaled @ matrix.T + shift
+    rows = [row for row, name in enumerate(fe_names)
+            if not evidence.measured_instance or _instance_of(name) == evidence.measured_instance]
+    part = fe_points[rows] if rows else fe_points
+    unit = evidence.fe_unit
+    low, high, scan_low, scan_high = part.min(axis=0), part.max(axis=0), mapped.min(axis=0), mapped.max(axis=0)
+    lines = [f"FE outer dimensions ({evidence.measured_instance or 'all FE nodes'}): {_box_text(low, high, unit)}.",
+             f"Measurement grid in FE coordinates ({len(mapped)} points): {_box_text(scan_low, scan_high, unit)}."]
+    size = float(np.linalg.norm(high - low))
+    shares = [f"{(scan_high[i] - scan_low[i]) / (high[i] - low[i]):.1%} along {'XYZ'[i]}" for i in range(3)
+              if high[i] - low[i] > 1.0e-9 * max(size, 1.0e-300)]
+    if shares:
+        lines.append(f"The grid spans {', '.join(shares)} of the FE dimensions. Its extent is that of the measured points, "
+                     "not the size of the part: it is placed by the evidence and is not stretched to the FE outline.")
+    beyond = float(max(np.max(low - scan_low), np.max(scan_high - high), 0.0))
+    if beyond > 1.0e-6 * max(size, 1.0e-300):
+        lines.append(f"The grid reaches {beyond:.4g} {unit} beyond the FE outer dimensions.")
+    rows_e, _rows_f, b = _landmarks(evidence, experimental[0], fe_names, fe_points, [])
+    if rows_e:
+        a = scaled[rows_e]
+        residuals = np.linalg.norm(a @ matrix.T + shift - b, axis=1)
+        text = (f"Landmark consistency: {len(rows_e)} landmark(s), worst distance {float(residuals.max()):.4g} {unit}, RMS "
+                f"{float(np.sqrt(np.mean(residuals ** 2))):.4g} {unit}")
+        spread_a, spread_b = float(np.linalg.norm(a - a.mean(axis=0))), float(np.linalg.norm(b - b.mean(axis=0)))
+        if spread_a > 0.0:
+            text += f"; the FE landmark places span {spread_b / spread_a:.4f} times the experimental ones (1 = the same size)"
+        lines.append(text + ".")
+    return tuple(lines)
+
+
+def registration_details(fe_dataset, experimental_dataset, evidence: Evidence, rotation, translation, scale, mapping,
+                         metrics) -> tuple:
+    """Everything a person reads to review a mapping; recomputed from a result, so a draft never has to store it."""
+    return (transform_lines(rotation, translation, scale, evidence.fe_unit, evidence.experimental_unit, mapping, metrics)
+            + coverage_lines(fe_dataset, experimental_dataset, evidence, rotation, translation, scale))
+
+
 def required(problems, *, evidence: Optional[Evidence] = None, **fields) -> Proposal:
     return Proposal(REGISTRATION_REQUIRED, tuple(problems), evidence_hash=evidence.evidence_hash if evidence else "",
                     **fields)
@@ -472,11 +642,11 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
     modes = list(experimental_dataset.modes)
     _check_dofs(evidence, modes, np.asarray(modes[0].node_ids, dtype=object), problems, warnings, checks)
     stated = _stated_axes(evidence, problems)
-    rows_e, rows_f = _landmarks(evidence, experimental_names, fe_names, problems)
+    rows_e, rows_f, b = _landmarks(evidence, experimental_names, fe_names, fe_points, problems)
     if any(problem.code in (LANDMARK, AMBIGUOUS) for problem in problems) or not rows_e:
         return required(problems, evidence=evidence, checks=tuple(checks))
 
-    a, b = scaled[rows_e], fe_points[rows_f]
+    a = scaled[rows_e]
     rotation = _rotation(evidence, a, b, stated, problems, checks)
     if rotation is None:
         return required(problems, evidence=evidence, checks=tuple(checks))
@@ -484,10 +654,7 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
     residuals = np.linalg.norm(a @ rotation.T + translation - b, axis=1)
     worst = float(residuals.max())
     if worst > tolerance:
-        hint = ""
-        spread_a, spread_b = float(np.linalg.norm(a - a.mean(axis=0))), float(np.linalg.norm(b - b.mean(axis=0)))
-        if spread_a > 0.0 and not 0.8 <= spread_b / spread_a <= 1.25:
-            hint = f" The landmark distances differ by a factor of {spread_b / spread_a:.3g}: check the units."
+        hint = _span_hint(a, b)
         problems.append(Problem(LANDMARK, f"The landmarks disagree with the stated orientation: worst distance "
                                           f"{worst:.4g} {evidence.fe_unit}, limit {tolerance:.4g}.{hint}"))
         return required(problems, evidence=evidence, checks=tuple(checks))
@@ -495,6 +662,10 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
         warnings.append("One landmark fixes the position and cannot check it; a second one would.")
     else:
         checks.append(f"{len(rows_e)} landmarks agree: worst distance {worst:.4g} {evidence.fe_unit}.")
+    placed = sum(row is None for row in rows_f)
+    if placed:
+        checks.append(f"{placed} of {len(rows_f)} landmarks are stated as FE positions in {evidence.fe_unit}, not as FE "
+                      "nodes.")
 
     mapped = scaled @ rotation.T + translation
     side = _vector(evidence.measured_side)
@@ -513,13 +684,17 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
         checks.append(f"Thin structure ({span:.4g} {evidence.fe_unit} along {evidence.measured_side}): points only on "
                       f"the stated side ({len(allowed)} nodes).")
     inside = set(allowed.tolist())
-    outside = [fe_names[row] for row in rows_f if row not in inside]
+    outside = [fe_names[row] for row in rows_f if row is not None and row not in inside]
+    for row, target in zip(rows_f, b):
+        if row is None and (not len(allowed)
+                            or float(np.linalg.norm(fe_points[allowed] - target, axis=1).min()) > tolerance):
+            outside.append(position_text(*target))
     if outside:
         problems.append(Problem(SIDE, f"These landmark FE nodes are not on the stated measured face or part: "
                                       f"{', '.join(outside)}."))
         return required(problems, evidence=evidence, checks=tuple(checks))
     position = {row: index for index, row in enumerate(allowed.tolist())}
-    fixed = {point: position[row] for point, row in zip(rows_e, rows_f)}
+    fixed = {point: position[row] for point, row in zip(rows_e, rows_f) if row is not None}
     chosen, hidden, ties = _map_points(mapped, fe_points[allowed], side, tolerance, fixed)
     chosen = allowed[chosen]
     distances = np.linalg.norm(fe_points[chosen] - mapped, axis=1)
@@ -555,6 +730,9 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
                            "tolerance": tolerance, "other_orientations": others},
                   evidence_hash=evidence.evidence_hash,
                   fe_geometry_sha256=str(modal_dataset_geometry_identity(fe_dataset)["sha256"]))
+    common["details"] = registration_details(fe_dataset, experimental_dataset, evidence, common["rotation"],
+                                             common["translation"], scale, [astuple(point) for point in points],
+                                             common["metrics"])
     if problems:
         return Proposal(REGISTRATION_REQUIRED, tuple(problems), **common)
     return Proposal(REGISTRATION_PROPOSED, (), **common)
@@ -774,5 +952,7 @@ def revalidate_draft(document: dict, fe_dataset, experimental_dataset, *, modal_
 
 
 __all__ = ["DIRECTIONS", "DOFS", "DraftRefused", "DraftResult", "Evidence", "HEURISTICS", "HEURISTICS_NOTE", "LIMIT",
-           "MappedPoint", "Problem", "Proposal", "REGISTRATION_PROPOSED", "REGISTRATION_REQUIRED", "UNITS", "draft_bytes",
-           "draft_document", "fe_instances", "geometry_summary", "propose", "read_draft", "required", "revalidate_draft", "write_draft"]
+           "MappedPoint", "Problem", "Proposal", "REGISTRATION_PROPOSED", "REGISTRATION_REQUIRED", "UNITS", "coverage_lines",
+           "draft_bytes", "draft_document", "fe_instances", "geometry_summary", "landmark_position", "position_text",
+           "propose", "read_draft", "registration_details", "required", "revalidate_draft", "rotation_text",
+           "transform_lines", "write_draft"]

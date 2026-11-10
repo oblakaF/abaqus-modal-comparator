@@ -232,6 +232,19 @@ def registration_instances(inputs: Inputs) -> tuple:
     return gr.fe_instances(inputs.full_fe.dataset)
 
 
+def registration_coverage(inputs: Inputs, set_index: int, draft: dict) -> tuple:
+    """The measurement grid of a draft against the FE outer dimensions, on the read data (ABM-AUD-3); words only."""
+    try:
+        evidence = gr.Evidence(**{key: tuple(map(tuple, value)) if key == "landmarks" else
+                                  (tuple(value) if isinstance(value, list) else value)
+                                  for key, value in draft["evidence"].items()})
+        result = draft["result"]
+        return gr.coverage_lines(inputs.full_fe.dataset, inputs.full_experimental.sets[set_index].dataset, evidence,
+                                 result["rotation"], result["translation"], result["scale"])
+    except (KeyError, TypeError, ValueError, IndexError):
+        return ()  # the draft is displayed as it is; its check is the revalidation, not this description
+
+
 def propose_registration(inputs: Inputs, set_index: int, evidence: gr.Evidence, cancel_event) -> gr.Proposal:
     """The evidence checked on the read data, or REGISTRATION_REQUIRED when a file changed since it was read."""
     try:
@@ -467,6 +480,6 @@ def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional
 
 
 __all__ = ["Analysis", "Inputs", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse", "consent_text",
-           "confirm_registration", "confirm_sources", "extract", "open_confirmation", "open_registration_draft", "propose_registration", "registration_geometry",
+           "confirm_registration", "confirm_sources", "extract", "open_confirmation", "open_registration_draft", "propose_registration", "registration_coverage", "registration_geometry",
            "save_registration_draft", "file_problem", "find_package", "make_plan", "package_folder", "plan_warnings",
            "read_inputs", "scoped_experimental", "scoped_fe", "scoped_inputs"]

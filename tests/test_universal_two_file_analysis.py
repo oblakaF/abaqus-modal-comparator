@@ -129,8 +129,8 @@ class Runner:
         return manifest
 
 
-def write_unv(path: Path, nodes, frequencies, sets=None) -> Path:
-    """Dataset 15 + 55 of real fitted-mode form, on the given nodes."""
+def write_unv(path: Path, nodes, frequencies, sets=None, shapes=None) -> Path:
+    """Dataset 15 + 55 of real fitted-mode form, on the given nodes; ``shapes[k]`` is record k's measured z shape."""
     import pyuff
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -146,7 +146,8 @@ def write_unv(path: Path, nodes, frequencies, sets=None) -> Path:
             zeta = 0.003
             w = 2 * math.pi * f / math.sqrt(1 - zeta ** 2)
             eig = -zeta * w + 1j * w * math.sqrt(1 - zeta ** 2)
-            shape = np.random.default_rng(100 + k).standard_normal(count).astype(complex)
+            shape = (np.random.default_rng(100 + k).standard_normal(count).astype(complex) if shapes is None
+                     else np.asarray(shapes[k], dtype=complex))
             data = pyuff.prepare_55(id1=name, id2="synthetic", id3="x", id4="x", id5="x", model_type=1,
                                     analysis_type=3, data_ch=2, spec_data_type=11, data_type=5, n_data_per_node=3,
                                     load_case=1, mode_n=k + 1, eig=eig, modal_a=1 + 0j, modal_b=1 + 0j,
