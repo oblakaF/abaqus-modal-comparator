@@ -21,7 +21,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parent / "src"), str(HERE)]
-N = 2000
+N = 500
 
 
 def counts():
@@ -48,6 +48,9 @@ def main() -> int:
     import scipy
 
     app = QApplication.instance() or QApplication([])
+    print(f"::notice title=bool probe 00::Python {sys.version.split()[0]} on {sys.platform}; PySide6 {PySide6.__version__}, "
+          f"shiboken6 {shiboken6.__version__}, numpy {numpy.__version__}, scipy {scipy.__version__}, matplotlib "
+          f"{matplotlib.__version__}; counts at start {counts()}", flush=True)
 
     class Bridge(QObject):
         two = Signal(int, int)
@@ -80,10 +83,14 @@ def main() -> int:
     results = []
 
     def case(name, action):
+        print(f"starting: {name}; counts now {counts()}", flush=True)
         try:
             results.append((name, measure(action)))
         except Exception as error:  # noqa: BLE001  (a diagnosis reports everything it can)
             results.append((name, f"{type(error).__name__}: {error}"))
+        # said at once: a case that ends the process must not take the earlier answers with it
+        print(f"::notice title=bool probe {len(results):02d}::{name}: {results[-1][1]} (True, False) over {N} repeats; "
+              f"counts now {counts()}", flush=True)
 
     def emit_case(signal_name, args, threaded, connected=True, keep_result=False, connection=None):
         def action():
