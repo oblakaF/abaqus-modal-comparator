@@ -24,6 +24,7 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+import time
 import tkinter as tk
 import unittest
 from unittest import mock
@@ -516,6 +517,14 @@ class HomeLocalFileTests(_Home):
         """Use changes the window as setting the field with its Browse button does: no modal set, registration, MAC,
         project or other variable of its own."""
         def snapshot(application):
+            # ABM-AUD-2: the series review identifies the chosen file on a worker thread and writes its answer into a
+            # window variable about 40 ms later; a snapshot taken before that answer compared an unfinished window with
+            # a finished one (1 failure in 8 runs). The snapshot waits, bounded, for the answer.
+            end = time.monotonic() + 30.0
+            while "identifying" in application.series_review_text.get() and time.monotonic() < end:
+                self.root.update()
+                time.sleep(0.01)
+            self.assertNotIn("identifying", application.series_review_text.get())
             return {name: value.get() for name, value in vars(application).items() if isinstance(value, tk.Variable)}
 
         browse, _ = self.home()

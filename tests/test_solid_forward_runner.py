@@ -2,6 +2,12 @@
 
 The fake workers exercise the supervision itself: identity handshake, memory limit, silence and wall-clock limits,
 cancellation and the termination of processes the worker started. No real FE model is solved here.
+
+ABM-AUD-2: the supervision is Win32 (a Job Object with a kernel memory limit, a suspended child, process identity by
+IsProcessInJob, kill-on-job-close). Every test that needs it carries ``WINDOWS_ONLY`` and is reported on another platform
+as SKIPPED_WINDOWS_ONLY, never as a pass; the Windows CI job runs them all and accepts no skip. What does not need Win32
+(the validation of What-If points, the reuse of the model, and the honest refusal on a platform without job objects)
+runs everywhere.
 """
 
 from __future__ import annotations
@@ -28,6 +34,10 @@ from services import solid_c3d8i_model as sm  # noqa: E402
 from services import solid_c3d8i_solver as ss  # noqa: E402
 from services import solid_forward_runner as sfr  # noqa: E402
 from test_solid_c3d8i_model import box_inp  # noqa: E402
+
+WINDOWS_ONLY_REASON = ("SKIPPED_WINDOWS_ONLY: Win32 Job Object supervision (kernel memory limit, suspended start, process "
+                       "identity, kill-on-job-close); run natively by the Windows CI job")
+WINDOWS_ONLY = unittest.skipUnless(sys.platform == "win32", WINDOWS_ONLY_REASON)
 
 FAKE = textwrap.dedent('''
     import json, os, subprocess, sys, time
@@ -109,6 +119,7 @@ class RunnerCase(unittest.TestCase):
                 self.assertFalse(sfr.process_alive(pid), pid)
 
 
+@WINDOWS_ONLY
 class SupervisedSolveTests(RunnerCase):
     def test_one_supervised_solve_matches_the_in_process_solver(self):
         request = self.request()
@@ -138,6 +149,7 @@ class SupervisedSolveTests(RunnerCase):
         self.assertTrue(outcome.worker_in_job)
 
 
+@WINDOWS_ONLY
 class RefusalTests(RunnerCase):
     def test_insufficient_memory_is_refused_before_any_worker_starts(self):
         outcome = sfr.run(self.request(), sfr.RunnerLimits(reserve_free_memory_bytes=10 ** 18))
@@ -182,6 +194,7 @@ class RefusalTests(RunnerCase):
         self.assertNothingLeft(outcome)
 
 
+@WINDOWS_ONLY
 class LimitTests(RunnerCase):
     def test_the_kernel_memory_limit_covers_the_worker_and_is_measured(self):
         limit = 300 * 1024 ** 2
@@ -210,6 +223,7 @@ class LimitTests(RunnerCase):
         self.assertNothingLeft(outcome)
 
 
+@WINDOWS_ONLY
 class CancellationTests(RunnerCase):
     def test_cancel_terminates_the_worker_and_the_processes_it_started(self):
         cancel = threading.Event()
@@ -258,6 +272,7 @@ class WhatIfTests(RunnerCase):
         e1, e2, g12 = point
         return ss.SolidForwardModel(sm.load_solid_inp(path)).solve(14, e1=e1, e2=e2, g12=g12).frequencies_hz
 
+    @WINDOWS_ONLY
     def test_two_and_three_point_runs_match_independent_single_point_solves_in_the_given_order(self):
         base = self.request()
         for points in (THREE[1:], THREE):
@@ -324,6 +339,9 @@ class WhatIfTests(RunnerCase):
             with self.assertRaises(sfr.RunnerRefused) as caught:
                 sfr.validate_points(material, points)
             self.assertIn(part, str(caught.exception))
+
+    @WINDOWS_ONLY
+    def test_invalid_points_are_refused_by_the_parent_and_again_by_the_worker(self):
         base = self.request()
         outcome = sfr.run(sfr.ForwardRequest(base.inp_path, base.inp_sha256, points=((70000.0, 0.0, 9000.0),)))
         self.assertEqual(outcome.status, sfr.REFUSED)
@@ -369,6 +387,7 @@ class WhatIfTests(RunnerCase):
         self.assertEqual(calls, [70000.0, 60000.0])  # a resource limit stops the remaining points
         self.assertEqual(reuse["points_attempted"], 2)
 
+    @WINDOWS_ONLY
     def test_partial_completion_is_reported_honestly(self):
         outcome = self.fake_run("points", points=THREE)
         self.assertEqual(outcome.status, sfr.PARTIAL)
@@ -380,6 +399,7 @@ class WhatIfTests(RunnerCase):
         self.assertEqual(outcome.points[2]["parameters"], dict(zip(sfr.WHATIF_PARAMETERS, THREE[2])))
         self.assertNothingLeft(outcome)
 
+    @WINDOWS_ONLY
     def test_cancel_and_memory_stop_keep_the_completed_points(self):
         cancel = threading.Event()
 
@@ -412,6 +432,7 @@ class WhatIfTests(RunnerCase):
         self.assertEqual([p["status"] for p in before.points], [sfr.POINT_NOT_RUN] * 3)
         self.assertEqual(before.label, sfr.WHATIF_LABEL)
 
+    @WINDOWS_ONLY
     def test_a_real_what_if_run_can_be_cancelled(self):
         cancel = threading.Event()
         base = self.request()
@@ -428,6 +449,51 @@ class WhatIfTests(RunnerCase):
             self.assertEqual(outcome.points[0]["status"], sfr.POINT_SOLVED)
             self.assertEqual(outcome.points[2]["status"], sfr.POINT_NOT_RUN)
         self.assertNothingLeft(outcome)
+
+
+class UnsupportedPlatformTests(RunnerCase):
+    """ABM-AUD-2: without Windows job objects there is no supervision, so nothing is solved. The refusal is said, no
+    process is started and no unsupervised fallback exists. These run on every platform."""
+
+    def refuse(self):
+        raise sfr.RunnerRefused("Supervised solid solves need Windows job objects; this platform is not supported.")
+
+    def test_the_kernel_interface_is_refused_off_windows(self):
+        with mock.patch.object(sfr.os, "name", "posix"):
+            with self.assertRaises(sfr.RunnerRefused) as caught:
+                sfr._kernel32()
+        self.assertIn("need Windows job objects; this platform is not supported", str(caught.exception))
+        if sys.platform != "win32":  # the real thing, not a patched name
+            for call in (sfr.available_memory_bytes, sfr.own_peak_commit_bytes, lambda: sfr.process_alive(os.getpid())):
+                with self.assertRaises(sfr.RunnerRefused):
+                    call()
+
+    def test_a_run_without_job_objects_is_refused_and_starts_no_process(self):
+        request = self.request()
+        started = AssertionError("a worker process was started without supervision")
+        for points, skip in (((), False), (THREE, False), ((), True), (THREE, True)):
+            with self.subTest(points=len(points), skip_preflight=skip),                     mock.patch.object(sfr, "_kernel32", side_effect=self.refuse),                     mock.patch.object(sfr.subprocess, "Popen", side_effect=started):
+                outcome = sfr.run(sfr.ForwardRequest(request.inp_path, request.inp_sha256, points=points),
+                                  child_argv=[sys.executable, str(self.fake), "quiet"], skip_preflight=skip)
+            self.assertEqual(outcome.status, sfr.REFUSED)
+            self.assertIn("this platform is not supported", outcome.message)
+            self.assertIsNone(outcome.launcher_pid)
+            self.assertIsNone(outcome.worker_pid)
+            self.assertFalse(outcome.worker_in_job)
+            self.assertIsNone(outcome.result)
+            self.assertEqual([p["status"] for p in outcome.points], [sfr.POINT_NOT_RUN] * len(points))
+            if points:
+                self.assertIn("No What-If point was solved", outcome.message)
+
+    def test_the_preflight_is_refused_too(self):
+        request = self.request()
+        with mock.patch.object(sfr, "_kernel32", side_effect=self.refuse):
+            with self.assertRaises(sfr.RunnerRefused) as caught:
+                sfr.preflight(request)
+        self.assertIn("this platform is not supported", str(caught.exception))
+
+    def test_the_windows_only_marker_names_itself(self):
+        self.assertTrue(WINDOWS_ONLY_REASON.startswith("SKIPPED_WINDOWS_ONLY"))
 
 
 if __name__ == "__main__":

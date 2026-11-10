@@ -29,8 +29,8 @@ from new_gui.workspace_state import EXPERIMENTAL, FE
 
 PAGES = ("Analyze", "Review", "MAC / Points", "Materials", "Research Tuning")
 ANALYZE_PAGE, REVIEW_PAGE, MAC_PAGE, MATERIALS_PAGE, TUNING_PAGE = 0, 1, 2, 3, 4
-TUNING_SUBTITLE = ("Research only: tune the assumed CFRP inputs of an Abaqus plate model against measured frequencies with a "
-                   "plate surrogate. No Abaqus run; the result is not a material property.")
+TUNING_SUBTITLE = ("Research only: tune the assumed CFRP inputs of an Abaqus shell model against measured frequencies with a "
+                   "Kirchhoff-Ritz surrogate. No Abaqus run; the result is not a material property.")
 MAC_SUBTITLE = "Mode pairs and MAC, what they rest on, and why they may be missing. Nothing here is computed from a manual choice."
 MATERIALS_PAGE_SUBTITLE = "Synthetic test of the two model methods, and a read-only view of ODB and UNV/UFF files. No material value is issued."
 ABOUT = ("Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze. Mode pairs and MAC appear only "

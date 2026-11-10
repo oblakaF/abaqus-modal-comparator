@@ -1,4 +1,8 @@
-"""ABM-SOLID-5: the solid offline FE mode of the Research Tuning page (synthetic C3D8I models only)."""
+"""ABM-SOLID-5: the solid offline FE mode of the Research Tuning page (synthetic C3D8I models only).
+
+ABM-AUD-2: the page's solid mode works through the Win32 supervised runner. The tests that need a supervised worker or
+the Windows memory status carry ``WINDOWS_ONLY`` (SKIPPED_WINDOWS_ONLY elsewhere, run by the Windows CI job). What the
+page does without that supervision (it says so and offers no calculation) is tested on every platform."""
 
 from __future__ import annotations
 
@@ -24,6 +28,7 @@ from services import solid_c3d8i_solver as ss  # noqa: E402
 from services import solid_forward_runner as sfr  # noqa: E402
 from test_real_input_1_compatibility import SHELL  # noqa: E402
 from test_solid_c3d8i_model import box_inp  # noqa: E402
+from test_solid_forward_runner import WINDOWS_ONLY  # noqa: E402
 
 DIMENSIONS = dict(nx=6, ny=3, nz=1, lx=60.0, ly=30.0, lz=5.0)
 
@@ -88,6 +93,7 @@ class SolidPage(unittest.TestCase):
     def cells(self, panel, key):
         return dict(map(tuple, panel.table_cells(key)))
 
+    @WINDOWS_ONLY
     def test_a_solid_inp_opens_the_separate_solid_mode_with_identity_and_unchanged_values(self):
         panel = self.panel()
         panel.choose_file("inp", str(self.inp))
@@ -110,6 +116,7 @@ class SolidPage(unittest.TestCase):
         self.assertIn("solid offline FE section", panel.message.text())
         self.assertIsNone(panel.solid_outcome)  # nothing is calculated until started and confirmed
 
+    @WINDOWS_ONLY
     def test_a_declined_confirmation_runs_nothing(self):
         panel = self.panel(confirm=False)
         panel.choose_file("inp", str(self.inp))
@@ -120,6 +127,7 @@ class SolidPage(unittest.TestCase):
         self.assertIn("Not started", panel.solid_state.text())
         self.assertIsNone(panel.solid_outcome)
 
+    @WINDOWS_ONLY
     def test_one_confirmed_supervised_solve_shows_frequencies_diagnostics_and_fe_fe_differences(self):
         panel = self.panel()
         panel.choose_file("inp", str(self.inp))
@@ -151,6 +159,7 @@ class SolidPage(unittest.TestCase):
         self.assertIn("NOT_VERIFIED", diagnostics["Element"])
         self.assertEqual(len(self.asked), 1)  # one confirmation, one solve, no repetition
 
+    @WINDOWS_ONLY
     def test_cancelling_terminates_the_worker(self):
         panel = self.panel()
         panel.choose_file("inp", str(self.inp))
@@ -174,6 +183,7 @@ class SolidPage(unittest.TestCase):
         self.assertFalse(panel.run_solid())
         self.assertEqual(self.asked, [])
 
+    @WINDOWS_ONLY
     def test_a_mismatched_dat_is_not_used_for_differences(self):
         from new_gui import research_tuning_model as rm
 
@@ -187,6 +197,7 @@ class SolidPage(unittest.TestCase):
         rows = rm.solid_frequency_rows({"frequencies_hz": list(self.direct)}, summary)
         self.assertEqual(rows[0][2:], ("—", "—", "—"))
 
+    @WINDOWS_ONLY
     def test_equal_mesh_and_mass_with_other_material_is_never_verified_and_differences_are_provisional(self):
         """ABM-SOLID-5-F1: a .dat from a model with the same mesh and mass but different material constants passes
         every consistency check, so those checks can never be shown as proof of identity."""
@@ -231,6 +242,7 @@ class SolidPage(unittest.TestCase):
         self.wait(panel)
         return panel
 
+    @WINDOWS_ONLY
     def test_what_if_points_show_the_original_values_and_one_confirmation_lists_every_solve(self):
         panel = self.checked()
         self.assertFalse(panel.whatif_button.isEnabled())  # nothing entered, nothing pre-filled
@@ -280,6 +292,7 @@ class SolidPage(unittest.TestCase):
         self.assertEqual(diagnostics["Worker processes still running after the run"], "0")
         self.assertIn("verified inside the supervision job", diagnostics["Worker process"])
 
+    @WINDOWS_ONLY
     def test_a_declined_what_if_confirmation_runs_nothing(self):
         panel = self.checked(confirm=False)
         panel.set_whatif(self.POINTS[:1])
@@ -290,6 +303,7 @@ class SolidPage(unittest.TestCase):
         self.assertIn("not confirmed", panel.solid_state.text())
         self.assertIsNone(panel.whatif_outcome)
 
+    @WINDOWS_ONLY
     def test_invalid_what_if_entries_are_explained_and_never_run(self):
         panel = self.checked()
         for rows, part in (([("60000", "", "7000")], "Row 1: Enter all of E1, E2 and G12"),
@@ -307,6 +321,7 @@ class SolidPage(unittest.TestCase):
                     self.assertFalse(panel.run_whatif())
         self.assertEqual(self.asked, [])  # no confirmation was even asked for
 
+    @WINDOWS_ONLY
     def test_cancelling_what_if_terminates_the_worker_and_reports_each_point(self):
         panel = self.checked()
         panel.set_whatif(self.POINTS)
@@ -345,6 +360,7 @@ class SolidPage(unittest.TestCase):
         self.assertIn("FAILED: RIGID_BODY_CLASSIFICATION_FAILED: synthetic — not retried",
                       diagnostics["Point 2 (E1 90000, E2 15000, G12 11000)"])
 
+    @WINDOWS_ONLY
     def test_edited_what_if_inputs_never_leave_the_previous_results_visible(self):
         # ABM-SOLID-6-F1: the displayed result always belongs to the entered points
         panel = self.checked()
@@ -391,6 +407,7 @@ class SolidPage(unittest.TestCase):
         self.assertNotEqual(cells, old)
         self.assertIn("G12 8000", " ".join(self.cells(panel, "whatif_diagnostics")))
 
+    @WINDOWS_ONLY
     def test_the_single_inp_value_solve_is_unchanged_next_to_what_if(self):
         panel = self.checked()
         panel.set_whatif(self.POINTS[:1])
@@ -405,6 +422,31 @@ class SolidPage(unittest.TestCase):
         self.wait(panel)
         self.assertEqual(panel.whatif_fields[0][0].text(), "")
         self.assertIsNone(panel.solid_outcome)
+
+    def test_without_job_objects_the_page_says_so_and_offers_no_calculation(self):
+        """ABM-AUD-2: on a platform without Windows job objects the solid mode is not available. The page says why,
+        shows no solid card, enables no run and starts no worker; there is no unsupervised fallback."""
+        def refuse():
+            raise sfr.RunnerRefused("Supervised solid solves need Windows job objects; this platform is not supported.")
+
+        panel = self.panel()
+        started = AssertionError("a worker process was started without supervision")
+        with mock.patch.object(sfr, "_kernel32", side_effect=refuse),                 mock.patch.object(sfr.subprocess, "Popen", side_effect=started):
+            panel.choose_file("inp", str(self.inp))
+            self.wait(panel)
+            self.assertIsNone(panel.solid)
+            self.assertIn("Solid offline FE is not available", panel.solid_state.text())
+            self.assertIn("need Windows job objects; this platform is not supported", panel.solid_state.text())
+            self.assertFalse(panel.solid_run_button.isVisible())
+            self.assertFalse(panel.whatif_button.isEnabled())
+            self.assertFalse(panel.run_solid())
+            panel.set_whatif(((60000.0, 25000.0, 7000.0),))
+            self.assertFalse(panel.run_whatif())
+            self.assertFalse(panel.cancel_solid())
+        self.assertIsNone(panel.solid_outcome)
+        self.assertIsNone(panel.whatif_outcome)
+        self.assertEqual(self.asked, [])  # no confirmation was asked for a calculation that cannot run
+        self.assertFalse(panel.busy())
 
     def test_the_shell_workflow_is_unchanged(self):
         panel = self.panel()
