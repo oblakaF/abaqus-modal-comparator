@@ -1117,6 +1117,20 @@ class PageWorkflowTests(_Page):
             self.assertIn("rank 2 is assigned to records 2, 3", panel.message.text())
         self.assertIsNone(panel.result)
 
+    def test_a_replaced_table_never_stays_behind_as_a_window(self):
+        """Every role change draws the correspondence tables again. A table taken out of the page must be hidden: left
+        visible without a parent it would be a stray window of its own."""
+        from PySide6.QtWidgets import QApplication, QTableWidget
+
+        _window, _analyze, panel = self.tuning()
+        panel.use_registered()
+        self.declare(panel)
+        self.reviewed(panel)
+        self.roles(panel)
+        self.roles(panel, holdout=(9, 10))
+        stray = [w.objectName() for w in QApplication.topLevelWidgets() if isinstance(w, QTableWidget) and w.isVisible()]
+        self.assertEqual(stray, [])
+
     def test_an_explicit_import_of_the_fe_dimensions_is_marked_as_such(self):
         _window, _analyze, panel = self.tuning()
         panel.use_registered()

@@ -994,6 +994,7 @@ class ResearchTuningPanel(QWidget):
     def _table(self, key: str, box, headers, rows, stretch: int) -> DiagnosticTable:
         old = self._tables.pop(key, None)
         if old is not None:
+            old.hide()  # hidden for good first: a table taken out of the page must never stay behind as a window
             old.setParent(None)
             old.deleteLater()
         if not rows:
