@@ -548,7 +548,17 @@ class ResearchTuningPanel(QWidget):
         inner.addWidget(self.registered_state)
         self.registered_identity_box = QVBoxLayout()
         inner.addLayout(self.registered_identity_box)
-        self.registered_form = QFrame()
+        self.registered_form = QFrame()  # filled by _build_registered_form when a registered set is first taken
+        self.reg_fields, self.reg_categories, self.reg_axes, self.review_boxes = {}, {}, {}, {}
+        inner.addWidget(self.registered_form)
+        self.registered_form.setVisible(False)
+        return card
+
+    def _build_registered_form(self) -> None:
+        """The form of the registered route, built once, when it is first needed: a window that never takes a registered
+        set carries none of its widgets (every window of the program holds this page)."""
+        if self.reg_fields:
+            return
         form = QVBoxLayout(self.registered_form)
         form.setContentsMargins(0, 0, 0, 0)
         form.setSpacing(8)
@@ -557,7 +567,6 @@ class ResearchTuningPanel(QWidget):
         grid = QGridLayout()
         grid.setColumnMinimumWidth(0, 130)  # the captions wrap and never ask for a width of their own
         grid.setColumnStretch(3, 1)
-        self.reg_fields, self.reg_categories = {}, {}
         for line, (key, caption) in enumerate(rm.PLATE_FIELDS):
             grid.addWidget(_label(caption), line, 0)
             field = QLineEdit()
@@ -578,7 +587,6 @@ class ResearchTuningPanel(QWidget):
         axes = QGridLayout()
         axes.setColumnMinimumWidth(0, 200)
         axes.setColumnStretch(2, 1)
-        self.reg_axes = {}
         for line, (key, caption) in enumerate((("length_axis", "Length a runs along FE axis"),
                                                ("width_axis", "Width b runs along FE axis"))):
             axes.addWidget(_label(caption), line, 0)
@@ -631,7 +639,6 @@ class ResearchTuningPanel(QWidget):
         self.review_note = _label(rm.RANK_ONLY_NOTE, "hint")
         self.review_note.setObjectName("tuningReviewNote")
         form.addWidget(self.review_note)
-        self.review_boxes = {}
         for key, title in (("reg_frame", "How the Ritz rectangle is tied to the registered frame"),
                            ("reg_mac", "Shape review: MAC of the records against the Ritz modes"),
                            ("reg_correspondence", "The correspondence of section 2 against the reviewed shapes"),
@@ -651,9 +658,6 @@ class ResearchTuningPanel(QWidget):
         self.reg_fixed.toggled.connect(lambda on: self._fix_toggled(on))
         form.addWidget(self.reg_fixed)
         form.addWidget(_label(rm.FIX_TEXT, "hint"))
-        inner.addWidget(self.registered_form)
-        self.registered_form.setVisible(False)
-        return card
 
     def _line(self, layout, key: str, caption: str) -> None:
         layout.addWidget(_label(caption))
@@ -713,6 +717,7 @@ class ResearchTuningPanel(QWidget):
     def set_plate(self, **values) -> None:
         """Fill the registered form (tests and checks): field texts by key, ``categories`` {name: category},
         ``length_axis``, ``width_axis``, ``linked``, ``material_axis``."""
+        self._build_registered_form()
         for key, choice in self.reg_categories.items():
             if key in values.get("categories", {}):
                 choice.set_value(values["categories"][key])
@@ -753,6 +758,7 @@ class ResearchTuningPanel(QWidget):
         self._clear_solid()
         self._table("inputs", None, (), (), 0)
         self._say("")
+        self._build_registered_form()
         self.registered, self.registered_data = rset, source
         self._drop_review()
         self.sources = rm.Sources(None, None, (), (), "", str(rset.source.get("experimental_file", "")),
@@ -782,6 +788,7 @@ class ResearchTuningPanel(QWidget):
             self._clear_result()
             old = self._tables.pop("records", None)
             if old is not None:
+                old.hide()  # never a stray window
                 old.setParent(None)
                 old.deleteLater()
             self.role_combos, self.rank_items = {}, {}
@@ -830,7 +837,7 @@ class ResearchTuningPanel(QWidget):
 
     def _unfix(self) -> None:
         self._fixed_signature = None
-        if self.reg_fixed.isChecked():
+        if self.reg_fields and self.reg_fixed.isChecked():
             self.reg_fixed.blockSignals(True)
             self.reg_fixed.setChecked(False)
             self.reg_fixed.blockSignals(False)
@@ -840,8 +847,9 @@ class ResearchTuningPanel(QWidget):
         for key, (caption, _box) in self.review_boxes.items():
             self._table(key, None, (), (), 0)
             caption.setVisible(False)
-        self.review_summary.setVisible(False)
-        self.review_note.setText(rm.RANK_ONLY_NOTE)
+        if self.reg_fields:
+            self.review_summary.setVisible(False)
+            self.review_note.setText(rm.RANK_ONLY_NOTE)
         self._unfix()
 
     def _stale_registered_result(self) -> None:
@@ -1039,6 +1047,7 @@ class ResearchTuningPanel(QWidget):
             self.rank_items[record] = rank
         old = self._tables.pop("records", None)
         if old is not None:
+            old.hide()  # never a stray window
             old.setParent(None)
             old.deleteLater()
         self._tables["records"] = table
@@ -1762,7 +1771,8 @@ class ResearchTuningPanel(QWidget):
         self.cancel_button.setEnabled(self._active in ("fit", "registered_fit", "stability"))
         self.use_registered_button.setEnabled(not running)
         self.registered_form.setEnabled(not running)
-        self.review_button.setEnabled(not running and self.registered is not None)
+        if self.reg_fields:
+            self.review_button.setEnabled(not running and self.registered is not None)
         self.run_button.setText("Run research fit..." if self.registered is not None else "Run tuning")
         live = self.result is not None and self.result.status != rft.CANCELLED and self.saved_path is None
         self.stability_button.setEnabled(not running and live)

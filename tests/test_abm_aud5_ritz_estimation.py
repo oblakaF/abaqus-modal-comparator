@@ -897,6 +897,19 @@ class _Page(a4._Compared):
         super().setUpClass()
         cls.truth = truth_plate(SQUARE, SQUARE, *SQUARE_TRUTH)
 
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(self.delete_now)  # registered first, so it runs after the window's own deleteLater
+
+    def delete_now(self):
+        """The windows of this test are deleted here, not left for whichever later test first runs an event loop:
+        processEvents() does not run deferred deletions, and a backlog of them holds a later test's loop."""
+        from PySide6.QtCore import QCoreApplication, QEvent
+
+        self.app.processEvents()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.app.processEvents()
+
     def modal_lists(self, frequencies=None):
         hz = self.truth.hz[:self.RECORDS] if frequencies is None else frequencies
         fe = [(FE_FACTOR * float(self.truth.hz[k]), mode_function(self.truth, k)) for k in range(self.RECORDS)]
