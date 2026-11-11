@@ -148,6 +148,7 @@ def _refit(inputs, request, names, x_full, bounds, left_out, counter, cancel) ->
         return {"record": left_out.record, "hz": left_out.hz, "rank": left_out.surrogate_rank, "done": False,
                 "reason": f"{len(fit_rows)} FIT records remain for {len(names)} parameters"}
     problem = rft._Problem(inputs, names, fit_rows, request.degree, cancel, counter)
+    problem.tracked = request.tracked_spectrum  # ABM-AUD-5: a refit follows the same fixed branches as the fit
     fit = rft._solve(problem, x_full, request.search_factor, bounds=bounds)
     if "E1" in names and len(fit["minima"]) == 1:  # the exchanged minimum is looked for, never assumed absent
         mirror = rft._solve(problem, rft._swap(names, fit["minima"][0]["x"]), request.search_factor, bounds=bounds)
@@ -171,7 +172,9 @@ def _refit(inputs, request, names, x_full, bounds, left_out, counter, cancel) ->
     competing = [m for m in minima[1:] if not (mirror and m is minima[1])]
     switched = same is not best
     kept = tuple(o for o in observations if o.role != rft.EXCLUDED) + (left_out,)
-    spectrum = rft._Problem(inputs, names, kept, request.degree, cancel, counter).spectrum(x)
+    whole = rft._Problem(inputs, names, kept, request.degree, cancel, counter)
+    whole.tracked = request.tracked_spectrum
+    spectrum = whole.spectrum(x)
 
     def ln(o):
         return math.log(float(spectrum[o.surrogate_rank - 1]) / o.hz)

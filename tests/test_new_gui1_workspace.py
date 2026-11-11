@@ -375,9 +375,9 @@ class SeparationTests(unittest.TestCase):
                          "materials_workspace_model.py": {"odb_import_service"},
                          "analyze_summary.py": set(), "mac_points_panel.py": set(), "materials_workspace.py": set(),
                          "review_model.py": set(), "review_panel.py": set(),
-                         "research_tuning_model.py": {"modal_data_viewer", "research_frequency_tuning",
+                         "research_tuning_model.py": {"modal_data_viewer", "registered_ritz_estimation", "research_frequency_tuning",
                                                       "solid_c3d8i_forward", "solid_c3d8i_model", "solid_forward_runner"},
-                         "research_tuning_panel.py": {"research_frequency_stability", "research_frequency_tuning",
+                         "research_tuning_panel.py": {"registered_ritz_estimation", "research_frequency_stability", "research_frequency_tuning",
                                                       "solid_forward_runner"}}
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):

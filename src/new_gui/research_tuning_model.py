@@ -22,6 +22,7 @@ from new_gui import analyze_model as am
 from new_gui import preview_model as pm
 from new_gui.workspace_state import EXPERIMENTAL, FE
 from services import modal_data_viewer as viewer
+from services import registered_ritz_estimation as rre
 from services import research_frequency_tuning as rft
 
 LABEL = rft.RESULT_LABEL
@@ -327,6 +328,8 @@ def frequency_rows(result: rft.TuningResult) -> tuple:
 
 FREQUENCY_HEADERS = ("EXP record", "Role", "Surrogate rank", "EXP (Hz)", "Ritz at INP values (Hz)", "Error before",
                      "Ritz at fitted values (Hz)", "Error after")
+REGISTERED_FREQUENCY_HEADERS = ("EXP record", "Role", "Fixed Ritz rank (at the reference)", "EXP (Hz)",
+                                "Ritz at reference values (Hz)", "Error before", "Ritz at fitted values (Hz)", "Error after")
 
 
 def candidate_rows(result: rft.TuningResult) -> tuple:
@@ -561,7 +564,8 @@ def assessment_rows(stability: dict) -> tuple:
     return tuple(rows)
 
 
-def error_plot(result: rft.TuningResult, width: int = 900, height: int = 420, scale: float = 1.0) -> Optional[bytes]:
+def error_plot(result: rft.TuningResult, width: int = 900, height: int = 420, scale: float = 1.0,
+               before: str = "Ritz at INP values") -> Optional[bytes]:
     rows = [r for r in result.rows if r["role"] != rft.EXCLUDED and r["ln_after"] is not None]
     if not rows:
         return None
@@ -573,7 +577,7 @@ def error_plot(result: rft.TuningResult, width: int = 900, height: int = 420, sc
     for index, r in enumerate(rows):
         if r["role"] == rft.HOLDOUT:
             axis.axvspan(index - 0.5, index + 0.5, color="#fdf3e7", zorder=0, linewidth=0)
-    axis.bar(places - 0.2, before, 0.38, color="#9aa5b1", label="Ritz at INP values")
+    axis.bar(places - 0.2, before, 0.38, color="#9aa5b1", label=before)
     axis.bar(places + 0.2, after, 0.38, color="#2563eb", label="Ritz at fitted values")
     axis.axhline(0.0, color="#3e4c59", linewidth=1.0)
     axis.set_xticks(places, [f"{r['record']}" + ("\nHOLDOUT" if r["role"] == rft.HOLDOUT else "") for r in rows], fontsize=9)
@@ -618,6 +622,309 @@ def open_saved(path) -> tuple:
     except (KeyError, IndexError, TypeError, ValueError, AttributeError) as error:
         raise rft.TuningRefused(f"The export is damaged and cannot be shown ({type(error).__name__}: {error}).") from None
     return result, stability
+
+
+# ================================================================================================ ABM-AUD-5: registered route
+
+REGISTERED_TITLE = "1b. Registered modal set (from the comparison on Analyze), instead of an INP"
+REGISTERED_INTRO = ("Estimates the bending stiffness of a flat rectangular plate from the modal set that the Analyze page "
+                    "compared with a verified or confirmed physical registration. The measured shapes are compared with "
+                    "Kirchhoff-Ritz shapes at the registered points; the fit itself uses frequencies only. Research only: "
+                    "conditional estimates, not material properties and not a production identification.")
+REGISTERED_NONE = ("No registered set. Finish a mode-shape comparison on the Analyze page (with a verified or confirmed "
+                   "registration), then take it here.")
+PLATE_FIELDS = (("length", "Length a (mm)"), ("width", "Width b (mm)"), ("thickness", "Thickness (mm)"), ("mass", "Mass (g)"),
+                ("nu12", "nu12 (held fixed)"))
+CATEGORY_CHOICES = ((rre.MEASURED, "Measured"), (rre.DECLARED, "Declared"), (rre.IMPORTED_FE, "From FE"))  # short: a narrow window
+CATEGORY_NOTE = ("For each value say what it is: Measured (on the plate itself), Declared (an engineering assumption) or "
+                 "From FE (taken from the FE model). The category is shown with every result.")
+AXIS_CHOICES = tuple((axis, axis) for axis in rre.AXES)
+MATERIAL_AXIS_CHOICES = (("", "Not stated"), (rre.AXIS_LENGTH, "Along the length"), (rre.AXIS_WIDTH, "Along the width"))
+LINK_CHECK = "The entered plate is the registered FE body"
+LINK_TEXT = ("By ticking this you state that the plate entered here is the body of the registered FE model, with its length "
+             "and width along the FE axes chosen above and its centre at the centre of the FE model. The program does not "
+             "verify it; without it no Ritz shape is compared with a measured shape.")
+FIX_CHECK = "I fix this correspondence for the fit"
+FIX_TEXT = ("By ticking this you fix the record -> Ritz rank correspondence shown in section 2 for the next fit. It is your "
+            "decision: the program pairs nothing by frequency or by fit, and any later change of a role or rank withdraws "
+            "the fixing.")
+REFERENCE_NOTE = ("Reference constants (MPa): a declared starting picture of the plate for the shape review and for the "
+                  "comparison column. They set neither the start nor the bounds of the fit. With a stated material axis 1, "
+                  "E1 is along that axis; otherwise E1 is along the length.")
+REVIEW_NOTE = ("MAC of every record (row) against every Ritz mode (column) at the reference constants, on the registered "
+               "measured DOFs. A diagnostic for review: no pair is made from it. Change the roles or declare ranks in "
+               "section 2, then fix the correspondence.")
+RANK_ONLY_NOTE = ("No shape review is in force. A fit started now uses frequency ranks only: an UNVERIFIED CORRESPONDENCE "
+                  "HYPOTHESIS, shown as diagnostic only.")
+PRESENTATION_TEXT = {
+    rre.SUPPORTED_ESTIMATE: "NUMERICALLY SUPPORTED RESEARCH ESTIMATE — conditional on the declared inputs; not a material property.",
+    rre.DIAGNOSTIC_ONLY: "DIAGNOSTIC ONLY — not a supported estimate.",
+    rre.NO_ESTIMATE: "NO ESTIMATE — the optimizer status gives none.",
+}
+REGISTERED_SAVED_NOTE = (" The registration, the comparison and the source files of this saved result were not revalidated: "
+                         "nothing of it is carried into a new calculation.")
+_SET_KEYS = ("modes", "transform", "fe_low", "fe_high", "source", "registration", "pairs")
+
+
+def load_registered(source: dict) -> rre.RegisteredSet:
+    """The registered set of a comparison (``analyze_model.registered_source``); a refusal says what is missing."""
+    return rre.registered_set(**{key: source[key] for key in _SET_KEYS})
+
+
+def registered_identity_rows(rset: rre.RegisteredSet) -> tuple:
+    s, r = rset.source, rset.registration
+    pairs = ", ".join(f"record {record} - FE {mode}" + ("" if mac is None else f" (MAC {mac:.3f})")
+                      for record, mode, mac in rset.pairs) or "none"
+    return (("Experimental file", f"{s.get('experimental_file', '')} ({s.get('experimental_size', 0)} bytes)"),
+            ("SHA-256", str(s.get("experimental_sha256", ""))), ("Modal set", str(s.get("modal_set_title", ""))),
+            ("Records (as read)", ", ".join(f"{record}: {hz:.4f} Hz" for record, hz in rset.records)),
+            ("Measured DOFs", f"{len(rset.labels)} at {rset.point_count} points"),
+            ("Registration", f"{r.get('kind', '')}, hash {str(r.get('registration_hash', ''))[:16]}…"
+                             + (f"; confirmed by {r['confirmed_by']} on {r.get('confirmed_at', '')}; evidence: "
+                                f"{r.get('evidence_location', '')}" if r.get("confirmed_by") else "")),
+            ("Units and measured side", f"FE {r.get('fe_unit') or 'not stated'}, experimental "
+                                        f"{r.get('experimental_unit') or 'not stated'}, measured side "
+                                        f"{r.get('measured_side') or 'not stated'}"),
+            ("FE source", f"package {str(s.get('fe_package_sha256', ''))[:16]}…, geometry "
+                          f"{str(s.get('fe_geometry_sha256', ''))[:16]}…"),
+            ("FE / EXP pairs of the comparison (kept, not used by the fit)", pairs))
+
+
+def fe_extent_mm(rset: rre.RegisteredSet, axis: str) -> Optional[float]:
+    """The FE model's extent along one FE axis in mm, for an explicit import by the user; None when the unit is unknown."""
+    unit = {"mm": 1.0, "m": 1000.0}.get(str(rset.registration.get("fe_unit", "")))
+    if unit is None or axis not in rre.AXES:
+        return None
+    index = rre.AXES.index(axis)
+    return (rset.fe_high[index] - rset.fe_low[index]) * unit
+
+
+def _number(text: str, name: str, problems: list) -> float:
+    try:
+        return float(str(text).strip().replace(",", "."))
+    except ValueError:
+        problems.append(f"{name}: '{str(text).strip()}' is not a number." if str(text).strip() else f"{name} is not entered.")
+        return float("nan")
+
+
+def parse_plate(texts: dict, categories: dict, choices: dict) -> tuple:
+    """(plate or None, problems). ``texts``: the entered fields; ``categories``: the category of each quantity ("" when
+    not stated); ``choices``: length_axis, width_axis, linked, material_axis. Nothing is completed or defaulted."""
+    problems = []
+    values = {key: _number(texts.get(key, ""), caption, problems) for key, caption in PLATE_FIELDS}
+    reference = tuple(_number(texts.get(key, ""), f"Reference {key}", problems) for key in ("E1", "E2", "G12"))
+    if problems:
+        return None, problems
+    plate = rre.Plate(values["length"], values["width"], values["thickness"], values["mass"], values["nu12"],
+                      tuple(categories.get(name, "") for name in rre.INPUT_NAMES), str(texts.get("source", "")).strip(),
+                      choices.get("length_axis", ""), choices.get("width_axis", ""), bool(choices.get("linked")),
+                      choices.get("material_axis", ""), str(texts.get("axis_evidence", "")).strip(),
+                      str(texts.get("suspension", "")).strip(), reference)
+    problems = rre.plate_problems(plate)
+    return (None if problems else plate), problems
+
+
+def review_headers(review: dict) -> tuple:
+    return ("EXP record", "EXP (Hz)") + tuple(f"Ritz {rank}\n{hz:.2f} Hz" for rank, hz in zip(review["ranks"], review["ritz_hz"]))
+
+
+def review_rows(review: dict) -> tuple:
+    return tuple((str(record), f"{hz:.4f}") + tuple(f"{value:.3f}" for value in row)
+                 for (record, hz), row in zip(review["records"], review["mac"]))
+
+
+CORRESPONDENCE_HEADERS = ("EXP record", "EXP (Hz)", "Role", "Fixed Ritz rank", "Ritz (Hz)", "MAC with it",
+                          "Most alike Ritz mode", "Shape verdict", "FE pair of the comparison")
+VERDICT_TEXT = {rre.AGREES: "agrees", rre.UNCERTAIN: "UNCERTAIN: close Ritz modes", rre.CONTRADICTS: "CONTRADICTS",
+                rre.NOT_COMPARED: "—"}
+
+
+def correspondence_table_rows(table: dict) -> tuple:
+    rows = []
+    for r in table["rows"]:
+        compared = r.get("compared_rank")
+        fixed = "—" if r["rank"] is None else str(r["rank"]) + (
+            f" (rank {compared} at these values)" if compared not in (None, r["rank"]) else "")
+        pair = "—" if not r.get("fe_pair") else f"FE {r['fe_pair'][0]}" + (
+            "" if r["fe_pair"][1] is None else f" (MAC {r['fe_pair'][1]:.3f})")
+        rows.append((str(r["record"]), f"{r['hz']:.4f}", r["role"], fixed,
+                     "—" if r["ritz_hz"] is None else f"{r['ritz_hz']:.3f}", "—" if r["mac"] is None else f"{r['mac']:.3f}",
+                     "—" if r["best_rank"] is None else f"rank {r['best_rank']} (MAC {r['best_mac']:.3f})",
+                     VERDICT_TEXT.get(r["verdict"], r["verdict"]), pair))
+    return tuple(rows)
+
+
+GROUP_HEADERS = ("Close Ritz modes", "Records fixed into the group: individual MAC", "Subspace MAC (group, not an identity)")
+
+
+def group_rows(table: dict) -> tuple:
+    rows = []
+    for g in table["groups"]:
+        name = ", ".join(f"rank {rank} ({hz:.2f} Hz)" for rank, hz in zip(g["ranks"], g["ritz_hz"]))
+        if g.get("exactly_degenerate"):
+            name += " — exactly degenerate: the individual shapes are not defined"
+        individual = "; ".join(f"record {record} with rank {rank}: {mac:.3f}" for record, rank, mac in g["individual"]) or "none"
+        subspace = (f"{g['subspace_mac']:.3f} — " if g.get("subspace_mac") is not None else "") + g.get("subspace_note", "")
+        rows.append((name, individual, subspace))
+    return tuple(rows)
+
+
+def correspondence_summary_text(table: dict) -> str:
+    parts = []
+    if table["contradicting"]:
+        parts.append("FIT record(s) " + ", ".join(map(str, table["contradicting"])) + " CONTRADICT their fixed Ritz mode by "
+                     "shape.")
+    if table["uncertain"]:
+        parts.append("FIT record(s) " + ", ".join(map(str, table["uncertain"])) + " lie among close Ritz modes: their "
+                     "individual identity is not established.")
+    if table["holdout_not_agreeing"]:
+        parts.append("HOLDOUT record(s) " + ", ".join(map(str, table["holdout_not_agreeing"])) + " do not agree by shape "
+                     "(they are predicted, not fitted).")
+    if not table["contradicting"] and not table["uncertain"]:
+        parts.insert(0, "Every FIT record agrees by shape with the Ritz mode it is fixed to.")
+    return " ".join(parts)
+
+
+BRANCH_HEADERS = ("EXP record", "Role", "Ritz rank at the reference", "Rank at the fitted values", "Fitted Ritz (Hz)",
+                  "MAC to the reference mode", "Lowest step MAC on the path", "Branch", "Note")
+
+
+def branch_rows(block: dict) -> tuple:
+    return tuple((str(r["record"]), r["role"], str(r["reference_rank"]), str(r["fitted_rank"]), f"{r['fitted_hz']:.3f}",
+                  f"{r['mac_to_reference']:.3f}", f"{r['lowest_step_mac']:.3f}", r["status"],
+                  r["note"] + (f" Close Ritz modes at the fitted values: ranks {', '.join(map(str, r['close_group']))}."
+                               if r.get("close_group") else ""))
+                 for r in block["branch"]["rows"])
+
+
+STIFFNESS_HEADERS = ("Bending stiffness", "Value (N m)", "Category")
+
+
+def stiffness_rows(block: dict) -> tuple:
+    s, verdict = block["stiffness"], block["presentation"]["verdict"]
+    if verdict == rre.NO_ESTIMATE:
+        return ()
+    category = rre.ESTIMATE if verdict == rre.SUPPORTED_ESTIMATE else "DIAGNOSTIC ONLY"
+    if s["alternatives"]:
+        rows = []
+        for a in s["alternatives"]:
+            rows += [(f"{a['alternative']}: D11 (x = {s['frame']['x']})", f"{a['D11']:.4f}", category + ", ALTERNATIVE"),
+                     (f"{a['alternative']}: D22 (y = {s['frame']['y']})", f"{a['D22']:.4f}", category + ", ALTERNATIVE"),
+                     (f"{a['alternative']}: D66", f"{a['D66']:.4f}", category + ", ALTERNATIVE")]
+        return tuple(rows)
+    v = s["values"]
+    return ((f"D11 (bending, x = {s['frame']['x']})", f"{v['D11']:.4f}", category),
+            (f"D22 (bending, y = {s['frame']['y']})", f"{v['D22']:.4f}", category),
+            ("D66 (twisting)", f"{v['D66']:.4f}", category),
+            ("D12 (coupling)", f"{v['D12']:.4f}", "FIXED RELATION: " + s["D12_note"]))
+
+
+CONSTANT_HEADERS = ("Quantity", "Value", "Category")
+CONSTANT_KIND_TEXT = {"CONDITIONAL_ENGINEERING_CONSTANTS": "CONDITIONAL RESEARCH ESTIMATE",
+                      "AXIS_FREE_VALUES": "RESEARCH ESTIMATE WITHOUT A MATERIAL AXIS", "DIAGNOSTIC_ONLY_VALUES": "DIAGNOSTIC ONLY"}
+
+
+def constant_rows(block: dict) -> tuple:
+    c = block["constants"]
+    category = CONSTANT_KIND_TEXT.get(c["kind"], c["kind"])
+    return tuple((name, f"{value:.0f} MPa ({value / 1000.0:.3f} GPa)" if isinstance(value, (int, float)) else str(value),
+                  category if isinstance(value, (int, float)) else "NOTE") for name, value in c["rows"])
+
+
+def constants_note(block: dict) -> str:
+    c = block["constants"]
+    if c["kind"] == "CONDITIONAL_ENGINEERING_CONSTANTS":
+        return (f"Conditional on: {c['conditions']}. Material axis 1 as declared (evidence: {c.get('axis_evidence', '')}). "
+                "Research estimates of the Ritz model, not verified material constants.")
+    lead = {"WITHHELD": "No engineering constant is given.",
+            "AXIS_FREE_VALUES": "E1 and E2 are not named.",
+            "DIAGNOSTIC_ONLY_VALUES": "DIAGNOSTIC ONLY: these numbers are not usable estimates, and E1 / E2 are not named."}
+    return lead.get(c["kind"], "") + " " + " ".join(c["reasons"]) + f" Conditional on: {c['conditions']}."
+
+
+def statement_rows(block: dict) -> tuple:
+    return tuple(tuple(row) for row in block.get("statements", ()))
+
+
+def presentation_text(block: dict) -> str:
+    p = block["presentation"]
+    return PRESENTATION_TEXT.get(p["verdict"], p["verdict"]) + ((" Reasons: " + " ".join(p["reasons"])) if p["reasons"] else "")
+
+
+def frame_rows(block_or_review: dict) -> tuple:
+    return tuple(tuple(line) for line in block_or_review.get("frame") or ())
+
+
+def confirmation_text(rset: rre.RegisteredSet, plate: rre.Plate, request: rft.TuningRequest, reviewed: bool,
+                      table: Optional[dict]) -> str:
+    """What the user confirms before a fit starts: every input and assumption of this one calculation."""
+    categories = dict(zip(rre.INPUT_NAMES, plate.categories))
+    lines = ["Run ONE bounded research fit of the Ritz model?", "",
+             f"Registered modal set: {rset.source.get('experimental_file', '')}, SHA-256 "
+             f"{str(rset.source.get('experimental_sha256', ''))[:16]}…, {rset.source.get('modal_set_title', '')}",
+             f"Registration: {rset.registration.get('kind', '')}, hash {str(rset.registration.get('registration_hash', ''))[:16]}…",
+             "", "Fixed correspondence (" + ("reviewed by shape" if reviewed else "UNVERIFIED frequency-rank hypothesis") + "):"]
+    verdicts = {r["record"]: r["verdict"] for r in (table or {}).get("rows", ())}
+    for o in sorted(request.observations, key=lambda item: item.record):
+        lines.append(f"  record {o.record} ({o.hz:.4f} Hz): {o.role}"
+                     + ("" if o.role == rft.EXCLUDED else f", Ritz rank {o.surrogate_rank}"
+                        + (f", shape {VERDICT_TEXT.get(verdicts[o.record], '')}" if o.record in verdicts else "")))
+    lines += ["", f"Fixed inputs: length {plate.length_mm:g} mm ({categories['length']}), width {plate.width_mm:g} mm "
+                  f"({categories['width']}), thickness {plate.thickness_mm:g} mm ({categories['thickness']}), mass "
+                  f"{plate.mass_g:g} g ({categories['mass']}), nu12 {plate.nu12:g} ({categories['nu12']}).",
+              f"Source of these values: {plate.inputs_source}",
+              "Material axis 1: " + ("not stated (no E1 / E2 will be named)" if not plate.material_axis else
+                                     f"along the {'length' if plate.material_axis == rre.AXIS_LENGTH else 'width'}; "
+                                     f"evidence: {plate.material_axis_evidence}"),
+              f"Fitted: {request.parameterization}. Search bounds: the start scaled from the measured frequencies, divided "
+              f"and multiplied by {request.search_factor:g}. Ritz basis degree {request.degree}.",
+              "", "Model assumptions:"] + [f"  - {text}" for text in rre.ASSUMPTIONS]
+    lines += ["", "Research only: the result is a conditional estimate of this model. It is not a material property, it "
+                  "changes no production status, and this confirmation is not a scientific approval of any value."]
+    return "\n".join(lines)
+
+
+def run_registered(source: dict, rset: rre.RegisteredSet, plate: rre.Plate, request: rft.TuningRequest,
+                   review: Optional[dict], cancel: threading.Event, progress) -> tuple:
+    """(result, block) of ``registered_ritz_estimation.run_estimation``, once both source files are confirmed to be the
+    files that were read and compared. A changed file is a refusal: nothing is fitted on other data."""
+    try:
+        am.confirm_sources(source["inputs"], cancel)
+    except am.StepCancelled:
+        return rft._cancelled(rre.plate_inputs(plate), request, rft.PARAMETERIZATIONS[request.parameterization]), None
+    except am.StepFailed as error:
+        raise ReadFailed(f"Not started: a source file changed after the comparison. {error}") from error
+    return rre.run_estimation(rset, plate, request, review, cancel, progress)
+
+
+def sources_unchanged(source: dict) -> str:
+    """"" when both source files are still the files that were read, otherwise the reason."""
+    try:
+        am.confirm_sources(source["inputs"], threading.Event())
+    except (am.StepFailed, am.StepCancelled) as error:
+        return str(error) or "the source files could not be confirmed"
+    return ""
+
+
+def open_saved_registered(path) -> tuple:
+    """(result, stability, block): ``open_saved`` and, when the export holds one, its registered-estimation part with the
+    presentation computed again from the saved facts. ``block`` is None for an export of the INP route."""
+    result, stability = open_saved(path)
+    block = rre.block_from_export(rft.read_export(path), result)
+    if block is not None:
+        try:
+            for rows in (stiffness_rows, constant_rows, statement_rows, branch_rows, frame_rows):
+                rows(block)
+            constants_note(block), presentation_text(block)
+            for key in ("reference", "fitted"):
+                table = block["correspondence"].get(key)
+                if table:
+                    correspondence_table_rows(table), group_rows(table), correspondence_summary_text(table)
+            if block.get("review"):
+                review_headers(block["review"]), review_rows(block["review"])
+        except (KeyError, IndexError, TypeError, ValueError, AttributeError) as error:
+            raise rft.TuningRefused(f"The export is damaged and cannot be shown ({type(error).__name__}: {error}).") from None
+    return result, stability, block
 
 
 # ================================================================================================ ABM-SOLID-5: solid mode
@@ -1006,7 +1313,13 @@ def whatif_diagnostic_rows(outcome) -> tuple:
     return tuple(rows)
 
 
-__all__ = ["CORRESPONDENCE_HINT", "STALE_TEXT", "candidate_headers", "candidate_note", "correspondence_preview",
+__all__ = ["BRANCH_HEADERS", "CATEGORY_CHOICES", "CONSTANT_HEADERS", "CORRESPONDENCE_HEADERS", "FIX_CHECK", "FIX_TEXT", "GROUP_HEADERS",
+           "LINK_CHECK", "LINK_TEXT", "PLATE_FIELDS", "REGISTERED_FREQUENCY_HEADERS", "REGISTERED_INTRO", "REGISTERED_NONE",
+           "REGISTERED_TITLE", "STIFFNESS_HEADERS", "branch_rows", "confirmation_text", "constant_rows", "constants_note",
+           "correspondence_summary_text", "correspondence_table_rows", "fe_extent_mm", "frame_rows", "group_rows",
+           "load_registered", "open_saved_registered", "parse_plate", "presentation_text", "registered_identity_rows",
+           "review_headers", "review_rows", "run_registered", "sources_unchanged", "statement_rows", "stiffness_rows",
+           "CORRESPONDENCE_HINT", "STALE_TEXT", "candidate_headers", "candidate_note", "correspondence_preview",
            "correspondence_rows", "estimate_headers", "fit_quality_rows", "headline", "quality_of",
            "ANALYZE_NOTE", "check_model", "compatibility_notes", "compatibility_rows", "LABEL", "ReadFailed", "SAVED_NOTE", "Sources", "candidate_rows", "open_saved", "default_holdout", "diagnostic_rows", "error_plot",
            "frequency_rows", "input_rows", "minima_rows", "parse_declared", "read_sources", "sensitivity_rows",

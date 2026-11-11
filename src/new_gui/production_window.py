@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QFrame, QH
                                QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QTabBar, QVBoxLayout, QWidget)
 
 from new_gui import APP_NAME
+from new_gui import analyze_model as am
 from new_gui.analyze_panel import (AnalyzePanel, CLOSE_PROJECT, OPEN_PROJECT, RUNNING, SAVE_PROJECT, SAVE_PROJECT_AS,
                                    SNAPSHOT_BADGE, SUBTITLE as ANALYZE_SUBTITLE)
 from new_gui.mac_points_panel import MacPointsPanel
@@ -85,7 +86,7 @@ class ProductionWindow(QMainWindow):
         self.review = ReviewPanel(self.analyze)
         self.mac_points = MacPointsPanel(self.analyze)
         self.materials_workspace = MaterialsWorkspace(self.analyze, self.materials)
-        self.research_tuning = ResearchTuningPanel()
+        self.research_tuning = ResearchTuningPanel(registered_source=self._registered_source)  # ABM-AUD-5
         self.analyze.route_project = self._route_project
         central = QWidget()
         root = QHBoxLayout(central)
@@ -198,7 +199,18 @@ class ProductionWindow(QMainWindow):
             self.show_page(REVIEW_PAGE)
         self.mac_points.refresh_evidence()
 
+    def _registered_source(self) -> dict:
+        """ABM-AUD-5: the validated source and registration of the comparison shown on Analyze, for Research Tuning.
+        A saved snapshot gives none: its registration and comparison are not carried into a new calculation."""
+        panel = self.analyze
+        if panel.snapshot is not None:
+            return am.registered_source(None, None, ap.KIND_NONE)  # raises with the reason
+        reference = panel.registration_ref
+        return am.registered_source(panel.inputs, panel.analysis, panel.registration_kind(),
+                                    None if reference is None else reference.document)
+
     def _project_changed(self) -> None:
+        self.research_tuning.analysis_changed()  # a registered set lives only as long as its comparison is shown
         panel = self.analyze
         for key in ("save", "save_as"):
             self.project_actions[key].setEnabled(panel.can_save())

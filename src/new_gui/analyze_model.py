@@ -480,7 +480,65 @@ def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional
                     compared.result if compared is not None else None)
 
 
-__all__ = ["Analysis", "Inputs", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse", "consent_text",
+REGISTERED_NEEDS = ("A registered modal set needs a mode-shape comparison made in this session with a verified or a "
+                    "confirmed physical registration.")
+
+
+def registered_source(inputs: Optional[Inputs], analysis: Optional[Analysis], kind: str,
+                      confirmation: Optional[dict] = None) -> dict:
+    """ABM-AUD-5: the validated source and registration identity of the comparison shown, for a research estimate.
+
+    Nothing is computed or chosen here: the records are the compared records with their own numbers, the transform is
+    the one the comparator used, and the registration is named by its hash and provenance. ``kind`` is the registration
+    kind of the result (``analysis_project.KIND_*``); ``confirmation`` is the confirmation document that was applied.
+    Raises ``StepFailed`` with the reason when there is no such comparison: no registration, a draft only, a saved
+    snapshot (nothing was read in this session) or FRF peak records."""
+    if analysis is None or inputs is None:
+        raise StepFailed(f"{REGISTERED_NEEDS} There is no analysis of files read in this session (a saved result is a "
+                         "snapshot: check its source files and compare again).")
+    if analysis.registration_outcome == PROVISIONAL:
+        raise StepFailed("The chosen modal set holds FRF peak records without validated modal fitting; they are not "
+                         "eligible for an estimate.")
+    result = analysis.comparison_result
+    if analysis.comparison is None or result is None:
+        reason = f" The reason given: {analysis.registration_reason}" if analysis.registration_reason else ""
+        raise StepFailed(f"REGISTRATION_REQUIRED. {REGISTERED_NEEDS} A frequency comparison holds no mode pair, and a "
+                         f"registration draft is not a confirmed registration.{reason}")
+    chosen = inputs.experimental.sets[analysis.set_index]
+    metadata = result.metadata
+    provenance = dict(metadata.get("user_confirmed_registration") or metadata.get("geometry_verified_registration") or {})
+    calibration = dict(metadata.get("geometry_calibration") or {})
+    evidence = ((confirmation or {}).get("draft") or {}).get("evidence") or {}
+    hashes = _source_hashes(inputs)
+    coordinates = inputs.full_fe.dataset.modes[0].coordinates  # (nodes, 3), FE units
+    experimental = inputs.identities["experimental"]
+    return {
+        "inputs": inputs, "analysis": analysis,
+        "modes": tuple(chosen.dataset.modes),
+        "transform": dict(metadata.get("selected_geometry_transform") or {}),
+        "fe_low": tuple(coordinates.min(axis=0).tolist()), "fe_high": tuple(coordinates.max(axis=0).tolist()),
+        "source": {"experimental_file": Path(inputs.full_experimental.source_path).name,
+                   "experimental_sha256": experimental["sha256"], "experimental_size": experimental["size"],
+                   "modal_set_key": chosen.key, "modal_set_title": analysis.set_title,
+                   "fe_manifest_sha256": hashes["fe"]["manifest_sha256"],
+                   "fe_package_sha256": hashes["fe"]["package_sha256"],
+                   "fe_geometry_sha256": provenance.get("fe_geometry_sha256", "")},
+        "registration": {"kind": kind, "status": analysis.status,
+                         "registration_hash": provenance.get("registration_hash", ""),
+                         "source": provenance.get("source", ""), "confirmed_by": provenance.get("confirmed_by", ""),
+                         "confirmed_at": provenance.get("confirmed_at", ""),
+                         "evidence_location": provenance.get("evidence_location", ""),
+                         "confirmation_sha256": provenance.get("confirmation_sha256", ""),
+                         "fe_unit": calibration.get("fe_unit", ""),
+                         "experimental_unit": calibration.get("experimental_unit", ""),
+                         "measured_side": evidence.get("measured_side", ""),
+                         "measured_dofs": list(evidence.get("measured_dofs", ()))},
+        "pairs": tuple((row.experimental_mode, row.abaqus_mode, row.mac) for row in analysis.comparison.pair_rows),
+    }
+
+
+__all__ = ["Analysis", "Inputs", "REGISTERED_NEEDS", "REGISTRATION_REQUIRED", "StepCancelled", "StepFailed", "analyse",
+           "consent_text", "registered_source",
            "confirm_registration", "confirm_sources", "extract", "open_confirmation", "open_registration_draft", "propose_registration", "registration_coverage", "registration_geometry",
            "save_registration_draft", "file_problem", "find_package", "make_plan", "package_folder", "plan_warnings",
            "read_inputs", "scoped_experimental", "scoped_fe", "scoped_inputs"]

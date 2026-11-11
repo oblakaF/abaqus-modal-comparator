@@ -463,10 +463,14 @@ class Surrogate:
     degree: int = 14
     mode_count: int = 24
 
-    def frequencies(self, E1: float, E2: float, G12: float) -> np.ndarray:
+    def solution(self, E1: float, E2: float, G12: float):
+        """The Ritz solve itself (frequencies and shapes), for a caller that follows branches by shape (ABM-AUD-5)."""
         config = RitzNumericalConfig(self.degree, self.degree, self.mode_count)
         stiffness = bending_stiffness(E1, E2, self.inputs.nu12, G12, self.inputs.thickness_mm)
-        return np.asarray(solve_ritz(self.inputs.geometry(), stiffness, config).frequencies_hz, dtype=float)
+        return solve_ritz(self.inputs.geometry(), stiffness, config)
+
+    def frequencies(self, E1: float, E2: float, G12: float) -> np.ndarray:
+        return np.asarray(self.solution(E1, E2, G12).frequencies_hz, dtype=float)
 
 
 def surrogate_discrepancy(surrogate: Surrogate, fe_elastic) -> tuple:
@@ -495,6 +499,10 @@ class TuningRequest:
     correspondence: str = RANK_ORDER
     search_factor: float = 10.0  # bounds: the data-scaled start divided and multiplied by this factor
     degree: int = 14
+    # ABM-AUD-5, optional: (surrogate, E1, E2, G12) -> frequencies in which place rank - 1 holds the frequency of the
+    # BRANCH that was fixed as that rank (followed by Ritz shape), not of whatever mode has that rank now. Without it
+    # the spectrum is the ascending one, as before. It is no part of the request's identity or of its saved form.
+    tracked_spectrum: Optional[Callable] = field(default=None, compare=False, repr=False)
 
     def fit_rows(self) -> tuple:
         return tuple(o for o in self.observations if o.role == FIT)
@@ -645,10 +653,11 @@ class _Cancelled(Exception):
 class _Problem:
     """One surrogate, one parameterization, one set of FIT rows: the spectrum, the residuals and their Jacobian."""
 
-    def __init__(self, inputs, names, rows, degree, cancel, progress):
+    def __init__(self, inputs, names, rows, degree, cancel, progress, tracked=None):
         top = max(o.surrogate_rank for o in rows)
         self.surrogate = Surrogate(inputs, degree, max(top + 4, 12))
         self.inputs, self.names, self.rows, self.cancel, self.progress = inputs, names, rows, cancel, progress
+        self.tracked = tracked  # ABM-AUD-5: TuningRequest.tracked_spectrum, or None for the ascending spectrum
         self.count = 0
 
     def spectrum(self, x: np.ndarray) -> np.ndarray:
@@ -658,6 +667,8 @@ class _Problem:
         if self.progress is not None:
             self.progress(self.count)
         moduli = _moduli(self.names, np.exp(x), self.inputs)
+        if self.tracked is not None:
+            return np.asarray(self.tracked(self.surrogate, moduli["E1"], moduli["E2"], moduli["G12"]), dtype=float)
         return self.surrogate.frequencies(moduli["E1"], moduli["E2"], moduli["G12"])
 
     def residual(self, x, rows=None):
@@ -872,8 +883,8 @@ def run_tuning(inputs: AbaqusPlateInputs, request: TuningRequest, fe_elastic=(),
     if not request.search_factor > 1.0:
         raise TuningRefused("The search range factor must exceed 1.")
     kept = tuple(o for o in request.observations if o.role != EXCLUDED)
-    problem = _Problem(inputs, names, fit_rows, request.degree, cancel, progress)
-    all_rows = _Problem(inputs, names, kept, request.degree, cancel, None)
+    problem = _Problem(inputs, names, fit_rows, request.degree, cancel, progress, request.tracked_spectrum)
+    all_rows = _Problem(inputs, names, kept, request.degree, cancel, None, request.tracked_spectrum)
     base_values = {"E": inputs.E1, "E1": inputs.E1, "E2": inputs.E2, "G12": inputs.G12}
     base = np.array([math.log(base_values[n]) for n in names])
     try:
@@ -1024,7 +1035,7 @@ def _first_mode_check(inputs, request, names, x, cancel) -> dict:
     fit_rows = tuple(o for o in observations if o.role == FIT)
     if len(fit_rows) <= len(names):
         return {"done": False, "reason": "too few FIT records without it", **origin}
-    problem = _Problem(inputs, names, fit_rows, request.degree, cancel, None)
+    problem = _Problem(inputs, names, fit_rows, request.degree, cancel, None, request.tracked_spectrum)
     fit = _solve(problem, x, request.search_factor)
     candidates = [m for m in fit["minima"]]
     nearest = min(candidates, key=lambda m: float(np.max(np.abs(m["x"] - x))))
@@ -1081,8 +1092,11 @@ def export_document(result: TuningResult, inputs: AbaqusPlateInputs, sources: Ma
     document["validity"] = dict(result.validity or VALIDITY)
     document["sources"] = dict(sources)
     document["stability"] = dict(stability) if stability else None
-    document["abaqus_elastic_candidate"] = abaqus_elastic_line(inputs, result.candidate) if presentation == PROPOSAL else None
+    declared = not inputs.inp_path  # ABM-AUD-5: a plate declared by the user has no INP whose *Elastic could be rewritten
+    document["abaqus_elastic_candidate"] = (abaqus_elastic_line(inputs, result.candidate)
+                                            if presentation == PROPOSAL and not declared else None)
     document["abaqus_elastic_candidate_withheld"] = (
+        "No INP: the model inputs were declared by the user, so there is no *Elastic block to rewrite." if declared else
         None if presentation == PROPOSAL else
         f"No oriented candidate: the optimizer status is {result.status}." if presentation == NO_CANDIDATE else
         "Withheld: " + quality["statement"] + " The numbers under 'candidate' are DIAGNOSTIC_ONLY.")
