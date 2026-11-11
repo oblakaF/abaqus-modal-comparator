@@ -170,6 +170,9 @@ class ResearchTuningPanel(QWidget):
         self._ask_path = ask_path or self._dialog_path
         self._ask_save = ask_save or self._dialog_save
         self._ask_confirm = ask_confirm or self._dialog_confirm
+        self._ask_save_summary = self._dialog_save_summary  # ABM-AUD-6; replaced in tests
+        self.uncertainty: Optional[dict] = None  # the input assessment of the shown registered result, when it was made
+        self.reg_ranges: dict = {}
         self.solid: Optional[rm.SolidSummary] = None  # ABM-SOLID-5: the checked solid model
         self.solid_outcome: Optional[sfr.RunnerOutcome] = None
         self.whatif_outcome: Optional[sfr.RunnerOutcome] = None  # ABM-SOLID-6
@@ -522,6 +525,10 @@ class ResearchTuningPanel(QWidget):
         self.export_button.setObjectName("tuningExport")
         self.export_button.clicked.connect(lambda: self.export())
         row.addWidget(self.export_button)
+        self.summary_button = QPushButton("Export readable summary (.txt)...")  # ABM-AUD-6: a registered result only
+        self.summary_button.setObjectName("tuningExportSummary")
+        self.summary_button.clicked.connect(lambda: self.export_summary())
+        row.addWidget(self.summary_button)
         row.addStretch(1)
         inner.addLayout(row)
         self.export_note = _label("", "hint")
@@ -582,6 +589,30 @@ class ResearchTuningPanel(QWidget):
             self.reg_fields[key], self.reg_categories[key] = field, choice
         form.addLayout(grid)
         self._line(form, "source", "Source of these values (for example the measurement sheet)")
+        form.addWidget(_label(rm.RANGES_TITLE, "sectionTitle"))
+        form.addWidget(_label(rm.RANGES_NOTE, "hint"))
+        ranges = QGridLayout()
+        ranges.setColumnMinimumWidth(0, 130)
+        ranges.setColumnStretch(3, 1)
+        ranges.addWidget(_label("lowest"), 0, 1)
+        ranges.addWidget(_label("highest"), 0, 2)
+        for line, (key, caption) in enumerate(rm.PLATE_FIELDS, start=1):
+            ranges.addWidget(_label(caption), line, 0)
+            for column, end in enumerate(("low", "high"), start=1):
+                field = QLineEdit()
+                field.setObjectName(f"reg_{end}_{key}")
+                field.setAccessibleName(f"{caption}: {'lowest' if end == 'low' else 'highest'} value")
+                field.setPlaceholderText("not stated")
+                field.setMinimumWidth(70)
+                field.setMaximumWidth(160)
+                field.textChanged.connect(lambda _t: self._ranges_changed())
+                ranges.addWidget(field, line, column)
+                self.reg_ranges[f"{end}_{key}"] = field
+        form.addLayout(ranges)
+        self.ranges_check = _label("", "warnings")
+        self.ranges_check.setObjectName("tuningRangesCheck")
+        self.ranges_check.setVisible(False)
+        form.addWidget(self.ranges_check)
         self._line(form, "suspension", "Support note, optional (the model is free on all edges)")
         form.addWidget(_label("Position in the registered FE frame", "sectionTitle"))
         axes = QGridLayout()
@@ -679,13 +710,29 @@ class ResearchTuningPanel(QWidget):
         self.presentation.setObjectName("tuningPresentation")
         inner.addWidget(self.presentation)
         self.registered_result_boxes = {}
-        for key, title in (("reg_statements", "Seven separate statements (none implies another)"),
+        for key, title in (("reg_summary", "Research summary (the details are in the tables below)"),
+                           ("reg_statements", "Seven separate statements (none implies another)"),
                            ("reg_stiffness", "Bending stiffness of the plate (in its edge axes)"),
-                           ("reg_constants", "Engineering constants, conditional")):
+                           ("reg_constants", "Engineering constants, conditional"),
+                           ("reg_unc_inputs", "Input uncertainty: what was stated"),
+                           ("reg_unc_sensitivity", "Local sensitivity of the estimates to each input"),
+                           ("reg_unc_ranges", "Estimates at the ends of the stated ranges (one input at a time)")):
             inner.addWidget(_label(title, "sectionTitle"))
             box = QVBoxLayout()
             inner.addLayout(box)
             self.registered_result_boxes[key] = box
+        self.uncertainty_note = _label(rm.UNCERTAINTY_NONE, "warnings")
+        self.uncertainty_note.setObjectName("tuningUncertaintyNote")
+        self.registered_result_boxes["reg_unc_inputs"].addWidget(_label(rm.UNCERTAINTY_NOTE, "hint"))
+        row = QHBoxLayout()
+        self.uncertainty_button = QPushButton("Assess input sensitivity and ranges")
+        self.uncertainty_button.setObjectName("tuningUncertainty")
+        self.uncertainty_button.setMinimumHeight(32)
+        self.uncertainty_button.clicked.connect(lambda: self.run_uncertainty())
+        row.addWidget(self.uncertainty_button)
+        row.addStretch(1)
+        self.registered_result_boxes["reg_unc_inputs"].addLayout(row)
+        self.registered_result_boxes["reg_unc_inputs"].addWidget(self.uncertainty_note)
         self.stiffness_note = _label("", "hint")
         self.registered_result_boxes["reg_stiffness"].addWidget(self.stiffness_note)
         self.constants_note = _label("", "warnings")
@@ -713,6 +760,12 @@ class ResearchTuningPanel(QWidget):
         choices = {"length_axis": self.reg_axes["length_axis"].value(), "width_axis": self.reg_axes["width_axis"].value(),
                    "linked": self.reg_linked.isChecked(), "material_axis": self.reg_material_axis.value()}
         return rm.parse_plate(texts, categories, choices)
+
+    def set_ranges(self, **values) -> None:
+        """Fill range fields (tests and checks): ``low_length=...``, ``high_length=...`` and so on; "" clears one."""
+        self._build_registered_form()
+        for key, value in values.items():
+            self.reg_ranges[key].setText(value if isinstance(value, str) else f"{value:g}")
 
     def set_plate(self, **values) -> None:
         """Fill the registered form (tests and checks): field texts by key, ``categories`` {name: category},
@@ -996,6 +1049,111 @@ class ResearchTuningPanel(QWidget):
         self._table("reg_reference", boxes["reg_reference"], rm.CORRESPONDENCE_HEADERS,
                     rm.correspondence_table_rows(reference) if reference else (), 8)
         self._table("reg_result_frame", boxes["reg_result_frame"], ("Item", "Value"), rm.frame_rows(block), 1)
+        self._show_uncertainty(self.uncertainty)  # and the summary with it
+
+    # ---------------------------------------------------------------------------------------------- ABM-AUD-6
+
+    def _range_texts(self) -> dict:
+        return {key: field.text() for key, field in self.reg_ranges.items()}
+
+    def _ranges(self) -> tuple:
+        """({input: (low, high)}, problems) of the range fields against the entered plate."""
+        plate, _problems = self._plate()
+        return rm.parse_ranges(self._range_texts(), plate)
+
+    def _ranges_changed(self) -> None:
+        """A range was edited: an assessment made for other ranges is dropped at once; the fit itself is not touched."""
+        if self.registered is None:
+            return
+        _ranges, problems = self._ranges()
+        self.ranges_check.setText("Ranges not usable: " + " ".join(problems) if problems else "")
+        self.ranges_check.setVisible(bool(problems))
+        if self.uncertainty is not None and self.saved_path is None and self._active is None:
+            self._show_uncertainty(None)
+            self.state.setText("The ranges changed: the previous assessment was cleared. Assess again for these ranges.")
+        self._refresh()
+
+    def run_uncertainty(self) -> bool:
+        """The sensitivity of the shown estimate to its inputs and its values over the stated ranges, in the background."""
+        if (self.registered is None or self.block is None or self.result is None or self.saved_path is not None
+                or self._active is not None or self.request is None):
+            return False
+        ranges, problems = self._ranges()
+        if problems:
+            self._say("Not assessed: " + " ".join(problems))
+            return False
+        self._say("")
+        self._show_uncertainty(None)
+        source, rset, plate, review = self.registered_data, self.registered, self._run_plate, self._run_review
+        request, result = self.request, self.result
+        self.state.setText("Assessing the inputs: the same fit is repeated with one input changed at a time...")
+        return self._start("uncertainty", lambda cancel, solved: rm.run_uncertainty(source, rset, plate, request, review,
+                                                                                   result, ranges, cancel, solved))
+
+    def _show_uncertainty(self, uncertainty: Optional[dict]) -> None:
+        self.uncertainty = uncertainty
+        boxes = self.registered_result_boxes
+        if uncertainty:
+            self._table("reg_unc_inputs", boxes["reg_unc_inputs"], rm.UNCERTAINTY_INPUT_HEADERS,
+                        rm.uncertainty_input_rows(uncertainty), 2)
+            self._table("reg_unc_sensitivity", boxes["reg_unc_sensitivity"], rm.SENSITIVITY_HEADERS,
+                        rm.uncertainty_sensitivity_rows(uncertainty), 1)
+            self._table("reg_unc_ranges", boxes["reg_unc_ranges"], rm.RANGE_HEADERS, rm.uncertainty_range_rows(uncertainty), 1)
+        else:
+            for key in ("reg_unc_inputs", "reg_unc_sensitivity", "reg_unc_ranges"):
+                self._table(key, None, (), (), 0)
+        self.uncertainty_note.setText(rm.uncertainty_text(uncertainty))
+        self._show_summary()
+
+    def _show_summary(self) -> None:
+        """The ten-point summary of the shown registered result, from what is on the page now."""
+        self._table("reg_summary", None, (), (), 0)  # the blocks shown before, if any
+        self.summary_labels = []
+        if self.block is None or self.result is None:
+            return
+        frame = QFrame()  # wrapped words, not a table: a table cell would cut every sentence
+        frame.setObjectName("tuning_reg_summary")
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        rows = rm.summary_rows(self.result, self.block, self.stability, self.uncertainty)
+        for index, (title, text) in enumerate(rows, start=1):
+            head, body = _label(title, "sectionTitle"), _label(text)
+            head.setObjectName(f"summaryTitle_{index}")
+            body.setObjectName(f"summaryPoint_{index}")
+            layout.addWidget(head)
+            layout.addWidget(body)
+            self.summary_labels.append((head, body))
+        self._tables["reg_summary"] = frame
+        self.registered_result_boxes["reg_summary"].addWidget(frame)
+
+    def summary_points(self) -> list:
+        """[(point, text)] of the summary as it is shown."""
+        return [(head.text(), body.text()) for head, body in getattr(self, "summary_labels", [])]
+
+    def summary_document(self) -> str:
+        return rm.summary_text(self.result, self.block, self.stability, self.uncertainty,
+                               Path(self.saved_path).name if self.saved_path else "")
+
+    def export_summary(self, path: Optional[str] = None) -> bool:
+        """The readable summary of the shown registered result as a text file. Also for a saved result: it is a rendering
+        of the snapshot and says so; nothing is recalculated."""
+        if self.block is None or self.result is None or self._active not in QUIET_JOBS:
+            return False
+        path = path if path is not None else self._ask_save_summary("registered_ritz_summary.txt")
+        if not path:
+            return False
+        try:
+            Path(path).write_text(self.summary_document(), encoding="utf-8")
+        except Exception as error:  # noqa: BLE001  (a message, never a silent failure of an export)
+            self._say(f"Not exported: {type(error).__name__}: {error}")
+            return False
+        self.export_note.setText(f"Summary exported: {path}")
+        return True
+
+    def _dialog_save_summary(self, start: str) -> str:
+        path, _f = QFileDialog.getSaveFileName(self, "Export readable summary", start, rm.SUMMARY_FILTER)
+        return path
 
     # ---------------------------------------------------------------------------------------------- tables
 
@@ -1194,10 +1352,12 @@ class ResearchTuningPanel(QWidget):
         if index >= 0:  # the setting shown matches the saved result
             self.parameterization.setCurrentIndex(index)
         self.block = block
+        self.uncertainty = (block or {}).get("uncertainty")
         self._show_result(result)
         if stability:
             self._show_stability(stability)
         self.saved_path = str(path)
+        self._show_summary()  # with the stability part and the name of the saved file's snapshot
         self.saved_note.setText(rm.SAVED_NOTE.format(name=Path(path).name)
                                 + (rm.REGISTERED_SAVED_NOTE if block is not None else ""))
         self.saved_note.setVisible(True)
@@ -1241,6 +1401,8 @@ class ResearchTuningPanel(QWidget):
     def _solved(self, token: int, count: int) -> None:
         if token == self._token and self._active in ("fit", "registered_fit"):
             self.state.setText(f"Fitting: {count} surrogate solves...")
+        elif token == self._token and self._active == "uncertainty":
+            self.state.setText(f"Assessing the inputs: {count} surrogate solves in the current refit...")
         elif token == self._token and self._active == "stability":
             self.state.setText(f"Stability check: {count} surrogate solves...")
 
@@ -1278,6 +1440,12 @@ class ResearchTuningPanel(QWidget):
             self._show_result(value)
         elif kind == "review":
             self._show_review(value)
+        elif kind == "uncertainty":
+            if value is None:
+                self.state.setText("Assessment cancelled. No uncertainty result.")
+            else:
+                self._show_uncertainty(value)
+                self.state.setText(f"Inputs assessed: {value['refits']} refits, one input changed at a time.")
         elif kind == "registered_fit":
             result, block = value
             self.block = block
@@ -1305,7 +1473,7 @@ class ResearchTuningPanel(QWidget):
             self._thread.join(timeout)
 
     def cancel(self) -> bool:
-        if self._active not in ("fit", "registered_fit", "stability") or self._cancel is None:
+        if self._active not in ("fit", "registered_fit", "stability", "uncertainty") or self._cancel is None:
             return False
         self._cancel.set()
         self.state.setText("Cancelling after the current surrogate solve...")
@@ -1604,6 +1772,7 @@ class ResearchTuningPanel(QWidget):
         influence = stability["influence"]
         self.influence_note.setText(f"{influence['rank_note']}. {influence['share_note']}.")
         self.influence_note.setVisible(True)
+        self._show_summary()  # ABM-AUD-6: the summary names the stability verdict
         self.state.setText(f"Stability check done: {stability['solves']} surrogate solves.")
 
     def _clear_compatibility(self) -> None:
@@ -1641,6 +1810,10 @@ class ResearchTuningPanel(QWidget):
                     "reg_result_frame"):
             self._table(key, None, (), (), 0)
         self.block = None
+        self.uncertainty = None
+        for key in ("reg_summary", "reg_unc_inputs", "reg_unc_sensitivity", "reg_unc_ranges"):
+            self._table(key, None, (), (), 0)
+        self.uncertainty_note.setText(rm.UNCERTAINTY_NONE)
         self.registered_results.setVisible(False)
         for label in (self.status, self.quality, self.validity, self.reasons, self.accuracy):
             label.setText("")
@@ -1732,8 +1905,9 @@ class ResearchTuningPanel(QWidget):
         if not path:
             return False
         if self.block is not None:
+            block = self.block if self.uncertainty is None else dict(self.block, uncertainty=self.uncertainty)
             try:
-                rft.write_export(rre.export_document(self.result, self.block, self.stability), path)
+                rft.write_export(rre.export_document(self.result, block, self.stability), path)
             except OSError as error:
                 self._say(f"Not exported: {error}")
                 return False
@@ -1768,7 +1942,13 @@ class ResearchTuningPanel(QWidget):
                        *getattr(self, "role_combos", {}).values()):  # ABM-AUD-1: no role changes under a running fit
             widget.setEnabled(not running)
         self.run_button.setEnabled(not running and self.sources is not None)
-        self.cancel_button.setEnabled(self._active in ("fit", "registered_fit", "stability"))
+        self.cancel_button.setEnabled(self._active in ("fit", "registered_fit", "stability", "uncertainty"))
+        estimate = (self.block is not None and self.result is not None
+                    and self.result.status in (rft.SUPPORTED, rft.MIRROR))
+        self.uncertainty_button.setEnabled(not running and estimate and self.saved_path is None
+                                           and self.registered is not None and self.request is not None)
+        self.summary_button.setEnabled(not running and self.block is not None and self.result is not None)
+        self.summary_button.setVisible(self.block is not None)
         self.use_registered_button.setEnabled(not running)
         self.registered_form.setEnabled(not running)
         if self.reg_fields:

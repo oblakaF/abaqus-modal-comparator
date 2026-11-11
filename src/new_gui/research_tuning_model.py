@@ -23,6 +23,7 @@ from new_gui import preview_model as pm
 from new_gui.workspace_state import EXPERIMENTAL, FE
 from services import modal_data_viewer as viewer
 from services import registered_ritz_estimation as rre
+from services import registered_ritz_uncertainty as rru
 from services import research_frequency_tuning as rft
 
 LABEL = rft.RESULT_LABEL
@@ -922,9 +923,241 @@ def open_saved_registered(path) -> tuple:
                     correspondence_table_rows(table), group_rows(table), correspondence_summary_text(table)
             if block.get("review"):
                 review_headers(block["review"]), review_rows(block["review"])
+            uncertainty = rru.check(block.get("uncertainty"))
+            if uncertainty:
+                uncertainty_input_rows(uncertainty), uncertainty_sensitivity_rows(uncertainty)
+                uncertainty_range_rows(uncertainty)
+            summary_text(result, block, stability, uncertainty)
         except (KeyError, IndexError, TypeError, ValueError, AttributeError) as error:
             raise rft.TuningRefused(f"The export is damaged and cannot be shown ({type(error).__name__}: {error}).") from None
     return result, stability, block
+
+
+# ================================================================================================ ABM-AUD-6: uncertainty, summary
+
+RANGES_TITLE = "Uncertainty ranges of these inputs (optional)"
+RANGES_NOTE = ("State a lowest and a highest value only where you know them (the same units as above). Nothing is assumed "
+               "for an input left empty: it is shown as NOT_ASSESSED. A range is one input's interval, not a confidence "
+               "interval.")
+UNCERTAINTY_NOTE = ("One input is changed at a time and the same fit is repeated, or the exact scaling of the homogeneous "
+                    "plate is used. The ranges are not combined and give no accuracy of the estimate.")
+UNCERTAINTY_NONE = ("NOT_ASSESSED: the sensitivity and the stated ranges were not calculated for this result. Press "
+                    "\"Assess input sensitivity and ranges\".")
+SUMMARY_FILTER = "Research summary (*.txt)"
+QUANTITY_CAPTIONS = {"D11": "D11", "D22": "D22", "D66": "D66", "E_x": "E along x", "E_y": "E along y", "G12": "G12"}
+INPUT_CAPTIONS = {"length": "Length a", "width": "Width b", "thickness": "Thickness", "mass": "Mass", "nu12": "nu12"}
+
+
+def parse_ranges(texts: dict, plate: Optional[rre.Plate]) -> tuple:
+    """({input: (low, high)}, problems) of the range fields: ``texts`` maps "low_<input>" and "high_<input>" to what
+    was typed. An input with both fields empty has no range; one field alone is a problem. Nothing is defaulted."""
+    ranges, problems = {}, []
+    for name, _attribute, _unit in rru.INPUTS:
+        low, high = str(texts.get(f"low_{name}", "")).strip(), str(texts.get(f"high_{name}", "")).strip()
+        if not low and not high:
+            continue
+        if not low or not high:
+            problems.append(f"{INPUT_CAPTIONS[name]}: enter both the lowest and the highest value, or neither.")
+            continue
+        try:
+            ranges[name] = (float(low.replace(",", ".")), float(high.replace(",", ".")))
+        except ValueError:
+            problems.append(f"{INPUT_CAPTIONS[name]}: '{low}' to '{high}' is not a range of two numbers.")
+    if plate is not None and not problems:
+        problems = rru.range_problems(plate, ranges)
+    return ranges, problems
+
+
+def run_uncertainty(source: dict, rset: rre.RegisteredSet, plate: rre.Plate, request: rft.TuningRequest,
+                    review: Optional[dict], result: rft.TuningResult, ranges: dict, cancel: threading.Event, progress):
+    """``registered_ritz_uncertainty.run_uncertainty`` once the source files are confirmed unchanged; None when cancelled."""
+    try:
+        am.confirm_sources(source["inputs"], cancel)
+    except am.StepCancelled:
+        return None
+    except am.StepFailed as error:
+        raise ReadFailed(f"Not started: a source file changed after the comparison. {error}") from error
+    return rru.run_uncertainty(rset, plate, request, review, result, ranges, cancel, progress)
+
+
+UNCERTAINTY_INPUT_HEADERS = ("Input", "Entered value", "Category", "Stated range", "Range status")
+
+
+def uncertainty_input_rows(uncertainty: dict) -> tuple:
+    rows = []
+    for item in uncertainty["inputs"]:
+        unit = f" {item['unit']}" if item["unit"] else ""
+        stated = "not stated" if item["low"] is None else f"{item['low']:g} to {item['high']:g}{unit}"
+        rows.append((INPUT_CAPTIONS[item["input"]], f"{item['nominal']:g}{unit}", item["category"], stated, item["status"]))
+    return tuple(rows)
+
+
+SENSITIVITY_HEADERS = ("Input", "What is held", "How") + tuple(f"d ln {QUANTITY_CAPTIONS[q]} / d ln input"
+                                                             for q in rru.QUANTITIES)
+
+
+def uncertainty_sensitivity_rows(uncertainty: dict) -> tuple:
+    rows = []
+    for item in uncertainty["sensitivity"]:
+        cells = tuple(f"{item['exponents'][q]:+.3f}" for q in rru.QUANTITIES) if item["status"] == rru.ASSESSED else (
+            (f"NOT_ASSESSED: {item['reason']}",) + ("—",) * (len(rru.QUANTITIES) - 1))
+        rows.append((INPUT_CAPTIONS[item["input"]], item["assumption"], item["method"]) + cells)
+    return tuple(rows)
+
+
+RANGE_HEADERS = ("Input at", "What is held", "How") + tuple(f"{QUANTITY_CAPTIONS[q]} change" for q in rru.QUANTITIES)
+
+
+def uncertainty_range_rows(uncertainty: dict) -> tuple:
+    rows = []
+    for item in uncertainty["ranges"]:
+        unit = f" {item['unit']}" if item["unit"] else ""
+        head = f"{INPUT_CAPTIONS[item['input']]} {item['bound']}: {item['value']:g}{unit}"
+        if item["status"] != rru.ASSESSED:
+            rows.append((head, item["assumption"], item["method"], f"NOT_ASSESSED: {item['reason']}")
+                        + ("—",) * (len(rru.QUANTITIES) - 1))
+            continue
+        note = "" if item.get("presentation") in (None, rre.SUPPORTED_ESTIMATE) else " (that refit is diagnostic only)"
+        rows.append((head, item["assumption"], item["method"] + note)
+                    + tuple(f"{item['change'][q]:+.2%}" for q in rru.QUANTITIES))
+    return tuple(rows)
+
+
+def uncertainty_text(uncertainty: Optional[dict]) -> str:
+    """One paragraph for the summary: what was assessed, the largest one-input change, and what was not assessed."""
+    if not uncertainty:
+        return UNCERTAINTY_NONE
+    stated = [i for i in uncertainty["inputs"] if i["status"] == rru.ASSESSED]
+    missing = [INPUT_CAPTIONS[i["input"]] for i in uncertainty["inputs"] if i["status"] != rru.ASSESSED]
+    parts = []
+    for item in uncertainty["envelope"]:
+        parts.append(f"{INPUT_CAPTIONS[item['input']]} over its stated range ({item['assumption']}): estimates move by up "
+                     f"to {item['largest_change']:.2%}")
+    text = ("; ".join(parts) + ". " if parts else "")
+    text += ("No range stated for: " + ", ".join(missing) + " (NOT_ASSESSED). " if missing else "")
+    if not stated:
+        text = "No input range was stated: every range is NOT_ASSESSED. Local sensitivities are listed below. "
+    exact = "Thickness: E goes as h^-3 with the measured mass held, as h^-2 if the density were held instead; D does not depend on the thickness with the mass held. "
+    return text + exact + uncertainty["statement"]
+
+
+def summary_rows(result: rft.TuningResult, block: dict, stability: Optional[dict] = None,
+                 uncertainty: Optional[dict] = None) -> tuple:
+    """ABM-AUD-6: the ten points of a registered research result, each in a few lines. Words only: every number is
+    taken from the result, its registered part, its stability check and its uncertainty part as they are."""
+    s, r, quality = block["source"], block["registration"], quality_of(result)
+    correspondence, branch = block["correspondence"], block["branch"]
+    reference = correspondence.get("reference") or {}
+    fit_rows = [row for row in result.rows if row["role"] == rft.FIT]
+    holdout_rows = [row for row in result.rows if row["role"] == rft.HOLDOUT]
+    pairs = block.get("fe_pairs") or []
+    macs = [pair[2] for pair in pairs if pair[2] is not None]
+    plate = block["plate"]
+    categories = dict(zip(rre.INPUT_NAMES, plate["categories"]))
+    shaped = correspondence["kind"] == rre.SHAPE_REVIEWED
+    stiffness, constants = block["stiffness"], block["constants"]
+    verdict = block["presentation"]["verdict"]
+    if verdict == rre.NO_ESTIMATE:
+        d_text = "No estimate: " + " ".join(block["presentation"]["reasons"])
+    elif stiffness["alternatives"]:
+        d_text = "Two alternatives, neither chosen: " + "; ".join(
+            f"{a['alternative']}: D11 {a['D11']:.4f}, D22 {a['D22']:.4f}, D66 {a['D66']:.4f} N m" for a in stiffness["alternatives"])
+    else:
+        v = stiffness["values"]
+        d_text = (f"D11 {v['D11']:.4f} (x = {stiffness['frame']['x']}), D22 {v['D22']:.4f} (y = {stiffness['frame']['y']}), "
+                  f"D66 {v['D66']:.4f}, D12 {v['D12']:.4f} N m. D12 is the fixed relation nu12 x D22, not an estimate."
+                  + ("" if verdict == rre.SUPPORTED_ESTIMATE else " DIAGNOSTIC ONLY."))
+    e_text = "; ".join(f"{name}: {value:.0f} MPa" if isinstance(value, (int, float)) else f"{name}: {value}"
+                       for name, value in constants["rows"]) or "none given"
+    e_text = f"{CONSTANT_KIND_TEXT.get(constants['kind'], constants['kind'])}. {e_text}. " + " ".join(constants["reasons"])
+    if stability:
+        numerical = stability["assessment"]["numerical_stability"]
+        stable = (f"Leave-one-out: {numerical['verdict']} ("
+                  + ", ".join(f"{p['parameter']} {p['largest_change_including_the_lowest_cost_minimum']:.2%}"
+                              for p in numerical["parameters"]) + ").")
+    else:
+        stable = "Leave-one-out stability: NOT_ASSESSED (the check was not run for this result)."
+    minima = (f"{len(result.minima)} minimum/minima reached"
+              + ("; two of them with the in-plane moduli exchanged (axis ambiguity, neither chosen)"
+                 if result.status == rft.MIRROR else ""))
+    condition = "—" if result.condition_number is None else f"{result.condition_number:.3g}"
+    return (
+        ("1. Experimental source", f"{s.get('experimental_file', '')}, SHA-256 {s.get('experimental_sha256', '')}; modal set "
+                                   f"{s.get('modal_set_title', '')}; records " + ", ".join(
+                                       f"{record} ({hz:.3f} Hz)" for record, hz in block["records"]) + "."),
+        ("2. Registration", f"{r.get('kind', '')}, hash {r.get('registration_hash', '')}"
+                            + (f"; confirmed by {r['confirmed_by']} on {r.get('confirmed_at', '')}; evidence: "
+                               f"{r.get('evidence_location', '')}" if r.get("confirmed_by") else "")
+                            + ". A confirmation is a person's statement, not an independent proof."),
+        ("3. Mode correspondence and MAC", (f"FE / EXP pairs of the comparison: {len(pairs)}"
+                                           + (f", MAC {min(macs):.3f} to {max(macs):.3f}" if macs else "") + ". "
+                                           + correspondence["statement"] + " "
+                                           + (f"By shape at the reference: {len(reference.get('contradicting', []))} FIT "
+                                              f"record(s) contradict, {len(reference.get('uncertain', []))} are uncertain. "
+                                              if shaped else "")
+                                           + f"Branches: {branch['verdict']}. A MAC shows that shapes are alike on the "
+                                             "measured DOFs only; it identifies no material.")),
+        ("4. FIT / HOLDOUT residuals", f"FIT: {quality.get('verdict')}, RMS {_rms(quality.get('fit_rms_ln'))} (ln f) over "
+                                       f"records {', '.join(str(row['record']) for row in fit_rows) or 'none'}. HOLDOUT (not "
+                                       f"fitted): {quality.get('holdout_verdict')}, RMS {_rms(quality.get('holdout_rms_ln'))} "
+                                       f"over records {', '.join(str(row['record']) for row in holdout_rows) or 'none'}."),
+        ("5. Convergence and identifiability", f"Optimizer {result.status}; practical rank {result.practical_rank} of "
+                                               f"{len(result.parameter_names)}; condition number {condition}; {minima}. "
+                                               + stable),
+        ("6. Bending stiffness (conditional)", d_text),
+        ("7. Engineering constants (conditional)", e_text),
+        ("8. Input uncertainty and sensitivity", "Inputs: " + ", ".join(
+            f"{INPUT_CAPTIONS[name]} {plate[key]:g} ({categories[name]})" for name, key, _u in rru.INPUTS) + ". "
+            + uncertainty_text(uncertainty)),
+        ("9. Assumptions and limitations", " ".join(block["assumptions"]) + " Not quantified: "
+                                           + " ".join(rru.NOT_QUANTIFIED)),
+        ("10. Scientific status", f"{PRESENTATION_TEXT.get(verdict, verdict)} "
+                                  + (" ".join(block["presentation"]["reasons"]) + " " if block["presentation"]["reasons"] else "")
+                                  + "Physical validity: NOT ESTABLISHED. Research only: not a material property, not a "
+                                    "production identification; no production status is changed by this result."),
+    )
+
+
+def _text_table(headers, rows) -> list:
+    rows = [tuple(str(cell).replace("\n", " ") for cell in row) for row in rows]
+    widths = [max(len(str(h).replace("\n", " ")), *(len(row[i]) for row in rows)) if rows else len(str(h))
+              for i, h in enumerate(headers)]
+    line = lambda cells: "  ".join(str(cell).replace("\n", " ").ljust(width) for cell, width in zip(cells, widths)).rstrip()  # noqa: E731
+    return [line(headers), line(["-" * width for width in widths])] + [line(row) for row in rows]
+
+
+def summary_text(result: rft.TuningResult, block: dict, stability: Optional[dict] = None,
+                 uncertainty: Optional[dict] = None, saved_from: str = "") -> str:
+    """The readable research summary of a registered result, as plain text. It is a rendering of the result and of the
+    parts saved with it; nothing is calculated for it."""
+    lines = ["RESEARCH SUMMARY - registered modal data against a Kirchhoff-Ritz plate", "=" * 78, rre.LABEL, rft.RESULT_LABEL, ""]
+    if saved_from:
+        lines += [f"Rendered from the saved result {saved_from}. A saved result is a historical snapshot: its sources and "
+                  "registration were not revalidated and nothing was recalculated.", ""]
+    for title, text in summary_rows(result, block, stability, uncertainty):
+        lines += [title, "    " + text, ""]
+    sections = [("Frequencies: FIT and HOLDOUT", REGISTERED_FREQUENCY_HEADERS, frequency_rows(result)),
+                ("Bending stiffness", STIFFNESS_HEADERS, stiffness_rows(block)),
+                ("Engineering constants", CONSTANT_HEADERS, constant_rows(block)),
+                ("Seven separate statements", ("Statement", "Verdict", "Basis"), statement_rows(block)),
+                ("Fixed branches", BRANCH_HEADERS, branch_rows(block)),
+                ("What is measured, declared, imported, computed and estimated", QUANTITY_HEADERS, quantity_rows(result))]
+    table = block["correspondence"].get("reference")
+    if table:
+        sections.insert(1, ("Fixed correspondence against the reviewed shapes", CORRESPONDENCE_HEADERS,
+                            correspondence_table_rows(table)))
+    if uncertainty:
+        sections += [("Inputs and their stated ranges", UNCERTAINTY_INPUT_HEADERS, uncertainty_input_rows(uncertainty)),
+                     ("Local sensitivity of the estimates", SENSITIVITY_HEADERS, uncertainty_sensitivity_rows(uncertainty)),
+                     ("Estimates at the ends of the stated ranges (one input at a time)", RANGE_HEADERS,
+                      uncertainty_range_rows(uncertainty))]
+    if stability:
+        sections.append(("Leave one FIT record out", stability_headers(stability), stability_rows(stability)))
+    for title, headers, rows in sections:
+        lines += [title, "-" * len(title)] + (_text_table(headers, rows) if rows else ["(none)"]) + [""]
+    lines += ["Not quantified", "--------------"] + [f"- {text}" for text in rru.NOT_QUANTIFIED]
+    lines += ["", "This summary is a research record. It releases no material property and changes no production status."]
+    return "\n".join(lines) + "\n"
 
 
 # ================================================================================================ ABM-SOLID-5: solid mode
@@ -1313,7 +1546,10 @@ def whatif_diagnostic_rows(outcome) -> tuple:
     return tuple(rows)
 
 
-__all__ = ["BRANCH_HEADERS", "CATEGORY_CHOICES", "CONSTANT_HEADERS", "CORRESPONDENCE_HEADERS", "FIX_CHECK", "FIX_TEXT", "GROUP_HEADERS",
+__all__ = ["RANGES_NOTE", "RANGES_TITLE", "RANGE_HEADERS", "SENSITIVITY_HEADERS", "SUMMARY_FILTER", "UNCERTAINTY_INPUT_HEADERS",
+           "UNCERTAINTY_NOTE", "parse_ranges", "run_uncertainty", "summary_rows", "summary_text", "uncertainty_input_rows",
+           "uncertainty_range_rows", "uncertainty_sensitivity_rows", "uncertainty_text",
+           "BRANCH_HEADERS", "CATEGORY_CHOICES", "CONSTANT_HEADERS", "CORRESPONDENCE_HEADERS", "FIX_CHECK", "FIX_TEXT", "GROUP_HEADERS",
            "LINK_CHECK", "LINK_TEXT", "PLATE_FIELDS", "REGISTERED_FREQUENCY_HEADERS", "REGISTERED_INTRO", "REGISTERED_NONE",
            "REGISTERED_TITLE", "STIFFNESS_HEADERS", "branch_rows", "confirmation_text", "constant_rows", "constants_note",
            "correspondence_summary_text", "correspondence_table_rows", "fe_extent_mm", "frame_rows", "group_rows",
