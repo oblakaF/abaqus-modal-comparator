@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 import test_universal_two_file_analysis as base
 import test_working_draft_r2_project as r2
 
-from PySide6.QtCore import QEventLoop, QTimer
+from PySide6.QtCore import QCoreApplication, QEvent, QEventLoop, QObject, QTimer
 
 from domain.plate_inverse_problem import MaterialReleaseRefusal, PlateInverseResult
 from domain.plate_material_problem import EvidenceKind, identity_hash
@@ -640,9 +640,92 @@ class RunControl(_Page):
         self.assertFalse(thread.is_alive())
         self.assertIsNone(panel.record)
 
+    @staticmethod
+    def delete_what_earlier_tests_left():
+        """ABM-AUD-5-F1. The tests of this suite schedule their windows with deleteLater() and run processEvents(), which
+        does not delete them; a QEventLoop.exec() does, all at once. Without this the first nested loop of the process
+        would spend its time deleting the windows of every earlier test. It is called before this test builds its own
+        page and before any worker runs, so it takes nothing away from what is measured."""
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+    def timer_beats(self):
+        """The times of the 5 ms timer beats seen by a nested event loop: it ends after the sixth beat or after 10 s."""
+        beats = []
+        loop = QEventLoop()
+        ticking, limit = QTimer(), QTimer()
+        self.addCleanup(ticking.stop)
+        self.addCleanup(limit.stop)
+
+        def beat():
+            beats.append(time.monotonic())
+            if len(beats) > 5:
+                loop.quit()
+
+        ticking.setInterval(5)
+        ticking.timeout.connect(beat)
+        limit.setSingleShot(True)
+        limit.timeout.connect(loop.quit)
+        limit.start(10000)  # bounded, and shorter than the gate's own limit
+        ticking.start()
+        loop.exec()
+        ticking.stop()
+        limit.stop()
+        return beats
+
+    @staticmethod
+    def largest_gap(beats) -> float:
+        return max(right - left for left, right in zip(beats, beats[1:]))
+
+    def slow_backlog(self, seconds: float):
+        """A controlled backlog: one object scheduled for deletion whose deletion takes ``seconds`` of the GUI thread.
+        Returns the list that receives the time of its deletion."""
+        deleted = []
+        leftover = QObject()
+
+        def slow(*_args):
+            time.sleep(seconds)
+            deleted.append(time.monotonic())
+
+        leftover.destroyed.connect(slow)
+        leftover.deleteLater()
+        self.app.processEvents()  # as the fixtures do: this does not run a deferred deletion
+        self.assertEqual(deleted, [])
+        return deleted
+
+    def test_a_backlog_of_deletions_would_hold_the_nested_loop(self):
+        """The interference itself, on a controlled backlog: left alone, the deletion runs inside the loop that measures."""
+        self.delete_what_earlier_tests_left()  # only the controlled backlog below is left for the loop
+        deleted = self.slow_backlog(2.5)
+        started = time.monotonic()
+        beats = self.timer_beats()
+        self.assertEqual(len(deleted), 1)
+        self.assertGreater(len(beats), 5)
+        self.assertGreater(deleted[0], started)  # it was deleted by the measuring loop
+        self.assertGreater(beats[0] - started, 2.0)  # which the deletion held before its first beat
+
+    def test_the_backlog_is_deleted_before_the_measurement_begins(self):
+        deleted = self.slow_backlog(2.5)
+        self.delete_what_earlier_tests_left()
+        self.assertEqual(len(deleted), 1)  # gone before anything is measured
+        started = time.monotonic()
+        beats = self.timer_beats()
+        self.assertGreater(len(beats), 5)
+        self.assertLess(beats[0] - started, 2.0)
+        self.assertLess(self.largest_gap(beats), 2.0)
+
+    def test_a_blocked_interface_is_still_detected(self):
+        """The measurement keeps its teeth: a GUI thread that is blocked while the beats run shows a gap over the limit,
+        with or without the cleanup before it."""
+        self.delete_what_earlier_tests_left()
+        QTimer.singleShot(20, lambda: time.sleep(2.5))  # the interface blocked for 2.5 s in the middle of the beats
+        beats = self.timer_beats()
+        self.assertGreater(len(beats), 5)
+        self.assertGreaterEqual(self.largest_gap(beats), 2.0)  # the original test's limit would be broken
+
     def test_the_interface_keeps_running_and_results_reach_widgets_on_its_thread(self):
+        self.delete_what_earlier_tests_left()  # ABM-AUD-5-F1: before the page exists and before the worker starts
         _window, panel = self.page()
-        beats, seen = [], []
+        seen = []
         original = panel._show_section
 
         def show(*args):
@@ -651,25 +734,7 @@ class RunControl(_Page):
 
         with mock.patch.object(panel, "_show_section", show):
             gate, _patcher = self.holding(panel)  # the worker stays unfinished until the test lets it go
-            loop = QEventLoop()
-            ticking, limit = QTimer(), QTimer()
-            self.addCleanup(ticking.stop)
-            self.addCleanup(limit.stop)
-
-            def beat():
-                beats.append(time.monotonic())
-                if len(beats) > 5:
-                    loop.quit()
-
-            ticking.setInterval(5)
-            ticking.timeout.connect(beat)
-            limit.setSingleShot(True)
-            limit.timeout.connect(loop.quit)
-            limit.start(10000)  # bounded, and shorter than the gate's own limit
-            ticking.start()
-            loop.exec()
-            ticking.stop()
-            limit.stop()
+            beats = self.timer_beats()
             self.assertGreater(len(beats), 5)  # all of these came while the work was certainly not finished
             self.assertLess(max(right - left for left, right in zip(beats, beats[1:])), 2.0)
             self.assertFalse(gate.go.is_set())
