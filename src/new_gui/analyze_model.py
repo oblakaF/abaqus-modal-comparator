@@ -371,6 +371,7 @@ class Analysis:
     unavailable_fe: tuple = ()  # requested FE mode numbers the results do not hold
     experimental_total: int = 0  # records of the chosen set as read
     comparison_result: Any = field(default=None, compare=False, repr=False)  # the comparator's own result; never saved
+    diagnostic: Any = field(default=None, compare=False, repr=False)  # the frequency diagnostic of this analysis; never saved
 
     @property
     def registration_note(self) -> str:
@@ -477,7 +478,46 @@ def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional
             notes += (reason,)
     return Analysis(status, statement, set_index, view.set_title, fe_rows, experimental, nearest, first_elastic,
                     tuple(sorted(rigid)), tuple(facts), notes, comparison, reason, registration, unavailable, total,
-                    compared.result if compared is not None else None)
+                    compared.result if compared is not None else None, outcome.diagnostic)
+
+
+REPORT_STATEMENT = "REGISTRATION_REQUIRED. MAC NOT COMPUTED. NO VERIFIED MODAL PAIRS."
+REPORT_SNAPSHOT = ("Not available for a saved result: its files were not read in this session. Check source files on "
+                   "the Analyze page, then Analyze, and export the fresh result.")
+REPORT_COMPARED = ("Not available here for a result with mode pairs: this report is the frequency-only diagnostic and "
+                   "would state that no registration exists.")
+REPORT_NOT_READY = "No result of files read in this session."
+
+
+def report_problem(inputs: Optional[Inputs], analysis: Optional[Analysis], snapshot: bool) -> str:
+    """Why the diagnostic report cannot be exported now (empty when it can). A saved snapshot is never exported as live
+    data: nothing of it was read or verified in this session."""
+    if snapshot:
+        return REPORT_SNAPSHOT
+    if inputs is None or analysis is None or analysis.diagnostic is None:
+        return REPORT_NOT_READY
+    if analysis.comparison is not None:
+        return REPORT_COMPARED
+    return ""
+
+
+def export_report(inputs: Inputs, analysis: Analysis, folder, cancel_event=None) -> tuple:
+    """The existing diagnostic report (PDF, Excel) of this analysis, written into ``folder``; returns the two paths.
+
+    Nothing is computed again: the report is built from the frequency diagnostic the analysis kept and the data it
+    read. ``report_export`` confirms first that the FE package and the experimental file still have the identities
+    recorded at the read, and refuses otherwise (``StepFailed``)."""
+    from new_gui import report_export as rx
+
+    problem = report_problem(inputs, analysis, False)
+    if problem:
+        raise StepFailed(problem)
+    reason = analysis.registration_reason or REGISTRATION_TEXT
+    try:
+        return rx.export_diagnostic(inputs.fe, inputs.experimental, analysis.set_index, analysis.diagnostic, reason,
+                                    folder, cancel_event, inputs.identities, statement=REPORT_STATEMENT)
+    except rx.ExportRefused as refusal:
+        raise StepFailed(f"Report not exported: {refusal}") from refusal
 
 
 REGISTERED_NEEDS = ("A registered modal set needs a mode-shape comparison made in this session with a verified or a "

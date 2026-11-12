@@ -6,11 +6,12 @@ placed here. The table's columns are fixed. A row's click shows that row's shape
 
 from __future__ import annotations
 
+import threading
 from typing import Callable, Optional
 
-from PySide6.QtCore import QEvent, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor
-from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMenu, QMessageBox,
+from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMenu, QMessageBox,
                                QPushButton,
                                QScrollArea, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
                                QWidget)
@@ -30,6 +31,10 @@ _FE_COLUMN = 3
 COMPACT_COLUMNS = (1, 2, 3, 4, 5)  # ABM-UX3: EXP mode and frequency, selected FE mode and frequency, Δf
 SHOW_COLUMNS, FEWER_COLUMNS = "Show all columns", "Show fewer columns"
 SAVE_RESULT = "Save result"
+EXPORT_REPORT = "Export report..."
+EXPORT_HINT = ("Writes the frequency-only diagnostic report of this result as PDF and Excel into a folder you choose. "
+               "Nothing is calculated again; the files are checked against what was read.")
+EXPORT_RUNNING = "Writing the report..."
 _SAVE_MESSAGES = ("Saving the project", "Project saved", "Project not saved")  # the panel's own save messages
 PICTURE_IN_VIEW = 120  # pixels of a shape picture that count as "on screen" after a row click
 VISUAL_ORDER = (0, 1, 2, 4, 5, 3, 6, 7)  # ABM-UX5: EXP mode, EXP Hz, FE Hz, Δf, then the FE mode choice; logical columns stay
@@ -95,6 +100,8 @@ def _scrolled(content: QWidget) -> QScrollArea:
 class ReviewPanel(QWidget):
     """``ask_duplicate(text)`` answers SWAP, KEEP or CANCEL; tests replace it, the program asks with a dialog."""
 
+    report_done = Signal(object)  # (analysis the export was started for, message, failed): from the export's worker
+
     def __init__(self, analyze, ask_duplicate: Optional[Callable[[str], str]] = None,
                  ask_row: Optional[Callable[[tuple], Optional[int]]] = None):
         super().__init__()
@@ -133,6 +140,11 @@ class ReviewPanel(QWidget):
         self.save_feedback = _label("", "hint")
         self.save_feedback.setVisible(False)
         top.addWidget(self.save_feedback)
+        self.export_feedback = _label("", "hint")
+        self.export_feedback.setVisible(False)
+        top.addWidget(self.export_feedback)
+        self._exporting = False
+        self.report_done.connect(self._report_done)
         self.saved_note = _label(rv.SAVED_PLOTS_TEXT, "warnings")
         top.addWidget(self.saved_note)
         self.provisional_note = _label(rv.PROVISIONAL_EXPLANATION, "warnings")
@@ -237,6 +249,12 @@ class ReviewPanel(QWidget):
         self.views = QTabWidget()
         self.views.setObjectName("reviewViews")
         self.views.setDocumentMode(True)
+        # ABM-PLATE-EXPORT-1: the existing diagnostic report. In the corner of the tab row the button takes no height of
+        # the page and does not narrow the status sentence above.
+        self.export_button = QPushButton(EXPORT_REPORT)
+        self.export_button.setObjectName("reviewExportReport")
+        self.export_button.clicked.connect(lambda: self.export_report())
+        self.views.setCornerWidget(self.export_button, Qt.Corner.TopRightCorner)
         self.views.setMinimumHeight(140)  # ABM-REAL-UX-1: the table pane keeps its rows; the page still fits a 900 x 700 window
         shapes = QWidget()
         inner = QVBoxLayout(shapes)
@@ -338,6 +356,7 @@ class ReviewPanel(QWidget):
         self.splitter.setVisible(has_result)
         self.top.setVisible(has_result)
         self.save_feedback.setVisible(False)  # a new or opened result: an earlier save outcome is not about it
+        self.export_feedback.setVisible(False)
         analysis = self.analyze.analysis if has_result else None
         self.status_sentence.setText(rv.status_sentence(analysis, analysis.statement == am.CONFIRMED_TEXT)
                                      if analysis is not None else "")
@@ -459,6 +478,65 @@ class ReviewPanel(QWidget):
     def _save_state(self) -> None:
         """Enabled exactly when the File menu's Save is: a shown result and nothing running."""
         self.save_button.setEnabled(self.analyze.can_save())
+        problem = self.export_problem()
+        self.export_button.setEnabled(not problem)
+        self.export_button.setToolTip(EXPORT_HINT if not problem else f"{EXPORT_HINT}\n{problem}")
+
+    # ---------------------------------------------------------------------------------------------- the report
+
+    def export_problem(self) -> str:
+        """Why the report cannot be exported now; empty when it can."""
+        if self._exporting:
+            return "A report is being written."
+        if not self.analyze.can_save():  # as Save result: a shown result and no step running
+            return am.REPORT_NOT_READY
+        return am.report_problem(self.analyze.inputs, self.analyze.analysis, self.analyze.snapshot is not None)
+
+    def export_report(self, folder: Optional[str] = None) -> bool:
+        """Write the diagnostic report (PDF and Excel) into a folder; False when nothing was started. The work runs in a
+        worker thread, so the window stays responsive; the result of files changed since the read is refused there."""
+        if self.export_problem():
+            return False
+        if folder is None:
+            folder = QFileDialog.getExistingDirectory(self, "Folder for the diagnostic report (PDF and Excel)")
+        if not folder:
+            return False
+        inputs, analysis = self.analyze.inputs, self.analyze.analysis
+        self._exporting = True
+        self._export_message(EXPORT_RUNNING, False)
+        self._save_state()
+
+        def work() -> None:
+            try:
+                written = am.export_report(inputs, analysis, folder)
+                message, failed = "Report exported: " + "; ".join(str(path) for path in written), False
+            except am.StepFailed as refusal:
+                message, failed = str(refusal), True
+            except Exception as error:  # noqa: BLE001  (a message, never a crash of the window)
+                message, failed = f"Report not exported ({type(error).__name__}: {error}).", True
+            try:
+                self.report_done.emit((analysis, message, failed))
+            except RuntimeError:  # the window was closed meanwhile
+                pass
+
+        self._export_thread = threading.Thread(target=work, name="new-gui-review-export", daemon=True)
+        self._export_thread.start()
+        return True
+
+    def _report_done(self, done) -> None:
+        analysis, message, failed = done
+        self._exporting = False
+        if analysis is not self.analyze.analysis:  # the result was replaced meanwhile: the report is of the earlier one
+            message = f"For the earlier result: {message}"
+        self._export_message(message, failed)
+        self._save_state()
+
+    def _export_message(self, text: str, failed: bool) -> None:
+        self.export_feedback.setObjectName("error" if failed else "hint")
+        self.export_feedback.style().unpolish(self.export_feedback)
+        self.export_feedback.style().polish(self.export_feedback)
+        self.export_feedback.setText(text)
+        self.export_feedback.setVisible(True)
 
     def _save_message(self, text: str) -> None:
         """The panel's own save outcome, shown beside the button (the status bar shows it too); other messages are not."""

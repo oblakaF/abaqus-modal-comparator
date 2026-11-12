@@ -31,6 +31,7 @@ are never written.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 import json
 import os
@@ -238,8 +239,11 @@ def export_verified(result, bound, view, fe_preview, experimental_preview, set_i
 
 
 def export_diagnostic(fe_preview, experimental_preview, set_index: int, diagnostic, registration_reason: str,
-                      folder, cancel=None, sources: Optional[dict] = None) -> tuple:
-    """Write the CORE-E2E-D diagnostic report (pdf, xlsx) of the frequency diagnostic shown; no MAC, no pair."""
+                      folder, cancel=None, sources: Optional[dict] = None, statement: str = "") -> tuple:
+    """Write the CORE-E2E-D diagnostic report (pdf, xlsx) of the frequency diagnostic shown; no MAC, no pair.
+
+    ``statement`` (ABM-PLATE-EXPORT-1) is put in front of the report's own reason, so the caller's status words stand
+    first under "Why the analysis is diagnostic"; nothing else of the report is changed."""
     from services import diagnostic_report as dr
     from services.modal_data_viewer import NOT_ESTABLISHED, LoadedModalData
 
@@ -253,6 +257,8 @@ def export_diagnostic(fe_preview, experimental_preview, set_index: int, diagnost
                                  frequency_diagnostic=diagnostic, abaqus_path=Path(fe_preview.manifest_path),
                                  experimental_path=Path(experimental_preview.source_path))
         report = dr.build_diagnostic_report(loaded, cancel=cancel)
+        if statement:
+            report = replace(report, reason=f"{statement} {report.reason}")
         stamp = _stamp()
         written = []
         for suffix, writer in ((".pdf", dr.write_diagnostic_pdf), (".xlsx", dr.write_diagnostic_xlsx)):

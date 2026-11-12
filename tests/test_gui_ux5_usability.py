@@ -13,6 +13,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtTest import QTest
 
 import test_gui_ux_r1 as ux
+from new_gui import analyze_model as am
 from new_gui import mac_points_model as mp
 from new_gui import materials_study_model as msm
 from new_gui import production_window as pw
@@ -206,6 +207,98 @@ class ReviewTableTests(_Flow):
         self.assertIn("Not one-to-one", review.duplicate_label.text())
         review.reset_all()
         self.assertFalse(review.colour_legend.isVisible())
+
+
+class ReportExportTests(_Flow):
+    """ABM-PLATE-EXPORT-1: the existing diagnostic report, exported from the Review page."""
+
+    def exported(self, review, folder):
+        self.assertTrue(review.export_report(str(folder)))
+        self.assertFalse(review.export_button.isEnabled())  # one export at a time
+        deadline = __import__("time").monotonic() + 120
+        while review._exporting and __import__("time").monotonic() < deadline:
+            self.settle(0.05)
+        self.assertFalse(review._exporting)
+        return review.export_feedback.text()
+
+    def test_the_review_page_exports_the_diagnostic_report_as_pdf_and_excel(self):
+        import openpyxl
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        self.assertEqual(review.export_button.text(), "Export report...")
+        self.assertTrue(review.export_button.isEnabled(), review.export_problem())
+        kept = panel.analysis.diagnostic
+        self.assertIsNotNone(kept)  # the frequency diagnostic of the analysis itself: nothing is run again to export
+        folder = self.root / "report of the result"
+        folder.mkdir()
+        with mock.patch("new_gui.diagnostic_model.run_diagnostic", side_effect=AssertionError("diagnostic run again")), \
+                mock.patch("abaqus_bridge.subprocess.Popen", side_effect=AssertionError("a process was started")):
+            message = self.exported(review, folder)
+        self.assertTrue(message.startswith("Report exported: "), message)
+        self.assertIs(panel.analysis.diagnostic, kept)
+        written = sorted(p.suffix for p in folder.iterdir())
+        self.assertEqual(written, [".pdf", ".xlsx"])
+        self.assertTrue(next(folder.glob("*.pdf")).read_bytes().startswith(b"%PDF"))
+        book = openpyxl.load_workbook(next(folder.glob("*.xlsx")), read_only=True)
+        cells = {name: [[str(c) if c is not None else "" for c in row] for row in book[name].iter_rows(values_only=True)]
+                 for name in book.sheetnames}
+        book.close()
+        everything = "\n".join(" | ".join(row) for rows in cells.values() for row in rows)
+        self.assertIn("REGISTRATION_REQUIRED. MAC NOT COMPUTED. NO VERIFIED MODAL PAIRS.", everything)
+        self.assertIn("NOT_COMPUTED", everything)
+        self.assertIn("NONE (physical mode pairing not established)", everything)
+        self.assertNotIn("MAC 0.", everything)
+        def numbers(header):  # the rows under the table whose first title is ``header``, as numbers where they are
+            for rows in cells.values():
+                titles = next((i for i, row in enumerate(rows) if row and row[0] == header), None)
+                if titles is not None:
+                    return [[float(c) if c.replace(".", "", 1).replace("-", "", 1).isdigit() else c for c in row]
+                            for row in rows[titles + 1:] if row and row[0]]
+            self.fail(f"no table {header!r}")
+
+        records = numbers("Record")
+        shown = panel.analysis.experimental_rows
+        self.assertEqual(len(records), len(shown))  # every experimental record, the first one included
+        self.assertEqual(records[0][0], 1.0)
+        for row, record in zip(shown, records):
+            self.assertAlmostEqual(record[1], float(row[2]), delta=6e-5, msg=row)
+        nearest = numbers("Experimental record")
+        self.assertEqual(len(nearest), len(panel.analysis.nearest_rows))
+        for row, line in zip(panel.analysis.nearest_rows, nearest):  # FE candidate, its frequency, the signed difference
+            self.assertEqual(int(line[2]), int(row[3]), row)
+            self.assertAlmostEqual(line[3], float(row[4]), delta=6e-5, msg=row)
+            self.assertAlmostEqual(line[4], float(row[5]), delta=6e-3, msg=row)
+            self.assertEqual(line[-2:], ["NOT_COMPUTED", "NONE (not a mode pair)"])
+        self.assertIn("RIGID-BODY (diagnostic record, not an elastic mode)", everything)
+        self.assertTrue(review.export_button.isEnabled())
+
+    def test_a_changed_file_refuses_the_export_and_writes_nothing(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        folder = self.root / "refused"
+        folder.mkdir()
+        source = panel.inputs.full_experimental.source_path
+        with open(source, "ab") as stream:
+            stream.write(b"\n")
+        message = self.exported(window.review, folder)
+        self.assertTrue(message.startswith("Report not exported: "), message)
+        self.assertIn("changed since it was read", message)
+        self.assertEqual(list(folder.iterdir()), [])
+
+    def test_a_saved_snapshot_is_not_exported_as_live_data(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        self.assertEqual(am.report_problem(panel.inputs, panel.analysis, True), am.REPORT_SNAPSHOT)
+        self.assertEqual(am.report_problem(None, panel.analysis, False), am.REPORT_NOT_READY)
+        with mock.patch.object(panel, "snapshot", object()):
+            review._save_state()
+            self.assertFalse(review.export_button.isEnabled())
+            self.assertIn("Not available for a saved result", review.export_button.toolTip())
+            self.assertFalse(review.export_report(str(self.root)))
+        review._save_state()
+        self.assertTrue(review.export_button.isEnabled())
 
 
 class ChartSelectionTests(_Flow):
