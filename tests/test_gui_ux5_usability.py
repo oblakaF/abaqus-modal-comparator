@@ -157,6 +157,37 @@ class ReviewTableTests(_Flow):
         self.assertEqual([header.logicalIndex(v) for v in range(header.count())], list(rp.VISUAL_ORDER))
         self.assertEqual(table.cellWidget(0, 7).text(), "Swap")  # swap, reset and every column stay
 
+    def whole_rows_on_screen(self, window) -> int:
+        """Rows of the frequency table that are drawn whole inside the window (not only present in the table)."""
+        table = window.review.table
+        seen = table.viewport().visibleRegion().boundingRect()  # what the pane, the page and the window leave of it
+        return sum(1 for row in range(table.rowCount())
+                   if seen.contains(table.visualRect(table.model().index(row, 1))) and not table.isRowHidden(row))
+
+    def test_frequency_rows_are_on_screen_in_a_small_window_before_anything_is_dragged(self):
+        """ABM-REAL-UX-1: a 1366 x 768 window at 150 % display scaling is 911 x 512 for the program; the notes of the
+        table pane wrap there, and the table was left a strip with no row in it."""
+        window, panel = self.analysed()
+        self.wait(panel)
+        review, table = window.review, window.review.table
+        rows = min(table.rowCount(), rp.ROWS_IN_VIEW)
+        self.assertGreaterEqual(rows, 3)
+        for size in ((911, 512), (900, 680), (1366, 768)):
+            window.resize(*size)
+            self.settle(0.3)
+            self.assertEqual(window.stack.currentWidget().verticalScrollBar().value(), 0, size)  # nothing was scrolled
+            self.assertGreaterEqual(self.whole_rows_on_screen(window), rows, size)
+            header = table.horizontalHeader()
+            self.assertGreaterEqual(header.viewport().visibleRegion().boundingRect().height(), header.height(), size)  # titles whole
+            self.assertEqual(table.horizontalScrollBar().maximum(), 0, size)
+            self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
+        self.assertFalse(review.selection_label.visibleRegion().isEmpty())  # at 1366 x 768 the chosen row's shapes too
+        self.assertTrue(review.selection_label.text().startswith("Shown: EXP "))
+        table.selectRow(1)  # choosing a row still works and shows its shapes
+        self.settle(0.3)
+        self.assertEqual(review.current, 1)
+        self.assertGreaterEqual(self.whole_rows_on_screen(window), rows)
+
     def test_a_duplicate_fe_selection_is_tinted_and_explained(self):
         window, panel = self.analysed()
         self.wait(panel)

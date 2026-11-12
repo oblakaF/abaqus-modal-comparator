@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QCursor
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMenu, QMessageBox,
                                QPushButton,
@@ -35,6 +35,7 @@ PICTURE_IN_VIEW = 120  # pixels of a shape picture that count as "on screen" aft
 VISUAL_ORDER = (0, 1, 2, 4, 5, 3, 6, 7)  # ABM-UX5: EXP mode, EXP Hz, FE Hz, Δf, then the FE mode choice; logical columns stay
 SIDE_BY_SIDE_WIDTH = 760  # the two frequency plots stand side by side from this pane width, else one above the other
 CELL_PADDING = 22
+ROWS_IN_VIEW = 3  # frequency rows the table shows whole at any window size (the page scrolls rather than hide them)
 
 
 def _title_width(title: str, metrics, lines: int = 3) -> int:
@@ -52,6 +53,34 @@ def _title_width(title: str, metrics, lines: int = 3) -> int:
         if count <= lines:
             return width
         width += 4
+
+
+class _RowsTable(QTableWidget):
+    """The frequency table is never made lower than its title row and ``ROWS_IN_VIEW`` of its rows."""
+
+    def minimumSizeHint(self) -> QSize:
+        header = self.horizontalHeader()
+        rows = min(self.rowCount(), ROWS_IN_VIEW)
+        height = (max(header.height(), header.sizeHint().height()) + rows * self.verticalHeader().defaultSectionSize()
+                  + 2 * self.frameWidth())
+        return QSize(super().minimumSizeHint().width(), height)
+
+
+class _TablePane(QWidget):
+    """ABM-REAL-UX-1: the pane of the frequency table is at least as high as its contents need at its own width.
+
+    Its notes wrap into more lines in a narrow window. With one fixed least height they took the pane and left the table
+    a strip with no row in it (a 1366 x 768 window at 150 % display scaling); now the pane's least height follows them."""
+
+    def minimumSizeHint(self) -> QSize:
+        hint = super().minimumSizeHint()
+        width = max(self.width(), hint.width())
+        return QSize(hint.width(), max(hint.height(), self.layout().totalMinimumHeightForWidth(width)))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if event.size().width() != event.oldSize().width():
+            self.updateGeometry()  # the splitter asks for the least height again
 
 
 def _scrolled(content: QWidget) -> QScrollArea:
@@ -150,15 +179,14 @@ class ReviewPanel(QWidget):
     # ---------------------------------------------------------------------------------------------- building
 
     def _build_table_pane(self) -> QWidget:
-        pane = QWidget()
-        pane.setMinimumHeight(170)
+        pane = _TablePane()
         inner = QVBoxLayout(pane)
         inner.setContentsMargins(0, 0, 0, 0)
         inner.setSpacing(6)
         self.table_title = _label(rv.UNVERIFIED_TITLE, "sectionTitle")
         inner.addWidget(self.table_title)
         inner.addWidget(_label(rv.LIMIT_TEXT, "hint"))
-        self.table = QTableWidget(0, len(rv.HEADERS) + 1)
+        self.table = _RowsTable(0, len(rv.HEADERS) + 1)
         self.table.setObjectName("reviewFrequencyTable")
         self.table.setMinimumWidth(240)  # its columns stretch to any width; its rows must not widen the page
         self.table.setHorizontalHeaderLabels(list(rv.HEADERS) + [ACTIONS])
@@ -209,7 +237,7 @@ class ReviewPanel(QWidget):
         self.views = QTabWidget()
         self.views.setObjectName("reviewViews")
         self.views.setDocumentMode(True)
-        self.views.setMinimumHeight(220)
+        self.views.setMinimumHeight(140)  # ABM-REAL-UX-1: the table pane keeps its rows; the page still fits a 900 x 700 window
         shapes = QWidget()
         inner = QVBoxLayout(shapes)
         inner.setContentsMargins(0, 8, 0, 0)
@@ -350,6 +378,7 @@ class ReviewPanel(QWidget):
                 self.table.setCellWidget(row.row, len(rv.HEADERS), swap)
                 self.swap_buttons.append(swap)
         self._size_columns(rows)
+        self.table.updateGeometry()  # its least height follows the number of rows
         self._building = False
         self._show_rows()
 
