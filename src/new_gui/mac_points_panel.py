@@ -11,7 +11,7 @@ import threading
 from typing import Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from new_gui import comparison_model as cm
 from new_gui import mac_points_model as mp
@@ -40,6 +40,234 @@ def _card():
 
 class _Bridge(QObject):
     done = Signal(object)
+
+
+class TrialMacCard(QFrame):
+    """ABM-PLATE-POINT-MAC-GUI-1: the exploratory trial of ``services.trial_point_mac`` on the data read in this session.
+
+    It reads ``analyze.inputs`` and ``analyze.analysis`` and writes to neither; what it shows lives only in this card."""
+
+    def __init__(self, analyze):
+        super().__init__()
+        self.setObjectName("card")
+        self.analyze = analyze
+        self.run_result = None
+        self.token = 0
+        self._key = None  # the inputs, set and rigid-body modes the shown or running trial belongs to
+        self._cancel: Optional[threading.Event] = None
+        self._threads: list = []
+        self._bridge = _Bridge(self)
+        self._bridge.done.connect(self._done)
+        self.mapping_table = self.matrix_table = None
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(8)
+        layout.addWidget(_label(mp.TRIAL_TITLE, "sectionTitle"))
+        layout.addWidget(self._badge())
+        layout.addWidget(_label(mp.TRIAL_NOTE, "hint"))
+        row = QHBoxLayout()
+        self.run_button, self.cancel_button = QPushButton(mp.TRIAL_RUN), QPushButton(mp.TRIAL_CANCEL)
+        self.run_button.setObjectName("trialMacRun")
+        self.cancel_button.setObjectName("trialMacCancel")
+        self.run_button.clicked.connect(self.run)
+        self.cancel_button.clicked.connect(self.cancel)
+        row.addWidget(self.run_button)
+        row.addWidget(self.cancel_button)
+        row.addStretch(1)
+        layout.addLayout(row)
+        self.status = _label("", "warnings")
+        layout.addWidget(self.status)
+        self.results = QWidget()
+        inner = QVBoxLayout(self.results)
+        inner.setContentsMargins(0, 0, 0, 0)
+        inner.setSpacing(8)
+        self.summary = _label("", "hint")
+        inner.addWidget(self.summary)
+        inner.addWidget(_label(mp.TRIAL_MAPPING_TITLE, "sectionTitle"))
+        inner.addWidget(self._badge())
+        self.mapping_box = QVBoxLayout()
+        inner.addLayout(self.mapping_box)
+        inner.addWidget(_label(mp.TRIAL_FAMILY_TITLE, "sectionTitle"))
+        inner.addWidget(self._badge())
+        inner.addWidget(_label(mp.TRIAL_FAMILY_NOTE, "hint"))
+        self.family_text = _label("", "hint")
+        inner.addWidget(self.family_text)
+        self.family_image = ImageView()
+        inner.addWidget(self.family_image)
+        self.family_actions = ImageActions(self.family_image, "trial_mac_families")
+        inner.addWidget(self.family_actions)
+        inner.addWidget(_label(mp.TRIAL_ONE_TITLE, "sectionTitle"))
+        inner.addWidget(self._badge())
+        self.trial_combo, self.exp_combo, self.fe_combo = _combo("trialMacPlacement"), _combo("trialMacExp"), _combo("trialMacFe")
+        choices = QGridLayout()  # one under another: three in a row would widen the page
+        choices.setColumnStretch(1, 1)
+        for line, (caption, combo) in enumerate((("Placement", self.trial_combo), ("EXP mode", self.exp_combo),
+                                                 ("FE mode", self.fe_combo))):
+            choices.addWidget(QLabel(caption), line, 0)
+            choices.addWidget(combo, line, 1)
+        inner.addLayout(choices)
+        self.matrix_box = QVBoxLayout()
+        inner.addLayout(self.matrix_box)
+        inner.addWidget(_label(mp.TRIAL_SHAPE_NOTE, "hint"))
+        self.shape_image = ImageView()
+        inner.addWidget(self.shape_image)
+        self.shape_actions = ImageActions(self.shape_image, "trial_mac_shapes")
+        inner.addWidget(self.shape_actions)
+        layout.addWidget(self.results)
+        self.trial_combo.currentIndexChanged.connect(self._trial_changed)
+        self.exp_combo.currentIndexChanged.connect(self.draw_shape)
+        self.fe_combo.currentIndexChanged.connect(self.draw_shape)
+        self.sync()
+
+    @staticmethod
+    def _badge() -> QLabel:
+        badge = _label(mp.TRIAL_LABEL, "badge")  # wraps in a narrow window; never widens the page
+        badge.setProperty("state", "blocked")
+        return badge
+
+    def problem(self) -> str:
+        return mp.trial_problem(self.analyze.analysis, self.analyze.inputs, self.analyze.snapshot is not None)
+
+    def _current_key(self):
+        analysis, inputs = self.analyze.analysis, self.analyze.inputs
+        if analysis is None or inputs is None or self.analyze.snapshot is not None:
+            return None
+        return inputs, analysis.set_index, tuple(analysis.rigid_modes)
+
+    def _same(self, key) -> bool:
+        return key is not None and self._key is not None and key[0] is self._key[0] and key[1:] == self._key[1:]
+
+    def sync(self) -> None:
+        """After any change of the result shown: values of other data, or of no data read here, are removed."""
+        stale = self._key is not None and not self._same(self._current_key())
+        if stale:
+            self._stop()
+            self._clear()
+        problem = self.problem()
+        if problem or stale or self._key is None:
+            self.status.setText(problem or (mp.TRIAL_STALE if stale else ""))
+        self._buttons()
+
+    def _buttons(self) -> None:
+        running = self._cancel is not None
+        self.run_button.setEnabled(not running and not self.problem())
+        self.cancel_button.setEnabled(running)
+        self.results.setVisible(self.run_result is not None)
+        self.status.setVisible(bool(self.status.text()))
+
+    def _clear(self) -> None:
+        self.run_result, self._key = None, None
+        for combo in (self.trial_combo, self.exp_combo, self.fe_combo):
+            combo.blockSignals(True)
+            combo.clear()
+            combo.blockSignals(False)
+        for name in ("mapping_table", "matrix_table"):
+            table = getattr(self, name)
+            if table is not None:
+                table.setParent(None)
+                table.deleteLater()
+            setattr(self, name, None)
+        self.family_image.clear_image()
+        self.shape_image.clear_image()
+
+    def run(self) -> bool:
+        if self._cancel is not None or self.problem():
+            return False
+        self._clear()
+        self._key = self._current_key()
+        self.token += 1
+        token, cancel, bridge = self.token, threading.Event(), self._bridge
+        inputs, analysis = self.analyze.inputs, self.analyze.analysis
+        self._cancel = cancel
+
+        def work() -> None:
+            outcome = mp.run_trial(inputs, analysis, token, cancel)
+            try:
+                bridge.done.emit(outcome)
+            except RuntimeError:
+                pass
+
+        worker = threading.Thread(target=work, name="new-gui-trial-mac", daemon=True)
+        self._threads = [thread for thread in self._threads if thread.is_alive()] + [worker]
+        self.status.setText(mp.TRIAL_RUNNING)
+        self._buttons()
+        worker.start()
+        return True
+
+    def cancel(self) -> None:
+        if self._cancel is None:
+            return
+        self._stop()
+        self._clear()
+        self.status.setText(mp.TRIAL_CANCELLED)
+        self._buttons()
+
+    def _stop(self) -> None:
+        if self._cancel is not None:
+            self._cancel.set()
+        self._cancel = None
+        self.token += 1
+
+    def _done(self, outcome: mp.TrialOutcome) -> None:
+        if outcome.token != self.token:  # cancelled, or for data no longer shown
+            return
+        self._cancel = None
+        if outcome.cancelled or outcome.error or not self._same(self._current_key()):
+            self._clear()
+            self.status.setText(mp.TRIAL_CANCELLED if outcome.cancelled else outcome.error or mp.TRIAL_STALE)
+            self._buttons()
+            return
+        self._show(outcome)
+
+    def _show(self, outcome: mp.TrialOutcome) -> None:
+        run = self.run_result = outcome.run
+        self.status.setText("")
+        self.summary.setText(mp.trial_summary(run))
+        self.mapping_table = _BoundedTable(mp.TRIAL_MAPPING_HEADERS, mp.trial_mapping_rows(run), 10, text_columns=(0, 1))
+        self.mapping_table.setObjectName("trialMacMapping")
+        self.mapping_box.addWidget(self.mapping_table)
+        self.family_text.setText(mp.trial_family_text(run))
+        self.family_image.set_image(outcome.family_image)
+        for combo, items in ((self.trial_combo, [t.name if t.usable else f"{t.name} (rejected)" for t in run.trials]),
+                             (self.exp_combo, [f"EXP {n} ({f:.2f} Hz)" for n, f in zip(run.experimental_numbers,
+                                                                                      run.experimental_frequencies)]),
+                             (self.fe_combo, [f"FE {n} ({f:.2f} Hz)" for n, f in zip(run.fe_numbers, run.fe_frequencies)])):
+            combo.blockSignals(True)
+            for index, text in enumerate(items):
+                combo.addItem(text, index)
+            combo.blockSignals(False)
+        self._buttons()
+        self._trial_changed()
+
+    def chosen_trial(self):
+        index = self.trial_combo.currentData()
+        return None if self.run_result is None or index is None else self.run_result.trials[index]
+
+    def _trial_changed(self, _index=0) -> None:
+        if self.matrix_table is not None:
+            self.matrix_table.setParent(None)
+            self.matrix_table.deleteLater()
+            self.matrix_table = None
+        trial = self.chosen_trial()
+        if trial is not None and trial.usable:
+            self.matrix_table = _BoundedTable(mp.trial_matrix_headers(self.run_result),
+                                              mp.trial_matrix_rows(self.run_result, trial), len(self.run_result.fe_numbers))
+            self.matrix_table.setObjectName("trialMacMatrix")
+            self.matrix_box.addWidget(self.matrix_table)
+        self.draw_shape()
+
+    def draw_shape(self, _index=0) -> bool:
+        trial, i, j = self.chosen_trial(), self.exp_combo.currentData(), self.fe_combo.currentData()
+        if trial is None or not trial.usable or i is None or j is None:
+            self.shape_image.clear_image()
+            return False
+        return self.shape_image.set_image(mp.trial_shape_plot(self.run_result, trial, i, j))
+
+    def busy(self) -> bool:
+        return any(thread.is_alive() for thread in self._threads)
+
+    def shutdown(self) -> None:
+        self._stop()
 
 
 class MacPointsPanel(QWidget):
@@ -117,6 +345,8 @@ class MacPointsPanel(QWidget):
             images.setColumnStretch(column, 1)
         inner.addLayout(images)
         layout.addWidget(self.pair_card)
+        self.trial = TrialMacCard(analyze)  # research only: apart from everything above
+        layout.addWidget(self.trial)
         layout.addStretch(1)
         analyze.result_shown.connect(self.rebuild)
         analyze.pair_chosen.connect(self.show_pair_images)
@@ -137,6 +367,7 @@ class MacPointsPanel(QWidget):
         self.badge.setVisible(bool(reason))
         self._rebuild_evidence()
         self._rebuild_measured()
+        self.trial.sync()
         view = analysis.comparison if analysis is not None else None
         self.pair_card.setVisible(view is not None and bool(view.pair_rows))
         self.pair_status.setText(mp.NEEDS_SOURCE if panel.snapshot is not None else mp.PAIR_TEXT)
@@ -334,10 +565,11 @@ class MacPointsPanel(QWidget):
         self.pair_token += 1
 
     def busy(self) -> bool:
-        return any(thread.is_alive() for thread in self._threads)
+        return any(thread.is_alive() for thread in self._threads) or self.trial.busy()
 
     def shutdown(self) -> None:
         self._stop()
+        self.trial.shutdown()
 
 
-__all__ = ["MacPointsPanel"]
+__all__ = ["MacPointsPanel", "TrialMacCard"]
