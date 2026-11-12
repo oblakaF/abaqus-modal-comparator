@@ -82,11 +82,15 @@ class RealCmdTests(unittest.TestCase):
         folder = self.root / folder_name
         folder.mkdir(parents=True, exist_ok=True)
         (folder / "stand_in.py").write_text(_STAND_IN, encoding="utf-8")
+        # The launchers name their neighbours by %~dp0, not by the folder's own text. cmd.exe reads the TEXT of a .bat
+        # in the console's OEM code page: a Cyrillic folder written there as UTF-8 was read as other characters ("The
+        # system cannot find the path specified"), and on a Western code page it cannot be written at all. The command
+        # line and %* are Unicode, so the paths under test still pass through both launchers.
         inner = folder / "abq inner.bat"
-        inner.write_text(f'@echo off\r\nsetlocal\r\n"{sys.executable}" "{folder / "stand_in.py"}" %*\r\nendlocal\r\n',
-                         encoding="utf-8")
+        inner.write_text(f'@echo off\r\nsetlocal\r\n"{sys.executable}" "%~dp0stand_in.py" %*\r\nendlocal\r\n',
+                         encoding="ascii", newline="")
         outer = folder / "abaqus launcher.bat"
-        outer.write_text(f'@echo off\r\n"{inner}" %*\r\n', encoding="utf-8")
+        outer.write_text('@echo off\r\n"%~dp0abq inner.bat" %*\r\n', encoding="ascii", newline="")
         self.received = folder / "received.json"
         return outer
 
@@ -123,6 +127,17 @@ class RealCmdTests(unittest.TestCase):
                 manifest, script = self.run_bridge(launcher, odb, output, program_folder=f"{name} program")
                 self.assertTrue(manifest.exists())
                 self.assert_received(odb, output, script)
+
+    def test_cyrillic_folders_and_file_names_with_spaces(self):
+        launcher = self.launcher("Папка запуска")
+        odb, output = self.root / "Плита образец" / "модель 1.odb", self.root / "Результаты расчёта" / "пакет 1"
+        manifest, script = self.run_bridge(launcher, odb, output, program_folder="Папка программы")
+        self.assertEqual(manifest, output / "manifest.json")
+        self.assert_received(odb, output, script)
+        received = json.loads(self.received.read_text(encoding="utf-8"))
+        self.assertEqual(Path(received["cwd"]), script.parent)  # the working folder is Cyrillic too
+        log = (output / "abaqus_extraction.log").read_text(encoding="utf-8")
+        self.assertIn(f'--odb "{odb}"', log)  # the log shows the path as it is
 
     def test_paths_without_spaces_still_work(self):
         launcher = self.launcher("launcher")
