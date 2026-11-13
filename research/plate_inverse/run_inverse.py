@@ -41,31 +41,11 @@ from services import identification_step as st  # noqa: E402
 
 SENSITIVITIES = REPO / "docs" / "research" / "plate_s4_central" / "CENTRAL_SENSITIVITIES.csv"
 SENSITIVITIES_SHA256 = "50136be13b38021251feb9c8f4fb74cfb052801bbeeba99e9b7f3efd90864ee8"
-P0 = {"E1": 56000.0, "E2": 56000.0, "G12": 5000.0}
-SIGMA_LN = 0.003
-BOUND_FACTOR = (0.5, 2.0)
-LINEAR_RANGE = 0.05  # the ±5 % of the central differences: outside it the approximation is an extrapolation
-RCOND = 1e-3
-SETTINGS = st.LMSettings(mu_initial=1e-3, mu_decrease=10.0, max_step_attempts=8, solve_budget=200,
-                         max_iterations=50)  # evaluations of the approximation, not solves
-LABELS = ["RESEARCH_ONLY", "HYPOTHETICAL_PAIRING", "NOT_A_MATERIAL_PROPERTY", "LINEAR_APPROXIMATION"]
-
-
-@dataclass(frozen=True)
-class Scenario:
-    key: str
-    pairs: tuple  # (EXP number, FE term)
-    parameters: tuple  # fitted parameters: "G12", or "E" (E1 = E2 = E) and "G12"
-    note: str
-
-
-SCENARIOS = (
-    Scenario("S0", ((1, "FE7"),), ("G12",), "one-mode research problem; E1, E2 fixed at 56 000 MPa"),
-    Scenario("H1", ((1, "FE7"), (8, "FE15+FE16")), ("E", "G12"),
-             "EXP8 lies in the FE15/FE16 span (two-mode subspace 0.92, single MAC 0.43): a hypothesis, not a pair"),
-    Scenario("H2", ((1, "FE7"), (7, "FE14")), ("E", "G12"),
-             "stress test: EXP7 ↔ FE14 research MAC 0.79 < 0.80 and |Δf| 15.5 % > the 15 % window"),
-)
+# PLATE-CANDIDATES: the fit itself lives in services.plate_candidate_results (moved there unchanged), so the
+# interface and this script run one implementation
+from services.plate_candidate_results import (BOUND_FACTOR, LABELS, LINEAR_RANGE, P0, RCOND, SCENARIOS,  # noqa: E402,F401
+                                              SETTINGS, SIGMA_LN, Scenario, fit, full_parameters, jacobian_rows,
+                                              predict, rank_report)
 
 
 class Refused(RuntimeError):
@@ -86,83 +66,6 @@ def load_sensitivities(path: Path = SENSITIVITIES, expected: str = SENSITIVITIES
                                 "real": {("G12", 4750.0): row["f_G12_minus"], ("G12", 5250.0): row["f_G12_plus"],
                                          ("E1", 53200.0): row["f_E1_minus"], ("E1", 58800.0): row["f_E1_plus"],
                                          ("E2", 53200.0): row["f_E2_minus"], ("E2", 58800.0): row["f_E2_plus"]}}
-    return out
-
-
-def full_parameters(fitted: dict) -> dict:
-    """E1, E2, G12 from the fitted set ('E' means E1 = E2 = E)."""
-    p = dict(P0)
-    if "E" in fitted:
-        p["E1"] = p["E2"] = fitted["E"]
-    for key in ("E1", "E2", "G12"):
-        if key in fitted:
-            p[key] = fitted[key]
-    return p
-
-
-def predict(sens: dict, term: str, p: dict) -> float:
-    s = sens[term]
-    return s["f0"] * math.exp(sum(s[j] * math.log(p[j] / P0[j]) for j in ("E1", "E2", "G12")))
-
-
-def jacobian_rows(sens: dict, terms, parameters) -> np.ndarray:
-    rows = []
-    for t in terms:
-        s = sens[t]
-        rows.append([s["E1"] + s["E2"] if name == "E" else s[name] for name in parameters])
-    return np.array(rows)
-
-
-def rank_report(S: np.ndarray) -> dict:
-    sv = np.linalg.svd(S, compute_uv=False)
-    rank = int(np.sum(sv > RCOND * sv[0])) if sv.size and sv[0] > 0 else 0
-    return {"singular_values": [float(v) for v in sv], "rank": rank,
-            "condition": float(sv[0] / sv[-1]) if sv[-1] > 0 else math.inf}
-
-
-def fit(scenario: Scenario, sens: dict, f_exp: dict) -> dict:
-    terms = [t for _e, t in scenario.pairs]
-    S_fit = jacobian_rows(sens, terms, scenario.parameters)
-    S_3 = jacobian_rows(sens, terms, ("E1", "E2", "G12"))
-    out = {"scenario": scenario.key, "pairs": [f"EXP{e} ↔ {t}" for e, t in scenario.pairs],
-           "fitted_parameters": list(scenario.parameters), "note": scenario.note, "labels": LABELS,
-           "rank_fitted": rank_report(S_fit), "rank_E1_E2_G12": rank_report(S_3)}
-    if out["rank_fitted"]["rank"] < len(scenario.parameters):
-        out.update(status="REFUSED_RANK_DEFICIENT", reason=f"rank {out['rank_fitted']['rank']} < "
-                   f"{len(scenario.parameters)} fitted parameters: no number is given")
-        return out
-
-    def residuals(q):
-        p = full_parameters(q)
-        return np.array([(math.log(predict(sens, t, p)) - math.log(f_exp[e])) / SIGMA_LN for e, t in scenario.pairs])
-
-    start = {n: (P0["E1"] if n == "E" else P0[n]) for n in scenario.parameters}
-    bounds = st.parameter_bounds([(n, v * BOUND_FACTOR[0], v * BOUND_FACTOR[1]) for n, v in start.items()])
-    try:
-        result = st.run_bounded_lm(residuals, start, bounds, SETTINGS)
-    except st.StepError as error:
-        out.update(status="REFUSED_STEP_ERROR", reason=str(error))
-        return out
-    p = full_parameters(result.parameters)
-    at_bound = [n for n, low, high in zip(bounds.names, bounds.lower, bounds.upper)
-                if math.isclose(result.parameters[n], low, rel_tol=1e-9)
-                or math.isclose(result.parameters[n], high, rel_tol=1e-9)]
-    # the same equations solved directly (an independent check of the LM; exact for a square full-rank system)
-    b = np.array([math.log(f_exp[e] / sens[t]["f0"]) for e, t in scenario.pairs])
-    direct = np.linalg.lstsq(S_fit, b, rcond=None)[0]
-    ratios = {n: result.parameters[n] / start[n] for n in scenario.parameters}
-    beyond = {n: r for n, r in ratios.items() if abs(math.log(r)) > math.log(1 + LINEAR_RANGE)}
-    out.update(status=result.status.value, refusal=result.refusal, evaluations=result.solves,
-               iterations=result.iterations, objective=result.objective, parameters=p, ratios=ratios,
-               at_bound=at_bound, direct_solution_ratios={n: float(math.exp(v))
-                                                         for n, v in zip(scenario.parameters, direct)},
-               local_sd_ln=list(result.local_sd) if result.local_sd else None,
-               extrapolation_beyond_5_percent=beyond,
-               residuals=[{"exp": e, "term": t, "f_exp": f_exp[e], "f0": sens[t]["f0"],
-                           "f_fit": predict(sens, t, p),
-                           "error_before_percent": 100 * (sens[t]["f0"] / f_exp[e] - 1),
-                           "error_after_percent": 100 * (predict(sens, t, p) / f_exp[e] - 1)}
-                          for e, t in scenario.pairs])
     return out
 
 

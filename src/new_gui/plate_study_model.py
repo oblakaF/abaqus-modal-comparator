@@ -41,6 +41,15 @@ position, HISTORY_ONLY; 261027: two rubber bands, turned 45°, the same plate, p
 experiment for M11), each with its provenance (the owner, the laboratory note, the instrument, a derivation), and the
 link of the two scans (``plate_registration_readiness.SERIES_LINK_261016_261027``). No fact is kept on the page
 itself.
+
+PLATE-CANDIDATES: Calculate parameter candidates runs ``services.plate_candidate_results`` on the measured
+frequencies of the modal set read: the declared scenarios S0, H1 and H2 are fitted offline with the project's bounded
+LM on the log-linear model of the M11 S4R sensitivities (no Abaqus). The files read are confirmed on disk and tied to
+the calculation first; a mismatch refuses it with every reason. Each scenario is shown apart with its E1, E2, G12,
+the measured and predicted frequencies, the residuals, the status and rank, the warnings and what the rows do not
+determine. The archived PRIORITY-3 / PRIORITY-4 records are shown beside the calculation as a regression check and
+as the archived Abaqus solves, never as the calculated answer. Export candidates for Abaqus... writes each calculated
+candidate as CSV and TXT. No scenario is ranked or chosen, and no value is a material property.
 """
 
 from __future__ import annotations
@@ -65,7 +74,9 @@ RUNNING_TEXT = "Computing the plate study (no fit, no FE solve)..."
 NOTE = ("Research only. One specimen: PLATE-300x300x1mm, series NEXP29/PLATE300-1MM/S261027-ROTATED — the primary "
         "experiment (two rubber bands, turned 45°), chosen by the owner for the free-free M11 FE model; 261016 (four "
         "rubber bands, 33.4491 Hz) is history only. No sandwich and no other specimen's result is used or shown. "
-        "Frequencies close to each other are not mode pairs; nothing is fitted and no material value is produced.")
+        "Frequencies close to each other are not mode pairs. Run plate study fits nothing. Calculate parameter "
+        "candidates fits research candidates of the FE model's E1, E2, G12 under declared hypotheses (offline, no "
+        "Abaqus). No material value is produced.")
 GATE_NOTE = ("The iterative estimation is prepared but NOT AUTHORISED: it needs a separate, explicit owner "
              "authorisation naming the FE model, the parameters, the solve budget and the campaign definition. This "
              "page cannot start it.")
@@ -531,6 +542,222 @@ def export_report(view: PlateStudyView, folder) -> tuple:
     return tuple(written)
 
 
+# ------------------------------------------------------------------ PLATE-CANDIDATES: calculated parameter candidates
+
+CALCULATE = "Calculate parameter candidates"
+EXPORT_CANDIDATES = "Export candidates for Abaqus..."
+CANDIDATES_TITLE = "Parameter candidates E1, E2, G12 — CALCULATED from the measured frequencies of the file read"
+CANDIDATES_BADGE = "RESEARCH CANDIDATES — NOT VALIDATED MATERIAL PROPERTIES"
+CANDIDATES_RUNNING = "Confirming the files read and calculating the candidates (offline; no Abaqus)..."
+CANDIDATES_NOTE = (
+    "Calculated now, offline: the bounded LM of the project on the log-linear model of the M11 S4R sensitivities "
+    "(six real Abaqus ±5 % solves of the baseline model). The predicted frequencies are values of that model, NOT "
+    "Abaqus results. Every EXP ↔ FE row is a hypothesis declared by its scenario: the 261027 scan has no physical "
+    "registration, no record is paired by its nearest frequency, and MAC is not an input. No value below is a "
+    "material property of the plate; check a candidate by a manual Abaqus run of the exported parameters.")
+NO_WINNER = ("The scenarios are alternatives, shown apart in their declared order. None is preferred: a small "
+             "residual of a square system is not evidence for its hypothesis.")
+SUMMARY_HEADERS = ("Scenario", "E1 (MPa)", "E2 (MPa)", "G12 (MPa)", "Fitted", "Status", "Rank (fitted)",
+                   "Rank E1/E2/G12", "Hypotheses")
+HYPOTHESIS_TITLE = "Measured against predicted — HYPOTHETICAL correspondences declared by the scenario"
+HYPOTHESIS_HEADERS = ("Hypothesis", "Measured (Hz)", "Baseline FE (Hz)", "Predicted FE (Hz)", "Residual before (%)",
+                      "Residual (%)", "Status")
+PREDICTION_TITLE = "Predicted FE frequencies of every tracked FE term (FE values only; not paired with any record)"
+PREDICTION_HEADERS = ("FE term", "Baseline FE (Hz)", "Predicted FE (Hz)", "Change (%)")
+ARCHIVE_TITLE = ("ARCHIVED Abaqus verification (PRIORITY-4) of the archived parameter set — not part of this "
+                 "calculation")
+ARCHIVE_HEADERS = ("Hypothesis", "Measured (Hz)", "Archived Abaqus (Hz)", "Archived residual (%)")
+EXPERIMENT_HEADERS = ("Record", "Measured (Hz)", "Used as a hypothesis by")
+HYPOTHETICAL = "HYPOTHETICAL — not a verified pair"
+NEED_BASELINE_FE = ("Read the baseline FE package of the M11 plate on the Workspace page (the S4R_0875_BASELINE "
+                    "extraction: the sensitivities were solved for it).")
+
+
+def candidates_unavailable(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index) -> tuple:
+    """Why the candidates cannot be calculated (empty when they can): by the identities recorded at Inspect file.
+    The files on disk, the modal set and the FE frequencies are checked when the command runs."""
+    from services import plate_candidate_results as pc
+    from services import plate_study as ps
+
+    reasons = []
+    if experimental_preview is None:
+        reasons.append(NEED_EXPERIMENT)
+    elif experimental_identity is None:
+        reasons.append("The experimental file's identity was not recorded when it was read; Inspect it again.")
+    elif experimental_identity["sha256"] != ps.WORKING_SOURCE_SHA256:
+        reasons.append(f"The experimental file is {ps.classify_source(experimental_identity['sha256'])} (SHA-256 "
+                       f"{experimental_identity['sha256'][:12]}…), not the working source of {ps.SERIES}: the "
+                       f"scenarios' hypotheses are declared for that test only. {NEED_EXPERIMENT}")
+    baseline = pc.baseline_member()
+    wanted = baseline.manifest.sha256 if baseline is not None and baseline.manifest else None
+    if fe_preview is None:
+        reasons.append(NEED_BASELINE_FE)
+    elif fe_identity is None:
+        reasons.append("The FE manifest's identity was not recorded when it was read; Inspect it again.")
+    elif fe_identity["sha256"] != wanted:
+        member = member_of(fe_identity)
+        reasons.append("The FE package is " + (member.member_id if member is not None else "not a member of the "
+                                               "plate's FE family")
+                       + f" (manifest SHA-256 {fe_identity['sha256'][:12]}…), not the baseline model the "
+                       f"sensitivities were solved for. {NEED_BASELINE_FE}")
+    if experimental_preview is not None and set_index is None:
+        reasons.append(NEED_SET)
+    return tuple(reasons)
+
+
+@dataclass(frozen=True)
+class CandidateSection:
+    key: str
+    title: str
+    calculated: bool
+    parameters: str
+    status: str
+    hypothesis_rows: tuple
+    prediction_rows: tuple
+    warnings: tuple
+    limitations: tuple
+    archive_lines: tuple
+    archive_rows: tuple
+
+
+@dataclass(frozen=True)
+class CandidatesView:
+    check_rows: tuple  # (identity, what was confirmed)
+    summary_rows: tuple
+    experiment_rows: tuple
+    sections: tuple  # one CandidateSection per scenario, in the declared order
+    across: tuple
+    archive_note: str
+    labels: str
+    result: Any = None  # the service's CandidateSet
+    sources: Any = None  # {"fe", "experimental"}: the identities confirmed before the calculation
+    fe_source: Optional[Path] = None
+    experimental_source: Optional[Path] = None
+
+
+def _mpa(value) -> str:
+    return "—" if value is None else f"{value:.1f}"
+
+
+def candidates_view(result, sources=None, fe_source=None, experimental_source=None) -> CandidatesView:
+    """The service's candidates as the page's rows; every number comes from ``result``."""
+    from services import plate_candidate_results as pc
+
+    used = {}
+    summary, sections = [], []
+    for c in result.candidates:
+        for e, _t in c.pairs:
+            used.setdefault(e, []).append(c.key)
+        fitted = " + ".join(c.fitted) + (" (E1 = E2)" if "E" in c.fitted else "")
+        summary.append((c.key, _mpa(c.E1), _mpa(c.E2), _mpa(c.G12), fitted, c.status,
+                        f"{c.rank_fitted} of {len(c.fitted)}", f"{c.rank_full} of 3", c.pairs_text))
+        archive_lines, archive_rows = [], ()
+        a = c.archive
+        if a is not None:
+            if a.largest_difference_mpa is None:
+                archive_lines.append(f"Archived PRIORITY-3 set: E1 {_mpa(a.E1)}, E2 {_mpa(a.E2)}, G12 {_mpa(a.G12)} "
+                                     "MPa. Nothing was calculated here, so nothing is compared.")
+            else:
+                archive_lines.append(
+                    f"Regression check against the archived PRIORITY-3 set (E1 {_mpa(a.E1)}, E2 {_mpa(a.E2)}, G12 "
+                    f"{_mpa(a.G12)} MPa): largest difference {a.largest_difference_mpa:.3f} MPa — "
+                    + ("REPRODUCED to the archive's 0.1 MPa." if a.reproduced else
+                       "NOT reproduced: the archived Abaqus solve below belongs to another parameter set and does "
+                       "not verify this calculation."))
+            archive_lines += [a.tracking + " (FE-to-FE: says nothing about the experiment).", a.solve]
+            archive_rows = tuple(a.abaqus_rows)
+        if c.calculated:
+            parameters = (f"{c.key}: E1 = {_mpa(c.E1)} MPa · E2 = {_mpa(c.E2)} MPa · G12 = {_mpa(c.G12)} MPa — "
+                          "CALCULATED now (ratios to the baseline: "
+                          + ", ".join(f"{k} ×{r:.4f}" for k, r in c.ratios.items()) + ")")
+            status = (f"Fit: {c.status} after {c.evaluations} evaluations of the model, objective {c.objective:.3g}; "
+                      f"rank of the fitted parameters {c.rank_fitted} of {len(c.fitted)} (condition "
+                      f"{c.condition:.3f}); rank of E1 / E2 / G12 on these rows {c.rank_full} of 3.")
+        else:
+            parameters = f"{c.key}: no value — {c.status}"
+            status = f"Refused: {c.reason}"
+        sections.append(CandidateSection(
+            key=c.key, title=f"{c.key} — {c.pairs_text} (hypotheses); fitted {fitted}", calculated=c.calculated,
+            parameters=parameters, status=status,
+            hypothesis_rows=tuple((f"EXP{x.exp} ↔ {x.term}", f"{x.f_exp_hz:.4f}", f"{x.f_baseline_hz:.5f}",
+                                   f"{x.f_predicted_hz:.5f}", f"{x.before_percent:+.2f}", f"{x.after_percent:+.4f}",
+                                   HYPOTHETICAL) for x in c.residuals),
+            prediction_rows=tuple((term, f"{f0:.5f}", f"{predicted:.5f}", f"{100 * (predicted / f0 - 1):+.2f}")
+                                  for term, f0, predicted in c.predictions),
+            warnings=c.warnings, limitations=c.limitations, archive_lines=tuple(line for line in archive_lines if line),
+            archive_rows=archive_rows))
+    experiment = tuple((f"EXP{n}", f"{hz:.4f}", ", ".join(used[n]) if n in used else "not used — not paired")
+                       for n, hz in result.experiment)
+    return CandidatesView(check_rows=tuple(result.checks), summary_rows=tuple(summary), experiment_rows=experiment,
+                          sections=tuple(sections), across=tuple(result.across), archive_note=result.archive_note,
+                          labels=" / ".join(pc.LABELS), result=result, sources=sources,
+                          fe_source=None if fe_source is None else Path(fe_source),
+                          experimental_source=None if experimental_source is None else Path(experimental_source))
+
+
+def compute_candidates(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index,
+                       cancel_event: Optional[threading.Event] = None) -> CandidatesView:
+    """Calculate the candidates from the modal set read. The files are confirmed on disk and tied to the calculation
+    first; ``plate_candidate_results.SourceMismatch`` (or ``InputsChanged``) refuses it."""
+    from services import plate_candidate_results as pc
+
+    reasons = candidates_unavailable(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index)
+    if reasons:
+        raise pc.SourceMismatch(reasons)
+    sources = confirm_inputs(fe_preview, fe_identity, experimental_preview, experimental_identity, cancel_event)
+    sens = pc.load_sensitivities()
+    chosen = experimental_preview.sets[set_index]
+    checks = pc.verify_sources(
+        sens, experimental_identity["sha256"], (chosen.key, chosen.display_name, chosen.processing_name),
+        [record.number for record in chosen.records], fe_identity["sha256"],
+        {int(mode.number): float(mode.frequency_hz) for mode in fe_preview.dataset.sorted_modes()})
+    measured = {int(record.number): float(record.frequency_hz) for record in chosen.records}  # from the file read
+    result = pc.calculate(measured, sens, checks=checks)
+    try:
+        result = pc.compare_with_archive(result, pc.load_archive())
+    except pc.ArchiveRefused as refusal:  # the calculation stands; only the comparison is missing
+        result = pc.compare_with_archive(result, None, f"The archived records were not compared ({refusal}).")
+    return candidates_view(result, sources, fe_preview.manifest_path, experimental_preview.source_path)
+
+
+def run_candidates(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index, token: int,
+                   cancel_event: threading.Event) -> PlateOutcome:
+    """``compute_candidates`` as an outcome (worker thread); a refusal is the outcome's error, with every reason."""
+    try:
+        view = compute_candidates(fe_preview, fe_identity, experimental_preview, experimental_identity, set_index,
+                                  cancel_event)
+    except Exception as error:  # noqa: BLE001  (source mismatch, changed files, a changed sensitivity table)
+        if cancel_event.is_set():
+            return PlateOutcome(token, cancelled=True)
+        reasons = getattr(error, "reasons", None) or (f"{type(error).__name__}: {error}",)
+        return PlateOutcome(token, error="The candidates were not calculated:\n"
+                            + "\n".join(f"• {reason}" for reason in reasons))
+    if cancel_event.is_set():
+        return PlateOutcome(token, cancelled=True)
+    return PlateOutcome(token, view=view)
+
+
+def export_candidates(view: CandidatesView, folder) -> tuple:
+    """Write every calculated candidate as CSV and TXT into ``folder``. The files the calculation read are confirmed
+    first (``report_export.confirmed_sources``): a changed file refuses the export and nothing is written."""
+    from types import SimpleNamespace
+
+    from new_gui import report_export as rx
+    from services import plate_candidate_results as pc
+
+    folder = Path(folder)
+    if not folder.is_dir():
+        raise ValueError(f"{folder} is not an existing folder.")
+    if view.sources is None or view.fe_source is None or view.experimental_source is None:
+        raise rx.ExportRefused("the calculation recorded no source identities; calculate again.")
+    rx.confirmed_sources(SimpleNamespace(manifest_path=view.fe_source),
+                         SimpleNamespace(source_path=view.experimental_source), view.sources)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return pc.export(view.result, folder, stamp,
+                     (("Experimental file read", str(view.experimental_source)),
+                      ("FE package read", str(view.fe_source)), ("Written", datetime.now().isoformat(timespec="seconds"))))
+
+
 class PlateSlot:
     def __init__(self) -> None:
         self.token = 0
@@ -561,5 +788,6 @@ class PlateSlot:
         return True
 
 
-__all__ = ["PlateOutcome", "PlateSlot", "PlateStudyView", "compute", "export_report", "member_of", "run_study",
-           "unavailable"]
+__all__ = ["CandidatesView", "PlateOutcome", "PlateSlot", "PlateStudyView", "candidates_unavailable",
+           "candidates_view", "compute", "compute_candidates", "export_candidates", "export_report", "member_of",
+           "run_candidates", "run_study", "unavailable"]

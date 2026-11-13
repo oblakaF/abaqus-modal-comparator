@@ -20,6 +20,12 @@ WINDOWS-RC1-A: the FE archive root (``family_root`` of ``plate_study_model.run_s
 by the user (Choose FE archive folder...). Each member's files are still verified by their recorded SHA-256 when the
 study runs (``plate_study.verify_member``); a member not found there is MISSING, never assumed. Changing the root
 discards the earlier result and its export status.
+
+PLATE-CANDIDATES: Calculate parameter candidates calculates E1, E2 and G12 of the declared scenarios S0, H1 and H2
+from the measured frequencies of the modal set read (``plate_study_model.run_candidates``; worker thread; offline, no
+Abaqus). The identities are confirmed first and a mismatch is refused with its reasons. Each scenario is a section of
+its own; the archived Abaqus records are shown apart as archived. Export candidates for Abaqus... writes the CSV and
+TXT files into a folder the user chooses. No scenario is ranked or chosen.
 """
 
 from __future__ import annotations
@@ -79,6 +85,11 @@ class PlateStudyPanel(QWidget):
         self._bridge.done.connect(self._done)
         self.tables: dict[str, DiagnosticTable] = {}
         self.spectrum: Optional[ImageView] = None
+        self.candidates = psm.PlateSlot()  # PLATE-CANDIDATES: the candidates calculated for the files read
+        self.candidate_tables: dict[str, DiagnosticTable] = {}
+        self.candidates_export_message = ""
+        self._candidates_bridge = _Bridge(self)
+        self._candidates_bridge.done.connect(self._candidates_done)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
@@ -105,9 +116,22 @@ class PlateStudyPanel(QWidget):
         self.gate_button.setObjectName("iterationGate")
         self.gate_button.setEnabled(False)  # never enabled in PLATE-ONLY-R1
         self.gate_button.setToolTip(psm.GATE_NOTE)
-        for button in (self.run_button, self.export_button, self.gate_button):
+        self.calculate_button = QPushButton(psm.CALCULATE)
+        self.calculate_button.setObjectName("plateCalculate")
+        self.calculate_button.setToolTip("Calculates E1, E2 and G12 of the declared scenarios S0, H1 and H2 from the "
+                                         "measured frequencies of the modal set read. Offline; no Abaqus.")
+        self.calculate_button.clicked.connect(lambda: self.calculate_candidates())
+        self.candidates_export_button = QPushButton(psm.EXPORT_CANDIDATES)
+        self.candidates_export_button.setObjectName("plateCandidatesExport")
+        self.candidates_export_button.clicked.connect(lambda: self.export_candidates())
+        for button in (self.run_button, self.export_button, self.calculate_button, self.candidates_export_button,
+                       self.gate_button):
             self.buttons.addWidget(button, 0, Qt.AlignmentFlag.AlignLeft)
         inner.addLayout(self.buttons)
+        self.candidates_why = _label("", "hint")
+        inner.addWidget(self.candidates_why)
+        self.candidates_status = _label("", "warnings")
+        inner.addWidget(self.candidates_status)
         inner.addWidget(_label(psm.GATE_NOTE, "warnings"))
         root_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)  # WINDOWS-RC1-A: the FE archive root
         self.root_label = _label("", "hint")
@@ -124,6 +148,12 @@ class PlateStudyPanel(QWidget):
         self.export_status = _label("", "hint")
         inner.addWidget(self.export_status)
         layout.addWidget(card)
+        self.candidates_card = QFrame()  # under the commands: the candidates are seen without scrolling the study
+        self.candidates_card.setObjectName("card")
+        self.candidates_layout = QVBoxLayout(self.candidates_card)
+        self.candidates_layout.setContentsMargins(16, 14, 16, 14)
+        self.candidates_layout.setSpacing(8)
+        layout.addWidget(self.candidates_card)
         shapes = QFrame()
         shapes.setObjectName("card")
         shapes_layout = QVBoxLayout(shapes)
@@ -156,11 +186,135 @@ class PlateStudyPanel(QWidget):
             return
         self.inputs = inputs
         self.slot.reset()
+        self.candidates.reset()  # the candidates shown were calculated from the files read before
+        self.candidates_export_message = ""
         self.export_message = ""
         self._refresh()
 
     def unavailable(self) -> tuple:
         return psm.unavailable(*self.inputs)
+
+    # ------------------------------------------------------------------------------------------ parameter candidates
+
+    def candidates_unavailable(self) -> tuple:
+        return psm.candidates_unavailable(*self.inputs)
+
+    def calculate_candidates(self) -> bool:
+        """Confirm the files read and calculate S0, H1 and H2 from the modal set read (worker thread; no Abaqus)."""
+        if self.candidates_unavailable() or self.candidates.state == psm.RUNNING:
+            return False
+        token, cancel_event = self.candidates.start()
+        self.candidates_export_message = ""
+        worker = threading.Thread(target=self._candidates_work, args=(*self.inputs, token, cancel_event), daemon=True,
+                                  name="new-gui-plate-candidates")
+        self._threads = [t for t in self._threads if t.is_alive()] + [worker]
+        worker.start()
+        self._refresh_candidates()
+        self.changed.emit()
+        return True
+
+    def _candidates_work(self, fe, fe_id, exp, exp_id, set_index, token, cancel_event) -> None:
+        outcome = psm.run_candidates(fe, fe_id, exp, exp_id, set_index, token, cancel_event)
+        try:
+            self._candidates_bridge.done.emit(outcome)
+        except RuntimeError:
+            pass
+
+    def _candidates_done(self, outcome) -> None:
+        if not self.candidates.finish(outcome):
+            self.discarded += 1
+            return
+        self._refresh_candidates()
+        self.changed.emit()
+
+    @property
+    def candidates_view(self) -> Optional[psm.CandidatesView]:
+        outcome = self.candidates.outcome
+        return outcome.view if self.candidates.state == psm.DONE and outcome is not None else None
+
+    def export_candidates(self, folder: Optional[str] = None) -> bool:
+        view = self.candidates_view
+        if view is None:
+            return False
+        folder = folder if folder is not None else self._ask_folder()
+        if not folder:
+            return False
+        try:
+            written = psm.export_candidates(view, folder)  # confirms the files read before writing
+            self.candidates_export_message = ("Candidates written for a manual Abaqus check:\n"
+                                              + "\n".join(str(p) for p in written)) if written else (
+                "Nothing was written: no scenario gave a value.")
+        except (OSError, ValueError) as error:  # ExportRefused is a ValueError: nothing was written
+            self.candidates_export_message = f"The candidates were not written ({error})."
+        self._refresh_candidates()
+        return True
+
+    def _candidate_table(self, key, title, headers, rows, stretch, text_columns=(), capped=()) -> None:
+        self.candidates_layout.addWidget(_label(title, "sectionTitle"))
+        table = DiagnosticTable(headers, rows, stretch, capped, text_columns)
+        self.candidate_tables[key] = table
+        self.candidates_layout.addWidget(table)
+
+    def _refresh_candidates(self) -> None:
+        reasons, state = self.candidates_unavailable(), self.candidates.state
+        self.calculate_button.setEnabled(not reasons and state != psm.RUNNING)
+        self.candidates_why.setText(f"{psm.CALCULATE} is not available:\n"
+                                    + "\n".join(f"• {reason}" for reason in reasons))
+        self.candidates_why.setVisible(bool(reasons))
+        outcome = self.candidates.outcome
+        message = psm.CANDIDATES_RUNNING if state == psm.RUNNING else (
+            outcome.error if state == psm.FAILED and outcome is not None else self.candidates_export_message)
+        self.candidates_status.setText(message)
+        self.candidates_status.setVisible(bool(message))
+        while self.candidates_layout.count():
+            widget = self.candidates_layout.takeAt(0).widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+        self.candidate_tables = {}
+        view = self.candidates_view
+        self.candidates_export_button.setEnabled(view is not None and any(s.calculated for s in view.sections))
+        self.candidates_card.setVisible(view is not None)
+        if view is None:
+            return
+        add = self.candidates_layout.addWidget
+        add(_label(psm.CANDIDATES_TITLE, "cardTitle"))
+        badge = _label(psm.CANDIDATES_BADGE, "badge")  # wraps: a long badge never widens the page
+        badge.setProperty("state", "chosen")
+        add(badge)
+        add(_label(view.labels, "hint"))
+        add(_label(psm.CANDIDATES_NOTE, "warnings"))
+        self._candidate_table("summary", "Calculated candidates, scenario by scenario (declared order; no "
+                              "preference)", psm.SUMMARY_HEADERS, view.summary_rows, 8, (0, 4, 5, 8))
+        add(_label(psm.NO_WINNER + ("\n" + "\n".join(f"• {line}" for line in view.across) if view.across else ""),
+                   "warnings"))
+        for section in view.sections:
+            add(_label(section.title, "cardTitle"))
+            add(_label(section.parameters, ""))
+            add(_label(section.status, "hint"))
+            if section.hypothesis_rows:
+                self._candidate_table(f"{section.key}:hypotheses", psm.HYPOTHESIS_TITLE, psm.HYPOTHESIS_HEADERS,
+                                      section.hypothesis_rows, 6, (0, 6))
+            if section.warnings:
+                add(_label("Warnings:\n" + "\n".join(f"• {line}" for line in section.warnings), "warnings"))
+            if section.limitations:
+                add(_label("Not determined by these rows:\n" + "\n".join(f"• {line}" for line in section.limitations),
+                           "warnings"))
+            if section.prediction_rows:
+                self._candidate_table(f"{section.key}:predictions", psm.PREDICTION_TITLE, psm.PREDICTION_HEADERS,
+                                      section.prediction_rows, 0, (0,))
+            if section.archive_rows:
+                self._candidate_table(f"{section.key}:archive", psm.ARCHIVE_TITLE, psm.ARCHIVE_HEADERS,
+                                      section.archive_rows, 0, (0,))
+            if section.archive_lines:
+                add(_label("Archived records (comparison only):\n" + "\n".join(f"• {line}" for line in
+                                                                                 section.archive_lines), "hint"))
+        if view.archive_note:
+            add(_label(view.archive_note, "warnings"))
+        self._candidate_table("experiment", "Measured frequencies read from the selected file (every record)",
+                              psm.EXPERIMENT_HEADERS, view.experiment_rows, 2, (0, 2))
+        self._candidate_table("checks", "Sources confirmed before the calculation", ("Identity", "Confirmed"),
+                              view.check_rows, 1, (0, 1))
 
     def current_family_root(self) -> Path:
         from services import plate_study as ps
@@ -209,13 +363,14 @@ class PlateStudyPanel(QWidget):
         self._refresh()
 
     def busy(self) -> bool:
-        return (self.slot.state == psm.RUNNING or any(t.is_alive() for t in self._threads)
-                or any(panel.busy() for panel in self.shapes.values()))
+        return (self.slot.state == psm.RUNNING or self.candidates.state == psm.RUNNING
+                or any(t.is_alive() for t in self._threads) or any(panel.busy() for panel in self.shapes.values()))
 
     def cancel(self) -> None:
         for panel in self.shapes.values():
             panel.cancel()
         self.slot.reset()
+        self.candidates.reset()
         self._refresh()
 
     @property
@@ -379,6 +534,7 @@ class PlateStudyPanel(QWidget):
                 view.plan), "hint"))
             self.result_layout.addWidget(_label("Limits:\n" + "\n".join(f"• {line}" for line in view.limits),
                                                 "hint"))
+        self._refresh_candidates()
         self.changed.emit()
 
 
