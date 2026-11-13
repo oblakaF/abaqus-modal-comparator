@@ -8,7 +8,9 @@ a material property: every result carries the service's label.
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
+import hashlib
 import io
 from pathlib import Path
 import threading
@@ -1566,3 +1568,256 @@ __all__ = ["RANGES_NOTE", "RANGES_TITLE", "RANGE_HEADERS", "SENSITIVITY_HEADERS"
            "solid_reference_rows", "solid_resource_text", "WHATIF_FIELDS", "WHATIF_INTRO", "WHATIF_NOTE", "WHATIF_TITLE",
            "parse_whatif", "solid_material_constants", "whatif_confirmation_text", "whatif_diagnostic_rows", "whatif_frequency_headers",
            "whatif_frequency_rows", "whatif_parameter_headers", "whatif_parameter_rows"]
+
+
+# ---------------------------------------------------------------------------------------------- ABM-RITZ-EXPORT-1
+# The numerical candidates of a finished INP-route tuning as files for a MANUAL Abaqus run. Nothing is fitted here: the
+# values are the tuning's own minima, written with every digit, and the Ritz frequencies of each are the same surrogate's.
+
+ABAQUS_EXPORT = "Export for Abaqus (TXT/CSV)..."
+ABAQUS_FIELD_CHARS = 20  # an Abaqus floating-point data item may use at most 20 characters
+ABAQUS_FIELDS = ("E1", "E2", "E3", "nu12", "nu13", "nu23", "G12", "G13", "G23")  # the ENGINEERING CONSTANTS order
+ABAQUS_STATUS = ("RESEARCH CANDIDATE FOR A MANUAL ABAQUS CHECK — NOT VALIDATED IN ABAQUS — NOT A MATERIAL PROPERTY")
+ABAQUS_MIRROR = ("Axis assignment: NOT IDENTIFIABLE. Minimum A and minimum B fit the measured frequencies almost equally; "
+                 "the frequencies do not say which plate axis is the stiff one. Both are exported, each in its own files; "
+                 "neither is selected or preferred. The letters follow the order in which the tuning lists its minima.")
+ABAQUS_USE = ("Use: put the *Elastic data lines below into a COPY of the INP, in place of the data lines of its *Elastic "
+              "block, and run that copy in Abaqus yourself. Never edit the original INP. Only that Abaqus run can check "
+              "the candidate; the Ritz frequencies below are values of the Kirchhoff plate surrogate, not FE results.")
+ABAQUS_UNITS = "Units as written in the INP: MPa, t/mm^3, mm."
+
+
+def full(value) -> str:
+    """Every digit of a number: the shortest text that reads back as the same double."""
+    return repr(float(value))
+
+
+def abaqus_candidates(result: Optional[rft.TuningResult]) -> tuple:
+    """The numerical candidates a result holds, in the tuning's own order: both mirror minima (none chosen), or the one
+    oriented candidate. None for a status without a candidate, and none for a HIGH MISFIT fit, whose numbers stay
+    diagnostic (the existing presentation rule)."""
+    if result is None or quality_of(result).get("verdict") != rft.FIT_WITHIN:
+        return ()
+    if result.status == rft.MIRROR and len(result.axis_assignments) == 2:
+        return tuple({"key": letter, "title": f"Ritz minimum {letter}", "E1": float(a["E1 (FE X)"]),
+                      "E2": float(a["E2 (FE Y)"]), "G12": float(a["G12"]), "cost": float(a["cost"])}
+                     for letter, a in zip("AB", result.axis_assignments))
+    if result.status == rft.SUPPORTED and result.candidate:
+        cost = float(result.minima[0]["cost"]) if result.minima else None
+        return ({"key": "", "title": "Ritz candidate", "E1": float(result.candidate["E1"]),
+                 "E2": float(result.candidate["E2"]), "G12": float(result.candidate["G12"]), "cost": cost},)
+    return ()
+
+
+def abaqus_export_unavailable(result: Optional[rft.TuningResult], sources: Optional[Sources], registered: bool = False,
+                              saved: bool = False) -> str:
+    """Why the candidates cannot be exported for Abaqus now; "" when they can."""
+    if result is None:
+        return "Export for Abaqus: run the tuning first."
+    if saved or sources is None:
+        return ("Export for Abaqus: not available for a saved result, whose INP was not re-read. Choose the files and run "
+                "the tuning.")
+    if registered or not sources.inputs.inp_path:
+        return "Export for Abaqus: not available for the registered route, which has no INP material block to write."
+    if result.status == rft.CANCELLED:
+        return "Export for Abaqus: the tuning was cancelled."
+    if sources.inputs.elastic_type != "ENGINEERING CONSTANTS":
+        return (f"Export for Abaqus: the INP defines *Elastic, type={sources.inputs.elastic_type}; E3, nu13 and nu23 are "
+                "not in it, so an ENGINEERING CONSTANTS block cannot be written.")
+    if not abaqus_candidates(result):
+        if quality_of(result).get("verdict") == rft.HIGH_MISFIT:
+            return ("Export for Abaqus: withheld. The spectral fit is a HIGH MISFIT, so the numbers are diagnostic only "
+                    "and no Abaqus block is written for them.")
+        return f"Export for Abaqus: no numerical candidate (optimizer status {result.status})."
+    return ""
+
+
+def abaqus_lines(inputs: rft.AbaqusPlateInputs, candidate: dict) -> tuple:
+    """The *Elastic, type=ENGINEERING CONSTANTS block: E1, E2, E3, nu12, nu13, nu23, G12, G13 on the first data line and
+    G23 on the second. E1, E2 and G12 are the candidate's; every other constant is the INP's."""
+    values = {"E1": candidate["E1"], "E2": candidate["E2"], "E3": inputs.E3, "nu12": inputs.nu12, "nu13": inputs.nu13,
+              "nu23": inputs.nu23, "G12": candidate["G12"], "G13": inputs.G13, "G23": inputs.G23}
+    texts = []
+    for name in ABAQUS_FIELDS:
+        if values[name] is None:
+            raise rft.TuningRefused(f"The INP gives no {name}, so the ENGINEERING CONSTANTS block cannot be written.")
+        text = full(values[name])
+        if len(text) > ABAQUS_FIELD_CHARS:
+            raise rft.TuningRefused(f"{name} = {text} is longer than the {ABAQUS_FIELD_CHARS} characters of an Abaqus data "
+                                    "item.")
+        texts.append(text)
+    return ("*Elastic, type=ENGINEERING CONSTANTS", ", ".join(texts[:8]), texts[8] + ",")
+
+
+def abaqus_frequency_rows(result: rft.TuningResult, inputs: rft.AbaqusPlateInputs, candidate: dict) -> tuple:
+    """Each measured record against the Ritz frequency of its declared rank at the candidate's values: the same surrogate
+    and the same correspondence as the tuning; nothing is fitted or re-matched."""
+    ranks = [row["rank"] for row in result.rows if row["rank"] is not None]
+    if not ranks:
+        raise rft.TuningRefused("The result holds no record with a rank.")
+    surrogate = rft.Surrogate(inputs, int(result.request["ritz_degree"]), max(max(ranks) + 4, 12))
+    spectrum = surrogate.frequencies(candidate["E1"], candidate["E2"], candidate["G12"])
+    rows = []
+    for row in result.rows:
+        if row["rank"] is None:
+            rows.append({"record": row["record"], "role": row["role"], "rank": None, "exp_hz": float(row["exp_hz"]),
+                         "ritz_hz": None, "ln": None})
+            continue
+        ritz = float(spectrum[row["rank"] - 1])
+        rows.append({"record": row["record"], "role": row["role"], "rank": row["rank"], "exp_hz": float(row["exp_hz"]),
+                     "ritz_hz": ritz, "ln": float(np.log(ritz / row["exp_hz"]))})
+    return tuple(rows)
+
+
+def _role_rms(rows, role) -> tuple:
+    found = [row["ln"] for row in rows if row["role"] == role and row["ln"] is not None]
+    return (float(np.sqrt(np.mean(np.square(found)))) if found else None), len(found)
+
+
+def _file_sha256(path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for block in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def tuning_sources_changed(sources: Sources) -> str:
+    """"" when the INP and the experimental file on disk are still the files the result was calculated from."""
+    problems = []
+    for what, path, expected in (("INP", sources.inputs.inp_path, sources.inputs.inp_sha256),
+                                 ("experimental file", sources.unv_path, sources.unv_sha256)):
+        try:
+            now = _file_sha256(path)
+        except OSError as error:
+            problems.append(f"the {what} cannot be read ({error})")
+            continue
+        if now != expected:
+            problems.append(f"the {what} changed on disk")
+    return "; ".join(problems)
+
+
+def abaqus_documents(result: rft.TuningResult, sources: Sources) -> tuple:
+    """One document per candidate: {"key", "stem", "txt", "csv"}. The best minimum's Ritz frequencies must be the ones
+    the tuning itself reported, or nothing is given."""
+    reason = abaqus_export_unavailable(result, sources)
+    if reason:
+        raise rft.TuningRefused(reason)
+    inputs, candidates = sources.inputs, abaqus_candidates(result)
+    mirror = result.status == rft.MIRROR
+    documents = []
+    for index, candidate in enumerate(candidates):
+        rows = abaqus_frequency_rows(result, inputs, candidate)
+        if index == 0:
+            for mine, theirs in zip(rows, result.rows):
+                if mine["ritz_hz"] is not None and abs(mine["ritz_hz"] / theirs["ritz_after_hz"] - 1.0) > 1.0e-9:
+                    raise rft.TuningRefused("The Ritz frequencies of the best minimum are not the ones the tuning reported; "
+                                            "nothing was exported.")
+        lines = abaqus_lines(inputs, candidate)
+        fit_rms, fit_count = _role_rms(rows, rft.FIT)
+        holdout_rms, holdout_count = _role_rms(rows, rft.HOLDOUT)
+        tied = "E" in result.parameter_names
+        fitted = "Ritz tuning (fitted" + (" as E1 = E2)" if tied else ")")
+        table = [("E1", candidate["E1"], "MPa", fitted, inputs.E1), ("E2", candidate["E2"], "MPa", fitted, inputs.E2),
+                 ("E3", inputs.E3, "MPa", "INP, unchanged (not part of the fit)", None),
+                 ("nu12", inputs.nu12, "-", "INP, held in the fit", None),
+                 ("nu13", inputs.nu13, "-", "INP, unchanged (not part of the fit)", None),
+                 ("nu23", inputs.nu23, "-", "INP, unchanged (not part of the fit)", None),
+                 ("G12", candidate["G12"], "MPa", "Ritz tuning (fitted)", inputs.G12),
+                 ("G13", inputs.G13, "MPa", "INP, unchanged (not part of the fit)", None),
+                 ("G23", inputs.G23, "MPa", "INP, unchanged (not part of the fit)", None),
+                 ("Density", inputs.density_t_mm3, "t/mm^3", "INP *Density, held in the fit", None),
+                 ("Shell thickness", inputs.thickness_mm, "mm", "INP *Shell Section, held in the fit", None)]
+        status = [("Label", result.label), ("Candidate status", ABAQUS_STATUS), ("Optimizer status", result.status),
+                  ("Parameters fitted", ", ".join(result.parameter_names)),
+                  ("Ritz cost of this candidate (half the sum of ln^2 over FIT)", "—" if candidate["cost"] is None else full(candidate["cost"])),
+                  ("FIT residual RMS of this candidate (ln f)", "—" if fit_rms is None else f"{fit_rms:.4%} over {fit_count} record(s)"),
+                  ("HOLDOUT residual RMS of this candidate (ln f)",
+                   "no HOLDOUT record" if holdout_rms is None else f"{holdout_rms:.4%} over {holdout_count} record(s)"),
+                  ("Physical validity", rft.NOT_ESTABLISHED), ("Abaqus", "NOT RUN for this candidate")]
+        if mirror:
+            status.append(("Mirror minima", ABAQUS_MIRROR))
+        assumptions = list(result.assumptions) + [ABAQUS_UNITS, "Plan from the INP nodes: " + full(inputs.a_mm) + " x "
+                                                  + full(inputs.b_mm) + " mm. Material: " + inputs.material + ". "
+                                                  + ("*Orientation present." if inputs.has_orientation
+                                                     else "No *Orientation: material axes are the global axes.")]
+        origin = [("INP", sources.inputs.inp_path), ("INP SHA-256", sources.inputs.inp_sha256),
+                  ("Experimental file", sources.unv_path), ("Experimental file SHA-256", sources.unv_sha256),
+                  ("Modal set", sources.set_title), ("Ritz degree", str(result.request["ritz_degree"])),
+                  ("Correspondence", str(result.request["correspondence"]))]
+        title = candidate["title"].upper() + " — INPUT FOR A MANUAL ABAQUS RUN"
+
+        text = [title, "=" * len(title), "", ABAQUS_USE, "", "1. Candidate status", ""]
+        text += [f"{name}: {value}" for name, value in status]
+        text += ["", "2. Parameters (every digit)", ""]
+        text += _text_table(("Parameter", "Value", "Unit", "Origin", "INP value", "Change"),
+                            [(name, full(value), unit, source, "" if original is None else full(original),
+                              "" if original is None else f"{100.0 * (value / original - 1.0):+.3f} %")
+                             for name, value, unit, source, original in table])
+        text += ["", "3. Abaqus input lines", "", *lines, "*Density", full(inputs.density_t_mm3) + ",", "",
+                 f"Shell thickness (the first item of the *Shell Section data line): {full(inputs.thickness_mm)}", "",
+                 "Order of *Elastic, type=ENGINEERING CONSTANTS: E1, E2, E3, nu12, nu13, nu23, G12, G13 / G23.", "",
+                 "4. Measured and Ritz frequencies", ""]
+        text += _text_table(("EXP record", "Role", "Ritz rank", "EXP (Hz)", "Ritz at this candidate (Hz)", "Residual ln",
+                             "Residual"),
+                            [(str(r["record"]), r["role"], "—" if r["rank"] is None else str(r["rank"]), full(r["exp_hz"]),
+                              "—" if r["ritz_hz"] is None else full(r["ritz_hz"]),
+                              "—" if r["ln"] is None else f"{r['ln']:+.6e}",
+                              "—" if r["ln"] is None else f"{100.0 * (r['ritz_hz'] / r['exp_hz'] - 1.0):+.4f} %")
+                             for r in rows])
+        text += ["", "Residual = Ritz / EXP − 1. A record is compared with the Ritz frequency of its declared rank: a "
+                     "hypothesis, not a mode identity.", "", "5. Fixed assumptions", ""]
+        text += [f"- {item}" for item in assumptions]
+        if result.warnings or result.reasons:
+            text += ["", "6. Reasons and warnings of the tuning", ""] + [f"- {item}" for item in [*result.reasons, *result.warnings]]
+        text += ["", "7. Sources (read only)", ""] + [f"{name}: {value}" for name, value in origin] + [""]
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, lineterminator="\n")
+        writer.writerow(("section", "item", "value", "unit", "note"))
+        writer.writerow(("candidate", "name", candidate["title"], "", ""))
+        for name, value in status:
+            writer.writerow(("status", name, value, "", ""))
+        for name, value, unit, source, original in table:
+            writer.writerow(("parameter", name, full(value), unit, source))
+        for name, _value, unit, _source, original in table:
+            if original is not None:
+                writer.writerow(("inp_value", name, full(original), unit, "the INP's own value, for comparison"))
+        for number, line in enumerate(lines, 1):
+            writer.writerow(("abaqus_elastic", f"line {number}", line, "", "E1, E2, E3, nu12, nu13, nu23, G12, G13 / G23"))
+        writer.writerow(("abaqus_density", "line 1", "*Density", "", ""))
+        writer.writerow(("abaqus_density", "line 2", full(inputs.density_t_mm3) + ",", "t/mm^3", ""))
+        for r in rows:
+            note = f"{r['role']}, Ritz rank {'none' if r['rank'] is None else r['rank']}"
+            writer.writerow(("frequency_exp", f"record {r['record']}", full(r["exp_hz"]), "Hz", note))
+            if r["ritz_hz"] is not None:
+                writer.writerow(("frequency_ritz", f"record {r['record']}", full(r["ritz_hz"]), "Hz", note))
+                writer.writerow(("residual_ln", f"record {r['record']}", full(r["ln"]), "ln(Ritz/EXP)", note))
+        for item in assumptions:
+            writer.writerow(("assumption", "", item, "", ""))
+        for item in [*result.reasons, *result.warnings]:
+            writer.writerow(("warning", "", item, "", ""))
+        for name, value in origin:
+            writer.writerow(("source", name, value, "", ""))
+        stem = "ritz_candidate" + (f"_{candidate['key']}" if candidate["key"] else "") + "_abaqus"
+        documents.append({"key": candidate["key"], "stem": stem, "txt": "\n".join(text), "csv": buffer.getvalue(),
+                          "lines": lines, "rows": rows})
+    return tuple(documents)
+
+
+def export_abaqus(result: rft.TuningResult, sources: Sources, folder, stamp: str) -> tuple:
+    """Write the .txt and .csv of every candidate into ``folder``; the paths written. The source files are hashed again
+    first, and a file that already exists is never replaced."""
+    changed = tuning_sources_changed(sources)
+    if changed:
+        raise rft.TuningRefused(f"A source file is no longer the one the result was calculated from: {changed}.")
+    documents = abaqus_documents(result, sources)
+    folder = Path(folder)
+    targets = [(folder / f"{d['stem']}_{stamp}.{kind}", d[kind]) for d in documents for kind in ("txt", "csv")]
+    existing = [path.name for path, _text in targets if path.exists()]
+    if existing:
+        raise rft.TuningRefused("Not written, the file already exists: " + ", ".join(existing))
+    for path, text in targets:
+        with open(path, "x", encoding="utf-8", newline="\n") as stream:
+            stream.write(text)
+    return tuple(path for path, _text in targets)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import threading
+import time
 from typing import Callable, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
@@ -171,6 +172,7 @@ class ResearchTuningPanel(QWidget):
         self._ask_save = ask_save or self._dialog_save
         self._ask_confirm = ask_confirm or self._dialog_confirm
         self._ask_save_summary = self._dialog_save_summary  # ABM-AUD-6; replaced in tests
+        self._ask_folder = self._dialog_folder  # ABM-RITZ-EXPORT-1; replaced in tests
         self.uncertainty: Optional[dict] = None  # the input assessment of the shown registered result, when it was made
         self.reg_ranges: dict = {}
         self.solid: Optional[rm.SolidSummary] = None  # ABM-SOLID-5: the checked solid model
@@ -529,8 +531,15 @@ class ResearchTuningPanel(QWidget):
         self.summary_button.setObjectName("tuningExportSummary")
         self.summary_button.clicked.connect(lambda: self.export_summary())
         row.addWidget(self.summary_button)
+        self.abaqus_button = QPushButton(rm.ABAQUS_EXPORT)  # ABM-RITZ-EXPORT-1: every candidate, for a manual run
+        self.abaqus_button.setObjectName("tuningExportAbaqus")
+        self.abaqus_button.clicked.connect(lambda: self.export_abaqus())
+        row.addWidget(self.abaqus_button)
         row.addStretch(1)
         inner.addLayout(row)
+        self.abaqus_note = _label("", "hint")
+        self.abaqus_note.setObjectName("tuningExportAbaqusNote")
+        inner.addWidget(self.abaqus_note)
         self.export_note = _label("", "hint")
         inner.addWidget(self.export_note)
         self.results_card.setVisible(False)
@@ -1271,6 +1280,9 @@ class ResearchTuningPanel(QWidget):
         path, _f = QFileDialog.getSaveFileName(self, "Export proposal", start, rm.EXPORT_FILTER)
         return path
 
+    def _dialog_folder(self, start: str) -> str:
+        return QFileDialog.getExistingDirectory(self, "Folder for the Abaqus candidate files", start)
+
     def _dialog_confirm(self, title: str, text: str) -> bool:
         if len(text.splitlines()) > 15:  # ABM-AUD-5: a long statement scrolls inside a dialog that fits the screen
             dialog = QDialog(self)
@@ -1924,6 +1936,24 @@ class ResearchTuningPanel(QWidget):
         self.export_note.setText(f"Exported: {path}")
         return True
 
+    def export_abaqus(self, folder: Optional[str] = None) -> bool:
+        """ABM-RITZ-EXPORT-1: a .txt and a .csv of every numerical candidate of the shown INP-route result, for a
+        manual Abaqus run. Both mirror minima are written; none is chosen. Nothing is fitted or started."""
+        if self._active not in QUIET_JOBS or rm.abaqus_export_unavailable(
+                self.result, self.sources, self.block is not None, self.saved_path is not None):
+            return False
+        folder = folder if folder is not None else self._ask_folder(str(Path(self.sources.unv_path).parent))
+        if not folder:
+            return False
+        try:
+            written = rm.export_abaqus(self.result, self.sources, folder, time.strftime("%Y%m%d_%H%M%S"))
+        except (OSError, rft.TuningRefused) as error:
+            self._say(f"Not exported: {error}")
+            return False
+        self.export_note.setText("Exported for Abaqus (not validated, not a material property): "
+                                 + ", ".join(path.name for path in written) + f" in {folder}")
+        return True
+
     def _refresh(self) -> None:
         running = self._active not in QUIET_JOBS  # a model check never holds the file choice
         solid_ok = self.solid is not None and self.solid.preflight.get("decision") == "ALLOW"
@@ -1958,6 +1988,13 @@ class ResearchTuningPanel(QWidget):
         self.stability_button.setEnabled(not running and live)
         self.progress.setVisible(running and not solid_running)
         self.export_button.setEnabled(not running and live)
+        why = rm.abaqus_export_unavailable(self.result, self.sources, self.block is not None, self.saved_path is not None)
+        count = len(rm.abaqus_candidates(self.result)) if not why else 0
+        self.abaqus_button.setEnabled(not running and not why)
+        self.abaqus_note.setText(why or ("Export for Abaqus: both axis assignments, minimum A and minimum B, are "
+                                        "written separately; neither is selected." if count == 2 else
+                                        "Export for Abaqus: the candidate is written with every digit, for a manual "
+                                        "Abaqus run."))
         self.open_button.setEnabled(not running)
 
 
