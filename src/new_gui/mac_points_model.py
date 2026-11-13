@@ -292,9 +292,10 @@ def profile_plot(pair, line: ProfileLine, component: int) -> Optional[bytes]:
 # ------------------------------------------------------------------------------------------------ the exploratory trial
 
 TRIAL_LABEL = tp.LABEL
-TRIAL_TITLE = "Trial MAC under unconfirmed placements (research)"
-TRIAL_NOTE = ("A research calculation, not a registration. The measured grid is placed on the FE plate in 40 fixed ways: 2 "
-              "faces x 4 quarter turns x 5 positions (centred by assumption, and shifts of 5 FE units along X and Y). It "
+TRIAL_TITLE = "Trial MAC under unconfirmed placements (exploratory)"
+TRIAL_NOTE = ("An exploratory calculation, not a registration. Every placement is unconfirmed. The measured grid is placed "
+              "on the FE model in 40 fixed ways: 2 faces x 4 quarter turns x 5 positions (centred by assumption, and "
+              "shifts of 5 FE units along X and Y). It "
               "assumes measured coordinates in metres and FE coordinates in millimetres, takes the nearest FE node of each "
               "point and uses the measured Z component at every point. No placement is selected or ranked. The values make "
               "no mode pair, change no status, are not saved with the result and are not used for material estimation.")

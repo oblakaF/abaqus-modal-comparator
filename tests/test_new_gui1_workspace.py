@@ -369,7 +369,9 @@ class SeparationTests(unittest.TestCase):
                           "research_tuning_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure", "numpy"}}
     # "from services import x" passes the "services" entry above whatever x is, so the modules added since the list was
     # last reviewed have the exact services they may take from that package. Every module not listed takes none new.
-    REVIEWED_SERVICES = {"mac_points_model.py": {"analysis_project"},
+    # ABM-PLATE-POINT-MAC-GUI-1: trial_point_mac takes numpy, scipy, modal_core and reviewed_core only; it reads the modes it
+    # is given, writes no file and starts no process
+    REVIEWED_SERVICES = {"mac_points_model.py": {"analysis_project", "trial_point_mac"},
                          "materials_study_model.py": {"materials_project"},
                          "materials_study_panel.py": {"analysis_project", "materials_project"},
                          "materials_workspace_model.py": {"odb_import_service"},
