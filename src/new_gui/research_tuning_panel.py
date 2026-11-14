@@ -25,6 +25,7 @@ from new_gui.shape_panel import _label
 from services import registered_ritz_estimation as rre
 from services import research_frequency_stability as rfs
 from services import research_frequency_tuning as rft
+from services import sandwich_trial_candidates as stc
 from services import solid_forward_runner as sfr
 
 QUIET_JOBS = (None, "check", "solid_check")  # jobs that never hold the file choice
@@ -64,9 +65,9 @@ class _RoleChooser(QWidget):
 
     currentIndexChanged = Signal(int)
 
-    def __init__(self, record: int):
+    def __init__(self, record: int, prefix: str = "tuningRole"):
         super().__init__()
-        self.setObjectName(f"tuningRole_{record}")
+        self.setObjectName(f"{prefix}_{record}")
         self.setStyleSheet(ROLE_STYLE)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
@@ -77,7 +78,7 @@ class _RoleChooser(QWidget):
         for index, role in enumerate(ROLES):
             button = QPushButton(role)
             button.setCheckable(True)
-            button.setObjectName(f"tuningRole_{record}_{role}")
+            button.setObjectName(f"{prefix}_{record}_{role}")
             button.setAccessibleName(f"Record {record}: {role}")
             button.setToolTip({rft.FIT: "Fitted.", rft.HOLDOUT: "Predicted only, not fitted.",
                                rft.EXCLUDED: "Not used; its rank stays unmatched."}[role])
@@ -179,6 +180,9 @@ class ResearchTuningPanel(QWidget):
         self.solid_outcome: Optional[sfr.RunnerOutcome] = None
         self.whatif_outcome: Optional[sfr.RunnerOutcome] = None  # ABM-SOLID-6
         self.solid_limits = sfr.RunnerLimits()
+        self.sandwich: Optional[rm.SandwichSources] = None  # ABM-SANDWICH-SP13-1: what was read for the SP-13 trial
+        self.sandwich_result: Optional[stc.TrialResult] = None
+        self.sandwich_archive = ""  # the folder the user named for the shape packs; "" = the configured store
         self.paths = {"inp": "", "unv": "", "odb": ""}
         self.sources: Optional[rm.Sources] = None
         self.result: Optional[rft.TuningResult] = None
@@ -205,6 +209,7 @@ class ResearchTuningPanel(QWidget):
         layout.addWidget(self._build_files())
         layout.addWidget(self._build_registered())
         layout.addWidget(self._build_solid())
+        layout.addWidget(self._build_sandwich())
         layout.addWidget(self._build_setup())
         layout.addWidget(self._build_results())
         layout.addStretch(1)
@@ -367,6 +372,114 @@ class ResearchTuningPanel(QWidget):
         self.whatif_points: tuple = ()
         self.whatif_problems: dict = {}
         self._whatif_result_points: tuple = ()  # the points of the displayed What-If result (ABM-SOLID-6-F1)
+
+    def _build_sandwich(self) -> QFrame:
+        """ABM-SANDWICH-SP13-1: the SP-13 sandwich trial, apart from the plate tuning. It uses the files of section 1."""
+        self.sandwich_card, inner = _card()
+        inner.addWidget(_label(rm.SANDWICH_TITLE, "sectionTitle"))
+        self.sandwich_badge = _label(stc.LABEL, "badge")
+        self.sandwich_badge.setProperty("state", "blocked")
+        inner.addWidget(self.sandwich_badge)
+        inner.addWidget(_label(rm.SANDWICH_INTRO, "hint"))
+        inner.addWidget(_label(rm.SANDWICH_STEPS, "hint"))
+        row = QHBoxLayout()
+        self.sandwich_read_button = QPushButton(rm.SANDWICH_READ)
+        self.sandwich_read_button.setObjectName("sandwichRead")
+        self.sandwich_read_button.setMinimumHeight(32)
+        self.sandwich_read_button.clicked.connect(lambda: self.read_sandwich())
+        self.sandwich_folder_button = QPushButton(rm.SANDWICH_FOLDER)
+        self.sandwich_folder_button.setObjectName("sandwichArchiveFolder")
+        self.sandwich_folder_button.setToolTip("The folder of the carbon project archive that holds fe_shapes (the validated "
+                                               "FE shape packs of the +/-5 % states). Every pack is verified by content.")
+        self.sandwich_folder_button.clicked.connect(lambda: self.choose_sandwich_archive())
+        row.addWidget(self.sandwich_read_button)
+        row.addWidget(self.sandwich_folder_button)
+        row.addStretch(1)
+        inner.addLayout(row)
+        self.sandwich_state = _label("Choose the SP-13 .inp and .unv in section 1, then read the sources.")
+        self.sandwich_state.setObjectName("sandwichState")
+        inner.addWidget(self.sandwich_state)
+        self.sandwich_block = _label("", "warnings")
+        self.sandwich_block.setObjectName("sandwichBlocked")
+        self.sandwich_block.setVisible(False)
+        inner.addWidget(self.sandwich_block)
+        self.sandwich_body = QWidget()
+        body = QVBoxLayout(self.sandwich_body)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(8)
+        self.sandwich_boxes = {}
+        for key, title in (("sw_identity", "Selected files and their identity"),
+                           ("sw_fe", "FE baseline frequencies and verified face sensitivities")):
+            body.addWidget(_label(title, "sectionTitle"))
+            box = QVBoxLayout()
+            body.addLayout(box)
+            self.sandwich_boxes[key] = box
+        body.addWidget(_label("Measured records and the correspondence", "sectionTitle"))
+        self.sandwich_warning = _label(stc.CORRESPONDENCE_WARNING, "warnings")
+        self.sandwich_warning.setObjectName("sandwichCorrespondenceWarning")
+        body.addWidget(self.sandwich_warning)
+        body.addWidget(_label(rm.SANDWICH_HYPOTHESIS_NOTE, "hint"))
+        self.sandwich_hypothesis = _Choice("sandwichHypothesis", rm.SANDWICH_HYPOTHESES, "Correspondence")
+        self.sandwich_hypothesis.changed.connect(self._sandwich_changed)
+        body.addWidget(self.sandwich_hypothesis)
+        self.sandwich_declared = QLineEdit()
+        self.sandwich_declared.setObjectName("sandwichDeclared")
+        self.sandwich_declared.setPlaceholderText("declared list, record:FE mode, e.g. 1:7, 2:9, 3:8, 4:10")
+        self.sandwich_declared.textChanged.connect(lambda _t: self._sandwich_changed())
+        body.addWidget(self.sandwich_declared)
+        self.sandwich_declared_note = _label("", "error")
+        self.sandwich_declared_note.setVisible(False)
+        body.addWidget(self.sandwich_declared_note)
+        body.addWidget(_label(rm.SANDWICH_ROLE_NOTE, "hint"))
+        self.sandwich_records_box = QVBoxLayout()
+        body.addLayout(self.sandwich_records_box)
+        row = QHBoxLayout()
+        self.sandwich_run_button = QPushButton(rm.SANDWICH_CALCULATE)
+        self.sandwich_run_button.setObjectName("sandwichCalculate")
+        self.sandwich_run_button.setMinimumHeight(36)
+        self.sandwich_run_button.clicked.connect(lambda: self.run_sandwich())
+        row.addWidget(self.sandwich_run_button)
+        row.addStretch(1)
+        body.addLayout(row)
+        self.sandwich_message = _label("", "error")
+        self.sandwich_message.setObjectName("sandwichMessage")
+        self.sandwich_message.setVisible(False)
+        body.addWidget(self.sandwich_message)
+        self.sandwich_result_body = QWidget()
+        result = QVBoxLayout(self.sandwich_result_body)
+        result.setContentsMargins(0, 0, 0, 0)
+        result.setSpacing(8)
+        result.addWidget(_label("Exploratory result", "sectionTitle"))
+        self.sandwich_status = _label("", "warnings")
+        self.sandwich_status.setObjectName("sandwichStatus")
+        result.addWidget(self.sandwich_status)
+        for key, title in (("sw_candidate", "Face material trial values (E1 = E2 and G12 only)"),
+                           ("sw_frequencies", "Measured, FE baseline and predicted frequencies"),
+                           ("sw_diagnostics", "Rank, conditioning and other stated correspondences")):
+            caption = _label(title, "sectionTitle")
+            result.addWidget(caption)
+            box = QVBoxLayout()
+            result.addLayout(box)
+            self.sandwich_boxes[key] = box
+            self.sandwich_boxes[key + "_caption"] = caption
+        self.sandwich_warnings = _label("", "hint")
+        self.sandwich_warnings.setObjectName("sandwichWarnings")
+        result.addWidget(self.sandwich_warnings)
+        row = QHBoxLayout()
+        self.sandwich_export_button = QPushButton(rm.SANDWICH_EXPORT)
+        self.sandwich_export_button.setObjectName("sandwichExport")
+        self.sandwich_export_button.clicked.connect(lambda: self.export_sandwich())
+        row.addWidget(self.sandwich_export_button)
+        row.addStretch(1)
+        result.addLayout(row)
+        self.sandwich_export_note = _label("", "hint")
+        self.sandwich_export_note.setObjectName("sandwichExportNote")
+        result.addWidget(self.sandwich_export_note)
+        self.sandwich_result_body.setVisible(False)
+        body.addWidget(self.sandwich_result_body)
+        self.sandwich_body.setVisible(False)
+        inner.addWidget(self.sandwich_body)
+        return self.sandwich_card
 
     def _build_setup(self) -> QFrame:
         card, inner = _card()
@@ -1319,6 +1432,8 @@ class ResearchTuningPanel(QWidget):
             self.release_registered("Released: the INP route's files were chosen.")
         self.sources = None
         self._clear_result()
+        if kind in ("inp", "unv"):  # ABM-SANDWICH-SP13-1: what was read for the trial belonged to the old files
+            self._clear_sandwich()
         inp, unv, odb = self.paths["inp"], self.paths["unv"], self.paths["odb"] or None
         if kind == "inp":
             self._clear_compatibility()
@@ -1424,6 +1539,10 @@ class ResearchTuningPanel(QWidget):
         self._active, self._cancel = None, None
         if kind in ("solid_check", "solid_run", "solid_whatif"):
             self._solid_done(kind, value)
+            self._refresh()
+            return
+        if kind == "sandwich_read":
+            self._sandwich_done(value)
             self._refresh()
             return
         if isinstance(value, Exception):
@@ -1708,6 +1827,197 @@ class ResearchTuningPanel(QWidget):
         self.solid_state.setText(f"{outcome.status}: {outcome.message}")
 
     # ---------------------------------------------------------------------------------------------- run
+
+    # ---------------------------------------------------------------------------------------------- ABM-SANDWICH-SP13-1
+
+    def choose_sandwich_archive(self, folder: Optional[str] = None) -> bool:
+        """Name the folder that holds the validated shape packs of the +/-5 % states. Nothing is read until the sources
+        are read; every pack is then verified by content against its pinned record."""
+        if self._active not in QUIET_JOBS:
+            return False
+        folder = folder if folder is not None else self._ask_folder(self.sandwich_archive)
+        if not folder:
+            return False
+        self.sandwich_archive = str(folder)
+        self._clear_sandwich()
+        self.sandwich_state.setText(f"Sensitivity archive folder: {folder}. Read the SP-13 sources.")
+        self._refresh()
+        return True
+
+    def read_sandwich(self) -> bool:
+        """Read the files chosen in section 1 for the SP-13 trial. A pending model check of the plate route is dropped."""
+        inp, unv = self.paths["inp"], self.paths["unv"]
+        if self._active not in QUIET_JOBS or not inp or not unv:
+            return False
+        if self._active is not None:  # the quiet check of the plate / solid route gives way
+            self._token += 1
+            self._active, self._cancel = None, None
+        self._clear_sandwich()
+        archive = self.sandwich_archive or None
+        self.sandwich_state.setText("Reading the SP-13 sources...")
+        return self._start("sandwich_read", lambda cancel, _s: rm.read_sandwich_sources(inp, unv, cancel, archive))
+
+    def _sandwich_done(self, value) -> None:
+        if isinstance(value, Exception):
+            self.sandwich_state.setText(f"Not read: {value}")
+            return
+        self.sandwich = value
+        self._table("sw_identity", self.sandwich_boxes["sw_identity"], ("Item", "Value"), rm.sandwich_identity_rows(value), 1)
+        self._table("sw_fe", self.sandwich_boxes["sw_fe"], rm.SANDWICH_FE_HEADERS, rm.sandwich_fe_rows(value), 4)
+        self._show_sandwich_records()
+        blocked = rm.sandwich_blocked(value)
+        self.sandwich_block.setText(blocked)
+        self.sandwich_block.setVisible(bool(blocked))
+        self.sandwich_body.setVisible(True)
+        self.sandwich_state.setText(f"Read: {len(value.records)} curve-fitted records of {value.set_title}; "
+                                    f"{len(value.fe_modes)} FE frequencies. Select the correspondence.")
+
+    def _show_sandwich_records(self) -> None:
+        table = QFrame()
+        table.setObjectName("sandwich_records")
+        grid = QGridLayout(table)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(4)
+        for column, (text, share, width) in enumerate(zip(rm.SANDWICH_RECORD_HEADERS, (0, 0, 0, 1, 0, 0),
+                                                          (90, 100, 280, 200, 120, 90))):
+            grid.addWidget(_label(text, "sectionTitle"), 0, column)
+            grid.setColumnStretch(column, share)
+            grid.setColumnMinimumWidth(column, width)
+        self.sandwich_role_combos, self.sandwich_record_items = {}, {}
+        for row, (record, hz) in enumerate(self.sandwich.records, start=1):
+            grid.addWidget(_label(str(record)), row, 0)
+            grid.addWidget(_label(f"{hz:.4f}"), row, 1)
+            combo = _RoleChooser(record, "sandwichRole")
+            combo.currentIndexChanged.connect(lambda _i: self._sandwich_changed())
+            grid.addWidget(combo, row, 2)
+            self.sandwich_role_combos[record] = combo
+            items = []
+            for column, name in enumerate(("sandwichFe", "sandwichFeHz", "sandwichDifference"), start=3):
+                item = _label("")
+                item.setObjectName(f"{name}_{record}")
+                grid.addWidget(item, row, column)
+                items.append(item)
+            self.sandwich_record_items[record] = items
+        old = self._tables.pop("sw_records", None)
+        if old is not None:
+            old.hide()  # never a stray window
+            old.setParent(None)
+            old.deleteLater()
+        self._tables["sw_records"] = table
+        self.sandwich_records_box.addWidget(table)
+        self._show_sandwich_correspondence()
+
+    def _selected_sandwich_hypothesis(self):
+        """(the selected correspondence or None, the problem of the declared list or "")."""
+        stated, problem = rm.sandwich_hypotheses(self.sandwich, self.sandwich_declared.text())
+        key = self.sandwich_hypothesis.value()
+        return next((h for h in stated if h.key == key), None), problem
+
+    def _show_sandwich_correspondence(self) -> None:
+        if self.sandwich is None:
+            return
+        hypothesis, problem = self._selected_sandwich_hypothesis()
+        texts = rm.sandwich_record_texts(self.sandwich, hypothesis)
+        for record, items in getattr(self, "sandwich_record_items", {}).items():
+            for item, text in zip(items, texts[record]):
+                item.setText(text)
+        self.sandwich_declared_note.setText(problem)
+        self.sandwich_declared_note.setVisible(bool(problem))
+
+    def _sandwich_changed(self) -> None:
+        """The correspondence, the declared list or a role was edited: the table follows and a shown result, which
+        belongs to other settings, is cleared."""
+        if self.sandwich is None:
+            return
+        self._show_sandwich_correspondence()
+        if self.sandwich_result is not None:
+            self._clear_sandwich_result()
+            self.sandwich_state.setText("The settings changed: the previous result was cleared.")
+        self._refresh()
+
+    def sandwich_roles(self) -> dict:
+        return {record: combo.currentData() for record, combo in getattr(self, "sandwich_role_combos", {}).items()}
+
+    def set_sandwich_role(self, record: int, role: str) -> None:
+        self.sandwich_role_combos[record].setCurrentIndex(ROLES.index(role))
+
+    def sandwich_record_cells(self) -> dict:
+        return {record: [item.text() for item in items]
+                for record, items in getattr(self, "sandwich_record_items", {}).items()}
+
+    def run_sandwich(self) -> bool:
+        """The bounded two-parameter trial under the selected correspondence. A linear calculation on the verified
+        sensitivities: nothing is solved, started or written."""
+        if self._active not in QUIET_JOBS or self.sandwich is None or not self.sandwich_hypothesis.value():
+            return False
+        self._clear_sandwich_result()
+        try:
+            result = rm.run_sandwich_trial(self.sandwich, self.sandwich_roles(), self.sandwich_declared.text(),
+                                           self.sandwich_hypothesis.value())
+        except ValueError as error:
+            self.sandwich_message.setText(f"Not calculated: {error}")
+            self.sandwich_message.setVisible(True)
+            self._refresh()
+            return False
+        self.sandwich_result = result
+        outcome = result.selected
+        self.sandwich_status.setText(rm.sandwich_status_text(result))
+        for key, headers, rows, stretch in (
+                ("sw_candidate", rm.SANDWICH_CANDIDATE_HEADERS, rm.sandwich_candidate_rows(result), 4),
+                ("sw_frequencies", rm.SANDWICH_FREQUENCY_HEADERS, rm.sandwich_frequency_rows(outcome), 8),
+                ("sw_diagnostics", ("Item", "Value"), rm.sandwich_diagnostic_rows(result), 1)):
+            self._table(key, self.sandwich_boxes[key], headers, rows, stretch)
+            self.sandwich_boxes[key + "_caption"].setVisible(bool(rows))
+        self.sandwich_warnings.setText("\n".join(outcome.warnings + stc.LIMITATIONS))
+        self.sandwich_result_body.setVisible(True)
+        self.sandwich_state.setText(f"Calculated: {outcome.status}.")
+        self._refresh()
+        return True
+
+    def export_sandwich(self, folder: Optional[str] = None) -> bool:
+        """A .txt and a .csv of the face-material trial values for a manual Abaqus entry. The core and the ties are not
+        written; nothing is fitted or started."""
+        if self._active not in QUIET_JOBS or rm.sandwich_export_unavailable(self.sandwich_result, self.sandwich):
+            return False
+        folder = folder if folder is not None else self._ask_folder(str(Path(self.sandwich.unv_path).parent))
+        if not folder:
+            return False
+        try:
+            written = rm.export_sandwich(self.sandwich_result, self.sandwich, folder, time.strftime("%Y%m%d_%H%M%S"))
+        except (OSError, ValueError) as error:
+            self.sandwich_export_note.setText(f"Not exported: {error}")
+            return False
+        self.sandwich_export_note.setText("Exported for Abaqus (exploratory, not validated, not a material property): "
+                                          + ", ".join(path.name for path in written) + f" in {folder}")
+        return True
+
+    def _clear_sandwich_result(self) -> None:
+        self.sandwich_result = None
+        for key in ("sw_candidate", "sw_frequencies", "sw_diagnostics"):
+            self._table(key, None, (), (), 0)
+        self.sandwich_status.setText("")
+        self.sandwich_warnings.setText("")
+        self.sandwich_export_note.setText("")
+        self.sandwich_message.setText("")
+        self.sandwich_message.setVisible(False)
+        self.sandwich_result_body.setVisible(False)
+
+    def _clear_sandwich(self) -> None:
+        """The files of section 1 changed (or are read again): what was read for the trial no longer belongs to them."""
+        self._clear_sandwich_result()
+        self.sandwich = None
+        for key in ("sw_identity", "sw_fe"):
+            self._table(key, None, (), (), 0)
+        old = self._tables.pop("sw_records", None)
+        if old is not None:
+            old.hide()
+            old.setParent(None)
+            old.deleteLater()
+        self.sandwich_role_combos, self.sandwich_record_items = {}, {}
+        self.sandwich_block.setVisible(False)
+        self.sandwich_body.setVisible(False)
+        self.sandwich_state.setText("Choose the SP-13 .inp and .unv in section 1, then read the sources.")
 
     def build_request(self) -> rft.TuningRequest:
         roles = self.roles()
@@ -1996,6 +2306,18 @@ class ResearchTuningPanel(QWidget):
                                         "Export for Abaqus: the candidate is written with every digit, for a manual "
                                         "Abaqus run."))
         self.open_button.setEnabled(not running)
+        chosen = bool(self.paths["inp"] and self.paths["unv"])  # ABM-SANDWICH-SP13-1
+        self.sandwich_read_button.setEnabled(not running and chosen)
+        self.sandwich_folder_button.setEnabled(not running)
+        blocked = rm.sandwich_blocked(self.sandwich)
+        self.sandwich_run_button.setEnabled(not running and not blocked and bool(self.sandwich_hypothesis.value()))
+        self.sandwich_hypothesis.setEnabled(not running)
+        self.sandwich_declared.setEnabled(not running)
+        why = rm.sandwich_export_unavailable(self.sandwich_result, self.sandwich)
+        self.sandwich_export_button.setEnabled(not running and not why)
+        if why or not self.sandwich_export_note.text().startswith(("Exported", "Not exported")):
+            self.sandwich_export_note.setText(why or "Export for Abaqus: the face material's *Elastic record with the "
+                                              "trial E1 = E2 and G12; the core and the ties are not written.")
 
 
 __all__ = ["ResearchTuningPanel"]

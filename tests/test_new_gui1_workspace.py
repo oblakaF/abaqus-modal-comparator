@@ -371,6 +371,8 @@ class SeparationTests(unittest.TestCase):
     # last reviewed have the exact services they may take from that package. Every module not listed takes none new.
     # ABM-PLATE-POINT-MAC-GUI-1: trial_point_mac takes numpy, scipy, modal_core and reviewed_core only; it reads the modes it
     # is given, writes no file and starts no process
+    # ABM-SANDWICH-SP13-1: sandwich_trial_candidates reads the chosen INP, the pinned repository records and the archived
+    # shape packs; it writes only the export files the user asks for and starts no process
     REVIEWED_SERVICES = {"mac_points_model.py": {"analysis_project", "trial_point_mac"},
                          "materials_study_model.py": {"materials_project"},
                          "materials_study_panel.py": {"analysis_project", "materials_project"},
@@ -378,10 +380,10 @@ class SeparationTests(unittest.TestCase):
                          "analyze_summary.py": set(), "mac_points_panel.py": set(), "materials_workspace.py": set(),
                          "review_model.py": set(), "review_panel.py": set(),
                          "research_tuning_model.py": {"modal_data_viewer", "registered_ritz_estimation", "registered_ritz_uncertainty",
-                                                      "research_frequency_tuning",
+                                                      "research_frequency_tuning", "sandwich_trial_candidates",
                                                       "solid_c3d8i_forward", "solid_c3d8i_model", "solid_forward_runner"},
                          "research_tuning_panel.py": {"registered_ritz_estimation", "research_frequency_stability", "research_frequency_tuning",
-                                                      "solid_forward_runner"}}
+                                                      "sandwich_trial_candidates", "solid_forward_runner"}}
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))

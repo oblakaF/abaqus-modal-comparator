@@ -27,6 +27,7 @@ from services import modal_data_viewer as viewer
 from services import registered_ritz_estimation as rre
 from services import registered_ritz_uncertainty as rru
 from services import research_frequency_tuning as rft
+from services import sandwich_trial_candidates as stc
 
 LABEL = rft.RESULT_LABEL
 SURROGATE_NOTE = ("Ritz values are frequencies of the Kirchhoff plate surrogate, not Abaqus FE results. A candidate is a "
@@ -1821,3 +1822,290 @@ def export_abaqus(result: rft.TuningResult, sources: Sources, folder, stamp: str
         with open(path, "x", encoding="utf-8", newline="\n") as stream:
             stream.write(text)
     return tuple(path for path, _text in targets)
+
+
+# ================================================================================ ABM-SANDWICH-SP13-1: the SP-13 sandwich trial
+
+SANDWICH_TITLE = "SP-13 Sandwich Trial — exploratory face-sheet candidates"
+SANDWICH_INTRO = ("For the SP-13 sandwich panel only. It reads the two files chosen in section 1 (the SP-13 Abaqus input and "
+                  "the ROTATED PolyMAX set of 28 October 2026), compares the measured frequencies with the FE baseline and "
+                  "calculates exploratory face-sheet values E (E1 = E2) and G12 from the archived FE response of this "
+                  "exact model to +/-5 % changes of E and G12. The Kirchhoff-Ritz plate surrogate above is NOT used: a "
+                  "sandwich panel is not a thin homogeneous plate. No Abaqus run, no FE solve, no MAC.")
+SANDWICH_STEPS = ("Steps: 1) choose the .inp and the .unv in section 1; 2) Read SP-13 sources; 3) select the "
+                  "correspondence and the role of each record; 4) Calculate exploratory candidates; 5) Export for Abaqus.")
+SANDWICH_HYPOTHESIS_NOTE = ("Correspondence: which FE mode each measured record is compared with. Nothing is chosen until "
+                            "you choose. Frequency rank compares the k-th record with the k-th elastic FE mode. Declared "
+                            "list uses your own record:FE mode pairs; a record you do not list can only be EXCLUDED. "
+                            "Record 1 is always kept in the table: its role says how it is used.")
+SANDWICH_ROLE_NOTE = ("Roles: FIT records are fitted; HOLDOUT records are predicted only; EXCLUDED records are not used and "
+                      "stay listed.")
+SANDWICH_EXPORT = "Export for Abaqus (TXT/CSV)..."
+SANDWICH_CALCULATE = "Calculate exploratory candidates"
+SANDWICH_READ = "Read SP-13 sources"
+SANDWICH_FOLDER = "Sensitivity archive folder..."
+SANDWICH_HYPOTHESES = ((stc.FREQUENCY_ORDER, "Frequency rank"), (stc.DECLARED, "Declared list"))
+SANDWICH_ROLES = stc.ROLES
+
+
+@dataclass(frozen=True)
+class SandwichSources:
+    model: stc.FeModel
+    evidence: stc.FaceSensitivityEvidence
+    usable: bool  # the verified sensitivities belong to the loaded FE model
+    binding_checks: tuple
+    binding_reasons: tuple
+    identity: stc.ExperimentalIdentity
+    unv_path: str
+    unv_sha256: str
+    set_title: str
+    records: tuple  # (record, Hz) of the curve-fitted set, all of them
+    fe_modes: tuple  # (FE mode, Hz)
+    fe_source: str
+    archive_folder: str
+
+
+def read_sandwich_sources(inp_path, unv_path, cancel: threading.Event, archive_folder=None) -> SandwichSources:
+    """The experimental file (the program's own importer), the Abaqus input (identified by content; its face material
+    record and the .dat beside it) and the archived face sensitivities with their checks. Read only; nothing is fitted."""
+    outcome = pm.run_read(EXPERIMENTAL, unv_path, 0, cancel)
+    if outcome.cancelled:
+        raise ReadFailed("Cancelled.")
+    if outcome.error:
+        raise ReadFailed(outcome.error)
+    fitted = [item for item in outcome.preview.sets if item.records and not any(r.provisional for r in item.records)]
+    if not fitted:
+        raise ReadFailed("The experimental file holds no curve-fitted modal set; FRF peak records are never used as modes.")
+    identity = outcome.identity
+    if not identity or not identity.get("sha256"):
+        raise ReadFailed("The experimental file could not be identified (it changed while it was read).")
+    chosen = fitted[0]
+    records = tuple((int(r.number), float(r.frequency_hz)) for r in chosen.records)
+    try:
+        model = stc.read_fe_model(inp_path, cancel=cancel)
+        roots = stc.archive_roots(archive_folder)
+        evidence = stc.load_face_sensitivities(roots, cancel=cancel)
+    except stc.TrialCancelled as error:
+        raise ReadFailed("Cancelled.") from error
+    usable, checks, reasons = stc.model_binding(model, evidence)
+    modes, source = stc.fe_frequencies(model, evidence)
+    return SandwichSources(model, evidence, usable, checks, reasons,
+                           stc.classify_experimental(identity["sha256"], identity["size"]), str(unv_path),
+                           str(identity["sha256"]), chosen.title + (
+                               "" if len(fitted) == 1 else f" [the first of {len(fitted)} curve-fitted sets of the file]"),
+                           records, modes, source,
+                           str(roots.get(stc.ARCHIVE_STORE, "")))
+
+
+def sandwich_blocked(sources: Optional[SandwichSources]) -> str:
+    """Why no candidate can be calculated from these sources, or ""."""
+    if sources is None:
+        return "Read the SP-13 sources first."
+    if not sources.identity.accepted:
+        return f"No calculation: the experimental file is not the target series. {sources.identity.text}"
+    if not sources.model.accepted:
+        return "No calculation: the Abaqus input is not the accepted SP-13 FE model. " + " ".join(sources.model.reasons)
+    if not sources.evidence.usable:
+        return (f"No calculation ({sources.evidence.status}): " + " ".join(sources.evidence.reasons)
+                + " The frequency comparison is still shown; no response model is assumed.")
+    if not sources.usable:
+        return "No calculation: " + " ".join(sources.binding_reasons)
+    return ""
+
+
+def sandwich_identity_rows(sources: SandwichSources) -> tuple:
+    model, evidence = sources.model, sources.evidence
+    rows = [("Experimental file", sources.unv_path), ("Experimental SHA-256", sources.unv_sha256),
+            ("Measurement series", f"{sources.identity.status}: {sources.identity.text}"),
+            ("Modal set", f"{sources.set_title}: {len(sources.records)} curve-fitted records"),
+            ("Abaqus input", model.inp_path), ("Abaqus input SHA-256", model.sha256 or "not read"),
+            ("FE model", (f"ACCEPTED SP-13 FE MODEL: {model.forward_model_id}" if model.accepted
+                          else "NOT THE ACCEPTED SP-13 FE MODEL: " + " ".join(model.reasons))),
+            ("FE frequencies", sources.fe_source),
+            ("Face sensitivities", evidence.status + (": " + " ".join(evidence.reasons) if evidence.reasons else "")),
+            ("Sensitivity archive folder", sources.archive_folder or "not configured")]
+    if model.material is not None:
+        m = model.material
+        rows.append(("Face material", f"{m.name}, *Elastic type=ENGINEERING CONSTANTS, INP lines "
+                                      f"{m.elastic_line}-{m.data_lines[-1]}: " + ", ".join(
+                                          f"{name} {token}" for name, token in zip(stc.CONSTANT_NAMES, m.tokens))))
+    rows += [("Checked", text) for text in model.checks + evidence.checks + sources.binding_checks]
+    rows += [("NOT VERIFIED", text) for text in sources.binding_reasons if text not in model.reasons + evidence.reasons]
+    return tuple(rows)
+
+
+SANDWICH_FE_HEADERS = ("FE mode", "FE baseline (Hz)", "S_E = d ln f / d ln E", "S_G12 = d ln f / d ln G12",
+                       "FE-to-FE branch in E+, E-, G12+, G12-")
+
+
+def sandwich_fe_rows(sources: SandwichSources) -> tuple:
+    rows = []
+    for mode, hz in sources.fe_modes:
+        item = sources.evidence.mode(mode) if sources.evidence.modes else None
+        if item is None:
+            rows.append((str(mode), f"{hz:.4f}", "—", "—", "no verified sensitivity"))
+        elif item.resolved:
+            lowest = min(mac for _m, mac, _hz in item.tracked.values())
+            rows.append((str(mode), f"{hz:.4f}", f"{item.s_e:.4f}", f"{item.s_g12:.4f}",
+                         f"resolved (lowest tracking MAC {lowest:.6f})"))
+        else:
+            rows.append((str(mode), f"{hz:.4f}", "—", "—", item.reason))
+    return tuple(rows)
+
+
+def parse_fe_modes(text: str) -> dict:
+    """"1:7, 2:9" -> {1: 7, 2: 9}: experimental record -> FE mode. Raises ValueError."""
+    mapping = {}
+    for part in (p.strip() for p in str(text).split(",")):
+        if not part:
+            continue
+        pieces = [piece.strip() for piece in part.split(":")]
+        if len(pieces) != 2 or not all(piece.isdigit() for piece in pieces):
+            raise ValueError(f"Declared list: '{part}' is not record:FE mode with two whole numbers.")
+        record, mode = int(pieces[0]), int(pieces[1])
+        if record in mapping:
+            raise ValueError(f"Declared list: record {record} is given more than once.")
+        mapping[record] = mode
+    return mapping
+
+
+def sandwich_hypotheses(sources: SandwichSources, declared_text: str) -> tuple:
+    """(the stated correspondences, problem of the declared list or ""). The frequency-rank one is always stated; the
+    declared one only when the list is not empty and valid."""
+    stated = [stc.frequency_order_hypothesis(sources.records, sources.fe_modes)]
+    problem = ""
+    try:
+        declared = parse_fe_modes(declared_text)
+        if declared:
+            stated.append(stc.declared_hypothesis(sources.records, declared))
+    except ValueError as error:
+        problem = str(error)
+    return tuple(stated), problem
+
+
+SANDWICH_RECORD_HEADERS = ("EXP record", "EXP (Hz)", "Role", "FE mode (your correspondence)", "FE baseline (Hz)",
+                           "FE vs EXP")
+
+
+def sandwich_record_texts(sources: SandwichSources, hypothesis: Optional[stc.Hypothesis]) -> dict:
+    """{record: (FE mode, FE baseline Hz, signed difference)} under the selected correspondence. Without a selected
+    correspondence there is no comparison: a record is never placed against an FE mode the user did not state."""
+    fe = dict(sources.fe_modes)
+    texts = {}
+    for record, hz in sources.records:
+        mode = None if hypothesis is None else hypothesis.fe_mode(record)
+        if hypothesis is None:
+            texts[record] = ("select a correspondence", "", "")
+        elif mode is None:
+            texts[record] = ("none stated", "", "")
+        elif mode not in fe:
+            texts[record] = (f"FE {mode}: not an FE mode of this model", "", "")
+        else:
+            texts[record] = (f"FE {mode}", f"{fe[mode]:.4f}", f"{(fe[mode] - hz) / hz:+.2%}")
+    return texts
+
+
+def run_sandwich_trial(sources: SandwichSources, roles: dict, declared_text: str, selected: str) -> stc.TrialResult:
+    why = sandwich_blocked(sources)
+    if why:
+        raise ValueError(why)
+    stated, problem = sandwich_hypotheses(sources, declared_text)
+    if problem:
+        raise ValueError(problem)
+    if selected not in [h.key for h in stated]:
+        raise ValueError("Select a correspondence first" + (": the declared list is empty." if selected == stc.DECLARED
+                                                           else "."))
+    return stc.calculate(sources.evidence, sources.records, roles, stated, selected)
+
+
+SANDWICH_CANDIDATE_HEADERS = ("Face material input", "INP value (MPa)", "Trial value (MPa)", "Change", "What it is")
+
+
+def sandwich_candidate_rows(result: stc.TrialResult) -> tuple:
+    outcome = result.selected
+    if not outcome.numerical:
+        return ()
+    rows = []
+    for name, parameter in (("E1", "E_in_plane_mpa"), ("E2", "E_in_plane_mpa"), ("G12", "G12_mpa")):
+        limit = parameter in outcome.at_limit
+        rows.append((name, f"{result.baseline[parameter]:g}", stc.full(outcome.values[name]),
+                     f"{outcome.change[parameter]:+.3%}",
+                     "LIMIT of the verified +/-5 % interval: a next trial point, NOT a fitted value" if limit
+                     else "exploratory trial value inside the verified interval"))
+    return tuple(rows)
+
+
+SANDWICH_FREQUENCY_HEADERS = ("EXP record", "Role", "FE mode", "EXP (Hz)", "FE baseline (Hz)", "Predicted (Hz)",
+                              "FE vs EXP before", "Predicted vs EXP", "Note")
+
+
+def sandwich_frequency_rows(outcome: stc.Outcome) -> tuple:
+    def hz(value):
+        return "—" if value is None else f"{value:.4f}"
+
+    def pct(value):
+        return "—" if value is None else f"{value:+.2%}"
+
+    return tuple((str(r.record), r.role, "—" if r.fe_mode is None else str(r.fe_mode), hz(r.experimental_hz),
+                  hz(r.baseline_hz), hz(r.predicted_hz), pct(r.before), pct(r.after), r.note) for r in outcome.rows)
+
+
+def sandwich_diagnostic_rows(result: stc.TrialResult) -> tuple:
+    outcome = result.selected
+
+    def pct(value):
+        return "—" if value is None else f"{value:.2%}"
+
+    rows = [("Outcome", outcome.status), ("Correspondence", outcome.hypothesis.title),
+            ("FIT records", str(outcome.fit_count)),
+            ("Rank", f"{outcome.rank} of 2 parameters at rcond {stc.RCOND:g}"),
+            ("Singular values", ", ".join(f"{s:.4g}" for s in outcome.singular_values) or "—"),
+            ("Condition number", "—" if outcome.condition is None else f"{outcome.condition:.3g}"),
+            ("Least determined combination", ", ".join(f"{k} {v:+.3f}" for k, v in outcome.weakest_direction.items()) or "—"),
+            ("FIT residual RMS, before -> after", f"{pct(outcome.rms.get('FIT_before'))} -> {pct(outcome.rms.get('FIT_after'))}"),
+            ("HOLDOUT residual RMS, before -> after",
+             f"{pct(outcome.rms.get('HOLDOUT_before'))} -> {pct(outcome.rms.get('HOLDOUT_after'))}")]
+    if outcome.unconstrained_change:
+        rows.append(("Unbounded linear solution (diagnostic, NOT a value outside +/-5 %)", ", ".join(
+            f"{stc.PARAMETER_TEXT[p]} {outcome.unconstrained_change[p]:+.1%}" for p in stc.PARAMETERS)))
+    for other in result.alternatives:
+        values = (f"E1 = E2 {stc.full(other.values['E1'])}, G12 {stc.full(other.values['G12'])} MPa" if other.numerical
+                  else "no value")
+        rows.append((f"Other stated correspondence, NOT selected: {other.hypothesis.title}",
+                     f"{other.status}; {values}; FIT RMS after {pct(other.rms.get('FIT_after'))}. " + " ".join(other.reasons)))
+    if result.competing:
+        rows.append(("COMPETING SOLUTIONS", "Another stated correspondence gives other values. Frequency agreement does "
+                                            "not decide between them; none is chosen."))
+    return tuple(rows)
+
+
+def sandwich_status_text(result: stc.TrialResult) -> str:
+    outcome = result.selected
+    return "\n".join([f"{outcome.status}. {stc.STATUS_TEXT[outcome.status]}", *outcome.reasons])
+
+
+def sandwich_sources_changed(sources: SandwichSources) -> str:
+    """"" when the INP and the experimental file on disk are still the files that were read."""
+    problems = []
+    for what, path, expected in (("INP", sources.model.inp_path, sources.model.sha256),
+                                 ("experimental file", sources.unv_path, sources.unv_sha256)):
+        try:
+            now = _file_sha256(path)
+        except OSError as error:
+            problems.append(f"the {what} cannot be read ({error})")
+            continue
+        if now != expected:
+            problems.append(f"the {what} changed on disk")
+    return "; ".join(problems)
+
+
+def sandwich_export_unavailable(result: Optional[stc.TrialResult], sources: Optional[SandwichSources]) -> str:
+    return stc.export_unavailable(result, None if sources is None else sources.model)
+
+
+def export_sandwich(result: stc.TrialResult, sources: SandwichSources, folder, stamp: str) -> tuple:
+    """The .txt and .csv of the trial values for a manual Abaqus entry. Raises ValueError / OSError; never overwrites."""
+    documents = stc.export_documents(result, sources.model, sources.evidence, {
+        "path": sources.unv_path, "sha256": sources.unv_sha256, "set_title": sources.set_title,
+        "identity": sources.identity.text})
+    return stc.write_export(documents, folder, stamp, unchanged=lambda: sandwich_sources_changed(sources))
