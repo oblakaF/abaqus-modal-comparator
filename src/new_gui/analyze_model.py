@@ -235,7 +235,7 @@ def registration_instances(inputs: Inputs) -> tuple:
 def registration_coverage(inputs: Inputs, set_index: int, draft: dict) -> tuple:
     """The measurement grid of a draft against the FE outer dimensions, on the read data (ABM-AUD-3); words only."""
     try:
-        evidence = gr.Evidence(**{key: tuple(map(tuple, value)) if key == "landmarks" else
+        evidence = gr.Evidence(**{key: tuple(map(tuple, value)) if key in ("landmarks", "sensor_directions") else
                                   (tuple(value) if isinstance(value, list) else value)
                                   for key, value in draft["evidence"].items()})
         result = draft["result"]
@@ -251,7 +251,15 @@ def propose_registration(inputs: Inputs, set_index: int, evidence: gr.Evidence, 
         confirm_sources(inputs, cancel_event)
     except StepFailed as error:
         return gr.required([gr.Problem(gr.STALE, str(error))], evidence=evidence)
-    proposal = gr.propose(inputs.full_fe.dataset, inputs.full_experimental.sets[set_index].dataset, evidence)
+    experimental = inputs.full_experimental.sets[set_index].dataset
+    proposal = gr.propose(inputs.full_fe.dataset, experimental, evidence)
+    if proposal.proposed:  # UNIVERSAL-GEOM-1: what the comparison would refuse is said now, before a draft is saved
+        try:
+            reason = cm.direction_refusal(experimental, cm.stated_sensor_directions(evidence, experimental))
+        except cm.ComparisonRefused as refusal:
+            reason = str(refusal)
+        if reason:
+            proposal = replace(proposal, status=gr.REGISTRATION_REQUIRED, problems=(gr.Problem(gr.DIRECTION, reason),))
     if cancel_event.is_set():
         raise StepCancelled()
     return proposal
@@ -386,11 +394,11 @@ class Analysis:
 
 
 NEAREST_HEADERS = ("EXP record", "EXP mode", "EXP (Hz)", "Nearest FE mode", "FE (Hz)", "Error (%)", "Next FE mode",
-                   "Next FE (Hz)", "Next error (%)", "Note")
+                   "Next FE (Hz)", "Next error (%)", "Note", "Verdict")
 FE_HEADERS = ("FE mode", "Frequency (Hz)", "Type (by shape)")
 EXPERIMENTAL_HEADERS = ("EXP record", "EXP mode", "Frequency (Hz)", "Classification")
 # of comparison_model.PAIR_HEADERS: modes, frequencies, error, MAC, status; ABM-AUD-4: coverage, points, close modes
-PAIR_COLUMNS = (0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 12)
+PAIR_COLUMNS = (0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 14)  # UNIVERSAL-GEOM-1: and the verdict
 PAIR_HEADERS = tuple(cm.PAIR_HEADERS[i] for i in PAIR_COLUMNS)
 
 
@@ -442,7 +450,16 @@ def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional
     position = {}
     for index, record in enumerate(analyzed.records):
         position.setdefault(record.number, index + 1)
-    nearest = tuple((f"EXP{position[int(row[1])]}",) + tuple(row[1:9]) + (row[11],) for row in view.nearest_rows)
+    # UNIVERSAL-GEOM-1: every record, EXP1 included, says what is known of its correspondence
+    if compared is None:
+        verdict = lambda number: cm.INSUFFICIENT_TEXT  # noqa: E731
+    elif compared.result is None:  # a comparison whose own result was not kept states no verdict
+        verdict = lambda number: cm.DASH  # noqa: E731
+    else:
+        verdicts = cm.mode_verdicts(compared.result)
+        verdict = lambda number: verdicts.get(number, cm.NOT_COMPARED_VERDICT)  # noqa: E731
+    nearest = tuple((f"EXP{position[int(row[1])]}",) + tuple(row[1:9]) + (row[11], verdict(int(row[1])))
+                    for row in view.nearest_rows)
     experimental = tuple((f"EXP{position[int(row[1])]}",) + tuple(row[1:]) for row in view.experimental_rows)
     diagnostic = outcome.diagnostic
     rigid = {int(mode) for mode, _f, _r in diagnostic.rigid_fe_modes}

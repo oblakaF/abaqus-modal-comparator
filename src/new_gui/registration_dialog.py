@@ -12,6 +12,9 @@ ABM-AUD-3: the form says what is needed and where each statement comes from (the
 evidence). A scan turned in its plane by any angle is stated by its out-of-plane axis and three landmarks; a landmark is
 an FE node or an FE position. The result shows the rotation, the translation, the unit factor, the landmark consistency
 and the extent of the measurement grid against the FE outer dimensions. The dialog never exceeds the screen.
+
+UNIVERSAL-GEOM-1: a beam or a curved shell. The measured side may be "all around the part", and single-axis sensors
+that measure in different directions (radial sensors on a tube) are stated one direction per point.
 """
 
 from __future__ import annotations
@@ -57,8 +60,15 @@ LANDMARK_NOTE = ("A landmark is an experimental point and the place where it phy
                  "label, or its FE position X, Y, Z in FE units. Measure the place on the part; the outermost scan "
                  "points are usually not on the FE edges.")
 SECTIONS = ("FE model", "Experiment", "Physical evidence (from the part and the test set-up)")
-SIDE_NOTE = "The FE direction the measured face looks towards."
+SIDE_NOTE = ("The FE direction the measured face looks towards. For points all around the part (a tube, a closed "
+             "section) choose 'all around the part': no single face is stated.")
+AROUND_TEXT = "all around the part"
 DOF_NOTE = "The experimental components that were measured."
+DIRECTION_HINT = "One per line: experimental point, dx, dy, dz   (experimental axes)"
+DIRECTION_NOTE = ("Only for single-axis sensors that do not all measure along one experimental axis (for example radial "
+                  "sensors on a tube): the direction each sensor measures along, for every point. FE motion is then "
+                  "compared along these directions. Leave empty when the measured DOFs are components along the "
+                  "experimental axes.")
 DETAILS_TITLE = "Transform and coverage"
 ACROSS = object()  # a form row that takes both columns
 MAPPING_HEADERS = ("Experimental point", "FE node", "Distance", "Landmark")
@@ -112,6 +122,24 @@ def parse_landmarks(text: str) -> tuple:
             except ValueError:
                 pass
         bad.append(line.strip())
+    return tuple(pairs), tuple(bad)
+
+
+def parse_directions(text: str) -> tuple:
+    """(point and "(dx, dy, dz)" pairs, lines that are not a point with three numbers)."""
+    pairs, bad = [], []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        parts = [part.strip() for part in line.replace(";", ",").split(",")]
+        if len(parts) == 1:
+            parts = line.split()
+        try:
+            if len(parts) != 4 or not parts[0]:
+                raise ValueError(line)
+            pairs.append((parts[0], gr.position_text(*(float(part.strip("() ")) for part in parts[1:]))))
+        except ValueError:
+            bad.append(line.strip())
     return tuple(pairs), tuple(bad)
 
 
@@ -221,6 +249,11 @@ class RegistrationDialog(QDialog):
         self.experimental_unit = _combo(gr.UNITS, "regExperimentalUnit", CHOOSE)
         self.axes = tuple(_combo(gr.DIRECTIONS, f"regAxis{name}", NOT_STATED) for name in "xyz")
         self.side = _combo(gr.DIRECTIONS, "regSide", CHOOSE)
+        self.side.addItem(AROUND_TEXT, gr.AROUND)
+        self.directions = QPlainTextEdit()
+        self.directions.setObjectName("regSensorDirections")
+        self.directions.setPlaceholderText(DIRECTION_HINT)
+        self.directions.setFixedHeight(84)
         instances = am.registration_instances(self.inputs)
         self.instance = _combo(instances if len(instances) > 1 else (), "regInstance", CHOOSE)
         self.instance.setVisible(len(instances) > 1)
@@ -252,6 +285,7 @@ class RegistrationDialog(QDialog):
                 (self.instance_caption, self.instance),
                 (experiment_title, None), ("Coordinate unit", self.experimental_unit),
                 ("Measured DOFs", dofs), (None, _text(DOF_NOTE, "hint")),
+                ("Sensor directions", self.directions), (None, _text(DIRECTION_NOTE, "hint")),
                 (evidence_title, None), (QLabel("Experimental axes in FE"), None), (ACROSS, axes),
                 (ACROSS, self.turned_label),
                 ("Landmarks", self.landmarks), (None, self.landmark_label), ("Evidence source", self.source))
@@ -280,12 +314,14 @@ class RegistrationDialog(QDialog):
     def evidence(self) -> tuple:
         """(the stated evidence, landmark lines that could not be read)."""
         pairs, bad = parse_landmarks(self.landmarks.toPlainText())
+        directions, bad_directions = parse_directions(self.directions.toPlainText())
+        bad += tuple(f"sensor direction {line}" for line in bad_directions)
         return gr.Evidence(fe_unit=self.fe_unit.currentData(), experimental_unit=self.experimental_unit.currentData(),
                            axes=tuple(combo.currentData() for combo in self.axes),
                            measured_side=self.side.currentData(),
                            measured_dofs=tuple(name for name, box in self.dofs.items() if box.isChecked()),
                            landmarks=pairs, source=self.source.text().strip(),
-                           measured_instance=self.instance.currentData()), bad
+                           measured_instance=self.instance.currentData(), sensor_directions=directions), bad
 
     def check(self) -> bool:
         """Check the stated evidence in a worker thread; a newer check or a closed dialog discards this one."""
@@ -293,7 +329,9 @@ class RegistrationDialog(QDialog):
             return False
         evidence, bad = self.evidence()
         if bad:
-            problem = gr.Problem(gr.LANDMARK, f"These landmark lines are not a pair: {'; '.join(bad)}.")
+            problem = gr.Problem(gr.LANDMARK, f"These landmark lines are not a pair: {'; '.join(bad)}. A landmark is a "
+                                              "point and an FE node or position; a sensor direction is a point and "
+                                              "dx, dy, dz.")
             self._show(gr.required([problem], evidence=evidence))
             return False
         inputs, set_index = self.inputs, self.set_index
@@ -479,6 +517,7 @@ class RegistrationDialog(QDialog):
         for name, box in self.dofs.items():
             box.setChecked(name in evidence.measured_dofs)
         self.landmarks.setPlainText("\n".join(f"{point}, {node}" for point, node in evidence.landmarks))
+        self.directions.setPlainText("\n".join(f"{point}, {text.strip('()')}" for point, text in evidence.sensor_directions))
         self.source.setText(evidence.source)
 
     def _show(self, proposal: gr.Proposal) -> None:
@@ -548,4 +587,4 @@ class RegistrationDialog(QDialog):
         super().closeEvent(event)
 
 
-__all__ = ["RegistrationDialog", "TITLE", "fit_to_screen", "parse_landmarks"]
+__all__ = ["RegistrationDialog", "TITLE", "fit_to_screen", "parse_directions", "parse_landmarks"]

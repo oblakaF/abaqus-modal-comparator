@@ -166,11 +166,12 @@ class ClearCorrespondenceTests(_Compared):
         table = panel.tables["pairs"]
         headers = [table.horizontalHeaderItem(c).text() for c in range(table.columnCount())]
         self.assertEqual(headers, ["FE mode", "FE (Hz)", "Exp record", "Exp mode", "Exp (Hz)", "Error (%)", "MAC",
-                                   "Comparator status", "DOF coverage", "Points", "Close modes"])
+                                   "Comparator status", "DOF coverage", "Points", "Close modes", "Verdict"])
         first = [table.item(0, c).text() for c in range(table.columnCount())]
         self.assertEqual(first[:6], ["7", "50.0000", "1", "1", f"{float(first[4]):.4f}", "-1.96"])
         self.assertAlmostEqual(float(first[4]), 51.0, places=3)
-        self.assertEqual(first[8:], ["100 %", str(GRID * GRID), cm.DASH])
+        self.assertEqual(first[8:11], ["100 %", str(GRID * GRID), cm.DASH])
+        self.assertTrue(first[11].startswith(cm.CONFIRMED_VERDICT), first[11])  # UNIVERSAL-GEOM-1
         self.assertEqual(first[7], str(analysis.comparison_result.pairs[0].status))  # the comparator's own word
         mac_table = panel.tables["mac"]
         self.assertEqual([mac_table.horizontalHeaderItem(c).text() for c in range(mac_table.columnCount())],
@@ -198,7 +199,8 @@ class ClearCorrespondenceTests(_Compared):
         self.assertEqual((view.pair_rows[0].abaqus_mode, view.pair_rows[0].experimental_mode), (FIRST, 1))
         self.assertEqual(view.candidate_rows[0][:2], ("1", "1"))
         self.assertEqual(len(view.candidate_rows), 5)  # no record is dropped
-        self.assertTrue(all(row.cells[-1] == cm.AUTO_ID_USE for row in view.pair_rows))  # never an Auto-ID observation
+        self.assertTrue(all(row.cells[13] == cm.AUTO_ID_USE for row in view.pair_rows))  # never an Auto-ID observation
+        self.assertEqual(cm.PAIR_HEADERS[13:], ("Auto-ID use", "Verdict"))  # UNIVERSAL-GEOM-1: the verdict follows it
 
     def test_the_comparators_limits_are_the_existing_ones(self):
         _panel, analysis = self.compared(CLEAR_FE, CLEAR_EXP)

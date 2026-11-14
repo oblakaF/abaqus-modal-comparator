@@ -46,6 +46,15 @@ its status, and it is NOT_AVAILABLE, with the reason, whenever the group does no
 No threshold is added and no pair is formed here. These words are kept in the existing ``close_groups`` and unmatched
 rows of the view, so a saved project holds them without a new field.
 
+UNIVERSAL-GEOM-1: single-axis sensors in different directions (a tube measured radially). On the confirmed route, and
+only when the confirmation states a direction for every measured point, the FE displacement of each mapped node is
+replaced by its projection on that point's stated direction before the comparator runs, so MAC compares what the
+sensors measured and never an assumed global component. The file's own vectors are checked first: every record's vector
+at a point must lie along the stated direction. A file whose vectors show such sensors while no direction is stated is
+refused, and so is a statement the file contradicts: MAC is not computed. The rigid-body FE modes are the comparator's
+own and are left as read. ``mode_verdicts`` words, for each experimental record, what the comparator's result says of its
+correspondence; it forms no pair and adds no limit.
+
 One heavy operation at a time: the comparison shares the lock of the frequency diagnostic and the registration check
 (NEW-GUI.4/5). ``ComparisonSlot`` keeps the current request; a replaced or cleared file, Inspect again, another modal
 set, a new registration check or a closed window cancels it and its outcome is discarded. A request cancelled while
@@ -54,6 +63,7 @@ it waits for the lock never runs the comparator.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 import math
 from pathlib import Path
@@ -110,7 +120,24 @@ LIMITS = (
 IDLE, RUNNING, DONE, REFUSED, FAILED = "idle", "running", "done", "refused", "failed"
 
 PAIR_HEADERS = ("FE mode", "FE (Hz)", "Exp record", "Exp mode", "Exp (Hz)", "Error (%)", "MAC", "Comparator status",
-                "Measured DOFs", "DOF coverage", "Points", "Order", "Close modes", "Auto-ID use")
+                "Measured DOFs", "DOF coverage", "Points", "Order", "Close modes", "Auto-ID use", "Verdict")
+# UNIVERSAL-GEOM-1: what the comparator's result says of one experimental record, in one word and a sentence
+CONFIRMED_VERDICT = "CORRESPONDENCE_CONFIRMED"
+REJECTED_VERDICT = "CORRESPONDENCE_REJECTED"
+AMBIGUOUS_VERDICT = "CORRESPONDENCE_AMBIGUOUS"
+INSUFFICIENT_VERDICT = "INSUFFICIENT_REGISTRATION_EVIDENCE"
+INSUFFICIENT_TEXT = (f"{INSUFFICIENT_VERDICT}: no verified or confirmed physical registration applies, so no MAC "
+                     "and no correspondence is stated for this record.")
+NOT_COMPARED_VERDICT = "NOT_COMPARED: the comparator did not take this record."
+VERDICT_NOTE = ("Verdict: the comparator's result for each experimental record in words. Confirmed: one admissible FE "
+                "mode, assigned, with the comparator's status Excellent or Good. Ambiguous: several admissible "
+                "candidates, a weaker status, or no MAC. Rejected: no FE mode passes the comparator's limits. A verdict "
+                "holds for the registration that was confirmed; it is not a physical validation.")
+SOUND_STATUSES = ("Excellent match", "Good match")
+PROJECTION_NOTE = ("MAC uses the FE displacement projected on the stated single-axis sensor direction of each measured "
+                   "point, not the components along the experimental axes.")
+DIRECTION_REQUIRED = "MAC NOT COMPUTED: MEASUREMENT_DIRECTION_REQUIRED."
+DIRECTION_CONTRADICTED = "MAC NOT COMPUTED: MEASUREMENT_DIRECTION_CONTRADICTED."
 CANDIDATE_HEADERS = ("Exp record", "Exp mode", "Exp (Hz)", "Best-MAC FE mode", "FE (Hz)", "MAC", "Error (%)",
                      "Coverage", "Admissible", "Rejected by", "Assigned")
 UNMATCHED_HEADERS = ("Mode", "Frequency (Hz)", "Nearest in frequency", "Highest MAC", "Why it has no pair")
@@ -193,6 +220,123 @@ def check_sources(fe_preview, sources: Optional[dict], experimental_now: Optiona
     return {"fe": fe_read, "experimental": experimental_read}
 
 
+def _vector_text(vector) -> str:
+    return "(" + ", ".join(f"{float(value) + 0.0:+.3f}" for value in vector) + ")"
+
+
+def _sensor_lines(dataset) -> tuple:
+    """For each experimental point, the line all its records' measured vectors share: (unit lines with NaN rows where
+    nothing was measured, whether a point's vectors leave their line, record count). The off-line share is the
+    registration's provisional extent heuristic (``RANK_RATIO``); nothing here is a modal quantity."""
+    import numpy as np
+    from services import generic_registration as gr
+
+    modes = list(dataset.modes)
+    parts = []
+    for mode in modes:
+        vectors = np.asarray(mode.vectors, dtype=complex)
+        measured = np.isfinite(vectors.real) & np.isfinite(vectors.imag)
+        mask = getattr(mode, "measured_dofs", None)
+        if mask is not None and np.shape(mask) == vectors.shape:
+            measured &= np.asarray(mask, dtype=bool)
+        values = np.where(measured, vectors, 0.0)
+        parts += [values.real, values.imag]
+    block = np.stack(parts, axis=1)  # points x (2 records) x 3
+    lines = np.full((block.shape[0], 3), np.nan)
+    off_line = np.zeros(block.shape[0], dtype=bool)
+    floor = 1.0e-12 * float(np.abs(block).max(initial=0.0))
+    for row in range(block.shape[0]):
+        _u, values, vt = np.linalg.svd(block[row], full_matrices=False)
+        if values[0] <= floor:
+            continue
+        lines[row] = vt[0]
+        off_line[row] = len(values) > 1 and values[1] > gr.RANK_RATIO * values[0]
+    return lines, off_line, len(modes)
+
+
+def stated_sensor_directions(evidence, experimental_dataset):
+    """The confirmed sensor direction of every experimental point (unit vectors, experimental axes), or None."""
+    import numpy as np
+    from services import generic_registration as gr
+
+    if evidence is None or not evidence.sensor_directions:
+        return None
+    names = [str(value) for value in np.asarray(experimental_dataset.modes[0].node_ids, dtype=object)]
+    problems: list = []
+    directions = gr._sensor_directions(evidence, names, problems)
+    if directions is None:
+        raise ComparisonRefused(f"{DIRECTION_CONTRADICTED} " + " ".join(problem.text for problem in problems))
+    return directions
+
+
+def direction_refusal(experimental_dataset, stated) -> str:
+    """Why MAC is not computed on these measured directions (empty when it can be).
+
+    Without stated directions: every point's vectors lie along one line in at least two records, and at some point that
+    line is not an experimental axis. Such sensors measure one direction each, and a comparison of the components along
+    the experimental axes would include FE motion that was never measured. With stated directions: the file's vectors
+    must lie along them. The angle is the registration's provisional stated-axis heuristic."""
+    import numpy as np
+    from services import generic_registration as gr
+
+    lines, off_line, records = _sensor_lines(experimental_dataset)
+    names = [str(value) for value in np.asarray(experimental_dataset.modes[0].node_ids, dtype=object)]
+    measured = np.isfinite(lines[:, 0])
+    limit = float(np.cos(np.radians(gr.STATED_AXIS_DEGREES)))
+    if stated is None:
+        if records < 2 or not measured.any() or off_line[measured].any():
+            return ""
+        oblique = [row for row in np.flatnonzero(measured) if float(np.abs(lines[row]).max()) < limit]
+        if not oblique:
+            return ""
+        row = oblique[0]
+        return (f"{DIRECTION_REQUIRED} At every measured point the vectors of all {records} records lie along one line, "
+                f"and at {len(oblique)} of {int(measured.sum())} points that line is not an experimental axis (for "
+                f"example point {names[row]}: {_vector_text(lines[row])}). These are single-axis sensors in different "
+                "directions; comparing the components along the experimental axes would count FE motion that was not "
+                "measured. State the sensor direction of every point in Set up registration and confirm it.")
+    if records >= 2 and off_line[measured].any():
+        rows = np.flatnonzero(measured & off_line)
+        return (f"{DIRECTION_CONTRADICTED} A single-axis sensor direction is stated for every point, but at "
+                f"{len(rows)} points the file's vectors do not stay on one line (for example point {names[rows[0]]}): "
+                "these points were not measured by single-axis sensors. Remove the sensor directions, or check the file.")
+    cosines = np.abs(np.einsum("ij,ij->i", np.nan_to_num(lines), stated))
+    wrong = [row for row in np.flatnonzero(measured) if cosines[row] < limit]
+    if wrong:
+        row = max(wrong, key=lambda item: -cosines[item])
+        angle = float(np.degrees(np.arccos(min(1.0, float(cosines[row])))))
+        return (f"{DIRECTION_CONTRADICTED} At {len(wrong)} of {int(measured.sum())} points the file's vectors do not "
+                f"lie along the stated sensor direction (at most {gr.STATED_AXIS_DEGREES:g} degrees apart; for example "
+                f"point {names[row]}: file {_vector_text(lines[row])}, stated {_vector_text(stated[row])}, "
+                f"{angle:.1f} degrees). A file that stores each sensor's reading in one column, without its direction, "
+                "cannot be compared: nothing is guessed.")
+    return ""
+
+
+def _projected_fe(dataset, node_labels, directions_fe, keep) -> Any:
+    """A copy of the FE data whose modes, except the numbers in ``keep``, hold at each mapped node only the displacement
+    along that node's sensor direction (FE frame). The read data are not changed."""
+    import numpy as np
+
+    projected = copy.copy(dataset)
+    modes = []
+    for mode in dataset.modes:
+        if int(mode.number) in keep:
+            modes.append(mode)
+            continue
+        lookup = {str(label): row for row, label in enumerate(np.asarray(mode.node_ids, dtype=object))}
+        rows = np.asarray([lookup[str(label)] for label in node_labels], dtype=int)
+        vectors = np.array(mode.vectors, dtype=complex)
+        along = np.einsum("ij,ij->i", vectors[rows], directions_fe)
+        vectors[rows] = along[:, np.newaxis] * directions_fe
+        changed = copy.copy(mode)
+        changed.vectors = vectors
+        modes.append(changed)
+    projected.modes = type(dataset.modes)(modes) if isinstance(dataset.modes, (list, tuple)) else modes
+    projected.metadata = copy.deepcopy(dict(dataset.metadata or {}))
+    return projected
+
+
 def compare_confirmed(fe_preview, experimental_preview, set_index: int, confirmation: dict, cancel_event, sources: dict,
                       scope: tuple, modal_set: dict, source_hashes: dict):
     """Check the sources and the confirmation now, then run the comparator on ``scope``; (confirmed, result)."""
@@ -208,12 +352,34 @@ def compare_confirmed(fe_preview, experimental_preview, set_index: int, confirma
     confirmed = cs.revalidate(confirmation, fe_preview.dataset, experimental_preview.sets[set_index].dataset,
                               modal_set=modal_set, sources=source_hashes)
     _check_scope(fe_preview, experimental_preview, set_index, scope)
+    stated = stated_sensor_directions(confirmed.evidence, experimental_preview.sets[set_index].dataset)
+    refusal = direction_refusal(experimental_preview.sets[set_index].dataset, stated)
+    if refusal:
+        raise ComparisonRefused(refusal)
     if cancel_event.is_set():
         raise ComparisonCancelled()
     from modal_core import compare_modal_datasets  # the reviewed quality-control facade (runtime_contracts)
 
     result = compare_modal_datasets(scope[0].dataset, scope[1].sets[set_index].dataset,
                                     frozen_registration=confirmed.registration)
+    if stated is not None:
+        import numpy as np
+
+        def rigid(outcome) -> set:
+            quality = dict(getattr(outcome.abaqus, "metadata", None) or {}).get("quality_control") or {}
+            return {int(number) for number in quality.get("excluded_abaqus_modes") or ()}
+
+        excluded = rigid(result)  # the comparator's own rigid-body modes, on the FE data as read
+        directions_fe = stated @ np.asarray(confirmed.registration.rotation, dtype=float).T
+        projected = _projected_fe(scope[0].dataset, confirmed.registration.mapped_fe_node_ids, directions_fe, excluded)
+        result = compare_modal_datasets(projected, scope[1].sets[set_index].dataset,
+                                        frozen_registration=confirmed.registration)
+        if rigid(result) != excluded:
+            raise ComparisonRefused("the projection on the sensor directions changed which FE modes the comparator "
+                                    "takes for rigid-body modes; the comparison is not shown.")
+        result.metadata["sensor_direction_projection"] = {"points": int(len(stated)), "frame": "experimental axes",
+                                                          "source": "user-confirmed sensor directions"}
+        result.warnings.insert(0, PROJECTION_NOTE)
     result.metadata["user_confirmed_registration"] = confirmed.provenance()
     result.warnings.insert(0, confirmed.warning())
     return confirmed, result
@@ -432,6 +598,46 @@ def _unmatched_rows(items, side: str, result, numbers: tuple) -> tuple:
     return tuple(rows)
 
 
+def mode_verdicts(result) -> dict:
+    """Experimental mode number -> the verdict of its correspondence, from the comparator's own pairs, statuses and
+    candidate diagnostics. Nothing is paired, re-ranked or limited here."""
+    candidates = list(result.candidate_diagnostics or ())
+    pairs = {int(pair.experimental_mode): pair for pair in result.pairs}
+    verdicts = {}
+    for number in (int(n) for n in result.experimental_mode_numbers):
+        own = [c for c in candidates if int(c.experimental_mode) == number]
+        admissible = [c for c in own if c.admissible]
+        pair = pairs.get(number)
+        if pair is None:
+            if admissible:
+                names = ", ".join(f"FE {c.abaqus_mode}" for c in admissible)
+                verdicts[number] = (f"{AMBIGUOUS_VERDICT}: admissible with {names}, but the one-to-one assignment gave "
+                                    "that mode to another record.")
+            elif own:
+                best = max(own, key=lambda c: -1.0 if c.mac is None or not math.isfinite(c.mac) else float(c.mac))
+                verdicts[number] = (f"{REJECTED_VERDICT}: no FE mode passes the comparator's limits (highest MAC: FE "
+                                    f"{best.abaqus_mode}, MAC {_mac(best.mac)}, error "
+                                    f"{_percent(best.frequency_error_percent)} %).")
+            else:
+                verdicts[number] = f"{REJECTED_VERDICT}: the comparator recorded no FE candidate for this record."
+            continue
+        fe = int(pair.abaqus_mode)
+        measure = f"FE {fe}, MAC {_mac(pair.mac)}, error {_percent(pair.frequency_error_percent)} %"
+        rivals = [f"FE {c.abaqus_mode}" for c in admissible if int(c.abaqus_mode) != fe]
+        rivals += [f"EXP {c.experimental_mode} for FE {fe}" for c in candidates
+                   if c.admissible and int(c.abaqus_mode) == fe and int(c.experimental_mode) != number]
+        if rivals:
+            verdicts[number] = f"{AMBIGUOUS_VERDICT}: paired with {measure}, but also admissible: {', '.join(rivals)}."
+        elif pair.mac is None or not math.isfinite(float(pair.mac)):
+            verdicts[number] = f"{AMBIGUOUS_VERDICT}: paired with {measure} by frequency only; the shape is not compared."
+        elif str(pair.status) in SOUND_STATUSES:
+            verdicts[number] = f"{CONFIRMED_VERDICT}: {measure}; the only admissible FE mode ({pair.status})."
+        else:
+            verdicts[number] = (f"{AMBIGUOUS_VERDICT}: {measure} is the only admissible FE mode, but the comparator's "
+                                f"status is {pair.status}.")
+    return verdicts
+
+
 def _subspace_text(pairs) -> str:
     """The group's subspace MAC from the existing cluster service, or NOT_AVAILABLE with the reason."""
     if len(pairs) < 2:
@@ -605,6 +811,7 @@ def comparison_view(result, bound, fe_preview, experimental_preview, set_index: 
     close_fe = _group_members(metadata_fe.get("close_abaqus_mode_groups"))
     close_exp = _group_members(metadata_fe.get("close_experimental_mode_groups"))
     rows = []
+    verdicts = mode_verdicts(result)
     for index, pair in enumerate(result.pairs):
         close = []
         if int(pair.abaqus_mode) in close_fe:
@@ -618,7 +825,8 @@ def comparison_view(result, bound, fe_preview, experimental_preview, set_index: 
                  _hz(pair.experimental_frequency_hz), _percent(pair.frequency_error_percent), mac_text,
                  str(pair.status), DASH if dof_count is None else str(dof_count),
                  _fraction(getattr(pair, "dof_coverage_fraction", None)), str(pair.mapped_points),
-                 "changed" if pair.order_changed else "kept", "; ".join(close) or DASH, AUTO_ID_USE)
+                 "changed" if pair.order_changed else "kept", "; ".join(close) or DASH, AUTO_ID_USE,
+                 verdicts.get(int(pair.experimental_mode), DASH))
         rows.append(PairRow(index, int(pair.abaqus_mode), int(pair.experimental_mode), pair.mac,
                             float(pair.frequency_error_percent), cells))
 
@@ -669,13 +877,15 @@ def comparison_view(result, bound, fe_preview, experimental_preview, set_index: 
         ("Archived modal set", str(provenance["modal_set"])),
         ("FE geometry identity", f"{provenance['fe_geometry_sha256']} ({provenance['fe_node_count']} nodes)"),
         ("Experimental SHA-256", str(provenance["experimental_sha256"])),
-        ("Orientation source", str(meta.get("orientation_source", DASH))),
+        # the MAC / Points page shows this row, so the projection is said where the registration is described
+        ("Orientation source", str(meta.get("orientation_source", DASH))
+         + (f". {PROJECTION_NOTE}" if meta.get("sensor_direction_projection") else "")),
         ("Geometry candidates evaluated", str(meta.get("evaluated_geometry_candidate_count", DASH))),
         ("Mapping RMS / max residual (FE units)",
          f"{_float(meta.get('mapping_rms_in_abaqus_units'))} / {_float(meta.get('mapping_max_residual_in_abaqus_units'))}"),
         ("Matched point fraction", _fraction(getattr(result.geometry, "matched_fraction", None))),
         ("Comparator state", str(result.diagnostic_state)),
-    ] + [(f"Check {number}", text) for number, text in enumerate(provenance["checks"], start=1)]
+    ] + ([("Measured directions", PROJECTION_NOTE)] if meta.get("sensor_direction_projection") else []) + [(f"Check {number}", text) for number, text in enumerate(provenance["checks"], start=1)]
     gates = tuple((key.replace("_", " "), str(value))
                   for key, value in dict(meta.get("admissibility_gates") or {}).items())
     errors = [abs(r.frequency_error_percent) for r in rows]
@@ -765,5 +975,6 @@ def run_pair_images(result, index: int, token: int, cancel_event: threading.Even
 
 
 __all__ = ["ComparisonOutcome", "ComparisonRefused", "ComparisonSlot", "ComparisonView", "PairImages", "PairRow",
-           "close_group_lines", "close_group_rows", "compare", "compare_confirmed", "comparison_view", "render_mac_image", "run_compare",
+           "close_group_lines", "close_group_rows", "compare", "compare_confirmed", "comparison_view", "direction_refusal",
+           "mode_verdicts", "render_mac_image", "run_compare", "stated_sensor_directions",
            "run_compare_confirmed", "run_pair_images", "unavailable"]

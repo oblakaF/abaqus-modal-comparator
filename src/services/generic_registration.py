@@ -35,6 +35,15 @@ its SHA-256, then the source hashes, the modal set and both geometries against t
 result is computed again from the stored evidence alone and compared. The SHA-256 only finds accidental or careless
 changes, since anyone can recompute it; the recomputation is the check. A draft is never an accepted physical
 registration and always needs the user's review.
+
+UNIVERSAL-GEOM-1: a beam or a curved shell. The measured side may be ``AROUND``: the points lie all around the part (a
+tube with sensors on its circumference), so no single face is stated and each point takes its nearest FE node of the
+measured part. Single-axis sensors that do not all measure along one experimental axis are stated one by one
+(``sensor_directions``, in experimental axes): the statement is checked here for completeness and against the stated
+measured DOFs, and the offset between each measured point and its FE node along its sensor direction is reported. Two FE
+nodes that follow one another along a sensor direction and lie equally near a point leave the measured surface unknown:
+that is refused. Nothing here reads a measured or computed shape; whether the file's own values lie along the stated
+directions is checked where the comparison is made.
 """
 
 from __future__ import annotations
@@ -64,6 +73,8 @@ REGISTRATION_PROPOSED = "REGISTRATION_PROPOSED"
 UNIT_IN_METRES = {"m": 1.0, "cm": 0.01, "mm": 0.001, "in": 0.0254}
 UNITS = tuple(UNIT_IN_METRES)
 DIRECTIONS = ("+X", "-X", "+Y", "-Y", "+Z", "-Z")
+AROUND = "AROUND"  # the measured points lie all around the part: no single face looks towards one FE direction
+SIDES = DIRECTIONS + (AROUND,)
 DOFS = ("x", "y", "z")
 GEOMETRY_TOLERANCE = 0.03  # of the scan diagonal, the comparator's geometry tolerance
 # Provisional diagnostic heuristics, not approved scientific gates:
@@ -91,6 +102,8 @@ SIDE = "MEASURED_SIDE_MISMATCH"
 DOF = "DOF_INCOMPATIBLE"
 GEOMETRY = "GEOMETRY_INVALID"
 LOCAL_AXES = "LOCAL_COORDINATE_SYSTEMS"
+DIRECTION = "SENSOR_DIRECTION"
+SURFACE = "SURFACE_OFFSET_UNKNOWN"
 STALE = "FILES_CHANGED"
 LIMIT = "Diagnostic only: this mapping is not applied. No MAC and no mode pair is computed from it."
 DRAFT_SCHEMA = "universal/registration-draft/v2"
@@ -129,10 +142,22 @@ class Evidence:
     landmarks: tuple = ()  # (experimental point, FE node or "(x, y, z)" FE position), independent of any modal result
     source: str = ""  # how the statements were established
     measured_instance: str = ""  # the FE instance that was measured; required when the FE data hold several
+    # (experimental point, "(dx, dy, dz)" in experimental axes): the one direction each single-axis sensor measures
+    # along. Every point or none; none means the measured DOFs are components along the experimental axes.
+    sensor_directions: tuple = ()
 
     @property
     def evidence_hash(self) -> str:
-        return hashlib.sha256(json.dumps(asdict(self), sort_keys=True, default=str).encode("utf-8")).hexdigest()
+        return hashlib.sha256(json.dumps(evidence_document(self), sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+def evidence_document(evidence: Evidence) -> dict:
+    """The evidence as a draft holds it. Sensor directions appear only when stated, so evidence without them keeps the
+    content and the SHA-256 it had before they existed."""
+    document = asdict(evidence)
+    if not document["sensor_directions"]:
+        del document["sensor_directions"]
+    return document
 
 
 @dataclass(frozen=True)
@@ -293,6 +318,45 @@ def _landmarks(evidence: Evidence, experimental_names: list, fe_names: list, fe_
     return rows_e, rows_f, np.asarray(targets, dtype=float).reshape(len(targets), 3)
 
 
+def _sensor_directions(evidence: Evidence, experimental_names: list, problems: list) -> Optional[np.ndarray]:
+    """The stated sensor direction of every experimental point, as unit vectors in experimental axes; None when none is
+    stated or when the statement cannot be used (the reasons are added to ``problems``)."""
+    if not evidence.sensor_directions:
+        return None
+    lookup = {name: row for row, name in enumerate(experimental_names)}
+    directions = np.full((len(experimental_names), 3), np.nan)
+    found = len(problems)
+    for point, text in evidence.sensor_directions:
+        point = str(point).strip()
+        vector = landmark_position(text)
+        if point not in lookup:
+            problems.append(Problem(DIRECTION, f"Sensor direction: experimental point {point} is not in the experimental "
+                                               "data."))
+        elif vector is None or float(np.linalg.norm(vector)) <= 0.0:
+            problems.append(Problem(DIRECTION, f"Sensor direction of point {point}: {text} is not a direction; write it "
+                                               "as (dx, dy, dz) in experimental axes, not all zero."))
+        elif np.isfinite(directions[lookup[point]]).all():
+            problems.append(Problem(DIRECTION, f"Sensor direction: experimental point {point} is stated twice."))
+        else:
+            directions[lookup[point]] = np.asarray(vector, dtype=float) / float(np.linalg.norm(vector))
+    if len(problems) > found:
+        return None
+    missing = [name for row, name in enumerate(experimental_names) if not np.isfinite(directions[row]).all()]
+    if missing:
+        shown = ", ".join(missing[:8]) + (", ..." if len(missing) > 8 else "")
+        problems.append(Problem(DIRECTION, f"Sensor directions are stated for {len(experimental_names) - len(missing)} of "
+                                           f"{len(experimental_names)} experimental points; a direction is needed for "
+                                           f"every point or for none. Missing: {shown}."))
+        return None
+    used = np.abs(directions).max(axis=0) > 1.0e-9
+    unstated = [name for index, name in enumerate(DOFS) if used[index] and name not in evidence.measured_dofs]
+    if unstated:
+        problems.append(Problem(DIRECTION, f"The stated sensor directions have a component along experimental "
+                                           f"{', '.join(unstated)}, which is not stated as a measured DOF."))
+        return None
+    return directions
+
+
 def _stated_axes(evidence: Evidence, problems: list) -> list:
     """(experimental axis index, FE vector) of each stated axis."""
     stated = [(index, _vector(text)) for index, text in enumerate(evidence.axes) if text]
@@ -384,31 +448,36 @@ def _lateral(points: np.ndarray, side: np.ndarray) -> np.ndarray:
     return points[:, axes]
 
 
-def _map_points(mapped: np.ndarray, fe_points: np.ndarray, side: np.ndarray, tolerance: float, fixed: dict) -> tuple:
-    """Each point's nearest FE node on the measured side (a landmark keeps its stated node).
+def _map_points(mapped: np.ndarray, fe_points: np.ndarray, side: Optional[np.ndarray], tolerance: float,
+                fixed: dict) -> tuple:
+    """Each point's nearest FE node on the measured side (a landmark keeps its stated node). With no single side
+    (``side`` None: points all around the part) every node can be seen.
 
-    Returns (FE rows, hidden rows among the stated or nearest nodes, ties)."""
+    Returns (FE rows, hidden rows among the stated or nearest nodes, ties as (point row, FE row, other FE row))."""
     tree = cKDTree(fe_points)
-    lateral = _lateral(fe_points, side)
-    lateral_tree = cKDTree(lateral)
+    lateral = None if side is None else _lateral(fe_points, side)
+    lateral_tree = None if side is None else cKDTree(lateral)
     k = min(CANDIDATE_NODES, len(fe_points))
     distances, rows = tree.query(mapped, k=k)
     distances, rows = np.asarray(distances).reshape(len(mapped), k), np.asarray(rows).reshape(len(mapped), k)
-    chosen, hidden, ties, memory = [], [], 0, {}
+    chosen, hidden, ties, memory = [], [], [], {}
+
+    def seen(row: int) -> bool:
+        return side is None or _visible(row, fe_points, side, lateral_tree, lateral, tolerance, memory)
+
     for index in range(len(mapped)):
         if index in fixed:
             chosen.append(fixed[index])
-            if not _visible(fixed[index], fe_points, side, lateral_tree, lateral, tolerance, memory):
+            if not seen(fixed[index]):
                 hidden.append(index)
             continue
-        visible = [position for position in range(k)
-                   if _visible(int(rows[index, position]), fe_points, side, lateral_tree, lateral, tolerance, memory)]
+        visible = [position for position in range(k) if seen(int(rows[index, position]))]
         if 0 not in visible:
             hidden.append(index)
         position = visible[0] if visible else 0
         chosen.append(int(rows[index, position]))
         if len(visible) > 1 and distances[index, visible[1]] - distances[index, position] <= TIE_SHARE * tolerance:
-            ties += 1
+            ties.append((index, int(rows[index, position]), int(rows[index, visible[1]])))
     return np.asarray(chosen, dtype=int), hidden, ties
 
 
@@ -469,7 +538,7 @@ def _missing(evidence: Evidence) -> list:
     missing = []
     if evidence.fe_unit not in UNIT_IN_METRES or evidence.experimental_unit not in UNIT_IN_METRES:
         missing.append("the coordinate units of both files")
-    if evidence.measured_side not in DIRECTIONS:
+    if evidence.measured_side not in SIDES:
         missing.append("the measured side")
     if not evidence.measured_dofs or not set(evidence.measured_dofs) <= set(DOFS):
         missing.append("the measured DOFs")
@@ -642,8 +711,9 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
     modes = list(experimental_dataset.modes)
     _check_dofs(evidence, modes, np.asarray(modes[0].node_ids, dtype=object), problems, warnings, checks)
     stated = _stated_axes(evidence, problems)
+    directions = _sensor_directions(evidence, experimental_names, problems)
     rows_e, rows_f, b = _landmarks(evidence, experimental_names, fe_names, fe_points, problems)
-    if any(problem.code in (LANDMARK, AMBIGUOUS) for problem in problems) or not rows_e:
+    if any(problem.code in (LANDMARK, AMBIGUOUS, DIRECTION) for problem in problems) or not rows_e:
         return required(problems, evidence=evidence, checks=tuple(checks))
 
     a = scaled[rows_e]
@@ -668,15 +738,18 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
                       "nodes.")
 
     mapped = scaled @ rotation.T + translation
-    side = _vector(evidence.measured_side)
+    side = None if evidence.measured_side == AROUND else _vector(evidence.measured_side)
     allowed = np.arange(len(fe_names))
     if evidence.measured_instance:
         allowed = np.asarray([row for row, name in enumerate(fe_names)
                               if _instance_of(name) == evidence.measured_instance], dtype=int)
         checks.append(f"Measured FE part: {evidence.measured_instance} ({len(allowed)} nodes).")
-    depth = fe_points[allowed] @ side
+    depth = np.zeros(len(allowed)) if side is None else fe_points[allowed] @ side
     span = float(np.ptp(depth)) if len(allowed) else 0.0
-    if span <= NO_DEPTH_SHARE * max(tolerance, 1.0e-12):
+    if side is None:
+        checks.append("Measured side: the points lie all around the part, so no single face is stated. Each point takes "
+                      "its nearest FE node of the measured part.")
+    elif span <= NO_DEPTH_SHARE * max(tolerance, 1.0e-12):
         warnings.append(f"The FE nodes have no depth along {evidence.measured_side}: the measured side is stated, and "
                         "the mesh cannot confirm it.")
     elif span <= tolerance:
@@ -713,7 +786,33 @@ def propose(fe_dataset, experimental_dataset, evidence: Evidence) -> Proposal:
     if len(set(chosen.tolist())) != len(chosen):
         problems.append(Problem(SHARED, f"{len(chosen) - len(set(chosen.tolist()))} points share an FE node."))
     if ties:
-        warnings.append(f"{ties} points are equally near two FE nodes (provisional diagnostic heuristic).")
+        warnings.append(f"{len(ties)} points are equally near two FE nodes (provisional diagnostic heuristic).")
+    if directions is not None:
+        along_fe = directions @ rotation.T  # the stated sensor directions in the FE frame
+        offsets = mapped - fe_points[chosen]
+        along = np.einsum("ij,ij->i", offsets, along_fe)
+        across = np.linalg.norm(offsets - along[:, np.newaxis] * along_fe, axis=1)
+        listed = "; ".join(f"{name} " + "(" + ", ".join(f"{value + 0.0:+.4f}" for value in vector) + ")"
+                           for name, vector in zip(experimental_names, directions))
+        checks.append(f"Sensor directions, stated for all {len(directions)} points as single-axis sensors (experimental "
+                      f"axes): {listed}.")
+        checks.append("Surface offset, measured point minus FE node along its sensor direction: median "
+                      f"{float(np.median(np.abs(along))):.4g}, largest {float(np.abs(along).max()):.4g} "
+                      f"{evidence.fe_unit}; across the sensor direction: largest {float(across.max()):.4g} "
+                      f"{evidence.fe_unit}.")
+        layered = []
+        for index, first, second in ties:
+            step = fe_points[allowed[second]] - fe_points[allowed[first]]
+            depth_step = float(step @ along_fe[index])
+            if abs(depth_step) > float(np.linalg.norm(step - depth_step * along_fe[index])):
+                layered.append(f"{experimental_names[index]} (FE nodes {fe_names[int(allowed[first])]} and "
+                               f"{fe_names[int(allowed[second])]})")
+        if layered:
+            shown = ", ".join(layered[:4]) + (", ..." if len(layered) > 4 else "")
+            problems.append(Problem(SURFACE, f"{len(layered)} points lie equally near two FE nodes that follow one "
+                                             f"another along the sensor direction: {shown}. The coordinates do not say "
+                                             "which surface carries the sensors. Give the measured points on that "
+                                             "surface (the surface offset); nothing is guessed."))
     others = _other_orientations(mapped, fe_points[allowed], tolerance, diagonal)
     if others:
         warnings.append(f"The geometry alone also fits {others} other orientations: only your evidence separates them.")
@@ -767,7 +866,7 @@ def draft_document(proposal: Proposal, evidence: Evidence, experimental_dataset,
         raise DraftRefused(DRAFT_INVALID, "The evidence changed after the check. Check the evidence again.")
     body = {"schema": DRAFT_SCHEMA, "status": DRAFT_STATUS, "accepted_physical_registration": False,
             "review_required": True, "limit": LIMIT, "provisional_heuristics": _heuristics_document(),
-            "evidence": asdict(evidence), "evidence_sha256": evidence.evidence_hash,
+            "evidence": evidence_document(evidence), "evidence_sha256": evidence.evidence_hash,
             "result": _result_document(proposal), "modal_set": dict(modal_set), "sources": json.loads(json.dumps(sources)),
             "fe_geometry_sha256": proposal.fe_geometry_sha256,
             "experimental_geometry_sha256": experimental_geometry_sha256(experimental_dataset)}
@@ -837,8 +936,12 @@ def _require_keys(value, keys: tuple, name: str) -> None:
 
 def _evidence_of(document: dict) -> Evidence:
     value = document["evidence"]
-    _require_keys(value, _EVIDENCE_KEYS, "evidence")
+    stated = value.get("sensor_directions") if isinstance(value, dict) else None
+    _require_keys(value, _EVIDENCE_KEYS + (("sensor_directions",) if stated is not None else ()), "evidence")
     landmarks = value["landmarks"]
+    if stated is not None and not (isinstance(stated, list) and stated and all(
+            isinstance(pair, list) and len(pair) == 2 and all(isinstance(item, str) for item in pair) for pair in stated)):
+        raise DraftRefused(DRAFT_INVALID, "The draft's sensor directions have values of the wrong type.")
     valid = (all(isinstance(value[key], str) for key in ("fe_unit", "experimental_unit", "measured_side", "source",
                                                          "measured_instance"))
              and isinstance(value["axes"], list) and len(value["axes"]) == 3
@@ -851,7 +954,7 @@ def _evidence_of(document: dict) -> Evidence:
         raise DraftRefused(DRAFT_INVALID, "The draft's evidence has values of the wrong type.")
     return Evidence(value["fe_unit"], value["experimental_unit"], tuple(value["axes"]), value["measured_side"],
                     tuple(value["measured_dofs"]), tuple(tuple(pair) for pair in landmarks), value["source"],
-                    value["measured_instance"])
+                    value["measured_instance"], tuple(tuple(pair) for pair in stated or ()))
 
 
 def _check_structure(document: dict) -> Evidence:
@@ -951,7 +1054,7 @@ def revalidate_draft(document: dict, fe_dataset, experimental_dataset, *, modal_
     return DraftResult(again, evidence, document)
 
 
-__all__ = ["DIRECTIONS", "DOFS", "DraftRefused", "DraftResult", "Evidence", "HEURISTICS", "HEURISTICS_NOTE", "LIMIT",
+__all__ = ["AROUND", "DIRECTIONS", "DOFS", "SIDES", "evidence_document", "DraftRefused", "DraftResult", "Evidence", "HEURISTICS", "HEURISTICS_NOTE", "LIMIT",
            "MappedPoint", "Problem", "Proposal", "REGISTRATION_PROPOSED", "REGISTRATION_REQUIRED", "UNITS", "coverage_lines",
            "draft_bytes", "draft_document", "fe_instances", "geometry_summary", "landmark_position", "position_text",
            "propose", "read_draft", "registration_details", "required", "revalidate_draft", "rotation_text",
