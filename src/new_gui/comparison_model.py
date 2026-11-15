@@ -129,10 +129,15 @@ INSUFFICIENT_VERDICT = "INSUFFICIENT_REGISTRATION_EVIDENCE"
 INSUFFICIENT_TEXT = (f"{INSUFFICIENT_VERDICT}: no verified or confirmed physical registration applies, so no MAC "
                      "and no correspondence is stated for this record.")
 NOT_COMPARED_VERDICT = "NOT_COMPARED: the comparator did not take this record."
+# a pair inside one of the comparator's close-mode groups: its group is compared, the individual mode is not identified
+GROUP_VERDICT = "CORRESPONDENCE_GROUP_LEVEL_ONLY"
+GROUP_UNRESOLVED = "Which mode of the group this record is stays unresolved"
 VERDICT_NOTE = ("Verdict: the comparator's result for each experimental record in words. Confirmed: one admissible FE "
-                "mode, assigned, with the comparator's status Excellent or Good. Ambiguous: several admissible "
-                "candidates, a weaker status, or no MAC. Rejected: no FE mode passes the comparator's limits. A verdict "
-                "holds for the registration that was confirmed; it is not a physical validation.")
+                "mode, assigned, with the comparator's status Excellent or Good, outside every group of close modes. "
+                "Group level only: such a pair inside one of the comparator's groups of close modes; the group is "
+                "compared as a whole by its subspace MAC, and the individual mode is not identified. Ambiguous: several "
+                "admissible candidates, a weaker status, or no MAC. Rejected: no FE mode passes the comparator's limits. "
+                "A verdict holds for the registration that was confirmed; it is not a physical validation.")
 SOUND_STATUSES = ("Excellent match", "Good match")
 PROJECTION_NOTE = ("MAC uses the FE displacement projected on the stated single-axis sensor direction of each measured "
                    "point, not the components along the experimental axes.")
@@ -598,73 +603,14 @@ def _unmatched_rows(items, side: str, result, numbers: tuple) -> tuple:
     return tuple(rows)
 
 
-def mode_verdicts(result) -> dict:
-    """Experimental mode number -> the verdict of its correspondence, from the comparator's own pairs, statuses and
-    candidate diagnostics. Nothing is paired, re-ranked or limited here."""
-    candidates = list(result.candidate_diagnostics or ())
-    pairs = {int(pair.experimental_mode): pair for pair in result.pairs}
-    verdicts = {}
-    for number in (int(n) for n in result.experimental_mode_numbers):
-        own = [c for c in candidates if int(c.experimental_mode) == number]
-        admissible = [c for c in own if c.admissible]
-        pair = pairs.get(number)
-        if pair is None:
-            if admissible:
-                names = ", ".join(f"FE {c.abaqus_mode}" for c in admissible)
-                verdicts[number] = (f"{AMBIGUOUS_VERDICT}: admissible with {names}, but the one-to-one assignment gave "
-                                    "that mode to another record.")
-            elif own:
-                best = max(own, key=lambda c: -1.0 if c.mac is None or not math.isfinite(c.mac) else float(c.mac))
-                verdicts[number] = (f"{REJECTED_VERDICT}: no FE mode passes the comparator's limits (highest MAC: FE "
-                                    f"{best.abaqus_mode}, MAC {_mac(best.mac)}, error "
-                                    f"{_percent(best.frequency_error_percent)} %).")
-            else:
-                verdicts[number] = f"{REJECTED_VERDICT}: the comparator recorded no FE candidate for this record."
-            continue
-        fe = int(pair.abaqus_mode)
-        measure = f"FE {fe}, MAC {_mac(pair.mac)}, error {_percent(pair.frequency_error_percent)} %"
-        rivals = [f"FE {c.abaqus_mode}" for c in admissible if int(c.abaqus_mode) != fe]
-        rivals += [f"EXP {c.experimental_mode} for FE {fe}" for c in candidates
-                   if c.admissible and int(c.abaqus_mode) == fe and int(c.experimental_mode) != number]
-        if rivals:
-            verdicts[number] = f"{AMBIGUOUS_VERDICT}: paired with {measure}, but also admissible: {', '.join(rivals)}."
-        elif pair.mac is None or not math.isfinite(float(pair.mac)):
-            verdicts[number] = f"{AMBIGUOUS_VERDICT}: paired with {measure} by frequency only; the shape is not compared."
-        elif str(pair.status) in SOUND_STATUSES:
-            verdicts[number] = f"{CONFIRMED_VERDICT}: {measure}; the only admissible FE mode ({pair.status})."
-        else:
-            verdicts[number] = (f"{AMBIGUOUS_VERDICT}: {measure} is the only admissible FE mode, but the comparator's "
-                                f"status is {pair.status}.")
-    return verdicts
-
-
-def _subspace_text(pairs) -> str:
-    """The group's subspace MAC from the existing cluster service, or NOT_AVAILABLE with the reason."""
-    if len(pairs) < 2:
-        return (f"{NOT_AVAILABLE}: the group holds {len(pairs)} assigned pair{'' if len(pairs) == 1 else 's'}; a "
-                "subspace needs at least two FE and two experimental modes paired by the comparator")
-    from services import modal_cluster_service as clusters  # the validated basis-invariant measure; nothing is re-derived
-
-    try:
-        value, shared, fe_rank, experimental_rank = clusters._paired_subspace_mac(pairs)
-    except ValueError as error:
-        return f"{NOT_AVAILABLE}: {error}"
-    if fe_rank != len(pairs) or experimental_rank != len(pairs):
-        return (f"{NOT_AVAILABLE}: the group is rank deficient on the measured DOFs (FE rank {fe_rank}, experimental "
-                f"rank {experimental_rank} of {len(pairs)} modes)")
-    return f"{value:.3f} on {shared} shared measured DOFs ({len(pairs)} FE and {len(pairs)} experimental modes)"
-
-
-def close_group_lines(result) -> tuple:
-    """One line per group of close modes: the comparator's FE and experimental close groups joined by its assigned
-    pairs. Cells are separated by ``CLOSE_SEPARATOR`` in the order of ``CLOSE_HEADERS``. Nothing is paired here."""
-    import numpy as np
-
+def _close_components(result) -> tuple:
+    """(frequency of each grouped mode, the groups): the comparator's FE and experimental close groups joined by
+    its assigned pairs. Each group is its ("fe" | "exp", mode number) members. Nothing is paired here."""
     metadata = dict(getattr(result.abaqus, "metadata", None) or {})
     fe_groups = [[int(item["mode"]) for item in group] for group in metadata.get("close_abaqus_mode_groups") or ()]
     exp_groups = [[int(item["mode"]) for item in group] for group in metadata.get("close_experimental_mode_groups") or ()]
     if not fe_groups and not exp_groups:
-        return ()
+        return {}, ()
     frequency = {}
     for key, groups in (("fe", metadata.get("close_abaqus_mode_groups")), ("exp", metadata.get("close_experimental_mode_groups"))):
         for group in groups or ():
@@ -697,11 +643,108 @@ def close_group_lines(result) -> tuple:
     components: dict = {}
     for node in list(parent):
         components.setdefault(find(node), []).append(node)
+    return frequency, tuple(components.values())
+
+
+def mode_verdicts(result) -> dict:
+    """Experimental mode number -> the verdict of its correspondence, from the comparator's own pairs, statuses and
+    candidate diagnostics. Nothing is paired, re-ranked or limited here."""
+    candidates = list(result.candidate_diagnostics or ())
+    pairs = {int(pair.experimental_mode): pair for pair in result.pairs}
+    frequency, components = _close_components(result)
+    groups = {}  # experimental mode -> (the text of its close group, the assigned pairs of that group)
+    for nodes in components:
+        fe_modes = sorted((n for key, n in nodes if key == "fe"), key=lambda n: frequency[("fe", n)])
+        exp_modes = sorted((n for key, n in nodes if key == "exp"), key=lambda n: frequency[("exp", n)])
+        inside = sorted((pair for pair in result.pairs
+                         if int(pair.abaqus_mode) in fe_modes and int(pair.experimental_mode) in exp_modes),
+                        key=lambda pair: float(pair.abaqus_frequency_hz))
+        text = "; ".join(f"{name} {' / '.join(map(str, modes))}"
+                         for name, modes in (("FE", fe_modes), ("EXP", exp_modes)) if modes)
+        for number in exp_modes:
+            groups[number] = (text, inside)
+
+    def in_group(number, verdict):
+        """An ambiguous or rejected record of a close group: its own verdict, and the group it belongs to."""
+        if number not in groups:
+            return verdict
+        return f"{verdict} It belongs to the close group {groups[number][0]}."
+
+    verdicts = {}
+    for number in (int(n) for n in result.experimental_mode_numbers):
+        own = [c for c in candidates if int(c.experimental_mode) == number]
+        admissible = [c for c in own if c.admissible]
+        pair = pairs.get(number)
+        if pair is None:
+            if admissible:
+                names = ", ".join(f"FE {c.abaqus_mode}" for c in admissible)
+                verdicts[number] = (f"{AMBIGUOUS_VERDICT}: admissible with {names}, but the one-to-one assignment gave "
+                                    "that mode to another record.")
+            elif own:
+                best = max(own, key=lambda c: -1.0 if c.mac is None or not math.isfinite(c.mac) else float(c.mac))
+                verdicts[number] = (f"{REJECTED_VERDICT}: no FE mode passes the comparator's limits (highest MAC: FE "
+                                    f"{best.abaqus_mode}, MAC {_mac(best.mac)}, error "
+                                    f"{_percent(best.frequency_error_percent)} %).")
+            else:
+                verdicts[number] = f"{REJECTED_VERDICT}: the comparator recorded no FE candidate for this record."
+            verdicts[number] = in_group(number, verdicts[number])
+            continue
+        fe = int(pair.abaqus_mode)
+        measure = f"FE {fe}, MAC {_mac(pair.mac)}, error {_percent(pair.frequency_error_percent)} %"
+        rivals = [f"FE {c.abaqus_mode}" for c in admissible if int(c.abaqus_mode) != fe]
+        rivals += [f"EXP {c.experimental_mode} for FE {fe}" for c in candidates
+                   if c.admissible and int(c.abaqus_mode) == fe and int(c.experimental_mode) != number]
+        if rivals:
+            verdicts[number] = in_group(
+                number, f"{AMBIGUOUS_VERDICT}: paired with {measure}, but also admissible: {', '.join(rivals)}.")
+        elif pair.mac is None or not math.isfinite(float(pair.mac)):
+            verdicts[number] = in_group(
+                number, f"{AMBIGUOUS_VERDICT}: paired with {measure} by frequency only; the shape is not compared.")
+        elif str(pair.status) not in SOUND_STATUSES:
+            verdicts[number] = in_group(number, f"{AMBIGUOUS_VERDICT}: {measure} is the only admissible FE mode, but "
+                                                f"the comparator's status is {pair.status}.")
+        elif number in groups:
+            # modes this close can mix or change order (CLOSE_NOTE): a sound pair inside the group names the group's
+            # agreement, never the individual mode; the pair, its MAC and its status stay the comparator's
+            text, inside = groups[number]
+            verdicts[number] = (f"{GROUP_VERDICT}: paired with {measure} ({pair.status}) inside the close group {text}. "
+                                f"{GROUP_UNRESOLVED}; the group is compared as a whole: subspace MAC "
+                                f"{_subspace_text(inside)}.")
+        else:
+            verdicts[number] = f"{CONFIRMED_VERDICT}: {measure}; the only admissible FE mode ({pair.status})."
+    return verdicts
+
+
+def _subspace_text(pairs) -> str:
+    """The group's subspace MAC from the existing cluster service, or NOT_AVAILABLE with the reason."""
+    if len(pairs) < 2:
+        return (f"{NOT_AVAILABLE}: the group holds {len(pairs)} assigned pair{'' if len(pairs) == 1 else 's'}; a "
+                "subspace needs at least two FE and two experimental modes paired by the comparator")
+    from services import modal_cluster_service as clusters  # the validated basis-invariant measure; nothing is re-derived
+
+    try:
+        value, shared, fe_rank, experimental_rank = clusters._paired_subspace_mac(pairs)
+    except ValueError as error:
+        return f"{NOT_AVAILABLE}: {error}"
+    if fe_rank != len(pairs) or experimental_rank != len(pairs):
+        return (f"{NOT_AVAILABLE}: the group is rank deficient on the measured DOFs (FE rank {fe_rank}, experimental "
+                f"rank {experimental_rank} of {len(pairs)} modes)")
+    return f"{value:.3f} on {shared} shared measured DOFs ({len(pairs)} FE and {len(pairs)} experimental modes)"
+
+
+def close_group_lines(result) -> tuple:
+    """One line per group of close modes: the comparator's FE and experimental close groups joined by its assigned
+    pairs. Cells are separated by ``CLOSE_SEPARATOR`` in the order of ``CLOSE_HEADERS``. Nothing is paired here."""
+    import numpy as np
+
+    frequency, components = _close_components(result)
+    if not components:
+        return ()
     matrix = np.asarray(result.mac_matrix, dtype=float)
     fe_numbers = [int(n) for n in result.abaqus_mode_numbers]
     exp_numbers = [int(n) for n in result.experimental_mode_numbers]
     lines = []
-    for nodes in sorted(components.values(), key=lambda members: min(frequency[node] for node in members)):
+    for nodes in sorted(components, key=lambda members: min(frequency[node] for node in members)):
         fe_modes = sorted((n for key, n in nodes if key == "fe"), key=lambda n: frequency[("fe", n)])
         exp_modes = sorted((n for key, n in nodes if key == "exp"), key=lambda n: frequency[("exp", n)])
         pairs = sorted((pair for pair in result.pairs

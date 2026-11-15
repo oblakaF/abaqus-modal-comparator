@@ -172,6 +172,8 @@ class ClearCorrespondenceTests(_Compared):
         self.assertAlmostEqual(float(first[4]), 51.0, places=3)
         self.assertEqual(first[8:11], ["100 %", str(GRID * GRID), cm.DASH])
         self.assertTrue(first[11].startswith(cm.CONFIRMED_VERDICT), first[11])  # UNIVERSAL-GEOM-1
+        # five well separated modes: every pair is confirmed mode by mode, none at group level
+        self.assertTrue(all(row.cells[-1].startswith(cm.CONFIRMED_VERDICT) for row in analysis.comparison.pair_rows))
         self.assertEqual(first[7], str(analysis.comparison_result.pairs[0].status))  # the comparator's own word
         mac_table = panel.tables["mac"]
         self.assertEqual([mac_table.horizontalHeaderItem(c).text() for c in range(mac_table.columnCount())],
@@ -227,6 +229,18 @@ class CloseModeTests(_Compared):
         self.assertAlmostEqual(value, expected_subspace((B, C), (C, B)), delta=0.003)
         self.assertGreater(value, 0.99)
         self.assertIn("on 289 shared measured DOFs", group["Subspace MAC (group)"])
+        # the verdicts: the two modes 1 Hz apart are confirmed as a group only, the two that stand alone mode by mode
+        verdicts = [row.cells[-1] for row in view.pair_rows]
+        for text, fe, exp in ((verdicts[1], 8, 3), (verdicts[2], 9, 2)):
+            self.assertTrue(text.startswith(f"{cm.GROUP_VERDICT}: paired with FE {fe}, MAC "), text)
+            self.assertIn("inside the close group FE 8 / 9; EXP 2 / 3.", text)
+            self.assertIn(cm.GROUP_UNRESOLVED, text)
+            self.assertIn("subspace MAC " + group["Subspace MAC (group)"], text)
+        for text in (verdicts[0], verdicts[3]):
+            self.assertTrue(text.startswith(cm.CONFIRMED_VERDICT), text)
+            self.assertNotIn("close group", text)
+        self.assertEqual([str(p.status) for p in analysis.comparison_result.pairs],
+                         [row.cells[7] for row in view.pair_rows])  # the comparator's statuses are not reworded
         table = panel.tables["pairs"]
         self.assertEqual(table.item(1, 10).text(), "FE 8 / 9; Exp 2 / 3")
         self.assertEqual(view.mac_fe_modes, (7, 8, 9, 10))  # nothing renamed, nothing removed
@@ -265,6 +279,10 @@ class CloseModeTests(_Compared):
             self.assertEqual(table.item(position, 7).text(), str(pair.status))
             self.assertEqual(table.item(position, 6).text(), f"{pair.mac:.3f}")
         self.assertNotEqual(table.item(1, 6).text(), group["Subspace MAC (group)"].split()[0])
+        for row in view.pair_rows[1:3]:  # a mixed mode is never confirmed, and never called rejected: it has its pair
+            self.assertFalse(row.cells[-1].startswith(cm.CONFIRMED_VERDICT), row.cells[-1])
+            self.assertFalse(row.cells[-1].startswith(cm.REJECTED_VERDICT), row.cells[-1])
+            self.assertIn("close group FE 8 / 9; EXP 2 / 3", row.cells[-1])
         self.assertNotIn("validated", " ".join(view.close_groups).lower())
 
     def test_a_close_group_with_poor_subspace_agreement_says_so_in_numbers(self):
@@ -282,6 +300,9 @@ class CloseModeTests(_Compared):
         pairs = {(row.abaqus_mode, row.experimental_mode): row.mac for row in view.pair_rows}
         self.assertAlmostEqual(pairs[(8, 2)], expected_mac(B, first), delta=0.004)
         self.assertAlmostEqual(pairs[(9, 3)], expected_mac(C, second), delta=0.004)
+        for row in view.pair_rows[1:3]:  # the weak group is named with its number; no word of the verdict hides it
+            self.assertFalse(row.cells[-1].startswith(cm.CONFIRMED_VERDICT), row.cells[-1])
+            self.assertIn("close group FE 8 / 9; EXP 2 / 3", row.cells[-1])
 
     def test_a_group_with_one_assigned_pair_has_no_subspace_value_and_says_why(self):
         experimental = ((51.0, A), (112.0, B), (113.0, U3), (174.0, D))  # record 3 is no FE shape at all
@@ -292,6 +313,15 @@ class CloseModeTests(_Compared):
         self.assertTrue(group["Subspace MAC (group)"].startswith(cm.NOT_AVAILABLE + ": the group holds 1 assigned pair"))
         self.assertIn("without a pair: FE 9, EXP 3", group["Assigned pairs (individual MAC)"])
         self.assertEqual(group["Order in the group"], cm.DASH)
+        verdicts = {row[0]: row[-1] for row in analysis.nearest_rows}
+        # FE 8 has a sound pair, but FE 9 beside it has none: record 2 is not identified as FE 8 alone
+        self.assertTrue(verdicts["EXP2"].startswith(cm.GROUP_VERDICT), verdicts["EXP2"])
+        self.assertIn("inside the close group FE 8 / 9; EXP 2 / 3.", verdicts["EXP2"])
+        self.assertIn(f"subspace MAC {cm.NOT_AVAILABLE}: the group holds 1 assigned pair", verdicts["EXP2"])
+        self.assertTrue(verdicts["EXP3"].startswith(cm.REJECTED_VERDICT), verdicts["EXP3"])
+        self.assertIn("It belongs to the close group FE 8 / 9; EXP 2 / 3.", verdicts["EXP3"])
+        for name in ("EXP1", "EXP4"):
+            self.assertTrue(verdicts[name].startswith(cm.CONFIRMED_VERDICT), verdicts[name])
         (fe_row,) = view.unmatched_fe_rows
         self.assertEqual(fe_row[:2], ("9", "111.0000"))
         self.assertIn("EXP 2 (112.0000 Hz): error -0.89 %", fe_row[2])  # nearest in frequency is not its shape

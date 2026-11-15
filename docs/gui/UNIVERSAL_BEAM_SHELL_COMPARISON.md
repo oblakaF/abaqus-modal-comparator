@@ -46,12 +46,19 @@ pair. The words restate the comparator's own result; no pair or limit is added.
 
 | Verdict | Meaning |
 |---|---|
-| `CORRESPONDENCE_CONFIRMED` | one admissible FE mode, assigned, comparator status Excellent or Good |
+| `CORRESPONDENCE_CONFIRMED` | one admissible FE mode, assigned, comparator status Excellent or Good, outside every close-mode group |
+| `CORRESPONDENCE_GROUP_LEVEL_ONLY` | such a pair inside one of the comparator's close-mode groups: the group is compared as a whole (its subspace MAC is quoted), the individual mode is not identified |
 | `CORRESPONDENCE_AMBIGUOUS` | several admissible candidates, a weaker status, or a pair without MAC |
 | `CORRESPONDENCE_REJECTED` | no FE mode passes the comparator's limits |
 | `INSUFFICIENT_REGISTRATION_EVIDENCE` | no verified or confirmed registration, so no MAC |
 
 A verdict holds for the registration that was confirmed.
+
+Close modes (a tube's bending doublet, FE 7 / 8 in the tests) can mix or change order between the model and the test, so
+a pair inside a close-mode group is never called confirmed on its own, whatever its MAC. The group is the comparator's
+own (the *Close modes* tab); no limit is added, and the pairs, MAC, statuses and subspace value are unchanged. The
+verdict quotes the group's subspace MAC and does not judge it. An ambiguous or rejected record of a group keeps its
+verdict and names the group.
 
 ## Limits
 

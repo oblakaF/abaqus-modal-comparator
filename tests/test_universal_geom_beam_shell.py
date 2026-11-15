@@ -133,6 +133,8 @@ class BeamTests(_GeometryFlow):
             self.assertGreater(row.mac, 0.9999)
             self.assertAlmostEqual(row.frequency_error_percent, -2.4, places=2)
             self.assertTrue(row.cells[-1].startswith(cm.CONFIRMED_VERDICT), row.cells[-1])
+        # well separated modes: no pair lies in a close group, so nothing stands between a pair and its verdict
+        self.assertTrue(all(row.cells[12] == cm.DASH and "close group" not in row.cells[-1] for row in view.pair_rows))
         return view
 
     def test_forward_the_mac_matrix_is_the_analytic_one(self):
@@ -340,7 +342,74 @@ class _ShellFlow(_GeometryFlow):
         return evidence_of(**values)
 
 
+def pairs_text(table, row) -> str:
+    return table.item(row, table.columnCount() - 1).text()
+
+
 class ShellWorkflowTests(_ShellFlow):
+    def assert_doublets_at_group_level(self, view):
+        """FE 7 / 8 and FE 9 / 10 are the tube's two doublets (0.3 % apart); FE 11 and FE 12 stand alone."""
+        verdicts = {row.abaqus_mode: row.cells[-1] for row in view.pair_rows}
+        groups = {cells[0]: cells for cells in cm.close_group_rows(view) if "no EXP mode" not in cells[0]}
+        self.assertEqual(len(groups), 2, view.close_groups)  # the FE modes above the measured band are left aside
+        for (first, second), (one, two) in (((7, 8), (1, 2)), ((9, 10), (3, 4))):
+            (cells,) = [c for name, c in groups.items() if name.startswith(f"FE {first} / {second} (")]
+            subspace = cells[-1]
+            self.assertGreater(float(subspace.split()[0]), 0.9999)  # the group as a whole agrees: nothing has failed
+            for fe, record in ((first, one), (second, two)):
+                text = verdicts[fe]
+                self.assertTrue(text.startswith(cm.GROUP_VERDICT + ": paired with FE %d, MAC 1.000" % fe), text)
+                self.assertIn(f"inside the close group FE {first} / {second}; EXP {one} / {two}.", text)
+                self.assertIn(cm.GROUP_UNRESOLVED, text)
+                self.assertIn(f"subspace MAC {subspace}", text)  # the existing group value, word for word
+                for word in (cm.CONFIRMED_VERDICT, cm.REJECTED_VERDICT, cm.AMBIGUOUS_VERDICT, "fail"):
+                    self.assertNotIn(word, text)
+        for fe in (11, 12):
+            self.assertTrue(verdicts[fe].startswith(cm.CONFIRMED_VERDICT), verdicts[fe])
+            self.assertNotIn("close group", verdicts[fe])
+
+    def test_the_verdicts_of_a_doublet_change_nothing_in_the_comparators_result(self):
+        _window, panel = self.analysed(unv=self.radial_unv())
+        analysis = self.service_comparison(panel, self.tube_evidence())
+        result = analysis.comparison_result
+        before = [(p.abaqus_mode, p.experimental_mode, p.mac, p.frequency_error_percent, p.status) for p in result.pairs]
+        matrix = np.array(result.mac_matrix, dtype=float)
+        lines = cm.close_group_lines(result)
+        verdicts = cm.mode_verdicts(result)
+        self.assertEqual(verdicts, cm.mode_verdicts(result))
+        self.assertEqual([(p.abaqus_mode, p.experimental_mode, p.mac, p.frequency_error_percent, p.status)
+                          for p in result.pairs], before)
+        np.testing.assert_array_equal(np.asarray(result.mac_matrix, dtype=float), matrix)
+        self.assertEqual(cm.close_group_lines(result), lines)
+        self.assertEqual(analysis.comparison.close_groups[-len(lines):], lines)
+        self.assertEqual([p[4] for p in before][:2], ["Excellent match"] * 2)  # the comparator's own word stays
+        self.assert_doublets_at_group_level(analysis.comparison)
+
+    def test_a_doublet_measured_turned_inside_its_span_is_not_confirmed_mode_by_mode(self):
+        """The bending pair measured 30 degrees away from the FE pair: each record is cos^2 = 0.75 of one FE mode and
+        0.25 of the other, the two spans are the same. No record is confirmed, none is called a failed comparison,
+        and the group's own value is the one displayed."""
+        turn = -np.pi / 6
+        self.records = ((1, turn, one_wave, 100.0), (1, turn - np.pi / 2, one_wave, 100.3)) + SHELL[2:]
+        _window, panel = self.analysed(unv=self.radial_unv())
+        analysis = self.service_comparison(panel, self.tube_evidence())
+        self.assertEqual(analysis.status, am.CONFIRMED_COMPARISON, analysis.registration_reason)
+        view = analysis.comparison
+        rows = {int(n): i for i, n in enumerate(view.mac_fe_modes)}
+        self.assertAlmostEqual(view.mac_values[rows[7]][0], 0.75, places=3)
+        self.assertAlmostEqual(view.mac_values[rows[8]][0], 0.25, places=3)
+        verdicts = {row[0]: row[-1] for row in analysis.nearest_rows}
+        for name in ("EXP1", "EXP2"):
+            self.assertFalse(verdicts[name].startswith(cm.CONFIRMED_VERDICT), verdicts[name])
+            self.assertFalse(verdicts[name].startswith(cm.REJECTED_VERDICT), verdicts[name])
+            self.assertIn("close group FE 7 / 8; EXP 1 / 2", verdicts[name])
+        (cells,) = [c for c in cm.close_group_rows(view) if c[0].startswith("FE 7 / 8 (")]
+        self.assertGreater(float(cells[-1].split()[0]), 0.9999)
+        for name in ("EXP3", "EXP4"):
+            self.assertTrue(verdicts[name].startswith(cm.GROUP_VERDICT), verdicts[name])
+        for name in ("EXP5", "EXP6"):
+            self.assertTrue(verdicts[name].startswith(cm.CONFIRMED_VERDICT), verdicts[name])
+
     def test_radial_sensors_all_around_give_pairs_with_the_analytic_mac(self):
         self.case_evidence = self.tube_evidence()
         _window, panel = self.analysed(unv=self.radial_unv())
@@ -371,7 +440,7 @@ class ShellWorkflowTests(_ShellFlow):
         for row in view.pair_rows:
             self.assertGreater(row.mac, 0.9999)
             self.assertAlmostEqual(row.frequency_error_percent, -2.4, places=2)
-            self.assertTrue(row.cells[-1].startswith(cm.CONFIRMED_VERDICT), row.cells[-1])
+        self.assert_doublets_at_group_level(view)
         # every cell of the matrix is the MAC of the two radial readings, computed here from the closed forms
         rows = {int(n): i for i, n in enumerate(view.mac_fe_modes)}
         for i, fe_shape in enumerate(SHELL):
@@ -392,7 +461,10 @@ class ShellWorkflowTests(_ShellFlow):
         nearest = panel.tables["nearest"]
         self.assertEqual(nearest.horizontalHeaderItem(nearest.columnCount() - 1).text(), "Verdict")
         self.assertEqual(nearest.item(0, 0).text(), "EXP1")
-        self.assertTrue(nearest.item(0, nearest.columnCount() - 1).text().startswith(cm.CONFIRMED_VERDICT))
+        # EXP1 is one of the bending doublet: its pair is shown, its individual identity is not claimed
+        self.assertTrue(nearest.item(0, nearest.columnCount() - 1).text().startswith(cm.GROUP_VERDICT))
+        self.assertTrue(nearest.item(4, nearest.columnCount() - 1).text().startswith(cm.CONFIRMED_VERDICT))
+        self.assertEqual(pairs_text(panel.tables["pairs"], 0), view.pair_rows[0].cells[-1])
         pairs = panel.tables["pairs"]
         self.assertEqual(pairs.horizontalHeaderItem(pairs.columnCount() - 1).text(), "Verdict")
         self.assertEqual(pairs.rowCount(), len(SHELL))
@@ -451,8 +523,11 @@ class ShellWorkflowTests(_ShellFlow):
         self.assertEqual(analysis.status, am.CONFIRMED_COMPARISON, analysis.registration_reason)
         verdicts = {row[0]: row[-1] for row in analysis.nearest_rows}
         self.assertTrue(verdicts["EXP6"].startswith(cm.REJECTED_VERDICT), verdicts["EXP6"])
-        for name in ("EXP1", "EXP2", "EXP3", "EXP4", "EXP5", "EXP7"):
+        for name in ("EXP1", "EXP2", "EXP3", "EXP4"):  # the two doublets: compared as groups
+            self.assertTrue(verdicts[name].startswith(cm.GROUP_VERDICT), verdicts[name])
+        for name in ("EXP5", "EXP7"):  # the modes that stand alone
             self.assertTrue(verdicts[name].startswith(cm.CONFIRMED_VERDICT), verdicts[name])
+        self.assertNotIn("close group", verdicts["EXP6"])
         self.assertEqual(len(analysis.comparison.pair_rows), len(SHELL))
         self.assertTrue(any(row[0] == "6" for row in analysis.comparison.unmatched_experimental_rows)
                         or any("mode 6" in text for text in analysis.comparison.unpaired_experimental))
@@ -630,6 +705,7 @@ class CompatibilityTests(reg3._Flow):
         self.assertNotIn(cm.PROJECTION_NOTE, analysis.comparison.warnings)
         self.assertTrue(all(row.mac > 0.999 for row in analysis.comparison.pair_rows))
         self.assertTrue(all(row[-1].startswith(cm.CONFIRMED_VERDICT) for row in analysis.nearest_rows))
+        self.assertTrue(all(row.cells[12] == cm.DASH for row in analysis.comparison.pair_rows))  # no pair in a group
 
 
 class DialogTextTests(unittest.TestCase):
