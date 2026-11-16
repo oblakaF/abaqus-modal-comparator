@@ -27,10 +27,10 @@ from pathlib import Path
 import threading
 from typing import Callable, Optional
 
-from PySide6.QtCore import QObject, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (QAbstractItemView, QBoxLayout, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTabWidget,
+                               QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QTabWidget,
                                QVBoxLayout, QWidget)
 
 from new_gui import analyze_model as am
@@ -192,10 +192,50 @@ class _ShapesRow(QWidget):
     def __init__(self, panel):
         super().__init__()
         self.panel = panel
+        self._viewport = None  # of the scroll area the row is shown in, if any
+        # the arrangement is changed after the resize that asked for it, never inside it (a layout change inside a
+        # resize of the pane resizes the pane again)
+        self._refit = QTimer(self)
+        self._refit.setSingleShot(True)
+        self._refit.setInterval(0)
+        self._refit.timeout.connect(lambda: self.panel.fit_shapes(self.room()))
+
+    def room(self) -> int:
+        """The width the two views can take without scrolling sideways. In a pane that scrolls sideways the row is never
+        narrower than the two views next to each other, so its own width says nothing: the pane's visible width does."""
+        width, parent = self.width(), self.parentWidget()
+        while parent is not None:
+            if isinstance(parent, QScrollArea) and parent.widget() is not None and parent.widget().isAncestorOf(self):
+                width = min(width, parent.viewport().width())
+            parent = parent.parentWidget()
+        return width
+
+    def _watch(self) -> None:
+        parent, viewport = self.parentWidget(), None
+        while parent is not None and viewport is None:
+            if isinstance(parent, QScrollArea) and parent.widget() is not None and parent.widget().isAncestorOf(self):
+                viewport = parent.viewport()
+            parent = parent.parentWidget()
+        if viewport is not self._viewport:
+            if self._viewport is not None:
+                self._viewport.removeEventFilter(self)
+            self._viewport = viewport
+            if viewport is not None:
+                viewport.installEventFilter(self)
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is self._viewport and event.type() == QEvent.Type.Resize:
+            self._refit.start()
+        return super().eventFilter(watched, event)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._watch()
+        self._refit.start()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self.panel.fit_shapes(event.size().width())
+        self._refit.start()
 
 
 class _Bridge(QObject):
@@ -1407,7 +1447,8 @@ class AnalyzePanel(QWidget):
                                            else QBoxLayout.Direction.LeftToRight)  # a narrow window never scrolls sideways
 
     def fit_shapes(self, width: int) -> None:
-        need = sum(panel.minimumSizeHint().width() for panel in self.shape_panels.values()) + 12
+        need = max(sum(panel.minimumSizeHint().width() for panel in panels.values() if not panel.isHidden())
+                   for panels in (self.shape_panels, self.saved_shapes)) + 12  # the views shown: live, or of a saved result
         self.shapes_layout.setDirection(QBoxLayout.Direction.TopToBottom if width < max(SIDE_BY_SIDE_WIDTH, need)
                                         else QBoxLayout.Direction.LeftToRight)
 

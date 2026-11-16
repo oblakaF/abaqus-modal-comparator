@@ -153,8 +153,14 @@ class LayoutTests(_WindowCase):
                 area = window.stack.currentWidget()
                 self.assertIsInstance(area, QScrollArea)
                 self.assertEqual(area.horizontalScrollBar().maximum(), 0)
-                if size[0] > 1000:  # at 900 the placeholder font of the offscreen platform leaves room to stack them only
-                    self.assertEqual(panel.shapes_layout.direction(), QBoxLayout.Direction.LeftToRight)
+                # REVIEW-UX-1: the two shape views stand side by side when the pane that is seen has room for both (with the
+                # placeholder font of the offscreen platform the pane of a 1366 px window is some pixels short of that),
+                # else one above the other; the pane itself never scrolls sideways
+                pane = window.review.shapes_area
+                self.assertEqual(pane.horizontalScrollBar().maximum(), 0)
+                need = sum(shape.minimumSizeHint().width() for shape in panel.shape_panels.values()) + panel.shapes_layout.spacing()
+                self.assertEqual(panel.shapes_layout.direction(), QBoxLayout.Direction.LeftToRight
+                                 if pane.viewport().width() >= need else QBoxLayout.Direction.TopToBottom)
 
     def test_a_missing_abaqus_keeps_the_window_within_its_width(self):
         window = self.window((900, 680))

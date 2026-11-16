@@ -500,6 +500,69 @@ class ReviewPageTests(_Flow):
         for text in [b.text() for b in panel.shape_banners.values()] + [review.frames_note.text()]:
             self.assertTrue(text.isascii(), text)  # English only
 
+    def _shape_views_fit_the_pane(self, window, panel, saved):
+        """At 900 x 700 the two views are one above the other; side by side wherever the pane has room for both (with the
+        fonts of the test platform the pane of a 1366 x 768 window may be some pixels short of that, a 1600 x 900 one is
+        not); never a sideways scroll, and the arrangement follows the pane that is seen."""
+        from PySide6.QtWidgets import QBoxLayout
+
+        review = window.review
+        review.select_row(1)
+        self.wait(panel)
+        self.assertIs(review.views.currentWidget(), review.shapes_area)
+        area, views = review.shapes_area, (panel.saved_shapes if saved else panel.shape_panels)
+        shown = {}
+        for size in ((1600, 900), (900, 700), (1366, 768), (900, 700), (1600, 900), (1366, 768)):
+            window.resize(*size)
+            for _ in range(5):
+                self.app.processEvents()
+            pane = area.viewport().width()
+            need = sum(view.minimumSizeHint().width() for view in views.values()) + panel.shapes_layout.spacing()
+            direction = QBoxLayout.Direction.LeftToRight if pane >= need else QBoxLayout.Direction.TopToBottom
+            if size == (900, 700):
+                self.assertLess(pane, need)  # the reported case: no room for both
+            elif size == (1600, 900):
+                self.assertGreaterEqual(pane, need)
+            self.assertEqual(panel.shapes_layout.direction(), direction, (size, pane, need, saved))
+            self.assertEqual(area.horizontalScrollBar().maximum(), 0, (size, pane, saved))  # the pane as it is seen
+            self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
+            self.assertLessEqual(area.widget().width(), pane, size)
+            for kind in (EXPERIMENTAL, FE):
+                banner, view = panel.shape_banners[(kind, saved)], views[kind]
+                self.assertTrue(view.isVisibleTo(area) and banner.isVisibleTo(area), (size, kind))
+                left = banner.mapTo(area.viewport(), banner.rect().topLeft()).x()
+                self.assertGreaterEqual(left, 0, (size, kind))
+                self.assertLessEqual(left + banner.width(), pane, (size, kind))  # the whole band, no sideways scrolling
+                # its two lines (the side, and whose frame) have the height they need at this width
+                self.assertGreaterEqual(banner.height(), banner.heightForWidth(banner.width()), (size, kind))
+            exp, fe = (views[kind].mapTo(area.widget(), views[kind].rect().topLeft()) for kind in (EXPERIMENTAL, FE))
+            if direction == QBoxLayout.Direction.TopToBottom:
+                self.assertEqual(exp.x(), fe.x(), size)
+                self.assertGreater(fe.y(), exp.y(), size)  # EXPERIMENT above ABAQUS FE
+            else:
+                self.assertGreater(fe.x(), exp.x(), size)
+                self.assertEqual(exp.y(), fe.y(), size)
+            for label in (review.selection_label, review.frames_note):
+                self.assertTrue(label.isVisibleTo(area))
+                self.assertLessEqual(label.x() + label.width(), pane, size)
+            shown[size] = (review.selection_label.text(), tuple(cells(review.table)[1]))
+        self.assertEqual(len(set(shown.values())), 1)  # the chosen row and its modes are the same at every size
+        return shown[(900, 700)]
+
+    def test_review_ux1_the_two_views_stack_in_a_narrow_window_and_stand_side_by_side_in_a_wide_one(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        live = self._shape_views_fit_the_pane(window, panel, saved=False)
+        for kind in (EXPERIMENTAL, FE):  # the controls and the picture of each view are still there
+            self.assertFalse(panel.shape_panels[kind].isHidden())
+        self.saved(panel)
+        again_window, again = self.reopened()
+        self.wait(again)
+        self.assertTrue(again.saved_shapes[FE].entries and again.saved_shapes[EXPERIMENTAL].entries)
+        reopened = self._shape_views_fit_the_pane(again_window, again, saved=True)
+        self.assertIsNotNone(again.saved_shapes[FE].image.source)
+        self.assertEqual(reopened[1], live[1])  # the same row of the table
+
     def test_review_ux1_the_fe_mode_choice_is_compact_and_still_chooses(self):
         window, panel = self.analysed()
         self.wait(panel)
@@ -595,7 +658,12 @@ class ReviewPageTests(_Flow):
         self.wait(panel)
         self.app.processEvents()
         bar, viewport = review.shapes_area.verticalScrollBar(), review.shapes_area.viewport()
-        for kind in (FE, EXPERIMENTAL):
+        # REVIEW-UX-1: in a pane too narrow for both views they are one above the other; the upper picture (EXPERIMENT)
+        # is then the one brought on screen, the lower one is reached by scrolling the pane down, never sideways
+        from PySide6.QtWidgets import QBoxLayout
+        stacked = panel.shapes_layout.direction() == QBoxLayout.Direction.TopToBottom
+        self.assertEqual(review.shapes_area.horizontalScrollBar().maximum(), 0)
+        for kind in ((EXPERIMENTAL,) if stacked else (FE, EXPERIMENTAL)):
             image = panel.shape_panels[kind].image
             top = image.mapTo(review.shapes_area.widget(), image.rect().topLeft()).y()
             self.assertLess(top, bar.value() + viewport.height() - 60, kind)  # a good part of each picture is in view
