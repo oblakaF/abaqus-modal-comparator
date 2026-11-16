@@ -452,6 +452,93 @@ class ReviewPageTests(_Flow):
             self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
             self.assertEqual(table.horizontalScrollBar().maximum(), 0, size)
 
+    def test_review_ux1_each_shape_view_says_which_side_it_is_also_when_stacked(self):
+        from PySide6.QtWidgets import QBoxLayout
+
+        from new_gui import analyze_panel as apanel
+
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        self.assertEqual(apanel.SHAPE_BANNER[EXPERIMENTAL][0], "EXPERIMENT (EXP)")
+        self.assertEqual(apanel.SHAPE_BANNER[FE][0], "ABAQUS FE")
+        for saved, panels in ((False, panel.shape_panels), (True, panel.saved_shapes)):
+            for kind, shape in panels.items():
+                banner = panel.shape_banners[(kind, saved)]
+                self.assertIs(shape.layout().itemAt(0).widget(), banner)  # the first thing of its own view
+                name, frame = apanel.SHAPE_BANNER[kind]
+                self.assertIn(name, banner.text())
+                self.assertIn("own coordinate frame", banner.text())
+                self.assertEqual(banner.accessibleName(), f"{name}. {frame}")
+                other = apanel.SHAPE_BANNER[FE if kind == EXPERIMENTAL else EXPERIMENTAL][0]
+                self.assertNotIn(other, banner.text())
+        live = [panel.shape_banners[(kind, False)] for kind in (EXPERIMENTAL, FE)]
+        self.assertGreaterEqual(min(b.font().pointSizeF() for b in live), 9.0)
+        self.assertIn("font-size:13pt", live[0].text())  # larger than the card title (12 pt)
+        for width, direction in ((1300, QBoxLayout.Direction.LeftToRight), (300, QBoxLayout.Direction.TopToBottom)):
+            panel.fit_shapes(width)
+            self.app.processEvents()
+            self.assertEqual(panel.shapes_layout.direction(), direction)
+            for kind in (EXPERIMENTAL, FE):  # side by side or stacked, the band is inside the view it names
+                banner, shape = panel.shape_banners[(kind, False)], panel.shape_panels[kind]
+                self.assertTrue(banner.isVisibleTo(shape))
+                self.assertTrue(shape.rect().contains(banner.geometry()))
+        # the two frames are independent, and likeness is no correspondence: said once, above both views
+        self.assertIn("independent coordinate frames", review.frames_note.text())
+        self.assertIn("not aligned", review.frames_note.text())
+        self.assertIn("not a validated modal correspondence", review.frames_note.text())
+        self.assertTrue(review.frames_note.isVisibleTo(review.shapes_area))
+        inner = review.shapes_area.widget().layout()
+        self.assertLess(inner.indexOf(review.frames_note), inner.indexOf(panel.shapes))
+        for size in ((900, 700), (1366, 768)):  # both sentences are read whole, whatever the views below them need
+            window.resize(*size)
+            self.app.processEvents()
+            pane = review.shapes_area.viewport().width()
+            for label in (review.selection_label, review.frames_note):
+                self.assertLessEqual(label.x() + label.width(), pane, size)
+            self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
+        for text in [b.text() for b in panel.shape_banners.values()] + [review.frames_note.text()]:
+            self.assertTrue(text.isascii(), text)  # English only
+
+    def test_review_ux1_the_fe_mode_choice_is_compact_and_still_chooses(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        table, widths = review.table, []
+        for size in ((900, 700), (1366, 768)):
+            window.resize(*size)
+            self.app.processEvents()
+            self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
+            self.assertEqual(table.horizontalScrollBar().maximum(), 0, size)
+            for row, combo in enumerate(review.combos):
+                self.assertGreaterEqual(combo.width(), rp.FE_CHOICE_WIDTH[0])
+                self.assertLessEqual(combo.width(), rp.FE_CHOICE_WIDTH[1])
+                self.assertTrue(combo.isVisibleTo(table))
+                self.assertIs(combo.parentWidget(), table.cellWidget(row, 3))
+            self.assertLess(review.combos[0].width(), table.columnWidth(3), size)  # no longer stretched over it
+            widths.append((review.combos[0].width(), table.columnWidth(3)))
+            self.assertGreaterEqual(table.height(), table.minimumSizeHint().height())  # its rows stay whole
+        self.assertEqual(widths[0][0], widths[1][0])  # a wider window widens the column, never the selector
+        self.assertGreater(widths[1][1], widths[0][1])
+        self.assertGreater(widths[1][1], 2 * widths[1][0])
+        self.assertEqual(table.rowCount(), len(panel.analysis.nearest_rows))
+        before = review.state.selected(0)
+        other = next(number for number, _text in review.state.options
+                     if number != before and number not in [review.state.selected(r) for r in range(len(review.state))])
+        review.combos[0].setCurrentIndex(review.combos[0].findData(other))
+        review.combos[0].activated.emit(review.combos[0].currentIndex())  # as a click on the list does
+        self.wait(panel)
+        row = review.state.row(0)
+        self.assertEqual(review.state.selected(0), other)
+        self.assertEqual(review.combos[0].currentData(), other)
+        self.assertEqual([table.item(0, c).text() for c in range(len(rv.HEADERS))], list(row.cells()))
+        self.assertRegex(table.item(0, 5).text(), r"^[+\-−]")  # the signed difference of the new choice
+        review._ask_duplicate = lambda _text: rp.KEEP
+        self.assertTrue(review.select_mode(1, other))
+        self.assertTrue(review.duplicate_label.text())  # the duplicate warning is still raised
+        self.assertTrue(review.reset_all())
+        self.assertEqual(review.state.selected(0), before)
+
     def test_ux3_one_sentence_status_and_unverified_candidates_without_a_registration(self):
         window, panel = self.analysed()
         self.wait(panel)

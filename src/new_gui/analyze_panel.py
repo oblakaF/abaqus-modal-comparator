@@ -57,6 +57,23 @@ CANCEL = "Cancel"
 CHOOSE_SET = "Choose a modal set..."
 IDLE, RUNNING, NEED_SET, DONE, BLOCKED = "idle", "running", "need_set", "done", "blocked"
 SIDE_BY_SIDE_WIDTH = 600  # below this page width the two shapes are stacked
+# REVIEW-UX-1: which side a shape view is, said on the view itself (so it stays true when the two views are stacked)
+SHAPE_BANNER = {EXPERIMENTAL: ("EXPERIMENT (EXP)", "Measured shape, drawn in the measurement file's own coordinate frame."),
+                FE: ("ABAQUS FE", "Calculated mode shape, drawn in the FE model's own coordinate frame.")}
+_BANNER_COLOUR = {EXPERIMENTAL: "#1f4e79", FE: "#7a3e00"}
+
+
+def shape_banner(kind: str) -> QLabel:
+    """The band at the top of one side's shape view: the side in large letters, and whose coordinate frame it is."""
+    name, frame = SHAPE_BANNER[kind]
+    label = QLabel(f'<span style="font-size:13pt; font-weight:700;">{name}</span><br>{frame}')
+    label.setObjectName("shapeBanner")
+    label.setTextFormat(Qt.TextFormat.RichText)
+    label.setWordWrap(True)
+    label.setAccessibleName(f"{name}. {frame}")
+    label.setStyleSheet(f"QLabel#shapeBanner {{ background: {_BANNER_COLOUR[kind]}; color: #ffffff; padding: 6px 10px; "
+                        "border-radius: 4px; }")
+    return label
 TABLE_HEIGHT = 250  # a long table scrolls, so that the shapes stay near
 SHOW_DETAILS, HIDE_DETAILS = "Show details", "Hide details"
 SHOW_LOG, HIDE_LOG = "Show log", "Hide log"
@@ -278,6 +295,11 @@ class AnalyzePanel(QWidget):
         self.saved_shapes = {kind: SavedShapePanel(kind) for kind in (EXPERIMENTAL, FE)}
         for panel in self.saved_shapes.values():
             self.shapes_layout.addWidget(panel, 1, Qt.AlignmentFlag.AlignTop)
+        self.shape_banners = {}  # (kind, saved) -> the band at the top of that view
+        for saved, panels in ((False, self.shape_panels), (True, self.saved_shapes)):
+            for kind, panel in panels.items():
+                self.shape_banners[(kind, saved)] = shape_banner(kind)
+                panel.layout().insertWidget(0, self.shape_banners[(kind, saved)])
         for box in (self.result_box, self.registration_box, self.comparison_box, self.tables_box, self.shapes):
             if external_results:
                 box.setParent(self)  # until the window places it on its page

@@ -41,6 +41,10 @@ VISUAL_ORDER = (0, 1, 2, 4, 5, 3, 6, 7)  # ABM-UX5: EXP mode, EXP Hz, FE Hz, Δf
 SIDE_BY_SIDE_WIDTH = 760  # the two frequency plots stand side by side from this pane width, else one above the other
 CELL_PADDING = 22
 ROWS_IN_VIEW = 3  # frequency rows the table shows whole at any window size (the page scrolls rather than hide them)
+# REVIEW-UX-1
+FRAMES_NOTE = ("The EXPERIMENT and ABAQUS FE views are drawn in independent coordinate frames and are not aligned to each "
+               "other. Visual similarity of the two pictures is not a validated modal correspondence.")
+FE_CHOICE_WIDTH = (64, 104)  # the FE mode selector is as wide as a mode number needs, within these limits (pixels)
 
 
 def _title_width(title: str, metrics, lines: int = 3) -> int:
@@ -262,6 +266,8 @@ class ReviewPanel(QWidget):
         inner.setSpacing(8)
         self.selection_label = _label("", "sectionTitle")
         inner.addWidget(self.selection_label)
+        self.frames_note = _label(FRAMES_NOTE, "warnings")
+        inner.addWidget(self.frames_note)
         inner.addWidget(self.analyze.shapes)
         inner.addStretch(1)
         self.shapes_area = _scrolled(shapes)
@@ -314,6 +320,7 @@ class ReviewPanel(QWidget):
         self.views.addTab(self.analyze.tables_box, TAB_TABLES)  # the tables fill the pane and scroll by themselves
         self.views.currentChanged.connect(lambda _index: self._draw_plots())
         self.plots_area.viewport().installEventFilter(self)
+        self.shapes_area.viewport().installEventFilter(self)
         return self.views
 
     def _arrange_plots(self, side_by_side: bool) -> None:
@@ -338,6 +345,11 @@ class ReviewPanel(QWidget):
         if event.type() == QEvent.Type.Resize:
             if watched is self.plots_area.viewport():
                 self._arrange_plots(watched.width() >= SIDE_BY_SIDE_WIDTH)
+            elif watched is self.shapes_area.viewport():
+                # REVIEW-UX-1: two views side by side can be wider than the pane (it then scrolls sideways); the two
+                # sentences above them wrap inside the pane and are read whole without that scrolling
+                for label in (self.selection_label, self.frames_note):
+                    label.setMaximumWidth(max(200, watched.width()))
             elif watched in (self.frequency_image, self.difference_image, self.frf_image):
                 kind = {self.frequency_image: "frequency", self.difference_image: "difference", self.frf_image: "frf"}[watched]
                 drawn = self._drawn_width.get(kind)
@@ -387,7 +399,15 @@ class ReviewPanel(QWidget):
                 combo.addItem(number, number)
             combo.setToolTip("Select another elastic FE mode to inspect it. This is a hypothesis, not a validated identity.")
             combo.activated.connect(lambda _index, r=row.row, c=combo: self.select_mode(r, c.currentData()))
-            self.table.setCellWidget(row.row, _FE_COLUMN, combo)
+            # REVIEW-UX-1: the selector keeps the width of a mode number, centred in its column like the other cells
+            combo.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            combo.setFixedWidth(max(FE_CHOICE_WIDTH[0], min(FE_CHOICE_WIDTH[1], combo.sizeHint().width())))
+            cell = QWidget()
+            cell.setObjectName("reviewFeModeCell")
+            centred = QHBoxLayout(cell)
+            centred.setContentsMargins(4, 0, 4, 0)
+            centred.addWidget(combo, 0, Qt.AlignmentFlag.AlignCenter)
+            self.table.setCellWidget(row.row, _FE_COLUMN, cell)
             self.combos.append(combo)
             if row.row + 1 < len(rows):
                 swap = QPushButton(SWAP_TEXT)
@@ -768,4 +788,4 @@ class ReviewPanel(QWidget):
         self.frf_image.set_image(chart.png)
 
 
-__all__ = ["CANCEL", "COMPACT_COLUMNS", "KEEP", "ReviewPanel", "SWAP", "VISUAL_ORDER"]
+__all__ = ["CANCEL", "COMPACT_COLUMNS", "FE_CHOICE_WIDTH", "FRAMES_NOTE", "KEEP", "ReviewPanel", "SWAP", "VISUAL_ORDER"]
