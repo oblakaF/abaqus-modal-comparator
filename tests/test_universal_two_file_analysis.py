@@ -251,7 +251,8 @@ class GeometryTests(_Case):
     def test_a_row_shows_that_records_shapes_side_by_side(self):
         panel = self.check(plate_nodes())
         self.assertEqual(panel.shapes_layout.direction(), QBoxLayout.Direction.LeftToRight)
-        self.assertTrue(panel.log.isHidden())  # the progress lines go after a finished analysis
+        self.assertFalse(panel.log.isHidden())  # ANALYZE-UX-LOG-1: the progress lines stay after a finished analysis
+        self.assertTrue(panel.log.toPlainText().strip())
         self.assertTrue(panel.show_candidate(2))
         self.wait(panel)
         self.assertEqual(panel.shape_panels[EXPERIMENTAL].chosen_index(), 2)

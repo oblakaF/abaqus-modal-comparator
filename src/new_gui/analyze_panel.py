@@ -77,6 +77,14 @@ def shape_banner(kind: str) -> QLabel:
 TABLE_HEIGHT = 250  # a long table scrolls, so that the shapes stay near
 SHOW_DETAILS, HIDE_DETAILS = "Show details", "Hide details"
 SHOW_LOG, HIDE_LOG = "Show log", "Hide log"
+# ANALYZE-UX-LOG-1: the progress lines of a run, in an area of their own that opens with the run and stays after it
+LOG_TITLE = "Analysis log"
+LOG_EMPTY = "No progress message yet."
+LOG_HEIGHT = (220, 280)  # the lines' viewport, in pixels: the least in a low window, the most in a high one
+LOG_SHARE = 0.36  # of the window's height, within those limits
+_LOG_STYLE = ("QFrame#analyzeLogBox { background: #f8fafc; border: 1px solid #d5dbe5; border-radius: 6px; } "
+              "QPlainTextEdit#analyzeLog { background: #ffffff; border: 1px solid #d5dbe5; border-radius: 4px; "
+              "padding: 6px; font-size: 10pt; }")
 SHOW_ADVANCED, HIDE_ADVANCED = "Advanced", "Hide advanced"
 SET_UP_REGISTRATION = "Set up registration..."
 PROPOSED_TEXT = "Registration setup: the geometry checks passed. Diagnostic only: not applied, so no MAC and no mode pairs."
@@ -417,17 +425,31 @@ class AnalyzePanel(QWidget):
         self.message = _label("", "hint")
         self.message.setVisible(False)
         inner.addWidget(self.message)
+        self._log_run = False  # the running step is an analysis (not a save, an open or a check)
+        self.log_box = QFrame()  # ANALYZE-UX-LOG-1: title, Show/Hide, and the lines
+        self.log_box.setObjectName("analyzeLogBox")
+        self.log_box.setStyleSheet(_LOG_STYLE)
+        boxed = QVBoxLayout(self.log_box)
+        boxed.setContentsMargins(12, 8, 12, 10)
+        boxed.setSpacing(6)
+        head = QHBoxLayout()
+        self.log_title = _label(LOG_TITLE, "sectionTitle")
+        head.addWidget(self.log_title, 1)
         self.log_button = QPushButton(SHOW_LOG)
         self.log_button.setObjectName("detailsToggle")
         self.log_button.setCheckable(True)
         self.log_button.toggled.connect(self._log_toggled)
-        inner.addWidget(self.log_button, 0, Qt.AlignmentFlag.AlignLeft)
+        head.addWidget(self.log_button, 0, Qt.AlignmentFlag.AlignRight)
+        boxed.addLayout(head)
         self.log = QPlainTextEdit()
         self.log.setObjectName("analyzeLog")
+        self.log.setAccessibleName(LOG_TITLE)
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(200)
-        self.log.setFixedHeight(90)
-        inner.addWidget(self.log)
+        self.log.setPlaceholderText(LOG_EMPTY)
+        self.log.setFixedHeight(LOG_HEIGHT[0])
+        boxed.addWidget(self.log)
+        inner.addWidget(self.log_box)
         self.advanced_toggle = QPushButton(SHOW_ADVANCED)
         self.advanced_toggle.setObjectName("detailsToggle")
         self.advanced_toggle.setCheckable(True)
@@ -539,6 +561,23 @@ class AnalyzePanel(QWidget):
     def _log_toggled(self, shown: bool) -> None:
         self.log_button.setText(HIDE_LOG if shown else SHOW_LOG)
         self._refresh()
+        if shown:  # reopened: the latest lines
+            bar = self.log.verticalScrollBar()
+            bar.setValue(bar.maximum())
+
+    def _say(self, text: str) -> None:
+        """One more line of the log. The latest line stays in view, unless the person has scrolled up to read earlier ones."""
+        bar = self.log.verticalScrollBar()
+        at_end = self.log.isHidden() or bar.value() >= bar.maximum() - 2
+        kept = bar.value()
+        self.log.appendPlainText(text)
+        bar.setValue(bar.maximum() if at_end else kept)
+
+    def _fit_log(self) -> None:
+        window = self.window()
+        height = max(LOG_HEIGHT[0], min(LOG_HEIGHT[1], round(LOG_SHARE * window.height())))
+        if self.log.height() != height:
+            self.log.setFixedHeight(height)
 
     def open_registration(self) -> Optional[RegistrationDialog]:
         """The evidence dialog for the shown result; it changes nothing on the page but its own summary line."""
@@ -708,6 +747,9 @@ class AnalyzePanel(QWidget):
         self.set_combo.clear()
         self._cancel = threading.Event()
         self.state = RUNNING
+        self._fit_log()
+        self._log_run = True  # the log is shown from the start of the run, before its first line
+        self.log_button.setChecked(True)  # ANALYZE-UX-LOG-1: the progress is seen without a click
         self._set_message("Identifying the ODB...", "hint")
         self._refresh()
         try:
@@ -716,7 +758,7 @@ class AnalyzePanel(QWidget):
             self._block(str(error))
             return True
         for text in am.plan_warnings(self.plan):
-            self.log.appendPlainText(text)
+            self._say(text)
         plan, cancel = self.plan, self._cancel
         self._run(_FIND, lambda say: am.find_package(plan, cancel, say))
         return True
@@ -749,7 +791,7 @@ class AnalyzePanel(QWidget):
 
     def _progress(self, token: int, text: str) -> None:
         if token == self._token:
-            self.log.appendPlainText(text)
+            self._say(text)
             self._refresh()
 
     def _step_done(self, token: int, step: str, value) -> None:
@@ -783,7 +825,7 @@ class AnalyzePanel(QWidget):
 
     def _package_found(self, manifest: Optional[Path]) -> None:
         if manifest is not None:
-            self.log.appendPlainText("These modes were already extracted from this ODB content; Abaqus is not needed.")
+            self._say("These modes were already extracted from this ODB content; Abaqus is not needed.")
             self._read_files(manifest)
             return
         plan = self.plan
@@ -949,7 +991,10 @@ class AnalyzePanel(QWidget):
                 button.setEnabled(not running)
         blocked = self.state == BLOCKED
         self.progress.setVisible(running)
-        has_log = (running or blocked) and bool(self.log.toPlainText())
+        # ANALYZE-UX-LOG-1: the log is there from the start of a run and stays after it, whatever its end; the lines go
+        # only when a new analysis starts or another result is opened
+        has_log = bool(self.log.toPlainText()) or (running and self._log_run)
+        self.log_box.setVisible(has_log)
         self.log_button.setVisible(has_log)
         self.log.setVisible(has_log and self.log_button.isChecked())
         self.launcher_button.setEnabled(not running)
@@ -1442,6 +1487,7 @@ class AnalyzePanel(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        self._fit_log()
         room = sum(b.sizeHint().width() for b in (self.launcher_button, self.folder_button)) + ADVANCED_ROW_MARGIN
         self.advanced_buttons.setDirection(QBoxLayout.Direction.TopToBottom if event.size().width() <= room
                                            else QBoxLayout.Direction.LeftToRight)  # a narrow window never scrolls sideways

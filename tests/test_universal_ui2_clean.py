@@ -22,6 +22,7 @@ from new_gui import materials_status_panel as msp
 from new_gui import production_window as pw
 from new_gui import registration_check_model as rm
 from new_gui import window as window_module
+from new_gui import analyze_panel as apanel
 from new_gui.analyze_panel import DONE, HIDE_DETAILS, IDLE, RUNNING, SHOW_DETAILS
 from new_gui.workspace_state import EXPERIMENTAL, FE
 
@@ -183,7 +184,7 @@ class LayoutTests(_WindowCase):
         self.assertEqual(set(panel.fields), {FE, EXPERIMENTAL})
         primary = [b for b in panel.findChildren(QPushButton) if b.objectName() == "primary" and b.isVisibleTo(panel)]
         self.assertEqual(primary, [panel.analyze_button])
-        for hidden in (panel.cancel_button, panel.advanced, panel.progress, panel.log, panel.log_button):
+        for hidden in (panel.cancel_button, panel.advanced, panel.progress, panel.log, panel.log_button, panel.log_box):
             self.assertTrue(hidden.isHidden())
         self.assertFalse(panel.launcher_button.isVisible() or panel.folder_button.isVisible())  # in the closed Advanced
 
@@ -248,21 +249,116 @@ class ProgressTests(_WindowCase):
         self.assertEqual(panel.state, RUNNING)
         self.assertTrue(panel.progress.isVisible())
         self.assertTrue(panel.cancel_button.isVisible())
-        self.assertTrue(panel.log.isHidden())
-        self.assertTrue(panel.log_button.isVisible())
-        panel.log_button.setChecked(True)
-        self.assertFalse(panel.log.isHidden())
+        # ANALYZE-UX-LOG-1: the log opened with the run, titled, with no click
+        self.assertTrue(panel.log_box.isVisible() and panel.log.isVisible() and panel.log_title.isVisible())
+        self.assertEqual(panel.log_title.text(), "Analysis log")
+        self.assertTrue(panel.log_button.isVisible() and panel.log_button.isChecked())
+        self.assertEqual(panel.log_button.text(), "Hide log")
+        self.assertTrue(apanel.LOG_HEIGHT[0] <= panel.log.height() <= apanel.LOG_HEIGHT[1])
+        self.assertEqual(apanel.LOG_HEIGHT, (220, 280))
+        before = panel.log.toPlainText()
+        panel.log_button.click()  # collapsed by hand: the title and the button stay, the run goes on
+        self.assertTrue(panel.log.isHidden() and panel.log_box.isVisible() and panel.log_button.isVisible())
+        self.assertEqual(panel.log_button.text(), "Show log")
+        self.assertEqual(panel.state, RUNNING)
+        self.assertTrue(panel.progress.isVisible() and panel.cancel_button.isVisible())
+        panel.log_button.click()
+        self.assertTrue(panel.log.isVisible())
+        self.assertEqual(panel.log.toPlainText(), before)
         panel.cancel()
         self.wait(panel)
         self.assertEqual(panel.state, IDLE)
         self.assertIn("Cancelled", panel.message.text())
         self.assertTrue(panel.progress.isHidden())
-        self.assertTrue(panel.log.isHidden())
+        self.assertTrue(panel.cancel_button.isHidden())
+        self.assertEqual(len(runner.calls), 1)
+        self.assertTrue(runner.calls[0]["cancel_event"].is_set())  # the same stop as before
+        # after a cancellation the lines of the run are still there
+        self.assertTrue(panel.log_box.isVisible() and panel.log.isVisible())
+        self.assertTrue(before and panel.log.toPlainText().startswith(before))
 
-    def test_the_progress_goes_after_a_finished_analysis(self):
-        panel = self.analysed(self.window())
+    def test_the_log_stays_after_a_finished_analysis_with_its_lines_in_order(self):
+        window = self.window()
+        panel = window.analyze
+        said = []
+        panel._bridge.progress.connect(lambda _token, text: said.append(text))
+        self.analysed(window)
         self.assertTrue(panel.progress.isHidden())
-        self.assertTrue(panel.log_button.isHidden())
+        self.assertTrue(panel.cancel_button.isHidden())
+        window.show_page(pw.ANALYZE_PAGE)
+        self.app.processEvents()
+        self.assertTrue(panel.log_box.isVisible() and panel.log.isVisible() and panel.log_button.isVisible())
+        lines = panel.log.toPlainText().splitlines()
+        self.assertTrue(said)
+        self.assertEqual([line for line in lines if line in said], [t for text in said for t in text.splitlines()])
+        self.assertEqual(lines, [t for text in said for t in text.splitlines()])  # nothing added, nothing dropped
+        panel.log_button.click()
+        self.assertTrue(panel.log.isHidden() and panel.log_box.isVisible())
+        panel.log_button.click()
+        self.assertEqual(panel.log.toPlainText().splitlines(), lines)
+        # a new analysis starts a new log
+        panel._say("a line of the earlier run")
+        self.run_analysis(panel)
+        self.assertNotIn("a line of the earlier run", panel.log.toPlainText())
+        self.assertTrue(panel.log.toPlainText().strip())
+
+    def test_the_log_stays_after_a_failed_analysis(self):
+        window = self.window()
+        panel = window.analyze
+        panel._runner = base.Runner(base.plate_nodes(), error="the extraction stopped")
+        said = []
+        panel._bridge.progress.connect(lambda _token, text: said.append(text))
+        panel.choose_file(FE, str(self.odb))
+        panel.choose_file(EXPERIMENTAL, str(self.unv(base.plate_nodes())))
+        self.run_analysis(panel)
+        self.assertEqual(panel.state, base.BLOCKED)
+        self.assertTrue(panel.progress.isHidden() and panel.cancel_button.isHidden())
+        self.assertEqual(panel.log.toPlainText().splitlines(), [t for text in said for t in text.splitlines()])
+        self.assertTrue(said and panel.log_box.isVisible() and panel.log.isVisible())
+        self.assertEqual(panel.log_button.text(), "Hide log")
+
+    def test_the_latest_line_stays_in_view_unless_earlier_lines_are_being_read(self):
+        window = self.window((900, 700))
+        panel = self.analysed(window)
+        window.show_page(pw.ANALYZE_PAGE)
+        self.app.processEvents()
+        bar = panel.log.verticalScrollBar()
+        for k in range(60):
+            panel._progress(panel._token, f"progress line {k}")
+        self.app.processEvents()
+        self.assertGreater(bar.maximum(), 0)
+        self.assertEqual(bar.value(), bar.maximum())  # the latest line is in view
+        bar.setValue(3)  # the person reads earlier lines
+        panel._progress(panel._token, "a later line")
+        self.app.processEvents()
+        self.assertEqual(bar.value(), 3)
+        self.assertEqual(panel.log.toPlainText().splitlines()[-1], "a later line")
+        self.assertEqual(panel.log.toPlainText().splitlines()[-61:-1], [f"progress line {k}" for k in range(60)])
+        bar.setValue(bar.maximum())
+        panel._progress(panel._token, "the last line")
+        self.app.processEvents()
+        self.assertEqual(bar.value(), bar.maximum())
+        panel._progress(panel._token + 1, "a line of a stopped run")  # as before: not shown
+        self.assertNotIn("a line of a stopped run", panel.log.toPlainText())
+
+    def test_the_log_fits_both_window_sizes(self):
+        for size, least in (((900, 700), 220), ((1366, 768), 250)):
+            with self.subTest(size=size):
+                window = self.window(size)
+                panel = self.analysed(window)
+                window.show_page(pw.ANALYZE_PAGE)
+                for _ in range(3):
+                    self.app.processEvents()
+                area = window.stack.currentWidget()
+                self.assertEqual(area.horizontalScrollBar().maximum(), 0)
+                self.assertTrue(panel.log.isVisible())
+                self.assertTrue(least <= panel.log.height() <= 280, panel.log.height())
+                right = panel.log_box.mapTo(window, panel.log_box.rect().topRight()).x()
+                self.assertLessEqual(right, window.width())
+                self.assertLessEqual(panel.log_button.mapTo(window, panel.log_button.rect().topRight()).x(), right)
+                self.assertGreaterEqual(panel.log.font().pointSizeF(), 9.0)
+                for text in (panel.log_title.text(), panel.log_button.text(), panel.log.placeholderText()):
+                    self.assertTrue(text.isascii())
 
 
 class ScientificStatementTests(_WindowCase):
