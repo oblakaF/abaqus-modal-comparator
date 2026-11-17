@@ -425,7 +425,7 @@ class AnalyzePanel(QWidget):
         self.message = _label("", "hint")
         self.message.setVisible(False)
         inner.addWidget(self.message)
-        self._log_run = False  # the running step is an analysis (not a save, an open or a check)
+        self._log_run = False  # an analysis was started: its log is kept, with or without a line, until a reset
         self.log_box = QFrame()  # ANALYZE-UX-LOG-1: title, Show/Hide, and the lines
         self.log_box.setObjectName("analyzeLogBox")
         self.log_box.setStyleSheet(_LOG_STYLE)
@@ -701,6 +701,7 @@ class AnalyzePanel(QWidget):
         self.registration_ref, self.confirmation_ref, self._compared_with = None, None, None
         self._wanted_set_key, self._fresh_text, self._reopen_text = None, "", ""
         self.log.clear()
+        self._log_run = False
         self.set_combo.clear()
         self._set_message("", "hint")
         self._show_result()
@@ -991,9 +992,9 @@ class AnalyzePanel(QWidget):
                 button.setEnabled(not running)
         blocked = self.state == BLOCKED
         self.progress.setVisible(running)
-        # ANALYZE-UX-LOG-1: the log is there from the start of a run and stays after it, whatever its end; the lines go
-        # only when a new analysis starts or another result is opened
-        has_log = bool(self.log.toPlainText()) or (running and self._log_run)
+        # ANALYZE-UX-LOG-1: the log is there from the start of a run and stays after it, whatever its end and with or
+        # without a line (F1); it goes when the inputs are chosen anew or another result is opened
+        has_log = bool(self.log.toPlainText()) or self._log_run
         self.log_box.setVisible(has_log)
         self.log_button.setVisible(has_log)
         self.log.setVisible(has_log and self.log_button.isChecked())
@@ -1376,6 +1377,7 @@ class AnalyzePanel(QWidget):
         self.analysis = snapshot.analysis
         self.state = DONE
         self.log.clear()
+        self._log_run = False
         self.set_combo.clear()
         self.file_error.setText("")
         sources = snapshot.document["sources"]

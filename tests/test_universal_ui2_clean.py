@@ -317,6 +317,94 @@ class ProgressTests(_WindowCase):
         self.assertTrue(said and panel.log_box.isVisible() and panel.log.isVisible())
         self.assertEqual(panel.log_button.text(), "Hide log")
 
+    def assert_empty_log_is_kept(self, panel):
+        """ANALYZE-UX-LOG-1-F1: a run that ended before its first line still has its log, with the placeholder only."""
+        self.assertEqual(panel.log.toPlainText(), "")
+        self.assertEqual(panel.log.placeholderText(), "No progress message yet.")
+        self.assertTrue(panel.progress.isHidden() and panel.cancel_button.isHidden())
+        self.assertTrue(panel.log_box.isVisible() and panel.log_title.isVisible() and panel.log.isVisible())
+        self.assertTrue(panel.log_button.isVisible() and panel.log_button.isChecked())
+        self.assertEqual(panel.log_button.text(), "Hide log")
+        panel.log_button.click()
+        self.assertTrue(panel.log.isHidden() and panel.log_box.isVisible() and panel.log_button.isVisible())
+        panel.log_button.click()
+        self.assertTrue(panel.log.isVisible())
+        self.assertEqual(panel.log.toPlainText(), "")
+
+    def assert_no_log(self, panel):
+        for hidden in (panel.log_box, panel.log_button, panel.log, panel.progress, panel.cancel_button):
+            self.assertTrue(hidden.isHidden())
+        self.assertFalse(panel.log_title.isVisible())  # inside the hidden area
+        self.assertEqual(panel.log.toPlainText(), "")
+
+    def fail_early(self, panel):
+        with mock.patch.object(am, "make_plan", side_effect=am.StepFailed("the ODB could not be identified")):
+            self.assertTrue(panel.analyze())
+        self.app.processEvents()
+        self.assertEqual(panel.state, base.BLOCKED)
+        self.assertIn("the ODB could not be identified", panel.message.text())
+
+    def test_the_log_stays_after_a_failure_before_the_first_line(self):
+        window = self.window()
+        panel = window.analyze
+        said = []
+        panel._bridge.progress.connect(lambda _token, text: said.append(text))
+        panel.choose_file(FE, str(self.odb))
+        panel.choose_file(EXPERIMENTAL, str(self.unv(base.plate_nodes())))
+        self.assert_no_log(panel)
+        self.fail_early(panel)
+        self.assertEqual(said, [])
+        self.assert_empty_log_is_kept(panel)
+        panel.choose_file(EXPERIMENTAL, str(self.unv(base.plate_nodes())))  # the inputs chosen anew: the clean page
+        self.assertEqual(panel.state, IDLE)
+        self.assert_no_log(panel)
+        self.fail_early(panel)
+        self.assert_empty_log_is_kept(panel)
+        self.assertTrue(panel.close_project())
+        self.assert_no_log(panel)
+
+    def test_the_log_stays_after_a_cancellation_before_the_first_line(self):
+        runner = base.Runner(base.plate_nodes(), wait_for_cancel=True)
+        window = self.window()
+        panel = window.analyze
+        panel._runner = runner
+        panel.choose_file(FE, str(self.odb))
+        panel.choose_file(EXPERIMENTAL, str(self.unv(base.plate_nodes())))
+        self.assertTrue(panel.analyze())
+        cancel_event = panel._cancel
+        panel.cancel()  # at once: no line of this run has been delivered, and none is shown afterwards
+        self.assertTrue(cancel_event.is_set())
+        self.wait(panel)
+        for _ in range(20):
+            self.app.processEvents()
+            base.time.sleep(0.01)
+        self.assertEqual(panel.state, IDLE)
+        self.assertIn("Cancelled", panel.message.text())
+        self.assert_empty_log_is_kept(panel)
+        panel.choose_file(FE, str(self.odb))
+        self.assert_no_log(panel)
+
+    def test_an_opened_project_starts_without_the_log_of_an_earlier_run(self):
+        window = self.window()
+        panel = self.analysed(window)
+        project = self.inputs / f"saved{apanel.ap.SUFFIX}"
+        self.assertTrue(panel.save_project_as(str(project)))
+        self.wait(panel)
+        self.assertTrue(project.is_file(), panel.message.text())
+        self.assertTrue(panel.close_project())
+        self.assert_no_log(panel)
+        panel.choose_file(FE, str(self.odb))
+        panel.choose_file(EXPERIMENTAL, str(self.unv(base.plate_nodes())))
+        self.fail_early(panel)
+        self.assert_empty_log_is_kept(panel)
+        self.assertTrue(panel.open_project(str(project)))
+        self.wait(panel)
+        self.assertEqual(panel.state, DONE, panel.message.text())
+        self.assertIsNotNone(panel.snapshot)
+        window.show_page(pw.ANALYZE_PAGE)
+        self.app.processEvents()
+        self.assert_no_log(panel)
+
     def test_the_latest_line_stays_in_view_unless_earlier_lines_are_being_read(self):
         window = self.window((900, 700))
         panel = self.analysed(window)
