@@ -501,29 +501,43 @@ class ReviewPageTests(_Flow):
             self.assertTrue(text.isascii(), text)  # English only
 
     def _shape_views_fit_the_pane(self, window, panel, saved):
-        """At 900 x 700 the two views are one above the other; side by side wherever the pane has room for both (with the
-        fonts of the test platform the pane of a 1366 x 768 window may be some pixels short of that, a 1600 x 900 one is
-        not); never a sideways scroll, and the arrangement follows the pane that is seen."""
+        """The two views stand side by side where the pane that is seen has room for both at their least widths, else one
+        above the other. The window's size alone does not say which: the live views, with their controls, need more room
+        than the views of a saved result, so at 900 x 700 the live ones are stacked while the saved ones may fit side by
+        side (REVIEW-UX-1-F2; whether they do depends on the fonts of the platform). Never a sideways scroll."""
         from PySide6.QtWidgets import QBoxLayout
+        from new_gui.analyze_panel import SIDE_BY_SIDE_WIDTH
 
         review = window.review
         review.select_row(1)
         self.wait(panel)
         self.assertIs(review.views.currentWidget(), review.shapes_area)
         area, views = review.shapes_area, (panel.saved_shapes if saved else panel.shape_panels)
+        others = panel.shape_panels if saved else panel.saved_shapes
+        row = panel.shapes_layout.parentWidget()
         shown = {}
         for size in ((1600, 900), (900, 700), (1366, 768), (900, 700), (1600, 900), (1366, 768)):
             window.resize(*size)
             for _ in range(5):
                 self.app.processEvents()
+            self.assertTrue(all(not view.isHidden() for view in views.values()), (size, saved))  # the views in question
+            self.assertTrue(all(view.isHidden() for view in others.values()), (size, saved))
             pane = area.viewport().width()
-            need = sum(view.minimumSizeHint().width() for view in views.values()) + panel.shapes_layout.spacing()
-            direction = QBoxLayout.Direction.LeftToRight if pane >= need else QBoxLayout.Direction.TopToBottom
-            if size == (900, 700):
-                self.assertLess(pane, need)  # the reported case: no room for both
-            elif size == (1600, 900):
-                self.assertGreaterEqual(pane, need)
-            self.assertEqual(panel.shapes_layout.direction(), direction, (size, pane, need, saved))
+            room = min(pane, row.width())  # what the two views can take without a sideways scroll
+            # the rule of the layout: side by side from the least widths of the two views shown plus the gap between them,
+            # and never below the least page width for two views
+            need = max(SIDE_BY_SIDE_WIDTH, sum(view.minimumSizeHint().width() for view in views.values()) + 12)
+            direction = QBoxLayout.Direction.LeftToRight if room >= need else QBoxLayout.Direction.TopToBottom
+            if size == (1600, 900):
+                self.assertGreaterEqual(room, need, (size, saved))  # a wide window: room for both, live or saved
+            elif size == (900, 700) and not saved:
+                self.assertLess(room, need, (size, saved))  # the reported case: the live views do not fit side by side
+            self.assertEqual(panel.shapes_layout.direction(), direction, (size, pane, room, need, saved))
+            if direction == QBoxLayout.Direction.LeftToRight:  # side by side only where both really fit
+                for view in views.values():
+                    left = view.mapTo(area.viewport(), view.rect().topLeft()).x()
+                    self.assertGreaterEqual(view.width(), view.minimumSizeHint().width(), (size, saved))
+                    self.assertTrue(0 <= left and left + view.width() <= pane, (size, saved, left, view.width(), pane))
             self.assertEqual(area.horizontalScrollBar().maximum(), 0, (size, pane, saved))  # the pane as it is seen
             self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
             self.assertLessEqual(area.widget().width(), pane, size)
@@ -545,8 +559,11 @@ class ReviewPageTests(_Flow):
             for label in (review.selection_label, review.frames_note):
                 self.assertTrue(label.isVisibleTo(area))
                 self.assertLessEqual(label.x() + label.width(), pane, size)
-            shown[size] = (review.selection_label.text(), tuple(cells(review.table)[1]))
-        self.assertEqual(len(set(shown.values())), 1)  # the chosen row and its modes are the same at every size
+            table = cells(review.table)
+            shown[size] = (review.selection_label.text(), tuple(table[1]), tuple(map(tuple, table)),
+                           review.table.currentRow())
+        # the chosen row, its modes and frequencies, and the whole table are the same at every size
+        self.assertEqual(len(set(shown.values())), 1)
         return shown[(900, 700)]
 
     def test_review_ux1_the_two_views_stack_in_a_narrow_window_and_stand_side_by_side_in_a_wide_one(self):
