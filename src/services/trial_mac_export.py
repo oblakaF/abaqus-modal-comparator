@@ -224,22 +224,31 @@ def build_files(run, provenance: Optional[Mapping] = None, created: Optional[str
     return {README: _readme(run, provenance).encode("utf-8-sig"), MANIFEST: manifest, **members}
 
 
+# Where hard links are missing, only a rename that can never replace a file is used instead: that is the Windows rename.
+_RENAME_NEVER_REPLACES = os.name == "nt"
+
+
 def _publish(temporary: str, target: Path) -> None:
-    """Give the finished file its name without ever replacing a file that is there."""
+    """Give the finished file its name without ever replacing a file that is there, and without ever leaving anything
+    under that name when the step fails: each way used is one atomic step that fails when the name is taken."""
     exists = ExportRefused(f"{target} already exists and is not replaced. Choose a new name.")
     try:
         os.link(temporary, target)  # atomic, and fails when the name is taken
+        return
     except FileExistsError as error:
         raise exists from error
-    except OSError:  # a file system without hard links
-        try:
-            if os.name == "nt":
-                os.rename(temporary, target)  # on Windows a rename never replaces
-            else:
-                os.close(os.open(target, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
-                os.replace(temporary, target)
-        except FileExistsError as error:
-            raise exists from error
+    except OSError as error:  # a file system without hard links
+        no_links = error
+    if os.path.lexists(target):
+        raise exists from no_links
+    if not _RENAME_NEVER_REPLACES:
+        raise ExportRefused(f"The archive was not written to {target}: this folder's file system cannot give a new file its "
+                            f"name without the risk of replacing another file ({no_links}). Choose a folder on another "
+                            "drive.") from no_links
+    try:
+        os.rename(temporary, target)  # on Windows a rename never replaces
+    except FileExistsError as error:
+        raise exists from error
 
 
 def write_archive(path, run, provenance: Optional[Mapping] = None, verify: Optional[Callable[[], None]] = None) -> Path:

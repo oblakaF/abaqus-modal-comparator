@@ -259,19 +259,54 @@ class SafeWriteTests(_Folder):
         def appears() -> None:
             self.target.write_bytes(b"someone else's")
 
-        for link in (os.link, mock.Mock(side_effect=OSError("no hard links here"))):
-            with self.subTest(link=link), mock.patch.object(os, "link", link):
+        no_links = mock.Mock(side_effect=OSError("no hard links here"))
+        for link, rename_is_safe in ((os.link, te._RENAME_NEVER_REPLACES), (no_links, te._RENAME_NEVER_REPLACES), (no_links, False)):
+            with self.subTest(link=link, rename_is_safe=rename_is_safe), mock.patch.object(os, "link", link),                     mock.patch.object(te, "_RENAME_NEVER_REPLACES", rename_is_safe):
                 with self.assertRaisesRegex(te.ExportRefused, "already exists"):
                     te.write_archive(self.target, self.run_, verify=appears)
                 self.assertEqual(self.target.read_bytes(), b"someone else's")
                 self.assertEqual(self.left(), ["trial.zip"])
                 self.target.unlink()
 
-    def test_without_hard_links_the_archive_is_still_complete(self):
+    def test_with_hard_links_the_archive_is_complete(self):
+        (self.folder / "probe").write_bytes(b"")
+        try:
+            os.link(self.folder / "probe", self.folder / "probe2")
+        except OSError:
+            self.skipTest("this file system has no hard links")
+        finally:
+            for name in ("probe", "probe2"):
+                (self.folder / name).unlink(missing_ok=True)
+        with mock.patch.object(os, "rename", side_effect=AssertionError("not needed")),                 mock.patch.object(os, "replace", side_effect=AssertionError("never used")):
+            te.write_archive(self.target, self.run_)
+        self.assertEqual(len(members(self.target)), 45)
+        self.assertEqual(self.left(), ["trial.zip"])
+
+    @unittest.skipUnless(os.name == "nt", "only the Windows rename never replaces a file")
+    def test_without_hard_links_the_archive_is_still_complete_on_windows(self):
         with mock.patch.object(os, "link", side_effect=OSError("no hard links here")):
             te.write_archive(self.target, self.run_)
         self.assertEqual(len(members(self.target)), 45)
         self.assertEqual(self.left(), ["trial.zip"])
+
+    def test_without_hard_links_and_without_a_safe_rename_nothing_is_written(self):
+        with mock.patch.object(os, "link", side_effect=OSError("no hard links here")),                 mock.patch.object(te, "_RENAME_NEVER_REPLACES", False),                 mock.patch.object(os, "rename", side_effect=AssertionError("never used")),                 mock.patch.object(os, "replace", side_effect=AssertionError("never used")):
+            with self.assertRaisesRegex(te.ExportRefused, "without the risk of replacing another file.*no hard links here"):
+                te.write_archive(self.target, self.run_)
+        self.assertEqual(self.left(), [])
+
+    def test_a_failure_after_the_fallback_began_leaves_no_file_at_all(self):
+        for failure, words in ((OSError("the drive went away"), "could not be written.*the drive went away"),
+                               (FileExistsError("taken meanwhile"), "already exists and is not replaced")):
+            with self.subTest(failure=failure), mock.patch.object(os, "link", side_effect=OSError("no hard links here")),                     mock.patch.object(te, "_RENAME_NEVER_REPLACES", True), mock.patch.object(os, "rename", side_effect=failure),                     mock.patch.object(os, "replace", side_effect=AssertionError("never used")):
+                with self.assertRaisesRegex(te.ExportRefused, words):
+                    te.write_archive(self.target, self.run_)
+                self.assertEqual(self.left(), [])  # neither an empty file under the name nor the temporary archive
+
+    def test_no_way_of_publishing_reserves_the_name_or_replaces(self):
+        text = (ROOT / "src" / "services" / "trial_mac_export.py").read_text(encoding="utf-8")
+        for forbidden in ("os.replace", "O_EXCL", "O_CREAT"):
+            self.assertNotIn(forbidden, text, forbidden)
 
     def test_a_failed_check_leaves_no_file(self):
         def fails() -> None:
