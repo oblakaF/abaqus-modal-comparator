@@ -71,6 +71,8 @@ jobs:
               sleep 60
             done > machine-watch.txt ) &
           watch=$!
+          # CI-LINUX-BLAS-FIX-1: what a Python process started from this very shell (as the suite is, next) receives.
+          python -c "import os, numpy as np; from scipy import linalg; a = np.eye(300) + 1; linalg.eigh(a); np.linalg.solve(a, a); print('::notice title=native threads of the suite process::' + ' '.join(n + '=' + str(os.environ.get(n)) for n in ('OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS')) + '; threads after BLAS calls: ' + [l.split()[1] for l in open('/proc/self/status') if l.startswith('Threads:')][0])" || true
           set +e
           python -X faulthandler tests/ci_run_suite.py --trace refcount-trace.jsonl 2>&1 | tee test-results.txt
           code=${PIPESTATUS[0]}
