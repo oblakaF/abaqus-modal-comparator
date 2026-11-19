@@ -373,7 +373,9 @@ class SeparationTests(unittest.TestCase):
     # is given, writes no file and starts no process
     # ABM-SANDWICH-SP13-1: sandwich_trial_candidates reads the chosen INP, the pinned repository records and the archived
     # shape packs; it writes only the export files the user asks for and starts no process
-    REVIEWED_SERVICES = {"mac_points_model.py": {"analysis_project", "trial_point_mac"},
+    # TRIAL-MAC-EXPORT-1: trial_mac_export takes numpy and trial_point_mac's constants only; it computes no MAC, starts no
+    # process and writes only the one new ZIP file the user asks for
+    REVIEWED_SERVICES = {"mac_points_model.py": {"analysis_project", "trial_mac_export", "trial_point_mac"},
                          "materials_study_model.py": {"materials_project"},
                          "materials_study_panel.py": {"analysis_project", "materials_project"},
                          "materials_workspace_model.py": {"odb_import_service"},

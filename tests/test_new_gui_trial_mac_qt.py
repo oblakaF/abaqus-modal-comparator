@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json
 import threading
 import time
 from unittest import mock
@@ -21,6 +24,7 @@ from new_gui import mac_points_model as mp
 from new_gui import production_window as pw
 from new_gui.workspace_state import EXPERIMENTAL, FE
 from services import analysis_project as ap
+from services import trial_mac_export as te
 from services import trial_point_mac as tp
 
 FREQUENCIES = (21.0, 42.0, 63.0, 84.0)
@@ -323,6 +327,249 @@ class SafetyTests(_Flow):
             window.close()
             self.finish(card)
         self.assertIsNone(card.run_result)
+
+
+class ExportTests(_Flow):
+    """TRIAL-MAC-EXPORT-1: "Export all Trial MAC..." writes the values shown, of the data shown, and nothing else."""
+
+    def export(self, card, path, expect=True):
+        card.ask_export_path = lambda: str(path)
+        self.assertEqual(card.export(), expect)
+        end = time.monotonic() + 120.0
+        while (card.busy() or card._exporting is not None) and time.monotonic() < end:
+            self.app.processEvents()
+            time.sleep(0.01)
+        self.app.processEvents()
+        self.assertIsNone(card._exporting)
+
+    def left(self) -> list:
+        return sorted(p.name for p in self.inputs.iterdir() if p.suffix in (".zip", ".partial"))
+
+    def test_the_button_is_off_until_a_trial_is_shown_and_while_one_runs(self):
+        window, _panel, card = self.ready()
+        self.assertEqual(card.export_button.text(), "Export all Trial MAC...")
+        self.assertFalse(card.export_button.isEnabled())  # analyzed, but no trial yet
+        asked = []
+        card.ask_export_path = lambda: asked.append(1) or str(self.inputs / "early.zip")
+        self.assertFalse(card.export())
+        release = threading.Event()
+        real = tp.run_trials
+
+        def held(*args, **kwargs):
+            release.wait(30)
+            return real(*args, **kwargs)
+
+        with mock.patch.object(tp, "run_trials", side_effect=held):
+            self.assertTrue(card.run())
+            self.assertFalse(card.export_button.isEnabled())  # during the calculation
+            self.assertFalse(card.export())
+            release.set()
+            self.finish(card)
+        self.assertIsNotNone(card.run_result)
+        self.assertTrue(card.export_button.isEnabled())
+        self.assertEqual((asked, self.left()), ([], []))
+        self.assertFalse(self.window().mac_points.trial.export_button.isEnabled())  # no result at all
+
+    def test_the_archive_holds_the_forty_placements_of_the_run_shown(self):
+        _window, panel, card = self.ran()
+        run, target = card.run_result, self.inputs / "all trials"  # no suffix given: .zip is added
+        self.export(card, target)
+        target = target.with_name("all trials.zip")
+        self.assertEqual(card.export_status.text(), f"Exported to {target}")
+        self.assertFalse(card.export_status.isHidden())
+        self.assertEqual(self.left(), ["all trials.zip"])
+        with zipfile.ZipFile(target) as archive:
+            self.assertIsNone(archive.testzip())
+            names = archive.namelist()
+            self.assertEqual(names, ["README.txt", "manifest.json", "placements.csv", "point_mapping.csv", "families.csv"]
+                             + [f"matrices/{t.name}.csv" for t in run.trials])
+            manifest = json.loads(archive.read("manifest.json"))
+            readme = archive.read("README.txt").decode("utf-8-sig")
+            for trial in run.trials:
+                rows = list(csv.reader(io.StringIO(archive.read(f"matrices/{trial.name}.csv").decode("utf-8-sig"))))
+                self.assertEqual([r[0] for r in rows[1:]], ["EXP 1", "EXP 2", "EXP 3", "EXP 4"])
+                self.assertEqual([h.split(" (")[0] for h in rows[0][2:]], [f"FE {n}" for n in range(7, 21)])
+                np.testing.assert_array_equal(np.array([[float(v) for v in r[2:]] for r in rows[1:]]), trial.mac)
+            points = list(csv.reader(io.StringIO(archive.read("point_mapping.csv").decode("utf-8-sig"))))
+            self.assertEqual(len(points), 1 + 40 * 25)
+            self.assertEqual({r[0] for r in points[1:]}, {"UNCONFIRMED"})
+            for data in (archive.read(n) for n in names):  # the source files are not in the archive
+                self.assertNotEqual(data, self.exp_path.read_bytes())
+        self.assertTrue(readme.startswith("EXPLORATORY MAC — UNCONFIRMED GEOMETRIC MAPPING"))
+        self.assertEqual(manifest["label"], "EXPLORATORY MAC — UNCONFIRMED GEOMETRIC MAPPING")
+        sources = manifest["sources"]
+        self.assertEqual((sources["experimental"]["verified_at_export"], sources["experimental"]["sha256"]),
+                         (True, base.sha(self.exp_path)))
+        self.assertEqual(sources["experimental"]["path"], str(self.exp_path))
+        package = panel.inputs.identities["fe"]["package"]
+        self.assertEqual((sources["fe_package"]["verified_at_export"], sources["fe_package"]["package_sha256"]),
+                         (True, package["package_sha256"]))
+        self.assertEqual(len(sources["fe_package"]["files"]), len(package["files"]))
+        self.assertEqual((sources["odb"]["verified_at_export"], sources["odb"]["check"], sources["odb"]["recorded_sha256"]),
+                         (True, "SOURCE_UNCHANGED", base.sha(self.odb)))  # hashed again by the existing source check
+        self.assertIn("the ODB was hashed again", readme)
+        self.assertEqual(manifest["modal_set"]["index"], panel.analysis.set_index)
+        self.assertEqual(manifest["modal_set"]["record_count"], 4)
+        self.assertEqual(manifest["rigid_body_fe_modes_excluded"], sorted(int(n) for n in panel.analysis.rigid_modes))
+        self.assertEqual([m["number"] for m in manifest["fe_modes"]], list(run.fe_numbers))
+        self.assertEqual([m["frequency_hz"] for m in manifest["experimental_modes"]], list(run.experimental_frequencies))
+
+    def test_an_odb_that_no_longer_matches_the_package_is_never_stated_as_verified(self):
+        _window, _panel, card = self.ran()
+        recorded = base.sha(self.odb)
+        self.odb.write_bytes(self.odb.read_bytes() + b"later")  # the package read is still the package: the values stand
+        target = self.inputs / "odb changed.zip"
+        self.export(card, target)
+        self.assertEqual(card.export_status.text(), f"Exported to {target}")
+        with zipfile.ZipFile(target) as archive:
+            odb = json.loads(archive.read("manifest.json"))["sources"]["odb"]
+            readme = archive.read("README.txt").decode("utf-8-sig")
+        self.assertEqual((odb["verified_at_export"], odb["check"], odb["recorded_sha256"]), (False, "SOURCE_CHANGED", recorded))
+        self.assertIn("the ODB identity is only the one recorded with the package and was not verified by this export", readme)
+        self.assertNotIn("the ODB was hashed again", readme)
+
+    def test_exporting_changes_no_status_no_pair_and_no_value(self):
+        window, panel, card = self.ran()
+        run, analysis, mac = card.run_result, panel.analysis, window.mac_points
+        matrices = [t.mac.copy() for t in run.trials]
+        shown = (cells(card.mapping_table), cells(card.matrix_table), card.summary.text(), card.family_text.text(),
+                 mac.badge.text(), mac.reason.text(), mac.readiness_answers(), cells(mac.evidence_table))
+        calls = len(self.runner.calls)
+        with mock.patch.object(tp, "run_trials", side_effect=AssertionError("nothing is recomputed")), \
+                mock.patch("subprocess.Popen", side_effect=AssertionError("no process")) as popen, \
+                mock.patch("subprocess.run", side_effect=AssertionError("no process")) as started:
+            self.export(card, self.inputs / "unchanged.zip")
+        self.assertTrue(card.export_status.text().startswith("Exported to "), card.export_status.text())
+        self.assertEqual((popen.call_count, started.call_count, len(self.runner.calls)), (0, 0, calls))
+        self.assertIs(card.run_result, run)
+        self.assertIs(panel.analysis, analysis)
+        for trial, before in zip(run.trials, matrices):
+            np.testing.assert_array_equal(trial.mac, before)
+        self.assertEqual((cells(card.mapping_table), cells(card.matrix_table), card.summary.text(), card.family_text.text(),
+                          mac.badge.text(), mac.reason.text(), mac.readiness_answers(), cells(mac.evidence_table)), shown)
+        self.assertEqual(panel.analysis.status, am.REGISTRATION_REQUIRED)
+        self.assertIsNone(panel.analysis.comparison)
+        self.assertEqual(panel.registration_kind(), ap.KIND_NONE)
+        self.assertEqual(len(panel.review_state.manual), 0)
+        self.assertIsNone(panel.confirmation)
+        self.assertIsNone(mac.result)
+        self.assertTrue(card.export_button.isEnabled())  # and it can be exported again, to another file
+        self.assertTrue(card.run_button.isEnabled())
+
+    def test_the_source_files_are_unchanged_and_only_the_archive_is_new(self):
+        _window, _panel, card = self.ran()
+
+        def state() -> dict:
+            return {str(p): base.sha(p) for p in sorted(self.root.rglob("*")) if p.is_file()}
+
+        before, target = state(), self.inputs / "only this.zip"
+        self.export(card, target)
+        after = state()
+        self.assertEqual(set(after) - set(before), {str(target)})
+        self.assertEqual({k: v for k, v in after.items() if k in before}, before)
+
+    def test_a_cancelled_file_choice_writes_nothing(self):
+        _window, _panel, card = self.ran()
+        card.ask_export_path = lambda: ""
+        self.assertFalse(card.export())
+        self.assertIsNone(card._exporting)
+        self.assertEqual((card.export_status.text(), self.left()), ("", []))
+        self.assertIsNotNone(card.run_result)
+        self.assertTrue(card.export_button.isEnabled())
+
+    def test_an_existing_archive_is_not_replaced_and_the_message_says_so(self):
+        _window, _panel, card = self.ran()
+        target = self.inputs / "kept.zip"
+        target.write_bytes(b"an earlier export")
+        self.export(card, target)
+        self.assertIn("already exists and is not replaced", card.export_status.text())
+        self.assertTrue(card.export_status.text().startswith("Not exported: "))
+        self.assertEqual(target.read_bytes(), b"an earlier export")
+        self.assertEqual(self.left(), ["kept.zip"])
+        self.assertIsNotNone(card.run_result)  # the values are still those of the files read
+        self.export(card, self.inputs / "new name.zip")
+        self.assertEqual(self.left(), ["kept.zip", "new name.zip"])
+        self.assertTrue(card.export_status.text().startswith("Exported to "))
+
+    def test_a_write_failure_is_said_and_leaves_no_partial_archive(self):
+        _window, _panel, card = self.ran()
+        with mock.patch.object(zipfile.ZipFile, "writestr", side_effect=OSError("disk full")):
+            self.export(card, self.inputs / "broken.zip")
+        self.assertTrue(card.export_status.text().startswith("Not exported: "))
+        self.assertIn("disk full", card.export_status.text())
+        self.assertEqual(self.left(), [])
+        self.export(card, self.inputs / "no such folder" / "x.zip")
+        self.assertTrue(card.export_status.text().startswith("Not exported: "))
+        self.assertIsNotNone(card.run_result)
+        self.assertTrue(card.export_button.isEnabled())
+
+    def test_a_source_changed_after_the_trial_is_not_exported_and_the_values_go(self):
+        _window, _panel, card = self.ran()
+        self.exp_path.write_text(self.exp_path.read_text() + "\n")
+        with mock.patch.object(te, "write_archive", side_effect=AssertionError("changed sources are not exported")):
+            self.export(card, self.inputs / "stale.zip")
+        self.assertEqual(self.left(), [])
+        self.assertIsNone(card.run_result)
+        self.assertEqual(card.status.text(), am.STALE_TEXT)
+        self.assertEqual(card.export_status.text(), "")
+        self.assertTrue(card.results.isHidden())
+        self.assertFalse(card.export_button.isEnabled())
+
+    def test_a_source_changed_while_the_archive_is_written_leaves_no_archive(self):
+        _window, _panel, card = self.ran()
+        real = te.build_files
+
+        def then_changed(*args, **kwargs):
+            files = real(*args, **kwargs)
+            self.exp_path.write_text(self.exp_path.read_text() + "\n")
+            return files
+
+        with mock.patch.object(te, "build_files", side_effect=then_changed):
+            self.export(card, self.inputs / "late.zip")
+        self.assertEqual(self.left(), [])
+        self.assertIsNone(card.run_result)
+        self.assertEqual(card.status.text(), am.STALE_TEXT)
+        self.assertFalse(card.export_button.isEnabled())
+
+    def test_a_new_analysis_or_another_file_turns_the_export_off(self):
+        _window, panel, card = self.ran()
+        self.assertTrue(card.export_button.isEnabled())
+        self.run_analysis(panel)  # the same files analyzed again: the values shown before belong to no current result
+        self.assertIsNone(card.run_result)
+        self.assertFalse(card.export_button.isEnabled())
+        asked = []
+        card.ask_export_path = lambda: asked.append(1) or str(self.inputs / "old.zip")
+        self.assertFalse(card.export())
+        self.assertTrue(card.run())
+        self.finish(card)
+        self.assertTrue(card.export_button.isEnabled())
+        panel.choose_file(EXPERIMENTAL, str(self.measured("another scan.unv")))
+        self.app.processEvents()
+        self.assertFalse(card.export_button.isEnabled())
+        self.assertFalse(card.export())
+        self.assertEqual((asked, self.left()), ([], []))
+
+    def test_data_replaced_while_the_file_is_being_chosen_are_not_exported(self):
+        _window, panel, card = self.ran()
+
+        def choosing() -> str:  # the dialog is open while the result shown is replaced
+            panel.choose_file(EXPERIMENTAL, str(self.measured("another scan.unv")))
+            self.app.processEvents()
+            return str(self.inputs / "replaced.zip")
+
+        card.ask_export_path = choosing
+        with mock.patch.object(mp, "export_trial", side_effect=AssertionError("values of replaced data are not exported")):
+            self.assertFalse(card.export())
+        self.assertEqual(self.left(), [])
+        self.assertIsNone(card._exporting)
+
+    def test_the_export_control_does_not_make_the_page_scroll_sideways(self):
+        window, _panel, card = self.ran()
+        self.export(card, self.inputs / "wide.zip")
+        for size in ((900, 680), (1366, 768)):
+            window.resize(*size)
+            self.app.processEvents()
+            self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
 
 
 if __name__ == "__main__":

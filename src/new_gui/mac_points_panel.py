@@ -7,11 +7,12 @@ point correspondence, the coverage, the pictures of a chosen pair and the line p
 from __future__ import annotations
 
 import html
+from pathlib import Path
 import threading
 from typing import Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from new_gui import comparison_model as cm
 from new_gui import mac_points_model as mp
@@ -58,6 +59,11 @@ class TrialMacCard(QFrame):
         self._threads: list = []
         self._bridge = _Bridge(self)
         self._bridge.done.connect(self._done)
+        self.export_token = 0
+        self._exporting: Optional[threading.Event] = None
+        self._export_bridge = _Bridge(self)
+        self._export_bridge.done.connect(self._exported)
+        self.ask_export_path = self._export_dialog_path
         self.mapping_table = self.matrix_table = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 14, 16, 14)
@@ -77,6 +83,16 @@ class TrialMacCard(QFrame):
         layout.addLayout(row)
         self.status = _label("", "warnings")
         layout.addWidget(self.status)
+        self.export_button = QPushButton(mp.TRIAL_EXPORT)
+        self.export_button.setObjectName("trialMacExport")
+        self.export_button.clicked.connect(lambda: self.export())
+        row = QHBoxLayout()  # a row of its own: three buttons side by side would widen the page at 900 px
+        row.addWidget(self.export_button)
+        row.addStretch(1)
+        layout.addLayout(row)
+        self.export_status = _label("", "hint")
+        self.export_status.setObjectName("trialMacExportStatus")
+        layout.addWidget(self.export_status)
         self.results = QWidget()
         inner = QVBoxLayout(self.results)
         inner.setContentsMargins(0, 0, 0, 0)
@@ -152,10 +168,23 @@ class TrialMacCard(QFrame):
         running = self._cancel is not None
         self.run_button.setEnabled(not running and not self.problem())
         self.cancel_button.setEnabled(running)
+        exporting = self._exporting is not None
+        self.run_button.setEnabled(self.run_button.isEnabled() and not exporting)
+        self.export_button.setEnabled(self.run_result is not None and not running and not exporting
+                                      and self._same(self._current_key()))
         self.results.setVisible(self.run_result is not None)
         self.status.setVisible(bool(self.status.text()))
+        self.export_status.setVisible(bool(self.export_status.text()))
+
+    def _stop_export(self) -> None:
+        if self._exporting is not None:
+            self._exporting.set()
+        self._exporting = None
+        self.export_token += 1
 
     def _clear(self) -> None:
+        self._stop_export()
+        self.export_status.setText("")
         self.run_result, self._key = None, None
         for combo in (self.trial_combo, self.exp_combo, self.fe_combo):
             combo.blockSignals(True)
@@ -171,7 +200,7 @@ class TrialMacCard(QFrame):
         self.shape_image.clear_image()
 
     def run(self) -> bool:
-        if self._cancel is not None or self.problem():
+        if self._cancel is not None or self._exporting is not None or self.problem():
             return False
         self._clear()
         self._key = self._current_key()
@@ -218,6 +247,54 @@ class TrialMacCard(QFrame):
             self._buttons()
             return
         self._show(outcome)
+
+    def _export_dialog_path(self) -> str:
+        path, _filter = QFileDialog.getSaveFileName(self, mp.TRIAL_EXPORT, mp.TRIAL_EXPORT_NAME, mp.TRIAL_EXPORT_FILTER,
+                                                    options=QFileDialog.Option.DontConfirmOverwrite)  # never replaced
+        return path
+
+    def export(self) -> bool:
+        """TRIAL-MAC-EXPORT-1: the values shown, of the data shown, to one new ZIP file; nothing here is recomputed."""
+        if not self.export_button.isEnabled():
+            return False
+        path = self.ask_export_path()
+        if not path or self.run_result is None or not self._same(self._current_key()):
+            return False
+        target = Path(path)
+        target = target if target.suffix else target.with_name(target.name + ".zip")
+        self.export_token += 1
+        token, cancel, bridge = self.export_token, threading.Event(), self._export_bridge
+        inputs, analysis, run = self.analyze.inputs, self.analyze.analysis, self.run_result
+        self._exporting = cancel
+
+        def work() -> None:
+            outcome = mp.export_trial(inputs, analysis, run, target, token, cancel)
+            try:
+                bridge.done.emit(outcome)
+            except RuntimeError:
+                pass
+
+        worker = threading.Thread(target=work, name="new-gui-trial-mac-export", daemon=True)
+        self._threads = [thread for thread in self._threads if thread.is_alive()] + [worker]
+        self.export_status.setText(mp.TRIAL_EXPORTING)
+        self._buttons()
+        worker.start()
+        return True
+
+    def _exported(self, outcome: mp.TrialExport) -> None:
+        if outcome.token != self.export_token:  # the values it belonged to are no longer shown
+            return
+        self._exporting = None
+        if outcome.stale:  # a source changed after it was read: these values are of no current file
+            self._stop()
+            self._clear()
+            self.status.setText(outcome.error)
+        elif outcome.cancelled:
+            self.export_status.setText("")
+        else:
+            self.export_status.setText(mp.TRIAL_NOT_EXPORTED.format(outcome.error) if outcome.error
+                                       else mp.TRIAL_EXPORTED.format(outcome.path))
+        self._buttons()
 
     def _show(self, outcome: mp.TrialOutcome) -> None:
         run = self.run_result = outcome.run
@@ -268,6 +345,7 @@ class TrialMacCard(QFrame):
 
     def shutdown(self) -> None:
         self._stop()
+        self._stop_export()
 
 
 class MacPointsPanel(QWidget):

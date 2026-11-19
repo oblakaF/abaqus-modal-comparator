@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import io
+from pathlib import Path
 from typing import Optional
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -22,6 +23,7 @@ from new_gui import comparison_model as cm
 from new_gui import review_model as rv
 from new_gui import shape_model as sm
 from services import analysis_project as ap
+from services import trial_mac_export as te
 from services import trial_point_mac as tp
 
 EVIDENCE_HEADERS = ("Evidence level", "State for this result", "What it means")
@@ -306,7 +308,9 @@ TRIAL_NEEDS_SOURCE = ("Not available for a saved result: its files were not read
 TRIAL_NEEDS_FITTED = "Not available: the chosen set holds FRF peak records, not fitted modes."
 TRIAL_RUNNING, TRIAL_CANCELLED = "Running the 40 trial placements...", "Cancelled. No trial value is shown."
 TRIAL_STALE = "The files or the chosen set changed, so the trial values were removed."
-TRIAL_MAPPING_TITLE = "Point mapping of every placement"
+TRIAL_EXPORT, TRIAL_EXPORT_NAME, TRIAL_EXPORT_FILTER = "Export all Trial MAC...", "trial_mac_export.zip", "ZIP archive (*.zip)"
+TRIAL_EXPORTING, TRIAL_EXPORTED, TRIAL_NOT_EXPORTED = "Exporting...", "Exported to {}", "Not exported: {}"
+TRIAL_MAPPING_TITLE ="Point mapping of every placement"
 TRIAL_MAPPING_HEADERS = ("Placement", "FE face", "Quarter turns", "Shift X", "Shift Y", "Mapped points", "Different FE nodes",
                          "RMS distance", "Max distance", "Edge margin", "State")
 TRIAL_FAMILY_TITLE = "Placements with numerically equal matrices, side by side"
@@ -364,6 +368,73 @@ def run_trial(inputs, analysis, token: int, cancel_event) -> TrialOutcome:
         if cancel_event.is_set():
             return TrialOutcome(token, cancelled=True)
         return TrialOutcome(token, error=f"The trial could not be completed ({type(error).__name__}: {error}).")
+
+
+@dataclass(frozen=True)
+class TrialExport:
+    token: int
+    path: str = ""
+    error: str = ""
+    cancelled: bool = False
+    stale: bool = False  # a source file is no longer the file that was read: the trial values must go
+
+
+def _odb_provenance(inputs, cancel_event) -> dict:
+    """The ODB content recorded when the package was extracted, hashed again now by the existing source check
+    (``odb_import_service.verify_source``). Only an unchanged ODB is stated as verified."""
+    checked = am.svc.verify_source(Path(inputs.full_fe.manifest_path).parent, cancel_event=cancel_event)
+    recorded = dict(checked.recorded or {})
+    return {"verified_at_export": checked.status == am.svc.SOURCE_UNCHANGED, "check": str(checked.status),
+            "check_text": str(checked.text), "recorded_path": str(recorded.get("path") or ""),
+            "recorded_size": recorded.get("size"), "recorded_sha256": str(recorded.get("sha256") or "")}
+
+
+def trial_export_provenance(inputs, analysis, cancel_event=None) -> dict:
+    """What the session recorded of the two sources and the modal set. Call it between two ``confirm_sources``: only
+    then are the FE package and the experimental file the files that were read."""
+    fe, experimental = inputs.identities["fe"], inputs.identities["experimental"]
+    package = fe["package"]
+    odb = _odb_provenance(inputs, cancel_event)
+    return {
+        "sources": {
+            "verification": ("the FE package files and the experimental file were hashed again at export and are the "
+                             "files that were read; "
+                             + ("the ODB was hashed again and is the content the package was extracted from"
+                                if odb["verified_at_export"] else
+                                f"the ODB identity is only the one recorded with the package and was {te.NOT_VERIFIED}")),
+            "fe_package": {"verified_at_export": True, "manifest_path": str(inputs.full_fe.manifest_path),
+                           "manifest_sha256": fe["sha256"], "package_sha256": package["package_sha256"],
+                           "files": [{"role": item["role"], "relative": item["relative"], "size": item["size"],
+                                      "sha256": item["sha256"]} for item in package["files"]]},
+            "odb": odb,
+            "experimental": {"verified_at_export": True, "path": str(inputs.full_experimental.source_path),
+                             "selected_path": str(inputs.full_experimental.selected_path),
+                             "size": experimental["size"], "sha256": experimental["sha256"]}},
+        "modal_set": {"index": int(analysis.set_index), **am._modal_set_identity(inputs, analysis.set_index)},
+        "rigid_body_fe_modes": sorted(int(number) for number in analysis.rigid_modes),
+    }
+
+
+def export_trial(inputs, analysis, run, path, token: int, cancel_event) -> TrialExport:
+    """The archive of ``run`` at the new file ``path``; both sources must be the files that were read, before the
+    archive is written and again before it takes its name. Computes nothing and changes nothing but that one file."""
+    def verify() -> None:
+        am.confirm_sources(inputs, cancel_event)
+
+    try:
+        verify()
+        written = te.write_archive(path, run, trial_export_provenance(inputs, analysis, cancel_event), verify)
+        return TrialExport(token, str(written))
+    except am.StepCancelled:
+        return TrialExport(token, cancelled=True)
+    except am.StepFailed as error:
+        return TrialExport(token, error=str(error), stale=True)
+    except te.ExportRefused as error:
+        return TrialExport(token, error=str(error))
+    except Exception as error:  # noqa: BLE001
+        if cancel_event.is_set():
+            return TrialExport(token, cancelled=True)
+        return TrialExport(token, error=f"The export could not be completed ({type(error).__name__}: {error}).")
 
 
 def trial_summary(run) -> str:
@@ -477,5 +548,5 @@ def trial_shape_plot(run, trial, experimental_index: int, fe_index: int) -> byte
 
 
 __all__ = ["MAC_PLAIN", "READINESS_TITLE", "READY_QUESTIONS", "readiness_rows", "evidence_levels", "point_rows", "profile_lines", "profile_plot", "unavailable_reason",
-           "TRIAL_LABEL", "TrialOutcome", "run_trial", "trial_family_plot", "trial_mapping_rows", "trial_matrix_rows",
+           "TRIAL_LABEL", "TrialExport", "TrialOutcome", "export_trial", "run_trial", "trial_family_plot", "trial_mapping_rows", "trial_matrix_rows",
            "trial_problem", "trial_shape_plot"]
