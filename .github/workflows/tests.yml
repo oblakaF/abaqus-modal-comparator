@@ -49,16 +49,32 @@ jobs:
         env:
           PROBE_QUICK: "1"
         run: python -X faulthandler tests/ci_bool_refcount_probe.py
+      - name: Record the machine before the full suite (CI-LINUX-PERF-ROOT-CAUSE-1)
+        continue-on-error: true
+        shell: bash
+        run: python tests/ci_blas_threading_probe.py --rounds 0 --out machine-before.json --title "machine before the suite"
       - name: Run unit tests (full suite, one process)
         shell: bash
         timeout-minutes: 60
         run: |
+          # CI-LINUX-PERF-ROOT-CAUSE-1: once a minute, beside the suite: load, free memory and swap, CPU time by kind.
+          ( while true; do
+              echo "$(date +%s) $(cut -d' ' -f1 /proc/loadavg) $(awk '/^MemAvailable/{a=$2} /^SwapFree/{s=$2} END{print a, s}' /proc/meminfo) $(head -1 /proc/stat)"
+              sleep 60
+            done > machine-watch.txt ) &
+          watch=$!
           set +e
           python -X faulthandler tests/ci_run_suite.py --trace refcount-trace.jsonl 2>&1 | tee test-results.txt
           code=${PIPESTATUS[0]}
+          kill "$watch" 2>/dev/null
           set -e
           python tests/ci_summary.py test-results.txt --group "Linux full suite" --exit-code "$code" \
             --min-tests 4000 --refcounts refcount-trace.jsonl
+      - name: Record the machine after the full suite (CI-LINUX-PERF-ROOT-CAUSE-1)
+        continue-on-error: true
+        if: always()
+        shell: bash
+        run: python tests/ci_blas_threading_probe.py --rounds 0 --out machine-after.json --title "machine after the suite" --watched machine-watch.txt
       - name: Check that the new interface Qt tests run offscreen (none skipped)
         if: always()
         shell: bash
@@ -90,6 +106,47 @@ jobs:
             refcount-trace.jsonl
             qt-test-results.txt
             research-test-results.txt
+            installed-packages.txt
+            machine-before.json
+            machine-after.json
+            machine-watch.txt
+
+  # CI-LINUX-PERF-ROOT-CAUSE-1 (diagnostic): the same real numerical test modules, each in a process of its own, with the
+  # default native threading and with one native thread, alternating on one runner. It asserts nothing about the times.
+  threading-probe:
+    name: linux threading probe (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.14"]
+    env:
+      QT_QPA_PLATFORM: offscreen
+      NEW_GUI_REQUIRE_QT: "1"
+      PYTHONFAULTHANDLER: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-new-gui.txt
+          python -m pip freeze | tee installed-packages.txt
+      - name: Numerical test modules, default threading against one thread
+        shell: bash
+        run: python tests/ci_blas_threading_probe.py --rounds 2 --out blas-threading-probe.json
+      - name: Upload the record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blas-threading-probe-${{ matrix.python }}
+          path: |
+            blas-threading-probe.json
             installed-packages.txt
 
   windows-supervisor:
