@@ -73,10 +73,18 @@ jobs:
           watch=$!
           # CI-LINUX-BLAS-FIX-1: what a Python process started from this very shell (as the suite is, next) receives.
           python -c "import os, numpy as np; from scipy import linalg; a = np.eye(300) + 1; linalg.eigh(a); np.linalg.solve(a, a); print('::notice title=native threads of the suite process::' + ' '.join(n + '=' + str(os.environ.get(n)) for n in ('OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS')) + '; threads after BLAS calls: ' + [l.split()[1] for l in open('/proc/self/status') if l.startswith('Threads:')][0])" || true
+          # CI-LINUX-MEMORY-ROOT-CAUSE-1: what the per-test memory trace shows so far, twice on the way, so that a run
+          # whose machine is lost still leaves it (the trace itself is flushed after every test).
+          ( for minute in 25 50; do
+              sleep 1500 > /dev/null 2>&1 < /dev/null
+              python tests/ci_run_suite.py --summarise-memory memory-trace.jsonl --title "at minute $minute, " | head -2 || true
+            done ) &
+          progress=$!
           set +e
-          python -X faulthandler tests/ci_run_suite.py --trace refcount-trace.jsonl 2>&1 | tee test-results.txt
+          python -X faulthandler tests/ci_run_suite.py --trace refcount-trace.jsonl --memory memory-trace.jsonl 2>&1 | tee test-results.txt
           code=${PIPESTATUS[0]}
-          kill "$watch" 2>/dev/null
+          echo "{\"event\": \"shell_saw_the_process_end\", \"time\": $(date +%s.%3N), \"exit_code\": $code}" >> memory-trace.jsonl
+          kill "$watch" "$progress" 2>/dev/null
           set -e
           python tests/ci_summary.py test-results.txt --group "Linux full suite" --exit-code "$code" \
             --min-tests 4000 --refcounts refcount-trace.jsonl
@@ -85,6 +93,11 @@ jobs:
         if: always()
         shell: bash
         run: python tests/ci_blas_threading_probe.py --rounds 0 --out machine-after.json --title "machine after the suite" --watched machine-watch.txt
+      - name: What the memory trace of the full suite shows (CI-LINUX-MEMORY-ROOT-CAUSE-1)
+        continue-on-error: true
+        if: always()
+        shell: bash
+        run: python tests/ci_run_suite.py --summarise-memory memory-trace.jsonl
       - name: Check that the new interface Qt tests run offscreen (none skipped)
         if: always()
         shell: bash
@@ -114,50 +127,13 @@ jobs:
           path: |
             test-results.txt
             refcount-trace.jsonl
+            memory-trace.jsonl
             qt-test-results.txt
             research-test-results.txt
             installed-packages.txt
             machine-before.json
             machine-after.json
             machine-watch.txt
-
-  # CI-LINUX-PERF-ROOT-CAUSE-1 (diagnostic): the same real numerical test modules, each in a process of its own, with the
-  # default native threading and with one native thread, alternating on one runner. It asserts nothing about the times.
-  threading-probe:
-    name: linux threading probe (Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        python: ["3.11", "3.14"]
-    env:
-      QT_QPA_PLATFORM: offscreen
-      NEW_GUI_REQUIRE_QT: "1"
-      PYTHONFAULTHANDLER: "1"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
-          python -m pip install -r requirements.txt
-          python -m pip install -r requirements-new-gui.txt
-          python -m pip freeze | tee installed-packages.txt
-      - name: Numerical test modules, default threading against one thread
-        shell: bash
-        run: python tests/ci_blas_threading_probe.py --rounds 2 --out blas-threading-probe.json
-      - name: Upload the record
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: blas-threading-probe-${{ matrix.python }}
-          path: |
-            blas-threading-probe.json
-            installed-packages.txt
 
   windows-supervisor:
     name: windows (Win32 Job Object supervision, native)
