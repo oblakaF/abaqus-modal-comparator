@@ -28,6 +28,14 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       NEW_GUI_REQUIRE_QT: "1"
       PYTHONFAULTHANDLER: "1"
+      # CI-LINUX-PERF-ROOT-CAUSE-1: one native thread, as in the Windows job and in the program's own solver runs. With
+      # the default, the two OpenBLAS pools (NumPy's and SciPy's) hold 13 threads on the 4 processors of the runner.
+      # Measured on one runner, same tests, same assertions: 4.5 times the CPU time and 19-38 % more wall time than with
+      # one thread; in the full suite the load stayed at 7-8 with 92 % of all four processors in user time for the whole
+      # hour of a run that then timed out (run 44477418203, Python 3.11, AMD EPYC 7763).
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
