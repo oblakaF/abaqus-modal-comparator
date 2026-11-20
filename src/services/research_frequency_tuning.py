@@ -160,6 +160,14 @@ COMPATIBLE, SOLID_MODEL, MIXED_ELEMENTS, NO_SHELL_ELEMENTS, IN_INCLUDE, MISSING_
 _MATERIAL_OPTIONS = ("*elastic", "*density", "*damping", "*expansion", "*plastic", "*hyperelastic", "*hyperfoam",
                      "*viscoelastic", "*conductivity", "*specific heat", "*depvar", "*user material", "*user defined field")
 _NOT_MODAL = ("*plastic", "*hyperelastic", "*hyperfoam", "*viscoelastic", "*user material")
+# RESEARCH-TUNING-NONPLANAR-GUARD-01: the surrogate is one flat plate, so the shell must lie in the global XY plane (any
+# constant z). This is a numerical rule, not a flatness tolerance: the z coordinates of all nodes must be equal up to the
+# rounding of a written coordinate. An INP holds decimal text of about seven or more significant digits, so two equal
+# heights can differ by at most about 1e-7 of the coordinate magnitude after writing and reading; the z spread allowed
+# is PLANAR_ROUNDOFF times the largest coordinate magnitude in the node data (0.3 micrometre for a 300 mm plate). A
+# deliberately curved, folded, tilted or dented shell is far above that and is refused; nothing is flattened or rotated.
+NOT_FLAT = "NOT_A_FLAT_PLATE_IN_XY"
+PLANAR_ROUNDOFF = 1.0e-6
 SOLID_BACKEND_NOTE = ("Research Tuning of a solid model needs a different forward model, a solid FE solve of every candidate; "
                       "this program has none that runs offline, and an Abaqus solve needs the owner's authorisation.")
 
@@ -334,6 +342,14 @@ def _inspect(path: Path, lines: Sequence[str], keyword: Sequence[tuple], data_af
         return report(MORE_THAN_ONE, "The INP holds more than one shell section.")
     if not nodes:
         return missing("*Node block")
+    low_z, high_z = min(n[2] for n in nodes), max(n[2] for n in nodes)
+    allowed = PLANAR_ROUNDOFF * max(abs(c) for n in nodes for c in n)
+    if not high_z - low_z <= allowed:
+        return report(NOT_FLAT, f"The shell model ({kinds or 'elements not in this file'}) is not a flat plate in the global "
+                                f"XY plane: its nodes span z from {low_z:g} to {high_z:g}, more than the rounding of a "
+                                f"written coordinate ({allowed:.3g}). The Kirchhoff-Ritz surrogate of Research Tuning stands "
+                                "for one flat rectangular plate; a curved, folded or tilted shell is not flattened or "
+                                "rotated here.")
     note = " The included file(s) were not read." if includes else ""
     return report(COMPATIBLE, f"Shell model ({kinds or 'elements not in this file'}, one *Shell Section, one orthotropic "
                               f"material): Research Tuning can read it.{note}")

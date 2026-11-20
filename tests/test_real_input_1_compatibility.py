@@ -1,11 +1,14 @@
 """ABM-REAL-INPUT-1: Research Tuning says exactly why an Abaqus INP can or cannot be used. Synthetic INP fixtures only:
-shell (supported), solid, continuum shell, mixed, missing definitions, *Include and unsupported material models."""
+shell (supported), solid, continuum shell, mixed, missing definitions, *Include, unsupported material models and, since
+RESEARCH-TUNING-NONPLANAR-GUARD-01, shell geometry that is not a flat plate in the global XY plane."""
 
 from __future__ import annotations
 
 import builtins
+import math
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import time
@@ -44,6 +47,21 @@ SOLID_NODES = "".join(f"{n + 1}, {x:g}, {y:g}, {z:g}\n" for n, (x, y, z) in enum
 SOLID = ("*Heading\n*Part, name=P\n*Node\n" + SOLID_NODES + "*Element, type=C3D8I\n1, 1, 2, 4, 3, 5, 6, 8, 7\n"
          "*Orientation, name=Ori-1\n1., 0., 0., 0., 1., 0.\n3, 0.\n"
          "*Solid Section, elset=Set-1, orientation=Ori-1, material=CFRP_T300_TEST\n,\n*End Part\n" + MATERIAL + STEP)
+
+
+def _shell(nodes) -> str:
+    """A two-element S4R strip over six nodes, with the same section, material and step as SHELL."""
+    block = "*Node\n" + "".join(f"{n + 1}, {x!r}, {y!r}, {z!r}\n" for n, (x, y, z) in enumerate(nodes))
+    return SHELL.replace(SHELL_NODES, block).replace("1, 1, 2, 3, 4\n", "1, 1, 2, 5, 4\n2, 2, 3, 6, 5\n")
+
+
+def _strip(z=lambda x, y: 0.0, x=(0.0, 150.5, 301.0)) -> list:
+    return [(xi, y, z(xi, y)) for y in (0.0, 300.0) for xi in x]
+
+
+# a 60 degree arc of a cylinder of radius 300 whose axis is parallel to y: the generators run along y
+ARC = [(300.0 * math.sin(math.radians(t)), y, 300.0 * (1.0 - math.cos(math.radians(t)))) for y in (0.0, 300.0)
+       for t in (0.0, 30.0, 60.0)]
 
 
 def _write(text: str, name: str = "model.inp", folder: Path = None) -> Path:
@@ -139,6 +157,70 @@ class Inspection(unittest.TestCase):
         self.assertIn("*Hyperelastic", report.reason)
 
 
+class Planarity(unittest.TestCase):
+    """RESEARCH-TUNING-NONPLANAR-GUARD-01: the Kirchhoff-Ritz surrogate stands for a flat plate in the global XY plane."""
+
+    def refused(self, text):
+        path = _write(text)
+        report = rft.inspect_inp(path)
+        self.assertEqual(report.verdict, rft.NOT_FLAT)
+        self.assertFalse(report.supported)
+        with self.assertRaises(rft.InpNotSupported) as caught:
+            rft.read_inp(path)
+        self.assertEqual(caught.exception.report, report)
+        return report
+
+    def test_a_flat_plate_is_read_with_its_plan(self):
+        path = _write(_shell(_strip()))
+        self.assertEqual(rft.inspect_inp(path).verdict, rft.COMPATIBLE)
+        inputs = rft.read_inp(path)
+        self.assertEqual((inputs.a_mm, inputs.b_mm, inputs.thickness_mm), (301.0, 300.0, 0.875))
+
+    def test_a_flat_plate_at_a_constant_z_is_read_with_the_same_plan(self):
+        for offset in (12.5, -4000.0, 1.0e-3):
+            path = _write(_shell(_strip(lambda x, y: offset)))
+            report = rft.inspect_inp(path)
+            self.assertEqual(report.verdict, rft.COMPATIBLE, offset)
+            self.assertEqual(dict(report.facts)["Node extent x × y × z"], "301 × 300 × 0 (6 nodes)")
+            inputs = rft.read_inp(path)
+            self.assertEqual((inputs.a_mm, inputs.b_mm), (301.0, 300.0))
+
+    def test_a_cylindrical_shell_is_refused_before_any_calculation(self):
+        text = _shell(ARC)
+        with mock.patch.object(rft, "Surrogate", side_effect=AssertionError("a tuning calculation started")), \
+                mock.patch.object(rft, "run_tuning", side_effect=AssertionError("a tuning calculation started")):
+            report = self.refused(text)
+        self.assertIn("not a flat plate in the global XY plane", report.reason)
+        self.assertIn("z from 0 to 150", report.reason)
+        self.assertIn("flat rectangular plate", report.reason)
+        self.assertIn("S4R", report.reason)
+
+    def test_a_flat_plate_out_of_the_xy_plane_is_refused_too(self):
+        for name, nodes in (("tilted", _strip(lambda x, y: 0.01 * x)),
+                            ("in the XZ plane", [(x, 0.0, y) for x, y, _z in _strip()]),
+                            ("one node lifted", _strip(lambda x, y: 1.0e-3 if (x, y) == (301.0, 300.0) else 0.0))):
+            with self.subTest(name):
+                self.refused(_shell(nodes))
+
+    def test_only_the_rounding_of_a_written_coordinate_is_let_through(self):
+        # the documented rule: the z spread may not exceed PLANAR_ROUNDOFF times the largest coordinate magnitude
+        self.assertEqual(rft.PLANAR_ROUNDOFF, 1.0e-6)
+        limit = rft.PLANAR_ROUNDOFF * 301.0
+        noise = iter((0.0, -7.10542736e-15, 3.55271368e-15, 0.0, 1.0e-7, 0.99 * limit))
+        within = _write(_shell(_strip(lambda x, y: next(noise))))
+        self.assertEqual(rft.inspect_inp(within).verdict, rft.COMPATIBLE)
+        self.assertEqual(rft.read_inp(within).a_mm, 301.0)
+        above = iter((0.0, 0.0, 0.0, 0.0, 0.0, 1.01 * limit))
+        self.refused(_shell(_strip(lambda x, y: next(above))))
+
+    def test_analyze_does_not_load_this_restriction(self):
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); from new_gui import analyze_model; "
+                "from services import odb_import_service, generic_registration, confirmed_registration; "
+                "print(sorted(m for m in sys.modules if m.endswith(('research_frequency_tuning', 'plate_ritz_forward'))))")
+        done = subprocess.run([sys.executable, "-c", code, str(ROOT / "src")], capture_output=True, text=True, timeout=300)
+        self.assertEqual((done.returncode, done.stdout.strip()), (0, "[]"), done.stderr)
+
+
 class ModelLayer(unittest.TestCase):
     def test_a_solid_model_is_a_read_failure_with_its_report_and_the_exp_file_is_not_read(self):
         from new_gui import research_tuning_model as rm
@@ -152,6 +234,16 @@ class ModelLayer(unittest.TestCase):
         with self.assertRaises(rm.ReadFailed):
             rm.check_model(path)
         self.assertEqual(rm.check_model(_write(SHELL)).verdict, rft.COMPATIBLE)
+
+    def test_a_curved_shell_is_a_read_failure_with_its_report_and_the_exp_file_is_not_read(self):
+        from new_gui import research_tuning_model as rm
+
+        path = _write(_shell(ARC))
+        with mock.patch.object(rm.pm, "run_read", side_effect=AssertionError("EXP read")):
+            with self.assertRaises(rm.ReadFailed) as caught:
+                rm.read_sources(path, "exp.unv", mock.Mock())
+        self.assertEqual(caught.exception.compatibility.verdict, rft.NOT_FLAT)
+        self.assertIn("not a flat plate in the global XY plane", str(caught.exception))
 
     def test_the_notes_name_what_stays_available_and_enable_nothing(self):
         from new_gui import research_tuning_model as rm
