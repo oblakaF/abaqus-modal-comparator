@@ -18,6 +18,10 @@ test: resident memory, swapped-out memory, the peak, the change since the previo
 other processes. Markers are written when the tests start, when unittest has finished, when its runner has returned and
 when the process ends. The order, the count and the verdict of the tests are untouched; without ``--memory`` nothing here
 runs. ``--summarise-memory FILE`` reads such a trace (complete or cut short) and prints what it shows as GitHub notices.
+
+GUI-QT-DEFERRED-DELETE-FIX-1: after every test (its cleanups done) the Qt deletions that tests schedule with
+``deleteLater()`` are delivered. Without a running event loop Qt never delivers them, and every window of every test
+stayed alive to the end of the process. Nothing of Qt is imported here: a suite that has not loaded Qt is run as before.
 """
 
 from __future__ import annotations
@@ -67,6 +71,33 @@ def memory_now() -> dict:
     return {**_fields(_read("/proc/self/status"), PROCESS_FIELDS), **_fields(_read("/proc/meminfo"), MACHINE_FIELDS)}
 
 
+def _qt(module: str):
+    """A Qt module some test has already imported, or None: this runner imports nothing of Qt itself."""
+    return sys.modules.get(f"PySide6.{module}")
+
+
+def deliver_deferred_deletions() -> bool:
+    """Deliver the pending ``deleteLater()`` deletions. Only where a Qt application exists and this is its thread; True
+    when they were delivered. An exception a deletion raises is the caller's to report."""
+    core = _qt("QtCore")
+    if core is None:
+        return False
+    app = core.QCoreApplication.instance()
+    if app is None or app.thread() is not core.QThread.currentThread():
+        return False
+    core.QCoreApplication.sendPostedEvents(None, core.QEvent.Type.DeferredDelete)
+    return True
+
+
+def qt_widgets_alive():
+    """How many Qt widgets exist now; None where no Qt widget application exists."""
+    widgets = _qt("QtWidgets")
+    if widgets is None:
+        return None
+    app = widgets.QApplication.instance()
+    return len(app.allWidgets()) if isinstance(app, widgets.QApplication) else None
+
+
 class MemoryTrace:
     """One flushed JSON line per finished test and per marker."""
 
@@ -82,7 +113,8 @@ class MemoryTrace:
         rss = now["rss_kb"]
         change = None if rss is None or self.previous is None else rss - self.previous
         self.previous = rss if rss is not None else self.previous
-        self._write({"test": test_id, "time": round(time.time(), 3), **now, "rss_change_kb": change})
+        self._write({"test": test_id, "time": round(time.time(), 3), **now, "rss_change_kb": change,
+                     "qt_widgets": qt_widgets_alive()})
 
     def marker(self, event: str, **more) -> None:
         try:
@@ -106,6 +138,10 @@ def tracing_result(trace, collect: bool, memory=None):
 
         def stopTest(self, test):
             super().stopTest(test)
+            try:  # the test's cleanups are done; what they scheduled for deletion is deleted now, not at the process's end
+                deliver_deferred_deletions()
+            except Exception:  # a deletion that fails is this test's error, in the verdict and in the closing lines
+                self.addError(test, sys.exc_info())
             row = {"test": test.id()}
             if collect:
                 gc.collect()
@@ -171,8 +207,12 @@ def describe_memory(facts: dict) -> list:
 
     marks = "; ".join(f"{m['event']} at +{m['time'] - first_time:.0f} s" + (f" [{m['threads']}]" if m.get("threads") else "")
                       for m in facts["markers"])
+    held = [t["rss_kb"] + (t.get("swap_kb") or 0) for t in facts["tests"] if t.get("rss_kb") is not None]
+    widgets = [t["qt_widgets"] for t in facts["tests"] if t.get("qt_widgets") is not None]
+    more = (f" Largest resident + swapped after a test: {_mb(max(held))} MB." if held else "") + (
+        f" Qt widgets alive after a test: {widgets[-1]} at the last such test, {max(widgets)} at most." if widgets else "")
     notices = [("memory trace: this process", f"{len(facts['tests'])} tests traced. At the start: {at(start)}. After the last "
-                f"traced test ({last['test']}, +{last['time'] - first_time:.0f} s): {at(last)}. Markers: {marks}.")]
+                f"traced test ({last['test']}, +{last['time'] - first_time:.0f} s): {at(last)}. Markers: {marks}.{more}")]
     notices.append(("memory trace: modules that grew this process most (resident + swapped MB)", "; ".join(
         f"{m['module']} +{_mb(m['growth_kb'])} ({m['tests']} tests, {_mb(m['before_kb'])} -> {_mb(m['after_kb'])})"
         for m in facts["grown"][:14])))

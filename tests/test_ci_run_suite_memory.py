@@ -3,6 +3,9 @@
 A small synthetic suite is run by the runner in a process of its own, as the CI runs the real one. The trace has one line
 per test and the markers; the reference-count trace, the exit code and unittest's closing lines are what they are without
 the memory trace. The figures themselves exist only where the system gives them (Linux); elsewhere they are empty.
+
+GUI-QT-DEFERRED-DELETE-FIX-1: the runner delivers the Qt deletions a test schedules with ``deleteLater()`` once the test
+and its cleanups are done, so a widget of one test no longer exists in the next; a suite without Qt loads nothing of Qt.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 TESTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTS))
@@ -26,6 +30,41 @@ import ci_summary as cs  # noqa: E402
 SAMPLE = ("import unittest\n\nKEPT = []\n\n\nclass T(unittest.TestCase):\n    def test_a_keeps(self):\n"
           "        KEPT.append(b'x' * (64 * 1024 * 1024))\n\n    def test_b_ok(self):\n        pass\n\n"
           "    def test_c_verdict(self):\n        self.assertTrue({verdict})\n")
+QT_SAMPLE = """import sys, threading, unittest
+
+from PySide6.QtWidgets import QApplication, QLabel, QWidget
+import shiboken6
+
+APP = QApplication.instance() or QApplication([])
+KEPT = []  # as a window a test's own objects still refer to: only Qt's deletion ends it
+
+
+class T(unittest.TestCase):
+    def test_a_schedules_the_deletion_of_its_window(self):
+        window = QWidget()
+        QLabel("a child", window)
+        window.show()
+        KEPT.append(window)
+        self.addCleanup(window.deleteLater)
+        self.addCleanup(window.close)
+        self.assertEqual(len(APP.allWidgets()), 2)
+
+    def test_b_the_window_of_the_test_before_is_gone(self):
+        self.assertFalse(shiboken6.isValid(KEPT[0]))
+        self.assertEqual(APP.allWidgets(), [])
+
+    def test_c_another_thread_delivers_nothing(self):
+        deliver, said = sys.modules["__main__"].deliver_deferred_deletions, []
+        thread = threading.Thread(target=lambda: said.append(deliver()))
+        thread.start()
+        thread.join()
+        self.assertEqual(said, [False])
+        self.assertIs(deliver(), True)
+"""
+PLAIN_SAMPLE = ("import sys, unittest\n\n\nclass T(unittest.TestCase):\n    def test_nothing_of_qt_is_loaded(self):\n"
+                "        self.assertEqual([n for n in sys.modules if n.startswith(('PySide6', 'shiboken6'))], [])\n"
+                "        self.assertIs(sys.modules['__main__'].deliver_deferred_deletions(), False)\n"
+                "        self.assertIsNone(sys.modules['__main__'].qt_widgets_alive())\n")
 STATUS = "Name:\tpython\nVmHWM:\t  900 kB\nVmRSS:\t  800 kB\nVmSwap:\t   50 kB\nThreads:\t3\n"
 MEMINFO = "MemTotal: 16000 kB\nMemAvailable:   12000 kB\nCached:  3000 kB\nSwapCached: 1 kB\nShmem: 40 kB\nSwapFree: 2000 kB\n"
 
@@ -114,6 +153,62 @@ class TraceTests(_Sample):
         text = "\n".join(text for _title, text in runner.describe_memory(runner.read_memory((folder / "memory.jsonl").read_text())))
         self.assertIn("1 tests traced", text)
         self.assertNotIn("tests_finished", text)  # the trace says how far the process came
+
+
+class DeferredDeletionTests(unittest.TestCase):
+    def folder(self, name: str, text: str) -> Path:
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: [p.unlink() for p in folder.rglob("*") if p.is_file()])
+        (folder / name).write_text(text, encoding="utf-8")
+        return folder
+
+    def run_in(self, folder: Path, *command) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, *command], capture_output=True, text=True, cwd=folder, timeout=300,
+                              env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", QT_QPA_PLATFORM="offscreen"))
+
+    def test_a_widget_scheduled_for_deletion_is_destroyed_before_the_next_test(self):
+        folder = self.folder("test_sample_qt.py", QT_SAMPLE)
+        done = self.run_in(folder, str(TESTS / "ci_run_suite.py"), "--start", str(folder), "--trace", "refcounts.jsonl",
+                           "--memory", "memory.jsonl")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        facts = cs.read(done.stderr)
+        self.assertEqual((facts["finished"], facts["ran"], facts["closing"]), (True, 3, "OK"))
+        trace = [r for r in rows(folder / "memory.jsonl") if "test" in r]
+        self.assertEqual([r["qt_widgets"] for r in trace], [0, 0, 0])  # none is left after any test
+        self.assertIn("Qt widgets alive after a test: 0 at the last such test, 0 at most",
+                      dict(runner.describe_memory(runner.read_memory((folder / "memory.jsonl").read_text())))["memory trace: this process"])
+
+    def test_without_the_runner_the_same_widget_outlives_its_test(self):
+        """What the runner corrects: unittest alone runs no event loop, and the scheduled deletion never happens."""
+        folder = self.folder("test_sample_qt.py", QT_SAMPLE)
+        done = self.run_in(folder, "-m", "unittest", "test_sample_qt.T.test_a_schedules_the_deletion_of_its_window",
+                           "test_sample_qt.T.test_b_the_window_of_the_test_before_is_gone")
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn("FAILED (failures=1)", done.stderr)
+        self.assertIn("self.assertFalse(shiboken6.isValid(KEPT[0]))", done.stderr)
+
+    def test_a_suite_without_qt_loads_nothing_of_qt_and_runs_as_before(self):
+        folder = self.folder("test_sample_plain.py", PLAIN_SAMPLE)
+        done = self.run_in(folder, str(TESTS / "ci_run_suite.py"), "--start", str(folder), "--trace", "refcounts.jsonl",
+                           "--memory", "memory.jsonl")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual([r["qt_widgets"] for r in rows(folder / "memory.jsonl") if "test" in r], [None])
+
+    def test_a_deletion_that_fails_is_an_error_of_that_test(self):
+        class Sample(unittest.TestCase):
+            def test_ok(self):
+                pass
+
+        for failing, errors in ((False, 0), (True, 1)):
+            with self.subTest(failing=failing), mock.patch.object(
+                    runner, "deliver_deferred_deletions", side_effect=RuntimeError("the deletion failed") if failing else None):
+                trace = io.StringIO()
+                result = unittest.TextTestRunner(stream=io.StringIO(), resultclass=runner.tracing_result(trace, False)).run(
+                    unittest.defaultTestLoader.loadTestsFromTestCase(Sample))
+                self.assertEqual((result.testsRun, len(result.errors), result.wasSuccessful()), (1, errors, not failing))
+                if failing:
+                    self.assertIn("the deletion failed", result.errors[0][1])
+                self.assertEqual(sorted(json.loads(trace.getvalue())), ["false", "test", "true"])  # the trace is kept
 
 
 class ReadingTests(unittest.TestCase):
