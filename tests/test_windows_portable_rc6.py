@@ -193,6 +193,54 @@ class PortableRc6PackagingTests(unittest.TestCase):
         text.encode("utf-8-sig")
         self.assertLessEqual(max(len(line) for line in lines), 120)
 
+    def test_only_what_the_program_never_loads_is_left_out(self):
+        """WINDOWS-PREVIEW-01-COMPACT."""
+        build = self.build
+        for shipped in ("PySide6\\Qt6Core.dll", "PySide6\\Qt6Gui.dll", "PySide6\\Qt6Widgets.dll", "PySide6\\Qt6Svg.dll",
+                        "PySide6\\plugins\\platforms\\qwindows.dll", "PySide6\\plugins\\imageformats\\qjpeg.dll",
+                        "PySide6\\plugins\\styles\\qmodernwindowsstyle.dll", "libcrypto-3.dll", "libssl-3.dll",
+                        "PIL\\_imaging.cp314-win_amd64.pyd", "PIL\\_webp.cp314-win_amd64.pyd",
+                        "matplotlib\\mpl-data\\fonts\\ttf\\DejaVuSans.ttf", "matplotlib\\mpl-data\\matplotlibrc",
+                        "numpy.libs\\libscipy_openblas64_-b788.dll", "scipy.libs\\libscipy_openblas-197e.dll",
+                        "scipy\\optimize\\_highspy\\_core.cp314-win_amd64.pyd", "scipy\\stats\\_stats.cp314-win_amd64.pyd",
+                        "python314.dll", "base_library.zip", "pyside6/translations.txt"):
+            self.assertEqual(build.left_out(shipped), "", shipped)
+        for dropped in ("PySide6\\opengl32sw.dll", "PySide6\\translations\\qtbase_de.qm", "PySide6\\Qt6Network.dll",
+                        "PySide6\\QtNetwork.pyd", "PySide6\\plugins\\tls\\qopensslbackend.dll",
+                        "PySide6\\plugins\\networkinformation\\qnetworklistmanager.dll", "libcrypto-3-x64.dll",
+                        "libssl-3-x64.dll", "PIL\\_avif.cp314-win_amd64.pyd", "PIL/_avif.cp311-win_amd64.pyd",
+                        "matplotlib\\mpl-data\\sample_data\\grace_hopper.jpg"):
+            self.assertTrue(build.left_out(dropped), dropped)
+        self.assertEqual(build.EXCLUDED_MODULES, ("PySide6.QtNetwork", "PIL._avif"))
+        self.assertEqual(build.ZIP_LEVEL, 9)
+        # the program itself never asks for what is left out
+        sources = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in (ROOT / "src").rglob("*.py"))
+        for unused in ("QtNetwork", "QNetwork", "QTranslator", "QtOpenGL", "QOpenGL", "avif", "get_sample_data", "import ssl"):
+            self.assertNotIn(unused, sources, unused)
+        # the specification applies this list and no other
+        spec = (PACKAGING / "AbaqusModalComparator_RC6.spec").read_text(encoding="utf-8")
+        self.assertIn("*_build.EXCLUDED_MODULES]", spec)
+        self.assertIn("a.binaries = [entry for entry in a.binaries if not _build.left_out(entry[0])]", spec)
+        self.assertIn("a.datas = [entry for entry in a.datas if not _build.left_out(entry[0])]", spec)
+        for unsafe in ("upx=True", "strip=True"):
+            self.assertNotIn(unsafe, spec)
+        # the finished folder: nothing left out is in it, and nothing needed is missing
+        with tempfile.TemporaryDirectory(prefix="RC6 compact ") as folder:
+            internal = Path(folder) / "_internal"
+            for pattern in build.REQUIRED:
+                target = internal / pattern.replace("*", "x")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b"x")
+            checked = build.check_compact(Path(folder))
+            self.assertEqual((len(checked["left_out"]), checked["required_present"]), (len(build.LEFT_OUT), len(build.REQUIRED)))
+            (internal / "PySide6" / "opengl32sw.dll").write_bytes(b"x")
+            with self.assertRaises(SystemExit):
+                build.check_compact(Path(folder))
+            (internal / "PySide6" / "opengl32sw.dll").unlink()
+            (internal / "PySide6" / "plugins" / "platforms" / "qwindows.dll").unlink()
+            with self.assertRaises(SystemExit):
+                build.check_compact(Path(folder))
+
     def test_the_extractor_is_packaged_where_the_frozen_bridge_resolves_it(self):
         with tempfile.TemporaryDirectory(prefix="RC6 extractor ") as folder:
             folder = Path(folder)

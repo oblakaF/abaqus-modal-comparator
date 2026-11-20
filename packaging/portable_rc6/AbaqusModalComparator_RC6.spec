@@ -4,9 +4,16 @@
 # The RC5 approach. Build it with packaging/portable_rc6/build_portable.py, which also puts the read-only reference
 # files and the ODB extractor (abaqus_scripts/extract_odb.py) beside the program (see docs/gui/WINDOWS_PORTABLE_RC6.md).
 # Nothing scientific is decided here.
+import importlib.util
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
+
+# WINDOWS-PREVIEW-01-COMPACT: what the program never loads is not collected. The list and its reasons are in
+# build_portable.py (LEFT_OUT, EXCLUDED_MODULES), which also checks the finished folder against it.
+_spec = importlib.util.spec_from_file_location("build_portable_rc6_for_spec", Path(SPECPATH) / "build_portable.py")
+_build = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_build)
 
 REPO = Path(SPECPATH).resolve().parents[1]
 SRC = REPO / "src"
@@ -33,10 +40,12 @@ a = Analysis(
     hookspath=[],
     hooksconfig={"matplotlib": {"backends": ["Agg", "QtAgg"]}},
     runtime_hooks=[str(Path(SPECPATH) / "rthook_open_audit.py")],
-    excludes=["tkinter", "_tkinter", "pytest", "IPython", "PyQt5", "PyQt6", "PySide2"],
+    excludes=["tkinter", "_tkinter", "pytest", "IPython", "PyQt5", "PyQt6", "PySide2", *_build.EXCLUDED_MODULES],
     noarchive=False,
     optimize=0,
 )
+a.binaries = [entry for entry in a.binaries if not _build.left_out(entry[0])]
+a.datas = [entry for entry in a.datas if not _build.left_out(entry[0])]
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz,

@@ -38,6 +38,12 @@ its ``.zip.sha256``, BUILD_INFO.json and README_PORTABLE.txt carry that name and
 window the program opens (Analyze, Review, MAC / Points, Materials, Research Tuning). A desktop copy of RC6 is now an
 earlier copy and is never written.
 
+WINDOWS-PREVIEW-01-COMPACT: the build leaves out what the program never loads (``LEFT_OUT``: Qt's software OpenGL
+renderer, Qt's translations, Qt Network with its TLS plug-ins and the OpenSSL they pull in, Pillow's AVIF codec,
+matplotlib's sample data); the specification applies the list, and the finished folder is checked for it and for the
+parts every function needs (``REQUIRED``). The ZIP is written with the strongest deflate level (still an ordinary ZIP
+that Windows opens).
+
 Nothing scientific is decided or changed here.
 """
 
@@ -83,6 +89,56 @@ TRACKED_ROOTS = ("src", "docs", "packaging", "abaqus_scripts", "requirements-new
 # Path(__file__).parents[1] / "abaqus_scripts" / "extract_odb.py"; a frozen top-level module's __file__ is
 # _internal\abaqus_bridge.pyc, so the script must lie beside the program at <portable>\abaqus_scripts\extract_odb.py.
 EXTRACTOR = PurePosixPath("abaqus_scripts/extract_odb.py")
+# WINDOWS-PREVIEW-01-COMPACT: never loaded by the program, so not shipped. A path of the portable folder below _internal
+# (lower case, forward slashes): a file, or a folder when it ends with "/". The program draws with Qt widgets (no
+# OpenGL), installs no translator (English only), opens no network connection, and reads and writes PNG and PDF only.
+LEFT_OUT = (
+    ("pyside6/opengl32sw.dll", "Qt's software OpenGL renderer: the interface uses Qt widgets, no OpenGL"),
+    ("pyside6/translations/", "Qt's own translations: the interface is English and installs no translator"),
+    ("pyside6/qt6network.dll", "Qt Network: the program opens no network connection"),
+    ("pyside6/qtnetwork.pyd", "Qt Network: the program opens no network connection"),
+    ("pyside6/plugins/tls/", "TLS plug-ins of Qt Network"),
+    ("pyside6/plugins/networkinformation/", "network state plug-in of Qt Network"),
+    ("libcrypto-3-x64.dll", "OpenSSL of the build computer, pulled in only by Qt's TLS plug-in"),
+    ("libssl-3-x64.dll", "OpenSSL of the build computer, pulled in only by Qt's TLS plug-in"),
+    ("pil/_avif.cp", "Pillow's AVIF codec: the program reads and writes PNG"),
+    ("matplotlib/mpl-data/sample_data/", "matplotlib's example data files"),
+)
+EXCLUDED_MODULES = ("PySide6.QtNetwork", "PIL._avif")  # the modules of the parts above; never imported by the program
+# What every function of the program needs, below _internal (a glob each): refused when one is missing.
+REQUIRED = ("python3*.dll", "base_library.zip", "PySide6/Qt6Core.dll", "PySide6/Qt6Gui.dll", "PySide6/Qt6Widgets.dll",
+            "PySide6/QtCore.pyd", "PySide6/QtGui.pyd", "PySide6/QtWidgets.pyd", "PySide6/plugins/platforms/qwindows.dll",
+            "PySide6/plugins/platforms/qoffscreen.dll", "PySide6/plugins/styles/*.dll",
+            "PySide6/plugins/imageformats/*.dll", "numpy/_core/_multiarray_umath*.pyd", "numpy.libs/*openblas*.dll",
+            "scipy.libs/*openblas*.dll", "scipy/linalg/_flapack*.pyd", "scipy/optimize/*.pyd", "scipy/sparse/*.pyd",
+            "scipy/spatial/*.pyd", "scipy/signal/*.pyd", "scipy/interpolate/*.pyd", "scipy/stats/*.pyd",
+            "matplotlib/ft2font*.pyd", "matplotlib/backends/_backend_agg*.pyd", "matplotlib/mpl-data/matplotlibrc",
+            "matplotlib/mpl-data/fonts/ttf/DejaVuSans.ttf", "PIL/_imaging.cp*.pyd", "libcrypto-3.dll", "_hashlib.pyd")
+
+
+def left_out(destination: str) -> str:
+    """Why a file of the frozen program (its path below _internal) is not shipped; empty when it is shipped."""
+    name = str(destination).replace("\\", "/").lower()
+    for pattern, reason in LEFT_OUT:
+        if name.startswith(pattern) if pattern.endswith(("/", ".cp")) else name == pattern:
+            return reason
+    return ""
+
+
+def check_compact(folder: Path) -> dict:
+    """The finished folder holds none of the parts left out and every part the program needs."""
+    internal = folder / "_internal"
+    present = sorted(p.relative_to(internal).as_posix() for p in internal.rglob("*")
+                     if p.is_file() and left_out(p.relative_to(internal).as_posix()))
+    if present:
+        raise SystemExit("refused: parts that are left out are in the build: " + ", ".join(present[:20]))
+    missing = [pattern for pattern in REQUIRED if not any(internal.glob(pattern))]
+    if missing:
+        raise SystemExit("refused: the build lacks parts the program needs: " + ", ".join(missing))
+    return {"left_out": [{"path": pattern, "why": reason} for pattern, reason in LEFT_OUT],
+            "excluded_modules": list(EXCLUDED_MODULES), "required_present": len(REQUIRED)}
+
+
 README = """Abaqus\u2013Simcenter Modal Comparator \u2014 {release}
 ==================================================
 
@@ -351,13 +407,16 @@ def verify_folder(folder: Path) -> dict:
     return result
 
 
+ZIP_LEVEL = 9  # the strongest deflate: an ordinary ZIP, as before, that Windows opens by itself
+
+
 def make_zip(folder: Path, archive: Path) -> None:
     tmp = archive.with_suffix(".zip.partial")
     # refused before anything is written: os.rename replaces its target on POSIX, so it is not the guard
     for existing in (archive, tmp):
         if existing.exists():
             raise SystemExit(f"refused: {existing} exists (an existing ZIP is never replaced)")
-    with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+    with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=ZIP_LEVEL) as zf:
         for path in sorted(folder.rglob("*")):
             zf.write(path, Path(folder.name) / path.relative_to(folder))
     os.rename(tmp, archive)
@@ -450,6 +509,7 @@ def main(argv=None) -> int:
     documents = copy_documents(folder)  # tracked paths begin with docs/
     extractor = copy_extractor(folder)  # RC6: abaqus_scripts/extract_odb.py beside the program
     check_contents(folder)
+    compact = check_compact(folder)
     research = check_research(folder)
     research["odb_extractor"] = check_extractor(folder)
     built = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -461,7 +521,7 @@ def main(argv=None) -> int:
             "exe_bytes": (folder / EXE).stat().st_size, "exe_sha256": sha256(folder / EXE),
             "files": count + 2, "bytes_before_info": size,  # + BUILD_INFO.json and PACKAGE_SHA256.txt
             "reference_files": len(documents), "reference_bytes": sum(d["bytes"] for d in documents),
-            "odb_extractor": extractor,
+            "odb_extractor": extractor, "compact": compact,
             "package_list": PACKAGE_LIST, "research_check": research}
     (folder / "BUILD_INFO.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
     write_package_list(folder)
