@@ -32,6 +32,12 @@ Steps:
 ``--verify <folder>`` checks a portable folder (for example one unpacked from the ZIP on another computer) against
 its PACKAGE_SHA256.txt.
 
+WINDOWS-PREVIEW-01: what the user receives is named Preview 0.1. PyInstaller still builds from the RC6 specification
+(``NAME``, the internal build source); the finished folder is then given the delivered name ``DELIVERED``, and the ZIP,
+its ``.zip.sha256``, BUILD_INFO.json and README_PORTABLE.txt carry that name and ``RELEASE``. The README describes the
+window the program opens (Analyze, Review, MAC / Points, Materials, Research Tuning). A desktop copy of RC6 is now an
+earlier copy and is never written.
+
 Nothing scientific is decided or changed here.
 """
 
@@ -57,7 +63,9 @@ EXE = "AbaqusModalComparator.exe"
 SPEC = HERE / f"{NAME}.spec"
 PACKAGE_LIST = "PACKAGE_SHA256.txt"
 EARLIER = ("RC1", "RC2", "RC3", "RC3_F1", "RC3_F2", "RC4", "RC4_F1", "RC5")
-PROTECTED_DESKTOP = tuple(f"AbaqusModalComparator_{name}{suffix}" for name in EARLIER
+RELEASE = "Preview 0.1"  # what the user sees: the README, BUILD_INFO.json, the folder and the ZIP
+DELIVERED = "AbaqusModalComparator_Preview_0.1"  # the delivered folder and ZIP; NAME stays the internal build source
+PROTECTED_DESKTOP = tuple(f"AbaqusModalComparator_{name}{suffix}" for name in EARLIER + ("RC6",)
                           for suffix in ("", ".zip"))  # never written by this build
 # The reference files the program reads (JSON records, CSV tables, Markdown, text, SHA-256 lists); figures and Word
 # documents are not read by the program and stay out.
@@ -75,45 +83,83 @@ TRACKED_ROOTS = ("src", "docs", "packaging", "abaqus_scripts", "requirements-new
 # Path(__file__).parents[1] / "abaqus_scripts" / "extract_odb.py"; a frozen top-level module's __file__ is
 # _internal\abaqus_bridge.pyc, so the script must lie beside the program at <portable>\abaqus_scripts\extract_odb.py.
 EXTRACTOR = PurePosixPath("abaqus_scripts/extract_odb.py")
-README = """Abaqus-Simcenter Modal Comparator - portable new interface ({name})
-WORKING RESEARCH PREVIEW for one single CFRP plate. It identifies no material value.
+README = """Abaqus\u2013Simcenter Modal Comparator \u2014 {release}
+==================================================
 
-Start: double-click {exe}. No Python, VS Code or Abaqus installation is needed, and the program starts no Abaqus.
-Keep the folder together: {exe}, _internal and docs belong to one another. The folder may be copied or moved
-anywhere, including a path with spaces. PACKAGE_SHA256.txt lists the SHA-256 of every file of the folder.
+{release} is a WORKING RESEARCH PREVIEW. It compares the modal results of an Abaqus finite-element (FE) model with a
+measured modal test. It does NOT identify material properties: real material identification and production Auto-ID
+remain BLOCKED (see "What is blocked" below).
 
-Not included: experimental files (UNV, UFF, LMS), Abaqus models and results (INP, ODB, DAT, SVD), extracted FE
-packages (for example the 3.1 GB SP-10 package of PRIORITY-6) and solver files. Choose them in the program:
-- Workspace: Choose file... for the FE results (an Abaqus .odb, or an extracted FE package manifest.json) and the
-  experimental file.
-- RC6: an .odb is not read directly. Click Extract modal results...: the program checks the file and looks for an
-  Abaqus launcher (PATH, C:\\SIMULIA\\Commands); nothing is started by itself. Only after your confirmation Abaqus
-  Python runs the packaged extractor abaqus_scripts\\extract_odb.py (the ODB is opened read-only) into a results
-  folder you choose; each extraction gets a new sub-folder, nothing is overwritten, and the ODB content (SHA-256) is
-  recorded beside the package. The package then becomes the FE file. Without Abaqus the program runs as before: the
-  dialog explains what is missing and how to fix it; a package extracted elsewhere can be chosen by its manifest.json.
-- File > Choose a known new experimental source...: Choose folder... points to the delivery folder wherever it lies.
-- Plate Study > A: Choose FE archive folder... points to the folder that holds the plate's FE family.
-- Plate Study > D: Choose FE baseline manifest..., Choose baseline INP (optional)... and Choose folder of FE states...
-  point to the extracted FE packages of one FE model.
-- Research Results: Load local research record... reads a matching_record.json you choose.
+START
+  Double-click {exe}. No Python, VS Code or Abaqus installation is needed to start it.
+  Keep the folder together: {exe}, _internal, docs and abaqus_scripts belong to one
+  another. The folder may be copied anywhere, also into a path with spaces. Your own files are not in this folder:
+  you choose them in the program.
 
-Plate Study:
-- A. Current PLATE Study: the archived PLATE study; the iterative estimation is NOT AUTHORISED.
-- B. New Single Plate - Research Workbench: a research study of any single rectangular CFRP plate. Open study... >
-  docs\\examples\\generic_single_plate_demo\\DEMO_STUDY.json opens a SYNTHETIC demonstration (never a physical
-  experiment). The physical offline fit is blocked.
-- C. Physical Readiness - Review: the dossier of the scientific readiness of one plate (a plan and a request, never a
-  run order).
-- D. FE Response: the 14 elastic FE branches of an FE family tracked by MAC between extracted FE packages, the
-  central sensitivities and the G12 / E What-If. Every value there is FE_ONLY; the What-If is a
-  FE_ONLY_LOCAL_PREDICTION, not an Abaqus solve.
+THE WINDOW
+  The list on the left has five pages: Analyze, Review, MAC / Points, Materials, Research Tuning.
+  The File menu has Open Project..., Save Project, Save Project As... and Close Project.
 
-Scientific status (unchanged): FREQUENCY_ONLY, MODE_PAIRS_NOT_CONFIRMED, NOT_READY_FOR_IDENTIFICATION. The M11 FE7
-19.07217 Hz and the PolyMAX 18.6307 Hz record of 2026-10-27 are not a confirmed mode pair. M8 GATE NOT_MET,
-D-077 NO_GLOBAL_PARAMETER_VALUE, production Auto-ID BLOCKED. Reports are written only into a folder you choose.
+1. ANALYZE - choose the two files and compare
+  - FE results (.odb): click Choose file... and pick the Abaqus output database of a frequency analysis.
+  - Experiment (.unv, .uff): click Choose file... and pick the measured modal file.
+  - Click Analyze. Cancel stops a running analysis; nothing is kept from a cancelled one.
+  The program never opens the .odb itself. If the modes of this .odb were already extracted (a folder
+  <odb name>_modal_packages beside it), they are reused and Abaqus is not needed. Otherwise the program asks
+  "Start Abaqus Python?" and names the file, the results folder and the launcher. No starts nothing. Yes needs an
+  Abaqus installation on this computer; the .odb is read read-only and no analysis is solved. Advanced lets you
+  choose the Abaqus launcher and the extraction folder.
 
-Build: commit {commit} ({branch}), {built}. See BUILD_INFO.json.
+2. REVIEW - frequencies and mode shapes
+  After Analyze the Review page opens. The table lists each measured (EXP) frequency with the FE frequency nearest to
+  it and the difference in percent. These are candidates chosen by frequency, not confirmed mode pairs.
+  Below the table: Mode shapes (Show shape, Save PNG), Frequency plots, FRF spectrum and All tables.
+  Export report... writes a diagnostic report (PDF and Excel) into a folder you choose.
+
+3. MAC / POINTS - why verified MAC may be missing
+  MAC compares the shape of an FE mode with the shape of a measured mode at the same points. For that the program
+  must know which FE node belongs to which measured point: a physical registration. Without a confirmed registration
+  the page says MAC NOT AVAILABLE and the status is REGISTRATION_REQUIRED: you have a frequency comparison only, with
+  no mode pairs and no MAC. This is the expected result for two files that have no registration yet.
+  Set up registration... starts one; it records a person's statement, not an independent proof.
+  Run trial MAC is something else: it tries a fixed list of possible placements of the measured points on the FE
+  model and shows the matrices under the label EXPLORATORY MAC - UNCONFIRMED GEOMETRIC MAPPING. A trial MAC is a
+  look at the data, never a verified MAC and never a confirmed mode pair. The page still says MAC NOT AVAILABLE after
+  it. Export all Trial MAC... saves the trial as a ZIP; an existing file is never replaced.
+
+4. SAVE AND REOPEN
+  File > Save Project As... (or Save result on the Review page) writes one .mcproj file. The source files are not in
+  it. File > Open Project... shows the saved result again, marked SAVED SNAPSHOT; nothing is calculated and no source
+  file is opened. Curves and components that need the source files appear again after a new Analyze.
+
+5. MATERIALS - two research methods on a built-in synthetic example
+  The Materials page tests two model methods on numbers the program makes itself. Tabs: Calculation, Results, Plots,
+  Diagnostics, FE / Experiment. Choose the Method, keep Data on "Built-in synthetic example", click Run calculation.
+  - Ritz plate model: a thin-plate model computed in the program. It needs the plate length a, width b and mass
+    (already filled in for the example); no ODB, Abaqus or matrix file. It fits D11, D22, D66 and u.
+  - Stage A matrix model: it needs a prepared matrix package (the built-in synthetic package is used for the
+    example); it does not use plate size or mass. It fits D, D66 and r. Without a compatible package it refuses.
+  Save result and Open result keep a result as a .mcproj file; Save plot (PNG)... saves a picture.
+  Every result of this page is a SYNTHETIC software test marked DIAGNOSTIC_OPTIMIZER_CANDIDATE and
+  NOT_A_RELEASE_VALUE: recovering known numbers tests the software and says nothing about a real material.
+  "Real file: view only" shows what an .odb or .unv/.uff holds on the FE / Experiment tab and calculates nothing.
+
+6. RESEARCH TUNING
+  Research only: it tunes the assumed inputs of a supported Abaqus shell model against measured frequencies with a
+  plate surrogate. No Abaqus run; the result is not a material property.
+
+WHAT IS BLOCKED
+  - Real-data inverse execution: BLOCKED. The program does not identify the material of a real specimen.
+  - Production Auto-ID: BLOCKED. M8 GATE NOT_MET, D-077 NO_GLOBAL_PARAMETER_VALUE.
+  No number shown by this preview is an accepted material property, a ply constant or a calibration.
+
+NOT INCLUDED
+  Experimental files (UNV, UFF, LMS), Abaqus models and results (INP, ODB, DAT) and extracted FE packages.
+
+FILES OF THIS FOLDER
+  PACKAGE_SHA256.txt lists the SHA-256 of every file. BUILD_INFO.json names the build.
+  Build: {release}, commit {commit} ({branch}), {built}.
+  Internal build source: {name}.
 """
 
 
@@ -337,6 +383,18 @@ def versions() -> dict:
     return {n: metadata.version(n) for n in names}
 
 
+def readme(commit: str, branch: str, built: str) -> str:
+    """README_PORTABLE.txt of the delivered folder: the release, the window the program opens, what is blocked."""
+    return README.format(release=RELEASE, name=NAME, exe=EXE, commit=commit, branch=branch, built=built)
+
+
+def deliver(built: Path, folder: Path) -> None:
+    """Give the folder PyInstaller made from the RC6 specification its delivered name. Nothing is replaced."""
+    if folder.exists():
+        raise SystemExit(f"refused: {folder} exists (nothing is replaced)")
+    os.rename(built, folder)
+
+
 def refuse_existing(out: Path) -> None:
     """The build folder is new or empty: an earlier RC build or an RC6 build there is never deleted or replaced."""
     if out.exists() and any(out.iterdir()):
@@ -344,12 +402,12 @@ def refuse_existing(out: Path) -> None:
 
 
 def desktop_targets(desktop: Path) -> tuple:
-    targets = (desktop / NAME, desktop / f"{NAME}.zip", desktop / f"{NAME}.zip.sha256")
+    targets = (desktop / DELIVERED, desktop / f"{DELIVERED}.zip", desktop / f"{DELIVERED}.zip.sha256")
     if any(t.name in PROTECTED_DESKTOP for t in targets):  # a guard: this build never writes the earlier copies
-        raise SystemExit("refused: the RC1-RC5 desktop copies are not written by the RC6 build")
+        raise SystemExit("refused: the RC1-RC6 desktop copies are not written by this build")
     existing = [str(t) for t in targets if t.exists()]
     if existing:
-        raise SystemExit("refused: an RC6 desktop copy exists (it is never replaced): " + ", ".join(existing))
+        raise SystemExit(f"refused: a {RELEASE} desktop copy exists (it is never replaced): " + ", ".join(existing))
     return targets
 
 
@@ -385,19 +443,20 @@ def main(argv=None) -> int:
 
     dist, work = out / "dist", out / "work"
     out.mkdir(parents=True, exist_ok=True)
-    folder, archive = dist / NAME, dist / f"{NAME}.zip"
+    folder, archive = dist / DELIVERED, dist / f"{DELIVERED}.zip"
     subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--log-level", "WARN",
                     "--distpath", str(dist), "--workpath", str(work), str(SPEC)], cwd=out, check=True)
+    deliver(dist / NAME, folder)  # the RC6 specification built it; the user receives it under the release's name
     documents = copy_documents(folder)  # tracked paths begin with docs/
     extractor = copy_extractor(folder)  # RC6: abaqus_scripts/extract_odb.py beside the program
     check_contents(folder)
     research = check_research(folder)
     research["odb_extractor"] = check_extractor(folder)
     built = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    (folder / "README_PORTABLE.txt").write_text(
-        README.format(name=NAME, exe=EXE, commit=commit, branch=branch, built=built), encoding="utf-8")
+    (folder / "README_PORTABLE.txt").write_text(readme(commit, branch, built), encoding="utf-8-sig")  # for Notepad
     count, size = folder_size(folder)
-    info = {"name": NAME, "commit": commit, "branch": branch, "dirty": bool(dirty), "built_utc": built,
+    info = {"name": DELIVERED, "release": RELEASE, "internal_build": NAME, "commit": commit, "branch": branch,
+            "dirty": bool(dirty), "built_utc": built,
             "python": sys.version.split()[0], "platform": platform.platform(), "packages": versions(), "exe": EXE,
             "exe_bytes": (folder / EXE).stat().st_size, "exe_sha256": sha256(folder / EXE),
             "files": count + 2, "bytes_before_info": size,  # + BUILD_INFO.json and PACKAGE_SHA256.txt
@@ -413,8 +472,9 @@ def main(argv=None) -> int:
     zipped = check_zip(folder, archive)
     count, size = folder_size(folder)
     zip_sha = sha256(archive)
-    (dist / f"{NAME}.zip.sha256").write_text(f"{zip_sha} *{NAME}.zip\n", encoding="utf-8")
-    result = {"folder": str(folder), "zip": str(archive), "files": count, "bytes": size,
+    (dist / f"{DELIVERED}.zip.sha256").write_text(f"{zip_sha} *{DELIVERED}.zip\n", encoding="utf-8")
+    result = {"release": RELEASE, "internal_build": NAME, "folder": str(folder), "zip": str(archive), "files": count,
+              "bytes": size,
               "exe_bytes": info["exe_bytes"], "exe_sha256": info["exe_sha256"],
               "zip_bytes": archive.stat().st_size, "zip_sha256": zip_sha, "zip_check": zipped,
               "package_list_sha256": sha256(folder / PACKAGE_LIST), "commit": commit, "branch": branch,
@@ -422,7 +482,7 @@ def main(argv=None) -> int:
     if desktop:
         shutil.copytree(folder, desktop[0])
         shutil.copy2(archive, desktop[1])
-        shutil.copy2(dist / f"{NAME}.zip.sha256", desktop[2])
+        shutil.copy2(dist / f"{DELIVERED}.zip.sha256", desktop[2])
         if sha256(desktop[1]) != zip_sha or not verify_folder(desktop[0])["verified"]:
             raise SystemExit("refused: the desktop copy does not match the build")
         result["desktop"] = [str(t) for t in desktop]

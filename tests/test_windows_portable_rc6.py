@@ -8,6 +8,11 @@ PyInstaller needed to run these tests).
   resolves it (_internal\\abaqus_bridge.pyc -> parents[1]/abaqus_scripts/extract_odb.py), byte-identical to the
   repository's, opening the ODB readOnly=True; the extractor itself is not changed by RC6;
 - the research checks of RC5 still hold from another folder, the package list and the ZIP rules are those of RC5.
+
+WINDOWS-PREVIEW-01: the delivered folder and ZIP are named AbaqusModalComparator_Preview_0.1 (the RC6 specification stays
+the internal build source, and an RC6 desktop copy is now an earlier, protected one). README_PORTABLE.txt names the
+release first, describes the five pages of the window the program opens with the program's own words, sends the user
+to no page of the earlier research window, and says what is blocked.
 """
 
 from __future__ import annotations
@@ -96,8 +101,11 @@ class PortableRc6PackagingTests(unittest.TestCase):
             self.assertIn(f'"{module}"', spec)
         self.assertEqual(set(self.build.PROTECTED_DESKTOP), {
             f"AbaqusModalComparator_{name}{suffix}"
-            for name in ("RC1", "RC2", "RC3", "RC3_F1", "RC3_F2", "RC4", "RC4_F1", "RC5") for suffix in ("", ".zip")})
-        self.assertNotIn(self.build.NAME, self.build.PROTECTED_DESKTOP)
+            for name in ("RC1", "RC2", "RC3", "RC3_F1", "RC3_F2", "RC4", "RC4_F1", "RC5", "RC6") for suffix in ("", ".zip")})
+        # the delivered name is its own: the internal RC6 name is an earlier desktop copy now, never written
+        self.assertEqual((self.build.RELEASE, self.build.DELIVERED), ("Preview 0.1", "AbaqusModalComparator_Preview_0.1"))
+        self.assertIn(self.build.NAME, self.build.PROTECTED_DESKTOP)
+        self.assertNotIn(self.build.DELIVERED, self.build.PROTECTED_DESKTOP)
 
     def test_rc1_to_rc5_packaging_unchanged(self):
         packaging = ROOT / "packaging"
@@ -121,14 +129,69 @@ class PortableRc6PackagingTests(unittest.TestCase):
             self.assertEqual(earlier.read_text(encoding="utf-8"), "{}")
             desktop = folder / "desktop"
             desktop.mkdir()
+            (desktop / "AbaqusModalComparator_RC6.zip").write_bytes(b"earlier RC6")  # not this build's: left alone
             self.assertEqual([t.name for t in self.build.desktop_targets(desktop)],
-                             ["AbaqusModalComparator_RC6", "AbaqusModalComparator_RC6.zip",
-                              "AbaqusModalComparator_RC6.zip.sha256"])
-            (desktop / "AbaqusModalComparator_RC6.zip").write_bytes(b"earlier RC6")
+                             ["AbaqusModalComparator_Preview_0.1", "AbaqusModalComparator_Preview_0.1.zip",
+                              "AbaqusModalComparator_Preview_0.1.zip.sha256"])
+            (desktop / "AbaqusModalComparator_Preview_0.1.zip").write_bytes(b"earlier preview")
             with self.assertRaises(SystemExit):
                 self.build.desktop_targets(desktop)
+            self.assertEqual((desktop / "AbaqusModalComparator_RC6.zip").read_bytes(), b"earlier RC6")
+            self.assertEqual((desktop / "AbaqusModalComparator_Preview_0.1.zip").read_bytes(), b"earlier preview")
+            # the built folder takes its delivered name only where nothing has it
+            built, delivered = folder / "built" / self.build.NAME, folder / "built" / self.build.DELIVERED
+            built.mkdir(parents=True)
+            (built / "AbaqusModalComparator.exe").write_bytes(b"exe")
+            self.build.deliver(built, delivered)
+            self.assertEqual(((delivered / "AbaqusModalComparator.exe").read_bytes(), built.exists()), (b"exe", False))
+            built.mkdir()
+            with self.assertRaises(SystemExit):
+                self.build.deliver(built, delivered)
+            self.assertEqual((delivered / "AbaqusModalComparator.exe").read_bytes(), b"exe")
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):  # there is no --replace
             self.build.main(["--out", "unused", "--replace"])
+
+    def test_the_readme_describes_the_window_the_program_opens(self):
+        """WINDOWS-PREVIEW-01: the names are the program's own, read from the modules that show them."""
+        from new_gui import analyze_panel, mac_points_model, materials_study_model as sm, materials_study_panel
+        from new_gui import production_window as pw
+
+        text = self.build.readme("0" * 40, "some-branch", "2026-01-01T00:00:00Z")
+        lines = text.splitlines()
+        self.assertEqual(lines[0], "Abaqus\u2013Simcenter Modal Comparator \u2014 Preview 0.1")
+        self.assertGreaterEqual(text.count("Preview 0.1"), 3)
+        self.assertNotIn("{", text)  # every field is filled
+        self.assertEqual(pw.PAGES, ("Analyze", "Review", "MAC / Points", "Materials", "Research Tuning"))
+        self.assertIn("five pages: " + ", ".join(pw.PAGES) + ".", text)
+        headings = [line for line in lines if line[:1].isdigit()]
+        for page in pw.PAGES:  # each page has its own numbered part
+            self.assertTrue(any(page.upper() in heading for heading in headings), page)
+        for shown in (analyze_panel.OPEN_PROJECT, analyze_panel.SAVE_PROJECT, analyze_panel.SAVE_PROJECT_AS,
+                      analyze_panel.CLOSE_PROJECT, analyze_panel.SET_UP_REGISTRATION, mac_points_model.TRIAL_RUN,
+                      mac_points_model.TRIAL_EXPORT, materials_study_panel.SYNTHETIC_CHOICE,
+                      materials_study_panel.REAL_CHOICE, *sm.METHOD_NAMES.values(), *materials_study_panel.TAB_TITLES,
+                      "FE / Experiment", "Run calculation", "Export report...", "Choose file...", "Start Abaqus Python?",
+                      "MAC NOT AVAILABLE", "REGISTRATION_REQUIRED", "SAVED SNAPSHOT", self.build.EXE):
+            self.assertIn(shown, text, shown)
+        self.assertIn(sm.RUN_BLOCKED, text)  # "Real-data inverse execution: BLOCKED"
+        for statement in ("Production Auto-ID: BLOCKED", "M8 GATE NOT_MET", "D-077 NO_GLOBAL_PARAMETER_VALUE",
+                          "does NOT identify material properties", "never a verified MAC",
+                          "EXPLORATORY MAC - UNCONFIRMED GEOMETRIC MAPPING", "NOT_A_RELEASE_VALUE"):
+            self.assertIn(statement, text, statement)
+        # each method with what it needs
+        ritz = next(line for line in lines if line.strip().startswith("- " + sm.METHOD_NAMES[sm.RITZ]))
+        stage = next(line for line in lines if line.strip().startswith("- " + sm.METHOD_NAMES[sm.STAGE_A]))
+        self.assertIn("length a, width b and mass", ritz)
+        self.assertIn("matrix package", stage)
+        # no page, command or route of the earlier research window, and no RC6 name as the release
+        for obsolete in ("Workspace", "Plate Study", "Research Results", "Extract modal results", "Physical Readiness",
+                         "FE Response", "Research Workbench", "Choose a known new experimental source", "Use this package",
+                         "manifest.json", "new interface (", "RC5"):
+            self.assertNotIn(obsolete, text, obsolete)
+        self.assertEqual(text.count("RC6"), 1)  # only as the internal build source, in the last line
+        self.assertIn("Internal build source: AbaqusModalComparator_RC6.", lines[-1])
+        text.encode("utf-8-sig")
+        self.assertLessEqual(max(len(line) for line in lines), 120)
 
     def test_the_extractor_is_packaged_where_the_frozen_bridge_resolves_it(self):
         with tempfile.TemporaryDirectory(prefix="RC6 extractor ") as folder:
