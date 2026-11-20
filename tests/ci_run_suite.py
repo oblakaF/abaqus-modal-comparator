@@ -89,15 +89,6 @@ def deliver_deferred_deletions() -> bool:
     return True
 
 
-def qt_widgets_alive():
-    """How many Qt widgets exist now; None where no Qt widget application exists."""
-    widgets = _qt("QtWidgets")
-    if widgets is None:
-        return None
-    app = widgets.QApplication.instance()
-    return len(app.allWidgets()) if isinstance(app, widgets.QApplication) else None
-
-
 class MemoryTrace:
     """One flushed JSON line per finished test and per marker."""
 
@@ -113,8 +104,7 @@ class MemoryTrace:
         rss = now["rss_kb"]
         change = None if rss is None or self.previous is None else rss - self.previous
         self.previous = rss if rss is not None else self.previous
-        self._write({"test": test_id, "time": round(time.time(), 3), **now, "rss_change_kb": change,
-                     "qt_widgets": qt_widgets_alive()})
+        self._write({"test": test_id, "time": round(time.time(), 3), **now, "rss_change_kb": change})
 
     def marker(self, event: str, **more) -> None:
         try:
@@ -208,9 +198,7 @@ def describe_memory(facts: dict) -> list:
     marks = "; ".join(f"{m['event']} at +{m['time'] - first_time:.0f} s" + (f" [{m['threads']}]" if m.get("threads") else "")
                       for m in facts["markers"])
     held = [t["rss_kb"] + (t.get("swap_kb") or 0) for t in facts["tests"] if t.get("rss_kb") is not None]
-    widgets = [t["qt_widgets"] for t in facts["tests"] if t.get("qt_widgets") is not None]
-    more = (f" Largest resident + swapped after a test: {_mb(max(held))} MB." if held else "") + (
-        f" Qt widgets alive after a test: {widgets[-1]} at the last such test, {max(widgets)} at most." if widgets else "")
+    more = f" Largest resident + swapped after a test: {_mb(max(held))} MB." if held else ""
     notices = [("memory trace: this process", f"{len(facts['tests'])} tests traced. At the start: {at(start)}. After the last "
                 f"traced test ({last['test']}, +{last['time'] - first_time:.0f} s): {at(last)}. Markers: {marks}.{more}")]
     notices.append(("memory trace: modules that grew this process most (resident + swapped MB)", "; ".join(

@@ -60,11 +60,19 @@ class T(unittest.TestCase):
         thread.join()
         self.assertEqual(said, [False])
         self.assertIs(deliver(), True)
+
+    def test_d_the_last_window_is_gone_too(self):
+        window = QWidget()
+        KEPT.append(window)
+        window.deleteLater()
+        self.assertEqual(len(APP.allWidgets()), 1)
+        self.assertIs(sys.modules["__main__"].deliver_deferred_deletions(), True)
+        self.assertEqual(APP.allWidgets(), [])
 """
 PLAIN_SAMPLE = ("import sys, unittest\n\n\nclass T(unittest.TestCase):\n    def test_nothing_of_qt_is_loaded(self):\n"
                 "        self.assertEqual([n for n in sys.modules if n.startswith(('PySide6', 'shiboken6'))], [])\n"
                 "        self.assertIs(sys.modules['__main__'].deliver_deferred_deletions(), False)\n"
-                "        self.assertIsNone(sys.modules['__main__'].qt_widgets_alive())\n")
+                "")
 STATUS = "Name:\tpython\nVmHWM:\t  900 kB\nVmRSS:\t  800 kB\nVmSwap:\t   50 kB\nThreads:\t3\n"
 MEMINFO = "MemTotal: 16000 kB\nMemAvailable:   12000 kB\nCached:  3000 kB\nSwapCached: 1 kB\nShmem: 40 kB\nSwapFree: 2000 kB\n"
 
@@ -172,11 +180,8 @@ class DeferredDeletionTests(unittest.TestCase):
                            "--memory", "memory.jsonl")
         self.assertEqual(done.returncode, 0, done.stderr)
         facts = cs.read(done.stderr)
-        self.assertEqual((facts["finished"], facts["ran"], facts["closing"]), (True, 3, "OK"))
-        trace = [r for r in rows(folder / "memory.jsonl") if "test" in r]
-        self.assertEqual([r["qt_widgets"] for r in trace], [0, 0, 0])  # none is left after any test
-        self.assertIn("Qt widgets alive after a test: 0 at the last such test, 0 at most",
-                      dict(runner.describe_memory(runner.read_memory((folder / "memory.jsonl").read_text())))["memory trace: this process"])
+        self.assertEqual((facts["finished"], facts["ran"], facts["closing"]), (True, 4, "OK"))
+        self.assertEqual(len([r for r in rows(folder / "memory.jsonl") if "test" in r]), 4)  # the memory trace is kept
 
     def test_without_the_runner_the_same_widget_outlives_its_test(self):
         """What the runner corrects: unittest alone runs no event loop, and the scheduled deletion never happens."""
@@ -192,7 +197,7 @@ class DeferredDeletionTests(unittest.TestCase):
         done = self.run_in(folder, str(TESTS / "ci_run_suite.py"), "--start", str(folder), "--trace", "refcounts.jsonl",
                            "--memory", "memory.jsonl")
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual([r["qt_widgets"] for r in rows(folder / "memory.jsonl") if "test" in r], [None])
+        self.assertEqual(len([r for r in rows(folder / "memory.jsonl") if "test" in r]), 1)
 
     def test_a_deletion_that_fails_is_an_error_of_that_test(self):
         class Sample(unittest.TestCase):
