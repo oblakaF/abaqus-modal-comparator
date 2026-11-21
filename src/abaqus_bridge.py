@@ -580,6 +580,49 @@ def _load_mode_csv(
     return mode
 
 
+# Every mode of one extraction normally lists the same nodes in the same order at the same coordinates, yet each mode
+# file is parsed into its own node-id strings and its own coordinate array. On a large model that repeated geometry is
+# several GiB. A mode whose geometry is exactly that of an earlier mode refers to the earlier mode's two arrays instead;
+# the arrays are then read-only, so a write through one mode cannot silently change another. "Exactly" means: the same
+# node ids in the same order and bit-identical float64 coordinates (no tolerance; -0.0 is not 0.0). Vectors and
+# measured-DOF masks are never shared.
+def _same_geometry(mode: ModeShape, other: ModeShape) -> bool:
+    ids, other_ids = mode.node_ids, other.node_ids
+    xyz, other_xyz = mode.coordinates, other.coordinates
+    if ids is other_ids and xyz is other_xyz:
+        return True
+    if ids.shape != other_ids.shape or xyz.shape != other_xyz.shape:
+        return False
+    if xyz.dtype != np.float64 or other_xyz.dtype != np.float64:
+        return False
+    if not (xyz.flags.c_contiguous and other_xyz.flags.c_contiguous):
+        return False
+    if xyz is not other_xyz and not np.array_equal(xyz.view(np.uint64), other_xyz.view(np.uint64)):
+        return False
+    return ids is other_ids or bool(np.array_equal(ids, other_ids))
+
+
+def _share_geometry(mode: ModeShape, holders: List[ModeShape]) -> bool:
+    """Point ``mode`` at the geometry arrays of the first of ``holders`` with exactly the same geometry; a mode with a
+    geometry of its own joins ``holders`` and keeps its arrays as they are."""
+    for holder in holders:
+        if _same_geometry(mode, holder):
+            holder.node_ids.flags.writeable = False
+            holder.coordinates.flags.writeable = False
+            mode.node_ids = holder.node_ids
+            mode.coordinates = holder.coordinates
+            return True
+    holders.append(mode)
+    return False
+
+
+def share_equal_geometry(modes) -> int:
+    """Make the modes with exactly equal geometry use one read-only node-id array and one read-only coordinate array.
+    Returns how many modes now use another mode's arrays. Nothing is copied and no value changes."""
+    holders: List[ModeShape] = []
+    return sum(_share_geometry(mode, holders) for mode in modes)
+
+
 # The frame frequency of an Abaqus frequency step is reported with only 5-6 significant digits, while the EIGFREQ
 # history output carries the solver's single-precision value. The history value replaces the frame value only when its
 # mode identity is unambiguous and consistent; otherwise the frame value stays (fail-closed).
@@ -777,6 +820,7 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
     frame_frequencies = {int(entry["mode"]): float(entry["frequency_hz"]) for entry in mode_entries}
     precise, kept = history_frequencies(manifest, frame_frequencies)
     modes: List[ModeShape] = []
+    geometry_holders: List[ModeShape] = []
     for mode_entry in mode_entries:
         if cancel_event is not None and cancel_event.is_set():
             # Cooperative cancellation during Python-side parse/read: no
@@ -798,15 +842,15 @@ def load_extracted_odb(manifest_path: Path, cancel_event=None) -> ModalDataset:
         }
         if mode_number in kept:
             metadata["frequency_history_note"] = kept[mode_number]
-        modes.append(
-            _load_mode_csv(
-                file_path=file_path,
-                mode_number=mode_number,
-                frequency_hz=precise.get(mode_number, frame_frequency),
-                metadata=metadata,
-                geometry=geometry,
-            )
+        mode = _load_mode_csv(
+            file_path=file_path,
+            mode_number=mode_number,
+            frequency_hz=precise.get(mode_number, frame_frequency),
+            metadata=metadata,
+            geometry=geometry,
         )
+        _share_geometry(mode, geometry_holders)  # before the mode is kept: a repeated geometry is not retained
+        modes.append(mode)
 
     if not modes:
         if rejected:

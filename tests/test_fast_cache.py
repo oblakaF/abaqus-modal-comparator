@@ -311,5 +311,146 @@ class ExtractedOdbCacheIdentityTests(unittest.TestCase):
             self.assertEqual(dataset.modes[0].frequency_hz, 31.0)
 
 
+def fe_modes(count=3, other_order_at=None):
+    """FE modes the way the loader built them before it shared geometry: every mode has arrays of its own."""
+    modes = []
+    for number in range(1, count + 1):
+        labels = [2, 1, 3] if number == other_order_at else [1, 2, 3]
+        mode = ModeShape(
+            number=number,
+            frequency_hz=10.0 * number,
+            node_ids=np.array([f"PART-1:{label}" for label in labels], dtype=object),
+            coordinates=np.array([[float(label), 0.5 * label, 0.0] for label in labels]),
+            vectors=np.array([[number + 0.1 * label, 0.0, 1.0 / label] for label in labels], dtype=complex),
+        )
+        mode.measured_dofs = np.ones(mode.vectors.shape, dtype=bool)
+        modes.append(mode)
+    return modes
+
+
+class ExtractedOdbCacheSharedGeometryTests(unittest.TestCase):
+    """SP13-SHARED-FE-GEOMETRY-01: a dataset read from the FE cache shares equal geometry as a parsed one does. The
+    cache key, the entry on disk and the values are what they were."""
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.root = Path(folder.name)
+        (self.root / "mode_001.csv").write_bytes(b"synthetic")
+        self.manifest = self.root / "manifest.json"
+        self.manifest.write_text(json.dumps({"modes": [{"file": "mode_001.csv"}]}), encoding="utf-8")
+        self.cache = self.root / "cache"
+        self.cache.mkdir()
+        self.signature = fast_cache._manifest_signature(self.manifest)
+        key = hashlib.sha256(json.dumps(self.signature, sort_keys=True).encode("utf-8")).hexdigest()
+        self.entry = self.cache / f"odb_{key}.pkl.gz"
+
+    def read(self, loader):
+        with patch.object(fast_cache, "_ORIGINAL_EXTRACTED_ODB_LOADER", loader, create=True), \
+                patch.object(fast_cache, "_user_cache_root", lambda: self.cache), \
+                patch.object(fast_cache, "_CACHE_FOLDER", None):
+            return fast_cache._cached_extracted_odb_loader(self.manifest)
+
+    @staticmethod
+    def must_not_parse(*_args, **_kwargs):
+        raise AssertionError("an existing extracted-ODB cache entry was not reused")
+
+    def write_entry_of_the_previous_program(self, modes):
+        for mode in modes:  # as parsed before this change: nothing shared
+            self.assertTrue(mode.node_ids.flags.writeable)
+        self.assertEqual(len({id(mode.coordinates) for mode in modes}), len(modes))
+        fast_cache._atomic_pickle_dump(
+            {"signature": self.signature, "dataset": ModalDataset("Abaqus ODB", self.manifest, modes)},
+            self.entry, compressed=True)
+        return hashlib.sha256(self.entry.read_bytes()).hexdigest()
+
+    def assert_values(self, dataset, expected):
+        self.assertEqual(len(dataset.modes), len(expected))
+        for mode, reference in zip(dataset.modes, expected):
+            self.assertEqual((mode.number, mode.frequency_hz), (reference.number, reference.frequency_hz))
+            self.assertEqual(mode.node_ids.tolist(), reference.node_ids.tolist())
+            self.assertEqual(mode.coordinates.tobytes(), reference.coordinates.tobytes())
+            self.assertEqual(mode.vectors.tobytes(), reference.vectors.tobytes())
+            self.assertEqual(mode.measured_dofs.tolist(), reference.measured_dofs.tolist())
+
+    def assert_shared_and_read_only(self, dataset):
+        first = dataset.modes[0]
+        for mode in dataset.modes[1:]:
+            self.assertIs(mode.node_ids, first.node_ids)
+            self.assertIs(mode.coordinates, first.coordinates)
+        with self.assertRaises(ValueError):
+            first.node_ids[0] = "OTHER:1"
+        with self.assertRaises(ValueError):
+            dataset.modes[-1].coordinates[0, 0] = 9.0
+        self.assertEqual(len({id(mode.vectors) for mode in dataset.modes}), len(dataset.modes))
+        self.assertEqual(len({id(mode.measured_dofs) for mode in dataset.modes}), len(dataset.modes))
+        self.assertTrue(all(mode.vectors.flags.writeable for mode in dataset.modes))
+
+    def test_an_entry_written_before_the_change_is_reused_and_shares_its_geometry(self):
+        digest = self.write_entry_of_the_previous_program(fe_modes())
+        dataset = self.read(self.must_not_parse)
+        self.assertIs(dataset.metadata["binary_odb_cache_reused"], True)
+        self.assert_shared_and_read_only(dataset)
+        self.assert_values(dataset, fe_modes())
+        self.assertEqual(hashlib.sha256(self.entry.read_bytes()).hexdigest(), digest)  # the entry is not rewritten
+        self.assertEqual(sorted(path.name for path in self.cache.iterdir()), [self.entry.name])
+
+    def test_a_cached_mode_with_another_node_order_keeps_its_own_arrays(self):
+        self.write_entry_of_the_previous_program(fe_modes(other_order_at=2))
+        one, two, three = self.read(self.must_not_parse).modes
+        self.assertIsNot(two.node_ids, one.node_ids)
+        self.assertIsNot(two.coordinates, one.coordinates)
+        self.assertEqual(two.node_ids.tolist(), ["PART-1:2", "PART-1:1", "PART-1:3"])
+        self.assertTrue(two.coordinates.flags.writeable)
+        self.assertIs(three.node_ids, one.node_ids)
+        self.assertIs(three.coordinates, one.coordinates)
+
+    def test_a_new_entry_keeps_the_key_and_gives_shared_read_only_geometry_when_read_back(self):
+        parsed = []
+
+        def loader(manifest_path, cancel_event=None):
+            modes = fe_modes()
+            abaqus_bridge_share(modes)
+            parsed.append(1)
+            return ModalDataset("Abaqus ODB", Path(manifest_path), modes)
+
+        written = self.read(loader)
+        self.assertIs(written.metadata["binary_odb_cache_reused"], False)
+        self.assertEqual(sorted(path.name for path in self.cache.iterdir()), [self.entry.name])  # the same key
+        self.assert_shared_and_read_only(written)
+        stored = fast_cache._pickle_load(self.entry, compressed=True)
+        self.assertEqual(stored["signature"], self.signature)
+        self.assertIs(stored["dataset"].modes[1].coordinates, stored["dataset"].modes[0].coordinates)  # stored once
+        ids, xyz = stored["dataset"].modes[0].node_ids.copy(), stored["dataset"].modes[0].coordinates.copy()
+        for mode in stored["dataset"].modes:  # whether a pickle keeps the flag depends on NumPy: drop it here ...
+            mode.node_ids, mode.coordinates = ids, xyz
+        self.assertTrue(ids.flags.writeable and xyz.flags.writeable)
+        fast_cache._atomic_pickle_dump(stored, self.entry, compressed=True)
+        again = self.read(self.must_not_parse)
+        self.assertEqual(parsed, [1])
+        self.assertIs(again.metadata["binary_odb_cache_reused"], True)
+        self.assert_shared_and_read_only(again)  # ... and the reader restores it
+        self.assert_values(again, fe_modes())
+
+    def test_a_changed_package_file_still_invalidates_the_entry(self):
+        self.write_entry_of_the_previous_program(fe_modes())
+        (self.root / "mode_001.csv").write_bytes(b"synthetic, changed")
+        parsed = []
+
+        def loader(manifest_path, cancel_event=None):
+            parsed.append(1)
+            return ModalDataset("Abaqus ODB", Path(manifest_path), fe_modes(count=1))
+
+        dataset = self.read(loader)
+        self.assertEqual(parsed, [1])
+        self.assertIs(dataset.metadata["binary_odb_cache_reused"], False)
+        self.assertEqual(len(dataset.modes), 1)
+
+
+def abaqus_bridge_share(modes):
+    import abaqus_bridge
+    return abaqus_bridge.share_equal_geometry(modes)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -364,6 +364,10 @@ def _cached_extracted_odb_loader(manifest_path: Path, cancel_event=None):
             _raise_if_cancelled(cancel_event)
             if payload.get("signature") == signature:
                 canonical = _clone_dataset(payload["dataset"])
+                # An entry written before the loader shared equal geometry holds one copy per mode, and a pickle
+                # need not keep the read-only flag: both are restored here. The entry itself is left as it is.
+                abaqus_bridge.share_equal_geometry(canonical.modes)
+                del payload
                 returned = _returned_dataset(
                     canonical, True, started, "binary_odb_cache_reused"
                 )
