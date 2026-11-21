@@ -34,6 +34,15 @@ SAVE_RESULT = "Save result"
 EXPORT_REPORT = "Export report..."
 EXPORT_HINT = ("Writes the frequency-only diagnostic report of this result as PDF and Excel into a folder you choose. "
                "Nothing is calculated again; the files are checked against what was read.")
+# PREVIEW-01-COMPARISON-REPORT-FIX: a result with mode pairs gets the comparison report, never the frequency-only one
+EXPORT_HINTS = {am.DIAGNOSTIC_REPORT: EXPORT_HINT,
+                am.COMPARISON_REPORT: ("Writes the comparison report of this result (mode pairs, frequencies, signed "
+                                       "errors, MAC, the registration it rests on and the verdict of every record) as "
+                                       "Excel, PDF and a JSON record into a folder you choose. Nothing is calculated "
+                                       "again; the files are checked against what was read.")}
+EXPORT_FOLDER = {am.DIAGNOSTIC_REPORT: "Folder for the diagnostic report (PDF and Excel)",
+                 am.COMPARISON_REPORT: "Folder for the comparison report (Excel, PDF and JSON)"}
+EXPORT_UNAVAILABLE = "Export report is not available. "
 EXPORT_RUNNING = "Writing the report..."
 _SAVE_MESSAGES = ("Saving the project", "Project saved", "Project not saved")  # the panel's own save messages
 PICTURE_IN_VIEW = 120  # pixels of a shape picture that count as "on screen" after a row click
@@ -147,6 +156,10 @@ class ReviewPanel(QWidget):
         self.export_feedback = _label("", "hint")
         self.export_feedback.setVisible(False)
         top.addWidget(self.export_feedback)
+        self.export_reason = _label("", "hint")  # why the report cannot be exported, in words on the page
+        self.export_reason.setObjectName("reviewExportReason")
+        self.export_reason.setVisible(False)
+        top.addWidget(self.export_reason)
         self._exporting = False
         self.report_done.connect(self._report_done)
         self.saved_note = _label(rv.SAVED_PLOTS_TEXT, "warnings")
@@ -500,7 +513,13 @@ class ReviewPanel(QWidget):
         self.save_button.setEnabled(self.analyze.can_save())
         problem = self.export_problem()
         self.export_button.setEnabled(not problem)
-        self.export_button.setToolTip(EXPORT_HINT if not problem else f"{EXPORT_HINT}\n{problem}")
+        hint = EXPORT_HINTS[am.report_kind(self.analyze.analysis)]
+        self.export_button.setToolTip(hint if not problem else f"{hint}\n{problem}")
+        # the reason is also said on the page: a disabled button does not show its tooltip to everyone
+        stated = bool(problem) and not self._exporting and (self.analyze.analysis is not None
+                                                            or self.analyze.snapshot is not None)
+        self.export_reason.setText(EXPORT_UNAVAILABLE + problem if stated else "")
+        self.export_reason.setVisible(stated)
 
     # ---------------------------------------------------------------------------------------------- the report
 
@@ -513,12 +532,13 @@ class ReviewPanel(QWidget):
         return am.report_problem(self.analyze.inputs, self.analyze.analysis, self.analyze.snapshot is not None)
 
     def export_report(self, folder: Optional[str] = None) -> bool:
-        """Write the diagnostic report (PDF and Excel) into a folder; False when nothing was started. The work runs in a
-        worker thread, so the window stays responsive; the result of files changed since the read is refused there."""
+        """Write the report of the shown result into a folder (the comparison report with mode pairs, else the
+        frequency-only diagnostic); False when nothing was started. The work runs in a worker thread, so the window
+        stays responsive; the result of files changed since the read is refused there."""
         if self.export_problem():
             return False
         if folder is None:
-            folder = QFileDialog.getExistingDirectory(self, "Folder for the diagnostic report (PDF and Excel)")
+            folder = QFileDialog.getExistingDirectory(self, EXPORT_FOLDER[am.report_kind(self.analyze.analysis)])
         if not folder:
             return False
         inputs, analysis = self.analyze.inputs, self.analyze.analysis

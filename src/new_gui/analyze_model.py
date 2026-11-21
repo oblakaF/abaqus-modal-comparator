@@ -380,6 +380,9 @@ class Analysis:
     experimental_total: int = 0  # records of the chosen set as read
     comparison_result: Any = field(default=None, compare=False, repr=False)  # the comparator's own result; never saved
     diagnostic: Any = field(default=None, compare=False, repr=False)  # the frequency diagnostic of this analysis; never saved
+    # PREVIEW-01-COMPARISON-REPORT-FIX: what the comparison report states, kept from the comparison itself; never saved
+    comparison_bound: Any = field(default=None, compare=False, repr=False)  # the registration object the comparator used
+    registration_basis: str = field(default="", compare=False)  # report_export.ARCHIVED_BASIS or CONFIRMED_BASIS
 
     @property
     def registration_note(self) -> str:
@@ -495,42 +498,61 @@ def analyse(inputs: Inputs, set_index: int, cancel_event, confirmation: Optional
             notes += (reason,)
     return Analysis(status, statement, set_index, view.set_title, fe_rows, experimental, nearest, first_elastic,
                     tuple(sorted(rigid)), tuple(facts), notes, comparison, reason, registration, unavailable, total,
-                    compared.result if compared is not None else None, outcome.diagnostic)
+                    compared.result if compared is not None else None, outcome.diagnostic,
+                    compared.bound if compared is not None else None,
+                    "" if compared is None else _CONFIRMED_BASIS if confirmation is not None else _ARCHIVED_BASIS)
 
 
 REPORT_STATEMENT = "REGISTRATION_REQUIRED. MAC NOT COMPUTED. NO VERIFIED MODAL PAIRS."
 REPORT_SNAPSHOT = ("Not available for a saved result: its files were not read in this session. Check source files on "
                    "the Analyze page, then Analyze, and export the fresh result.")
-REPORT_COMPARED = ("Not available here for a result with mode pairs: this report is the frequency-only diagnostic and "
-                   "would state that no registration exists.")
+REPORT_NOT_KEPT = ("Not available: the comparison's own result is not held in this session, so its pairs and MAC cannot "
+                   "be stated. Analyze again, then export.")
 REPORT_NOT_READY = "No result of files read in this session."
+_ARCHIVED_BASIS, _CONFIRMED_BASIS = "ARCHIVED_VERIFIED_REGISTRATION", "USER_CONFIRMED_REGISTRATION"  # report_export's
+COMPARISON_REPORT, DIAGNOSTIC_REPORT = "comparison", "diagnostic"
+
+
+def report_kind(analysis: Optional[Analysis]) -> str:
+    """Which report this result gets: the comparison report (pairs and MAC) or the frequency-only diagnostic."""
+    return COMPARISON_REPORT if analysis is not None and analysis.comparison is not None else DIAGNOSTIC_REPORT
 
 
 def report_problem(inputs: Optional[Inputs], analysis: Optional[Analysis], snapshot: bool) -> str:
-    """Why the diagnostic report cannot be exported now (empty when it can). A saved snapshot is never exported as live
-    data: nothing of it was read or verified in this session."""
+    """Why the report cannot be exported now (empty when it can). A saved snapshot is never exported as live data:
+    nothing of it was read or verified in this session. A result with pairs is exported only with the comparator's own
+    result and the registration it used; a frequency-only report is never written for it."""
     if snapshot:
         return REPORT_SNAPSHOT
     if inputs is None or analysis is None or analysis.diagnostic is None:
         return REPORT_NOT_READY
-    if analysis.comparison is not None:
-        return REPORT_COMPARED
+    if analysis.comparison is not None and (analysis.comparison_result is None or analysis.comparison_bound is None
+                                            or not analysis.registration_basis):
+        return REPORT_NOT_KEPT
     return ""
 
 
 def export_report(inputs: Inputs, analysis: Analysis, folder, cancel_event=None) -> tuple:
-    """The existing diagnostic report (PDF, Excel) of this analysis, written into ``folder``; returns the two paths.
+    """The report of this analysis, written into ``folder``; returns the written paths.
 
-    Nothing is computed again: the report is built from the frequency diagnostic the analysis kept and the data it
-    read. ``report_export`` confirms first that the FE package and the experimental file still have the identities
-    recorded at the read, and refuses otherwise (``StepFailed``)."""
+    Nothing is computed again. Without a registration it is the existing frequency-only diagnostic report (PDF, Excel)
+    built from the diagnostic the analysis kept. With mode pairs it is the existing comparison report (Excel, PDF and a
+    JSON record) of the comparator's own result, with the registration it used and the verdict of every record.
+    ``report_export`` confirms first that the FE package and the experimental file still have the identities recorded at
+    the read, and refuses otherwise (``StepFailed``)."""
     from new_gui import report_export as rx
 
     problem = report_problem(inputs, analysis, False)
     if problem:
         raise StepFailed(problem)
-    reason = analysis.registration_reason or REGISTRATION_TEXT
     try:
+        if analysis.comparison is not None:
+            return rx.export_verified(analysis.comparison_result, analysis.comparison_bound, analysis.comparison,
+                                      inputs.fe, inputs.experimental, analysis.set_index, folder, cancel_event,
+                                      inputs.identities, basis=analysis.registration_basis, status=analysis.status,
+                                      statement=analysis.statement, notes=analysis.notes,
+                                      verdicts={int(row[1]): row[-1] for row in analysis.nearest_rows})
+        reason = analysis.registration_reason or REGISTRATION_TEXT
         return rx.export_diagnostic(inputs.fe, inputs.experimental, analysis.set_index, analysis.diagnostic, reason,
                                     folder, cancel_event, inputs.identities, statement=REPORT_STATEMENT)
     except rx.ExportRefused as refusal:

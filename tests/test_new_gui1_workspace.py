@@ -349,7 +349,9 @@ class SeparationTests(unittest.TestCase):
     # module that calls it (the report layers are installed by report_export in src/main.py's order, tested there).
     SCIENTIFIC_MODULES = {"comparison_model.py": {"modal_core", "amplitude_correlation", "reporting_hardening",
                                                   "numpy"},
-                          "report_export.py": {"reporting"},
+                          # PREVIEW-01-COMPARISON-REPORT-FIX: the statement in front of the written workbook and PDF
+                          "report_export.py": {"reporting", "openpyxl", "pypdf", "matplotlib", "matplotlib.figure",
+                                               "matplotlib.backends.backend_pdf"},
                           # GUI-UX-R1: drawing of already loaded values; display scaling of a saved pair, no comparison
                           "review_model.py": {"matplotlib.backends.backend_agg", "matplotlib.figure",
                                               "matplotlib.patches", "numpy"},
