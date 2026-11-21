@@ -170,7 +170,16 @@ THE WINDOW
   After Analyze the Review page opens. The table lists each measured (EXP) frequency with the FE frequency nearest to
   it and the difference in percent. These are candidates chosen by frequency, not confirmed mode pairs.
   Below the table: Mode shapes (Show shape, Save PNG), Frequency plots, FRF spectrum and All tables.
-  Export report... writes a diagnostic report (PDF and Excel) into a folder you choose.
+  Export report... writes the report of the shown result into a folder you choose. Which report depends on the result:
+  - Frequency-only (no registration, status REGISTRATION_REQUIRED): a diagnostic report as PDF and Excel. It holds
+    frequencies and frequency differences only: no MAC and no mode pairs.
+  - Registered comparison (mode pairs were computed): the comparison report as PDF, Excel and a JSON record. It holds
+    the actual FE / EXP mode pairs, their frequencies, signed frequency errors and MAC, the registration the pairs
+    rest on (an archived verified registration or a user-confirmed one, named as such) and the verdict of every
+    measured record. A verdict such as CORRESPONDENCE_GROUP_LEVEL_ONLY or CORRESPONDENCE_AMBIGUOUS is kept as it is:
+    a high MAC alone is not proof that one FE mode is one measured mode, and the report says so on its first page.
+  Nothing is calculated again for a report, and existing files are never replaced. When a report cannot be written,
+  the page says why beside the button.
 
 3. MAC / POINTS - why verified MAC may be missing
   MAC compares the shape of an FE mode with the shape of a measured mode at the same points. For that the program
@@ -187,6 +196,8 @@ THE WINDOW
   File > Save Project As... (or Save result on the Review page) writes one .mcproj file. The source files are not in
   it. File > Open Project... shows the saved result again, marked SAVED SNAPSHOT; nothing is calculated and no source
   file is opened. Curves and components that need the source files appear again after a new Analyze.
+  A SAVED SNAPSHOT cannot be exported as a report: first click Check source files on the Analyze page, then Analyze
+  again, and export the fresh result.
 
 5. MATERIALS - two research methods on a built-in synthetic example
   The Materials page tests two model methods on numbers the program makes itself. Tabs: Calculation, Results, Plots,
@@ -202,7 +213,14 @@ THE WINDOW
 
 6. RESEARCH TUNING
   Research only: it tunes the assumed inputs of a supported Abaqus shell model against measured frequencies with a
-  plate surrogate. No Abaqus run; the result is not a material property.
+  plate surrogate. No Abaqus run; the result is not a material property. The model must be a flat plate in the
+  global XY plane (any constant Z); a curved, folded or tilted shell model is refused with the reason.
+
+MEMORY
+  The program holds the extracted FE mode shapes in memory. In testing, one large sandwich-panel example (about
+  1.6 million FE nodes, 18 modes) used up to approximately 8.6 GB of memory while it was compared and exported.
+  This is one observation: it is not a maximum, and not a minimum system requirement. Smaller models use far less.
+  If Windows runs short of memory, close other programs or use a computer with more memory.
 
 WHAT IS BLOCKED
   - Real-data inverse execution: BLOCKED. The program does not identify the material of a real specimen.

@@ -193,6 +193,47 @@ class PortableRc6PackagingTests(unittest.TestCase):
         text.encode("utf-8-sig")
         self.assertLessEqual(max(len(line) for line in lines), 120)
 
+    def test_the_readme_describes_both_reports_the_snapshot_rule_and_the_observed_memory(self):
+        """PREVIEW-01-COMPACT-REBUILD-02: the words are the program's own; the memory figure is one observation."""
+        from new_gui import analyze_model as am, analyze_panel, comparison_model as cm, report_export as rx
+        from new_gui import review_panel as rp
+
+        text = self.build.readme("0" * 40, "some-branch", "2026-01-01T00:00:00Z")
+        flat = " ".join(text.split())
+        review = flat[flat.index("2. REVIEW"):flat.index("3. MAC / POINTS")]
+        self.assertIn(rp.EXPORT_REPORT, review)
+        frequency = review[review.index("- Frequency-only"):review.index("- Registered comparison")]
+        registered = review[review.index("- Registered comparison"):]
+        self.assertIn(am.REGISTRATION_REQUIRED, frequency)
+        self.assertIn("PDF and Excel", frequency)
+        self.assertIn("no MAC and no mode pairs", frequency)
+        self.assertNotIn("JSON", frequency)
+        for word in ("PDF, Excel and a JSON record", "mode pairs", "signed frequency errors", "MAC",
+                     "archived verified registration", "user-confirmed", "verdict of every measured record",
+                     cm.GROUP_VERDICT, cm.AMBIGUOUS_VERDICT, "a high MAC alone is not proof"):
+            self.assertIn(word, registered, word)
+        self.assertIn("A high MAC is not proof", rx.IDENTITY_NOT_CLAIMED)  # what the report's first page says
+        self.assertIn("the page says why beside the button", review)
+        saved = flat[flat.index("4. SAVE AND REOPEN"):flat.index("5. MATERIALS")]
+        self.assertIn("A SAVED SNAPSHOT cannot be exported as a report", saved)
+        self.assertIn(analyze_panel.CHECK_SOURCES, saved)
+        self.assertIn("then Analyze again, and export the fresh result", saved)
+        self.assertIn("Check source files", am.REPORT_SNAPSHOT)
+        memory = flat[flat.index("MEMORY "):flat.index("WHAT IS BLOCKED")]
+        self.assertIn("up to approximately 8.6 GB", memory)
+        self.assertIn("one large sandwich-panel example", memory)
+        self.assertIn("it is not a maximum, and not a minimum system requirement", memory)
+        for claim in ("requires", "at least", "minimum of", "recommended"):
+            self.assertNotIn(claim, memory.lower(), claim)
+        tuning = flat[flat.index("6. RESEARCH TUNING"):flat.index("MEMORY ")]
+        self.assertIn("flat plate in the global XY plane", tuning)
+        self.assertIn("is refused", tuning)
+        self.assertLessEqual(max(len(line) for line in text.splitlines()), 120)
+        # the compact exclusions and the blocked statements are as they were
+        self.assertEqual(self.build.EXCLUDED_MODULES, ("PySide6.QtNetwork", "PIL._avif"))
+        for statement in ("Real-data inverse execution: BLOCKED", "Production Auto-ID: BLOCKED", "M8 GATE NOT_MET"):
+            self.assertIn(statement, text)
+
     def test_only_what_the_program_never_loads_is_left_out(self):
         """WINDOWS-PREVIEW-01-COMPACT."""
         build = self.build
