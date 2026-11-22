@@ -228,6 +228,10 @@ VERDICT_GLOSS = {
     cm.AMBIGUOUS_VERDICT: "not a confirmed correspondence",
     cm.REJECTED_VERDICT: "no FE mode passes the comparator's limits"}
 NO_VERDICT = "Verdict: not stored with this result."
+# PREVIEW-01-REVIEW-PAIR-CLARITY-01-F1: the same two statements on one line of the page; their full wording is one hover away
+CANDIDATE_SHORT_LEAD, PAIR_SHORT_LEAD = "Frequency candidate:", "Comparator pair:"
+FRESH_SHORT, STORED_SHORT = "fresh result", "saved snapshot"
+VERDICT_PREFIX = "CORRESPONDENCE_"  # left out of the one line only; the full word is in the tooltip and the accessible text
 
 
 @dataclass(frozen=True)
@@ -242,6 +246,12 @@ class RowStatements:
     verdict: str = ""
     detail: str = ""
     differs: bool = False  # the paired FE mode is not the candidate's
+    candidate_short: str = ""  # the same two statements for one line of the page: FE mode and origin of the candidate,
+    pair_short: str = ""  # FE mode, MAC and verdict of the pair, fresh result or saved snapshot
+
+
+def _short_verdict(word: str) -> str:
+    return word[len(VERDICT_PREFIX):] if word.startswith(VERDICT_PREFIX) else (word or "no verdict stored")
 
 
 def _verdict_words(text: str) -> tuple:
@@ -269,22 +279,28 @@ def row_statements(analysis, state: Optional[ReviewState], index: Optional[int],
                          f"{MANUAL_LIMIT}")
         else:
             candidate = f"{chosen}, automatic nearest frequency. {CANDIDATE_LIMIT}"
+        short = f"FE {row.selected_mode} ({f'manual choice; nearest FE {row.nearest_mode}' if row.manual else 'nearest'})"
     else:
         candidate = "none: no elastic FE mode is selected for this record."
+        short = "none selected"
+    short = f"{CANDIDATE_SHORT_LEAD} {short}"
     candidate = f"{CANDIDATE_LEAD} for EXP {row.exp_mode}: {candidate}"
     lead = f"{PAIR_LEAD} for EXP {row.exp_mode}: "
     view = analysis.comparison
     if view is None:
         reason = NO_PAIR_REASONS.get(status_sentence(analysis, False), NO_PAIR_REASONS[STATUS_UNREGISTERED])
         origin = f" {STORED_NO_COMPARISON}" if saved else ""
-        return RowStatements(candidate, f"{lead}{PAIR_UNAVAILABLE} {reason}{origin}")
+        return RowStatements(candidate, f"{lead}{PAIR_UNAVAILABLE} {reason}{origin}", candidate_short=short,
+                             pair_short=f"{PAIR_SHORT_LEAD} not available")
     origin = STORED_ORIGIN if saved else FRESH_ORIGIN
+    tail = f" · {STORED_SHORT if saved else FRESH_SHORT}"
     source = state.nearest[index]
     pair = next((p for p in view.pair_rows if str(p.experimental_mode) == str(row.exp_mode).strip()), None)
     if pair is None:
         detail = str(source[10]) if len(source) > 10 else ""
         word, verdict = _verdict_words(detail)
-        return RowStatements(candidate, f"{lead}{NO_PAIR} {verdict} {origin}", None, word, detail)
+        return RowStatements(candidate, f"{lead}{NO_PAIR} {verdict} {origin}", None, word, detail, False, short,
+                             f"{PAIR_SHORT_LEAD} none ({_short_verdict(word)}){tail}")
     cells = pair.cells
     detail = str(cells[14]) if len(cells) > 14 else (str(source[10]) if len(source) > 10 else "")
     word, verdict = _verdict_words(detail)
@@ -293,7 +309,8 @@ def row_statements(analysis, state: Optional[ReviewState], index: Optional[int],
     note = f" Not the frequency-based candidate (FE {row.selected_mode})." if differs else ""
     mac = f"MAC {cells[6]}" if pair.mac is not None else str(cells[6])  # a MAC not computed says so in its own words
     return RowStatements(candidate, f"{lead}FE {mode} ({cells[1]} Hz, error {cells[5]} %, {mac}). {verdict}{note} "
-                                    f"{origin}", mode, word, detail, differs)
+                                    f"{origin}", mode, word, detail, differs, short,
+                         f"{PAIR_SHORT_LEAD} FE {mode}, {mac}, {_short_verdict(word)}{tail}")
 
 
 # ---------------------------------------------------------------------------------------------- plots

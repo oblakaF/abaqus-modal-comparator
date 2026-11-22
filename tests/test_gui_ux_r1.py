@@ -306,6 +306,39 @@ class PairClarityTests(unittest.TestCase):
                      *rv.NO_PAIR_REASONS.values(), *rv.VERDICT_GLOSS.values()):
             self.assertTrue(text.isascii(), text)  # English only
 
+    def test_the_one_line_form_keeps_the_candidate_the_pair_the_mac_the_verdict_and_the_origin(self):
+        """PREVIEW-01-REVIEW-PAIR-CLARITY-01-F1: what the page shows on one line; the full statements are unchanged."""
+        analysis = _Compared()
+        wanted = {0: ("Frequency candidate: FE 8 (nearest)", "Comparator pair: FE 8, MAC 0.528, AMBIGUOUS"),
+                  1: ("Frequency candidate: FE 11 (nearest)", "Comparator pair: FE 10, MAC 0.958, GROUP_LEVEL_ONLY"),
+                  2: ("Frequency candidate: FE 12 (nearest)", "Comparator pair: none (REJECTED)"),
+                  3: ("Frequency candidate: FE 12 (nearest)", "Comparator pair: FE 12, MAC 0.981, CONFIRMED"),
+                  4: ("Frequency candidate: FE 9 (nearest)", "Comparator pair: FE 9, MAC NOT COMPUTED (no shape), AMBIGUOUS")}
+        words = []
+        for row, (candidate, pair) in wanted.items():
+            fresh, _state = self.said(analysis, row)
+            stored, _state = self.said(analysis, row, saved=True)
+            self.assertEqual((fresh.candidate_short, stored.candidate_short), (candidate, candidate))
+            self.assertEqual(fresh.pair_short, f"{pair} \u00b7 fresh result")
+            self.assertEqual(stored.pair_short, f"{pair} \u00b7 saved snapshot")
+            words.append(pair.rstrip(")").split()[-1].lstrip("("))
+            self.assertEqual(fresh.verdict, rv.VERDICT_PREFIX + words[-1])  # the full word stays in the full statement
+            self.assertIn(fresh.verdict, fresh.pair)
+        self.assertEqual(sorted(set(words)), ["AMBIGUOUS", "CONFIRMED", "GROUP_LEVEL_ONLY", "REJECTED"])  # none merged
+        manual, _state = self.said(analysis, 1, manual="9")
+        self.assertEqual(manual.candidate_short, "Frequency candidate: FE 9 (manual choice; nearest FE 11)")
+        self.assertEqual(manual.pair_short, wanted[1][1] + " \u00b7 fresh result")  # the pair is not the person's to change
+        for unregistered in (_Compared(False), _Compared(False, "failed")):
+            none, _state = self.said(unregistered, 1, saved=True)
+            self.assertEqual(none.pair_short, "Comparator pair: not available")  # no FE mode is named as a pair
+            self.assertEqual(none.candidate_short, "Frequency candidate: FE 11 (nearest)")
+        analysis.nearest_rows = tuple(row[:10] for row in analysis.nearest_rows)  # saved before the verdicts were kept
+        analysis.comparison.pair_rows = tuple(cm_row.__class__(cm_row.index, cm_row.abaqus_mode, cm_row.experimental_mode,
+                                                               cm_row.mac, cm_row.frequency_error_percent, cm_row.cells[:14])
+                                              for cm_row in analysis.comparison.pair_rows)
+        old = rv.row_statements(analysis, rv.ReviewState(analysis), 1, True)
+        self.assertEqual(old.pair_short, "Comparator pair: FE 10, MAC 0.958, no verdict stored \u00b7 saved snapshot")
+
 
 class FrfTests(unittest.TestCase):
     def test_no_frf_data_gives_no_curve(self):

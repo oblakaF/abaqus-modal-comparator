@@ -209,6 +209,9 @@ class ReviewTableTests(_Flow):
         self.assertFalse(review.colour_legend.isVisible())
 
 
+SIZES = ((1366, 768), (900, 700), (900, 680))  # PREVIEW-01-REVIEW-PAIR-CLARITY-01-F1
+
+
 class PairStatementTests(_Flow):
     """PREVIEW-01-REVIEW-PAIR-CLARITY-01: under the table, the selected record's frequency candidate and its comparator
     pair are two statements that follow the row, the FE choice, a reset and an opened project."""
@@ -245,9 +248,22 @@ class PairStatementTests(_Flow):
         self.assertEqual(review.status_sentence.text(), rv.STATUS_UNREGISTERED)
         self.assertIn("no mode pairs and no MAC", review.status_sentence.text())
         self.assertFalse(review.status_sentence.visibleRegion().isEmpty())
-        window.resize(900, 700)
-        self.settle(0.3)
-        self.assertEqual(window.stack.currentWidget().verticalScrollBar().maximum(), 0)  # as before this change
+        pane = review.table.parentWidget()
+        for size in SIZES:
+            window.resize(*size)
+            self.settle(0.3)
+            page = window.stack.currentWidget()
+            self.assertEqual(page.verticalScrollBar().maximum(), 0, size)  # as before this change
+            self.assertEqual(page.horizontalScrollBar().maximum(), 0, size)
+            self.assertEqual(review.views.visibleRegion().boundingRect().height(), review.views.height(), size)
+            height = pane.minimumSizeHint().height()
+            for label in (review.candidate_statement, review.pair_statement):
+                label.setVisible(True)
+            self.app.processEvents()
+            self.assertGreater(pane.minimumSizeHint().height(), height, size)
+            review._show_statements()
+            self.app.processEvents()
+            self.assertEqual(pane.minimumSizeHint().height(), height, size)  # the hidden line takes no height at all
 
     def test_the_pair_is_the_comparators_own_and_a_manual_candidate_does_not_change_it(self):
         window, panel = self.compared()
@@ -268,12 +284,22 @@ class PairStatementTests(_Flow):
             else:
                 self.assertIn(f": FE {pair.abaqus_mode} ({pair.cells[1]} Hz, error {pair.cells[5]} %, MAC {pair.cells[6]}).",
                               said.pair)
-                self.assertEqual(review.pair_statement.toolTip(), pair.cells[14])  # the verdict as the comparison worded it
+                self.assertIn(pair.cells[14], review.pair_statement.toolTip())  # the verdict as the comparison worded it
                 self.assertIn(pair.cells[14].split(":")[0], said.pair)
+                self.assertIn(f"FE {pair.abaqus_mode}, MAC {pair.cells[6]}, ", review.pair_statement.full())
             self.assertTrue(said.pair.endswith(rv.FRESH_ORIGIN))
             self.assertTrue(review.candidate_statement.isVisibleTo(review) and review.pair_statement.isVisibleTo(review))
-        self.assertIn("<b>Comparator-assigned FE pair for EXP", review.pair_statement.text())  # the leads are set apart
-        self.assertIn("<b>Frequency-based FE candidate for EXP", review.candidate_statement.text())
+            # F1: the page shows the one-line form; the full statements are the tooltips and the accessible names
+            self.assertEqual(review.candidate_statement.full(), said.candidate_short)
+            self.assertEqual(review.pair_statement.full(), said.pair_short)
+            self.assertTrue(review.pair_statement.full().endswith(rv.FRESH_SHORT))
+            self.assertEqual(review.candidate_statement.toolTip(), said.candidate)
+            self.assertTrue(review.pair_statement.toolTip().startswith(said.pair))
+            self.assertEqual(review.candidate_statement.accessibleName(), said.candidate)
+        self.assertEqual((review.candidate_statement.lead, review.pair_statement.lead),  # the leads are set apart, in bold
+                         (rv.CANDIDATE_SHORT_LEAD, rv.PAIR_SHORT_LEAD))
+        self.assertTrue(review.pair_statement.text().startswith("<b>"))
+        self.assertTrue(review.candidate_statement.text().startswith("<b>"))
         row = next(r for r in range(review.table.rowCount()) if self.pair_of(panel, review, r) is not None)
         review.select_row(row)
         self.wait(panel)
@@ -286,6 +312,9 @@ class PairStatementTests(_Flow):
         after = review.statements
         self.assertIn(f"FE {other} ", after.candidate)
         self.assertIn("your manual choice (USER_REVIEW_HYPOTHESIS)", review.candidate_statement.accessibleName())
+        self.assertEqual(review.candidate_statement.full(),
+                         f"Frequency candidate: FE {other} (manual choice; nearest FE {before.pair_mode})")
+        self.assertEqual(review.pair_statement.full(), before.pair_short)  # the line of the pair is the same line
         self.assertEqual((after.pair_mode, after.verdict, after.detail), (before.pair_mode, before.verdict, before.detail))
         self.assertTrue(after.differs)
         self.assertIn(f"Not the frequency-based candidate (FE {other}).", review.pair_statement.accessibleName())
@@ -322,6 +351,8 @@ class PairStatementTests(_Flow):
             self.assertTrue(said.pair.endswith(rv.STORED_ORIGIN))
             self.assertEqual(said.pair[:-len(rv.STORED_ORIGIN)], live.pair[:-len(rv.FRESH_ORIGIN)])
             self.assertEqual(stored.pair_statement.accessibleName(), said.pair)
+            self.assertTrue(stored.pair_statement.full().endswith(rv.STORED_SHORT))  # on the page, not only in the tooltip
+            self.assertEqual(stored.pair_statement.full()[:-len(rv.STORED_SHORT)], live.pair_short[:-len(rv.FRESH_SHORT)])
         self.assertEqual(again.analysis.comparison.pair_rows, panel.analysis.comparison.pair_rows)
 
     def test_a_reopened_frequency_only_project_shows_no_pair(self):
@@ -358,39 +389,96 @@ class PairStatementTests(_Flow):
         self.assertIsNone(review.statements)
         self.assertTrue(review.candidate_statement.isHidden() and review.pair_statement.isHidden())
 
-    def test_both_statements_fit_the_two_window_sizes(self):
+    def test_the_statements_take_one_line_and_the_page_keeps_its_height(self):
+        """PREVIEW-01-REVIEW-PAIR-CLARITY-01-F1: at the small sizes the page of a result with pairs does not scroll, as
+        before the statements were added; the table rows and the Mode shapes area are on screen without scrolling."""
         window, panel = self.compared()
         review, table = window.review, window.review.table
         row = next(r for r in range(table.rowCount()) if self.pair_of(panel, review, r) is not None)
         review.select_row(row)
         self.wait(panel)
         rows = min(table.rowCount(), rp.ROWS_IN_VIEW)
-        for size in ((1366, 768), (900, 680)):
+        pane = table.parentWidget()
+        labels = (review.candidate_statement, review.pair_statement)
+        for size in SIZES:
             window.resize(*size)
             self.settle(0.3)
             page = window.stack.currentWidget()
-            if size == (1366, 768):
-                self.assertEqual(page.verticalScrollBar().maximum(), 0, size)  # the page fills the window
-            else:  # the small window: the two statements are reached by a short scroll of the page, never sideways
-                self.assertLessEqual(page.verticalScrollBar().maximum(), 130, size)
-                page.ensureWidgetVisible(review.pair_statement, 0, 8)
-                self.settle(0.2)
+            self.assertEqual(page.verticalScrollBar().maximum(), 0, size)  # no outer scrolling: the page fills the window
             self.assertEqual(page.horizontalScrollBar().maximum(), 0, size)  # no sideways scrolling of the page
             self.assertEqual(table.horizontalScrollBar().maximum(), 0, size)  # nor of the table
-            pane = table.parentWidget()
-            for label in (review.candidate_statement, review.pair_statement):
-                self.assertTrue(label.isVisibleTo(review), size)
-                self.assertLessEqual(label.x() + label.width(), pane.width(), size)  # wrapped inside the pane
-                self.assertGreaterEqual(label.height(), label.heightForWidth(label.width()), size)  # every line of it
-                self.assertEqual(label.visibleRegion().boundingRect().height(), label.height(), size)  # whole, on screen
-            self.assertLess(table.geometry().bottom(), review.candidate_statement.y(), size)
-            self.assertLess(review.candidate_statement.geometry().bottom(), review.pair_statement.y(), size)
-            if size == (1366, 768):
-                self.assertGreaterEqual(ReviewTableTests.whole_rows_on_screen(self, window), rows, size)
-                self.assertFalse(review.selection_label.visibleRegion().isEmpty(), size)  # the chosen row's shapes too
-            page.verticalScrollBar().setValue(0)
-            self.settle(0.2)
             self.assertGreaterEqual(ReviewTableTests.whole_rows_on_screen(self, window), rows, size)  # the rows, unscrolled
+            # the Mode shapes area: its tab row, the row's caption and at least its least height, all inside the window
+            self.assertEqual(review.views.currentWidget(), review.shapes_area, size)
+            self.assertEqual(review.views.visibleRegion().boundingRect().height(), review.views.height(), size)
+            self.assertGreaterEqual(review.views.height(), review.views.minimumHeight(), size)
+            self.assertFalse(review.selection_label.visibleRegion().isEmpty(), size)
+            self.assertFalse(review.views.tabBar().visibleRegion().isEmpty(), size)
+            line = labels[0].fontMetrics().lineSpacing()
+            for label in labels:
+                self.assertTrue(label.isVisibleTo(review), size)
+                self.assertLessEqual(label.x() + label.width(), pane.width(), size)  # inside the pane
+                self.assertLessEqual(label.height(), line + 4, size)  # one line, at any width
+                self.assertEqual(label.visibleRegion().boundingRect().height(), label.height(), size)  # whole, on screen
+                self.assertEqual(label.y(), labels[0].y(), size)  # the two stand on the same line
+                self.assertGreater(label.y(), table.geometry().bottom(), size)  # under the table
+                self.assertLess(label.geometry().bottom(), review.reset_row_button.y(), size)
+                self.assertEqual(label.elided, label.sizeHint().width() - 4 > label.width() - 2, size)  # cut only if it must
+                if label.elided:  # never cut silently, and never the only place of the statement
+                    self.assertIn("\u2026", label.text(), size)
+                self.assertTrue(label.toolTip() and label.accessibleName(), size)
+            self.assertLess(labels[0].geometry().right(), labels[1].x(), size)  # the candidate, then the pair
+            # the least height the line adds to the page: one line of text and one gap of the pane, at every width
+            with_line = pane.minimumSizeHint().height()
+            for label in labels:
+                label.setVisible(False)
+            self.app.processEvents()
+            without = pane.minimumSizeHint().height()
+            review._show_statements()
+            self.app.processEvents()
+            self.assertEqual(pane.minimumSizeHint().height(), with_line, size)
+            self.assertEqual(with_line - without, labels[0].sizeHint().height() + pane.layout().spacing(), size)
+            self.assertLessEqual(with_line - without, line + pane.layout().spacing() + 4, size)
+        wide = sum(label.sizeHint().width() for label in labels) + 420  # a window wide enough: nothing is cut
+        window.resize(wide, 768)
+        self.settle(0.3)
+        said = review.statements
+        for label, text in zip(labels, (said.candidate_short, said.pair_short)):
+            self.assertFalse(label.elided)
+            self.assertNotIn("\u2026", label.text())
+            self.assertEqual(label.full(), text)
+            lead, _colon, rest = text.partition(":")
+            self.assertEqual(label.text(), f"<b>{lead}:</b>{rest}")
+        self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0)
+
+    def test_a_manual_choice_adds_one_line_to_what_it_added_before(self):
+        """With a manual FE choice the page already scrolled in a small window before the statements (its own notes
+        appear). The statements add to that the height of their one line, and nothing sideways."""
+        window, panel = self.compared()
+        review, table = window.review, window.review.table
+        review._ask_duplicate = lambda _text: rp.KEEP
+        other = next(n for n, _t in review.state.options if n != review.state.selected(1))
+        self.assertTrue(review.select_mode(1, other))
+        self.wait(panel)
+        pane = table.parentWidget()
+        labels = (review.candidate_statement, review.pair_statement)
+        for size in SIZES:
+            window.resize(*size)
+            self.settle(0.3)
+            page = window.stack.currentWidget()
+            self.assertEqual(page.horizontalScrollBar().maximum(), 0, size)
+            self.assertEqual(table.horizontalScrollBar().maximum(), 0, size)
+            with_line = pane.minimumSizeHint().height()
+            for label in labels:
+                label.setVisible(False)
+            self.app.processEvents()
+            without = pane.minimumSizeHint().height()
+            review._show_statements()
+            self.app.processEvents()
+            self.assertEqual(with_line - without, labels[0].sizeHint().height() + pane.layout().spacing(), size)
+            self.assertTrue(review.hypothesis_label.isVisibleTo(review), size)  # the warning of the manual choice, whole
+            self.assertGreaterEqual(review.hypothesis_label.height(),
+                                    review.hypothesis_label.heightForWidth(review.hypothesis_label.width()), size)
 
 
 class ReportExportTests(_Flow):

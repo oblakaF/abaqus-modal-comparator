@@ -11,7 +11,7 @@ import threading
 from typing import Callable, Optional
 
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QCursor
+from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics
 from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMenu, QMessageBox,
                                QPushButton,
                                QScrollArea, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
@@ -100,6 +100,63 @@ class _TablePane(QWidget):
         super().resizeEvent(event)
         if event.size().width() != event.oldSize().width():
             self.updateGeometry()  # the splitter asks for the least height again
+
+
+class _OneLine(QLabel):
+    """PREVIEW-01-REVIEW-PAIR-CLARITY-01-F1: a statement that takes the height of one line at any width. Its bold lead and
+    its text never wrap and never widen the page. In a window too narrow for it the line ends in an ellipsis; the whole
+    statement is always in the tooltip and in the accessible name."""
+
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("hint")
+        self.setTextFormat(Qt.TextFormat.RichText)
+        self.setMinimumWidth(0)
+        self.lead, self.rest, self.elided = "", "", False
+
+    def say(self, lead: str, rest: str) -> None:
+        self.lead, self.rest = lead, rest
+        self.updateGeometry()
+        self._fit()
+
+    def full(self) -> str:
+        return f"{self.lead} {self.rest}".strip()
+
+    def _metrics(self) -> tuple:
+        """(metrics of the bold lead, metrics of the text after it), of the font the style sheet gave the line."""
+        self.ensurePolished()
+        bold = QFont(self.font())
+        bold.setBold(True)
+        return QFontMetrics(bold), QFontMetrics(self.font())
+
+    def _widths(self) -> tuple:
+        bold, plain = self._metrics()
+        return bold.horizontalAdvance(self.lead + " ") if self.lead else 0, plain.horizontalAdvance(self.rest)
+
+    def sizeHint(self) -> QSize:
+        return QSize(sum(self._widths()) + 4, self._metrics()[0].lineSpacing())
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(0, self._metrics()[0].lineSpacing())
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._fit()
+
+    def _fit(self) -> None:
+        full, room = self.full(), max(0, self.width() - 2)
+        bold, plain = self._metrics()
+        lead = self._widths()[0]
+        if sum(self._widths()) <= room:
+            shown = full
+        elif self.lead and lead >= room:  # not even the lead fits
+            shown = bold.elidedText(self.lead, Qt.TextElideMode.ElideRight, room)
+        else:
+            rest = plain.elidedText(self.rest, Qt.TextElideMode.ElideRight, room - lead)
+            shown = f"{self.lead} {rest}".strip()
+        self.elided = shown != full
+        cut = min(len(self.lead), len(shown))
+        self.setText(f"<b>{html.escape(shown[:cut])}</b>{html.escape(shown[cut:])}")
 
 
 def _scrolled(content: QWidget) -> QScrollArea:
@@ -238,13 +295,17 @@ class ReviewPanel(QWidget):
         self.table.itemSelectionChanged.connect(self._row_selected)
         inner.addWidget(self.table, 1)
         # PREVIEW-01-REVIEW-PAIR-CLARITY-01: of the selected record, the frequency candidate and the comparator's pair apart
-        self.candidate_statement = _label("", "hint")
-        self.pair_statement = _label("", "hint")
+        # F1: both on one line, so the page keeps the height it had; the full statements are the tooltips
+        self.candidate_statement, self.pair_statement = _OneLine(), _OneLine()
+        said = QHBoxLayout()
+        said.setSpacing(14)
         for label, name in ((self.candidate_statement, "Frequency-based FE candidate of the selected record"),
                             (self.pair_statement, "Comparator-assigned FE pair of the selected record")):
-            label.setTextFormat(Qt.TextFormat.RichText)
             label.setAccessibleDescription(name)
-            inner.addWidget(label)
+            label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)  # too narrow: both give way
+            said.addWidget(label)
+        said.addStretch(1)
+        inner.addLayout(said)
         row = QHBoxLayout()
         self.reset_row_button = QPushButton(RESET_ROW)
         self.reset_row_button.setObjectName("reviewResetRow")
@@ -497,19 +558,23 @@ class ReviewPanel(QWidget):
     def _show_statements(self) -> None:
         """The two statements of the selected row, from the shown or saved result; they follow every change of the row,
         of its FE choice and of the result. The lead of each is bold, so the two are told apart at a glance. They stand
-        under the table of a result that holds a comparison. Without one the status sentence above already says that
-        there are no mode pairs, and the page keeps its height (it fills a 900 x 700 window without scrolling)."""
+        on one line under the table of a result that holds a comparison (F1: two wrapped paragraphs pushed the shapes
+        out of a small window); the full statements, with the verdict as the comparison worded it, are the tooltips and
+        the accessible names. Without a comparison the status sentence above already says that there are no mode pairs,
+        and no line is added."""
         saved = self.analyze.snapshot is not None
         analysis = self.analyze.analysis
         said = rv.row_statements(analysis, self.state, self.current, saved)
         self.statements = said
         compared = self.state is not None and analysis is not None and analysis.comparison is not None
         texts = (rv.SELECT_A_ROW, "") if said is None else (said.candidate, said.pair)
-        for label, text in zip((self.candidate_statement, self.pair_statement), texts):
-            head, colon, rest = text.partition(":") if said is not None else ("", "", text)
-            label.setText(f"<b>{html.escape(head + colon)}</b>{html.escape(rest)}")
+        short = (rv.SELECT_A_ROW, "") if said is None else (said.candidate_short, said.pair_short)
+        for label, text, line in zip((self.candidate_statement, self.pair_statement), texts, short):
+            head, colon, rest = line.partition(":") if said is not None else ("", "", line)
+            label.say(head + colon, rest.strip())
             label.setAccessibleName(text)
-            label.setToolTip(said.detail if said is not None and label is self.pair_statement else "")
+            verdict = said.detail if said is not None and label is self.pair_statement else ""
+            label.setToolTip(text if not verdict or verdict in text else f"{text}\n{verdict}")
             label.setVisible(bool(text) and compared)
 
     def _selected_changed(self) -> None:
