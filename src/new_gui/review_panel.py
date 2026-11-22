@@ -6,6 +6,7 @@ placed here. The table's columns are fixed. A row's click shows that row's shape
 
 from __future__ import annotations
 
+import html
 import threading
 from typing import Callable, Optional
 
@@ -128,6 +129,7 @@ class ReviewPanel(QWidget):
         self._redraw.setInterval(120)
         self._redraw.timeout.connect(self._draw_plots)
         self.state: Optional[rv.ReviewState] = None
+        self.statements: Optional[rv.RowStatements] = None  # what is said of the selected row
         self.current: Optional[int] = None
         self.combos: list = []
         self.swap_buttons: list = []
@@ -235,6 +237,14 @@ class ReviewPanel(QWidget):
         header.setMinimumHeight(58)
         self.table.itemSelectionChanged.connect(self._row_selected)
         inner.addWidget(self.table, 1)
+        # PREVIEW-01-REVIEW-PAIR-CLARITY-01: of the selected record, the frequency candidate and the comparator's pair apart
+        self.candidate_statement = _label("", "hint")
+        self.pair_statement = _label("", "hint")
+        for label, name in ((self.candidate_statement, "Frequency-based FE candidate of the selected record"),
+                            (self.pair_statement, "Comparator-assigned FE pair of the selected record")):
+            label.setTextFormat(Qt.TextFormat.RichText)
+            label.setAccessibleDescription(name)
+            inner.addWidget(label)
         row = QHBoxLayout()
         self.reset_row_button = QPushButton(RESET_ROW)
         self.reset_row_button.setObjectName("reviewResetRow")
@@ -482,6 +492,25 @@ class ReviewPanel(QWidget):
     def _buttons(self) -> None:
         state, current = self.state, self.current
         self.reset_row_button.setEnabled(state is not None and current in state.manual)
+        self._show_statements()
+
+    def _show_statements(self) -> None:
+        """The two statements of the selected row, from the shown or saved result; they follow every change of the row,
+        of its FE choice and of the result. The lead of each is bold, so the two are told apart at a glance. They stand
+        under the table of a result that holds a comparison. Without one the status sentence above already says that
+        there are no mode pairs, and the page keeps its height (it fills a 900 x 700 window without scrolling)."""
+        saved = self.analyze.snapshot is not None
+        analysis = self.analyze.analysis
+        said = rv.row_statements(analysis, self.state, self.current, saved)
+        self.statements = said
+        compared = self.state is not None and analysis is not None and analysis.comparison is not None
+        texts = (rv.SELECT_A_ROW, "") if said is None else (said.candidate, said.pair)
+        for label, text in zip((self.candidate_statement, self.pair_statement), texts):
+            head, colon, rest = text.partition(":") if said is not None else ("", "", text)
+            label.setText(f"<b>{html.escape(head + colon)}</b>{html.escape(rest)}")
+            label.setAccessibleName(text)
+            label.setToolTip(said.detail if said is not None and label is self.pair_statement else "")
+            label.setVisible(bool(text) and compared)
 
     def _selected_changed(self) -> None:
         self._draw_plots()

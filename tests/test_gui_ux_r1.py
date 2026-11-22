@@ -141,6 +141,172 @@ class ReviewStateTests(unittest.TestCase):
         self.assertNotEqual(rv.difference_plot(state, 0), rv.difference_plot(state, 1))
 
 
+def _pair(index, fe, exp, mac, error, verdict):
+    """A pair row as ``comparison_model.comparison_view`` words it (15 cells, the verdict last)."""
+    from new_gui import comparison_model as cm
+
+    cells = (str(fe), f"{100.0 + fe:.4f}", f"EXP{exp}", str(exp), "100.0000", f"{error:+.2f}",
+             "MAC NOT COMPUTED (no shape)" if mac is None else f"{mac:.3f}", "Good match", "12", "1.00", "12", "kept", "—",
+             "not used", verdict)
+    return cm.PairRow(index, fe, exp, mac, error, cells)
+
+
+class _Compared(_Stub):
+    """An analysis as the SP-13 result reads: EXP 4 is nearest in frequency to FE 11 and paired with FE 10."""
+
+    registration_outcome = ""
+
+    def __init__(self, comparison=True, outcome="", experimental=()):
+        from new_gui import comparison_model as cm
+        from types import SimpleNamespace
+
+        fe = tuple((str(n), f"{100.0 + n:.4f}", "elastic") for n in (8, 9, 10, 11, 12))
+        self.verdicts = {
+            3: f"{cm.AMBIGUOUS_VERDICT}: paired with FE 8, MAC 0.528, error -10.09 %, but also admissible: FE 9.",
+            4: f"{cm.GROUP_VERDICT}: paired with FE 10, MAC 0.958, error -9.05 % (Good match) inside the close group "
+               f"FE 10 / 11; EXP 4 / 5. {cm.GROUP_UNRESOLVED}.",
+            6: f"{cm.REJECTED_VERDICT}: no FE mode passes the comparator's limits (highest MAC: FE 12, MAC 0.210).",
+            7: f"{cm.CONFIRMED_VERDICT}: FE 12, MAC 0.981, error -2.76 %; the only admissible FE mode (Excellent match).",
+            8: f"{cm.AMBIGUOUS_VERDICT}: paired with FE 9 by frequency only; the shape is not compared."}
+        nearest = tuple((f"EXP{i + 1}", str(exp), "100.0000", str(near), f"{100.0 + near:.4f}", "+1.00", "9", "109.0000",
+                         "+9.00", "—", self.verdicts[exp] if comparison else cm.INSUFFICIENT_TEXT)
+                        for i, (exp, near) in enumerate(((3, 8), (4, 11), (6, 12), (7, 12), (8, 9))))
+        super().__init__(nearest, fe, experimental)
+        self.registration_outcome = outcome
+        pairs = (_pair(0, 8, 3, 0.5278996171862161, -10.086449352786078, self.verdicts[3]),
+                 _pair(1, 10, 4, 0.9584584247911996, -9.054748027603976, self.verdicts[4]),
+                 _pair(2, 12, 7, 0.981, -2.76, self.verdicts[7]), _pair(3, 9, 8, None, 0.5, self.verdicts[8]))
+        self.comparison = SimpleNamespace(pair_rows=pairs) if comparison else None
+
+
+class PairClarityTests(unittest.TestCase):
+    """PREVIEW-01-REVIEW-PAIR-CLARITY-01: the frequency candidate and the comparator's pair of a record are said apart."""
+
+    def said(self, analysis, row, saved=False, manual=None):
+        state = rv.ReviewState(analysis)
+        if manual:
+            state.assign(row, manual, allow_duplicate=True)
+        return rv.row_statements(analysis, state, row, saved), state
+
+    def test_the_nearest_fe_candidate_and_the_assigned_pair_are_two_statements(self):
+        analysis = _Compared()
+        said, _state = self.said(analysis, 1)  # EXP 4: nearest in frequency FE 11, paired by the comparator with FE 10
+        self.assertTrue(said.candidate.startswith("Frequency-based FE candidate for EXP 4: FE 11 (111.0000 Hz, Δf +1.00 %)"))
+        self.assertIn("automatic nearest frequency", said.candidate)
+        self.assertIn("Not a mode pair.", said.candidate)
+        self.assertNotIn("FE 10", said.candidate)
+        self.assertTrue(said.pair.startswith("Comparator-assigned FE pair for EXP 4: FE 10 (110.0000 Hz, error -9.05 %, "
+                                             "MAC 0.958)."))
+        self.assertIn("Not the frequency-based candidate (FE 11).", said.pair)
+        self.assertEqual((said.pair_mode, said.differs), ("10", True))
+        same, _state = self.said(analysis, 0)  # EXP 3: the candidate and the pair are the same FE mode
+        self.assertEqual((same.pair_mode, same.differs), ("8", False))
+        self.assertNotIn("Not the frequency-based candidate", same.pair)
+
+    def test_group_level_ambiguous_and_confirmed_verdicts_stay_distinct(self):
+        from new_gui import comparison_model as cm
+
+        analysis = _Compared()
+        wanted = {0: (cm.AMBIGUOUS_VERDICT, "not a confirmed correspondence"),
+                  1: (cm.GROUP_VERDICT, "a group of close modes; the individual mode is not identified"),
+                  3: (cm.CONFIRMED_VERDICT, "confirmed for the registration used")}
+        for row, (word, gloss) in wanted.items():
+            said, _state = self.said(analysis, row)
+            self.assertEqual(said.verdict, word)
+            self.assertIn(f"Verdict: {word} ({gloss}", said.pair)
+            for other, _gloss in wanted.values():
+                if other != word:
+                    self.assertNotIn(other, said.pair, row)
+            self.assertEqual(said.detail, analysis.verdicts[int(analysis.nearest_rows[row][1])])  # the verdict as worded
+        self.assertNotIn("confirmed for the registration", self.said(analysis, 1)[0].pair)
+        self.assertNotIn("confirmed for the registration", self.said(analysis, 0)[0].pair)
+        unscored, _state = self.said(analysis, 4)  # a pair without a MAC says so in the comparison's own words
+        self.assertIn("MAC NOT COMPUTED (no shape)).", unscored.pair)
+        self.assertNotIn("MAC MAC", unscored.pair)
+
+    def test_a_record_without_a_pair_says_that_no_pair_was_assigned(self):
+        from new_gui import comparison_model as cm
+
+        said, _state = self.said(_Compared(), 2)  # EXP 6: nearest FE 12, which the comparator gave to EXP 7
+        self.assertTrue(said.pair.startswith("Comparator-assigned FE pair for EXP 6: none. The comparator assigned no FE "
+                                             "mode to this record."))
+        self.assertIn(f"Verdict: {cm.REJECTED_VERDICT}", said.pair)
+        self.assertIsNone(said.pair_mode)
+        self.assertFalse(said.differs)
+        self.assertNotIn("FE 12", said.pair)  # the candidate's FE mode is not offered as a pair
+        self.assertIn("FE 12", said.candidate)
+
+    def test_without_a_registration_no_pair_is_shown(self):
+        from new_gui import analyze_model as analyze
+
+        cases = ((_Compared(False), rv.NO_PAIR_REASONS[rv.STATUS_UNREGISTERED]),
+                 (_Compared(False, "failed"), rv.NO_PAIR_REASONS[rv.STATUS_FAILED]),
+                 (_Compared(False, analyze.PROVISIONAL, (("EXP1", "3", "100.0", sm.PROVISIONAL_TEXT),)),
+                  rv.NO_PAIR_REASONS[rv.STATUS_FRF_PEAKS]))
+        for analysis, reason in cases:
+            for row in range(len(analysis.nearest_rows)):
+                said, _state = self.said(analysis, row)
+                exp = analysis.nearest_rows[row][1]
+                self.assertEqual(said.pair, f"Comparator-assigned FE pair for EXP {exp}: not available. {reason}")
+                self.assertIsNone(said.pair_mode)
+                self.assertEqual((said.verdict, said.detail, said.differs), ("", "", False))
+                self.assertNotIn("FE ", said.pair.split(":", 1)[1])  # no FE mode is named as a pair
+                self.assertTrue(said.candidate.startswith(f"Frequency-based FE candidate for EXP {exp}: FE "))
+
+    def test_a_manual_candidate_does_not_change_the_comparator_pair(self):
+        analysis = _Compared()
+        pairs = analysis.comparison.pair_rows
+        automatic, _state = self.said(analysis, 1)
+        manual, state = self.said(analysis, 1, manual="9")
+        self.assertIn("FE 9 (109.0000 Hz, Δf +9.00 %), your manual choice (USER_REVIEW_HYPOTHESIS)", manual.candidate)
+        self.assertIn("automatic nearest: FE 11", manual.candidate)
+        self.assertIn("it changes no comparator pair", manual.candidate)
+        self.assertEqual((manual.pair_mode, manual.verdict, manual.detail),
+                         (automatic.pair_mode, automatic.verdict, automatic.detail))
+        self.assertEqual(manual.pair.replace("(FE 9)", "(FE 11)"), automatic.pair)  # only the candidate it names differs
+        chosen, state = self.said(analysis, 1, manual="10")  # choosing the paired mode by hand: still two statements
+        self.assertFalse(chosen.differs)
+        self.assertIn("your manual choice", chosen.candidate)
+        state.reset(1)
+        self.assertEqual(rv.row_statements(analysis, state, 1), automatic)
+        self.assertIs(analysis.comparison.pair_rows, pairs)
+        self.assertEqual([(p.abaqus_mode, p.experimental_mode, p.mac) for p in pairs],
+                         [(8, 3, 0.5278996171862161), (10, 4, 0.9584584247911996), (12, 7, 0.981), (9, 8, None)])
+
+    def test_a_stored_comparison_is_told_from_a_fresh_one(self):
+        analysis = _Compared()
+        for row in range(len(analysis.nearest_rows)):
+            fresh, _state = self.said(analysis, row)
+            stored, _state = self.said(analysis, row, saved=True)
+            self.assertTrue(fresh.pair.endswith(rv.FRESH_ORIGIN))
+            self.assertTrue(stored.pair.endswith(rv.STORED_ORIGIN))
+            self.assertEqual(stored.pair[:-len(rv.STORED_ORIGIN)], fresh.pair[:-len(rv.FRESH_ORIGIN)])
+            self.assertEqual(stored.candidate, fresh.candidate)
+        self.assertIn("source files were not read in this session", rv.STORED_ORIGIN)
+        without, _state = self.said(_Compared(False), 0, saved=True)
+        self.assertTrue(without.pair.endswith(rv.STORED_NO_COMPARISON))
+        self.assertIn("not available", without.pair)
+
+    def test_no_row_no_result_and_an_older_saved_result_are_handled(self):
+        analysis = _Compared()
+        state = rv.ReviewState(analysis)
+        for index in (None, -1, len(state)):
+            self.assertIsNone(rv.row_statements(analysis, state, index))
+        self.assertIsNone(rv.row_statements(None, state, 0))
+        self.assertIsNone(rv.row_statements(analysis, None, 0))
+        analysis.nearest_rows = tuple(row[:10] for row in analysis.nearest_rows)  # saved before the verdicts were kept
+        analysis.comparison.pair_rows = tuple(rp_row.__class__(rp_row.index, rp_row.abaqus_mode, rp_row.experimental_mode,
+                                                               rp_row.mac, rp_row.frequency_error_percent, rp_row.cells[:14])
+                                              for rp_row in analysis.comparison.pair_rows)
+        old = rv.ReviewState(analysis)
+        self.assertIn(f"FE 10 (110.0000 Hz, error -9.05 %, MAC 0.958). {rv.NO_VERDICT}", rv.row_statements(analysis, old, 1).pair)
+        self.assertIn(f"none. The comparator assigned no FE mode to this record. {rv.NO_VERDICT}",
+                      rv.row_statements(analysis, old, 2).pair)
+        for text in (rv.SELECT_A_ROW, rv.FRESH_ORIGIN, rv.STORED_ORIGIN, rv.STORED_NO_COMPARISON, rv.NO_VERDICT,
+                     *rv.NO_PAIR_REASONS.values(), *rv.VERDICT_GLOSS.values()):
+            self.assertTrue(text.isascii(), text)  # English only
+
+
 class FrfTests(unittest.TestCase):
     def test_no_frf_data_gives_no_curve(self):
         dataset = ModalDataset("EXP", Path("x.unv"), [], metadata={"mode_source": "dataset 55"})

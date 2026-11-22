@@ -17,6 +17,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 
+from new_gui import comparison_model as cm
 from new_gui import shape_model as sm
 
 USER_HYPOTHESIS = "USER_REVIEW_HYPOTHESIS"
@@ -205,6 +206,94 @@ def status_sentence(analysis, confirmed: bool) -> str:
 
 def table_title(analysis) -> str:
     return PAIRED_TITLE if analysis is not None and analysis.comparison is not None else UNVERIFIED_TITLE
+
+
+# PREVIEW-01-REVIEW-PAIR-CLARITY-01: the selected record's frequency candidate and its comparator pair, said apart
+CANDIDATE_LEAD, PAIR_LEAD = "Frequency-based FE candidate", "Comparator-assigned FE pair"
+SELECT_A_ROW = "Select a table row to see its frequency-based FE candidate and its comparator-assigned FE pair."
+CANDIDATE_LIMIT = "Not a mode pair."
+MANUAL_LIMIT = "Not a mode pair; it changes no comparator pair."
+NO_PAIR = "none. The comparator assigned no FE mode to this record."
+PAIR_UNAVAILABLE = "not available."
+FRESH_ORIGIN = "Fresh result: computed from the source files in this session."
+STORED_ORIGIN = "Stored comparison: the source files were not read in this session."
+STORED_NO_COMPARISON = "Stored result: the source files were not read in this session."
+NO_PAIR_REASONS = {  # by status_sentence: why no pair can be shown; none is ever made up from the frequency table
+    STATUS_UNREGISTERED: "No physical registration applies, so no pair was assigned and no MAC was computed.",
+    STATUS_FRF_PEAKS: "FRF peak records are not fitted modes, so no pair was assigned and no MAC was computed.",
+    STATUS_FAILED: "The registration check failed, so no pair was assigned and no MAC was computed."}
+VERDICT_GLOSS = {
+    cm.CONFIRMED_VERDICT: "confirmed for the registration used",
+    cm.GROUP_VERDICT: "a group of close modes; the individual mode is not identified",
+    cm.AMBIGUOUS_VERDICT: "not a confirmed correspondence",
+    cm.REJECTED_VERDICT: "no FE mode passes the comparator's limits"}
+NO_VERDICT = "Verdict: not stored with this result."
+
+
+@dataclass(frozen=True)
+class RowStatements:
+    """What the page says of the selected record: ``candidate`` is the frequency table's row (automatic or manual),
+    ``pair`` the comparator's own pair of that record, or that there is none. ``pair_mode`` is the paired FE mode or
+    None; ``verdict`` the comparator's verdict word; ``detail`` its full sentence as computed or saved."""
+
+    candidate: str
+    pair: str
+    pair_mode: Optional[str] = None
+    verdict: str = ""
+    detail: str = ""
+    differs: bool = False  # the paired FE mode is not the candidate's
+
+
+def _verdict_words(text: str) -> tuple:
+    """(verdict word, sentence for the page) of a verdict text as the comparison worded it; nothing is judged here."""
+    text = str(text or "").strip()
+    word = text.split(":")[0].strip()
+    if word in VERDICT_GLOSS:
+        return word, f"Verdict: {word} ({VERDICT_GLOSS[word]})."
+    if not text or text == _DASH:
+        return "", NO_VERDICT
+    return word, f"Verdict: {word}."
+
+
+def row_statements(analysis, state: Optional[ReviewState], index: Optional[int], saved: bool = False) -> Optional[RowStatements]:
+    """The two statements of one table row, from the analysis as shown or saved. The pair is read from the comparison's
+    own pair rows by the record's EXP mode; nothing is paired, re-ranked or computed here, and a manual candidate never
+    reaches the pair. Without a comparison no pair is stated."""
+    if analysis is None or state is None or index is None or not 0 <= index < len(state):
+        return None
+    row = state.row(index)
+    if row.selected_mode in state.fe_hz:
+        chosen = f"FE {row.selected_mode} ({row.selected_text} Hz, Δf {row.difference_text} %)"
+        if row.manual:
+            candidate = (f"{chosen}, your manual choice ({USER_HYPOTHESIS}); automatic nearest: FE {row.nearest_mode}. "
+                         f"{MANUAL_LIMIT}")
+        else:
+            candidate = f"{chosen}, automatic nearest frequency. {CANDIDATE_LIMIT}"
+    else:
+        candidate = "none: no elastic FE mode is selected for this record."
+    candidate = f"{CANDIDATE_LEAD} for EXP {row.exp_mode}: {candidate}"
+    lead = f"{PAIR_LEAD} for EXP {row.exp_mode}: "
+    view = analysis.comparison
+    if view is None:
+        reason = NO_PAIR_REASONS.get(status_sentence(analysis, False), NO_PAIR_REASONS[STATUS_UNREGISTERED])
+        origin = f" {STORED_NO_COMPARISON}" if saved else ""
+        return RowStatements(candidate, f"{lead}{PAIR_UNAVAILABLE} {reason}{origin}")
+    origin = STORED_ORIGIN if saved else FRESH_ORIGIN
+    source = state.nearest[index]
+    pair = next((p for p in view.pair_rows if str(p.experimental_mode) == str(row.exp_mode).strip()), None)
+    if pair is None:
+        detail = str(source[10]) if len(source) > 10 else ""
+        word, verdict = _verdict_words(detail)
+        return RowStatements(candidate, f"{lead}{NO_PAIR} {verdict} {origin}", None, word, detail)
+    cells = pair.cells
+    detail = str(cells[14]) if len(cells) > 14 else (str(source[10]) if len(source) > 10 else "")
+    word, verdict = _verdict_words(detail)
+    mode = str(pair.abaqus_mode)
+    differs = mode != row.selected_mode
+    note = f" Not the frequency-based candidate (FE {row.selected_mode})." if differs else ""
+    mac = f"MAC {cells[6]}" if pair.mac is not None else str(cells[6])  # a MAC not computed says so in its own words
+    return RowStatements(candidate, f"{lead}FE {mode} ({cells[1]} Hz, error {cells[5]} %, {mac}). {verdict}{note} "
+                                    f"{origin}", mode, word, detail, differs)
 
 
 # ---------------------------------------------------------------------------------------------- plots
@@ -546,4 +635,4 @@ def mac_plot(view) -> bytes:
 __all__ = ["DuplicateSelection", "FRF_NEEDS_SOURCE", "FRF_NOT_IN_FILE", "HEADERS", "LIMIT_TEXT", "PROVISIONAL_EXPLANATION",
            "ReviewRow", "ReviewState", "SAVED_PLOTS_TEXT", "SESSION_ONLY_TEXT", "TITLE", "USER_HYPOTHESIS", "difference_plot",
            "frequency_plot", "frf_plot", "frf_series", "mac_plot", "Chart", "frequency_chart", "difference_chart",
-           "frf_chart", "rows_at", "CONFLICT_TEXT", "MANUAL_TINT_TEXT", "DETAIL_LIMIT"]
+           "frf_chart", "rows_at", "CONFLICT_TEXT", "MANUAL_TINT_TEXT", "DETAIL_LIMIT", "RowStatements", "row_statements"]

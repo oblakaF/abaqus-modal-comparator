@@ -209,6 +209,190 @@ class ReviewTableTests(_Flow):
         self.assertFalse(review.colour_legend.isVisible())
 
 
+class PairStatementTests(_Flow):
+    """PREVIEW-01-REVIEW-PAIR-CLARITY-01: under the table, the selected record's frequency candidate and its comparator
+    pair are two statements that follow the row, the FE choice, a reset and an opened project."""
+
+    def compared(self):
+        window, panel = self.analysed()
+        self.confirmed(panel)
+        self.compare(panel)
+        self.wait(panel)
+        return window, panel
+
+    def pair_of(self, panel, review, row):
+        mode = review.state.row(row).exp_mode
+        return next((p for p in panel.analysis.comparison.pair_rows if str(p.experimental_mode) == mode), None)
+
+    def test_without_a_registration_no_pair_is_shown_and_the_page_keeps_its_height(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        self.assertIsNone(panel.analysis.comparison)
+        for row in range(review.table.rowCount()):
+            review.select_row(row)
+            self.wait(panel)
+            shown = review.state.row(row)
+            self.assertEqual(review.candidate_statement.accessibleName(), review.statements.candidate)
+            self.assertIn(f"Frequency-based FE candidate for EXP {shown.exp_mode}: FE {shown.selected_mode} ",
+                          review.statements.candidate)
+            self.assertEqual(review.pair_statement.accessibleName(),
+                             f"Comparator-assigned FE pair for EXP {shown.exp_mode}: not available. "
+                             f"{rv.NO_PAIR_REASONS[rv.STATUS_UNREGISTERED]}")
+            self.assertIsNone(review.statements.pair_mode)
+            # no line is added under the table: the status sentence above already says that there are no pairs
+            self.assertTrue(review.candidate_statement.isHidden() and review.pair_statement.isHidden())
+        self.assertEqual(review.status_sentence.text(), rv.STATUS_UNREGISTERED)
+        self.assertIn("no mode pairs and no MAC", review.status_sentence.text())
+        self.assertFalse(review.status_sentence.visibleRegion().isEmpty())
+        window.resize(900, 700)
+        self.settle(0.3)
+        self.assertEqual(window.stack.currentWidget().verticalScrollBar().maximum(), 0)  # as before this change
+
+    def test_the_pair_is_the_comparators_own_and_a_manual_candidate_does_not_change_it(self):
+        window, panel = self.compared()
+        review = window.review
+        analysis, view = panel.analysis, panel.analysis.comparison
+        pairs = tuple(view.pair_rows)
+        self.assertTrue(pairs)
+        for row in range(review.table.rowCount()):
+            review.select_row(row)
+            self.wait(panel)
+            pair, said = self.pair_of(panel, review, row), review.statements
+            self.assertEqual(review.current, row)
+            self.assertEqual(said, rv.row_statements(analysis, review.state, row, False))
+            self.assertEqual(review.pair_statement.accessibleName(), said.pair)
+            if pair is None:
+                self.assertIn(": none. The comparator assigned no FE mode to this record.", said.pair)
+                self.assertIsNone(said.pair_mode)
+            else:
+                self.assertIn(f": FE {pair.abaqus_mode} ({pair.cells[1]} Hz, error {pair.cells[5]} %, MAC {pair.cells[6]}).",
+                              said.pair)
+                self.assertEqual(review.pair_statement.toolTip(), pair.cells[14])  # the verdict as the comparison worded it
+                self.assertIn(pair.cells[14].split(":")[0], said.pair)
+            self.assertTrue(said.pair.endswith(rv.FRESH_ORIGIN))
+            self.assertTrue(review.candidate_statement.isVisibleTo(review) and review.pair_statement.isVisibleTo(review))
+        self.assertIn("<b>Comparator-assigned FE pair for EXP", review.pair_statement.text())  # the leads are set apart
+        self.assertIn("<b>Frequency-based FE candidate for EXP", review.candidate_statement.text())
+        row = next(r for r in range(review.table.rowCount()) if self.pair_of(panel, review, r) is not None)
+        review.select_row(row)
+        self.wait(panel)
+        before = review.statements
+        self.assertFalse(before.differs)  # in this synthetic plate the nearest FE mode is the paired one
+        review._ask_duplicate = lambda _text: rp.KEEP
+        other = next(n for n, _t in review.state.options if n != review.state.selected(row))
+        self.assertTrue(review.select_mode(row, other))
+        self.wait(panel)
+        after = review.statements
+        self.assertIn(f"FE {other} ", after.candidate)
+        self.assertIn("your manual choice (USER_REVIEW_HYPOTHESIS)", review.candidate_statement.accessibleName())
+        self.assertEqual((after.pair_mode, after.verdict, after.detail), (before.pair_mode, before.verdict, before.detail))
+        self.assertTrue(after.differs)
+        self.assertIn(f"Not the frequency-based candidate (FE {other}).", review.pair_statement.accessibleName())
+        self.assertIs(panel.analysis, analysis)  # the analysis, its pairs and its MAC are untouched
+        self.assertEqual(tuple(panel.analysis.comparison.pair_rows), pairs)
+        self.assertTrue(review.reset_row())
+        self.wait(panel)
+        self.assertEqual(review.statements, before)
+        self.assertEqual(review.pair_statement.accessibleName(), before.pair)
+        self.assertTrue(review.select_mode(row, other))
+        self.assertTrue(review.reset_all())
+        self.assertEqual(review.statements, before)
+
+    def test_a_reopened_project_states_its_stored_comparison(self):
+        window, panel = self.compared()
+        review = window.review
+        fresh = {}
+        for row in range(review.table.rowCount()):
+            review.select_row(row)
+            self.wait(panel)
+            fresh[row] = review.statements
+        self.saved(panel)
+        second, again = self.reopened()
+        stored = second.review
+        self.assertIsNotNone(again.snapshot)
+        self.assertIsNotNone(stored.current)  # the row of the pair on show is selected, and its statements are said
+        self.assertEqual(stored.statements, rv.row_statements(again.analysis, stored.state, stored.current, True))
+        for row, live in fresh.items():
+            stored.select_row(row)
+            self.wait(again)
+            said = stored.statements
+            self.assertEqual(said.candidate, live.candidate)
+            self.assertEqual((said.pair_mode, said.verdict, said.detail), (live.pair_mode, live.verdict, live.detail))
+            self.assertTrue(said.pair.endswith(rv.STORED_ORIGIN))
+            self.assertEqual(said.pair[:-len(rv.STORED_ORIGIN)], live.pair[:-len(rv.FRESH_ORIGIN)])
+            self.assertEqual(stored.pair_statement.accessibleName(), said.pair)
+        self.assertEqual(again.analysis.comparison.pair_rows, panel.analysis.comparison.pair_rows)
+
+    def test_a_reopened_frequency_only_project_shows_no_pair(self):
+        _window, panel = self.analysed()
+        self.wait(panel)
+        self.saved(panel)
+        second, again = self.reopened()
+        review = second.review
+        review.select_row(1)
+        self.wait(again)
+        self.assertIn("not available.", review.pair_statement.accessibleName())
+        self.assertTrue(review.pair_statement.accessibleName().endswith(rv.STORED_NO_COMPARISON))
+        self.assertIsNone(review.statements.pair_mode)
+        self.assertTrue(review.pair_statement.isHidden())
+        self.assertEqual(review.status_sentence.text(), rv.STATUS_UNREGISTERED)
+
+    def test_a_new_result_starts_without_a_stale_statement(self):
+        window, panel = self.analysed()
+        self.wait(panel)
+        review = window.review
+        review.select_row(2)
+        self.wait(panel)
+        self.assertIn("not available", review.pair_statement.accessibleName())
+        self.assertTrue(review.pair_statement.isHidden())
+        self.confirmed(panel)
+        self.compare(panel)
+        self.wait(panel)
+        self.assertEqual(review.statements, rv.row_statements(panel.analysis, review.state, review.current, False))
+        self.assertNotIn("not available", review.pair_statement.accessibleName())
+        self.assertTrue(review.pair_statement.isVisibleTo(review))
+        review.state = None  # no result: nothing is said
+        review.current = None
+        review._show_statements()
+        self.assertIsNone(review.statements)
+        self.assertTrue(review.candidate_statement.isHidden() and review.pair_statement.isHidden())
+
+    def test_both_statements_fit_the_two_window_sizes(self):
+        window, panel = self.compared()
+        review, table = window.review, window.review.table
+        row = next(r for r in range(table.rowCount()) if self.pair_of(panel, review, r) is not None)
+        review.select_row(row)
+        self.wait(panel)
+        rows = min(table.rowCount(), rp.ROWS_IN_VIEW)
+        for size in ((1366, 768), (900, 680)):
+            window.resize(*size)
+            self.settle(0.3)
+            page = window.stack.currentWidget()
+            if size == (1366, 768):
+                self.assertEqual(page.verticalScrollBar().maximum(), 0, size)  # the page fills the window
+            else:  # the small window: the two statements are reached by a short scroll of the page, never sideways
+                self.assertLessEqual(page.verticalScrollBar().maximum(), 130, size)
+                page.ensureWidgetVisible(review.pair_statement, 0, 8)
+                self.settle(0.2)
+            self.assertEqual(page.horizontalScrollBar().maximum(), 0, size)  # no sideways scrolling of the page
+            self.assertEqual(table.horizontalScrollBar().maximum(), 0, size)  # nor of the table
+            pane = table.parentWidget()
+            for label in (review.candidate_statement, review.pair_statement):
+                self.assertTrue(label.isVisibleTo(review), size)
+                self.assertLessEqual(label.x() + label.width(), pane.width(), size)  # wrapped inside the pane
+                self.assertGreaterEqual(label.height(), label.heightForWidth(label.width()), size)  # every line of it
+                self.assertEqual(label.visibleRegion().boundingRect().height(), label.height(), size)  # whole, on screen
+            self.assertLess(table.geometry().bottom(), review.candidate_statement.y(), size)
+            self.assertLess(review.candidate_statement.geometry().bottom(), review.pair_statement.y(), size)
+            if size == (1366, 768):
+                self.assertGreaterEqual(ReviewTableTests.whole_rows_on_screen(self, window), rows, size)
+                self.assertFalse(review.selection_label.visibleRegion().isEmpty(), size)  # the chosen row's shapes too
+            page.verticalScrollBar().setValue(0)
+            self.settle(0.2)
+            self.assertGreaterEqual(ReviewTableTests.whole_rows_on_screen(self, window), rows, size)  # the rows, unscrolled
+
+
 class ReportExportTests(_Flow):
     """ABM-PLATE-EXPORT-1: the existing diagnostic report, exported from the Review page."""
 
