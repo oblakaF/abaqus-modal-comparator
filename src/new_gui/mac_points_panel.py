@@ -20,6 +20,12 @@ from new_gui.diagnostic_panel import DiagnosticTable
 from new_gui.shape_panel import ImageActions, ImageView, _combo, _label
 
 TAB_POINTS, TAB_PROVENANCE, TAB_PROFILE = "Registered points", "Mapping diagnostics", "Line profile"
+# PREVIEW-01-MAC-TRIAL-SEPARATION-01: beside a comparison with mode pairs the exploratory card is closed until it is opened
+TRIAL_SEPARATE = ("Exploratory only, closed by default. Trial MAC is independent of the registered comparison above: it uses "
+                  "and changes none of its pairs, MAC values or verdicts, and it does not establish a physical registration.")
+TRIAL_SHOW, TRIAL_HIDE = "Show exploratory Trial MAC", "Hide exploratory Trial MAC"
+TRIAL_TOGGLE_TIP = TRIAL_SEPARATE + " Opening the section starts no calculation."
+_NOT_SEEN = object()
 
 
 class _BoundedTable(DiagnosticTable):
@@ -69,6 +75,23 @@ class TrialMacCard(QFrame):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(8)
         layout.addWidget(_label(mp.TRIAL_TITLE, "sectionTitle"))
+        self._seen = _NOT_SEEN  # the analysis the open or closed state belongs to
+        self.separate = _label(TRIAL_SEPARATE, "hint")
+        layout.addWidget(self.separate)
+        self.toggle = QPushButton(TRIAL_SHOW)
+        self.toggle.setObjectName("trialMacToggle")
+        self.toggle.setCheckable(True)
+        self.toggle.setToolTip(TRIAL_TOGGLE_TIP)
+        self.toggle.toggled.connect(lambda _checked: self._buttons())  # shows or hides only: it starts nothing
+        row = QHBoxLayout()
+        row.addWidget(self.toggle)
+        row.addStretch(1)
+        layout.addLayout(row)
+        self.body = QWidget()
+        outer, layout = layout, QVBoxLayout(self.body)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        outer.addWidget(self.body)
         layout.addWidget(self._badge())
         layout.addWidget(_label(mp.TRIAL_NOTE, "hint"))
         row = QHBoxLayout()
@@ -153,12 +176,25 @@ class TrialMacCard(QFrame):
     def _same(self, key) -> bool:
         return key is not None and self._key is not None and key[0] is self._key[0] and key[1:] == self._key[1:]
 
+    def registered(self) -> bool:
+        """A comparison with mode pairs is shown: the card must not read as that comparison's status."""
+        view = getattr(self.analyze.analysis, "comparison", None)
+        return view is not None and bool(view.pair_rows)
+
+    def is_open(self) -> bool:
+        return not self.registered() or self.toggle.isChecked()
+
     def sync(self) -> None:
         """After any change of the result shown: values of other data, or of no data read here, are removed."""
         stale = self._key is not None and not self._same(self._current_key())
         if stale:
             self._stop()
             self._clear()
+        if self.analyze.analysis is not self._seen:  # another result: closed again, unless a trial of these data still runs
+            self._seen = self.analyze.analysis
+            self.toggle.blockSignals(True)
+            self.toggle.setChecked(self._cancel is not None)
+            self.toggle.blockSignals(False)
         problem = self.problem()
         if problem or stale or self._key is None:
             self.status.setText(problem or (mp.TRIAL_STALE if stale else ""))
@@ -172,6 +208,13 @@ class TrialMacCard(QFrame):
         self.run_button.setEnabled(self.run_button.isEnabled() and not exporting)
         self.export_button.setEnabled(self.run_result is not None and not running and not exporting
                                       and self._same(self._current_key()))
+        registered = self.registered()
+        self.separate.setVisible(registered)
+        self.toggle.setVisible(registered)
+        self.toggle.setText(TRIAL_HIDE if self.toggle.isChecked() else TRIAL_SHOW)
+        self.toggle.setAccessibleName(self.toggle.text())
+        self.toggle.setEnabled(not running and not exporting)  # Cancel stays in view while a trial runs
+        self.body.setVisible(self.is_open())
         self.results.setVisible(self.run_result is not None)
         self.status.setVisible(bool(self.status.text()))
         self.export_status.setVisible(bool(self.export_status.text()))

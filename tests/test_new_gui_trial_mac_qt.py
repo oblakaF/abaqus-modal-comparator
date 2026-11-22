@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import gc
 import io
 import json
 import threading
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import QLabel
 
 from new_gui import analyze_model as am
 from new_gui import mac_points_model as mp
+from new_gui import mac_points_panel as panel_module
 from new_gui import production_window as pw
 from new_gui.workspace_state import EXPERIMENTAL, FE
 from services import analysis_project as ap
@@ -570,6 +572,236 @@ class ExportTests(_Flow):
             window.resize(*size)
             self.app.processEvents()
             self.assertEqual(window.stack.currentWidget().horizontalScrollBar().maximum(), 0, size)
+
+
+class SeparationTests(r2._Project):
+    """PREVIEW-01-MAC-TRIAL-SEPARATION-01: beside a comparison with mode pairs the exploratory card is closed until it is
+    opened on purpose, so its label is not read as the status of the registered comparison."""
+
+    SIZES = ((900, 680), (1366, 768), (1600, 900))
+
+    def setUp(self):
+        # the windows of earlier tests are freed here, in the GUI thread: a collection that starts inside a drawing
+        # thread would destroy their widgets there
+        gc.collect()
+        super().setUp()
+        self.addCleanup(gc.collect)
+
+    def compared(self):
+        window, panel = self.analysed()
+        self.confirmed(panel)
+        self.compare(panel)
+        self.wait(panel)
+        self.assertEqual(panel.analysis.status, am.CONFIRMED_COMPARISON)
+        window.show_page(pw.MAC_PAGE)
+        self.app.processEvents()
+        return window, panel, window.mac_points.trial
+
+    def labels(self, card) -> list:
+        return [label for label in card.findChildren(QLabel) if label.text() == mp.TRIAL_LABEL]
+
+    def registered(self, window, panel) -> dict:
+        mac = window.mac_points
+        return {"pairs": cells(panel.tables["pairs"]), "mac": cells(panel.tables["mac"]),
+                "evidence": cells(mac.evidence_table), "coverage": cells(mac.coverage_table),
+                "tabs": [panel.comparison_tabs.tabText(i) for i in range(panel.comparison_tabs.count())],
+                "status": panel.analysis.status, "answers": mac.readiness_answers(),
+                "result": panel.analysis.comparison_result, "view": panel.analysis.comparison}
+
+    def test_beside_a_registered_comparison_the_card_is_closed_at_first(self):
+        window, panel, card = self.compared()
+        self.assertTrue(card.registered())
+        self.assertFalse(card.is_open())
+        self.assertTrue(card.toggle.isVisible())
+        self.assertFalse(card.toggle.isChecked())
+        self.assertEqual(card.toggle.text(), panel_module.TRIAL_SHOW)
+        self.assertEqual(card.toggle.accessibleName(), panel_module.TRIAL_SHOW)
+        self.assertTrue(card.separate.isVisible())
+        for words in ("independent of the registered comparison", "does not establish a physical registration"):
+            self.assertIn(words, card.separate.text())
+            self.assertIn(words, card.toggle.toolTip())
+        self.assertIn("starts no calculation", card.toggle.toolTip())
+        self.assertTrue(self.labels(card))
+        self.assertFalse(any(label.isVisible() for label in self.labels(card)))  # the label is not beside the pairs
+        self.assertFalse(card.run_button.isVisible())
+        self.assertTrue(panel.tables["pairs"].isVisible())
+        self.assertTrue(window.mac_points.badge.isHidden())  # the registered comparison's own state: MAC is available
+
+    def test_opening_and_closing_start_nothing_and_change_nothing_registered(self):
+        window, panel, card = self.compared()
+        before, token = self.registered(window, panel), card.token
+        with mock.patch.object(mp, "run_trial", side_effect=AssertionError("opening starts no trial")), \
+                mock.patch.object(tp, "run_trials", side_effect=AssertionError("opening starts no trial")):
+            card.toggle.click()
+            self.app.processEvents()
+            self.assertTrue(card.is_open())
+            self.assertEqual(card.toggle.text(), panel_module.TRIAL_HIDE)
+            self.assertTrue(self.labels(card)[0].isVisible())  # the warning, whole and unchanged, when open
+            self.assertEqual(self.labels(card)[0].text(), tp.LABEL)
+            self.assertTrue(card.run_button.isVisible() and card.run_button.isEnabled())
+            self.assertTrue(card.separate.isVisible())
+            self.assertEqual((card.token, card._cancel, card.run_result, card.busy()), (token, None, None, False))
+            opened = self.registered(window, panel)
+            card.toggle.click()
+            self.app.processEvents()
+        self.assertFalse(card.is_open())
+        self.assertFalse(card.run_button.isVisible())
+        self.assertEqual(card.token, token)
+        closed = self.registered(window, panel)
+        for name, value in before.items():
+            if name in ("result", "view"):
+                self.assertIs(opened[name], value)
+                self.assertIs(closed[name], value)
+            else:
+                self.assertEqual(opened[name], value, name)
+                self.assertEqual(closed[name], value, name)
+
+    def test_without_a_registered_comparison_the_card_is_as_it_was(self):
+        window, panel = self.analysed()
+        window.show_page(pw.MAC_PAGE)
+        self.app.processEvents()
+        card = window.mac_points.trial
+        self.assertFalse(card.registered())
+        self.assertTrue(card.is_open())
+        self.assertFalse(card.toggle.isVisible())
+        self.assertFalse(card.separate.isVisible())
+        self.assertTrue(self.labels(card)[0].isVisible())
+        self.assertTrue(card.run_button.isVisible() and card.run_button.isEnabled())
+        self.assertIsNone(panel.analysis.comparison)
+
+    def test_a_saved_comparison_is_closed_and_cannot_run_the_trial_when_opened(self):
+        window, panel, _card = self.compared()
+        stored = cells(panel.tables["pairs"])
+        self.saved(panel)
+        window, again = self.reopened()
+        window.show_page(pw.MAC_PAGE)
+        self.app.processEvents()
+        card = window.mac_points.trial
+        self.assertIsNotNone(again.snapshot)
+        self.assertTrue(card.registered())
+        self.assertFalse(card.is_open())
+        with mock.patch.object(mp, "run_trial", side_effect=AssertionError("no trial on a saved result")), \
+                mock.patch.object(tp, "run_trials", side_effect=AssertionError("no trial on a saved result")):
+            card.toggle.click()
+            self.app.processEvents()
+            self.assertTrue(card.is_open())
+            self.assertFalse(card.run_button.isEnabled())
+            self.assertFalse(card.export_button.isEnabled())
+            self.assertEqual(card.status.text(), mp.TRIAL_NEEDS_SOURCE)
+            self.assertTrue(card.status.isVisible())
+            card.run_button.click()
+            self.assertFalse(card.run())
+            self.assertFalse(card.export())
+            self.app.processEvents()
+        self.assertIsNone(card.run_result)
+        self.assertFalse(card.busy())
+        self.assertEqual(cells(again.tables["pairs"]), stored)
+
+    def held(self, release):
+        def work(_inputs, _analysis, token, _cancel):
+            release.wait(30)
+            return mp.TrialOutcome(token, cancelled=True)
+        return work
+
+    def finish(self, card):
+        end = time.monotonic() + 60
+        while card.busy() and time.monotonic() < end:
+            self.app.processEvents()
+            time.sleep(0.01)
+        self.app.processEvents()
+        self.assertFalse(card.busy())
+
+    def test_a_new_analysis_stops_the_running_trial_and_resets_the_section(self):
+        _window, panel, card = self.compared()
+        release = threading.Event()
+        self.addCleanup(release.set)
+        with mock.patch.object(mp, "run_trial", side_effect=self.held(release)):
+            card.toggle.click()
+            self.assertTrue(card.run())
+            self.app.processEvents()
+            self.assertFalse(card.toggle.isEnabled())  # not closed over a running trial: Cancel stays in view
+            self.assertTrue(card.cancel_button.isVisible() and card.cancel_button.isEnabled())
+            token = card.token
+            self.run_analysis(panel)  # another result, without a comparison
+            self.assertIsNone(panel.analysis.comparison)
+            self.assertIsNone(card._cancel)
+            self.assertNotEqual(card.token, token)
+            self.assertIsNone(card.run_result)
+            self.assertFalse(card.toggle.isChecked())
+            self.assertFalse(card.toggle.isVisible())
+            self.assertTrue(card.is_open())  # no registered comparison: the card as it always was
+            self.assertTrue(card.run_button.isEnabled())
+            release.set()
+            self.finish(card)
+        self.assertIsNone(card.run_result)
+        self.assertTrue(card.results.isHidden())
+
+    def test_a_comparison_that_arrives_closes_the_section_and_the_same_result_keeps_it_as_set(self):
+        window, panel = self.analysed()
+        window.show_page(pw.MAC_PAGE)
+        card = window.mac_points.trial
+        self.assertTrue(card.is_open())
+        self.confirmed(panel)
+        self.compare(panel)
+        self.wait(panel)
+        self.assertTrue(card.registered())
+        self.assertFalse(card.is_open())
+        card.toggle.click()
+        self.assertTrue(card.is_open())
+        window.show_page(pw.REVIEW_PAGE)  # the same result: what the user opened stays open
+        window.show_page(pw.MAC_PAGE)
+        window.mac_points.rebuild()
+        self.assertTrue(card.is_open())
+        self.run_analysis(panel)
+        self.assertFalse(card.toggle.isChecked())
+
+    def test_a_trial_still_running_when_the_comparison_arrives_keeps_its_cancel_in_view(self):
+        window, panel = self.analysed()
+        self.confirmed(panel)
+        window.show_page(pw.MAC_PAGE)
+        card = window.mac_points.trial
+        release = threading.Event()
+        self.addCleanup(release.set)
+        with mock.patch.object(mp, "run_trial", side_effect=self.held(release)):
+            self.assertTrue(card.run())
+            self.compare(panel)
+            self.wait(panel)
+            self.assertTrue(card.registered())
+            self.assertIsNotNone(card._cancel)  # the same data: the trial goes on, and can still be cancelled
+            self.assertTrue(card.is_open())
+            self.assertTrue(card.cancel_button.isVisible() and card.cancel_button.isEnabled())
+            card.cancel()
+            self.assertTrue(card.toggle.isEnabled())
+            release.set()
+            self.finish(card)
+        self.assertIsNone(card.run_result)
+
+    def settle(self):
+        for _ in range(8):
+            self.app.processEvents()
+
+    def test_the_section_adds_no_sideways_scroll_of_its_own_and_is_shorter_closed(self):
+        window, _panel, card = self.compared()
+        for size in self.SIZES:
+            window.resize(*size)
+            self.settle()
+            area = window.stack.currentWidget()
+            self.assertFalse(card.is_open())
+            card.setVisible(False)  # the page without the card: the comparison's own tables set its width
+            self.settle()
+            sideways = area.horizontalScrollBar().maximum()
+            card.setVisible(True)
+            self.settle()
+            self.assertEqual(area.horizontalScrollBar().maximum(), sideways, size)
+            closed = area.verticalScrollBar().maximum()
+            card.toggle.click()
+            self.settle()
+            self.assertEqual(area.horizontalScrollBar().maximum(), sideways, size)
+            self.assertGreater(area.verticalScrollBar().maximum(), closed, size)
+            card.toggle.click()
+            self.settle()
+            self.assertEqual(area.horizontalScrollBar().maximum(), sideways, size)
+            self.assertEqual(area.verticalScrollBar().maximum(), closed, size)
 
 
 if __name__ == "__main__":
