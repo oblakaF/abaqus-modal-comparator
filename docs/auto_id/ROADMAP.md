@@ -13,6 +13,31 @@ Original audited snapshot:
 Machine-readable state: [STATUS.json](STATUS.json). Decisions: [DECISIONS.md](DECISIONS.md).
 History: [CHANGELOG.md](CHANGELOG.md). Evidence: [EVIDENCE.md](EVIDENCE.md).
 
+## Owner priority — material properties first (ROADMAP-PROPERTIES-FIRST-01)
+
+Owner decision on execution order, recorded 2026-11-23. It sets what is worked on
+next. It changes no stage status, no decision, no SPEC rule and no scientific gate,
+and it states no identified material value: none exists yet.
+
+Scientifically defensible CFRP material-property identification is completed before
+other program development resumes. In order:
+
+1. Establish a physically traceable old T300 plain 0.45 bare laminate specimen that
+   matches the SP-02 / SP-13 face sheets.
+2. Obtain valid modal measurements, an independent physical registration, thickness
+   measurements and setup-repeat evidence for it.
+3. Apply the accepted Stage A method and the identifiability / uncertainty gates to
+   determine which effective laminate properties the data support.
+4. Independently constrain the core / interface behaviour and validate the properties
+   against SP-02 / SP-13.
+5. Defer the remaining Preview GUI enhancements, EXE packaging and unrelated
+   development until the material-property work is scientifically resolved or the
+   owner explicitly reprioritises.
+
+Every item is subject to the governing SPEC, the accepted decisions, the stage
+statuses below and the existing HUMAN gates (Abaqus, merges). M8 GATE NOT_MET, D-077
+and the block on production Auto-ID stand as recorded.
+
 ## Execution rule
 
 **ONE MINI-STEP AT A TIME.**
