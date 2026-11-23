@@ -13,30 +13,84 @@ Original audited snapshot:
 Machine-readable state: [STATUS.json](STATUS.json). Decisions: [DECISIONS.md](DECISIONS.md).
 History: [CHANGELOG.md](CHANGELOG.md). Evidence: [EVIDENCE.md](EVIDENCE.md).
 
-## Owner priority — material properties first (ROADMAP-PROPERTIES-FIRST-01)
+## Owner priority — material properties first (ROADMAP-PROPERTIES-FIRST-01; corrected by PLATE-0875-PROVENANCE-AND-ROADMAP-01)
 
-Owner decision on execution order, recorded 2026-11-23. It sets what is worked on
-next. It changes no stage status, no decision, no SPEC rule and no scientific gate,
-and it states no identified material value: none exists yet.
+Owner decision on execution order, recorded 2026-11-23 and corrected the same day
+after a provenance audit of the existing plate. It sets what is worked on next. It
+changes no stage status, no decision, no SPEC rule and no scientific gate, and it
+states no identified material value: none exists.
 
 Scientifically defensible CFRP material-property identification is completed before
-other program development resumes. In order:
+other program development resumes. **The existing plate comes first**: the owner
+confirms that the physical plate exists, so no new specimen is manufactured before
+its evidence is evaluated.
 
-1. Establish a physically traceable old T300 plain 0.45 bare laminate specimen that
-   matches the SP-02 / SP-13 face sheets.
-2. Obtain valid modal measurements, an independent physical registration, thickness
-   measurements and setup-repeat evidence for it.
-3. Apply the accepted Stage A method and the identifiability / uncertainty gates to
-   determine which effective laminate properties the data support.
-4. Independently constrain the core / interface behaviour and validate the properties
-   against SP-02 / SP-13.
-5. Defer the remaining Preview GUI enhancements, EXE packaging and unrelated
-   development until the material-property work is scientifically resolved or the
+### The existing plate: what the records hold
+
+Specimen `PLATE-300x300x1mm`; series 261016 (M11) and 261027 ROTATED. Sources:
+[M11](../reconciliation/M11_SINGLE_CFRP_PLATE.md),
+[plate-only](../research/plate_only/README.md),
+[PRIORITY-9](../research/plate_physical_readiness_p9/RESULTS.md). Every item below is
+a research or HUMAN record, not governed evidence.
+
+| Item | Record | Kind | Source |
+|---|---|---|---|
+| One physical plate in both series | the owner's statement of 2026-10-30 | OWNER_REPORTED | plate-only §12.1 |
+| Mass, plan | 118.37 g; 301 × 300 mm (by 2026-10-21; instruments not stated) | MEASURED (owner's sheet) | M11 §8 |
+| Perimeter thickness | 20 readings, 5 per edge, 0.71–0.94 mm, about 4.5–6.5 mm from the edge; mean 0.876 mm (0.8745 with the ambiguous reading), edge means 0.816–0.926 mm | MEASURED (owner's sheet) | M11 §8, §8.1; plate-only §13.3 |
+| Interior thickness | not measured | NOT_VERIFIED | M11 §8; plate-only §13.3 |
+| FE model thickness | uniform 0.875 mm (`S4R_0875_BASELINE`); a model input set to the perimeter mean, not a measured thickness field | FE_INPUT | M11 §2; plate-only §12.3 |
+| Areal mass | 1 310.9 g/m² | DERIVED (mass, plan) | M11 §2 |
+| Weave | plain: owner's statement; visible face plain, tows about 0/90° to the edges (photograph) | OWNER_REPORTED | M11 §8.1, §10.1, §11.1 |
+| Material stock, batch | not recorded. The Abaqus material name `CFRP_T300_TEST` is a model label, not a stock record | NOT_VERIFIED | M11 §2, §6 |
+| Number of plies | unknown to the owner; not resolvable on the edge photograph | NOT_VERIFIED | M11 §8.1, §11.1 |
+| Stacking sequence, hidden face, interior | not recorded | NOT_VERIFIED | M11 §10.1, §18.5 |
+| Manufacturing process | not recorded | NOT_VERIFIED | — |
+| Material axes | the model's E1 / E2 are model directions; fibre directions not evidenced | NOT_VERIFIED | M11 §19.1; plate-only §12.3 |
+| Suspension, 261027 | two upper points, rubber bands and strings; attachment points, lengths and stiffness not recorded; softness not demonstrated | OWNER_REPORTED; details NOT_VERIFIED | plate-only §12.3; PRIORITY-9 §9 D1–D2 |
+| Excitation, 261027 | a force reference channel is in the instrument record; the place, mass and attachment of the force sensor are not recorded | MEASURED (instrument record); details NOT_VERIFIED | plate-only §14; PRIORITY-9 §9 D3 |
+| Experimental modal set | `Polymax_bravo`, 11 fitted records, 289 points, +Z of the scan frame | MEASURED | PRIORITY-9 §1 |
+| FE-to-EXP physical registration | `PHYSICAL_REGISTRATION_NOT_VERIFIED`: six facts open; no frozen registration, no admissible MAC, no confirmed mode pair | NOT_VERIFIED | PRIORITY-9 §3–§4 |
+| Setup repeat (Σ_setup) | none: 261016 and 261027 differ in suspension, protocol and grid | NOT_VERIFIED | plate-only §12.4 |
+
+**Material-family equivalence with the SP-02 / SP-13 face sheets (old T300 plain
+0.45): `NOT_VERIFIED`.** The records hold a plain weave and nothing on stock, batch,
+ply count or layup. The areal mass and the perimeter mean are about twice one old
+0.45 plain face; M11 §6 records this as consistent with, but not evidence of, a
+two-ply laminate of that stock. Equivalence is not inferred from thickness, mass,
+frequency similarity or MAC.
+
+Until the equivalence is established by a physical or laboratory record, the plate is
+eligible for a separate research study of this plate only. Nothing obtained from it
+is transferred to SP-02 / SP-13.
+
+### Order of work
+
+1. **Existing plate first.** Use the existing plate and its accepted records; accepted
+   measurements are not repeated unless a specific gap requires it.
+2. **Verify material-family compatibility.** A record of the fabric stock and batch,
+   the number of plies, the stacking sequence and orientation, and the manufacturing
+   process, compared with the same records for the SP-02 / SP-13 face sheets. Without
+   them the equivalence stays `NOT_VERIFIED`.
+3. **Close the specific physical-evidence gaps:** the six open registration facts
+   (PRIORITY-9 §9 A–C); the suspension points, lengths and characteristics and the
+   force-sensor place, mass and attachment (D1–D3); an interior thickness map (D4,
+   SPEC §15: 9+ points); a setup repeat under one protocol (SPEC §15, D-053).
+4. **Stage A identification only after scientific readiness:** a frozen physical
+   registration, confirmed mode pairs, a FIT / HOLDOUT set declared first, and the
+   identifiability / uncertainty gates. The result is whichever effective laminate
+   properties the data support, or a refusal.
+5. **Independent sandwich validation afterward:** core / interface behaviour
+   constrained independently, then a check against SP-02 / SP-13 — only if step 2
+   established the equivalence.
+6. **Deferred:** the remaining Preview GUI enhancements, EXE packaging and unrelated
+   development, until the material-property work is scientifically resolved or the
    owner explicitly reprioritises.
 
 Every item is subject to the governing SPEC, the accepted decisions, the stage
-statuses below and the existing HUMAN gates (Abaqus, merges). M8 GATE NOT_MET, D-077
-and the block on production Auto-ID stand as recorded.
+statuses below and the existing HUMAN gates (Abaqus, merges). D-077
+`NO_GLOBAL_PARAMETER_VALUE`, M8 GATE `NOT_MET` and Production Auto-ID `BLOCKED` stand
+as recorded.
 
 ## Execution rule
 
