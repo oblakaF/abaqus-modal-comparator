@@ -1,10 +1,10 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
 or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in two sections: one ODB
-extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction (§19). §1–§17 and §20
-ran no Abaqus; they read existing FE results.
+extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction (§19). §1–§17, §20
+and §21 ran no Abaqus; §21 reads experimental files only, the others read existing FE results.
 
 - **Scope (owner).** The sandwich panels are set aside. One specimen is studied: `PLATE-300x300x1mm`, series
   `NEXP29/PLATE300-1MM/S261027-ROTATED`.
@@ -1787,6 +1787,259 @@ Figure: `fig_material_sensitivity.png` (§20.7): both tables as heat maps, mater
 `material_sensitivity_summary.csv`, `report.py`, `fig_material_sensitivity.png`.
 
 Nothing is published in the repository except this section and the corrected opening statement.
+
+## 21. PLATE-0875-EXPERIMENTAL-MODE-QUALITY-01 — are the poorly matched experimental records supported by the response data? (2026-11-25)
+
+**Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** Experimental data only:
+no FE frequency, shape or MAC enters any diagnostic or label of this section. No Abaqus solve and no ODB extraction
+was run. Nothing was fitted to a material parameter. All 11 records are kept: none is excluded, weighted or
+re-selected, and no pole is added, removed or moved. No coherence or uncertainty value is invented. No
+FrozenRegistration was created. M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED are
+unchanged.
+
+**Short answer.**
+
+- **The fitted records are what the response data contain.** With the 11 stored poles held fixed, a refit of the
+  residues to the stored transfer functions returns the stored shapes (MAC ≥ 0.998 for all 11).
+- **Ten of the eleven records have a clear resonance.** A peak of 10–43 dB within one spectral line, and a response
+  shape at that line equal to the fitted shape (MAC 0.93–1.00). The exception is record 4.
+- **Of the seven records that no FE model explains (3, 4, 5, 6, 9, 10, 11):**
+  - records 5, 6, 9, 10 and 11 are supported by the response data without a limitation of the shape;
+  - record 3 is supported, with a low coherence at its peak (0.88);
+  - record 4 has weak support: a 4 dB shoulder beside record 3, with the highest damping of the low records.
+- **So the FE discrepancy of records 5, 6, 9, 10 and 11 is not an artefact of the modal fit.** Its cause lies in the
+  FE model or in the FE-to-scan mapping. This section does not say which.
+- **A pattern that the earlier sections did not use.** Four records are bending in one grid direction only: records 2
+  and 7 along one grid index, records 3 and 9 along the other. The second group lies 16 % higher in frequency, in
+  both orders. This is a hypothesis about a direction-dependent bending stiffness (§21.5); it is not a material value.
+
+### 21.1 Inputs and what the response file contains
+
+| Input | Content | SHA-256 |
+|---|---|---|
+| Fitted records 261027 | `…ROTATED_Polytec_261027.unv`, set `Polymax_bravo`: 11 records, 289 points, U3, complex as stored; poles from the dataset-55 headers | `76db80ae…` = recorded |
+| Response data 261027 | `…ROTATED_261027.unv` (PSV export of the same session, acquired 27-Oct-26 11:38:17), dataset 58, 867 records | `d3bc99e9…` = recorded |
+| History 261016 | `…261016_POLYMAX.unv`, set `Polymax_bravo`: 10 records. Supplementary only | `117c893b…` = recorded |
+
+The response file was inspected before any use (the task requires the quantities and units to be verified first):
+
+| Function (as stored) | Type | Ordinate | Records | Abscissa |
+|---|---|---|---|---|
+| `Transfer Function H1`, "H1 Velocity / Force" | 4 (frequency response function), complex | Velocity, m/s, over Force, N | 289 | 0.3125 … 500 Hz, 1600 lines of 0.3125 Hz |
+| `Coherence` | 6, real | dimensionless, 9.5e-6 … 1.0 | 289 | the same |
+| `Cross Spectrum`, "CP Force * Velocity" | 3, complex | N · m/s | 289 | the same |
+
+- **It is a transfer function.** The records are H1 mobilities (velocity per force) with a stored coherence, one per
+  scan point, response direction 3, one force reference. They may be read as FRFs. The phase of each H1 equals the
+  phase of its cross spectrum (largest difference 6.7e-6 rad over 179 378 cells), as H1 = G_fv / G_ff requires.
+- **Same points.** The node tables of the fitted file and of the response file are identical (289 ids; relative rms
+  2e-16 after a similarity fit, scale 1.0). Point id k ↔ id k is used.
+- **PolyMAX band.** The fitted file stores residual terms below 14.90 Hz and above 240.95 Hz: the fit covered that
+  band. Damping ratios are stored for all 11 records (record 11 too, which the workbook does not list).
+- **Not in the file.** The number of averages, the window, the excitation signal and position, and any uncertainty
+  of a frequency, damping or shape. None is assumed.
+
+### 21.2 Method
+
+The protocol (`protocol.json`) was written before any diagnostic was computed. Two descriptors were added after the
+first results and are marked as such in the protocol (the grid pattern of §21.5 and the span check of §21.4); they
+change no label.
+
+- **Resonance.** Indicator S(f) = Σ |H1|² over the 289 points. For each record: the nearest local maximum within
+  ± 3 lines and its prominence in dB.
+- **Coherence.** The stored coherence at that line: |H1|²-weighted mean, median, and share of points below 0.9.
+- **Damping and resolution.** Stored ζ; bandwidth 2ζf in lines; half-power damping of the indicator
+  (`universal_reader._estimate_half_power_damping`).
+- **Phase.** Modal phase collinearity (`experimental_qc._phase_collinearity`); a metric without a limit.
+- **Response shape.** H1 at the peak line, and the first singular shape of H1 over ± 8 lines; complex MAC with the
+  fitted record.
+- **Refit.** Linear least squares of H1 in 15–200 Hz with the 11 stored poles fixed, free residues, and one lower
+  and one upper residual per point.
+- **Distinctness.** Complex AutoMAC of the 11 records.
+- **Levels (descriptive, no gate).** Coherence 0.9, AutoMAC 0.5 and 3 lines are the existing SPEC §6 S1 flag levels;
+  MAC 0.80 is the level used in §17; 3 dB of prominence and 0.90 of the window energy are declared here.
+- **Labels.** *Supported*: peak ≥ 3 dB, coherence ≥ 0.9, window-shape MAC ≥ 0.80 and AutoMAC ≤ 0.5. *Supported, with
+  limitation*: peak and shape, but not the coherence or the AutoMAC. *Weak support*: no such peak, or no such shape.
+  Marks: *mixed indication* (AutoMAC > 0.5, or one shape carries < 0.90 of the window energy, or the window shape
+  has MAC ≥ 0.5 with another record) and *unresolved* (bandwidth < 3 lines).
+
+### 21.3 Experimental quality of the 11 records
+
+Records in bold are the seven that no FE model of §17–§20 explains.
+
+| Record | Hz | Peak of the response: Hz (prominence) | Coherence at the peak: weighted / median (points < 0.9) | ζ stored, % | Bandwidth, lines | MPC | MAC of the response shape with the record: peak line / window | Refit MAC | Largest AutoMAC | Label |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 18.63 | 18.75 (13 dB) | 0.998 / 0.999 (0 %) | 0.189 | 0.2 | 0.918 | 0.93 / 0.95 | 0.998 | 0.01 | supported; mixed indication, unresolved |
+| 2 | 54.62 | 54.69 (21 dB) | 0.986 / 0.988 (0 %) | 0.394 | 1.4 | 0.987 | 1.00 / 1.00 | 1.000 | 0.02 | supported; unresolved |
+| **3** | 63.50 | 63.44 (43 dB) | 0.881 / 0.902 (49 %) | 0.159 | 0.6 | 0.927 | 0.99 / 1.00 | 1.000 | 0.04 | supported, with limitation; unresolved |
+| **4** | 66.85 | 67.19 (4 dB) | 0.998 / 0.999 (0 %) | 0.923 | 3.9 | 0.903 | 0.90 / 0.60 | 1.000 | 0.04 | weak support; mixed indication |
+| **5** | 74.21 | 74.06 (18 dB) | 0.997 / 0.997 (0 %) | 0.271 | 1.3 | 0.994 | 0.99 / 1.00 | 1.000 | 0.01 | supported; unresolved |
+| **6** | 112.27 | 112.19 (22 dB) | 0.995 / 0.995 (0 %) | 0.640 | 4.6 | 0.997 | 1.00 / 1.00 | 1.000 | 0.01 | supported |
+| 7 | 145.94 | 145.94 (11 dB) | 0.996 / 0.997 (0 %) | 0.783 | 7.3 | 0.977 | 0.99 / 0.99 | 1.000 | 0.01 | supported |
+| 8 | 157.85 | 157.81 (35 dB) | 0.871 / 0.899 (50 %) | 0.102 | 1.0 | 0.956 | 0.99 / 1.00 | 1.000 | 0.00 | supported, with limitation; unresolved |
+| **9** | 169.18 | 169.06 (12 dB) | 0.999 / 0.999 (0 %) | 0.300 | 3.2 | 0.993 | 0.98 / 0.98 | 0.999 | 0.00 | supported |
+| **10** | 180.14 | 180.00 (25 dB) | 0.980 / 0.985 (0 %) | 0.064 | 0.7 | 0.993 | 1.00 / 1.00 | 1.000 | 0.01 | supported; unresolved |
+| **11** | 191.60 | 191.56 (10 dB) | 0.992 / 0.995 (0 %) | 0.809 | 9.9 | 0.979 | 0.99 / 0.99 | 0.999 | 0.01 | supported |
+
+Further diagnostics of the same records:
+
+| Record | Window energy in one shape | Second window shape | Half-power ζ of the indicator, % (ratio to stored) | Synthesis error near the record | Roughness | Nearest 261016 record (MAC) |
+|---|---|---|---|---|---|---|
+| 1 | 0.719 | rigid plane 0.98 | 1.081 (5.7) | 0.15 | 0.001 | #1, 33.45 Hz (0.90) |
+| 2 | 0.980 | like record 3 (0.56) | 0.372 (0.9) | 0.13 | 0.001 | #2, 55.25 Hz (0.82) |
+| **3** | 0.934 | like record 4 (0.89) | 0.235 (1.5) | 0.33 | 0.011 | #3, 68.10 Hz (0.68) |
+| **4** | 0.843 | like record 3 (0.69) | 0.810 (0.9) | 0.42 | 0.002 | #4, 71.96 Hz (0.48) |
+| **5** | 0.970 | like record 4 (0.56) | 0.427 (1.6) | 0.10 | 0.001 | #5, 80.47 Hz (0.71) |
+| **6** | 0.995 | like record 7 (0.19) | 0.694 (1.1) | 0.10 | 0.001 | #6, 116.90 Hz (0.97) |
+| 7 | 0.987 | like record 8 (0.65) | 1.347 (1.7) | 0.23 | 0.002 | #7, 144.60 Hz (0.90) |
+| 8 | 0.974 | like record 7 (0.07) | 0.115 (1.1) | 0.18 | 0.009 | #8, 158.84 Hz (0.70) |
+| **9** | 0.961 | like record 8 (0.41) | 0.656 (2.2) | 0.34 | 0.002 | none: best is #8 (0.10) |
+| **10** | 0.981 | like record 11 (0.66) | 0.132 (2.1) | 0.10 | 0.003 | #9, 178.04 Hz (0.82) |
+| **11** | 0.993 | like record 10 (0.43) | 1.593 (2.0) | 0.22 | 0.002 | none: best is #7 (0.01) |
+
+- **Roughness** is the share of a shape's energy in point-to-point variation (2-D cosine terms of index 9 or more on
+  the 17 × 17 grid). It is at most 1.1 %: the shapes are spatially smooth.
+- **Synthesis error** is the relative difference between the measured H1 and the 11-pole model within ± 5 lines; over
+  15–200 Hz it is 0.25. The stored poles reproduce the shapes exactly but not the full response level: narrow peaks
+  are sampled by one to three lines.
+- **Response without a fitted record.** No peak of 3 dB or more in 15–200 Hz lacks a record. The existing detector
+  lists five minor ones: 59.4 Hz (1.3 dB), 76.6 Hz (2.8 dB; shape like record 5, MAC 0.92), 82.2 Hz (0.8 dB),
+  122.2 Hz (2.9 dB; shape like record 6, MAC 0.84) and 125.0 Hz (0.6 dB). Below the PolyMAX band there are peaks at
+  3.1, 10.3 and 12.5 Hz (6, 22 and 7 dB), as §3 reported.
+- **Coherence elsewhere.** A dip at 150.0 Hz (0.87) and a smaller one at 50.0 Hz coincide with no record.
+
+### 21.4 Session 261016 as a supplementary view
+
+Session 261016 used another suspension, another excitation and another scan (§12.4, §13.2). It is not a repeat, and
+its records are compared on the same point ids only (id k ↔ id k, DERIVED).
+
+- **Records 1–8 have a 261016 record in the same order** (MAC 0.90, 0.82, 0.68, 0.48, 0.71, 0.97, 0.90, 0.70), and
+  record 10 has one (#9, 0.82). Records 9 and 11 have none in the 261016 fitted set; that set has ten records, and it
+  does not show whether such modes were absent or not fitted.
+- **Record 6** recurs almost exactly (0.97, at 116.90 Hz against 112.27 Hz).
+- **Records 3 and 4.** In 261016, #3 (68.10 Hz) and #4 (71.96 Hz) are each nearly pure in one parity class of the
+  grid (0.98 and 0.84). In 261027, records 3 and 4 each contain both classes (§21.5). Each lies about three quarters
+  in the span of the two 261016 shapes (0.77 and 0.74).
+- **Caution.** 261016 #4 and #5 have low phase collinearity (0.59 and 0.44).
+
+### 21.5 Spatial patterns on the scan grid
+
+The descriptors use the grid's own two indices, called u and v here. They refer to no plate edge and no FE axis.
+"Parity" is the symmetry (S) or antisymmetry (A) of the shape about the two centre lines of the grid.
+
+| Record | Hz | Share varying along u only (sign changes) | Along v only (sign changes) | Parity SS / AS / SA / AA |
+|---|---|---|---|---|
+| 1 | 18.63 | 0.01 | 0.01 | 0.00 / 0.00 / 0.00 / **0.99** |
+| 2 | 54.62 | **0.98** (2) | 0.01 | **0.98** / 0.00 / 0.02 / 0.00 |
+| **3** | 63.50 | 0.01 | **0.72** (2) | 0.72 / 0.01 / 0.27 / 0.00 |
+| **4** | 66.85 | 0.01 | 0.42 (2) | 0.43 / 0.00 / 0.57 / 0.00 |
+| **5** | 74.21 | 0.01 | 0.00 | 0.00 / **0.99** / 0.00 / 0.00 |
+| **6** | 112.27 | 0.00 | 0.00 | **1.00** / 0.00 / 0.00 / 0.00 |
+| 7 | 145.94 | **0.80** (3) | 0.00 | 0.00 / 0.80 / 0.00 / 0.19 |
+| 8 | 157.85 | 0.17 | 0.00 | 0.00 / 0.17 / 0.00 / 0.82 |
+| **9** | 169.18 | 0.00 | **0.99** (3) | 0.00 / 0.01 / **0.99** / 0.00 |
+| **10** | 180.14 | 0.00 | 0.00 | 0.00 / 0.01 / 0.00 / **0.98** |
+| **11** | 191.60 | 0.01 | 0.01 | 0.00 / **0.97** / 0.01 / 0.01 |
+
+- **Nine records lie in one parity class** (share 0.80–1.00). Records 3 and 4 share two classes between them.
+- **Four records are bending in one grid direction.** Records 2 and 7 vary along u only, with two and three nodal
+  lines. Records 3 and 9 vary along v only, with two and three nodal lines (record 3 only to 0.72).
+- **Their frequencies.** 145.94 / 54.62 = 2.672 and 169.18 / 63.50 = 2.665; a free uniform beam gives 2.757 between
+  its first two bending modes. Between the directions: 63.50 / 54.62 = 1.163 and 169.18 / 145.94 = 1.159.
+- **In 261016** the u-only records are #2 (55.25 Hz, 0.84) and #7 (144.60 Hz, 0.76), and the v-only record is #3
+  (68.10 Hz, 0.88): 68.10 / 55.25 = 1.233. No second v-only record was fitted there.
+
+### 21.6 Verified findings and hypotheses
+
+**Verified** (computed from the stored data; reproducible):
+
+1. The auxiliary file holds H1 mobilities with coherence for the same 289 points (§21.1).
+2. The fitted shapes are the residues of that response at the stored poles (refit MAC ≥ 0.998).
+3. Ten records have a peak of 10 dB or more within one line; record 4 has 4 dB, one line away.
+4. The response shape at the peak equals the fitted shape for nine records (0.98–1.00); 0.93 for record 1 and 0.90
+   for record 4.
+5. The weighted coherence at the peak is 0.98 or more for nine records, and 0.88 and 0.87 for records 3 and 8.
+6. The 11 shapes are mutually distinct (largest AutoMAC 0.04) and spatially smooth.
+7. Six records (1, 2, 3, 5, 8, 10) are narrower than three spectral lines.
+8. Records 2 and 7, and records 3 and 9, are one-direction bending patterns in the two grid directions, with the
+   frequency ratios of §21.5.
+9. The file gives no uncertainty for any frequency, damping or shape.
+
+**The seven poorly matched records:**
+
+| Record | Experimental support | What the FE discrepancy can therefore be |
+|---|---|---|
+| 5, 6, 10, 11 | supported; clean phase (MPC 0.98–1.00); 5, 6 and 10 recur in 261016 | not an artefact of the fit: FE model or mapping (unexplained) |
+| 9 | supported; MPC 0.99; pure one-direction pattern; no 261016 counterpart | the same; see hypothesis H4 |
+| 3 | supported, with low coherence at a very narrow peak; shares two parity classes with record 4 | possibly a mixed mode (H1); otherwise as above |
+| 4 | weak: a 4 dB shoulder, ζ 0.92 %, window shape dominated by record 3 | possibly a mixed mode or a measurement limitation (H1) |
+
+**Hypotheses** (not verified; nothing is selected or released on their basis):
+
+- **H1. Records 3 and 4 are a coupled pair.** Two patterns that are separate in 261016 appear mixed in both 261027
+  records, and record 4 is the most damped low record. A coupling through the suspension or the force sensor would
+  do this. The data do not show the cause.
+- **H2. The low coherence at records 3 and 8 is a resolution effect.** They are the two sharpest peaks (43 and
+  35 dB; 0.6 and 1.0 lines wide), and the weighted coherence is below 0.9 at the peak line only (0.96–0.99 one line
+  away). The number of averages and the window are unknown, so this is not verified.
+- **H3. Records 7, 9 and 11 have response beside the fitted pole.** These three are resolved (3–10 lines), and the
+  indicator's half-power width is 1.7–2.2 times the stored bandwidth. A single shape still carries 0.96–0.99 of the
+  energy. For the unresolved records the same ratio only reflects the line spacing.
+- **H4. The bending stiffness differs between the two grid directions.** If records 2, 7 and 3, 9 are beam-like
+  bending of a plate with equal sides (301 and 300 mm change a frequency by 0.7 %), the ratio 1.16 of the frequencies
+  corresponds to a ratio of about 1.35 of the bending stiffnesses.
+  - It agrees with the frequency pattern of §20.3: a common reduction of E by 22–25 % closes the errors of records 2
+    and 7 and opens those of record 9, and the unreduced model is within about 1 % of record 9.
+  - No archived FE variant has such a difference; the largest is 10 % (§20.1).
+  - The cause is not determined. A different in-plane stiffness of the laminate, an initial curvature of the thin
+    plate and the suspension would each produce it. The layup is not recorded (§15).
+  - The ratio is 1.23 in 261016, so it is not a constant of the specimen alone.
+  - It is not a material value, and no direction of the FE model is assigned to u or v here.
+- **H5. The remaining discrepancies of records 5, 6, 10 and 11 follow from the same cause.** Untested.
+
+### 21.7 Limitations
+
+- One force reference: closely spaced modes cannot be separated by a multi-reference indicator.
+- Line spacing 0.3125 Hz; six records are narrower than three lines, so their damping and peak level are weakly
+  supported by the response data. Their frequencies and shapes are not affected in the same way.
+- No averages, window, excitation position, sensor mass or uncertainty in the files.
+- The labels describe support by the response data. They are not acceptance: `PHYSICAL_REGISTRATION_NOT_VERIFIED`
+  stands, and no record becomes an identification row.
+
+### 21.8 Recommended next minimum step
+
+**A pattern-class comparison of the existing FE packages with the experiment; no solve and no extraction.**
+
+- **What.** Apply the grid descriptors of §21.5 (one-direction share, nodal-line count, parity) to the sampled shapes
+  of the 16 existing FE models of §17–§20, and compare frequencies class by class: first and second bending in each
+  direction, and the parity class of the other records.
+- **Why this first.**
+  - It tests H4 with data that already exist, and shows whether the FE variants with E1 ≠ E2 already contain the two
+    one-direction bending branches.
+  - A class is far less sensitive to the unverified point registration than a point-by-point MAC.
+  - It gives a per-direction frequency error, which is the quantity an effective bending stiffness per direction
+    needs.
+- **Then, only on a separate owner authorisation:** one FE solve with a direction-dependent stiffness whose ratio is
+  stated beforehand from the experimental frequency ratio alone, with the expected classes and frequencies written
+  before the solve. That is a test of one hypothesis, not a fit.
+- **Not recommended now.** Any further thickness or material variant chosen by its effect on MAC or frequency.
+
+### 21.9 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `1efdb0b6…` and a clean tracked tree before the edit |
+| Input identities | the three inputs equal their recorded SHA-256; size and mtime are the same before and after |
+| Response quantities | function type, ordinate labels and units read from every one of the 867 records; one signature per function; H1 phase = cross-spectrum phase |
+| Existing diagnostics | the MPC of the 11 records equals §3 and §12.4 (0.918, 0.987, 0.927, 0.903, …); record frequencies equal §3; the low peaks at 10.3 and 12.5 Hz equal §3 (the lowest is at 3.1 Hz here and 3.4 Hz in §3, which used the smoothing detector) |
+| Reproducibility | two complete runs give byte-identical `results.json` (`5d93fa1e…`) and `arrays.npz` (`12975ecb…`) |
+| Tests | `tests.test_experimental_qc`: 27 OK (4 skipped). `tests.test_frf_import`: 6 OK. `tests.test_plate_study`: 30 OK. `tests.test_polymax_modal_sets`: 17 OK |
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_EXPERIMENTAL_MODE_QUALITY_01` (outside git):
+`run_mode_quality.py`, `unv58.py`, `protocol.json` (`40287e89…`), `results.json`, `arrays.npz`, `report.py`,
+`fig_response_support.png`, `fig_shapes.png`.
+
+Nothing is published in the repository except this section.
 
 ## Not changed
 
