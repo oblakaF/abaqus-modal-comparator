@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -1268,6 +1268,298 @@ preregistration.
   `fig_first_ranked_three_models.png`.
 
 Nothing is published in the repository except this section. No ODB, solver file or extraction is committed.
+
+## 19. PLATE-0875-THICKNESS-FIELD-01 — a thickness field from all 20 perimeter readings (2026-11-25)
+
+**Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** The interior thickness
+of the model is **`ASSUMED_MODEL_FORM`**: it is an interpolation, not measured geometry. Nothing here is a mode
+pairing, a confirmed cluster, a physical registration or a parameter estimate. No material constant, density or
+thickness was adjusted, and nothing was optimised against a frequency or a MAC. No FrozenRegistration was created; the
+registration guard is unchanged and was not bypassed. M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production
+Auto-ID BLOCKED are unchanged.
+
+**Abaqus use (owner authorisation: at most one solve and one extraction).**
+
+| Action | Count | Detail |
+|---|---|---|
+| Abaqus solves | **1** | `CFRP_S4R_TFIELD20_FreeFree`, Abaqus/Standard 2024, cpus = 1, interactive; 2026-11-25 00:28:40, 14.6 s, exit 0; no retry |
+| ODB extractions | **1** | pinned extractor `039aa067…`, modes 1–20; 00:29:01, 4.5 s, exit 0; the ODB is unchanged by it; no retry |
+
+**Short answer.** The 20-reading field behaves almost like the wedge of §18 with its thick side at edge 4: its 14
+shapes are the wedge's shapes (FE-to-FE MAC ≥ 0.96). Against the experiment it changes **one** low bending record,
+record 2 (0.60 → 0.80), keeps record 7 (0.96), is weaker than the wedge for record 8 (0.53 against 0.65) and leaves
+records 3–6 where they were. The frequency errors do not shrink. The result for record 2 rests on assumed reading
+positions that could not be varied with one solve.
+
+### 19.1 The readings and their mapping
+
+Source: the owner's handwritten sheet, photograph `plate_measurements_20261021.jpg` (`df5339cd…` = recorded), read
+again for this task, and M11 §8–§8.1. Its transcription file `plate_measurements_20261021.json` (`6d52a323…`, hash
+first recorded here) and `plate_study.THICKNESS_READINGS_MM` hold the same 20 values. Nothing was changed in them.
+
+| Row = edge | Readings 1 → 5, mm | Mean |
+|---|---|---|
+| 1 | 0.94, 0.92, 0.94, 0.89, **0.71** | 0.880 |
+| 2 | 0.79, 0.82, 0.84\*, 0.81, 0.82 | 0.816 |
+| 3 | **0.74**, 0.89, 0.94, 0.92, 0.92 | 0.882 |
+| 4 | 0.93, 0.94, 0.93, 0.92, 0.91 | 0.926 |
+
+\* The historical ambiguity is kept: 0.84 as transcribed and as read by the owner (M11 §8.1); it could be read 0.81.
+The model uses 0.84. With 0.81 the field would change by at most 0.030 mm (rms 0.004 mm) and the mass by −0.24 g.
+The readings 0.71 and 0.74 mm are kept and are reproduced by the field.
+
+**Measured against assumed.**
+
+| Item | Status | Source or assumption |
+|---|---|---|
+| The 20 values, five per edge | MEASURED (owner's sheet) | caliper of 0.01 mm resolution and an electronic caliper (M11 §8.1) |
+| Row → edge | OWNER_REPORTED | rows 1, 2, 3 = edges 1, 2, 3; row 4 = edge 4 (the owner wrote "3 левая" for the left edge; read as row 4, M11 §8.1) |
+| Mass 118.37 g, plan 301 × 300 mm | MEASURED (owner's sheet) | — |
+| Distance of a row from its edge | PARTLY RECORDED | the sheet sketch shows 4.5 mm on a vertical row and 6.5 mm on a horizontal row. **Assumed:** 4.5 mm for edges 2 and 4, 6.5 mm for edges 1 and 3 |
+| Position of each reading along its edge | **ASSUMED** | the centres of five equal segments: 30.1, 90.3, 150.5, 210.7, 270.9 mm along 301 mm; 30, 90, 150, 210, 270 mm along 300 mm. The sheet gives no positions |
+| Direction of each row | **ASSUMED** | one continuous circuit in the order of the row numbers 1 → 2 → 3 → 4: row 1 from the edge-4 end to the edge-2 end, row 2 from edge 1 to edge 3, row 3 from the edge-2 end to the edge-4 end, row 4 from edge 3 to edge 1. M11 §8 lists "the corner each row starts from" as open |
+| Edges on the FE model | CONVENTION_ONLY (placement D, owner's task text) | edge 2 (thin) at X = 0, edge 4 (thick) at X = 301, edge 1 at Y = 300, edge 3 at Y = 0 |
+| Interior thickness | **ASSUMED_MODEL_FORM** | the interpolation below; nothing is measured inside the plate |
+
+With the assumed circuit both low readings fall next to the thin edge 2: 0.71 at (30.1, 293.5) and 0.74 at
+(30.1, 6.5) mm. That is a consequence of the assumption, not a finding. With rows 1 and 3 read in the other direction
+they would lie next to the thick edge 4.
+
+### 19.2 The thickness field
+
+**Method, fixed before the solve and before any modal comparison** (`build_thickness_field.py`, declaration SHA-256
+`7f1bacbf…`): inverse-distance weighting (Shepard), power 2, over all 20 readings, evaluated at the 10 201 nodes and
+written as `*Nodal Thickness`.
+
+- It is deterministic and exact at every reading.
+- It is a convex combination of the readings, so it is bounded by the smallest and largest reading and positive.
+- It is smooth away from the reading positions.
+- Its single parameter is the classical value 2. No parameter, position, direction or reading was tuned.
+
+| Check | Result |
+|---|---|
+| Exact at the 20 readings | error 0.0 analytically; the nodal (bilinear) field at the 20 positions is within 0.00024 mm |
+| Bounded and positive | 0.7100–0.9400 mm at the nodes (readings 0.71–0.94 mm) |
+| Distribution | area mean 0.8805 mm, sd 0.043 mm; percentiles 5 / 25 / 50 / 75 / 95: 0.804 / 0.848 / 0.894 / 0.916 / 0.928 mm; value at the plate centre 0.882 mm |
+| Edge lines | means along the four reading lines 0.880 / 0.814 / 0.884 / 0.925 mm (edges 1 / 2 / 3 / 4); the archived edge means are 0.880 / 0.816 / 0.882 / 0.926 mm |
+| Smoothness | largest nodal gradient 0.0048 mm per mm (next to the 0.71 reading) |
+| Orientation | mean 0.814 mm for X < 10 and 0.925 mm for X > 291: thin edge at X = 0, thick edge at X = 301, as required |
+| **Integrated mass** | **119.109 g** with the unchanged density 1.498e-9 t/mm³ (`.dat` of the solve: 119.109 g; integral of the INP thickness: 119.109 g) |
+| **Against the record 118.37 g** | **+0.62 %** (+0.74 g). The uniform model has 118.361 g (−0.01 %), the wedge 117.684 g (−0.58 %). **Neither density nor thickness was adjusted** |
+| Centre of mass | X 154.26 mm, Y 149.80 mm (uniform: 150.50, 150.00) |
+
+The mass difference means that the field's mean thickness (0.8805 mm) and the density of the template (set from the
+mean of the 20 readings, 0.876 mm) are not exactly consistent. It is reported, not corrected.
+
+**What the assumptions change in the thickness (no solve, no modal quantity).**
+
+| Alternative | Largest change | rms change | Mass |
+|---|---|---|---|
+| Reading 0.81 instead of 0.84 | 0.030 mm | 0.004 mm | 118.87 g |
+| Power 1 / 3 / 4 instead of 2 | 0.071 / 0.030 / 0.046 mm | 0.019 / 0.008 / 0.013 mm | 118.78 / 119.41 / 119.63 g |
+| Row 2 or row 4 reversed | 0.03 mm | ≤ 0.006 mm | 119.11 g |
+| Row 3 reversed | 0.18 mm | 0.027 mm | 119.11 g |
+| Row 1 reversed | 0.23 mm | 0.034 mm | 119.11 g |
+| Rows 1 and 3 reversed | 0.23 mm | 0.044 mm | 119.11 g |
+
+The direction of rows 1 and 3 is the assumption that matters: it moves the two low readings to the other side of the
+plate. Its effect on the modes is **not known**: only the declared field was solved.
+
+The contour map with the measured values, their assumed positions and the assumed row directions is
+`fig_thickness_field.png` (§19.7).
+
+### 19.3 The model and its solve
+
+| Item | Result |
+|---|---|
+| INP | `CFRP_S4R_TFIELD20_FreeFree.inp` (`d688a272…`): the archived wedge INP with only the 10 201 thickness values, the job-name comment and the description comment replaced (checked line by line) |
+| Mesh | 10 201 nodes, 10 000 S4R, plan 301 × 300 mm: identical to the baseline (labels, connectivity, coordinates) |
+| Material, step, boundary conditions | density, elastic constants, Lanczos 20 modes, field output U: the same lines as the baseline; no boundary, spring, mass, constraint or load keyword (free-free) |
+| Only difference from the baseline | `*Nodal Thickness` and the `nodal thickness` option of the shell section |
+| Solver completion | `.sta`: THE ANALYSIS HAS COMPLETED SUCCESSFULLY (25-Nov-2026 00:28:51); `.dat` and `.msg`: 0 errors, 0 warnings, 0 negative-eigenvalue messages; six rigid-body modes at numerical zero (≤ 0.011 Hz); modes 7–20 positive |
+| Extraction integrity | 22 files; 20 modes; 10 201 nodes; manifest frequencies = `.dat` (difference 0); modes real; in-plane / U3 ≤ 2.9e-12; the INP nodes reproduce the extracted geometry to 1.5e-05 mm; ODB `ce07142c…` equal before and after |
+
+A first version of the INP was written with the thickness evaluated in the part frame instead of the assembly frame
+(the instance is translated). The mass check exposed it (114.4 g) before any solve; it was replaced and never run.
+The declaration was not changed.
+
+### 19.4 Frequencies and FE-to-FE branches of the three models
+
+Real MAC over all 10 201 nodes and three components, one-to-one assignment, as in §18.3. "Wedge" is the wedge with
+its thick side at edge 4 (§18, mirrored in X), the orientation of the field.
+
+| Baseline mode | Uniform, Hz | Wedge: mode, Hz | Field: mode, Hz | Field against uniform | Field against wedge | MAC field–uniform | MAC field–wedge |
+|---|---|---|---|---|---|---|---|
+| 7 | 19.07 | 7: 19.00 | 7: 19.47 | +2.10 % | +2.51 % | 0.997 | 1.000 |
+| 8 | 59.87 | 8: 59.39 | 8: 60.19 | +0.53 % | +1.35 % | 0.911 | 0.963 |
+| 9 | 62.01 | 9: 61.44 | 9: 63.33 | +2.13 % | +3.07 % | 0.920 | 0.961 |
+| 10 | 71.85 | 10: 71.43 | **11**: 74.08 | +3.11 % | +3.71 % | 0.984 | 0.985 |
+| 11 | 72.19 | 11: 72.10 | **10**: 73.29 | +1.52 % | +1.65 % | 0.973 | 0.983 |
+| 12 | 116.58 | 12: 115.93 | 12: 117.82 | +1.06 % | +1.63 % | 0.996 | 0.999 |
+| 13 | 167.49 | 14: 166.42 | 14: 169.16 | +1.00 % | +1.65 % | 0.995 | 0.997 |
+| 14 | 168.61 | 13: 164.12 | 13: 166.13 | −1.47 % | +1.22 % | **0.743** | 0.998 |
+| 15 | 174.80 | 15: 174.80 | 15: 177.73 | +1.68 % | +1.68 % | **0.843** | 0.966 |
+| 16 | 179.90 | 16: 180.49 | 16: 182.97 | +1.71 % | +1.37 % | **0.892** | 0.964 |
+| 17 | 213.20 | 17: 211.86 | 17: 214.94 | +0.82 % | +1.45 % | 0.959 | 0.963 |
+| 18 | 213.95 | 18: 213.10 | 18: 215.26 | +0.61 % | +1.01 % | 0.942 | 0.963 |
+| 19 | 295.78 | 19: 294.06 | 19: 297.30 | +0.51 % | +1.10 % | 0.988 | 0.999 |
+| 20 | 327.90 | — | — | — | — | 0.155 with field 20 | — |
+| (wedge 20) | — | 20: 318.18 | 20: 321.42 | — | +1.02 % | — | 0.997 |
+
+- **Field against wedge.** All 14 field modes track one wedge mode with MAC ≥ 0.96 and second-best ≤ 0.04; the two
+  sets span the same space. The field is the wedge plus local detail. Its frequencies are 1.0 % to 3.7 % higher, in
+  line with its larger mean thickness (0.8805 against 0.870 mm, +1.2 %) and its thicker right half.
+- **Field against uniform.** Frequencies +0.5 % to +3.1 %, one branch −1.5 %. Ten branches keep MAC ≥ 0.91. Baseline
+  10 / 11 and 13 / 14 exchange their order. Baseline 14, 15 and 16 are re-mixed (0.74–0.89), as with the wedge.
+  Baseline 20 is lost; field 20 is the edge mode of the wedge (97 % of its U3 energy in the thin half).
+- **Low pairs.** The field turns the FE 8 / 9 subspace by 9.1° and FE 10 / 11 by 6.9° against the uniform model
+  (wedge: 11.5° and 9.7°). Inside the 8 / 9 pair it mixes more than the wedge: off-diagonal MAC 0.07 against 0.01,
+  and the pair spacing grows from 3.6 % to 5.2 %.
+- **Close groups (3 % trigger) of the field:** FE 10 / 11 (1.1 %), 13 / 14 (1.8 %), 15 / 16 (2.95 %), 17 / 18
+  (0.15 %).
+
+Figure: `fig_shapes_three_models.png` (§19.7).
+
+### 19.5 Research FE / EXP MAC with the unchanged mapping
+
+Mapping, metric, levels and labels are exactly those of §17 and §18.4. The matrices of the uniform model and of both
+wedge orientations are reproduced with difference 0.0. [min–max] is the range over the same 59 declared geometry
+scenarios; no scenario is selected. 289 of 289 points are mapped in every case.
+
+**Nominal matrix, field of the 20 readings.**
+
+| EXP (Hz) | FE 7 | FE 8 | FE 9 | FE 10 | FE 11 | FE 12 | FE 13 | FE 14 | FE 15 | FE 16 | FE 17 | FE 18 | FE 19 | FE 20 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FE Hz | 19.5 | 60.2 | 63.3 | 73.3 | 74.1 | 117.8 | 166.1 | 169.2 | 177.7 | 183.0 | 214.9 | 215.3 | 297.3 | 321.4 |
+| 1 (18.63) | **0.93** | 0.00 | 0.01 | 0.00 | 0.15 | 0.00 | 0.01 | 0.00 | 0.32 | 0.15 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 2 (54.62) | 0.00 | **0.80** | 0.36 | 0.05 | 0.00 | 0.29 | 0.00 | 0.00 | 0.00 | 0.00 | 0.02 | 0.00 | 0.00 | 0.00 |
+| 3 (63.50) | 0.00 | 0.07 | 0.21 | **0.25** | 0.00 | 0.03 | 0.00 | 0.14 | 0.00 | 0.00 | 0.11 | 0.00 | 0.00 | 0.00 |
+| 4 (66.85) | 0.00 | 0.07 | 0.10 | **0.49** | 0.01 | 0.10 | 0.00 | 0.09 | 0.00 | 0.00 | 0.22 | 0.02 | 0.00 | 0.01 |
+| 5 (74.21) | 0.00 | 0.00 | 0.00 | 0.01 | **0.48** | 0.00 | 0.00 | 0.00 | 0.16 | 0.08 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 6 (112.27) | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | **0.49** | 0.00 | 0.00 | 0.00 | 0.00 | 0.25 | 0.01 | 0.00 | 0.00 |
+| 7 (145.94) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.96** | 0.00 | 0.08 | 0.04 | 0.01 | 0.34 | 0.12 | 0.00 |
+| 8 (157.85) | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.31 | **0.53** | 0.00 | 0.06 | 0.36 | 0.00 |
+| 9 (169.18) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.24** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 |
+| 10 (180.14) | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | **0.11** | 0.10 | 0.00 | 0.01 | 0.00 | 0.00 |
+| 11 (191.60) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.02 | 0.00 | 0.00 | 0.00 | 0.03 | **0.43** | 0.24 | 0.00 |
+
+**First-ranked FE mode of each model: FE mode, signed frequency error, MAC [min–max], label.**
+
+| EXP | Hz | Uniform | Wedge, thick at edge 4 | Field of the 20 readings |
+|---|---|---|---|---|
+| 1 | 18.63 | FE 7, +2.4 %, 0.91 [0.88–0.93], CANDIDATE_ONLY | FE 7, +2.0 %, 0.92 [0.90–0.94], CANDIDATE_ONLY | FE 7, +4.5 %, 0.93 [0.90–0.95], CANDIDATE_ONLY |
+| 2 | 54.62 | FE 9, +13.5 %, 0.60 [0.59–0.61], AMBIGUOUS_CLUSTER | FE 8, +8.7 %, 0.64 [0.62–0.65], AMBIGUOUS_CLUSTER | FE 8, +10.2 %, **0.80** [0.79–0.81], AMBIGUOUS_CLUSTER |
+| 3 | 63.50 | FE 20, +416 %, 0.31 [0.26–0.35], NO_CANDIDATE | FE 11, +13.6 %, 0.22 [0.21–0.23], NO_CANDIDATE | FE 10, +15.4 %, 0.25 [0.24–0.26], NO_CANDIDATE |
+| 4 | 66.85 | FE 11, +8.0 %, 0.55 [0.54–0.56], AMBIGUOUS_CLUSTER | FE 11, +7.9 %, 0.50 [0.48–0.52], AMBIGUOUS_CLUSTER | FE 10, +9.6 %, 0.49 [0.47–0.50], NO_CANDIDATE |
+| 5 | 74.21 | FE 10, −3.2 %, 0.48 [0.45–0.51], NO_CANDIDATE | FE 10, −3.8 %, 0.47 [0.44–0.50], NO_CANDIDATE | FE 11, −0.2 %, 0.48 [0.44–0.51], NO_CANDIDATE |
+| 6 | 112.27 | FE 12, +3.8 %, 0.52 [0.49–0.55], WEAK_CANDIDATE | FE 12, +3.3 %, 0.48 [0.44–0.51], NO_CANDIDATE | FE 12, +4.9 %, 0.49 [0.46–0.53], NO_CANDIDATE |
+| 7 | 145.94 | FE 14, +15.5 %, 0.79 [0.77–0.79], AMBIGUOUS_CLUSTER | FE 13, +12.5 %, 0.97 [0.95–0.97], AMBIGUOUS_CLUSTER | FE 13, +13.8 %, **0.96** [0.95–0.97], AMBIGUOUS_CLUSTER |
+| 8 | 157.85 | FE 16, +14.0 %, 0.43 [0.41–0.44], AMBIGUOUS_CLUSTER | FE 16, +14.3 %, 0.65 [0.62–0.66], AMBIGUOUS_CLUSTER | FE 16, +15.9 %, **0.53** [0.51–0.53], AMBIGUOUS_CLUSTER |
+| 9 | 169.18 | FE 13, −1.0 %, 0.26 [0.24–0.27], NO_CANDIDATE | FE 14, −1.6 %, 0.24 [0.22–0.26], NO_CANDIDATE | FE 14, −0.0 %, 0.24 [0.22–0.25], NO_CANDIDATE |
+| 10 | 180.14 | FE 15, −3.0 %, 0.15 [0.14–0.16], NO_CANDIDATE | FE 15, −3.0 %, 0.16 [0.14–0.17], NO_CANDIDATE | FE 15, −1.3 %, 0.11 [0.10–0.12], NO_CANDIDATE |
+| 11 | 191.60 | FE 18, +11.7 %, 0.54 [0.51–0.56], AMBIGUOUS_CLUSTER | FE 18, +11.2 %, 0.46 [0.42–0.49], NO_CANDIDATE | FE 18, +12.3 %, 0.43 [0.38–0.46], NO_CANDIDATE |
+
+The labels are the descriptive ones of §17.4; none is a pairing status. The mode numbers are those of each model
+(the field's FE 10 is the branch of baseline 11, §19.4). The wedge with its thick side at edge 2 is in §18.4; it is
+not the orientation of this field.
+
+**Two-mode subspaces and the span of all 14 shapes** (descriptive shares; a high share is not a confirmed cluster):
+
+| EXP | Two-mode subspace: uniform | Wedge | Field | All 14: uniform | Wedge | Field |
+|---|---|---|---|---|---|---|
+| 1 | FE 15 / 16: 0.48 | FE 15 / 16: 0.47 | FE 15 / 16: 0.47 | 0.97 | 0.98 | 0.98 |
+| 2 | FE 8 / 9: 0.97 | FE 8 / 9: 0.99 | FE 8 / 9: 0.99 | 1.00 | 1.00 | 1.00 |
+| 3 | FE 8 / 9: 0.35 | FE 8 / 9: 0.35 | FE 8 / 9: 0.34 | 0.84 | 0.73 | 0.74 |
+| 4 | FE 10 / 11: 0.55 | FE 10 / 11: 0.50 | FE 10 / 11: 0.50 | 0.92 | 0.84 | 0.84 |
+| 5 | FE 10 / 11: 0.48 | FE 10 / 11: 0.47 | FE 10 / 11: 0.49 | 0.68 | 0.69 | 0.71 |
+| 6 | FE 17 / 18: 0.20 | FE 17 / 18: 0.25 | FE 17 / 18: 0.26 | 1.00 | 1.00 | 1.00 |
+| 7 | FE 13 / 14: 0.79 | FE 13 / 14: 0.97 | FE 13 / 14: 0.97 | 0.99 | 0.99 | 0.99 |
+| 8 | FE 15 / 16: 0.92 | FE 15 / 16: 0.83 | FE 15 / 16: 0.84 | 0.98 | 0.98 | 0.98 |
+| 9 | FE 13 / 14: 0.26 | FE 13 / 14: 0.24 | FE 13 / 14: 0.24 | 0.48 | 0.26 | 0.26 |
+| 10 | FE 15 / 16: 0.25 | FE 15 / 16: 0.22 | FE 15 / 16: 0.22 | 0.67 | 0.67 | 0.67 |
+| 11 | FE 17 / 18: 0.55 | FE 17 / 18: 0.47 | FE 17 / 18: 0.46 | 0.99 | 0.99 | 0.99 |
+
+Figures: `fig_mac_three_models.png` and `fig_first_ranked_three_models.png` (§19.7).
+
+### 19.6 Does the field explain the low bending modes and records 7 and 8 better?
+
+| Quantity | Uniform | Wedge, thick at edge 4 | Field of the 20 readings |
+|---|---|---|---|
+| Mean first-ranked MAC, low bending records 2–6 | 0.494 | 0.463 | 0.503 |
+| Mean first-ranked MAC, records 7 and 8 | 0.607 | 0.811 | 0.745 |
+| Mean first-ranked MAC, all 11 records | 0.504 | 0.520 | 0.519 |
+| Records with MAC ≥ 0.80 | 1 | 1, 7 | 1, 2, 7 |
+| Records with MAC ≥ 0.50 | 1, 2, 4, 6, 7, 11 | 1, 2, 4, 7, 8 | 1, 2, 7, 8 |
+| Integrated mass against 118.37 g | −0.01 % | −0.58 % | +0.62 % |
+| Signed frequency error of the first-ranked mode, records 1 / 2 / 7 / 8 | +2.4 / +13.5 / +15.5 / +14.0 % | +2.0 / +8.7 / +12.5 / +14.3 % | +4.5 / +10.2 / +13.8 / +15.9 % |
+
+- **Low bending records: one of five.** Record 2 rises from 0.60 (uniform) and 0.64 (wedge) to 0.80 [0.79–0.81]
+  with FE 8. It lies on the 0.80 level, not above it; its frequency error is +10.2 %; its label stays
+  `AMBIGUOUS_CLUSTER` because it lies 0.99 in the FE 8 / 9 subspace. Records 3, 4, 5 and 6 change by −0.06 to −0.01
+  against the uniform model and by −0.01 to +0.03 against the wedge: **the field does not explain them**. Records 4
+  and 6 drop below 0.50.
+- **Record 7: as the wedge.** 0.96 [0.95–0.97] against 0.97; still `AMBIGUOUS_CLUSTER` (FE 13 / 14 are 1.8 % apart)
+  and +13.8 % in frequency.
+- **Record 8: better than uniform, worse than the wedge.** 0.53 against 0.43 and 0.65. It remains a mixture (0.84 in
+  FE 15 / 16).
+- **Other records.** Record 11 falls to 0.43 (uniform 0.54). Records 3, 5, 9 and 10 have no candidate in any model.
+- **Frequencies are not explained.** The field raises every frequency but one against the uniform model. The
+  first-ranked errors of the bending records stay at +10 % to +16 %, and record 1 moves from +2.4 % to +4.5 %.
+- **Overall** the field equals the wedge (mean 0.519 against 0.520). It trades record 8 and records 4, 6, 11
+  against record 2. No model is better on every record, and none is selected.
+- **Placement.** For the field the placements A and C differ from D by up to 0.57 in one cell, and B by 0.03: the
+  X orientation decides, the Y asymmetry of the readings matters little.
+
+**How far the record-2 result can be trusted.** The difference between the field and the wedge is the local detail
+at the two ends of the thin edge, where the assumed circuit puts the readings 0.71 and 0.74. The direction of rows 1
+and 3 is assumed, and reversing it changes the field there by up to 0.23 mm. Whether record 2 would still reach 0.80
+is not known, and it was not explored: one solve was authorised, and choosing a row direction by MAC is excluded.
+
+### 19.7 Remaining limitations for stiffness identification
+
+1. **The thickness field is assumed.** The interior is not measured. The positions along the edges and the row
+   directions are assumed; the low readings may sit on either side. Only a thickness map of the plate removes this.
+2. **The mass is not closed.** The field is 0.62 % above the weighed mass with the unchanged density. With a
+   non-uniform thickness, density and thickness can no longer both be taken from the template; nothing was adjusted.
+3. **The frequencies are off by +10 % to +16 %** for the bending candidates with the template constants, in all
+   three models. No thickness form examined here removes that, and no constant was fitted.
+4. **Candidates, not pairs.** Record 1 (twist; informs D66 only), record 7 (0.96, in a close FE group) and record 2
+   (0.80, on the level, dependent on an assumption). All three rest on a convention placement and an unverified
+   registration. Eight of eleven records stay at or below 0.53 with this field. This does not establish
+   identifiability of D11 or D22, and no estimate is attempted.
+5. **Model form still incomplete.** E1 ≠ E2 with traceable axes, the two-band suspension and the force sensor are
+   untested (§14).
+6. **Unchanged:** the blockers of §17.7, the registration facts of §16.3, D-044, SPEC §6 S4, M8 GATE NOT_MET and
+   D-077.
+
+### 19.8 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `bc0082bc…` and a clean tracked tree before the edit |
+| Source hashes | sheet photograph, baseline and wedge INP, the experiment, the nominal geometry, the R6 package, the wedge extraction (22 files) and the results of §17 and §18 equal their recorded hashes; unchanged after the run |
+| Measurement mapping | 20 of 20 values equal in the sheet, the transcription file and `plate_study`; every position, offset and direction listed as measured or assumed (§19.1) |
+| Interpolation validity | exact at the readings; bounded 0.71–0.94 mm; positive; the solved INP equals the declared field (difference 0.0) |
+| Mass | `.dat` = integral of the INP thickness (119.109 g); +0.62 % against the record; no adjustment |
+| Solver completion and extraction integrity | §19.3 |
+| Branch tracking | one-to-one; row and column maxima agree with the assignment in all three comparisons; the wedge tracking of §18.3 is reproduced to 8e-10; one lost branch reported, not re-paired by frequency |
+| Research MAC reproducibility | uniform = §17.3 and both wedge matrices = §18.4 with difference 0.0; identical shapes 1.0; scale and sign ≤ 2.2e-16; in-process repeat 2.8e-16; two complete runs give byte-identical `results.json` and CSV files |
+| Tests | `research/m11_r65`: 29 OK. `tests.test_plate_registration_readiness`, `tests.test_plate_rc1_owner_clarification`, `tests.test_plate_study`: 60 OK |
+
+The field, its assumptions and the model were fixed and hashed before the solve. The comparison metrics are those of
+§17 and §18. This is not an independent preregistration.
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_THICKNESS_FIELD_01` (outside git):
+
+- `build_thickness_field.py`, `thickness_field.json` (`a48fba73…`), `thickness_field.npz`;
+- `solve\` (INP, `.dat` `c7c65550…`, `.odb` `ce07142c…`, `.sta`, `.msg`, logs), `scripts\extract_odb.py`, `logs\`,
+  `extraction\`;
+- `run_thickness_field_compare.py`, `results.json` (`61947357…`), `shapes_u3.npz`, `mac_nominal_*.csv`,
+  `fe_fe_branches_tfield_vs_baseline.csv`;
+- `report.py`, `fig_thickness_field.png`, `fig_shapes_three_models.png`, `fig_mac_three_models.png`,
+  `fig_first_ranked_three_models.png`.
+
+Nothing is published in the repository except this section. No INP, ODB, solver file or extraction is committed.
 
 ## Not changed
 
