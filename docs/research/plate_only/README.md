@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -756,6 +756,218 @@ directory, outside git).
 
 The diagram with the two questions is `PLATE_0875_registration_remaining_decisions.png` in the same work directory.
 It is not published: it is a decision aid, not evidence.
+
+## 17. PLATE-0875-RESEARCH-MAC-01 — research FE / EXP MAC of 261027 and its geometry sensitivity (2026-11-24)
+
+**Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** It is an offline
+diagnostic comparison authorised by the owner. It is not a physical registration, not a governed comparison and not a
+mode pairing. No FrozenRegistration was created. No Abaqus, FE solve, LM, parameter fit or Auto-ID was run, and no
+material constant is released. The registration guard of the program (`mac_permitted` is False without a frozen
+registration) is unchanged and was not bypassed: the computation uses the separate research path of M11 R6.5
+(`research/m11_r65/cmac_research.py`). M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID
+BLOCKED are unchanged.
+
+**Owner decisions used (2026-11-24).** Scanned face: unmarked. FE placement: picture D, `CONVENTION_ONLY` (X towards
+edge 4, Y towards edge 1, Z towards the scanner). Nominal research mapping: the existing 261016 geometric
+reconstruction. The comparison does not wait for the 261027 `.svd`, and that file was not searched for again. A
+convention and a decision are not physical evidence; the verdict stays `PHYSICAL_REGISTRATION_NOT_VERIFIED`.
+
+### 17.1 Inputs and mapping
+
+| Input | Content | SHA-256 |
+|---|---|---|
+| Experiment 261027 | `…ROTATED_Polytec_261027.unv`, set `Polymax_bravo`: 11 fitted records, 289 points, U3 only, complex as stored. Record 1 (18.6307 Hz) kept | `76db80ae…` = recorded |
+| FE | `S4R_0875_BASELINE` extracted package (R6): `geometry.csv`, `manifest.json`, modes 7–20 (all 14 elastic modes of the package; FE 7 is the first elastic mode; rigid modes 1–6 excluded); `CFRP_S4R_0875_FreeFree.inp` for the connectivity | all 17 files = `research/m11_r65/expected_inputs.json` |
+| Nominal geometry | `plate_reconstruction_W301xH300.json` (261016, diagnostic) | `09be8b88…` = recorded |
+| Geometry alternatives | `…_ALT_BOTTOM.json` `1c3b2075…` = recorded; 261016 `.svd` copy `0a770b1b…` and POLYMAX UNV `117c893b…` = recorded; `plate_reconstruction_W300xH301.json` `1dfe211f…`, `plate_scan_px.json` `bd80b5b7…` and `reg02_checks.json` `0bb26277…` (derived files; hashes first recorded here) | as stated |
+
+- **Session 261016** enters as geometry only. None of its modes or frequencies is used.
+- **Point map.** id k ↔ id k, 289 of 289 (DERIVED, §14, §16.2). The experimental records are ordered by the
+  reconstruction's point ids; a missing, extra or duplicate id is refused.
+- **Positions.** The 261016 reconstructed positions of the same points on the 301 × 300 mm plate (window about
+  215.4 × 285.2 mm; gaps 56.4 / 29.2 / 7.0 / 7.8 mm to the left / right / bottom / top edge in the scanner view).
+- **Placement D.** Scan +x → FE +X, +y → +Y, +z → +Z.
+- **Metric.** Complex MAC |eᴴf|² / ((eᴴe)(fᴴf)) over the 289 measured U3 values, bilinear S4R interpolation of the
+  FE U3 field (primary) and nearest node (check). No phase is optimised per cell.
+
+### 17.2 Verification
+
+| Check | Result |
+|---|---|
+| Input identities | every input lies in a declared copy root (no original store is read) and equals its recorded SHA-256; three derived files had no earlier record (above) |
+| Originals and copies unchanged | size, mtime and SHA-256 of all 25 inputs equal before and after |
+| Handedness | scan frame right-handed (x right, y up, +Z to the scanner); the affine map scan → panel has determinant +0.98 (no mirror); D has determinant +1; the S4R node order gives +Z for all 10 000 elements |
+| Session link | id-preserving similarity 261016 → 261027: turn −44.19°, rms 0.68 mm, max 1.78 mm; a mirrored map does not fit (rms 121 mm) |
+| FE package | 10 201 nodes, flat, plan 301 × 300 mm; the INP nodes reproduce the extraction to 1.5e-05 mm; modes real; in-plane / U3 ≤ 1.7e-11 |
+| Mapping coverage | 289 of 289 points inside the mesh in all 64 geometries (the bilinear transfer refuses a point outside; no extrapolation). Smallest distance to a plate edge 1.01 mm (ALT_BOTTOM_EDGE); 2.41 mm in the declared range |
+| Interpolation validity | a linear field is reproduced on the real mesh at the real points to 1.6e-15; local coordinates within [−1, 1]; nearest node at most 2.11 mm away (3 mm mesh); bilinear against nearest-node MAC differ by at most 0.004 |
+| MAC implementation | identical shapes 1.0; orthogonal synthetic shapes 1.5e-34; scale, sign and global complex factor change the value by at most 3.3e-16 |
+| A–D on the homogeneous model | maximum difference against D 7.8e-08 (single-precision FE data), as in M11 §17.6. This is a property of the model, not evidence for D |
+| Reproducibility | two complete runs give byte-identical `results.json` and CSV files; an in-process repeat differs by at most 2.8e-16 |
+| Against the archive | the nominal matrix equals the PRIORITY-1 research matrix (`real_modal_matching_202610/RESULTS.md`, printed to two decimals) within 0.005 |
+| Real part against complex | real-normalised experimental shapes change a cell by at most 0.019 (MPC 0.90–1.00) |
+| Tests | `research/m11_r65`: 29 OK. `tests.test_plate_registration_readiness`, `tests.test_plate_rc1_owner_clarification`, `tests.test_plate_study`: 60 OK |
+
+The scenarios, alternatives, levels and labels were fixed in the script before its first run (protocol SHA-256
+`725223cc…`, local execution log). This is **not an independent preregistration**: the nominal matrix was already known
+from PRIORITY-1.
+
+### 17.3 Nominal research MAC, 11 × 14
+
+Bold marks the row maximum. It is descriptive, not a pairing.
+
+| EXP (Hz, MPC) | FE 7 | FE 8 | FE 9 | FE 10 | FE 11 | FE 12 | FE 13 | FE 14 | FE 15 | FE 16 | FE 17 | FE 18 | FE 19 | FE 20 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FE Hz | 19.1 | 59.9 | 62.0 | 71.8 | 72.2 | 116.6 | 167.5 | 168.6 | 174.8 | 179.9 | 213.2 | 213.9 | 295.8 | 327.9 |
+| 1 (18.63, 0.92) | **0.91** | 0.00 | 0.01 | 0.15 | 0.00 | 0.00 | 0.00 | 0.00 | 0.34 | 0.21 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 2 (54.62, 0.99) | 0.00 | 0.57 | **0.60** | 0.00 | 0.00 | 0.30 | 0.00 | 0.00 | 0.00 | 0.00 | 0.02 | 0.00 | 0.00 | 0.00 |
+| 3 (63.50, 0.93) | 0.00 | 0.19 | 0.09 | 0.00 | 0.26 | 0.02 | 0.13 | 0.00 | 0.00 | 0.00 | 0.11 | 0.00 | 0.00 | **0.31** |
+| 4 (66.85, 0.90) | 0.00 | 0.08 | 0.09 | 0.00 | **0.55** | 0.07 | 0.07 | 0.00 | 0.00 | 0.00 | 0.24 | 0.00 | 0.00 | 0.20 |
+| 5 (74.21, 0.99) | 0.00 | 0.00 | 0.00 | **0.48** | 0.00 | 0.00 | 0.00 | 0.00 | 0.14 | 0.09 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 6 (112.27, 1.00) | 0.00 | 0.00 | 0.01 | 0.00 | 0.00 | **0.52** | 0.00 | 0.00 | 0.00 | 0.00 | 0.20 | 0.00 | 0.00 | 0.00 |
+| 7 (145.94, 0.98) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.79** | 0.02 | 0.03 | 0.00 | 0.31 | 0.13 | 0.00 |
+| 8 (157.85, 0.96) | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.17 | 0.36 | **0.43** | 0.00 | 0.00 | 0.38 | 0.00 |
+| 9 (169.18, 0.99) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.26** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.18 |
+| 10 (180.14, 0.99) | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.15** | 0.13 | 0.00 | 0.01 | 0.00 | 0.00 |
+| 11 (191.60, 0.98) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | 0.01 | 0.00 | **0.54** | 0.15 | 0.00 |
+
+The heatmap is `fig_mac_nominal.png` in the work directory (§17.8). FE frequencies are metadata of the template
+constants (E 56 000, G12 5 000 MPa); they are not fitted.
+
+### 17.4 Candidate correspondences (not verified mode pairs)
+
+- **Signed error** is (f_FE − f_EXP) / f_EXP.
+- **[min–max]** is the range over the 59 declared scenarios of §17.5 (max − min; not a confidence interval).
+- **Two-mode subspace** is the share of the record in the span of the named FE pair; **all 14** is its share in the
+  span of FE 7–20 at the 289 points (a random shape gives about 14 / 289 = 0.05). Both are descriptive.
+- **Labels** use the existing levels 0.80, 0.50, the 15 % frequency window and the 3 % spacing trigger, descriptively
+  only. `CANDIDATE_ONLY`: MAC ≥ 0.80 inside the window, not ambiguous. `AMBIGUOUS_CLUSTER`: MAC ≥ 0.50 with a member of
+  a close FE group, or two FE modes ≥ 0.50, or a two-mode subspace ≥ 0.80. `WEAK_CANDIDATE`: 0.50–0.80 with one FE
+  mode. `NO_CANDIDATE`: below 0.50. No label is a pairing status.
+
+| EXP | Hz | First-ranked FE (Hz) | Signed error | MAC [min–max] | Second FE: MAC [min–max] | Two-mode subspace [min–max] | All 14 [min–max] | First rank unchanged | Label (unchanged in) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 18.6307 | FE 7 (19.07) | +2.37 % | 0.91 [0.88–0.93] | FE 15: 0.34 [0.30–0.37] | FE 15 / 16: 0.48 [0.42–0.52] | 0.97 [0.97–0.98] | 59 / 59 | CANDIDATE_ONLY (59 / 59) |
+| 2 | 54.6193 | FE 9 (62.01) | +13.53 % | 0.60 [0.59–0.61] | FE 8: 0.57 [0.55–0.58] | FE 8 / 9: 0.97 [0.96–0.98] | 1.00 [0.99–1.00] | 59 / 59 | AMBIGUOUS_CLUSTER (59 / 59) |
+| 3 | 63.4950 | FE 20 (327.90) | +416 %: outside the window | 0.31 [0.26–0.35] | FE 11: 0.26 [0.25–0.26]; it is the best inside the window (+13.69 %) | FE 8 / 9: 0.35 [0.33–0.36] | 0.84 [0.83–0.86] | 59 / 59 | NO_CANDIDATE (59 / 59) |
+| 4 | 66.8467 | FE 11 (72.19) | +7.99 % | 0.55 [0.54–0.56] | FE 17: 0.24 [0.21–0.27] | FE 10 / 11: 0.55 [0.54–0.56] | 0.92 [0.91–0.92] | 59 / 59 | AMBIGUOUS_CLUSTER (59 / 59) |
+| 5 | 74.2149 | FE 10 (71.85) | −3.19 % | 0.48 [0.45–0.51] | FE 15: 0.14 [0.09–0.19] | FE 10 / 11: 0.48 [0.46–0.51] | 0.68 [0.64–0.72] | 59 / 59 | NO_CANDIDATE (42 / 59; else AMBIGUOUS_CLUSTER) |
+| 6 | 112.2655 | FE 12 (116.58) | +3.84 % | 0.52 [0.49–0.55] | FE 17: 0.20 [0.13–0.28] | FE 17 / 18: 0.20 [0.14–0.29] | 1.00 [0.99–1.00] | 59 / 59 | WEAK_CANDIDATE (43 / 59; else NO_CANDIDATE) |
+| 7 | 145.9357 | FE 14 (168.61) | +15.54 %: outside the window | 0.79 [0.77–0.79] | FE 18: 0.31 [0.29–0.33] | FE 13 / 14: 0.79 [0.77–0.79] | 0.99 [0.99–0.99] | 59 / 59 | AMBIGUOUS_CLUSTER (59 / 59) |
+| 8 | 157.8508 | FE 16 (179.90) | +13.97 % | 0.43 [0.41–0.44] | FE 19: 0.38 [0.33–0.41] | FE 15 / 16: 0.92 [0.88–0.94] | 0.98 [0.97–0.98] | 58 / 59 (else FE 19) | AMBIGUOUS_CLUSTER (59 / 59) |
+| 9 | 169.1849 | FE 13 (167.49) | −1.00 % | 0.26 [0.24–0.27] | FE 20: 0.18 [0.11–0.27] | FE 13 / 14: 0.26 [0.24–0.28] | 0.48 [0.42–0.55] | 48 / 59 (else FE 20) | NO_CANDIDATE (59 / 59) |
+| 10 | 180.1363 | FE 15 (174.80) | −2.96 % | 0.15 [0.14–0.16] | FE 16: 0.13 [0.12–0.14] | FE 15 / 16: 0.25 [0.23–0.26] | 0.67 [0.58–0.77] | 59 / 59 | NO_CANDIDATE (59 / 59) |
+| 11 | 191.6019 | FE 18 (213.95) | +11.66 % | 0.54 [0.51–0.56] | FE 19: 0.15 [0.08–0.22] | FE 17 / 18: 0.55 [0.52–0.56] | 0.99 [0.99–0.99] | 59 / 59 | AMBIGUOUS_CLUSTER (59 / 59) |
+
+**Ambiguous and closely spaced modes.**
+
+- **Close FE groups (3 % trigger):** FE 10 / 11, 13 / 14, 15 / 16 and 17 / 18. FE 8 / 9 are 3.5 % apart and behave as
+  a near-degenerate pair (M11 §17.7, §6). In a balanced, uniform model the two shapes of such a pair are fixed only by
+  the model's exact symmetry; a small asymmetry of the real plate mixes or exchanges them.
+- **Experimental records:** none within 3 %; the closest are records 3 and 4 (5.3 %). The experimental AutoMAC has no
+  off-diagonal value above 0.04.
+- **FE AutoMAC on the 289 measured points:** largest off-diagonal value 0.45 (below 0.50). The scan window
+  distinguishes all 14 FE shapes; the incomplete, off-centre window is not what limits the comparison.
+- **No FE mode is first-ranked for two records.**
+- **Record 1 ↔ FE 7** is the only `CANDIDATE_ONLY` row: the twist shape, +2.37 %. It is a candidate, not a pair.
+- **Record 2** lies in the FE 8 / 9 pair (0.97) but in neither shape alone (0.57, 0.60). **Record 8** lies in FE 15 / 16
+  (0.92; single 0.43). These can only ever be cluster terms.
+- **Record 7** resembles FE 14 alone (0.79; FE 13 0.00), stays below 0.80 in every scenario, and is +15.5 % off.
+  Which of FE 13 / 14 carries this shape depends on E1 against E2 (they exchange, PRIORITY-1 §3).
+- **Records 3, 5, 9 and 10** have no FE shape above 0.50. Records 5, 9 and 10 lie only 0.68, 0.48 and 0.67 in the
+  span of all 14 FE shapes.
+
+### 17.5 Geometry sensitivity
+
+These are deterministic diagnostic scenarios. **They are not a validated uncertainty bound for 261027**, whose own
+scan window has no instrument record (§16.4). No scenario or alternative is selected, and none is preferred because
+its MAC is higher.
+
+- **Declared range (59 scenarios, as in M11 R6.4 / R6.5):** X and Y shifts of 0, ±1, ±2 and ±3 mm in every
+  combination, and ±0.874° about the grid centroid alone and with ±3 mm corner shifts.
+- **Separate documented alternatives (not merged into the range):**
+  - `ALT_BOTTOM_EDGE`: the competing bottom-edge image feature (M11 §17.5);
+  - `PLAN_W300xH301`: the M11 reconstruction with the plan sides exchanged; it contradicts the owner's X = 301 mm;
+  - `SCANNER_ANGLE_SHAPE`: the grid shape from the scanner angles, similarity-fitted to the nominal points
+    (M11 §15.4; reproduced: rms 1.32 mm, max 2.34 mm);
+  - `EDGES_SECOND_METHOD`: the axis-parallel plate edges of §16.2.
+- **Control (in no range):** `UNV_REPRESENTATION_CONTROL`, the near-square 261016 UNV grid fitted to the nominal
+  points. M11 §15.4 documents it as **not** a physical calibration (rms 15.04 mm, max 24.73 mm; reproduced).
+
+| Geometry | Point shift, rms / max | Points mapped | Max abs ΔMAC, any cell | Max abs ΔMAC, first-ranked cells | First rank changes |
+|---|---|---|---|---|---|
+| Shifts within ±1 mm (9) | ≤ 1.41 mm | 289 / 289 | 0.026 | 0.015 | none |
+| Shifts within ±3 mm (49) | ≤ 4.24 mm | 289 / 289 | 0.082 | 0.046 | record 9 |
+| ±0.874° alone and with ±3 mm (10) | ≤ 6.96 mm | 289 / 289 | 0.083 | 0.049 | records 8, 9 |
+| All 59 declared | ≤ 6.96 mm | 289 / 289 | 0.083 | 0.049 | records 8 (1 scenario), 9 (11 scenarios) |
+| ALT_BOTTOM_EDGE | 3.25 / 6.01 mm | 289 / 289 | 0.035 | 0.021 | none |
+| PLAN_W300xH301 | 0.82 / 1.33 mm | 289 / 289 | 0.016 | 0.010 | none |
+| SCANNER_ANGLE_SHAPE | 1.32 / 2.34 mm | 289 / 289 | 0.037 | 0.027 | none |
+| EDGES_SECOND_METHOD | 0.69 / 0.92 mm | 289 / 289 | 0.010 | 0.005 | none |
+| UNV_REPRESENTATION_CONTROL | 15.04 / 24.73 mm | 289 / 289 | 0.335 | 0.306 | records 2, 3, 8 |
+
+- **Nominal, minimum and maximum** of every first-ranked cell are in §17.4; the full minimum and maximum matrices are
+  in `results.json`. Over the declared range and the four alternatives together the first-ranked values span:
+  record 1 0.88–0.93, record 2 0.59–0.62, record 7 0.77–0.79.
+- **Largest ranges** are in weak off-candidate cells: record 9–FE 20 0.11–0.27, record 6–FE 17 0.13–0.28,
+  record 11–FE 19 0.08–0.22.
+- **Stability.** The first-ranked FE mode is the same in all 59 scenarios and all four alternatives for 9 of 11
+  records. It changes for record 8 (FE 16 / FE 19, both ≤ 0.44) and record 9 (FE 13 / FE 20, both ≤ 0.27). The label
+  changes only for records 5 and 6, whose values (0.48 and 0.52) lie on the 0.50 level.
+- **The control** changes the first-ranked cells by up to 0.31 in both directions: six go up (records 1, 5, 6, 9, 10,
+  11: 0.92, 0.74, 0.69, 0.57, 0.41, 0.62) and five go down (records 2, 3, 4, 7, 8: 0.42, 0.11, 0.52, 0.59, 0.30). A
+  higher MAC is not evidence for a geometry, and the control is not adopted. It shows only the size of the effect of
+  a centimetre-level error.
+
+### 17.6 Is the geometry a significant limitation?
+
+**Within millimetres: no. At the centimetre level: yes; and which of the two holds for 261027 is not verified.**
+
+- **Geometry.** A shift of ±1 mm moves a first-ranked value by at most 0.015, and ±3 mm with ±0.874° by at most
+  0.049. The four documented alternatives move it by at most 0.027. No such change brings a second record to 0.80,
+  takes record 1 below 0.80, or changes a first-ranked mode above 0.45. The descriptive picture of §17.4 therefore
+  does not depend on the 1–3 mm uncertainty of the 261016 reconstruction.
+- **What this rests on.** The 261027 positions are the 261016 ones only through the owner's "same points" and the
+  DERIVED id map. The 261016 grid shape is confirmed by the scanner angles; its offsets to the edges rest on one
+  image. If the true 261027 positions differed by centimetres, the comparison would change materially (the control).
+  Only the 261027 instrument record can exclude that. The scenarios do not.
+- **FE applicability (separate, and larger).** With the nominal mapping and in every scenario, only record 1 reaches
+  0.80. The other shortfalls (0.2–0.85 from unity) are 4 to 17 times the geometric range. They have the signature of
+  the model, not of the mapping:
+  - records 2, 4, 6, 7, 8 and 11 lie 0.92–1.00 in the span of the FE shapes but 0.43–0.79 in one shape: the measured
+    shapes are **mixtures** of FE shapes, mostly inside the near-degenerate pairs;
+  - the first-ranked frequencies are off by −3 % to +16 %, with no common sign or factor;
+  - the model is uniform (0.875 mm), balanced (E1 = E2) and free-free. The plate's edge thickness varies by 13 %, its
+    material axes are not evidenced, and the two-band suspension and the force sensor are not modelled (§12.3).
+- **Experimental limits (separate).** Records 5, 9 and 10 are only partly inside the FE basis (0.48–0.68). Whether
+  that is measurement noise, a local or suspension effect, or content the model lacks is not established.
+
+### 17.7 Remaining blockers for the effective-stiffness research
+
+1. **One candidate only.** Record 1 ↔ FE 7 is a twist shape: it informs D66 (G12; sensitivity 0.48) and almost not
+   D11 / D22 (0.02; PRIORITY-1 §5–§6). With it alone the estimation problem has rank 1. No candidate informs the
+   bending stiffness.
+2. **Bending records are mixtures in near-degenerate FE pairs.** They can enter only as confirmed cluster terms, and
+   only with an FE model whose pairs are split physically: the measured edge-thickness asymmetry, E1 ≠ E2 with
+   traceable axes, the two-band suspension and the force sensor (the prepared applicability jobs of §14; Abaqus,
+   separate HUMAN gate).
+3. **Physical registration not verified.** The 261027 scan window and metric geometry have no instrument record
+   (§16.4); the FE placement is a convention. Without a frozen registration there is no admissible MAC and no pair.
+   This section changes none of that.
+4. **Thickness.** The interior is not measured, so E and G cannot be separated from D (§13.3).
+5. **Unchanged governance.** SPEC §6 S4 central sensitivities, the setup repeat, D-044 (one plate), M8 GATE NOT_MET
+   and D-077 `NO_GLOBAL_PARAMETER_VALUE`.
+
+### 17.8 Files (work directory, outside git)
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_RESEARCH_MAC_01`:
+
+- `run_research_mac.py`, `protocol.json`, `execution_log.txt`;
+- `results.json` (`f8e2d80d…`): all matrices, checks and tables; `all_matrices.npz`: the 64 matrices;
+- `mac_nominal.csv`, `candidates.csv`, `geometry_sensitivity.csv`;
+- `report.py`, `fig_mac_nominal.png`, `fig_geometry_sensitivity.png`.
+
+Nothing is published in the repository except this section.
 
 ## Not changed
 
