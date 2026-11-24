@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -682,6 +682,80 @@ LM or Auto-ID was run. No material constant is released; every material paramete
 - **Scope of §1.** The study still uses no sandwich data.
 - **Next.** The physical registration and the experimental readiness of the existing plate: the open items of §12.6
   and §14 ([roadmap](../../auto_id/ROADMAP.md), owner priority).
+
+## 16. PLATE-0875-PHYSICAL-REGISTRATION-02 — the scanned face and the four remaining registration facts (2026-11-24)
+
+Research only, non-normative. No Abaqus, solver, FE computation, LM, Auto-ID or MAC was run. No orientation was chosen
+by MAC, frequency or shape. No FrozenRegistration was created, and none of the pictures A–D is selected. The verdict
+stays `PHYSICAL_REGISTRATION_NOT_VERIFIED`. Every original was only read; size and mtime are equal before and after.
+
+### 16.1 The owner's confirmation of the scanned face
+
+| Item | Content |
+|---|---|
+| Statement | The laser scanned the face without handwritten markings. The handwritten markings were on the rear face, opposite the laser |
+| By, date | the owner, 2026-11-24 |
+| Kind | OWNER_REPORTED physical evidence (variant U of the PLATE-0875-PHYSICAL-REGISTRATION-01 review image). A HUMAN record, not governed evidence |
+| Agrees with | the 261016 camera frame: the plate occludes the shaker body, and no numeral is visible (M11 §15.3). These supported the statement; they did not establish it |
+| The two bright dots | near the lower-left corner of the 261016 frame. They are no longer needed for the scanned face. Their physical nature is unknown |
+
+Consequences for 261027, through the owner's "same face, same points, 45° turn" of 2026-10-30 (§14):
+
+| Fact | Value | Provenance | State |
+|---|---|---|---|
+| `scanned_face` | unmarked | OWNER_REPORTED (2026-11-24) for 261016; carried to 261027 by the owner's "same face" (2026-10-30) | **established** |
+| `grid_plus_u_edge` | edge 1 | DERIVED: 261016 grid +u is up in the camera frame; edge 1 is at the top (owner, M11 §13.1); the ids keep it | established (unchanged) |
+| `grid_plus_v_edge` | edge 2 | DERIVED: 261016 grid +v points to the scanner's left; with the unmarked face towards the scanner that side is edge 2 | **established** |
+| `rotation_reference` | the 261016 position, turned 45° clockwise as viewed from the Polytec | DERIVED: the owner's 45°, the laboratory note and the id-preserving grid turn | established (unchanged) |
+| `scan_scale`, `measured_dof` | SI metres, distance 1.15 m; +Z of the scan frame | INSTRUMENT_RECORD | established (unchanged) |
+| `fe_x_along_edges` | edges 1 / 3 (301 mm) | HUMAN_CONFIRMED (M11 §13.1) | established (unchanged) |
+
+### 16.2 Checks made on the existing records
+
+Script and results: `research\PLATE_0875_PHYSICAL_REGISTRATION_01\reg02_checks.py`, `reg02_checks.json` (work
+directory, outside git).
+
+| Check | Result |
+|---|---|
+| Source identities | 261027 UNV `76db80ae…` and 261016 UNV `6d66eafe…` equal the recorded hashes; the 261016 `.svd` `0a770b1b…` equals M11 §17.2; the camera frame used here (`e2c42802…`, extracted from that `.svd`) is pixel-identical to the M11 frame `plate_frame_raw.png` |
+| Point map 261016 → 261027 | 289 of 289 ids common. An id-preserving similarity without a mirror fits with a turn of −44.19° (documented: −44.17°), scale 1.1186 and residual rms 0.68 mm, max 1.78 mm. A mirrored map does not fit (it collapses to scale 0.002). The turn is clockwise as viewed from the scanner. The scale is a ratio of two UNV representations, not a physical calibration |
+| Handedness of the scan frame | In the 261016 camera frame UNV +x maps to image right and +y to image up; the points lie at z = −1.0 m, so +Z points from the plate to the scanner. The frame is right-handed as the camera sees it. With +u up and +v to the scanner's left, u × v = +Z |
+| Edge numbering | Seen from the scanner with the unmarked face in front: edge 1 top, edge 3 bottom, edge 2 left (thin, mean 0.816 mm), edge 4 right (0.926 mm). This is the mirror of the owner's shaker-side sketch (M11 §14.1) |
+| Plate edges in the 261016 frame, second method | Median positions of the strongest profile step in 25 strips per edge: left 352.5, right 1243.5, top 66.5, bottom 960.5 px (recorded reconstruction: 352, 1244, 67, 960). With the recorded scan-point pixels and the v range of deviation 1, the gaps are 57.3 / 29.1 / 8.5 / 7.3 mm (left / right / top / bottom) against the recorded 56.4 / 29.2 / 7.8 / 7.0 mm: differences ≤ 0.9 mm, inside the 1–3 mm of M11 §15.4. **Same image, another detector: not an independent source** |
+
+### 16.3 The four remaining facts
+
+| Fact | What exists | Kind | State | What would close it |
+|---|---|---|---|---|
+| `scan_window_offsets_mm` | 261016: gaps to edge 2 / 4 / 1 / 3 = 56.4 / 29.19 / 7.78 / 7.02 mm (+v / −v / +u / −u). The assignment of each gap to a numbered edge now follows from §16.1. The values are the M11 diagnostic reconstruction: deviation 1 is confirmed by the scanner angles; deviations 2 and 3 rest on the image only (M11 §15.4); uncertain at 1–3 mm | DIAGNOSTIC (values); DERIVED (edge assignment) | **open** | the 261027 `.svd` (its own frame and alignment), or a PSV screenshot of the points over the video; or a SUPERVISOR decision to accept the 261016 reconstruction with its stated uncertainty. A decision is not evidence |
+| `scan_metric_geometry` | 261016: grid shape and scale confirmed by the scanner-angle record (aspect 0.7747 against 0.7553; rms 1.32 mm; M11 §15.4), window about 215.4 × 285.2 mm. 261027: no instrument record of the physical positions; the owner's "same points" carries the 261016 positions; the 261027 UNV grid (277.7 × 277.0 mm) is a representation | INSTRUMENT_RECORD for the 261016 shape; OWNER_REPORTED carry-over to 261027 | **open** | the same as above |
+| `fe_origin_corner` | none. The M11 model has no physical landmark; its origin is an artefact of the sketch (M11 §15.1); the owner does not know where the Abaqus axes lie (M11 §15) | not a physical fact | **open — CONVENTION required** | a declared placement recorded as `CONVENTION_ONLY`; or an FE variant that carries a measured asymmetry (the edge thicknesses 1–4), whose construction fixes the correspondence |
+| `fe_normal_face` | none; it follows from the placement: +Z leaves the marked face in A / B and the unmarked face in C / D (M11 §15.2) | not a physical fact | **open — CONVENTION required** | the same placement decision |
+
+**Coordinate convention against physical evidence.**
+
+- With the unmarked face towards the scanner, the experimental axes of the 261016 scan (x right, y up, z to the
+  scanner) in FE are −X +Y −Z (A), +X −Y −Z (B), −X −Y +Z (C) and +X +Y +Z (D). All four have determinant +1.
+- Nothing physical tells them apart: no photograph, scanner record or model file ties FE (0, 0) to a corner. Naming
+  one of them is a convention. It is not established by being named, and it is not selected here.
+- For the homogeneous, uniform M11 model the four are related by the model's own symmetries (M11 §15.1, §15.2), so a
+  comparison with this model does not depend on the choice. This is a property of the model, not evidence for a
+  placement.
+- A placement acquires a physical meaning only in a model that carries a measured asymmetry. Such a model must be
+  built in the declared convention.
+
+### 16.4 Exact remaining blockers
+
+1. **Scan window and metric geometry of 261027** (`scan_window_offsets_mm`, `scan_metric_geometry`): no instrument
+   record of 261027 is available. Needed: the file `300by300_plate_only_1mm_ROTATED_261027.svd` named by the PSV
+   export, or a PSV screenshot; otherwise a SUPERVISOR decision on the 261016 reconstruction (deviations 2 and 3).
+2. **FE placement** (`fe_origin_corner`, `fe_normal_face`): a SUPERVISOR convention, recorded as `CONVENTION_ONLY`.
+   Proposal only: D, where the FE axes equal the 261016 scan axes (X to edge 4, Y to edge 1, +Z to the scanner).
+3. Unchanged and outside this task: the physical-readiness items D1–D4 (suspension, force sensor, interior
+   thickness) and the setup repeat.
+
+The diagram with the two questions is `PLATE_0875_registration_remaining_decisions.png` in the same work directory.
+It is not published: it is a decision aid, not evidence.
 
 ## Not changed
 
