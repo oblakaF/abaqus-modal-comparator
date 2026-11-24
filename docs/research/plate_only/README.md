@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -968,6 +968,306 @@ its MAC is higher.
 - `report.py`, `fig_mac_nominal.png`, `fig_geometry_sensitivity.png`.
 
 Nothing is published in the repository except this section.
+
+## 18. PLATE-0875-FE-APPLICABILITY-01 — does the existing wedge-thickness model explain part of the shape discrepancy? (2026-11-25)
+
+**Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** The wedge is a
+**model-form sensitivity scenario**, not a measured interior thickness field. Nothing here is a mode pairing, a
+confirmed cluster, a physical registration or a parameter estimate. No material constant was changed, fitted or
+released. No FrozenRegistration was created; the program's registration guard is unchanged and was not bypassed (the
+research path of §17 is reused). M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED are
+unchanged.
+
+**Abaqus use (owner authorisation: at most one solve and one extraction).**
+
+| Action | Count | Detail |
+|---|---|---|
+| Abaqus solves | **0** | The archived `CFRP_S4R_WEDGE_FreeFree.odb` of 2026-10-20 exists and is complete, so the authorised solve was not used. It is not carried over to another task |
+| ODB extractions | **1** | Abaqus Python, pinned extractor `abaqus_scripts/extract_odb.py` (`039aa067…`, the one of R6 / R6.6 / R6.7), modes 1–20, on a verified work copy of the ODB; 2026-11-24 23:56:49, 5.3 s, exit 0; no retry |
+
+**Short answer.** The wedge explains a **part** of the shape discrepancy, and only in one group of modes
+(164–180 Hz, records 7 and 8). It does not explain the frequency errors and does not help the low bending records.
+Its effect has **opposite sign for the two orientations** of the wedge on the plate, so it cannot be used before the
+placement of the FE model on the plate is physical. Thickness asymmetry **warrants further investigation** (§18.6).
+
+### 18.1 Inputs and identities
+
+| Input | Content | SHA-256 |
+|---|---|---|
+| Wedge model | `CFRP_S4R_WEDGE_FreeFree.inp`, `.dat` | `dcb639f1…`, `d545876a…` = `plate_study.PLATE_FE_FAMILY` |
+| Wedge result | `.odb`, `.sta`, `.msg` of the archived run | `6f26bd19…`, `c41de675…`, `11b4ac74…` = `M11_SINGLE_CFRP_PLATE.json` |
+| Work copy of the ODB | the only file opened by Abaqus Python | `6f26bd19…`; the source copy and the work copy are unchanged after the extraction |
+| Baseline | the R6 package and INP of §17.1; `CFRP_S4R_0875_FreeFree.dat` `f4405925…` | = recorded |
+| Experiment and mapping | 261027 UNV `76db80ae…`; nominal geometry `09be8b88…` | = recorded (§17.1) |
+| Previous results | `PLATE_0875_RESEARCH_MAC_01\results.json` `f8e2d80d…` | = §17.8 |
+
+No original store was read. Every input lies in a declared copy root; size, mtime and SHA-256 of all 28 inputs are
+equal before and after.
+
+### 18.2 The wedge model against the baseline
+
+| Item | Baseline `S4R_0875_BASELINE` | Wedge `S4R_WEDGE` | Verdict |
+|---|---|---|---|
+| Mesh | 10 201 nodes, 10 000 S4R, plan 301 × 300 mm | the same labels, connectivity and coordinates (difference 0) | identical |
+| Material | ρ 1.498e-9 t/mm³; E1 = E2 = 56 000, G12 5 000 MPa, ν12 0.05 | the same line, character for character | **unchanged** |
+| Step | Lanczos, 20 modes, mass normalisation, field output U | the same | identical |
+| Boundary conditions | none (no `*Boundary`, spring, mass, constraint or load keyword) | none | free-free in both |
+| Section | `*Shell Section`, 0.875 mm, 5 points | `*Shell Section, nodal thickness`, 5 points | the only difference: one keyword, `*Nodal Thickness` |
+| Thickness | uniform 0.875 mm | exactly linear in X (deviation from a plane 6e-9 mm, no Y term): **0.93 mm at X = 0 to 0.81 mm at X = 301**; area mean 0.870 mm | as documented (M11 §2) |
+| Mass | 118.361 g (`.dat`; ρ·h·A from the INP: 118.361 g) | 117.684 g (`.dat`; integrated from the INP: 117.684 g) | wedge −0.57 % against the baseline and −0.58 % against the record 118.37 g |
+| Centre of mass, X | 150.50 mm | 147.04 mm (`.dat` and INP) | shifted to the thick side |
+| Solver completion | — | `.sta`: THE ANALYSIS HAS COMPLETED SUCCESSFULLY (20-Oct-2026 18:03:07); `.dat` and `.msg`: 0 errors, 0 warnings, 0 negative-eigenvalue messages; six rigid-body modes at numerical zero (≤ 0.009 Hz); modes 7–20 positive | complete |
+| Extraction integrity | — | 22 files; 20 modes; 10 201 nodes; format 2; the manifest frequencies equal the `.dat` (difference 0); modes real; in-plane / U3 ≤ 4.4e-12; the INP nodes reproduce the extracted geometry to 1.5e-05 mm | PASS |
+
+**Thickness definition against the record.** The wedge is built from the two extreme edge means only (M11 §2):
+
+- 5 mm from its edges it has 0.928 and 0.812 mm; the archived means of edges 4 and 2 are 0.926 and 0.816 mm;
+- along edges 1 and 3 it averages 0.870 mm; the archived means are 0.880 and 0.882 mm;
+- it does not contain the single low readings 0.71 and 0.74 mm near two corners, and nothing in the interior, which
+  is not measured (§12.2).
+
+**Orientation of the wedge on the plate.** The archived model is thick at FE X = 0. Under the declared placement D,
+FE X = 0 lies at edge 2, whose readings are the **thin** ones (0.816 mm), and X = 301 at edge 4 (0.926 mm). So the
+archived wedge under D has its gradient opposite to the edge readings. Two orientations were therefore declared
+before any FE / EXP value of this task was computed, and neither is selected by MAC:
+
+- `WEDGE_AS_ARCHIVED`: the model as solved, under D exactly as in §17 (thick at edge 2);
+- `WEDGE_MIRRORED_X`: the same solution reflected X → 301 − X (thick at edge 4, as the edge readings under D). The
+  reflection is an exact symmetry of the plan, the mesh and the axis-aligned material, so it equals the model with
+  the reversed gradient; no solve is needed. Checks: the baseline shapes are unchanged by it (MAC ≥ 1 − 7e-14); the
+  result equals the archived wedge under placements A and C to 7.2e-08.
+
+Which orientation agrees with the thickness record is read from that record and from the convention D. D itself is
+`CONVENTION_ONLY`, so this is not a physical statement about the plate.
+
+### 18.3 Baseline against wedge: frequencies and branches (FE to FE)
+
+Real MAC over all 10 201 nodes and three displacement components; one-to-one assignment (Hungarian), as in M11 R6.6.
+The table is the same for both orientations (difference 8e-10).
+
+| Baseline mode | Baseline, Hz | Wedge mode | Wedge, Hz | Change | FE-to-FE MAC | Second-best |
+|---|---|---|---|---|---|---|
+| 7 | 19.07 | 7 | 19.00 | −0.39 % | 0.998 | 0.002 |
+| 8 | 59.87 | 8 | 59.39 | −0.81 % | 0.978 | 0.008 |
+| 9 | 62.01 | 9 | 61.44 | −0.92 % | 0.968 | 0.017 |
+| 10 | 71.85 | 10 | 71.43 | −0.59 % | 0.999 | 0.001 |
+| 11 | 72.19 | 11 | 72.10 | −0.12 % | 0.972 | 0.024 |
+| 12 | 116.58 | 12 | 115.93 | −0.56 % | 0.997 | 0.003 |
+| 13 | 167.49 | **14** | 166.42 | −0.64 % | 0.998 | 0.000 |
+| 14 | 168.61 | **13** | 164.12 | −2.66 % | **0.744** | 0.148 |
+| 15 | 174.80 | 15 | 174.80 | +0.00 % | **0.815** | 0.151 |
+| 16 | 179.90 | 16 | 180.49 | +0.33 % | **0.797** | 0.104 |
+| 17 | 213.20 | 17 | 211.86 | −0.63 % | 0.997 | 0.002 |
+| 18 | 213.95 | 18 | 213.10 | −0.40 % | 0.974 | 0.020 |
+| 19 | 295.78 | 19 | 294.06 | −0.58 % | 0.991 | 0.008 |
+| 20 | 327.90 | — | — | — | 0.176 with wedge 20 | 0.001 |
+
+- **Frequencies.** Ten branches move by −0.1 % to −0.9 %, the size of the mean-thickness change (0.870 against
+  0.875 mm, −0.57 %). Baseline 15 and 16 move by 0.00 % and +0.33 %, and baseline 14 by −2.66 %. With the same
+  constants the wedge changes no tracked frequency by more than 3 %.
+- **Branches kept (MAC ≥ 0.97): 10 of 14.** Baseline 13 and 14 exchange their order.
+- **Branches changed: baseline 14, 15 and 16** (MAC 0.74–0.81). They are not lost: wedge modes 13, 15 and 16 lie
+  0.977–0.996 inside the span of baseline 13–16. The wedge re-mixes a three-mode group, not a single pair. Wedge 13
+  (164.1 Hz) carries 89 % of its U3 energy in the thin half of the plate.
+- **Branch lost: baseline 20.** It has no counterpart among wedge modes 7–20. Wedge 20 (318.2 Hz) is another mode,
+  96 % in the thin half, and lies only 0.18 in the span of the 14 baseline modes. It is reported as lost and is not
+  re-paired by frequency. The two 14-mode sets therefore do not span the same space.
+
+**Close modal subspaces.**
+
+| Group | Spacing, baseline / wedge | Principal angles between the two subspaces | Share of each wedge mode in the baseline group |
+|---|---|---|---|
+| FE 8 / 9 | 3.57 % / 3.45 % | 2.4°, 11.5° | 0.983, 0.975 |
+| FE 10 / 11 | 0.47 % / 0.94 % | 2.0°, 9.7° | 0.999, 0.972 |
+| FE 13 / 14 | 0.67 % / 1.40 % | 2.4°, 30.4° | 0.744, 0.998 |
+| FE 15 / 16 | 2.92 % / 3.26 % | 3.3°, 30.1° | 0.919, 0.829 |
+| FE 17 / 18 | 0.35 % / 0.59 % | 3.1°, 9.3° | 0.997, 0.974 |
+| FE 13–16 | — | 0.2°, 2.4°, 2.5°, 9.8° | 0.996, 0.998, 0.995, 0.977 |
+
+- The wedge widens every close pair except 8 / 9. It lifts FE 15 / 16 just above the 3 % trigger; FE 10 / 11,
+  13 / 14 and 17 / 18 stay close groups.
+- In the low pairs (8 / 9, 10 / 11) and in 17 / 18 the wedge turns the pair by about 10° and mixes almost nothing
+  inside it (off-diagonal MAC ≤ 0.02). The 13 % edge-thickness asymmetry therefore **does not re-mix the low
+  near-degenerate bending pairs** in which records 2 and 4 lie.
+
+Figures: `fig_shapes_baseline_vs_wedge.png` (the 14 shapes of both models) and `fig_fe_fe_tracking.png` (§18.7).
+
+### 18.4 Research FE / EXP MAC with the nominal mapping of §17
+
+Mapping, metric, levels and labels are exactly those of §17 (point id k ↔ k, the 261016 reconstruction, placement D,
+complex MAC over 289 U3 values, bilinear transfer). The baseline matrix of §17.3 is reproduced with difference 0.0,
+and its minimum matrix over the 59 scenarios also with 0.0. [min–max] is the range over the same 59 declared geometry
+scenarios; no scenario is selected. 289 of 289 points are mapped in every case.
+
+| EXP | Hz | Baseline: FE, signed error, MAC [min–max], label | Wedge as archived (thick at edge 2 under D) | Wedge mirrored in X (thick at edge 4 under D) |
+|---|---|---|---|---|
+| 1 | 18.63 | FE 7, +2.4 %, 0.91 [0.88–0.93], CANDIDATE_ONLY | FE 7, +2.0 %, 0.88 [0.85–0.91], CANDIDATE_ONLY | FE 7, +2.0 %, 0.92 [0.90–0.94], CANDIDATE_ONLY |
+| 2 | 54.62 | FE 9, +13.5 %, 0.60 [0.59–0.61], AMBIGUOUS_CLUSTER | FE 8, +8.7 %, 0.61 [0.60–0.62], AMBIGUOUS_CLUSTER | FE 8, +8.7 %, 0.64 [0.62–0.65], AMBIGUOUS_CLUSTER |
+| 3 | 63.50 | FE 20, +416 %, 0.31 [0.26–0.35], NO_CANDIDATE | FE 11, +13.6 %, 0.27 [0.26–0.27], NO_CANDIDATE | FE 11, +13.6 %, 0.22 [0.21–0.23], NO_CANDIDATE |
+| 4 | 66.85 | FE 11, +8.0 %, 0.55 [0.54–0.56], AMBIGUOUS_CLUSTER | FE 11, +7.9 %, 0.54 [0.53–0.55], AMBIGUOUS_CLUSTER | FE 11, +7.9 %, 0.50 [0.48–0.52], AMBIGUOUS_CLUSTER |
+| 5 | 74.21 | FE 10, −3.2 %, 0.48 [0.45–0.51], NO_CANDIDATE | FE 10, −3.8 %, 0.50 [0.47–0.52], NO_CANDIDATE | FE 10, −3.8 %, 0.47 [0.44–0.50], NO_CANDIDATE |
+| 6 | 112.27 | FE 12, +3.8 %, 0.52 [0.49–0.55], WEAK_CANDIDATE | FE 12, +3.3 %, 0.56 [0.53–0.58], WEAK_CANDIDATE | FE 12, +3.3 %, 0.48 [0.44–0.51], NO_CANDIDATE |
+| 7 | 145.94 | FE 14, +15.5 %, 0.79 [0.77–0.79], AMBIGUOUS_CLUSTER | FE 16, +23.7 %, **0.45** [0.42–0.49], NO_CANDIDATE | FE 13, +12.5 %, **0.97** [0.95–0.97], AMBIGUOUS_CLUSTER |
+| 8 | 157.85 | FE 16, +14.0 %, 0.43 [0.41–0.44], AMBIGUOUS_CLUSTER | FE 13, +4.0 %, 0.55 [0.53–0.55], AMBIGUOUS_CLUSTER | FE 16, +14.3 %, 0.65 [0.62–0.66], AMBIGUOUS_CLUSTER |
+| 9 | 169.18 | FE 13, −1.0 %, 0.26 [0.24–0.27], NO_CANDIDATE | FE 14, −1.6 %, 0.28 [0.26–0.29], NO_CANDIDATE | FE 14, −1.6 %, 0.24 [0.22–0.26], NO_CANDIDATE |
+| 10 | 180.14 | FE 15, −3.0 %, 0.15 [0.14–0.16], NO_CANDIDATE | FE 15, −3.0 %, 0.23 [0.22–0.24], NO_CANDIDATE | FE 15, −3.0 %, 0.16 [0.14–0.17], NO_CANDIDATE |
+| 11 | 191.60 | FE 18, +11.7 %, 0.54 [0.51–0.56], AMBIGUOUS_CLUSTER | FE 18, +11.2 %, 0.61 [0.59–0.61], AMBIGUOUS_CLUSTER | FE 18, +11.2 %, 0.46 [0.42–0.49], NO_CANDIDATE |
+
+The labels are the descriptive ones of §17.4; none is a pairing status. The mode numbers of the wedge are its own
+(wedge 13 is the changed branch of baseline 14, §18.3).
+
+**Nominal matrix, wedge as archived (placement D as declared).**
+
+| EXP (Hz) | FE 7 | FE 8 | FE 9 | FE 10 | FE 11 | FE 12 | FE 13 | FE 14 | FE 15 | FE 16 | FE 17 | FE 18 | FE 19 | FE 20 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FE Hz | 19.0 | 59.4 | 61.4 | 71.4 | 72.1 | 115.9 | 164.1 | 166.4 | 174.8 | 180.5 | 211.9 | 213.1 | 294.1 | 318.2 |
+| 1 (18.63) | **0.88** | 0.00 | 0.01 | 0.14 | 0.00 | 0.00 | 0.01 | 0.00 | 0.41 | 0.09 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 2 (54.62) | 0.00 | **0.61** | 0.50 | 0.00 | 0.03 | 0.29 | 0.00 | 0.00 | 0.00 | 0.00 | 0.02 | 0.00 | 0.00 | 0.00 |
+| 3 (63.50) | 0.00 | 0.21 | 0.07 | 0.00 | **0.27** | 0.02 | 0.00 | 0.11 | 0.00 | 0.00 | 0.12 | 0.00 | 0.00 | 0.01 |
+| 4 (66.85) | 0.00 | 0.04 | 0.17 | 0.00 | **0.54** | 0.05 | 0.00 | 0.06 | 0.00 | 0.00 | 0.25 | 0.00 | 0.00 | 0.00 |
+| 5 (74.21) | 0.00 | 0.00 | 0.00 | **0.50** | 0.00 | 0.00 | 0.00 | 0.00 | 0.15 | 0.04 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 6 (112.27) | 0.00 | 0.00 | 0.01 | 0.00 | 0.00 | **0.56** | 0.00 | 0.00 | 0.00 | 0.00 | 0.16 | 0.00 | 0.00 | 0.00 |
+| 7 (145.94) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.40 | 0.00 | 0.13 | **0.45** | 0.00 | 0.23 | 0.14 | 0.00 |
+| 8 (157.85) | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.55** | 0.00 | 0.04 | 0.27 | 0.00 | 0.01 | 0.39 | 0.00 |
+| 9 (169.18) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.28** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 10 (180.14) | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.23** | 0.05 | 0.00 | 0.01 | 0.00 | 0.00 |
+| 11 (191.60) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.02 | 0.00 | 0.00 | 0.02 | 0.00 | **0.61** | 0.08 | 0.00 |
+
+**Nominal matrix, wedge mirrored in X (thick side at edge 4 under D).** FE frequencies as above.
+
+| EXP (Hz) | FE 7 | FE 8 | FE 9 | FE 10 | FE 11 | FE 12 | FE 13 | FE 14 | FE 15 | FE 16 | FE 17 | FE 18 | FE 19 | FE 20 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 (18.63) | **0.92** | 0.00 | 0.01 | 0.15 | 0.00 | 0.00 | 0.01 | 0.01 | 0.39 | 0.08 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 2 (54.62) | 0.00 | **0.64** | 0.53 | 0.00 | 0.08 | 0.30 | 0.00 | 0.00 | 0.00 | 0.00 | 0.02 | 0.00 | 0.00 | 0.00 |
+| 3 (63.50) | 0.00 | 0.13 | 0.17 | 0.00 | **0.22** | 0.03 | 0.00 | 0.14 | 0.00 | 0.00 | 0.11 | 0.00 | 0.00 | 0.01 |
+| 4 (66.85) | 0.00 | 0.11 | 0.05 | 0.00 | **0.50** | 0.10 | 0.00 | 0.08 | 0.00 | 0.00 | 0.23 | 0.00 | 0.00 | 0.01 |
+| 5 (74.21) | 0.00 | 0.00 | 0.00 | **0.47** | 0.00 | 0.00 | 0.00 | 0.00 | 0.19 | 0.04 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 6 (112.27) | 0.00 | 0.00 | 0.01 | 0.00 | 0.01 | **0.48** | 0.00 | 0.00 | 0.00 | 0.00 | 0.25 | 0.00 | 0.00 | 0.00 |
+| 7 (145.94) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.97** | 0.00 | 0.05 | 0.07 | 0.00 | 0.35 | 0.12 | 0.00 |
+| 8 (157.85) | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.18 | **0.65** | 0.00 | 0.06 | 0.36 | 0.00 |
+| 9 (169.18) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.24** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 |
+| 10 (180.14) | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | **0.16** | 0.07 | 0.00 | 0.01 | 0.00 | 0.00 |
+| 11 (191.60) | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.02 | 0.00 | 0.00 | 0.00 | 0.00 | **0.46** | 0.23 | 0.00 |
+
+**Close subspaces and the span of all 14 shapes** (descriptive shares at the 289 points; a high share is **not** a
+confirmed cluster):
+
+| EXP | Best two-mode subspace: baseline | Wedge as archived | Wedge mirrored | All 14: baseline | As archived | Mirrored |
+|---|---|---|---|---|---|---|
+| 1 | FE 15 / 16: 0.48 | FE 15 / 16: 0.47 | FE 15 / 16: 0.47 | 0.97 | 0.96 | 0.98 |
+| 2 | FE 8 / 9: 0.97 | FE 8 / 9: 0.91 | FE 8 / 9: 0.99 | 1.00 | 1.00 | 1.00 |
+| 3 | FE 8 / 9: 0.35 | FE 8 / 9: 0.35 | FE 8 / 9: 0.35 | 0.84 | 0.72 | 0.73 |
+| 4 | FE 10 / 11: 0.55 | FE 10 / 11: 0.54 | FE 10 / 11: 0.50 | 0.92 | 0.83 | 0.84 |
+| 5 | FE 10 / 11: 0.48 | FE 10 / 11: 0.50 | FE 10 / 11: 0.47 | 0.68 | 0.67 | 0.69 |
+| 6 | FE 17 / 18: 0.20 | FE 17 / 18: 0.16 | FE 17 / 18: 0.25 | 1.00 | 1.00 | 1.00 |
+| 7 | FE 13 / 14: 0.79 | FE 15 / 16: 0.65 | FE 13 / 14: 0.97 | 0.99 | 0.99 | 0.99 |
+| 8 | FE 15 / 16: 0.92 | FE 13 / 14: 0.55 | FE 15 / 16: 0.83 | 0.98 | 0.98 | 0.98 |
+| 9 | FE 13 / 14: 0.26 | FE 13 / 14: 0.28 | FE 13 / 14: 0.24 | 0.48 | 0.29 | 0.26 |
+| 10 | FE 15 / 16: 0.25 | FE 15 / 16: 0.27 | FE 15 / 16: 0.22 | 0.67 | 0.68 | 0.67 |
+| 11 | FE 17 / 18: 0.55 | FE 17 / 18: 0.61 | FE 17 / 18: 0.47 | 0.99 | 0.99 | 0.99 |
+
+The lower "all 14" shares of records 3, 4 and 9 with the wedge come from the lost baseline mode 20 (§18.3): the wedge
+set no longer contains that shape. It is a change of the basis, not a worse model.
+
+Figures: `fig_mac_three_models.png` and `fig_first_ranked_three_models.png` (§18.7).
+
+### 18.5 Comparison with PLATE-0875-RESEARCH-MAC-01
+
+| Quantity | Baseline (§17) | Wedge as archived | Wedge mirrored in X |
+|---|---|---|---|
+| Records with a first-ranked MAC ≥ 0.80 | 1 (record 1) | 1 (record 1) | 2 (records 1 and 7) |
+| Records with a first-ranked MAC ≥ 0.50 | 6 | 6 | 5 |
+| Mean of the 11 first-ranked values | 0.504 | 0.498 | 0.520 |
+| Change of the first-ranked value, record 7 | — | −0.33 | +0.19 |
+| Change, record 8 | — | +0.12 | +0.22 |
+| Change, the other nine records | — | −0.04 to +0.08 | −0.09 to +0.04 |
+| First-ranked FE mode changes for records | — | 2, 3, 7, 8, 9 | 2, 3, 7, 9 |
+| Signed frequency error of the first-ranked mode, records 2, 4, 11 | +13.5 %, +8.0 %, +11.7 % | +8.7 %, +7.9 %, +11.2 % | the same as archived |
+| Largest change of any cell | — | 0.79 | 0.97 |
+
+- **Against the geometry range of §17.5** (0.049 on the first-ranked cells): the wedge moves records 7 and 8 by 2 to
+  7 times that range, and the other records by at most twice it. For modes 13–16 the model form matters more than
+  the millimetre geometry; for the rest it is of similar size.
+- **Record 7** (145.94 Hz). The measured shape resembles wedge 13, a Y-bending shape concentrated in the thin half:
+  0.97 [0.95–0.97] with the thick side at edge 4, and 0.45 with the thick side at edge 2. It is **one record and one
+  orientation**. Its label stays `AMBIGUOUS_CLUSTER` (wedge 13 / 14 are 1.4 % apart), and its frequency error stays
+  +12.5 %. It is a candidate, not a pair and not a confirmed cluster term.
+- **Record 8** rises to 0.55 or 0.65 and remains a mixture (two-mode share 0.83 with the mirrored wedge).
+- **Record 2.** The first-ranked mode changes from FE 9 to FE 8 only because the two values exchange their order
+  (0.57 / 0.60 → 0.61–0.64 / 0.50–0.53). The record still lies in the pair (0.91–0.99) and in neither shape
+  alone.
+- **Records 3, 5, 9 and 10** stay without a candidate in both orientations (≤ 0.50).
+- **Records 4, 6 and 11** fall by 0.04–0.08 with the mirrored wedge and change by −0.01 to +0.06 with the archived
+  one: the two orientations trade these records against record 7. Neither orientation improves every record.
+- **Placement.** With the uniform baseline the placements A–D agreed to 7.8e-08 (§17.2). With the wedge they split
+  into two classes, B = D (difference 4e-10) and A = C, which differ by up to 0.57 in one cell. A model with a
+  thickness gradient is the first one here for which the placement convention changes the result.
+
+### 18.6 Does thickness asymmetry warrant further investigation?
+
+**Yes, as a model-form question tied to the physical registration. Not as an explanation of the whole discrepancy,
+and not as a route to a parameter value.**
+
+What the existing wedge shows:
+
+1. **It is a first-order effect for one mode group.** A 13 % edge-to-edge gradient with unchanged constants re-mixes
+   baseline modes 14–16, replaces mode 20 and turns the 13 / 14 and 15 / 16 subspaces by 30°. A uniform model cannot
+   represent the shapes of records 7 and 8 between 146 and 158 Hz.
+2. **It does not explain the frequencies.** It moves no frequency by more than 3 %, and the first-ranked errors of
+   records 2, 4, 7, 8 and 11 remain +8 % to +14 %.
+3. **It does not explain the low bending records.** Records 2, 4 and 5 (55–74 Hz) change by at most 0.05. Whatever
+   mixes the FE 8 / 9 and 10 / 11 pairs in the experiment, this thickness gradient is not it. E1 ≠ E2, the two-band
+   suspension and the force sensor remain untested (§14).
+4. **Its sign depends on the orientation.** Record 7 is 0.97 with one orientation and 0.45 with the other. The
+   orientation that agrees with the edge readings under D gives the higher value. That is consistent with the
+   thickness record. It is **not** evidence for placement D, for the 261016 reconstruction or for the wedge as the
+   true thickness field. An added mass or stiffness on one side (sensor, suspension) could produce a similar
+   one-sided shape and is not modelled.
+5. **It is not the plate.** The wedge uses two edge means, ignores the interior and the low corner readings, and its
+   mass is 0.58 % below the record.
+
+What follows for the research (nothing below is started; each item needs its own authorisation):
+
+- **Measure the thickness inside the plate** (a map of 9 or more points, §10). This is the step with the highest
+  value: without it any thickness model is a scenario.
+- **Fix the FE placement physically before using a non-uniform model.** A thickness model built from the numbered
+  edge readings carries the plate's own asymmetry and fixes the correspondence by construction (§16.3). Until then
+  both orientations must be reported side by side, as here.
+- **Do not combine the candidates.** Record 1 informs D66 only (§17.7). Record 7 is a candidate with one orientation
+  of a scenario model, with a +12.5 % frequency error and an unverified registration. Two candidates of this kind do
+  not make the bending stiffness identifiable, and no estimate is attempted.
+- The blockers of §17.7 are unchanged.
+
+### 18.7 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `51d6b84f…` and a clean tracked tree before the edit |
+| Input hashes | all 28 inputs equal their recorded SHA-256 (§18.1); unchanged after the run |
+| Mass consistency | `.dat` mass = mass integrated from the INP thickness, for both models, to 1e-5 g; centre of mass reproduced (147.04 mm) |
+| Solver completion | archived run complete, no error, warning or negative eigenvalue (§18.2). No solve in this task |
+| Extraction integrity | exit 0; 22 files; frequencies = `.dat`; node set and geometry = baseline; real modes (§18.2) |
+| Branch tracking | assignment one-to-one; row and column maxima agree with it for all 14 rows; one lost branch and three changed branches reported, none re-paired by frequency |
+| Mirror | the node map is an involution over all 10 201 nodes; mirroring the field equals mirroring the points to 7.2e-08 |
+| Research MAC reproducibility | baseline = §17.3 with difference 0.0; identical shapes 1.0; scale, sign and complex factor ≤ 3.3e-16; in-process repeat 3.3e-16; two complete runs give byte-identical `results.json` and CSV files |
+| Tests | `research/m11_r65`: 29 OK. `tests.test_plate_registration_readiness`, `tests.test_plate_rc1_owner_clarification`, `tests.test_plate_study`: 60 OK |
+
+The models, both wedge orientations, the metrics and the rules were written into the script before its first run
+(`protocol.json`). Two checks were added after the first results were seen: the three-mode group FE 13–16 and the
+wedge under placements A–D. They add descriptions and change no reported MAC. This is not an independent
+preregistration.
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_FE_APPLICABILITY_01` (outside git):
+
+- `input\CFRP_S4R_WEDGE_FreeFree.odb` (verified copy), `scripts\extract_odb.py`, `logs\`, `extraction\` (manifest,
+  geometry, 20 modes);
+- `run_fe_applicability.py`, `protocol.json`, `results.json` (`1fd0965e…`), `shapes_u3.npz`;
+- `fe_fe_branches.csv`, `mac_nominal_BASELINE.csv`, `mac_nominal_WEDGE_AS_ARCHIVED.csv`,
+  `mac_nominal_WEDGE_MIRRORED_X.csv`;
+- `report.py`, `fig_shapes_baseline_vs_wedge.png`, `fig_fe_fe_tracking.png`, `fig_mac_three_models.png`,
+  `fig_first_ranked_three_models.png`.
+
+Nothing is published in the repository except this section. No ODB, solver file or extraction is committed.
 
 ## Not changed
 
